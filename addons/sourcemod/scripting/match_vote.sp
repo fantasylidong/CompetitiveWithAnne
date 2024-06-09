@@ -355,6 +355,9 @@ public void MatchVoteResultHandler(Handle vote, int num_votes, int num_clients, 
 				Format(sVotepass, sizeof(sVotepass), "%T", "VotePass_Loading", LANG_SERVER);
 
 				DisplayBuiltinVotePass(vote, sVotepass);
+				for(int j = 0; j < strlen(g_sCfg); j++){
+					g_sCfg[j] = CharToLower(g_sCfg[j]);
+				}
 				ServerCommand("sm_forcematch %s", g_sCfg);
 				return;
 			}
@@ -663,6 +666,9 @@ public void ChMatchVoteResultHandler(Handle vote, int num_votes, int num_clients
 				Format(sVotepass, sizeof(sVotepass), "%T", "VotePass_Changed", LANG_SERVER);
 
 				DisplayBuiltinVotePass(vote, sVotepass);
+				for(int j = 0; j < strlen(g_sCfg); j++){
+					g_sCfg[j] = CharToLower(g_sCfg[j]);
+				}
 				ServerCommand("sm_forcechangematch %s", g_sCfg);
 				return;
 			}
