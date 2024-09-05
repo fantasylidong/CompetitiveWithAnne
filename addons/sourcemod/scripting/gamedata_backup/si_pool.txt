@@ -1,0 +1,132 @@
+/*
+ * @Author: 我是派蒙啊
+ * @Last Modified by: 我是派蒙啊
+ * @Create Date: 2024-02-17 16:48:01
+ * @Last Modified time: 2024-04-03 10:29:06
+ * @Github: https://github.com/Paimon-Kawaii
+ */
+"Games"
+{
+    "left4dead2"
+    {
+        "Functions"
+        {
+            "L4D2::CBaseServer::ConnectClient"
+            {
+                "signature"     "CBaseServer::ConnectClient"
+                "callconv"      "thiscall"
+                "return"        "void"
+                "this"          "ignore"
+            }
+        }
+        "Addresses"
+        {
+            "NextBotCreatePlayerBot.jumptable"
+            {
+                "windows"
+                {
+                    "signature"    "CTerrorPlayer::ReplaceWithBot.jumptable"
+                    "offset"    "7"
+                }
+            }
+        }
+
+        "Signatures"
+        {
+            "CBaseServer::ConnectClient"
+            {
+                "library"        "engine"
+                "linux"        "@_ZN11CBaseServer13ConnectClientER8netadr_siiiPKcS3_S3_iR10CUtlVectorI22CLC_SplitPlayerConnect10CUtlMemoryIS5_iEEb"
+                "windows"    "\x55\x8B\xEC\x83\xEC\x10\x56\x68\x2A\x2A\x2A\x2A"
+                /* 55 8B EC 83 EC 10 56 68 ? ? ? ? */
+            }
+
+            "CTerrorPlayer::ReplaceWithBot.jumptable"
+            {
+                "library" "server"
+                // Switch jump with a bunch of cases matching...
+                // PUSH rel32
+                // CALL rel32
+                // JUMP rel8
+                // There are acutally 2 matches of this in the windows binary, 
+                // but they appear to be the same functionality--so it doesn't matter which we get.
+                /* FF 24 85 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 ? ? ? ? EB ? 68 ? ? ? ? E8 */
+                "windows" "\xFF\x24\x85\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\xEB\x2A\x68\x2A\x2A\x2A\x2A\xE8"
+            }
+            
+            "NextBotCreatePlayerBot<Hunter>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI6HunterEPT_PKc"
+            }
+            
+            "NextBotCreatePlayerBot<Jockey>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI6JockeyEPT_PKc"
+            }
+            "NextBotCreatePlayerBot<Spitter>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI7SpitterEPT_PKc"
+            }
+            "NextBotCreatePlayerBot<Charger>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI7ChargerEPT_PKc"
+            }
+            "NextBotCreatePlayerBot<Smoker>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI6SmokerEPT_PKc"
+            }
+            "NextBotCreatePlayerBot<Boomer>"
+            {
+                "library"    "server"
+                "linux"        "@_Z22NextBotCreatePlayerBotI6BoomerEPT_PKc"
+            }
+            
+            /*
+             * CTerrorPlayer::SetClass(CBaseEntity *, int)
+             */
+            "CTerrorPlayer::SetClass"
+            {
+                "library"    "server"
+                "linux"        "@_ZN13CTerrorPlayer8SetClassE15ZombieClassType"
+                "windows"    "\x55\x8B\x2A\x56\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x83\x2A\x2A\x0F\x85\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x40\xA3"
+                /* 55 8B ? 56 8B ? E8 ? ? ? ? 83 ? ? 0F 85 ? ? ? ? A1 ? ? ? ? 40 A3 */ // Updated by SilverShot.
+                /* Search "weapon_smoker_claw" */
+            }
+
+            /*
+             * CBaseAbility::CreateForPlayer(CBaseAbility *this, CTerrorPlayer *)
+             */
+            "CBaseAbility::CreateForPlayer"
+            {
+                "library"    "server"
+                "linux"        "@_ZN12CBaseAbility15CreateForPlayerEP13CTerrorPlayer"
+                "windows"    "\x55\x8B\x2A\x83\x2A\x2A\x56\x8B\x2A\x2A\x85\x2A\x0F\x84\x2A\x2A\x2A\x2A\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x83"
+                /* 55 8B ? 83 ? ? 56 8B ? ? 85 ? 0F 84 ? ? ? ? 8B ? E8 ? ? ? ? 83 */ // Updated by SilverShot.
+                /* Search "ability_tongue" */
+            }
+            
+            /* CCSPlayer::State_Transition(CSPlayerState) */
+            "CCSPlayer::State_Transition"
+            {
+                "library"    "server"
+                "linux"        "@_ZN9CCSPlayer16State_TransitionE13CSPlayerState"
+                "windows"    "\x55\x8B\xEC\x56\x8B\xF1\x8B\x86\x2A\x2A\x2A\x2A\x57\x8B\x7D\x2A\x85\xC0\x74\x2A\x83"
+                /* 55 8B EC 56 8B F1 8B 86 ? ? ? ? 57 8B 7D ? 85 C0 74 ? 83 */
+            }
+            
+            /* CTerrorPlayer::RoundRespawn */
+            "CTerrorPlayer::RoundRespawn"
+            {
+                "library"    "server"
+                "linux"        "@_ZN13CTerrorPlayer12RoundRespawnEv"
+                "windows"    "\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75"
+                /* 56 8B F1 E8 ? ? ? ? E8 ? ? ? ? 84 C0 75    */
+            }
+        }
+    }
+}
