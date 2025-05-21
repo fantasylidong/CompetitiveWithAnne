@@ -30,7 +30,7 @@ jobs:
         sm_version:
           #- "1.9"
           #- "1.10"
-          - "1.11"
+          #- "1.11"
           - "1.12"
           - "1.13"
 
@@ -47,9 +47,20 @@ jobs:
 
       - name: Compile plugins
         run: |
+          errors=0
           for file in *.sp
           do
             echo -e "\nCompiling $file..."
-            spcomp -E -w234 -w217 -O2 -v2 -i $SCRIPTS_PATH/include $file
+            spcomp -E -w234 -w217 -O2 -v2 -i $SCRIPTS_PATH/include $file || {
+              errors=$((errors + 1))
+              continue
+            }
           done
+          if [ "$errors" -gt 0 ]; then
+            echo -e "\n$errors plugin(s) failed to compile."
+            exit 1
+          else
+            echo -e "\nAll plugins compiled successfully."
+            exit 0
+          fi
         working-directory: ${{ env.SCRIPTS_PATH }}/

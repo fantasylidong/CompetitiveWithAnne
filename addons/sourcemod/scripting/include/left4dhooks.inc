@@ -18,7 +18,7 @@
  * Copyright (C) 2017 "Accelerator74"
  *
  * Left 4 DHooks Direct SourceMod plugin
- * Copyright (C) 2024 "SilverShot" / "Silvers"
+ * Copyright (C) 2025 "SilverShot" / "Silvers"
  *
  * =============================================================================
  *
@@ -65,9 +65,9 @@
 // L4D2 = 61 [left4downtown] + 59 [l4d_direct] + 31 [l4d2addresses] + 118 [silvers - mine!] + 4 [anim] = 273
 // Methods and Natives by "Forgetest": 53 [PlayerAnimState] + 22 [Ammo_t] + 15 [AmmoDef] = 90
 
-// Forwards: 224 (including 5 for L4D1 only)
+// Forwards: 230 (including 5 for L4D1 only)
 // L4D1 = 149
-// L4D2 = 219
+// L4D2 = 225
 
 // Stocks: 169 (L4D1 = 114, L4D2 = 167)
 // left4dhooks_silver			46 stocks	(L4D1 = 39,		L4D2 = 53)
@@ -390,6 +390,7 @@ public void __pl_l4dh_SetNTVOptional()
 	MarkNativeAsOptional("L4D_State_Transition");
 	MarkNativeAsOptional("L4D_RegisterForbiddenTarget");
 	MarkNativeAsOptional("L4D_UnRegisterForbiddenTarget");
+	MarkNativeAsOptional("L4D_IsEntitySaveable");
 	MarkNativeAsOptional("L4D2_CTerrorPlayer_OnHitByVomitJar");
 	MarkNativeAsOptional("L4D2_Infected_OnHitByVomitJar");
 	MarkNativeAsOptional("L4D2_CTerrorPlayer_Fling");
@@ -843,7 +844,7 @@ enum WeaponType
 	WEAPONTYPE_UNKNOWN
 };
 
-stock static const char g_sWeaponTypes[WeaponType][16] =
+stock const char g_sWeaponTypes[WeaponType][16] =
 {
 	"pistol",
 	"smg",
@@ -2349,7 +2350,7 @@ forward void L4D_OnCThrowActivate_PostHandled(int ability);
 
 /**
  * @brief Called when CBaseAnimating::SelectWeightedSequence(int Activity) is invoked with tank attack activity
- * @remarks Called whenever a tank uses his primary (punch) or secondary (throw) attack (uses ACT_* activity numbers)
+ * @remarks Called whenever a tank uses their primary (punch) or secondary (throw) attack (uses ACT_* activity numbers)
  *
  * This detour uses activity sequence numbers
  *
@@ -2374,7 +2375,7 @@ forward Action L4D2_OnSelectTankAttackPre(int client, int &sequence);
 
 /**
  * @brief Called when CBaseAnimating::SelectWeightedSequence(int Activity) is invoked with tank attack activity
- * @remarks Called whenever a tank uses his primary (punch) or secondary (throw) attack (uses m_nSequence animation numbers)
+ * @remarks Called whenever a tank uses their primary (punch) or secondary (throw) attack (uses m_nSequence animation numbers)
  *
  * This detour uses models m_nSequence numbers
  *
@@ -2395,7 +2396,7 @@ forward Action L4D2_OnSelectTankAttack(int client, int &sequence);
 
 /**
  * @brief Called whenever CTerrorMeleeWeapon::StartMeleeSwing(CTerrorPlayer *, bool) is invoked
- * @remarks Called when a player uses his melee weapons primary attack. This is before the game
+ * @remarks Called when a player uses their melee weapons primary attack. This is before the game
  *			reads the melee weapon data (model etc) and decides if he CAN attack at all
  *
  * @return			Plugin_Handled to block, Plugin_Continue otherwise
@@ -2405,7 +2406,7 @@ forward Action L4D_OnStartMeleeSwing(int client, bool boolean);
 
 /**
  * @brief Called whenever CTerrorMeleeWeapon::StartMeleeSwing(CTerrorPlayer *, bool) is invoked
- * @remarks Called when a player uses his melee weapons primary attack. This is before the game
+ * @remarks Called when a player uses their melee weapons primary attack. This is before the game
  *			reads the melee weapon data (model etc) and decides if he CAN attack at all
  * @remarks This forward will not trigger if the relative pre-hook forward has been blocked with Plugin_Handled
  *
@@ -2416,7 +2417,7 @@ forward void L4D_OnStartMeleeSwing_Post(int client, bool boolean);
 
 /**
  * @brief Called whenever CTerrorMeleeWeapon::StartMeleeSwing(CTerrorPlayer *, bool) is invoked
- * @remarks Called when a player uses his melee weapons primary attack. This is before the game
+ * @remarks Called when a player uses their melee weapons primary attack. This is before the game
  *			reads the melee weapon data (model etc) and decides if he CAN attack at all
  * @remarks This forward will ONLY trigger if the relative pre-hook forward has been blocked with Plugin_Handled
  *
@@ -2483,7 +2484,8 @@ forward Action L4D2_OnSendInRescueVehicle();
 /**
  * @brief Called whenever CDirector::CreateRescuableSurvivors is invoked
  * @remarks Called when the director is attempting to find survivors to respawn in rescue closets
- * @remarks The value for every client in the "players" array will be set to 1, change this value to 0 to prevent their ghost appearing in rescue closets
+ * @remarks The value for every client in the "players" array will be set to 0, change this value to 1 to prevent their ghost appearing in rescue closets
+ * @remarks This is called every frame, so don't add complicated expensive logic within here
  *
  * @return			Plugin_Changed to modify who is allowed to spawn, Plugin_Continue otherwise
  */
@@ -4209,6 +4211,180 @@ forward void L4D_OnGameModeChange(int gamemode);
 forward void L4D_OnServerHibernationUpdate(bool hibernating);
 
 /**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and is about to save the entities in the saferoom
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if Director::AreHumanZombiesAllowed() returns true, which refers to the versus gamemode, or this entity name is "info_solo_changelevel"
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * @param Kv				A KeyValue pointer Address. Null_Address will be returned if the pointer is null
+ * 
+ * @return					Plugin_Handled to prevent saving entities, Plugin_Continue otherwise
+*/
+// L4D1 only
+forward Action L4D1_OnSavingEntities(int info_changelevel, Address Kv);
+
+/**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and is about to save the entities in the saferoom (usually props or items brought into the saferoom.)
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if CTerrorGameRules::HasPlayerControlledZombies() returns true, which refers to the versus/scavenge related pvp gamemode
+ * @remarks This forward will not trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * @param Kv				A KeyValue pointer Address. Null_Address will be returned if the pointer is null
+ * 
+ * @noreturn
+*/
+// L4D1 only
+forward void L4D1_OnSavingEntities_Post(int info_changelevel, Address Kv);
+
+/**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and is about to save the entities in the saferoom
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if CTerrorGameRules::HasPlayerControlledZombies() returns true, which refers to the versus/scavenge related pvp gamemode
+ * @remarks This forward will ONLY trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * @param Kv				A KeyValue pointer Address. Null_Address will be returned if the pointer is null
+ * 
+ * @noreturn
+*/
+// L4D1 only
+forward void L4D1_OnSavingEntities_PostHandled(int info_changelevel, Address Kv);
+
+/**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and is about to save the entities in the saferoom (usually props or items brought into the saferoom.)
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if CTerrorGameRules::HasPlayerControlledZombies() returns true, which refers to the versus/scavenge related pvp gamemode
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * 
+ * @return					Plugin_Handled to prevent saving entities, Plugin_Continue otherwise
+*/
+// L4D2 only
+forward Action L4D2_OnSavingEntities(int info_changelevel);
+
+/**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and the game has finished saving the entities in the saferoom
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if CTerrorGameRules::HasPlayerControlledZombies() returns true, which refers to the versus/scavenge related pvp gamemode
+ * @remarks This forward will not trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnSavingEntities_Post(int info_changelevel);
+
+/**
+ * @brief Called whenever InfoChangelevel::SaveEntities() is invoked
+ * @brief Called when a map has been finished, and the game has finished saving the entities in the saferoom
+ * @remarks Called before the event "map_transition"
+ * @remarks Won't be called if CTerrorGameRules::HasPlayerControlledZombies() returns true, which refers to the versus/scavenge related pvp gamemode
+ * @remarks This forward will ONLY trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param info_changelevel	The entity index of "info_changelevel"
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnSavingEntities_PostHandled(int info_changelevel);
+
+/**
+ * Internally, game uses keyvalues structure to save survivors' data for the level-transitioning,
+ * and stores these keyvalues into an array.
+ * After we have transitioned to the next map, we restore the data from the keyvalues array.
+ * 
+ * To retrieve the keyvalues before these functions below calling,
+ * you may need to access the memory from the internal global array g_SavedPlayers or g_SavedSurvivorBots etc.
+ * 
+ * To see the keys and their values, see PlayerSaveData::PlayerSaveData().
+*/
+
+/**
+ * @brief Called whenever CTerrorPlayer::TransitionRestore is invoked.
+ * @remarks This will only be called for human players after the level-transitioning. For bots, See L4D2_OnRestoreTransitionedSurvivorBots.
+ * @remarks This will be called for every survivors including bots once the level failed and restarted.
+ * 
+ * @param client		Client index
+ * 
+ * @return				Plugin_Handled to block this player from restoring their level-transitioned data, others otherwise.
+*/
+// L4D2 only
+forward Action L4D2_OnTransitionRestore(int client);
+
+/**
+ * @brief Called after CTerrorPlayer::TransitionRestore is invoked.
+ * @remarks This will only be called for human players after the level-transitioning. For bots, See L4D2_OnRestoreTransitionedSurvivorBots.
+ * @remarks This will be called for every survivors including bots once the level failed and restarted.
+ * @remarks This forward will not trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param client		Client index
+ * @param pkv			Address of the keyvalues pointer.
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnTransitionRestore_Post(int client, Address pkv);
+
+/**
+ * @brief Called after CTerrorPlayer::TransitionRestore is invoked.
+ * @remarks This will only be called for human players after the level-transitioning. For bots, See L4D2_OnRestoreTransitionedSurvivorBots.
+ * @remarks This will be called for every survivors including bots once the level failed and restarted.
+ * @remarks This forward will ONLY trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @param client		Client index
+ * @param pkv			Address of the keyvalues pointer.
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnTransitionRestore_PostHandled(int client, Address pkv);
+
+/**
+ * @brief Called after RestoreTransitionedSurvivorBots is invoked. Called BEFORE bots create.
+ * 
+ * @remarks This will only be called once after the level-transitioning and will not be called once the level failed.
+ * @remarks Blocking this function will result the bot not being spawned after transitioned to next map.
+ * @remarks For human players, See L4D2_OnTransitionRestore.
+ * 
+ * @param botIndex		Bot index
+ * 
+ * @return				Plugin_Handled to block this bot from being created, others otherwise.
+*/
+// L4D2 only
+forward Action L4D2_OnRestoreTransitionedSurvivorBots();
+
+/**
+ * @brief Called after RestoreTransitionedSurvivorBots is invoked. Called AFTER bots have created.
+ * 
+ * @remarks This will only be called once after the level-transitioning and will not be called once the level failed.
+ * @remarks For human players, See L4D2_OnTransitionRestore.
+ * @remarks This forward will ONLY trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnRestoreTransitionedSurvivorBots_Post();
+
+/**
+ * @brief Called after RestoreTransitionedSurvivorBots is invoked. Called AFTER bots have created.
+ * 
+ * @remarks This will only be called once after the level-transitioning and will not be called once the level failed.
+ * @remarks For human players, See L4D2_OnTransitionRestore.
+ * @remarks This forward will not trigger if the relative pre-hook forward has been blocked with Plugin_Handled
+ * 
+ * @noreturn
+*/
+// L4D2 only
+forward void L4D2_OnRestoreTransitionedSurvivorBots_PostHandled();
+
+/**
  * @brief Called when the client's material system is expecting instructions from the server in regards to addons
  * @remarks Doesn't fire if l4d2_addons_eclipse is -1 or 0
  *
@@ -5601,6 +5777,17 @@ native void L4D_GetLobbyReservation(char [] reservation, int maxlength);
 native void L4D_SetLobbyReservation(char reservation[20]);
 
 /**
+ * Set player intensity
+ *
+ * Note: Its percentage. 0.0 - Player is calm, 1.0 - Player is stressed
+ *
+ * @param client		Client index
+ * @param intensity		Intensity (values 0.0 to 1.0 only)
+ * @noreturn
+ */
+native void L4D_SetPlayerIntensity(int client, float intensity);
+
+/**
  * @brief Get the current campaign scores stored in the Director
  * @remarks The campaign scores are updated after L4D_OnSetCampaignScores
  *
@@ -6356,7 +6543,7 @@ native CountdownTimer L4D2Direct_GetSIClassSpawnTimer(int class);
 
 /**
  * Gets the number of times the tank has passed to a player
- * @note When this variable is >1 the tank will be replaced with a bot when the his frustration reaches 0
+ * @note When this variable is >1 the tank will be replaced with a bot when their frustration reaches 0
  * @note The initial pass from AI to a player counts as a pass
  * @note As this is global on the director weird things could potentially happen if more than one tank is alive at a time with z_frustration 1
  *
@@ -6366,7 +6553,7 @@ native int L4D2Direct_GetTankPassedCount();
 
 /**
  * Sets the number of times the tank has passed to a player
- * @note When this variable is >1 the tank will be replaced with a bot when the his frustration reaches 0
+ * @note When this variable is >1 the tank will be replaced with a bot when their frustration reaches 0
  * @note The initial pass from AI to a player counts as a pass
  * @note As this is global on the director weird things could potentially happen if more than one tank is alive at a time with z_frustration 1
  *
@@ -6635,7 +6822,7 @@ native int L4D2Direct_GetShovePenalty(int client);
 native void L4D2Direct_SetShovePenalty(int client, int penalty);
 
 /**
- * Gets the time at which a survivor can perform his next +attack2
+ * Gets the time at which a survivor can perform their next +attack2
  *
  * @param client		Client id
  *
@@ -6645,7 +6832,7 @@ native void L4D2Direct_SetShovePenalty(int client, int penalty);
 native float L4D2Direct_GetNextShoveTime(int client);
 
 /**
- * Sets the time at which a survivor can perform his next +attack2
+ * Sets the time at which a survivor can perform their next +attack2
  *
  * @param client		Client id
  * @param time			Game time
@@ -7429,3 +7616,15 @@ native int L4D_RegisterForbiddenTarget(int entity);
  * @return				Some memory address (large value) or possibly ID if already registered (low value from 1+)
  */
 native void L4D_UnRegisterForbiddenTarget(int entity);
+
+/**
+ * @brief To see if an entity is saveable to be transitioned to next map
+ * @remarks Calls InfoChangelevel::IsSaveableEntity. Entities that are saveable follow the rules below:
+ * @remarks 1. Entity is not a player, and its root hierarchical parent entity is not a player either
+ * @remarks 2. Entity has a capability flag "FCAP_ACROSS_TRANSITION", or the entity has no flag "EFL_DORMANT"
+ * 
+ * @param entity		Entity to check, usaully a prop, should not be a brush, etc
+ * 
+ * @return 				True if entity is saveable, false otherwise
+ */
+native void L4D_IsEntitySaveable(int entity);
