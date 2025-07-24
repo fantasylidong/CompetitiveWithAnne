@@ -1,6 +1,6 @@
 /*
 *	Target Override
-*	Copyright (C) 2022 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"2.24"
+#define PLUGIN_VERSION 		"2.30"
 #define DEBUG_BENCHMARK		0			// 0=Off. 1=Benchmark only (for command). 2=Benchmark (displays on server). 3=PrintToServer various data.
 
 /*======================================================================================
@@ -32,6 +32,29 @@
 
 ========================================================================================
 	Change Log:
+
+2.30 (21-Mar-2025)
+	- L4D2: Plugin no longer throws error if the patch is already applied.
+	- Fixed not resetting a variable. Thanks to "Voevoda" for reporting.
+
+2.29 (25-Mar-2024)
+	- Plugin now follows the "nb_blind" cvar and prevents attacking if set to "1".
+	- Added option "21" to target a Survivor whose health is below "survivor_limp_health" cvar value. Requested by "jimmycm123".
+
+2.28 (20-Jan-2024)
+	- Added option "minigun" to the data config to choose whether to ignore players on a minigun or treat them as normal players. Requested by "Morning".
+
+2.27 (05-Sep-2023)
+	- Added option "20" to target a Survivor who is being chased by a Witch. Requested by "Xenorvya".
+	- This requires the Actions extension. Thanks to "ForgeTest" for providing the method and code.
+
+2.26 (27-Jul-2023)
+	- Added option "19" to target a Survivor who is inside the saferoom. Requested by "SpannerV2".
+
+2.25 (19-Jun-2023)
+	- Added option "18" to target the Survivor who caused the highest damage.
+	- Fixed issues with the "time" option and resetting the last attacker.
+	- Thanks to "Kanashimi" and "kooper990" for helping test.
 
 2.24 (24-Nov-2022)
 	- Fixed plugin not accounting for idle or disconnected players being replaced by bots. Thanks to "HarryPotter" for help.
@@ -209,11 +232,19 @@
 #include <dhooks>
 #include <l4d_target_override>
 
+#undef REQUIRE_EXTENSIONS
+#tryinclude <actions>
+#define REQUIRE_EXTENSIONS
+
+
+
 // Left4DHooks natives - optional - (added here to avoid requiring Left4DHooks include)
 native float L4D2Direct_GetFlowDistance(int client);
 native Address L4D2Direct_GetTerrorNavArea(const float pos[3], float beneathLimit = 120.0);
 native float L4D2Direct_GetTerrorNavAreaFlow(Address pTerrorNavArea);
 native int L4D_GetHighestFlowSurvivor();
+native bool L4D_IsInFirstCheckpoint(int client);
+native bool L4D_IsInLastCheckpoint(int client);
 
 
 
@@ -231,10 +262,10 @@ float g_iBenchTicks;
 #define GAMEDATA			"l4d_target_override"
 #define CONFIG_DATA			"data/l4d_target_override.cfg"
 
-ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarForward, g_hCvarSpecials, g_hCvarTeam, g_hCvarType, g_hDecayDecay, g_hCvarLimp;
-bool g_bCvarAllow, g_bMapStarted, g_bLateLoad, g_bLeft4Dead2, g_bLeft4DHooks, g_bCvarForward;
+ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarForward, g_hCvarSpecials, g_hCvarTeam, g_hCvarType, g_hCvarDecay, g_hCvarBlind, g_hCvarLimp;
+bool g_bCvarAllow, g_bMapStarted, g_bLateLoad, g_bLeft4Dead2, g_bLeft4DHooks, g_bActions, g_bCvarBlind, g_bCvarForward;
 int g_iCvarSpecials, g_iCvarTeam, g_iCvarType, g_iClassTank;
-float g_fDecayDecay, g_fCvarLimp;
+float g_fCvarDecay, g_fCvarLimp;
 Handle g_hDetour, g_hForward;
 
 ArrayList g_BytesSaved;
@@ -244,7 +275,7 @@ int g_iFixCount, g_iFixMatch;
 
 
 #define MAX_BUFFER		48		// Maximum buffer size when exploding the "order" string "0,0,0"
-#define MAX_ORDERS		17		// Maximum number of "order"'s
+#define MAX_ORDERS		18		// Maximum number of "order"'s
 int g_iOrderTank[MAX_ORDERS];
 int g_iOrderSmoker[MAX_ORDERS];
 int g_iOrderBoomer[MAX_ORDERS];
@@ -257,6 +288,7 @@ int g_iOrderCharger[MAX_ORDERS];
 int g_iOptionLast[MAX_SPECIAL];
 int g_iOptionPinned[MAX_SPECIAL];
 int g_iOptionIncap[MAX_SPECIAL];
+int g_iOptionMini[MAX_SPECIAL];
 int g_iOptionVoms[MAX_SPECIAL];
 int g_iOptionVoms2[MAX_SPECIAL];
 int g_iOptionSafe[MAX_SPECIAL];
@@ -267,6 +299,7 @@ float g_fOptionLast[MAX_SPECIAL];
 float g_fOptionWait[MAX_SPECIAL];
 
 #define MAX_PLAY		MAXPLAYERS+1
+float g_fTotalDamage[MAX_PLAY][MAX_PLAY];
 float g_fLastSwitch[MAX_PLAY];
 float g_fLastAttack[MAX_PLAY];
 int g_iLastAttacker[MAX_PLAY];
@@ -347,12 +380,16 @@ public void OnLibraryAdded(const char[] sName)
 {
 	if( strcmp(sName, "left4dhooks") == 0 )
 		g_bLeft4DHooks = true;
+	else if( strcmp(sName, "actionslib") == 0 )
+		g_bActions = true;
 }
 
 public void OnLibraryRemoved(const char[] sName)
 {
 	if( strcmp(sName, "left4dhooks") == 0 )
 		g_bLeft4DHooks = false;
+	else if( strcmp(sName, "actionslib") == 0 )
+		g_bActions = false;
 }
 
 public void OnAllPluginsLoaded()
@@ -411,7 +448,7 @@ public void OnPluginStart()
 			g_BytesSaved.Push(LoadFromAddress(g_iFixOffset + view_as<Address>(i), NumberType_Int8));
 		}
 
-		if( g_BytesSaved.Get(0) != g_iFixMatch ) SetFailState("Failed to load, byte mis-match @ %d (0x%02X != 0x%02X)", offs, g_BytesSaved.Get(0), g_iFixMatch);
+		if( g_BytesSaved.Get(0) != g_iFixMatch && g_BytesSaved.Get(0) != 0x90 ) SetFailState("Failed to load, byte mismatch @ %d (0x%02X != 0x%02X)", offs, g_BytesSaved.Get(0), g_iFixMatch);
 	}
 
 	delete hGameData;
@@ -435,8 +472,9 @@ public void OnPluginStart()
 	CreateConVar(							"l4d_target_override_version",			PLUGIN_VERSION,		"Target Override plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true,					"l4d_target_override");
 
+	g_hCvarBlind = FindConVar("nb_blind");
 	g_hCvarLimp = FindConVar("survivor_limp_health");
-	g_hDecayDecay = FindConVar("pain_pills_decay_rate");
+	g_hCvarDecay = FindConVar("pain_pills_decay_rate");
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");
 	g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Allow);
 	g_hCvarModes.AddChangeHook(ConVarChanged_Allow);
@@ -447,7 +485,8 @@ public void OnPluginStart()
 	g_hCvarSpecials.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarTeam.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarType.AddChangeHook(ConVarChanged_Cvars);
-	g_hDecayDecay.AddChangeHook(ConVarChanged_Cvars);
+	g_hCvarDecay.AddChangeHook(ConVarChanged_Cvars);
+	g_hCvarBlind.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarLimp.AddChangeHook(ConVarChanged_Cvars);
 
 
@@ -569,6 +608,7 @@ void ExplodeToArray(char[] key, KeyValues hFile, int index, int arr[MAX_ORDERS])
 
 		g_iOptionPinned[index] = hFile.GetNum("pinned");
 		g_iOptionIncap[index] = hFile.GetNum("incap");
+		g_iOptionMini[index] = hFile.GetNum("minigun");
 		g_iOptionVoms[index] = hFile.GetNum("voms");
 		g_iOptionVoms2[index] = hFile.GetNum("voms2");
 		g_fOptionRange[index] = hFile.GetFloat("range");
@@ -604,7 +644,8 @@ void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newV
 
 void GetCvars()
 {
-	g_fDecayDecay =		g_hDecayDecay.FloatValue;
+	g_fCvarDecay =		g_hCvarDecay.FloatValue;
+	g_bCvarBlind =		g_hCvarBlind.BoolValue;
 	g_fCvarLimp =		g_hCvarLimp.FloatValue;
 	g_bCvarForward =	g_hCvarForward.BoolValue;
 	g_iCvarSpecials =	g_hCvarSpecials.IntValue;
@@ -778,6 +819,8 @@ public void OnClientDisconnect(int client)
 			g_iLastVictim[i] = 0;
 		}
 	}
+
+	ResetVars(client);
 }
 
 void Event_EnteredCheckpoint(Event event, const char[] name, bool dontBroadcast)
@@ -844,17 +887,23 @@ void HookPlayerHurt(bool doHook)
 	if( doHook && hook && !bHookedHurt )
 	{
 		bHookedHurt = true;
-		HookEvent("player_hurt",		Event_PlayerHurt);
+		HookEvent("player_hurt", Event_PlayerHurt);
 	}
 	else if( (!doHook || !hook) && bHookedHurt )
 	{
 		bHookedHurt = false;
-		UnhookEvent("player_hurt",		Event_PlayerHurt);
+		UnhookEvent("player_hurt", Event_PlayerHurt);
 	}
 }
 
 void ResetVars(int client)
 {
+	for( int i = 0; i <= MaxClients; i++ )
+	{
+		g_fTotalDamage[i][client] = 0.0;
+		g_fTotalDamage[client][i] = 0.0;
+	}
+
 	g_iLastAttacker[client] = 0;
 	g_iLastOrders[client] = 0;
 	g_iLastVictim[client] = 0;
@@ -892,6 +941,7 @@ void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
+	ResetVars(client);
 
 	g_iLastVictim[client] = 0;
 
@@ -899,6 +949,9 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 	{
 		for( int i = 1; i <= MaxClients; i++ )
 		{
+			g_fTotalDamage[i][client] = 0.0;
+			g_fTotalDamage[client][i] = 0.0;
+
 			if( g_iLastVictim[i] == client )
 			{
 				g_iLastVictim[i] = 0;
@@ -909,16 +962,27 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("userid"));
-	int attacker = event.GetInt("attacker");
-	if( attacker )
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	if( attacker && IsClientInGame(attacker) )
 	{
-		int type = event.GetInt("type");
-
-		if( type & (DMG_BULLET|DMG_SLASH|DMG_CLUB) )
+		int client = GetClientOfUserId(event.GetInt("userid"));
+		if( client && GetClientTeam(client) == 3 )
 		{
-			g_iLastAttacker[client] = attacker;
-			g_fLastAttack[client] = GetGameTime();
+			int class = GetEntProp(client, Prop_Send, "m_zombieClass");
+			if( class == g_iClassTank ) class = 0;
+
+			if( g_fLastAttack[client] + g_fOptionLast[class] > GetGameTime() )
+			{
+				int type = event.GetInt("type");
+
+				if( type & (DMG_BULLET|DMG_SLASH|DMG_CLUB) )
+				{
+					g_iLastAttacker[client] = attacker;
+					g_fLastAttack[client] = GetGameTime();
+				}
+			}
+
+			g_fTotalDamage[attacker][client] += event.GetInt("dmg_health");
 		}
 	}
 }
@@ -1063,6 +1127,8 @@ void DetourAddress(bool patch)
 
 MRESReturn ChooseVictim(int attacker, Handle hReturn)
 {
+	if( g_bCvarBlind ) return MRES_Ignored;
+
 	#if DEBUG_BENCHMARK == 1 || DEBUG_BENCHMARK == 2
 	StartProfiling(g_Prof);
 	#endif
@@ -1607,7 +1673,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 
 					if( g_iOptionPinned[class] & 8 && g_bPinCharger[victim] )
 					{
-						if( GetEntPropEnt(victim, Prop_Send, "m_carryAttacker") == -1  || GetEntPropEnt(victim, Prop_Send, "m_pummelAttacker") == -1 )
+						if( GetEntPropEnt(victim, Prop_Send, "m_carryAttacker") == -1 || GetEntPropEnt(victim, Prop_Send, "m_pummelAttacker") == -1 )
 						{
 							allPinned = false;
 							g_bPinCharger[victim] = false;
@@ -1693,7 +1759,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 
 						if( g_iOptionPinned[class] & 8 && g_bPinCharger[i] )
 						{
-							if( GetEntPropEnt(i, Prop_Send, "m_carryAttacker") == -1  || GetEntPropEnt(i, Prop_Send, "m_pummelAttacker") == -1 )
+							if( GetEntPropEnt(i, Prop_Send, "m_carryAttacker") == -1 || GetEntPropEnt(i, Prop_Send, "m_pummelAttacker") == -1 )
 							{
 								allPinned = false;
 								g_bPinCharger[i] = false;
@@ -2036,7 +2102,7 @@ int OrderTest(int attacker, int victim, int team, int class, int order)
 			}
 		}
 
-		// 15=Furthest Ahead
+		// 15=Furthest Behind
 		case 15:
 		{
 			if( g_bLeft4DHooks && team == 2 )
@@ -2098,10 +2164,83 @@ int OrderTest(int attacker, int victim, int team, int class, int order)
 				}
 			}
 		}
+
+		// 18=Damage
+		case 18:
+		{
+			if( team == 2 )
+			{
+				int target;
+				float max;
+
+				for( int i = 1; i <= MaxClients; i++ )
+				{
+					if( g_fTotalDamage[i][attacker] > max )
+					{
+						target = i;
+						max = g_fTotalDamage[i][attacker];
+					}
+				}
+
+				if( target == victim )
+				{
+					newVictim = victim;
+
+					#if DEBUG_BENCHMARK == 3
+					PrintToServer("Break order 18");
+					#endif
+				}
+			}
+		}
+
+		// 19=Saferoom
+		case 19:
+		{
+			if( g_bLeft4DHooks && team == 2 && (L4D_IsInFirstCheckpoint(victim) || L4D_IsInLastCheckpoint(victim)) )
+			{
+				newVictim = victim;
+
+				#if DEBUG_BENCHMARK == 3
+				PrintToServer("Break order 19");
+				#endif
+			}
+		}
+
+		// 20=Witch target
+		case 20:
+		{
+			if( g_bActions )
+			{
+				#if defined BehaviorAction
+				if( HasWitchAttacker(victim) )
+				{
+					newVictim = victim;
+
+					#if DEBUG_BENCHMARK == 3
+					PrintToServer("Break order 20");
+					#endif
+				}
+				#endif
+			}
+		}
+
+		// 21=Critical health
+		case 21:
+		{
+			int health = RoundFloat(GetClientHealth(victim) + GetTempHealth(victim));
+			if( health < g_fCvarLimp )
+			{
+				newVictim = victim;
+
+				#if DEBUG_BENCHMARK == 3
+				PrintToServer("Break order 21");
+				#endif
+			}
+		}
 	}
 
 	// Ignore players using a minigun if not checking for that
-	if( newVictim && order != 11 && GetEntProp(newVictim, Prop_Send, "m_usingMountedWeapon") > 0 )
+	if( newVictim && order != 11 && g_iOptionMini[class] == 0 && GetEntProp(newVictim, Prop_Send, "m_usingMountedWeapon") > 0 )
 	{
 		newVictim = 0;
 	}
@@ -2217,12 +2356,60 @@ Action SendForward(int attacker, int &victim, int order)
 
 
 // ====================================================================================================
+//					WITCH STOCKS - Credit to "ForgeTest" for this method
+// ====================================================================================================
+#if defined BehaviorAction
+methodmap EHANDLE {
+	public int Get() {
+	#if SOURCEMOD_V_MAJOR >= 1 && SOURCEMOD_V_MINOR >= 12 && SOURCEMOD_V_REV >= 6964
+		return LoadEntityFromHandleAddress(view_as<Address>(this));
+	#else
+		static int s_iRandomOffsetToAnEHandle = -1;
+		if( s_iRandomOffsetToAnEHandle == -1 )
+			s_iRandomOffsetToAnEHandle = FindSendPropInfo("CWorld", "m_hOwnerEntity");
+
+		int temp = GetEntData(0, s_iRandomOffsetToAnEHandle, 4);
+		SetEntData(0, s_iRandomOffsetToAnEHandle, this, 4);
+		int result = GetEntDataEnt2(0, s_iRandomOffsetToAnEHandle);
+		SetEntData(0, s_iRandomOffsetToAnEHandle, temp, 4);
+
+		return result;
+	#endif
+	}
+}
+
+bool HasWitchAttacker(int client)
+{
+	int witch = -1;
+
+	while( (witch = FindEntityByClassname(witch, "witch")) != INVALID_ENT_REFERENCE )
+	{
+		if( IsValidEdict(witch) )
+		{
+			BehaviorAction action = ActionsManager.GetAction(witch, "WitchAttack");
+
+			if( action != INVALID_ACTION )
+			{
+				EHANDLE ehndl = action.Get(52);
+
+				if( ehndl.Get() == client ) return true;
+			}
+		}
+	}
+
+	return false;
+}
+#endif
+
+
+
+// ====================================================================================================
 //					STOCKS
 // ====================================================================================================
 float GetTempHealth(int client)
 {
 	float fHealth = GetEntPropFloat(client, Prop_Send, "m_healthBuffer");
-	fHealth -= (GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * g_fDecayDecay;
+	fHealth -= (GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * g_fCvarDecay;
 	return fHealth < 0.0 ? 0.0 : fHealth;
 }
 
