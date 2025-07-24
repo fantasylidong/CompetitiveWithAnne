@@ -89,7 +89,7 @@ void GetInterControl_Cvars(ConVar convar, const char[] oldValue, const char[] ne
 public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
 	if (!IsAiJockey(jockey) || !IsPlayerAlive(jockey)) { return Plugin_Continue; }
-	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey))
+	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey) || !IsGrounded(jockey) || GetEntityMoveType(jockey) == MOVETYPE_NONE)
 		return Plugin_Continue;
 	float fSpeed[3] = {0.0}, fCurrentSpeed = 0.0, fJockeyPos[3] = {0.0};
 	GetEntPropVector(jockey, Prop_Data, "m_vecVelocity", fSpeed);
