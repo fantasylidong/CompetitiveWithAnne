@@ -960,6 +960,7 @@ public OnPluginStart()
 	{
 		EnableSounds_Charger_Ram = false;
 	}
+	delete L4DStatsConf;
 }
 
 
@@ -1340,6 +1341,10 @@ public OnPluginEnd()
 	//	CloseHandle(ClearPlayerMenu);
 	//	ClearPlayerMenu = INVALID_HANDLE;
 	//}
+	delete MapTimingSurvivors; 
+ 	delete MapTimingInfected; 
+ 	delete FriendlyFireDamageTrie; 
+ 	delete PlayerRankVoteTrie; 
 }
 
 // Show rank on connect.
