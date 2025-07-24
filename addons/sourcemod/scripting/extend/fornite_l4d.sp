@@ -422,11 +422,30 @@ public Action Event_Start(Event event, const char[] name, bool dontBroadcast)
 	return Plugin_Continue;
 }
 
+// 检测生还是否在换弹
+bool IsInReload(int client)
+{
+	int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	if (IsValidEntity(weapon) && IsValidEdict(weapon) && HasEntProp(weapon, Prop_Data, "m_bInReload"))
+	{
+		if (GetEntProp(weapon, Prop_Data, "m_bInReload") == 1)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 public Action Command_Menu(int client, int args)
 {
 	if (!IsValidClient(client))
 		return Plugin_Handled;
 
+	if(IsInReload(client))
+	{
+		ReplyToCommand(client,"换子弹的时候你跳鸡毛舞");
+		return Plugin_Handled;
+	}
 
 	char sBuffer[32];
 	g_cvFlagEmotesMenu.GetString(sBuffer, sizeof(sBuffer));
@@ -442,6 +461,11 @@ public Action Command_Menu(int client, int args)
 
 Action CreateEmote(int client, const char[] anim1, const char[] anim2, const char[] soundName, bool isLooped) {
 	if (!IsValidClient(client)) return Plugin_Handled;
+	if(IsInReload(client))
+	{
+		ReplyToCommand(client,"换子弹的时候你跳鸡毛舞");
+		return Plugin_Handled;
+	}
 
 	if (g_EmoteForward_Pre != null) {
 		Action res = Plugin_Continue;
