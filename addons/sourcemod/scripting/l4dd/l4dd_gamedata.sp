@@ -1,6 +1,6 @@
 /*
 *	Left 4 DHooks Direct
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -1427,6 +1427,16 @@ void LoadGameData()
 			LogError("Failed to create SDKCall: \"CTerrorPlayer::GetFlowDistance\" (%s)", g_sSystem);
 	}
 
+	StartPrepSDKCall(SDKCall_Raw);
+	if( PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "Intensity::Reset") == false )
+	{
+		LogError("Failed to find signature: \"Intensity::Reset\" (%s)", g_sSystem);
+	} else {
+		g_hSDK_Intensity_Reset = EndPrepSDKCall();
+		if( g_hSDK_Intensity_Reset == null )
+			LogError("Failed to create SDKCall: \"Intensity::Reset\" (%s)", g_sSystem);
+	}
+
 	StartPrepSDKCall(SDKCall_Player);
 	if( PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTerrorPlayer::SetShovePenalty") == false )
 	{
@@ -1941,6 +1951,18 @@ void LoadGameData()
 			LogError("Failed to create SDKCall: \"CDirector::UnregisterForbiddenTarget\" (%s)", g_sSystem);
 	}
 
+	StartPrepSDKCall(SDKCall_Entity);
+	if( PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "InfoChangelevel::IsEntitySaveable") == false )
+	{
+		LogError("Failed to find signature: \"InfoChangelevel::IsEntitySaveable\" (%s)", g_sSystem);
+	} else {
+		PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+		PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
+		g_hSDK_InfoChangeLevel_IsEntitySaveable = EndPrepSDKCall();
+		if( g_hSDK_InfoChangeLevel_IsEntitySaveable == null )
+			LogError("Failed to create SDKCall: \"InfoChangeLevel::IsEntitySaveable\" (%s)", g_sSystem);
+	}
+
 	StartPrepSDKCall(SDKCall_Raw);
 	if( PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CDirectorVersusMode::EndVersusModeRound") == false )
 	{
@@ -2374,6 +2396,9 @@ void LoadGameData()
 		ValidateOffset(g_iOff_m_iSetupNotifyTime, "CDirectorSurvivalMode::m_iSetupNotifyTime");
 	}
 
+	g_iOff_Intensity = hGameData.GetOffset("m_intensity");
+	ValidateOffset(g_iOff_Intensity, "m_intensity");
+
 	g_iOff_m_flow = hGameData.GetOffset("m_flow");
 	ValidateOffset(g_iOff_m_flow, "m_flow");
 
@@ -2555,6 +2580,7 @@ void LoadGameData()
 	PrintToServer("m_bWitchThisRound = %d", g_iOff_m_bWitchThisRound);
 	PrintToServer("InvulnerabilityTimer = %d", g_iOff_InvulnerabilityTimer);
 	PrintToServer("m_iTankTickets = %d", g_iOff_m_iTankTickets);
+	PrintToServer("m_intensity = %d", g_iOff_Intensity);
 	PrintToServer("m_flow = %d", g_iOff_m_flow);
 	PrintToServer("m_chapter = %d", g_iOff_m_chapter);
 	PrintToServer("m_PendingMobCount = %d", g_iOff_m_PendingMobCount);

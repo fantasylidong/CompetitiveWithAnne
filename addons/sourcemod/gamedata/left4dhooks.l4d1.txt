@@ -738,7 +738,7 @@
 
 			"L4DD::CDirector::CreateRescuableSurvivors"
 			{
-				"signature"		"L4DD::CDirector::CreateRescuableSurvivors"
+				"signature"		"CDirector::CreateRescuableSurvivors"
 				"callconv"		"thiscall"
 				"return"		"int"
 			}
@@ -1212,6 +1212,21 @@
 					}
 				}
 			}
+
+			"L4DD::InfoChangelevel::SaveEntities"
+			{
+				"signature"		"InfoChangelevel::SaveEntities"
+				"callconv"		"thiscall"
+				"return"		"void"
+				"this"			"entity"
+				"arguments"
+				{
+					"KeyValues"
+					{
+						"type"	"int"
+					}
+				}
+			}
 		}
 
 
@@ -1546,6 +1561,11 @@
 				"windows"	"340"
 				"linux"		"348"
 			}
+			"m_intensity"
+			{
+				"windows"	"7268" // Search "Tempo: PEAK_FADE (%3.2f)" jump into call above, jump into call inside that, call just below "!= 2" has value
+				"linux"		"7288" // Can be found in "ForEachTerrorPlayer<FindMaxIntensity>"
+			}
 			"m_chapter"
 			{
 				"windows"	"1652"
@@ -1770,8 +1790,8 @@
 			{
 				"library"		"server"
 				"windows"		"\xD9\x05\x2A\x2A\x2A\x2A\x6A\x0E\x6A\x0A\x6A\x04\x2A\xD9\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x00\x6A\x00\x6A\x01\x68\x02\x00\x00\x80"
-								/* not actual function beginning, starts at the second call */
-								/* D9 05 ? ? ? ? 6A 0E 6A 0A 6A 04 ? D9 ? ? 68 ? ? ? ? 6A 00 6A 00 6A 01 68 02 00 00 80 */
+				/* not actual function beginning, starts at the second call */
+				/* D9 05 ? ? ? ? 6A 0E 6A 0A 6A 04 ? D9 ? ? 68 ? ? ? ? 6A 00 6A 00 6A 01 68 02 00 00 80 */
 			}
 
 			// =========================
@@ -2230,7 +2250,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw7DoSwingEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x2A\x85\x2A\x74\x2A\x8D\x2A\x2A\x2A\x50\x8D\x2A\x2A\x2A\x51\x68"
-						/* ? ? ? ? ? ? ? E8 ? ? ? ? 8B ? 85 ? 74 ? 8D ? ? ? 50 8D ? ? ? 51 68 */
+				/* ? ? ? ? ? ? ? E8 ? ? ? ? 8B ? 85 ? 74 ? 8D ? ? ? 50 8D ? ? ? 51 68 */
 			}
 
 			/**
@@ -2248,7 +2268,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw11GroundPoundEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x2A\x85"
-						/* ? ? ? ? ? ? 81 EC ? ? ? ? 53 56 57 8B ? E8 ? ? ? ? 8B ? 85 */
+				/* ? ? ? ? ? ? 81 EC ? ? ? ? 53 56 57 8B ? E8 ? ? ? ? 8B ? 85 */
 			}
 
 			/**
@@ -2270,7 +2290,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw11OnPlayerHitEP13CTerrorPlayerb"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x53\x55\x56\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x8B\xB4"
-						/* ? ? ? ? ? ? 53 55 56 57 8B ? E8 ? ? ? ? 8B B4 */
+				/* ? ? ? ? ? ? 53 55 56 57 8B ? E8 ? ? ? ? 8B B4 */
 			}
 
 			/**
@@ -2292,7 +2312,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankRock8DetonateEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x80\xBE\x2A\x2A\x2A\x2A\x2A\x57\x0F\x84\x2A\x2A\x2A\x2A\xD9"
-						/* ? ? ? ? ? ? 8B ? 80 BE ? ? ? ? ? 57 0F 84 ? ? ? ? D9 */
+				/* ? ? ? ? ? ? 8B ? 80 BE ? ? ? ? ? 57 0F 84 ? ? ? ? D9 */
 			}
 
 			/**
@@ -2308,7 +2328,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankRock9OnReleaseERK6VectorRK6QAngleS2_S2_"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xC7\x86\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x2A\x2A\x2A\x57"
-						/* ? ? ? ? ? ? ? ? ? ? ? C7 86 ? ? ? ? ? ? ? ? E8 ? ? ? ? 8B ? ? ? 57 */
+				/* ? ? ? ? ? ? ? ? ? ? ? C7 86 ? ? ? ? ? ? ? ? E8 ? ? ? ? 8B ? ? ? 57 */
 			}
 
 			/**
@@ -2329,7 +2349,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankRock11BounceTouchEP11CBaseEntity"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x53\x8B\x9C\x2A\x2A\x2A\x2A\x2A\x0F"
-						/* ? ? ? ? ? ? 53 8B 9C ? ? ? ? ? 0F */
+				/* ? ? ? ? ? ? 53 8B 9C ? ? ? ? ? 0F */
 			}
 
 			/**
@@ -2348,7 +2368,7 @@
 				"library"	"server"
 				"linux"		"@_ZN16CDeathFallCamera6EnableEP11CBasePlayer"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x85\x2A\x74\x2A\x6A"
-						/* ? ? ? ? ? ? 8B ? 8B ? E8 ? ? ? ? 85 ? 74 ? 6A */
+				/* ? ? ? ? ? ? 8B ? 8B ? E8 ? ? ? ? 85 ? 74 ? 6A */
 			}
 
 			/* CTerrorPlayer::Cough(CTerrorPlayer *this, CBasePlayer *) */
@@ -2396,7 +2416,7 @@
 				"library"	"server"
 				"linux"		"@_ZN13CTerrorPlayer9OnFallingEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x83\x2A\x2A\x0F\x85\x2A\x2A\x2A\x2A\x8D"
-						/* ? ? ? ? ? ? 57 8B ? E8 ? ? ? ? 83 ? ? 0F 85 ? ? ? ? 8D */
+				/* ? ? ? ? ? ? 57 8B ? E8 ? ? ? ? 83 ? ? 0F 85 ? ? ? ? 8D */
 			}
 
 			/* CTerrorPlayer::EstimateFallingDamage(CTerrorPlayer *this) */
@@ -2426,7 +2446,7 @@
 				"library"	"server"
 				"linux"		"@_ZN4Tank11EnterStasisEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x0F\x85\x2A\x2A\x2A\x2A\x83\x2A\x2A\x2A\x0F\x84\x2A\x2A\x2A\x2A\x0F"
-						/* ? ? ? ? ? ? ? ? ? ? 0F 85 ? ? ? ? 83 ? ? ? 0F 84 ? ? ? ? 0F */
+				/* ? ? ? ? ? ? ? ? ? ? 0F 85 ? ? ? ? 83 ? ? ? 0F 84 ? ? ? ? 0F */
 			}
 
 			/**
@@ -2442,7 +2462,7 @@
 				"library"	"server"
 				"linux"		"@_ZN4Tank11LeaveStasisEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x0F\x84\x2A\x2A\x2A\x2A\x83\x2A\x2A\x2A\x74\x2A\x0F"
-						/* ? ? ? ? ? ? ? ? ? ? 0F 84 ? ? ? ? 83 ? ? ? 74 ? 0F */
+				/* ? ? ? ? ? ? ? ? ? ? 0F 84 ? ? ? ? 83 ? ? ? 74 ? 0F */
 			}
 			// =========================
 
@@ -3038,7 +3058,7 @@
 				"library"	"server"
 				"linux"		"@_ZN12CFirstAidKit12StartHealingENS_14HealTargetTypeE.part.38"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x53\x55\x56\x8D\xB1\x2A\x2A\x2A\x2A\x57\x89"
-						/* ? ? ? ? ? ? ? ? 53 55 56 8D B1 ? ? ? ? 57 89 */
+				/* ? ? ? ? ? ? ? ? 53 55 56 8D B1 ? ? ? ? 57 89 */
 			}
 
 			"BossZombiePlayerBot::ChooseVictim"
@@ -3060,6 +3080,19 @@
 				/* Search: "%s_%s_%d%s" and xref to vtable, function is above this. */
 			}
 
+			/**
+			 * Windows sig:
+			 * Search for string "Would change level, but not going to!\n" to find InfoChangelevel::StartChangeLevel
+			 * the function above string "map_transition" is InfoChangeLevel::SavingEntities
+			 */
+			/*  */
+			"InfoChangelevel::SaveEntities"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15InfoChangelevel12SaveEntitiesEP9KeyValues"
+				"windows"	"\x55\x8B\x2A\x83\x2A\x2A\x83\x2A\x2A\x53\x56\x8B\x2A\x57\xB9\x2A\x2A\x2A\x2A\x89"
+				/* 55 8B ? 83 ? ? 83 ? ? 53 56 8B ? 57 B9 ? ? ? ? 89 */
+			}
 
 
 			// ====================================================================================================
@@ -3175,6 +3208,21 @@
 				/* 8B 01 8B 90 ? ? ? ? FF D2 85 C0 74 0E 8B 4C 24 04 D9 84 88 ? ? ? ? C2 04 00 D9 05 ? ? ? ? C2 04 00 */
 			}
 
+			/*
+			* Intensity::Reset(Intensity *this)
+			*/
+			"Intensity::Reset"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9Intensity5ResetEv"
+				"windows"	"\x51\xD9\x2A\x56\xD9\x2A\x8D\x2A\x2A\xD9\x2A\x2A\x8B"
+				/* 51 D9 ? 56 D9 ? 8D ? ? D9 ? ? 8B */
+				/*
+				* 1. Search "ClientSettings" for "CTerrorPlayer::CTerrorPlayer" function
+				* 2. Match to Linux, target call is below a "memset" instruction
+				*/
+			}
+
 			/**
 			 * CTerrorPlayer::SetShovePenalty(CTerrorPlayer *this, int)
 			 *
@@ -3215,8 +3263,8 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN16CTerrorGameRules19RecomputeTeamScoresEv"
-				"windows"	"\xA1\x88\x2A\x2A\x2A\x83\xEC\x34\x80\x78\x2A\x2A\x56\x8B\xF1\x0F\x84\x2A\x2A\x2A\x2A\x53\x33\xDB"
-				/* A1 88 ? ? ? 83 EC 34 80 78 ? ? 56 8B F1 0F 84 ? ? ? ? 53 33 DB */
+				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\xEC\x34\x80\x78\x2A\x2A\x56\x8B\xF1\x0F\x84\x2A\x2A\x2A\x2A\x53\x33\xDB"
+				/* ? ? ? ? ? ? EC 34 80 78 ? ? 56 8B F1 0F 84 ? ? ? ? 53 33 DB */
 			}
 
 			/* CTerrorPlayer::RoundRespawn(CTerrorPlayer *this) */
@@ -3546,6 +3594,23 @@
 				"windows"	"\x56\x8B\x2A\x2A\x2A\x85\x2A\x74\x2A\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x8B\x2A\xFF\x2A\x84\x2A\x74\x2A\x8B\x2A\x5E\xC3"
 				/* 56 8B ? ? ? 85 ? 74 ? 8B ? 8B ? ? ? ? ? 8B ? FF ? 84 ? 74 ? 8B ? 5E C3 */ // Found by SilverShot.
 				/* Search "PanicEvent" for "CCarProp::InputSurvivorStandingOnCar". Called in here. */
+			}
+
+			/*
+			 * InfoChangelevel::IsEntitySaveable(CBaseEntity *)
+			 */
+
+			/**
+			 * windows sig:
+			 * Find InfoChangelevel::SaveEntities (see signature description InfoChangelevel::SaveEntities),
+			 * At the top of the function, see a 'while' statement, inside of it there's 'if' statement, the second condition call is InfoChangelevel::IsEntitySaveable.
+			 */
+			"InfoChangelevel::IsEntitySaveable"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15InfoChangelevel16IsEntitySaveableEP11CBaseEntity"
+				"windows"	"\x53\x56\x8B\x2A\x2A\x2A\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x8B\x2A\xFF\x2A\x8B\x2A\x85\x2A\x78\x2A\x8B"
+				/* 53 56 8B ? ? ? 8B ? 8B ? ? ? ? ? 8B ? FF ? 8B ? 85 ? 78 ? 8B */
 			}
 
 			/*
