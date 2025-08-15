@@ -482,7 +482,7 @@ public Action ForceWitchCommand(int client, int args)
 	// Convert it to in int boy
 	int p_iRequestedPercent = StringToInt(bv_sWitch);
 	
-	if (p_iRequestedPercent < 0)
+	if (p_iRequestedPercent <= 0)
 	{
 		CPrintToChat(client, "%t", "PercentageInvalid");
 		return Plugin_Handled;
