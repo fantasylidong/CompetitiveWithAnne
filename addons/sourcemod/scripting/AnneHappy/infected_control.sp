@@ -27,6 +27,8 @@
 #define NORMALPOSMULT         1.4
 #define BaitDistance          200.0
 #define LadderDetectDistance  500.0
+#define IntenceAttackerMulit  0.7
+#define SneakyAttackerMuilt   1.5
 
 // 启用特感类型
 #define ENABLE_SMOKER         (1 << 0)
@@ -865,6 +867,9 @@ stock bool SpawnInfected(float fSpawnPos[3], float SpawnDistance, int iZombieCla
             SpawnDistance += BaitDistance;
         }
 
+        if(iZombieClass == 3 || iZombieClass == 5 || iZombieClass == 6){distance *= IntenceAttackerMulit;}
+        else if(iZombieClass == 1){distance *= SneakyAttackerMuilt;}
+
         // nav1 和 nav2 必须有网格相连的路，并且生成距离大于distance，增加不能是同nav网格的要求
         if (L4D2_NavAreaBuildPath(nav1, nav2, distance, TEAM_INFECTED, false) && GetVectorDistance(fSurvivorPos, fSpawnPos, true) >= Pow(g_fSpawnDistanceMin, 2.0) && nav1 != nav2)
         {
@@ -887,7 +892,12 @@ stock bool SpawnInfected(float fSpawnPos[3], float SpawnDistance, int iZombieCla
                     // aSpawnNavList.Push(nav1);
                     // Debug_Print("<nav记录> 当前入队nav：%d，当前队列长度：%d", nav1, aSpawnNavList.Length);
                     if (IsInfectedBot(entityindex) && IsPlayerAlive(entityindex))
+                    {
+                        //生成一个特感后，能刷的范围增加50码，防止刷的太密集
+                        g_fSpawnDistance += 50.0;
                         return true;
+                    }
+                        
                     else
                     {
 #if DEBUG
