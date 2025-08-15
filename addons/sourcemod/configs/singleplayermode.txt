@@ -310,6 +310,14 @@
 		{
 			"message" "关闭大枪购买"
 		}
+		"sm_cvar rpg_allow_UseB 1"
+		{
+			"message" "允许使用B数"
+		}
+		"sm_cvar rpg_allow_UseB 0"
+		{
+			"message" "禁止使用B数"
+		}
 	}
 	"开关Mod"
 	{

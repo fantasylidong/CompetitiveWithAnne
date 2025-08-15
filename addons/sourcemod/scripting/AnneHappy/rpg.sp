@@ -32,9 +32,9 @@ PlayerStruct player[MAXPLAYERS + 1];
 ConVar GaoJiRenJi;
 bool valid=true;
 bool IsStart=false;
-bool IsAllowBigGun = false;
+bool IsAllowBigGun = false, IsAllowUseB = false;
 int InfectedNumber=6;
-ConVar AllowBigGun, g_InfectedNumber;
+ConVar AllowBigGun, g_InfectedNumber, AllowUseB;
 bool g_bGodFrameSystemAvailable = false;
 bool g_bReadyUpSystemAvailable = false;
 //new lastpoints[MAXPLAYERS + 1];
@@ -181,10 +181,12 @@ public void  OnPluginStart()
 	HookEvent("player_afk", 	Event_PlayerAFK);
 	//HookEvent("player_team", 	Event_PlayerTeam, EventHookMode_Pre);
 	AllowBigGun = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	AllowUseB = CreateConVar("rpg_allow_UseB", "1", "是否允许在商店内消费B数", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	GaoJiRenJi=FindConVar("sb_fix_enabled");
 	InfectedNumber=GetConVarInt(FindConVar("l4d_infected_limit"));
 	g_InfectedNumber=FindConVar("l4d_infected_limit");
 	AllowBigGun.AddChangeHook(ConVarChanged_Cvars);
+	AllowUseB.AddChangeHook(ConVarChanged_Cvars);
 	g_InfectedNumber.AddChangeHook(ConVarChanged_Cvars);
 	GaoJiRenJi.AddChangeHook(ConVarChanged_Cvars);
 	ReturnBlood = CreateConVar("ReturnBlood", "0", "回血模式");
@@ -232,6 +234,10 @@ void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newV
 		IsAllowBigGun = true;
 	else
 		IsAllowBigGun = false;
+	if(AllowUseB.IntValue)
+		IsAllowUseB = true;
+	else
+		IsAllowUseB = false;
 }
 
 public void Event_PlayerAFK( Event hEvent, const char[] sName, bool bDontBroadcast )
@@ -942,6 +948,10 @@ public bool RemovePoints(int client, int costpoints,char bitem[64])
 	{
 		PrintToChat(client,"\x03商店技能冷却中(冷却时间15s)");
 		return false;
+	}
+	if(!IsAllowUseB && costpoints > 0)
+	{
+		PrintToChat(client,"\x03商店不允许使用B数，请在vote投票商店菜单中允许使用B数");
 	}
 	int actuallypoints = player[client].ClientPoints - costpoints;
 	if(IsVaildClient(client) && actuallypoints >= 0)
