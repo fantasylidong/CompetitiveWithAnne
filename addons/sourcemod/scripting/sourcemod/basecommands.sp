@@ -103,6 +103,13 @@ public void OnPluginStart()
 	ProtectVar("sm_immunity_mode");
 }
 
+public void OnLibraryAdded(const char[] name)
+{
+	if (strcmp(name, "l4d2_changelevel") == 0)
+		L4D2ChangeLevelActive = true;
+}
+
+
 public void OnMapStart()
 {
 	ParseConfigs();
@@ -193,24 +200,12 @@ public void OnAdminMenuReady(Handle aTopMenu)
 	}
 }
 
-public void OnLibraryAdded(const char[] name)
-{
-	if (strcmp(name, "l4d2_changelevel") == 0)
-	{
-		L4D2ChangeLevelActive = true;
-	}
-}
-
 public void OnLibraryRemoved(const char[] name)
 {
 	if (strcmp(name, "adminmenu") == 0)
-	{
 		hTopMenu = null;
-	}
 	else if (strcmp(name, "l4d2_changelevel") == 0)
-	{
 		L4D2ChangeLevelActive = false;
-	}
 }
 
 #define FLAG_STRINGS		14

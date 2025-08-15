@@ -1771,6 +1771,30 @@
 				}
 			}
 
+			"L4DD::InfoChangelevel::SaveEntities"
+			{
+				"signature" 	"InfoChangelevel::SaveEntities"
+				"callconv" 		"thiscall"
+				"return" 		"void"
+				"this" 			"entity"
+			}
+
+			"L4DD::CTerrorPlayer::TransitionRestore"
+			{
+				"signature"		"CTerrorPlayer::TransitionRestore"
+				"callconv"		"thiscall"
+				"return"		"int"
+				"this"			"entity"
+			}
+
+			"L4DD::RestoreTransitionedSurvivorBots"
+			{
+				"signature"		"RestoreTransitionedSurvivorBots"
+				"callconv"		"cdecl"
+				"return"		"void"
+				"this"			"ignore"
+			}
+
 			// Addons Disabler
 			"L4DD::CBaseServer::FillServerInfo"
 			{
@@ -2012,6 +2036,18 @@
 				}
 			}
 
+			"CTerrorPlayer::RoundRespawn::Address"
+			{
+				"windows"
+				{
+					"signature" "CTerrorPlayer::RoundRespawn"
+				}
+				"linux"
+				{
+					"signature" "CTerrorPlayer::RoundRespawn"
+				}
+			}
+
 			// Used for dynamic searching of memory address for SDKCall
 			"Molotov_StrFind"
 			{
@@ -2247,6 +2283,22 @@
 				"linux"		"5"
 			}
 
+			"CTerrorPlayer::RoundRespawn::Offset"
+			{
+				"windows"	"8"
+				"linux"		"18"
+			}
+			"CTerrorPlayer::RoundRespawn::Bytes"
+			{
+				"windows"	"232" // 0xE8
+				"linux"		"232" // 0xE8
+			}
+			"CTerrorPlayer::RoundRespawn::Count"
+			{
+				"windows"	"16"
+				"linux"		"17"
+			}
+
 			"MobSpawnTimer"
 			{
 				"windows"	"660"
@@ -2402,6 +2454,11 @@
 				"windows"	"332"
 				"linux"		"340"
 				// From "CTerrorPlayer::GetFlowDistance"
+			}
+			"m_intensity"
+			{
+				"windows"	"12020" // Search "IntensityThreshold" xref, jump into call above and call inside that
+				"linux"		"12000" // Can be found in "ForEachTerrorPlayer<FindMaxIntensity>"
 			}
 			"m_chapter"
 			{
@@ -2765,8 +2822,8 @@
 			{
 				"library"		"server"
 				"windows"		"\xD9\x05\x2A\x2A\x2A\x2A\x6A\x0E\x6A\x0A\x6A\x08\x2A\xD9\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x00\x6A\x00\x6A\x01\x68\x02\x00\x00\x80"
-								/* not actual function beginning, starts at the second call */
-								/* D9 05 ? ? ? ? 6A 0E 6A 0A 6A 08 ? D9 ? ? 68 ? ? ? ? 6A 00 6A 00 6A 01 68 02 00 00 80 */
+				/* not actual function beginning, starts at the second call */
+				/* D9 05 ? ? ? ? 6A 0E 6A 0A 6A 08 ? D9 ? ? 68 ? ? ? ? 6A 00 6A 00 6A 01 68 02 00 00 80 */
 			}
 
 			// =========================
@@ -3018,7 +3075,7 @@
 			"CGrenadeLauncher_Projectile::Explode"
 			{
 				"library"	"server"
-				"linux"		"@_ZN27CGrenadeLauncher_Projectile12ExplodeTouchEP11CBaseEntity"
+				"linux"		"@_ZN27CGrenadeLauncher_Projectile7ExplodeEP10CGameTracei"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x89\x2A\x2A\x8B\x2A\x2A\x53\x56\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\xC1\x2A\x2A\x57"
 				/* ? ? ? ? ? ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 8B ? ? 53 56 8B ? 8B ? ? ? ? ? C1 ? ? 57 */
 			}
@@ -3478,7 +3535,7 @@
 				"library"		"server"
 				"linux"			"@_ZN21CMultiPlayerAnimState17ResetMainActivityEv"
 				"windows"		"\x56\x8B\x2A\x8B\x2A\x8B\x2A\x2A\xC7\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xFF"
-								/* 56 8B ? 8B ? 8B ? ? C7 ? ? ? ? ? ? ? ? ? FF */
+				/* 56 8B ? 8B ? 8B ? ? C7 ? ? ? ? ? ? ? ? ? FF */
 			}
 
 
@@ -3985,7 +4042,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw7DoSwingEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x56\x89\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x2A\x85"
-						/* ? ? ? ? ? ? 56 89 ? ? E8 ? ? ? ? 8B ? 85 */
+				/* ? ? ? ? ? ? 56 89 ? ? E8 ? ? ? ? 8B ? 85 */
 			}
 
 			/**
@@ -4003,7 +4060,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw11GroundPoundEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x83\x2A\x2A\x83\x2A\x2A\x55\x8B\x2A\x2A\x89\x2A\x2A\x2A\x8B\x2A\x81\xEC\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x89\x2A\x2A\x56\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x8B\x2A\x89"
-						/* ? ? ? ? ? ? 83 ? ? 83 ? ? 55 8B ? ? 89 ? ? ? 8B ? 81 EC ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 56 57 8B ? E8 ? ? ? ? 8B ? 89 */
+				/* ? ? ? ? ? ? 83 ? ? 83 ? ? 55 8B ? ? 89 ? ? ? 8B ? 81 EC ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 56 57 8B ? E8 ? ? ? ? 8B ? 89 */
 			}
 
 			/**
@@ -4025,7 +4082,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankClaw11OnPlayerHitEP13CTerrorPlayerb"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x89\x2A\x2A\x53\x56\x8B\x2A\x2A\x57\x8B\x2A\x89\x2A\x2A\xE8"
-						/* ? ? ? ? ? ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 53 56 8B ? ? 57 8B ? 89 ? ? E8 */
+				/* ? ? ? ? ? ? ? ? ? A1 ? ? ? ? 33 ? 89 ? ? 53 56 8B ? ? 57 8B ? 89 ? ? E8 */
 			}
 
 			/**
@@ -4047,7 +4104,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankRock8DetonateEv"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x53\x56\x8B\x2A\x80\xBE\x2A\x2A\x2A\x2A\x2A\x57\x0F\x84\x2A\x2A\x2A\x2A\xA1"
-						/* ? ? ? ? ? ? 53 56 8B ? 80 BE ? ? ? ? ? 57 0F 84 ? ? ? ? A1 */
+				/* ? ? ? ? ? ? 53 56 8B ? 80 BE ? ? ? ? ? 57 0F 84 ? ? ? ? A1 */
 			}
 
 			/**
@@ -4063,7 +4120,7 @@
 				"library"	"server"
 				"linux"		"@_ZN9CTankRock9OnReleaseERK6VectorRK6QAngleS2_S2_"
 				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x57\xC6\x86\x2A\x2A\x2A\x2A\x2A\xC7"
-						/* ? ? ? ? ? ? 57 C6 86 ? ? ? ? ? C7 */
+				/* ? ? ? ? ? ? 57 C6 86 ? ? ? ? ? C7 */
 			}
 
 			/**
@@ -4521,6 +4578,39 @@
 				/* Search: "%s_%s_%d%s" and xref to vtable, function is above this. */
 			}
 
+			/**
+			 * Windows sig:
+			 * search for "Would change level, but not going to!\n" or "map_transition" to find InfoChangelevel::StartChangeLevel
+			 * the call above "map_transition" is InfoChangelevel::SaveEntities
+			 */
+
+			/* InfoChangelevel::SaveEntities(InfoChangelevel *this) */
+			"InfoChangelevel::SaveEntities"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15InfoChangelevel12SaveEntitiesEv"
+				"windows"	"\x55\x8B\x2A\x83\x2A\x2A\x53\x56\x8B\x2A\xB9\x2A\x2A\x2A\x2A\x89\x2A\x2A\xE8"
+				/* 55 8B ? 83 ? ? 53 56 8B ? B9 ? ? ? ? 89 ? ? E8 */
+			}
+
+			/* CTerrorPlayer::TransitionRestore(CTerrorPlayer *__hidden this) */
+			"CTerrorPlayer::TransitionRestore"
+			{
+				"library"	"server"
+				"linux"		"@_ZN13CTerrorPlayer17TransitionRestoreEv"
+				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x80\xBE\x2A\x2A\x2A\x2A\x2A\x75\x2A\x33\x2A\x5E\x8B\x2A\x5D\xC3"
+				/* ? ? ? ? ? ? ? 80 BE ? ? ? ? ? 75 ? 33 ? 5E 8B ? 5D C3 */
+			}
+
+			/* RestoreTransitionedSurvivorBots(void) */
+			"RestoreTransitionedSurvivorBots"
+			{
+				"library"	"server"
+				"linux"		"@_Z31RestoreTransitionedSurvivorBotsv"
+				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x83\x2A\x2A\x85\x2A\x0F\x84\x2A\x2A\x2A\x2A\x53\x56\x57\x50\x68"
+				/* ? ? ? ? ? ? ? ? 83 ? ? 85 ? 0F 84 ? ? ? ? 53 56 57 50 68 */
+			}
+
 
 
 			// ====================================================================================================
@@ -4647,6 +4737,21 @@
 				/* 55 8B ? 8B ? 8B ? ? ? ? ? ? ? 85 ? 74 */
 				/* Search: "Director state change SUSTAIN_PEAK" few calls below */
 				/* Found by "SilverShot" */
+			}
+
+			/*
+			* Intensity::Reset(Intensity *this)
+			*/
+			"Intensity::Reset"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9Intensity5ResetEv"
+				"windows"	"\x55\x8B\x2A\x51\x0F\x2A\x2A\x56\x8D\x2A\x2A\xF3\x2A\x2A\x2A\xF3"
+				/* 55 8B ? 51 0F ? ? 56 8D ? ? F3 ? ? ? F3 */
+				/*
+				* 1. Search "ClientSettings" for "CTerrorPlayer::CTerrorPlayer" function
+				* 2. Match to Linux, target call is below a "memset" instruction
+				*/
 			}
 
 			/**
@@ -5294,6 +5399,23 @@
 				/* Search "triggered_car_alarm" for "CCarProp::InputSurvivorStandingOnCar". Called in here. */
 			}
 
+			/*
+			 * InfoChangelevel::IsEntitySaveable(CBaseEntity *)
+			 */
+
+			/**
+			 * Windows sig:
+			 * Find InfoChangelevel::SaveEntities (see signature description InfoChangelevel::SaveEntities),
+			 * At the top of the function, see a 'while' statement, the second condition call is InfoChangelevel::IsEntitySaveable.
+			 */
+			"InfoChangelevel::IsEntitySaveable"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15InfoChangelevel16IsEntitySaveableEP11CBaseEntity"
+				"windows"	"\x55\x8B\x2A\x53\x56\x8B\x2A\x2A\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x8B\x2A\xFF\x2A\x8B\x2A\x85\x2A\x78\x2A\x8B"
+				/* 55 8B ? 53 56 8B ? ? 8B ? 8B ? ? ? ? ? 8B ? FF ? 8B ? 85 ? 78 ? 8B */
+			}
+
 
 
 			// UNUSED / BROKEN
@@ -5515,7 +5637,7 @@
 			{
 				"library"	"server"
 				"windows"	"\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x8B\x45\x14\x53\x8B\x5D\x08"
-					/* 55 8B EC 81 EC ? ? ? ? A1 ? ? ? ? 33 C5 89 45 FC 8B 45 14 53 8B 5D 08 */
+				/* 55 8B EC 81 EC ? ? ? ? A1 ? ? ? ? 33 C5 89 45 FC 8B 45 14 53 8B 5D 08 */
 			}
 
 			"nav_update_lighting"
@@ -5670,7 +5792,7 @@
 				"library"	"server"
 				"linux"		"@_ZNK18CServerGameClients15GetPlayerLimitsERiS0_S0_"
 				// "windows"	"\x8B\x44\x24\x04\x8B\x4C\x24\x08\xC7\x00\x2A\x2A\x2A\x2A\xC7\x01\x2A\x2A\x2A\x2A\x8B\x10"
-					/* 8B 44 24 04 8B 4C 24 08 C7 00 ? ? ? ? C7 01 ? ? ? ? 8B 10 */
+				/* 8B 44 24 04 8B 4C 24 08 C7 00 ? ? ? ? C7 01 ? ? ? ? 8B 10 */
 			}
 
 			/*
@@ -5814,7 +5936,7 @@
 				"library"	"server"
 				"linux"		"@_ZN13CTerrorPlayer12RoundRespawnEv"
 				"windows"	"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x75"
-				/* 56 8B F1 E8 ? ? ? ? E8 ? ? ? ? 84 C0 75	*/
+				/* 56 8B F1 E8 ? ? ? ? E8 ? ? ? ? 84 C0 75 */
 			}
 
 			/*

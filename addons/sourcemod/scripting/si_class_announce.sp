@@ -7,7 +7,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 public Plugin myinfo =
 {
@@ -63,6 +63,7 @@ bool
 
 public void OnPluginStart()
 {
+	LoadTranslation("si_class_announce.phrases");
 	g_hCvarFooter	= CreateConVar(	"si_announce_ready_footer",
 									"1",
 									"Enable si class string be added to readyup panel as footer (if available).",
@@ -92,7 +93,7 @@ void ProcessReadyupFooter()
 	}
 }
 
-public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bMessagePrinted = false;
 	g_bRoundStarted = true;
@@ -108,12 +109,12 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 	}
 }
 
-public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
+void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundStarted = false;
 }
 
-public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
 	if (!g_bAllowFooter) return;
 	
@@ -130,7 +131,7 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 	}
 }
 
-public Action UpdateReadyUpFooter(Handle timer)
+Action UpdateReadyUpFooter(Handle timer)
 {
 	g_hAddFooterTimer = null;
 	
@@ -158,7 +159,7 @@ public void OnRoundIsLive()
 	}
 }
 
-public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontBroadcast)
+void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontBroadcast)
 {
 	// if no readyup, use this as the starting event
 	if (!g_bMessagePrinted) {
@@ -194,7 +195,18 @@ bool ProcessSIString(char[] msg, int maxlength, bool footer = false)
 		return false;
 	}
 
-	strcopy(msg, maxlength, footer ? "SI: " : "Special Infected: ");
+	char translate[32];
+
+	if(footer)
+	{
+		Format(translate, sizeof(translate), "%T", "SI", LANG_SERVER);
+		strcopy(msg, maxlength, translate);
+	}
+	else
+	{
+		Format(translate, sizeof(translate), "%T", "SpecialInfected", LANG_SERVER);
+		strcopy(msg, maxlength, translate);
+	}
 	
 	int printFlags = g_hCvarPrint.IntValue;
 	bool useColor = !footer && (printFlags & CHAT_FLAG);
@@ -243,4 +255,24 @@ stock bool IsInfectedTeamFullAlive()
 		if (IsClientInGame(i) && GetClientTeam(i) == TEAM_INFECTED && IsPlayerAlive(i)) players++;
 	}
 	return players == cMaxZombies.IntValue;
+}
+
+/**
+ * Check if the translation file exists
+ *
+ * @param translation	Translation name.
+ * @noreturn
+ */
+stock void LoadTranslation(const char[] translation)
+{
+	char
+		sPath[PLATFORM_MAX_PATH],
+		sName[64];
+
+	Format(sName, sizeof(sName), "translations/%s.txt", translation);
+	BuildPath(Path_SM, sPath, sizeof(sPath), sName);
+	if (!FileExists(sPath))
+		SetFailState("Missing translation file %s.txt", translation);
+
+	LoadTranslations(translation);
 }

@@ -1,6 +1,6 @@
 /*
 *	Left 4 DHooks Direct
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
 
 
 
-#define PLUGIN_VERSION		"1.155"
-#define PLUGIN_VERLONG		1155
+#define PLUGIN_VERSION		"1.160"
+#define PLUGIN_VERLONG		1160
 
 #define DEBUG				0
 // #define DEBUG			1	// Prints addresses + detour info (only use for debugging, slows server down).
@@ -294,6 +294,7 @@ int g_iOff_m_bFirstSurvivorLeftStartArea;
 int g_iOff_m_preIncapacitatedHealth;
 int g_iOff_m_preIncapacitatedHealthBuffer;
 int g_iOff_m_maxFlames;
+int g_iOff_Intensity;
 int g_iOff_m_flow;
 int g_iOff_m_PendingMobCount;
 int g_iOff_m_nFirstClassIndex;
@@ -303,6 +304,11 @@ int g_iOff_m_bInIntro;
 int g_iOff_m_attributeFlags;
 int g_iOff_m_spawnAttributes;
 int g_iOff_NavAreaID;
+
+Address g_pCTerrorPlayer_RoundRespawn;
+int g_iOff_RespawnPlayer;
+int g_iSize_RespawnPlayer;
+int g_iByte_RespawnPlayer;
 // int g_iOff_m_iClrRender; // NULL PTR - METHOD (kept for demonstration)
 // int ClearTeamScore_A;
 // int ClearTeamScore_B;
@@ -370,6 +376,7 @@ bool g_bLeft4Dead2;
 bool g_bFinalCheck;
 bool g_bMapStarted;
 bool g_bRoundEnded;
+bool g_bBreakable;
 bool g_bCheckpointFirst[MAXPLAYERS+1];
 bool g_bCheckpointLast[MAXPLAYERS+1];
 ConVar g_hCvar_VScriptBuffer;
@@ -1355,7 +1362,7 @@ void AddonsDisabler_Unpatch()
 // ====================================================================================================
 //										ADDONS DISABLER DETOUR
 // ====================================================================================================
-MRESReturn DTR_AddonsDisabler(int pThis, Handle hReturn, DHookParam hParams) // Forward "L4D2_OnClientDisableAddons"
+MRESReturn DTR_AddonsDisabler(int pThis, DHookReturn hReturn, DHookParam hParams) // Forward "L4D2_OnClientDisableAddons"
 {
 	// Details on finding offsets can be found here: https://github.com/ProdigySim/left4dhooks/pull/1
 	// Big thanks to "ProdigySim" for updating for The Last Stand update.

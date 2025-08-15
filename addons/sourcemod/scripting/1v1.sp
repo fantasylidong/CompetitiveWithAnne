@@ -52,7 +52,7 @@ public Plugin myinfo =
 	name = "1v1 EQ",
 	author = "Blade + Confogl Team, Tabun, Visor",
 	description = "A plugin designed to support 1v1.",
-	version = "0.2.1",
+	version = "0.2.2",
 	url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -71,14 +71,15 @@ public void OnPluginStart()
 	HookEvent("player_hurt", Event_PlayerHurt, EventHookMode_Post);
 }
 
-public void Event_PlayerHurt(Event hEvent, const char[] sEventName, bool bDontBroadcast)
+void Event_PlayerHurt(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
 	int fDamage = hEvent.GetInt("dmg_health");
 	if (fDamage < g_hCvarDmgThreshold.IntValue) {
 		return;
 	}
 	
-	int iAttacker = GetClientOfUserId(hEvent.GetInt("attacker"));
+	int iAttackerId = hEvent.GetInt("attacker");
+	int iAttacker = GetClientOfUserId(iAttackerId);
 	if (!IsClientAndInGame(iAttacker) || GetClientTeam(iAttacker) != L4D2Team_Infected) {
 		return;
 	}
@@ -114,7 +115,7 @@ public void Event_PlayerHurt(Event hEvent, const char[] sEventName, bool bDontBr
 		CPrintToChatAll("%t %t", "Tag", "HealthRemaining", sName, L4D2_InfectedNames[iZclass], iRemainingHealth);
 	}
 	
-	ForcePlayerSuicide(iAttacker);
+	RequestFrame(NextFrame_PlayerHurt, iAttackerId);
 	
 	int maxHealth = g_hSpecialInfectedHP[iZclass].IntValue;
 	if (iRemainingHealth == 1) {
@@ -132,6 +133,22 @@ public void Event_PlayerHurt(Event hEvent, const char[] sEventName, bool bDontBr
 	{
 		CPrintToChat(iVictim, "%t", "NBad");
 	}
+}
+
+void NextFrame_PlayerHurt(int userid)
+{
+	int iAttacker = GetClientOfUserId(userid);
+	if (!IsClientAndInGame(iAttacker) || GetClientTeam(iAttacker) != L4D2Team_Infected || !IsPlayerAlive(iAttacker)) {
+		return;
+	}
+
+	int iZclass = GetEntProp(iAttacker, Prop_Send, "m_zombieClass");
+	
+	if (iZclass < L4D2Infected_Smoker || iZclass > L4D2Infected_Charger) {
+		return;
+	}
+	
+	ForcePlayerSuicide(iAttacker);
 }
 
 bool IsClientAndInGame(int iClient)

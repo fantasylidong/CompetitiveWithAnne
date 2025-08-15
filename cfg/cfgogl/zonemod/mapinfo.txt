@@ -476,7 +476,7 @@
 		"start_dist"		"50.000000"
 		"start_extra_dist"	"0.000000"
 		"end_dist"			"50.000000"
-		"max_distance"		"700"
+		"max_distance"		"600"
 		"horde_limit"		"150"
 		"tank_ban_flow"
 		{
@@ -1080,6 +1080,11 @@
 				"min"		"34"
 				"max"		"63"
 			}
+			"may spawn in water"
+			{
+				"min"		"70"
+				"max"		"72"
+			}
 			"Late spawns"
 			{
 				"min"		"78"
@@ -1678,6 +1683,10 @@
 		"start_extra_dist"	"203.035721"
 		"end_point"			"696.980591 8058.962891 0.031250"
 		"end_dist"			"164.379135"
+		"ItemLimits"
+		{
+			"pain_pills"	"3"
+		}
 		"tank_ban_flow"
 		{
 			"1"
@@ -1686,6 +1695,7 @@
 				"max"		"100"
 			}
 		}
+		"max_distance"      "700"
 	}
 	"uf3_harbor"
 	{
@@ -1702,6 +1712,10 @@
 		"start_extra_dist"	"123.117989"
 		"end_point"			"-697.423767 -182.836334 214.806290"
 		"end_dist"			"1754.263794"
+		"ItemLimits"
+		{
+			"pain_pills"	"4"
+		}
 	}
 	
 //=======================================================================
@@ -2166,6 +2180,7 @@
 		"start_extra_dist"	"350.000000"
 		"end_dist"			"50.000000"
 		"horde_limit"		"90"
+		"max_distance"      "600"
 	}
 	"l4d2_diescraper3_mid_361"
 	{
@@ -2904,16 +2919,63 @@
 
 //=======================================================================
 //=============== Open Road 绝命公路
+	"x1m1_cliffs"
+	{
+		"start_point"		"-1015.396912 341.406525 126.031250"
+		"end_point"			"3243.783203 6433.084473 -4.936020"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"200.000000"
+		"end_dist"			"50.000000"
+	}
 	"x1m2_path"
 	{
+		"start_point"		"3243.607178 6429.794922 -4.936020"
+		"end_point"			"-1189.893921 8862.433594 -321.936340"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"300.000000"
+		"end_dist"			"50.000000"
+		"max_distance"		"600"
 		"tank_ban_flow"
 		{
-			"being out the cave"
+			"Outside the cave"
 			{
 				"min"		"82"
 				"max"		"100"
 			}
 		}
+	}
+	"x1m3_city"
+	{
+		"start_point"		"-1191.079956 8860.584961 -321.936340"
+		"end_point"			"-2887.968750 3387.599365 -480.968750"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"500.000000"
+		"end_dist"			"350.000000"
+	}
+	"x1m4_forest"
+	{
+		"start_point"		"-3031.968750 3448.686768 -480.968750"
+		"end_point"			"3737.209473 -3916.848633 -841.968750"
+		"start_dist"		"350.000000"
+		"start_extra_dist"	"500.000000"
+		"end_dist"			"300.000000"
+		"max_distance"		"600"
+		"tank_ban_flow"
+		{
+			"1"
+			{
+				"min"		"70"
+				"max"		"100"
+			}
+		}
+	}
+	"x1m5_salvation"
+	{
+		"start_point"		"3724.242188 -3920.156982 -841.968750"
+		"end_point"			"6660.927246 -2910.637695 -1017.968750"
+		"start_dist"		"300.000000"
+		"start_extra_dist"	"350.000000"
+		"end_dist"			"50.000000"
 	}
 	
 //=======================================================================
@@ -2925,7 +2987,65 @@
 			"pain_pills"	"4"
 		}
 	}
-
+	
+//=======================================================================
+//=============== Dead Center Rebirth 死亡中心-重生
+ "dcr_m1_hotel"
+	{
+		"start_point"		"427.606232 5739.467773 2926.982178"
+		"end_point"			"2045.685913 4429.264160 1246.031250"
+		"start_dist"		"100.000000"
+		"start_extra_dist"	"0.000000"
+		"end_dist"			"200.000000"
+		"max_distance"		"400"
+		"tank_ban_flow"
+		{
+			"1"
+			{
+				"min"		"0"
+				"max"		"21"
+			}
+			"2"
+			{
+				"min"		"37"
+				"max"		"100"
+			}
+		}
+	}
+	"dcr_m2_streets"
+	{
+		"start_point"		"2395.007813 4964.173340 522.224670"
+		"end_point"			"-7688.886230 -4694.720703 463.251282"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"250.000000"
+		"end_dist"			"200.000000"
+		
+	}
+	"dcr_m3_mall"
+	{
+		"start_point"		"6520.577148 -1477.425659 103.001579"
+		"end_point"			"-2182.585938 -4630.097168 615.226501"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"150.000000"
+		"end_dist"			"200.000000"
+		"tank_ban_flow"
+		{
+			"Event"
+			{
+				"min"		"52"
+				"max"		"68"
+			}
+		}
+	}
+	"dcr_m4_atrium"
+	{
+		"start_point"		"-2207.119141 -4694.244141 615.226318"
+		"end_point"			"-4467.291016 -4060.759277 88.031250"
+		"start_dist"		"50.000000"
+		"start_extra_dist"	"150.000000"
+		"end_dist"			"150.000000"
+	}
+	
 //-------- ↓↓↓ you can add custom info here ↓↓↓
 
 
@@ -2933,6 +3053,6 @@
 
 
 
-//-------- ↓↓↓ dont del the last parenthesis ↓↓↓
+//-------- ↓↓↓ dont delete the closing bracket ↓↓↓
 
 }

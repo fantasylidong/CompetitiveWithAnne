@@ -1,6 +1,6 @@
 /*
 *	Left 4 DHooks Direct
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2025 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -173,6 +173,15 @@ GlobalForward g_hFWD_CGasCan_OnActionComplete;
 GlobalForward g_hFWD_CGasCan_OnActionComplete_Post;
 GlobalForward g_hFWD_CGasCan_OnActionComplete_PostHandled;
 GlobalForward g_hFWD_CServerGameDLL_ServerHibernationUpdate;
+GlobalForward g_hFWD_InfoChangelevel_SaveEntities;
+GlobalForward g_hFWD_InfoChangelevel_SaveEntities_Post;
+GlobalForward g_hFWD_InfoChangelevel_SaveEntities_PostHandled;
+GlobalForward g_hFWD_CTerrorPlayer_TransitionRestore;
+GlobalForward g_hFWD_CTerrorPlayer_TransitionRestore_Post;
+GlobalForward g_hFWD_CTerrorPlayer_TransitionRestore_PostHandled;
+GlobalForward g_hFWD_RestoreTransitionedSurvivorBots;
+GlobalForward g_hFWD_RestoreTransitionedSurvivorBots_Post;
+GlobalForward g_hFWD_RestoreTransitionedSurvivorBots_PostHandled;
 GlobalForward g_hFWD_CTerrorPlayer_OnPouncedOnSurvivor;
 GlobalForward g_hFWD_CTerrorPlayer_OnPouncedOnSurvivor_Post;
 GlobalForward g_hFWD_CTerrorPlayer_OnPouncedOnSurvivor_PostHandled;
@@ -438,9 +447,9 @@ void SetupDetours(GameData hGameData = null)
 
 	if( g_bLeft4Dead2 )
 	{
-		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D_MolotovProjectile_Pre");
-		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D_MolotovProjectile_Post",					true);
-		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D_MolotovProjectile_PostHandled",			true);
+		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D2_VomitJarProjectile_Pre");
+		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D2_VomitJarProjectile_Post",					true);
+		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CVomitJarProjectile_Create_Pre,		DTR_CVomitJarProjectile_Create_Post,			"L4DD::CVomitJarProjectile::Create",								"L4D2_VomitJarProjectile_PostHandled",			true);
 
 		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CGrenadeLauncherProjectile_Create_Pre,	DTR_CGrenadeLauncherProjectile_Create_Post,	"L4DD::CGrenadeLauncher_Projectile::Create",						"L4D2_GrenadeLauncherProjectile_Pre");
 		CreateDetour(g_bLinuxOS ? hGameData : g_hTempGameData,		DTR_CGrenadeLauncherProjectile_Create_Pre,	DTR_CGrenadeLauncherProjectile_Create_Post,	"L4DD::CGrenadeLauncher_Projectile::Create",						"L4D2_GrenadeLauncherProjectile_Post",			true);
@@ -472,6 +481,26 @@ void SetupDetours(GameData hGameData = null)
 	CreateDetour(hGameData,			DTR_CTerrorPlayer_CancelStagger,							DTR_CTerrorPlayer_CancelStagger_Post,						"L4DD::CTerrorPlayer::CancelStagger",								"L4D_OnCancelStagger");
 	CreateDetour(hGameData,			DTR_CTerrorPlayer_CancelStagger,							DTR_CTerrorPlayer_CancelStagger_Post,						"L4DD::CTerrorPlayer::CancelStagger",								"L4D_OnCancelStagger_Post",						true);
 	CreateDetour(hGameData,			DTR_CTerrorPlayer_CancelStagger,							DTR_CTerrorPlayer_CancelStagger_Post,						"L4DD::CTerrorPlayer::CancelStagger",								"L4D_OnCancelStagger_PostHandled",				true);
+
+	if( !g_bLeft4Dead2 )
+	{
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D1,						DTR_InfoChangelevel_SaveEntities_Post_L4D1,					"L4DD::InfoChangelevel::SaveEntities",								"L4D1_OnSavingEntities");
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D1,						DTR_InfoChangelevel_SaveEntities_Post_L4D1,					"L4DD::InfoChangelevel::SaveEntities",								"L4D1_OnSavingEntities_Post",					true);
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D1,						DTR_InfoChangelevel_SaveEntities_Post_L4D1,					"L4DD::InfoChangelevel::SaveEntities",								"L4D1_OnSavingEntities_PostHandled",			true);
+	}
+	else
+	{
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D2,						DTR_InfoChangelevel_SaveEntities_Post_L4D2,					"L4DD::InfoChangelevel::SaveEntities",								"L4D2_OnSavingEntities");
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D2,						DTR_InfoChangelevel_SaveEntities_Post_L4D2,					"L4DD::InfoChangelevel::SaveEntities",								"L4D2_OnSavingEntities_Post",					true);
+		CreateDetour(hGameData,		DTR_InfoChangelevel_SaveEntities_L4D2,						DTR_InfoChangelevel_SaveEntities_Post_L4D2,					"L4DD::InfoChangelevel::SaveEntities",								"L4D2_OnSavingEntities_PostHandled",			true);
+
+		CreateDetour(hGameData,		DTR_CTerrorPlayer_TransitionRestore,						DTR_CTerrorPlayer_TransitionRestore_Post,					"L4DD::CTerrorPlayer::TransitionRestore",							"L4D2_OnTransitionRestore", 					false);
+		CreateDetour(hGameData,		DTR_CTerrorPlayer_TransitionRestore,						DTR_CTerrorPlayer_TransitionRestore_Post,					"L4DD::CTerrorPlayer::TransitionRestore",							"L4D2_OnTransitionRestore_Post", 				true);
+		CreateDetour(hGameData,		DTR_CTerrorPlayer_TransitionRestore,						DTR_CTerrorPlayer_TransitionRestore_Post,					"L4DD::CTerrorPlayer::TransitionRestore",							"L4D2_OnTransitionRestore_PostHandled",			true);
+		CreateDetour(hGameData,		DTR_RestoreTransitionedSurvivorBots, 						DTR_RestoreTransitionedSurvivorBots_Post,					"L4DD::RestoreTransitionedSurvivorBots",							"L4D2_OnRestoreTransitionedSurvivorBots",		false);
+		CreateDetour(hGameData,		DTR_RestoreTransitionedSurvivorBots, 						DTR_RestoreTransitionedSurvivorBots_Post,					"L4DD::RestoreTransitionedSurvivorBots",							"L4D2_OnRestoreTransitionedSurvivorBots_Post",	true);
+		CreateDetour(hGameData,		DTR_RestoreTransitionedSurvivorBots, 						DTR_RestoreTransitionedSurvivorBots_Post,					"L4DD::RestoreTransitionedSurvivorBots",							"L4D2_OnRestoreTransitionedSurvivorBots_PostHandled",	true);
+	}
 
 	if( !g_bLeft4Dead2 )
 	{
@@ -3487,7 +3516,8 @@ MRESReturn DTR_CTerrorPlayer_OnIncapacitatedAsSurvivor_Post(int pThis, DHookRetu
 MRESReturn DTR_CTerrorPlayer_DropWeapons(int pThis, DHookReturn hReturn) // Forward "L4D_OnDeathDroppedWeapons"
 {
 	//PrintToServer("##### DTR_CTerrorPlayer_DropWeapons");
-
+	if( pThis < 1 || pThis > MaxClients ) return MRES_Ignored;
+	if( !IsClientInGame(pThis) ) return MRES_Ignored;
 	if( !IsPlayerAlive(pThis) ) return MRES_Ignored; // Triggered before round_start or so but players are dead at this point, should only trigger when still alive
 
 	// Get held object if non-weapon
@@ -3863,6 +3893,8 @@ MRESReturn DTR_CMolotovProjectile_Create_Post(DHookReturn hReturn, DHookParam hP
 bool g_bBlock_CPipeBombProjectile_Create;
 MRESReturn DTR_CPipeBombProjectile_Create_Pre(DHookReturn hReturn, DHookParam hParams) // Forward "L4D_PipeBombProjectile_Pre"
 {
+	if(	g_bBreakable ) return MRES_Ignored;
+
 	//PrintToServer("##### DTR_CPipeBombProjectile_Create_Pre");
 	g_bBlock_CPipeBombProjectile_Create = false;
 
@@ -3911,6 +3943,8 @@ MRESReturn DTR_CPipeBombProjectile_Create_Pre(DHookReturn hReturn, DHookParam hP
 
 MRESReturn DTR_CPipeBombProjectile_Create_Post(DHookReturn hReturn, DHookParam hParams) // Forward "L4D_PipeBombProjectile_Post" and "L4D_PipeBombProjectile_PostHandled"
 {
+	if(	g_bBreakable ) return MRES_Ignored;
+
 	//PrintToServer("##### DTR_CPipeBombProjectile_Create_Post");
 	int client;
 	if( !hParams.IsNull(5) )
@@ -4149,6 +4183,8 @@ MRESReturn DTR_CMolotovProjectile_Detonate(int pThis, DHookReturn hReturn, DHook
 bool g_bBlock_CPipeBombProjectile_Detonate;
 MRESReturn DTR_CPipeBombProjectile_Detonate_Pre(int pThis, DHookReturn hReturn, DHookParam hParams) // Forward "L4D_PipeBomb_Detonate"
 {
+	if(	g_bBreakable ) return MRES_Ignored;
+
 	//PrintToServer("##### DTR_CPipeBombProjectile_Detonate_Pre");
 	g_bBlock_CPipeBombProjectile_Detonate = false;
 
@@ -4173,6 +4209,8 @@ MRESReturn DTR_CPipeBombProjectile_Detonate_Pre(int pThis, DHookReturn hReturn, 
 
 MRESReturn DTR_CPipeBombProjectile_Detonate(int pThis, DHookReturn hReturn, DHookParam hParams) // Forward "L4D_PipeBomb_Detonate_Post" and "L4D_PipeBomb_Detonate_PostHandled"
 {
+	if(	g_bBreakable ) return MRES_Ignored;
+
 	//PrintToServer("##### DTR_CPipeBombProjectile_Detonate");
 	int client = GetEntPropEnt(pThis, Prop_Send, "m_hThrower");
 
@@ -4262,12 +4300,16 @@ MRESReturn DTR_CGrenadeLauncher_Projectile_Explode(int pThis, DHookReturn hRetur
 
 MRESReturn DTR_CBreakableProp_Break_Pre(int pThis, DHookReturn hReturn, DHookParam hParams)
 {
+	g_bBreakable = true;
+
 	//PrintToServer("##### DTR_CBreakableProp_Break_Pre");
 	return MRES_Ignored;
 }
 
 MRESReturn DTR_CBreakableProp_Break_Post(int pThis, DHookReturn hReturn, DHookParam hParams) // Forward "L4D_CBreakableProp_Break"
 {
+	g_bBreakable = false;
+
 	//PrintToServer("##### DTR_CBreakableProp_Break_Post");
 	int entity;
 	if( !hParams.IsNull(1) )
@@ -4694,6 +4736,144 @@ MRESReturn DTR_CServerGameDLL_ServerHibernationUpdate(int pThis, DHookReturn hRe
 
 	Call_StartForward(g_hFWD_CServerGameDLL_ServerHibernationUpdate);
 	Call_PushCell(status);
+	Call_Finish();
+
+	return MRES_Ignored;
+}
+
+bool g_bBlock_InfoChangelevel_SaveEntities_L4D1;
+MRESReturn DTR_InfoChangelevel_SaveEntities_L4D1(int pThis, DHookParam hParams) // Forward "L4D1_OnSavingEntities"
+{
+	//PrintToServer("##### DTR_InfoChangelevel_SaveEntities_L4D1");
+	if( !IsValidEntity(pThis) ) return MRES_Ignored;
+
+	Address pKv = view_as<Address>(hParams.Get(1));
+
+	Action aResult = Plugin_Continue;
+	Call_StartForward(g_hFWD_InfoChangelevel_SaveEntities);
+	Call_PushCell(pThis);
+	Call_PushCell(pKv);
+	Call_Finish(aResult);
+
+	if( aResult == Plugin_Handled )
+	{
+		g_bBlock_InfoChangelevel_SaveEntities_L4D1 = true;
+
+		return MRES_Supercede;
+	}
+
+	return MRES_Ignored;
+}
+
+MRESReturn DTR_InfoChangelevel_SaveEntities_Post_L4D1(int pThis, DHookParam hParams) // Forward "L4D1_OnSavingEntities_Post" and "L4D1_OnSavingEntities_PostHandled"
+{
+	//PrintToServer("##### DTR_InfoChangelevel_SaveEntities_Post_L4D1");
+	if( !IsValidEntity(pThis) ) return MRES_Ignored;
+
+	Address pKv = view_as<Address>(hParams.Get(1));
+
+	Call_StartForward(g_bBlock_InfoChangelevel_SaveEntities_L4D1 ? g_hFWD_InfoChangelevel_SaveEntities_PostHandled : g_hFWD_InfoChangelevel_SaveEntities_Post);
+	Call_PushCell(pThis);
+	Call_PushCell(pKv);
+	Call_Finish();
+
+	return MRES_Ignored;
+}
+
+bool g_bBlock_InfoChangelevel_SaveEntities_L4D2;
+MRESReturn DTR_InfoChangelevel_SaveEntities_L4D2(int pThis) // Forward "L4D2_OnSavingEntities"
+{
+	//PrintToServer("##### DTR_InfoChangelevel_SaveEntities_L4D2");
+	g_bBlock_InfoChangelevel_SaveEntities_L4D2 = false;
+
+	if( !IsValidEntity(pThis) ) return MRES_Ignored;
+
+	Action aResult = Plugin_Continue;
+	Call_StartForward(g_hFWD_InfoChangelevel_SaveEntities);
+	Call_PushCell(pThis);
+	Call_Finish(aResult);
+
+	if( aResult == Plugin_Handled )
+	{
+		g_bBlock_InfoChangelevel_SaveEntities_L4D2 = true;
+
+		return MRES_Supercede;
+	}
+
+	return MRES_Ignored;
+}
+
+MRESReturn DTR_InfoChangelevel_SaveEntities_Post_L4D2(int pThis) // Forward "L4D2_OnSavingEntities_Post" and "L4D2_OnSavingEntities_PostHandled"
+{
+	//PrintToServer("##### DTR_InfoChangelevel_SaveEntities_Post_L4D2");
+	if( !IsValidEntity(pThis) ) return MRES_Ignored;
+
+	Call_StartForward(g_bBlock_InfoChangelevel_SaveEntities_L4D2 ? g_hFWD_InfoChangelevel_SaveEntities_PostHandled : g_hFWD_InfoChangelevel_SaveEntities_Post);
+	Call_PushCell(pThis);
+	Call_Finish();
+
+	return MRES_Ignored;
+}
+
+bool g_bBlock_CTerrorPlayer_TransitionRestore;
+MRESReturn DTR_CTerrorPlayer_TransitionRestore(int pThis, DHookReturn hReturn)
+{
+	//PrintToServer("##### DTR_CTerrorPlayer_TransitionRestore");
+	g_bBlock_CTerrorPlayer_TransitionRestore = false;
+
+	Action aResult = Plugin_Continue;
+	Call_StartForward(g_hFWD_CTerrorPlayer_TransitionRestore);
+	Call_PushCell(pThis);
+	Call_Finish(aResult);
+
+	if( aResult == Plugin_Handled )
+	{
+		g_bBlock_CTerrorPlayer_TransitionRestore = true;
+
+		hReturn.Value = 0;
+		return MRES_Supercede;
+	}
+
+	return MRES_Ignored;
+}
+
+MRESReturn DTR_CTerrorPlayer_TransitionRestore_Post(int pThis, DHookReturn hReturn)
+{
+	//PrintToServer("##### DTR_CTerrorPlayer_TransitionRestore_Post");
+	Address iReturn = hReturn.Value;
+
+	Call_StartForward(g_bBlock_CTerrorPlayer_TransitionRestore ? g_hFWD_CTerrorPlayer_TransitionRestore_PostHandled : g_hFWD_CTerrorPlayer_TransitionRestore_Post);
+	Call_PushCell(pThis);
+	Call_PushCell(iReturn);
+	Call_Finish();
+
+	return MRES_Ignored;
+}
+
+bool g_bBlock_RestoreTransitionedSurvivorBots;
+MRESReturn DTR_RestoreTransitionedSurvivorBots()
+{
+	//PrintToServer("##### DTR_RestoreTransitionedSurvivorBots");
+	g_bBlock_RestoreTransitionedSurvivorBots = false;
+
+	Action aResult = Plugin_Continue;
+	Call_StartForward(g_hFWD_RestoreTransitionedSurvivorBots);
+	Call_Finish(aResult);
+
+	if( aResult == Plugin_Handled )
+	{
+		g_bBlock_RestoreTransitionedSurvivorBots = true;
+		return MRES_Supercede;
+	}
+
+	return MRES_Ignored;
+}
+
+MRESReturn DTR_RestoreTransitionedSurvivorBots_Post()
+{
+	//PrintToServer("##### DTR_RestoreTransitionedSurvivorBots_Post");
+
+	Call_StartForward(g_bBlock_RestoreTransitionedSurvivorBots ? g_hFWD_RestoreTransitionedSurvivorBots_PostHandled : g_hFWD_RestoreTransitionedSurvivorBots_Post);
 	Call_Finish();
 
 	return MRES_Ignored;
@@ -5527,7 +5707,10 @@ MRESReturn DTR_CSquirrelVM_GetValue(DHookReturn hReturn, DHookParam hParams) // 
 	hParams.GetString(2, key, sizeof(key));
 
 	// Setup methodmap
-	ScriptVariant pVar = ScriptVariant(hParams.GetAddress(3));
+	Address ptr = hParams.GetAddress(3);
+	if( !ptr ) return MRES_Ignored;
+
+	ScriptVariant pVar = ScriptVariant(ptr);
 	fieldtype_t type = pVar.m_type;
 
 	// Forwards
