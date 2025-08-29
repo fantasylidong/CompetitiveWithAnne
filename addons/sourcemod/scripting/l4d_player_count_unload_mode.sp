@@ -240,8 +240,11 @@ void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) 
 {
-	ClearDefault();
+    ClearDefault();
+    ResetTimer();          // ← 必须停掉
+    g_bPluginStart = false; // ← 暂停检测，等下个回合再启动
 }
+
 
 void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast) 
 {
@@ -301,16 +304,8 @@ Action Timer_DetectPlayerCount(Handle timer)
     if(!bIsInCvarTime)
         return Plugin_Continue;
 
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if(!IsClientInGame(i)) continue;
-        if(IsFakeClient(i)) continue;
-
-        if(HasAccess(i, g_sCvarFlag)) 
-            return Plugin_Continue;
-
-        break;
-    }
+    if (IsAnyAdminOnline())
+        return Plugin_Continue;
 
     ServerCommand("sm_resetmatch");
     CPrintToChatAll("管理员不在场，此时间段模式人数不足 {green}%d{default} 人，{green}强制卸载模式!!!!", g_iCvarCount);
@@ -318,6 +313,15 @@ Action Timer_DetectPlayerCount(Handle timer)
     return Plugin_Continue;
 }
 
+bool IsAnyAdminOnline()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i) || IsFakeClient(i)) continue;
+        if (HasAccess(i, g_sCvarFlag)) return true;
+    }
+    return false;
+}
 // Function-------------------------------
 
 void ConvertStringTimeToInt(char[] sTime, ETimeData eTimeData)
@@ -348,18 +352,16 @@ void ConvertStringTimeToInt(char[] sTime, ETimeData eTimeData)
 	eTimeData.m_iCvarEndMin = StringToInt(sEndTime[1]);
 }
 
-bool IsBetweenTime(int iSystemTimeHour, int iSystemTimeMin, ETimeData eTimeData)
+bool IsBetweenTime(int sysH, int sysM, ETimeData d)
 {
-	int systemmins = iSystemTimeHour*60+iSystemTimeMin;
-	int startmins = eTimeData.m_iCvarStartHour*60+eTimeData.m_iCvarStartMin;
-	int endmins = eTimeData.m_iCvarEndHour*60+eTimeData.m_iCvarEndMin;
+    int sys  = sysH*60 + sysM;
+    int beg  = d.m_iCvarStartHour*60 + d.m_iCvarStartMin;
+    int end  = d.m_iCvarEndHour*60   + d.m_iCvarEndMin;
 
-	if(startmins <= systemmins <= endmins)
-	{
-		return true;
-	}
-
-	return false;
+    if (beg == end) return true;                 // 覆盖整天
+    if (beg < end)  return (sys >= beg && sys <= end);
+    // 跨零点
+    return (sys >= beg || sys <= end);
 }
 
 // Others-------------------------------

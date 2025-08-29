@@ -341,7 +341,7 @@ int GetCrowdPlace(int num_survivors)
 	if (num_survivors > 0)
 	{
 		int index = 0, iTarget = 0;
-		int[] iSurvivors = new int[num_survivors];
+		int[] iSurvivors = new int[MAXPLAYERS + 1];
 		float fDistance[MAXPLAYERS + 1] = {-1.0};
 		for (int client = 1; client <= MaxClients; client++)
 		{
