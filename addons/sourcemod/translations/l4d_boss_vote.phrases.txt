@@ -139,9 +139,4 @@
 		"#format"   "{1:i},{2:s}" // 1:p_iRequestedPercent 2:clientName
         "en"        "Witch spawn set to {olive}{1}%{default} by Admin {blue}{2}{default}."
     }
-	"RoundNotReachLimit"
-    {
-		"#format"   "{1:i}" // 1:round_limit
-        "en"        "When SI limit below 9, you need try {1} times to use boss vote."
-    }
 }

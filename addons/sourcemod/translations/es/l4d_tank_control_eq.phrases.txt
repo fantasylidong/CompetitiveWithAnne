@@ -1,35 +1,46 @@
 "Phrases"
 {
-	"Tag_Selecion"
+	"TagRage"
 	{
-		"es"		"{red}<{default}Selección de Tank{red}>{default}"
+		"es"		"{red}<{default}Tank Rage{red}>"
 	}
-	"Tag_Rage"
+	"Refilled"
 	{
-		"es"		"{red}<{default}Ira del Tank{red}>{default}"
+		"es"		"{default}({green}%N{default}) {olive}Medidor de Control {red}Recargado"
 	}
-	"YouBecomeTank"
+	"RefilledBot"
 	{
-		"es"		"¡{green}Tu{default} te convertirás en el {red}Tank{default}!"
+		"es"		"{olive}Medidor de Control {red}Recargado"
 	}
-	"BecomeTank"
+
+    "TagSelection"
 	{
-		"es"		"{olive}%s{default} se convertirá en el {red}Tank{default}!"
+		"es"		"{red}<{default}Tank Selection{red}>"
 	}
-	"UnableGiveTank"
+    "YouBecomeTank"
 	{
-		"es"		"[{olive}SM{default}] %s no es infectado. No se puede dar el Tank"
+		"es"		"{green}Tu {default}serás el {red}Tank{default}!"
 	}
-	"Hit_RageMeterRefilled"
+   "BecomeTank"
 	{
-		"es"		"Medidor de ira Recargado"
+		"es"		"{olive}%N {default}será el {red}Tank!"
 	}
-	"YouRageMeterRefilled"
+
+    "TagControl"
 	{
-		"es"		"{olive}Medidor de ira {red}Recargado{default}"
+		"es"		"{green}[{olive}Tank Control{green}]"
 	}
-	"RageMeterRefilled"
+   "InvalidTarget"
 	{
-		"es"		"({green}%N{default}'s) {olive}Medidor de ira {red}Recargado"
+		"es"		"{default}Objetivo inválido. No se puede dar tanque"
+	}
+   "NoInfected"
+	{
+		"es"		"{olive}%N {default}no está en el equipo infectado. No se puede dar tanque"
+	}
+
+    "HintText"
+	{
+		"es"		 "Medidor de Control Recargado"
 	}
 }

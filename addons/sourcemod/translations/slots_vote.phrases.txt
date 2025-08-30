@@ -41,8 +41,4 @@
 	{
 		"en"		"Limiting Slots..."
 	}
-	"LimitSlotsBelow"
-	{
-		"en"		"Only Admin can set slot below {blue}{1}{default}."
-	}
 }

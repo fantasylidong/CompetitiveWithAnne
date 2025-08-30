@@ -1,128 +1,108 @@
 "Phrases"
 {
-	"Tag"
+// The following uses bracket style color tags (see colors.inc)
+	"PanelHide"
 	{
-		"chi"		"[{green}!{default}]"
+		"chi"		"[{olive}Readyup{default}] 准备面板已 {red}关闭{default}"
 	}
-	// readyup/action.inc
-	"LiveCountdownBegin"
+	
+	"PanelShow"
 	{
-		"chi"		"比赛即将开始！\n输入 !unready / 按 F2 中断倒数"
+		"chi"		"[{olive}Readyup{default}] 准备面板已 {blue}开启{default}"
 	}
-	"RoundIsLive"
-	{
-		"chi"		"比赛开始！"
-	}	
-	"LiveCountdown"
-	{
-		"#format"	"{1:d}"
-		"chi"		"开始倒计时: {1}\n输入 !unready / 按 F2 中断倒数"
-	}
-	"AutoStartWaiting"
-	{
-		"chi"		"等待玩家加入..."
-	}
-	"AutoStartWaiting"
-	{
-		"chi"		"玩家数量不足..."
-	}
-	"InitiateAutoStart"
-	{
-		"chi"		"游戏将会自动开始！"
-	}
-	"AutoStartCountdown"
-	{
-		"#format"	"{1:d}"
-		"chi"		"游戏开始于：{1}"
-	}
-	"LiveCountdownCancelled"
-	{
-		"chi"		"倒数中止！"
-	}
-	"CountUnReady"
-	{
-		"#format"	"{1:d}{2:d}"	// 1:GetUnReadyCount(client), 2:l4d_ready_unready_limit.IntValue
-		"en"		" [{green}{1}{default}/{green}{2}{default}]"
-	}
-	"UnReadyLimit"
-	{
-		"chi"		"你已经到达你的 {red}取消准备上限{default} [{green}%d{default}]"
-	}
-	// readyup/command.inc
+	
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"
 		"chi"		"[{green}!{default}] {blue}管理员 {default}({olive}{1}{default}) {green}强制{default}了{blue}游戏开始"
 	}
-	"PanelHide"
+	
+	"VoteInProgress"
 	{
-		"chi"		"[{olive}Readyup{default}] 准备面板已 {red}关闭{default}"
+		"chi"		"[{olive}Readyup{default}] 现在有{olive}投票{green}正在进行{default}"
 	}
-	"PanelShow"
+	
+	"VoteDelay"
 	{
-		"chi"		"[{olive}Readyup{default}] 准备面板已 {blue}开启{default}"
+		"#format"	"{1:d}"
+		"chi"		"[{olive}Readyup{default}] 请等待 {blue}{1}秒 {default}以发起下一轮投票"
 	}
-	// readyup/panel.inc
-	"HintReady"
-	{
-		"chi"		"你已经准备了\n输入 !unready / 按 F2 取消准备"
-	}
-	"HintUnready"
-	{
-		"chi"		"你还没有准备\n输入 !ready / 按 F1 确认准备"
-	}
-	"PanelSlots"
-	{
-		"#format"	"{1:s},{2:d},{3:d},{4:s}"	// 1:ServerName, 2:GetSeriousClientCount(), 3:FindConVar("sv_maxplayers").IntValue, 4:cfgName
-		"chi"		"▸ 服务器名字: {1} \n▸ 位置: {2}/{3}\n▸ 比赛配置: {4}"
-	}
-	"PanelCommands"
-	{
-		"chi"		"▸ 命令:"
-	}
-	"PanelSurvivors"
-	{
-		"#format"	"{1:d},{2:s}"	// 1:++textCount, 2:isTeamReadyMode ? teamReadySymbol[survivorReady] : ""
-		"chi"		"->{1}. 生还者{2}"
-	}
-	"PanelInfected"
-	{
-		"#format"	"{1:d},{2:s}"	// 1:++textCount, 2:isTeamReadyMode ? teamReadySymbol[survivorReady] : ""
-		"chi"		"->{1}. 感染者{2}"
-	}
-	"PanelCaster"
-	{
-		"#format"	"{1:d},{2:s}"	// 1:++textCount, 2:casterCount > 1 ? "s" : ""
-		"chi"		"->{1}. 裁判{2}"
-	}
-	"PanelSpectator"
-	{
-		"#format"	"{1:d},{2:s}"	// 1:++textCount, 2:specCount > 1 ? "s" : ""
-		"chi"		"->{1}. 旁观者"
-	}
-	"PanelMany"
-	{
-		"chi"		"**很多** (%d)"
-	}
-	// g_sDisruptReason[]
+	
 	"Player marked unready"
 	{
 		"#format"	"{1:N}"
 		"chi"		"{default}[{green}!{default}] {green}倒数中止！ {default}({teamcolor}{1} {green}取消了准备{default})"
 	}
+	
 	"Player switched team"
 	{
 		"#format"	"{1:N}"
 		"chi"		"{default}[{green}!{default}] {green}倒数中止！ {default}({teamcolor}{1} {olive}切换了阵营{default})"
 	}
+	
 	"Player disconnected"
 	{
 		"#format"	"{1:N}"
 		"chi"		"{default}[{green}!{default}] {green}倒数中止！ {default}({teamcolor}{1} {green}离开了游戏{default})"
 	}
+	
 	"Admin aborted"
 	{
 		"#format"	"{1:N}"
 		"chi"		"{default}[{green}!{default}] {green}叫停强制开始！ {default}({green}由 {olive}{1} {green}发起{default})"
+	}
+	
+	
+// The following are not allowed to use any color tag
+	"HintReady"
+	{
+		"chi"		"你已经准备了\n输入 !unready / 按 F2 取消准备"
+	}
+	
+	"HintUnready"
+	{
+		"chi"		"你还没有准备\n输入 !ready / 按 F1 确认准备"
+	}
+	
+	"LiveCountdownBegin"
+	{
+		"chi"		"比赛即将开始！\n输入 !unready / 按 F2 中断倒数"
+	}
+	
+	"LiveCountdown"
+	{
+		"#format"	"{1:d}"
+		"chi"		"请各就各位：{1} \n输入 !unready / 按 F2 中断倒数"
+	}
+	
+	"LiveCountdownCancelled"
+	{
+		"chi"		"倒数中止！"
+	}
+	
+	"RoundIsLive"
+	{
+		"chi"		"比赛开始！"
+	}	
+	
+	"InitiateAutoStart"
+	{
+		"chi"		"游戏将会自动开始！"
+	}
+	
+	"AutoStartCountdown"
+	{
+		"#format"	"{1:d}"
+		"chi"		"游戏开始于：{1}"
+	}
+	
+	"AutoStartWaiting"
+	{
+		"chi"		"等待玩家加入..."
+	}
+	
+	"AutoStartNotEnoughPlayers"
+	{
+		"chi"		"玩家数量不足..."
 	}
 }
