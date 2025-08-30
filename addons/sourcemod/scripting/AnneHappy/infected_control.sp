@@ -73,14 +73,14 @@ enum
 #define NORMALPOSMULT          1.4
 #define BAIT_DISTANCE          200.0
 #define LADDER_DETECT_DIST     500.0
-#define RING_SLACK             300.0
+#define RING_SLACK             200.0
 #define ROOF_SEPARATION_PENALTY 180.0
 #define ROOF_VDELTA_MIN         100.0
 #define ROOF_HORIZ_MAX          650.0
 
 // —— 低分阈值＆扩圈 ——
-#define LOW_SCORE_THRESHOLD   100.0
-#define LOW_SCORE_EXPAND      100.0
+#define LOW_SCORE_THRESHOLD   70.0
+#define LOW_SCORE_EXPAND      50.0
 #define LOW_SCORE_MAX_STEPS   64
 
 #define ENABLE_SMOKER          (1 << 0)
@@ -92,7 +92,6 @@ enum
 
 #define SPIT_INTERVAL          2.0
 #define RUSH_MAN_DISTANCE      1200.0
-#define TRACE_RAY_FLAG         (MASK_SHOT | CONTENTS_MONSTERCLIP | CONTENTS_GRATE)
 
 #define FRAME_THINK_STEP       0.02
 #define CANDIDATE_TRIES        24
@@ -103,23 +102,23 @@ enum
 
 // ---- Global diversity (shared by all SI) ----
 #define DIVERSITY_HISTORY_GLOBAL        12
-#define DIVERSITY_NEAR_RADIUS           400.0
-#define DIVERSITY_NEAR_WEIGHT           0.85
-#define DIVERSITY_MID_RADIUS            800.0
+#define DIVERSITY_NEAR_RADIUS           250.0
+#define DIVERSITY_NEAR_WEIGHT           0.75
+#define DIVERSITY_MID_RADIUS            600.0
 #define DIVERSITY_MID_WEIGHT            0.35
-#define DIVERSITY_AREA_PENALTY_GLOBAL   230.0
+#define DIVERSITY_AREA_PENALTY_GLOBAL   120.0
 
 // ---- Ladder bait: proximity + Nav mask ----
-#define LADDER_PROX_RADIUS              380.0
-#define LADDER_PROX_NEAR                250.0
-#define LADDER_PROX_PENALTY_NEAR        400.0
-#define LADDER_PROX_PENALTY_FAR         180.0
+#define LADDER_PROX_RADIUS              300.0
+#define LADDER_PROX_NEAR                100.0
+#define LADDER_PROX_PENALTY_NEAR        200.0
+#define LADDER_PROX_PENALTY_FAR         90.0
 
-#define LADDER_NAVMASK_RADIUS        240.0
+#define LADDER_NAVMASK_RADIUS        100.0
 #define LADDER_MASK_OFFS1            100.0
-#define LADDER_MASK_OFFS2            160.0
+#define LADDER_MASK_OFFS2            100.0
 #define LADDER_NAVMASK_STRICT_ALWAYS 0
-#define LADDER_MASK_SOFT_PENALTY     160.0
+#define LADDER_MASK_SOFT_PENALTY     120.0
 
 // ---- “路线（Lane）”枚举 ＆ 打分参数 ----
 #define LANE_COUNT              5
@@ -156,7 +155,7 @@ static const char LANEN[LANE_COUNT][] = { "left","front","right","back","top" };
 #define SMOKER_Z_MAX_EXTRA           200.0
 #define SMOKER_TOP_SOFTMAX_BONUS     300.0
 #define SMOKER_TOP_PEN_RELIEF          0.65
-#define HUNTER_TOP_BONUS        20.0
+#define HUNTER_TOP_BONUS        80.0
 #define JOCKEY_TOP_BONUS         20.0
 #define CHARGER_TOP_BONUS        20.0
 #define SPITTER_TOP_BONUS       600.0
@@ -237,7 +236,7 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode        = CreateConVar("inf_DebugMode", "0","0=off, 1=logfile, 2=console+logfile, 3= console + logfile + beam", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.DebugMode        = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3= console + logfile + beam", CVAR_FLAG, true, 0.0, true, 3.0);
 
 
         this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
@@ -451,7 +450,7 @@ stock void Debug_Print(const char[] format, any ...)
 
     // 仅 2 档打印到控制台
     if (gCV.iDebugMode >= 2)
-        PrintToServer("[IC] %s", buf);
+        PrintToConsoleAll("[IC] %s", buf);
 }
 
 
@@ -787,7 +786,7 @@ public Action Cmd_StartSpawn(int client, int args)
         CreateTimer(0.1, Timer_SpawnFirstWave);
         ReadSiCap();
         TweakAllChargerOrHunter();
-        PrintToChatAll("\x03 目前是测试版本v1.6，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
+        PrintToChatAll("\x03 目前是测试版本v1.7，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
     }
     return Plugin_Handled;
 }
@@ -1085,6 +1084,9 @@ public void OnGameFrame()
     if (now < gST.nextFrameThink)
         return;
     gST.nextFrameThink = now + FRAME_THINK_STEP;
+    //如果总特感和特感上限一样了那你还找什么位置
+    if(gST.totalSI == gCV.iSiLimit)
+        return;
 
     // —— 填队列逻辑保持不变（省略） ——
     if (gST.teleportQueueSize <= 0 && gST.spawnQueueSize < gCV.iSiLimit)
@@ -1117,9 +1119,6 @@ public void OnGameFrame()
             Debug_Print("<SpawnQ> +%s size=%d", INFDN[zc], gST.spawnQueueSize);
         }
     }
-    //如果总特感和特感上限一样了那你还找什么位置
-    if(gST.totalSI == gCV.iSiLimit)
-        return;
 
     if (!gST.bLate)
         return;
@@ -1200,7 +1199,7 @@ public void OnGameFrame()
                 RecordLaneForPos(pos2, gST.targetSurvivor);
 
                 // [PATCH] 成功后把下一轮起始半径刷新路径
-                gST.spawnDistCur =FloatMin(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
+                gST.spawnDistCur =FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
 
                 Debug_DumpSuccess("SPAWN");
             }
@@ -1296,10 +1295,6 @@ static Action Timer_CheckSpawnWindow(Handle timer)
     if (!gST.bShouldCheck || gST.hSpawn != INVALID_HANDLE) return Plugin_Continue;
 
     if (FindConVar("survivor_limit").IntValue >= 2 && IsAnyTankOrAboveHalfSurvivorDownOrDied(1) && gST.lastSpawnSecs < RoundToFloor(gCV.fSiInterval / 2))
-        return Plugin_Continue;
-
-    // 原来带 “!gST.bSIPool” 的 Spitter 早期延迟，现去掉 pool 条件，保留延迟
-    if ((gCV.iEnableMask & ENABLE_SPITTER) && gST.lastSpawnSecs < 4)
         return Plugin_Continue;
 
     if (!gCV.bAutoSpawn)
@@ -1486,11 +1481,8 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
     float eyes[3];
     float posEye[3];
-    float posHead[3];
     posEye = pos;
     posEye[2] += 62.0;
-    posHead= posEye;
-    posHead[2] += 28.0;
 
     int countTooFar = 0;
     int skipCount   = 0;
@@ -1539,8 +1531,6 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
             return true;
         if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))
             return true;
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posHead))
-            return true;
     }
     return false;
 }
@@ -1567,9 +1557,9 @@ stock void DebugBeam(const float start[3], const float end[3], bool clear)
 static int GroundMaskForRadius(float r)
 {
     // 近距离更严格：用可见性掩码保证真正落在可见几何上
-    if (r <= 600.0)         return MASK_VISIBLE;
+    if (r <= 400.0)         return MASK_VISIBLE;
     // 中距离略放宽：允许栅格
-    else if (r <= 1000.0)   return MASK_VISIBLE | CONTENTS_GRATE;
+    else if (r <= 700.0)   return MASK_VISIBLE | CONTENTS_GRATE;
     // 远距离：回到原先的“射击可达”类掩码（但去掉 MONSTERCLIP，避免“悬空”）
     else                    return MASK_SHOT | CONTENTS_GRATE;
 }
@@ -1598,6 +1588,34 @@ static bool TraceFilter_Stuck(int ent, int mask)
     GetEntityClassname(ent, cls, sizeof cls);
     if (strcmp(cls, "env_physics_blocker") == 0 && !EnvBlockType(ent))
         return false;
+    return true;
+}
+
+// 地面投射专用过滤器：尽量只让射线命中“真实地面/刷得住的几何”，忽略小道具等
+static bool TraceFilter_Ground(int ent, int mask)
+{
+    if (ent <= MaxClients || !IsValidEntity(ent))
+        return false;
+
+    char cls[32];
+    GetEntityClassname(ent, cls, sizeof cls);
+
+    // 忽略常见“非地面”的命中体
+    if (StartsWith(cls, "prop_"))             return false; // 各种道具
+    if (StartsWith(cls, "weapon_"))           return false; // 掉落武器
+    if (StartsWith(cls, "item_"))             return false; // 道具包等
+    if (StartsWith(cls, "trigger_"))          return false; // 触发器体积
+    if (StartsWith(cls, "func_ladder"))       return false; // 梯子本身不是我们要落的“地”
+    // 根据需要还可加：projectile_ / ragdoll 等
+
+    // 常见物理阻挡器（1/2 型 clip）一律忽略，避免“落在 clip 顶”
+    if (strcmp(cls, "env_physics_blocker") == 0)
+    {
+        int t = GetEntProp(ent, Prop_Data, "m_nBlockType");
+        if (t == 1 || t == 2) return false;
+    }
+
+    // 其他保持命中（func_brush/位移地形/世界几何等）
     return true;
 }
 
@@ -2089,6 +2107,8 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
             continue;
 
         gDBG.considered++;
+
+        if (IsPosVisibleSDK(pz, teleportMode)) { gDBG.failVisible++; continue; }
 
         // G) 前进方向约束（传送/抓跑男/杀手类要求“在前方”）
         if ((gST.bPickRushMan || teleportMode) && IsKillerClassInt(zc) && !IsPosAheadOfHighest(pz, targetSurvivor))
@@ -2609,33 +2629,5 @@ stock bool TraceFilter(int entity, int contentsMask)
     if (strcmp(sClassName, "infected") == 0 || strcmp(sClassName, "witch") == 0)
         return false;
 
-    return true;
-}
-
-// 地面投射专用过滤器：尽量只让射线命中“真实地面/刷得住的几何”，忽略小道具等
-static bool TraceFilter_Ground(int ent, int mask)
-{
-    if (ent <= MaxClients || !IsValidEntity(ent))
-        return false;
-
-    char cls[32];
-    GetEntityClassname(ent, cls, sizeof cls);
-
-    // 忽略常见“非地面”的命中体
-    if (StartsWith(cls, "prop_"))             return false; // 各种道具
-    if (StartsWith(cls, "weapon_"))           return false; // 掉落武器
-    if (StartsWith(cls, "item_"))             return false; // 道具包等
-    if (StartsWith(cls, "trigger_"))          return false; // 触发器体积
-    if (StartsWith(cls, "func_ladder"))       return false; // 梯子本身不是我们要落的“地”
-    // 根据需要还可加：projectile_ / ragdoll 等
-
-    // 常见物理阻挡器（1/2 型 clip）一律忽略，避免“落在 clip 顶”
-    if (strcmp(cls, "env_physics_blocker") == 0)
-    {
-        int t = GetEntProp(ent, Prop_Data, "m_nBlockType");
-        if (t == 1 || t == 2) return false;
-    }
-
-    // 其他保持命中（func_brush/位移地形/世界几何等）
     return true;
 }
