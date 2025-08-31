@@ -26,7 +26,7 @@
 #include <sdktools>
 #include <left4dhooks>
 #include <l4d2util_stocks>
-
+#include <colors>
 #define SURVIVOR_RUNSPEED 220.0
 #define TEAM_SURVIVORS 2
 #define TEAM_INFECTED 3
@@ -127,7 +127,7 @@ public void OnConfigsExecuted()
 	CvarsToType();
 }
 
-void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	CvarsToType();
 }
@@ -143,17 +143,17 @@ void CvarsToType()
 	fJockeyMinMountedSpeed = hCvarJockeyMinMoundedSpeed.FloatValue;
 }
 
-void TankSpawn(Event event, const char[] name, bool dontBroadcast) 
+public void TankSpawn(Event event, const char[] name, bool dontBroadcast) 
 {
 	if (!tankInPlay) {
 		tankInPlay = true;
 		if (fSurvWaterSpeedDuringTank > 0.0) {
-			PrintToChatAll("\x05Water Slowdown\x01 has been reduced while Tank is in play.");
+			CPrintToChatAll("{default}[{olive}Water Slowdown{default}]  {green}水中减速{default} 效果因tank生成被减弱.");
 		}
 	}
 }
 
-void TankDeath(Event event, const char[] name, bool dontBroadcast)
+public void TankDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if (client > 0 && IsInfected(client) && IsTank(client)) {
@@ -161,27 +161,27 @@ void TankDeath(Event event, const char[] name, bool dontBroadcast)
 	}
 }
 
-Action Timer_CheckTank(Handle timer)
+public Action Timer_CheckTank(Handle timer)
 {
 	int tankclient = FindTankClient();
 	if (!tankclient || !IsPlayerAlive(tankclient)) {
 		tankInPlay = false;
 		if (fSurvWaterSpeedDuringTank > 0.0) {
-			PrintToChatAll("\x05Water Slowdown\x01 has been restored to normal.");
+			CPrintToChatAll("{default}[{olive}Water Slowdown{default}]  {green}水中减速{default} 效果已恢复到正常水平。");
 		}
 	}
 
 	return Plugin_Stop;
 }
 
-void RoundStart(Event event, const char[] name, bool dontBroadcast)
+public void RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
 	tankInPlay = false;
 	HookCrouchTriggers();
 }
 
 // Hook trigger_multiple entities that are named "l4d2_slowdown_crouch_speed"
-void HookCrouchTriggers()
+public void HookCrouchTriggers()
 {
 	bFoundCrouchTrigger = false;
 
@@ -205,14 +205,14 @@ void HookCrouchTriggers()
 	}
 }
 
-void CrouchSpeedStartTouch(const char[] output, int caller, int activator, float delay)
+public void CrouchSpeedStartTouch(const char[] output, int caller, int activator, float delay)
 {
 	if (0 < activator <= MaxClients && IsClientInGame(activator)) {
 		bPlayerInCrouchTrigger[activator] = true;
 	}
 }
 
-void CrouchSpeedEndTouch(const char[] output, int caller, int activator, float delay)
+public void CrouchSpeedEndTouch(const char[] output, int caller, int activator, float delay)
 {
 	if (0 < activator <= MaxClients && IsClientInGame(activator)) {
 		bPlayerInCrouchTrigger[activator] = false;
@@ -224,7 +224,7 @@ void CrouchSpeedEndTouch(const char[] output, int caller, int activator, float d
  * Slowdown from gunfire: Tank & SI
  *
 **/
-void PlayerHurt(Event event, const char[] name, bool dontBroadcast)
+public void PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if (client > 0 && IsInfected(client)) {

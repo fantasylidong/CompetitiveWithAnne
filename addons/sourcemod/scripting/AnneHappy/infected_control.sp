@@ -97,7 +97,7 @@ enum
 #define RUSH_MAN_DISTANCE      1200.0
 
 #define FRAME_THINK_STEP       0.01
-#define CANDIDATE_TRIES        15
+#define CANDIDATE_TRIES        10
 
 // ---- Support SI gating at wave start ----
 #define SUPPORT_SPAWN_DELAY_SECS  1.8
@@ -122,6 +122,12 @@ enum
 #define LADDER_MASK_OFFS2            100.0
 #define LADDER_NAVMASK_STRICT_ALWAYS 0
 #define LADDER_MASK_SOFT_PENALTY     60.0
+#define SAME_LAYER_Z_TOL           140.0    // 认为“同一层”的 Nav 中心 Z 容忍
+#define BRIDGE_SEP_HORIZ_MAX       700.0    // 近水平距离才算“上下层叠”
+#define BRIDGE_SEP_PENALTY_STRONG  420.0    // 上下层叠且被几何体隔断时的强惩罚
+#define LOWER_LAYER_PENALTY        160.0    // 候选显著在下层时的轻惩罚
+#define SAME_LAYER_BONUS           110.0    // 同层的稳定加分
+
 
 // 删除所有 LANE 相关常量/加分（完全去除动态路线）
 
@@ -1489,8 +1495,8 @@ stock void DebugBeam(const float start[3], const float end[3], bool clear)
 
 static int GroundMaskForRadius(float r)
 {
-    if (r <= 400.0)         return MASK_VISIBLE;
-    else                    return MASK_VISIBLE | CONTENTS_GRATE;
+     // 用玩家可站立的固体为主，辅以怪物阻挡；更稳地命中桥面/楼板
+    return MASK_PLAYERSOLID | CONTENTS_MONSTERCLIP| CONTENTS_GRATE;
 }
 
 static bool IsHullFreeAt(const float at[3])
@@ -1745,6 +1751,12 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
             float dir[3] = {90.0, 0.0, 0.0};
             int gmask = GroundMaskForRadius(radiusCur);
             Handle trRay = TR_TraceRayFilterEx(p, dir, gmask, RayType_Infinite, TraceFilter_Ground);
+            if (!TR_DidHit(trRay))
+            {
+                delete trRay;
+                // 兜底：刷子类固体（防极端地图素材）
+                trRay = TR_TraceRayFilterEx(p, dir, MASK_SOLID_BRUSHONLY, RayType_Infinite, TraceFilter_Ground);
+            }
             if (TR_DidHit(trRay))
             {
                 float endp[3];
@@ -1784,32 +1796,68 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
                 atMasked = true;
             }
 
-            // 房顶/楼板隔断惩罚（轻量）
+            // —— 上下层叠/隔断：只降分，不硬过滤 ——
+            // 计算与当前目标的相对几何关系
             float dx = p[0] - sPos[0];
             float dy = p[1] - sPos[1];
-            float dz_check = (p[2] - sPos[2]);
+            float dz_check    = (p[2] - sPos[2]);
             float horiz_check = SquareRoot(dx*dx + dy*dy);
-            float sepPenalty = 0.0;
-            if (dz_check > ROOF_VDELTA_MIN && horiz_check < ROOF_HORIZ_MAX && IsSeparatedByCeiling(p, targetSurvivor))
-                sepPenalty = -ROOF_SEPARATION_PENALTY;
 
-            // === 无评分模式：半径 >= 1000 直接接受第一个合格点 ===
+            // 取目标胸口点，贴近真实交互高度
+            float chest[3]; GetClientAbsOrigin(targetSurvivor, chest); chest[2] += PLAYER_CHEST;
+
+            bool bigVerticalSplit = (FloatAbs(dz_check) > ROOF_VDELTA_MIN) && (horiz_check < BRIDGE_SEP_HORIZ_MAX);
+            float sepPenalty = 0.0;
+
+            // 若是明显上下层叠，且两点间被实体/世界几何体隔断：强惩罚（桥下这种情况就会被打很低分）
+            if (bigVerticalSplit && HasSolidBetweenPts(p, chest))
+            {
+                sepPenalty -= BRIDGE_SEP_PENALTY_STRONG;
+            }
+            // 否则保留原本的“顶部/楼板”轻惩罚（单向）
+            else if (dz_check > ROOF_VDELTA_MIN && horiz_check < ROOF_HORIZ_MAX && IsSeparatedByCeiling(p, targetSurvivor))
+            {
+                sepPenalty -= ROOF_SEPARATION_PENALTY;
+            }
+
+            // —— 同层优先 / 下层稍降分 ——
+            // navS：目标所在 Nav，navP：候选所在 Nav（你上面已经拿过 navS/navP）
+            float tCenter[3], pCenter[3];
+            L4D_GetNavAreaCenter(navS, tCenter);
+            L4D_GetNavAreaCenter(navP, pCenter);
+
+            float navDz = pCenter[2] - tCenter[2];
+            float sameLayerAdj = 0.0;
+
+            if (FloatAbs(navDz) <= SAME_LAYER_Z_TOL)
+                sameLayerAdj += SAME_LAYER_BONUS;         // 同层更稳
+            else if (navDz < -SAME_LAYER_Z_TOL)
+                sameLayerAdj -= LOWER_LAYER_PENALTY;  
+
+            // === 大半径轻量评分模式：只用惩罚/加分（更偏向同层/非隔断），不硬过滤 ===
             if (radiusCur >= 1000.0)
             {
-                gDBG.bestScore      = 0.0;
-                gDBG.bestPos[0]     = p[0]; gDBG.bestPos[1] = p[1]; gDBG.bestPos[2] = p[2];
-                gDBG.distToTarget   = dist;
-                gDBG.ideal          = 0.0;
-                gDBG.classScore     = 0.0;
-                gDBG.divPenBest     = 0.0;
-                gDBG.ladPenBest     = 0.0;
-                gDBG.sepPenaltyBest = sepPenalty;
-                gDBG.maskedSoft     = atMasked;
-                gDBG.navBest        = navP;
-                gDBG.radiusFinal    = radiusCur;
+                float sc_far = DiversityPenaltyGlobal(p, navP) + LadderProximityPenalty(p) + sepPenalty + sameLayerAdj;
+                if (sc_far > bestScore)
+                {
+                    bestScore = sc_far;
+                    best[0] = p[0]; best[1] = p[1]; best[2] = p[2];
+                    haveBest = true;
 
-                outPos[0] = p[0]; outPos[1] = p[1]; outPos[2] = p[2];
-                return true;
+                    gDBG.bestScore      = sc_far;
+                    gDBG.bestPos[0]     = p[0]; gDBG.bestPos[1] = p[1]; gDBG.bestPos[2] = p[2];
+                    gDBG.distToTarget   = dist;
+                    gDBG.ideal          = 0.0;
+                    gDBG.classScore     = 0.0;
+                    gDBG.divPenBest     = DiversityPenaltyGlobal(p, navP);
+                    gDBG.ladPenBest     = LadderProximityPenalty(p);
+                    gDBG.sepPenaltyBest = sepPenalty;
+                    gDBG.maskedSoft     = atMasked;
+                    gDBG.navBest        = navP;
+                    gDBG.radiusFinal    = radiusCur;
+                }
+                // 注意：不 return，让循环继续比较 10 次候选后统一出 best
+                continue;
             }
 
             // === 正常评分模式（半径 < 1000 才会走到这里）===
@@ -1838,7 +1886,7 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
 
             float divPen = DiversityPenaltyGlobal(p, navP);
             float ladPen = LadderProximityPenalty(p);
-            float sc = classSc + divPen + ladPen + sepPenalty;
+            float sc = classSc + divPen + ladPen + sepPenalty + sameLayerAdj;
             if (atMasked) sc -= LADDER_MASK_SOFT_PENALTY;
 
             if (sc > bestScore)
@@ -2403,5 +2451,15 @@ static bool IsSeparatedByCeiling(const float spawnPos[3], int target)
     int ent  = hit ? TR_GetEntityIndex(tr) : -1;
     delete tr;
 
+    return hit && IsBrushySolid(ent);
+}
+// 通用：两点之间是否被实体/世界几何体隔断（func_ / prop_ / 世界刷）
+// 只用于打分（降分），不做硬拒绝
+static bool HasSolidBetweenPts(const float a[3], const float b[3])
+{
+    Handle tr = TR_TraceRayFilterEx(a, b, MASK_VISIBLE | CONTENTS_GRATE, RayType_EndPoint, TraceFilter_Stuck);
+    bool hit  = TR_DidHit(tr);
+    int  ent  = hit ? TR_GetEntityIndex(tr) : -1;
+    delete tr;
     return hit && IsBrushySolid(ent);
 }
