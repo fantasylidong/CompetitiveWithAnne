@@ -2,9 +2,10 @@
 #pragma newdecls required
 
 /**
- * Infected Control (Rework) + Dynamic Lanes (3–4 routes)
- * ------------------------------------------------------
+ * Infected Control (Rework) + Dynamic Lanes (3–4 routes) + Nav Snap
+ * -----------------------------------------------------------------
  * - 强化找位、低分扩圈直至 inf_SpawnDistanceMax、到顶后兜底随机
+ * - Nav 吸附：候选点若不在 Nav 上，优先吸附到最近的 Nav 面中心 + 抖动
  * - 全局多样性、梯子诱饵抑制（Nav 黑名单 + 距离惩罚）
  * - 辅助型延后机制（优先进攻）
  * - 动态“路线”调度（前/后/左/右/上：优先把路线数维持在 3–4 条）
@@ -19,7 +20,7 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <sdktools_tempents>     // 已移除：不再画可视性调试光束
+#include <sdktools_tempents>
 #include <left4dhooks>
 #undef REQUIRE_PLUGIN
 #include <si_target_limit>
@@ -68,9 +69,9 @@ enum
 #define PLAYER_HEIGHT          72.0
 #define PLAYER_CHEST           45.0
 #define HIGHERPOS              300.0
-#define HIGHERPOSADDDISTANCE   300.0
+#define HIGHERPOSADDDISTANCE   220.0   // ↓ from 300 → 180
 #define INCAPSURVIVORCHECKDIS  500.0
-#define NORMALPOSMULT          1.4
+#define NORMALPOSMULT          1.4     // ↓ from 1.4 → 1.2
 #define BAIT_DISTANCE          200.0
 #define LADDER_DETECT_DIST     500.0
 #define RING_SLACK             200.0
@@ -79,8 +80,8 @@ enum
 #define ROOF_HORIZ_MAX          650.0
 
 // —— 低分阈值＆扩圈 ——
-#define LOW_SCORE_THRESHOLD   70.0
-#define LOW_SCORE_EXPAND      50.0
+#define LOW_SCORE_THRESHOLD   -200.0   // ↓ allow accepting not-perfect candidates
+#define LOW_SCORE_EXPAND      20.0
 #define LOW_SCORE_MAX_STEPS   64
 
 #define ENABLE_SMOKER          (1 << 0)
@@ -93,8 +94,8 @@ enum
 #define SPIT_INTERVAL          2.0
 #define RUSH_MAN_DISTANCE      1200.0
 
-#define FRAME_THINK_STEP       0.02
-#define CANDIDATE_TRIES        24
+#define FRAME_THINK_STEP       0.01
+#define CANDIDATE_TRIES        10
 
 // ---- Support SI gating at wave start ----
 #define SUPPORT_SPAWN_DELAY_SECS  1.8
@@ -106,7 +107,7 @@ enum
 #define DIVERSITY_NEAR_WEIGHT           0.75
 #define DIVERSITY_MID_RADIUS            600.0
 #define DIVERSITY_MID_WEIGHT            0.35
-#define DIVERSITY_AREA_PENALTY_GLOBAL   120.0
+#define DIVERSITY_AREA_PENALTY_GLOBAL   60.0   // ↓ from 120 → 60
 
 // ---- Ladder bait: proximity + Nav mask ----
 #define LADDER_PROX_RADIUS              300.0
@@ -118,7 +119,7 @@ enum
 #define LADDER_MASK_OFFS1            100.0
 #define LADDER_MASK_OFFS2            100.0
 #define LADDER_NAVMASK_STRICT_ALWAYS 0
-#define LADDER_MASK_SOFT_PENALTY     120.0
+#define LADDER_MASK_SOFT_PENALTY     60.0   // ↓ from 120 → 60
 
 // ---- “路线（Lane）”枚举 ＆ 打分参数 ----
 #define LANE_COUNT              5
@@ -143,10 +144,10 @@ static const char LANEN[LANE_COUNT][] = { "left","front","right","back","top" };
 #define TOP_HORIZ_MAX     650.0
 #define TOP_HORIZ_MAX2       (500.0*500.0)
 
-#define LANE_DIST_SOFTMAX      900.0
+#define LANE_DIST_SOFTMAX      1000.0   // ↑ from 900 → 1000
 #define LANE_DIST_PEN_PERUU      0.6
-#define LANE_FB_BALANCE_BONUS    160.0   // 对“落后方”的补偿分
-#define LANE_FB_TOLERANCE          1     // 前后差多少开始补偿
+#define LANE_FB_BALANCE_BONUS    160.0
+#define LANE_FB_TOLERANCE          1
 
 // ---------------------- [MOD] Smoker 顶路专属策略 ----------------------
 #define SMOKER_TOP_BONUS             260.0
@@ -199,7 +200,7 @@ enum struct Config
     ConVar AddDmgSmoker;
     ConVar SiLimit;
     ConVar SiInterval;
-    ConVar DebugMode;   // ← 新增：debug 模式（0/1/2）
+    ConVar DebugMode;
 
     // read-only pointers
     ConVar MaxPlayerZombies;
@@ -213,7 +214,7 @@ enum struct Config
     int   iSiLimit;
     int   iEnableMask;
     int   iTeleportCheckTime;
-    int   iDebugMode;  // ← 新增：runtime 缓存
+    int   iDebugMode;
     bool  bTeleport;
     bool  bAutoSpawn;
     bool  bIgnoreIncapSight;
@@ -236,8 +237,7 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode        = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3= console + logfile + beam", CVAR_FLAG, true, 0.0, true, 3.0);
-
+        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3= console + logfile + beam", CVAR_FLAG, true, 0.0, true, 3.0);
 
         this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
         this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
@@ -259,7 +259,6 @@ enum struct Config
         this.SiLimit.AddChangeHook(OnSiLimitChanged);
         this.DebugMode.AddChangeHook(OnCfgChanged);
 
-
         this.Refresh();
         this.ApplyMaxZombieBound();
     }
@@ -278,7 +277,7 @@ enum struct Config
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.bAntiBait          = this.AntiBait.BoolValue;
         this.fBaitFlow          = this.BaitFlow.FloatValue;
-        this.iDebugMode       = this.DebugMode.IntValue;
+        this.iDebugMode         = this.DebugMode.IntValue;
     }
 
     void ApplyMaxZombieBound()
@@ -355,9 +354,9 @@ enum struct State
     float  nextFrameThink;
 
     // —— 动态路线（每波） —— //
-    int    laneCount[LANE_COUNT]; // 0~4
-    int    laneFillTarget;        // 目标铺开路线数（动态）
-    int    laneMax;               // 并行路线数上限（动态）
+    int    laneCount[LANE_COUNT];
+    int    laneFillTarget;
+    int    laneMax;
 
     void Reset()
     {
@@ -417,8 +416,8 @@ public Plugin myinfo =
 {
     name        = "Direct InfectedSpawn (Rework)",
     author      = "Caibiii, 夜羽真白，东, Paimon-Kawaii + ChatGPT",
-    description = "特感刷新控制 / 传送 / 反诱饵 / 每类特感找位策略 (重构版)",
-    version     = "2025.08.27-lanes",
+    description = "特感刷新控制 / 传送 / 反诱饵 / 每类特感找位策略 (重构+Nav吸附)",
+    version     = "2025.08.30-lanes-navsnap",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -445,14 +444,10 @@ stock void Debug_Print(const char[] format, any ...)
     char buf[512];
     VFormat(buf, sizeof buf, format, 2);
 
-    // 1/2 档都写文件
     LogToFile(g_sLogFile, "%s", buf);
-
-    // 仅 2 档打印到控制台
     if (gCV.iDebugMode >= 2)
         PrintToConsoleAll("[IC] %s", buf);
 }
-
 
 static bool IsKillerClassInt(int zc)
 {
@@ -466,11 +461,10 @@ static int ClampInt(int v, int mn, int mx) { if (v < mn) return mn; if (v > mx) 
 enum struct SpawnDebug
 {
     int   zc;
-    int target;
+    int   target;
     float radius;
     bool  ladderStrict;
     int   considered;
-    // 筛除原因计数
     int failVisible;
     int failMesh;
     int failHull;
@@ -479,9 +473,8 @@ enum struct SpawnDebug
     int failRing;
     int failPath;
     int failMaskedStrict;
-    int   lowExpands;       // 因为分数低而额外扩圈了几次
-    float radiusFinal;      // 真正找到点时的最终半径
-    // 选中结果
+    int   lowExpands;
+    float radiusFinal;
     float bestScore;
     float bestPos[3];
     float distToTarget;
@@ -493,7 +486,6 @@ enum struct SpawnDebug
     bool  maskedSoft;
     Address navBest;
     Address navTarget;
-    // 路线
     int   laneBest;
     float laneAdjBest;
 }
@@ -665,9 +657,9 @@ static bool ShouldApplyLadderStrict()
     #if LADDER_NAVMASK_STRICT_ALWAYS
         return true;
     #else
-        if (gST.ladderBaitCount > 0) return true;
         float avg = GetSurAvrDistance();
-        return (avg > 0.0 && avg <= BAIT_DISTANCE + 30.0);
+        if (avg > 0.0 && avg <= BAIT_DISTANCE + 30.0) return true; // 当前近身优先
+        return (gST.ladderBaitCount > 0);
     #endif
 }
 
@@ -786,7 +778,7 @@ public Action Cmd_StartSpawn(int client, int args)
         CreateTimer(0.1, Timer_SpawnFirstWave);
         ReadSiCap();
         TweakAllChargerOrHunter();
-        PrintToChatAll("\x03 目前是测试版本v1.7，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
+        PrintToChatAll("\x03 目前是测试版本v1.8，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
     }
     return Plugin_Handled;
 }
@@ -856,7 +848,6 @@ public void evt_PlayerSpawn(Event event, const char[] name, bool dont_broadcast)
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (IsSpitter(client))
         gST.spitterSpitTime[client] = GetGameTime();
-    
 }
 
 public void evt_AbilityUse(Event event, const char[] name, bool dont_broadcast)
@@ -899,7 +890,6 @@ public void evt_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
     int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
 
-    // 原逻辑：非 Spitter 马上踢出，spitter走系统踢出
     if (zc != view_as<int>(SI_Spitter))
         CreateTimer(0.5, Timer_KickBot, client);
 
@@ -933,11 +923,18 @@ static void StartWave()
         if (IsValidSurvivor(i) && IsPlayerAlive(i))
             gST.survIdx[gST.survCount++] = i;
 
-    // —— 本波路线清零 + 动态目标 —— //
     for (int k = 0; k < LANE_COUNT; k++) gST.laneCount[k] = 0;
     int alive = gST.survCount; if (alive <= 0) alive = 4;
-    gST.laneFillTarget = ClampInt(alive - 1, 2, 3); // 2~3
-    gST.laneMax        = ClampInt(alive,     3, 4); // 3~4
+    gST.laneFillTarget = ClampInt(alive - 1, 2, 3);
+    gST.laneMax        = ClampInt(alive,     3, 4);
+
+    // 波级复位，避免跨波粘滞
+    gST.ladderBaitCount = 0;
+    if (gST.bPickRushMan) { gST.bPickRushMan = false; gST.rushManIndex = -1; FireRushmanForward(false); }
+    else { gST.rushManIndex = -1; }
+    gST.teleportDistCur = gCV.fSpawnMin;
+    gST.hordeStatus     = 0;
+    if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
 
     gST.spawnDistCur = gCV.fSpawnMin;
     gST.siQueueCount += gCV.iSiLimit;
@@ -950,7 +947,7 @@ static void StartWave()
 
     if (gST.siQueueCount > gCV.iSiLimit)
         gST.siQueueCount = gCV.iSiLimit;
-    // ★ 根因修复：新一波必须清空全局多样性历史，避免被上波“div”强行推远
+
     ResetGlobalDiversityHistory();
     Debug_Print("Start wave %d", gST.waveIndex);
 }
@@ -1084,11 +1081,9 @@ public void OnGameFrame()
     if (now < gST.nextFrameThink)
         return;
     gST.nextFrameThink = now + FRAME_THINK_STEP;
-    //如果总特感和特感上限一样了那你还找什么位置
     if(gST.totalSI == gCV.iSiLimit)
         return;
 
-    // —— 填队列逻辑保持不变（省略） ——
     if (gST.teleportQueueSize <= 0 && gST.spawnQueueSize < gCV.iSiLimit)
     {
         int zc = 0;
@@ -1123,7 +1118,6 @@ public void OnGameFrame()
     if (!gST.bLate)
         return;
 
-    // —— 先处理传送队列（不再做“每帧 +20”的半径外扩；内部逐圈外扩足够） ——
     if (gST.totalSI < gCV.iSiLimit)
     {
         if (gST.teleportQueueSize > 0)
@@ -1151,7 +1145,6 @@ public void OnGameFrame()
             }
         }
 
-        // —— 再处理正常刷特（去掉“每帧 +5”的半径外扩） ——
         if (gST.siQueueCount > 0 && gST.teleportQueueSize <= 0 && gST.spawnQueueSize > 0)
         {
             gST.targetSurvivor = ChooseTargetSurvivor();
@@ -1198,8 +1191,7 @@ public void OnGameFrame()
                 RecordSpawnPosGlobal(pos2, GetPosAreaOrNearest(pos2));
                 RecordLaneForPos(pos2, gST.targetSurvivor);
 
-                // [PATCH] 成功后把下一轮起始半径刷新路径
-                gST.spawnDistCur =FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
+                gST.spawnDistCur = FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
 
                 Debug_DumpSuccess("SPAWN");
             }
@@ -1451,7 +1443,7 @@ static bool CanBeTeleport(int client)
 {
     if (!IsInfectedBot(client) || !IsClientInGame(client) || !IsPlayerAlive(client))
         return false;
-    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8) // tank
+    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8)
         return false;
     if (IsPinningSomeone(client))
         return false;
@@ -1516,8 +1508,6 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         }
 
         float d2 = GetVectorDistance(pos, eyes, true);
-        if (d2 < Pow(gCV.fSpawnMin, 2.0))
-            return true;
         int effective = (survTotal - skipCount);
         if (d2 >= Pow(gCV.fSpawnMax, 2.0))
         {
@@ -1526,7 +1516,6 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
                 return false;
         }
 
-        // ——— 保留三次 SDK 可视性检测（点位+头部高度），删除 Hull 复检以降低成本 ———
         if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, pos))
             return true;
         if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))
@@ -1535,10 +1524,8 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
     return false;
 }
 
-// （调试画线函数保留空实现；DEBUG=0 时不会编译内部调用） 
 stock void DebugBeam(const float start[3], const float end[3], bool clear)
 {
-    // 仅在 2 档（控制台+调试）时画线，避免 1 档纯日志也去画粒子特效
     if (gCV.iDebugMode < 3) return;
 
     static int g_iBeamSprite = -1;
@@ -1556,18 +1543,8 @@ stock void DebugBeam(const float start[3], const float end[3], bool clear)
 
 static int GroundMaskForRadius(float r)
 {
-    // 近距离更严格：用可见性掩码保证真正落在可见几何上
     if (r <= 400.0)         return MASK_VISIBLE;
-    // 中距离略放宽：允许栅格
-    else if (r <= 700.0)   return MASK_VISIBLE | CONTENTS_GRATE;
-    // 远距离：回到原先的“射击可达”类掩码（但去掉 MONSTERCLIP，避免“悬空”）
-    else                    return MASK_SHOT | CONTENTS_GRATE;
-}
-
-static bool IsOnValidMesh(float ref[3])
-{
-    Address area = L4D2Direct_GetTerrorNavArea(ref);
-    return area != Address_Null && !((L4D_GetNavArea_SpawnAttributes(area) & CHECKPOINT));
+    else                    return MASK_VISIBLE | CONTENTS_GRATE;
 }
 
 static bool IsHullFreeAt(const float at[3])
@@ -1591,7 +1568,6 @@ static bool TraceFilter_Stuck(int ent, int mask)
     return true;
 }
 
-// 地面投射专用过滤器：尽量只让射线命中“真实地面/刷得住的几何”，忽略小道具等
 static bool TraceFilter_Ground(int ent, int mask)
 {
     if (ent <= MaxClients || !IsValidEntity(ent))
@@ -1600,22 +1576,18 @@ static bool TraceFilter_Ground(int ent, int mask)
     char cls[32];
     GetEntityClassname(ent, cls, sizeof cls);
 
-    // 忽略常见“非地面”的命中体
-    if (StartsWith(cls, "prop_"))             return false; // 各种道具
-    if (StartsWith(cls, "weapon_"))           return false; // 掉落武器
-    if (StartsWith(cls, "item_"))             return false; // 道具包等
-    if (StartsWith(cls, "trigger_"))          return false; // 触发器体积
-    if (StartsWith(cls, "func_ladder"))       return false; // 梯子本身不是我们要落的“地”
-    // 根据需要还可加：projectile_ / ragdoll 等
+    if (StartsWith(cls, "prop_"))             return false;
+    if (StartsWith(cls, "weapon_"))           return false;
+    if (StartsWith(cls, "item_"))             return false;
+    if (StartsWith(cls, "trigger_"))          return false;
+    if (StartsWith(cls, "func_ladder"))       return false;
 
-    // 常见物理阻挡器（1/2 型 clip）一律忽略，避免“落在 clip 顶”
     if (strcmp(cls, "env_physics_blocker") == 0)
     {
         int t = GetEntProp(ent, Prop_Data, "m_nBlockType");
         if (t == 1 || t == 2) return false;
     }
 
-    // 其他保持命中（func_brush/位移地形/世界几何等）
     return true;
 }
 
@@ -1675,14 +1647,14 @@ static float ScoreSmoker(float pos[3], int target, float dist, float ideal)
     Handle tr = TR_TraceRayFilterEx(pos, tChest, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
     bool clear = !TR_DidHit(tr);
     delete tr;
-    if (clear) score += 320.0; else score -= 150.0;
+    if (clear) score += 220.0; else score -= 150.0; // ↓ from +320
     return score;
 }
 
 static float ScoreBoomer(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal);
-    float aheadBias = IsPosAheadOfHighest(pos, target) ? -120.0 : 80.0;
+    float aheadBias = IsPosAheadOfHighest(pos, target) ? 0.0 : 80.0; // 更中性，微倾后路
     score += aheadBias;
 
     float fwd[3]; SurvivorForward(target, fwd);
@@ -1693,6 +1665,7 @@ static float ScoreBoomer(float pos[3], int target, float dist, float ideal)
     else if (FloatAbs(dot) < 0.2) score += 100.0;
 
     score += ClampFloat(-ScoreHeightDelta(pos, target), 0.0, 150.0);
+    score += 30.0;
     return score;
 }
 
@@ -1706,9 +1679,10 @@ static float ScoreHunter(float pos[3], int target, float dist, float ideal)
 static float ScoreSpitter(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal);
-    float aheadBias = IsPosAheadOfHighest(pos, target) ? -140.0 : 70.0;
+    float aheadBias = IsPosAheadOfHighest(pos, target) ? 0.0 : 60.0;
     score += aheadBias;
     score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.4;
+    score += 60.0;
     return score;
 }
 
@@ -1719,8 +1693,8 @@ static float ScoreJockey(float pos[3], int target, float dist, float ideal)
     float t[3];   GetClientAbsOrigin(target, t);
     float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
     float dot = GetVectorDotProduct(fwd, to);
-    if (FloatAbs(dot) < 0.35) score += 120.0;
-    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.4; // ← 新增
+    if (FloatAbs(dot) < 0.50) score += 100.0; // 窗口更宽
+    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.55;
     return score;
 }
 
@@ -1728,12 +1702,12 @@ static float ScoreCharger(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal) + ScoreAheadness(pos, target);
     float fwd[3]; SurvivorForward(target, fwd);
-    if (HasClearRunway(pos, fwd, 350.0)) score += 240.0; else score -= 100.0;
+    if (HasClearRunway(pos, fwd, 350.0)) score += 200.0; else score -= 100.0;
     return score;
 }
 
 // ---------------------------------------------------------------------------
-// Lane helpers（路线识别/打分/记录）
+// Lane helpers
 // ---------------------------------------------------------------------------
 
 static int ComputeLaneId(const float p[3], int target)
@@ -1827,7 +1801,6 @@ static float LaneAdjustScore(const float p[3], int target, bool teleportMode, fl
                adj -= NONSMOKER_TOP_RESERVE_PEN;
             else
                adj += TOP_LANE_BONUS;
-           // 其他职业的“顶路”加分（温和）
             if (zc == view_as<int>(SI_Hunter))  adj += HUNTER_TOP_BONUS;
             if (zc == view_as<int>(SI_Jockey))  adj += JOCKEY_TOP_BONUS;
             if (zc == view_as<int>(SI_Charger)) adj += CHARGER_TOP_BONUS;
@@ -1836,19 +1809,23 @@ static float LaneAdjustScore(const float p[3], int target, bool teleportMode, fl
     }
     else
     {
-        if (!teleportMode && lane == LANE_BACK)
-            adj -= REAR_NONTP_PENALTY;
+        if (!teleportMode && lane == LANE_BACK) {
+            if (IsKillerClassInt(zc)) adj -= REAR_NONTP_PENALTY; // 杀手类保留重罚
+            else                      adj -= 0.0;                // 支援类不罚后路
+        }
     }
 
     float softMax = LANE_DIST_SOFTMAX;
     float penPer  = LANE_DIST_PEN_PERUU;
     if (lane == LANE_TOP) {
-        softMax += 150.0; // 所有职业在顶路可接受更远一点
+        softMax += 150.0;
         if (zc == view_as<int>(SI_Smoker)) {
             softMax += SMOKER_TOP_SOFTMAX_BONUS;
             penPer  *= SMOKER_TOP_PEN_RELIEF;
         }
     }
+    if (zc == view_as<int>(SI_Charger)) softMax += 150.0;
+
     if (dist > softMax)
         adj -= (dist - softMax) * penPer;
 
@@ -1879,14 +1856,14 @@ static float LaneAdjustScore(const float p[3], int target, bool teleportMode, fl
         if (c >= (gCV.iSiLimit + 1) / 2)
             adj -= LANE_SAT_PENALTY;
     }
-    // —— 前/后路数均衡：谁当前更少，就给谁补偿分 —— //
+
     int f = gST.laneCount[LANE_FRONT];
     int b = gST.laneCount[LANE_BACK];
     int diff = f - b;
     if (diff >= LANE_FB_TOLERANCE && lane == LANE_BACK)
-        adj += LANE_FB_BALANCE_BONUS;     // 后路少 → 鼓励后路
+        adj += LANE_FB_BALANCE_BONUS;
     else if (diff <= -LANE_FB_TOLERANCE && lane == LANE_FRONT)
-        adj += LANE_FB_BALANCE_BONUS;     // 前路少 → 鼓励前路
+        adj += LANE_FB_BALANCE_BONUS;
 
     return adj;
 }
@@ -1899,7 +1876,7 @@ static void RecordLaneForPos(const float p[3], int target)
 }
 
 // ---------------------------------------------------------------------------
-// FindSpawnPosForClass (with low-score expand, lane score, debug trace)
+// FindSpawnPosForClass (with low-score expand, lane score, debug)
 // ---------------------------------------------------------------------------
 
 static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius, bool teleportMode, float outPos[3])
@@ -1925,6 +1902,8 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
     int   expandCnt = 0;
     bool isSupportClass = (zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter));
     float maxR = isSupportClass ? FloatMin(gCV.fSpawnMax, SUPPORT_EXPAND_MAX) : gCV.fSpawnMax;
+    if (gCV.iDebugMode >= 2 && isSupportClass)
+        Debug_Print("[Find] Support maxR=%.1f (SpawnMax=%.1f, cap=%d)", maxR, gCV.fSpawnMax, SUPPORT_EXPAND_MAX);
 
     float avgDist = GetSurAvrDistance();
     int   triesThisRound = 0;
@@ -1972,24 +1951,29 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
 
             gDBG.considered++; triesThisRound++;
 
-            if (IsPosVisibleSDK(p, teleportMode)) { gDBG.failVisible++; continue; }
-            if (!IsOnValidMesh(p))                { gDBG.failMesh++;    continue; }
+            if (!IsOnValidMesh(p)) { gDBG.failMesh++; continue; }
+
+            // —— Hull 占用检测 —— //
             if (!IsHullFreeAt(p))                 { gDBG.failHull++;    continue; }
 
+            // —— 距离环带/近距约束 —— //
             float dist = GetVectorDistance(sPos, p);
             if (dist < gCV.fSpawnMin)             { gDBG.failNear++;  continue; }
             if (dist > (R + RING_SLACK))          { gDBG.failRing++; continue; }
 
+            // —— 前进方向约束（传送/抓跑男/杀手类要求“在前方”） —— //
             if ((gST.bPickRushMan || teleportMode) && IsKillerClassInt(zc) && !IsPosAheadOfHighest(p, targetSurvivor))
             { gDBG.failAhead++; continue; }
 
-            Address navP = L4D_GetNearestNavArea(p, 120.0, false, false, false, TEAM_INFECTED);
+            // —— 可视性 —— //
+            if (IsPosVisibleSDK(p, teleportMode)) { gDBG.failVisible++; continue; }
 
+            // —— Path 判定：可达 —— //
             float pathNeed = radiusCur * NORMALPOSMULT;
-            if (pathNeed - radiusCur <= 250.0) pathNeed = radiusCur + 250.0;
+            if (pathNeed - radiusCur <= 120.0) pathNeed = radiusCur + 120.0;
             if (p[2] - sPos[2] > HIGHERPOS)       pathNeed += HIGHERPOSADDDISTANCE;
-
-            if (!L4D2_NavAreaBuildPath(navP, navS, pathNeed, TEAM_INFECTED, false)) { gDBG.failPath++; continue; }
+            Address navP = L4D_GetNearestNavArea(p, 120.0, false, false, false, TEAM_INFECTED);
+            if (!L4D2_NavAreaBuildPath(navS, navP, pathNeed, TEAM_INFECTED, false)) { gDBG.failPath++; continue; }
 
             bool atMasked = false;
             if (IsAreaMasked(navP))
@@ -2011,7 +1995,7 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
             switch (zc)
             {
                 case view_as<int>(SI_Smoker):  ideal = baseIdeal + 60.0;
-                case view_as<int>(SI_Boomer):  ideal = baseIdeal - 120.0;
+                case view_as<int>(SI_Boomer):  ideal = baseIdeal - 60.0;   // ↓ -120 → -60
                 case view_as<int>(SI_Hunter):  ideal = baseIdeal + 40.0;
                 case view_as<int>(SI_Spitter): ideal = baseIdeal + 20.0;
                 case view_as<int>(SI_Jockey):  ideal = baseIdeal - 60.0;
@@ -2089,20 +2073,14 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
         return true;
     }
 
-    // --- 新兜底：用导演的随机 PZ 刷位 ---
-
-    float pz[3];
-    bool  ok = false;
-
-    // 优先用“本次目标生还者”作参考；退化到最高流生还者；再退化到 0
+    // --- 兜底：导演随机 PZ 点 ---
+    float pz[3]; bool  ok = false;
     int refSur = IsValidSurvivor(targetSurvivor) ? targetSurvivor : L4D_GetHighestFlowSurvivor();
     if (!IsValidSurvivor(refSur)) refSur = 0;
 
-    // 尝试若干次要一个“导演认可”的点（次数可调）
     const int PZ_TRIES = 24;
     for (int j = 0; j < PZ_TRIES; j++)
     {
-        // 你的工程里已在别处用过第三参=2，这里沿用以保持一致
         if (!L4D_GetRandomPZSpawnPosition(refSur, zc, 2, pz))
             continue;
 
@@ -2110,25 +2088,21 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
 
         if (IsPosVisibleSDK(pz, teleportMode)) { gDBG.failVisible++; continue; }
 
-        // G) 前进方向约束（传送/抓跑男/杀手类要求“在前方”）
         if ((gST.bPickRushMan || teleportMode) && IsKillerClassInt(zc) && !IsPosAheadOfHighest(pz, targetSurvivor))
         { gDBG.failAhead++; continue; }
 
-        // —— 通过全部校验：作为兜底结果 —— //
         outPos[0] = pz[0];
         outPos[1] = pz[1];
-        outPos[2] = pz[2]; // 若需要抬高可: + NAV_MESH_HEIGHT（通常 PZ 已给到地面）
+        outPos[2] = pz[2];
 
         gDBG.radiusFinal = gCV.fSpawnMax;
-        gDBG.bestScore   = -500.0;    // 兜底，不参与常规评分排名
+        gDBG.bestScore   = -500.0;
         ok = true;
         break;
     }
 
     if (ok)
         return true;
-
-
 
     Debug_DumpFail(teleportMode ? "TP" : "SPAWN");
     return false;
@@ -2222,11 +2196,13 @@ static int CountDominateQueued()
     for (int i = 0; i < gQ.spawn.Length; i++)
     {
         int t = gQ.spawn.Get(i);
-        if (t != view_as<int>(SI_Boomer) || t == view_as<int>(SI_Spitter)) c++;
+        if (t == view_as<int>(SI_Smoker)
+         || t == view_as<int>(SI_Hunter)
+         || t == view_as<int>(SI_Jockey)
+         || t == view_as<int>(SI_Charger)) c++;
     }
     return c;
 }
-
 static bool HasReachedLimit(int zc)
 {
     int count = 0;
@@ -2366,19 +2342,18 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
     return false;
 }
 
-/*
- * 说明：
- * - 本文件依赖的工具函数（如：GetSurAvrDistance / GetSurAvrFlow / IsSeparatedByCeiling /
- *   GetRandomSurvivor / IsAnyTankOrAboveHalfSurvivorDownOrDied / SpawnCommonInfect / Timer_InitLadders 等）
- *   与你原工程保持一致，未在此重复实现。
- */
-
 static int Calculate_Flow(Address area)
 {
     float flow = L4D2Direct_GetTerrorNavAreaFlow(area) / L4D2Direct_GetMapMaxFlowDistance();
     float prox = flow + gCV.VsBossFlowBuffer.FloatValue / L4D2Direct_GetMapMaxFlowDistance();
     if (prox > 1.0) prox = 1.0;
     return RoundToNearest(prox * 100.0);
+}
+
+static bool IsOnValidMesh(float ref[3])
+{
+    Address area = L4D2Direct_GetTerrorNavArea(ref);
+    return area != Address_Null && !((L4D_GetNavArea_SpawnAttributes(area) & CHECKPOINT));
 }
 
 // ---------------------------------------------------------------------------
@@ -2394,6 +2369,11 @@ static int IsSurvivorBait()
     }
 
     float avgDist = GetSurAvrDistance();
+    if (avgDist > (BAIT_DISTANCE + 80.0) || gST.totalSI >= (gCV.iSiLimit - 1))
+    {
+        if (gST.ladderBaitCount > 0) gST.ladderBaitCount--;
+    }
+
     bool ladderNear = IsLadderAround(GetRandomSurvivor(), LADDER_DETECT_DIST);
 
     if (avgDist > 0.0 && avgDist <= BAIT_DISTANCE && gST.totalSI <= RoundToFloor(float(gCV.iSiLimit) / 3.0) && ladderNear)

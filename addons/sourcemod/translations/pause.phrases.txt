@@ -4,182 +4,240 @@
 	{
 		"en"	"{default}[{green}!{default}]"
 	}
+
 	"ClientFullyLoaded"
 	{
+		"#format" "{1:N}"
 		"en"	"{olive}%N {default}has fully loaded"
 	}
+
 	"PauseCommand"
 	{
+		"#format" "{1:N}"
 		"en"	"{olive}%N {blue}Paused{default}."
 	}
+
 	// PauseDelay_Timer
 	"PauseAction"
 	{
 		"en"	"{red}PAUSED"
 	}
+
 	"PauseDelay"
 	{
+		"#format" "{1:d}"
 		"en"	"{blue}Pausing in{default}: {olive}%d"
 	}
+
 	// ForcePause_Cmd
 	"Crashed"
 	{
 		"en"	"{olive}Game {default}was {green}force paused {default}because a player has {blue}crashed{default}."
 	}
+
 	"ForcePause"
 	{
+		"#format" "{1:N}"
 		"en"	"A {green}force pause {default}is issued by {blue}Admin {default}({olive}%N{default})"
 	}
+
 	// Unpause_Cmd
 	"UnpauseSurvivors"
 	{
+		"#format" "{1:N},{2:s},{3:s}"
 		"en"	"{olive}%N %s{default}marked {blue}%s {default}ready."
 	}
+
 	"UnpauseInfected"
 	{
+		"#format" "{1:N},{2:s},{3:s}"
 		"en"	"{olive}%N %s{default}marked {red}%s {default}ready."
 	}
+
 	"UnpauseInitiator"
 	{
+		"#format" "{1:N}"
 		"en"	"{olive}%N {default}marked {green}Initiator {default}ready."
 	}
+
 	"UnpauseAdminConfirm"
 	{
 		"en"	"{olive}Teams {default}are ready. Wait for {blue}Admin {default}to {green}confirm{default}."
 	}
+
 	// Unready_Cmd
 	"UnreadySurvivors"
 	{
+		"#format" "{1:N},{2:s},{3:s}"
 		"en"	"{olive}%N %s{default}marked {blue}%s {default}not ready."
 	}
+
 	"UnreadyInfected"
 	{
+		"#format" "{1:N},{2:s},{3:s}"
 		"en"	"{olive}%N %s{default}marked {red}%s {default}not ready."
 	}
+
 	"UnreadyInitiator"
 	{
+		"#format" "{1:N}"
 		"en"	"{olive}%N {default}marked {green}Initiator {default}not ready."
 	}
+
 	// void AsInitiator()
 	"AsInitiator"
 	{
-		"en"		"{default}as {green}Initiator "
+		"en"	"{default}as {green}Initiator "
 	}
+
 	// ForceUnpause_Cmd
 	"ForceUnpause"
 	{
+		"#format" "{1:N}"
 		"en"	"A {green}force unpause {default}is issued by {blue}Admin {default}({olive}%N{default})"
 	}
+
 	// AddPauseCount
 	"PauseLimit"
 	{
 		"en"	"You have reached your pause limit."
 	}
+
 	// AttemptPause
 	"PauseDeferred"
 	{
 		"en"	"{red}Pause has been delayed due to a pick-up in progress!"
 	}
+
 	// Pause
 	"PausePreventSpawn"
 	{
 		"en"	"{default}Your {red}Spawn {default}has been prevented because of the Pause"
 	}
+
 	// Show_Cmd
 	"PanelShow"
 	{
 		"en"	"Panel is now {blue}on{default}."
 	}
+
 	"PanelHide"
 	{
 		"en"	"Panel is now {red}off{default}."
 	}
+
 	// UpdatePanel
 	"PanelSlots"
 	{
+		"#format" "{1:s},{2:d},{3:d}"
 		"en"	"▸ Server: %s\n▸ Slots: %d/%d"
 	}
+
 	"PanelDate"
 	{
 		"en"	"▸ %m/%d/%Y - %I:%M%p"
 	}
+
 	"PanelTitle"
 	{
 		"en"	"▸ Ready Status"
 	}
+
 	"RequireAdmin"
 	{
 		"en"	"->0. Require Admin to Unpause"
 	}
+
 	"SurvivorUnPaused"
 	{
 		"en"	"->1. Survivors: [√]"
 	}
+
 	"SurvivorPaused"
 	{
 		"en"	"->1. Survivors: [X]"
 	}
+
 	"InfectedUnPaused"
 	{
 		"en"	"->2. Infected: [√]"
 	}
+
 	"InfectedPaused"
 	{
 		"en"	"->2. Infected: [X]"
 	}
+
 	"InitiatorUnPaused"
 	{
 		"en"	"->0. Initiator: [√]"
 	}
+
 	"InitiatorPaused"
 	{
 		"en"	"->0. Initiator: [X]"
 	}
+
 	"AutoPauseCrash"
 	{
 		"en"	"▸ Forced AutoPause -> Crash"
 	}
+
 	"ForcePauseAdmin"
 	{
+		"#format" "{1:s}"
 		"en"	"▸ Force Pause -> %s (Admin)"
 	}
+
 	"InitiatorPause"
 	{
+		"#format" "{1:s},{2:s}"
 		"en"	"▸ Initiator -> %s (%s)"
 	}
+
 	"DurationPause"
 	{
+		"#format" "{1:d},{2:d}"
 		"en"	"▸ Duration: %02d:%02d"
 	}
+
 	// InitiateLiveCountdown
 	"CountdownCancelNotify"
 	{
-		"en"		"Say {olive}!unready {default}to cancel"
+		"en"	"Say {olive}!unready {default}to cancel"
 	}
+
 	"GameisLive"
 	{
-		"en"		"Game is live!"
+		"en"	"Game is live!"
 	}
+
 	"CountdownReadyDelay"
 	{
-		"en"		"{blue}Live in{default}: {olive}%d{default}..."
+		"#format" "{1:d}"
+		"en"	"{blue}Live in{default}: {olive}%d{default}..."
 	}
+
 	// CancelFullReady
 	"CountdownCancelled"
 	{
-		"en"		"{olive}%N {default}cancelled the countdown!"
+		"#format" "{1:N}"
+		"en"	"{olive}%N {default}cancelled the countdown!"
 	}
+
 	// Callvote_Callback
 	"CallvoteNoSpec"
 	{
-		"en"		"You're unable to call votes as a spectator."
+		"en"	"You're unable to call votes as a spectator."
 	}
+
 	"CallvoteNoExploit"
 	{
-		"en"		"You've just switched Teams, you are unable to vote for a few seconds."
+		"en"	"You've just switched Teams, you are unable to vote for a few seconds."
 	}
+
 	"CallvoteCannotTargetAdmin"
 	{
-		"en"		"You may not kick Admins."
+		"en"	"You may not kick Admins."
 	}
 }
