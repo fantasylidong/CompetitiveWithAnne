@@ -6,6 +6,7 @@
 #include <sdkhooks>
 #include <colors>
 #include <rpg>
+#include <admin>
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 #include <hextags>
@@ -38,8 +39,14 @@ bool IsAllowBigGun = false;
 bool IsAnne = false;
 int InfectedNumber=6;
 bool g_bEnableGlow = true;
-ConVar GaoJiRenJi, AllowBigGun, g_InfectedNumber, g_cShopEnable, g_hEnableGlow;
-bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false;
+ConVar GaoJiRenJi, AllowBigGun, g_InfectedNumber, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
+// === Admin Anti-Kick ===
+ConVar g_hAntiKickEnable;
+ConVar g_hAntiKickBlockVote;
+ConVar g_hAntiKickBlockCmdKick;
+ConVar g_hAntiKickMinImmunity;   // 0=只要有任意管理员标识就保护；>0=要求免疫等级>=此值才保护
+ConVar g_hAntiKickEqualBlock;    // 同级免疫是否禁止互踢（默认禁用互踢）
+bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false;
 //new lastpoints[MAXPLAYERS + 1];
 
 //枚举变量,修改武器消耗积分在此。
@@ -167,6 +174,69 @@ public any Native_SetGlobalValue(Handle plugin, int numParams)
 	return -1;
 }
 
+
+static int GetClientImmunityLevel(int client)
+{
+    AdminId adm = GetUserAdmin(client);
+    if (adm == INVALID_ADMIN_ID) return 0;
+    return GetAdminImmunityLevel(adm);
+}
+
+static bool HasAnyAdminFlag(int client)
+{
+    return (GetUserAdmin(client) != INVALID_ADMIN_ID) || (GetUserFlagBits(client) != 0);
+}
+
+
+// 目标是否受“防踢”保护
+static bool IsAdminProtected(int target)
+{
+    if (!IsClientInGame(target)) return false;
+    if (!HasAnyAdminFlag(target)) return false;
+
+    int minImm = g_hAntiKickMinImmunity != null ? g_hAntiKickMinImmunity.IntValue : 0;
+    if (minImm <= 0) return true;                       // 0：只要有任意管理员身份就保护
+    return GetClientImmunityLevel(target) >= minImm;    // 否则：需达到阈值
+}
+
+// 解析 callvote/ sm_kick 里的目标参数，支持 "#userid" 或 精确姓名；
+// 如果精确不唯一，则返回 0（避免误判）
+static int ResolveSingleTarget(const char[] arg)
+{
+    if (arg[0] == '#' && strlen(arg) >= 2)
+    {
+        int uid = StringToInt(arg[1]);
+        int cl = GetClientOfUserId(uid);
+        return (cl > 0 && IsClientInGame(cl)) ? cl : 0;
+    }
+
+    // 先尝试精确匹配
+    for (int i=1; i<=MaxClients; i++)
+    {
+        if (!IsClientInGame(i)) continue;
+        char name[64];
+        GetClientName(i, name, sizeof(name));
+        if (StrEqual(name, arg, false))
+            return i;
+    }
+
+    // 再尝试“唯一”子串匹配（仅当唯一命中才返回）
+    int hit = 0, cnt = 0;
+    for (int i=1; i<=MaxClients; i++)
+    {
+        if (!IsClientInGame(i)) continue;
+        char name[64];
+        GetClientName(i, name, sizeof(name));
+        if (StrContains(name, arg, false) != -1)
+        {
+            hit = i; cnt++;
+            if (cnt > 1) break;
+        }
+    }
+    return (cnt == 1) ? hit : 0;
+}
+
+
 public bool IsSurvivor(int client)
 {
     return (IsValidClient(client) && GetClientTeam(client) == view_as<int>(Team_Survivor));
@@ -178,31 +248,65 @@ public bool IsValidClient(int client)
 
 public void OnAllPluginsLoaded()
 {
-	g_bGodFrameSystemAvailable = LibraryExists("l4d2_godframes_control_merge");
-	g_bHatSystemAvailable = LibraryExists("l4d_hats");
-	g_bl4dstatsSystemAvailable = LibraryExists("l4d_stats");
-	g_bHextagsSystemAvailable = LibraryExists("hextags");
-//	g_bpunchangelSystemAvailable = LibraryExists("punch_angle");
-	g_bReadyUpSystemAvailable = LibraryExists("readyup");
+    g_bGodFrameSystemAvailable   = LibraryExists("l4d2_godframes_control_merge");
+    g_bHatSystemAvailable        = LibraryExists("l4d_hats");
+    g_bl4dstatsSystemAvailable   = LibraryExists("l4d_stats");
+    g_bHextagsSystemAvailable    = LibraryExists("hextags");
+    g_bReadyUpSystemAvailable    = LibraryExists("readyup");
+
+    // 只在 infected_control 库存在时再去找 l4d_infected_limit
+    g_bInfectedControlAvailable  = LibraryExists("infected_control");
+    if (g_bInfectedControlAvailable)
+    {
+        g_hInfectedLimit = FindConVar("l4d_infected_limit");
+        if (g_hInfectedLimit != null)
+        {
+            g_hInfectedLimit.AddChangeHook(ConVarChanged_Cvars);
+            RefreshInfectedLimit();
+            IsAnne = true; // 兼容你原先用来标识“启用Anne系配置”的开关
+        }
+    }
 }
+
 public void OnLibraryAdded(const char[] name)
 {
-    if ( StrEqual(name, "l4d2_godframes_control_merge") ) { g_bGodFrameSystemAvailable = true; }
-	else if ( StrEqual(name, "l4d_hats") ) { g_bHatSystemAvailable = true; }
-	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
-	else if ( StrEqual(name, "hextags") ) { g_bHextagsSystemAvailable = true; }
-//	else if ( StrEqual(name, "punch_angle") ) { g_bpunchangelSystemAvailable = true; }
-	else if ( StrEqual(name, "readyup") ) { g_bReadyUpSystemAvailable = true; }
+    if (StrEqual(name, "l4d2_godframes_control_merge")) { g_bGodFrameSystemAvailable = true; }
+    else if (StrEqual(name, "l4d_hats")) { g_bHatSystemAvailable = true; }
+    else if (StrEqual(name, "l4d_stats")) { g_bl4dstatsSystemAvailable = true; }
+    else if (StrEqual(name, "hextags")) { g_bHextagsSystemAvailable = true; }
+    else if (StrEqual(name, "readyup")) { g_bReadyUpSystemAvailable = true; }
+    else if (StrEqual(name, "infected_control"))
+    {
+        g_bInfectedControlAvailable = true;
+        g_hInfectedLimit = FindConVar("l4d_infected_limit");
+        if (g_hInfectedLimit != null)
+        {
+            g_hInfectedLimit.AddChangeHook(ConVarChanged_Cvars);
+            RefreshInfectedLimit();
+            IsAnne = true;
+        }
+    }
 }
+
 public void OnLibraryRemoved(const char[] name)
 {
-    if ( StrEqual(name, "l4d2_godframes_control_merge") ) { g_bGodFrameSystemAvailable = false; }
-	else if ( StrEqual(name, "l4d_hats") ) { g_bHatSystemAvailable = false; }
-	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = false; }
-	else if ( StrEqual(name, "hextags") ) { g_bHextagsSystemAvailable = false; }
-//	else if ( StrEqual(name, "punch_angle") ) { g_bpunchangelSystemAvailable = false; }
-	else if ( StrEqual(name, "readyup") ) { g_bReadyUpSystemAvailable = false; }
+    if (StrEqual(name, "l4d2_godframes_control_merge")) { g_bGodFrameSystemAvailable = false; }
+    else if (StrEqual(name, "l4d_hats")) { g_bHatSystemAvailable = false; }
+    else if (StrEqual(name, "l4d_stats")) { g_bl4dstatsSystemAvailable = false; }
+    else if (StrEqual(name, "hextags")) { g_bHextagsSystemAvailable = false; }
+    else if (StrEqual(name, "readyup")) { g_bReadyUpSystemAvailable = false; }
+    else if (StrEqual(name, "infected_control"))
+    {
+        g_bInfectedControlAvailable = false;
+        if (g_hInfectedLimit != null)
+        {
+            g_hInfectedLimit.RemoveChangeHook(ConVarChanged_Cvars);
+            g_hInfectedLimit = null;
+        }
+        // 不再强制关闭 IsAnne；保持你原来的判定流转（仅不再跟随 l4d_infected_limit）
+    }
 }
+
 
 //god frame send forward implement
 public void L4D2_GodFrameRenderChange(int client){
@@ -254,12 +358,28 @@ public void  OnPluginStart()
 	g_cShopEnable =  CreateConVar("shop_enable", "0", "是否打开商店购买", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	AllowBigGun = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hEnableGlow = CreateConVar("rpg_allow_glow", "1", "商店是否打开轮廓", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	// --- Admin Anti-Kick: ConVars ---
+	g_hAntiKickEnable       = CreateConVar("rpg_antikick_enable", "1", "是否启用管理员防踢（投票/命令）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hAntiKickBlockVote    = CreateConVar("rpg_antikick_block_votekick", "1", "禁止对受保护管理员发起投票踢", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hAntiKickBlockCmdKick = CreateConVar("rpg_antikick_block_cmdkick", "1", "低级/同级管理员是否禁止用 sm_kick 踢受保护管理员", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hAntiKickMinImmunity  = CreateConVar("rpg_antikick_min_immunity", "0", "受保护阈值：管理员免疫等级>=此值即保护；0=任意管理员都保护", FCVAR_NOTIFY, true, 0.0, true, 100.0);
+	g_hAntiKickEqualBlock   = CreateConVar("rpg_antikick_equal_block", "1", "同级免疫是否禁止互踢（仅对 sm_kick 生效）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+	// --- Admin Anti-Kick: 监听命令 ---
+	AddCommandListener(OnCallVote, "callvote");   // 阻止对管理员的投票踢
+	AddCommandListener(OnSmKick,  "sm_kick");     // 限制同级/低级管理员踢更高级（或同级）
 	if(FindConVar("sb_fix_enabled"))
 		GaoJiRenJi=FindConVar("sb_fix_enabled");
-	if(FindConVar("l4d_infected_limit")){
-		IsAnne = true;
-		g_InfectedNumber=FindConVar("l4d_infected_limit");
-		InfectedNumber=GetConVarInt(g_InfectedNumber);
+	if (LibraryExists("infected_control"))
+	{
+		g_bInfectedControlAvailable = true;
+		g_hInfectedLimit = FindConVar("l4d_infected_limit");
+		if (g_hInfectedLimit != null)
+		{
+			RefreshInfectedLimit();
+			g_hInfectedLimit.AddChangeHook(ConVarChanged_Cvars);
+			IsAnne = true;
+		}
 	}
 	AllowBigGun.AddChangeHook(ConVarChanged_Cvars);
 	g_hEnableGlow.AddChangeHook(ConVarChanged_Cvars);
@@ -308,22 +428,26 @@ public void OnConfigsExecuted()
 // *********************
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	if(!IsAnne){
-		valid = false;
-		return;
-	}
+    if (!g_bInfectedControlAvailable || g_hInfectedLimit == null)
+    {
+        // 没有 infected_control，就当这局不计有效（保持你原始语义）
+        valid = false;
+        return;
+    }
 
-	if(IsStart)
-	{
-		PrintToChatAll("\x01[\x04RANK\x01]\x04判断额外积分所需变量发生变化，此局无法获得额外积分, 过关也不奖励额外分数");
-		valid=false;
-		Call_StartForward(IsValid);//转发触发
-		Call_PushCell(false);//按顺序将参数push进forward传参列表里
-		Call_Finish();//转发结束
-	}
-	InfectedNumber = GetConVarInt(FindConVar("l4d_infected_limit"));
-	IsAllowBigGun = GetConVarBool(AllowBigGun);
-	g_bEnableGlow = GetConVarBool(g_hEnableGlow);
+    if (IsStart)
+    {
+        PrintToChatAll("\x01[\x04RANK\x01]\x04判断额外积分所需变量发生变化，此局无法获得额外积分, 过关也不奖励额外分数");
+        valid = false;
+        Call_StartForward(IsValid);
+        Call_PushCell(false);
+        Call_Finish();
+    }
+
+    // 统一从缓存句柄取
+    RefreshInfectedLimit();
+    IsAllowBigGun = GetConVarBool(AllowBigGun);
+    g_bEnableGlow = GetConVarBool(g_hEnableGlow);
 }
 
 public void Event_PlayerDisconnectOrAFK( Event hEvent, const char[] sName, bool bDontBroadcast )
@@ -620,15 +744,16 @@ public void OnClientPostAdminCheck(int client)
 
 public Action SetClientTag(Handle timer, int client)
 {
-	if(!IsValidClient(client) || IsFakeClient(client))
-		return Plugin_Handled;
-	if(player[client].tags.ChatTag[0] != '\0')
-	{
-		SetTags(client,player[client].tags.ChatTag);
-		//LogError("称号名字：%s",player[client].tags.ChatTag);
-	}
-	return Plugin_Continue;
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Handled;
+
+    if (player[client].tags.ChatTag[0] != '\0' && g_bHextagsSystemAvailable)
+    {
+        SetTags(client, player[client].tags.ChatTag);
+    }
+    return Plugin_Continue;
 }
+
 
 public Action CheckPlayer(Handle timer, int client)
 {
@@ -818,6 +943,33 @@ public void ClientSaveToFileCreate(int Client)
 	return;
 }
 
+public void ClientTagsSaveToFileSave(int Client)
+{
+    if (!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
+        return;
+
+    char SteamID[64];
+    GetClientAuthId(Client, AuthId_Steam2, SteamID, sizeof(SteamID));
+    if (StrEqual(SteamID, "BOT")) return;
+
+    // 转义 ChatTag
+    char escTag[64];
+    escTag[0] = '\0';
+    if (player[Client].tags.ChatTag[0] != '\0' && db != INVALID_HANDLE)
+    {
+        SQL_EscapeString(db, player[Client].tags.ChatTag, escTag, sizeof(escTag));
+    }
+
+    if (player[Client].tags.ChatTag[0] == '\0')
+        CPrintToChat(Client, "\x04你的称号取消设置");
+    else
+        CPrintToChat(Client, "\x04你的称号更新成功，新称号为：\x03%s", player[Client].tags.ChatTag);
+
+    char query[255];
+    Format(query, sizeof(query), "UPDATE RPG SET CHATTAG='%s' WHERE steamid = '%s'", escTag, SteamID);
+    SendSQLUpdate(query);
+}
+
 public void ClientSaveToFileSave(int Client)
 {
 	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
@@ -831,21 +983,12 @@ public void ClientSaveToFileSave(int Client)
 	return;
 }
 
-public void ClientTagsSaveToFileSave(int Client)
+static void RefreshInfectedLimit()
 {
-	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
-		return;
-	char query[255];
-	char SteamID[64];
-	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
-	if(StrEqual(SteamID,"BOT"))return;
-	if(player[Client].tags.ChatTag[0] == '\0')
-		CPrintToChat(Client,"\x04你的称号取消设置");
-	else
-		CPrintToChat(Client,"\x04你的称号更新成功，新称号为：\x03%s",player[Client].tags.ChatTag);
-	Format(query, sizeof(query), "UPDATE RPG SET CHATTAG='%s' WHERE steamid = '%s'", player[Client].tags.ChatTag, SteamID);	
-	SendSQLUpdate(query);
-	return;
+    if (g_bInfectedControlAvailable && g_hInfectedLimit != null)
+    {
+        InfectedNumber = g_hInfectedLimit.IntValue;
+    }
 }
 
 
@@ -1135,15 +1278,21 @@ public Action UnSetCH(int client,int args)
 
 public void SetTags(int client, char[] tagsname)
 {
-	char temp[32];
-	Format(temp,sizeof(temp),"<%s>", tagsname);
-	HexTags_SetClientTag(client, ScoreTag, temp);
-	Format(temp,sizeof(temp),"{green}<%s>", tagsname);
-	HexTags_SetClientTag(client, ChatTag, temp);
-	HexTags_SetClientTag(client, ChatColor, "{teamcolor}");
-	HexTags_SetClientTag(client, NameColor, "{lightgreen}");
-    //ClientSaveToFileSave(client);
+    if (!g_bHextagsSystemAvailable)
+    {
+        CPrintToChat(client, "\x04称号模块未启用，无法设置称号");
+        return;
+    }
+    char temp[32];
+    Format(temp, sizeof(temp), "<%s>", tagsname);
+    HexTags_SetClientTag(client, ScoreTag, temp);
+
+    Format(temp, sizeof(temp), "{green}<%s>", tagsname);
+    HexTags_SetClientTag(client, ChatTag, temp);
+    HexTags_SetClientTag(client, ChatColor, "{teamcolor}");
+    HexTags_SetClientTag(client, NameColor, "{lightgreen}");
 }
+
 
 public Action ResetBuy(Handle timer, int client)
 {
@@ -2378,4 +2527,66 @@ stock bool AnneMultiPlayerMode(){
 	{
 		return false;
 	}
+}
+
+public Action OnCallVote(int client, const char[] command, int argc)
+{
+    if (client <= 0 || !IsClientInGame(client)) return Plugin_Continue;
+    if (!g_hAntiKickEnable.BoolValue || !g_hAntiKickBlockVote.BoolValue) return Plugin_Continue;
+
+    // 语法: callvote Kick <#userid|name>  （其他议题不拦）
+    char issue[32]; GetCmdArg(1, issue, sizeof(issue));
+    if (!StrEqual(issue, "Kick", false)) return Plugin_Continue;
+
+    char targetArg[64]; GetCmdArg(2, targetArg, sizeof(targetArg));
+    if (targetArg[0] == '\0') return Plugin_Continue;
+
+    int target = ResolveSingleTarget(targetArg);
+    if (target <= 0) return Plugin_Continue;
+
+    if (IsAdminProtected(target))
+    {
+        char tname[64], cname[64];
+        GetClientName(target, tname, sizeof(tname));
+        GetClientName(client, cname, sizeof(cname));
+
+        CPrintToChat(client, "\x04[AntiKick]\x01 该玩家 \x05%N\x01 为管理员，已启用防踢，投票无效。", target);
+        PrintToServer("[AntiKick] %s attempted votekick on admin %s, blocked.", cname, tname);
+        return Plugin_Handled;   // 直接拦截投票
+    }
+
+    return Plugin_Continue;
+}
+
+public Action OnSmKick(int client, const char[] command, int argc)
+{
+    // 控制台/服务器执行不拦（通常用于管理）
+    if (client == 0) return Plugin_Continue;
+    if (!IsClientInGame(client)) return Plugin_Continue;
+    if (!g_hAntiKickEnable.BoolValue || !g_hAntiKickBlockCmdKick.BoolValue) return Plugin_Continue;
+
+    // 语法: sm_kick <#userid|name> [reason...]
+    char targetArg[64]; GetCmdArg(1, targetArg, sizeof(targetArg));
+    if (targetArg[0] == '\0') return Plugin_Continue;
+
+    int target = ResolveSingleTarget(targetArg);
+    if (target <= 0) return Plugin_Continue;
+
+    if (!IsAdminProtected(target)) return Plugin_Continue;
+
+    int callerImm = GetClientImmunityLevel(client);
+    int targetImm = GetClientImmunityLevel(target);
+    bool equalBlock = g_hAntiKickEqualBlock.BoolValue;
+
+    // 规则：低级 < 高级 => 禁止；同级 && equalBlock => 禁止
+    if (callerImm < targetImm || (callerImm == targetImm && equalBlock))
+    {
+        char tname[64];
+        GetClientName(target, tname, sizeof(tname));
+        CPrintToChat(client, "\x04[AntiKick]\x01 你无权踢出受保护管理员：\x05%N\x01。", target);
+        return Plugin_Handled;
+    }
+
+    // 更高免疫管理员可以踢（尊重免疫层级）
+    return Plugin_Continue;
 }

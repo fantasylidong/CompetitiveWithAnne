@@ -83,8 +83,8 @@ enum
 
 // —— 低分阈值＆扩圈 ——
 #define LOW_SCORE_THRESHOLD   -200.0
-#define LOW_SCORE_EXPAND      20.0
-#define LOW_SCORE_MAX_STEPS   75
+#define LOW_SCORE_EXPAND      15.0
+#define LOW_SCORE_MAX_STEPS   100
 
 #define ENABLE_SMOKER          (1 << 0)
 #define ENABLE_BOOMER          (1 << 1)
@@ -97,7 +97,7 @@ enum
 #define RUSH_MAN_DISTANCE      1200.0
 
 #define FRAME_THINK_STEP       0.01
-#define CANDIDATE_TRIES        16
+#define CANDIDATE_TRIES        15
 
 // ---- Support SI gating at wave start ----
 #define SUPPORT_SPAWN_DELAY_SECS  1.8
@@ -403,7 +403,7 @@ stock void Debug_Print(const char[] format, any ...)
 
 static bool IsKillerClassInt(int zc)
 {
-    return zc == view_as<int>(SI_Smoker) || zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger);
+    return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger);
 }
 
 static int AddrAsInt(Address a) { return view_as<int>(a); }
@@ -1065,21 +1065,31 @@ public void OnGameFrame()
             float pos[3];
             int want = gQ.teleport.Get(0);
             bool ok = FindSpawnPosForClass(want, gST.targetSurvivor, gST.teleportDistCur, true, pos);
-            if (ok)
-            {
-                if (DoSpawnAt(pos, want))
-                {
-                    gST.siAlive[want-1]++; gST.totalSI++;
-                    gQ.teleport.Erase(0);  gST.teleportQueueSize--;
-                    RecordSpawnPosGlobal(pos, L4D2Direct_GetTerrorNavArea(pos));
-                    Debug_DumpSuccess("TP");
-                }
-            }
-            else if (gST.teleportQueueSize <= 0)
-            {
-                gQ.teleport.Clear();
-                gST.teleportQueueSize = 0;
-            }
+            if (ok && DoSpawnAt(pos, want))
+       {
+           // 成功：像普通刷特一样，距离回落，优先贴近 SpawnMin
+           gST.siAlive[want-1]++; gST.totalSI++;
+           gQ.teleport.Erase(0);  gST.teleportQueueSize--;
+           RecordSpawnPosGlobal(pos, L4D2Direct_GetTerrorNavArea(pos));
+           Debug_DumpSuccess("TP");
+           gST.teleportDistCur = FloatMax(gCV.fSpawnMin, gST.teleportDistCur * 0.8);     // ★ 新增
+           if (gST.teleportQueueSize == 0)                                              // ★ 新增（可选）
+               gST.teleportDistCur = gCV.fSpawnMin;
+       }
+       else
+       {
+           // 失败：与普通生成“内部扩圈”的思路呼应，跨调用逐步外扩
+           float step = FloatMax(LOW_SCORE_EXPAND * 4.0, 60.0); // 约 80u/次               // ★ 新增
+           gST.teleportDistCur = FloatMin(gST.teleportDistCur + step, gCV.fSpawnMax);     // ★ 新增
+           Debug_Print("[TP] expand dist -> %.1f (max=%.1f)", gST.teleportDistCur, gCV.fSpawnMax);
+
+           // 原逻辑里这块清空队列的分支基本不会触发，这里保留安全网：
+           if (gST.teleportQueueSize <= 0)
+           {
+               gQ.teleport.Clear();
+               gST.teleportQueueSize = 0;
+           }
+       }
         }
 
         if (gST.siQueueCount > 0 && gST.teleportQueueSize <= 0 && gST.spawnQueueSize > 0)
@@ -1127,7 +1137,7 @@ public void OnGameFrame()
 
                 RecordSpawnPosGlobal(pos2, L4D2Direct_GetTerrorNavArea(pos2));
 
-                gST.spawnDistCur = FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
+                gST.spawnDistCur = FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.5);
 
                 Debug_DumpSuccess("SPAWN");
             }

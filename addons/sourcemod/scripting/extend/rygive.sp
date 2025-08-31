@@ -241,7 +241,7 @@ public void OnPluginStart() {
 	CreateConVar("rygive_version", PLUGIN_VERSION, "Give Item Menu plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 
 	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
-	RegAdminCmd("sm_rygive", cmdRygive, ADMFLAG_CHEATS, "rygive");
+	RegAdminCmd("sm_rygive", cmdRygive, ADMFLAG_CHAT, "rygive");
 
 	g_smMeleeTrans.SetString("fireaxe", "斧头");
 	g_smMeleeTrans.SetString("frying_pan", "平底锅");
