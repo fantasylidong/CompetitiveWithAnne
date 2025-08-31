@@ -1,19 +1,18 @@
-#pragma semicolon 1
+#pragma semicolon 1 
 #pragma newdecls required
 
 /**
- * Infected Control (Rework) + Dynamic Lanes (3–4 routes) + Nav Snap
- * -----------------------------------------------------------------
+ * Infected Control (Rework) + Nav Snap (no dynamic lanes)
+ * -------------------------------------------------------
  * - 强化找位、低分扩圈直至 inf_SpawnDistanceMax、到顶后兜底随机
- * - Nav 吸附：候选点若不在 Nav 上，优先吸附到最近的 Nav 面中心 + 抖动
  * - 全局多样性、梯子诱饵抑制（Nav 黑名单 + 距离惩罚）
  * - 辅助型延后机制（优先进攻）
- * - 动态“路线”调度（前/后/左/右/上：优先把路线数维持在 3–4 条）
- * - 详细 Debug：候选点淘汰原因计数、最终评分构成、半径、NavID、路线等
+ * - 详细 Debug：候选点淘汰原因计数、最终评分构成、半径、NavID 等
+ * - 去除 “动态路线(Lane)” 相关逻辑，仅保留前后均衡在评分中的“前方优先”(ScoreAheadness)
  *
  * Compatible with SourceMod 1.10+ + L4D2 + left4dhooks
  *
- * Authors: Caibiii, 夜羽真白, 东, Paimon-Kawaii, and rework by ChatGPT
+ * Authors: Caibiii, 夜羽真白, 东, Paimon-Kawaii, and rework by ChatGPT (no-lanes)
  */
 
 //#define DEBUG 1      // ← 调试输出开关（1=输出；0=静默）
@@ -26,35 +25,36 @@
 #include <si_target_limit>
 #include <pause>
 #include <ai_smoker_new>
+
 // Nav Area Spawn Attribute
 enum
 {
-	EMPTY = 2,
-	STOP_SCAN = 4,
-	BATTLESTATION = 32,
-	FINALE = 64,
-	PLAYER_START = 128,
-	BATTLEFIELD = 256,
-	IGNORE_VISIBILITY = 512,
-	NOT_CLEARABLE = 1024,
-	CHECKPOINT = 2048,
-	OBSCURED = 4096,
-	NO_MOBS = 8192,
-	THREAT = 16384,
-	RESCUE_VEHICLE = 32768,
-	RESCUE_CLOSET = 65536,
-	ESCAPE_ROUTE = 131072,
-	DOOR_OR_DESTROYED_DOOR = 262144,
-	NOTHREAT = 524288,
-	LYINGDOWN = 1048576,
-	COMPASS_NORTH = 16777216,
-	COMPASS_NORTHEAST = 33554432,
-	COMPASS_EAST = 67108864,
-	COMPASS_EASTSOUTH = 134217728,
-	COMPASS_SOUTH = 268435456,
-	COMPASS_SOUTHWEST = 536870912,
-	COMPASS_WEST = 1073741824,
-	COMPASS_WESTNORTH = -2147483648
+    EMPTY = 2,
+    STOP_SCAN = 4,
+    BATTLESTATION = 32,
+    FINALE = 64,
+    PLAYER_START = 128,
+    BATTLEFIELD = 256,
+    IGNORE_VISIBILITY = 512,
+    NOT_CLEARABLE = 1024,
+    CHECKPOINT = 2048,
+    OBSCURED = 4096,
+    NO_MOBS = 8192,
+    THREAT = 16384,
+    RESCUE_VEHICLE = 32768,
+    RESCUE_CLOSET = 65536,
+    ESCAPE_ROUTE = 131072,
+    DOOR_OR_DESTROYED_DOOR = 262144,
+    NOTHREAT = 524288,
+    LYINGDOWN = 1048576,
+    COMPASS_NORTH = 16777216,
+    COMPASS_NORTHEAST = 33554432,
+    COMPASS_EAST = 67108864,
+    COMPASS_EASTSOUTH = 134217728,
+    COMPASS_SOUTH = 268435456,
+    COMPASS_SOUTHWEST = 536870912,
+    COMPASS_WEST = 1073741824,
+    COMPASS_WESTNORTH = -2147483648
 }
 
 // ---------------------------------------------------------------------------
@@ -69,20 +69,22 @@ enum
 #define PLAYER_HEIGHT          72.0
 #define PLAYER_CHEST           45.0
 #define HIGHERPOS              300.0
-#define HIGHERPOSADDDISTANCE   220.0   // ↓ from 300 → 180
+#define HIGHERPOSADDDISTANCE   250.0
 #define INCAPSURVIVORCHECKDIS  500.0
-#define NORMALPOSMULT          1.4     // ↓ from 1.4 → 1.2
+#define NORMALPOSMULT          1.4
 #define BAIT_DISTANCE          200.0
 #define LADDER_DETECT_DIST     500.0
-#define RING_SLACK             200.0
+#define RING_SLACK             300.0
 #define ROOF_SEPARATION_PENALTY 180.0
 #define ROOF_VDELTA_MIN         100.0
 #define ROOF_HORIZ_MAX          650.0
+#define NOSCORE_RADIUS          1000.0
+#define SUPPORT_EXPAND_MAX      1200.0
 
 // —— 低分阈值＆扩圈 ——
-#define LOW_SCORE_THRESHOLD   -200.0   // ↓ allow accepting not-perfect candidates
+#define LOW_SCORE_THRESHOLD   -200.0
 #define LOW_SCORE_EXPAND      20.0
-#define LOW_SCORE_MAX_STEPS   64
+#define LOW_SCORE_MAX_STEPS   75
 
 #define ENABLE_SMOKER          (1 << 0)
 #define ENABLE_BOOMER          (1 << 1)
@@ -95,7 +97,7 @@ enum
 #define RUSH_MAN_DISTANCE      1200.0
 
 #define FRAME_THINK_STEP       0.01
-#define CANDIDATE_TRIES        10
+#define CANDIDATE_TRIES        16
 
 // ---- Support SI gating at wave start ----
 #define SUPPORT_SPAWN_DELAY_SECS  1.8
@@ -107,7 +109,7 @@ enum
 #define DIVERSITY_NEAR_WEIGHT           0.75
 #define DIVERSITY_MID_RADIUS            600.0
 #define DIVERSITY_MID_WEIGHT            0.35
-#define DIVERSITY_AREA_PENALTY_GLOBAL   60.0   // ↓ from 120 → 60
+#define DIVERSITY_AREA_PENALTY_GLOBAL   60.0
 
 // ---- Ladder bait: proximity + Nav mask ----
 #define LADDER_PROX_RADIUS              300.0
@@ -119,50 +121,11 @@ enum
 #define LADDER_MASK_OFFS1            100.0
 #define LADDER_MASK_OFFS2            100.0
 #define LADDER_NAVMASK_STRICT_ALWAYS 0
-#define LADDER_MASK_SOFT_PENALTY     60.0   // ↓ from 120 → 60
+#define LADDER_MASK_SOFT_PENALTY     60.0
 
-// ---- “路线（Lane）”枚举 ＆ 打分参数 ----
-#define LANE_COUNT              5
-#define LANE_LEFT               0
-#define LANE_FRONT              1
-#define LANE_RIGHT              2
-#define LANE_BACK               3
-#define LANE_TOP                4
+// 删除所有 LANE 相关常量/加分（完全去除动态路线）
 
-static const char LANEN[LANE_COUNT][] = { "left","front","right","back","top" };
-
-#define LANE_NEW_BONUS          180.0
-#define LANE_SAT_PENALTY        240.0
-#define TOP_LANE_BONUS          300.0
-#define REAR_NONTP_PENALTY      600.0
-
-#define SUPPORT_EXPAND_MAX       900.0
-#define FRONT_COS                0.8191520
-#define BACK_COS                -0.8191520
-
-#define TOP_MIN_DZ        96.0
-#define TOP_HORIZ_MAX     650.0
-#define TOP_HORIZ_MAX2       (500.0*500.0)
-
-#define LANE_DIST_SOFTMAX      1000.0   // ↑ from 900 → 1000
-#define LANE_DIST_PEN_PERUU      0.6
-#define LANE_FB_BALANCE_BONUS    160.0
-#define LANE_FB_TOLERANCE          1
-
-// ---------------------- [MOD] Smoker 顶路专属策略 ----------------------
-#define SMOKER_TOP_BONUS             260.0
-#define NONSMOKER_TOP_RESERVE_PEN    0.0
-#define SMOKER_Z_MIN_BIAS             64.0
-#define SMOKER_Z_MAX_EXTRA           200.0
-#define SMOKER_TOP_SOFTMAX_BONUS     300.0
-#define SMOKER_TOP_PEN_RELIEF          0.65
-#define HUNTER_TOP_BONUS        80.0
-#define JOCKEY_TOP_BONUS         20.0
-#define CHARGER_TOP_BONUS        20.0
-#define SPITTER_TOP_BONUS       600.0
-// ----------------------------------------------------------------------
-
-stock const char INFDN[10][] = {
+static const char INFDN[10][] = {
     "common","smoker","boomer","hunter","spitter","jockey","charger","witch","tank","survivor"
 };
 
@@ -332,7 +295,6 @@ enum struct State
     int    lastSpawnSecs;
     int    rushManIndex;
     int    targetSurvivor;
-    int    hordeStatus;
 
     // Survivors cache
     int    survCount;
@@ -353,11 +315,6 @@ enum struct State
     // Think throttle
     float  nextFrameThink;
 
-    // —— 动态路线（每波） —— //
-    int    laneCount[LANE_COUNT];
-    int    laneFillTarget;
-    int    laneMax;
-
     void Reset()
     {
         if (this.hTeleport != INVALID_HANDLE) { delete this.hTeleport; this.hTeleport = INVALID_HANDLE; }
@@ -368,7 +325,6 @@ enum struct State
         this.bShouldCheck = false;
         this.bLate        = false;
 
-        this.hordeStatus  = 0;
         this.siQueueCount = 0;
         this.lastWaveStartTime = 0.0;
         this.unpauseDelay      = 0.0;
@@ -392,10 +348,6 @@ enum struct State
         }
         for (int i = 0; i < 6; i++) this.siAlive[i] = 0;
 
-        for (int k = 0; k < LANE_COUNT; k++) this.laneCount[k] = 0;
-        this.laneFillTarget = 3;
-        this.laneMax        = 4;
-
         ResetGlobalDiversityHistory();
     }
 }
@@ -414,10 +366,10 @@ static LadderList gLadder;
 
 public Plugin myinfo =
 {
-    name        = "Direct InfectedSpawn (Rework)",
+    name        = "Direct InfectedSpawn (Rework, no-lanes)",
     author      = "Caibiii, 夜羽真白，东, Paimon-Kawaii + ChatGPT",
-    description = "特感刷新控制 / 传送 / 反诱饵 / 每类特感找位策略 (重构+Nav吸附)",
-    version     = "2025.08.30-lanes-navsnap",
+    description = "特感刷新控制 / 传送 / 反诱饵 / 每类特感找位策略 (重构，无动态路线)",
+    version     = "2025.08.31-nolanes",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -455,7 +407,6 @@ static bool IsKillerClassInt(int zc)
 }
 
 static int AddrAsInt(Address a) { return view_as<int>(a); }
-static int ClampInt(int v, int mn, int mx) { if (v < mn) return mn; if (v > mx) return mx; return v; }
 
 // —— 单次找位 Debug 结构 —— //
 enum struct SpawnDebug
@@ -486,8 +437,6 @@ enum struct SpawnDebug
     bool  maskedSoft;
     Address navBest;
     Address navTarget;
-    int   laneBest;
-    float laneAdjBest;
 }
 static SpawnDebug gDBG;
 
@@ -506,8 +455,6 @@ static void Debug_Reset(int zc, int target, float radius, Address navTarget, boo
     gDBG.navBest = Address_Null; gDBG.navTarget = navTarget;
     gDBG.lowExpands   = 0;
     gDBG.radiusFinal  = radius;
-    gDBG.laneBest     = -1;
-    gDBG.laneAdjBest  = 0.0;
 }
 
 static void Debug_DumpSuccess(const char[] tag)
@@ -519,9 +466,8 @@ static void Debug_DumpSuccess(const char[] tag)
     Debug_Print("  pos=(%.1f %.1f %.1f) dist=%.1f score=%.1f  ideal=%.1f",
         gDBG.bestPos[0], gDBG.bestPos[1], gDBG.bestPos[2],
         gDBG.distToTarget, gDBG.bestScore, gDBG.ideal);
-    Debug_Print("  class=%.1f, div=%.1f, ladder=%.1f, ceiling=%.1f, lane[%s]=%.1f, maskedSoft=%d",
+    Debug_Print("  class=%.1f, div=%.1f, ladder=%.1f, ceiling=%.1f, maskedSoft=%d",
         gDBG.classScore, gDBG.divPenBest, gDBG.ladPenBest, gDBG.sepPenaltyBest,
-        (gDBG.laneBest>=0 && gDBG.laneBest<LANE_COUNT?LANEN[gDBG.laneBest]:"-"), gDBG.laneAdjBest,
         gDBG.maskedSoft ? 1 : 0);
     Debug_Print("  ladderStrict=%d, navBest=0x%x, navTarget=0x%x",
         gDBG.ladderStrict ? 1 : 0, AddrAsInt(gDBG.navBest), AddrAsInt(gDBG.navTarget));
@@ -551,14 +497,6 @@ static void ResetGlobalDiversityHistory()
 {
     g_LastHeadGlobal  = 0;
     g_LastCountGlobal = 0;
-}
-
-static Address GetPosAreaOrNearest(float p[3])
-{
-    Address a = L4D2Direct_GetTerrorNavArea(p);
-    if (a == Address_Null)
-        a = view_as<Address>(L4D_GetNearestNavArea(p, 300.0, false, false, false, TEAM_INFECTED));
-    return a;
 }
 
 static void RecordSpawnPosGlobal(const float p[3], Address area)
@@ -778,7 +716,7 @@ public Action Cmd_StartSpawn(int client, int args)
         CreateTimer(0.1, Timer_SpawnFirstWave);
         ReadSiCap();
         TweakAllChargerOrHunter();
-        PrintToChatAll("\x03 目前是测试版本v1.8，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
+        PrintToChatAll("\x03 目前是测试版本v1.8-nolanes，刷特在版本更新期间可能会不断跟进版本，谢谢大家体谅");
     }
     return Plugin_Handled;
 }
@@ -807,12 +745,9 @@ public void evt_RoundEnd(Event event, const char[] name, bool dontBroadcast)
     if (gLadderNavMask != null) gLadderNavMask.Clear();
     StopAll();
 
-    for (int k = 0; k < LANE_COUNT; k++) gST.laneCount[k] = 0;
-
-    // 波级复位，避免跨波粘滞
+    // 波级复位
     gST.ladderBaitCount = 0;
     gST.teleportDistCur = gCV.fSpawnMin;
-    gST.hordeStatus     = 0;
     if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
 
     gST.spawnDistCur = gCV.fSpawnMin;
@@ -935,16 +870,9 @@ static void StartWave()
         if (IsValidSurvivor(i) && IsPlayerAlive(i))
             gST.survIdx[gST.survCount++] = i;
 
-    for (int k = 0; k < LANE_COUNT; k++) gST.laneCount[k] = 0;
-    int alive = gST.survCount; if (alive <= 0) alive = 4;
-    gST.laneFillTarget = ClampInt(alive - 1, 2, 3);
-    gST.laneMax        = ClampInt(alive,     3, 4);
-
-    // 波级复位，避免跨波粘滞
+    // 波级复位
     gST.ladderBaitCount = 0;
     gST.teleportDistCur = gCV.fSpawnMin;
-    gST.hordeStatus     = 0;
-    //if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
 
     gST.spawnDistCur = gCV.fSpawnMin;
     gST.siQueueCount += gCV.iSiLimit;
@@ -1143,8 +1071,7 @@ public void OnGameFrame()
                 {
                     gST.siAlive[want-1]++; gST.totalSI++;
                     gQ.teleport.Erase(0);  gST.teleportQueueSize--;
-                    RecordSpawnPosGlobal(pos, GetPosAreaOrNearest(pos));
-                    RecordLaneForPos(pos, gST.targetSurvivor);
+                    RecordSpawnPosGlobal(pos, L4D2Direct_GetTerrorNavArea(pos));
                     Debug_DumpSuccess("TP");
                 }
             }
@@ -1198,8 +1125,7 @@ public void OnGameFrame()
 
                 BypassAndExecuteCommand("nb_assault");
 
-                RecordSpawnPosGlobal(pos2, GetPosAreaOrNearest(pos2));
-                RecordLaneForPos(pos2, gST.targetSurvivor);
+                RecordSpawnPosGlobal(pos2, L4D2Direct_GetTerrorNavArea(pos2));
 
                 gST.spawnDistCur = FloatMax(gCV.fSpawnMin, gST.spawnDistCur * 0.8);
 
@@ -1625,21 +1551,6 @@ static float ScoreAheadness(float pos[3], int target)
     return IsPosAheadOfHighest(pos, target) ? 100.0 : -100.0;
 }
 
-static bool HasClearRunway(const float pos[3], const float dirNorm[3], float length)
-{
-    static const float mins[3] = { -20.0, -20.0, 0.0 };
-    static const float maxs[3] = {  20.0,  20.0, 62.0 };
-
-    float to[3];
-    to[0] = pos[0] + dirNorm[0] * length;
-    to[1] = pos[1] + dirNorm[1] * length;
-    to[2] = pos[2] + dirNorm[2] * length;
-
-    Handle tr = TR_TraceHullFilterEx(pos, to, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
-    bool ok = !TR_DidHit(tr);
-    delete tr;
-    return ok;
-}
 
 static void SurvivorForward(int target, float out[3])
 {
@@ -1650,243 +1561,126 @@ static void SurvivorForward(int target, float out[3])
 
 static float ScoreSmoker(float pos[3], int target, float dist, float ideal)
 {
+    // 轻量：距离理想度 + 前方优先 + 高打低
     float score = ScoreDistanceIdeal(dist, ideal) + ScoreAheadness(pos, target);
-    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.80;
 
-    float tChest[3]; GetClientAbsOrigin(target, tChest); tChest[2] += PLAYER_CHEST;
-    Handle tr = TR_TraceRayFilterEx(pos, tChest, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
-    bool clear = !TR_DidHit(tr);
-    delete tr;
-    if (clear) score += 220.0; else score -= 150.0; // ↓ from +320
+    float dz = ClampFloat(ScoreHeightDelta(pos, target), 0.0, 320.0);
+    score += dz * 0.80; // 高打低较稳
+
+    // 与生还者朝向的点积（-1 背后，0 侧面，+1 正前）
+    float fwd[3]; SurvivorForward(target, fwd);
+    float t[3];   GetClientAbsOrigin(target, t);
+    float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
+    float dot = GetVectorDotProduct(fwd, to);
+
+    // 侧面优先，其次背后；用点积近似而非射线
+    if (FloatAbs(dot) < 0.35)        score += 140.0;
+    else if (dot < -0.25)            score += 80.0;
+
+    // 过低位置略减分（易被掩体卡视角）
+    if (dz < 24.0)                   score -= 30.0;
+
     return score;
 }
 
 static float ScoreBoomer(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal);
-    float aheadBias = IsPosAheadOfHighest(pos, target) ? 0.0 : 80.0; // 更中性，微倾后路
+
+    // 略倾向后路（不在推进面上更安全接近）
+    float aheadBias = IsPosAheadOfHighest(pos, target) ? 0.0 : 80.0;
     score += aheadBias;
 
+    // 与朝向的点积：背后最佳，其次侧面
     float fwd[3]; SurvivorForward(target, fwd);
     float t[3];   GetClientAbsOrigin(target, t);
     float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
     float dot = GetVectorDotProduct(fwd, to);
-    if (dot < -0.2)               score += 200.0;
-    else if (FloatAbs(dot) < 0.2) score += 100.0;
+    if (dot < -0.20)                 score += 200.0;  // 背后
+    else if (FloatAbs(dot) < 0.20)   score += 110.0;  // 侧面
 
-    score += ClampFloat(-ScoreHeightDelta(pos, target), 0.0, 150.0);
-    score += 30.0;
+    // 稍低位/等高更好
+    float below = -ScoreHeightDelta(pos, target);
+    score += ClampFloat(below, 0.0, 160.0) * 0.90;
+
+    score += 25.0; // 轻微常数项
     return score;
 }
 
 static float ScoreHunter(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal) + ScoreAheadness(pos, target);
-    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 700.0) * 0.8;
+
+    // 高差更利于猛扑
+    float dz = ClampFloat(ScoreHeightDelta(pos, target), 0.0, 720.0);
+    score += dz * 0.80;
+
+    // 正面斜上略优（用点积近似落点朝向关系）
+    float fwd[3]; SurvivorForward(target, fwd);
+    float t[3];   GetClientAbsOrigin(target, t);
+    float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
+    float dot = GetVectorDotProduct(fwd, to);
+    if (dot > 0.35)                  score += 70.0;
+
     return score;
 }
 
 static float ScoreSpitter(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal);
+
+    // 稍微偏后/侧更安全抛射
     float aheadBias = IsPosAheadOfHighest(pos, target) ? 0.0 : 60.0;
     score += aheadBias;
-    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.4;
-    score += 60.0;
+
+    // 略微高度优势（不需要太高）
+    float dz = ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0);
+    score += dz * 0.40;
+
+    score += 60.0; // 常数项
     return score;
 }
 
 static float ScoreJockey(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal) + ScoreAheadness(pos, target);
+
+    // 侧面黏人窗口更大
     float fwd[3]; SurvivorForward(target, fwd);
     float t[3];   GetClientAbsOrigin(target, t);
     float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
     float dot = GetVectorDotProduct(fwd, to);
-    if (FloatAbs(dot) < 0.50) score += 100.0; // 窗口更宽
-    score += ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0) * 0.55;
+    if (FloatAbs(dot) < 0.50)        score += 100.0;
+
+    // 轻度高度优势
+    float dz = ClampFloat(ScoreHeightDelta(pos, target), 0.0, 300.0);
+    score += dz * 0.55;
+
     return score;
 }
 
 static float ScoreCharger(float pos[3], int target, float dist, float ideal)
 {
     float score = ScoreDistanceIdeal(dist, ideal) + ScoreAheadness(pos, target);
+
+    // 跑道检测改为方向对齐近似（去除 HasClearRunway 的 Hull Trace）
     float fwd[3]; SurvivorForward(target, fwd);
-    if (HasClearRunway(pos, fwd, 350.0)) score += 200.0; else score -= 100.0;
+    float t[3];   GetClientAbsOrigin(target, t);
+    float to[3];  MakeVectorFromPoints(pos, t, to); NormalizeVector(to, to);
+    float dot = GetVectorDotProduct(fwd, to);
+
+    if (dot > 0.35)                  score += 180.0;   // 基本对正
+    if (dot > 0.70)                  score += 60.0;    // 高度对正
+
+    // 垂直差过大不利于冲锋，给惩罚（无射线）
+    float adz = FloatAbs(ScoreHeightDelta(pos, target));
+    if (adz > 60.0)                  score -= (adz - 60.0) * 0.80;
+
     return score;
 }
 
 // ---------------------------------------------------------------------------
-// Lane helpers
-// ---------------------------------------------------------------------------
-
-static int ComputeLaneId(const float p[3], int target)
-{
-    float tpos[3];
-    float ang[3];
-    float f[3];
-    float r[3];
-    float up[3];
-
-    GetClientAbsOrigin(target, tpos);
-    GetClientEyeAngles(target, ang);
-    GetAngleVectors(ang, f, r, up);
-    NormalizeVector(f, f);
-    NormalizeVector(r, r);
-
-    float v[3];
-    MakeVectorFromPoints(tpos, p, v);
-
-    float dz = v[2];
-
-    float vh[3];
-    vh[0] = v[0];
-    vh[1] = v[1];
-    vh[2] = 0.0;
-
-    float h2 = vh[0]*vh[0] + vh[1]*vh[1];
-
-    if (dz >= TOP_MIN_DZ && h2 <= (TOP_HORIZ_MAX * TOP_HORIZ_MAX))
-    {
-        return LANE_TOP;
-    }
-
-    if (h2 <= 1.0)
-    {
-        return LANE_FRONT;
-    }
-
-    NormalizeVector(vh, vh);
-    float df = GetVectorDotProduct(f, vh);
-    if (df >= FRONT_COS)
-    {
-        return LANE_FRONT;
-    }
-    if (df <= BACK_COS)
-    {
-        return LANE_BACK;
-    }
-
-    float dr = GetVectorDotProduct(r, vh);
-    return (dr >= 0.0) ? LANE_RIGHT : LANE_LEFT;
-}
-
-static bool QueueHasClass(ArrayList q, int zc)
-{
-    if (q == null) return false;
-    for (int i = 0; i < q.Length; i++)
-        if (q.Get(i) == zc) return true;
-    return false;
-}
-
-static bool ShouldReserveTopForSmoker()
-{
-    int zc = view_as<int>(SI_Smoker);
-    if ((CheckClassEnabled(zc)) == 0) return false;
-
-    if (QueueHasClass(gQ.spawn, zc) || QueueHasClass(gQ.teleport, zc))
-        return true;
-
-    if (!HasReachedLimit(zc) && MeetClassRequirement(zc))
-        return true;
-
-    return false;
-}
-
-static float LaneAdjustScore(const float p[3], int target, bool teleportMode, float dist, int zc, int &outLane)
-{
-    int lane = ComputeLaneId(p, target);
-    outLane  = lane;
-
-    float adj = 0.0;
-
-    bool reserveTop = ShouldReserveTopForSmoker();
-
-    if (lane == LANE_TOP)
-    {
-       if (zc == view_as<int>(SI_Smoker)) {
-           adj += TOP_LANE_BONUS + SMOKER_TOP_BONUS;
-       } else {
-            if (reserveTop && gST.laneCount[LANE_TOP] == 0)
-               adj -= NONSMOKER_TOP_RESERVE_PEN;
-            else
-               adj += TOP_LANE_BONUS;
-            if (zc == view_as<int>(SI_Hunter))  adj += HUNTER_TOP_BONUS;
-            if (zc == view_as<int>(SI_Jockey))  adj += JOCKEY_TOP_BONUS;
-            if (zc == view_as<int>(SI_Charger)) adj += CHARGER_TOP_BONUS;
-            if (zc == view_as<int>(SI_Spitter)) adj += SPITTER_TOP_BONUS;
-       }
-    }
-    else
-    {
-        if (!teleportMode && lane == LANE_BACK) {
-            if (IsKillerClassInt(zc)) adj -= REAR_NONTP_PENALTY; // 杀手类保留重罚
-            else                      adj -= 0.0;                // 支援类不罚后路
-        }
-    }
-
-    float softMax = LANE_DIST_SOFTMAX;
-    float penPer  = LANE_DIST_PEN_PERUU;
-    if (lane == LANE_TOP) {
-        softMax += 150.0;
-        if (zc == view_as<int>(SI_Smoker)) {
-            softMax += SMOKER_TOP_SOFTMAX_BONUS;
-            penPer  *= SMOKER_TOP_PEN_RELIEF;
-        }
-    }
-    if (zc == view_as<int>(SI_Charger)) softMax += 150.0;
-
-    if (dist > softMax)
-        adj -= (dist - softMax) * penPer;
-
-    int used =
-        ((gST.laneCount[0] > 0) + (gST.laneCount[1] > 0) + (gST.laneCount[2] > 0) +
-         (gST.laneCount[3] > 0) + (gST.laneCount[4] > 0));
-    int c = gST.laneCount[lane];
-
-    if (c == 0)
-    {
-        if (used < gST.laneFillTarget)
-        {
-            adj += LANE_NEW_BONUS;
-        }
-        else if (used >= gST.laneMax)
-        {
-            if (!(lane == LANE_TOP && zc == view_as<int>(SI_Smoker)))
-                adj -= LANE_NEW_BONUS;
-        }
-        else
-        {
-            adj += LANE_NEW_BONUS * 0.4;
-        }
-    }
-    else
-    {
-        adj += 40.0;
-        if (c >= (gCV.iSiLimit + 1) / 2)
-            adj -= LANE_SAT_PENALTY;
-    }
-
-    int f = gST.laneCount[LANE_FRONT];
-    int b = gST.laneCount[LANE_BACK];
-    int diff = f - b;
-    if (diff >= LANE_FB_TOLERANCE && lane == LANE_BACK)
-        adj += LANE_FB_BALANCE_BONUS;
-    else if (diff <= -LANE_FB_TOLERANCE && lane == LANE_FRONT)
-        adj += LANE_FB_BALANCE_BONUS;
-
-    return adj;
-}
-
-static void RecordLaneForPos(const float p[3], int target)
-{
-    int lane = ComputeLaneId(p, target);
-    if (lane >= 0 && lane < LANE_COUNT)
-        gST.laneCount[lane]++;
-}
-
-// ---------------------------------------------------------------------------
-// FindSpawnPosForClass (with low-score expand, lane score, debug)
+// FindSpawnPosForClass (with low-score expand, debug)
 // ---------------------------------------------------------------------------
 
 static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius, bool teleportMode, float outPos[3])
@@ -1901,7 +1695,7 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
     GetClientEyePosition(targetSurvivor, sPos);
     sPos[2] -= 60.0;
 
-    Address navS = L4D_GetNearestNavArea(sPos, 120.0, false, false, false, TEAM_INFECTED);
+    Address navS = L4D2Direct_GetTerrorNavArea(sPos);
     bool strictLadder = ShouldApplyLadderStrict();
     Debug_Reset(zc, targetSurvivor, searchRadius, navS, strictLadder);
 
@@ -1910,13 +1704,10 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
 
     float radiusCur = searchRadius;
     int   expandCnt = 0;
-    bool isSupportClass = (zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter));
+    bool  isSupportClass = (zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter));
     float maxR = isSupportClass ? FloatMin(gCV.fSpawnMax, SUPPORT_EXPAND_MAX) : gCV.fSpawnMax;
-    if (gCV.iDebugMode >= 2 && isSupportClass)
-        Debug_Print("[Find] Support maxR=%.1f (SpawnMax=%.1f, cap=%d)", maxR, gCV.fSpawnMax, SUPPORT_EXPAND_MAX);
 
     float avgDist = GetSurAvrDistance();
-    int   triesThisRound = 0;
 
     do
     {
@@ -1929,12 +1720,6 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
         maxs[1] = tEye[1] + radiusCur;
         maxs[2] = tEye[2] + ((radiusCur < 500.0) ? 800.0 : (radiusCur + 300.0));
 
-        if (zc == view_as<int>(SI_Smoker))
-        {
-            mins[2] += SMOKER_Z_MIN_BIAS;
-            maxs[2] += SMOKER_Z_MAX_EXTRA;
-        }
-
         float R = radiusCur;
         if (avgDist < BAIT_DISTANCE) R *= (1.0 + (avgDist / BAIT_DISTANCE));
         if (gST.ladderBaitCount)     R += BAIT_DISTANCE;
@@ -1946,7 +1731,8 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
             p[1] = GetRandomFloat(mins[1], maxs[1]);
             p[2] = GetRandomFloat(mins[2], maxs[2]);
 
-            float dir[3]; dir[0] = 90.0; dir[1] = 0.0; dir[2] = 0.0;
+            // 落地到可站高度
+            float dir[3] = {90.0, 0.0, 0.0};
             int gmask = GroundMaskForRadius(radiusCur);
             Handle trRay = TR_TraceRayFilterEx(p, dir, gmask, RayType_Infinite, TraceFilter_Ground);
             if (TR_DidHit(trRay))
@@ -1959,32 +1745,28 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
             }
             delete trRay;
 
-            gDBG.considered++; triesThisRound++;
+            gDBG.considered++;
 
             if (!IsOnValidMesh(p)) { gDBG.failMesh++; continue; }
+            if (!IsHullFreeAt(p))  { gDBG.failHull++; continue; }
 
-            // —— Hull 占用检测 —— //
-            if (!IsHullFreeAt(p))                 { gDBG.failHull++;    continue; }
-
-            // —— 距离环带/近距约束 —— //
             float dist = GetVectorDistance(sPos, p);
-            if (dist < gCV.fSpawnMin)             { gDBG.failNear++;  continue; }
-            if (dist > (R + RING_SLACK))          { gDBG.failRing++; continue; }
+            if (dist < gCV.fSpawnMin)        { gDBG.failNear++;  continue; }
+            if (dist > (R + RING_SLACK))     { gDBG.failRing++;  continue; }
 
-            // —— 前进方向约束（传送/抓跑男/杀手类要求“在前方”） —— //
             if ((gST.bPickRushMan || teleportMode) && IsKillerClassInt(zc) && !IsPosAheadOfHighest(p, targetSurvivor))
             { gDBG.failAhead++; continue; }
 
-            // —— 可视性 —— //
             if (IsPosVisibleSDK(p, teleportMode)) { gDBG.failVisible++; continue; }
 
-            // —— Path 判定：可达 —— //
+            // 可达性
             float pathNeed = radiusCur * NORMALPOSMULT;
             if (pathNeed - radiusCur <= 120.0) pathNeed = radiusCur + 120.0;
-            if (p[2] - sPos[2] > HIGHERPOS)       pathNeed += HIGHERPOSADDDISTANCE;
-            Address navP = L4D_GetNearestNavArea(p, 120.0, false, false, false, TEAM_INFECTED);
+            if (p[2] - sPos[2] > HIGHERPOS)   pathNeed += HIGHERPOSADDDISTANCE;
+            Address navP = view_as<Address>(L4D_GetNearestNavArea(p, 120.0, false, false, false, TEAM_INFECTED));
             if (!L4D2_NavAreaBuildPath(navS, navP, pathNeed, TEAM_INFECTED, false)) { gDBG.failPath++; continue; }
 
+            // 梯子黑名单（严格模式直接拒绝）
             bool atMasked = false;
             if (IsAreaMasked(navP))
             {
@@ -1992,20 +1774,40 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
                 atMasked = true;
             }
 
-            float dz_check = (p[2] - sPos[2]);
+            // 房顶/楼板隔断惩罚（轻量）
             float dx = p[0] - sPos[0];
             float dy = p[1] - sPos[1];
+            float dz_check = (p[2] - sPos[2]);
             float horiz_check = SquareRoot(dx*dx + dy*dy);
-
             float sepPenalty = 0.0;
             if (dz_check > ROOF_VDELTA_MIN && horiz_check < ROOF_HORIZ_MAX && IsSeparatedByCeiling(p, targetSurvivor))
                 sepPenalty = -ROOF_SEPARATION_PENALTY;
 
+            // === 无评分模式：半径 >= 1000 直接接受第一个合格点 ===
+            if (radiusCur >= 1000.0)
+            {
+                gDBG.bestScore      = 0.0;
+                gDBG.bestPos[0]     = p[0]; gDBG.bestPos[1] = p[1]; gDBG.bestPos[2] = p[2];
+                gDBG.distToTarget   = dist;
+                gDBG.ideal          = 0.0;
+                gDBG.classScore     = 0.0;
+                gDBG.divPenBest     = 0.0;
+                gDBG.ladPenBest     = 0.0;
+                gDBG.sepPenaltyBest = sepPenalty;
+                gDBG.maskedSoft     = atMasked;
+                gDBG.navBest        = navP;
+                gDBG.radiusFinal    = radiusCur;
+
+                outPos[0] = p[0]; outPos[1] = p[1]; outPos[2] = p[2];
+                return true;
+            }
+
+            // === 正常评分模式（半径 < 1000 才会走到这里）===
             float ideal = baseIdeal;
             switch (zc)
             {
                 case view_as<int>(SI_Smoker):  ideal = baseIdeal + 60.0;
-                case view_as<int>(SI_Boomer):  ideal = baseIdeal - 60.0;   // ↓ -120 → -60
+                case view_as<int>(SI_Boomer):  ideal = baseIdeal - 60.0;
                 case view_as<int>(SI_Hunter):  ideal = baseIdeal + 40.0;
                 case view_as<int>(SI_Spitter): ideal = baseIdeal + 20.0;
                 case view_as<int>(SI_Jockey):  ideal = baseIdeal - 60.0;
@@ -2026,19 +1828,7 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
 
             float divPen = DiversityPenaltyGlobal(p, navP);
             float ladPen = LadderProximityPenalty(p);
-
-            int lane = -1;
-            float laneAdj = LaneAdjustScore(p, targetSurvivor, teleportMode, dist, zc, lane);
-
-            float sc = classSc + divPen + ladPen + sepPenalty + laneAdj;
-
-            if (lane >= 0 && lane < LANE_COUNT)
-            {
-                if (gST.laneCount[lane] < 2)
-                {
-                    divPen *= 0.75;
-                }
-            }
+            float sc = classSc + divPen + ladPen + sepPenalty;
             if (atMasked) sc -= LADDER_MASK_SOFT_PENALTY;
 
             if (sc > bestScore)
@@ -2047,18 +1837,16 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
                 best[0] = p[0]; best[1] = p[1]; best[2] = p[2];
                 haveBest = true;
 
-                gDBG.bestScore = sc;
-                gDBG.bestPos[0] = p[0]; gDBG.bestPos[1] = p[1]; gDBG.bestPos[2] = p[2];
-                gDBG.distToTarget = dist;
-                gDBG.ideal = ideal;
-                gDBG.classScore = classSc;
-                gDBG.divPenBest = divPen;
-                gDBG.ladPenBest = ladPen;
+                gDBG.bestScore      = sc;
+                gDBG.bestPos[0]     = p[0]; gDBG.bestPos[1] = p[1]; gDBG.bestPos[2] = p[2];
+                gDBG.distToTarget   = dist;
+                gDBG.ideal          = ideal;
+                gDBG.classScore     = classSc;
+                gDBG.divPenBest     = divPen;
+                gDBG.ladPenBest     = ladPen;
                 gDBG.sepPenaltyBest = sepPenalty;
-                gDBG.maskedSoft = atMasked;
-                gDBG.navBest = navP;
-                gDBG.laneBest = lane;
-                gDBG.laneAdjBest = laneAdj;
+                gDBG.maskedSoft     = atMasked;
+                gDBG.navBest        = navP;
             }
         }
 
@@ -2083,8 +1871,8 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
         return true;
     }
 
-    // --- 兜底：导演随机 PZ 点 ---
-    float pz[3]; bool  ok = false;
+    // --- 兜底：导演随机 PZ 点（保持你原有逻辑，不引入评分） ---
+    float pz[3]; bool ok = false;
     int refSur = IsValidSurvivor(targetSurvivor) ? targetSurvivor : L4D_GetHighestFlowSurvivor();
     if (!IsValidSurvivor(refSur)) refSur = 0;
 
@@ -2097,7 +1885,6 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
         gDBG.considered++;
 
         if (IsPosVisibleSDK(pz, teleportMode)) { gDBG.failVisible++; continue; }
-
         if ((gST.bPickRushMan || teleportMode) && IsKillerClassInt(zc) && !IsPosAheadOfHighest(pz, targetSurvivor))
         { gDBG.failAhead++; continue; }
 
@@ -2111,12 +1898,12 @@ static bool FindSpawnPosForClass(int zc, int targetSurvivor, float searchRadius,
         break;
     }
 
-    if (ok)
-        return true;
+    if (ok) return true;
 
     Debug_DumpFail(teleportMode ? "TP" : "SPAWN");
     return false;
 }
+
 
 // ---------------------------------------------------------------------------
 // Spawning
@@ -2372,7 +2159,7 @@ static bool IsOnValidMesh(float ref[3])
 
 static int IsSurvivorBait()
 {
-    if (IsAnyTankOrAboveHalfSurvivorDownOrDied(1) || gST.hordeStatus)
+    if (IsAnyTankOrAboveHalfSurvivorDownOrDied(1))
     {
         gST.ladderBaitCount = 0;
         return 0;
@@ -2607,17 +2394,4 @@ static bool IsSeparatedByCeiling(const float spawnPos[3], int target)
     delete tr;
 
     return hit && IsBrushySolid(ent);
-}
-
-stock bool TraceFilter(int entity, int contentsMask)
-{
-    if (entity <= MaxClients || !IsValidEntity(entity))
-        return false;
-
-    static char sClassName[9];
-    GetEntityClassname(entity, sClassName, sizeof(sClassName));
-    if (strcmp(sClassName, "infected") == 0 || strcmp(sClassName, "witch") == 0)
-        return false;
-
-    return true;
 }
