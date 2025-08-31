@@ -3,6 +3,7 @@
 	"Tag"
 	{
 		"en"		"[{olive}SpecListener{default}]"
+		"chi"		"[{olive}SpecListener{default}]"
 	}
 	"OnlySpec"
 	{
@@ -12,6 +13,7 @@
 	"PanelTitle"
 	{
 		"en"		"SpecListener"
+		"chi"		"SpecListener"
 	}
 	"PanelEnable"
 	{

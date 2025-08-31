@@ -11,6 +11,7 @@
 #include <l4d_hats>
 #include <godframecontrol>
 #include <readyup>
+#include <infected_control>
 #define PLUGIN_VERSION "1.3"
 #define MAX_LINE_WIDTH 64
 
@@ -34,7 +35,10 @@ bool valid=true;
 bool IsStart=false;
 bool IsAllowBigGun = false, IsAllowUseB = false;
 int InfectedNumber=6;
-ConVar AllowBigGun, g_InfectedNumber, AllowUseB;
+ConVar AllowBigGun, AllowUseB;
+ConVar g_hInfectedLimit = null;     // 可选 Cvar 句柄（来自 infected_control 时存在）
+
+bool g_bInfCtrlAvailable = false;   // 是否加载了 infected_control
 bool g_bGodFrameSystemAvailable = false;
 bool g_bReadyUpSystemAvailable = false;
 //new lastpoints[MAXPLAYERS + 1];
@@ -120,20 +124,34 @@ public bool IsValidClient(int client)
     return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client));
 }
 
-public void OnAllPluginsLoaded(){
-	g_bGodFrameSystemAvailable = LibraryExists("l4d2_godframes_control_merge");
-	g_bReadyUpSystemAvailable = LibraryExists("readyup");
+public void OnAllPluginsLoaded()
+{
+    g_bGodFrameSystemAvailable = LibraryExists("l4d2_godframes_control_merge");
+    g_bReadyUpSystemAvailable  = LibraryExists("readyup");
+    g_bInfCtrlAvailable        = LibraryExists("infected_control");
+    SetupInfectedLimitCvar();   // 绑定/刷新 l4d_infected_limit
 }
+
 public void OnLibraryAdded(const char[] name)
 {
-	if ( StrEqual(name, "l4d2_godframes_control_merge") ) { g_bGodFrameSystemAvailable = true; }
-	if ( StrEqual(name, "readyup") ) { g_bReadyUpSystemAvailable = true; }
+    if (StrEqual(name, "l4d2_godframes_control_merge")) g_bGodFrameSystemAvailable = true;
+    if (StrEqual(name, "readyup"))                       g_bReadyUpSystemAvailable  = true;
+    if (StrEqual(name, "infected_control")) {
+        g_bInfCtrlAvailable = true;
+        SetupInfectedLimitCvar();
+    }
 }
+
 public void OnLibraryRemoved(const char[] name)
 {
-	if ( StrEqual(name, "l4d2_godframes_control_merge") ) { g_bGodFrameSystemAvailable = false; }
-	if ( StrEqual(name, "readyup") ) { g_bReadyUpSystemAvailable = false; }
+    if (StrEqual(name, "l4d2_godframes_control_merge")) g_bGodFrameSystemAvailable = false;
+    if (StrEqual(name, "readyup"))                       g_bReadyUpSystemAvailable  = false;
+    if (StrEqual(name, "infected_control")) {
+        g_bInfCtrlAvailable = false;
+        SetupInfectedLimitCvar();
+    }
 }
+
 
 //god frame send forward implement
 public void L4D2_GodFrameRenderChange(int client){
@@ -156,58 +174,61 @@ public void L4D_OnHatLoadSave(int client, int index)
 //载入事件
 public void OnMapStart()
 {
-	for(int i=1;i<MaxClients;i++){
-		if(IsSurvivor(i))
-			{
-				player[i].ClientFirstBuy=true;
-				player[i].CanBuy=true;
-				player[i].ClientPoints=500;
-			}
-		else
-			player[i].ClientPoints=0;
-		IsStart=false;
-		valid=true;
-	}
+    for (int i = 1; i <= MaxClients; i++) {
+        if (IsSurvivor(i)) {
+            player[i].ClientFirstBuy = true;
+            player[i].CanBuy         = true;
+            player[i].ClientPoints   = 500;
+        } else {
+            player[i].ClientPoints   = 0;
+        }
+    }
+    IsStart = false;   // ★ 放到循环外
+    valid   = true;    // ★ 放到循环外
 }
 
-public void  OnPluginStart()
+
+public void OnPluginStart()
 {
-//	LoadTranslations("menu_shop.phrases.txt");
-	HookEvent("round_start",EventRoundStart);
-	HookEvent("player_death", EventReturnBlood);
-	HookEvent("player_spawn", 	Event_Player_Spawn);
-	HookEvent("mission_lost",EventMissionLost);
-	HookEvent("map_transition", EventMapChange);
-	HookEvent("player_afk", 	Event_PlayerAFK);
-	//HookEvent("player_team", 	Event_PlayerTeam, EventHookMode_Pre);
-	AllowBigGun = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	AllowUseB = CreateConVar("rpg_allow_UseB", "1", "是否允许在商店内消费B数", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	GaoJiRenJi=FindConVar("sb_fix_enabled");
-	InfectedNumber=GetConVarInt(FindConVar("l4d_infected_limit"));
-	g_InfectedNumber=FindConVar("l4d_infected_limit");
-	AllowBigGun.AddChangeHook(ConVarChanged_Cvars);
-	AllowUseB.AddChangeHook(ConVarChanged_Cvars);
-	g_InfectedNumber.AddChangeHook(ConVarChanged_Cvars);
-	GaoJiRenJi.AddChangeHook(ConVarChanged_Cvars);
-	ReturnBlood = CreateConVar("ReturnBlood", "0", "回血模式");
-	RegConsoleCmd("sm_buy", BuyMenu, "打开购买菜单(只能在游戏中)");
-	RegConsoleCmd("sm_ammo", BuyAmmo, "快速买子弹");
-	RegConsoleCmd("sm_pen", BuyPen, "快速随机买一把单喷");
-	RegConsoleCmd("sm_chr", BuyChr, "快速买一把二代单喷");
-	RegConsoleCmd("sm_pum", BuyPum, "快速买一把一代单喷");
-	RegConsoleCmd("sm_smg", BuySmg, "快速买smg");
-	RegConsoleCmd("sm_uzi", BuyUzi, "快速买uzi");
-	RegConsoleCmd("sm_pill", BuyPill, "快速买药");
-	RegConsoleCmd("sm_setch", SetCH, "设置自定义称号");
-	RegConsoleCmd("sm_applytags", ApplyTags, "佩戴自定义称号");
-	RegConsoleCmd("sm_rpg", BuyMenu, "打开购买菜单(只能在游戏中)");
-	RegAdminCmd("sm_rpginfo", RpgInfo, ADMFLAG_ROOT ,"输出rpg人物信息");
-	for(int i=1;i<MaxClients;i++){
-			player[i].ClientPoints=500;
-			player[i].ClientFirstBuy=true;
-			player[i].CanBuy=true;
-	}
+    HookEvent("round_start",      EventRoundStart);
+    HookEvent("player_death",     EventReturnBlood);
+    HookEvent("player_spawn",     Event_Player_Spawn);
+    HookEvent("mission_lost",     EventMissionLost);
+    HookEvent("map_transition",   EventMapChange);
+    HookEvent("player_afk",       Event_PlayerAFK);
+
+    AllowBigGun  = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    AllowUseB    = CreateConVar("rpg_allow_UseB",   "1", "是否允许在商店内消费B数", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    GaoJiRenJi   = FindConVar("sb_fix_enabled");
+    ReturnBlood  = CreateConVar("ReturnBlood", "0", "回血模式");
+
+    AllowBigGun.AddChangeHook(ConVarChanged_Cvars);
+    AllowUseB.AddChangeHook(ConVarChanged_Cvars);
+    GaoJiRenJi.AddChangeHook(ConVarChanged_Cvars);
+
+    // ★ 绑定/读取 l4d_infected_limit（若 infected_control 存在则优先）
+    SetupInfectedLimitCvar();
+
+    RegConsoleCmd("sm_buy",      BuyMenu,  "打开购买菜单(只能在游戏中)");
+    RegConsoleCmd("sm_ammo",     BuyAmmo,  "快速买子弹");
+    RegConsoleCmd("sm_pen",      BuyPen,   "快速随机买一把单喷");
+    RegConsoleCmd("sm_chr",      BuyChr,   "快速买一把二代单喷");
+    RegConsoleCmd("sm_pum",      BuyPum,   "快速买一把一代单喷");
+    RegConsoleCmd("sm_smg",      BuySmg,   "快速买smg");
+    RegConsoleCmd("sm_uzi",      BuyUzi,   "快速买uzi");
+    RegConsoleCmd("sm_pill",     BuyPill,  "快速买药");
+    RegConsoleCmd("sm_setch",    SetCH,    "设置自定义称号");
+    RegConsoleCmd("sm_applytags",ApplyTags,"佩戴自定义称号");
+    RegConsoleCmd("sm_rpg",      BuyMenu,  "打开购买菜单(只能在游戏中)");
+    RegAdminCmd("sm_rpginfo",    RpgInfo, ADMFLAG_ROOT ,"输出rpg人物信息");
+
+    for (int i = 1; i <= MaxClients; i++) {
+        player[i].ClientPoints   = 500;
+        player[i].ClientFirstBuy = true;
+        player[i].CanBuy         = true;
+    }
 }
+
 public void OnConfigsExecuted()
 {
 
@@ -222,23 +243,53 @@ public void OnConfigsExecuted()
 // *********************
 //		获取Cvar值
 // *********************
+// 当 infected_control 存在时优先读取它注册的 l4d_infected_limit；否则尝试全局查找；失败就用默认值 6
+void SetupInfectedLimitCvar()
+{
+    if (g_hInfectedLimit != null) {
+        g_hInfectedLimit.RemoveChangeHook(OnInfectedLimitChanged);
+        g_hInfectedLimit = null;
+    }
+
+    // 优先：infected_control 存在时
+    if (g_bInfCtrlAvailable) {
+        g_hInfectedLimit = FindConVar("l4d_infected_limit");
+    }
+    // 兜底：即便没有 infected_control，也尝试全局 Cvar（避免编译/运行报错）
+    if (g_hInfectedLimit == null) {
+        g_hInfectedLimit = FindConVar("l4d_infected_limit");
+    }
+
+    if (g_hInfectedLimit != null) {
+        InfectedNumber = g_hInfectedLimit.IntValue;
+        g_hInfectedLimit.AddChangeHook(OnInfectedLimitChanged);
+        // PrintToServer("[RPG] l4d_infected_limit = %d (hooked)", InfectedNumber);
+    } else {
+        InfectedNumber = 6; // 安全默认值
+        // PrintToServer("[RPG] l4d_infected_limit not found, fallback to %d", InfectedNumber);
+    }
+}
+
+public void OnInfectedLimitChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    if (IsStart) {
+        PrintToChatAll("\x04[RANK] 判断额外积分所需变量发生变化，此局无法获得额外积分");
+        valid = false;
+    }
+    InfectedNumber = convar.IntValue;
+}
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	if(IsStart)
-		{
-			PrintToChatAll("\x04[RANK]判断额外积分所需变量发生变化，此局无法获得额外积分");
-			valid=false;
-		}
-	InfectedNumber=GetConVarInt(FindConVar("l4d_infected_limit"));
-	if(AllowBigGun.IntValue)
-		IsAllowBigGun = true;
-	else
-		IsAllowBigGun = false;
-	if(AllowUseB.IntValue)
-		IsAllowUseB = true;
-	else
-		IsAllowUseB = false;
+    if (IsStart) {
+        PrintToChatAll("\x04[RANK] 判断额外积分所需变量发生变化，此局无法获得额外积分");
+        valid = false;
+    }
+
+    IsAllowBigGun = AllowBigGun.BoolValue;
+    IsAllowUseB   = AllowUseB.BoolValue;
+    // InfectedNumber 现在由 OnInfectedLimitChanged 统一维护
 }
+
 
 public void Event_PlayerAFK( Event hEvent, const char[] sName, bool bDontBroadcast )
 {
@@ -713,16 +764,9 @@ public Action EventRoundStart(Handle event, const char []name, bool dontBroadcas
 }
 
 //检查client合法
-int IsVaildClient(int client)
+bool IsVaildClient(int client)
 {
-	if( client > 0 ) return 1;
-	if( client < 64 ) return 1;
-	if( IsClientInGame(client) ) return 1;
-	if( GetClientTeam(client) == 2 ) return 1;
-	else
-    {
-        return 0;
-    }
+    return (client > 0 && client <= MaxClients && IsClientInGame(client));
 }
 
 //输出rpg任务信息动作
@@ -755,35 +799,27 @@ public Action BuyAmmo(int client,int args)
 	return Plugin_Continue;
 }
 
-//快速买喷子指令
 public Action BuyPen(int client,int args)
-{ 
-	if(IsVaildClient(client) && IsPlayerAlive(client)  )
-	{
-		if(player[client].ClientFirstBuy){
-			player[client].ClientFirstBuy=false;
-			bool result = false;
-			if(GetRandomInt(0,1))
-				result = RemovePoints(client,0,"pumpshotgun");
-			else
-				result = RemovePoints(client,0,"shotgun_chrome");
-			if(result)
-			PrintToChatAll("\x04%N \x03第一次随机白嫖一把喷子",client);
-		}else if(player[client].ClientPoints>49)
-		{
-			bool result = false;
-			if(GetRandomInt(0,1))
-				result = RemovePoints(client,0,"pumpshotgun");
-			else
-				result = RemovePoints(client,0,"shotgun_chrome");
-			if(result)
-			PrintToChatAll("\x04%N \x03快速花费50B数随机购买一把单喷",client);
-		}else{
-			PrintToChat(client,"\x03没钱你买个屁喷子，心里没点B数");
-		}
-	}
-	return Plugin_Continue;
+{
+    if (IsVaildClient(client) && IsPlayerAlive(client)) {
+        if (player[client].ClientFirstBuy) {
+            player[client].ClientFirstBuy = false;
+            bool result = (GetRandomInt(0, 1) == 1)
+                        ? RemovePoints(client, 0,  "pumpshotgun")
+                        : RemovePoints(client, 0,  "shotgun_chrome");
+            if (result) PrintToChatAll("\x04%N \x03第一次随机白嫖一把喷子", client);
+        } else if (player[client].ClientPoints >= 50) {
+            bool result = (GetRandomInt(0, 1) == 1)
+                        ? RemovePoints(client, 50, "pumpshotgun")      // ★ 修正：应扣 50
+                        : RemovePoints(client, 50, "shotgun_chrome");   // ★ 修正：应扣 50
+            if (result) PrintToChatAll("\x04%N \x03快速花费50B数随机购买一把单喷", client);
+        } else {
+            PrintToChat(client, "\x03没钱你买个屁喷子，心里没点B数");
+        }
+    }
+    return Plugin_Continue;
 }
+
 
 //快速买二代单喷指令
 public Action BuyChr(int client,int args)
@@ -941,60 +977,50 @@ public Action ResetBuy(Handle timer, int client)
 	return Plugin_Continue;
 }
 
-//分数操作
-public bool RemovePoints(int client, int costpoints,char bitem[64])
+public bool RemovePoints(int client, int costpoints, char bitem[64])
 {
-	if(!player[client].CanBuy)
-	{
-		PrintToChat(client,"\x03商店技能冷却中(冷却时间15s)");
-		return false;
-	}
-	if(!IsAllowUseB && costpoints > 0)
-	{
-		PrintToChat(client,"\x03商店不允许使用B数，请在vote投票商店菜单中允许使用B数");
-	}
-	int actuallypoints = player[client].ClientPoints - costpoints;
-	if(IsVaildClient(client) && actuallypoints >= 0)
-	{	
-		GiveItems(client,bitem);
-		player[client].ClientPoints=player[client].ClientPoints - costpoints;
-		player[client].CanBuy = false;
-		CreateTimer(15.0, ResetBuy, client, TIMER_FLAG_NO_MAPCHANGE);
-		return true;
-	}
-	else
-	{
-		PrintToChat(client,"\x03你自己心里没有点B数吗?");
-		return false;
-	}
+    if (!player[client].CanBuy) {
+        PrintToChat(client, "\x03商店技能冷却中(冷却时间15s)");
+        return false;
+    }
+    if (!IsAllowUseB && costpoints > 0) {
+        PrintToChat(client, "\x03商店不允许使用B数，请在vote投票商店菜单中允许使用B数");
+        return false; // ★ 之前只提示不拦截，这里直接拦截
+    }
 
+    int actuallypoints = player[client].ClientPoints - costpoints;
+    if (IsVaildClient(client) && actuallypoints >= 0) {
+        GiveItems(client, bitem);
+        player[client].ClientPoints = actuallypoints;
+        player[client].CanBuy = false;
+        CreateTimer(15.0, ResetBuy, client, TIMER_FLAG_NO_MAPCHANGE);
+        return true;
+    } else {
+        PrintToChat(client, "\x03你自己心里没有点B数吗?");
+        return false;
+    }
 }
+
 //数据库操作返回数据
 public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 {
     int client = data;
-
-    if (!client || hndl == INVALID_HANDLE&&IsFakeClient(client))
+    if (!client || hndl == INVALID_HANDLE || IsFakeClient(client))  // ★ 修正
         return;
 
-    if (SQL_FetchRow(hndl)){
+    if (SQL_FetchRow(hndl)) {
         player[client].ClientMelee = SQL_FetchInt(hndl, 0);
         player[client].ClientBlood = SQL_FetchInt(hndl, 1);
-        player[client].ClientHat = SQL_FetchInt(hndl, 2);
-        player[client].GlowType = SQL_FetchInt(hndl, 3);
-        player[client].SkinType = SQL_FetchInt(hndl, 4);
-        /*if(SQL_IsFieldNull(hndl,4))
-        	strcopy(player[client].tags.ChatTag,32,"NULL");
-        else*/
+        player[client].ClientHat   = SQL_FetchInt(hndl, 2);
+        player[client].GlowType    = SQL_FetchInt(hndl, 3);
+        player[client].SkinType    = SQL_FetchInt(hndl, 4);
         SQL_FetchString(hndl, 5, player[client].tags.ChatTag, 24);
-		//PrintToChat(client,"\x03返回的ClientMelee：%d",player[client].ClientMelee);
-		//PrintToChat(client,"\x03返回的ClientBlood：%d",player[client].ClientBlood);
-		}
-		else{
-			PrintToChat(client,"\x04新用户，正在创建数据库",player[client].ClientBlood);
-			ClientSaveToFileCreate(client);
-		}
+    } else {
+        PrintToChat(client, "\x04新用户，正在创建数据库");
+        ClientSaveToFileCreate(client);
+    }
 }
+
 //实现给予物品
 public void GiveItems(int client, char bitem[64])
 {
@@ -1025,10 +1051,9 @@ public void BuildMenu(int client)
 	if( IsVaildClient(client) )
 	{
 		char binfo[255];
-		Menu menu = new Menu(TopMenu);
-
-		FormatEx(binfo, sizeof(binfo), "☆☆购物商店☆☆\n—————————\n当前B数：%d\n—————————",player[client].ClientPoints, client);	//玩家积分：
-		menu.SetTitle(binfo);
+        Menu menu = new Menu(TopMenu);
+        FormatEx(binfo, sizeof(binfo), "☆☆购物商店☆☆\n—————————\n当前B数：%d\n—————————", player[client].ClientPoints);
+        menu.SetTitle(binfo);
 
 		//FormatEx(binfo, sizeof(binfo),  "购买枪械", client);	//武器
 		FormatEx(binfo, sizeof(binfo), "购买枪械", client);
@@ -1250,12 +1275,11 @@ void GetAura(int client, int id)
         }
     }
 
-    if (0 <= id <= 15) 
-    {
+    // ★ 修正范围判断
+    if (id >= 0 && id <= 15) {
         SetEntProp(client, Prop_Send, "m_iGlowType", 3);
         SetEntProp(client, Prop_Send, "m_nGlowRange", 99999);
         SetEntProp(client, Prop_Send, "m_nGlowRangeMin", 0);
-		
         SDKUnhook(client, SDKHook_PreThink, RainbowPlayer);
     }
     
@@ -1362,7 +1386,7 @@ void GetSkin(int client, int id, bool broadcast = true)
             DisableSkin( client );
             player[client].SkinType = id;
             if(broadcast)
-            	PrintToChat(client, "\x05你关闭了生还者轮廓");
+            	PrintToChat(client, "\x05你关闭了生还者皮肤");
             return;
         }
         case 1: 
@@ -1547,7 +1571,7 @@ public void gun(int client)
 			FormatEx(binfo, sizeof(binfo),  "一代单发霰弹枪 %dB数",CostPumpShotgun, client);
 			menu.AddItem("pumpshotgun", binfo);
 
-			FormatEx(binfo, sizeof(binfo),  "二代单发霰弹枪 %dB数",CostPumpShotgun, client);
+			FormatEx(binfo, sizeof(binfo),  "二代单发霰弹枪 %dB数",CostChromeShotgun, client);
 			menu.AddItem("shotgun_chrome", binfo);
 			
 			FormatEx(binfo, sizeof(binfo),"普通小手枪 %dB数",CostP220, client);

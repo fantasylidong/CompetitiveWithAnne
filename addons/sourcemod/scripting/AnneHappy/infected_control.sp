@@ -806,6 +806,18 @@ public void evt_RoundEnd(Event event, const char[] name, bool dontBroadcast)
     gLadder.Clear();
     if (gLadderNavMask != null) gLadderNavMask.Clear();
     StopAll();
+
+    for (int k = 0; k < LANE_COUNT; k++) gST.laneCount[k] = 0;
+
+    // 波级复位，避免跨波粘滞
+    gST.ladderBaitCount = 0;
+    gST.teleportDistCur = gCV.fSpawnMin;
+    gST.hordeStatus     = 0;
+    if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
+
+    gST.spawnDistCur = gCV.fSpawnMin;
+    gST.lastSpawnSecs = 0;
+    ResetGlobalDiversityHistory();
 }
 
 static void StopAll()
@@ -930,11 +942,9 @@ static void StartWave()
 
     // 波级复位，避免跨波粘滞
     gST.ladderBaitCount = 0;
-    if (gST.bPickRushMan) { gST.bPickRushMan = false; gST.rushManIndex = -1; FireRushmanForward(false); }
-    else { gST.rushManIndex = -1; }
     gST.teleportDistCur = gCV.fSpawnMin;
     gST.hordeStatus     = 0;
-    if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
+    //if (gQ.spawn.Length > 0) { gQ.spawn.Clear(); gST.spawnQueueSize = 0; }
 
     gST.spawnDistCur = gCV.fSpawnMin;
     gST.siQueueCount += gCV.iSiLimit;
