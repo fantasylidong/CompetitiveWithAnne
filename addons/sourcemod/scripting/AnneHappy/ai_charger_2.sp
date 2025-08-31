@@ -38,11 +38,11 @@ public void OnPluginStart()
 	g_hAllowBhop = CreateConVar("ai_ChargerBhop", "1", "是否开启 Charger 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_ChagrerBhopSpeed", "90.0", "Charger 连跳速度", CVAR_FLAG, true, 0.0);
 	g_hChargeDist = CreateConVar("ai_ChargerChargeDistance", "250.0", "Charger 只能在与目标小于这一距离时冲锋", CVAR_FLAG, true, 0.0);
-	g_hExtraTargetDist = CreateConVar("ai_ChargerExtraTargetDistance", "0,350", "Charger 会在这一范围内寻找其他有效的目标（中间用逗号隔开，不要有空格）", CVAR_FLAG);
-	g_hAimOffset = CreateConVar("ai_ChargerAimOffset", "30.0", "目标的瞄准水平与 Charger 处在这一范围内，Charger 不会冲锋", CVAR_FLAG, true, 0.0);
+	g_hExtraTargetDist = CreateConVar("ai_ChargerExtraTargetDistance", "250,600", "Charger 会在这一范围内寻找其他有效的目标（中间用逗号隔开，不要有空格）", CVAR_FLAG);
+	g_hAimOffset = CreateConVar("ai_ChargerAimOffset", "15.0", "目标的瞄准水平与 Charger 处在这一范围内，Charger 不会冲锋", CVAR_FLAG, true, 0.0);
 	g_hAllowMeleeAvoid = CreateConVar("ai_ChargerMeleeAvoid", "1", "是否开启 Charger 近战回避", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hChargerMeleeDamage = CreateConVar("ai_ChargerMeleeDamage", "350", "Charger 血量小于这个值，将不会直接冲锋拿着近战的生还者", CVAR_FLAG, true, 0.0);
-	g_hChargerTarget = CreateConVar("ai_ChargerTarget", "1", "Charger目标选择：1=自然目标选择，2=优先取最近目标，3=优先撞人多处", CVAR_FLAG, true, 1.0, true, 2.0);
+	g_hChargerTarget = CreateConVar("ai_ChargerTarget", "3", "Charger目标选择：1=自然目标选择，2=优先取最近目标，3=优先撞人多处", CVAR_FLAG, true, 1.0, true, 2.0);
 	g_hChargeInterval = FindConVar("z_charge_interval");
 	g_hExtraTargetDist.AddChangeHook(extraTargetDistChangeHandler);
 	// HookEvents
@@ -246,7 +246,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 				// 不满足近战回避距离限制或血量要求的牛，阻止其冲锋，令其对手持近战的目标挥拳
 				else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) && !IsInChargeDuration(specialInfected) && (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue || GetClientHealth(specialInfected) >= g_hChargerMeleeDamage.IntValue))
 				{
-					BlockCharge(curTarget);
+					BlockCharge(specialInfected);
 				}
 				// 目标选择
 				switch (g_hChargerTarget.IntValue)
