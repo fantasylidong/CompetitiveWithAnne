@@ -39,6 +39,8 @@ bool IsAllowBigGun = false;
 bool IsAnne = false;
 int InfectedNumber=6;
 bool g_bEnableGlow = true;
+bool  g_bAllowUseB = true;
+ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_InfectedNumber, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
 // === Admin Anti-Kick ===
 ConVar g_hAntiKickEnable;
@@ -364,6 +366,13 @@ public void  OnPluginStart()
 	g_hAntiKickBlockCmdKick = CreateConVar("rpg_antikick_block_cmdkick", "1", "低级/同级管理员是否禁止用 sm_kick 踢受保护管理员", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hAntiKickMinImmunity  = CreateConVar("rpg_antikick_min_immunity", "0", "受保护阈值：管理员免疫等级>=此值即保护；0=任意管理员都保护", FCVAR_NOTIFY, true, 0.0, true, 100.0);
 	g_hAntiKickEqualBlock   = CreateConVar("rpg_antikick_equal_block", "1", "同级免疫是否禁止互踢（仅对 sm_kick 生效）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hAllowUseB = CreateConVar(
+    "rpg_allow_UseB", "1",
+    "是否允许消费B数（>0 价格的商品）。1=允许；0=禁止（仅允许 0B 商品）",
+    FCVAR_NOTIFY, true, 0.0, true, 1.0
+	);
+	g_bAllowUseB = g_hAllowUseB.BoolValue;
+	g_hAllowUseB.AddChangeHook(ConVarChanged_Cvars);
 
 	// --- Admin Anti-Kick: 监听命令 ---
 	AddCommandListener(OnCallVote, "callvote");   // 阻止对管理员的投票踢
@@ -428,6 +437,14 @@ public void OnConfigsExecuted()
 // *********************
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	// 先单独处理 rpg_allow_UseB（不依赖 infected_control）
+    if (convar == g_hAllowUseB)
+    {
+        g_bAllowUseB = g_hAllowUseB.BoolValue;
+        PrintToChatAll("\x01[\x04RPG\x01] %s",
+            g_bAllowUseB ? "允许使用B数购买商品" : "已禁止使用B数购买（仅允许 0B 商品）");
+        return;
+    }
     if (!g_bInfectedControlAvailable || g_hInfectedLimit == null)
     {
         // 没有 infected_control，就当这局不计有效（保持你原始语义）
@@ -1300,12 +1317,30 @@ public Action ResetBuy(Handle timer, int client)
 	return Plugin_Continue;
 }
 
+static bool CanSpendB(int client, int costpoints)
+{
+    // 0B 永远允许
+    if (costpoints <= 0) return true;
+
+    // >0B 时需开关允许
+    if (g_bAllowUseB) return true;
+
+    PrintToChat(client, "\x03当前已禁止使用B数购买商品（仅允许 0B 物品）。");
+    return false;
+}
+
 //分数操作
 public bool RemovePoints(int client, int costpoints,char bitem[64])
 {
 	if(!player[client].CanBuy)
 	{
 		PrintToChat(client,"\x03商店技能冷却中(冷却时间15s)");
+		return false;
+	}
+	// 新增：消费开关判定（>0B 时禁止）
+    if (!CanSpendB(client, costpoints))
+    {
+		PrintToChat(client, "服务器关闭了B币使用通道，如需使用请投票开启");
 		return false;
 	}
 	int actuallypoints = player[client].ClientPoints - costpoints;

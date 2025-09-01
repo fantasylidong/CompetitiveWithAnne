@@ -122,11 +122,11 @@ enum
 #define LADDER_MASK_OFFS2            100.0
 #define LADDER_NAVMASK_STRICT_ALWAYS 0
 #define LADDER_MASK_SOFT_PENALTY     60.0
-#define SAME_LAYER_Z_TOL           140.0    // 认为“同一层”的 Nav 中心 Z 容忍
+#define SAME_LAYER_Z_TOL           300.0    // 认为“同一层”的 Nav 中心 Z 容忍
 #define BRIDGE_SEP_HORIZ_MAX       700.0    // 近水平距离才算“上下层叠”
-#define BRIDGE_SEP_PENALTY_STRONG  420.0    // 上下层叠且被几何体隔断时的强惩罚
-#define LOWER_LAYER_PENALTY        160.0    // 候选显著在下层时的轻惩罚
-#define SAME_LAYER_BONUS           110.0    // 同层的稳定加分
+#define BRIDGE_SEP_PENALTY_STRONG  120.0    // 上下层叠且被几何体隔断时的强惩罚
+#define LOWER_LAYER_PENALTY        60.0    // 候选显著在下层时的轻惩罚
+#define SAME_LAYER_BONUS           200.0    // 同层的稳定加分
 
 
 // 删除所有 LANE 相关常量/加分（完全去除动态路线）
