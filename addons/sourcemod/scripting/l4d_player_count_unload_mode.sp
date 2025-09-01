@@ -90,6 +90,8 @@ ConVar survivor_limit, z_max_player_zombies;
 int g_iCvarSurvivorLimit, g_iCvarInfectedMax;
 
 ConVar g_hCvarEnable, g_hCvarTime, g_hCvarCount, g_hCvarFlag, g_hCvarDelay;
+// 服务器本地相对 UTC 的偏移（分钟）。优先用 %z，失败时回退到可配置的 ConVar。
+ConVar g_hTzServerOffset; // 可选：回退用（例如老 Windows 不支持 %z）
 bool g_bCvarEnable;
 int g_iCvarCount;
 float g_fCvarDelay;
@@ -128,6 +130,8 @@ public void OnPluginStart()
     g_hCvarFlag         = CreateConVar(	PLUGIN_NAME ... "_flag", 		  "b",              "有這權限的管理員在場就不會被強制卸載模式", CVAR_FLAGS);
     g_hCvarDelay        = CreateConVar(	PLUGIN_NAME ... "_delay", 		  "60.0",           "地圖載入此秒數後才會檢測時間與人數", CVAR_FLAGS, true, 0.0);
     CreateConVar(                       PLUGIN_NAME ... "_version",       PLUGIN_VERSION, PLUGIN_NAME ... " Plugin Version", CVAR_FLAGS_PLUGIN_VERSION);
+    g_hTzServerOffset = CreateConVar(PLUGIN_NAME ... "_server_utc_offset", "480",
+        "Fallback: server's UTC offset in minutes (only used if %z unsupported).");
     //AutoExecConfig(true,                PLUGIN_NAME);
 
     GetCvars();
@@ -277,31 +281,37 @@ Action Timer_DetectPlayerCount(Handle timer)
 {
     g_hDetectTimer = null;
 
-    if(!g_bCvarEnable)
+    if (!g_bCvarEnable)
         return Plugin_Continue;
-    
-    if(g_iCvarSurvivorLimit + GetInfectedSlots() > g_iCvarCount) 
+
+    if (g_iCvarSurvivorLimit + GetInfectedSlots() > g_iCvarCount)
         return Plugin_Continue;
 
     bool bIsInCvarTime = false;
     ETimeData eTimeData;
-    static char sSystemTimeHour[4], sSystemTimeMin[4];
+
+    // —— 关键：先把当前时间戳换算到上海时区，再格式化出小时/分钟 ——
+    char sSystemTimeHour[4], sSystemTimeMin[4];
     int iSystemTimeHour, iSystemTimeMin;
-    FormatTime(sSystemTimeHour, sizeof(sSystemTimeHour), "%H", GetTime());
-    FormatTime(sSystemTimeMin, sizeof(sSystemTimeMin), "%M", GetTime());
+
+    int stampCN = ToShanghaiStamp(GetTime());
+    FormatTime(sSystemTimeHour, sizeof(sSystemTimeHour), "%H", stampCN);
+    FormatTime(sSystemTimeMin,  sizeof(sSystemTimeMin),  "%M", stampCN);
+
     iSystemTimeHour = StringToInt(sSystemTimeHour);
-    iSystemTimeMin = StringToInt(sSystemTimeMin);
-    for(int i = 0; i < g_aTimeList.Length; i++)
+    iSystemTimeMin  = StringToInt(sSystemTimeMin);
+
+    for (int i = 0; i < g_aTimeList.Length; i++)
     {
         g_aTimeList.GetArray(i, eTimeData);
-        if(IsBetweenTime(iSystemTimeHour, iSystemTimeMin, eTimeData))
+        if (IsBetweenTime(iSystemTimeHour, iSystemTimeMin, eTimeData))
         {
             bIsInCvarTime = true;
             break;
         }
     }
 
-    if(!bIsInCvarTime)
+    if (!bIsInCvarTime)
         return Plugin_Continue;
 
     if (IsAnyAdminOnline())
@@ -309,9 +319,10 @@ Action Timer_DetectPlayerCount(Handle timer)
 
     ServerCommand("sm_resetmatch");
     CPrintToChatAll("管理员不在场，此时间段模式人数不足 {green}%d{default} 人，{green}强制卸载模式!!!!", g_iCvarCount);
-   
+
     return Plugin_Continue;
 }
+
 
 bool IsAnyAdminOnline()
 {
@@ -425,4 +436,32 @@ bool HasAccess(int client, char[] sAcclvl)
 	}
 
 	return false;
+}
+
+
+// 读取“此时间戳下，服务器本地相对 UTC 的偏移（分钟）”
+int GetLocalUtcOffsetMinutes(int stamp)
+{
+    char z[8];
+    FormatTime(z, sizeof z, "%z", stamp); // 形如 +0800 / -0700
+
+    // 若运行库不支持 %z（个别平台会返回空或'???'等），走回退
+    if (z[0] == '\0' || z[0] == '?')
+        return g_hTzServerOffset.IntValue;
+
+    // 解析 +HHMM / -HHMM
+    int hhmm = StringToInt(z); // "+0800"→800, "-0700"→-700
+    int sign = (z[0] == '-') ? -1 : 1;
+    int absval = (hhmm < 0) ? -hhmm : hhmm;
+    int minutes = (absval / 100) * 60 + (absval % 100);
+    return sign * minutes;
+}
+
+// 把 UTC 时间戳转换为“上海时区意义下”的时间戳，再交给 FormatTime 使用
+int ToShanghaiStamp(int stampUtc /* = GetTime() */)
+{
+    if (stampUtc <= 0) stampUtc = GetTime();
+    const int kShanghaiOffsetMin = 8 * 60;  // Asia/Shanghai 固定 UTC+8，无夏令时
+    int localOffset = GetLocalUtcOffsetMinutes(stampUtc);
+    return stampUtc + (kShanghaiOffsetMin - localOffset) * 60;
 }
