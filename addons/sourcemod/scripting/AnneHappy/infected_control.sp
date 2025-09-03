@@ -1,4 +1,4 @@
-#pragma semicolon 1
+#pragma semicolon 1 
 #pragma newdecls required
 
 /**
@@ -57,6 +57,22 @@
 // Support SI gating
 #define SUPPORT_SPAWN_DELAY_SECS  1.8
 #define SUPPORT_NEED_KILLERS      1
+
+// —— 分散度四件套参数 —— //
+#define PI                        3.1415926535
+#define SECTORS                   8
+#define SEP_TTL                   10.0    // 最近刷点保留秒数
+#define SEP_MAX                   20      // 记录上限（防止无限增长）
+// === Dispersion tuning (lighter penalties) ===
+#define SEP_RADIUS              200.0   // 原来 800.0 -> 更容易在近处复用相邻位置
+#define NAV_CD_SECS             2.0     // 原来 8.0 -> 同一 Nav 更快解禁
+#define SECTOR_PREF_BONUS       -8.0    // 原来可能更大(负值=奖励) -> 降低绝对值
+#define SECTOR_OFF_PENALTY      4.0     // 原来可能 10~30 -> 降低
+#define RECENT_PENALTY_0        3.0     // 最近一次用过该扇区的惩罚
+#define RECENT_PENALTY_1        2.0     // 次近
+#define RECENT_PENALTY_2        1.0     // 再次近
+#define RAND_JITTER_MAX         2.0     // 原来更大 -> 降低抖动避免“误伤”近点
+
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
 
@@ -358,6 +374,10 @@ static int g_iSurPosDataLen = 0;
 static int g_iSurvivors[MAXPLAYERS+1];
 static int g_iSurCount = 0;
 
+// —— 分散度：最近扇区 & 最近刷点 —— //
+int recentSectors[3] = { -1, -1, -1 };   // 最近 3 次使用的扇区
+ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
+
 // =========================
 // 全局
 // =========================
@@ -410,6 +430,11 @@ public void OnPluginStart()
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
     RecalcSiCapFromAlive(true);
 
+    // 分散度：初始化
+    g_NavCooldown = new StringMap();
+    lastSpawns = new ArrayList(4);
+    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
+
     RegAdminCmd("sm_startspawn", Cmd_StartSpawn, ADMFLAG_ROOT, "管理员重置刷特时钟");
     RegAdminCmd("sm_stopspawn",  Cmd_StopSpawn,  ADMFLAG_ROOT, "管理员停止刷特");
 
@@ -435,7 +460,12 @@ public void OnPluginEnd()
         FindConVar("z_charge_max_damage").RestoreDefault();
         FindConVar("z_charge_interval").RestoreDefault();
     }
-
+}
+public void OnMapEnd()
+{
+    if (g_NavCooldown != null) g_NavCooldown.Clear();
+    if (lastSpawns != null) lastSpawns.Clear();
+    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 }
 void TweakSettings()
 {
@@ -497,6 +527,8 @@ static void StopAll()
 {
     gQ.Clear();
     gST.Reset();
+    if (lastSpawns != null) lastSpawns.Clear();
+    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 }
 static Action Timer_ApplyMaxSpecials(Handle timer)
 {
@@ -841,7 +873,7 @@ static void TryNormalSpawnOnce()
 
     int want = gQ.spawn.Get(0);
 
-    // 新增：生成前再做一次“只看活着的”上限闸门；满了就丢弃队首，避免超额或空转
+    // 生成前再做一次“只看活着的”上限闸门
     if (HasReachedLimit(want))
     {
         Debug_Print("[SPAWN DROP] class=%s reached alive-cap, drop head", INFDN[want]);
@@ -853,18 +885,24 @@ static void TryNormalSpawnOnce()
     bool isSupport = (want == view_as<int>(SI_Boomer) || want == view_as<int>(SI_Spitter));
 
     float pos[3];
+    int areaIdx = -1;
     float ring = gST.spawnDistCur;
 
     float maxR = gCV.fSpawnMax;
     if (isSupport && SUPPORT_EXPAND_MAX < maxR)
         maxR = SUPPORT_EXPAND_MAX;
 
-    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos);
+    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx);
 
     if (ok && IsPosVisibleSDK(pos, false)) { ok = false; }
 
     if (ok && DoSpawnAt(pos, want))
     {
+        // 分散度：成功后记录冷却与最近刷点
+        if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
+        float center[3]; GetSectorCenter(center, gST.targetSurvivor);
+        RememberSpawn(pos, center);
+
         gST.siQueueCount--;
         gST.siAlive[want - 1]++; gST.totalSI++;
         gQ.spawn.Erase(0);        gST.spawnQueueSize--;
@@ -893,6 +931,10 @@ static void TryNormalSpawnOnce()
         float pt[3];
         if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, /*teleportMode=*/false, pt) && DoSpawnAt(pt, want))
         {
+            // 兜底不绑定具体 NavArea，记录坐标分散度即可
+            float center[3]; GetSectorCenter(center, gST.targetSurvivor);
+            RememberSpawn(pt, center);
+
             gST.siQueueCount--;
             gST.siAlive[want - 1]++; gST.totalSI++;
             gQ.spawn.Erase(0);        gST.spawnQueueSize--;
@@ -921,15 +963,20 @@ static void TryTeleportSpawnOnce()
         return;
 
     float pos[3];
+    int areaIdx = -1;
     float ring = gST.teleportDistCur;
     float maxR = gCV.fSpawnMax;
 
-    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, true, pos);
+    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, true, pos, areaIdx);
 
     if (ok && IsPosVisibleSDK(pos, true)) { ok = false; }
 
     if (ok && DoSpawnAt(pos, want))
     {
+        if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
+        float center[3]; GetSectorCenter(center, gST.targetSurvivor);
+        RememberSpawn(pos, center);
+
         gST.siAlive[want - 1]++; gST.totalSI++;
         gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
@@ -958,6 +1005,9 @@ static void TryTeleportSpawnOnce()
         float pt[3];
         if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, /*teleportMode=*/true, pt) && DoSpawnAt(pt, want))
         {
+            float center[3]; GetSectorCenter(center, gST.targetSurvivor);
+            RememberSpawn(pt, center);
+
             gST.siAlive[want - 1]++; gST.totalSI++;
             gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
@@ -1201,8 +1251,9 @@ static bool CanBeTeleport(int client)
 // =========================
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    float eyes[3], posEye[3];
+    float eyes[3], posEye[3], posHead[3];
     posEye = pos; posEye[2] += 62.0;
+    posHead = pos; posHead[2] += 90;
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -1221,6 +1272,7 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 
         if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, pos))     return true;
         if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))  return true;
+        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posHead))  return true;
     }
     return false;
 }
@@ -1461,14 +1513,172 @@ static float GetMinDistToAnySurvivor(const float p[3])
 }
 
 // =========================
-// 主找点（fdxx NavArea 简化版）
+// 分散度工具（冷却/扇区/间距/并列最小随机）
 // =========================
-enum struct SpawnData 
-{ 
-    float fDist; 
-    float fPos[3]; 
+bool IsNavOnCooldown(int area, float now)
+{
+    if (g_NavCooldown == null) return false;
+
+    char key[16];
+    IntToString(area, key, sizeof(key));
+
+    any stored;
+    if (g_NavCooldown.GetValue(key, stored))
+    {
+        float until = view_as<float>(stored);
+        return (now < until);
+    }
+    return false;
 }
 
+void TouchNavCooldown(int area, float now, float cooldown = 8.0)
+{
+    if (g_NavCooldown == null)
+        g_NavCooldown = new StringMap();
+
+    char key[16];
+    IntToString(area, key, sizeof(key));
+
+    g_NavCooldown.SetValue(key, view_as<any>(now + cooldown));
+}
+
+stock void CleanupLastSpawns(float now)
+{
+    if (lastSpawns == null) return;
+    for (int i = lastSpawns.Length - 1; i >= 0; i--)
+    {
+        float rec[4];
+        lastSpawns.GetArray(i, rec); // [x,y,z,t]
+        if (now - rec[3] > SEP_TTL)
+            lastSpawns.Erase(i);
+    }
+    while (lastSpawns.Length > SEP_MAX)
+        lastSpawns.Erase(0);
+}
+
+stock bool PassMinSeparation(const float pos[3])
+{
+    if (lastSpawns == null || lastSpawns.Length == 0) return true;
+
+    float now = GetGameTime();
+    float sep2 = SEP_RADIUS * SEP_RADIUS;
+
+    for (int i = lastSpawns.Length - 1; i >= 0; i--)
+    {
+        float rec[4];
+        lastSpawns.GetArray(i, rec); // [x, y, z, t]
+
+        // 过期清理
+        if (now - rec[3] > SEP_TTL)
+        {
+            lastSpawns.Erase(i);
+            continue;
+        }
+
+        // 只取前三个分量参与距离计算
+        float rec3[3];
+        rec3[0] = rec[0];
+        rec3[1] = rec[1];
+        rec3[2] = rec[2];
+
+        // 用平方距离避免开方
+        if (GetVectorDistance(pos, rec3, true) < sep2)
+            return false;
+    }
+    return true;
+}
+
+stock int ComputeSectorIndex(const float center[3], const float pt[3])
+{
+    float dx = pt[0] - center[0];
+    float dy = pt[1] - center[1];
+    float ang = ArcTangent2(dy, dx); // -pi..pi
+    if (ang < 0.0) ang += 2.0 * PI;
+    float w = (2.0 * PI) / float(SECTORS);
+    int idx = RoundToFloor(ang / w);
+    if (idx < 0) idx = 0;
+    if (idx >= SECTORS) idx = SECTORS - 1;
+    return idx;
+}
+
+stock void GetSectorCenter(float outCenter[3], int targetSur)
+{
+    if (IsValidSurvivor(targetSur))
+    {
+        GetClientAbsOrigin(targetSur, outCenter);
+        return;
+    }
+
+    int fb = L4D_GetHighestFlowSurvivor();
+    if (IsValidSurvivor(fb))
+    {
+        GetClientAbsOrigin(fb, outCenter);
+        return;
+    }
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsValidSurvivor(i))
+        {
+            GetClientAbsOrigin(i, outCenter);
+            return;
+        }
+    }
+
+    outCenter[0] = outCenter[1] = outCenter[2] = 0.0;
+}
+
+stock void RememberSpawn(const float pos[3], const float center[3])
+{
+    float now = GetGameTime();
+    CleanupLastSpawns(now);
+
+    float rec[4];
+    rec[0] = pos[0]; rec[1] = pos[1]; rec[2] = pos[2]; rec[3] = now;
+    lastSpawns.PushArray(rec);
+
+    int s = ComputeSectorIndex(center, pos);
+    recentSectors[2] = recentSectors[1];
+    recentSectors[1] = recentSectors[0];
+    recentSectors[0] = s;
+}
+
+stock int ArgMinFloat(const float[] a, int n, float eps = 0.0001)
+{
+    if (n <= 0) return -1;
+
+    float best = a[0];
+    for (int i = 1; i < n; i++)
+        if (a[i] < best) best = a[i];
+
+    int ties = 0;
+    for (int i = 0; i < n; i++)
+        if (a[i] <= best + eps) ties++;
+
+    int pick = GetRandomInt(1, ties);
+    for (int i = 0; i < n; i++)
+        if (a[i] <= best + eps && --pick == 0) return i;
+
+    return 0;
+}
+
+int PickSector()
+{
+    // 最近使用的扇区加惩罚，其余加入随机抖动
+    float score[SECTORS];
+    for (int s = 0; s < SECTORS; s++)
+        score[s] = GetRandomFloat(0.0, 1.0);
+
+    if (recentSectors[0] >= 0) score[recentSectors[0]] += 1.5;
+    if (recentSectors[1] >= 0) score[recentSectors[1]] += 1.0;
+    if (recentSectors[2] >= 0) score[recentSectors[2]] += 0.5;
+
+    return ArgMinFloat(score, SECTORS);
+}
+
+// =========================
+// 主找点（fdxx NavArea 简化 + 分散度）
+// =========================
 static bool GetSurPosData()
 {
     if (g_aSurPosData != null) { delete g_aSurPosData; g_aSurPosData = null; }
@@ -1497,7 +1707,7 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
     if (bFinaleArea && (iFlags & TERROR_NAV_FINALE) == 0)
         return false;
 
-    return (iFlags & (TERROR_NAV_RESCUE_CLOSET|TERROR_NAV_RESCUE_VEHICLE)) == 0;
+    return (iFlags & (TERROR_NAV_RESCUE_CLOSET|TERROR_NAV_RESCUE_VEHICLE|TERROR_NAV_CHECKPOINT)) == 0;
 }
 static bool IsNearTheSur(float fSpawnRange, float fFlow, const float fPos[3], float &fDist)
 {
@@ -1517,7 +1727,7 @@ static bool IsNearTheSur(float fSpawnRange, float fFlow, const float fPos[3], fl
     return false;
 }
 
-static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3])
+static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
     if (!GetSurPosData())
     {
@@ -1530,13 +1740,21 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int iAreaCount = g_pTheNavAreas.Count();
     bool bFinaleArea = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
 
-    ArrayList array = new ArrayList(sizeof(SpawnData));
-    SpawnData data;
+    float center[3]; GetSectorCenter(center, targetSur);
+    int preferredSector = PickSector();
+    float now = GetGameTime();
 
-    int cFlagBad=0, cFlowBad=0, cNearFail=0, cVis=0, cStuck=0;
+    bool found = false;
+    float bestScore = 1.0e9;
+    int   bestIdx = -1;
+    float bestPos[3];
+
+    int cFlagBad=0, cFlowBad=0, cNearFail=0, cVis=0, cStuck=0, cCD=0, cSep=0;
 
     for (int i = 0; i < iAreaCount; i++)
     {
+        if (IsNavOnCooldown(i, now)) { cCD++; continue; }
+
         NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(i, false));
         if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
         { cFlagBad++; continue; }
@@ -1549,37 +1767,48 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         pArea.GetRandomPoint(fSpawnPos);
 
         float fDist;
-        if (IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+        if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+        { cNearFail++; continue; }
+
+        // ★ 强制最小距离（和 ring 上限配合，形成 [SpawnMin, searchRange] 窗口）
+        if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
+
+        if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
+        if (WillStuck(fSpawnPos)) { cStuck++; continue; }
+        if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
+
+        // 扇区打分：优先扇区-0，其他+基罚；最近扇区附加惩罚；带少量抖动
+        int s = ComputeSectorIndex(center, fSpawnPos);
+
+        float sectorPenalty = (s == preferredSector) ? SECTOR_PREF_BONUS : SECTOR_OFF_PENALTY;
+        if (recentSectors[0] == s) sectorPenalty += RECENT_PENALTY_0;
+        if (recentSectors[1] == s) sectorPenalty += RECENT_PENALTY_1;
+        if (recentSectors[2] == s) sectorPenalty += RECENT_PENALTY_2;
+
+        float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
+
+        // 越小越好：距离主导 + 轻惩罚 + 微抖动
+        float score = fDist + sectorPenalty + jitter;
+
+        if (!found || score < bestScore)
         {
-            if (!IsPosVisibleSDK(fSpawnPos, teleportMode) && !WillStuck(fSpawnPos))
-            {
-                data.fDist = fDist;
-                data.fPos  = fSpawnPos;
-                array.PushArray(data);
-            }
-            else
-            {
-                if (IsPosVisibleSDK(fSpawnPos, teleportMode)) cVis++; else cStuck++;
-            }
+            found = true;
+            bestScore = score;
+            bestIdx = i;
+            bestPos = fSpawnPos;
         }
-        else cNearFail++;
     }
 
-    bool found = false;
-    if (array.Length > 0)
+    if (!found)
     {
-        array.GetArray(GetRandomInt(0, array.Length-1), data);
-        outPos = data.fPos;
-        found = true;
-    }
-    else
-    {
-        Debug_Print("[FIND FAIL] ring=%.1f arr=0 (flags=%d flow=%d near=%d vis=%d stuck=%d)",
-            searchRange, cFlagBad, cFlowBad, cNearFail, cVis, cStuck);
+        Debug_Print("[FIND FAIL] ring=%.1f arr=0 (flags=%d flow=%d near=%d vis=%d stuck=%d cd=%d sep=%d)",
+            searchRange, cFlagBad, cFlowBad, cNearFail, cVis, cStuck, cCD, cSep);
+        return false;
     }
 
-    delete array;
-    return found;
+    outPos = bestPos;
+    outAreaIdx = bestIdx;
+    return true;
 }
 
 // =========================
@@ -1587,11 +1816,19 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 // =========================
 static bool DoSpawnAt(const float pos[3], int zc)
 {
+    // 绝对保险：小于 SpawnMin 一律拒绝
+    if (GetMinDistToAnySurvivor(pos) < gCV.fSpawnMin)
+    {
+        Debug_Print("[SPAWN BLOCK] too close (< SpawnMin=%.1f) at (%.1f %.1f %.1f)",
+                    gCV.fSpawnMin, pos[0], pos[1], pos[2]);
+        return false;
+    }
+
     int idx = L4D2_SpawnSpecial(zc, pos, NULL_VECTOR);
     if (idx > 0)
     {
         Debug_Print("[SPAWN OK] %s idx=%d at (%.1f %.1f %.1f)", INFDN[zc], idx, pos[0], pos[1], pos[2]);
-        RecalcSiCapFromAlive(false);  // 成功刷出后立刻刷新剩余额度
+        RecalcSiCapFromAlive(false);
         return true;
     }
     Debug_Print("[SPAWN FAIL] %s at (%.1f %.1f %.1f) -> idx=%d", INFDN[zc], pos[0], pos[1], pos[2], idx);
@@ -1599,7 +1836,6 @@ static bool DoSpawnAt(const float pos[3], int zc)
 }
 static void BypassAndExecuteCommand(const char[] cmd)
 {
-    // 简化：直接执行，避免 flags 失败
     ServerCommand("%s", cmd);
 }
 
@@ -1613,7 +1849,6 @@ static bool CheckClassEnabled(int zc)
 }
 
 // 重要：只按“活着的”判断是否到达每类上限（不把队列算进上限）
-// cap = alive + remain；alive >= cap -> reached
 static bool HasReachedLimit(int zc)
 {
     int idx = zc - 1;
@@ -1634,66 +1869,66 @@ static void InitSDK_FromGamedata()
 {
     char sBuffer[128];
 
-	strcopy(sBuffer, sizeof(sBuffer), "infected_control");
-	GameData hGameData = new GameData(sBuffer);
-	if (hGameData == null)
-		SetFailState("Failed to load \"%s.txt\" gamedata.", sBuffer);
+    strcopy(sBuffer, sizeof(sBuffer), "infected_control");
+    GameData hGameData = new GameData(sBuffer);
+    if (hGameData == null)
+        SetFailState("Failed to load \"%s.txt\" gamedata.", sBuffer);
 
-	GetOffset(hGameData, g_iSpawnAttributesOffset, "TerrorNavArea::SpawnAttributes");
-	GetOffset(hGameData, g_iFlowDistanceOffset, "TerrorNavArea::FlowDistance");
-	GetOffset(hGameData, g_iNavCountOffset, "TheNavAreas::Count");
-	
-	GetAddress(hGameData, view_as<Address>(g_pTheNavAreas), "TheNavAreas");
-	GetAddress(hGameData, g_pPanicEventStage, "CDirectorScriptedEventManager::m_PanicEventStage");
+    GetOffset(hGameData, g_iSpawnAttributesOffset, "TerrorNavArea::SpawnAttributes");
+    GetOffset(hGameData, g_iFlowDistanceOffset, "TerrorNavArea::FlowDistance");
+    GetOffset(hGameData, g_iNavCountOffset, "TheNavAreas::Count");
+    
+    GetAddress(hGameData, view_as<Address>(g_pTheNavAreas), "TheNavAreas");
+    GetAddress(hGameData, g_pPanicEventStage, "CDirectorScriptedEventManager::m_PanicEventStage");
 
-	// Vector CNavArea::GetRandomPoint( void ) const
-	strcopy(sBuffer, sizeof(sBuffer), "TerrorNavArea::FindRandomSpot");
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
-	PrepSDKCall_SetReturnInfo(SDKType_Vector, SDKPass_ByValue);
-	g_hSDKFindRandomSpot = EndPrepSDKCall();
-	if(g_hSDKFindRandomSpot == null)
-		SetFailState("Failed to create SDKCall: %s", sBuffer);
+    // Vector CNavArea::GetRandomPoint( void ) const
+    strcopy(sBuffer, sizeof(sBuffer), "TerrorNavArea::FindRandomSpot");
+    StartPrepSDKCall(SDKCall_Raw);
+    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
+    PrepSDKCall_SetReturnInfo(SDKType_Vector, SDKPass_ByValue);
+    g_hSDKFindRandomSpot = EndPrepSDKCall();
+    if(g_hSDKFindRandomSpot == null)
+        SetFailState("Failed to create SDKCall: %s", sBuffer);
 
-	// IsVisibleToPlayer(Vector const&, CBasePlayer *, int, int, float, CBaseEntity const*, TerrorNavArea **, bool *);
-	strcopy(sBuffer, sizeof(sBuffer), "IsVisibleToPlayer");
-	StartPrepSDKCall(SDKCall_Static);
-	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
-	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);			// target position
-	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);		// client
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);		// client team
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);		// target position team
-	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);				// unknown
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);		// unknown
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer);	// target position NavArea
-	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Pointer);			// auto get NavArea if false
-	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
-	g_hSDKIsVisibleToPlayer = EndPrepSDKCall();
-	if (g_hSDKIsVisibleToPlayer == null)
-		SetFailState("Failed to create SDKCall: %s", sBuffer);
+    // IsVisibleToPlayer(Vector const&, CBasePlayer *, int, int, float, CBaseEntity const*, TerrorNavArea **, bool *);
+    strcopy(sBuffer, sizeof(sBuffer), "IsVisibleToPlayer");
+    StartPrepSDKCall(SDKCall_Static);
+    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
+    PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);            // target position
+    PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);     // client
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // client team
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // target position team
+    PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);             // unknown
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // unknown
+    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer);    // target position NavArea
+    PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Pointer);            // auto get NavArea if false
+    PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
+    g_hSDKIsVisibleToPlayer = EndPrepSDKCall();
+    if (g_hSDKIsVisibleToPlayer == null)
+        SetFailState("Failed to create SDKCall: %s", sBuffer);
 
-	// Unlock Max SI limit.
-	strcopy(sBuffer, sizeof(sBuffer), "CDirector::GetMaxPlayerZombies");
-	MemoryPatch mPatch = MemoryPatch.CreateFromConf(hGameData, sBuffer);
-	if (!mPatch.Validate())
-		SetFailState("Failed to verify patch: %s", sBuffer);
-	if (!mPatch.Enable())
-		SetFailState("Failed to Enable patch: %s", sBuffer);
+    // Unlock Max SI limit.
+    strcopy(sBuffer, sizeof(sBuffer), "CDirector::GetMaxPlayerZombies");
+    MemoryPatch mPatch = MemoryPatch.CreateFromConf(hGameData, sBuffer);
+    if (!mPatch.Validate())
+        SetFailState("Failed to verify patch: %s", sBuffer);
+    if (!mPatch.Enable())
+        SetFailState("Failed to Enable patch: %s", sBuffer);
 
-	delete hGameData;
+    delete hGameData;
 }
 void GetOffset(GameData hGameData, int &offset, const char[] name)
 {
-	offset = hGameData.GetOffset(name);
-	if (offset == -1)
-		SetFailState("Failed to get offset: %s", name);
+    offset = hGameData.GetOffset(name);
+    if (offset == -1)
+        SetFailState("Failed to get offset: %s", name);
 }
 
 void GetAddress(GameData hGameData, Address &address, const char[] name)
 {
-	address = hGameData.GetAddress(name);
-	if (address == Address_Null)
-		SetFailState("Failed to get address: %s", name);
+    address = hGameData.GetAddress(name);
+    if (address == Address_Null)
+        SetFailState("Failed to get address: %s", name);
 }
 
 
