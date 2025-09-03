@@ -1836,6 +1836,8 @@ static bool DoSpawnAt(const float pos[3], int zc)
 }
 static void BypassAndExecuteCommand(const char[] cmd)
 {
+    // 只有在你 sv_cheats=1 才执行
+    if (!CheatsOn()) return;
     ServerCommand("%s", cmd);
 }
 
@@ -1940,4 +1942,9 @@ stock float FloatMin(float a, float b) { return (a < b) ? a : b; }
 public void OnPause()
 {
     PauseSpawnTimer();
+}
+static bool CheatsOn()
+{
+    ConVar sv = FindConVar("sv_cheats");
+    return (sv != null && sv.BoolValue);
 }
