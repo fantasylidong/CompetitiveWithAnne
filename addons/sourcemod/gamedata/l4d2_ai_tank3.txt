@@ -1,0 +1,15 @@
+"Games"
+{
+  "left4dead2"
+  {
+    "Signatures"
+    {
+      "CTankClaw::SweepFist"
+      {
+        "library" "server"
+        "windows" "\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x04\x89\x6C\x24\x04\x8B\xEC\x81\xEC\xA8\x01\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x8B\x43\x0C"
+        "linux"   "@_ZN9CTankClaw9SweepFistERK6VectorS2_"
+      }
+    }
+  }
+}

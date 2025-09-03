@@ -26,8 +26,6 @@ public Plugin myinfo =
 #define POUNCE_LFET 0
 #define POUNCE_RIGHT 1
 #define DEBUG 0
-#define NOSIGHT_CLOSE_LUNGE     200.0  // 无视野且距离<=200时允许盲扑
-#define VERTICAL_DIRECT_POUNCE  300.0  // 高度差>=200时强制直扑（忽略侧飞限制）
 
 // 基本 cvar
 ConVar
@@ -223,21 +221,9 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
 		}
 		else if (gametime > timestamp)
 		{
-			float dz = FloatAbs(selfPos[2] - targetPos[2]);
-
-			// 规则A：无视野但很近，允许盲扑；规则B：高差>=200，允许直扑
-			bool allowBlind = (targetDistance <= NOSIGHT_CLOSE_LUNGE) || (dz >= VERTICAL_DIRECT_POUNCE);
-
-			// 否则仍沿用原有“无视野允许范围”CVar 的限制，不满足就不跳——让引擎走路靠近
-			if (!allowBlind)
-			{
-				if ((noSightPounceRange > 0 && targetDistance > noSightPounceRange) ||
-					(noSightPounceHeight > 0 && dz > noSightPounceHeight))
-				{
-					return Plugin_Continue; // 保持走位靠近，避免对墙起跳
-				}
-			}
-
+			// 设置了高度或距离或两个都设置情况下，检查是否符合条件
+			if (noSightPounceRange > 0 && targetDistance > noSightPounceRange) { return Plugin_Continue; }
+			if (noSightPounceHeight > 0 && FloatAbs(selfPos[2] - targetPos[2]) > noSightPounceHeight) { return Plugin_Continue; }
 			if (!hasQueuedLunge[hunter])
 			{
 				hasQueuedLunge[hunter] = true;
@@ -248,8 +234,8 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
 				buttons |= IN_ATTACK;
 				hasQueuedLunge[hunter] = false;
 			}
-			return Plugin_Changed;
 		}
+		return Plugin_Changed;
 	}
 	// 有视野的情况，飞扑前按右键
 	if (isDucking && g_hMeleeFirst.BoolValue &&
@@ -355,18 +341,14 @@ public void hunterOnPounce(int hunter)
 	GetClientAbsOrigin(target, targetPos);
 	// 目标正在看着 hunter 且距离大于直扑限制距离同时高度小于直接高扑的高度，侧飞
 	// 目标没有正在看着 hunter 且垂直距离大于高扑限制高度时，直扑
-	float dz = FloatAbs(targetPos[2] - selfPos[2]);
-	bool forceDirectByHeight = (dz >= VERTICAL_DIRECT_POUNCE);
-
-	if (isVisibleTo(hunter, target, g_hAimOffset.FloatValue) &&
-		!forceDirectByHeight && // 高差>=200时，强制直扑：不进入侧飞
-		(GetClientDistance(hunter, target) > g_hStraightPounceDistance.IntValue ||
-		dz < g_hHighPounceHeight.FloatValue))
+	if (isVisibleTo(hunter, target, g_hAimOffset.FloatValue) && (GetClientDistance(hunter, target) > g_hStraightPounceDistance.IntValue || FloatAbs(targetPos[2] - selfPos[2]) < g_hHighPounceHeight.FloatValue))
 	{
 		#if DEBUG
-			PrintToConsoleAll("[Ai-Hunter]：与最近目标：%N 距离：%d，高度：%.2f 可以侧飞", target, GetClientDistance(hunter, target), dz);
+			PrintToConsoleAll("[Ai-Hunter]：与最近目标：%N 距离：%d，高度：%.2f 可以侧飞", target, GetClientDistance(hunter, target), FloatAbs(targetPos[2] - selfPos[2]));
 		#endif
-		int angle = xorShiftGetRandomInt(0, g_hPounceAngleMean.IntValue, g_hPounceAngleStd.IntValue);
+		static int angle;
+		angle = xorShiftGetRandomInt(0, g_hPounceAngleMean.IntValue, g_hPounceAngleStd.IntValue);
+		// 角度是正值，则 ht 向左飞，反之向右，是否需要角度修正
 		if ((angle > 0 && anglePounceCount[hunter][POUNCE_LFET] - anglePounceCount[hunter][POUNCE_RIGHT] > g_hAnglePounceCount.IntValue) ||
 			(angle < 0 && anglePounceCount[hunter][POUNCE_RIGHT] - anglePounceCount[hunter][POUNCE_LFET] > g_hAnglePounceCount.IntValue))
 		{
@@ -377,16 +359,6 @@ public void hunterOnPounce(int hunter)
 		limitLungeVerticality(lungeEntity);
 		#if DEBUG
 			PrintToConsoleAll("[Ai-Hunter]：最终随机侧飞角度是：%.2f 度", float(angle));
-		#endif
-	}
-	else
-	{
-		// 直扑：对准目标但不侧飞，仍然限制垂直角度，避免“竖着飞”
-		angleLunge(hunter, target, lungeEntity, 0.0);
-		limitLungeVerticality(lungeEntity);
-		#if DEBUG
-			if (forceDirectByHeight)
-				PrintToConsoleAll("[Ai-Hunter]：高度差 %.1f >= %.1f，强制直扑", dz, VERTICAL_DIRECT_POUNCE);
 		#endif
 	}
 }
