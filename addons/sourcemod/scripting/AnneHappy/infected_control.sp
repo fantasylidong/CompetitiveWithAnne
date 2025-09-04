@@ -40,7 +40,7 @@
 #define SUPPORT_EXPAND_MAX        1200.0
 
 // 扩圈节奏
-#define LOW_SCORE_EXPAND          50.0
+#define LOW_SCORE_EXPAND          80.0
 
 #define ENABLE_SMOKER             (1 << 0)
 #define ENABLE_BOOMER             (1 << 1)
@@ -60,17 +60,19 @@
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
-#define SECTORS                   5
+#define SECTORS                   6
 #define SEP_TTL                   10.0    // 最近刷点保留秒数
 #define SEP_MAX                   20      // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
 #define SEP_RADIUS              120.0   // 原来 800.0 -> 更容易在近处复用相邻位置
 #define NAV_CD_SECS             1.5    // 原来 8.0 -> 同一 Nav 更快解禁
-#define SECTOR_PREF_BONUS       -8.0    // 原来可能更大(负值=奖励) -> 降低绝对值
-#define SECTOR_OFF_PENALTY      4.0     // 原来可能 10~30 -> 降低
-#define RECENT_PENALTY_0        3.0     // 最近一次用过该扇区的惩罚
-#define RECENT_PENALTY_1        2.0     // 次近
-#define RECENT_PENALTY_2        1.0     // 再次近
+// 原：-8 / +4 → 建议：-6 / +3
+#define SECTOR_PREF_BONUS   -6.0
+#define SECTOR_OFF_PENALTY   3.0
+// 近期惩罚也各减 1
+#define RECENT_PENALTY_0     2.0
+#define RECENT_PENALTY_1     1.0
+#define RECENT_PENALTY_2     1.0
 #define RAND_JITTER_MAX         2.0     // 原来更大 -> 降低抖动避免“误伤”近点
 
 // 记录最近使用过的 navArea -> 过期时间
@@ -909,7 +911,7 @@ static void TryNormalSpawnOnce()
 
         BypassAndExecuteCommand("nb_assault");
 
-        float nextStart = ring * 0.5;
+        float nextStart = ring * 0.7;
         if (nextStart < gCV.fSpawnMin) nextStart = gCV.fSpawnMin;
         if (nextStart > gCV.fSpawnMax) nextStart = gCV.fSpawnMax;
         gST.spawnDistCur = nextStart;
@@ -941,7 +943,7 @@ static void TryNormalSpawnOnce()
 
             BypassAndExecuteCommand("nb_assault");
 
-            gST.spawnDistCur = gCV.fSpawnMin; // 兜底后回到最小半径
+            gST.spawnDistCur *= 0.8; // 兜底后回到最小半径
             Debug_Print("[SPAWN] fallback@max success, reset ring->min");
         }
         else
@@ -980,7 +982,7 @@ static void TryTeleportSpawnOnce()
         gST.siAlive[want - 1]++; gST.totalSI++;
         gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
-        float nextTP = ring * 0.7;
+        float nextTP = ring * 0.8;
         if (nextTP < gCV.fSpawnMin) nextTP = gCV.fSpawnMin;
         if (nextTP > gCV.fSpawnMax) nextTP = gCV.fSpawnMax;
         gST.teleportDistCur = nextTP;
@@ -1251,37 +1253,59 @@ static bool CanBeTeleport(int client)
 // =========================
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    float eyes[3], posEye[3], posHead[3];
+    // 统一使用“眼位”高度做一次检测
+    float eyes[3],posEye[3];
     posEye = pos; posEye[2] += 62.0;
-    posHead = pos; posHead[2] += 90;
 
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsClientInGame(i) || GetClientTeam(i) != TEAM_SURVIVOR || !IsPlayerAlive(i))
             continue;
 
+        if (teleportMode && L4D_IsPlayerIncapacitated(i) && gCV.bIgnoreIncapSight)
+            continue;
+
         GetClientEyePosition(i, eyes);
 
-        if (teleportMode && (L4D_IsPlayerIncapacitated(i)))
-        {
-            if (gCV.bIgnoreIncapSight)
-            {
-                continue;
-            }
-        }
+        // ① 快速：引擎可见性（一次）
+        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))
+            return true;
 
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, pos))     return true;
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))  return true;
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posHead))  return true;
+        // ② 兜底：我们自己打一条直线（一次）
+        Handle tr = TR_TraceRayFilterEx(eyes, posEye, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
+        bool blocked = TR_DidHit(tr);
+        delete tr;
+
+        if (!blocked)
+            return true;
     }
+
     return false;
 }
-static bool TraceFilter_Stuck(int ent, int mask)
+stock bool TraceFilter_Stuck(int entity, int contentsMask)
 {
-    if (ent <= MaxClients || !IsValidEntity(ent))
+    if (entity <= MaxClients || !IsValidEntity(entity))
         return false;
+
+    static char sClassName[20];
+    GetEntityClassname(entity, sClassName, sizeof(sClassName));
+    if (strcmp(sClassName, "env_physics_blocker") == 0 && !EnvBlockType(entity))
+        return false;
+
     return true;
 }
+
+stock bool EnvBlockType(int entity)
+{
+    int BlockType = GetEntProp(entity, Prop_Data, "m_nBlockType");
+    //阻拦ai infected
+    // if (BlockType == 1 || BlockType == 2)
+    //     return false;
+    // else
+    //     return true;
+    return !(BlockType == 1 || BlockType == 2);
+}
+
 static bool WillStuck(const float at[3])
 {
     static const float mins[3] = { -16.0, -16.0, 0.0 };
@@ -1290,6 +1314,18 @@ static bool WillStuck(const float at[3])
     bool hit = TR_DidHit(tr);
     delete tr;
     return hit;
+}
+stock bool TraceFilter(int entity, int contentsMask)
+{
+    if (entity <= MaxClients || !IsValidEntity(entity))
+        return false;
+
+    static char sClassName[9];
+    GetEntityClassname(entity, sClassName, sizeof(sClassName));
+    if (strcmp(sClassName, "infected") == 0 || strcmp(sClassName, "witch") == 0)
+        return false;
+
+    return true;
 }
 
 // =========================
