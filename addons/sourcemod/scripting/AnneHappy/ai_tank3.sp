@@ -61,6 +61,7 @@ ConVar
 	g_cvRockTargetAdjust,
 	g_cvBackFist,
 	g_cvBackFistRange,
+	g_cvBackFistMaxSpeed,  
 	g_cvPunchLockVision;
 
 ConVar
@@ -150,7 +151,7 @@ public void OnPluginStart() {
 	// allow tank to bhop when he has no sight to any survivor
 	g_cvBhopNoVision = CreateConVar("ai_tank3_bhop_no_vision", "1", "是否允许坦克在无生还者视野时连跳", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// when tank has no sight of any survivors, he is allowed to bhop when his speed vector and eye angle forward vector within this degree
-	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "180.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
+	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
 	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "100.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
@@ -166,10 +167,10 @@ public void OnPluginStart() {
 	// allow tank to punch survivor who is behind him?
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
-	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
+	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "-1", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
 	g_cvPunchLockVision = CreateConVar("ai_tank3_punch_lock_vision", "1", "是否允许Tank打拳时锁定视角到目标", CVAR_FLAGS, true, 0.0, true, 1.0);
-
+	g_cvBackFistMaxSpeed = CreateConVar("ai_tank3_back_fist_max_speed","60.0","当坦克速度(uu/s) ≤ 此值时，才允许360°通背拳；设为0则完全禁用360°",CVAR_FLAGS, true, 0.0);
 	// 日志记录 logging
 	g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
 
@@ -348,33 +349,38 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget) {
 // ============================================================
 // 通背拳 Back Fist
 // ============================================================
-public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
-	if (!g_cvBackFist.BoolValue)
-		return;
-	if (!isAiTank(tank))
-		return;
+public void L4D_TankClaw_DoSwing_Post(int tank, int claw)
+{
+    if (!g_cvBackFist.BoolValue) return;
+    if (!isAiTank(tank)) return;
 
-	static ConVar cv_SwingRange;
-	if (!cv_SwingRange)
-		cv_SwingRange = FindConVar("tank_swing_range");
+    // 速度判断：大于阈值则不触发360°
+    float v[3]; 
+    GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", v);
+    float speed = GetVectorLength(v);
+    float limit = g_cvBackFistMaxSpeed.FloatValue;
+    if (limit > 0.0 && speed > limit) return;
 
-	static float pos[3], targetPos[3], swingRange, fistRange;
-	swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
-	fistRange = g_cvBackFistRange.IntValue >= 0 ? g_cvBackFistRange.FloatValue : swingRange;
+    static ConVar cv_SwingRange;
+    if (!cv_SwingRange) cv_SwingRange = FindConVar("tank_swing_range");
 
-	GetClientEyePosition(tank, pos);
-	for (int i = 1; i <= MaxClients; i++) {
-		if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
-			continue;
-		GetClientEyePosition(i, targetPos);
-		if (GetVectorDistance(pos, targetPos) > fistRange)
-			continue;
-		if (!clientIsVisibleToClient(tank, i))
-			continue;
+    float swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
+    float fistRange  = (g_cvBackFistRange.IntValue >= 0) ? g_cvBackFistRange.FloatValue : swingRange;
 
-		// SweepFist 从 start 到 end 扫描, 检测碰撞
-		SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
-	}
+    float pos[3], targetPos[3];
+    GetClientEyePosition(tank, pos);
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
+
+        GetClientEyePosition(i, targetPos);
+        if (GetVectorDistance(pos, targetPos) > fistRange) continue;
+        if (!clientIsVisibleToClient(tank, i)) continue;
+
+        // 触发一次 SweepFist 命中该方向目标（实现360°效果，但仅低速才会走到这里）
+        SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
+    }
 }
 
 Action punchLockVision(int client, int target, const float pos[3], const float targetPos[3]) {
