@@ -60,12 +60,12 @@
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
-#define SECTORS                   6
+#define SECTORS                   4
 #define SEP_TTL                   10.0    // 最近刷点保留秒数
 #define SEP_MAX                   20      // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS              120.0   // 原来 800.0 -> 更容易在近处复用相邻位置
-#define NAV_CD_SECS             1.5    // 原来 8.0 -> 同一 Nav 更快解禁
+#define SEP_RADIUS              100.0   // 原来 800.0 -> 更容易在近处复用相邻位置
+#define NAV_CD_SECS             1.0    // 原来 8.0 -> 同一 Nav 更快解禁
 // 原：-8 / +4 → 建议：-6 / +3
 #define SECTOR_PREF_BONUS   -6.0
 #define SECTOR_OFF_PENALTY   3.0
