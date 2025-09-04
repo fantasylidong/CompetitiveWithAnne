@@ -426,19 +426,19 @@
 		}
 		"sm_cvar ai_TankSneakTime 8.0"
 		{
-			"message" "开启狡猾Tank（特感生成8s前才压制，）"
+			"message" "开启狡猾Tank（[22-12~2405版本有效]）"
 		}
 		"sm_cvar ai_TankSneakTime 0.0"
 		{
-			"message" "关闭狡猾Tank[22-12版本起有效]"
+			"message" "关闭狡猾Tank[22-12~2405版本有效]"
 		}
 		"exec vote/Consume_on.cfg"
 		{
-			"message" "开启消耗克[22-7版本起有效]"
+			"message" "开启消耗克[22-7~2405版本有效]"
 		}
 		"exec vote/Consume_off.cfg"
 		{
-			"message" "关闭消耗克[22-7版本起有效]"
+			"message" "关闭消耗克[22-7~2405版本有效]"
 		}
 		"sm_cvar l4d_multislots_autokicktank 1"
 		{
