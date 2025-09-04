@@ -153,7 +153,7 @@ public void OnPluginStart() {
 	// when tank has no sight of any survivors, he is allowed to bhop when his speed vector and eye angle forward vector within this degree
 	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
-	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "50.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "100.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.45", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
@@ -512,11 +512,35 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 		&& angle > g_cvAirVecModifyDegree.FloatValue && angle < g_cvAirVecModifyMaxDegree.FloatValue
 		&& GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime > g_cvAirVecModifyInterval.FloatValue
 		&& ((buttons & IN_FORWARD) && !(buttons & IN_BACK))) {
-			log.debugAll("%N triggered air speed modify, current vector angle: %.2f", client, angle);
-			ScaleVector(vDir, speed + g_cvBhopImpulse.FloatValue);
-			vDir[2] = vAbsVelVecCpy[2];
-			// 应用新的速度方向
-			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir);
+			log.debugAll("%N air-correct (no accel), angle: %.2f", client, angle);
+
+			// 仅旋转“水平分量”的方向；保留原Z速度；保持 |v| 不变
+			float vz   = vAbsVelVecCpy[2];                       // 原竖直速度
+			float h2   = speed * speed - vz * vz;                // 目标水平速度平方
+			float hspd = (h2 > 0.0) ? SquareRoot(h2) : 0.0;      // 目标水平速度大小
+
+			// vDir 当前是“指向目标”的单位水平向量
+			ScaleVector(vDir, hspd);
+
+			float vNew[3];
+			vNew[0] = vDir[0];
+			vNew[1] = vDir[1];
+			vNew[2] = vz;
+
+			// 应用新速度（不改变模长、只改方向）
+			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vNew);
+
+			// （可选稳妥）做一次上限钳制，避免数值误差导致超速
+			float maxSpd = g_cvBhopMaxSpeed.FloatValue;
+			if (maxSpd > 0.0) {
+				float sp = GetVectorLength(vNew);
+				if (sp > maxSpd + 0.01) {
+					NormalizeVector(vNew, vNew);
+					ScaleVector(vNew, maxSpd);
+					TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vNew);
+				}
+			}
+
 			g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
 	}
 
