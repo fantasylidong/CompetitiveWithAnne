@@ -167,7 +167,7 @@ public void OnPluginStart() {
 	// allow tank to punch survivor who is behind him?
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
-	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "-1", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
+	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
 	g_cvPunchLockVision = CreateConVar("ai_tank3_punch_lock_vision", "1", "是否允许Tank打拳时锁定视角到目标", CVAR_FLAGS, true, 0.0, true, 1.0);
 	g_cvBackFistMaxSpeed = CreateConVar("ai_tank3_back_fist_max_speed","60.0","当坦克速度(uu/s) ≤ 此值时，才允许360°通背拳；设为0则完全禁用360°",CVAR_FLAGS, true, 0.0);
