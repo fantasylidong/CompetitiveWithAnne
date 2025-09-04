@@ -13,11 +13,11 @@
 
 public Plugin myinfo = 
 {
-    name = "Smoker Animation Fix",
-    author = "HoongDou",
-    description = "Fixes AI Smoker tongue animation to match human players",
-    version = "1.1",
-    url = "https://github.com/HoongDou/L4D2-HoongDou-Project"
+    name        = "Smoker Animation Fix (windowed & safe reset)",
+    author      = "HoongDou, edited by ChatGPT for morzlee",
+    description = "Fix AI Smoker tongue animation to match human players (with window & robust resets)",
+    version     = "1.2",
+    url         = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
 // ====================================================================================================
@@ -25,16 +25,22 @@ public Plugin myinfo =
 // ====================================================================================================
 
 // Handles
-Handle hConf = null;       // Gamedata配置文件的句柄。
-Handle sdkDoAnim = null;   // DoAnimationEvent SDKCall的句柄。
-Handle hSequenceSet = null; // SelectWeightedSequence Detour的句柄。
+Handle  hConf         = null;      // Gamedata
+Handle  sdkDoAnim     = null;      // SDKCall: CTerrorPlayer::DoAnimationEvent
+Handle  hSequenceSet  = null;      // Detour:   CTerrorPlayer::SelectWeightedSequence
 
-//ConVars
-ConVar g_cvEnabled; // 用于开关插件功能的控制台变量。
+// ConVars
+ConVar g_cvEnabled;                // 是否启用
+ConVar g_cvHoldWindow;             // 起手强制动画的持续窗口
+ConVar g_cvSafetyTimer;            // 起手兜底复位时间
 
 // State Tracking
-// 追踪一个 Smoker 当前是否处于舌头攻击状态。
-static bool g_bTongueAttacking[MAXPLAYERS + 1] = {false, ...};
+static bool  g_bTongueAttacking[MAXPLAYERS + 1] = {false, ...};  // 当前是否处于“吐舌动画强制期”
+static float g_fTongueWindow[MAXPLAYERS + 1]    = {0.0,   ...};  // 强制期截止时间（EngineTime）
+static bool  g_bDidAnimKick[MAXPLAYERS + 1]     = {false, ...};  // 是否已在起手踢过一次 DoAnimationEvent
+
+// Animation cache: key = "<model_path>::<activity_name>" -> sequence id
+StringMap g_hAnimCache = null;
 
 // ====================================================================================================
 // >> SIGNATURES
@@ -54,126 +60,182 @@ static bool g_bTongueAttacking[MAXPLAYERS + 1] = {false, ...};
 // >> PLUGIN CORE
 // ====================================================================================================
 
-/**
- * @brief 当插件首次加载时调用，用于初始化所有内容。
- */
 public void OnPluginStart()
 {
-    // Hook游戏事件以追踪 Smoker 的行为。
-    HookEvent("ability_use", Event_AbilityUse);
-    HookEvent("tongue_grab", Event_TongueGrab);
+    // 事件：技能/抓住/释放（核心三件套）
+    HookEvent("ability_use",    Event_AbilityUse);
+    HookEvent("tongue_grab",    Event_TongueGrab);
     HookEvent("tongue_release", Event_TongueRelease);
-    
-    // 创建控制台变量,是否启用该插件。
-    g_cvEnabled = CreateConVar("smoker_anim_fix_enabled", "1", "Enable smoker animation fix", FCVAR_NONE, true, 0.0, true, 1.0);
-    
-    // 加载Gamedata，准备SDKCalls，并设置DHooks。
+
+    // 事件：复位相关（尽量覆盖所有边界）
+    HookEvent("player_death",       Event_PlayerDeath);
+    HookEvent("player_spawn",       Event_PlayerSpawn);
+    HookEvent("player_team",        Event_PlayerTeam);
+    HookEvent("bot_player_replace", Event_PlayerSwap);   // 人/机互换
+    HookEvent("player_bot_replace", Event_PlayerSwap);
+
+    HookEvent("round_end",       Event_RoundEnd);
+    HookEvent("map_transition",  Event_MapTransition);
+    HookEvent("mission_lost",    Event_MissionLost);
+
+    // ConVars
+    g_cvEnabled     = CreateConVar("smoker_anim_fix_enabled", "1",    "Enable smoker animation fix", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvHoldWindow  = CreateConVar("smoker_anim_fix_hold_window", "0.6",
+                                   "Seconds we force tongue animation after ability start.", FCVAR_NONE, true, 0.1, true, 2.0);
+    g_cvSafetyTimer = CreateConVar("smoker_anim_fix_safety_timer", "2.0",
+                                   "Safety timer to reset tongue flag after ability start.", FCVAR_NONE, true, 0.5, true, 5.0);
+
+    // Gamedata / SDK / Detour
     GetGamedata();
     PrepSDKCall();
     LoadOffset();
-    
+
+    // 动画缓存
+    if (g_hAnimCache == null)
+        g_hAnimCache = new StringMap();
+
     AutoExecConfig(true, "l4d2_smoker_anim_fix");
 }
 
-/**
- * @brief 当插件即将卸载时调用，用于清理 Hooks。
- */
 public void OnPluginEnd()
 {
     if (hSequenceSet != null)
     {
         DHookDisableDetour(hSequenceSet, false, OnSequenceSet_Pre);
-        DHookDisableDetour(hSequenceSet, true, OnSequenceSet_Post);
+        DHookDisableDetour(hSequenceSet, true,  OnSequenceSet_Post);
     }
+}
+
+public void OnMapStart()
+{
+    // 地图开始清缓存和状态
+    if (g_hAnimCache != null)
+        g_hAnimCache.Clear();
+
+    for (int i = 1; i <= MaxClients; i++)
+        ResetSmokerFlag(i);
+}
+
+public void OnClientDisconnect(int client)
+{
+    ResetSmokerFlag(client);
+}
+
+public void OnClientPutInServer(int client)
+{
+    ResetSmokerFlag(client);
 }
 
 // ====================================================================================================
 // >> EVENT HANDLERS
 // ====================================================================================================
 
-/**
- * @brief 当玩家使用技能时调用。用它来检测 Smoker 攻击的开始。
- *
- * @param event             Handle of the event.
- * @param name              Name of the event.
- * @param dontBroadcast     Whether the event is broadcast to clients.
- * @return                  Always continues to the next plugin.
- */
 public Action Event_AbilityUse(Event event, const char[] name, bool dontBroadcast)
 {
     if (!GetConVarBool(g_cvEnabled))
         return Plugin_Continue;
-    
+
     int userid = event.GetInt("userid");
     int client = GetClientOfUserId(userid);
-    
-    if (!IsValidClient(client) || !IsPlayerAlive(client))
+
+    if (!IsValidSmoker(client))
         return Plugin_Continue;
-    
-    if (!IsFakeClient(client) || GetClientTeam(client) != 3)
-        return Plugin_Continue;
-    
+
     char ability[64];
     event.GetString("ability", ability, sizeof(ability));
     int context = event.GetInt("context");
-    
-    if (StrEqual(ability, "ability_tongue") && context == 1) // context 1 = ability start
+
+    // context==1: start
+    if (StrEqual(ability, "ability_tongue") && context == 1)
     {
-        char classname[64];
-        GetClientModel(client, classname, sizeof(classname));
-        if (StrContains(classname, "smoker", false) != -1 || GetEntProp(client, Prop_Send, "m_zombieClass") == 1)
+        g_bTongueAttacking[client] = true;
+        g_fTongueWindow[client]    = GetEngineTime() + g_cvHoldWindow.FloatValue;
+        g_bDidAnimKick[client]     = false;
+
+        // 只在起手踢一次动画
+        if (sdkDoAnim != null && !g_bDidAnimKick[client])
         {
-            g_bTongueAttacking[client] = true;
-            
-            // 强制游戏播放舌头攻击的动画事件。
-            if (sdkDoAnim != null)
-            {
-                SDKCall(sdkDoAnim, client, 4, 1); // 4 = PLAYERANIMEVENT_ATTACK_PRIMARY
-            }
-            
-            // 设置一个安全计时器，以防tongue_release事件未触发时重置标志。
-            CreateTimer(2.0, Timer_ResetTongueFlag, client);
+            SDKCall(sdkDoAnim, client, 4, 1); // 4 = PLAYERANIMEVENT_ATTACK_PRIMARY
+            g_bDidAnimKick[client] = true;
         }
+
+        // 起手兜底 2.0s（可配）
+        CreateTimer(g_cvSafetyTimer.FloatValue, Timer_ResetTongueFlag, client);
     }
-    
+
     return Plugin_Continue;
 }
 
-/**
- * @brief 当 Smoker 的舌头成功抓住生还者时(choke)调用。
- */
 public Action Event_TongueGrab(Event event, const char[] name, bool dontBroadcast)
 {
     if (!GetConVarBool(g_cvEnabled))
         return Plugin_Continue;
-    
+
     int userid = event.GetInt("userid");
     int client = GetClientOfUserId(userid);
-    
-    if (client > 0 && IsClientInGame(client) && IsFakeClient(client))
+
+    if (IsValidSmoker(client))
     {
+        // 抓住后保持在强制期（不刷新窗口，防止长时间卡动画；由窗口时间控制）
         g_bTongueAttacking[client] = true;
+        if (g_fTongueWindow[client] <= 0.0)
+        {
+            // 若此前没有窗口（理论不应发生），给个很短的窗口以免卡死
+            g_fTongueWindow[client] = GetEngineTime() + 0.3;
+        }
     }
-    
+
     return Plugin_Continue;
 }
 
-/**
- * @brief 当Smoker的舌头被释放或切断时调用。
- */
 public Action Event_TongueRelease(Event event, const char[] name, bool dontBroadcast)
 {
     if (!GetConVarBool(g_cvEnabled))
         return Plugin_Continue;
-    
+
     int userid = event.GetInt("userid");
     int client = GetClientOfUserId(userid);
-    
-    if (client > 0 && IsClientInGame(client))
-    {
-        g_bTongueAttacking[client] = false;
-    }
-    
+
+    ResetSmokerFlag(client);
+    return Plugin_Continue;
+}
+
+// 复位相关事件
+public Action Event_PlayerDeath(Event e, const char[] n, bool db)
+{
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("userid")));
+    return Plugin_Continue;
+}
+public Action Event_PlayerSpawn(Event e, const char[] n, bool db)
+{
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("userid")));
+    return Plugin_Continue;
+}
+public Action Event_PlayerTeam(Event e, const char[] n, bool db)
+{
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("userid")));
+    return Plugin_Continue;
+}
+public Action Event_PlayerSwap(Event e, const char[] n, bool db)
+{
+    // bot_player_replace / player_bot_replace 都清一次
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("userid")));
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("bot")));
+    return Plugin_Continue;
+}
+public Action Event_RoundEnd(Event e, const char[] n, bool db)
+{
+    for (int i = 1; i <= MaxClients; i++) ResetSmokerFlag(i);
+    return Plugin_Continue;
+}
+public Action Event_MapTransition(Event e, const char[] n, bool db)
+{
+    for (int i = 1; i <= MaxClients; i++) ResetSmokerFlag(i);
+    return Plugin_Continue;
+}
+public Action Event_MissionLost(Event e, const char[] n, bool db)
+{
+    for (int i = 1; i <= MaxClients; i++) ResetSmokerFlag(i);
     return Plugin_Continue;
 }
 
@@ -181,19 +243,10 @@ public Action Event_TongueRelease(Event event, const char[] name, bool dontBroad
 // >> TIMERS
 // ====================================================================================================
 
-/**
- * @brief 一个用于重置客户端舌头攻击标志的计时器。
- *
- * @param timer             Handle of the timer.
- * @param client            The client index.
- * @return                  Stops the timer from repeating.
- */
 public Action Timer_ResetTongueFlag(Handle timer, int client)
 {
-    if (IsValidClient(client))
-    {
-        g_bTongueAttacking[client] = false;
-    }
+    // 兜底：2s 后清理强制标志（若仍在窗口内，窗口检查也会结束）
+    ResetSmokerFlag(client);
     return Plugin_Stop;
 }
 
@@ -201,52 +254,41 @@ public Action Timer_ResetTongueFlag(Handle timer, int client)
 // >> DHOOK CALLBACKS
 // ====================================================================================================
 
-/**
- * @brief Pre-hook for CTerrorPlayer::SelectWeightedSequence. 不做任何事，但DHooks要求必须有。
- */
 public MRESReturn OnSequenceSet_Pre(int client, Handle hReturn, Handle hParams)
 {
     return MRES_Ignored;
 }
 
-/**
- * @brief Post-hook for CTerrorPlayer::SelectWeightedSequence. 核心逻辑实现。
- *
- * @description If an AI Smoker is in the tongue attacking state, this function intercepts the
- *              animation chosen by the game and replaces it with the correct tongue attack sequence.
- *
- * @param client            The entity index (this pointer).
- * @param hReturn           Handle to the function's return value.
- * @param hParams           Handle to the function's parameters.
- * @return                  MRES_Override to change the sequence, or MRES_Ignored to do nothing.
- */
 public MRESReturn OnSequenceSet_Post(int client, Handle hReturn, Handle hParams)
 {
     if (!GetConVarBool(g_cvEnabled))
         return MRES_Ignored;
-    
-    if (!IsValidClient(client) || !IsPlayerAlive(client))
+
+    if (!IsValidSmoker(client))
         return MRES_Ignored;
-    
-    if (!IsFakeClient(client) || GetClientTeam(client) != 3)
+
+    // 若未处于强制期，或强制期超时，则不覆盖
+    if (!g_bTongueAttacking[client])
         return MRES_Ignored;
-    
-    if (GetEntProp(client, Prop_Send, "m_zombieClass") != 1)
-        return MRES_Ignored;
-    
-    int sequence = DHookGetReturn(hReturn);
-    
-    // 如果Smoker应该处于攻击状态，则强制使用正确的动画序列。
-    if (g_bTongueAttacking[client])
+
+    float now = GetEngineTime();
+    if (now > g_fTongueWindow[client])
     {
-        int tongueSequence = GetAnimation(client, "ACT_TERROR_SMOKER_SENDING_OUT_TONGUE");
-        if (tongueSequence > -1 && sequence != tongueSequence)
-        {
-            DHookSetReturn(hReturn, tongueSequence);
-            return MRES_Override;
-        }
+        // 超时自动清空，避免“长时间吐舌动画”
+        ResetSmokerFlag(client);
+        return MRES_Ignored;
     }
-    
+
+    int sequence = DHookGetReturn(hReturn);
+
+    // 获取吐舌动画的序列 id（带缓存）
+    int tongueSequence = GetAnimationCached(client, "ACT_TERROR_SMOKER_SENDING_OUT_TONGUE");
+    if (tongueSequence > -1 && sequence != tongueSequence)
+    {
+        DHookSetReturn(hReturn, tongueSequence);
+        return MRES_Override;
+    }
+
     return MRES_Ignored;
 }
 
@@ -254,138 +296,155 @@ public MRESReturn OnSequenceSet_Post(int client, Handle hReturn, Handle hParams)
 // >> HELPER FUNCTIONS
 // ====================================================================================================
 
-/**
- * @brief 通过活动名称字符串获取动画序列的数字ID。
- *
- * @description This works by creating a temporary prop, setting its model to the target entity's
- *              model, using the "SetAnimation" input, and then reading the resulting sequence ID.
- *
- * @param entity            The entity whose model should be used.
- * @param sequence          The animation activity name (e.g., "ACT_IDLE").
- * @return                  The sequence ID, or -1 on failure.
- */
-int GetAnimation(int entity, const char[] sequence)
-{
-    if (!IsValidEntity(entity))
-        return -1;
-    
-    char model[PLATFORM_MAX_PATH];
-    GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
-    
-    int tempEnt = CreateEntityByName("prop_dynamic");
-    if (!IsValidEntity(tempEnt))
-        return -1;
-    
-    SetEntityModel(tempEnt, model);
-    
-    SetVariantString(sequence);
-    AcceptEntityInput(tempEnt, "SetAnimation");
-    int result = GetEntProp(tempEnt, Prop_Send, "m_nSequence");
-    
-    RemoveEntity(tempEnt);
-    return result;
-}
-
-/**
- * @brief A 快速检查客户端索引是否有效且在游戏中。
- *
- * @param client            The client index to check.
- * @return                  True if valid, false otherwise.
- */
 bool IsValidClient(int client)
 {
     return (client > 0 && client <= MaxClients && IsClientInGame(client));
+}
+
+bool IsValidSmoker(int client)
+{
+    if (!IsValidClient(client) || !IsPlayerAlive(client))
+        return false;
+    if (!IsFakeClient(client))          // 只针对 AI
+        return false;
+    if (GetClientTeam(client) != 3)     // Infected
+        return false;
+    if (GetEntProp(client, Prop_Send, "m_zombieClass") != 1) // 1 = Smoker
+        return false;
+    return true;
+}
+
+void ResetSmokerFlag(int client)
+{
+    if (client <= 0 || client > MaxClients)
+        return;
+    g_bTongueAttacking[client] = false;
+    g_bDidAnimKick[client]     = false;
+    g_fTongueWindow[client]    = 0.0;
+}
+
+/**
+ * 获取动画序列（带缓存）：key = "<model>::<activity>"
+ */
+int GetAnimationCached(int entity, const char[] activity)
+{
+    if (!IsValidEntity(entity))
+        return -1;
+
+    char model[PLATFORM_MAX_PATH];
+    GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
+
+    char key[PLATFORM_MAX_PATH + 96];
+    Format(key, sizeof(key), "%s::%s", model, activity);
+
+    int seq = -1;
+    if (g_hAnimCache != null && g_hAnimCache.GetValue(key, seq))
+        return seq;
+
+    // 未命中缓存：创建临时 prop_dynamic 读取序列
+    int tempEnt = CreateEntityByName("prop_dynamic");
+    if (tempEnt == -1 || !IsValidEntity(tempEnt))
+        return -1;
+
+    SetEntityModel(tempEnt, model);
+    DispatchSpawn(tempEnt);
+
+    SetVariantString(activity);
+    AcceptEntityInput(tempEnt, "SetAnimation");
+    seq = GetEntProp(tempEnt, Prop_Send, "m_nSequence");
+
+    RemoveEntity(tempEnt);
+
+    if (g_hAnimCache != null && seq > -1)
+        g_hAnimCache.SetValue(key, seq, true);
+
+    return seq;
 }
 
 // ====================================================================================================
 // >> SETUP & INITIALIZATION
 // ====================================================================================================
 
-/**
- * @brief 为 CTerrorPlayer::DoAnimationEvent 准备 SDKCall。
- */
 void PrepSDKCall()
 {
     if (hConf == null)
         SetFailState("Error: Gamedata not loaded!");
-    
+
     StartPrepSDKCall(SDKCall_Player);
     if (!PrepSDKCall_SetFromConf(hConf, SDKConf_Signature, NAME_DoAnimationEvent))
         SetFailState("Can't find %s signature in gamedata", NAME_DoAnimationEvent);
-    
+
+    // CTerrorPlayer::DoAnimationEvent(PlayerAnimEvent_t, int)
     PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain); // PlayerAnimEvent_t
     PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain); // int
     sdkDoAnim = EndPrepSDKCall();
-    
+
     if (sdkDoAnim == null)
         SetFailState("Can't initialize %s SDKCall", NAME_DoAnimationEvent);
 }
 
-/**
- * @brief 为 CTerrorPlayer::SelectWeightedSequence 创建并启用 DHooks detour。
- */
 void LoadOffset()
 {
     if (hConf == null)
         SetFailState("Error: Gamedata not found");
-    
+
     hSequenceSet = DHookCreateDetour(Address_Null, CallConv_THISCALL, ReturnType_Int, ThisPointer_CBaseEntity);
     DHookSetFromConf(hSequenceSet, hConf, SDKConf_Signature, NAME_SelectWeightedSequence);
     DHookAddParam(hSequenceSet, HookParamType_Int); // Activity
     DHookEnableDetour(hSequenceSet, false, OnSequenceSet_Pre);
-    DHookEnableDetour(hSequenceSet, true, OnSequenceSet_Post);
+    DHookEnableDetour(hSequenceSet, true,  OnSequenceSet_Post);
 }
 
-/**
- * @brief 加载gamedata文件。如果文件不存在，它会自动生成一个。
- */
 void GetGamedata()
 {
     char filePath[PLATFORM_MAX_PATH];
     BuildPath(Path_SM, filePath, sizeof(filePath), "gamedata/%s.txt", GAMEDATA);
-    
+
     if (FileExists(filePath))
     {
         hConf = LoadGameConfigFile(GAMEDATA);
-    }
-    else
-    {
-        PrintToServer("[SM] %s gamedata file not found. Generating...", "Smoker Animation Fix");
-        
-        Handle fileHandle = OpenFile(filePath, "a+");
-        if (fileHandle == null)
-            SetFailState("[SM] Couldn't generate gamedata file!");
-        
-        WriteFileLine(fileHandle, "\"Games\"");
-        WriteFileLine(fileHandle, "{");
-        WriteFileLine(fileHandle, "    \"left4dead2\"");
-        WriteFileLine(fileHandle, "    {");
-        WriteFileLine(fileHandle, "        \"Signatures\"");
-        WriteFileLine(fileHandle, "        {");
-        WriteFileLine(fileHandle, "            \"%s\"", NAME_SelectWeightedSequence);
-        WriteFileLine(fileHandle, "            {");
-        WriteFileLine(fileHandle, "                \"library\"    \"server\"");
-        WriteFileLine(fileHandle, "                \"linux\"      \"%s\"", SIG_SelectWeightedSequence_LINUX);
-        WriteFileLine(fileHandle, "                \"windows\"    \"%s\"", SIG_SelectWeightedSequence_WINDOWS);
-        WriteFileLine(fileHandle, "                \"mac\"        \"%s\"", SIG_SelectWeightedSequence_LINUX);
-        WriteFileLine(fileHandle, "            }");
-        WriteFileLine(fileHandle, "            \"%s\"", NAME_DoAnimationEvent);
-        WriteFileLine(fileHandle, "            {");
-        WriteFileLine(fileHandle, "                \"library\"    \"server\"");
-        WriteFileLine(fileHandle, "                \"linux\"      \"%s\"", SIG_DoAnimationEvent_LINUX);
-        WriteFileLine(fileHandle, "                \"windows\"    \"%s\"", SIG_DoAnimationEvent_WINDOWS);
-        WriteFileLine(fileHandle, "                \"mac\"        \"%s\"", SIG_DoAnimationEvent_LINUX);
-        WriteFileLine(fileHandle, "            }");
-        WriteFileLine(fileHandle, "        }");
-        WriteFileLine(fileHandle, "    }");
-        WriteFileLine(fileHandle, "}");
-        
-        CloseHandle(fileHandle);
-        hConf = LoadGameConfigFile(GAMEDATA);
-        
         if (hConf == null)
-            SetFailState("[SM] Failed to load auto-generated gamedata file!");
-        
-        PrintToServer("[SM] %s successfully generated gamedata file!", "Smoker Animation Fix");
+            SetFailState("[SM] Failed to load gamedata file!");
+        return;
     }
+
+    PrintToServer("[SM] %s gamedata file not found. Generating...", "Smoker Animation Fix");
+
+    Handle fileHandle = OpenFile(filePath, "a+");
+    if (fileHandle == null)
+        SetFailState("[SM] Couldn't generate gamedata file!");
+
+    WriteFileLine(fileHandle, "\"Games\"");
+    WriteFileLine(fileHandle, "{");
+    WriteFileLine(fileHandle, "    \"left4dead2\"");
+    WriteFileLine(fileHandle, "    {");
+    WriteFileLine(fileHandle, "        \"Signatures\"");
+    WriteFileLine(fileHandle, "        {");
+    // SelectWeightedSequence
+    WriteFileLine(fileHandle, "            \"%s\"", NAME_SelectWeightedSequence);
+    WriteFileLine(fileHandle, "            {");
+    WriteFileLine(fileHandle, "                \"library\"    \"server\"");
+    WriteFileLine(fileHandle, "                \"linux\"      \"%s\"", SIG_SelectWeightedSequence_LINUX);
+    WriteFileLine(fileHandle, "                \"windows\"    \"%s\"", SIG_SelectWeightedSequence_WINDOWS);
+    WriteFileLine(fileHandle, "                \"mac\"        \"%s\"", SIG_SelectWeightedSequence_LINUX);
+    WriteFileLine(fileHandle, "            }");
+    // DoAnimationEvent
+    WriteFileLine(fileHandle, "            \"%s\"", NAME_DoAnimationEvent);
+    WriteFileLine(fileHandle, "            {");
+    WriteFileLine(fileHandle, "                \"library\"    \"server\"");
+    WriteFileLine(fileHandle, "                \"linux\"      \"%s\"", SIG_DoAnimationEvent_LINUX);
+    WriteFileLine(fileHandle, "                \"windows\"    \"%s\"", SIG_DoAnimationEvent_WINDOWS);
+    WriteFileLine(fileHandle, "                \"mac\"        \"%s\"", SIG_DoAnimationEvent_LINUX);
+    WriteFileLine(fileHandle, "            }");
+    WriteFileLine(fileHandle, "        }");
+    WriteFileLine(fileHandle, "    }");
+    WriteFileLine(fileHandle, "}");
+
+    CloseHandle(fileHandle);
+
+    hConf = LoadGameConfigFile(GAMEDATA);
+    if (hConf == null)
+        SetFailState("[SM] Failed to load auto-generated gamedata file!");
+
+    PrintToServer("[SM] %s successfully generated gamedata file!", "Smoker Animation Fix");
 }
