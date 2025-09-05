@@ -63,7 +63,7 @@
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
 #define SEP_MAX                   20      // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS              90.0
+#define SEP_RADIUS              100.0
 #define NAV_CD_SECS             1.0
 #define SECTORS_BASE              4       // 你的当前调参基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -76,6 +76,12 @@
 #define RECENT_PENALTY_1_BASE     1.0
 #define RECENT_PENALTY_2_BASE     1.0
 #define RAND_JITTER_MAX           2.5     // 原来更大 -> 降低抖动避免“误伤”近点
+
+// 可调参数（想热调也能做成 CVar，这里先给常量）
+#define PEN_LIMIT_SCALE_HI   1.08   // L=1 时：正向惩罚略强一点
+#define PEN_LIMIT_SCALE_LO   0.60   // L=20 时：正向惩罚明显减弱
+#define PEN_LIMIT_MINL       1
+#define PEN_LIMIT_MAXL       20
 
 
 // 记录最近使用过的 navArea -> 过期时间
@@ -1888,6 +1894,22 @@ int PickSector(int sectors)
 
     return ArgMinFloat(score, sectors);
 }
+// 将 iSiLimit∈[1,20] → t∈[0,1]，再做 smoothstep 平滑
+static float SectorPenaltyScaleByLimit()
+{
+    int L = gCV.iSiLimit;
+    if (L < PEN_LIMIT_MINL) L = PEN_LIMIT_MINL;
+    if (L > PEN_LIMIT_MAXL) L = PEN_LIMIT_MAXL;
+
+    // 归一化到 0..1
+    float t = (float(L) - float(PEN_LIMIT_MINL)) / float(PEN_LIMIT_MAXL - PEN_LIMIT_MINL);
+
+    // smoothstep：t^2*(3-2t)，让两端更平滑，避免在中段“拐弯”太猛
+    t = t * t * (3.0 - 2.0 * t);
+
+    // L 越大 → 惩罚缩放越小（更弱），避免高上限时被“扇区惩罚”推得太远
+    return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
+}
 
 
 // 运行时计算当前扇区数：最低2；其余= ceil(目标T/2)+1；再夹在 [2, SECTORS_MAX]
@@ -2017,6 +2039,13 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
         float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
         float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
+
+        // 仅对“正向惩罚”应用缩放（不要动 prefBonus，保持就近倾向）
+        float penScaleLimit = SectorPenaltyScaleByLimit();
+        offPenalty *= penScaleLimit;
+        rpen0     *= penScaleLimit;
+        rpen1     *= penScaleLimit;
+        rpen2     *= penScaleLimit;
 
         float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
         if (recentSectors[0] == s) sectorPenalty += rpen0;
