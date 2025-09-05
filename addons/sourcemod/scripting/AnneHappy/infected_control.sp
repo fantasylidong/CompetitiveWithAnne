@@ -1508,34 +1508,57 @@ static bool CanBeTeleport(int client)
 // =========================
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    // 统一使用“眼位”高度做一次检测 + 一次射线兜底
-    float eyes[3], posEye[3];
-    posEye = pos; posEye[2] += 62.0;
+    const float NEAR2 = 360000.0;
+
+    float posHead[3],posHull[3];
+    posHead = pos; posHead[2] += 62.0;
+    posHull = pos; posHull[2] += 24.0;
 
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsClientInGame(i) || GetClientTeam(i) != TEAM_SURVIVOR || !IsPlayerAlive(i))
             continue;
-
         if (teleportMode && L4D_IsPlayerIncapacitated(i) && gCV.bIgnoreIncapSight)
             continue;
 
+        float eyes[3]; 
         GetClientEyePosition(i, eyes);
 
-        // ① 快速：引擎可见性（一次）
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posEye))
+        // 0) 最便宜：引擎可见（对头偏移点）
+        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posHead))
             return true;
 
-        // ② 兜底：我们自己打一条直线（一次）
-        Handle tr = TR_TraceRayFilterEx(eyes, posEye, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
-        bool blocked = TR_DidHit(tr);
-        delete tr;
+        float d2 = GetVectorDistance(eyes, pos, true);
 
-        if (!blocked)
-            return true;
+        if (d2 <= NEAR2)
+        {
+            // 1) 近距：薄盒 Hull + 允许穿草/栅格
+            static const float HULL_MINS[3] = { -6.0, -6.0, -2.0 };
+            static const float HULL_MAXS[3] = {  6.0,  6.0,  2.0 };
+
+            Handle th = TR_TraceHullFilterEx(eyes, posHull, HULL_MINS, HULL_MAXS,
+                                             MASK_VISIBLE | MASK_SHOT, TraceFilter);
+            bool blocked = TR_DidHit(th);
+            float frac   = TR_GetFraction(th);
+            delete th;
+
+            if (!blocked || frac > 0.98)
+                return true;
+        }
+        else
+        {
+            // 2) 远距：Ray 到胸口
+            Handle tr = TR_TraceRayFilterEx(eyes, posHull, MASK_VISIBLE | MASK_SHOT,
+                                            RayType_EndPoint, TraceFilter);
+            bool blocked = TR_DidHit(tr);
+            delete tr;
+            if (!blocked)
+                return true;
+        }
     }
     return false;
 }
+
 stock bool TraceFilter_Stuck(int entity, int contentsMask)
 {
     if (entity <= MaxClients || !IsValidEntity(entity))
