@@ -15,29 +15,22 @@
 
 #define GAMEDATA "l4d2_ai_tank3"
 
-#define DEFAULT_THROW_FORCE 800.0
-#define DEFAULT_SV_GRAVITY 800.0
-#define DEFAULT_SWING_RANGE 56.0
-#define ROCK_FL_GRAVITY 0.4				// 石头重力因子
+#define DEFAULT_THROW_FORCE 		800.0
+#define DEFAULT_SV_GRAVITY 			800.0
+#define DEFAULT_SWING_RANGE 		56.0
+#define ROCK_FL_GRAVITY 			0.4				// 石头重力因子
 
-#define PLAYER_HEIGHT 72.0
-#define PLAYER_EYE_HEIGHT 62.0
-#define PLAYER_CHEST 52.0
-#define TANK_HEIGHT 84.0
-#define JUMP_HEIGHT 56.0
+#define PLAYER_HEIGHT 				72.0
+#define PLAYER_EYE_HEIGHT 			62.0
+#define PLAYER_CHEST 				52.0
+#define TANK_HEIGHT 				84.0
+#define JUMP_HEIGHT 				56.0
 
-#define THROW_OVERSHOULDER_ANIM_SEQ	49
-#define THROW_UNDERHEAD_ANIM_SEQ	50
-#define THROW_OVERHEAD_ANIM_SEQ		51
+#define THROW_UNDERHEAD_POS_Z 		33.38		// e 砖出手坐标
+#define THROW_OVERSHOULDER_POS_Z 	93.58 	// 单手过头出手坐标
+#define THROW_OVERHEAD_POS_Z 		104.01		// 双手过头出手坐标
 
-#define THROW_UNDERHEAD_POS_Z 33.38		// e 砖出手坐标
-#define THROW_OVERSHOULDER_POS_Z 93.58 	// 单手过头出手坐标
-#define THROW_OVERHEAD_POS_Z 104.01		// 双手过头出手坐标
-
-#define ATTACHMENT_NAME_RHAND "rhand"	// 右手骨骼挂载点名称
-
-#define TANKMELEESCANDELAY 0.0
-#define TANKATTACKRANGEFACTOR 0.90
+#define JUMP_SPEED_Z 				300.0
 
 ConVar
 	g_cvPluginName,
@@ -61,15 +54,20 @@ ConVar
 	g_cvRockTargetAdjust,
 	g_cvBackFist,
 	g_cvBackFistRange,
-	g_cvBackFistMaxSpeed,  
-	g_cvPunchLockVision;
+	g_cvBackFistAllowMaxSpd,
+	g_cvPunchLockVision,
+	g_cvJumpRock;
 
 ConVar
-	g_cvBhopNoVisionMaxAng,
-	g_cvThrowForce;
+	g_cvBhopNoVisionMaxAng;
+
+StringMap
+	g_hThrowAnimMap,
+	g_hClimbAnimMap;
 
 Handle
-	g_hSdkTankClawSweepFist;
+	g_hSdkTankClawSweepFist,
+	g_hSdkGetRunTopSpeed;
 
 bool
 	g_bLateLoad;
@@ -78,35 +76,18 @@ enum struct AiTank {
 	int target;					// 攻击目标 (userId)
 	float lastAirVecModifyTime; // 上次空中速度修正时间 (EngineTime)
 	float nextAttackTime;		// 下次挥拳时间 (EngineTime)
-	bool throwHooked;
+	bool wasThrowing;			// 是否正在扔石头
 
 	void initData() {
 		this.target = -1;
 		this.lastAirVecModifyTime = 0.0;
 		this.nextAttackTime = 0.0;
+		this.wasThrowing = false;
 	}
 }
 AiTank g_AiTanks[MAXPLAYERS + 1];
 
 Logger log;
-
-static char g_ThrowSequence[][] = {
-	"ACT_SIGNAL2",						// 49 单手过头
-	"ACT_SIGNAL3",						// 50 低抛
-	"ACT_SIGNAL_ADVANCE"				// 51 双手过头
-};
-
-static char g_ClimbSequence[][] = {
-	// 15, ACT_JUMP
-	"ACT_RANGE_ATTACK1",				// 爬过低矮栏杆 c2m2 亭子, seq: 16
-	"ACT_RANGE_ATTACK2",				// 引体向上, seq: 17
-	"ACT_RANGE_ATTACK1_LOW",			// 双手撑起爬过低矮栏杆, seq: 18
-	"ACT_RANGE_ATTACK2_LOW",			// 爬过低矮石头, seq: 19
-	"ACT_DIESIMPLE",					// 爬上帐篷 c2m2 小帐篷, seq: 20
-	"ACT_DIEBACKWARD",					// 引体向上, seq: 21
-	"ACT_DIEFORWARD",					// 爬上 c2m2 餐车, seq: 22
-	"ACT_DIEVIOLENT"
-};
 
 enum TankSequenceType {
 	tankSequence_Throw,
@@ -137,15 +118,15 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart() {
 
 	// plugin enable?
-	g_cvEnable = CreateConVar("ai_tank3_enable", "1", "是否启用插件, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
+	g_cvEnable = CreateConVar("ai_tank_enable", "1", "是否启用插件, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to bhop?
 	g_cvTankBhop = CreateConVar("ai_tank_bhop", "1", "是否允许坦克连跳, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// tank can bhop when he and his target are within the distance (ai_tank3_bhop_min_dist, ai_tank3_bhop_max_dist) 
 	g_cvBhopMinDist = CreateConVar("ai_tank3_bhop_min_dist", "135", "停止连跳的最小距离", CVAR_FLAGS, true, 0.0);
-	g_cvBhopMaxDist = CreateConVar("ai_tank3_bhop_max_dist", "99999", "开始连跳的最大距离", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMaxDist = CreateConVar("ai_tank3_bhop_max_dist", "9999", "开始连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	// when tank's speed is higher than 'ai_tank3_bhop_min_speed', he is allowed to bhop, and his max bhop speed will not above 'ai_tank3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_tank3_bhop_min_speed", "200", "连跳的最小速度", CVAR_FLAGS, true, 0.0);
-	g_cvBhopMaxSpeed = CreateConVar("ai_tank3_bhop_max_speed", "600", "连跳的最大速度", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMaxSpeed = CreateConVar("ai_tank3_bhop_max_speed", "1000", "连跳的最大速度", CVAR_FLAGS, true, 0.0);
 	// used to control the speed acceleration during tank each jump from the ground
 	g_cvBhopImpulse = CreateConVar("ai_tank3_bhop_impulse", "60", "连跳的加速度", CVAR_FLAGS, true, 0.0);
 	// allow tank to bhop when he has no sight to any survivor
@@ -153,24 +134,27 @@ public void OnPluginStart() {
 	// when tank has no sight of any survivors, he is allowed to bhop when his speed vector and eye angle forward vector within this degree
 	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
-	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "50.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "100.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
-	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.45", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
+	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "60.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "135.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
-	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
-	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "99999", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
+	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "400", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
+	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "1500", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	// you can use the value of 'ai_tank3_climb_anim_rate' to accelerate the animation rate when tank is climbing over some obstacle
-	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "3.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
+	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "5.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
 	// when tank throwing rock and his target is not visible, allow tank to switch target and throw to new survivor that is visible and closest to tank?
 	g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "扔石头时目标不可见是否允许切换目标", CVAR_FLAGS, true, 0.0, true, 1.0);
-	g_cvThrowForce = CreateConVar("_ai_tank3_throw_force", "1000", "扔石头力度", CVAR_FLAGS, true, 0.0);
 	// allow tank to punch survivor who is behind him?
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
-	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
+	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "90.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
+	// allow tank to punch survivor who is behind him when his speed is lower than this value
+	g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "允许使用通背拳时Tank的最小速度", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
 	g_cvPunchLockVision = CreateConVar("ai_tank3_punch_lock_vision", "1", "是否允许Tank打拳时锁定视角到目标", CVAR_FLAGS, true, 0.0, true, 1.0);
-	g_cvBackFistMaxSpeed = CreateConVar("ai_tank3_back_fist_max_speed","60.0","当坦克速度(uu/s) ≤ 此值时，才允许360°通背拳；设为0则完全禁用360°",CVAR_FLAGS, true, 0.0);
+	// allow tank to jump when he starts to grab a rock
+	g_cvJumpRock = CreateConVar("ai_tank3_jump_rock", "1", "是否允许Tank使用跳砖", CVAR_FLAGS, true, 0.0, true, 1.0);
+
 	// 日志记录 logging
 	g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
 
@@ -184,6 +168,8 @@ public void OnPluginStart() {
 	HookEvent("round_end", evtRoundEnd);
 
 	log = new Logger(PLUGIN_PREFIX, g_cvLogLevel.IntValue);
+	// 初始化动画序列 HashMap
+	initAnimMap();
 
 	if (g_bLateLoad) {
 		for (int i = 1; i <= MaxClients; i++) {
@@ -201,7 +187,7 @@ public void OnAllPluginsLoaded() {
 	if (!FileExists(path))
 		SetFailState("Mising required gamedata file: %s.", path);
 
-	Handle hGamedata = LoadGameConfigFile("l4d2_ai_tank3");
+	Handle hGamedata = LoadGameConfigFile(GAMEDATA);
 	if (!hGamedata)
 		SetFailState("Failed to load %s gamedata.", GAMEDATA);
 
@@ -215,11 +201,20 @@ public void OnAllPluginsLoaded() {
 	if (!g_hSdkTankClawSweepFist)
 		SetFailState("Failed to find signature for CTankClaw::SweepFist.");
 
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTerrorPlayer::GetRunTopSpeed");
+	PrepSDKCall_SetReturnInfo(SDKType_Float, SDKPass_Plain);
+	g_hSdkGetRunTopSpeed = EndPrepSDKCall();
+	if (!g_hSdkGetRunTopSpeed)
+		SetFailState("Failed to find signature for CTerrorPlayer::GetRunTopSpeed.");
+
 	delete hGamedata;
 }
 
 public void OnPluginEnd() {
 	delete log;
+	delete g_hThrowAnimMap;
+	delete g_hClimbAnimMap;
 }
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {
@@ -238,6 +233,27 @@ public void OnMapEnd() {
 
 }
 
+stock void initAnimMap() {
+	if (!g_hThrowAnimMap)
+		g_hThrowAnimMap = new StringMap();
+	if (!g_hClimbAnimMap)
+		g_hClimbAnimMap = new StringMap();
+	
+	// 扔石头动画 ActivityName
+	g_hThrowAnimMap.SetValue("ACT_SIGNAL2", true);
+    g_hThrowAnimMap.SetValue("ACT_SIGNAL3", true);
+    g_hThrowAnimMap.SetValue("ACT_SIGNAL_ADVANCE", true);
+	// 攀爬动画 ActivityName
+	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK1", true);
+	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK2", true);
+	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK1_LOW", true);
+	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK2_LOW", true);
+	g_hClimbAnimMap.SetValue("ACT_DIESIMPLE", true);
+	g_hClimbAnimMap.SetValue("ACT_DIEBACKWARD", true);
+	g_hClimbAnimMap.SetValue("ACT_DIEFORWARD", true);
+	g_hClimbAnimMap.SetValue("ACT_DIEVIOLENT", true);
+}
+
 // ============================================================
 // Main
 // ============================================================
@@ -250,17 +266,10 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
 		return Plugin_Continue;
 	static float pos[3], targetPos[3], dist;
-	static float tankattackrange = -1.0;
-	if (tankattackrange < 0.0)
-	{
-		tankattackrange = GetConVarFloat(FindConVar("tank_attack_range"));
-	}
 	GetClientAbsOrigin(client, pos);
 	GetClientAbsOrigin(target, targetPos);
 	dist = GetVectorDistance(pos, targetPos);
 
-	// 进入范围直接打拳
-	punchInTheRange(buttons, pos, targetPos);
 	// 打拳时是否锁定视角
 	punchLockVision(client, target, pos, targetPos);
 	// 检查是否允许扔石头
@@ -268,67 +277,6 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	// 检查是否允许连跳
 	checkEnableBhop(client, target, buttons, pos, targetPos, dist);
 
-	static int animSeq;
-	animSeq = GetEntProp(client, Prop_Send, "m_nSequence");
-	// 石头出手时, 选择最近的可视目标 (坦克与目标坐标连线间没有障碍挡住), 这里只做锁视角动作, 扔石头在 OnRockRelease 中处理
-	if (g_cvRockTargetAdjust.BoolValue && isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Throw))) {
-		static int newRockTarget;
-		newRockTarget = -1;
-
-		static ArrayList targets;
-		if (!targets)
-			targets = new ArrayList(2);
-		
-		GetClientEyePosition(client, pos);
-		for (int i = 1; i <= MaxClients; i++) {
-			if (client == i || !IsValidSurvivor(i) || !IsPlayerAlive(i))
-				continue;
-			if (IsClientIncapped(i))
-				continue;
-			if (!clientIsVisibleToClient(client, i))
-				continue;
-
-			GetClientEyePosition(i, targetPos);
-			targets.Set(targets.Push(GetVectorDistance(pos, targetPos)), i, 1);
-		}
-
-		// 选择距离最近的新目标
-		if (targets.Length > 0) {
-			SortADTArray(targets, Sort_Ascending, Sort_Float);
-			newRockTarget = targets.Get(0, 1);
-		}
-		delete targets;
-
-		static int aimTarget;
-		aimTarget = IsValidSurvivor(newRockTarget) ? newRockTarget : target;
-		static float dir[3];
-		GetClientEyePosition(client, pos);
-		GetClientEyePosition(aimTarget, targetPos);
-		MakeVectorFromPoints(pos, targetPos, dir);
-		NormalizeVector(dir, dir);
-		GetVectorAngles(dir, dir);
-		TeleportEntity(client, NULL_VECTOR, dir, NULL_VECTOR);
-
-		if (IsValidSurvivor(aimTarget))
-			log.debugAll("%N ready to throw rock, current rock target: %N", client, aimTarget);
-	}
-
-	return Plugin_Continue;
-}
-
-// 保证在攻击范围内打拳
-Action punchInTheRange(int &buttons,  const float pos[3], const float targetPos[3])
-{
-	float tankattackrange = -1.0;
-	if (tankattackrange < 0.0)
-	{
-		tankattackrange = GetConVarFloat(FindConVar("tank_attack_range"));
-	}
-	float targetdist = GetVectorDistance(pos, targetPos, false);
-	if (targetdist > -1.0 && targetdist < tankattackrange * TANKATTACKRANGEFACTOR)
-	{
-		buttons |= IN_ATTACK;
-	}
 	return Plugin_Continue;
 }
 
@@ -349,38 +297,39 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget) {
 // ============================================================
 // 通背拳 Back Fist
 // ============================================================
-public void L4D_TankClaw_DoSwing_Post(int tank, int claw)
-{
-    if (!g_cvBackFist.BoolValue) return;
-    if (!isAiTank(tank)) return;
+public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
+	if (!g_cvBackFist.BoolValue)
+		return;
+	if (!isAiTank(tank))
+		return;
+	// 通背拳 Tank 水平速度限制
+	static float vAbsVelVec[3], speed;
+	GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+	speed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
+	if (speed > g_cvBackFistAllowMaxSpd.FloatValue)
+		return;
 
-    // 速度判断：大于阈值则不触发360°
-    float v[3]; 
-    GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", v);
-    float speed = GetVectorLength(v);
-    float limit = g_cvBackFistMaxSpeed.FloatValue;
-    if (limit > 0.0 && speed > limit) return;
+	static ConVar cv_SwingRange;
+	if (!cv_SwingRange)
+		cv_SwingRange = FindConVar("tank_swing_range");
 
-    static ConVar cv_SwingRange;
-    if (!cv_SwingRange) cv_SwingRange = FindConVar("tank_swing_range");
+	static float pos[3], targetPos[3], swingRange, fistRange;
+	swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
+	fistRange = g_cvBackFistRange.IntValue >= 0 ? g_cvBackFistRange.FloatValue : swingRange;
 
-    float swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
-    float fistRange  = (g_cvBackFistRange.IntValue >= 0) ? g_cvBackFistRange.FloatValue : swingRange;
+	GetClientEyePosition(tank, pos);
+	for (int i = 1; i <= MaxClients; i++) {
+		if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+			continue;
+		GetClientEyePosition(i, targetPos);
+		if (GetVectorDistance(pos, targetPos) > fistRange)
+			continue;
+		if (!clientIsVisibleToClient(tank, i))
+			continue;
 
-    float pos[3], targetPos[3];
-    GetClientEyePosition(tank, pos);
-
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
-
-        GetClientEyePosition(i, targetPos);
-        if (GetVectorDistance(pos, targetPos) > fistRange) continue;
-        if (!clientIsVisibleToClient(tank, i)) continue;
-
-        // 触发一次 SweepFist 命中该方向目标（实现360°效果，但仅低速才会走到这里）
-        SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
-    }
+		// SweepFist 从 start 到 end 扫描, 检测碰撞
+		SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
+	}
 }
 
 Action punchLockVision(int client, int target, const float pos[3], const float targetPos[3]) {
@@ -486,7 +435,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 	// 在空中的时候, 检查是否连跳过头
 	static float angle, speed, vDir[3], vAbsVelVecCpy[3];
 	vAbsVelVecCpy = vAbsVelVec;
-	speed = GetVectorLength(vAbsVelVec);
+	speed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
 	NormalizeVector(vAbsVelVec, vAbsVelVec);
 	MakeVectorFromPoints(pos, targetPos, vDir);
 	NormalizeVector(vDir, vDir);
@@ -512,35 +461,14 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 		&& angle > g_cvAirVecModifyDegree.FloatValue && angle < g_cvAirVecModifyMaxDegree.FloatValue
 		&& GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime > g_cvAirVecModifyInterval.FloatValue
 		&& ((buttons & IN_FORWARD) && !(buttons & IN_BACK))) {
-			log.debugAll("%N air-correct (no accel), angle: %.2f", client, angle);
-
-			// 仅旋转“水平分量”的方向；保留原Z速度；保持 |v| 不变
-			float vz   = vAbsVelVecCpy[2];                       // 原竖直速度
-			float h2   = speed * speed - vz * vz;                // 目标水平速度平方
-			float hspd = (h2 > 0.0) ? SquareRoot(h2) : 0.0;      // 目标水平速度大小
-
-			// vDir 当前是“指向目标”的单位水平向量
-			ScaleVector(vDir, hspd);
-
-			float vNew[3];
-			vNew[0] = vDir[0];
-			vNew[1] = vDir[1];
-			vNew[2] = vz;
-
-			// 应用新速度（不改变模长、只改方向）
-			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vNew);
-
-			// （可选稳妥）做一次上限钳制，避免数值误差导致超速
-			float maxSpd = g_cvBhopMaxSpeed.FloatValue;
-			if (maxSpd > 0.0) {
-				float sp = GetVectorLength(vNew);
-				if (sp > maxSpd + 0.01) {
-					NormalizeVector(vNew, vNew);
-					ScaleVector(vNew, maxSpd);
-					TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vNew);
-				}
-			}
-
+			log.debugAll("%N triggered air speed modify, current vector angle: %.2f", client, angle);
+			static float runTopSpeed;
+			runTopSpeed = SDKCall(g_hSdkGetRunTopSpeed, client);
+			ScaleVector(vDir, runTopSpeed + g_cvBhopImpulse.FloatValue);
+			log.debugAll("%N's run top speed: %.2f, speed vec len: %.2f, new vector length: %.2f", client, runTopSpeed, speed, GetVectorLength(vDir));
+			vDir[2] = vAbsVelVecCpy[2];
+			// 应用新的速度方向
+			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir);
 			g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
 	}
 
@@ -662,6 +590,14 @@ Action tankAnimHookPostCb(int tank, int &sequence) {
 	// 如果想要扔石头的时候一直看着目标, 把 OnRockRelease 的代码放到下面即可
 	if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Throw))) {
 		// Tank 扔石头时
+		if (!g_cvJumpRock.BoolValue)
+			return Plugin_Continue;
+		if (g_AiTanks[tank].wasThrowing)
+			return Plugin_Continue;
+		
+		makeTankJumpRock(tank);
+		g_AiTanks[tank].wasThrowing = true;
+		CreateTimer(0.5, timerResetThrowingFlagHandler, GetClientUserId(tank), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	} else if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Climb))) {
 		if (GetEntPropFloat(tank, Prop_Send, "m_flPlaybackRate") != g_cvClimbAnimRate.FloatValue)
 			SDKHook(tank, SDKHook_PostThinkPost, climbRateModifyHookHandler);
@@ -679,15 +615,9 @@ bool isMatchedSequence(int sequence, TankSequenceType seqType) {
 
 	switch (seqType) {
 		case view_as<TankSequenceType>(tankSequence_Throw): {
-			for (int i = 0; i < sizeof(g_ThrowSequence); i++) {
-				if (strcmp(seqName, g_ThrowSequence[i]) == 0)
-					return true;
-			}
+			return g_hThrowAnimMap.ContainsKey(seqName);
 		} case view_as<TankSequenceType>(tankSequence_Climb): {
-			for (int i = 0; i < sizeof(g_ClimbSequence); i++) {
-				if (strcmp(seqName, g_ClimbSequence[i]) == 0)
-					return true;
-			}
+			return g_hClimbAnimMap.ContainsKey(seqName);
 		}
 	}
 	return false;
@@ -696,6 +626,31 @@ bool isMatchedSequence(int sequence, TankSequenceType seqType) {
 // ============================================================
 // 扔石头操作 Rock Throwing
 // ============================================================
+void makeTankJumpRock(int tank) {
+	if (!isAiTank(tank))
+		return;
+	
+	static float vAbsVelVec[3];
+	GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+	vAbsVelVec[2] += JUMP_SPEED_Z;
+	TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
+}
+
+Action timerResetThrowingFlagHandler(Handle timer, int userId) {
+	static int tank;
+	tank = GetClientOfUserId(userId);
+	if (!isAiTank(tank))
+		return Plugin_Stop;
+	
+	static int animSeq;
+	animSeq = GetEntProp(tank, Prop_Data, "m_nSequence");
+	if (!isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Throw))) {
+		g_AiTanks[tank].wasThrowing = false;
+		return Plugin_Stop;
+	}
+	return Plugin_Continue;
+}
+
 Action checkEnableThrow(int client, int& buttons, const float pos[3], const float targetPos[3], float dist) {
 	if (!isAiTank(client))
 		return Plugin_Continue;
@@ -719,9 +674,6 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 	static ConVar cv_ThrowForce, cv_Gravity;
 	if (!cv_ThrowForce)
 		cv_ThrowForce = FindConVar("z_tank_throw_force");
-	if (cv_ThrowForce)
-		cv_ThrowForce.SetInt(g_cvThrowForce.IntValue);
-
 	if (!cv_Gravity)
 		cv_Gravity = FindConVar("sv_gravity");
 
@@ -744,9 +696,7 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 		static float pos[3], targetPos[3];
 		GetClientEyePosition(tank, pos);
 		for (int i = 1; i <= MaxClients; i++) {
-			if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i))
-				continue;
-			if (IsClientIncapped(i))
+			if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i) || IsClientIncapped(i) || isPinnedByHunterOrCharger(i))
 				continue;
 			if (!clientIsVisibleToClient(tank, i))
 				continue;
@@ -779,19 +729,17 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 
 	static float pos[3], targetPos[3], predPos[3], vTargetAbsVelVec[3], aimAng[3];
 	GetClientAbsOrigin(tank, pos);
-	log.debugAll("tank pos: [%f, %f, %f], rock pos: [%f, %f, %f]", pos[0], pos[1], pos[2], vecPos[0], vecPos[1], vecPos[2]);
 	// 获取目标下一帧位置
 	GetClientAbsOrigin(aimTarget, targetPos);
 	GetEntPropVector(aimTarget, Prop_Data, "m_vecAbsVelocity", vTargetAbsVelVec);
 
-	// 低抛石头偏航角度修正
+	// 石头偏航角度修正
 	static float dx, vx, t, yawCenter, yawThrow;
 	dx = SquareRoot(Pow(vecPos[0] - targetPos[0], 2.0) + Pow(vecPos[1] - targetPos[1], 2.0));
 	// 石头水平飞行速度
 	vx = throwSpeed * Cosine(DegToRad(pitch));
-	// 石头飞行时间 t
+	// 计算目标不动的情况下石头飞行时间 t, 用作预测
 	t = dx / vx;
-	log.debugAll("%N throw pitch: %f, dx: %f, vx: %f, t: %f, %N vel length: %f", tank, pitch, dx, vx, t, aimTarget, GetVectorLength(vTargetAbsVelVec));
 	// 预测位置
 	predPos[0] = targetPos[0] + vTargetAbsVelVec[0] * t;
 	predPos[1] = targetPos[1] + vTargetAbsVelVec[1] * t;
@@ -819,14 +767,6 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 
 	vecVel = aimAng;
 	return Plugin_Changed;
-}
-
-public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3], const float vecAng[3], const float vecVel[3], const float vecRot[3]) {
-	static ConVar cv_ThrowForce;
-	if (!cv_ThrowForce)
-		cv_ThrowForce = FindConVar("z_tank_throw_force");
-	if (cv_ThrowForce)
-		cv_ThrowForce.RestoreDefault();
 }
 
 /**

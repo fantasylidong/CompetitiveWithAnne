@@ -1,4 +1,4 @@
-#pragma semicolon 1 
+#pragma semicolon 1  
 #pragma newdecls required
 
 /**
@@ -40,7 +40,7 @@
 #define SUPPORT_EXPAND_MAX        1200.0
 
 // 扩圈节奏
-#define LOW_SCORE_EXPAND          80.0
+#define LOW_SCORE_EXPAND          100.0
 
 #define ENABLE_SMOKER             (1 << 0)
 #define ENABLE_BOOMER             (1 << 1)
@@ -60,20 +60,23 @@
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
-#define SECTORS                   4
-#define SEP_TTL                   10.0    // 最近刷点保留秒数
+#define SEP_TTL                   8.0    // 最近刷点保留秒数
 #define SEP_MAX                   20      // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS              100.0   // 原来 800.0 -> 更容易在近处复用相邻位置
-#define NAV_CD_SECS             1.0    // 原来 8.0 -> 同一 Nav 更快解禁
-// 原：-8 / +4 → 建议：-6 / +3
-#define SECTOR_PREF_BONUS   -6.0
-#define SECTOR_OFF_PENALTY   3.0
-// 近期惩罚也各减 1
-#define RECENT_PENALTY_0     2.0
-#define RECENT_PENALTY_1     1.0
-#define RECENT_PENALTY_2     1.0
-#define RAND_JITTER_MAX         2.0     // 原来更大 -> 降低抖动避免“误伤”近点
+#define SEP_RADIUS              90.0
+#define NAV_CD_SECS             1.0
+#define SECTORS_BASE              4       // 你的当前调参基准
+#define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
+#define DYN_SECTORS_MIN           2       // 动态下限
+
+// === Dispersion tuning (penalties at BASE=4) ===
+#define SECTOR_PREF_BONUS_BASE   -6.0
+#define SECTOR_OFF_PENALTY_BASE   3.0
+#define RECENT_PENALTY_0_BASE     2.0
+#define RECENT_PENALTY_1_BASE     1.0
+#define RECENT_PENALTY_2_BASE     1.0
+#define RAND_JITTER_MAX           2.5     // 原来更大 -> 降低抖动避免“误伤”近点
+
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -199,6 +202,18 @@ enum struct Config
     ConVar MaxPlayerZombies;
     ConVar VsBossFlowBuffer;
 
+    // —— 新增：死亡CD（两档） —— //
+    ConVar DeathCDKiller;
+    ConVar DeathCDSupport;
+    float  fDeathCDKiller;
+    float  fDeathCDSupport;
+
+    // —— 新增：死亡CD放宽的“双保险” —— //
+    ConVar DeathCDBypassAfter;   // 最近一次成功刷出超过X秒 → 放宽
+    ConVar DeathCDUnderfill;     // 场上活着特感 < iSiLimit * 比例 → 放宽
+    float  fDeathCDBypassAfter;
+    float  fDeathCDUnderfill;
+
     float fSpawnMin;
     float fSpawnMax;
     float fSiInterval;
@@ -226,6 +241,23 @@ enum struct Config
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
         this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3=console+logfile(+预留beam位)", CVAR_FLAG, true, 0.0, true, 3.0);
+
+        // —— 死亡CD —— //
+        this.DeathCDKiller  = CreateConVar("inf_DeathCooldownKiller",  "2.0",
+            "同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
+        this.DeathCDSupport = CreateConVar("inf_DeathCooldownSupport", "2.0",
+            "同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
+
+        // —— 双保险：超时放宽 + 低密度放宽 —— //
+        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.0",
+            "距离上次成功刷出超过该秒数时，临时忽略死亡CD（防饿死）", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5",
+            "当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD 优先补齐", CVAR_FLAG, true, 0.0, true, 1.0);
+
+        this.DeathCDKiller.AddChangeHook(OnCfgChanged);
+        this.DeathCDSupport.AddChangeHook(OnCfgChanged);
+        this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
+        this.DeathCDUnderfill.AddChangeHook(OnCfgChanged);
 
         this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
         this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
@@ -263,6 +295,12 @@ enum struct Config
         this.bAutoSpawn         = this.AutoSpawnTime.BoolValue;
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.iDebugMode         = this.DebugMode.IntValue;
+
+        // 读取死亡CD & 放宽
+        this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
+        this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
+        this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
+        this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
     }
 
     void ApplyMaxZombieBound()
@@ -380,6 +418,10 @@ static int g_iSurCount = 0;
 int recentSectors[3] = { -1, -1, -1 };   // 最近 3 次使用的扇区
 ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
 
+// —— 新增：死亡CD时间戳 & 最近一次成功刷出 —— //
+static float g_LastDeathTime[6];     // zc-1 索引
+static float g_LastSpawnOkTime = 0.0;
+
 // =========================
 // 全局
 // =========================
@@ -437,6 +479,10 @@ public void OnPluginStart()
     lastSpawns = new ArrayList(4);
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
+    // 初始化死亡时间戳
+    g_LastSpawnOkTime = 0.0;
+    for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
+
     RegAdminCmd("sm_startspawn", Cmd_StartSpawn, ADMFLAG_ROOT, "管理员重置刷特时钟");
     RegAdminCmd("sm_stopspawn",  Cmd_StopSpawn,  ADMFLAG_ROOT, "管理员停止刷特");
 
@@ -468,6 +514,9 @@ public void OnMapEnd()
     if (g_NavCooldown != null) g_NavCooldown.Clear();
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
+
+    g_LastSpawnOkTime = 0.0;
+    for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
 }
 void TweakSettings()
 {
@@ -531,6 +580,9 @@ static void StopAll()
     gST.Reset();
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
+
+    g_LastSpawnOkTime = 0.0;
+    for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
 }
 static Action Timer_ApplyMaxSpecials(Handle timer)
 {
@@ -613,6 +665,9 @@ public void evt_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
     if (zc >= 1 && zc <= 6)
     {
+        // 记录该类最后死亡时间
+        g_LastDeathTime[zc - 1] = GetGameTime();
+
         int idx = zc - 1;
         if (gST.siAlive[idx] > 0) gST.siAlive[idx]--; else gST.siAlive[idx] = 0;
         if (gST.totalSI > 0) gST.totalSI--; else gST.totalSI = 0;
@@ -689,14 +744,16 @@ static void ResetMatchState()
             int zc = GetEntProp(i, Prop_Send, "m_zombieClass");
             if (zc >= 1 && zc <= 6)
             {
-                int idx = zc - 1;
-                gST.siAlive[idx]++;
+                gST.siAlive[zc - 1]++;
                 gST.totalSI++;
             }
         }
         if (IsValidSurvivor(i) && !IsPlayerAlive(i))
             L4D_RespawnPlayer(i);
     }
+    // 重置死亡记录
+    g_LastSpawnOkTime = 0.0;
+    for (int k = 0; k < 6; k++) g_LastDeathTime[k] = 0.0;
 }
 // 扫描在场特感 → gST.siAlive[] / gST.totalSI；再用“上限 - 活着 = 剩余额度”写回 gST.siCap[]
 static void RecalcSiCapFromAlive(bool log = false)
@@ -784,11 +841,15 @@ public void OnGameFrame()
 }
 
 // -------------------------
-// 队列维护
+// 队列维护 & 选类规则（更新）
 // -------------------------
 static bool IsKillerClassInt(int zc)
 {
     return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Smoker);
+}
+static bool IsSupportClassInt(int zc)
+{
+    return zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter);
 }
 static int CountKillersAlive()
 {
@@ -807,28 +868,126 @@ static int CountKillersQueued()
     }
     return c;
 }
+
+// 让“是否存在可入队的杀手类”也考虑死亡CD或放宽逻辑
 static bool AnyEligibleKillerToQueue()
 {
     static int ks[4] = { view_as<int>(SI_Smoker), view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
+    bool relax = ShouldRelaxDeathCD();
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && MeetClassRequirement(k))
-            return true;
+        if (!CheckClassEnabled(k) || HasReachedLimit(k) || !MeetClassRequirement(k))
+            continue;
+        if (!relax && !PassDeathCooldown(k))
+            continue;
+        return true;
     }
     return false;
 }
+
+// 被 MaintainSpawnQueueOnce() 调用的挑选函数（优先在杀手类里随机挑一个满足条件的）
 static int PickEligibleKillerClass()
 {
     static int ks[4] = { view_as<int>(SI_Smoker), view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
-    for (int s = 0; s < 6; s++)
+    bool relax = ShouldRelaxDeathCD();
+
+    // 随机尝试若干次，先走随机
+    for (int tries = 0; tries < 8; tries++)
     {
         int k = ks[GetRandomInt(0, 3)];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && MeetClassRequirement(k))
+        if (!CheckClassEnabled(k) || HasReachedLimit(k) || !MeetClassRequirement(k))
+            continue;
+        if (!relax && !PassDeathCooldown(k))
+            continue;
+        return k;
+    }
+
+    // 兜底：线性扫一遍
+    for (int i = 0; i < 4; i++)
+    {
+        int k = ks[i];
+        if (CheckClassEnabled(k) && !HasReachedLimit(k) && MeetClassRequirement(k) && (relax || PassDeathCooldown(k)))
             return k;
     }
     return 0;
 }
+// —— 新增：死亡CD判断 —— //
+static bool PassDeathCooldown(int zc)
+{
+    if (zc < 1 || zc > 6) return true;
+    float now = GetGameTime();
+    float last = g_LastDeathTime[zc - 1];
+    if (last <= 0.01) return true;
+
+    float need = IsSupportClassInt(zc) ? gCV.fDeathCDSupport : gCV.fDeathCDKiller;
+    return (now - last) >= need;
+}
+
+// —— 新增：是否放宽CD（永不饿死双保险） —— //
+static bool ShouldRelaxDeathCD()
+{
+    float now = GetGameTime();
+
+    // 1) 最近无成功刷出超过阈值（防饿死）
+    if (gCV.fDeathCDBypassAfter > 0.01
+        && (g_LastSpawnOkTime <= 0.01 || (now - g_LastSpawnOkTime) >= gCV.fDeathCDBypassAfter))
+        return true;
+
+    // 2) 场上活着数低于“下限保有量”
+    float uf = gCV.fDeathCDUnderfill;
+    if (uf < 0.0) uf = 0.0;
+    if (uf > 1.0) uf = 1.0;
+    int floorAlive = RoundToCeil(float(gCV.iSiLimit) * uf);
+    if (floorAlive < 1) floorAlive = 1;
+
+    if (gST.totalSI < floorAlive)
+        return true;
+
+    return false;
+}
+
+// —— 新增：稀缺度优先选类（两遍：严格CD → 放宽CD） —— //
+static int PickScarceClass()
+{
+    int pick = PickScarceClassImpl(/*relaxCD=*/false);
+    if (pick == 0 && ShouldRelaxDeathCD())
+        pick = PickScarceClassImpl(/*relaxCD=*/true);
+    return pick;
+}
+static int PickScarceClassImpl(bool relaxCD)
+{
+    float bestScore = 9999.0;
+    int bestZc = 0;
+
+    for (int zc = 1; zc <= 6; zc++)
+    {
+        if (!CheckClassEnabled(zc))   continue;
+        if (HasReachedLimit(zc))      continue;
+        if (!MeetClassRequirement(zc))continue;
+        if (!relaxCD && !PassDeathCooldown(zc)) continue;
+
+        int idx      = zc - 1;
+        int alive    = gST.siAlive[idx];
+        int capTotal = alive + gST.siCap[idx];
+        if (capTotal <= 0) continue;
+
+        // 稀缺度：alive / (alive + remain)，越小越稀缺
+        float ratio = float(alive) / float(capTotal);
+
+        // 刷新开头给杀手类一点优先（小幅）
+        if (gST.lastSpawnSecs < SUPPORT_SPAWN_DELAY_SECS && IsKillerClassInt(zc))
+            ratio -= 0.05;
+
+        if (ratio < bestScore)
+        {
+            bestScore = ratio;
+            bestZc = zc;
+        }
+    }
+    return bestZc;
+}
+
 static void MaintainSpawnQueueOnce()
 {
     RecalcSiCapFromAlive(false);  // 入队前刷新“剩余额度”
@@ -836,9 +995,17 @@ static void MaintainSpawnQueueOnce()
     if (gST.spawnQueueSize >= gCV.iSiLimit) return;
 
     int zc = 0;
+
+    // 模式锁定
     if (gCV.AllCharger.BoolValue)      zc = view_as<int>(SI_Charger);
     else if (gCV.AllHunter.BoolValue)  zc = view_as<int>(SI_Hunter);
-    else
+
+    // 稀缺度优先（默认）
+    if (zc == 0)
+        zc = PickScarceClass();
+
+    // 若仍未挑到（比如所有类都临时不适合），则按旧策略兜底
+    if (zc == 0)
     {
         float waveAge    = float(gST.lastSpawnSecs);
         int killersNow   = CountKillersAlive() + CountKillersQueued();
@@ -858,8 +1025,15 @@ static void MaintainSpawnQueueOnce()
         }
     }
 
-    if (zc != 0 && MeetClassRequirement(zc) && !HasReachedLimit(zc) && gST.spawnQueueSize < gCV.iSiLimit && CheckClassEnabled(zc))
+    // 入队前：如果该类处于死亡CD且不满足放宽，就暂不入队，等待下一帧
+    if (zc != 0 && !HasReachedLimit(zc) && CheckClassEnabled(zc))
     {
+        if (!PassDeathCooldown(zc) && !ShouldRelaxDeathCD())
+        {
+            Debug_Print("<SpawnQ> skip %s: death-cooldown active", INFDN[zc]);
+            return;
+        }
+
         gQ.spawn.Push(zc);
         gST.spawnQueueSize++;
         Debug_Print("<SpawnQ> +%s size=%d", INFDN[zc], gST.spawnQueueSize);
@@ -881,6 +1055,15 @@ static void TryNormalSpawnOnce()
         Debug_Print("[SPAWN DROP] class=%s reached alive-cap, drop head", INFDN[want]);
         gQ.spawn.Erase(0);
         gST.spawnQueueSize--;
+        return;
+    }
+
+    // 若队头处于死亡CD且当前不触发放宽：把队头旋转到末尾，等待下一次
+    if (!PassDeathCooldown(want) && !ShouldRelaxDeathCD())
+    {
+        gQ.spawn.Erase(0);
+        gQ.spawn.Push(want);
+        Debug_Print("[QUEUE ROTATE] %s under death-cooldown, rotate to tail", INFDN[want]);
         return;
     }
 
@@ -943,8 +1126,8 @@ static void TryNormalSpawnOnce()
 
             BypassAndExecuteCommand("nb_assault");
 
-            gST.spawnDistCur *= 0.8; // 兜底后回到最小半径
-            Debug_Print("[SPAWN] fallback@max success, reset ring->min");
+            gST.spawnDistCur *= 0.8; // 兜底后略收缩
+            Debug_Print("[SPAWN] fallback@max success");
         }
         else
         {
@@ -1253,8 +1436,8 @@ static bool CanBeTeleport(int client)
 // =========================
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    // 统一使用“眼位”高度做一次检测
-    float eyes[3],posEye[3];
+    // 统一使用“眼位”高度做一次检测 + 一次射线兜底
+    float eyes[3], posEye[3];
     posEye = pos; posEye[2] += 62.0;
 
     for (int i = 1; i <= MaxClients; i++)
@@ -1279,7 +1462,6 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         if (!blocked)
             return true;
     }
-
     return false;
 }
 stock bool TraceFilter_Stuck(int entity, int contentsMask)
@@ -1294,18 +1476,11 @@ stock bool TraceFilter_Stuck(int entity, int contentsMask)
 
     return true;
 }
-
 stock bool EnvBlockType(int entity)
 {
     int BlockType = GetEntProp(entity, Prop_Data, "m_nBlockType");
-    //阻拦ai infected
-    // if (BlockType == 1 || BlockType == 2)
-    //     return false;
-    // else
-    //     return true;
     return !(BlockType == 1 || BlockType == 2);
 }
-
 static bool WillStuck(const float at[3])
 {
     static const float mins[3] = { -16.0, -16.0, 0.0 };
@@ -1624,18 +1799,20 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock int ComputeSectorIndex(const float center[3], const float pt[3])
+stock int ComputeSectorIndex(const float center[3], const float pt[3], int sectors)
 {
     float dx = pt[0] - center[0];
     float dy = pt[1] - center[1];
     float ang = ArcTangent2(dy, dx); // -pi..pi
     if (ang < 0.0) ang += 2.0 * PI;
-    float w = (2.0 * PI) / float(SECTORS);
+
+    float w = (2.0 * PI) / float(sectors);
     int idx = RoundToFloor(ang / w);
     if (idx < 0) idx = 0;
-    if (idx >= SECTORS) idx = SECTORS - 1;
+    if (idx >= sectors) idx = sectors - 1;
     return idx;
 }
+
 
 stock void GetSectorCenter(float outCenter[3], int targetSur)
 {
@@ -1673,7 +1850,8 @@ stock void RememberSpawn(const float pos[3], const float center[3])
     rec[0] = pos[0]; rec[1] = pos[1]; rec[2] = pos[2]; rec[3] = now;
     lastSpawns.PushArray(rec);
 
-    int s = ComputeSectorIndex(center, pos);
+    int sectors = GetCurrentSectors();
+    int s = ComputeSectorIndex(center, pos, sectors);
     recentSectors[2] = recentSectors[1];
     recentSectors[1] = recentSectors[0];
     recentSectors[0] = s;
@@ -1698,19 +1876,36 @@ stock int ArgMinFloat(const float[] a, int n, float eps = 0.0001)
     return 0;
 }
 
-int PickSector()
+int PickSector(int sectors)
 {
-    // 最近使用的扇区加惩罚，其余加入随机抖动
-    float score[SECTORS];
-    for (int s = 0; s < SECTORS; s++)
+    float score[SECTORS_MAX];
+    for (int s = 0; s < sectors; s++)
         score[s] = GetRandomFloat(0.0, 1.0);
 
-    if (recentSectors[0] >= 0) score[recentSectors[0]] += 1.5;
-    if (recentSectors[1] >= 0) score[recentSectors[1]] += 1.0;
-    if (recentSectors[2] >= 0) score[recentSectors[2]] += 0.5;
+    if (recentSectors[0] >= 0 && recentSectors[0] < sectors) score[recentSectors[0]] += 1.5;
+    if (recentSectors[1] >= 0 && recentSectors[1] < sectors) score[recentSectors[1]] += 1.0;
+    if (recentSectors[2] >= 0 && recentSectors[2] < sectors) score[recentSectors[2]] += 0.5;
 
-    return ArgMinFloat(score, SECTORS);
+    return ArgMinFloat(score, sectors);
 }
+
+
+// 运行时计算当前扇区数：最低2；其余= ceil(目标T/2)+1；再夹在 [2, SECTORS_MAX]
+static int GetCurrentSectors()
+{
+    int T = gCV.iSiLimit; // 也可以换成 gST.totalSI 或(活着+队列)；此处用上限更稳定
+    int n = (T <= 2) ? 2 : (RoundToCeil(float(T) / 2.0) + 1);
+    if (n < DYN_SECTORS_MIN) n = DYN_SECTORS_MIN;
+    if (n > SECTORS_MAX)     n = SECTORS_MAX;
+    return n;
+}
+
+// 把“以4扇区为基准”的罚分缩放到当前扇区数
+static float ScaleBySectors(float baseAt4, int sectorsNow)
+{
+    return baseAt4 * (float(SECTORS_BASE) / float(sectorsNow));
+}
+
 
 // =========================
 // 主找点（fdxx NavArea 简化 + 分散度）
@@ -1777,7 +1972,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     bool bFinaleArea = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
 
     float center[3]; GetSectorCenter(center, targetSur);
-    int preferredSector = PickSector();
+    int sectors = GetCurrentSectors();
+    int preferredSector = PickSector(sectors);
     float now = GetGameTime();
 
     bool found = false;
@@ -1808,18 +2004,25 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
         // ★ 强制最小距离（和 ring 上限配合，形成 [SpawnMin, searchRange] 窗口）
         if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
-
-        if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
         if (WillStuck(fSpawnPos)) { cStuck++; continue; }
+        if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
         if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
 
-        // 扇区打分：优先扇区-0，其他+基罚；最近扇区附加惩罚；带少量抖动
-        int s = ComputeSectorIndex(center, fSpawnPos);
+        // 扇区打分
+        int s = ComputeSectorIndex(center, fSpawnPos, sectors);
 
-        float sectorPenalty = (s == preferredSector) ? SECTOR_PREF_BONUS : SECTOR_OFF_PENALTY;
-        if (recentSectors[0] == s) sectorPenalty += RECENT_PENALTY_0;
-        if (recentSectors[1] == s) sectorPenalty += RECENT_PENALTY_1;
-        if (recentSectors[2] == s) sectorPenalty += RECENT_PENALTY_2;
+        // 以4扇区为基准的罚分 → 按当前扇区数缩放
+        float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
+        float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
+        float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
+        float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
+        float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
+
+        float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
+        if (recentSectors[0] == s) sectorPenalty += rpen0;
+        if (recentSectors[1] == s) sectorPenalty += rpen1;
+        if (recentSectors[2] == s) sectorPenalty += rpen2;
+
 
         float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
 
@@ -1863,6 +2066,9 @@ static bool DoSpawnAt(const float pos[3], int zc)
     int idx = L4D2_SpawnSpecial(zc, pos, NULL_VECTOR);
     if (idx > 0)
     {
+        // 记录“最近一次成功刷出”的时间（用于超时放宽）
+        g_LastSpawnOkTime = GetGameTime();
+
         Debug_Print("[SPAWN OK] %s idx=%d at (%.1f %.1f %.1f)", INFDN[zc], idx, pos[0], pos[1], pos[2]);
         RecalcSiCapFromAlive(false);
         return true;
@@ -1872,7 +2078,6 @@ static bool DoSpawnAt(const float pos[3], int zc)
 }
 static void BypassAndExecuteCommand(const char[] cmd)
 {
-    // 只有在你 sv_cheats=1 才执行
     if (!CheatsOn()) return;
     ServerCommand("%s", cmd);
 }
@@ -1895,7 +2100,6 @@ static bool HasReachedLimit(int zc)
     int cap = gST.siAlive[idx] + gST.siCap[idx];
     return gST.siAlive[idx] >= cap;
 }
-
 static bool MeetClassRequirement(int zc)
 {
     // 如需更复杂条件可扩展；默认通过
@@ -1961,7 +2165,6 @@ void GetOffset(GameData hGameData, int &offset, const char[] name)
     if (offset == -1)
         SetFailState("Failed to get offset: %s", name);
 }
-
 void GetAddress(GameData hGameData, Address &address, const char[] name)
 {
     address = hGameData.GetAddress(name);
@@ -1969,10 +2172,10 @@ void GetAddress(GameData hGameData, Address &address, const char[] name)
         SetFailState("Failed to get address: %s", name);
 }
 
-
 // --- Math helpers --- 
 stock float FloatMax(float a, float b) { return (a > b) ? a : b; } 
 stock float FloatMin(float a, float b) { return (a < b) ? a : b; }
+stock float Clamp01(float v) { if (v < 0.0) return 0.0; if (v > 1.0) return 1.0; return v; }
 
 // --- pause
 public void OnPause()

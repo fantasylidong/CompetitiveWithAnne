@@ -26,6 +26,28 @@ stock int getPinnedSurvivorCount() {
 }
 
 /**
+* 检查客户端是否正在被 Hunter 或者 Charger 控制
+* @param client 客户端索引
+* @return bool 是否被控制
+**/
+stock bool isPinnedByHunterOrCharger(int client) {
+    if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+        return false;
+    
+    static int infected;
+    infected = GetEntPropEnt(client, Prop_Send, "m_pounceAttacker");
+    if (IsValidInfected(infected))
+        return true;
+    infected = GetEntPropEnt(client, Prop_Send, "m_carryAttacker");
+    if (IsValidInfected(infected))
+        return true;
+    infected = GetEntPropEnt(client, Prop_Send, "m_pummelAttacker");
+    if (IsValidInfected(infected))
+        return true;
+    return false;
+}
+
+/**
 * 生还者是否处于胆汁状态
 * @param client 客户端索引
 * @return bool
@@ -135,7 +157,18 @@ stock bool _CIsVisible2C_traceRayFilter(int entity, int contentsMask, any data) 
     if (strcmp(className, "func_illusionary", false) == 0)
         return false;
     // 忽略玻璃
-    if (strcmp(className, "func_breakable", false) == 0 && GetEntProp(entity, Prop_Data, "m_nSolidType") == 1)
+    static int solidType, effects;
+    solidType = GetEntProp(entity, Prop_Data, "m_nSolidType");
+    if (strcmp(className, "func_breakable", false) == 0 && solidType == 1)
+        return false;
+    // 忽略阻挡玩家或特感的空气墙
+    if (strcmp(className, "func_playerclip", false) == 0 ||
+        strcmp(className, "player_infected_clip", false) == 0 ||
+        strcmp(className, "func_playerinfected_clip", false) == 0)
+        return false;
+    // 忽略效果包含 EF_NODRAW 的实体
+    effects = GetEntProp(entity, Prop_Send, "m_fEffects");
+    if (effects & 32)
         return false;
 
     return true;

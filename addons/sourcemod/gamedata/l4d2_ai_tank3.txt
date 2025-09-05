@@ -1,15 +1,60 @@
 "Games"
 {
-  "left4dead2"
-  {
-    "Signatures"
-    {
-      "CTankClaw::SweepFist"
-      {
-        "library" "server"
-        "windows" "\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x04\x89\x6C\x24\x04\x8B\xEC\x81\xEC\xA8\x01\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x8B\x43\x0C"
-        "linux"   "@_ZN9CTankClaw9SweepFistERK6VectorS2_"
-      }
-    }
-  }
+	"left4dead2"
+	{
+		"Offsets"
+		{
+			"CTankClaw::OnHit"
+			{
+				"windows"	"436"
+				"linux"		"438"
+			}
+			"CTankClaw::OnPlayerHit"
+			{
+				"windows"	"448"
+				"linux"		"450"
+			}
+		}
+		"Signatures"
+		{
+			"CTankClaw::SweepFist"
+			{
+				"library"	"server"
+				"windows"	"\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x04\x89\x6C\x24\x04\x8B\xEC\x81\xEC\xA8\x01\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x8B\x43\x0C"
+				"linux"		"@_ZN9CTankClaw9SweepFistERK6VectorS2_"
+			}
+			
+			// CTankClaw::OnHit(CGameTrace &, Vector const&, bool)
+			// 1. search string "KnifeSlash", then look up the cross refs, you will find 3 functions refers to this string
+			// 2. the last function is "CTankClaw::OnHit", you could check the function thumbnail and find linux and windows are similar
+			// 55 8B EC 81 EC 44 01 00 00 53
+			"CTankClaw::OnHit"
+			{
+				"library"	"server"
+				"windows"	"\x55\x8B\xEC\x81\xEC\x44\x01\x00\x00\x53"
+				"linux"		"_ZN9CTankClaw5OnHitER10CGameTraceRK6Vectorb"
+			}
+			
+			// CTankClaw::OnPlayerHit(CTankClaw *this, CTerrorPlayer *, bool)
+			// 1. search string "tank_survivor_pound", then look up the cross refs, you will only find 1 function that refers to this stirng in windows server.dll
+			// 2. this string is what you want, you can see strings like "tank_survivor_pound", "HulkZombie.PunchIncap", "PlayerGroundPoundedByTank"
+			// 55 8B EC 81 EC 90 00 00 00 A1 ? ? ? ? 33 C5 89 45 FC 53 56 8B 75 08 57
+			"CTankClaw::OnPlayerHit"
+			{
+				"library"	"server"
+				"windows"	"\x55\x8B\xEC\x81\xEC\x90\x00\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x53\x56\x8B\x75\x08\x57"
+				"linux"		"_ZN9CTankClaw11OnPlayerHitEP13CTerrorPlayerb"
+			}
+			
+			// CTerrorPlayer::GetRunTopSpeed(void)const
+			// Only references to float value 115.0 (00 00 E6 42) are in this func.
+			// 55 8B EC 83 EC ? 56 8B F1 8B 06 8B 90 ? ? ? ? FF D2 84 C0 74 0D A1 ? ? ? ? D9 40 ? 5E
+			"CTerrorPlayer::GetRunTopSpeed"
+			{
+				"library"	"server"
+				"linux"		"@_ZNK13CTerrorPlayer14GetRunTopSpeedEv"
+				"windows" 	"\x55\x8B\xEC\x83\xEC\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74\x0D\xA1\x2A\x2A\x2A\x2A\xD9\x40\x2A\x5E"
+			}
+		}
+	}
 }
