@@ -1,15 +1,18 @@
-#pragma semicolon 1  
+#pragma semicolon 1
 #pragma newdecls required
 
 /**
- * Infected Control (fdxx-style NavArea spot picking + max-distance fallback)
- * - 主找点（唯一）：遍历 TerrorNavArea::FindRandomSpot
- *   - Flow & 距离窗口（窗口=当前 ring）
- *   - 视线不可见（L4D2_IsVisibleToPlayer）
- *   - Hull 不卡（WillStuck）
- *   - 无“多样性/梯子”重过滤（按你要求全部移除）
- * - 扩圈：SpawnMin → SpawnMax；到达 Max 触发“导演兜底”（更易出点）
- * - 保留：队列、跑男检测、传送监督、上限/间隔、暂停联动等
+ * Infected Control (fdxx-style NavArea spot picking + max-distance fallback + FLOW分桶)
+ * - Nav 分桶：开局预扫全图 NavArea，按“进度百分比(0..100)”分桶
+ *   - 选点仅在【目标幸存者附近 ±N 桶】里扫描（默认 N=10，可改CVar）
+ *   - 大幅降低每次遍历量；其余过滤保持不变
+ * - 主找点（唯一）：TerrorNavArea::FindRandomSpot
+ *   - Flow 窗口（仍做二次校验）& 距离窗口（窗口=当前 ring）
+ *   - 视线不可见（IsVisibleToPlayer）
+ *   - Hull 不会卡（WillStuck）
+ *   - 去除多样性/梯子重过滤（按你的要求）
+ * - 扩圈：SpawnMin → SpawnMax；到达 Max 触发“导演兜底”
+ * - 保留：队列、跑男检测、传送监督、上限/间隔、暂停联动、死亡CD双保险等
  *
  * Compatible with SourceMod 1.10+ + L4D2 + left4dhooks
  * Authors: Caibiii, 夜羽真白, 东, Paimon-Kawaii, fdxx (思路), merge & cleanup by ChatGPT
@@ -61,10 +64,10 @@
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
-#define SEP_MAX                   20      // 记录上限（防止无限增长）
+#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS              100.0
-#define NAV_CD_SECS             1.0
+#define SEP_RADIUS                100.0
+#define NAV_CD_SECS               1.0
 #define SECTORS_BASE              4       // 你的当前调参基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
@@ -75,14 +78,16 @@
 #define RECENT_PENALTY_0_BASE     2.0
 #define RECENT_PENALTY_1_BASE     1.0
 #define RECENT_PENALTY_2_BASE     1.0
-#define RAND_JITTER_MAX           2.5     // 原来更大 -> 降低抖动避免“误伤”近点
+#define RAND_JITTER_MAX           2.5     // 降低抖动避免“误伤”近点
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
-#define PEN_LIMIT_SCALE_HI   1.08   // L=1 时：正向惩罚略强一点
-#define PEN_LIMIT_SCALE_LO   0.60   // L=20 时：正向惩罚明显减弱
-#define PEN_LIMIT_MINL       1
-#define PEN_LIMIT_MAXL       20
+#define PEN_LIMIT_SCALE_HI        1.08   // L=1 时：正向惩罚略强一点
+#define PEN_LIMIT_SCALE_LO        0.60   // L=20 时：正向惩罚明显减弱
+#define PEN_LIMIT_MINL            1
+#define PEN_LIMIT_MAXL            20
 
+// Nav Flow 分桶
+#define FLOW_BUCKETS              101     // 0..100
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -208,17 +213,17 @@ enum struct Config
     ConVar MaxPlayerZombies;
     ConVar VsBossFlowBuffer;
 
+    // —— Nav 分桶 —— //
+    ConVar NavBucketEnable;      
+    ConVar NavBucketWindow;      
+
     // —— 新增：死亡CD（两档） —— //
-    ConVar DeathCDKiller;
-    ConVar DeathCDSupport;
-    float  fDeathCDKiller;
-    float  fDeathCDSupport;
+    ConVar DeathCDKiller;        
+    ConVar DeathCDSupport;       
 
     // —— 新增：死亡CD放宽的“双保险” —— //
-    ConVar DeathCDBypassAfter;   // 最近一次成功刷出超过X秒 → 放宽
-    ConVar DeathCDUnderfill;     // 场上活着特感 < iSiLimit * 比例 → 放宽
-    float  fDeathCDBypassAfter;
-    float  fDeathCDUnderfill;
+    ConVar DeathCDBypassAfter;   
+    ConVar DeathCDUnderfill;     
 
     float fSpawnMin;
     float fSpawnMax;
@@ -231,6 +236,12 @@ enum struct Config
     bool  bAutoSpawn;
     bool  bIgnoreIncapSight;
     bool  bAddDmgSmoker;
+    bool  bNavBucketEnable;
+    int   iNavBucketWindow;
+    float fDeathCDKiller;
+    float fDeathCDSupport;
+    float fDeathCDBypassAfter; // 最近一次成功刷出超过X秒 → 放宽
+    float fDeathCDUnderfill;   // 场上活着特感 < iSiLimit * 比例 → 放宽
 
     void Create()
     {
@@ -248,10 +259,14 @@ enum struct Config
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
         this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3=console+logfile(+预留beam位)", CVAR_FLAG, true, 0.0, true, 3.0);
 
+        // —— Nav 分桶 —— //
+        this.NavBucketEnable   = CreateConVar("inf_NavBucketEnable", "1", "启用 Nav 进度分桶筛选(0=禁用,1=启用)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketWindow   = CreateConVar("inf_NavBucketWindow", "10", "按进度百分比搜索的桶半径(±N)，默认10", CVAR_FLAG, true, 0.0, true, 100.0);
+
         // —— 死亡CD —— //
-        this.DeathCDKiller  = CreateConVar("inf_DeathCooldownKiller",  "2.0",
+        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "2.0",
             "同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
-        this.DeathCDSupport = CreateConVar("inf_DeathCooldownSupport", "2.0",
+        this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0",
             "同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
 
         // —— 双保险：超时放宽 + 低密度放宽 —— //
@@ -284,6 +299,11 @@ enum struct Config
         this.SiLimit.AddChangeHook(OnSiLimitChanged);
         this.DebugMode.AddChangeHook(OnCfgChanged);
 
+        // Nav 分桶
+        this.NavBucketEnable.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindow.AddChangeHook(OnCfgChanged);
+        this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 变更时重建桶
+
         this.Refresh();
         this.ApplyMaxZombieBound();
     }
@@ -301,6 +321,10 @@ enum struct Config
         this.bAutoSpawn         = this.AutoSpawnTime.BoolValue;
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.iDebugMode         = this.DebugMode.IntValue;
+
+        // Nav 分桶
+        this.bNavBucketEnable   = this.NavBucketEnable.BoolValue;
+        this.iNavBucketWindow   = this.NavBucketWindow.IntValue;
 
         // 读取死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
@@ -428,15 +452,19 @@ ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
 static float g_LastDeathTime[6];     // zc-1 索引
 static float g_LastSpawnOkTime = 0.0;
 
+// —— Nav Flow 分桶 —— //
+static ArrayList g_FlowBuckets[FLOW_BUCKETS]; // 每桶存 NavArea 索引 i
+static bool g_BucketsReady = false;
+
 // =========================
 // 全局
 // =========================
 public Plugin myinfo =
 {
-    name        = "Direct InfectedSpawn (fdxx-nav + maxdist-fallback)",
+    name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "Caibiii, 夜羽真白, 东, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
-    description = "特感刷新控制 / 传送 / 跑男 / fdxx风格NavArea选点 + 最大距离兜底（无多样性/梯子）",
-    version     = "2025.09.03-fdxxnav-lite",
+    description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
+    version     = "2025.09.04-buckets",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -451,7 +479,6 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 // =========================
 public void OnAllPluginsLoaded()
 {
-    // 修正：库名小写，和原插件一致
     g_bTargetLimitLib = LibraryExists("si_target_limit");
     g_bSmokerLib      = LibraryExists("ai_smoker_new");
     g_bPauseLib       = LibraryExists("pause");
@@ -478,6 +505,7 @@ public void OnPluginStart()
     gQ.Create();
     gST.Reset();
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
+    BuildNavBuckets();        // ← 预建 FLOW 分桶
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
@@ -523,6 +551,9 @@ public void OnMapEnd()
 
     g_LastSpawnOkTime = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
+
+    ClearNavBuckets();
+    g_BucketsReady = false;
 }
 void TweakSettings()
 {
@@ -568,7 +599,7 @@ public Action Cmd_StartSpawn(int client, int args)
         ResetMatchState();
         CreateTimer(0.1, Timer_SpawnFirstWave);
         ReadSiCap();
-        PrintToChatAll("\x03 fdxx-NavArea找点 + 最大距离兜底 已启用 (v2025.09.03) ");
+        PrintToChatAll("\x03 fdxx-NavArea找点 + FLOW分桶 + 最大距离兜底 已启用 (v2025.09.04) ");
         TweakSettings();
     }
     return Plugin_Handled;
@@ -620,6 +651,7 @@ public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
+    CreateTimer(0.2, Timer_RebuildBuckets, _, TIMER_FLAG_NO_MAPCHANGE); // 地图开局重建分桶
     CreateTimer(1.0,  Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 public void evt_RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -733,7 +765,15 @@ static Action Timer_StartNewWave(Handle timer)
 // =========================
 // CVar / 上限
 // =========================
-static void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv) { gCV.Refresh(); }
+static void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
+{
+    gCV.Refresh();
+}
+static void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
+{
+    // Flow 百分比变化会影响分桶 → 重建
+    RebuildNavBuckets();
+}
 static void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 {
     gCV.iSiLimit = gCV.SiLimit.IntValue;
@@ -774,7 +814,7 @@ static void RecalcSiCapFromAlive(bool log = false)
             int zc = GetEntProp(c, Prop_Send, "m_zombieClass");
             if (1 <= zc && zc <= 6)
             {
-                gST.siAlive[zc - 1]++; 
+                gST.siAlive[zc - 1]++;
                 gST.totalSI++;
             }
         }
@@ -795,10 +835,24 @@ static void RecalcSiCapFromAlive(bool log = false)
         gST.siCap[i] = remain;
     }
 
-    if (log) Debug_Print("[CAP] remain S=%d B=%d H=%d P=%d J=%d C=%d | alive S=%d B=%d H=%d P=%d J=%d C=%d | total=%d",
+    // —— 全猎/全牛：忽略各类原上限，强制该类 = l4d_infected_limit，其它类 = 0 —— //
+    int forced = 0;
+    if (gCV.AllHunter.BoolValue)  forced = view_as<int>(SI_Hunter);
+    if (gCV.AllCharger.BoolValue) forced = view_as<int>(SI_Charger);
+    if (forced != 0)
+    {
+        for (int i = 0; i < 6; i++) gST.siCap[i] = 0;
+        int idx = forced - 1;
+        int want = gCV.iSiLimit - gST.siAlive[idx];
+        if (want < 0) want = 0;
+        gST.siCap[idx] = want;
+    }
+
+    if (log) Debug_Print("[CAP] remain S=%d B=%d H=%d P=%d J=%d C=%d | alive S=%d B=%d H=%d P=%d J=%d C=%d | total=%d%s",
         gST.siCap[0], gST.siCap[1], gST.siCap[2], gST.siCap[3], gST.siCap[4], gST.siCap[5],
         gST.siAlive[0], gST.siAlive[1], gST.siAlive[2], gST.siAlive[3], gST.siAlive[4], gST.siAlive[5],
-        gST.totalSI);
+        gST.totalSI,
+        (forced!=0) ? " [forced mode]" : "");
 }
 static void ReadSiCap()
 {
@@ -809,8 +863,22 @@ static void ReadSiCap()
     gST.siCap[4] = GetConVarInt(FindConVar("z_jockey_limit"));
     gST.siCap[5] = GetConVarInt(FindConVar("z_charger_limit"));
 
-    Debug_Print("[CAP] caps S=%d B=%d H=%d P=%d J=%d C=%d",
-        gST.siCap[0], gST.siCap[1], gST.siCap[2], gST.siCap[3], gST.siCap[4], gST.siCap[5]);
+    // —— 全猎/全牛：强制把该类上限改成 l4d_infected_limit，其它类清 0 —— //
+    int forced = 0;
+    if (gCV.AllHunter.BoolValue)  forced = view_as<int>(SI_Hunter);
+    if (gCV.AllCharger.BoolValue) forced = view_as<int>(SI_Charger);
+    if (forced != 0)
+    {
+        for (int i = 0; i < 6; i++) gST.siCap[i] = 0;
+        int idx = forced - 1;
+        int want = gCV.iSiLimit - gST.siAlive[idx];
+        if (want < 0) want = 0;
+        gST.siCap[idx] = want;
+    }
+
+    Debug_Print("[CAP] caps S=%d B=%d H=%d P=%d J=%d C=%d%s",
+        gST.siCap[0], gST.siCap[1], gST.siCap[2], gST.siCap[3], gST.siCap[4], gST.siCap[5],
+        (forced!=0) ? " [forced mode]" : "");
 }
 
 // =========================
@@ -883,7 +951,7 @@ static bool AnyEligibleKillerToQueue()
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
-        if (!CheckClassEnabled(k) || HasReachedLimit(k) || !MeetClassRequirement(k))
+        if (!CheckClassEnabled(k) || !CanQueueClass(k) )
             continue;
         if (!relax && !PassDeathCooldown(k))
             continue;
@@ -902,7 +970,7 @@ static int PickEligibleKillerClass()
     for (int tries = 0; tries < 8; tries++)
     {
         int k = ks[GetRandomInt(0, 3)];
-        if (!CheckClassEnabled(k) || HasReachedLimit(k) || !MeetClassRequirement(k))
+        if (!CheckClassEnabled(k) || HasReachedLimit(k))
             continue;
         if (!relax && !PassDeathCooldown(k))
             continue;
@@ -913,7 +981,7 @@ static int PickEligibleKillerClass()
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && MeetClassRequirement(k) && (relax || PassDeathCooldown(k)))
+        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k)))
             return k;
     }
     return 0;
@@ -968,9 +1036,8 @@ static int PickScarceClassImpl(bool relaxCD)
 
     for (int zc = 1; zc <= 6; zc++)
     {
-        if (!CheckClassEnabled(zc))   continue;
-        if (HasReachedLimit(zc))      continue;
-        if (!MeetClassRequirement(zc))continue;
+        if (!CheckClassEnabled(zc))    continue;
+        if (!CanQueueClass(zc))        continue;
         if (!relaxCD && !PassDeathCooldown(zc)) continue;
 
         int idx      = zc - 1;
@@ -997,7 +1064,6 @@ static int PickScarceClassImpl(bool relaxCD)
 static void MaintainSpawnQueueOnce()
 {
     RecalcSiCapFromAlive(false);  // 入队前刷新“剩余额度”
-    if (gST.teleportQueueSize > 0) return;
     if (gST.spawnQueueSize >= gCV.iSiLimit) return;
 
     int zc = 0;
@@ -1025,14 +1091,14 @@ static void MaintainSpawnQueueOnce()
             for (int tries = 0; tries < 6; tries++)
             {
                 int pick = GetRandomInt(1, 6);
-                if (MeetClassRequirement(pick) && !HasReachedLimit(pick) && CheckClassEnabled(pick))
+                if (CanQueueClass(pick) && CheckClassEnabled(pick))
                 { zc = pick; break; }
             }
         }
     }
 
     // 入队前：如果该类处于死亡CD且不满足放宽，就暂不入队，等待下一帧
-    if (zc != 0 && !HasReachedLimit(zc) && CheckClassEnabled(zc))
+    if (zc != 0 && CanQueueClass(zc) && CheckClassEnabled(zc))
     {
         if (!PassDeathCooldown(zc) && !ShouldRelaxDeathCD())
         {
@@ -1320,7 +1386,7 @@ static Action Timer_TeleportTick(Handle timer)
                 }
             }
 
-            if (gST.teleCount[c] > gCV.iTeleportCheckTime || (gST.bPickRushMan && gST.teleCount[c] > 0))
+            if (gST.teleCount[c] > gCV.iTeleportCheckTime || (gST.bPickRushMan && gST.teleportQueueSize == 0 && gST.teleCount[c] > 0))
             {
                 int zcx = GetInfectedClass(c);
                 if (zcx >= 1 && zcx <= 6)
@@ -1535,6 +1601,13 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
 stock static int Calculate_Flow(Address area)
 {
     float flow = L4D2Direct_GetTerrorNavAreaFlow(area) / L4D2Direct_GetMapMaxFlowDistance();
+    float prox = flow + gCV.VsBossFlowBuffer.FloatValue / L4D2Direct_GetMapMaxFlowDistance();
+    if (prox > 1.0) prox = 1.0;
+    return RoundToNearest(prox * 100.0);
+}
+static int FlowDistanceToPercent(float flowDist)
+{
+    float flow = flowDist / L4D2Direct_GetMapMaxFlowDistance();
     float prox = flow + gCV.VsBossFlowBuffer.FloatValue / L4D2Direct_GetMapMaxFlowDistance();
     if (prox > 1.0) prox = 1.0;
     return RoundToNearest(prox * 100.0);
@@ -1901,21 +1974,16 @@ static float SectorPenaltyScaleByLimit()
     if (L < PEN_LIMIT_MINL) L = PEN_LIMIT_MINL;
     if (L > PEN_LIMIT_MAXL) L = PEN_LIMIT_MAXL;
 
-    // 归一化到 0..1
     float t = (float(L) - float(PEN_LIMIT_MINL)) / float(PEN_LIMIT_MAXL - PEN_LIMIT_MINL);
-
-    // smoothstep：t^2*(3-2t)，让两端更平滑，避免在中段“拐弯”太猛
     t = t * t * (3.0 - 2.0 * t);
 
-    // L 越大 → 惩罚缩放越小（更弱），避免高上限时被“扇区惩罚”推得太远
     return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
 }
-
 
 // 运行时计算当前扇区数：最低2；其余= ceil(目标T/2)+1；再夹在 [2, SECTORS_MAX]
 static int GetCurrentSectors()
 {
-    int T = gCV.iSiLimit; // 也可以换成 gST.totalSI 或(活着+队列)；此处用上限更稳定
+    int T = gCV.iSiLimit;
     int n = (T <= 2) ? 2 : (RoundToCeil(float(T) / 2.0) + 1);
     if (n < DYN_SECTORS_MIN) n = DYN_SECTORS_MIN;
     if (n > SECTORS_MAX)     n = SECTORS_MAX;
@@ -1928,9 +1996,8 @@ static float ScaleBySectors(float baseAt4, int sectorsNow)
     return baseAt4 * (float(SECTORS_BASE) / float(sectorsNow));
 }
 
-
 // =========================
-// 主找点（fdxx NavArea 简化 + 分散度）
+// Survivor数据辅助
 // =========================
 static bool GetSurPosData()
 {
@@ -1980,6 +2047,60 @@ static bool IsNearTheSur(float fSpawnRange, float fFlow, const float fPos[3], fl
     return false;
 }
 
+// =========================
+// Nav Flow 分桶：构建 / 清理 / 计时器回调
+// =========================
+static void ClearNavBuckets()
+{
+    for (int i = 0; i < FLOW_BUCKETS; i++)
+    {
+        if (g_FlowBuckets[i] != null)
+        {
+            delete g_FlowBuckets[i];
+            g_FlowBuckets[i] = null;
+        }
+    }
+}
+static void BuildNavBuckets()
+{
+    ClearNavBuckets();
+
+    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
+    int iAreaCount = g_pTheNavAreas.Count();
+
+    int added = 0;
+    for (int i = 0; i < iAreaCount; i++)
+    {
+        Address areaAddr = pTheNavAreas.GetAreaRaw(i, false);
+        if (areaAddr == Address_Null) continue;
+
+        int percent = Calculate_Flow(areaAddr);
+        if (percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
+
+        if (g_FlowBuckets[percent] == null)
+            g_FlowBuckets[percent] = new ArrayList(); // 存 NavArea 索引 i
+
+        g_FlowBuckets[percent].Push(i);
+        added++;
+    }
+
+    g_BucketsReady = true;
+    Debug_Print("[BUCKET] built %d areas into 0..100 buckets", added);
+}
+static Action Timer_RebuildBuckets(Handle timer)
+{
+    RebuildNavBuckets();
+    return Plugin_Stop;
+}
+static void RebuildNavBuckets()
+{
+    BuildNavBuckets();
+}
+
+// =========================
+// 主找点（fdxx NavArea 简化 + 分散度 + FLOW分桶）
+// =========================
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
     if (!GetSurPosData())
@@ -2005,72 +2126,166 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
     int cFlagBad=0, cFlowBad=0, cNearFail=0, cVis=0, cStuck=0, cCD=0, cSep=0;
 
-    for (int i = 0; i < iAreaCount; i++)
+    // ====== 计算要扫描的桶集合（±Window，针对所有有效幸存者） ======
+    bool useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
+    bool bucketMask[FLOW_BUCKETS];
+    for (int i = 0; i < FLOW_BUCKETS; i++) bucketMask[i] = false;
+
+    if (useBuckets)
     {
-        if (IsNavOnCooldown(i, now)) { cCD++; continue; }
+        SurPosData data;
+        int win = gCV.iNavBucketWindow;
+        if (win < 0) win = 0; if (win > 100) win = 100;
 
-        NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(i, false));
-        if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
-        { cFlagBad++; continue; }
-
-        float fFlow = pArea.GetFlow();
-        if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
-        { cFlowBad++; continue; }
-
-        float fSpawnPos[3];
-        pArea.GetRandomPoint(fSpawnPos);
-
-        float fDist;
-        if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
-        { cNearFail++; continue; }
-
-        // ★ 强制最小距离（和 ring 上限配合，形成 [SpawnMin, searchRange] 窗口）
-        if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
-        if (WillStuck(fSpawnPos)) { cStuck++; continue; }
-        if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
-        if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
-
-        // 扇区打分
-        int s = ComputeSectorIndex(center, fSpawnPos, sectors);
-
-        // 以4扇区为基准的罚分 → 按当前扇区数缩放
-        float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
-        float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
-        float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
-        float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
-        float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
-
-        // 仅对“正向惩罚”应用缩放（不要动 prefBonus，保持就近倾向）
-        float penScaleLimit = SectorPenaltyScaleByLimit();
-        offPenalty *= penScaleLimit;
-        rpen0     *= penScaleLimit;
-        rpen1     *= penScaleLimit;
-        rpen2     *= penScaleLimit;
-
-        float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
-        if (recentSectors[0] == s) sectorPenalty += rpen0;
-        if (recentSectors[1] == s) sectorPenalty += rpen1;
-        if (recentSectors[2] == s) sectorPenalty += rpen2;
-
-
-        float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-
-        // 越小越好：距离主导 + 轻惩罚 + 微抖动
-        float score = fDist + sectorPenalty + jitter;
-
-        if (!found || score < bestScore)
+        for (int i = 0; i < g_iSurPosDataLen; i++)
         {
-            found = true;
-            bestScore = score;
-            bestIdx = i;
-            bestPos = fSpawnPos;
+            g_aSurPosData.GetArray(i, data);
+            int s = FlowDistanceToPercent(data.fFlow);
+            int lo = s - win;
+            int hi = s + win;
+            if (lo < 0) lo = 0;
+            if (hi > 100) hi = 100;
+            for (int b = lo; b <= hi; b++) bucketMask[b] = true;
+        }
+    }
+
+    // ====== 扫描候选 NavArea（按桶或全量） ======
+    // 为了实现“桶扫描”和“全量扫描”共用同一套过滤逻辑，这里拆成 lambda 风格的小循环体：
+    // 但在 Pawn 里没有 lambda，直接写两段循环体保持一致逻辑。
+
+    if (useBuckets)
+    {
+        for (int b = 0; b < FLOW_BUCKETS; b++)
+        {
+            if (!bucketMask[b]) continue;
+            if (g_FlowBuckets[b] == null) continue;
+
+            for (int k = 0; k < g_FlowBuckets[b].Length; k++)
+            {
+                int i = g_FlowBuckets[b].Get(k);
+
+                if (IsNavOnCooldown(i, now)) { cCD++; continue; }
+
+                NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(i, false));
+                if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
+                { cFlagBad++; continue; }
+
+                float fFlow = pArea.GetFlow();
+                if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
+                { cFlowBad++; continue; }
+
+                float fSpawnPos[3];
+                pArea.GetRandomPoint(fSpawnPos);
+
+                float fDist;
+                if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+                { cNearFail++; continue; }
+
+                // ★ 强制最小距离（和 ring 上限配合，形成 [SpawnMin, searchRange] 窗口）
+                if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
+                if (WillStuck(fSpawnPos)) { cStuck++; continue; }
+                if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
+                if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
+
+                // 扇区打分
+                int s = ComputeSectorIndex(center, fSpawnPos, sectors);
+
+                float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
+                float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
+                float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
+                float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
+                float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
+
+                float penScaleLimit = SectorPenaltyScaleByLimit();
+                offPenalty *= penScaleLimit;
+                rpen0     *= penScaleLimit;
+                rpen1     *= penScaleLimit;
+                rpen2     *= penScaleLimit;
+
+                float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
+                if (recentSectors[0] == s) sectorPenalty += rpen0;
+                if (recentSectors[1] == s) sectorPenalty += rpen1;
+                if (recentSectors[2] == s) sectorPenalty += rpen2;
+
+                float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
+
+                // 越小越好：距离主导 + 轻惩罚 + 微抖动
+                float score = fDist + sectorPenalty + jitter;
+
+                if (!found || score < bestScore)
+                {
+                    found = true;
+                    bestScore = score;
+                    bestIdx = i;
+                    bestPos = fSpawnPos;
+                }
+            }
+        }
+    }
+    else
+    {
+        // 兼容：未启用分桶或桶未就绪 → 全量扫描（原逻辑）
+        for (int i = 0; i < iAreaCount; i++)
+        {
+            if (IsNavOnCooldown(i, now)) { cCD++; continue; }
+
+            NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(i, false));
+            if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
+            { cFlagBad++; continue; }
+
+            float fFlow = pArea.GetFlow();
+            if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
+            { cFlowBad++; continue; }
+
+            float fSpawnPos[3];
+            pArea.GetRandomPoint(fSpawnPos);
+
+            float fDist;
+            if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+            { cNearFail++; continue; }
+
+            if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
+            if (WillStuck(fSpawnPos)) { cStuck++; continue; }
+            if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
+            if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
+
+            int s = ComputeSectorIndex(center, fSpawnPos, sectors);
+
+            float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
+            float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
+            float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
+            float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
+            float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
+
+            float penScaleLimit = SectorPenaltyScaleByLimit();
+            offPenalty *= penScaleLimit;
+            rpen0     *= penScaleLimit;
+            rpen1     *= penScaleLimit;
+            rpen2     *= penScaleLimit;
+
+            float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
+            if (recentSectors[0] == s) sectorPenalty += rpen0;
+            if (recentSectors[1] == s) sectorPenalty += rpen1;
+            if (recentSectors[2] == s) sectorPenalty += rpen2;
+
+            float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
+            float score = fDist + sectorPenalty + jitter;
+
+            if (!found || score < bestScore)
+            {
+                found = true;
+                bestScore = score;
+                bestIdx = i;
+                bestPos = fSpawnPos;
+            }
         }
     }
 
     if (!found)
     {
-        Debug_Print("[FIND FAIL] ring=%.1f arr=0 (flags=%d flow=%d near=%d vis=%d stuck=%d cd=%d sep=%d)",
-            searchRange, cFlagBad, cFlowBad, cNearFail, cVis, cStuck, cCD, cSep);
+        Debug_Print("[FIND FAIL] ring=%.1f arr=0 (flags=%d flow=%d near=%d vis=%d stuck=%d cd=%d sep=%d)%s",
+            searchRange, cFlagBad, cFlowBad, cNearFail, cVis, cStuck, cCD, cSep,
+            useBuckets ? " [buckets]" : "");
         return false;
     }
 
@@ -2129,13 +2344,31 @@ static bool HasReachedLimit(int zc)
     int cap = gST.siAlive[idx] + gST.siCap[idx];
     return gST.siAlive[idx] >= cap;
 }
-static bool MeetClassRequirement(int zc)
+// 统计 spawn 队列中某类的数量（不含 teleport 队列）
+static int CountQueuedOfClass(int zc)
 {
-    // 如需更复杂条件可扩展；默认通过
-    return true;
+    int n = 0;
+    for (int i = 0; i < gQ.spawn.Length; i++)
+    {
+        if (gQ.spawn.Get(i) == zc)
+            n++;
+    }
+    return n;
 }
 
-// 覆盖/替换你工程里的 InitSDK_FromGamedata()
+// 是否还能把该类加入 spawn 队列：活着 + 已入队 < 该类总额度（alive + remain）
+static bool CanQueueClass(int zc)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= 6) return false;
+
+    int capTotal = gST.siAlive[idx] + gST.siCap[idx];
+    return (gST.siAlive[idx] + CountQueuedOfClass(zc)) < capTotal;
+}
+
+// =========================
+// Gamedata / SDK
+// =========================
 static void InitSDK_FromGamedata()
 {
     char sBuffer[128];
