@@ -672,7 +672,7 @@ public Action Cmd_StartSpawn(int client, int args)
         ResetMatchState();
         CreateTimer(0.1, Timer_SpawnFirstWave);
         ReadSiCap();
-        PrintToChatAll("\x03 fdxx-NavArea找点 + FLOW分桶 + 最大距离兜底 已启用 (v2025.09.04) ");
+        //PrintToChatAll("\x03 fdxx-NavArea找点 + FLOW分桶 + 最大距离兜底 已启用 (v2025.09.04) ");
         TweakSettings();
     }
     return Plugin_Handled;
