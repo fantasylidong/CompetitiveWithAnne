@@ -1581,11 +1581,11 @@ static bool CanBeTeleport(int client)
 // =========================
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    const float NEAR2 = 360000.0;
-
-    float posHead[3],posHull[3];
-    posHead = pos; posHead[2] += 62.0;
-    posHull = pos; posHull[2] += 24.0;
+    // 头/胸/脚：高度大致对应 SI 模型
+    float head[3],chest[3],feet[3];
+    head = pos; head[2] += 62.0;
+    chest = pos; chest[2] += 32.0;
+    feet = pos; feet[2] += 8.0;
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -1594,43 +1594,37 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         if (teleportMode && L4D_IsPlayerIncapacitated(i) && gCV.bIgnoreIncapSight)
             continue;
 
-        float eyes[3]; 
+        float eyes[3];
         GetClientEyePosition(i, eyes);
 
-        // 0) 最便宜：引擎可见（对头偏移点）
-        if (L4D2_IsVisibleToPlayer(i, 2, 3, 0, posHead))
-            return true;
-
-        float d2 = GetVectorDistance(eyes, pos, true);
-
-        if (d2 <= NEAR2)
+        // 1) Ray：眼睛 -> 头（任一射线“几乎贯通”都视为可见 → 禁刷）
         {
-            // 1) 近距：薄盒 Hull + 允许穿草/栅格
-            static const float HULL_MINS[3] = { -6.0, -6.0, -2.0 };
-            static const float HULL_MAXS[3] = {  6.0,  6.0,  2.0 };
-
-            Handle th = TR_TraceHullFilterEx(eyes, posHull, HULL_MINS, HULL_MAXS,
-                                             MASK_VISIBLE | MASK_SHOT, TraceFilter);
-            bool blocked = TR_DidHit(th);
-            float frac   = TR_GetFraction(th);
-            delete th;
-
-            if (!blocked || frac > 0.98)
-                return true;
-        }
-        else
-        {
-            // 2) 远距：Ray 到胸口
-            Handle tr = TR_TraceRayFilterEx(eyes, posHull, MASK_VISIBLE | MASK_SHOT,
-                                            RayType_EndPoint, TraceFilter);
+            Handle tr = TR_TraceRayFilterEx(eyes, head, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
             bool blocked = TR_DidHit(tr);
+            float frac   = TR_GetFraction(tr);
             delete tr;
-            if (!blocked)
+            if (!blocked || frac > 0.985)
                 return true;
         }
+
+        // 2) Ray：眼睛 -> 脚
+        {
+            Handle tr = TR_TraceRayFilterEx(eyes, feet, MASK_VISIBLE, RayType_EndPoint, TraceFilter);
+            bool blocked = TR_DidHit(tr);
+            float frac   = TR_GetFraction(tr);
+            delete tr;
+            if (!blocked || frac > 0.985)
+                return true;
+        }
+
+        // 3) 引擎可视（到胸，team_target=感染者队）
+        if (L4D2_IsVisibleToPlayer(i, TEAM_SURVIVOR, TEAM_INFECTED, 0, chest))
+            return true;
     }
-    return false;
+    return false; // 对所有幸存者都不可见 → 可以刷
 }
+
+
 
 stock bool TraceFilter_Stuck(int entity, int contentsMask)
 {
