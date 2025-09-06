@@ -217,6 +217,13 @@ enum struct Config
     ConVar NavBucketEnable;      
     ConVar NavBucketWindow;      
 
+    // —— 动态分桶（新增） —— //
+    ConVar NavBucketLinkToRing;   // 1=跟随扩圈动态调整桶窗口
+    ConVar NavBucketWindowMin;    // ring<=MinAt 时窗口(±N)
+    ConVar NavBucketWindowMax;    // ring>=MaxAt 时窗口(±N)
+    ConVar NavBucketMinAt;        // ring 下界
+    ConVar NavBucketMaxAt;        // ring 上界
+
     // —— 新增：死亡CD（两档） —— //
     ConVar DeathCDKiller;        
     ConVar DeathCDSupport;       
@@ -236,12 +243,22 @@ enum struct Config
     bool  bAutoSpawn;
     bool  bIgnoreIncapSight;
     bool  bAddDmgSmoker;
+
+    // —— Nav 分桶 —— //
     bool  bNavBucketEnable;
     int   iNavBucketWindow;
+
+    // —— 动态分桶（新增） —— //
+    bool  bNavBucketLinkToRing;
+    int   iNavBucketWindowMin;
+    int   iNavBucketWindowMax;
+    float fNavBucketMinAt;
+    float fNavBucketMaxAt;
+
     float fDeathCDKiller;
     float fDeathCDSupport;
-    float fDeathCDBypassAfter; // 最近一次成功刷出超过X秒 → 放宽
-    float fDeathCDUnderfill;   // 场上活着特感 < iSiLimit * 比例 → 放宽
+    float fDeathCDBypassAfter;
+    float fDeathCDUnderfill;
 
     void Create()
     {
@@ -257,23 +274,26 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off, 1=logfile, 2=console+logfile, 3=console+logfile(+预留beam位)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
 
-        // —— Nav 分桶 —— //
+        // —— Nav 分桶（静态窗口） —— //
         this.NavBucketEnable   = CreateConVar("inf_NavBucketEnable", "1", "启用 Nav 进度分桶筛选(0=禁用,1=启用)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.NavBucketWindow   = CreateConVar("inf_NavBucketWindow", "10", "按进度百分比搜索的桶半径(±N)，默认10", CVAR_FLAG, true, 0.0, true, 100.0);
 
-        // —— 死亡CD —— //
-        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "2.0",
-            "同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
-        this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0",
-            "同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
+        // —— 动态分桶（新增） —— //
+        this.NavBucketLinkToRing = CreateConVar("inf_NavBucketLinkToRing", "1", "扩圈时动态调整桶窗口(0=关闭,1=开启)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketWindowMin  = CreateConVar("inf_NavBucketWindowMin", "6", "ring<=MinAt时使用的桶窗口(±N)", CVAR_FLAG, true, 0.0, true, 100.0);
+        this.NavBucketWindowMax  = CreateConVar("inf_NavBucketWindowMax", "12", "ring>=MaxAt时使用的桶窗口(±N)", CVAR_FLAG, true, 0.0, true, 100.0);
+        this.NavBucketMinAt      = CreateConVar("inf_NavBucketMinAt", "500.0", "小桶阈值对应的ring", CVAR_FLAG, true, 0.0);
+        this.NavBucketMaxAt      = CreateConVar("inf_NavBucketMaxAt", "1500.0", "大桶阈值对应的ring", CVAR_FLAG, true, 0.0);
 
-        // —— 双保险：超时放宽 + 低密度放宽 —— //
-        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.0",
-            "距离上次成功刷出超过该秒数时，临时忽略死亡CD（防饿死）", CVAR_FLAG, true, 0.0, true, 10.0);
-        this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5",
-            "当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD 优先补齐", CVAR_FLAG, true, 0.0, true, 1.0);
+        // —— 死亡CD —— //
+        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "2.0","同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
+        this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0","同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
+
+        // —— 双保险 —— //
+        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.0","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
 
         this.DeathCDKiller.AddChangeHook(OnCfgChanged);
         this.DeathCDSupport.AddChangeHook(OnCfgChanged);
@@ -302,6 +322,12 @@ enum struct Config
         // Nav 分桶
         this.NavBucketEnable.AddChangeHook(OnCfgChanged);
         this.NavBucketWindow.AddChangeHook(OnCfgChanged);
+        this.NavBucketLinkToRing.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindowMin.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindowMax.AddChangeHook(OnCfgChanged);
+        this.NavBucketMinAt.AddChangeHook(OnCfgChanged);
+        this.NavBucketMaxAt.AddChangeHook(OnCfgChanged);
+
         this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 变更时重建桶
 
         this.Refresh();
@@ -326,7 +352,14 @@ enum struct Config
         this.bNavBucketEnable   = this.NavBucketEnable.BoolValue;
         this.iNavBucketWindow   = this.NavBucketWindow.IntValue;
 
-        // 读取死亡CD & 放宽
+        // 动态分桶
+        this.bNavBucketLinkToRing = this.NavBucketLinkToRing.BoolValue;
+        this.iNavBucketWindowMin  = this.NavBucketWindowMin.IntValue;
+        this.iNavBucketWindowMax  = this.NavBucketWindowMax.IntValue;
+        this.fNavBucketMinAt      = this.NavBucketMinAt.FloatValue;
+        this.fNavBucketMaxAt      = this.NavBucketMaxAt.FloatValue;
+
+        // 死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
         this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
         this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
@@ -339,6 +372,7 @@ enum struct Config
         this.MaxPlayerZombies.IntValue = this.iSiLimit;
     }
 }
+
 
 enum struct Queues
 {
@@ -456,6 +490,9 @@ static float g_LastSpawnOkTime = 0.0;
 static ArrayList g_FlowBuckets[FLOW_BUCKETS]; // 每桶存 NavArea 索引 i
 static bool g_BucketsReady = false;
 
+// 跑男通知 forward
+Handle g_hRushManNotifyForward = INVALID_HANDLE;
+
 // =========================
 // 全局
 // =========================
@@ -477,6 +514,14 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 // =========================
 // 前置：事件 & 库
 // =========================
+public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max)
+{
+    RegPluginLibrary("infected_control");                           // 供其他插件依赖
+    g_hRushManNotifyForward = CreateGlobalForward("OnDetectRushman", // 跑男 forward：传入幸存者 index
+                                                  ET_Ignore, Param_Cell);
+    CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
+    return APLRes_Success;
+}
 public void OnAllPluginsLoaded()
 {
     g_bTargetLimitLib = LibraryExists("si_target_limit");
@@ -494,6 +539,34 @@ public void OnLibraryRemoved(const char[] name)
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = false;
     else if (StrEqual(name, "ai_smoker_new")) g_bSmokerLib   = false;
     else if (StrEqual(name, "pause"))         g_bPauseLib    = false;
+}
+//native
+public any Native_GetNextSpawnTime(Handle plugin, int numParams)
+{
+    // -1：还没开始刷特（或未知）
+    if (!gST.bLate)
+        return view_as<any>(-1.0);
+
+    float now = GetGameTime();
+
+    // 如果在暂停，返回预计恢复倒计时
+    if (g_bPauseLib && IsInPause())
+    {
+        float rem = gST.unpauseDelay;
+        if (rem <= 0.0) rem = -1.0;
+        return view_as<any>(rem);
+    }
+
+    // 如果“下一波定时器”存在，按 (间隔 - 已经过的时间) 粗略估算
+    if (gST.hSpawn != INVALID_HANDLE)
+    {
+        float rem = gCV.fSiInterval - (now - gST.lastWaveStartTime);
+        if (rem < 0.0) rem = 0.0;
+        return view_as<any>(rem);
+    }
+
+    // 没有定时器则表示由窗口逻辑随时可能触发，返回 刷特间隔
+    return view_as<any>(gCV.fSiInterval);
 }
 
 // =========================
@@ -1719,7 +1792,11 @@ static bool CheckRushManAndAllPinned()
 
         gST.bPickRushMan = true;
         gST.rushManIndex = target;
-        if (old != gST.bPickRushMan) LogMsg("Runner state ON: %N", target);
+        if (old != gST.bPickRushMan)
+        {
+            LogMsg("Runner state ON: %N", target);
+            EmitRushmanForward(target);    // ← 这里触发 forward，告诉外部“检测到跑男”
+        }
     }
     return pinned == ns;
 }
@@ -2111,6 +2188,33 @@ static void BuildNavBuckets()
     g_BucketsReady = true;
     Debug_Print("[BUCKET] built %d areas into 0..100 buckets", added);
 }
+static int ComputeDynamicBucketWindow(float ring)
+{
+    // 如果没启用动态联动，直接返回静态窗口
+    if (!gCV.bNavBucketLinkToRing)
+        return gCV.iNavBucketWindow;
+
+    float a = gCV.fNavBucketMinAt;
+    float b = gCV.fNavBucketMaxAt;
+    int   w0 = gCV.iNavBucketWindowMin;
+    int   w1 = gCV.iNavBucketWindowMax;
+
+    if (b < a) { float t=a; a=b; b=t; } // 容错：交换
+
+    float t;
+    if (ring <= a)       t = 0.0;
+    else if (ring >= b)  t = 1.0;
+    else                 t = (ring - a) / (b - a);
+
+    // 线性插值并四舍五入
+    float w = float(w0) + (float(w1) - float(w0)) * t;
+    int   win = RoundToNearest(w);
+
+    if (win < 0)   win = 0;
+    if (win > 100) win = 100;
+    return win;
+}
+
 static Action Timer_RebuildBuckets(Handle timer)
 {
     RebuildNavBuckets();
@@ -2149,33 +2253,46 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
     int cFlagBad=0, cFlowBad=0, cNearFail=0, cVis=0, cStuck=0, cCD=0, cSep=0;
 
-    // ====== 计算要扫描的桶集合（±Window，针对所有有效幸存者） ======
+    // ====== 计算要扫描的桶集合（±Window） ======
     bool useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
     bool bucketMask[FLOW_BUCKETS];
     for (int i = 0; i < FLOW_BUCKETS; i++) bucketMask[i] = false;
 
     if (useBuckets)
     {
-        SurPosData data;
-        int win = gCV.iNavBucketWindow;
+        // 动态或静态窗口
+        int win = ComputeDynamicBucketWindow(searchRange);
         if (win < 0) win = 0; if (win > 100) win = 100;
 
-        for (int i = 0; i < g_iSurPosDataLen; i++)
+        // A) 优先围绕目标幸存者的进度建桶
+        if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
         {
-            g_aSurPosData.GetArray(i, data);
-            int s = FlowDistanceToPercent(data.fFlow);
+            float tFlowDist = L4D2Direct_GetFlowDistance(targetSur);
+            int s = FlowDistanceToPercent(tFlowDist);
             int lo = s - win;
             int hi = s + win;
             if (lo < 0) lo = 0;
             if (hi > 100) hi = 100;
             for (int b = lo; b <= hi; b++) bucketMask[b] = true;
         }
+        else
+        {
+            // B) 退化为所有存活幸存者的并集（与旧行为一致）
+            SurPosData data;
+            for (int i = 0; i < g_iSurPosDataLen; i++)
+            {
+                g_aSurPosData.GetArray(i, data);
+                int s = FlowDistanceToPercent(data.fFlow);
+                int lo = s - win;
+                int hi = s + win;
+                if (lo < 0) lo = 0;
+                if (hi > 100) hi = 100;
+                for (int b = lo; b <= hi; b++) bucketMask[b] = true;
+            }
+        }
     }
 
     // ====== 扫描候选 NavArea（按桶或全量） ======
-    // 为了实现“桶扫描”和“全量扫描”共用同一套过滤逻辑，这里拆成 lambda 风格的小循环体：
-    // 但在 Pawn 里没有 lambda，直接写两段循环体保持一致逻辑。
-
     if (useBuckets)
     {
         for (int b = 0; b < FLOW_BUCKETS; b++)
@@ -2204,13 +2321,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
                 { cNearFail++; continue; }
 
-                // ★ 强制最小距离（和 ring 上限配合，形成 [SpawnMin, searchRange] 窗口）
+                // [SpawnMin, searchRange] 窗口
                 if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
                 if (WillStuck(fSpawnPos)) { cStuck++; continue; }
                 if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
                 if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
 
-                // 扇区打分
                 int s = ComputeSectorIndex(center, fSpawnPos, sectors);
 
                 float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
@@ -2231,8 +2347,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (recentSectors[2] == s) sectorPenalty += rpen2;
 
                 float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-
-                // 越小越好：距离主导 + 轻惩罚 + 微抖动
                 float score = fDist + sectorPenalty + jitter;
 
                 if (!found || score < bestScore)
@@ -2247,7 +2361,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     }
     else
     {
-        // 兼容：未启用分桶或桶未就绪 → 全量扫描（原逻辑）
+        // 未启用分桶或桶未就绪 → 全量扫描（原逻辑）
         for (int i = 0; i < iAreaCount; i++)
         {
             if (IsNavOnCooldown(i, now)) { cCD++; continue; }
@@ -2316,6 +2430,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     outAreaIdx = bestIdx;
     return true;
 }
+
 
 // =========================
 // Spawn / Command helpers
@@ -2471,4 +2586,14 @@ static bool CheatsOn()
 {
     ConVar sv = FindConVar("sv_cheats");
     return (sv != null && sv.BoolValue);
+}
+
+static void EmitRushmanForward(int survivor)
+{
+    if (g_hRushManNotifyForward != INVALID_HANDLE)
+    {
+        Call_StartForward(g_hRushManNotifyForward);
+        Call_PushCell(survivor);   // 跑男目标
+        Call_Finish();
+    }
 }
