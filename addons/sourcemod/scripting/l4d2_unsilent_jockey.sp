@@ -98,6 +98,11 @@ public void L4D_OnEnterGhostState(int client)
 	ChangeJockeyTimerStatus(client, false);
 }
 
+public void OnClientDisconnect(int client)
+{
+    ChangeJockeyTimerStatus(client, false);
+}
+
 void PlayerSpawn_Event(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
@@ -178,10 +183,18 @@ void JockeyRideEnd_NextFrame(any userid)
 
 Action delayedJockeySound(Handle timer, any client)
 {
-	int rndPick = GetRandomInt(0, (sizeof(g_sJockeySound) - 1));
-	EmitSoundToAll(g_sJockeySound[rndPick], client, SNDCHAN_VOICE, SNDLEVEL_HELICOPTER);
+    // 目标无效/不再是活着的非幽灵猴子 -> 停止这个重复计时器
+    if (client < 1 || !IsClientInGame(client) || !IsPlayerAlive(client)
+        || GetClientTeam(client) != TEAM_INFECTED
+        || GetEntProp(client, Prop_Send, "m_zombieClass") != ZC_JOCKEY
+        || GetEntProp(client, Prop_Send, "m_isGhost"))
+    {
+        return Plugin_Stop; // 关键：停止重复
+    }
 
-	return Plugin_Continue;
+    int rndPick = GetRandomInt(0, (sizeof(g_sJockeySound) - 1));
+    EmitSoundToAll(g_sJockeySound[rndPick], client, SNDCHAN_VOICE, SNDLEVEL_HELICOPTER);
+    return Plugin_Continue;
 }
 
 void ChangeJockeyTimerStatus(int client, bool bEnable)
