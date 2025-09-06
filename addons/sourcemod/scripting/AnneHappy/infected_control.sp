@@ -64,9 +64,9 @@
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
-#define SEP_MAX                   20     // 记录上限（防止无限增长）
+//#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                100.0
+#define SEP_RADIUS                80.0
 #define NAV_CD_SECS               1.0
 #define SECTORS_BASE              4       // 你的当前调参基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -81,7 +81,7 @@
 #define RAND_JITTER_MAX           2.5     // 降低抖动避免“误伤”近点
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
-#define PEN_LIMIT_SCALE_HI        1.08   // L=1 时：正向惩罚略强一点
+#define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
 #define PEN_LIMIT_SCALE_LO        0.60   // L=20 时：正向惩罚明显减弱
 #define PEN_LIMIT_MINL            1
 #define PEN_LIMIT_MAXL            20
@@ -851,6 +851,9 @@ static void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 {
     gCV.iSiLimit = gCV.SiLimit.IntValue;
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
+
+    // 立刻按新上限收缩记录
+    CleanupLastSpawns(GetGameTime());
 }
 static void ResetMatchState()
 {
@@ -1929,6 +1932,8 @@ void TouchNavCooldown(int area, float now, float cooldown = 8.0)
 stock void CleanupLastSpawns(float now)
 {
     if (lastSpawns == null) return;
+
+    // 先按时间 (SEP_TTL) 清
     for (int i = lastSpawns.Length - 1; i >= 0; i--)
     {
         float rec[4];
@@ -1936,7 +1941,10 @@ stock void CleanupLastSpawns(float now)
         if (now - rec[3] > SEP_TTL)
             lastSpawns.Erase(i);
     }
-    while (lastSpawns.Length > SEP_MAX)
+
+    // 再按“数量上限 = iSiLimit”裁旧
+    int cap = GetSepMax();
+    while (lastSpawns.Length > cap)
         lastSpawns.Erase(0);
 }
 
@@ -2591,3 +2599,11 @@ static void EmitRushmanForward(int survivor)
         Call_Finish();
     }
 }
+stock int GetSepMax()
+{
+    int cap = gCV.iSiLimit;       // 与特感数量上限一致
+    if (cap < 0)  cap = 0;        // 下限保护
+    if (cap > 20) cap = 20;       // 上限保护（可按需调大）
+    return cap;
+}
+

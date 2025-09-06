@@ -698,6 +698,8 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 		for (int i = 1; i <= MaxClients; i++) {
 			if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i) || IsClientIncapped(i) || isPinnedByHunterOrCharger(i))
 				continue;
+			if (IsClientIncapped(i) || IsClientPinned(i))
+				continue;
 			if (!clientIsVisibleToClient(tank, i))
 				continue;
 
