@@ -13,9 +13,13 @@
 	}
 	"Anne版本选择"
 	{
-		"sm_fm AnneHappy"
+		"sm_fchmatch AnneHappy"
 		{
 			"message" "最新版本"
+		}
+		"exec vote/Anne/Anne24-5.cfg"
+		{
+			"message" "24-5月版本"
 		}
 		"exec vote/Anne/Anne23-1.cfg"
 		{

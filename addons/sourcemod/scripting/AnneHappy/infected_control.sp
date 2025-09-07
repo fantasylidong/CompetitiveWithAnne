@@ -1210,13 +1210,16 @@ static void MaintainSpawnQueueOnce()
 // ===========================
 // 单次正常生成尝试（fdxx-NavArea 主路）
 // ===========================
+// ===========================
+// 单次正常生成尝试（fdxx-NavArea 主路）— 改：DoSpawnAt 失败给 NavArea 短冷却
+// ===========================
 static void TryNormalSpawnOnce()
 {
     static const float EPS_RADIUS = 1.0;
 
     int want = gQ.spawn.Get(0);
 
-    // 生成前再做一次“只看活着的”上限闸门
+    // 生成前“只看活着的”上限闸门
     if (HasReachedLimit(want))
     {
         Debug_Print("[SPAWN DROP] class=%s reached alive-cap, drop head", INFDN[want]);
@@ -1225,7 +1228,7 @@ static void TryNormalSpawnOnce()
         return;
     }
 
-    // 若队头处于死亡CD且当前不触发放宽：把队头旋转到末尾，等待下一次
+    // 死亡CD：若队头处于死亡CD且当前不放宽，则旋转到末尾
     if (!PassDeathCooldown(want) && !ShouldRelaxDeathCD())
     {
         gQ.spawn.Erase(0);
@@ -1248,7 +1251,16 @@ static void TryNormalSpawnOnce()
 
     if (ok && IsPosVisibleSDK(pos, false)) { ok = false; }
 
-    if (ok && DoSpawnAt(pos, want))
+    bool triedSpawn = false;
+    bool spawnOk = false;
+
+    if (ok)
+    {
+        triedSpawn = true;
+        spawnOk = DoSpawnAt(pos, want);
+    }
+
+    if (ok && spawnOk)
     {
         // 分散度：成功后记录冷却与最近刷点
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
@@ -1268,6 +1280,12 @@ static void TryNormalSpawnOnce()
 
         Debug_Print("[SPAWN] success ring=%.1f -> nextStart=%.1f", ring, gST.spawnDistCur);
         return;
+    }
+    else
+    {
+        // —— 新增：若确实调用了 DoSpawnAt 且失败，并且拿到了 NavArea 编号，则给该 Area 一个短失败冷却 —— //
+        if (triedSpawn && !spawnOk && areaIdx >= 0)
+            TouchNavCooldown(areaIdx, GetGameTime(), 0.8);
     }
 
     // 扩圈
@@ -1303,8 +1321,12 @@ static void TryNormalSpawnOnce()
     }
 }
 
+
 // ===========================
 // 单次传送尝试（fdxx-NavArea 主路）
+// ===========================
+// ===========================
+// 单次传送尝试（fdxx-NavArea 主路）— 改：DoSpawnAt 失败给 NavArea 短冷却
 // ===========================
 static void TryTeleportSpawnOnce()
 {
@@ -1323,7 +1345,16 @@ static void TryTeleportSpawnOnce()
 
     if (ok && IsPosVisibleSDK(pos, true)) { ok = false; }
 
-    if (ok && DoSpawnAt(pos, want))
+    bool triedSpawn = false;
+    bool spawnOk = false;
+
+    if (ok)
+    {
+        triedSpawn = true;
+        spawnOk = DoSpawnAt(pos, want);
+    }
+
+    if (ok && spawnOk)
     {
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
         float center[3]; GetSectorCenter(center, gST.targetSurvivor);
@@ -1342,6 +1373,12 @@ static void TryTeleportSpawnOnce()
 
         Debug_Print("[TP] success ring=%.1f -> nextStart=%.1f", ring, gST.teleportDistCur);
         return;
+    }
+    else
+    {
+        // —— 新增：若确实调用了 DoSpawnAt 且失败，并且拿到了 NavArea 编号，则给该 Area 一个短失败冷却 —— //
+        if (triedSpawn && !spawnOk && areaIdx >= 0)
+            TouchNavCooldown(areaIdx, GetGameTime(), 0.8);
     }
 
     // 扩圈
@@ -1372,6 +1409,7 @@ static void TryTeleportSpawnOnce()
         }
     }
 }
+
 
 // =========================
 // Anti-bait 定时器 / 波时序（去掉梯子相关）
@@ -2507,10 +2545,13 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 // =========================
 // Spawn / Command helpers
 // =========================
+// =========================
+// Spawn / Command helpers（改：使用眼睛距离判定 SpawnMin）
+// =========================
 static bool DoSpawnAt(const float pos[3], int zc)
 {
-    // 绝对保险：小于 SpawnMin 一律拒绝
-    if (GetMinDistToAnySurvivor(pos) < gCV.fSpawnMin)
+    // 使用“眼睛距离”作为硬下限口径，统一与你想要的判定方式
+    if (GetMinEyeDistToAnySurvivor(pos) < gCV.fSpawnMin)
     {
         Debug_Print("[SPAWN BLOCK] too close (< SpawnMin=%.1f) at (%.1f %.1f %.1f)",
                     gCV.fSpawnMin, pos[0], pos[1], pos[2]);
@@ -2527,13 +2568,31 @@ static bool DoSpawnAt(const float pos[3], int zc)
         RecalcSiCapFromAlive(false);
         return true;
     }
+
     Debug_Print("[SPAWN FAIL] %s at (%.1f %.1f %.1f) -> idx=%d", INFDN[zc], pos[0], pos[1], pos[2], idx);
     return false;
 }
+
 static void BypassAndExecuteCommand(const char[] cmd)
 {
     if (!CheatsOn()) return;
     ServerCommand("%s", cmd);
+}
+// 计算到任意幸存者“眼睛”的最小距离（用于 DoSpawnAt 的硬下限判定）
+static float GetMinEyeDistToAnySurvivor(const float p[3])
+{
+    float best = 999999.0;
+    float eyes[3];
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        GetClientEyePosition(i, eyes);
+        float d = GetVectorDistance(p, eyes);
+        if (d < best) best = d;
+    }
+    return best;
 }
 
 // =========================

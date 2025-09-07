@@ -204,7 +204,7 @@ public void OnPluginStart()
 	
 	CreateConVar("l4d2_pickup_version", PLUGIN_VERSION, "l4d2_pickup version cvar.", FCVAR_DONTRECORD|FCVAR_NOTIFY|FCVAR_REPLICATED|FCVAR_SPONLY);
 	
-	ConVar cv = CreateConVar("pickup_switch_flags", "7", "Flags for Switching from current item (1:Secondary, 2: Passed Pills, 4: Primary)", _, true, 0.0, true, 7.0);
+	ConVar cv = CreateConVar("pickup_switch_flags", "0", "Flags for Switching from current item (1:Secondary, 2: Passed Pills, 4: Primary)", _, true, 0.0, true, 7.0);
 	SwitchCVarChanged(cv, "", "");
 	cv.AddChangeHook(SwitchCVarChanged);
 	

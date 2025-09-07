@@ -490,7 +490,7 @@ void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newV
 
     if (IsStart)
     {
-        PrintToChatAll("\x01[\x04RANK\x01]\x04判断额外积分所需变量发生变化，此局无法获得额外积分, 过关也不奖励额外分数");
+        if(valid)PrintToChatAll("\x01[\x04RANK\x01]\x04判断额外积分所需变量发生变化，此局无法获得额外积分, 过关也不奖励额外分数");
         valid = false;
         Call_StartForward(IsValid);
         Call_PushCell(false);
@@ -2489,13 +2489,13 @@ public void Recoil(int client)
 	{
 		char binfo[64];
 		Menu menu = new Menu(Recoil_back);
-		if(player[client].ClientRecoil)
-			menu.SetTitle("是否开启枪械抖动,当前状态：是\n——————————");
-		else
-			menu.SetTitle("是否开启枪械抖动,当前状态：否\n——————————");
+		if (player[client].ClientRecoil)
+		menu.SetTitle("是否开启防抖动（去除枪械抖动），当前状态：是\n——————————");
+	else
+		menu.SetTitle("是否开启防抖动（去除枪械抖动），当前状态：否\n——————————");
+
 		FormatEx(binfo, sizeof(binfo),  "是", client);
 		menu.AddItem("Yes", binfo);
-
 		FormatEx(binfo, sizeof(binfo),  "否", client);
 		menu.AddItem("No", binfo);
 		menu.Display(client, 20);
@@ -2509,11 +2509,15 @@ public int Recoil_back(Menu menu, MenuAction action, int param1, int param2)
         case MenuAction_Select:
         {
             char bitem[64]; menu.GetItem(param2, bitem, sizeof bitem);
-            int on = StrEqual(bitem, "Yes") ? 1 : 0;
-
-            RPG_SetRecoilAndBroadcast(param1, on, /*force=*/false);
-
-            PrintToChat(param1, on ? "\x04你已经开启了枪械抖动" : "\x04你已经关闭了枪械抖动.");
+            if (StrEqual(bitem, "Yes")) {
+				player[param1].ClientRecoil = 1;           // 1 = 开启防抖
+				ClientSaveToFileSave(param1);
+				PrintToChat(param1, "\x04你已经开启了防抖动（去除枪械抖动）");
+			} else {
+				player[param1].ClientRecoil = 0;           // 0 = 关闭防抖，恢复原版抖动
+				ClientSaveToFileSave(param1);
+				PrintToChat(param1, "\x04你已经关闭了防抖动（恢复原版抖动）");
+			}
         }
         case MenuAction_End: delete menu;
     }

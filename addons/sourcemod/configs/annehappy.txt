@@ -13,7 +13,7 @@
 	}
 	"Anne版本选择"
 	{
-		"sm_fm AnneHappy"
+		"sm_fchmatch AnneHappy"
 		{
 			"message" "最新版本"
 		}
