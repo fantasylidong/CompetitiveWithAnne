@@ -1,0 +1,33 @@
+"Phrases"
+{
+    "Select"
+    {
+        "chi"           "[Punch Angle] 选择一个选项来保存设置并开关后坐力"
+    }
+
+    "CookieSlected"
+    {
+        "#format"       "{1:s}"
+        "chi"           "[Punch Angle] 后坐力开关: {1:s}"
+    }
+
+    "On"
+    {
+        "chi"           "开"
+    }
+
+    "Off"
+    {
+        "chi"           "关"
+    }
+    
+    "Recoil_On"
+    {
+        "chi"          "[抖动] 已关闭（无视角抖动）"
+    } 
+
+    "Recoil_Off"
+    {
+        "chi"           "[抖动] 已开启（原版效果）"
+    } 
+}

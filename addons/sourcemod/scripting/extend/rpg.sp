@@ -48,7 +48,7 @@ ConVar g_hAntiKickBlockVote;
 ConVar g_hAntiKickBlockCmdKick;
 ConVar g_hAntiKickMinImmunity;   // 0=只要有任意管理员标识就保护；>0=要求免疫等级>=此值才保护
 ConVar g_hAntiKickEqualBlock;    // 同级免疫是否禁止互踢（默认禁用互踢）
-bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false;
+bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false;
 //new lastpoints[MAXPLAYERS + 1];
 
 //枚举变量,修改武器消耗积分在此。
@@ -110,18 +110,42 @@ public Plugin myinfo =
 
 Handle IsValid, IsUseBuy;
 //Startup
+// rpg.sp —— 在 AskPluginLoad2 里注册 Native（和你现有的三个一起）
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-	//API
-	RegPluginLibrary("rpg");
-	IsValid = CreateGlobalForward("OnValidValveChange", ET_Ignore, Param_Cell);
-	IsUseBuy = CreateGlobalForward("OnBuyValveChange", ET_Ignore, Param_Cell);
+    RegPluginLibrary("rpg");
+    IsValid = CreateGlobalForward("OnValidValveChange", ET_Ignore, Param_Cell);
+    IsUseBuy = CreateGlobalForward("OnBuyValveChange", ET_Ignore, Param_Cell);
 
-	//Native
-	CreateNative("L4D_RPG_GetValue", Native_GetValue);
-	CreateNative("L4D_RPG_GetGlobalValue", Native_GetGlobalValue);
-	CreateNative("L4D_RPG_SetGlobalValue", Native_SetGlobalValue);
-	return APLRes_Success;
+    CreateNative("L4D_RPG_GetValue",        Native_GetValue);
+    CreateNative("L4D_RPG_GetGlobalValue",  Native_GetGlobalValue);
+    CreateNative("L4D_RPG_SetGlobalValue",  Native_SetGlobalValue);
+    CreateNative("L4D_RPG_SetValue",        Native_SetValue); // ★ 新增
+    return APLRes_Success;
+}
+
+// rpg.sp —— 在合适位置加上实现（紧跟你已有的 Native_* 后面即可）
+public any Native_SetValue(Handle plugin, int numParams)
+{
+    int client = GetNativeCell(1);
+    int option = GetNativeCell(2);
+    int value  = GetNativeCell(3);
+
+    if (client < 1 || client > MaxClients)
+        return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+    if (!IsClientConnected(client))
+        return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+
+    switch (view_as<TARGET_VALUE_INDEX>(option))
+    {
+        case INDEX_RECOIL:
+        {
+            player[client].ClientRecoil = value ? 1 : 0;
+            ClientSaveToFileSave(client);   // 你已有的落库函数：UPDATE RPG ... RECOIL=...
+            return 1;
+        }
+    }
+    return -1;
 }
 
 public any Native_GetValue(Handle plugin, int numParams)
@@ -255,6 +279,7 @@ public void OnAllPluginsLoaded()
     g_bl4dstatsSystemAvailable   = LibraryExists("l4d_stats");
     g_bHextagsSystemAvailable    = LibraryExists("hextags");
     g_bReadyUpSystemAvailable    = LibraryExists("readyup");
+	g_bpunchangelSystemAvailable = LibraryExists("punch_angle");
 
     // 只在 infected_control 库存在时再去找 l4d_infected_limit
     g_bInfectedControlAvailable  = LibraryExists("infected_control");
@@ -288,6 +313,7 @@ public void OnLibraryAdded(const char[] name)
             IsAnne = true;
         }
     }
+	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = true; }
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -307,6 +333,7 @@ public void OnLibraryRemoved(const char[] name)
         }
         // 不再强制关闭 IsAnne；保持你原来的判定流转（仅不再跟随 l4d_infected_limit）
     }
+	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = false; }
 }
 
 
@@ -1428,12 +1455,10 @@ public void BuildMenu(int client)
 			FormatEx(binfo, sizeof(binfo),  "回血技能", client); //技能菜单
 			menu.AddItem("Blood", binfo);
 		}
-		/*
 		if (g_bpunchangelSystemAvailable){
 			FormatEx(binfo, sizeof(binfo),  "枪械抖动设置", client); //技能菜单
 			menu.AddItem("Recoil", binfo);
 		}
-		*/
 		if(g_bHextagsSystemAvailable){
 			FormatEx(binfo, sizeof(binfo),  "称号菜单", client); //称号菜单
 			menu.AddItem("ChatTags", binfo);

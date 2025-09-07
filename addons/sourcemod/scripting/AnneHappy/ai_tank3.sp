@@ -135,10 +135,10 @@ public void OnPluginStart() {
 	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
 	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "60.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "135.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "100.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
-	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "400", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
+	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "1500", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	// you can use the value of 'ai_tank3_climb_anim_rate' to accelerate the animation rate when tank is climbing over some obstacle
 	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "5.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
@@ -147,7 +147,7 @@ public void OnPluginStart() {
 	// allow tank to punch survivor who is behind him?
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
-	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "90.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
+	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "100.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
 	// allow tank to punch survivor who is behind him when his speed is lower than this value
 	g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "允许使用通背拳时Tank的最小速度", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
@@ -320,6 +320,9 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
 	GetClientEyePosition(tank, pos);
 	for (int i = 1; i <= MaxClients; i++) {
 		if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+			continue;
+		//已经倒地被控就别打了
+		if (IsClientIncapped(i) || IsClientPinned(i))
 			continue;
 		GetClientEyePosition(i, targetPos);
 		if (GetVectorDistance(pos, targetPos) > fistRange)
@@ -696,7 +699,7 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 		static float pos[3], targetPos[3];
 		GetClientEyePosition(tank, pos);
 		for (int i = 1; i <= MaxClients; i++) {
-			if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i) || IsClientIncapped(i) || isPinnedByHunterOrCharger(i))
+			if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i))
 				continue;
 			if (IsClientIncapped(i) || IsClientPinned(i))
 				continue;

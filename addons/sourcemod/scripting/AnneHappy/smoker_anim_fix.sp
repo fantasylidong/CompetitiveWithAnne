@@ -13,10 +13,10 @@
 
 public Plugin myinfo = 
 {
-    name        = "Smoker Animation Fix (windowed & safe reset)",
+    name        = "Smoker Animation Fix (windowed & safe reset, end-on-grab option)",
     author      = "HoongDou, edited by ChatGPT for morzlee",
-    description = "Fix AI Smoker tongue animation to match human players (with window & robust resets)",
-    version     = "1.2",
+    description = "Fix AI Smoker tongue animation to match human players (with window, robust resets, and end-on-grab option)",
+    version     = "1.3",
     url         = "https://github.com/HoongDou/L4D2-HoongDou-Project"
 };
 
@@ -31,8 +31,9 @@ Handle  hSequenceSet  = null;      // Detour:   CTerrorPlayer::SelectWeightedSeq
 
 // ConVars
 ConVar g_cvEnabled;                // 是否启用
-ConVar g_cvHoldWindow;             // 起手强制动画的持续窗口
-ConVar g_cvSafetyTimer;            // 起手兜底复位时间
+ConVar g_cvHoldWindow;             // 起手强制动画的持续窗口（秒）
+ConVar g_cvSafetyTimer;            // 起手兜底复位时间（秒）
+ConVar g_cvEndOnGrab;              // 抓住瞬间是否立即结束覆盖窗口（更贴近原生）
 
 // State Tracking
 static bool  g_bTongueAttacking[MAXPLAYERS + 1] = {false, ...};  // 当前是否处于“吐舌动画强制期”
@@ -79,11 +80,17 @@ public void OnPluginStart()
     HookEvent("mission_lost",    Event_MissionLost);
 
     // ConVars
-    g_cvEnabled     = CreateConVar("smoker_anim_fix_enabled", "1",    "Enable smoker animation fix", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvEnabled     = CreateConVar("smoker_anim_fix_enabled", "1",
+                                   "Enable smoker animation fix", FCVAR_NONE, true, 0.0, true, 1.0);
+
     g_cvHoldWindow  = CreateConVar("smoker_anim_fix_hold_window", "0.6",
-                                   "Seconds we force tongue animation after ability start.", FCVAR_NONE, true, 0.1, true, 2.0);
+                                   "Seconds we force tongue animation after ability start.", FCVAR_NONE, true, 0.0, true, 2.0);
+
     g_cvSafetyTimer = CreateConVar("smoker_anim_fix_safety_timer", "2.0",
                                    "Safety timer to reset tongue flag after ability start.", FCVAR_NONE, true, 0.5, true, 5.0);
+
+    g_cvEndOnGrab   = CreateConVar("smoker_anim_fix_end_on_grab", "1",
+                                   "End the hold window immediately when tongue grabs a target.", FCVAR_NONE, true, 0.0, true, 1.0);
 
     // Gamedata / SDK / Detour
     GetGamedata();
@@ -159,7 +166,7 @@ public Action Event_AbilityUse(Event event, const char[] name, bool dontBroadcas
             g_bDidAnimKick[client] = true;
         }
 
-        // 起手兜底 2.0s（可配）
+        // 起手兜底（可配）
         CreateTimer(g_cvSafetyTimer.FloatValue, Timer_ResetTongueFlag, client);
     }
 
@@ -173,16 +180,20 @@ public Action Event_TongueGrab(Event event, const char[] name, bool dontBroadcas
 
     int userid = event.GetInt("userid");
     int client = GetClientOfUserId(userid);
+    if (!IsValidSmoker(client))
+        return Plugin_Continue;
 
-    if (IsValidSmoker(client))
+    if (GetConVarBool(g_cvEndOnGrab))
     {
-        // 抓住后保持在强制期（不刷新窗口，防止长时间卡动画；由窗口时间控制）
+        // 抓住就结束覆盖：马上允许引擎选“拉人/拖拽”等序列
+        ResetSmokerFlag(client);
+    }
+    else
+    {
+        // 维持短窗口（极端条件下的兜底），防止某些边界态视觉抖动
         g_bTongueAttacking[client] = true;
         if (g_fTongueWindow[client] <= 0.0)
-        {
-            // 若此前没有窗口（理论不应发生），给个很短的窗口以免卡死
             g_fTongueWindow[client] = GetEngineTime() + 0.3;
-        }
     }
 
     return Plugin_Continue;
@@ -245,7 +256,7 @@ public Action Event_MissionLost(Event e, const char[] n, bool db)
 
 public Action Timer_ResetTongueFlag(Handle timer, int client)
 {
-    // 兜底：2s 后清理强制标志（若仍在窗口内，窗口检查也会结束）
+    // 兜底：到时清理强制标志（若仍在窗口内，窗口检查也会结束）
     ResetSmokerFlag(client);
     return Plugin_Stop;
 }

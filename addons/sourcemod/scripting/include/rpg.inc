@@ -40,6 +40,8 @@ public void __pl_rpg_SetNTVOptional()
 	MarkNativeAsOptional("L4D_RPG_GetValue");
 	MarkNativeAsOptional("L4D_RPG_GetGlobalValue");
 	MarkNativeAsOptional("L4D_RPG_SetGlobalValue");
+	// 新增：玩家级 Setter
+    MarkNativeAsOptional("L4D_RPG_SetValue");
 }
 #endif
 
@@ -110,3 +112,14 @@ native any L4D_RPG_GetGlobalValue(TARGET_VALUE_INDEX option);
 * @return	-1为设置失败，其余为正常
 */
 native any L4D_RPG_SetGlobalValue(TARGET_VALUE_INDEX option, bool vaule);
+
+/**
+* @brief 设置rpg插件里的“玩家值”（如 INDEX_RECOIL 等）
+*
+* @param client   目标玩家
+* @param option   TARGET_VALUE_INDEX（0-7）
+* @param value    通常为int/bool（true=1/false=0）
+*
+* @return 1为成功，-1失败
+*/
+native any L4D_RPG_SetValue(int client, TARGET_VALUE_INDEX option, any value);

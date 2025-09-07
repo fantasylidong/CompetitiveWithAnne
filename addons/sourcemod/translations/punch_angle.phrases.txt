@@ -1,0 +1,32 @@
+"Phrases"
+{
+    "Select"
+    {
+        "en"        "[Punch Angle] Select an option to save your setting and toggle recoil on/off"
+    }
+
+    "CookieSlected"
+    {
+        "#format"   "{1:t}"
+        "en"        "[Punch Angle] Punch Angle Toggle: {1:t}"
+    }
+
+    "On"
+    {
+        "en"        "On"
+    }
+
+    "Off"
+    {
+        "en"        "Off"
+    }
+	"Recoil_On"
+    {
+        "en"          "[Recoil] ON (no punch)"
+    } 
+
+    "Recoil_Off"
+    {
+        "en"           "[Recoil] OFF (vanilla)"
+    } 
+}
