@@ -104,6 +104,17 @@ public void OnClientPutInServer(int client)
 	// RPG 不可用/失败 → Cookie 流程由 OnClientCookiesCached 覆盖
 }
 
+public void OnRPGRecoilChanged(int client, int enabled )
+{
+    if (client < 1 || client > MaxClients || !IsClientInGame(client))
+        return;
+
+    g_bClientCookie[client] = (enabled != 0);
+
+    if (g_cvZGunVerticalPu != null)
+		g_cvZGunVerticalPu.ReplicateToClient(client, g_bClientCookie[client] ? "0" : "1");
+}
+
 public void OnClientCookiesCached(int client)
 {
 	if (IsFakeClient(client))

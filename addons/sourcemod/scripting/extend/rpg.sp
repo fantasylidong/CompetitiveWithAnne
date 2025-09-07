@@ -13,7 +13,7 @@
 #include <l4d_hats>
 #include <godframecontrol>
 #include <readyup>
-#define PLUGIN_VERSION "1.5"
+#define PLUGIN_VERSION "2.0"
 #define MAX_LINE_WIDTH 64
 #define DB_CONF_NAME  "rpg"
 
@@ -40,6 +40,7 @@ bool IsAnne = false;
 int InfectedNumber=6;
 bool g_bEnableGlow = true;
 bool  g_bAllowUseB = true;
+Handle gF_OnRPGRecoilChanged;
 ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_InfectedNumber, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
 // === Admin Anti-Kick ===
@@ -121,8 +122,16 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("L4D_RPG_GetGlobalValue",  Native_GetGlobalValue);
     CreateNative("L4D_RPG_SetGlobalValue",  Native_SetGlobalValue);
     CreateNative("L4D_RPG_SetValue",        Native_SetValue); // ★ 新增
+	gF_OnRPGRecoilChanged = CreateGlobalForward(
+        "OnRPGRecoilChanged",      // 名字
+        ET_Ignore,                 // 不关心返回值
+        Param_Cell,                // client
+        Param_Cell                 // enabled(0/1) —— 如需强度可再加 Param_Float
+    );
     return APLRes_Success;
 }
+
+
 
 // rpg.sp —— 在合适位置加上实现（紧跟你已有的 Native_* 后面即可）
 public any Native_SetValue(Handle plugin, int numParams)
@@ -1409,6 +1418,7 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
  		player[client].GlowType = SQL_FetchInt(hndl, 3);
  		player[client].SkinType = SQL_FetchInt(hndl, 4);
 		player[client].ClientRecoil = SQL_FetchInt(hndl, 5);
+		 RPG_SetRecoilAndBroadcast(client, player[client].ClientRecoil, /*force=*/true);
  		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
 	}
 	else
@@ -2494,28 +2504,22 @@ public void Recoil(int client)
 
 public int Recoil_back(Menu menu, MenuAction action, int param1, int param2)
 {
-	switch(action)
-	{
-		case MenuAction_Select:
-		{
-			char bitem[64];
-			menu.GetItem(param2, bitem, sizeof(bitem));
-			if( StrEqual(bitem, "Yes") ){	
-				player[param1].ClientRecoil=1;
-				ClientSaveToFileSave(param1);
-				PrintToChat(param1,"\x04你已经开启了枪械抖动");
-			}
-			else {				
-				player[param1].ClientRecoil=0;
-				ClientSaveToFileSave(param1);
-				PrintToChat(param1,"\x04你已经关闭了枪械抖动.");
-			}
-		}
-		case MenuAction_End:
-			delete menu;
-	}
-	return 0;
+    switch(action)
+    {
+        case MenuAction_Select:
+        {
+            char bitem[64]; menu.GetItem(param2, bitem, sizeof bitem);
+            int on = StrEqual(bitem, "Yes") ? 1 : 0;
+
+            RPG_SetRecoilAndBroadcast(param1, on, /*force=*/false);
+
+            PrintToChat(param1, on ? "\x04你已经开启了枪械抖动" : "\x04你已经关闭了枪械抖动.");
+        }
+        case MenuAction_End: delete menu;
+    }
+    return 0;
 }
+
 
 stock bool IsAboveFourPeople()
 {
@@ -2650,3 +2654,23 @@ public Action OnSmKick(int client, const char[] command, int argc)
     // 更高免疫管理员可以踢（尊重免疫层级）
     return Plugin_Continue;
 }
+static void RPG_SetRecoilAndBroadcast(int client, int newOn, bool force = false)
+{
+    newOn = newOn ? 1 : 0;
+
+    // 不强制且值没变 → 不广播，避免噪音
+    if (!force && player[client].ClientRecoil == newOn)
+        return;
+
+    player[client].ClientRecoil = newOn;
+    ClientSaveToFileSave(client);
+
+    if (gF_OnRPGRecoilChanged != null)
+    {
+        Call_StartForward(gF_OnRPGRecoilChanged);
+        Call_PushCell(client);
+        Call_PushCell(newOn);
+        Call_Finish();
+    }
+}
+
