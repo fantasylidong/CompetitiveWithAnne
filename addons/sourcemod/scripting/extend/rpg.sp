@@ -40,7 +40,6 @@ bool IsAnne = false;
 int InfectedNumber=6;
 bool g_bEnableGlow = true;
 bool  g_bAllowUseB = true;
-Handle gF_OnRPGRecoilChanged;
 ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_InfectedNumber, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
 // === Admin Anti-Kick ===
@@ -122,12 +121,6 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("L4D_RPG_GetGlobalValue",  Native_GetGlobalValue);
     CreateNative("L4D_RPG_SetGlobalValue",  Native_SetGlobalValue);
     CreateNative("L4D_RPG_SetValue",        Native_SetValue); // ★ 新增
-	gF_OnRPGRecoilChanged = CreateGlobalForward(
-        "OnRPGRecoilChanged",      // 名字
-        ET_Ignore,                 // 不关心返回值
-        Param_Cell,                // client
-        Param_Cell                 // enabled(0/1) —— 如需强度可再加 Param_Float
-    );
     return APLRes_Success;
 }
 
@@ -1418,7 +1411,7 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
  		player[client].GlowType = SQL_FetchInt(hndl, 3);
  		player[client].SkinType = SQL_FetchInt(hndl, 4);
 		player[client].ClientRecoil = SQL_FetchInt(hndl, 5);
-		 RPG_SetRecoilAndBroadcast(client, player[client].ClientRecoil, /*force=*/true);
+		FakeClientCommand(client, "sm_recoil %d", player[client].ClientRecoil);
  		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
 	}
 	else
@@ -2504,24 +2497,49 @@ public void Recoil(int client)
 
 public int Recoil_back(Menu menu, MenuAction action, int param1, int param2)
 {
-    switch(action)
+    switch (action)
     {
         case MenuAction_Select:
         {
-            char bitem[64]; menu.GetItem(param2, bitem, sizeof bitem);
-            if (StrEqual(bitem, "Yes")) {
-				player[param1].ClientRecoil = 1;           // 1 = 开启防抖
-				ClientSaveToFileSave(param1);
-				PrintToChat(param1, "\x04你已经开启了防抖动（去除枪械抖动）");
-			} else {
-				player[param1].ClientRecoil = 0;           // 0 = 关闭防抖，恢复原版抖动
-				ClientSaveToFileSave(param1);
-				PrintToChat(param1, "\x04你已经关闭了防抖动（恢复原版抖动）");
-			}
+            char bitem[64];
+            menu.GetItem(param2, bitem, sizeof(bitem));
+
+            // Yes = 不抖动(去抖) → sm_recoil 1
+            // No  = 抖动(原版)   → sm_recoil 0
+            int want = StrEqual(bitem, "Yes") ? 1 : 0;
+
+            // 1) 立即更新本地值并写库，保证数据库与面板显示一致
+            player[param1].ClientRecoil = want; 
+            ClientSaveToFileSave(param1);
+
+            // 3) **下一帧**再执行命令，避免在菜单回调里直接 FakeClientCommand 失效的情况
+            DataPack pack = new DataPack();
+            pack.WriteCell(GetClientUserId(param1)); // 保存 userid，避免玩家刚好重连导致 index 变动
+            pack.WriteCell(want);
+            RequestFrame(Exec_RecoilCmdNextFrame, pack);
         }
-        case MenuAction_End: delete menu;
+
+        case MenuAction_End:
+            delete menu;
     }
     return 0;
+}
+
+// 在下一帧执行命令
+public void Exec_RecoilCmdNextFrame(DataPack pack)
+{
+    pack.Reset();
+    int userid = pack.ReadCell();
+    int want   = pack.ReadCell();
+    delete pack;
+
+    int client = GetClientOfUserId(userid);
+    if (client <= 0 || !IsClientInGame(client))
+        return;
+
+    // 4) 触发 punch 插件的命令：!recoil 1=不抖动，0=抖动
+    //    建议用 FakeClientCommandEx 以便拿到返回值（若你的 SM 版本支持）
+    FakeClientCommand(client, "sm_recoil %d", want);
 }
 
 
@@ -2657,24 +2675,5 @@ public Action OnSmKick(int client, const char[] command, int argc)
 
     // 更高免疫管理员可以踢（尊重免疫层级）
     return Plugin_Continue;
-}
-static void RPG_SetRecoilAndBroadcast(int client, int newOn, bool force = false)
-{
-    newOn = newOn ? 1 : 0;
-
-    // 不强制且值没变 → 不广播，避免噪音
-    if (!force && player[client].ClientRecoil == newOn)
-        return;
-
-    player[client].ClientRecoil = newOn;
-    ClientSaveToFileSave(client);
-
-    if (gF_OnRPGRecoilChanged != null)
-    {
-        Call_StartForward(gF_OnRPGRecoilChanged);
-        Call_PushCell(client);
-        Call_PushCell(newOn);
-        Call_Finish();
-    }
 }
 
