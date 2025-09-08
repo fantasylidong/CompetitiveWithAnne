@@ -86,7 +86,7 @@ public Plugin myinfo =
 #define FLAGS_INCAP_TANKPUNCH             2
 #define FLAGS_INCAP_TANKROCK              4
 
-#define TEAM_SURVIVOR                     2
+//#define TEAM_SURVIVOR                     2
 #define TEAM_INFECTED                     3
 
 #define DMG_TYPE_SPIT (DMG_RADIATION|DMG_ENERGYBEAM)
