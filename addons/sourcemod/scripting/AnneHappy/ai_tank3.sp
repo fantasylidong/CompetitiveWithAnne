@@ -149,7 +149,7 @@ public void OnPluginStart() {
 	// allow tank to punch survivor who is behind him?
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
-	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "100.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);//超过90度了就不修正了
+	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "110.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);//超过90度了就不修正了
 	// allow tank to punch survivor who is behind him when his speed is lower than this value
 	g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "允许使用通背拳时Tank的最大速度", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
@@ -157,7 +157,7 @@ public void OnPluginStart() {
 	// allow tank to jump when he starts to grab a rock
 	g_cvJumpRock = CreateConVar("ai_tank3_jump_rock", "1", "是否允许Tank使用跳砖", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// 空中速度修正模式：0=关闭, 1=只改方向不加速, 2=加速到 RunTopSpeed+Impulse, 3=加速到 RunTopSpeed+(Impulse/3)
-	g_cvAirVecModifyMode = CreateConVar("ai_tank3_airvec_modify_mode", "3","空中速度修正模式(0=关闭,1=只改方向不加速,2=加速到RunTopSpeed+Impulse,3=加速到RunTopSpeed+(Impulse/3))",CVAR_FLAGS, true, 0.0, true, 3.0);	g_cvLadderAnimRate = CreateConVar("ai_tank3_ladder_anim_rate", "3.0","Tank在梯子上的动画速率(1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMode = CreateConVar("ai_tank3_airvec_modify_mode", "3","空中速度修正模式(0=关闭,1=只改方向不加速,2=加速到RunTopSpeed+Impulse,3=加速到RunTopSpeed+(Impulse/2))",CVAR_FLAGS, true, 0.0, true, 3.0);	g_cvLadderAnimRate = CreateConVar("ai_tank3_ladder_anim_rate", "3.0","Tank在梯子上的动画速率(1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
 
 	// 日志记录 logging
 	g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
@@ -534,7 +534,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 			case 3: // 改方向并加速到 RunTopSpeed + (Impulse/3)
 			{
 				float runTopSpeed = SDKCall(g_hSdkGetRunTopSpeed, client);
-				targetLen = runTopSpeed + (g_cvBhopImpulse.FloatValue / 3.0);
+				targetLen = runTopSpeed + (g_cvBhopImpulse.FloatValue / 2.0);
 			}
 			default: // 0=关闭
 			{

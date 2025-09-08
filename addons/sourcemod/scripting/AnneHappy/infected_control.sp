@@ -67,7 +67,7 @@
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                80.0
+#define SEP_RADIUS                120.0
 #define NAV_CD_SECS               1.0
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -75,11 +75,11 @@
 
 // === Dispersion tuning (penalties at BASE=4) ===
 #define SECTOR_PREF_BONUS_BASE   -6.0
-#define SECTOR_OFF_PENALTY_BASE   3.0
-#define RECENT_PENALTY_0_BASE     2.0
-#define RECENT_PENALTY_1_BASE     1.0
+#define SECTOR_OFF_PENALTY_BASE   4.0
+#define RECENT_PENALTY_0_BASE     2.5
+#define RECENT_PENALTY_1_BASE     1.5
 #define RECENT_PENALTY_2_BASE     1.0
-#define RAND_JITTER_MAX           2.5     // 降低抖动避免“误伤”近点
+#define RAND_JITTER_MAX           2.0     // 降低抖动避免“误伤”近点
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
@@ -284,7 +284,7 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.DebugMode         = CreateConVar("inf_DebugMode", "0","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
 
         // —— Nav 分桶（静态窗口） —— //
         this.NavBucketEnable   = CreateConVar("inf_NavBucketEnable", "1", "启用 Nav 进度分桶筛选(0=禁用,1=启用)", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -795,8 +795,8 @@ public void evt_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
     if (zc >= 1 && zc <= 6)
     {
-        // 记录该类最后死亡时间
-        g_LastDeathTime[zc - 1] = GetGameTime();
+        // —— 这里改成“只在未处于冷却期时触发一次CD”，冷却中死亡不重置 —— //
+        TouchDeathCooldownOnce(zc);
 
         int idx = zc - 1;
         if (gST.siAlive[idx] > 0) gST.siAlive[idx]--; else gST.siAlive[idx] = 0;
@@ -1091,6 +1091,37 @@ static bool PassDeathCooldown(int zc)
 
     float need = IsSupportClassInt(zc) ? gCV.fDeathCDSupport : gCV.fDeathCDKiller;
     return (now - last) >= need;
+}
+
+// 仅在“无活动冷却”时开启一次死亡CD；若已在CD中则忽略本次死亡
+static void TouchDeathCooldownOnce(int zc)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= 6) return;
+
+    float need = IsSupportClassInt(zc) ? gCV.fDeathCDSupport : gCV.fDeathCDKiller;
+    if (need <= 0.01)
+    {
+        // 冷却为 0 时不做限制；保持可立即补位
+        g_LastDeathTime[idx] = 0.0;
+        return;
+    }
+
+    float now  = GetGameTime();
+    float last = g_LastDeathTime[idx];
+
+    // 若从未启动过，或上一个冷却已结束 → 以“本次死亡”启动新的冷却
+    if (last <= 0.01 || (now - last) >= need)
+    {
+        g_LastDeathTime[idx] = now;
+        Debug_Print("[DEATHCD] start %s at %.2f (CD=%.2f)", INFDN[zc], now, need);
+    }
+    else
+    {
+        // 仍在冷却期：忽略，不刷新时间戳（不把CD往后推）
+        Debug_Print("[DEATHCD] ignore %s death at %.2f (remain=%.2f)",
+            INFDN[zc], now, need - (now - last));
+    }
 }
 
 // —— 新增：是否放宽CD（永不饿死双保险） —— //
@@ -2189,22 +2220,31 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
 // 仅按“硬距离窗口”筛选：SpawnMin ≤ 距离 ≤ ring
 static bool IsNearTheSur(float ring, float flow /*ignored*/, const float pos[3], float &dist)
 {
-    if (g_aSurPosData == null || g_iSurPosDataLen <= 0)
-        return false;
-
     float dmin = 999999.0;
-    bool inRange = false;
+    bool  foundAny = false;
+    bool  inRange  = false;
 
-    SurPosData data;
-    for (int i = 0; i < g_iSurPosDataLen; i++)
+    float eyes[3];
+
+    for (int i = 1; i <= MaxClients; i++)
     {
-        g_aSurPosData.GetArray(i, data);
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
 
-        float d = GetVectorDistance(data.fPos, pos);
+        GetClientEyePosition(i, eyes);
+        float d = GetVectorDistance(eyes, pos);
+
         if (d < dmin) dmin = d;
+        foundAny = true;
 
         if (d >= gCV.fSpawnMin && d <= ring)
             inRange = true;
+    }
+
+    if (!foundAny)
+    {
+        dist = 999999.0;
+        return false;
     }
 
     dist = dmin;
@@ -2316,8 +2356,8 @@ static void RebuildNavBuckets()
 // =========================
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
-    // 只在“命中候选”（通过全部前置过滤）的前 10 个里挑最优
-    const int TOPK = 10;
+    // 只在“命中候选”（通过全部前置过滤）的前 15 个里挑最优
+    const int TOPK = 15;
     int acceptedHits = 0;
 
     if (!GetSurPosData())
