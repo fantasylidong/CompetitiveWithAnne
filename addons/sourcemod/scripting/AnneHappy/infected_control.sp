@@ -1914,7 +1914,7 @@ static float GetSurAvrFlow()
 }
 
 // =========================
-// 兜底（导演 at MaxDistance）
+// 兜底（导演 at MaxDistance）— 安全版：容错 target 无效
 // =========================
 static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, float outPos[3])
 {
@@ -1927,19 +1927,49 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
     float spawnMax = gCV.fSpawnMax;
     float spawnMin = gCV.fSpawnMin;
 
-    float tFeet[3]; GetClientAbsOrigin(target, tFeet);
+    // --- 1) 选一个“有效目标幸存者”作为参考（容错 target=-1/已死/未初始化） ---
+    int tgt = target;
+    if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
+        tgt = L4D_GetHighestFlowSurvivor();
+
+    if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
+    {
+        // 再扫一遍找任何还活着的幸存者
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsValidSurvivor(i) && IsPlayerAlive(i)) { tgt = i; break; }
+        }
+    }
+
+    if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
+    {
+        // 场上没有可用幸存者，兜底无意义 → 返回失败，避免无效 GetClientAbsOrigin
+        Debug_Print("[FALLBACK] no valid survivor to reference, abort");
+        return false;
+    }
+
+    // --- 2) 以该幸存者脚底所在区域作为大致参考（求一个邻近 nav） ---
+    float tFeet[3];
+    GetClientAbsOrigin(tgt, tFeet);
+
     Address navTarget = L4D2Direct_GetTerrorNavArea(tFeet);
     if (navTarget == Address_Null)
         navTarget = view_as<Address>(L4D_GetNearestNavArea(tFeet, 300.0, false, false, false, TEAM_INFECTED));
-    if (navTarget == Address_Null) return false;
 
+    if (navTarget == Address_Null)
+    {
+        Debug_Print("[FALLBACK] no nav near survivor feet, abort");
+        return false;
+    }
+
+    // --- 3) 用导演随机点反复取样，挑一个接近 spawnMax 的、看不见/不卡的点 ---
     for (int i = 0; i < kTries; i++)
     {
         float pt[3];
-        if (!L4D_GetRandomPZSpawnPosition(target, zc, 7, pt))
+        if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt))
             continue;
 
-        float minD = GetMinDistToAnySurvivor(pt);
+        float minD = GetMinDistToAnySurvivor(pt); // 脚底距离；硬下限用眼睛距离在 DoSpawnAt 再把关
         if (minD < spawnMin || minD > spawnMax + 200.0)
             continue;
 
@@ -1950,8 +1980,8 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
             continue;
 
         float delta = FloatAbs(spawnMax - minD);
-
         bool prefer = (minD <= spawnMax);
+
         if (!have)
         {
             bestPt = pt; have = true; bestDelta = delta;
@@ -1960,6 +1990,8 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
         {
             float bestMinD = GetMinDistToAnySurvivor(bestPt);
             bool bestPrefer = (bestMinD <= spawnMax);
+
+            // 优先选“<=spawnMax”的，再比谁更接近 spawnMax
             if ((prefer && !bestPrefer) || (prefer == bestPrefer && delta < bestDelta))
             {
                 bestPt = pt; bestDelta = delta;
@@ -1967,10 +1999,15 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
         }
     }
 
-    if (!have) return false;
-    outPos[0]=bestPt[0]; outPos[1]=bestPt[1]; outPos[2]=bestPt[2];
+    if (!have)
+        return false;
+
+    outPos[0] = bestPt[0];
+    outPos[1] = bestPt[1];
+    outPos[2] = bestPt[2];
     return true;
 }
+
 static float GetMinDistToAnySurvivor(const float p[3])
 {
     float best = 999999.0;
