@@ -74,12 +74,12 @@
 #define DYN_SECTORS_MIN           2       // 动态下限
 
 // === Dispersion tuning (penalties at BASE=4) ===
-#define SECTOR_PREF_BONUS_BASE   -6.0
-#define SECTOR_OFF_PENALTY_BASE   4.0
-#define RECENT_PENALTY_0_BASE     2.5
-#define RECENT_PENALTY_1_BASE     1.5
-#define RECENT_PENALTY_2_BASE     1.0
-#define RAND_JITTER_MAX           2.0     // 降低抖动避免“误伤”近点
+#define SECTOR_PREF_BONUS_BASE   -10.0
+#define SECTOR_OFF_PENALTY_BASE   5.0
+#define RECENT_PENALTY_0_BASE     5.0
+#define RECENT_PENALTY_1_BASE     3.0
+#define RECENT_PENALTY_2_BASE     2.0
+#define RAND_JITTER_MAX           3.0     // 降低抖动避免“误伤”近点
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
@@ -2218,7 +2218,7 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
     return (iFlags & (TERROR_NAV_RESCUE_CLOSET|TERROR_NAV_RESCUE_VEHICLE|TERROR_NAV_CHECKPOINT)) == 0;
 }
 // 仅按“硬距离窗口”筛选：SpawnMin ≤ 距离 ≤ ring
-static bool IsNearTheSur(float ring, float flow /*ignored*/, const float pos[3], float &dist)
+static bool IsNearTheSur(float ring, const float pos[3], float &dist)
 {
     float dmin = 999999.0;
     bool  foundAny = false;
@@ -2266,33 +2266,7 @@ static void ClearNavBuckets()
         }
     }
 }
-static void BuildNavBuckets()
-{
-    ClearNavBuckets();
 
-    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
-    int iAreaCount = g_pTheNavAreas.Count();
-
-    int added = 0;
-    for (int i = 0; i < iAreaCount; i++)
-    {
-        Address areaAddr = pTheNavAreas.GetAreaRaw(i, false);
-        if (areaAddr == Address_Null) continue;
-
-        int percent = Calculate_Flow(areaAddr);
-        if (percent < 0) percent = 0;
-        if (percent > 100) percent = 100;
-
-        if (g_FlowBuckets[percent] == null)
-            g_FlowBuckets[percent] = new ArrayList(); // 存 NavArea 索引 i
-
-        g_FlowBuckets[percent].Push(i);
-        added++;
-    }
-
-    g_BucketsReady = true;
-    Debug_Print("[BUCKET] built %d areas into 0..100 buckets", added);
-}
 static int ComputeDynamicBucketWindow(float ring)
 {
     // 如果没启用动态联动，直接返回静态窗口
@@ -2320,23 +2294,71 @@ static int ComputeDynamicBucketWindow(float ring)
     return win;
 }
 
-// —— 新增：构造“中心向外成对扩散”的桶序列 —— //
+// —— 覆盖：前方优先 4 桶 + 前后交替 ——
+// 先 push s+1,s+2,s+3,s+4（受 win/边界约束），再交替：-1,+5,-2,+6,-3,+7,-4,+8,... 直到 win 用尽
 static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[FLOW_BUCKETS])
 {
     int n = 0;
-    if (includeCenter) {
-        if (0 <= s && s <= 100) outBuckets[n++] = s;
-    }
-    for (int d = 1; d <= win; d++)
+
+    // 是否包含中心桶（通常你会传 false）
+    if (includeCenter && 0 <= s && s <= 100)
+        outBuckets[n++] = s;
+
+    // 1) 先把前方 +1..+4 放进去
+    for (int d = 1; d <= 4 && d <= win; d++)
     {
-        int a = s - d;
         int b = s + d;
-        if (a >= 0)   outBuckets[n++] = a;
         if (b <= 100) outBuckets[n++] = b;
     }
+
+    // 2) 然后交替推进：-1,+5,-2,+6,...
+    int backD = 1;                 // 向后距离从 1 开始：-1,-2,-3...
+    int frontD = 5;                // 向前距离从 5 开始：+5,+6,+7...
+    while (backD <= win || frontD <= win)
+    {
+        if (backD <= win)
+        {
+            int a = s - backD;
+            if (a >= 0) outBuckets[n++] = a;
+            backD++;
+        }
+        if (frontD <= win)
+        {
+            int b = s + frontD;
+            if (b <= 100) outBuckets[n++] = b;
+            frontD++;
+        }
+    }
+
     return n;
 }
+static void BuildNavBuckets()
+{
+    ClearNavBuckets();
 
+    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
+    int iAreaCount = g_pTheNavAreas.Count();
+
+    int added = 0;
+    for (int i = 0; i < iAreaCount; i++)
+    {
+        Address areaAddr = pTheNavAreas.GetAreaRaw(i, false);
+        if (areaAddr == Address_Null) continue;
+
+        int percent = Calculate_Flow(areaAddr);
+        if (percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
+
+        if (g_FlowBuckets[percent] == null)
+            g_FlowBuckets[percent] = new ArrayList(); // 存 NavArea 索引 i
+
+        g_FlowBuckets[percent].Push(i);
+        added++;
+    }
+
+    g_BucketsReady = true;
+    Debug_Print("[BUCKET] built %d areas into 0..100 buckets", added);
+}
 static Action Timer_RebuildBuckets(Handle timer)
 {
     RebuildNavBuckets();
@@ -2350,13 +2372,8 @@ static void RebuildNavBuckets()
 // =========================
 // 主找点（fdxx NavArea 简化 + 分散度 + FLOW分桶）
 // =========================
-// =========================
-// 主找点（fdxx NavArea 简化 + 分散度 + FLOW分桶）
-// 使用你已有的 BuildBucketOrder 生成「对称桶顺序」；仅评估前 TOPK=10 个命中候选
-// =========================
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
-    // 只在“命中候选”（通过全部前置过滤）的前 15 个里挑最优
     const int TOPK = 15;
     int acceptedHits = 0;
 
@@ -2376,71 +2393,69 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int preferredSector = PickSector(sectors);
     float now = GetGameTime();
 
+    // ===== 新增：统计“所有幸存者”的 minZ / maxZ / minFlowBucket =====
+    float allMinZ =  1.0e9;
+    float allMaxZ = -1.0e9;
+    int   allMinFlowBucket = 100;  // 进度桶越小越靠后
+    {
+        SurPosData data;
+        for (int si = 0; si < g_iSurPosDataLen; si++)
+        {
+            g_aSurPosData.GetArray(si, data);
+            if (data.fPos[2] < allMinZ) allMinZ = data.fPos[2];
+            if (data.fPos[2] > allMaxZ) allMaxZ = data.fPos[2];
+
+            int sb = FlowDistanceToPercent(data.fFlow);
+            if (sb < allMinFlowBucket) allMinFlowBucket = sb;
+        }
+    }
+
+    // 计算中心桶（用于“前/后”判定 & 构造序列）
+    int centerBucket = 50;
+    if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
+    {
+        float tFlowDist = L4D2Direct_GetFlowDistance(targetSur);
+        centerBucket = FlowDistanceToPercent(tFlowDist);
+    }
+    else
+    {
+        float bestFlow = -1.0;
+        SurPosData data2;
+        for (int si = 0; si < g_iSurPosDataLen; si++)
+        {
+            g_aSurPosData.GetArray(si, data2);
+            if (data2.fFlow > bestFlow) bestFlow = data2.fFlow;
+        }
+        if (bestFlow > 0.0) centerBucket = FlowDistanceToPercent(bestFlow);
+    }
+
     bool found = false;
     float bestScore = 1.0e9;
-    int   bestIdx = -1;
+    int   bestIdx   = -1;
     float bestPos[3];
 
     int cFlagBad=0, cFlowBad=0, cNearFail=0, cVis=0, cStuck=0, cCD=0, cSep=0;
 
-    // ====== 计算要扫描的桶集合（±Window） ======
+    // ===== 分桶路径 =====
     bool useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
-    bool bucketMask[FLOW_BUCKETS];
-    for (int bi = 0; bi < FLOW_BUCKETS; bi++) bucketMask[bi] = false;
-
-    int centerBucket = 50; // fallback
-
     if (useBuckets)
     {
         int win = ComputeDynamicBucketWindow(searchRange);
         if (win < 0) win = 0; if (win > 100) win = 100;
 
-        // 计算中心桶 + 可用桶掩码（并集）
-        if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
-        {
-            float tFlowDist = L4D2Direct_GetFlowDistance(targetSur);
-            centerBucket = FlowDistanceToPercent(tFlowDist);
-
-            int lo = centerBucket - win, hi = centerBucket + win;
-            if (lo < 0) lo = 0; if (hi > 100) hi = 100;
-            for (int b = lo; b <= hi; b++) bucketMask[b] = true;
-        }
-        else
-        {
-            float bestFlow = -1.0;
-            int   bestS = 50;
-
-            SurPosData data;
-            for (int si = 0; si < g_iSurPosDataLen; si++)
-            {
-                g_aSurPosData.GetArray(si, data);
-                int s = FlowDistanceToPercent(data.fFlow);
-                if (data.fFlow > bestFlow) { bestFlow = data.fFlow; bestS = s; }
-
-                int lo = s - win, hi = s + win;
-                if (lo < 0) lo = 0; if (hi > 100) hi = 100;
-                for (int b = lo; b <= hi; b++) bucketMask[b] = true;
-            }
-            centerBucket = bestS;
-        }
-
-        // —— 使用你已有的 BuildBucketOrder 生成对称顺序 —— //
+        // —— 使用你重写后的 BuildBucketOrder（前 4 + 交替） —— //
         int order[FLOW_BUCKETS];
         int orderLen = BuildBucketOrder(centerBucket, win, /*includeCenter=*/false, order);
 
-        // ====== 按顺序扫描候选 NavArea ======
-        bool stop = false; // TopK 早停
-        for (int oi = 0; oi < orderLen && !stop; oi++)
+        for (int oi = 0; oi < orderLen; oi++)
         {
             int b = order[oi];
             if (b < 0 || b > 100) continue;
-            if (!bucketMask[b])   continue;           // 用掩码过滤不在并集范围内的桶
             if (g_FlowBuckets[b] == null) continue;
 
             for (int k = 0; k < g_FlowBuckets[b].Length; k++)
             {
                 int ai = g_FlowBuckets[b].Get(k);
-
                 if (IsNavOnCooldown(ai, now)) { cCD++; continue; }
 
                 NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(ai, false));
@@ -2451,64 +2466,74 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
                 { cFlowBad++; continue; }
 
-                float fSpawnPos[3];
-                pArea.GetRandomPoint(fSpawnPos);
+                float p[3];
+                pArea.GetRandomPoint(p);
 
-                float fDist;
-                if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+                float dist;
+                if (!IsNearTheSur(searchRange, p, dist))
                 { cNearFail++; continue; }
 
-                // [SpawnMin, searchRange] 窗口
-                if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
-                if (WillStuck(fSpawnPos))  { cStuck++;    continue; }
-                if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
-                if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
+                if (dist < gCV.fSpawnMin)            { cNearFail++; continue; }
+                if (WillStuck(p))                     { cStuck++;    continue; }
+                if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
+                if (!PassMinSeparation(p))            { cSep++;      continue; }
 
-                // —— 评分（分散度/扇区偏好 + 轻微抖动）——
-                int s = ComputeSectorIndex(center, fSpawnPos, sectors);
-
+                // —— 原有扇区分散度 —— //
+                int sidx = ComputeSectorIndex(center, p, sectors);
                 float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
                 float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
                 float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
                 float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
                 float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
-
                 float penScaleLimit = SectorPenaltyScaleByLimit();
-                offPenalty *= penScaleLimit;
-                rpen0     *= penScaleLimit;
-                rpen1     *= penScaleLimit;
-                rpen2     *= penScaleLimit;
+                offPenalty *= penScaleLimit; rpen0 *= penScaleLimit; rpen1 *= penScaleLimit; rpen2 *= penScaleLimit;
 
-                float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
-                if (recentSectors[0] == s) sectorPenalty += rpen0;
-                if (recentSectors[1] == s) sectorPenalty += rpen1;
-                if (recentSectors[2] == s) sectorPenalty += rpen2;
+                float sectorPenalty = (sidx == preferredSector) ? prefBonus : offPenalty;
+                if (recentSectors[0] == sidx) sectorPenalty += rpen0;
+                if (recentSectors[1] == sidx) sectorPenalty += rpen1;
+                if (recentSectors[2] == sidx) sectorPenalty += rpen2;
+
+                // ===== 新增：两条高度/进度惩罚 =====
+                // 惩罚强度（可微调）
+                const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
+                const float PEN_TOO_HIGH       = 60.0;   // 适中
+                const float PEN_TOO_HIGH2      = 30.0;   // 适中
+                int candBucket = FlowDistanceToPercent(fFlow);
+
+                float extra = 0.0;
+
+                // ① 地底且在后方：p.z 低于所有幸存者 & 进度落在所有幸存者之后（cand < allMinFlowBucket）
+                if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket)
+                    extra += PEN_LOW_BEHIND_BIG;
+
+                // ② 过高 500：p.z 高于所有幸存者 500，且职业不是 Smoker
+                if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker))
+                    extra += PEN_TOO_HIGH;
+
+                // ② 过高 300：p.z 高于所有幸存者 500，且职业不是 Smoker/Hunter
+                else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
+                    extra += PEN_TOO_HIGH2;
 
                 float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-                float score  = fDist + sectorPenalty + jitter;
+                float score  = dist + sectorPenalty + extra + jitter;
 
-                // —— 维护当前最优 —— //
                 if (!found || score < bestScore)
                 {
                     found     = true;
                     bestScore = score;
                     bestIdx   = ai;
-                    bestPos   = fSpawnPos;
+                    bestPos   = p;
                 }
 
-                // —— 命中候选计数，达到 TOPK=10 早停 —— //
                 acceptedHits++;
-                if (acceptedHits >= TOPK)
-                {
-                    stop = true;
-                    break;
-                }
+                if (acceptedHits >= TOPK) break;
             }
+            if (acceptedHits >= TOPK) break;
         }
     }
     else
     {
-        // 未启用分桶或桶未就绪 → 全量扫描（保留 TopK 早停）
+        // —— 无分桶：全量路径同样套两条惩罚 —— //
         for (int ai = 0; ai < iAreaCount; ai++)
         {
             if (IsNavOnCooldown(ai, now)) { cCD++; continue; }
@@ -2521,51 +2546,57 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
             { cFlowBad++; continue; }
 
-            float fSpawnPos[3];
-            pArea.GetRandomPoint(fSpawnPos);
+            float p[3];
+            pArea.GetRandomPoint(p);
 
-            float fDist;
-            if (!IsNearTheSur(searchRange, fFlow, fSpawnPos, fDist))
+            float dist;
+            if (!IsNearTheSur(searchRange, p, dist))
             { cNearFail++; continue; }
 
-            if (fDist < gCV.fSpawnMin) { cNearFail++; continue; }
-            if (WillStuck(fSpawnPos))  { cStuck++;    continue; }
-            if (IsPosVisibleSDK(fSpawnPos, teleportMode)) { cVis++; continue; }
-            if (!PassMinSeparation(fSpawnPos)) { cSep++; continue; }
+            if (dist < gCV.fSpawnMin)            { cNearFail++; continue; }
+            if (WillStuck(p))                     { cStuck++;    continue; }
+            if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
+            if (!PassMinSeparation(p))            { cSep++;      continue; }
 
-            int s = ComputeSectorIndex(center, fSpawnPos, sectors);
-
+            int sidx = ComputeSectorIndex(center, p, sectors);
             float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
             float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
             float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
             float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
             float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
-
             float penScaleLimit = SectorPenaltyScaleByLimit();
-            offPenalty *= penScaleLimit;
-            rpen0     *= penScaleLimit;
-            rpen1     *= penScaleLimit;
-            rpen2     *= penScaleLimit;
+            offPenalty *= penScaleLimit; rpen0 *= penScaleLimit; rpen1 *= penScaleLimit; rpen2 *= penScaleLimit;
 
-            float sectorPenalty = (s == preferredSector) ? prefBonus : offPenalty;
-            if (recentSectors[0] == s) sectorPenalty += rpen0;
-            if (recentSectors[1] == s) sectorPenalty += rpen1;
-            if (recentSectors[2] == s) sectorPenalty += rpen2;
+            float sectorPenalty = (sidx == preferredSector) ? prefBonus : offPenalty;
+            if (recentSectors[0] == sidx) sectorPenalty += rpen0;
+            if (recentSectors[1] == sidx) sectorPenalty += rpen1;
+            if (recentSectors[2] == sidx) sectorPenalty += rpen2;
+
+            // —— 同样加两条惩罚 —— //
+            const float PEN_LOW_BEHIND_BIG = 999.0;
+            const float PEN_TOO_HIGH       = 6.0;
+
+            int candBucket = FlowDistanceToPercent(fFlow);
+
+            float extra = 0.0;
+            if (p[2] < allMinZ && candBucket < allMinFlowBucket)
+                extra += PEN_LOW_BEHIND_BIG;
+            if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker) && zc != view_as<int>(SI_Hunter))
+                extra += PEN_TOO_HIGH;
 
             float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-            float score  = fDist + sectorPenalty + jitter;
+            float score  = dist + sectorPenalty + extra + jitter;
 
             if (!found || score < bestScore)
             {
                 found     = true;
                 bestScore = score;
                 bestIdx   = ai;
-                bestPos   = fSpawnPos;
+                bestPos   = p;
             }
 
             acceptedHits++;
-            if (acceptedHits >= TOPK)
-                break;
+            if (acceptedHits >= TOPK) break;
         }
     }
 
@@ -2581,6 +2612,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     outAreaIdx = bestIdx;
     return true;
 }
+
 
 // =========================
 // Spawn / Command helpers

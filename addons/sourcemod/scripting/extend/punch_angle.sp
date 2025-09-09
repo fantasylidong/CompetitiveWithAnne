@@ -199,9 +199,9 @@ static void ApplyRecoilSetting(int client, bool anti, bool persist, bool silent)
 	{
 		if (g_bRPG)
 		{
-			// RPG 语义：1=不抖动；0=抖动
-			int rpgValue = anti ? 1 : 0;
-			L4D_RPG_SetValue(client, INDEX_RECOIL, rpgValue);
+			// RPG 语义：1=不抖动；0=抖动 不用改，插件自己维护
+			//int rpgValue = anti ? 1 : 0;
+			//L4D_RPG_SetValue(client, INDEX_RECOIL, rpgValue);
 		}
 		else
 		{
