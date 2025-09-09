@@ -2331,39 +2331,57 @@ static int ComputeDynamicBucketWindow(float ring)
     return win;
 }
 
-// —— 覆盖：前方优先 4 桶 + 前后交替 ——
-// 先 push s+1,s+2,s+3,s+4（受 win/边界约束），再交替：-1,+5,-2,+6,-3,+7,-4,+8,... 直到 win 用尽
+// —— 新版：前2后1推进；若前>后差距>4，则前批量+1、后批量+1 ——
+// 例：+1,+2,-1,+3,+4,-2,+5,+6,-3,...；当前累计比后累计多 >4 时→
+//     下一轮起批量从 (FwdRun,BackRun) 变为 (FwdRun+1, BackRun+1)。
 static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[FLOW_BUCKETS])
 {
-    int n = 0;
+    if (win < 0)  win = 0;
+    if (win > 100) win = 100;
+    if (s < 0) s = 0;
+    if (s > 100) s = 100;
 
-    // 是否包含中心桶（通常你会传 false）
+    int n = 0;
     if (includeCenter && 0 <= s && s <= 100)
         outBuckets[n++] = s;
 
-    // 1) 先把前方 +1..+4 放进去
-    for (int d = 1; d <= 4 && d <= win; d++)
-    {
-        int b = s + d;
-        if (b <= 100) outBuckets[n++] = b;
-    }
+    // 距离指针（相对桶）
+    int fdist = 1; // 向前：s+1, s+2, ...
+    int bdist = 1; // 向后：s-1, s-2, ...
 
-    // 2) 然后交替推进：-1,+5,-2,+6,...
-    int backD = 1;                 // 向后距离从 1 开始：-1,-2,-3...
-    int frontD = 5;                // 向前距离从 5 开始：+5,+6,+7...
-    while (backD <= win || frontD <= win)
+    // 每轮批量（动态调整）
+    int fwdRun = 2;  // 初始“前2”
+    int backRun = 1; // 初始“后1”
+
+    // 已实际添加的前/后计数（考虑边界过滤后有效入列数量）
+    int addedF = 0;
+    int addedB = 0;
+
+    while ((fdist <= win || bdist <= win) && n < FLOW_BUCKETS)
     {
-        if (backD <= win)
+        // 先推一轮“前 fwdRun”
+        int pushedF = 0;
+        for (int k = 0; k < fwdRun && fdist <= win && n < FLOW_BUCKETS; k++, fdist++)
         {
-            int a = s - backD;
-            if (a >= 0) outBuckets[n++] = a;
-            backD++;
+            int b = s + fdist;
+            if (b <= 100) { outBuckets[n++] = b; pushedF++; }
         }
-        if (frontD <= win)
+        addedF += pushedF;
+
+        // 再推一轮“后 backRun”
+        int pushedB = 0;
+        for (int k = 0; k < backRun && bdist <= win && n < FLOW_BUCKETS; k++, bdist++)
         {
-            int b = s + frontD;
-            if (b <= 100) outBuckets[n++] = b;
-            frontD++;
+            int a = s - bdist;
+            if (a >= 0) { outBuckets[n++] = a; pushedB++; }
+        }
+        addedB += pushedB;
+
+        // 如果“前面累计 - 后面累计”> 4，则从下一轮起扩大两侧批量（前+1 / 后+1）
+        if ((addedF - addedB) > 4)
+        {
+            fwdRun++;
+            backRun++;
         }
     }
 
@@ -2530,27 +2548,29 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (recentSectors[1] == sidx) sectorPenalty += rpen1;
                 if (recentSectors[2] == sidx) sectorPenalty += rpen2;
 
-                // ===== 新增：两条高度/进度惩罚 =====
-                // 惩罚强度（可微调）
-                const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
-                const float PEN_TOO_HIGH       = 60.0;   // 适中
-                const float PEN_TOO_HIGH2      = 30.0;   // 适中
-                int candBucket = FlowDistanceToPercent(fFlow);
-
                 float extra = 0.0;
 
-                // ① 地底且在后方：p.z 低于所有幸存者 & 进度落在所有幸存者之后（cand < allMinFlowBucket）
-                if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket)
-                    extra += PEN_LOW_BEHIND_BIG;
+                if(!(L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() != FINALE_NONE))
+                {
+                    // ===== 新增：两条高度/进度惩罚 =====
+                    // 惩罚强度（可微调）
+                    const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
+                    const float PEN_TOO_HIGH       = 60.0;   // 适中
+                    const float PEN_TOO_HIGH2      = 30.0;   // 适中
+                    int candBucket = FlowDistanceToPercent(fFlow);         
 
-                // ② 过高 500：p.z 高于所有幸存者 500，且职业不是 Smoker
-                if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker))
-                    extra += PEN_TOO_HIGH;
+                    // ① 地底且在后方：p.z 低于所有幸存者 & 进度落在所有幸存者之后（cand < allMinFlowBucket）
+                    if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket)
+                        extra += PEN_LOW_BEHIND_BIG;
 
-                // ② 过高 300：p.z 高于所有幸存者 500，且职业不是 Smoker/Hunter
-                else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
-                    extra += PEN_TOO_HIGH2;
+                    // ② 过高 500：p.z 高于所有幸存者 500，且职业不是 Smoker
+                    if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker))
+                        extra += PEN_TOO_HIGH;
 
+                    // ② 过高 300：p.z 高于所有幸存者 500，且职业不是 Smoker/Hunter
+                    else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
+                        extra += PEN_TOO_HIGH2;
+                }
                 float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
                 float score  = dist + sectorPenalty + extra + jitter;
 
@@ -2761,7 +2781,7 @@ static void InitSDK_FromGamedata()
     GetOffset(hGameData, g_iNavCountOffset, "TheNavAreas::Count");
     
     GetAddress(hGameData, view_as<Address>(g_pTheNavAreas), "TheNavAreas");
-    GetAddress(hGameData, g_pPanicEventStage, "CDirectorScriptedEventManager::m_PanicEventStage");
+    GetAddress(hGameData, view_as<Address>(g_pPanicEventStage), "CDirectorScriptedEventManager::m_PanicEventStage");
 
     // Vector CNavArea::GetRandomPoint( void ) const
     strcopy(sBuffer, sizeof(sBuffer), "TerrorNavArea::FindRandomSpot");
