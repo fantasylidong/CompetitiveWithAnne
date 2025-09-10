@@ -2550,8 +2550,10 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
                 float extra = 0.0;
 
-                if(!(L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() != FINALE_NONE))
-                {
+                bool inFinale = L4D_IsMissionFinalMap();
+                bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
+
+                if (!(inFinale && finaleActive) && centerBucket < 95) {
                     // ===== 新增：两条高度/进度惩罚 =====
                     // 惩罚强度（可微调）
                     const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
