@@ -67,19 +67,18 @@
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                120.0
+#define SEP_RADIUS                100.0
 #define NAV_CD_SECS               1.0
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
 
 // === Dispersion tuning (penalties at BASE=4) ===
-#define SECTOR_PREF_BONUS_BASE   -10.0
-#define SECTOR_OFF_PENALTY_BASE   5.0
-#define RECENT_PENALTY_0_BASE     5.0
-#define RECENT_PENALTY_1_BASE     3.0
+#define SECTOR_PREF_BONUS_BASE   -8.0
+#define SECTOR_OFF_PENALTY_BASE   4.0
+#define RECENT_PENALTY_0_BASE     4.0
+#define RECENT_PENALTY_1_BASE     2.4
 #define RECENT_PENALTY_2_BASE     2.0
-#define RAND_JITTER_MAX           3.0     // 降低抖动避免“误伤”近点
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
@@ -2573,8 +2572,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
                         extra += PEN_TOO_HIGH2;
                 }
-                float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-                float score  = dist + sectorPenalty + extra + jitter;
+                float score  = dist + sectorPenalty + extra ;
 
                 if (!found || score < bestScore)
                 {
@@ -2631,20 +2629,33 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (recentSectors[1] == sidx) sectorPenalty += rpen1;
             if (recentSectors[2] == sidx) sectorPenalty += rpen2;
 
-            // —— 同样加两条惩罚 —— //
-            const float PEN_LOW_BEHIND_BIG = 999.0;
-            const float PEN_TOO_HIGH       = 6.0;
-
-            int candBucket = FlowDistanceToPercent(fFlow);
-
             float extra = 0.0;
-            if (p[2] < allMinZ && candBucket < allMinFlowBucket)
-                extra += PEN_LOW_BEHIND_BIG;
-            if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker) && zc != view_as<int>(SI_Hunter))
-                extra += PEN_TOO_HIGH;
 
-            float jitter = GetRandomFloat(0.0, RAND_JITTER_MAX);
-            float score  = dist + sectorPenalty + extra + jitter;
+            bool inFinale = L4D_IsMissionFinalMap();
+            bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
+
+            if (!(inFinale && finaleActive) && centerBucket < 95) {
+                // ===== 新增：两条高度/进度惩罚 =====
+                // 惩罚强度（可微调）
+                const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
+                const float PEN_TOO_HIGH       = 60.0;   // 适中
+                const float PEN_TOO_HIGH2      = 30.0;   // 适中
+                int candBucket = FlowDistanceToPercent(fFlow);         
+
+                // ① 地底且在后方：p.z 低于所有幸存者 & 进度落在所有幸存者之后（cand < allMinFlowBucket）
+                if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket)
+                    extra += PEN_LOW_BEHIND_BIG;
+
+                // ② 过高 500：p.z 高于所有幸存者 500，且职业不是 Smoker
+                if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker))
+                    extra += PEN_TOO_HIGH;
+
+                // ② 过高 300：p.z 高于所有幸存者 500，且职业不是 Smoker/Hunter
+                else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
+                    extra += PEN_TOO_HIGH2;
+            }
+
+            float score  = dist + sectorPenalty + extra ;
 
             if (!found || score < bestScore)
             {
