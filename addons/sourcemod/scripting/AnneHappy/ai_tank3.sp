@@ -124,7 +124,7 @@ public void OnPluginStart() {
 	// allow tank to bhop?
 	g_cvTankBhop = CreateConVar("ai_tank_bhop", "1", "是否允许坦克连跳, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// tank can bhop when he and his target are within the distance (ai_tank3_bhop_min_dist, ai_tank3_bhop_max_dist) 
-	g_cvBhopMinDist = CreateConVar("ai_tank3_bhop_min_dist", "135", "停止连跳的最小距离", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMinDist = CreateConVar("ai_Tank_StopDistance", "135", "停止连跳的最小距离", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxDist = CreateConVar("ai_tank3_bhop_max_dist", "9999", "开始连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	// when tank's speed is higher than 'ai_tank3_bhop_min_speed', he is allowed to bhop, and his max bhop speed will not above 'ai_tank3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_tank3_bhop_min_speed", "200", "连跳的最小速度", CVAR_FLAGS, true, 0.0);
@@ -136,8 +136,8 @@ public void OnPluginStart() {
 	// when tank has no sight of any survivors, he is allowed to bhop when his speed vector and eye angle forward vector within this degree
 	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
-	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "60.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "120.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "50.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "100.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
 	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);

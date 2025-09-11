@@ -1,126 +1,71 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-/**
- * Ai Charger 增强 2.0（合并修复版 - “永不站桩”）
- * -------------------------------------------------
- * 行为流程（每帧 RunCmd 决策）：
- *  0) 运行时跟踪
- *     - is_charging[]       ：从 m_isCharging 读出（1=冲锋中），用于捕捉开始/结束
- *     - charge_interval[]   ：记录“冲锋结束时刻” + 0.2s（避免恢复帧误差）
- *     - g_BlockUntil[]      ：最近一次调用 BlockCharge() 设置的“禁止冲锋直到何时”的节流时戳
- *
- *  1) 状态同步
- *     - 发现 m_isCharging 由 0→1：标记 is_charging=true
- *     - 发现 m_isCharging 由 1→0：将 charge_interval = GetGameTime() + 0.2
- *
- *  2) 距离内（closet_survivor_distance < ai_ChargerChargeDistance）且可见（m_hasVisibleThreats）：
- *     A. 目标“没看我”（角度偏差 > ai_ChargerAimOffset）且我血量 ≥ ai_ChargerMeleeDamage：
- *        - 轻节流 BlockCharge（仅一次），随后 TryRetargetAndAdvance()：
- *            * 若新目标满足“能冲”→立刻冲；否则→前压靠近（原生导航接管）
- *     B. 目标“看我”且没近战、非起身/倒地、我能冲且脚踩地：直接冲（仅 IN_ATTACK）
- *     C. 目标起身/倒地：TryRetargetAndAdvance（前压或换人冲）
- *     D. 目标被控：我血量足→BlockCharge + TryRetargetAndAdvance；否则→TryRetargetAndAdvance（不 BlockCharge）
- *
- *  3) 距离外：TryRetargetAndAdvance（不 BlockCharge）
- *
- *  4) 连跳（Bhop）：条件满足时轻推加速，避免长期与原生 AI 争夺移动控制
- *
- *  5) 梯子：禁止 IN_JUMP/IN_DUCK
- *
- *  6) 永不站桩关键：
- *     - 所有“没有合适冲锋对象”的路径都走 TryRetargetAndAdvance（能冲就冲，否则前压推进）
- *     - BlockCharge 做了节流，避免“每帧往后推冷却，永远冲不到”
- */
-
-// ======================= Debug 开关 =======================
-// 将 DEBUG 设为 1 可打开调试日志
-#define DEBUG 0
-
-stock void DBG(const char[] fmt, any ...)
-{
-    #if DEBUG
-        static char msg[256];
-        VFormat(msg, sizeof(msg), fmt, 2);
-        PrintToServer("[AiChargerDBG] %s", msg);
-    #endif
-}
-// ========================================================
-
-// 头文件
+// ===== Headers =====
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
 #include <treeutil>
 
-// 原作者常量
-#define CVAR_FLAG           FCVAR_NOTIFY
-#define NAV_MESH_HEIGHT     20.0
-#define FALL_DETECT_HEIGHT  120.0
+// ===== Defines =====
+#define CVAR_FLAG FCVAR_NOTIFY
+#define NAV_MESH_HEIGHT 20.0
+#define FALL_DETECT_HEIGHT 120.0
 
-// 保底枚举（你的头文件里若已定义，这里不会生效）
-#if !defined TEAM_SURVIVOR
-    #define TEAM_SURVIVOR 2
-#endif
-#if !defined ZC_CHARGER
-    #define ZC_CHARGER 6
-#endif
-#if !defined SC_INVALID
-    #define SC_INVALID (-1)
-#endif
-
-public Plugin myinfo = 
+// NOTE: 保留原作者/链接信息
+public Plugin myinfo =
 {
-    name        = "Ai Charger 增强 2.0 版本（合并修复）",
-    author      = "夜羽真白 / 修订: ChatGPT for morzlee",
-    description = "Ai Charger 2.0 - 永不站桩、换人推进、轻节流冷却、防冲突输入",
-    version     = "2.0.0.1 / 2025-09-08",
+    name        = "Ai Charger 增强 2.0 版本 (fixed)",
+    author      = "夜羽真白, fixes by ChatGPT for morzlee",
+    description = "Ai Charger 2.0 with bugfixes & behavior tweaks",
+    version     = "2.0.0.1 / 2025-09-10",
     url         = "https://steamcommunity.com/id/saku_ra/"
 }
 
-// ---------------- ConVars ----------------
-ConVar g_hAllowBhop, g_hBhopSpeed, g_hChargeDist, g_hExtraTargetDist, g_hAimOffset, g_hChargerTarget, g_hAllowMeleeAvoid, g_hChargerMeleeDamage, g_hChargeInterval;
+// ===== ConVars =====
+ConVar g_hAllowBhop;
+ConVar g_hBhopSpeed;                 // 注意：保持原键名拼写 ai_ChagrerBhopSpeed 兼容旧配置
+ConVar g_hChargeDist;
+ConVar g_hExtraTargetDist;
+ConVar g_hAimOffset;
+ConVar g_hChargerTarget;
+ConVar g_hAllowMeleeAvoid;
+ConVar g_hChargerMeleeDamage;
+ConVar g_hChargeInterval;            // z_charge_interval
 
-// ---------------- 运行时状态 ----------------
-float charge_interval[MAXPLAYERS + 1] = {0.0};   // 记录“冲锋结束+0.2s”的时戳
-float g_BlockUntil[MAXPLAYERS + 1]    = {0.0};   // BlockCharge 节流控制（防“每帧后推”）
+// ===== State =====
+float charge_interval[MAXPLAYERS + 1] = {0.0};
+bool  can_attack_pinned[MAXPLAYERS + 1] = {false};
+bool  is_charging[MAXPLAYERS + 1] = {false};
+int   survivor_num = 0;
+int   ranged_client[MAXPLAYERS + 1][MAXPLAYERS + 1];
+int   ranged_index[MAXPLAYERS + 1] = {0};
 
-float min_dist = 100.0;  // “额外目标范围”CVar 解析失败的兜底
-float max_dist = 600.0;
+// extra target search window
+float min_dist = 0.0;
+float max_dist = 350.0;
 
-bool is_charging[MAXPLAYERS + 1]       = {false};
-bool can_attack_pinned[MAXPLAYERS + 1] = {false};
+// ===== Forward Decls =====
+void   getOtherRangedTarget();
+void   CalculateVel(const float self_pos[3], const float target_pos[3], float force, float out[3]);
+bool   TR_EntityFilter(int entity, int mask, any data);
+void   CopyVector(const float src[3], float dest[3]);
+bool   WillChargePathClear(int client, const float dirAngles[3], float ahead);
+bool   IsMeleeClass(const char[] cls);
 
-int survivor_num = 0;
-int ranged_client[MAXPLAYERS + 1][MAXPLAYERS + 1];
-int ranged_index[MAXPLAYERS + 1] = {0};
-/*
-// ---------------- 前置声明 ----------------
-void extraTargetDistChangeHandler(ConVar convar, const char[] oldValue, const char[] newValue);
-void getOtherRangedTarget();
-int  FindRangedClients(int client, float min_range, float max_range);
-void BlockCharge(int client);
-void SetCharge(int client);
-bool TR_EntityFilterEx(int entity, int mask, any data);
-bool TR_RayFilter(int entity, int mask, any data);
-bool TryRetargetAndAdvance(int client, int ability, int &buttons);
-void CalcVel(const float self_pos[3], const float target_pos[3], float force, float out[3]);
-*/
-// ---------------- PluginStart ----------------
+// ===== Plugin Start =====
 public void OnPluginStart()
 {
-    // CreateConVars（保持原注释/拼写）
-    g_hAllowBhop          = CreateConVar("ai_ChargerBhop", "1", "是否开启 Charger 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
-    g_hBhopSpeed          = CreateConVar("ai_ChagrerBhopSpeed", "90.0", "Charger 连跳速度", CVAR_FLAG, true, 0.0);
-    g_hChargeDist         = CreateConVar("ai_ChargerChargeDistance", "250.0", "Charger 只能在与目标小于这一距离时冲锋", CVAR_FLAG, true, 0.0);
-    g_hExtraTargetDist    = CreateConVar("ai_ChargerExtraTargetDistance", "250,600", "Charger 会在这一范围内寻找其他有效的目标（中间用逗号隔开，不要有空格）", CVAR_FLAG);
-    g_hAimOffset          = CreateConVar("ai_ChargerAimOffset", "15.0", "目标的瞄准水平与 Charger 处在这一范围内，Charger 不会冲锋", CVAR_FLAG, true, 0.0);
-    g_hAllowMeleeAvoid    = CreateConVar("ai_ChargerMeleeAvoid", "1", "是否开启 Charger 近战回避", CVAR_FLAG, true, 0.0, true, 1.0);
-    g_hChargerMeleeDamage = CreateConVar("ai_ChargerMeleeDamage", "350", "Charger 血量小于这个值，将不会直接冲锋拿着近战的生还者", CVAR_FLAG, true, 0.0);
-    // 修：上限允许 3（原代码误写为 2，导致 case 3 永远进不去）
-    g_hChargerTarget      = CreateConVar("ai_ChargerTarget", "3", "Charger目标选择：1=自然目标选择，2=优先取最近目标，3=优先撞人多处", CVAR_FLAG, true, 1.0, true, 3.0);
-
-    g_hChargeInterval     = FindConVar("z_charge_interval");
+    g_hAllowBhop         = CreateConVar("ai_ChargerBhop", "1", "是否开启 Charger 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
+    // 注意：保持键名 ai_ChagrerBhopSpeed 以兼容旧服配置（原拼写有误）
+    g_hBhopSpeed         = CreateConVar("ai_ChagrerBhopSpeed", "90.0", "Charger 连跳速度/推进力度", CVAR_FLAG, true, 0.0);
+    g_hChargeDist        = CreateConVar("ai_ChargerChargeDistance", "260.0", "Charger 只能在与目标小于这一距离时冲锋", CVAR_FLAG, true, 0.0);
+    g_hExtraTargetDist   = CreateConVar("ai_ChargerExtraTargetDistance", "0,420", "Charger 会在这一范围内寻找其他有效的目标/背身冲锋窗口（逗号分隔，无空格）", CVAR_FLAG);
+    g_hAimOffset         = CreateConVar("ai_ChargerAimOffset", "30.0", "目标的瞄准水平与 Charger 处在这一范围内，视为“看着你”", CVAR_FLAG, true, 0.0);
+    g_hAllowMeleeAvoid   = CreateConVar("ai_ChargerMeleeAvoid", "1", "是否开启 Charger 近战回避", CVAR_FLAG, true, 0.0, true, 1.0);
+    g_hChargerMeleeDamage= CreateConVar("ai_ChargerMeleeDamage", "351", "Charger 血量小于这个值，将不会直接冲锋拿着近战的生还者", CVAR_FLAG, true, 0.0);
+    g_hChargerTarget     = CreateConVar("ai_ChargerTarget", "3", "Charger目标选择：1=自然，2=最近，3=撞人多处", CVAR_FLAG, true, 1.0, true, 3.0);
+    g_hChargeInterval    = FindConVar("z_charge_interval");
 
     g_hExtraTargetDist.AddChangeHook(extraTargetDistChangeHandler);
 
@@ -129,202 +74,249 @@ public void OnPluginStart()
     getOtherRangedTarget();
 }
 
-// CVar 变更：解析“额外目标范围”
+public void OnMapStart()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        charge_interval[i] = 0.0;
+        is_charging[i] = false;
+        can_attack_pinned[i] = false;
+        ranged_index[i] = 0;
+    }
+}
+
+public void OnClientDisconnect(int client)
+{
+    charge_interval[client] = 0.0;
+    is_charging[client] = false;
+    can_attack_pinned[client] = false;
+    ranged_index[client] = 0;
+}
+
 void extraTargetDistChangeHandler(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     getOtherRangedTarget();
 }
 
-// 事件：牛生成时初始化状态
+// ===== Events =====
 public void evt_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (IsCharger(client))
     {
+        // 初始设置为：刚好结束一次冲锋 → 可以立刻挥拳
         charge_interval[client] = 0.0 - g_hChargeInterval.FloatValue;
-        g_BlockUntil[client] = 0.0;
         is_charging[client] = false;
-        can_attack_pinned[client] = false;
-        DBG("Spawn: chg %d charge_interval=%.2f", client, charge_interval[client]);
     }
 }
 
-// ---------------- 主循环：RunCmd 决策 ----------------
+// ===== Core Control =====
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
-    if (IsCharger(client) && IsPlayerAlive(client))
+    if (!IsCharger(client) || !IsPlayerAlive(client))
+        return Plugin_Continue;
+
+    bool has_sight = view_as<bool>(GetEntProp(client, Prop_Send, "m_hasVisibleThreats"));
+    int  target = GetClientAimTarget(client, true);
+    int  flags  = GetEntityFlags(client);
+    int  ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+
+    float self_pos[3];
+    float target_pos[3];
+    float vec_speed[3];
+    float cur_speed;
+
+    GetClientAbsOrigin(client, self_pos);
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vec_speed);
+    cur_speed = SquareRoot(Pow(vec_speed[0], 2.0) + Pow(vec_speed[1], 2.0));
+
+    survivor_num = GetSurvivorCount(true, false);
+
+    // 监控 charging state 变化 → 记录结束时间戳
+    if (IsValidEntity(ability) && !is_charging[client] && GetEntProp(ability, Prop_Send, "m_isCharging") == 1)
     {
-        if (GetEntPropEnt(client, Prop_Send, "m_pummelVictim") > 0 || GetEntPropEnt(client, Prop_Send, "m_carryVictim") > 0)
-            return Plugin_Continue;
+        is_charging[client] = true;
+    }
+    else if (IsValidEntity(ability) && is_charging[client] && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
+    {
+        charge_interval[client] = GetGameTime();
+        is_charging[client] = false;
+    }
 
-        if (L4D_IsPlayerStaggering(client))
-            return Plugin_Continue;
+    // 冲锋时静止玩家输入速度
+    if (buttons & IN_ATTACK)
+    {
+        vel[0] = vel[1] = vel[2] = 0.0;
+    }
 
-        bool has_sight = view_as<bool>(GetEntProp(client, Prop_Send, "m_hasVisibleThreats"));
-        int target = GetClientAimTarget(client, true);
-        int closet_survivor_distance = GetClosetSurvivorDistance(client);
-        int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+    // 主逻辑：根据“是否看你(背身)”与距离，决定冲/拳
+    if (IsValidSurvivor(target))
+    {
+        GetClientAbsOrigin(target, target_pos);
+        float dist = GetVectorDistance(self_pos, target_pos);
+        bool target_watching = Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue);
+        bool inChargeCD = IsInChargeDuration(client);
+        bool onGround = (flags & FL_ONGROUND) != 0;
+        bool abilityCharging = (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging") == 1);
 
-        float self_pos[3] = {0.0}, target_pos[3] = {0.0}, vec_speed[3] = {0.0}, vel_buffer[3] = {0.0};
-        GetClientAbsOrigin(client, self_pos);
-        GetEntPropVector(client, Prop_Data, "m_vecVelocity", vec_speed);
-        float cur_speed = SquareRoot(Pow(vec_speed[0], 2.0) + Pow(vec_speed[1], 2.0));
-
-        survivor_num = GetSurvivorCount(true, false);
-
-        // --- 冲锋状态机同步（开始/结束） ---
-        if (IsValidEntity(ability) && !is_charging[client] && GetEntProp(ability, Prop_Send, "m_isCharging") == 1)
+        // 先处理“可见且距离在主阈值周边”的场景
+        if (has_sight && !abilityCharging)
         {
-            is_charging[client] = true;
-            DBG("StartCharge chg=%d", client);
-        }
-        else if (IsValidEntity(ability) && is_charging[client] && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
-        {
-            charge_interval[client] = GetGameTime() + 0.2; // 微延后
-            is_charging[client] = false;
-            DBG("EndCharge chg=%d charge_interval=%.2f", client, charge_interval[client]);
-        }
-
-        // 冲锋帧：清零三方向速度（保留原行为）
-        if (buttons & IN_ATTACK)
-            vel[0] = vel[1] = vel[2] = 0.0;
-
-        // ====== 主决策 ======
-        if (closet_survivor_distance < g_hChargeDist.IntValue)
-        {
-            if (has_sight && IsValidSurvivor(target) && !IsClientIncapped(target) && !IsClientPinned(target) && !IsInChargeDuration(client))
+            // 背身分支：
+            if (!target_watching && !IsClientIncapped(target) && !IsClientPinned(target))
             {
-                // A. 目标没看我 + 我血量足：轻节流 Block + 强制换人推进
-                if (GetClientHealth(client) >= g_hChargerMeleeDamage.IntValue
-                    && !Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue))
+                // 背身 && 距离在 (ChargeDist, ExtraMax] && 在 [ExtraMin, ExtraMax] 窗口 → 试图冲锋（先检查是否会被挡）
+                if (!inChargeCD && onGround && dist > g_hChargeDist.FloatValue && dist >= min_dist && dist <= max_dist)
+                {
+                    float chargeAngles[3];
+                    float dir[3];
+                    MakeVectorFromPoints(self_pos, target_pos, dir);
+                    GetVectorAngles(dir, chargeAngles);
+
+                    if (WillChargePathClear(client, chargeAngles, 120.0))
+                    {
+                        SetCharge(client);
+                        buttons |= IN_ATTACK;   // 交由能力决定是冲锋
+                        return Plugin_Changed;
+                    }
+                    else
+                    {
+                        // 路径被挡 → 挥拳更稳
+                        BlockCharge(client);
+                        buttons |= IN_ATTACK;   // 挥拳
+                        return Plugin_Changed;
+                    }
+                }
+                // 背身 && 距离 <= ChargeDist → 挥拳（近距离冲锋易贴脸卡）
+                else if (dist <= g_hChargeDist.FloatValue)
                 {
                     BlockCharge(client);
-                    if (TryRetargetAndAdvance(client, ability, buttons))
-                        return Plugin_Changed;
-                }
-                // B. 目标看我、可冲锋：直接冲
-                else if (Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue)
-                         && !Client_MeleeCheck(target)
-                         && !Is_InGetUp_Or_Incapped(target)
-                         && GetEntProp(ability, Prop_Send, "m_isCharging") != 1
-                         && IsGrounded(client))
-                {
-                    SetCharge(client);
-                    buttons |= IN_ATTACK; // 仅冲锋
-                    DBG("DirectCharge target=%d chg=%d", target, client);
+                    buttons |= IN_ATTACK;
                     return Plugin_Changed;
                 }
-                // C. 目标起身/倒地：推进（不 Block）
-                else if (Is_InGetUp_Or_Incapped(target))
-                {
-                    if (TryRetargetAndAdvance(client, ability, buttons))
-                        return Plugin_Changed;
-                }
             }
-            // 目标被控：血量足则 Block+推进，否则直接推进（不 Block）
-            else if (has_sight && IsValidSurvivor(target) && IsClientPinned(target) && !IsInChargeDuration(client))
+            else if (target_watching && !IsClientIncapped(target) && !IsClientPinned(target))
             {
-                if (GetClientHealth(client) > g_hChargerMeleeDamage.IntValue)
+                // 正面看你：若目标不是近战，尝试冲锋（带路径检查）
+                if (!Client_MeleeCheck(target) && !inChargeCD && onGround)
+                {
+                    float chargeAngles2[3];
+                    float dir2[3];
+                    MakeVectorFromPoints(self_pos, target_pos, dir2);
+                    GetVectorAngles(dir2, chargeAngles2);
+
+                    if (WillChargePathClear(client, chargeAngles2, 120.0))
+                    {
+                        SetCharge(client);
+                        buttons |= IN_ATTACK;
+                        return Plugin_Changed;
+                    }
+                    else
+                    {
+                        BlockCharge(client);
+                        buttons |= IN_ATTACK; // 路不通 → 挥拳
+                        return Plugin_Changed;
+                    }
+                }
+                // 正面且对方拿近战：交给 OnChooseVictim 去转移目标或近战回避；此处只防冲
+                else if (Client_MeleeCheck(target))
                 {
                     BlockCharge(client);
-                    if (TryRetargetAndAdvance(client, ability, buttons))
-                        return Plugin_Changed;
-                }
-                else
-                {
-                    if (TryRetargetAndAdvance(client, ability, buttons))
-                        return Plugin_Changed;
                 }
             }
-        }
-        else
-        {
-            // 距离外：不 Block，推进
-            if (!IsInChargeDuration(client) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
+
+            // 目标倒地/起身：不冲 → 挥拳
+            if (Is_InGetUp_Or_Incapped(target))
             {
-                if (TryRetargetAndAdvance(client, ability, buttons))
-                    return Plugin_Changed;
+                BlockCharge(client);
+                buttons |= IN_ATTACK;
+                return Plugin_Changed;
             }
         }
 
-        // ====== 连跳（轻推） ======
-        int bhopMinDist = can_attack_pinned[client] ? 60 : g_hChargeDist.IntValue;
-
-        if (has_sight
-            && g_hAllowBhop.BoolValue
-            && float(closet_survivor_distance) > float(bhopMinDist)
-            && float(closet_survivor_distance) < 10000.0
-            && cur_speed > 175.0
-            && IsValidSurvivor(target))
+        // 距离过大或其他情况：阻止冲锋，允许普通攻击（追击/压制）
+        if (!inChargeCD && !abilityCharging)
         {
-            if (IsGrounded(client))
-            {
-                GetClientAbsOrigin(target, target_pos);
-                CalcVel(self_pos, target_pos, g_hBhopSpeed.FloatValue, vel_buffer);
-
-                buttons |= IN_JUMP;
-                buttons |= IN_DUCK;
-
-                if (Do_Bhop(client, buttons, vel_buffer))
-                {
-                    DBG("Bhop chg=%d", client);
-                    return Plugin_Changed;
-                }
-            }
-        }
-
-        // 梯子：禁止连跳
-        if (GetEntityMoveType(client) == MOVETYPE_LADDER)
-        {
-            buttons &= ~IN_JUMP;
-            buttons &= ~IN_DUCK;
+            BlockCharge(client);
+            // buttons |= IN_ATTACK; // 这里不强制攻击，交由 AI 自然移动
         }
     }
+
+    // ====== BHop 逻辑 ======
+    int bhopMinDist = can_attack_pinned[client] ? 0 : g_hChargeDist.IntValue;
+    float closestDist = GetClosestSurvivorDistance(client);
+
+    if (has_sight && g_hAllowBhop.BoolValue
+        && closestDist > float(bhopMinDist)
+        && closestDist < 2000.0
+        && cur_speed > 175.0
+        && IsValidSurvivor(GetClientAimTarget(client, true)))
+    {
+        if ((flags & FL_ONGROUND) != 0)
+        {
+            int tgt = GetClientAimTarget(client, true);
+            float vel_buffer[3];
+            if (IsValidSurvivor(tgt))
+            {
+                float tgtpos[3];
+                GetClientAbsOrigin(tgt, tgtpos);
+                CalculateVel(self_pos, tgtpos, g_hBhopSpeed.FloatValue, vel_buffer);
+                buttons |= IN_JUMP;
+                buttons |= IN_DUCK;
+                if (Do_Bhop(client, buttons, vel_buffer))
+                    return Plugin_Changed;
+            }
+        }
+    }
+
+    // 梯子上禁用连跳
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER)
+    {
+        buttons &= ~IN_JUMP;
+        buttons &= ~IN_DUCK;
+    }
+
     return Plugin_Continue;
 }
 
-// ---------------- 目标选择（L4D2 Forward） ----------------
+// ===== Victim Selection =====
 public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 {
     int new_target = 0;
     if (IsCharger(specialInfected))
     {
-        if (GetEntPropEnt(specialInfected, Prop_Send, "m_pummelVictim") > 0 || GetEntPropEnt(specialInfected, Prop_Send, "m_carryVictim") > 0)
-            return Plugin_Continue;
-
-        float self_pos[3] = {0.0}, target_pos[3] = {0.0};
+        float self_pos[3];
+        float target_pos[3];
         GetClientEyePosition(specialInfected, self_pos);
-
-        // 刷新范围内可视目标池
         FindRangedClients(specialInfected, min_dist, max_dist);
 
         if (IsValidSurvivor(curTarget) && IsPlayerAlive(curTarget))
         {
             GetClientEyePosition(curTarget, target_pos);
 
-            // 范围内有人被控且血量足 → 先去被控附近压迫（Block 一次）
+            // 1) 范围内若有人被控，且自身血量>阈值，先去挥拳解场
             for (int i = 0; i < ranged_index[specialInfected]; i++)
             {
-                if (GetClientHealth(specialInfected) > g_hChargerMeleeDamage.IntValue
-                    && !IsInChargeDuration(specialInfected)
-                    && (GetEntPropEnt(ranged_client[specialInfected][i], Prop_Send, "m_pounceAttacker") > 0
-                        || GetEntPropEnt(ranged_client[specialInfected][i], Prop_Send, "m_tongueOwner") > 0
-                        || GetEntPropEnt(ranged_client[specialInfected][i], Prop_Send, "m_jockeyAttacker") > 0))
+                int s = ranged_client[specialInfected][i];
+                if (GetClientHealth(specialInfected) > g_hChargerMeleeDamage.IntValue && !IsInChargeDuration(specialInfected))
                 {
-                    can_attack_pinned[specialInfected] = true;
-                    curTarget = ranged_client[specialInfected][i];
-                    BlockCharge(specialInfected);
-                    DBG("ChooseVictim: attack pinned -> near %d", curTarget);
-                    return Plugin_Changed;
+                    if (GetEntPropEnt(s, Prop_Send, "m_pounceAttacker") > 0 ||
+                        GetEntPropEnt(s, Prop_Send, "m_tongueOwner") > 0   ||
+                        GetEntPropEnt(s, Prop_Send, "m_jockeyAttacker") > 0)
+                    {
+                        can_attack_pinned[specialInfected] = true;
+                        curTarget = s;
+                        BlockCharge(specialInfected); // 修正：阻止的是牛，不是目标
+                        return Plugin_Changed;
+                    }
                 }
-                can_attack_pinned[specialInfected] = false;
             }
+            can_attack_pinned[specialInfected] = false;
 
+            // 2) 近战回避：目标拿近战 & 距离>=冲锋阈 & 我血量≥阈 → 尝试切换
             if (!IsClientIncapped(curTarget) && !IsClientPinned(curTarget))
             {
-                // 近战回避：若当前目标近战，且距离≥冲锋距离、且血量足 → 切到非近战且可视的目标
-                if (g_hAllowMeleeAvoid.BoolValue
-                    && Client_MeleeCheck(curTarget)
+                if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget)
                     && GetVectorDistance(self_pos, target_pos) >= g_hChargeDist.FloatValue
                     && GetClientHealth(specialInfected) >= g_hChargerMeleeDamage.IntValue)
                 {
@@ -333,39 +325,36 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
                     if (Client_MeleeCheck(curTarget) && melee_num < survivor_num && IsValidSurvivor(new_target) && Player_IsVisible_To(specialInfected, new_target))
                     {
                         curTarget = new_target;
-                        DBG("ChooseVictim: melee avoid -> switch to %d", curTarget);
                         return Plugin_Changed;
                     }
                 }
-                // 不满足回避距离/血量，但目标近战：Block 一次（以靠近为主）
-                else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget)
-                         && !IsInChargeDuration(specialInfected)
-                         && (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue || GetClientHealth(specialInfected) >= g_hChargerMeleeDamage.IntValue))
+                // 不满足回避条件 → 防冲，改为近战压制
+                else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) && !IsInChargeDuration(specialInfected)
+                    && (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue || GetClientHealth(specialInfected) < g_hChargerMeleeDamage.IntValue))
                 {
                     BlockCharge(specialInfected);
-                    DBG("ChooseVictim: melee avoid -> block charge");
                 }
 
-                // —— 目标选择策略（用 if/else，避免 break 语境错误） —— //
-                int mode = g_hChargerTarget.IntValue;
-                if (mode == 2)
+                // 3) 目标选择策略
+                switch (g_hChargerTarget.IntValue)
                 {
-                    new_target = GetClosetMobileSurvivor(specialInfected);
-                    if (IsValidSurvivor(new_target))
+                    case 2:
                     {
-                        curTarget = new_target;
-                        DBG("ChooseVictim: nearest -> %d", curTarget);
-                        return Plugin_Changed;
+                        new_target = GetClosetMobileSurvivor(specialInfected); // 保留原函数名
+                        if (IsValidSurvivor(new_target))
+                        {
+                            curTarget = new_target;
+                            return Plugin_Changed;
+                        }
                     }
-                }
-                else if (mode == 3)
-                {
-                    new_target = GetCrowdPlace(survivor_num);
-                    if (IsValidSurvivor(new_target))
+                    case 3:
                     {
-                        curTarget = new_target;
-                        DBG("ChooseVictim: crowd -> %d", curTarget);
-                        return Plugin_Changed;
+                        new_target = GetCrowdPlace(survivor_num);
+                        if (IsValidSurvivor(new_target))
+                        {
+                            curTarget = new_target;
+                            return Plugin_Changed;
+                        }
                     }
                 }
             }
@@ -376,256 +365,186 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
             if (IsValidSurvivor(new_target))
             {
                 curTarget = new_target;
-                DBG("ChooseVictim: fallback nearest -> %d", curTarget);
                 return Plugin_Changed;
             }
         }
     }
 
-    // 避免把“已倒地/被控的人”作为当前目标
     if (!can_attack_pinned[specialInfected] && IsCharger(specialInfected) && IsValidSurvivor(curTarget) && (IsClientIncapped(curTarget) || IsClientPinned(curTarget)))
     {
-        int nt = GetClosetMobileSurvivor(specialInfected);
-        if (IsValidSurvivor(nt))
+        int new_target2 = GetClosetMobileSurvivor(specialInfected);
+        if (IsValidSurvivor(new_target2))
         {
-            curTarget = nt;
-            DBG("ChooseVictim: avoid incapped/pinned -> %d", curTarget);
+            curTarget = new_target2;
             return Plugin_Changed;
         }
     }
+
     return Plugin_Continue;
 }
 
-// ---------------- 工具函数：强制换目标 + 推进（核心：永不站桩） ----------------
-bool TryRetargetAndAdvance(int client, int ability, int &buttons)
-{
-    FindRangedClients(client, min_dist, max_dist);
-
-    int cand = -1;
-
-    // 1) 优先“看我”的可动目标
-    for (int i = 0; i < ranged_index[client]; i++)
-    {
-        int s = ranged_client[client][i];
-        if (!IsClientPinned(s) && !Is_InGetUp_Or_Incapped(s) && Is_Target_Watching_Attacker(client, s, g_hAimOffset.IntValue))
-        { cand = s; break; }
-    }
-
-    // 2) 否则最近的可动目标
-    if (cand == -1)
-    {
-        float best = 1.0e9;
-        float self[3]; GetClientAbsOrigin(client, self);
-        for (int i = 0; i < ranged_index[client]; i++)
-        {
-            int s = ranged_client[client][i];
-            if (!IsClientPinned(s) && !Is_InGetUp_Or_Incapped(s))
-            {
-                float pos[3]; GetClientAbsOrigin(s, pos);
-                float d = GetVectorDistance(self, pos);
-                if (d < best) { best = d; cand = s; }
-            }
-        }
-    }
-
-    // 3) 再退回“最近可动生还者”或“人多处”
-    if (cand == -1) cand = GetClosetMobileSurvivor(client);
-    if (!IsValidSurvivor(cand)) cand = GetCrowdPlace(survivor_num);
-    if (!IsValidSurvivor(cand)) return false;
-
-    // 4) 立刻面向该目标
-    float self_pos[3], tgt_pos[3], ang[3];
-    GetClientAbsOrigin(client, self_pos);
-    GetClientAbsOrigin(cand,  tgt_pos);
-    MakeVectorFromPoints(self_pos, tgt_pos, tgt_pos);
-    GetVectorAngles(tgt_pos, ang);
-    TeleportEntity(client, NULL_VECTOR, ang, NULL_VECTOR);
-
-    // 5) 满足“能冲” → 立刻冲；否则 → 前压（不 Block）
-    bool canChargeNow = (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
-                     && !IsInChargeDuration(client)
-                     && IsGrounded(client)
-                     && Is_Target_Watching_Attacker(client, cand, g_hAimOffset.IntValue)
-                     && !Client_MeleeCheck(cand)
-                     && !Is_InGetUp_Or_Incapped(cand);
-
-    if (canChargeNow)
-    {
-        SetCharge(client);
-        buttons &= ~IN_ATTACK2;
-        buttons |= IN_ATTACK;
-        DBG("Retarget->Charge chg=%d target=%d", client, cand);
-    }
-    else
-    {
-        buttons &= ~IN_ATTACK;
-        buttons &= ~IN_ATTACK2;
-        buttons |= IN_FORWARD; // 交给原生导航推进
-        DBG("Retarget->Advance chg=%d target=%d", client, cand);
-    }
-    return true;
-}
-
-// ---------------- 近战数量统计 & 近战识别 ----------------
+// ===== Helpers =====
 void Get_MeleeNum(int &melee_num, int &new_target)
 {
     int active_weapon = -1;
-    char weapon_name[48] = {'\0'};
+    char weapon_name[48];
+    melee_num = 0;
+    new_target = -1;
+
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (IsClientConnected(client) && IsClientInGame(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR) && IsPlayerAlive(client) && !IsClientIncapped(client) && !IsClientPinned(client))
+        if (IsClientConnected(client) && IsClientInGame(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR)
+            && IsPlayerAlive(client) && !IsClientIncapped(client) && !IsClientPinned(client))
         {
             active_weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
             if (IsValidEntity(active_weapon) && IsValidEdict(active_weapon))
             {
                 GetEdictClassname(active_weapon, weapon_name, sizeof(weapon_name));
-                if (StrContains(weapon_name, "melee", false) != -1 || StrEqual(weapon_name, "weapon_chainsaw"))
+                if (IsMeleeClass(weapon_name))
+                {
                     melee_num += 1;
+                }
                 else
-                    new_target = client;
+                {
+                    new_target = client; // 记录一个非近战目标
+                }
             }
         }
     }
+}
+
+public bool IsMeleeClass(const char[] cls)
+{
+    if (strcmp(cls, "weapon_chainsaw") == 0)
+        return true;
+    return (strncmp(cls, "weapon_melee", 12, false) == 0);
 }
 
 bool Client_MeleeCheck(int client)
 {
-    int active_weapon = -1;
-    char weapon_name[48] = {'\0'};
-    if (IsValidSurvivor(client) && IsPlayerAlive(client) && !IsClientIncapped(client) && !IsClientPinned(client))
-    {
-        active_weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-        if (IsValidEntity(active_weapon) && IsValidEdict(active_weapon))
-        {
-            GetEdictClassname(active_weapon, weapon_name, sizeof(weapon_name));
-            if (StrContains(weapon_name, "melee", false) != -1 || StrEqual(weapon_name, "weapon_chainsaw"))
-                return true;
-        }
-    }
-    return false;
+    if (!IsValidSurvivor(client) || !IsPlayerAlive(client) || IsClientIncapped(client) || IsClientPinned(client))
+        return false;
+
+    int wep = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+    if (!IsValidEntity(wep) || !IsValidEdict(wep))
+        return false;
+
+    char cls[48];
+    GetEdictClassname(wep, cls, sizeof(cls));
+    return IsMeleeClass(cls);
 }
 
-// ---------------- 人群中心（原作者引用方法） ----------------
-// From：http://github.com/PaimonQwQ/L4D2-Plugins/smartspitter.sp
 int GetCrowdPlace(int num_survivors)
 {
-    if (num_survivors > 0)
+    if (num_survivors <= 0)
+        return -1;
+
+    int index = 0, iTarget = 0;
+    int[] iSurvivors = new int[num_survivors];
+    float fDistance[MAXPLAYERS + 1];
+    for (int i = 0; i <= MAXPLAYERS; i++) fDistance[i] = -1.0;
+
+    for (int client = 1; client <= MaxClients; client++)
     {
-        int index = 0, iTarget = 0;
-        int[] iSurvivors = new int[MAXPLAYERS + 1];
-        float fDistance[MAXPLAYERS + 1] = {-1.0};
-
-        for (int client = 1; client <= MaxClients; client++)
-        {
-            if (IsValidClient(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR))
-                iSurvivors[index++] = client;
-        }
-
-        for (int client = 1; client <= MaxClients; client++)
-        {
-            if (IsValidClient(client) && IsPlayerAlive(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR))
-            {
-                fDistance[client] = 0.0;
-                float fClientPos[3] = {0.0};
-                GetClientAbsOrigin(client, fClientPos);
-                for (int i = 0; i < num_survivors; i++)
-                {
-                    float fPos[3] = {0.0};
-                    GetClientAbsOrigin(iSurvivors[i], fPos);
-                    fDistance[client] += GetVectorDistance(fClientPos, fPos, true);
-                }
-            }
-        }
-
-        for (int i = 0; i < num_survivors; i++)
-        {
-            if (fDistance[iSurvivors[iTarget]] > fDistance[iSurvivors[i]])
-            {
-                if (fDistance[iSurvivors[i]] != -1.0)
-                    iTarget = i;
-            }
-        }
-        return iSurvivors[iTarget];
+        if (IsValidClient(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR))
+            iSurvivors[index++] = client;
     }
-    return -1;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsValidClient(client) && IsPlayerAlive(client) && GetClientTeam(client) == view_as<int>(TEAM_SURVIVOR))
+        {
+            fDistance[client] = 0.0;
+            float fClientPos[3];
+            GetClientAbsOrigin(client, fClientPos);
+            for (int i = 0; i < num_survivors; i++)
+            {
+                float fPos[3];
+                GetClientAbsOrigin(iSurvivors[i], fPos);
+                fDistance[client] += GetVectorDistance(fClientPos, fPos, true);
+            }
+        }
+    }
+
+    for (int i = 0; i < num_survivors; i++)
+    {
+        if (fDistance[iSurvivors[iTarget]] > fDistance[iSurvivors[i]] && fDistance[iSurvivors[i]] != -1.0)
+            iTarget = i;
+    }
+
+    return iSurvivors[iTarget];
 }
 
-// ---------------- 判断/工具（保留原语义） ----------------
+// 是否 AI 牛
 bool IsCharger(int client)
 {
     return view_as<bool>(GetInfectedClass(client) == view_as<int>(ZC_CHARGER) && IsFakeClient(client));
 }
 
-// 起身/倒地识别（依赖 treeutil/left4dhooks 的动画表）
+// 判断目标是否处于正在起身或正在倒地状态
 bool Is_InGetUp_Or_Incapped(int client)
 {
     int character_index = IdentifySurvivor(client);
-    if (character_index != view_as<int>(SC_INVALID))
-    {
-        int sequence = GetEntProp(client, Prop_Send, "m_nSequence");
-        if (sequence == GetUpAnimations[character_index][ID_HUNTER] || sequence == GetUpAnimations[character_index][ID_CHARGER] || sequence == GetUpAnimations[character_index][ID_CHARGER_WALL] || sequence == GetUpAnimations[character_index][ID_CHARGER_GROUND])
-            return true;
-        else if (sequence == IncappAnimations[character_index][ID_SINGLE_PISTOL] || sequence == IncappAnimations[character_index][ID_DUAL_PISTOLS])
-            return true;
+    if (character_index == view_as<int>(SC_INVALID))
         return false;
-    }
+
+    int sequence = GetEntProp(client, Prop_Send, "m_nSequence");
+    if (sequence == GetUpAnimations[character_index][ID_HUNTER] ||
+        sequence == GetUpAnimations[character_index][ID_CHARGER] ||
+        sequence == GetUpAnimations[character_index][ID_CHARGER_WALL] ||
+        sequence == GetUpAnimations[character_index][ID_CHARGER_GROUND])
+        return true;
+
+    if (sequence == IncappAnimations[character_index][ID_SINGLE_PISTOL] ||
+        sequence == IncappAnimations[character_index][ID_DUAL_PISTOLS])
+        return true;
+
     return false;
 }
 
-// 阻止牛冲锋（带节流，避免“每帧把 m_timestamp 往后推”）
+// 阻止牛冲锋（推迟能力时间戳）
 void BlockCharge(int client)
 {
     int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
-    if (!IsValidEntity(ability) || GetEntProp(ability, Prop_Send, "m_isCharging") == 1)
-        return;
-
-    float until = GetGameTime() + g_hChargeInterval.FloatValue;
-    if (g_BlockUntil[client] + 0.01 < until)
-    {
-        g_BlockUntil[client] = until;
-        SetEntPropFloat(ability, Prop_Send, "m_timestamp", until);
-        DBG("BlockCharge chg=%d until=%.2f", client, until);
-    }
+    if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
+        SetEntPropFloat(ability, Prop_Send, "m_timestamp", GetGameTime() + g_hChargeInterval.FloatValue);
 }
 
-// 让牛冲锋（立即把时间戳拉回“可用”）
+// 让牛冲锋（提前能力时间戳）
 void SetCharge(int client)
 {
     int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
     if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1)
-    {
         SetEntPropFloat(ability, Prop_Send, "m_timestamp", GetGameTime() - 0.5);
-        DBG("SetCharge chg=%d", client);
-    }
 }
 
-// 是否在冲锋间隔（基于“冲锋结束+0.2s”的记录）
+// 是否在冲锋间隔
 bool IsInChargeDuration(int client)
 {
     return view_as<bool>((GetGameTime() - (g_hChargeInterval.FloatValue + charge_interval[client])) < 0.0);
 }
 
-// 在 min..max 范围内、且可视的有效生还者集合（写入 ranged_client / ranged_index）
+// 查找范围内可视的有效玩家
 int FindRangedClients(int client, float min_range, float max_range)
 {
     int index = 0;
+    float self_eye_pos[3];
+    GetClientEyePosition(client, self_eye_pos);
+
     for (int i = 1; i <= MaxClients; i++)
     {
         if (IsClientConnected(i) && IsClientInGame(i) && GetClientTeam(i) == view_as<int>(TEAM_SURVIVOR) && IsPlayerAlive(i) && !IsClientIncapped(i))
         {
-            float self_eye_pos[3] = {0.0}, target_eye_pos[3] = {0.0};
-            GetClientEyePosition(client, self_eye_pos);
+            float target_eye_pos[3];
             GetClientEyePosition(i, target_eye_pos);
             float dist = GetVectorDistance(self_eye_pos, target_eye_pos);
             if (dist >= min_range && dist <= max_range)
             {
-                Handle hTrace = TR_TraceRayFilterEx(self_eye_pos, target_eye_pos, MASK_VISIBLE, RayType_EndPoint, TR_RayFilter, client);
-                if (!TR_DidHit(hTrace) || TR_GetEntityIndex(hTrace) == i)
-                {
-                    ranged_client[client][index] = i;
-                    index += 1;
-                }
+                Handle hTrace = TR_TraceRayFilterEx(self_eye_pos, target_eye_pos, MASK_VISIBLE, RayType_EndPoint, TR_EntityFilter, client);
+                bool ok = (!TR_DidHit(hTrace) || TR_GetEntityIndex(hTrace) == i);
                 delete hTrace;
+                if (ok)
+                    ranged_client[client][index++] = i;
             }
         }
     }
@@ -633,56 +552,94 @@ int FindRangedClients(int client, float min_range, float max_range)
     return index;
 }
 
-// 轻量连跳：仅在有移动输入且速度低时注入
+// 牛连跳
 bool Do_Bhop(int client, int &buttons, float vec[3])
 {
-    if (buttons & IN_FORWARD || buttons & IN_BACK || buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT)
+    if (buttons & (IN_FORWARD|IN_BACK|IN_MOVELEFT|IN_MOVERIGHT))
     {
-        float curvel[3] = {0.0};
-        GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", curvel);
-        if (GetVectorLength(curvel) <= 250.0)
-        {
-            AddVectors(curvel, vec, curvel);
-            NormalizeVector(curvel, curvel);
-            ScaleVector(curvel, 251.0);
-            TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, curvel);
+        if (ClientPush(client, vec))
             return true;
-        }
     }
     return false;
 }
 
-// 计算面向 target 的水平速度向量（输出到 out）
-void CalcVel(const float self_pos[3], const float target_pos[3], float force, float out[3])
+bool ClientPush(int client, float vec[3])
 {
-    out[0] = target_pos[0] - self_pos[0];
-    out[1] = target_pos[1] - self_pos[1];
-    out[2] = 0.0;
-    NormalizeVector(out, out);
-    ScaleVector(out, force);
+    float curvel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", curvel);
+    AddVectors(curvel, vec, curvel);
+    if (Dont_HitWall_Or_Fall(client, curvel))
+    {
+        if (GetVectorLength(curvel) <= 250.0)
+        {
+            NormalizeVector(curvel, curvel);
+            ScaleVector(curvel, 251.0);
+        }
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, curvel);
+        return true;
+    }
+    return false;
 }
 
-// 碰撞/掉落检测（原逻辑保留，签名统一）
-stock bool Dont_HitWall_Or_Fall(int client, float vel[3])
+// 计算自→目标的单位向量 * force
+public void CalculateVel(const float self_pos[3], const float target_pos[3], float force, float out[3])
 {
-    bool  hullrayhit = false;
-    int   down_hullray_hitent = -1;
-    char  down_hullray_hitent_classname[16] = {'\0'};
-    float selfpos[3] = {0.0}, resultpos[3] = {0.0}, mins[3] = {0.0}, maxs[3] = {0.0}, hullray_endpos[3] = {0.0}, down_hullray_startpos[3] = {0.0}, down_hullray_endpos[3] = {0.0}, down_hullray_hitpos[3] = {0.0};
+    float dir[3];
+    SubtractVectors(target_pos, self_pos, dir);
+    NormalizeVector(dir, dir);
+    ScaleVector(dir, force);
+    out[0] = dir[0]; out[1] = dir[1]; out[2] = dir[2];
+}
+
+// 冲锋路径快速可行性检查：以当前包围盒沿着角度前探 ahead
+public bool WillChargePathClear(int client, const float dirAngles[3], float ahead)
+{
+    float mins[3], maxs[3];
+    GetClientMins(client, mins);
+    GetClientMaxs(client, maxs);
+
+    float start[3];
+    GetClientAbsOrigin(client, start);
+    start[2] += NAV_MESH_HEIGHT; // 与地面留出高度
+
+    float fwd[3];
+    GetAngleVectors(dirAngles, fwd, NULL_VECTOR, NULL_VECTOR);
+    float end[3];
+    end[0] = start[0] + fwd[0] * ahead;
+    end[1] = start[1] + fwd[1] * ahead;
+    end[2] = start[2];
+
+    Handle hTrace = TR_TraceHullFilterEx(start, end, mins, maxs, MASK_NPCSOLID_BRUSHONLY, TR_EntityFilter);
+    bool blocked = TR_DidHit(hTrace);
+    delete hTrace;
+
+    return !blocked;
+}
+
+// 检测下一帧位置是否撞墙/掉落/受伤
+bool Dont_HitWall_Or_Fall(int client, float vel[3])
+{
+    bool hullrayhit = false;
+    int down_hullray_hitent = -1;
+    char down_hullray_hitent_classname[16];
+
+    float selfpos[3], resultpos[3], mins[3], maxs[3], hullray_endpos[3];
+    float down_hullray_startpos[3], down_hullray_endpos[3], down_hullray_hitpos[3];
 
     GetClientAbsOrigin(client, selfpos);
     AddVectors(selfpos, vel, resultpos);
     GetClientMins(client, mins);
     GetClientMaxs(client, maxs);
-    selfpos[2]  += NAV_MESH_HEIGHT;
-    resultpos[2]+= NAV_MESH_HEIGHT;
 
-    Handle hTrace = TR_TraceHullFilterEx(selfpos, resultpos, mins, maxs, MASK_NPCSOLID_BRUSHONLY, TR_EntityFilterEx, client);
+    float start[3]; CopyVector(selfpos, start); start[2] += NAV_MESH_HEIGHT;
+    float end[3];   CopyVector(resultpos, end); end[2] += NAV_MESH_HEIGHT;
+
+    Handle hTrace = TR_TraceHullFilterEx(start, end, mins, maxs, MASK_NPCSOLID_BRUSHONLY, TR_EntityFilter);
     if (TR_DidHit(hTrace))
     {
         hullrayhit = true;
         TR_GetEndPosition(hullray_endpos, hTrace);
-        if (GetVectorDistance(selfpos, hullray_endpos) <= NAV_MESH_HEIGHT)
+        if (GetVectorDistance(start, hullray_endpos) <= NAV_MESH_HEIGHT)
         {
             delete hTrace;
             return false;
@@ -690,20 +647,15 @@ stock bool Dont_HitWall_Or_Fall(int client, float vel[3])
     }
     delete hTrace;
 
-    resultpos[2] -= NAV_MESH_HEIGHT;
-
+    // 向下投射，避免大跌落/触发伤害
     if (!hullrayhit)
     {
-        down_hullray_startpos[0] = resultpos[0];
-        down_hullray_startpos[1] = resultpos[1];
-        down_hullray_startpos[2] = resultpos[2];
+        CopyVector(resultpos, down_hullray_startpos);
     }
+    CopyVector(down_hullray_startpos, down_hullray_endpos);
+    down_hullray_endpos[2] -= 100000.0;
 
-    down_hullray_endpos[0] = down_hullray_startpos[0];
-    down_hullray_endpos[1] = down_hullray_startpos[1];
-    down_hullray_endpos[2] = down_hullray_startpos[2] - 100000.0;
-
-    Handle hDownTrace = TR_TraceHullFilterEx(down_hullray_startpos, down_hullray_endpos, mins, maxs, MASK_NPCSOLID_BRUSHONLY, TR_EntityFilterEx, client);
+    Handle hDownTrace = TR_TraceHullFilterEx(down_hullray_startpos, down_hullray_endpos, mins, maxs, MASK_NPCSOLID_BRUSHONLY, TR_EntityFilter);
     if (TR_DidHit(hDownTrace))
     {
         TR_GetEndPosition(down_hullray_hitpos, hDownTrace);
@@ -726,26 +678,27 @@ stock bool Dont_HitWall_Or_Fall(int client, float vel[3])
     return false;
 }
 
-// Trace 过滤器（统一签名）
-public bool TR_EntityFilterEx(int entity, int mask, any data)
+// Trace filter：忽略玩家/常见实体
+public bool TR_EntityFilter(int entity, int mask, any data)
 {
     if (entity <= MaxClients)
         return false;
 
-    char classname[32] = {'\0'};
-    GetEdictClassname(entity, classname, sizeof(classname));
-    if (strcmp(classname, "infected") == 0 || strcmp(classname, "witch") == 0 || strcmp(classname, "prop_physics") == 0 || strcmp(classname, "tank_rock") == 0)
-        return false;
-
+    char classname[32];
+    if (IsValidEntity(entity) && IsValidEdict(entity))
+    {
+        GetEdictClassname(entity, classname, sizeof(classname));
+        if (strcmp(classname, "infected") == 0 || strcmp(classname, "witch") == 0 || strcmp(classname, "prop_physics") == 0 || strcmp(classname, "tank_rock") == 0)
+            return false;
+    }
     return true;
 }
 
-
-
-// “是否目标在看我”（水平面角度偏差 <= offset）
+// 目标是否“看着你”（水平夹角 ≤ offset）
 bool Is_Target_Watching_Attacker(int client, int target, int offset)
 {
-    if (IsValidInfected(client) && IsValidSurvivor(target) && IsPlayerAlive(client) && IsPlayerAlive(target) && !IsClientIncapped(target) && !IsClientPinned(target) && !Is_InGetUp_Or_Incapped(target))
+    if (IsValidInfected(client) && IsValidSurvivor(target) && IsPlayerAlive(client) && IsPlayerAlive(target)
+        && !IsClientIncapped(target) && !IsClientPinned(target) && !Is_InGetUp_Or_Incapped(target))
     {
         int aim_offset = RoundToNearest(Get_Player_Aim_Offset(target, client));
         return (aim_offset <= offset);
@@ -753,47 +706,66 @@ bool Is_Target_Watching_Attacker(int client, int target, int offset)
     return false;
 }
 
-// 计算“目标视线”与“指向 Charger 的方向向量”的水平夹角
 float Get_Player_Aim_Offset(int client, int target)
 {
     if (IsValidClient(client) && IsValidClient(target) && IsPlayerAlive(client) && IsPlayerAlive(target))
     {
-        float self_pos[3] = {0.0}, target_pos[3] = {0.0}, aim_vector[3] = {0.0}, dir_vector[3] = {0.0};
+        float self_pos[3], target_pos[3], aim_vector[3], dir_vector[3];
         float result_angle = 0.0;
-
         GetClientEyeAngles(client, aim_vector);
-        aim_vector[0] = 0.0;
-        aim_vector[2] = 0.0;
+        aim_vector[0] = 0.0; // Pitch 忽略
+        aim_vector[2] = 0.0; // Roll 忽略
         GetAngleVectors(aim_vector, aim_vector, NULL_VECTOR, NULL_VECTOR);
         NormalizeVector(aim_vector, aim_vector);
-
         GetClientAbsOrigin(target, target_pos);
         GetClientAbsOrigin(client, self_pos);
-        self_pos[2] = target_pos[2] = 0.0;
-
+        self_pos[2] = 0.0; target_pos[2] = 0.0;
         MakeVectorFromPoints(self_pos, target_pos, dir_vector);
         NormalizeVector(dir_vector, dir_vector);
-
         result_angle = RadToDeg(ArcCosine(GetVectorDotProduct(aim_vector, dir_vector)));
         return result_angle;
     }
     return -1.0;
 }
 
-// 解析“额外目标范围”CVar，失败时使用兜底
-void getOtherRangedTarget()
+public void getOtherRangedTarget()
 {
-    static char cvar_dist[32], result_dist[2][16];
+    static char cvar_dist[32];
+    static char parts[2][16];
     g_hExtraTargetDist.GetString(cvar_dist, sizeof(cvar_dist));
-    if (!IsNullString(cvar_dist) && ExplodeString(cvar_dist, ",", result_dist, 2, sizeof(result_dist[])) == 2)
+    if (!IsNullString(cvar_dist) && ExplodeString(cvar_dist, ",", parts, sizeof(parts), sizeof(parts[])) == 2)
     {
-        min_dist = StringToFloat(result_dist[0]);
-        max_dist = StringToFloat(result_dist[1]);
+        min_dist = StringToFloat(parts[0]);
+        max_dist = StringToFloat(parts[1]);
+        if (max_dist < min_dist) { float t = min_dist; min_dist = max_dist; max_dist = t; }
     }
     else
     {
-        min_dist = 100.0;
-        max_dist = 600.0;
+        min_dist = 0.0;
+        max_dist = 350.0;
     }
-    DBG("ExtraTargetDist parsed: min=%.1f max=%.1f", min_dist, max_dist);
+}
+
+// ===== Utility =====
+public void CopyVector(const float src[3], float dest[3])
+{
+    dest[0] = src[0]; dest[1] = src[1]; dest[2] = src[2];
+}
+
+float GetClosestSurvivorDistance(int client)
+{
+    float selfpos[3];
+    GetClientAbsOrigin(client, selfpos);
+    float best = 999999.0;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsValidSurvivor(i) && IsPlayerAlive(i))
+        {
+            float pos[3];
+            GetClientAbsOrigin(i, pos);
+            float d = GetVectorDistance(selfpos, pos);
+            if (d < best) best = d;
+        }
+    }
+    return best;
 }
