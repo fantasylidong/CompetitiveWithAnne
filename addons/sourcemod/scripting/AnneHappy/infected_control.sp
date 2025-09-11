@@ -2555,21 +2555,21 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (!(inFinale && finaleActive) && centerBucket < 95) {
                     // ===== 新增：两条高度/进度惩罚 =====
                     // 惩罚强度（可微调）
-                    const float PEN_LOW_BEHIND_BIG = 200.0; // 基本等于否决
-                    const float PEN_TOO_HIGH       = 60.0;   // 适中
-                    const float PEN_TOO_HIGH2      = 30.0;   // 适中
+                    const float PEN_LOW_BEHIND_BIG = 600.0; // 基本等于否决
+                    const float PEN_TOO_HIGH       = 120.0;   // 适中
+                    const float PEN_TOO_HIGH2      = 60.0;   // 适中
                     int candBucket = FlowDistanceToPercent(fFlow);         
 
                     // ① 地底且在后方：p.z 低于所有幸存者 & 进度落在所有幸存者之后（cand < allMinFlowBucket）
-                    if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket)
+                    if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket +1 )
                         extra += PEN_LOW_BEHIND_BIG;
 
                     // ② 过高 500：p.z 高于所有幸存者 500，且职业不是 Smoker
-                    if (p[2] > allMaxZ + 500.0 && zc != view_as<int>(SI_Smoker))
+                    if (p[2] > allMaxZ + 400.0 && zc != view_as<int>(SI_Smoker))
                         extra += PEN_TOO_HIGH;
 
                     // ② 过高 300：p.z 高于所有幸存者 500，且职业不是 Smoker/Hunter
-                    else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
+                    else if (p[2] > allMaxZ + 250.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
                         extra += PEN_TOO_HIGH2;
                 }
                 float score  = dist + sectorPenalty + extra ;
