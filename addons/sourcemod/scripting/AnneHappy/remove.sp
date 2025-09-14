@@ -32,7 +32,7 @@ public void OnPluginStart()
 
 public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-	CreateTimer(1.0, RoundStartTimer);
+	CreateTimer(3.0, RoundStartTimer);
 }
 
 public Action RoundStartTimer(Handle timer)
