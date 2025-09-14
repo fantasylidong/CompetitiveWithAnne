@@ -58,7 +58,7 @@ public void OnPluginStart()
 {
     g_hAllowBhop         = CreateConVar("ai_ChargerBhop", "1", "是否开启 Charger 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
     // 注意：保持键名 ai_ChagrerBhopSpeed 以兼容旧服配置（原拼写有误）
-    g_hBhopSpeed         = CreateConVar("ai_ChagrerBhopSpeed", "90.0", "Charger 连跳速度/推进力度", CVAR_FLAG, true, 0.0);
+    g_hBhopSpeed         = CreateConVar("ai_ChagrerBhopSpeed", "110.0", "Charger 连跳速度/推进力度", CVAR_FLAG, true, 0.0);
     g_hChargeDist        = CreateConVar("ai_ChargerChargeDistance", "260.0", "Charger 只能在与目标小于这一距离时冲锋", CVAR_FLAG, true, 0.0);
     g_hExtraTargetDist   = CreateConVar("ai_ChargerExtraTargetDistance", "0,420", "Charger 会在这一范围内寻找其他有效的目标/背身冲锋窗口（逗号分隔，无空格）", CVAR_FLAG);
     g_hAimOffset         = CreateConVar("ai_ChargerAimOffset", "30.0", "目标的瞄准水平与 Charger 处在这一范围内，视为“看着你”", CVAR_FLAG, true, 0.0);
@@ -120,6 +120,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     int  target = GetClientAimTarget(client, true);
     int  flags  = GetEntityFlags(client);
     int  ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+    bool abilityCharging = (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging") == 1);
 
     float self_pos[3];
     float target_pos[3];
@@ -144,7 +145,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     }
 
     // 冲锋时静止玩家输入速度
-    if (buttons & IN_ATTACK)
+    if ((buttons & IN_ATTACK) && !abilityCharging)
     {
         vel[0] = vel[1] = vel[2] = 0.0;
     }
@@ -247,6 +248,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     float closestDist = GetClosestSurvivorDistance(client);
 
     if (has_sight && g_hAllowBhop.BoolValue
+        && !abilityCharging
         && closestDist > float(bhopMinDist)
         && closestDist < 2000.0
         && cur_speed > 175.0
