@@ -66,7 +66,7 @@ public void OnPluginStart()
 
 	// 该 cvar 控制射击的垂直 punch；去抖时置 0，原版置 1
 	g_cvZGunVerticalPu = FindConVar("z_gun_vertical_punch");
-	if (g_cvZGunVerticalPu != null) g_cvZGunVerticalPu.IntValue = 0;
+	if (g_cvZGunVerticalPu != null) g_cvZGunVerticalPu.IntValue = 1;
 
 	g_cvToggle = CreateConVar("punch_angle_toggle", "1", "Toggles recoil on or off.",
 		_, true, 0.0, true, 1.0);
