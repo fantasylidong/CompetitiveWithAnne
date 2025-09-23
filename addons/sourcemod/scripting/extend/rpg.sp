@@ -48,7 +48,7 @@ ConVar g_hAntiKickBlockVote;
 ConVar g_hAntiKickBlockCmdKick;
 ConVar g_hAntiKickMinImmunity;   // 0=只要有任意管理员标识就保护；>0=要求免疫等级>=此值才保护
 ConVar g_hAntiKickEqualBlock;    // 同级免疫是否禁止互踢（默认禁用互踢）
-bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false;
+bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false, g_bDamageShowHudAvailable = false;
 //new lastpoints[MAXPLAYERS + 1];
 
 //枚举变量,修改武器消耗积分在此。
@@ -295,6 +295,7 @@ public void OnAllPluginsLoaded()
             IsAnne = true; // 兼容你原先用来标识“启用Anne系配置”的开关
         }
     }
+	g_bDamageShowHudAvailable = LibraryExists("damage_show");
 }
 
 public void OnLibraryAdded(const char[] name)
@@ -316,6 +317,7 @@ public void OnLibraryAdded(const char[] name)
         }
     }
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = true; }
+	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = true; }
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -336,6 +338,7 @@ public void OnLibraryRemoved(const char[] name)
         // 不再强制关闭 IsAnne；保持你原来的判定流转（仅不再跟随 l4d_infected_limit）
     }
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = false; }
+	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = false; }
 }
 
 
@@ -1472,6 +1475,11 @@ public void BuildMenu(int client)
 			menu.AddItem("Hat", binfo);
 		}
 
+		if(g_bDamageShowHudAvailable){
+			FormatEx(binfo, sizeof(binfo),  "伤害显示菜单", client); //伤害显示菜单
+			menu.AddItem("Damage", binfo);
+		}
+
 		if(g_bEnableGlow && ((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,20) || (CheckCommandAccess(client, "", ADMFLAG_SLAY)) || player[client].GlowType > 0) || !g_bl4dstatsSystemAvailable)))
 		{
 			FormatEx(binfo, sizeof(binfo),  "生还者轮廓", client); //生还者轮廓菜单
@@ -1515,6 +1523,8 @@ public int TopMenu(Menu menu, MenuAction action, int param1, int param2)
 				Survivor_skin(param1);
 			else if( StrEqual(bitem, "Recoil") )
 				Recoil(param1);
+			else if( StrEqual(bitem, "Damage"))
+				Damage(param1);
 		}
 		case MenuAction_End:
 			delete menu;
@@ -1961,6 +1971,12 @@ public void ChatTags(int client)
 public void Hat(int client)
 {
 	ClientCommand(client,"sm_hats");	
+}
+
+//创建购买菜单>>主菜单--伤害显示菜单
+public void Damage(int client)
+{
+	ClientCommand(client,"sm_dmgmenu");	
 }
 
 //创建购买菜单>>主菜单--主武器类型
