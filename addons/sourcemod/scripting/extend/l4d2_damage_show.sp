@@ -107,6 +107,8 @@ bool  g_bNeverFire[L4D2_MAXPLAYERS + 1];
 int   g_sprite;
 int   g_iVitcimHealth[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 float g_fTankIncap[L4D2_MAXPLAYERS + 1];
+// === Spectator admin: view-all toggle (default OFF) ===
+bool g_bAdminObsViewAll[MAXPLAYERS + 1]; // 仅旁观时生效；默认 false
 
 static const int color[][3] = {
     {  0,255,  0}, // 绿：友伤
@@ -416,6 +418,7 @@ public void OnPluginStart()
 
 public void OnClientPutInServer(int client)
 {
+    g_bAdminObsViewAll[client] = false;   // 旁观查看所有人：默认关闭
     SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
 }
 
@@ -493,6 +496,14 @@ static void OpenMainMenu(int client)
         m.AddItem("admin_showother", "切换：允许别人看到我的数字（管理员）");
     else
         m.AddItem("admin_showother", "允许别人看到我的数字（需要管理员）", ITEMDRAW_DISABLED);
+    // === 仅管理员 + 旁观时提供的开关 ===
+    if (GetClientTeam(client) == 1 && CheckCommandAccess(client, "", ADMFLAG_GENERIC)) // 任意你认可的管理位
+    {
+        char s[64];
+        Format(s, sizeof s, "旁观：查看所有人生还者伤害（当前：%s）",
+            g_bAdminObsViewAll[client] ? "开" : "关");
+        m.AddItem("spec_view_all", s);
+    }
 
     m.AddItem("size+", "字号 +0.5");
     m.AddItem("size-", "字号 -0.5");
@@ -555,6 +566,26 @@ public int Menu_Main(Menu menu, MenuAction action, int client, int param2)
         ClampStyle(client);
         DB_Save(client);
         CPrintToChat(client, "{olive}[HUD]{default} 设置已保存。");
+    }
+    
+    // 旁观开关
+    else if (StrEqual(key, "spec_view_all"))
+    {
+        if (GetClientTeam(client) != 1 || !CheckCommandAccess(client, "", ADMFLAG_GENERIC))
+        {
+            PrintToChat(client, "\x03只有管理员在旁观时才能使用该开关。");
+        }
+        else
+        {
+            g_bAdminObsViewAll[client] = !g_bAdminObsViewAll[client];
+            PrintToChat(client, "\x04旁观显示\x01已切换为：\x05%s",
+                        g_bAdminObsViewAll[client] ? "查看所有人生还者伤害【开】" : "查看所有人生还者伤害【关】");
+        }
+
+        // 重新打开菜单，反映状态
+        //（按你自己的菜单函数名来）
+        // ShowDamageMenu(param1);
+        return 0;
     }
 
     ClampStyle(client);
@@ -835,6 +866,21 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
 
         // 自己一定能看
         if (i == attacker) { recv[total++]=i; continue; }
+
+        // 旁观者
+        if (GetClientTeam(i) == 1)
+        {
+            // 非管理员旁观：看不到
+            if (!CheckCommandAccess(i, "", ADMFLAG_GENERIC))
+                continue;
+
+            // 管理员旁观：只有开启了“查看所有人生还者伤害”才看到
+            if (g_bAdminObsViewAll[i])
+            {
+                recv[total++] = i;
+            }
+            continue;
+        }
 
         // 非管理员如果没开启 show_other（或者被强制关），就不向别人发
         if (!g_Plr[attacker].show_other) continue;
