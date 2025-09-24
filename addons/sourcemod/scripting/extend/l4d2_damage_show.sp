@@ -44,7 +44,6 @@ enum struct PlayerSetData
     // 运行期缓存
     int   wpn_id;
     int   wpn_type; // 0狙 1步冲 2近战 3其它 4火焰 5投掷类
-    bool  plugin_switch; // 本地显示开关(与 enable 对应)
     bool  show_other;    // “允许别人看到我的数字”（仅管理员可真）
     float last_set_time;
 
@@ -217,8 +216,6 @@ static void Settings_Default(int client)
     g_Plr[client].showdist      = 1500.0;
     g_Plr[client].summode       = true;
     g_Plr[client].sgmerge       = true;
-
-    g_Plr[client].plugin_switch = g_Plr[client].enable;
     g_Plr[client].show_other    = false; // 非管理员默认 false
 }
 
@@ -269,7 +266,6 @@ static void Cookie_Load(int client)
     g_Plr[client].summode     = (StringToInt(part[9]) != 0);
     g_Plr[client].sgmerge     = (StringToInt(part[10]) != 0);
 
-    g_Plr[client].plugin_switch = g_Plr[client].enable;
     g_Plr[client].show_other = false; // cookie 模式非管理员也不允许开放
     ClampStyle(client);
     g_bSettingsLoaded[client] = true;
@@ -337,7 +333,6 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
     // 设置加载完成，防止未加载状态的保存覆盖
     g_bSettingsLoaded[client] = true;
 
-    g_Plr[client].plugin_switch = g_Plr[client].enable;
     // 非管理员不能开放 show_other
     if (!IsAdminOrRoot(client)) g_Plr[client].show_other = false;
     else                        g_Plr[client].show_other = (g_Plr[client].share_scope > 0); // 给管理员一个同步
@@ -502,7 +497,6 @@ public int Menu_Root(Menu menu, MenuAction action, int client, int param2)
     else if (StrEqual(key, "share")) OpenShareMenu(client);
     else if (StrEqual(key, "save"))
     {
-        g_Plr[client].plugin_switch = g_Plr[client].enable;
         ClampStyle(client);
         DB_Save(client);
         CPrintToChat(client, "{olive}[HUD]{default} 设置已保存。");
@@ -674,7 +668,7 @@ public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
 
     // 自己的功能开关（默认 false）
-    if (!g_Plr[attacker].enable || !g_Plr[attacker].plugin_switch) return;
+    if (!g_Plr[attacker].enable) return;
 
     int remain = hEvent.GetInt("health");
     int damage = hEvent.GetInt("dmg_health");
@@ -698,7 +692,7 @@ public void SDK_OnTakeDamagePost(int victim, int attacker, int inflictor, float 
 {
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
-    if (!g_Plr[attacker].enable || !g_Plr[attacker].plugin_switch) return;
+    if (!g_Plr[attacker].enable) return;
 
     int wpn = (weapon == -1) ? inflictor : weapon;
     int dval = g_AttackCache[attacker][victim].damage;
@@ -953,7 +947,7 @@ static void BuildReceivers(int attacker, int victim, int recv[MAXPLAYERS], int &
 static void DisplayDamage(int victim, int attacker, int weapon, int damage, int damagetype, const float damagePosition[3], bool forceHeadshot=false, bool UpdateFrame=false)
 {
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
-    if (!g_Plr[attacker].enable || !g_Plr[attacker].plugin_switch) return;
+    if (!g_Plr[attacker].enable) return;
 
     if (g_Plr[attacker].wpn_id != weapon && weapon != -1 && IsValidEdict(weapon))
     {
