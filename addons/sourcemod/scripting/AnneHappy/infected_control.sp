@@ -237,6 +237,13 @@ enum struct Config
     ConVar DeathCDBypassAfter;   
     ConVar DeathCDUnderfill;     
 
+    ConVar ZSmokerLimit;
+    ConVar ZBoomerLimit;
+    ConVar ZHunterLimit;
+    ConVar ZSpitterLimit;
+    ConVar ZJockeyLimit;
+    ConVar ZChargerLimit;
+
     float fSpawnMin;
     float fSpawnMax;
     float fSiInterval;
@@ -305,16 +312,20 @@ enum struct Config
         this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0","同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
 
         // —— 双保险 —— //
-        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.0","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.5","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
         this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
-
+        this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
+        this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
+        this.ZSmokerLimit  = FindConVar("z_smoker_limit");
+        this.ZBoomerLimit  = FindConVar("z_boomer_limit");
+        this.ZHunterLimit  = FindConVar("z_hunter_limit");
+        this.ZSpitterLimit = FindConVar("z_spitter_limit");
+        this.ZJockeyLimit  = FindConVar("z_jockey_limit");
+        this.ZChargerLimit = FindConVar("z_charger_limit");
         this.DeathCDKiller.AddChangeHook(OnCfgChanged);
         this.DeathCDSupport.AddChangeHook(OnCfgChanged);
         this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
         this.DeathCDUnderfill.AddChangeHook(OnCfgChanged);
-
-        this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
-        this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
 
         SetConVarInt(FindConVar("director_no_specials"), 1);
 
@@ -915,12 +926,12 @@ static void RecalcSiCapFromAlive(bool log = false)
     }
 
     int baseCap[6];
-    baseCap[0] = GetConVarInt(FindConVar("z_smoker_limit"));
-    baseCap[1] = GetConVarInt(FindConVar("z_boomer_limit"));
-    baseCap[2] = GetConVarInt(FindConVar("z_hunter_limit"));
-    baseCap[3] = GetConVarInt(FindConVar("z_spitter_limit"));
-    baseCap[4] = GetConVarInt(FindConVar("z_jockey_limit"));
-    baseCap[5] = GetConVarInt(FindConVar("z_charger_limit"));
+    baseCap[0] = gCV.ZSmokerLimit.IntValue;
+    baseCap[1] = gCV.ZBoomerLimit.IntValue;
+    baseCap[2] = gCV.ZHunterLimit.IntValue;
+    baseCap[3] = gCV.ZSpitterLimit.IntValue;
+    baseCap[4] = gCV.ZJockeyLimit.IntValue;
+    baseCap[5] = gCV.ZChargerLimit.IntValue;
 
     for (int i = 0; i < 6; i++)
     {
@@ -950,12 +961,12 @@ static void RecalcSiCapFromAlive(bool log = false)
 }
 static void ReadSiCap()
 {
-    gST.siCap[0] = GetConVarInt(FindConVar("z_smoker_limit"));
-    gST.siCap[1] = GetConVarInt(FindConVar("z_boomer_limit"));
-    gST.siCap[2] = GetConVarInt(FindConVar("z_hunter_limit"));
-    gST.siCap[3] = GetConVarInt(FindConVar("z_spitter_limit"));
-    gST.siCap[4] = GetConVarInt(FindConVar("z_jockey_limit"));
-    gST.siCap[5] = GetConVarInt(FindConVar("z_charger_limit"));
+    gST.siCap[0] = gCV.ZSmokerLimit.IntValue;
+    gST.siCap[1] = gCV.ZBoomerLimit.IntValue;
+    gST.siCap[2] = gCV.ZHunterLimit.IntValue;
+    gST.siCap[3] = gCV.ZSpitterLimit.IntValue;
+    gST.siCap[4] = gCV.ZJockeyLimit.IntValue;
+    gST.siCap[5] = gCV.ZChargerLimit.IntValue;
 
     // —— 全猎/全牛：强制把该类上限改成 l4d_infected_limit，其它类清 0 —— //
     int forced = 0;
@@ -1474,7 +1485,7 @@ static Action Timer_CheckSpawnWindow(Handle timer)
         else
         {
             gST.bShouldCheck = false;
-            gST.hSpawn = CreateTimer(gCV.fSiInterval * 1.5, Timer_StartNewWave, _, TIMER_REPEAT);
+            gST.hSpawn = CreateTimer(gCV.fSiInterval * 1.5, Timer_StartNewWave);
         }
     }
     else if ((IsAllKillersDown() && gST.siQueueCount == 0) || (gST.totalSI <= (RoundToFloor(gCV.iSiLimit / 4.0) + 1) && gST.siQueueCount == 0) || (gST.lastSpawnSecs >= gCV.fSiInterval * 0.5))
@@ -1486,7 +1497,7 @@ static Action Timer_CheckSpawnWindow(Handle timer)
         else
         {
             gST.bShouldCheck = false;
-            gST.hSpawn = CreateTimer(gCV.fSiInterval, Timer_StartNewWave, _, TIMER_REPEAT);
+            gST.hSpawn = CreateTimer(gCV.fSiInterval, Timer_StartNewWave);
         }
     }
 
@@ -1506,7 +1517,7 @@ static void UnpauseSpawnTimer(float delay)
 {
     if (gST.hSpawn == INVALID_HANDLE)
     {
-        gST.hSpawn = CreateTimer(delay, Timer_StartNewWave, _, TIMER_REPEAT);
+        gST.hSpawn = CreateTimer(delay, Timer_StartNewWave);
         Debug_Print("Resume spawn in %.2f", delay);
     }
 }
@@ -2256,35 +2267,9 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
 // 仅按“硬距离窗口”筛选：SpawnMin ≤ 距离 ≤ ring
 static bool IsNearTheSur(float ring, const float pos[3], float &dist)
 {
-    float dmin = 999999.0;
-    bool  foundAny = false;
-    bool  inRange  = false;
-
-    float eyes[3];
-
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
-            continue;
-
-        GetClientEyePosition(i, eyes);
-        float d = GetVectorDistance(eyes, pos);
-
-        if (d < dmin) dmin = d;
-        foundAny = true;
-
-        if (d >= gCV.fSpawnMin && d <= ring)
-            inRange = true;
-    }
-
-    if (!foundAny)
-    {
-        dist = 999999.0;
-        return false;
-    }
-
-    dist = dmin;
-    return inRange;
+    dist = GetMinEyeDistToAnySurvivor(pos);
+    if (dist >= 999998.0) return false; // 无存活生还者
+    return (dist >= gCV.fSpawnMin && dist <= ring);
 }
 
 
@@ -2499,7 +2484,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
         // —— 使用你重写后的 BuildBucketOrder（前 4 + 交替） —— //
         int order[FLOW_BUCKETS];
-        int orderLen = BuildBucketOrder(centerBucket, win, /*includeCenter=*/false, order);
+        int orderLen = BuildBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order);
+        bool firstFit = gCV.bNavBucketFirstFit;
 
         for (int oi = 0; oi < orderLen; oi++)
         {
@@ -2572,18 +2558,25 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     else if (p[2] > allMaxZ + 250.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
                         extra += PEN_TOO_HIGH2;
                 }
-                float score  = dist + sectorPenalty + extra ;
-
-                if (!found || score < bestScore)
+               if (firstFit)
                 {
-                    found     = true;
-                    bestScore = score;
-                    bestIdx   = ai;
-                    bestPos   = p;
+                    outPos = p;
+                    outAreaIdx = ai;
+                    return true;
                 }
-
-                acceptedHits++;
-                if (acceptedHits >= TOPK) break;
+                else
+                {
+                    float score  = dist + sectorPenalty + extra ;
+                    if (!found || score < bestScore)
+                    {
+                        found     = true;
+                        bestScore = score;
+                        bestIdx   = ai;
+                        bestPos   = p;
+                    }
+                    acceptedHits++;
+                    if (acceptedHits >= TOPK) break;
+                }
             }
             if (acceptedHits >= TOPK) break;
         }
@@ -2655,18 +2648,25 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     extra += PEN_TOO_HIGH2;
             }
 
-            float score  = dist + sectorPenalty + extra ;
-
-            if (!found || score < bestScore)
+            if (gCV.bNavBucketFirstFit)
             {
-                found     = true;
-                bestScore = score;
-                bestIdx   = ai;
-                bestPos   = p;
+                outPos = p;
+                outAreaIdx = ai;
+                return true;
             }
-
-            acceptedHits++;
-            if (acceptedHits >= TOPK) break;
+            else
+            {
+                float score  = dist + sectorPenalty + extra ;
+                if (!found || score < bestScore)
+                {
+                    found     = true;
+                    bestScore = score;
+                    bestIdx   = ai;
+                    bestPos   = p;
+                }
+                acceptedHits++;
+                if (acceptedHits >= TOPK) break;
+            }
         }
     }
 

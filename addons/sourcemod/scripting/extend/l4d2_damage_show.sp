@@ -7,12 +7,11 @@
 #include <clientprefs>
 #include <colors>
 
-#define PLUGIN_VERSION  "2.0-mysql-cookie"
+#define PLUGIN_VERSION  "2.1-mysql-cookie"
 #define SPRITE_MATERIAL "materials/sprites/laserbeam.vmt"
 #define DMG_HEADSHOT    (1 << 30)
 #define L4D2_MAXPLAYERS 32
 #define ZC_BOOMER       2
-#define ZC_CHARGER      6
 #define ZC_TANK         8
 #define UPDATE_INTERVAL 0.10 // 累加帧间隔（不要低于 0.05）
 
@@ -20,35 +19,39 @@
 #define DB_CONF_NAME "rpg"        // databases.cfg 中的配置名
 #define COOKIE_NAME  "l4d2_dmgshow_v2"
 
-// rpgdamage 表结构：
-// CREATE TABLE IF NOT EXISTS `rpgdamage` (
-//   `steamid`      VARCHAR(255) NOT NULL PRIMARY KEY,
-//   `enable`       TINYINT      NOT NULL DEFAULT 1,
-//   `see_others`   TINYINT      NOT NULL DEFAULT 0,
-//   `share_scope`  TINYINT      NOT NULL DEFAULT 1,  -- 0=只自己,1=仅队友,2=所有玩家
-//   `size`         FLOAT        NOT NULL DEFAULT 5.0,
-//   `gap`          FLOAT        NOT NULL DEFAULT 5.0,
-//   `alpha`        INT          NOT NULL DEFAULT 70,
-//   `xoff`         FLOAT        NOT NULL DEFAULT 20.0,
-//   `yoff`         FLOAT        NOT NULL DEFAULT 10.0,
-//   `showdist`     FLOAT        NOT NULL DEFAULT 1500.0,
-//   `summode`      TINYINT      NOT NULL DEFAULT 1,
-//   `sg_merge`     TINYINT      NOT NULL DEFAULT 1
-// ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+// rpgdamage 表结构（注意：share_scope 仅 0/1；默认全关，防首次覆盖）
+/*
+CREATE TABLE IF NOT EXISTS `rpgdamage` (
+  `steamid`      VARCHAR(255) NOT NULL PRIMARY KEY,
+  `enable`       TINYINT      NOT NULL DEFAULT 0,      -- 默认不开启显示
+  `see_others`   TINYINT      NOT NULL DEFAULT 1,      -- 默认：允许看到他人（用于看“管理员分享”的）
+  `share_scope`  TINYINT      NOT NULL DEFAULT 0,      -- 0=仅自己,1=仅队友（无“所有人”选项）
+  `size`         FLOAT        NOT NULL DEFAULT 5.0,
+  `gap`          FLOAT        NOT NULL DEFAULT 5.0,
+  `alpha`        INT          NOT NULL DEFAULT 70,
+  `xoff`         FLOAT        NOT NULL DEFAULT 20.0,
+  `yoff`         FLOAT        NOT NULL DEFAULT 10.0,
+  `showdist`     FLOAT        NOT NULL DEFAULT 1500.0,
+  `summode`      TINYINT      NOT NULL DEFAULT 1,
+  `sg_merge`     TINYINT      NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+*/
+
+// ============ 结构体 ============
 
 enum struct PlayerSetData
 {
-    // --- 原插件运行期缓存 ---
+    // 运行期缓存
     int   wpn_id;
     int   wpn_type; // 0狙 1步冲 2近战 3其它 4火焰 5投掷类
     bool  plugin_switch; // 本地显示开关(与 enable 对应)
-    bool  show_other;    // 允许别人看到我的数字（仅管理员可设为真）
+    bool  show_other;    // “允许别人看到我的数字”（仅管理员可真）
     float last_set_time;
 
-    // --- 新增：可持久化的 per-client 样式 ---
-    bool  enable;        // 伤害显示开关
-    bool  see_others;    // 我是否能看到别人（仅影响我是否接收他人数字）
-    int   share_scope;   // 我把损伤分享给谁：0仅自己/1队友/2所有
+    // 可持久化 per-client 样式
+    bool  enable;        // 伤害显示开关（默认 false）
+    bool  see_others;    // 我是否能看到“他人分享”的数字（默认 true，便于看到管理员分享）
+    int   share_scope;   // 我把伤害分享给谁：0仅自己/1队友（仅管理员有效）
     float size;          // 字号
     float gap;           // 字距
     int   alpha;         // 透明度 0-255
@@ -95,11 +98,12 @@ enum struct DamageTrans
     int  damage;
 }
 
-// ============ 运行期全局 ============
-PlayerSetData    g_Plr[L4D2_MAXPLAYERS + 1];
-ShotgunDamageData g_SGbuf[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1]; // [attacker][victim]
-SumShowMode       g_Sum[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
-DamageTrans       g_AttackCache[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
+// ============ 全局 ============
+
+PlayerSetData      g_Plr[L4D2_MAXPLAYERS + 1];
+ShotgunDamageData  g_SGbuf[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1]; // [attacker][victim]
+SumShowMode        g_Sum[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
+DamageTrans        g_AttackCache[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 
 ConVar g_hMaxTE;
 
@@ -107,8 +111,12 @@ bool  g_bNeverFire[L4D2_MAXPLAYERS + 1];
 int   g_sprite;
 int   g_iVitcimHealth[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 float g_fTankIncap[L4D2_MAXPLAYERS + 1];
-// === Spectator admin: view-all toggle (default OFF) ===
-bool g_bAdminObsViewAll[MAXPLAYERS + 1]; // 仅旁观时生效；默认 false
+
+// === 旁观管理员：查看所有人开关（默认关） ===
+bool  g_bAdminObsViewAll[MAXPLAYERS + 1];
+
+// === 防止“加载前保存覆盖”的标记 ===
+bool  g_bSettingsLoaded[MAXPLAYERS + 1];
 
 static const int color[][3] = {
     {  0,255,  0}, // 绿：友伤
@@ -123,10 +131,10 @@ Handle g_DB = INVALID_HANDLE;
 bool   g_UseMySQL = false;
 Cookie g_ck = null;
 
-// ============ 菜单 ============
+// ============ 菜单（分两层） ============
 #define MENU_TIME 20
 
-// ============ 工具函数 ============
+// --------- 工具函数 ----------
 static bool IsValidClient(int client) {
     return (client > 0 && client <= MaxClients && IsClientInGame(client));
 }
@@ -137,7 +145,6 @@ static bool IsAdminOrRoot(int client) {
 
 static void ClampStyle(int client)
 {
-    // 防止用户设置越界
     if (g_Plr[client].size < 0.0)     g_Plr[client].size = 0.0;
     if (g_Plr[client].size > 100.0)   g_Plr[client].size = 100.0;
     if (g_Plr[client].gap < 0.0)      g_Plr[client].gap = 0.0;
@@ -152,14 +159,16 @@ static void ClampStyle(int client)
     if (g_Plr[client].showdist > 8192.0) g_Plr[client].showdist = 8192.0;
 
     if (g_Plr[client].share_scope < 0) g_Plr[client].share_scope = 0;
-    if (g_Plr[client].share_scope > 2) g_Plr[client].share_scope = 2;
+    if (g_Plr[client].share_scope > 1) g_Plr[client].share_scope = 1;
 
-    // 非管理员强制禁止“让别人看到我的数字”
-    if (!IsAdminOrRoot(client))
+    // 非管理员：强制不对外分享（仅自己）
+    if (!IsAdminOrRoot(client)) {
         g_Plr[client].show_other = false;
+        g_Plr[client].share_scope = 0;
+    }
 }
 
-// ============ MySQL / Cookie 读写 ============
+// --------- MySQL / Cookie ----------
 static void DB_TryConnect()
 {
     if (g_DB != INVALID_HANDLE) return;
@@ -181,9 +190,11 @@ static void DB_TryConnect()
     SQL_SetCharset(g_DB, "utf8mb4");
     g_UseMySQL = true;
 
-    // 建表（注意：单行字符串）
+    // 建表（单行 SQL）
     char q[1024];
-    Format(q, sizeof q, "CREATE TABLE IF NOT EXISTS `rpgdamage` (`steamid` VARCHAR(255) NOT NULL PRIMARY KEY, `enable` TINYINT NOT NULL DEFAULT 1, `see_others` TINYINT NOT NULL DEFAULT 0, `share_scope` TINYINT NOT NULL DEFAULT 1, `size` FLOAT NOT NULL DEFAULT 5.0, `gap` FLOAT NOT NULL DEFAULT 5.0, `alpha` INT NOT NULL DEFAULT 70, `xoff` FLOAT NOT NULL DEFAULT 20.0, `yoff` FLOAT NOT NULL DEFAULT 10.0, `showdist` FLOAT NOT NULL DEFAULT 1500.0, `summode` TINYINT NOT NULL DEFAULT 1, `sg_merge` TINYINT NOT NULL DEFAULT 1) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    Format(q, sizeof q,
+        "CREATE TABLE IF NOT EXISTS `rpgdamage` (`steamid` VARCHAR(255) NOT NULL PRIMARY KEY,`enable` TINYINT NOT NULL DEFAULT 0,`see_others` TINYINT NOT NULL DEFAULT 1,`share_scope` TINYINT NOT NULL DEFAULT 0,`size` FLOAT NOT NULL DEFAULT 5.0,`gap` FLOAT NOT NULL DEFAULT 5.0,`alpha` INT NOT NULL DEFAULT 70,`xoff` FLOAT NOT NULL DEFAULT 20.0,`yoff` FLOAT NOT NULL DEFAULT 10.0,`showdist` FLOAT NOT NULL DEFAULT 1500.0,`summode` TINYINT NOT NULL DEFAULT 1,`sg_merge` TINYINT NOT NULL DEFAULT 1) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
     SQL_TQuery(g_DB, SQLCB_Nop, q);
 }
 
@@ -195,24 +206,26 @@ public void SQLCB_Nop(Handle owner, Handle hndl, const char[] error, any data)
 
 static void Settings_Default(int client)
 {
-    g_Plr[client].enable      = true;
-    g_Plr[client].see_others  = false;
-    g_Plr[client].share_scope = 1;
-    g_Plr[client].size        = 5.0;
-    g_Plr[client].gap         = 5.0;
-    g_Plr[client].alpha       = 70;
-    g_Plr[client].xoff        = 20.0;
-    g_Plr[client].yoff        = 10.0;
-    g_Plr[client].showdist    = 1500.0;
-    g_Plr[client].summode     = true;
-    g_Plr[client].sgmerge     = true;
+    g_Plr[client].enable        = false;  // 默认不开
+    g_Plr[client].see_others    = true;   // 允许看“管理员分享”
+    g_Plr[client].share_scope   = 0;      // 仅自己
+    g_Plr[client].size          = 5.0;
+    g_Plr[client].gap           = 5.0;
+    g_Plr[client].alpha         = 70;
+    g_Plr[client].xoff          = 20.0;
+    g_Plr[client].yoff          = 10.0;
+    g_Plr[client].showdist      = 1500.0;
+    g_Plr[client].summode       = true;
+    g_Plr[client].sgmerge       = true;
+
     g_Plr[client].plugin_switch = g_Plr[client].enable;
-    g_Plr[client].show_other = false; // 非管理员默认 false
+    g_Plr[client].show_other    = false; // 非管理员默认 false
 }
 
 static void Cookie_Save(int client)
 {
     if (g_ck == null || IsFakeClient(client)) return;
+    if (!g_bSettingsLoaded[client]) return; // 未加载前不保存，防覆盖
 
     char buf[256];
     Format(buf, sizeof buf, "%d|%d|%d|%.1f|%.1f|%d|%.1f|%.1f|%.1f|%d|%d",
@@ -234,44 +247,32 @@ static void Cookie_Save(int client)
 static void Cookie_Load(int client)
 {
     Settings_Default(client);
-    if (g_ck == null || IsFakeClient(client)) return;
+    if (g_ck == null || IsFakeClient(client)) { g_bSettingsLoaded[client] = true; return; }
 
     char buf[256];
     g_ck.Get(client, buf, sizeof buf);
-    if (!buf[0]) return;
+    if (!buf[0]) { g_bSettingsLoaded[client] = true; return; }
 
-    // 直接炸到二维数组
     char part[11][32];
     int n = ExplodeString(buf, "|", part, sizeof(part), sizeof(part[]));
-    if (n < 11) return;
+    if (n < 11) { g_bSettingsLoaded[client] = true; return; }
 
-    int en     = StringToInt(part[0]);
-    int so     = StringToInt(part[1]);
-    int scope  = StringToInt(part[2]);
-    float size = StringToFloat(part[3]);
-    float gap  = StringToFloat(part[4]);
-    int alpha  = StringToInt(part[5]);
-    float x    = StringToFloat(part[6]);
-    float y    = StringToFloat(part[7]);
-    float dist = StringToFloat(part[8]);
-    int sum    = StringToInt(part[9]);
-    int merge  = StringToInt(part[10]);
-
-    g_Plr[client].enable      = (en != 0);
-    g_Plr[client].see_others  = (so != 0);
-    g_Plr[client].share_scope = scope;
-    g_Plr[client].size        = size;
-    g_Plr[client].gap         = gap;
-    g_Plr[client].alpha       = alpha;
-    g_Plr[client].xoff        = x;
-    g_Plr[client].yoff        = y;
-    g_Plr[client].showdist    = dist;
-    g_Plr[client].summode     = (sum != 0);
-    g_Plr[client].sgmerge     = (merge != 0);
+    g_Plr[client].enable      = (StringToInt(part[0]) != 0);
+    g_Plr[client].see_others  = (StringToInt(part[1]) != 0);
+    g_Plr[client].share_scope = StringToInt(part[2]);
+    g_Plr[client].size        = StringToFloat(part[3]);
+    g_Plr[client].gap         = StringToFloat(part[4]);
+    g_Plr[client].alpha       = StringToInt(part[5]);
+    g_Plr[client].xoff        = StringToFloat(part[6]);
+    g_Plr[client].yoff        = StringToFloat(part[7]);
+    g_Plr[client].showdist    = StringToFloat(part[8]);
+    g_Plr[client].summode     = (StringToInt(part[9]) != 0);
+    g_Plr[client].sgmerge     = (StringToInt(part[10]) != 0);
 
     g_Plr[client].plugin_switch = g_Plr[client].enable;
     g_Plr[client].show_other = false; // cookie 模式非管理员也不允许开放
     ClampStyle(client);
+    g_bSettingsLoaded[client] = true;
 }
 
 static void DB_Load(int client)
@@ -311,7 +312,7 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
     }
     else
     {
-        // 不存在则默认并插入
+        // 不存在则按默认插入（默认不开启）
         Settings_Default(client);
         char sid[64];
         GetClientAuthId(client, AuthId_Steam2, sid, sizeof sid);
@@ -333,15 +334,19 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         SQL_TQuery(g_DB, SQLCB_Nop, iq);
     }
 
+    // 设置加载完成，防止未加载状态的保存覆盖
+    g_bSettingsLoaded[client] = true;
+
     g_Plr[client].plugin_switch = g_Plr[client].enable;
     // 非管理员不能开放 show_other
     if (!IsAdminOrRoot(client)) g_Plr[client].show_other = false;
-    else                        g_Plr[client].show_other = g_Plr[client].see_others; // 管理员可同步一份
+    else                        g_Plr[client].show_other = (g_Plr[client].share_scope > 0); // 给管理员一个同步
     ClampStyle(client);
 }
 
 static void DB_Save(int client)
 {
+    if (!g_bSettingsLoaded[client]) return; // 未加载前不保存
     ClampStyle(client);
 
     if (!g_UseMySQL || IsFakeClient(client)) {
@@ -357,7 +362,6 @@ static void DB_Save(int client)
     Format(q, sizeof q, "INSERT INTO rpgdamage (steamid,enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge) VALUES ('%s',%d,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%.1f,%d,%d) ON DUPLICATE KEY UPDATE enable=VALUES(enable),see_others=VALUES(see_others),share_scope=VALUES(share_scope),size=VALUES(size),gap=VALUES(gap),alpha=VALUES(alpha),xoff=VALUES(xoff),yoff=VALUES(yoff),showdist=VALUES(showdist),summode=VALUES(summode),sg_merge=VALUES(sg_merge)",
         sid,
         g_Plr[client].enable?1:0,
-        // see_others 保存的是“我是否看别人”，与 show_other(让别人看我)不同
         g_Plr[client].see_others?1:0,
         g_Plr[client].share_scope,
         g_Plr[client].size,
@@ -377,7 +381,7 @@ public Plugin myinfo =
 {
     name        = "[L4D2] Damage HUD (MySQL+Cookie)",
     author      = "Loqi + you (mod by ChatGPT)",
-    description = "Per-client damage digits with DB/Cookie + menu + admin gate",
+    description = "Per-client damage digits with DB/Cookie + menus + admin sharing gate",
     version     = PLUGIN_VERSION,
     url         = "https://"
 };
@@ -386,8 +390,7 @@ public Plugin myinfo =
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
     RegPluginLibrary("damage_show");
-    EngineVersion test = GetEngineVersion();
-    if (test != Engine_Left4Dead2)
+    if (GetEngineVersion() != Engine_Left4Dead2)
     {
         strcopy(error, err_max, "仅支持 L4D2");
         return APLRes_SilentFailure;
@@ -398,15 +401,15 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
     g_hMaxTE = FindConVar("sv_multiplayer_maxtempentities");
-    g_hMaxTE.SetInt(512);
+    if (g_hMaxTE != null) g_hMaxTE.SetInt(512);
 
     // Cookie
     g_ck = new Cookie(COOKIE_NAME, "damage hud per-client", CookieAccess_Protected);
 
-    // 数据库
+    // DB
     DB_TryConnect();
 
-    // 菜单命令
+    // 命令
     RegConsoleCmd("sm_dmgmenu", Cmd_Menu, "打开伤害数字设置菜单");
 
     // 事件/钩子
@@ -418,7 +421,8 @@ public void OnPluginStart()
 
 public void OnClientPutInServer(int client)
 {
-    g_bAdminObsViewAll[client] = false;   // 旁观查看所有人：默认关闭
+    g_bAdminObsViewAll[client] = false;
+    g_bSettingsLoaded[client]  = false;
     SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
 }
 
@@ -426,14 +430,13 @@ public void OnClientCookiesCached(int client)
 {
     if (IsFakeClient(client)) return;
     Settings_Default(client);
-    DB_Load(client);
+    DB_Load(client); // 加载完成前不做任何保存
 }
 
 public void OnMapStart()
 {
     g_sprite = PrecacheModel(SPRITE_MATERIAL, true);
 
-    // 清空运行期缓存
     for (int i=1;i<=L4D2_MAXPLAYERS;i++)
     {
         g_Plr[i].wpn_id   = -1;
@@ -461,50 +464,69 @@ public void OnMapStart()
 
 public void OnClientDisconnect(int client)
 {
-    // 退出时保存
     if (IsClientConnected(client) && !IsFakeClient(client))
-        DB_Save(client);
+        DB_Save(client); // 仅在已加载后才会真正保存
 }
 
-// ============ 小菜单 ============
+// ============ 菜单（分面板） ============
+
 public Action Cmd_Menu(int client, int args)
 {
     if (!IsValidClient(client)) return Plugin_Handled;
-    OpenMainMenu(client);
+    OpenRootMenu(client);
     return Plugin_Handled;
 }
 
-static void OpenMainMenu(int client)
+// 根菜单：分为【显示样式】与【分享/可见性】
+static void OpenRootMenu(int client)
 {
-    Menu m = new Menu(Menu_Main);
+    Menu m = new Menu(Menu_Root);
+    m.SetTitle("伤害数字设置（根）\n请选择一个分面板：");
+
+    m.AddItem("style", "① 显示样式 / 字体 / 偏移");
+    m.AddItem("share", "② 分享 / 可见性 / 管理功能");
+    m.AddItem("save",  "保存当前设置");
+
+    m.Display(client, MENU_TIME);
+}
+
+public int Menu_Root(Menu menu, MenuAction action, int client, int param2)
+{
+    if (action == MenuAction_End) { delete menu; return 0; }
+    if (action != MenuAction_Select) return 0;
+
+    char key[16];
+    menu.GetItem(param2, key, sizeof key);
+
+    if (StrEqual(key, "style")) OpenStyleMenu(client);
+    else if (StrEqual(key, "share")) OpenShareMenu(client);
+    else if (StrEqual(key, "save"))
+    {
+        g_Plr[client].plugin_switch = g_Plr[client].enable;
+        ClampStyle(client);
+        DB_Save(client);
+        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存。");
+        OpenRootMenu(client);
+    }
+    return 0;
+}
+
+// 样式面板：只放与字体/偏移相关项，避免一屏过长
+static void OpenStyleMenu(int client)
+{
+    Menu m = new Menu(Menu_Style);
     char title[256];
     Format(title, sizeof title,
-        "伤害数字设置\n———（仅本地显示，不影响他人样式）———\n显示开关: %s\n看他人: %s\n分享范围: %s\n字号: %.1f  间距: %.1f  透明度: %d\nX偏移: %.1f  Y偏移: %.1f\n最大距离: %.0f\n累加模式: %s  霰弹合并: %s\n\n提示：非管理员不能开启“让别人看到我的数字”。",
+        "① 显示样式 / 字体 / 偏移\n开关: %s\n字号: %.1f  间距: %.1f  透明度: %d\nX偏移: %.1f  Y偏移: %.1f  最大距离: %.0f\n累加模式: %s  霰弹合并: %s",
         g_Plr[client].enable ? "开" : "关",
-        g_Plr[client].see_others ? "开" : "关",
-        g_Plr[client].share_scope==0 ? "仅自己" : (g_Plr[client].share_scope==1 ? "队友" : "所有人"),
         g_Plr[client].size, g_Plr[client].gap, g_Plr[client].alpha,
         g_Plr[client].xoff, g_Plr[client].yoff, g_Plr[client].showdist,
         g_Plr[client].summode ? "开" : "关",
         g_Plr[client].sgmerge ? "开" : "关"
     );
     m.SetTitle(title);
-    m.AddItem("toggle_enable", "切换：显示开关");
-    m.AddItem("toggle_see",    "切换：看他人数字");
-    m.AddItem("scope",         "切换：分享范围（仅影响别人能否看到你的数字）");
-    if (IsAdminOrRoot(client))
-        m.AddItem("admin_showother", "切换：允许别人看到我的数字（管理员）");
-    else
-        m.AddItem("admin_showother", "允许别人看到我的数字（需要管理员）", ITEMDRAW_DISABLED);
-    // === 仅管理员 + 旁观时提供的开关 ===
-    if (GetClientTeam(client) == 1 && CheckCommandAccess(client, "", ADMFLAG_GENERIC)) // 任意你认可的管理位
-    {
-        char s[64];
-        Format(s, sizeof s, "旁观：查看所有人生还者伤害（当前：%s）",
-            g_bAdminObsViewAll[client] ? "开" : "关");
-        m.AddItem("spec_view_all", s);
-    }
 
+    m.AddItem("toggle_enable", "切换：显示开关");
     m.AddItem("size+", "字号 +0.5");
     m.AddItem("size-", "字号 -0.5");
     m.AddItem("gap+",  "间距 +0.5");
@@ -519,31 +541,19 @@ static void OpenMainMenu(int client)
     m.AddItem("dist-", "最大距离 -250");
     m.AddItem("sum", "切换：累加模式");
     m.AddItem("sg",  "切换：霰弹合并");
-    m.AddItem("save", "保存设置（数据库/Cookie）");
+    m.AddItem("back", "返回：根菜单");
+
     m.Display(client, MENU_TIME);
 }
-public int Menu_Main(Menu menu, MenuAction action, int client, int param2)
+public int Menu_Style(Menu menu, MenuAction action, int client, int param2)
 {
     if (action == MenuAction_End) { delete menu; return 0; }
     if (action != MenuAction_Select) return 0;
 
     char key[32];
     menu.GetItem(param2, key, sizeof key);
-    if (StrEqual(key, "toggle_enable"))
-        g_Plr[client].enable = !g_Plr[client].enable;
-    else if (StrEqual(key, "toggle_see"))
-        g_Plr[client].see_others = !g_Plr[client].see_others;
-    else if (StrEqual(key, "scope"))
-        g_Plr[client].share_scope = (g_Plr[client].share_scope + 1) % 3;
-    else if (StrEqual(key, "admin_showother"))
-    {
-        if (IsAdminOrRoot(client))
-        {
-            g_Plr[client].show_other = !g_Plr[client].show_other;
-            CPrintToChat(client, "{olive}[HUD]{default} 已%s允许别人看到你的伤害数字。", g_Plr[client].show_other ? "开启" : "关闭");
-        }
-        else CPrintToChat(client, "{olive}[HUD]{default} 只有管理员可开启这个选项。");
-    }
+
+    if (StrEqual(key, "toggle_enable")) g_Plr[client].enable = !g_Plr[client].enable;
     else if (StrEqual(key, "size+")) g_Plr[client].size += 0.5;
     else if (StrEqual(key, "size-")) g_Plr[client].size -= 0.5;
     else if (StrEqual(key, "gap+"))  g_Plr[client].gap  += 0.5;
@@ -558,50 +568,103 @@ public int Menu_Main(Menu menu, MenuAction action, int client, int param2)
     else if (StrEqual(key, "dist-")) g_Plr[client].showdist -= 250.0;
     else if (StrEqual(key, "sum")) g_Plr[client].summode = !g_Plr[client].summode;
     else if (StrEqual(key, "sg"))  g_Plr[client].sgmerge = !g_Plr[client].sgmerge;
-    else if (StrEqual(key, "save"))
+    else if (StrEqual(key, "back")) { OpenRootMenu(client); return 0; }
+
+    ClampStyle(client);
+    OpenStyleMenu(client);
+    return 0;
+}
+
+// 分享/可见性面板：只放“看他人/分享给谁/管理员选项”
+static void OpenShareMenu(int client)
+{
+    Menu m = new Menu(Menu_Share);
+    char title[256];
+    char scopeText[16];
+    strcopy(scopeText, sizeof scopeText, g_Plr[client].share_scope == 0 ? "仅自己" : "队友");
+    Format(title, sizeof title,
+        "② 分享 / 可见性 / 管理功能\n看他人（用于接收分享）: %s\n分享范围（只对管理员有效）: %s\n管理员对外分享权限: %s\n%s",
+        g_Plr[client].see_others ? "开" : "关",
+        scopeText,
+        (IsAdminOrRoot(client) && g_Plr[client].show_other) ? "开启" : "关闭",
+        (GetClientTeam(client) == 1 && IsAdminOrRoot(client)) ?
+        (g_bAdminObsViewAll[client] ? "旁观：查看所有人生还者伤害【开】" : "旁观：查看所有人生还者伤害【关】") : ""
+    );
+    m.SetTitle(title);
+
+    m.AddItem("toggle_see",    "切换：看他人（接收分享）");
+
+    // 分享范围：仅管理员可调；普通玩家灰
+    if (IsAdminOrRoot(client)) m.AddItem("scope", "切换：分享范围（仅自己/队友）");
+    else                       m.AddItem("scope", "切换：分享范围（仅管理员可设）", ITEMDRAW_DISABLED);
+
+    // 管理员开启“允许别人看到我的数字”
+    if (IsAdminOrRoot(client))
+        m.AddItem("admin_showother", "切换：管理员对外分享权限");
+    else
+        m.AddItem("admin_showother", "管理员对外分享权限（需要管理员）", ITEMDRAW_DISABLED);
+
+    // 旁观管理员全览
+    if (GetClientTeam(client) == 1 && IsAdminOrRoot(client))
+        m.AddItem("spec_view_all", "旁观：切换“查看所有人生还者伤害”");
+
+    m.AddItem("back", "返回：根菜单");
+    m.Display(client, MENU_TIME);
+}
+
+public int Menu_Share(Menu menu, MenuAction action, int client, int param2)
+{
+    if (action == MenuAction_End) { delete menu; return 0; }
+    if (action != MenuAction_Select) return 0;
+
+    char key[32];
+    menu.GetItem(param2, key, sizeof key);
+
+    if (StrEqual(key, "toggle_see"))
+        g_Plr[client].see_others = !g_Plr[client].see_others;
+    else if (StrEqual(key, "scope"))
     {
-        g_Plr[client].plugin_switch = g_Plr[client].enable;
-        // 非管理员，强制不能开放 show_other
-        if (!IsAdminOrRoot(client)) g_Plr[client].show_other = false;
-        ClampStyle(client);
-        DB_Save(client);
-        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存。");
+        if (IsAdminOrRoot(client))
+            g_Plr[client].share_scope = (g_Plr[client].share_scope + 1) % 2; // 0/1 轮换
+        else
+            CPrintToChat(client, "{olive}[HUD]{default} 只有管理员可以修改分享范围。");
     }
-    
-    // 旁观开关
+    else if (StrEqual(key, "admin_showother"))
+    {
+        if (IsAdminOrRoot(client))
+        {
+            g_Plr[client].show_other = !g_Plr[client].show_other;
+            CPrintToChat(client, "{olive}[HUD]{default} 管理员对外分享已%s。", g_Plr[client].show_other ? "开启" : "关闭");
+        }
+        else CPrintToChat(client, "{olive}[HUD]{default} 只有管理员可开启该选项。");
+    }
     else if (StrEqual(key, "spec_view_all"))
     {
-        if (GetClientTeam(client) != 1 || !CheckCommandAccess(client, "", ADMFLAG_GENERIC))
+        if (GetClientTeam(client) == 1 && IsAdminOrRoot(client))
         {
-            PrintToChat(client, "\x03只有管理员在旁观时才能使用该开关。");
+            g_bAdminObsViewAll[client] = !g_bAdminObsViewAll[client];
+            PrintToChat(client, "\x04旁观显示\x01已切换：\x05%s",
+                g_bAdminObsViewAll[client] ? "查看所有人生还者伤害【开】" : "查看所有人生还者伤害【关】");
         }
         else
         {
-            g_bAdminObsViewAll[client] = !g_bAdminObsViewAll[client];
-            PrintToChat(client, "\x04旁观显示\x01已切换为：\x05%s",
-                        g_bAdminObsViewAll[client] ? "查看所有人生还者伤害【开】" : "查看所有人生还者伤害【关】");
+            PrintToChat(client, "\x03只有旁观中的管理员可以使用该开关。");
         }
-
-        // 重新打开菜单，反映状态
-        //（按你自己的菜单函数名来）
-        // ShowDamageMenu(param1);
-        return 0;
     }
+    else if (StrEqual(key, "back")) { OpenRootMenu(client); return 0; }
 
     ClampStyle(client);
-    // 打开新菜单刷新显示
-    OpenMainMenu(client);
+    OpenShareMenu(client);
     return 0;
 }
 
 // ============ 提示 ============
 void E_LeftSafe(Event event, const char[] name, bool dontBroadcast)
 {
-    //PrintToChatAll("\x04[伤害显示]\x05 输入 !dmgmenu 打开伤害数字设置菜单。");
+    // PrintToChatAll("\x04[伤害显示]\x05 输入 !dmgmenu 打开设置菜单。");
 }
 
-// ============ 原事件/绘制路径（整合 per-client 样式） ============
-
+// ============ 事件/绘制 ============
 public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
 {
     int attacker = GetClientOfUserId(hEvent.GetInt("attacker"));
@@ -610,6 +673,7 @@ public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
 
+    // 自己的功能开关（默认 false）
     if (!g_Plr[attacker].enable || !g_Plr[attacker].plugin_switch) return;
 
     int remain = hEvent.GetInt("health");
@@ -641,13 +705,10 @@ public void SDK_OnTakeDamagePost(int victim, int attacker, int inflictor, float 
     bool forceHS = g_AttackCache[attacker][victim].forceHeadshot;
 
     if (g_Plr[attacker].sgmerge && (damagetype & DMG_BUCKSHOT))
-    {
         Handle_Shotgun(attacker, victim, wpn, dval, damagetype, damagePosition, forceHS);
-    }
     else
-    {
         DisplayDamage(victim, attacker, wpn, dval, damagetype, damagePosition, forceHS);
-    }
+
     g_AttackCache[attacker][victim].damage = 0;
     g_AttackCache[attacker][victim].forceHeadshot = false;
 }
@@ -845,55 +906,63 @@ public void OnGameFrame()
     }
 }
 
+// —— 可见性/分享规则要点 ——
+// 1) 自己永远能看见自己的数字（只要 enable=true）。
+// 2) “看他人”仅决定我是否接收他人分享（默认 true 便于看管理员分享）。
+// 3) 只有管理员可分享（show_other=true）并按 share_scope=0/1（仅自己/队友）分发；普通玩家强制仅自己，不对外分享。
+// 4) 旁观管理员可选“查看所有人生还者伤害”。
+
+static void BuildReceivers(int attacker, int victim, int recv[MAXPLAYERS], int &total)
+{
+    total = 0;
+    for (int i=1;i<=MaxClients;i++)
+    {
+        if (!IsValidClient(i)) continue;
+
+        // 1) 攻击者本人：始终接收
+        if (i == attacker) { recv[total++]=i; continue; }
+
+        // 2) 旁观者
+        if (GetClientTeam(i) == 1)
+        {
+            if (IsAdminOrRoot(i) && g_bAdminObsViewAll[i])
+                recv[total++] = i; // 旁观管理员“全览”
+            continue;
+        }
+
+        // 3) 非旁观玩家：只有在攻击者“允许分享+管理员”时才有资格接收
+        if (!(IsAdminOrRoot(attacker) && g_Plr[attacker].show_other)) continue;
+
+        // 分享范围：仅自己/队友
+        if (g_Plr[attacker].share_scope == 1) // 队友
+        {
+            if (GetClientTeam(i) != GetClientTeam(attacker)) continue;
+        }
+        else // 仅自己
+        {
+            continue; // 不向他人发
+        }
+
+        // 对方还需开启“看他人”
+        if (!g_Plr[i].see_others) continue;
+
+        recv[total++] = i;
+    }
+}
+
 static void DisplayDamage(int victim, int attacker, int weapon, int damage, int damagetype, const float damagePosition[3], bool forceHeadshot=false, bool UpdateFrame=false)
 {
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (!g_Plr[attacker].enable || !g_Plr[attacker].plugin_switch) return;
 
-    // 武器类型
     if (g_Plr[attacker].wpn_id != weapon && weapon != -1 && IsValidEdict(weapon))
     {
         g_Plr[attacker].wpn_id   = weapon;
         g_Plr[attacker].wpn_type = GetWpnType(weapon);
     }
 
-    // 选择接收者：我自己永远能看；如果我开启 see_others，我也能在别处看他们（与本函数无关）
-    // 这里控制“我的数字”发送给谁：share_scope + show_other（管理员门槛）
-    int recv[MAXPLAYERS], total=0;
-    for (int i=1;i<=MaxClients;i++)
-    {
-        if (!IsValidClient(i)) continue;
-
-        // 自己一定能看
-        if (i == attacker) { recv[total++]=i; continue; }
-
-        // 旁观者
-        if (GetClientTeam(i) == 1)
-        {
-            // 非管理员旁观：看不到
-            if (!CheckCommandAccess(i, "", ADMFLAG_GENERIC))
-                continue;
-
-            // 管理员旁观：只有开启了“查看所有人生还者伤害”才看到
-            if (g_bAdminObsViewAll[i])
-            {
-                recv[total++] = i;
-            }
-            continue;
-        }
-
-        // 非管理员如果没开启 show_other（或者被强制关），就不向别人发
-        if (!g_Plr[attacker].show_other) continue;
-
-        // 分享范围
-        if (g_Plr[attacker].share_scope == 0) continue; // 仅自己
-        if (g_Plr[attacker].share_scope == 1 && GetClientTeam(i) != GetClientTeam(attacker)) continue; // 仅队友
-
-        // 对方还必须允许“看他人”
-        if (!g_Plr[i].see_others) continue;
-
-        recv[total++] = i;
-    }
+    int recv[MAXPLAYERS], total;
+    BuildReceivers(attacker, victim, recv, total);
     if (total <= 0) return;
 
     int zombieClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
@@ -1019,7 +1088,6 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
         return;
     }
 
-    // 实际绘制
     int rgbaFull[4] ;
     rgbaFull[0] = rgba[0];
     rgbaFull[1] = rgba[1];
