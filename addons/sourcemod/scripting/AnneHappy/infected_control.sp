@@ -2267,9 +2267,35 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
 // 仅按“硬距离窗口”筛选：SpawnMin ≤ 距离 ≤ ring
 static bool IsNearTheSur(float ring, const float pos[3], float &dist)
 {
-    dist = GetMinEyeDistToAnySurvivor(pos);
-    if (dist >= 999998.0) return false; // 无存活生还者
-    return (dist >= gCV.fSpawnMin && dist <= ring);
+    float dmin = 999999.0;
+    bool  foundAny = false;
+    bool  inRange  = false;
+
+    float eyes[3];
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        GetClientEyePosition(i, eyes);
+        float d = GetVectorDistance(eyes, pos);
+
+        if (d < dmin) dmin = d;
+        foundAny = true;
+
+        if (d >= gCV.fSpawnMin && d <= ring)
+            inRange = true;
+    }
+
+    if (!foundAny)
+    {
+        dist = 999999.0;
+        return false;
+    }
+
+    dist = dmin;
+    return inRange;
 }
 
 
