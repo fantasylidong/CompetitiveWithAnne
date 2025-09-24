@@ -67,8 +67,8 @@
 #define SEP_TTL                   8.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                100.0
-#define NAV_CD_SECS               1.0
+#define SEP_RADIUS                80.0
+#define NAV_CD_SECS               0.8
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
