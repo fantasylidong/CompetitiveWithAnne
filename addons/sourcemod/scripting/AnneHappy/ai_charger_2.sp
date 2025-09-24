@@ -244,10 +244,14 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 					}
 				}
 				// 不满足近战回避距离限制或血量要求的牛，阻止其冲锋，令其对手持近战的目标挥拳
-				else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) && !IsInChargeDuration(specialInfected) && (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue || GetClientHealth(specialInfected) >= g_hChargerMeleeDamage.IntValue))
+				else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) 
+					&& !IsInChargeDuration(specialInfected)
+					&& (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue 
+						|| GetClientHealth(specialInfected) <= g_hChargerMeleeDamage.IntValue))
 				{
-					BlockCharge(curTarget);
+					BlockCharge(specialInfected);
 				}
+
 				// 目标选择
 				switch (g_hChargerTarget.IntValue)
 				{
