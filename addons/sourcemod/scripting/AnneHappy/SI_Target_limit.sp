@@ -128,7 +128,7 @@ public void OnDetectRushman(int DetectRushman){
 public void  OnPluginStart()
 {
 	g_hPluginEnable = CreateConVar("SI_target_enable", "1", "是否开启插件", 0, true, 0.0, true, 1.0);//Plugin Enable
-	g_hSI_enable_option = CreateConVar("SI_enable_option", "53", "控制不同特感是否开启此项功能（1smoker，2boomer，4hunter，……，总共7个，把这些值相加的最终结果）.", 0, true, 0.0, true, 127.0);//1,2,4,8,16,32,64 add to enable different SI enable option
+	g_hSI_enable_option = CreateConVar("SI_enable_option", "22", "控制不同特感是否开启此项功能（1smoker，2boomer，4hunter，……，总共7个，把这些值相加的最终结果）.", 0, true, 0.0, true, 127.0);//1,2,4,8,16,32,64 add to enable different SI enable option
 	g_hLimit_auto = CreateConVar("SI_target_limit_auto", "1", "服务器是否自动根据特感数量限定值来限制最大目标数量[Auto = (max / 正常生还者数量)向下取整 +1].", 0, true, 0.0, true, 1.0);//Auto Set target limit
 	g_hLimit_manual = CreateConVar("SI_target_limit_manual", "3", "服务器不自动情况下手动限制最大目标的值.", 0, false, 0.0, false, 0.0);//If Auto disable, use manual value to control target limit
 	g_hSILimit = FindConVar("l4d_infected_limit");
