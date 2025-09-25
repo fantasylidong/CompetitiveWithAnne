@@ -3,23 +3,14 @@
  *
  * Features:
  * - Multi SOUND sets from configs/hitsound_sets.cfg (0 = disabled).
+ *   keys per set: name / headshot / hit / kill / builtin(or buildin)=1 => skip FastDL
  * - Overlay ICON sets from configs/hiticon_sets.cfg with DIRECT IDs:
- *     0 = disabled (no overlay)
- *     1..N = the same numeric keys in hiticon_sets.cfg
- * - Save/Load from RPG DB (hitsound_cfg, hitsound_overlay_set), fallback to KeyValues file.
- * - Auto FastDL registration for sound files (hitsound_sets) and materials (hiticon_sets).
- * - Commands: !snd (menu), !hitui (toggle overlay between 0 and last non-zero).
- * - Library registration via RegPluginLibrary; optional native for version.
- *
- * -------------------------------------------------------------------
- * SQL (MySQL) migration (SINGLE-COLUMN overlay):
- * -------------------------------------------------------------------
- * -- If not present yet:
- * ALTER TABLE `rpg`
- *   ADD COLUMN `hitsound_cfg` TINYINT NOT NULL DEFAULT 0,
- *   ADD COLUMN `hitsound_overlay_set` TINYINT NOT NULL DEFAULT 0;
- *
- *
+ *     section name = numeric ID (0 = disabled)
+ *     keys per set: name / headshot / hit / kill     (paths are material bases, no extension)
+ * - Save/Load from RPG DB (rpg.hitsound_cfg, rpg.hitsound_overlay_set), fallback to KeyValues.
+ * - Auto FastDL for sound & materials (skip when builtin=1 or file不存在).
+ * - Commands: !snd (menu root), !hitui (toggle overlay between 0 and last non-zero).
+ * - Precache only in OnMapStart (best practice).
  */
 
 #pragma semicolon 1
@@ -29,24 +20,24 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "1.3.0"
+#define PLUGIN_VERSION "1.3.2"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 
 #define IsValidClient(%1) (1 <= %1 <= MaxClients && IsClientInGame(%1))
 
 // -----------------------------------------------------------
-// Library registration (so RPG can detect us early)
+// Library registration
 // -----------------------------------------------------------
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-    RegPluginLibrary("l4d2_hitsound"); // compatibility alias (optional)
+    RegPluginLibrary("l4d2_hitsound");
     CreateNative("HitsoundPlus_Version", Native_HitsoundPlus_Version);
     return APLRes_Success;
 }
-public any Native_HitsoundPlus_Version(Handle plugin, int numParams) { return 10300; }
+public any Native_HitsoundPlus_Version(Handle plugin, int numParams) { return 10302; }
 
 // -----------------------------------------------------------
-// Globals: ConVars & handles
+// Globals
 // -----------------------------------------------------------
 Handle SoundStore = INVALID_HANDLE; // KV fallback
 ConVar plugin_enable;
@@ -56,44 +47,43 @@ ConVar g_blast;
 ConVar g_cvDBEnabled;          // sm_hitsound_db_enable
 ConVar g_cvDBConf;             // sm_hitsound_db_conf
 ConVar Time;                   // sm_hitsound_showtime
+ConVar g_cvFastDLDebug;        // sm_hitsound_fastdl_debug
+#define FDLD() (g_cvFastDLDebug != null && GetConVarBool(g_cvFastDLDebug))
 
-// Per-player selection/state
-int  SoundSelect[MAXPLAYERS + 1];     // SOUND set id (0 = disabled per sounds cfg)
-int  g_OverlayTheme[MAXPLAYERS + 1];  // ICON set id (0 = disabled, 1..N = direct IDs)
-int  g_LastNonZeroOv[MAXPLAYERS + 1]; // ephemeral: for !hitui quick toggle
+// Per-player
+int  SoundSelect[MAXPLAYERS + 1];     // SOUND set index (0..g_SetCount-1), 0=禁用
+int  g_OverlayTheme[MAXPLAYERS + 1];  // ICON set direct ID (0=禁用, 1..N)
+int  g_LastNonZeroOv[MAXPLAYERS + 1]; // for !hitui toggle
+int  g_killCount[MAXPLAYERS + 1]     = { 0, ... };
+bool g_bShowAuthor[MAXPLAYERS + 1]   = { false, ... };
+bool IsVictimDeadPlayer[MAXPLAYERS + 1] = { false, ... };
 
-// Old save file path (fallback)
-char SavePath[256];
-
-// Timers & helper per player
+// Timers
 Handle g_taskCountdown[MAXPLAYERS + 1] = { INVALID_HANDLE, ... };
 Handle g_taskClean[MAXPLAYERS + 1]     = { INVALID_HANDLE, ... };
-int    g_killCount[MAXPLAYERS + 1]     = { 0, ... };
-bool   g_bShowAuthor[MAXPLAYERS + 1]   = { false, ... };
-bool   IsVictimDeadPlayer[MAXPLAYERS + 1] = { false, ... };
 
 // SQL
 Handle g_hDB = INVALID_HANDLE;
 
-// SOUND sets (hitsound_sets.cfg) — using lists indexed by their numeric keys order.
-// We'll also record their numeric IDs if you want strict mapping; but for sounds
-// we allow 0..g_SetCount-1 compact indexing like before (0=disabled).
+// SOUND sets (compact index 0..g_SetCount-1)
 Handle g_SetNames    = INVALID_HANDLE;
 Handle g_SetHeadshot = INVALID_HANDLE;
 Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
-Handle g_SetIsBuiltin = INVALID_HANDLE; // 每套装一个 0/1
 int    g_SetCount    = 0;
 
-// ICON sets (hiticon_sets.cfg) — DIRECT numeric IDs mapping
-Handle g_OvIds      = INVALID_HANDLE; // ArrayList<int> as string storage
+// ICON sets (direct ID list)
+Handle g_OvIds      = INVALID_HANDLE; // store string IDs
 Handle g_OvNames    = INVALID_HANDLE;
-Handle g_OvHeadshot = INVALID_HANDLE; // materials base, no extension
+Handle g_OvHeadshot = INVALID_HANDLE; // base path (no ext)
 Handle g_OvHit      = INVALID_HANDLE;
 Handle g_OvKill     = INVALID_HANDLE;
 int    g_OvCount    = 0;
 
-// overlay enums for choosing which icon to show
+// Paths
+char SavePath[256];
+
+// overlay enums
 enum { KILL_HEADSHOT = 0, HIT_ARMOR, KILL_NORMAL };
 
 // -----------------------------------------------------------
@@ -108,11 +98,21 @@ public Plugin:myinfo =
 };
 
 // -----------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------
+bool GetSteam2Id(int client, char[] sid, int maxlen)
+{
+    if (IsFakeClient(client)) return false;
+    if (!GetClientAuthId(client, AuthId_Steam2, sid, maxlen, true)) return false;
+    if (sid[0] == '\0' || StrEqual(sid, "BOT", false)) return false;
+    return true;
+}
+
+// -----------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------
 public void OnPluginStart()
 {
-    // Check game
     char Game_Name[64];
     GetGameFolderName(Game_Name, sizeof(Game_Name));
     if (!StrEqual(Game_Name, "left4dead2", false))
@@ -121,40 +121,38 @@ public void OnPluginStart()
     CreateConVar("l4d2_hitsound_plus_ver", PLUGIN_VERSION, "Plugin version", 0);
 
     // Core ConVars
-    plugin_enable = CreateConVar("sm_hitsound_enable", "1", "是否开启本插件(0-关, 1-开)", CVAR_FLAGS);
-    sound_enable  = CreateConVar("sm_hitsound_sound_enable", "1", "是否开启音效(0-关, 1-开)", CVAR_FLAGS);
-    pic_enable    = CreateConVar("sm_hitsound_pic_enable", "1", "是否开启击中/击杀图标(0-关, 1-开)", CVAR_FLAGS);
-    g_blast       = CreateConVar("sm_blast_damage_enable", "0", "是否开启爆炸反馈提示(0-关, 1-开 建议关闭)", CVAR_FLAGS);
-    Time          = CreateConVar("sm_hitsound_showtime", "0.3", "图标存在的时长(秒, 默认0.3)");
+    plugin_enable   = CreateConVar("sm_hitsound_enable", "1", "是否开启本插件(0-关, 1-开)", CVAR_FLAGS);
+    sound_enable    = CreateConVar("sm_hitsound_sound_enable", "1", "是否开启音效(0-关, 1-开)", CVAR_FLAGS);
+    pic_enable      = CreateConVar("sm_hitsound_pic_enable", "1", "是否开启击中/击杀图标(0-关, 1-开)", CVAR_FLAGS);
+    g_blast         = CreateConVar("sm_blast_damage_enable", "0", "是否开启爆炸反馈提示(0-关, 1-开 建议关闭)", CVAR_FLAGS);
+    Time            = CreateConVar("sm_hitsound_showtime", "0.3", "图标存在的时长(秒, 默认0.3)");
+    g_cvDBEnabled   = CreateConVar("sm_hitsound_db_enable", "1", "启用 RPG 表存储（1=启用，0=禁用）", CVAR_FLAGS);
+    g_cvDBConf      = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
+    g_cvFastDLDebug = CreateConVar("sm_hitsound_fastdl_debug", "0", "打印所有 FastDL 注册项到日志", FCVAR_NOTIFY);
 
-    // DB
-    g_cvDBEnabled = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储（1=启用，0=禁用）", CVAR_FLAGS);
-    g_cvDBConf    = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
-
-    // KV fallback file
+    // KV fallback
     LoadSndData();
 
-    // SOUND set arrays
+    // Arrays
     g_SetNames    = CreateArray(64);
     g_SetHeadshot = CreateArray(PLATFORM_MAX_PATH);
     g_SetHit      = CreateArray(PLATFORM_MAX_PATH);
     g_SetKill     = CreateArray(PLATFORM_MAX_PATH);
-    g_SetIsBuiltin = CreateArray(1);
     LoadHitSoundSets();
 
-    // ICON set arrays (direct ID mapping)
-    g_OvIds      = CreateArray(16); // store IDs as strings we can convert; or store int via SetArrayCell
+    g_OvIds      = CreateArray(16);
     g_OvNames    = CreateArray(64);
     g_OvHeadshot = CreateArray(PLATFORM_MAX_PATH);
     g_OvHit      = CreateArray(PLATFORM_MAX_PATH);
     g_OvKill     = CreateArray(PLATFORM_MAX_PATH);
     LoadHitIconSets();
 
-    // DB connect (old-style signature)
+    // DB connect
     DB_InitIfEnabled();
 
     // Commands
-    RegConsoleCmd("sm_snd",   MenuFunc_Snd, "设置音效/图标套装");
+    RegConsoleCmd("sm_snd",   MenuFunc_Snd, "命中反馈设置");
+    RegConsoleCmd("sm_hitui", Cmd_ToggleOverlay, "图标套装在 0 与上一次非0 之间切换");
 
     AutoExecConfig(true, "l4d2_hitsound_plus");
 
@@ -193,7 +191,7 @@ void LoadSndData()
 }
 
 // -----------------------------------------------------------
-// DB init (OLD-STYLE order): SQL_TConnect(callback, confname, data)
+// DB init
 // -----------------------------------------------------------
 void DB_InitIfEnabled()
 {
@@ -209,7 +207,9 @@ public void SQL_OnConnect(Handle owner, Handle hndl, const char[] error, any dat
 }
 
 // -----------------------------------------------------------
-// SOUND sets from hitsound_sets.cfg (keys: name/headshot/hit/kill)
+// SOUND sets from addons/sourcemod/configs/hitsound_sets.cfg
+// keys per set: name / headshot / hit / kill / builtin(or buildin)
+// builtin=1 → 游戏自带/客户端已有 → 不加入 FastDL
 // -----------------------------------------------------------
 void LoadHitSoundSets()
 {
@@ -218,48 +218,52 @@ void LoadHitSoundSets()
     {
         LogError("[hitsound] 无法读取 hitsound_sets.cfg，创建仅禁用选项");
         ClearArray(g_SetNames); ClearArray(g_SetHeadshot); ClearArray(g_SetHit); ClearArray(g_SetKill);
-        if (g_SetIsBuiltin != INVALID_HANDLE) ClearArray(g_SetIsBuiltin);
         PushArrayString(g_SetNames, "禁用击中/击杀音效");
         PushArrayString(g_SetHeadshot, ""); PushArrayString(g_SetHit, ""); PushArrayString(g_SetKill, "");
-        if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, 1);
         g_SetCount = 1; CloseHandle(kv); return;
     }
 
     ClearArray(g_SetNames); ClearArray(g_SetHeadshot); ClearArray(g_SetHit); ClearArray(g_SetKill);
-    if (g_SetIsBuiltin != INVALID_HANDLE) ClearArray(g_SetIsBuiltin);
 
     KvRewind(kv);
     if (KvGotoFirstSubKey(kv))
     {
-        do {
+        do
+        {
             char name[64], sh[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH];
-            int isbuiltin = KvGetNum(kv, "builtin", 0);
-
             KvGetString(kv, "name",     name, sizeof(name), "未命名");
             KvGetString(kv, "headshot", sh,   sizeof(sh),   "");
             KvGetString(kv, "hit",      hi,   sizeof(hi),   "");
             KvGetString(kv, "kill",     ki,   sizeof(ki),   "");
 
+            int isBuiltin = KvGetNum(kv, "builtin", KvGetNum(kv, "buildin", 0));
+
             PushArrayString(g_SetNames,    name);
             PushArrayString(g_SetHeadshot, sh);
             PushArrayString(g_SetHit,      hi);
             PushArrayString(g_SetKill,     ki);
-            if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, isbuiltin);
 
-            // 只有“非内置 & 文件确实在服务器磁盘上”才加入 FastDL
-            if (!isbuiltin && sh[0] != '\0') {
-                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh);
-                if (FileExists(p)) AddFileToDownloadsTable(p);
+            // FastDL（非 builtin 且文件存在）
+            if (!isBuiltin && sh[0] != '\0')
+            {
+                char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", sh);
+                if (FileExists(dl, true)) { AddFileToDownloadsTable(dl); if (FDLD()) LogMessage("[hitsound] FastDL += %s", dl); }
+                else LogError("[hitsound] 缺少文件(不加入下载表): %s", dl);
             }
-            if (!isbuiltin && hi[0] != '\0') {
-                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi);
-                if (FileExists(p)) AddFileToDownloadsTable(p);
+            if (!isBuiltin && hi[0] != '\0')
+            {
+                char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", hi);
+                if (FileExists(dl, true)) { AddFileToDownloadsTable(dl); if (FDLD()) LogMessage("[hitsound] FastDL += %s", dl); }
+                else LogError("[hitsound] 缺少文件(不加入下载表): %s", dl);
             }
-            if (!isbuiltin && ki[0] != '\0') {
-                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki);
-                if (FileExists(p)) AddFileToDownloadsTable(p);
+            if (!isBuiltin && ki[0] != '\0')
+            {
+                char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", ki);
+                if (FileExists(dl, true)) { AddFileToDownloadsTable(dl); if (FDLD()) LogMessage("[hitsound] FastDL += %s", dl); }
+                else LogError("[hitsound] 缺少文件(不加入下载表): %s", dl);
             }
-        } while (KvGotoNextKey(kv));
+        }
+        while (KvGotoNextKey(kv));
     }
     CloseHandle(kv);
 
@@ -268,14 +272,16 @@ void LoadHitSoundSets()
     {
         PushArrayString(g_SetNames, "禁用击中/击杀音效");
         PushArrayString(g_SetHeadshot, ""); PushArrayString(g_SetHit, ""); PushArrayString(g_SetKill, "");
-        if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, 1);
         g_SetCount = 1;
     }
-    LogMessage("[hitsound] 已加载 %d 套音效配置（0..%d）", g_SetCount, g_SetCount - 1);
+
+    LogMessage("[hitsound] 已加载 %d 套音效配置（索引 0..%d）", g_SetCount, g_SetCount - 1);
 }
 
 // -----------------------------------------------------------
-// ICON sets from hiticon_sets.cfg (DIRECT IDs, keys: headshot/hit/kill)
+// ICON sets from addons/sourcemod/configs/hiticon_sets.cfg
+// section name = direct numeric ID (0 = disabled)
+// keys per set: name / headshot / hit / kill    (material base path, no extension)
 // -----------------------------------------------------------
 void LoadHitIconSets()
 {
@@ -286,7 +292,7 @@ void LoadHitIconSets()
     Handle kv = CreateKeyValues("HitIconSets");
     if (!FileToKeyValues(kv, "addons/sourcemod/configs/hiticon_sets.cfg"))
     {
-        LogMessage("[hitsound] 未找到 hiticon_sets.cfg，图标将只受 0=禁用 / 其它=无可用 配置影响");
+        LogMessage("[hitsound] 未找到 hiticon_sets.cfg，图标仅支持 0=禁用");
         CloseHandle(kv);
         return;
     }
@@ -294,38 +300,56 @@ void LoadHitIconSets()
     KvRewind(kv);
     if (KvGotoFirstSubKey(kv))
     {
-        do {
-            // 读取该子节的名称（即数字ID）
+        do
+        {
             char sec[16]; KvGetSectionName(kv, sec, sizeof(sec));
-            // 只接受非负整数 ID
             int id = StringToInt(sec);
             if (id < 0) continue;
 
             char name[64], hs[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH];
-            KvGetString(kv, "name", name, sizeof(name), "未命名图标套装");
-            KvGetString(kv, "headshot", hs, sizeof(hs), "");
-            KvGetString(kv, "hit",      hi, sizeof(hi), "");
-            KvGetString(kv, "kill",     ki, sizeof(ki), "");
+            KvGetString(kv, "name",     name, sizeof(name), "未命名图标套装");
+            KvGetString(kv, "headshot", hs,   sizeof(hs),   "");
+            KvGetString(kv, "hit",      hi,   sizeof(hi),   "");
+            KvGetString(kv, "kill",     ki,   sizeof(ki),   "");
 
-            PushArrayString(g_OvIds, sec);          // 保存成字符串，使用时再转 int
-            PushArrayString(g_OvNames, name);
+            PushArrayString(g_OvIds,      sec);
+            PushArrayString(g_OvNames,    name);
             PushArrayString(g_OvHeadshot, hs);
             PushArrayString(g_OvHit,      hi);
             PushArrayString(g_OvKill,     ki);
             g_OvCount++;
 
-            // FastDL: 注册 VMT/VTF（非空才注册）
-            if (hs[0] != '\0') { char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hs); AddFileToDownloadsTable(p1);
-                                 char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hs); AddFileToDownloadsTable(p2); }
-            if (hi[0] != '\0') { char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hi); AddFileToDownloadsTable(p1);
-                                 char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hi); AddFileToDownloadsTable(p2); }
-            if (ki[0] != '\0') { char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", ki); AddFileToDownloadsTable(p1);
-                                 char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", ki); AddFileToDownloadsTable(p2); }
-        } while (KvGotoNextKey(kv));
+            // FastDL: .vmt / .vtf
+            if (hs[0] != '\0')
+            {
+                char p1[PLATFORM_MAX_PATH], p2[PLATFORM_MAX_PATH];
+                Format(p1, sizeof(p1), "materials/%s.vmt", hs);
+                Format(p2, sizeof(p2), "materials/%s.vtf", hs);
+                if (FileExists(p1, true)) { AddFileToDownloadsTable(p1); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p1); } else LogError("[hitsound] 缺少 VMT: %s", p1);
+                if (FileExists(p2, true)) { AddFileToDownloadsTable(p2); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p2); } else LogError("[hitsound] 缺少 VTF: %s", p2);
+            }
+            if (hi[0] != '\0')
+            {
+                char p1[PLATFORM_MAX_PATH], p2[PLATFORM_MAX_PATH];
+                Format(p1, sizeof(p1), "materials/%s.vmt", hi);
+                Format(p2, sizeof(p2), "materials/%s.vtf", hi);
+                if (FileExists(p1, true)) { AddFileToDownloadsTable(p1); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p1); } else LogError("[hitsound] 缺少 VMT: %s", p1);
+                if (FileExists(p2, true)) { AddFileToDownloadsTable(p2); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p2); } else LogError("[hitsound] 缺少 VTF: %s", p2);
+            }
+            if (ki[0] != '\0')
+            {
+                char p1[PLATFORM_MAX_PATH], p2[PLATFORM_MAX_PATH];
+                Format(p1, sizeof(p1), "materials/%s.vmt", ki);
+                Format(p2, sizeof(p2), "materials/%s.vtf", ki);
+                if (FileExists(p1, true)) { AddFileToDownloadsTable(p1); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p1); } else LogError("[hitsound] 缺少 VMT: %s", p1);
+                if (FileExists(p2, true)) { AddFileToDownloadsTable(p2); if (FDLD()) LogMessage("[hitsound] FastDL += %s", p2); } else LogError("[hitsound] 缺少 VTF: %s", p2);
+            }
+        }
+        while (KvGotoNextKey(kv));
     }
     CloseHandle(kv);
 
-    LogMessage("[hitsound] 已加载 %d 个图标套装（使用直接ID，包含0=禁用时也算一个）", g_OvCount);
+    LogMessage("[hitsound] 已加载 %d 个图标套装（直接ID）", g_OvCount);
 }
 
 // -----------------------------------------------------------
@@ -336,15 +360,15 @@ public void OnClientPutInServer(int client)
     if (IsFakeClient(client)) return;
 
     SoundSelect[client]    = 0;
-    g_OverlayTheme[client] = 0; // 默认禁用；你也可以改成 1=某默认主题
-    g_LastNonZeroOv[client]= 1; // 记录上次非0的选择，初始给1（若不存在，会在菜单里被覆盖）
+    g_OverlayTheme[client] = 0;
+    g_LastNonZeroOv[client]= 1;
 
     if (GetConVarBool(g_cvDBEnabled) && g_hDB != INVALID_HANDLE)
     {
-        char sid[64]; GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
+        char sid[64]; if (!GetSteam2Id(client, sid, sizeof(sid))) return;
         char q[256];
         Format(q, sizeof(q),
-            "SELECT hitsound_cfg, hitsound_overlay_set FROM rpg_player WHERE steamid='%s' LIMIT 1;", sid);
+            "SELECT hitsound_cfg, hitsound_overlay_set FROM RPG WHERE steamid='%s' LIMIT 1;", sid);
         SQL_TQuery(g_hDB, SQL_OnLoadPrefs, q, GetClientUserId(client));
     }
     else
@@ -389,21 +413,21 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any u
     }
     else
     {
-        DB_SavePlayerPrefs(client); // write defaults
+        DB_SavePlayerPrefs(client); // 写默认
     }
 }
 
 void DB_SavePlayerPrefs(int client)
 {
     if (g_hDB == INVALID_HANDLE) return;
+    char sid[64]; if (!GetSteam2Id(client, sid, sizeof(sid))) return;
 
-    char sid[64]; GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
     int cfg  = SoundSelect[client];
     int ovst = g_OverlayTheme[client];
 
     char q[512];
     Format(q, sizeof(q),
-        "INSERT INTO rpg_player (steamid, hitsound_cfg, hitsound_overlay_set) VALUES ('%s', %d, %d) ON DUPLICATE KEY UPDATE  hitsound_cfg=VALUES(hitsound_cfg), hitsound_overlay_set=VALUES(hitsound_overlay_set);",
+        "INSERT INTO RPG (steamid, hitsound_cfg, hitsound_overlay_set) VALUES ('%s', %d, %d) =ON DUPLICATE KEY UPDATE hitsound_cfg=VALUES(hitsound_cfg), hitsound_overlay_set=VALUES(hitsound_overlay_set);",
         sid, cfg, ovst);
 
     SQL_TQuery(g_hDB, SQL_OnSavePrefs, q);
@@ -414,31 +438,63 @@ public void SQL_OnSavePrefs(Handle owner, Handle hndl, const char[] error, any d
 }
 
 // -----------------------------------------------------------
-// Fallback to KeyValues file (only OverlaySet now)
+// Fallback to KeyValues file
 // -----------------------------------------------------------
 public void ClientSaveToFileSave(int client)
 {
-    char user_id[128] = "";
-    GetClientAuthId(client, AuthId_Engine, user_id, sizeof(user_id), true);
+    char key[128];
+    if (!GetSteam2Id(client, key, sizeof(key))) return;
 
-    KvJumpToKey(SoundStore, user_id, true);
-    KvSetNum(SoundStore, "Snd", SoundSelect[client]);
-    KvSetNum(SoundStore, "OverlaySet", g_OverlayTheme[client]); // 0=禁用,1..N=直连ID
+    KvJumpToKey(SoundStore, key, true);
+    KvSetNum(SoundStore, "Snd",         SoundSelect[client]);
+    KvSetNum(SoundStore, "OverlaySet",  g_OverlayTheme[client]);
     KvGoBack(SoundStore);
     KvRewind(SoundStore);
     KeyValuesToFile(SoundStore, SavePath);
 }
 public void ClientSaveToFileLoad(int client)
 {
-    char user_id[128] = "";
-    GetClientAuthId(client, AuthId_Engine, user_id, sizeof(user_id), true);
+    char key[128];
+    if (!GetSteam2Id(client, key, sizeof(key))) return;
 
-    KvJumpToKey(SoundStore, user_id, true);
-    SoundSelect[client]    = KvGetNum(SoundStore, "Snd", 0);
-    g_OverlayTheme[client] = KvGetNum(SoundStore, "OverlaySet", 0);
+    // 先用 Steam2 读
+    bool found = KvJumpToKey(SoundStore, key, false);
+    int snd = 0, ov = 0;
+
+    if (found)
+    {
+        snd = KvGetNum(SoundStore, "Snd", 0);
+        ov  = KvGetNum(SoundStore, "OverlaySet", 0);
+        KvGoBack(SoundStore);
+    }
+    else
+    {
+        // 向后兼容：旧版可能用 Engine ID
+        char oldKey[128];
+        if (GetClientAuthId(client, AuthId_Engine, oldKey, sizeof(oldKey), true) && oldKey[0] != '\0')
+        {
+            if (KvJumpToKey(SoundStore, oldKey, false))
+            {
+                snd = KvGetNum(SoundStore, "Snd", 0);
+                ov  = KvGetNum(SoundStore, "OverlaySet", 0);
+                KvGoBack(SoundStore);
+
+                // 写入新键
+                KvJumpToKey(SoundStore, key, true);
+                KvSetNum(SoundStore, "Snd", snd);
+                KvSetNum(SoundStore, "OverlaySet", ov);
+                KvGoBack(SoundStore);
+
+                KvDeleteKey(SoundStore, oldKey);
+                KvRewind(SoundStore);
+                KeyValuesToFile(SoundStore, SavePath);
+            }
+        }
+    }
+
+    SoundSelect[client]    = snd;
+    g_OverlayTheme[client] = ov;
     if (g_OverlayTheme[client] != 0) g_LastNonZeroOv[client] = g_OverlayTheme[client];
-    KvGoBack(SoundStore);
-    KvRewind(SoundStore);
 }
 
 // -----------------------------------------------------------
@@ -446,62 +502,62 @@ public void ClientSaveToFileLoad(int client)
 // -----------------------------------------------------------
 public Action MenuFunc_Snd(int client, int args)
 {
-    Handle menu = CreateMenu(MenuHandler_MainMenu);
-    char title[128];
-    Format(title, sizeof(title), "选择音效/图标 | 当前音效套装: %d", SoundSelect[client]);
-    SetMenuTitle(menu, title);
+    Handle m = CreateMenu(MenuHandler_MainRoot);
+    SetMenuTitle(m, "命中反馈设置");
 
-    char ovCurName[64] = "禁用";
-    int idCount = GetArraySize(g_OvIds);
-    for (int i=0; i<idCount; i++)
-    {
-        char sec[16]; GetArrayString(g_OvIds, i, sec, sizeof(sec));
-        int id = StringToInt(sec);
-        if (id == g_OverlayTheme[client])
-        {
-            GetArrayString(g_OvNames, i, ovCurName, sizeof(ovCurName));
-            break;
-        }
-    }
-    char ovsetLabel[96];
-    Format(ovsetLabel, sizeof(ovsetLabel), "图标套装: %d - %s (点击选择)", g_OverlayTheme[client], ovCurName);
-    AddMenuItem(menu, "overlay_set_open", ovsetLabel);
+    AddMenuItem(m, "open_sound",   "选择【音效套装】");
+    AddMenuItem(m, "open_overlay", "选择【图标套装】");
 
-    AddMenuItem(menu, "sep", "----------------", ITEMDRAW_DISABLED);
-
-    // list SOUND sets (0..g_SetCount-1)
-    for (int i = 0; i < g_SetCount; i++)
-    {
-        char idx[8]; IntToString(i, idx, sizeof(idx));
-        char name[64]; GetArrayString(g_SetNames, i, name, sizeof(name));
-        AddMenuItem(menu, idx, name);
-    }
-
-    SetMenuExitButton(menu, true);
-    DisplayMenu(menu, client, MENU_TIME_FOREVER);
+    SetMenuExitButton(m, true);
+    DisplayMenu(m, client, MENU_TIME_FOREVER);
     return Plugin_Handled;
 }
-
-public int MenuHandler_MainMenu(Handle menu, MenuAction action, int client, int item)
+public int MenuHandler_MainRoot(Handle menu, MenuAction action, int client, int item)
 {
     if (action == MenuAction_End) { CloseHandle(menu); }
     if (action == MenuAction_Select)
     {
+        char key[32]; GetMenuItem(menu, item, key, sizeof(key));
+        if (StrEqual(key, "open_sound"))   { OpenSoundSetMenu(client);   }
+        if (StrEqual(key, "open_overlay")) { OpenOverlaySetMenu(client); }
+    }
+    return 0;
+}
+
+Action OpenSoundSetMenu(int client)
+{
+    Handle m = CreateMenu(MenuHandler_SoundMenu);
+    char title[96]; Format(title, sizeof(title), "选择音效套装 (当前: %d)", SoundSelect[client]);
+    SetMenuTitle(m, title);
+
+    for (int i = 0; i < g_SetCount; i++)
+    {
+        char idx[8]; IntToString(i, idx, sizeof(idx));
+        char name[64]; GetArrayString(g_SetNames, i, name, sizeof(name));
+        AddMenuItem(m, idx, name);
+    }
+
+    SetMenuExitBackButton(m, true);
+    DisplayMenu(m, client, MENU_TIME_FOREVER);
+    return Plugin_Handled;
+}
+public int MenuHandler_SoundMenu(Handle menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End) { CloseHandle(menu); }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack) { MenuFunc_Snd(client, 0); }
+    if (action == MenuAction_Select)
+    {
         char info[16]; GetMenuItem(menu, item, info, sizeof(info));
-
-        if (StrEqual(info, "overlay_set_open"))
-        {
-            OpenOverlaySetMenu(client);
-            return 0;
-        }
-
         int choice = StringToInt(info);
         if (choice < 0 || choice >= g_SetCount) choice = 0;
+
         SoundSelect[client] = choice;
         PrintToChat(client, "已选择音效套装: %d", SoundSelect[client]);
 
         if (GetConVarBool(g_cvDBEnabled) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
         else ClientSaveToFileSave(client);
+
+        OpenSoundSetMenu(client); // 停留
     }
     return 0;
 }
@@ -513,7 +569,6 @@ Action OpenOverlaySetMenu(int client)
     Format(title, sizeof(title), "选择图标套装 (当前: %d)", g_OverlayTheme[client]);
     SetMenuTitle(m, title);
 
-    // Always provide "0 - 禁用"
     AddMenuItem(m, "ov_0", "0 - 禁用");
 
     int idCount = GetArraySize(g_OvIds);
@@ -521,7 +576,7 @@ Action OpenOverlaySetMenu(int client)
     {
         char sec[16]; GetArrayString(g_OvIds, i, sec, sizeof(sec));
         int id = StringToInt(sec);
-        if (id == 0) continue; // 0 already provided
+        if (id == 0) continue;
         char name[64]; GetArrayString(g_OvNames, i, name, sizeof(name));
 
         char key[16];  Format(key, sizeof(key), "ov_%d", id);
@@ -533,7 +588,6 @@ Action OpenOverlaySetMenu(int client)
     DisplayMenu(m, client, MENU_TIME_FOREVER);
     return Plugin_Handled;
 }
-
 public int MenuHandler_OvMenu(Handle menu, MenuAction action, int client, int item)
 {
     if (action == MenuAction_End) { CloseHandle(menu); }
@@ -565,8 +619,30 @@ public int MenuHandler_OvMenu(Handle menu, MenuAction action, int client, int it
     return 0;
 }
 
+public Action Cmd_ToggleOverlay(int client, int args)
+{
+    if (client <= 0 || !IsClientInGame(client) || IsFakeClient(client)) return Plugin_Handled;
+
+    if (g_OverlayTheme[client] == 0)
+    {
+        g_OverlayTheme[client] = (g_LastNonZeroOv[client] > 0 ? g_LastNonZeroOv[client] : 1);
+        PrintToChat(client, "图标套装已启用：%d", g_OverlayTheme[client]);
+    }
+    else
+    {
+        g_LastNonZeroOv[client] = g_OverlayTheme[client];
+        g_OverlayTheme[client] = 0;
+        PrintToChat(client, "图标套装已禁用（再次输入 !hitui 可恢复 %d）", g_LastNonZeroOv[client]);
+    }
+
+    if (GetConVarBool(g_cvDBEnabled) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
+    else ClientSaveToFileSave(client);
+
+    return Plugin_Handled;
+}
+
 // -----------------------------------------------------------
-// SOUND helpers: which: 0=headshot, 1=hit, 2=kill
+// SOUND & ICON helpers
 // -----------------------------------------------------------
 bool GetSetPath(int setIdx, int which, char[] out, int maxlen)
 {
@@ -577,7 +653,6 @@ bool GetSetPath(int setIdx, int which, char[] out, int maxlen)
     return (out[0] != '\0');
 }
 
-// ICON helpers: direct ID lookup by scanning parallel arrays
 bool GetIconPathById(int id, int which, char[] out, int maxlen)
 {
     out[0] = '\0';
@@ -603,49 +678,43 @@ public void Event_Spawn(Event event, const char[] name, bool dontBroadcast)
     int Client = GetClientOfUserId(GetEventInt(event, "userid"));
     if (Client > 0 && Client <= MaxClients) IsVictimDeadPlayer[Client] = false;
 }
-public Action PlayerIncap(Handle event, const char[] name, bool dontBroadcast)
+public Action PlayerIncap(Event event, const char[] name, bool dontBroadcast)
 {
     int victim = GetClientOfUserId(GetEventInt(event, "userid"));
     if (IsValidClient(victim) && GetClientTeam(victim) == 3 && GetEntProp(victim, Prop_Send, "m_zombieClass") == 8)
         IsVictimDeadPlayer[victim] = true;
     return Plugin_Continue;
 }
-public Action Event_TankSpawn(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     int tank = GetClientOfUserId(GetEventInt(event, "userid"));
     if (IsValidClient(tank)) IsVictimDeadPlayer[tank] = false;
     return Plugin_Continue;
 }
 
-public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int victim     = GetClientOfUserId(GetEventInt(event, "userid"));
     int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
     bool headshot  = GetEventBool(event, "headshot");
     int damagetype = GetEventInt(event, "type");
 
-    if (damagetype & (DMG_BURN | DMG_SLOWBURN))  // 新增：燃烧击杀就不播提示/覆盖
-        return Plugin_Changed;
-
-    if (damagetype & DMG_DIRECT) return Plugin_Changed;
+    if (damagetype & (DMG_BURN | DMG_SLOWBURN))  return Plugin_Changed;
+    if (damagetype & DMG_DIRECT)                 return Plugin_Changed;
     if (GetConVarInt(g_blast) == 0 && (damagetype & DMG_BLAST)) return Plugin_Changed;
 
     if (IsValidClient(victim) && GetClientTeam(victim) == 3 && IsValidClient(attacker) && GetClientTeam(attacker) == 2 && !IsFakeClient(attacker))
     {
-        // ICON
         if (GetConVarInt(pic_enable) == 1 && g_OverlayTheme[attacker] != 0)
-        {
             ShowKillMessage(attacker, headshot ? KILL_HEADSHOT : KILL_NORMAL);
-        }
 
-        // SOUND
         if (GetConVarInt(sound_enable) == 1)
         {
             char snd[PLATFORM_MAX_PATH];
             int which = headshot ? 0 : 2;
             if (GetSetPath(SoundSelect[attacker], which, snd, sizeof(snd)))
             {
-                PrecacheSound(snd, true);
+                // no precache here
                 EmitSoundToClient(attacker, snd, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
             }
         }
@@ -657,7 +726,7 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
     return Plugin_Continue;
 }
 
-public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
     int victim     = GetClientOfUserId(GetEventInt(event, "userid"));
     int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
@@ -686,7 +755,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
                 char snd[PLATFORM_MAX_PATH];
                 if (GetSetPath(SoundSelect[attacker], 1, snd, sizeof(snd)))
                 {
-                    PrecacheSound(snd, true);
+                    // no precache here
                     EmitSoundToClient(attacker, snd, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
                 }
             }
@@ -699,7 +768,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
     return Plugin_Changed;
 }
 
-public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_InfectedDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
     bool headshot  = GetEventBool(event, "headshot");
@@ -720,7 +789,7 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
             int which = headshot ? 0 : 2;
             if (GetSetPath(SoundSelect[attacker], which, snd, sizeof(snd)))
             {
-                PrecacheSound(snd, true);
+                // no precache here
                 EmitSoundToClient(attacker, snd, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
             }
         }
@@ -732,9 +801,60 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
     return Plugin_Continue;
 }
 
+public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadcast)
+{
+    int victim     = GetEventInt(event, "entityid");
+    int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
+    int dmg        = GetEventInt(event, "amount");
+    int eventhealth= GetEntProp(victim, Prop_Data, "m_iHealth");
+    int damagetype = GetEventInt(event, "type");
+
+    if (!IsValidEntity(victim) || !IsValidEdict(victim)) return Plugin_Changed;
+    if (damagetype & DMG_DIRECT) return Plugin_Changed;
+    if (GetConVarInt(g_blast) == 0 && (damagetype & DMG_BLAST)) return Plugin_Changed;
+
+    if (IsValidClient(attacker) && !IsFakeClient(attacker))
+    {
+        bool IsVictimDead = ((eventhealth - dmg) <= 0);
+        if (!IsVictimDead)
+        {
+            if (GetConVarInt(pic_enable) == 1 && g_OverlayTheme[attacker] != 0)
+                ShowKillMessage(attacker, HIT_ARMOR);
+
+            if (GetConVarInt(sound_enable) == 1)
+            {
+                char snd[PLATFORM_MAX_PATH];
+                if (GetSetPath(SoundSelect[attacker], 1, snd, sizeof(snd)))
+                {
+                    // no precache here
+                    EmitSoundToClient(attacker, snd, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                }
+            }
+
+            if (g_taskClean[attacker] != INVALID_HANDLE) { KillTimer(g_taskClean[attacker]); g_taskClean[attacker] = INVALID_HANDLE; }
+            float showtime = GetConVarFloat(Time);
+            g_taskClean[attacker] = CreateTimer(showtime, task_Clean, attacker);
+        }
+    }
+    return Plugin_Changed;
+}
+
+public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        g_killCount[client] = 0;
+        if (g_taskCountdown[client] != INVALID_HANDLE) { KillTimer(g_taskCountdown[client]); g_taskCountdown[client] = INVALID_HANDLE; }
+        g_bShowAuthor[client] = GetRandomInt(1,3) == 1;
+    }
+}
+
+// -----------------------------------------------------------
+// OnMapStart: Precache everything (best practice)
+// -----------------------------------------------------------
 public void OnMapStart()
 {
-    // 预缓存 SOUND 套装
+    // Sounds
     int nS = GetArraySize(g_SetNames);
     char path[PLATFORM_MAX_PATH];
     for (int i = 0; i < nS; i++)
@@ -747,7 +867,7 @@ public void OnMapStart()
         if (path[0] != '\0') PrecacheSound(path, true);
     }
 
-    // 预缓存 ICON 套装（VTF/VMT）
+    // Icons
     int nI = GetArraySize(g_OvIds);
     char base[PLATFORM_MAX_PATH], file[PLATFORM_MAX_PATH];
 
@@ -771,57 +891,6 @@ public void OnMapStart()
     }
 }
 
-
-public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroadcast)
-{
-    int victim     = GetEventInt(event, "entityid");
-    int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
-    int dmg        = GetEventInt(event, "amount");
-    int eventhealth= GetEntProp(victim, Prop_Data, "m_iHealth");
-    int damagetype = GetEventInt(event, "type");
-
-    if (!IsValidEntity(victim) || !IsValidEdict(victim)) 
-        return Plugin_Changed;
-
-    if (damagetype & DMG_DIRECT) return Plugin_Changed;
-    if (GetConVarInt(g_blast) == 0 && (damagetype & DMG_BLAST)) return Plugin_Changed;
-
-    if (IsValidClient(attacker) && !IsFakeClient(attacker))
-    {
-        bool IsVictimDead = ((eventhealth - dmg) <= 0);
-        if (!IsVictimDead)
-        {
-            if (GetConVarInt(pic_enable) == 1 && g_OverlayTheme[attacker] != 0)
-                ShowKillMessage(attacker, HIT_ARMOR);
-
-            if (GetConVarInt(sound_enable) == 1)
-            {
-                char snd[PLATFORM_MAX_PATH];
-                if (GetSetPath(SoundSelect[attacker], 1, snd, sizeof(snd)))
-                {
-                    PrecacheSound(snd, true);
-                    EmitSoundToClient(attacker, snd, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
-                }
-            }
-
-            if (g_taskClean[attacker] != INVALID_HANDLE) { KillTimer(g_taskClean[attacker]); g_taskClean[attacker] = INVALID_HANDLE; }
-            float showtime = GetConVarFloat(Time);
-            g_taskClean[attacker] = CreateTimer(showtime, task_Clean, attacker);
-        }
-    }
-    return Plugin_Changed;
-}
-
-public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
-{
-    for (int client = 1; client <= MaxClients; client++)
-    {
-        g_killCount[client] = 0;
-        if (g_taskCountdown[client] != INVALID_HANDLE) { KillTimer(g_taskCountdown[client]); g_taskCountdown[client] = INVALID_HANDLE; }
-        g_bShowAuthor[client] = GetRandomInt(1,3) == 1;
-    }
-}
-
 // -----------------------------------------------------------
 // Timers & overlay
 // -----------------------------------------------------------
@@ -836,10 +905,10 @@ public Action task_Countdown(Handle timer, any client)
 }
 public Action task_Clean(Handle timer, any client)
 {
-    KillTimer(timer); 
+    KillTimer(timer);
     g_taskClean[client] = INVALID_HANDLE;
 
-    if (client <= 0 || !IsClientInGame(client)) 
+    if (client <= 0 || !IsClientInGame(client))
         return Plugin_Stop;
 
     int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
@@ -850,25 +919,12 @@ public Action task_Clean(Handle timer, any client)
 
 public void ShowKillMessage(int client, int type)
 {
-    // 0 = disabled by direct ID
     if (g_OverlayTheme[client] == 0) return;
 
-    // Lookup exact icon base by current ID
     char baseHead[PLATFORM_MAX_PATH], baseHit[PLATFORM_MAX_PATH], baseKill[PLATFORM_MAX_PATH];
     bool okH = GetIconPathById(g_OverlayTheme[client], 0, baseHead, sizeof(baseHead));
     bool okB = GetIconPathById(g_OverlayTheme[client], 1, baseHit,  sizeof(baseHit));
     bool okK = GetIconPathById(g_OverlayTheme[client], 2, baseKill, sizeof(baseKill));
-
-    // 如果当前套装缺某项，就不显示该类覆盖（不回退 CVar）
-    char overlays_file[PLATFORM_MAX_PATH];
-
-    // Precache only those present
-    if (okH) { Format(overlays_file, sizeof(overlays_file), "%s.vtf", baseHead); PrecacheDecal(overlays_file, true);
-               Format(overlays_file, sizeof(overlays_file), "%s.vmt", baseHead); PrecacheDecal(overlays_file, true); }
-    if (okB) { Format(overlays_file, sizeof(overlays_file), "%s.vtf", baseHit ); PrecacheDecal(overlays_file, true);
-               Format(overlays_file, sizeof(overlays_file), "%s.vmt", baseHit ); PrecacheDecal(overlays_file, true); }
-    if (okK) { Format(overlays_file, sizeof(overlays_file), "%s.vtf", baseKill); PrecacheDecal(overlays_file, true);
-               Format(overlays_file, sizeof(overlays_file), "%s.vmt", baseKill); PrecacheDecal(overlays_file, true); }
 
     int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
     SetCommandFlags("r_screenoverlay", iFlags);
