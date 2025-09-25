@@ -1264,7 +1264,8 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     }
     if (zombieClass == ZC_BOOMER) if (life < 0.5) life = 0.5;
     if (UpdateFrame) life = UPDATE_INTERVAL;
-    if (forceHeadshot)
+    // ★ 修正：只有在 非累加 模式下才中断累加并单发显示
+    if (forceHeadshot && !g_Plr[attacker].summode)
     {
         g_Sum[attacker][victim].needShow = false;
         float temp_life = g_Sum[attacker][victim].lastHitTime + 0.5 - GetGameTime();
@@ -1350,6 +1351,13 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
         }
         g_Sum[attacker][victim].lastHitTime = now;
         g_Sum[attacker][0].lastHitTime = now;
+        // ★ 如果这是收尾击杀：保持累加，不清空；并尽快刷新一次
+        if (forceHeadshot)
+        {
+            g_Sum[attacker][victim].lastHitTime = GetGameTime(); // 结束计时窗口=0.5s
+            g_Sum[attacker][victim].lastShowTime = 0.0;          // 让下一帧就刷新
+            g_bNeverFire[attacker] = false;                      // 确保帧驱动在跑
+        }
         return;
     }
 
