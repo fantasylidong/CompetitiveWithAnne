@@ -82,6 +82,7 @@ Handle g_SetNames    = INVALID_HANDLE;
 Handle g_SetHeadshot = INVALID_HANDLE;
 Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
+Handle g_SetIsBuiltin = INVALID_HANDLE; // 每套装一个 0/1
 int    g_SetCount    = 0;
 
 // ICON sets (hiticon_sets.cfg) — DIRECT numeric IDs mapping
@@ -138,6 +139,7 @@ public void OnPluginStart()
     g_SetHeadshot = CreateArray(PLATFORM_MAX_PATH);
     g_SetHit      = CreateArray(PLATFORM_MAX_PATH);
     g_SetKill     = CreateArray(PLATFORM_MAX_PATH);
+    g_SetIsBuiltin = CreateArray(1);
     LoadHitSoundSets();
 
     // ICON set arrays (direct ID mapping)
@@ -216,30 +218,47 @@ void LoadHitSoundSets()
     {
         LogError("[hitsound] 无法读取 hitsound_sets.cfg，创建仅禁用选项");
         ClearArray(g_SetNames); ClearArray(g_SetHeadshot); ClearArray(g_SetHit); ClearArray(g_SetKill);
+        if (g_SetIsBuiltin != INVALID_HANDLE) ClearArray(g_SetIsBuiltin);
         PushArrayString(g_SetNames, "禁用击中/击杀音效");
         PushArrayString(g_SetHeadshot, ""); PushArrayString(g_SetHit, ""); PushArrayString(g_SetKill, "");
+        if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, 1);
         g_SetCount = 1; CloseHandle(kv); return;
     }
 
     ClearArray(g_SetNames); ClearArray(g_SetHeadshot); ClearArray(g_SetHit); ClearArray(g_SetKill);
+    if (g_SetIsBuiltin != INVALID_HANDLE) ClearArray(g_SetIsBuiltin);
+
     KvRewind(kv);
     if (KvGotoFirstSubKey(kv))
     {
         do {
             char name[64], sh[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH];
-            KvGetString(kv, "name", name, sizeof(name), "未命名");
-            KvGetString(kv, "headshot", sh, sizeof(sh), "");
-            KvGetString(kv, "hit", hi, sizeof(hi), "");
-            KvGetString(kv, "kill", ki, sizeof(ki), "");
+            int isbuiltin = KvGetNum(kv, "builtin", 0);
 
-            PushArrayString(g_SetNames, name);
+            KvGetString(kv, "name",     name, sizeof(name), "未命名");
+            KvGetString(kv, "headshot", sh,   sizeof(sh),   "");
+            KvGetString(kv, "hit",      hi,   sizeof(hi),   "");
+            KvGetString(kv, "kill",     ki,   sizeof(ki),   "");
+
+            PushArrayString(g_SetNames,    name);
             PushArrayString(g_SetHeadshot, sh);
-            PushArrayString(g_SetHit, hi);
-            PushArrayString(g_SetKill, ki);
+            PushArrayString(g_SetHit,      hi);
+            PushArrayString(g_SetKill,     ki);
+            if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, isbuiltin);
 
-            if (sh[0] != '\0') { char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", sh); AddFileToDownloadsTable(dl); }
-            if (hi[0] != '\0') { char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", hi); AddFileToDownloadsTable(dl); }
-            if (ki[0] != '\0') { char dl[PLATFORM_MAX_PATH]; Format(dl, sizeof(dl), "sound/%s", ki); AddFileToDownloadsTable(dl); }
+            // 只有“非内置 & 文件确实在服务器磁盘上”才加入 FastDL
+            if (!isbuiltin && sh[0] != '\0') {
+                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh);
+                if (FileExists(p)) AddFileToDownloadsTable(p);
+            }
+            if (!isbuiltin && hi[0] != '\0') {
+                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi);
+                if (FileExists(p)) AddFileToDownloadsTable(p);
+            }
+            if (!isbuiltin && ki[0] != '\0') {
+                char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki);
+                if (FileExists(p)) AddFileToDownloadsTable(p);
+            }
         } while (KvGotoNextKey(kv));
     }
     CloseHandle(kv);
@@ -249,6 +268,7 @@ void LoadHitSoundSets()
     {
         PushArrayString(g_SetNames, "禁用击中/击杀音效");
         PushArrayString(g_SetHeadshot, ""); PushArrayString(g_SetHit, ""); PushArrayString(g_SetKill, "");
+        if (g_SetIsBuiltin != INVALID_HANDLE) PushArrayCell(g_SetIsBuiltin, 1);
         g_SetCount = 1;
     }
     LogMessage("[hitsound] 已加载 %d 套音效配置（0..%d）", g_SetCount, g_SetCount - 1);
