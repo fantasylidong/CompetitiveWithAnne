@@ -48,7 +48,7 @@ ConVar g_hAntiKickBlockVote;
 ConVar g_hAntiKickBlockCmdKick;
 ConVar g_hAntiKickMinImmunity;   // 0=只要有任意管理员标识就保护；>0=要求免疫等级>=此值才保护
 ConVar g_hAntiKickEqualBlock;    // 同级免疫是否禁止互踢（默认禁用互踢）
-bool g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false, g_bDamageShowHudAvailable = false;
+bool g_bHitSoundAvailable = false,g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false, g_bDamageShowHudAvailable = false;
 //new lastpoints[MAXPLAYERS + 1];
 
 //枚举变量,修改武器消耗积分在此。
@@ -282,6 +282,7 @@ public void OnAllPluginsLoaded()
     g_bHextagsSystemAvailable    = LibraryExists("hextags");
     g_bReadyUpSystemAvailable    = LibraryExists("readyup");
 	g_bpunchangelSystemAvailable = LibraryExists("punch_angle");
+	g_bHitSoundAvailable = LibraryExists("l4d2_hitsound");
 
     // 只在 infected_control 库存在时再去找 l4d_infected_limit
     g_bInfectedControlAvailable  = LibraryExists("infected_control");
@@ -318,6 +319,7 @@ public void OnLibraryAdded(const char[] name)
     }
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = true; }
 	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = true; }
+	else if (StrEqual(name, "l4d2_hitsound")) { g_bHitSoundAvailable = true; }
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -339,6 +341,7 @@ public void OnLibraryRemoved(const char[] name)
     }
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = false; }
 	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = false; }
+	else if (StrEqual(name, "l4d2_hitsound")) { g_bHitSoundAvailable = false; }
 }
 
 
@@ -1480,6 +1483,11 @@ public void BuildMenu(int client)
 			menu.AddItem("Damage", binfo);
 		}
 
+		if(g_bHitSoundAvailable){
+			FormatEx(binfo, sizeof(binfo),  "命中反馈菜单", client); //伤害显示菜单
+			menu.AddItem("HitSound", binfo);
+		}
+
 		if(g_bEnableGlow && ((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,20) || (CheckCommandAccess(client, "", ADMFLAG_SLAY)) || player[client].GlowType > 0) || !g_bl4dstatsSystemAvailable)))
 		{
 			FormatEx(binfo, sizeof(binfo),  "生还者轮廓", client); //生还者轮廓菜单
@@ -1525,6 +1533,8 @@ public int TopMenu(Menu menu, MenuAction action, int param1, int param2)
 				Recoil(param1);
 			else if( StrEqual(bitem, "Damage"))
 				Damage(param1);
+			else if( StrEqual(bitem, "HitSound"))
+				HitSound(param1);
 		}
 		case MenuAction_End:
 			delete menu;
@@ -1977,6 +1987,12 @@ public void Hat(int client)
 public void Damage(int client)
 {
 	ClientCommand(client,"sm_dmgmenu");	
+}
+
+//创建购买菜单>>主菜单--伤害显示菜单
+public void HitSound(int client)
+{
+	ClientCommand(client,"sm_snd");	
 }
 
 //创建购买菜单>>主菜单--主武器类型
