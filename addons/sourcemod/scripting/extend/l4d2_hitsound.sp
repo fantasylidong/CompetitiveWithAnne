@@ -2,8 +2,8 @@
  * l4d2_hitsound_plus.sp
  *
  * - 多套音效配置（configs/hitsound_sets.cfg）支持 builtin=1 跳过 FastDL
- * - 覆盖图标“套装”由全局 CVar 控制（configs/hiticon_sets.cfg），0=全局禁用覆盖图标
- * - 玩家可单独：选择音效套装 + 开/关覆盖图标；仅这两项写入 RPG 表（两列）
+ * - 覆盖图标“套装”按玩家各自选择（configs/hiticon_sets.cfg），0=禁用
+ * - 仅两列写库：hitsound_cfg（音效套装编号）、hitsound_overlay（图标套装编号，0=禁用）
  * - DB 失败时回退到 KeyValues 文件 data/SoundSelect.txt（键：Snd, Overlay）
  * - FastDL 自动登记（音频=sound/…；图标=materials/…），builtin=1 时跳过
  * - RegPluginLibrary 供其他插件检测：l4d2_hitsound_plus（兼容别名 l4d2_hitsound）
@@ -12,12 +12,12 @@
  * SQL（示例，仅两列，确保 steamid 唯一）:
  *   ALTER TABLE `rpg_player`
  *     ADD COLUMN `hitsound_cfg` TINYINT NOT NULL DEFAULT 0,
- *     ADD COLUMN `hitsound_overlay` TINYINT(1) NOT NULL DEFAULT 1,
+ *     ADD COLUMN `hitsound_overlay` TINYINT NOT NULL DEFAULT 0,
  *     ADD UNIQUE KEY `uniq_steamid` (`steamid`);
  *
  * commands:
- *   !snd    -> 打开菜单（开关覆盖图标、选择音效套装）
- *   !hitui  -> 快捷开关个人覆盖图标
+ *   !snd    -> 主菜单（音效套装（玩家） / 图标套装（玩家） / 覆盖图开关）
+ *   !hitui  -> 快速在“禁用/套装1”之间切换覆盖图
  */
 
 #pragma semicolon 1
@@ -27,7 +27,7 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "1.3.0"
+#define PLUGIN_VERSION "1.4.0"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 
@@ -42,18 +42,18 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 // --------------------- ConVars ---------------------
 ConVar cv_enable;
 ConVar cv_sound_enable;
-ConVar cv_pic_enable;
+ConVar cv_pic_enable;     // 全局启/停覆盖图功能（大总开关）
 ConVar cv_blast;
 ConVar cv_showtime;
-ConVar cv_overlay_default; // 新玩家默认是否显示覆盖图标
+// 新玩家默认是否启用覆盖图：1=给默认套装1（若存在），0=默认禁用
+ConVar cv_overlay_default_enable;
+
 ConVar cv_db_enable;
 ConVar cv_db_conf;
-// 全局选择：覆盖图标套装（0=禁用，>=1 使用 hiticon_sets.cfg 对应编号）
-ConVar cv_overlay_set;
 
 // --------------------- State ---------------------
-int  g_SoundSelect[MAXPLAYERS + 1] = {0, ...};   // 0=禁用音效，>=1 用 hitsound_sets.cfg 的编号
-bool g_OverlayEnable[MAXPLAYERS + 1] = {true, ...}; // 个人是否显示覆盖图标
+int  g_SoundSelect[MAXPLAYERS + 1]   = {0, ...}; // 玩家选的音效套装编号（0=禁用；>=1）
+int  g_OverlaySet[MAXPLAYERS + 1]    = {0, ...}; // 玩家选的覆盖图套装（0=禁用；>=1）
 
 Handle g_hDB = INVALID_HANDLE;
 
@@ -71,7 +71,7 @@ Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
 int    g_SetCount    = 0;
 
-// --------------------- Overlay icon sets (全局 CVar 选择) ---------------------
+// --------------------- Overlay icon sets（玩家自选） ---------------------
 Handle g_OvNames = INVALID_HANDLE;
 Handle g_OvHead  = INVALID_HANDLE; // materials 基名（不含扩展名）
 Handle g_OvHit   = INVALID_HANDLE;
@@ -91,7 +91,7 @@ public Plugin myinfo =
 {
     name = "L4D2 Hit/Kill Feedback Plus",
     author = "TsukasaSato , Hesh233 (branch) , merged/updated by ChatGPT",
-    description = "音效套装 + 覆盖图标全局套装(0禁用) + RPG两列存取 + FDL",
+    description = "音效套装(玩家) + 覆盖图标套装(玩家,0禁用) + 两列表存取 + FDL",
     version = PLUGIN_VERSION
 };
 
@@ -109,17 +109,15 @@ public void OnPluginStart()
 
     CreateConVar("l4d2_hitsound_plus_ver", PLUGIN_VERSION, "Plugin version", 0);
 
-    cv_enable          = CreateConVar("sm_hitsound_enable", "1", "是否开启本插件(0关,1开)", CVAR_FLAGS);
-    cv_sound_enable    = CreateConVar("sm_hitsound_sound_enable", "1", "是否开启音效(0关,1开)", CVAR_FLAGS);
-    cv_pic_enable      = CreateConVar("sm_hitsound_pic_enable", "1", "是否开启覆盖图标(0关,1开)", CVAR_FLAGS);
-    cv_blast           = CreateConVar("sm_blast_damage_enable", "0", "是否开启爆炸反馈提示(0关,1开 建议关)", CVAR_FLAGS);
-    cv_showtime        = CreateConVar("sm_hitsound_showtime", "0.3", "覆盖图标显示时长(秒)", CVAR_FLAGS);
+    cv_enable                 = CreateConVar("sm_hitsound_enable", "1", "是否开启本插件(0关,1开)", CVAR_FLAGS);
+    cv_sound_enable           = CreateConVar("sm_hitsound_sound_enable", "1", "是否开启音效(0关,1开)", CVAR_FLAGS);
+    cv_pic_enable             = CreateConVar("sm_hitsound_pic_enable", "1", "是否开启覆盖图标(0关,1开 总开关)", CVAR_FLAGS);
+    cv_blast                  = CreateConVar("sm_blast_damage_enable", "0", "是否开启爆炸反馈提示(0关,1开 建议关)", CVAR_FLAGS);
+    cv_showtime               = CreateConVar("sm_hitsound_showtime", "0.3", "覆盖图标显示时长(秒)", CVAR_FLAGS);
+    cv_overlay_default_enable = CreateConVar("sm_hitsound_overlay_default", "1", "新玩家默认是否启用覆盖图(1给套装1,0禁用)", CVAR_FLAGS);
 
-    cv_overlay_default = CreateConVar("sm_hitsound_overlay_default", "1", "新玩家默认是否显示覆盖图标(1显示,0隐藏)", CVAR_FLAGS);
-    cv_overlay_set     = CreateConVar("sm_hitsound_overlay_set", "0", "覆盖图标套装编号(0=全局禁用,>=1 使用 hiticon_sets.cfg)", CVAR_FLAGS);
-
-    cv_db_enable       = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储(1启用,0禁用)", CVAR_FLAGS);
-    cv_db_conf         = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
+    cv_db_enable              = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储(1启用,0禁用)", CVAR_FLAGS);
+    cv_db_conf                = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
 
     // Fallback KV
     g_SoundStore = CreateKeyValues("SoundSelect");
@@ -147,11 +145,11 @@ public void OnPluginStart()
     {
         char confName[32];
         GetConVarString(cv_db_conf, confName, sizeof(confName));
-        SQL_TConnect(SQL_OnConnect, confName, 0); // 按你的签名使用
+        SQL_TConnect(SQL_OnConnect, confName, 0); // 固定签名
     }
 
-    RegConsoleCmd("sm_snd",   Cmd_MenuSnd,   "设置音效套装/覆盖图标开关");
-    RegConsoleCmd("sm_hitui", Cmd_ToggleUI,  "开关自己的覆盖图标");
+    RegConsoleCmd("sm_snd",   Cmd_MenuMain, "主菜单：音效套装（玩家）/ 图标套装（玩家）/ 覆盖图开关");
+    RegConsoleCmd("sm_hitui", Cmd_ToggleUI,  "快速在禁用与套装1间切换覆盖图");
 
     AutoExecConfig(true, "l4d2_hitsound_plus");
 
@@ -237,7 +235,7 @@ void LoadHitSoundSets()
     }
     CloseHandle(kv);
 
-    LogMessage("[hitsound] 已加载 %d 套音效配置（含 0 号禁用项时总数会更大）。", g_SetCount);
+    LogMessage("[hitsound] 已加载 %d 套音效配置。", g_SetCount);
 }
 
 void LoadHitIconSets()
@@ -251,7 +249,7 @@ void LoadHitIconSets()
     Handle kv = CreateKeyValues("HitIconSets");
     if (!FileToKeyValues(kv, "addons/sourcemod/configs/hiticon_sets.cfg"))
     {
-        LogMessage("[hitsound] 未找到 hiticon_sets.cfg，overlay_set=0 将禁用覆盖图。");
+        LogMessage("[hitsound] 未找到 hiticon_sets.cfg，玩家只能选择禁用(0)。");
         CloseHandle(kv);
         return;
     }
@@ -265,7 +263,7 @@ void LoadHitIconSets()
             int  isbuiltin = 0;
 
             KvGetString(kv, "name", name, sizeof(name), "未命名图标套装");
-            // 兼容你的配置：键名 headshot/head/hit/kill
+            // 支持 headshot/head
             KvGetString(kv, "head", head, sizeof(head), "");
             if (head[0] == '\0') KvGetString(kv, "headshot", head, sizeof(head), "");
             KvGetString(kv, "hit",  hit,  sizeof(hit),  "");
@@ -298,7 +296,7 @@ void LoadHitIconSets()
     }
     CloseHandle(kv);
 
-    LogMessage("[hitsound] 已加载 %d 套图标覆盖主题（0=禁用，>=1 有效）。", g_OvCount);
+    LogMessage("[hitsound] 已加载 %d 套图标覆盖主题（玩家自选, 0=禁用）。", g_OvCount);
 }
 
 // ========================================================
@@ -308,8 +306,13 @@ public void OnClientPutInServer(int client)
 {
     if (IsFakeClient(client)) return;
 
-    g_SoundSelect[client]   = 0;
-    g_OverlayEnable[client] = GetConVarBool(cv_overlay_default);
+    g_SoundSelect[client] = 0;
+
+    // 默认覆盖图：若启用且有套装，则给 1，否则 0
+    if (GetConVarBool(cv_overlay_default_enable) && g_OvCount >= 1)
+        g_OverlaySet[client] = 1;
+    else
+        g_OverlaySet[client] = 0;
 
     if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE)
     {
@@ -318,7 +321,7 @@ public void OnClientPutInServer(int client)
 
         char q[256];
         Format(q, sizeof(q),
-            "SELECT hitsound_cfg, hitsound_overlay FROM rpg_player WHERE steamid='%s' LIMIT 1;", sid);
+            "SELECT hitsound_cfg, hitsound_overlay FROM RPG WHERE steamid='%s' LIMIT 1;", sid);
         SQL_TQuery(g_hDB, SQL_OnLoadPrefs, q, GetClientUserId(client));
     }
     else
@@ -359,8 +362,12 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any u
     {
         int cfg = SQL_FetchInt(hndl, 0);
         int ov  = SQL_FetchInt(hndl, 1);
-        g_SoundSelect[client]   = (cfg >= 0 && cfg < g_SetCount) ? cfg : 0;
-        g_OverlayEnable[client] = (ov != 0);
+        g_SoundSelect[client] = (cfg >= 0 && cfg < g_SetCount) ? cfg : 0;
+
+        // 覆盖图套装编号（0=禁用；>=1）
+        if (ov < 0) ov = 0;
+        if (ov > g_OvCount) ov = 0; // 越界则禁用
+        g_OverlaySet[client] = ov;
     }
     else
     {
@@ -376,7 +383,7 @@ void DB_SavePlayerPrefs(int client)
     GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
 
     int cfg = g_SoundSelect[client];
-    int ov  = g_OverlayEnable[client] ? 1 : 0;
+    int ov  = g_OverlaySet[client];
 
     char q[384];
     Format(q, sizeof(q),
@@ -400,7 +407,7 @@ void KV_SavePlayer(int client)
 
     KvJumpToKey(g_SoundStore, uid, true);
     KvSetNum(g_SoundStore, "Snd", g_SoundSelect[client]);
-    KvSetNum(g_SoundStore, "Overlay", g_OverlayEnable[client] ? 1 : 0);
+    KvSetNum(g_SoundStore, "Overlay", g_OverlaySet[client]); // 0..g_OvCount
     KvGoBack(g_SoundStore);
     KvRewind(g_SoundStore);
     KeyValuesToFile(g_SoundStore, g_SavePath);
@@ -412,8 +419,13 @@ void KV_LoadPlayer(int client)
     GetClientAuthId(client, AuthId_Engine, uid, sizeof(uid), true);
 
     KvJumpToKey(g_SoundStore, uid, true);
-    g_SoundSelect[client]   = KvGetNum(g_SoundStore, "Snd", 0);
-    g_OverlayEnable[client] = KvGetNum(g_SoundStore, "Overlay", GetConVarBool(cv_overlay_default) ? 1 : 0) != 0;
+    g_SoundSelect[client] = KvGetNum(g_SoundStore, "Snd", 0);
+
+    int defOv = (GetConVarBool(cv_overlay_default_enable) && g_OvCount >= 1) ? 1 : 0;
+    g_OverlaySet[client]  = KvGetNum(g_SoundStore, "Overlay", defOv);
+    if (g_OverlaySet[client] < 0 || g_OverlaySet[client] > g_OvCount)
+        g_OverlaySet[client] = 0;
+
     KvGoBack(g_SoundStore);
     KvRewind(g_SoundStore);
 }
@@ -433,30 +445,36 @@ bool GetSoundPath(int setId, int which, char[] out, int maxlen)
     return (out[0] != '\0');
 }
 
-// which: 0=head, 1=hit, 2=kill ; 返回 false 表示“全局禁用/缺失”
-static bool GetOverlayBase_Global(int which, char[] out, int maxlen)
+// 玩家专属覆盖图：which 0=head 1=hit 2=kill
+static bool GetOverlayBase_Player(int client, int which, char[] out, int maxlen)
 {
-    new set = GetConVarInt(cv_overlay_set); // 0=禁用
-    if (set <= 0) { out[0] = 0; return false; }
+    int set = g_OverlaySet[client]; // 0=禁用
+    if (set <= 0) { out[0] = '\0'; return false; }
 
-    new idx = set - 1;
-    if (idx < 0 || idx >= g_OvCount) { out[0] = 0; return false; }
+    int idx = set - 1;
+    if (idx < 0 || idx >= g_OvCount) { out[0] = '\0'; return false; }
 
     if (which == 0)      GetArrayString(g_OvHead, idx, out, maxlen);
     else if (which == 1) GetArrayString(g_OvHit,  idx, out, maxlen);
     else                 GetArrayString(g_OvKill, idx, out, maxlen);
 
-    return (out[0] != 0);
+    return (out[0] != '\0');
 }
 
 // ========================================================
-// Commands & Menu
+// Commands & Menus
 // ========================================================
 public Action Cmd_ToggleUI(int client, int args)
 {
     if (client <= 0 || !IsClientInGame(client)) return Plugin_Handled;
-    g_OverlayEnable[client] = !g_OverlayEnable[client];
-    PrintToChat(client, "覆盖图标: %s", g_OverlayEnable[client] ? "开启" : "关闭");
+
+    // 0 <-> 1（若有套装）
+    if (g_OverlaySet[client] > 0)
+        g_OverlaySet[client] = 0;
+    else
+        g_OverlaySet[client] = (g_OvCount >= 1) ? 1 : 0;
+
+    PrintToChat(client, "覆盖图标: %s", (g_OverlaySet[client] > 0) ? "开启" : "关闭");
 
     if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
     else KV_SavePlayer(client);
@@ -464,39 +482,30 @@ public Action Cmd_ToggleUI(int client, int args)
     return Plugin_Handled;
 }
 
-public Action Cmd_MenuSnd(int client, int args)
+public Action Cmd_MenuMain(int client, int args)
 {
     Handle menu = CreateMenu(MenuHandler_Main);
     char title[128];
-    Format(title, sizeof(title), "命中反馈设置 | 当前音效套装: %d", g_SoundSelect[client]);
+
+    char curSnd[64] = "禁用";
+    if (g_SoundSelect[client] >= 0 && g_SoundSelect[client] < g_SetCount)
+        GetArrayString(g_SetNames, g_SoundSelect[client], curSnd, sizeof(curSnd));
+
+    char curOv[64] = "禁用";
+    if (g_OverlaySet[client] >= 1 && g_OverlaySet[client] <= g_OvCount)
+        GetArrayString(g_OvNames, g_OverlaySet[client]-1, curOv, sizeof(curOv));
+
+    Format(title, sizeof(title), "命中反馈设置\n音效: %d - %s | 图标: %d - %s",
+           g_SoundSelect[client], curSnd, g_OverlaySet[client], curOv);
     SetMenuTitle(menu, title);
 
-    // 覆盖图标个人开关
+    AddMenuItem(menu, "sound_sets", "音效套装（玩家）");
+    AddMenuItem(menu, "icon_sets",  "图标套装（玩家）");
+
     char overlayLabel[64];
-    Format(overlayLabel, sizeof(overlayLabel), "覆盖图标: %s (点击切换)",
-        g_OverlayEnable[client] ? "开启" : "关闭");
+    Format(overlayLabel, sizeof(overlayLabel), "覆盖图标: %s (点此快速开关)",
+        (g_OverlaySet[client] > 0) ? "开启" : "关闭");
     AddMenuItem(menu, "overlay_toggle", overlayLabel);
-
-    // 显示全局图标套装信息（只读）
-    if (g_OvCount > 0)
-    {
-        char ovname[64] = "禁用";
-        int ovset = GetConVarInt(cv_overlay_set);
-        if (ovset >= 1 && ovset <= g_OvCount)
-            GetArrayString(g_OvNames, ovset-1, ovname, sizeof(ovname));
-        char info[96]; Format(info, sizeof(info), "全局图标套装: %d - %s", ovset, ovname);
-        AddMenuItem(menu, "ov_info", info, ITEMDRAW_DISABLED);
-    }
-
-    AddMenuItem(menu, "sep", "----------------", ITEMDRAW_DISABLED);
-
-    // 音效套装列表（0..g_SetCount-1）
-    for (int i = 0; i < g_SetCount; i++)
-    {
-        char idx[8]; IntToString(i, idx, sizeof(idx));
-        char name[64]; GetArrayString(g_SetNames, i, name, sizeof(name));
-        AddMenuItem(menu, idx, name);
-    }
 
     SetMenuExitButton(menu, true);
     DisplayMenu(menu, client, MENU_TIME_FOREVER);
@@ -509,21 +518,69 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
 
     if (action == MenuAction_Select)
     {
-        char info[16]; GetMenuItem(menu, item, info, sizeof(info));
+        char info[32]; GetMenuItem(menu, item, info, sizeof(info));
 
+        if (StrEqual(info, "sound_sets"))
+        {
+            OpenSoundSetMenu(client);
+            return 0;
+        }
+        if (StrEqual(info, "icon_sets"))
+        {
+            OpenIconSetMenu_Player(client);
+            return 0;
+        }
         if (StrEqual(info, "overlay_toggle"))
         {
-            g_OverlayEnable[client] = !g_OverlayEnable[client];
-            PrintToChat(client, "覆盖图标: %s", g_OverlayEnable[client] ? "开启" : "关闭");
+            if (g_OverlaySet[client] > 0) g_OverlaySet[client] = 0;
+            else g_OverlaySet[client] = (g_OvCount >= 1) ? 1 : 0;
+
+            PrintToChat(client, "覆盖图标: %s", (g_OverlaySet[client] > 0) ? "开启" : "关闭");
 
             if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
             else KV_SavePlayer(client);
 
-            // 重新显示菜单
-            Cmd_MenuSnd(client, 0);
+            Cmd_MenuMain(client, 0);
             return 0;
         }
+    }
+    return 0;
+}
 
+// 子菜单：音效套装（玩家）
+static void OpenSoundSetMenu(int client)
+{
+    Handle m = CreateMenu(MenuHandler_SndSets);
+    char title[96], curName[64] = "禁用";
+    if (g_SoundSelect[client] >= 0 && g_SoundSelect[client] < g_SetCount)
+        GetArrayString(g_SetNames, g_SoundSelect[client], curName, sizeof(curName));
+    Format(title, sizeof(title), "选择音效套装（当前: %d - %s）", g_SoundSelect[client], curName);
+    SetMenuTitle(m, title);
+
+    for (int i = 0; i < g_SetCount; i++)
+    {
+        char key[8], name[64], label[96];
+        IntToString(i, key, sizeof(key));
+        GetArrayString(g_SetNames, i, name, sizeof(name));
+        Format(label, sizeof(label), "%d - %s", i, name);
+        AddMenuItem(m, key, label);
+    }
+
+    SetMenuExitBackButton(m, true);
+    DisplayMenu(m, client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_SndSets(Handle menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End) { CloseHandle(menu); }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack)
+    {
+        Cmd_MenuMain(client, 0);
+        return 0;
+    }
+    if (action == MenuAction_Select)
+    {
+        char info[16]; GetMenuItem(menu, item, info, sizeof(info));
         int choice = StringToInt(info);
         if (choice < 0 || choice >= g_SetCount) choice = 0;
 
@@ -532,6 +589,65 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
 
         if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
         else KV_SavePlayer(client);
+
+        OpenSoundSetMenu(client);
+    }
+    return 0;
+}
+
+// 子菜单：图标套装（玩家）
+static void OpenIconSetMenu_Player(int client)
+{
+    Handle m = CreateMenu(MenuHandler_OvSets_Player);
+    char title[96], curName[64] = "禁用";
+    if (g_OverlaySet[client] >= 1 && g_OverlaySet[client] <= g_OvCount)
+        GetArrayString(g_OvNames, g_OverlaySet[client]-1, curName, sizeof(curName));
+    Format(title, sizeof(title), "选择图标套装（当前: %d - %s）", g_OverlaySet[client], curName);
+    SetMenuTitle(m, title);
+
+    AddMenuItem(m, "ov_0", "0 - 禁用覆盖图标");
+    for (int i = 0; i < g_OvCount; i++)
+    {
+        char key[16], name[64], label[96];
+        Format(key, sizeof(key), "ov_%d", i+1);
+        GetArrayString(g_OvNames, i, name, sizeof(name));
+        Format(label, sizeof(label), "%d - %s", i+1, name);
+        AddMenuItem(m, key, label);
+    }
+
+    SetMenuExitBackButton(m, true);
+    DisplayMenu(m, client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_OvSets_Player(Handle menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End) { CloseHandle(menu); }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack)
+    {
+        Cmd_MenuMain(client, 0);
+        return 0;
+    }
+    if (action == MenuAction_Select)
+    {
+        char info[16]; GetMenuItem(menu, item, info, sizeof(info));
+        if (StrContains(info, "ov_", false) == 0)
+        {
+            ReplaceString(info, sizeof(info), "ov_", "");
+            int val = StringToInt(info); // 0..g_OvCount
+            if (val < 0) val = 0;
+            if (val > g_OvCount) val = 0; // 越界视为禁用
+
+            g_OverlaySet[client] = val;
+
+            char name[64] = "禁用";
+            if (val >= 1 && val <= g_OvCount) GetArrayString(g_OvNames, val-1, name, sizeof(name));
+            PrintToChat(client, "\x04[Hitsound] 你的图标套装已设置为: %d - %s", val, name);
+
+            if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
+            else KV_SavePlayer(client);
+
+            OpenIconSetMenu_Player(client);
+        }
     }
     return 0;
 }
@@ -575,8 +691,8 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
     if (IsValidClient(victim) && GetClientTeam(victim) == 3 &&
         IsValidClient(attacker) && GetClientTeam(attacker) == 2 && !IsFakeClient(attacker))
     {
-        // 覆盖图（受三层控制：全局开关、全局套装非0、个人开关）
-        if (GetConVarInt(cv_pic_enable) == 1 && GetConVarInt(cv_overlay_set) >= 1 && g_OverlayEnable[attacker])
+        // 覆盖图（受：全局总开关 + 玩家套装编号>0）
+        if (GetConVarInt(cv_pic_enable) == 1 && g_OverlaySet[attacker] > 0)
         {
             ShowOverlay(attacker, headshot ? KILL_HEADSHOT : KILL_NORMAL);
         }
@@ -629,7 +745,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
 
         if (!g_IsVictimDeadPlayer[victim])
         {
-            if (GetConVarInt(cv_pic_enable) == 1 && GetConVarInt(cv_overlay_set) >= 1 && g_OverlayEnable[attacker])
+            if (GetConVarInt(cv_pic_enable) == 1 && g_OverlaySet[attacker] > 0)
             {
                 ShowOverlay(attacker, HIT_ARMOR);
             }
@@ -660,7 +776,7 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
 
     if (IsValidClient(attacker) && GetClientTeam(attacker) == 2 && !IsFakeClient(attacker))
     {
-        if (GetConVarInt(cv_pic_enable) == 1 && GetConVarInt(cv_overlay_set) >= 1 && g_OverlayEnable[attacker])
+        if (GetConVarInt(cv_pic_enable) == 1 && g_OverlaySet[attacker] > 0)
         {
             ShowOverlay(attacker, headshot ? KILL_HEADSHOT : KILL_NORMAL);
         }
@@ -706,7 +822,7 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
 
         if (!dead)
         {
-            if (GetConVarInt(cv_pic_enable) == 1 && GetConVarInt(cv_overlay_set) >= 1 && g_OverlayEnable[attacker])
+            if (GetConVarInt(cv_pic_enable) == 1 && g_OverlaySet[attacker] > 0)
             {
                 ShowOverlay(attacker, HIT_ARMOR);
             }
@@ -741,21 +857,20 @@ public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast
 // ========================================================
 // Overlay show/clean
 // ========================================================
-public ShowOverlay(int client, OverlayType type)
+void ShowOverlay(int client, OverlayType type)
 {
-    // 全局禁用直接返回
-    if (GetConVarInt(cv_overlay_set) <= 0)
-        return;
+    if (GetConVarInt(cv_pic_enable) == 0) return;   // 全局禁用
+    if (g_OverlaySet[client] <= 0) return;          // 玩家未启用
 
-    // 取三张贴图基名
+    // 取该玩家套装的三张贴图基名
     char head[PLATFORM_MAX_PATH];
     char hit [PLATFORM_MAX_PATH];
     char kill[PLATFORM_MAX_PATH];
-    if (!GetOverlayBase_Global(0, head, sizeof(head))) return;
-    if (!GetOverlayBase_Global(1, hit,  sizeof(hit ))) return;
-    if (!GetOverlayBase_Global(2, kill, sizeof(kill))) return;
+    if (!GetOverlayBase_Player(client, 0, head, sizeof(head))) return;
+    if (!GetOverlayBase_Player(client, 1, hit,  sizeof(hit ))) return;
+    if (!GetOverlayBase_Player(client, 2, kill, sizeof(kill))) return;
 
-    // 预缓存
+    // 预缓存（注意：这里不加 "materials/" 前缀，和 r_screenoverlay 的资源习惯保持一致）
     char path[PLATFORM_MAX_PATH];
     Format(path, sizeof(path), "%s.vtf", head); PrecacheDecal(path, true);
     Format(path, sizeof(path), "%s.vtf", hit ); PrecacheDecal(path, true);
