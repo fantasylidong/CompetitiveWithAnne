@@ -10,22 +10,37 @@
 // =========================
 // Plugin constants / config
 // =========================
-#define PLUGIN_VERSION  "2.2-asyncdb-steam2"
+#define PLUGIN_VERSION  "2.2-mysql-cookie(db-first)+asyncconnect+queue-save+steam2"
 #define SPRITE_MATERIAL "materials/sprites/laserbeam.vmt"
 #define DMG_HEADSHOT    (1 << 30)
 #define L4D2_MAXPLAYERS 32
 #define ZC_BOOMER       2
 #define ZC_TANK         8
-#define UPDATE_INTERVAL 0.10   // 累加帧间隔（不要低于 0.05）
+#define UPDATE_INTERVAL 0.10 // 累加帧间隔（不要低于 0.05）
 
 // ====== 数据层：MySQL + Cookie ======
-#define DB_CONF_NAME "rpg"             // databases.cfg 中的配置名
-#define COOKIE_NAME  "l4d2_dmgshow_v2" // Cookie 键名（受保护）
+#define DB_CONF_NAME "rpg"        // databases.cfg 中的配置名
+#define COOKIE_NAME  "l4d2_dmgshow_v2"
 
-// rpgdamage 表结构（Steam2 作为主键）
-// CREATE TABLE IF NOT EXISTS `rpgdamage` ( ... 如上所示 ... )
+// rpgdamage 表结构（使用 Steam2 作为主键，保持与你现表一致）
+// 建表参考：
+// CREATE TABLE IF NOT EXISTS `rpgdamage` (
+//   `steamid`     VARCHAR(64) NOT NULL PRIMARY KEY,
+//   `enable`      TINYINT     NOT NULL DEFAULT 0,
+//   `see_others`  TINYINT     NOT NULL DEFAULT 1,
+//   `share_scope` TINYINT     NOT NULL DEFAULT 0,
+//   `size`        FLOAT       NOT NULL DEFAULT 5.0,
+//   `gap`         FLOAT       NOT NULL DEFAULT 5.0,
+//   `alpha`       INT         NOT NULL DEFAULT 70,
+//   `xoff`        FLOAT       NOT NULL DEFAULT 20.0,
+//   `yoff`        FLOAT       NOT NULL DEFAULT 10.0,
+//   `showdist`    FLOAT       NOT NULL DEFAULT 1500.0,
+//   `summode`     TINYINT     NOT NULL DEFAULT 1,
+//   `sg_merge`    TINYINT     NOT NULL DEFAULT 1
+// ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 // ============ 结构体 ============
+
 enum struct PlayerSetData
 {
     // 运行期缓存
@@ -80,11 +95,12 @@ enum struct SumShowMode
 
 enum struct DamageTrans
 {
-    bool  forceHeadshot;
-    int   damage;
+    bool forceHeadshot;
+    int  damage;
 }
 
 // ============ 全局 ============
+
 PlayerSetData      g_Plr[L4D2_MAXPLAYERS + 1];
 ShotgunDamageData  g_SGbuf[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1]; // [attacker][victim]
 SumShowMode        g_Sum[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
@@ -97,13 +113,37 @@ int   g_sprite;
 int   g_iVitcimHealth[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 float g_fTankIncap[L4D2_MAXPLAYERS + 1];
 
-// 旁观管理员：查看所有人开关（默认关）
+// === 旁观管理员：查看所有人开关（默认关） ===
 bool  g_bAdminObsViewAll[MAXPLAYERS + 1];
 
-// 设置是否已加载（防止“加载前保存覆盖”）
-bool  g_bSettingsLoaded[MAXPLAYERS + 1];
+// ============ DB / Cookie ============
 
-// 颜色
+Handle g_DB = INVALID_HANDLE;
+bool   g_UseMySQL = false;
+
+// 异步连接状态
+bool  g_DbConnecting = false;
+bool  g_DbReady      = false;
+float g_DbRetryAfter = 0.0;
+#define DB_RETRY_COOLDOWN 10.0
+
+Cookie g_ck = null;
+
+// === 防止“加载前保存覆盖”的标记（改用更精细的状态机） ===
+enum LoadState
+{
+    LS_None = 0,     // 未开始
+    LS_DBPending,    // 等待 DB 回调
+    LS_Ready         // 已完成（DB 优先；若无则 cookie/默认并回写）
+};
+int  g_LoadState[MAXPLAYERS + 1];
+bool g_HaveCookie[MAXPLAYERS + 1];
+char g_CookieRaw[MAXPLAYERS + 1][256];
+
+// 保存排队：在未加载完成时点了“保存”，把当时的设置拍个快照
+bool          g_PendingSave[MAXPLAYERS + 1];
+PlayerSetData g_SaveSnapshot[MAXPLAYERS + 1];
+
 static const int color[][3] = {
     {  0,255,  0}, // 绿：友伤
     {255,255,  0}, // 黄：未用
@@ -112,20 +152,11 @@ static const int color[][3] = {
     {255,  0,  0}  // 红：爆头
 };
 
-// ============ 数据持久化 ============
-Handle g_DB = INVALID_HANDLE;
-Cookie g_ck = null;
-
-// 异步连接状态
-bool  g_DbReady       = false;   // 连接 + 初始化完成
-bool  g_DbConnecting  = false;   // 正在连接
-float g_DbRetryAfter  = 0.0;     // 允许下次重连的时间戳
-const float DB_RETRY_COOLDOWN = 10.0;
-
-// ============ 菜单 ============
+// ============ 菜单（分两层） ============
 #define MENU_TIME 20
 
-// ============ 日志 ============
+// ============ 日志小工具 ============
+
 #define LOG_PREFIX "[DMGSHOW]"
 
 stock void LogInfo(const char[] fmt, any ...)
@@ -142,7 +173,7 @@ stock void LogErr(const char[] fmt, any ...)
     LogError("%s %s", LOG_PREFIX, msg);
 }
 
-// ============ 工具函数 ============
+// --------- 工具函数 ----------
 static bool IsValidClient(int client) {
     return (client > 0 && client <= MaxClients && IsClientInGame(client));
 }
@@ -176,7 +207,9 @@ static void ClampStyle(int client)
     }
 }
 
-// ============ SQL 拼接工具 ============
+// ===============================
+// SQL 拼接工具（避免相邻 ""）
+// ===============================
 stock void SQLCat(char[] buffer, int maxlen, const char[] piece)
 {
     int blen = strlen(buffer);
@@ -192,95 +225,13 @@ stock void SQLCat(char[] buffer, int maxlen, const char[] piece)
 stock void SQLCatF(char[] buffer, int maxlen, const char[] fmt, any ...)
 {
     char tmp[512];
-    VFormat(tmp, sizeof(tmp), fmt, 4); // fmt 是第3参，可变参起始=4
+    VFormat(tmp, sizeof(tmp), fmt, 4); // buffer(1) maxlen(2) fmt(3) → 可变参起始=4
     SQLCat(buffer, maxlen, tmp);
 }
 
-// ============ DB 异步连接 ============
-static void DB_BeginConnect()
-{
-    if (g_DbConnecting) return;                 // 正在连接
-    if (g_DB != INVALID_HANDLE) return;         // 已有句柄（可能 ready 还没置 true）
-    if (GetGameTime() < g_DbRetryAfter) return; // 冷却中
-
-    if (!SQL_CheckConfig(DB_CONF_NAME))
-    {
-        LogErr("[DB] databases.cfg missing '%s' or invalid.", DB_CONF_NAME);
-        g_DB = INVALID_HANDLE;
-        g_DbReady = false;
-        return;
-    }
-    g_DbConnecting = true;
-    g_DbReady = false;
-    SQL_TConnect(SQLCB_OnConnect, DB_CONF_NAME, 0);
-    LogInfo("[DB] SQL_TConnect issued (async) for '%s' ...", DB_CONF_NAME);
-}
-
-public void SQLCB_OnConnect(Handle owner, Handle db, const char[] error, any data)
-{
-    g_DbConnecting = false;
-
-    if (db == INVALID_HANDLE)
-    {
-        LogErr("[DB] connect failed: %s", error);
-        g_DB = INVALID_HANDLE;
-        g_DbReady = false;
-        g_DbRetryAfter = GetGameTime() + DB_RETRY_COOLDOWN;
-        return;
-    }
-
-    g_DB = db;
-    LogInfo("[DB] connected (async), handle=%p", g_DB);
-
-    // 最小化初始化：SET NAMES utf8mb4（异步）
-    SQL_TQuery(g_DB, SQLCB_OnSetNames, "SET NAMES utf8mb4", 0);
-
-    // 额外打印会话字符集（异步）
-    SQL_TQuery(g_DB, SQLCB_OnSessionDump,
-        "SELECT @@character_set_client,@@character_set_connection,@@character_set_results,@@collation_connection", 0);
-}
-
-public void SQLCB_OnSetNames(Handle owner, Handle hndl, const char[] error, any data)
-{
-    if (error[0] != '\0')
-    {
-        LogErr("[DB] SET NAMES utf8mb4 failed: %s", error);
-        // 即便失败，允许继续（大多数 ASCII/utf8 仍可用）
-    }
-    else
-    {
-        LogInfo("[DB] SET NAMES utf8mb4 OK");
-    }
-    g_DbReady = true; // 初始化完成
-}
-
-public void SQLCB_OnSessionDump(Handle owner, Handle hndl, const char[] error, any data)
-{
-    if (error[0] != '\0')
-    {
-        LogErr("[DB] session snapshot failed: %s", error);
-        return;
-    }
-    if (hndl != INVALID_HANDLE && SQL_FetchRow(hndl))
-    {
-        char a[64], b[64], c[64], d[64];
-        SQL_FetchString(hndl, 0, a, sizeof a);
-        SQL_FetchString(hndl, 1, b, sizeof b);
-        SQL_FetchString(hndl, 2, c, sizeof c);
-        SQL_FetchString(hndl, 3, d, sizeof d);
-        LogInfo("[DB] session charset: client=%s connection=%s results=%s coll=%s", a, b, c, d);
-    }
-}
-
-// 识别断线错误（回调里触发重连冷却）
-static bool DB_IsDisconnectError(const char[] err)
-{
-    return (StrContains(err, "server has gone away", false) != -1
-         || StrContains(err, "Lost connection",      false) != -1
-         || StrContains(err, "MySQL server has gone away", false) != -1);
-}
-
-// ========== Cookie 与默认 ==========
+// ===============================
+// Cookie / 默认
+// ===============================
 static void Settings_Default(int client)
 {
     g_Plr[client].enable        = false;  // 默认不开
@@ -297,10 +248,36 @@ static void Settings_Default(int client)
     g_Plr[client].show_other    = false; // 非管理员默认 false
 }
 
+static bool ApplyCookieRawString(int client, const char[] raw)
+{
+    if (!raw[0]) return false;
+
+    char part[11][32];
+    int n = ExplodeString(raw, "|", part, sizeof(part), sizeof(part[]));
+    if (n < 11) return false;
+
+    g_Plr[client].enable      = (StringToInt(part[0]) != 0);
+    g_Plr[client].see_others  = (StringToInt(part[1]) != 0);
+    g_Plr[client].share_scope = StringToInt(part[2]);
+    g_Plr[client].size        = StringToFloat(part[3]);
+    g_Plr[client].gap         = StringToFloat(part[4]);
+    g_Plr[client].alpha       = StringToInt(part[5]);
+    g_Plr[client].xoff        = StringToFloat(part[6]);
+    g_Plr[client].yoff        = StringToFloat(part[7]);
+    g_Plr[client].showdist    = StringToFloat(part[8]);
+    g_Plr[client].summode     = (StringToInt(part[9]) != 0);
+    g_Plr[client].sgmerge     = (StringToInt(part[10]) != 0);
+
+    g_Plr[client].show_other = false; // cookie 模式非管理员也不允许开放
+    ClampStyle(client);
+    return true;
+}
+
+// 允许强制保存：force=true 时即便还没加载完成也写入 Cookie，防丢
 static void Cookie_Save(int client, bool force = false)
 {
     if (g_ck == null || IsFakeClient(client)) return;
-    if (!g_bSettingsLoaded[client] && !force) return;
+    if ((g_LoadState[client] != LS_Ready) && !force) return;
 
     char buf[256];
     Format(buf, sizeof(buf), "%d|%d|%d|%.1f|%.1f|%d|%.1f|%.1f|%.1f|%d|%d",
@@ -320,88 +297,192 @@ static void Cookie_Save(int client, bool force = false)
     LogInfo("[Cookie] Saved (force=%d) for client %d: %s", force ? 1 : 0, client, buf);
 }
 
-static void Cookie_Load(int client)
+// ===============================
+// MySQL 连接 / 会话字符集 / 调试
+// ===============================
+static void DB_DebugDumpSession()
 {
-    Settings_Default(client);
-    if (g_ck == null || IsFakeClient(client)) { g_bSettingsLoaded[client] = true; return; }
+    if (g_DB == INVALID_HANDLE) return;
 
-    char buf[256];
-    g_ck.Get(client, buf, sizeof buf);
-    if (!buf[0]) { g_bSettingsLoaded[client] = true; return; }
-
-    char part[11][32];
-    int n = ExplodeString(buf, "|", part, sizeof(part), sizeof(part[]));
-    if (n < 11) { g_bSettingsLoaded[client] = true; return; }
-
-    g_Plr[client].enable      = (StringToInt(part[0]) != 0);
-    g_Plr[client].see_others  = (StringToInt(part[1]) != 0);
-    g_Plr[client].share_scope = StringToInt(part[2]);
-    g_Plr[client].size        = StringToFloat(part[3]);
-    g_Plr[client].gap         = StringToFloat(part[4]);
-    g_Plr[client].alpha       = StringToInt(part[5]);
-    g_Plr[client].xoff        = StringToFloat(part[6]);
-    g_Plr[client].yoff        = StringToFloat(part[7]);
-    g_Plr[client].showdist    = StringToFloat(part[8]);
-    g_Plr[client].summode     = (StringToInt(part[9]) != 0);
-    g_Plr[client].sgmerge     = (StringToInt(part[10]) != 0);
-
-    g_Plr[client].show_other = false; // cookie 模式非管理员也不允许开放
-    ClampStyle(client);
-    g_bSettingsLoaded[client] = true;
-
-    LogInfo("[Cookie] Loaded for client %d.", client);
+    SQL_TQuery(g_DB, SQLCB_OnSessionDump,
+        "SELECT @@character_set_client,@@character_set_connection,@@character_set_results,@@collation_connection", 0);
 }
 
-// ========== DB 加载 / 保存（Steam2） ==========
+static void DB_BeginConnect()
+{
+    if (g_DbConnecting) return;
+    if (g_DB != INVALID_HANDLE) return;
+    if (GetGameTime() < g_DbRetryAfter) return;
+
+    if (!SQL_CheckConfig(DB_CONF_NAME))
+    {
+        LogErr("[DB] databases.cfg is missing or invalid for '%s'", DB_CONF_NAME);
+        g_UseMySQL = false;
+        g_DB = INVALID_HANDLE;
+        g_DbReady = false;
+        return;
+    }
+
+    g_DbConnecting = true;
+    g_UseMySQL = true;   // 有配置就视为启用，真正就绪看 g_DbReady
+    g_DbReady = false;
+
+    // 正确参数顺序：SQL_TConnect(回调, 配置名, 持久化, 可选data)
+    SQL_TConnect(SQLCB_OnConnect, DB_CONF_NAME, true);
+    LogInfo("[DB] SQL_TConnect issued (async) for '%s'", DB_CONF_NAME);
+} 
+
+static bool DB_EnsureReady()
+{
+    if (g_DbReady && g_DB != INVALID_HANDLE) return true;
+    DB_BeginConnect();
+    return (g_DbReady && g_DB != INVALID_HANDLE);
+}
+
+// SQL_TConnect 的正确回调签名（3参）
+// ✅ 老式回调原型：owner + hndl
+public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any data)
+{
+    LogInfo("[DB] SQLCB_OnConnect fired. hndl=%p error='%s'",
+        hndl, (error[0] ? error : "(none)"));
+
+    g_DbConnecting = false;
+
+    if (hndl == INVALID_HANDLE)
+    {
+        LogErr("[DB] connect failed: %s", error);
+        g_DB = INVALID_HANDLE;
+        g_DbReady = false;
+        g_DbRetryAfter = GetGameTime() + DB_RETRY_COOLDOWN;
+        return;
+    }
+
+    g_DB = hndl;
+    g_DbReady = true;
+
+    // 会话层兜底：SET NAMES utf8mb4（用异步查询）
+    SQL_TQuery(g_DB, SQLCB_OnSetNames, "SET NAMES utf8mb4", 0);
+    DB_DebugDumpSession();
+
+    LogInfo("[DB] connected (async), handle=%p", g_DB);
+}
+
+
+public void SQLCB_OnSetNames(Handle owner, Handle hndl, const char[] error, any data)
+{
+    if (error[0]) LogErr("[DB] SET NAMES utf8mb4 failed: %s", error);
+    else          LogInfo("[DB] SET NAMES utf8mb4 OK");
+}
+
+public void SQLCB_OnSessionDump(Handle owner, Handle hndl, const char[] error, any data)
+{
+    if (error[0])
+    {
+        LogErr("[DB] session snapshot failed: %s", error);
+        return;
+    }
+    if (hndl != INVALID_HANDLE && SQL_FetchRow(hndl))
+    {
+        char a[64], b[64], c[64], d[64];
+        SQL_FetchString(hndl, 0, a, sizeof a);
+        SQL_FetchString(hndl, 1, b, sizeof b);
+        SQL_FetchString(hndl, 2, c, sizeof c);
+        SQL_FetchString(hndl, 3, d, sizeof d);
+        LogInfo("[DB] session charset: client=%s connection=%s results=%s coll=%s", a,b,c,d);
+    }
+}
+
+public void SQLCB_Nop(Handle owner, Handle hndl, const char[] error, any data)
+{
+    if (error[0] != '\0')
+        LogErr("[DB] SQL error in NOP: %s", error);
+}
+
+// ========== DB 加载 / 保存（DB 优先 + 队列保存） ==========
+static void CopySettings(PlayerSetData dst, const PlayerSetData src)
+{
+    dst.wpn_id        = src.wpn_id;
+    dst.wpn_type      = src.wpn_type;
+    dst.show_other    = src.show_other;
+    dst.last_set_time = src.last_set_time;
+
+    dst.enable        = src.enable;
+    dst.see_others    = src.see_others;
+    dst.share_scope   = src.share_scope;
+    dst.size          = src.size;
+    dst.gap           = src.gap;
+    dst.alpha         = src.alpha;
+    dst.xoff          = src.xoff;
+    dst.yoff          = src.yoff;
+    dst.showdist      = src.showdist;
+    dst.summode       = src.summode;
+    dst.sgmerge       = src.sgmerge;
+}
+
 static void DB_Load(int client)
 {
-    if (IsFakeClient(client)) { Cookie_Load(client); return; }
+    if (IsFakeClient(client)) { g_LoadState[client] = LS_Ready; return; }
 
-    // DB 优先策略：如果 DB 未就绪 → 不读 Cookie，保持默认（避免污染）
-    if (!g_DbReady || g_DB == INVALID_HANDLE)
+    if (!DB_EnsureReady())
     {
-        LogInfo("[Load] DB not ready yet for client %d; waiting DB. (No cookie apply)", client);
+        // DB 不可用 → 如果有 Cookie 用 Cookie，否则默认
+        bool ok = false;
+        if (g_HaveCookie[client])
+            ok = ApplyCookieRawString(client, g_CookieRaw[client]);
+        if (!ok) Settings_Default(client);
+
+        g_LoadState[client] = LS_Ready;
+        LogInfo("[Load] DB not ready, used %s for client %d.",
+                ok ? "cookie" : "defaults", client);
         return;
     }
 
-    char sid[64];
-    if (!GetClientAuthId(client, AuthId_Steam2, sid, sizeof sid) || StrEqual(sid, "BOT"))
+    g_LoadState[client] = LS_DBPending;
+
+    char sid2[64], sid_esc[128];
+    if (!GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2) || StrEqual(sid2, "BOT"))
     {
-        LogErr("[Load] No valid Steam2 for client %d -> fallback Cookie.", client);
-        Cookie_Load(client);
+        bool ok = false;
+        if (g_HaveCookie[client])
+            ok = ApplyCookieRawString(client, g_CookieRaw[client]);
+        if (!ok) Settings_Default(client);
+        g_LoadState[client] = LS_Ready;
+        LogInfo("[Load] No Steam2 (or BOT), used %s for client %d.",
+                ok ? "cookie" : "defaults", client);
         return;
     }
 
-    char sid_esc[128];
-    SQL_EscapeString(g_DB, sid, sid_esc, sizeof sid_esc);
+    SQL_EscapeString(g_DB, sid2, sid_esc, sizeof sid_esc);
 
     char q[512];
     Format(q, sizeof q,
-        "SELECT enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge FROM rpgdamage WHERE steamid='%s' LIMIT 1",
-        sid_esc);
-    LogInfo("[Load] SQL: %s", q);
+        "SELECT enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge FROM rpgdamage WHERE steamid='%s' LIMIT 1", sid_esc);
+
+    LogInfo("[Load] DB_Load SQL: %s", q);
     SQL_TQuery(g_DB, SQLCB_Load, q, GetClientUserId(client));
 }
 
 public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
 {
     int client = GetClientOfUserId(data);
-    if (error[0] != '\0')
+    if (!IsValidClient(client)) return;
+
+    if (error[0])
     {
-        LogErr("[Load] SQL error: %s (uid=%d)", error, data);
-        if (DB_IsDisconnectError(error))
-        {
-            if (g_DB != INVALID_HANDLE) CloseHandle(g_DB);
-            g_DB = INVALID_HANDLE; g_DbReady = false; g_DbRetryAfter = GetGameTime() + DB_RETRY_COOLDOWN;
-            DB_BeginConnect();
-        }
-        if (IsValidClient(client) && !g_bSettingsLoaded[client]) Cookie_Load(client); // 真失败才用 Cookie
+        bool ok = false;
+        if (g_HaveCookie[client])
+            ok = ApplyCookieRawString(client, g_CookieRaw[client]);
+        if (!ok) Settings_Default(client);
+
+        g_LoadState[client] = LS_Ready;
+        LogErr("[Load] SQL error: %s. Used %s for client %d.",
+               error, ok ? "cookie" : "defaults", client);
         return;
     }
-    if (!IsValidClient(client)) return;
 
     if (hndl != INVALID_HANDLE && SQL_FetchRow(hndl))
     {
+        // ★ DB 有记录 → 用 DB
         g_Plr[client].enable      = (SQL_FetchInt(hndl, 0) != 0);
         g_Plr[client].see_others  = (SQL_FetchInt(hndl, 1) != 0);
         g_Plr[client].share_scope = SQL_FetchInt(hndl, 2);
@@ -414,25 +495,30 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         g_Plr[client].summode     = (SQL_FetchInt(hndl, 9) != 0);
         g_Plr[client].sgmerge     = (SQL_FetchInt(hndl,10) != 0);
 
-        LogInfo("[Load] Loaded settings from DB for client %d.", client);
-        g_bSettingsLoaded[client] = true;
-
-        if (!IsAdminOrRoot(client)) g_Plr[client].show_other = false;
-        else                        g_Plr[client].show_other = (g_Plr[client].share_scope > 0);
+        g_Plr[client].show_other = false; // 非管理员不对外
         ClampStyle(client);
+
+        g_LoadState[client] = LS_Ready;
+        LogInfo("[Load] Loaded settings from DB for client %d.", client);
     }
     else
     {
-        // DB 无记录：默认值 → 插入一条默认记录；仍标记为“已加载”（来自 DB 默认）
-        Settings_Default(client);
+        // ★ DB 无记录 → 有 Cookie 则用 Cookie，再插入；否则默认并插入
+        bool fromCookie = false;
+        if (g_HaveCookie[client])
+            fromCookie = ApplyCookieRawString(client, g_CookieRaw[client]);
+        if (!fromCookie)
+            Settings_Default(client);
 
-        char sid[64], sid_esc[128];
-        GetClientAuthId(client, AuthId_Steam2, sid, sizeof sid);
-        SQL_EscapeString(g_DB, sid, sid_esc, sizeof sid_esc);
+        char sid2[64], sid_esc[128];
+        GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2);
+        SQL_EscapeString(g_DB, sid2, sid_esc, sizeof sid_esc);
 
-        char iq[512];
-        Format(iq, sizeof iq,
-            "INSERT INTO rpgdamage (steamid,enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge) VALUES ('%s',%d,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%.1f,%d,%d)",
+        char q[1024]; q[0]='\0';
+        SQLCat(q, sizeof q, "INSERT INTO rpgdamage ");
+        SQLCat(q, sizeof q, "(steamid,enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge) ");
+        SQLCatF(q, sizeof q,
+            "VALUES ('%s',%d,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%.1f,%d,%d) ",
             sid_esc,
             g_Plr[client].enable?1:0,
             g_Plr[client].see_others?1:0,
@@ -446,68 +532,38 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
             g_Plr[client].summode?1:0,
             g_Plr[client].sgmerge?1:0
         );
-        LogInfo("[Load] No row; insert defaults: %s", iq);
-        SQL_TQuery(g_DB, SQLCB_Nop, iq);
+        SQLCat(q, sizeof q, "ON DUPLICATE KEY UPDATE ");
+        SQLCat(q, sizeof q, "enable=VALUES(enable), see_others=VALUES(see_others), share_scope=VALUES(share_scope), ");
+        SQLCat(q, sizeof q, "size=VALUES(size), gap=VALUES(gap), alpha=VALUES(alpha), xoff=VALUES(xoff), yoff=VALUES(yoff), ");
+        SQLCat(q, sizeof q, "showdist=VALUES(showdist), summode=VALUES(summode), sg_merge=VALUES(sg_merge)");
 
-        g_bSettingsLoaded[client] = true;
-        if (!IsAdminOrRoot(client)) g_Plr[client].show_other = false;
-        else                        g_Plr[client].show_other = (g_Plr[client].share_scope > 0);
-        ClampStyle(client);
+        LogInfo("[Load] No DB row; applying %s and inserting: %s",
+                fromCookie ? "cookie" : "defaults", q);
+        SQL_TQuery(g_DB, SQLCB_Nop, q);
+
+        g_LoadState[client] = LS_Ready;
+    }
+
+    // 若期间用户点过“保存”，立即把当时的快照写库（避免丢变更）
+    if (g_PendingSave[client])
+    {
+        g_PendingSave[client] = false;
+        int rc = DB_Save_Snapshot(client);
+        LogInfo("[SavePending] Flushed queued save for client %d, rc=%d", client, rc);
     }
 }
 
-public void SQLCB_Nop(Handle owner, Handle hndl, const char[] error, any data)
+// 供回调把“排队快照”落库（不依赖 g_Plr 当前值）
+static int DB_Save_Snapshot(int client)
 {
-    if (error[0] != '\0')
-    {
-        LogErr("[DB] SQL Error (NOP): %s", error);
-        if (DB_IsDisconnectError(error))
-        {
-            if (g_DB != INVALID_HANDLE) CloseHandle(g_DB);
-            g_DB = INVALID_HANDLE; g_DbReady = false; g_DbRetryAfter = GetGameTime() + DB_RETRY_COOLDOWN;
-            DB_BeginConnect();
-        }
-    }
-}
+    if (!g_UseMySQL || g_DB == INVALID_HANDLE || IsFakeClient(client))
+        return 0;
 
-// 返回值：0 = 只写 Cookie, 2 = 异步 DB 保存已发起
-static int DB_Save(int client)
-{
-    ClampStyle(client);
+    char sid2[64], sid_esc[128];
+    if (!GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2) || StrEqual(sid2, "BOT"))
+        return 0;
 
-    // 设置尚未加载：不要写库；只把当前 UI 改动保住在 Cookie
-    if (!g_bSettingsLoaded[client])
-    {
-        Cookie_Save(client, true);
-        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存到本地（Cookie-Force）。服务器端设置尚未加载。");
-        LogInfo("[Save] Forced cookie save (not loaded) client=%d", client);
-        // 尝试拉起连接（带冷却）
-        DB_BeginConnect();
-        return 1;
-    }
-
-    // DB 未就绪：只写 Cookie，并触发一次连接尝试（带冷却）
-    if (!g_DbReady || g_DB == INVALID_HANDLE || IsFakeClient(client))
-    {
-        Cookie_Save(client);
-        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存到本地（Cookie）。数据库未就绪。");
-        LogInfo("[Save] DB not ready; saved cookie. client=%d ready=%d handle=%p", client, g_DbReady?1:0, g_DB);
-        DB_BeginConnect();
-        return 1;
-    }
-
-    // 正常写 DB（异步）
-    char sid[64];
-    if (!GetClientAuthId(client, AuthId_Steam2, sid, sizeof sid) || StrEqual(sid, "BOT"))
-    {
-        Cookie_Save(client);
-        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存到本地（Cookie）。无法获取有效 SteamID。");
-        LogErr("[Save] No valid Steam2, fallback cookie. client=%d", client);
-        return 1;
-    }
-
-    char sid_esc[128];
-    SQL_EscapeString(g_DB, sid, sid_esc, sizeof sid_esc);
+    SQL_EscapeString(g_DB, sid2, sid_esc, sizeof sid_esc);
 
     char q[1024]; q[0] = '\0';
     SQLCat(q, sizeof q, "INSERT INTO rpgdamage ");
@@ -515,8 +571,73 @@ static int DB_Save(int client)
     SQLCatF(q, sizeof q,
         "VALUES ('%s',%d,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%.1f,%d,%d) ",
         sid_esc,
-        g_Plr[client].enable ? 1 : 0,
-        g_Plr[client].see_others ? 1 : 0,
+        g_SaveSnapshot[client].enable?1:0,
+        g_SaveSnapshot[client].see_others?1:0,
+        g_SaveSnapshot[client].share_scope,
+        g_SaveSnapshot[client].size,
+        g_SaveSnapshot[client].gap,
+        g_SaveSnapshot[client].alpha,
+        g_SaveSnapshot[client].xoff,
+        g_SaveSnapshot[client].yoff,
+        g_SaveSnapshot[client].showdist,
+        g_SaveSnapshot[client].summode?1:0,
+        g_SaveSnapshot[client].sgmerge?1:0
+    );
+    SQLCat(q, sizeof q, "ON DUPLICATE KEY UPDATE ");
+    SQLCat(q, sizeof q, "enable=VALUES(enable), see_others=VALUES(see_others), share_scope=VALUES(share_scope), ");
+    SQLCat(q, sizeof q, "size=VALUES(size), gap=VALUES(gap), alpha=VALUES(alpha), xoff=VALUES(xoff), yoff=VALUES(yoff), ");
+    SQLCat(q, sizeof q, "showdist=VALUES(showdist), summode=VALUES(summode), sg_merge=VALUES(sg_merge)");
+
+    LogInfo("[SaveSnapshot] Exec SQL (client=%d): %s", client, q);
+    SQL_TQuery(g_DB, SQLCB_Save, q, client);
+    return 2;
+}
+
+// 返回：0 未保存/失败；1 仅 Cookie；2 已发起 DB 异步保存
+static int DB_Save(int client)
+{
+    ClampStyle(client);
+
+    // 1) 若还没 Ready：排队保存（拍快照），并写本地 Cookie 兜底
+    if (g_LoadState[client] != LS_Ready)
+    {
+        CopySettings(g_SaveSnapshot[client], g_Plr[client]);
+        g_PendingSave[client] = true;
+
+        Cookie_Save(client, true); // 强制写 Cookie 防丢
+        CPrintToChat(client, "{olive}[HUD]{default} 已保存到本地（Cookie），并已排队，待加载完成后写入数据库。");
+        LogInfo("[Save] Queued (not ready). client=%d state=%d", client, g_LoadState[client]);
+        return 1;
+    }
+
+    // 2) DB 不可用：只写 Cookie
+    if (!g_UseMySQL || g_DB == INVALID_HANDLE || IsFakeClient(client))
+    {
+        Cookie_Save(client);
+        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存到本地（Cookie）。MySQL 未启用或不可用。");
+        LogInfo("[Save] DB not available, saved to Cookie. client=%d", client);
+        return 1;
+    }
+
+    // 3) 正常 DB 写入（UPSERT）
+    char sid2[64], sid_esc[128];
+    if (!GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2) || StrEqual(sid2, "BOT"))
+    {
+        Cookie_Save(client);
+        CPrintToChat(client, "{olive}[HUD]{default} 设置已保存到本地（Cookie）。无法获取有效 SteamID。");
+        LogErr("[Save] No valid Steam2, saved to Cookie. client=%d", client);
+        return 1;
+    }
+    SQL_EscapeString(g_DB, sid2, sid_esc, sizeof sid_esc);
+
+    char q[1024]; q[0]='\0';
+    SQLCat(q, sizeof q, "INSERT INTO rpgdamage ");
+    SQLCat(q, sizeof q, "(steamid,enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge) ");
+    SQLCatF(q, sizeof q,
+        "VALUES ('%s',%d,%d,%d,%.1f,%.1f,%d,%.1f,%.1f,%.1f,%d,%d) ",
+        sid_esc,
+        g_Plr[client].enable?1:0,
+        g_Plr[client].see_others?1:0,
         g_Plr[client].share_scope,
         g_Plr[client].size,
         g_Plr[client].gap,
@@ -524,28 +645,20 @@ static int DB_Save(int client)
         g_Plr[client].xoff,
         g_Plr[client].yoff,
         g_Plr[client].showdist,
-        g_Plr[client].summode ? 1 : 0,
-        g_Plr[client].sgmerge ? 1 : 0
+        g_Plr[client].summode?1:0,
+        g_Plr[client].sgmerge?1:0
     );
     SQLCat(q, sizeof q, "ON DUPLICATE KEY UPDATE ");
-    SQLCat(q, sizeof q, "enable=VALUES(enable), ");
-    SQLCat(q, sizeof q, "see_others=VALUES(see_others), ");
-    SQLCat(q, sizeof q, "share_scope=VALUES(share_scope), ");
-    SQLCat(q, sizeof q, "size=VALUES(size), ");
-    SQLCat(q, sizeof q, "gap=VALUES(gap), ");
-    SQLCat(q, sizeof q, "alpha=VALUES(alpha), ");
-    SQLCat(q, sizeof q, "xoff=VALUES(xoff), ");
-    SQLCat(q, sizeof q, "yoff=VALUES(yoff), ");
-    SQLCat(q, sizeof q, "showdist=VALUES(showdist), ");
-    SQLCat(q, sizeof q, "summode=VALUES(summode), ");
-    SQLCat(q, sizeof q, "sg_merge=VALUES(sg_merge)");
+    SQLCat(q, sizeof q, "enable=VALUES(enable), see_others=VALUES(see_others), share_scope=VALUES(share_scope), ");
+    SQLCat(q, sizeof q, "size=VALUES(size), gap=VALUES(gap), alpha=VALUES(alpha), xoff=VALUES(xoff), yoff=VALUES(yoff), ");
+    SQLCat(q, sizeof q, "showdist=VALUES(showdist), summode=VALUES(summode), sg_merge=VALUES(sg_merge)");
 
     LogInfo("[Save] Exec SQL (client=%d): %s", client, q);
     SQL_TQuery(g_DB, SQLCB_Save, q, client);
 
     // 双写 Cookie：本地立即生效
     Cookie_Save(client);
-    CPrintToChat(client, "{olive}[HUD]{default} 设置已保存（已写入本地 Cookie，正在写入数据库）。");
+    CPrintToChat(client, "{olive}[HUD]{default} 设置已保存（本地 Cookie + 数据库）。");
     return 2;
 }
 
@@ -554,13 +667,7 @@ public void SQLCB_Save(Handle owner, Handle hndl, const char[] error, any data)
     int client = data;
     if (error[0] != '\0')
     {
-        LogErr("[Save] SQL error client %d: %s", client, error);
-        if (DB_IsDisconnectError(error))
-        {
-            if (g_DB != INVALID_HANDLE) CloseHandle(g_DB);
-            g_DB = INVALID_HANDLE; g_DbReady = false; g_DbRetryAfter = GetGameTime() + DB_RETRY_COOLDOWN;
-            DB_BeginConnect();
-        }
+        LogErr("[Save] SQL error for client %d: %s", client, error);
     }
     else
     {
@@ -571,9 +678,9 @@ public void SQLCB_Save(Handle owner, Handle hndl, const char[] error, any data)
 // ============ 插件信息 ============
 public Plugin myinfo =
 {
-    name        = "[L4D2] Damage HUD (MySQL+Cookie, async, steam2)",
+    name        = "[L4D2] Damage HUD (MySQL+Cookie, DB-first)",
     author      = "Loqi + you (mod by ChatGPT)",
-    description = "Per-client damage digits with DB/Cookie + menus + admin sharing gate",
+    description = "Per-client damage digits with DB-first persistence + cookies + menus + admin sharing gate",
     version     = PLUGIN_VERSION,
     url         = "https://"
 };
@@ -598,14 +705,15 @@ public void OnPluginStart()
     // Cookie
     g_ck = new Cookie(COOKIE_NAME, "damage hud per-client", CookieAccess_Protected);
 
-    // 异步 DB 连接
+    // DB（异步）
     DB_BeginConnect();
 
     // 命令
     RegConsoleCmd("sm_dmgmenu", Cmd_Menu, "打开伤害数字设置菜单");
-    RegAdminCmd("sm_dmgcookie",          Cmd_DmgCookie, Admin_Generic,        "Dump cookie & current settings");
-    RegAdminCmd("sm_dmgdbstat",          Cmd_DmgDBStat, Admin_Generic,        "Show DB status & session charset (async)");
-    RegAdminCmd("sm_dmgforcesavecookie", Cmd_DmgForceSaveCookie, Admin_Generic,"Force save current settings to cookie");
+    RegAdminCmd("sm_dmgcookie",          Cmd_DmgCookie,        Admin_Generic, "Dump cookie & current settings");
+    RegAdminCmd("sm_dmgdbstat",          Cmd_DmgDBStat,        Admin_Generic, "Show DB status & session charset");
+    RegAdminCmd("sm_dmgforcesavecookie", Cmd_DmgForceSaveCookie, Admin_Generic, "Force save current settings to cookie");
+    RegAdminCmd("sm_dmgdbprobe",         Cmd_DmgDBProbe,       Admin_Generic, "One-shot sync DB probe");
 
     // 事件/钩子
     HookEvent("player_left_safe_area", E_LeftSafe, EventHookMode_PostNoCopy);
@@ -617,8 +725,12 @@ public void OnPluginStart()
 public void OnClientPutInServer(int client)
 {
     g_bAdminObsViewAll[client] = false;
-    g_bSettingsLoaded[client]  = false;
-    Settings_Default(client); // 上线先默认值（DB 优先策略，不即时套 Cookie）
+
+    g_LoadState[client]   = LS_None;
+    g_HaveCookie[client]  = false;
+    g_CookieRaw[client][0]= '\0';
+    g_PendingSave[client] = false;
+
     SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
 }
 
@@ -626,8 +738,23 @@ public void OnClientCookiesCached(int client)
 {
     if (IsFakeClient(client)) return;
 
-    // DB 优先：不立即套 Cookie，直接尝试 DB 加载。
-    LogInfo("[Ensure] Cookies cached; DB-first load for client %d.", client);
+    // 取 Cookie 原始串，仅缓存，不应用（避免覆盖 DB）
+    if (g_ck != null)
+    {
+        g_CookieRaw[client][0] = '\0';
+        g_ck.Get(client, g_CookieRaw[client], sizeof(g_CookieRaw[]));
+        g_HaveCookie[client] = (g_CookieRaw[client][0] != '\0');
+    }
+    else
+    {
+        g_HaveCookie[client] = false;
+        g_CookieRaw[client][0] = '\0';
+    }
+
+    // 先给默认值占位，避免 UI 空值
+    Settings_Default(client);
+
+    // 启动 DB 加载（DB 优先）
     DB_Load(client);
 }
 
@@ -656,7 +783,7 @@ public void OnMapStart()
             g_Sum[i][j].needShow = false;
             g_Sum[i][j].totalDamage = 0;
             g_Sum[i][j].lastShowTime = 0.0;
-            g_Sum[i][j].lastHitTime  = 0.0;
+            g_Sum[i][j].lastHitTime = 0.0;
 
             g_iVitcimHealth[i][j] = 0;
         }
@@ -666,10 +793,103 @@ public void OnMapStart()
 public void OnClientDisconnect(int client)
 {
     if (IsClientConnected(client) && !IsFakeClient(client))
-        DB_Save(client); // 未加载则只写 Cookie
+        DB_Save(client); // 已准备好则写库；否则队列+写 Cookie
 }
 
-// ============ 菜单 ============
+// ============ 调试命令 ============
+public Action Cmd_DmgCookie(int client, int args)
+{
+    if (!IsValidClient(client)) return Plugin_Handled;
+
+    PrintToConsole(client, "[DMGSHOW] ---- Cookie Dump ----");
+    PrintToConsole(client, "[DMGSHOW] LoadState=%d UseMySQL=%d", g_LoadState[client], g_UseMySQL ? 1 : 0);
+
+    if (g_ck == null)
+    {
+        PrintToConsole(client, "[DMGSHOW] Cookie object is NULL.");
+        return Plugin_Handled;
+    }
+
+    char raw[256];
+    raw[0] = '\0';
+    g_ck.Get(client, raw, sizeof(raw));
+    PrintToConsole(client, "[DMGSHOW] Raw cookie: %s", raw[0] ? raw : "(empty)");
+
+    PrintToConsole(client, "[DMGSHOW] Current settings in memory:");
+    PrintToConsole(client, "  enable=%d see_others=%d share_scope=%d", g_Plr[client].enable ? 1 : 0, g_Plr[client].see_others ? 1 : 0, g_Plr[client].share_scope);
+    PrintToConsole(client, "  size=%.1f gap=%.1f alpha=%d", g_Plr[client].size, g_Plr[client].gap, g_Plr[client].alpha);
+    PrintToConsole(client, "  xoff=%.1f yoff=%.1f showdist=%.1f", g_Plr[client].xoff, g_Plr[client].yoff, g_Plr[client].showdist);
+    PrintToConsole(client, "  summode=%d sgmerge=%d", g_Plr[client].summode ? 1 : 0, g_Plr[client].sgmerge ? 1 : 0);
+    return Plugin_Handled;
+}
+
+public Action Cmd_DmgDBStat(int client, int args)
+{
+    PrintToConsole(client, "[DMGSHOW] ---- DB Status ----");
+    PrintToConsole(client, "[DMGSHOW] Ready=%d Connecting=%d Handle=%p RetryAfter=%.2f Now=%.2f",
+        g_DbReady ? 1:0, g_DbConnecting ? 1:0, g_DB, g_DbRetryAfter, GetGameTime());
+
+    if (!g_DbReady || g_DB == INVALID_HANDLE)
+        return Plugin_Handled;
+
+    Handle h = SQL_Query(g_DB,
+        "SELECT @@character_set_client,@@character_set_connection,@@character_set_results,@@collation_connection");
+    if (h == INVALID_HANDLE)
+    {
+        PrintToConsole(client, "[DMGSHOW] SQL_Query failed for session snapshot.");
+        return Plugin_Handled;
+    }
+    if (SQL_FetchRow(h))
+    {
+        char a[64], b[64], c[64], d[64];
+        SQL_FetchString(h, 0, a, sizeof a);
+        SQL_FetchString(h, 1, b, sizeof b);
+        SQL_FetchString(h, 2, c, sizeof c);
+        SQL_FetchString(h, 3, d, sizeof d);
+        PrintToConsole(client, "[DMGSHOW] Session charset: client=%s connection=%s results=%s coll=%s", a,b,c,d);
+    }
+    CloseHandle(h);
+    return Plugin_Handled;
+}
+
+public Action Cmd_DmgForceSaveCookie(int client, int args)
+{
+    if (!IsValidClient(client)) return Plugin_Handled;
+    Cookie_Save(client, true); // 强制
+    PrintToConsole(client, "[DMGSHOW] Forced cookie save done.");
+    return Plugin_Handled;
+}
+
+public Action Cmd_DmgDBProbe(int client, int args)
+{
+    char err[256];
+    Handle tmp = SQL_Connect(DB_CONF_NAME, false, err, sizeof(err));
+    if (tmp == INVALID_HANDLE)
+    {
+        PrintToConsole(client, "[DMGSHOW] Probe: SQL_Connect FAILED: %s", err);
+        return Plugin_Handled;
+    }
+
+    bool ok = SQL_FastQuery(tmp, "SET NAMES utf8mb4");
+    PrintToConsole(client, "[DMGSHOW] Probe: SET NAMES utf8mb4 -> %s", ok ? "OK" : "FAILED");
+
+    Handle h = SQL_Query(tmp, "SELECT 1");
+    if (h == INVALID_HANDLE)
+    {
+        PrintToConsole(client, "[DMGSHOW] Probe: SELECT 1 failed.");
+    }
+    else
+    {
+        PrintToConsole(client, "[DMGSHOW] Probe: SELECT 1 OK.");
+        CloseHandle(h);
+    }
+
+    CloseHandle(tmp);
+    return Plugin_Handled;
+}
+
+// ============ 菜单（分面板） ============
+
 public Action Cmd_Menu(int client, int args)
 {
     if (!IsValidClient(client)) return Plugin_Handled;
@@ -681,10 +901,22 @@ public Action Cmd_Menu(int client, int args)
 static void OpenRootMenu(int client)
 {
     Menu m = new Menu(Menu_Root);
-    m.SetTitle("伤害数字设置（根）\n请选择一个分面板：");
+    char state[32];
+    switch (g_LoadState[client])
+    {
+        case LS_Ready:     strcopy(state, sizeof state, "已加载"); 
+        case LS_DBPending: strcopy(state, sizeof state, "加载中"); 
+        default:           strcopy(state, sizeof state, "未开始"); 
+    }
+
+    char title[128];
+    Format(title, sizeof title, "伤害数字设置（根）\n配置状态：%s\n请选择一个分面板：", state);
+    m.SetTitle(title);
 
     m.AddItem("style", "① 显示样式 / 字体 / 偏移");
     m.AddItem("share", "② 分享 / 可见性 / 管理功能");
+
+    // 允许随时点保存；未就绪则走排队保存逻辑
     m.AddItem("save",  "保存当前设置");
 
     m.Display(client, MENU_TIME);
@@ -744,7 +976,6 @@ static void OpenStyleMenu(int client)
 
     m.Display(client, MENU_TIME);
 }
-
 public int Menu_Style(Menu menu, MenuAction action, int client, int param2)
 {
     if (action == MenuAction_End) { delete menu; return 0; }
@@ -793,6 +1024,7 @@ static void OpenShareMenu(int client)
     m.SetTitle(title);
 
     m.AddItem("toggle_see",    "切换：看他人（接收分享）");
+
     if (IsAdminOrRoot(client)) m.AddItem("scope", "切换：分享范围（仅自己/队友）");
     else                       m.AddItem("scope", "切换：分享范围（仅管理员可设）", ITEMDRAW_DISABLED);
 
@@ -821,7 +1053,7 @@ public int Menu_Share(Menu menu, MenuAction action, int client, int param2)
     else if (StrEqual(key, "scope"))
     {
         if (IsAdminOrRoot(client))
-            g_Plr[client].share_scope = (g_Plr[client].share_scope + 1) % 2; // 0/1 轮换
+            g_Plr[client].share_scope = (g_Plr[client].share_scope + 1) % 2;
         else
             CPrintToChat(client, "{olive}[HUD]{default} 只有管理员可以修改分享范围。");
     }
@@ -854,78 +1086,6 @@ public int Menu_Share(Menu menu, MenuAction action, int client, int param2)
     return 0;
 }
 
-// ============ 调试命令 ============
-public Action Cmd_DmgCookie(int client, int args)
-{
-    if (!IsValidClient(client)) return Plugin_Handled;
-
-    PrintToConsole(client, "[DMGSHOW] ---- Cookie Dump ----");
-    PrintToConsole(client, "[DMGSHOW] SettingsLoaded=%d DBReady=%d", g_bSettingsLoaded[client] ? 1 : 0, g_DbReady ? 1 : 0);
-
-    if (g_ck == null)
-    {
-        PrintToConsole(client, "[DMGSHOW] Cookie object is NULL.");
-        return Plugin_Handled;
-    }
-
-    char raw[256]; raw[0] = '\0';
-    g_ck.Get(client, raw, sizeof(raw));
-    PrintToConsole(client, "[DMGSHOW] Raw cookie: %s", raw[0] ? raw : "(empty)");
-
-    PrintToConsole(client, "[DMGSHOW] Current settings in memory:");
-    PrintToConsole(client, "  enable=%d see_others=%d share_scope=%d", g_Plr[client].enable ? 1 : 0, g_Plr[client].see_others ? 1 : 0, g_Plr[client].share_scope);
-    PrintToConsole(client, "  size=%.1f gap=%.1f alpha=%d", g_Plr[client].size, g_Plr[client].gap, g_Plr[client].alpha);
-    PrintToConsole(client, "  xoff=%.1f yoff=%.1f showdist=%.1f", g_Plr[client].xoff, g_Plr[client].yoff, g_Plr[client].showdist);
-    PrintToConsole(client, "  summode=%d sgmerge=%d", g_Plr[client].summode ? 1 : 0, g_Plr[client].sgmerge ? 1 : 0);
-    return Plugin_Handled;
-}
-
-public Action Cmd_DmgDBStat(int client, int args)
-{
-    if (!IsValidClient(client)) return Plugin_Handled;
-
-    PrintToConsole(client, "[DMGSHOW] ---- DB Status ----");
-    PrintToConsole(client, "[DMGSHOW] Ready=%d Connecting=%d RetryAfter=%.2f Handle=%p",
-        g_DbReady ? 1 : 0, g_DbConnecting ? 1 : 0, g_DbRetryAfter, g_DB);
-
-    if (!g_DbReady || g_DB == INVALID_HANDLE)
-        return Plugin_Handled;
-
-    SQL_TQuery(g_DB, SQLCB_PrintSession, 
-        "SELECT @@character_set_client,@@character_set_connection,@@character_set_results,@@collation_connection", 
-        GetClientUserId(client));
-    return Plugin_Handled;
-}
-
-public void SQLCB_PrintSession(Handle owner, Handle hndl, const char[] error, any data)
-{
-    int client = GetClientOfUserId(data);
-    if (!IsValidClient(client)) return;
-
-    if (error[0] != '\0')
-    {
-        PrintToConsole(client, "[DMGSHOW] Session query error: %s", error);
-        return;
-    }
-    if (hndl != INVALID_HANDLE && SQL_FetchRow(hndl))
-    {
-        char a[64], b[64], c[64], d[64];
-        SQL_FetchString(hndl, 0, a, sizeof(a));
-        SQL_FetchString(hndl, 1, b, sizeof(b));
-        SQL_FetchString(hndl, 2, c, sizeof(c));
-        SQL_FetchString(hndl, 3, d, sizeof(d));
-        PrintToConsole(client, "[DMGSHOW] Session charset: client=%s connection=%s results=%s coll=%s", a, b, c, d);
-    }
-}
-
-public Action Cmd_DmgForceSaveCookie(int client, int args)
-{
-    if (!IsValidClient(client)) return Plugin_Handled;
-    Cookie_Save(client, true);
-    PrintToConsole(client, "[DMGSHOW] Forced cookie save done.");
-    return Plugin_Handled;
-}
-
 // ============ 提示 ============
 void E_LeftSafe(Event event, const char[] name, bool dontBroadcast)
 {
@@ -941,6 +1101,7 @@ public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
 
+    // 自己的功能开关（默认 false）
     if (!g_Plr[attacker].enable) return;
 
     int remain = hEvent.GetInt("health");
@@ -955,7 +1116,7 @@ public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
         else
             damage = g_iVitcimHealth[attacker][victim];
         g_iVitcimHealth[attacker][victim] = 0;
-        forceHS = true; // 标记“致死一枪”
+        forceHS = true; // 致死一枪；在累加模式里仍会进入 Sum 缓存，最终一帧统一显示
     }
     g_AttackCache[attacker][victim].damage = damage;
     g_AttackCache[attacker][victim].forceHeadshot = forceHS;
@@ -971,10 +1132,15 @@ public void SDK_OnTakeDamagePost(int victim, int attacker, int inflictor, float 
     int dval = g_AttackCache[attacker][victim].damage;
     bool forceHS = g_AttackCache[attacker][victim].forceHeadshot;
 
+    // 霰弹合并
+    #if defined DMG_BUCKSHOT
     if (g_Plr[attacker].sgmerge && (damagetype & DMG_BUCKSHOT))
         Handle_Shotgun(attacker, victim, wpn, dval, damagetype, damagePosition, forceHS);
     else
         DisplayDamage(victim, attacker, wpn, dval, damagetype, damagePosition, forceHS);
+    #else
+        DisplayDamage(victim, attacker, wpn, dval, damagetype, damagePosition, forceHS);
+    #endif
 
     g_AttackCache[attacker][victim].damage = 0;
     g_AttackCache[attacker][victim].forceHeadshot = false;
@@ -1006,7 +1172,6 @@ static void Handle_Shotgun(int attacker, int victim, int weapon, int damage, int
         RequestFrame(NextFrame_SG, pack);
     }
 }
-
 public void NextFrame_SG(DataPack pack)
 {
     pack.Reset();
@@ -1174,10 +1339,10 @@ public void OnGameFrame()
     }
 }
 
-// —— 可见性/分享规则 ——
+// —— 可见性/分享规则要点 ——
 // 1) 自己永远能看见自己的数字（只要 enable=true）。
 // 2) “看他人”仅决定我是否接收他人分享（默认 true 便于看管理员分享）。
-// 3) 只有管理员可分享（show_other=true）并按 share_scope=0/1（仅自己/队友）分发；普通玩家强制仅自己。
+// 3) 只有管理员可分享（show_other=true）并按 share_scope=0/1（仅自己/队友）分发；普通玩家强制仅自己，不对外分享。
 // 4) 旁观管理员可选“查看所有人生还者伤害”。
 
 static void BuildReceivers(int attacker, int victim, int recv[MAXPLAYERS], int &total)
@@ -1267,13 +1432,42 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     if (zombieClass == ZC_BOOMER) if (life < 0.5) life = 0.5;
     if (UpdateFrame) life = UPDATE_INTERVAL;
 
-    // === 修复点：累加模式下，致死一枪不要“单独显示”，而是继续累计 ===
-    // 之前的逻辑在 forceHeadshot 时会强制立即显示并清空累加，我们改成只有在“非累加模式”时才这么做
-    if (forceHeadshot && !g_Plr[attacker].summode)
+    // ★ 累加模式： lethal 一枪也进入合并，最后一帧统一显示
+    if (g_Plr[attacker].summode && !UpdateFrame)
     {
-        g_Sum[attacker][victim].needShow = false;
+        if (!g_Sum[attacker][victim].needShow || !g_Sum[attacker][0].needShow)
+        {
+            g_Sum[attacker][victim].needShow = true;
+            g_Sum[attacker][0].needShow = true;
+            g_Sum[attacker][victim].lastShowTime = 0.0;
+            g_Sum[attacker][victim].totalDamage = val;
+            g_bNeverFire[attacker] = false;
+        }
+        else g_Sum[attacker][victim].totalDamage += val;
+
+        g_Sum[attacker][victim].damagePosition = damagePosition;
+        g_Sum[attacker][victim].damageType = damagetype;
+        g_Sum[attacker][victim].weapon = weapon;
+        g_Sum[attacker][victim].isHeadshot = forceHeadshot;
+
+        float now = GetGameTime();
+        if (IsPlayerAlive(victim))
+        {
+            int zc = GetEntProp(victim, Prop_Send, "m_zombieClass");
+            if (zc == ZC_TANK) now += 3.0;
+            else if (g_Plr[attacker].wpn_type == 3) now += 0.5;
+        }
+        g_Sum[attacker][victim].lastHitTime = now;
+        g_Sum[attacker][0].lastHitTime = now;
+        return;
+    }
+
+    if (forceHeadshot)
+    {
+        // 在非累加路径下，致死一枪的展示时间稍微延长一点
         float temp_life = g_Sum[attacker][victim].lastHitTime + 0.5 - GetGameTime();
         life = (temp_life > 0.5) ? temp_life : 0.5;
+        g_Sum[attacker][victim].needShow = false;
     }
 
     float z_distance = 40.0, distance, gap, size, width=0.8, vecPos[3], vecOrg[3];
@@ -1290,21 +1484,21 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     bool is_near = false;
     if (distance <= 120.0 * 120.0)
     {
-        float scale = (120.0 * 120.0) / distance;
-        if (scale > 4.0) scale = 4.0;
-        gap   /= scale;
-        size  /= scale;
+        float scale2 = (120.0 * 120.0) / distance;
+        if (scale2 > 4.0) scale2 = 4.0;
+        gap   /= scale2;
+        size  /= scale2;
         z_distance = 1.0;
-        width /= scale;
+        width /= scale2;
         is_near = true;
     }
     else if (distance > 70.0 * 70.0 * 100.0)
     {
-        float scale = distance / (70.0 * 70.0 * 100.0);
-        if (scale > 2.0) scale = 2.0;
-        gap   *= scale;
-        size  *= scale;
-        width *= scale;
+        float scale3 = distance / (70.0 * 70.0 * 100.0);
+        if (scale3 > 2.0) scale3 = 2.0;
+        gap   *= scale3;
+        size  *= scale3;
+        width *= scale3;
     }
 
     float dmgpos[3];
@@ -1328,36 +1522,6 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     float x_start = half_width;
     float scale = (damagePosition[0] < vecOrg[0]) ? -1.0 : 1.0;
     if (is_near) scale = 0.0;
-
-    // —— 累加模式缓存（包括致死一枪也进入累加）——
-    if (g_Plr[attacker].summode && !UpdateFrame)
-    {
-        if (!g_Sum[attacker][victim].needShow || !g_Sum[attacker][0].needShow)
-        {
-            g_Sum[attacker][victim].needShow = true;
-            g_Sum[attacker][0].needShow = true;
-            g_Sum[attacker][victim].lastShowTime = 0.0;
-            g_Sum[attacker][victim].totalDamage = val;
-            g_bNeverFire[attacker] = false;
-        }
-        else g_Sum[attacker][victim].totalDamage += val;
-
-        g_Sum[attacker][victim].damagePosition = dmgpos;
-        g_Sum[attacker][victim].damageType = damagetype;
-        g_Sum[attacker][victim].weapon = weapon;
-        g_Sum[attacker][victim].isHeadshot = (forceHeadshot || (damagetype & DMG_HEADSHOT) != 0);
-
-        float now = GetGameTime();
-        if (IsPlayerAlive(victim))
-        {
-            int zc = GetEntProp(victim, Prop_Send, "m_zombieClass");
-            if (zc == ZC_TANK) now += 3.0;
-            else if (g_Plr[attacker].wpn_type == 3) now += 0.5;
-        }
-        g_Sum[attacker][victim].lastHitTime = now;
-        g_Sum[attacker][0].lastHitTime = now;
-        return;
-    }
 
     int rgbaFull[4];
     rgbaFull[0] = rgba[0];
