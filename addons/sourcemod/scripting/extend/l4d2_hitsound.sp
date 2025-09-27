@@ -1,4 +1,4 @@
-/**
+/** 
  * l4d2_hitsound_plus.sp
  *
  * - 多套音效配置（configs/hitsound_sets.cfg）支持 builtin=1 跳过 FastDL
@@ -10,7 +10,7 @@
  * - SQL_TConnect 固定用：SQL_TConnect(SQL_OnConnect, confName, 0);
  *
  * SQL（示例，仅两列，确保 steamid 唯一）:
- *   ALTER TABLE `rpg_player`
+ *   ALTER TABLE `rpg`
  *     ADD COLUMN `hitsound_cfg` TINYINT NOT NULL DEFAULT 0,
  *     ADD COLUMN `hitsound_overlay` TINYINT NOT NULL DEFAULT 0,
  *     ADD UNIQUE KEY `uniq_steamid` (`steamid`);
@@ -18,6 +18,7 @@
  * commands:
  *   !snd    -> 主菜单（音效套装（玩家） / 图标套装（玩家） / 覆盖图开关）
  *   !hitui  -> 快速在“禁用/套装1”之间切换覆盖图
+ *   sm_hitsound_reload -> 重新从 DB/KV 读取所有在线玩家的偏好
  */
 
 #pragma semicolon 1
@@ -27,7 +28,7 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "1.4.0"
+#define PLUGIN_VERSION "1.4.2"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 
@@ -50,10 +51,15 @@ ConVar cv_overlay_default_enable;
 
 ConVar cv_db_enable;
 ConVar cv_db_conf;
+ConVar cv_db_table;       // 新增：可配置表名（默认 rpg_player）
 
 // --------------------- State ---------------------
 int  g_SoundSelect[MAXPLAYERS + 1]   = {0, ...}; // 玩家选的音效套装编号（0=禁用；>=1）
 int  g_OverlaySet[MAXPLAYERS + 1]    = {0, ...}; // 玩家选的覆盖图套装（0=禁用；>=1）
+
+// 新增：加载/脏标志，避免默认值误写库
+bool g_PrefsLoaded[MAXPLAYERS + 1] = { false, ... };
+bool g_PrefsDirty [MAXPLAYERS + 1] = { false, ... };
 
 Handle g_hDB = INVALID_HANDLE;
 
@@ -118,6 +124,7 @@ public void OnPluginStart()
 
     cv_db_enable              = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储(1启用,0禁用)", CVAR_FLAGS);
     cv_db_conf                = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
+    cv_db_table               = CreateConVar("sm_hitsound_db_table", "RPG", "存储表名", CVAR_FLAGS);
 
     // Fallback KV
     g_SoundStore = CreateKeyValues("SoundSelect");
@@ -150,6 +157,7 @@ public void OnPluginStart()
 
     RegConsoleCmd("sm_snd",   Cmd_MenuMain, "主菜单：音效套装（玩家）/ 图标套装（玩家）/ 覆盖图开关");
     RegConsoleCmd("sm_hitui", Cmd_ToggleUI,  "快速在禁用与套装1间切换覆盖图");
+    RegAdminCmd ("sm_hitsound_reload", Cmd_ReloadAll, ADMFLAG_ROOT, "重新从 DB/KV 读取所有在线玩家的偏好");
 
     AutoExecConfig(true, "l4d2_hitsound_plus");
 
@@ -166,6 +174,12 @@ public void OnPluginStart()
     }
 }
 
+// 在执行完 cfg（例如加载模式/exec zonemod/药抗）后，重新加载在线玩家的偏好
+public void OnConfigsExecuted()
+{
+    ReloadAllPlayersPrefs();
+}
+
 // ========================================================
 // DB Connect callback
 // ========================================================
@@ -178,6 +192,9 @@ public void SQL_OnConnect(Handle owner, Handle hndl, const char[] error, any dat
     }
     g_hDB = hndl;
     LogMessage("[hitsound] 数据库连接成功。");
+
+    // 插件重载/晚加载时，在线玩家不会触发 OnClientPutInServer，这里主动补一次
+    ReloadAllPlayersPrefs();
 }
 
 // ========================================================
@@ -227,9 +244,9 @@ void LoadHitSoundSets()
 
             if (!isbuiltin)
             {
-                if (sh[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); AddFileToDownloadsTable(p); }
-                if (hi[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); AddFileToDownloadsTable(p); }
-                if (ki[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); AddFileToDownloadsTable(p); }
+                if (sh[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); AddFileToDownloadsTable(p); }
+                if (hi[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); AddFileToDownloadsTable(p); }
+                if (ki[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); AddFileToDownloadsTable(p); }
             }
         } while (KvGotoNextKey(kv));
     }
@@ -265,7 +282,7 @@ void LoadHitIconSets()
             KvGetString(kv, "name", name, sizeof(name), "未命名图标套装");
             // 支持 headshot/head
             KvGetString(kv, "head", head, sizeof(head), "");
-            if (head[0] == '\0') KvGetString(kv, "headshot", head, sizeof(head), "");
+            if (head[0] == ' ') KvGetString(kv, "headshot", head, sizeof(head), "");
             KvGetString(kv, "hit",  hit,  sizeof(hit),  "");
             KvGetString(kv, "kill", kill, sizeof(kill), "");
 
@@ -279,15 +296,15 @@ void LoadHitIconSets()
 
             if (!isbuiltin)
             {
-                if (head[0] != '\0') {
+                if (head[0] != ' ') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", head); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", head); AddFileToDownloadsTable(p2);
                 }
-                if (hit[0] != '\0') {
+                if (hit[0] != ' ') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hit); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hit); AddFileToDownloadsTable(p2);
                 }
-                if (kill[0] != '\0') {
+                if (kill[0] != ' ') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", kill); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", kill); AddFileToDownloadsTable(p2);
                 }
@@ -314,19 +331,19 @@ public void OnClientPutInServer(int client)
     else
         g_OverlaySet[client] = 0;
 
+    // 初始化标志
+    g_PrefsLoaded[client] = false;
+    g_PrefsDirty [client] = false;
+
     if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE)
     {
-        char sid[64];
-        GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
-
-        char q[256];
-        Format(q, sizeof(q),
-            "SELECT hitsound_cfg, hitsound_overlay FROM RPG WHERE steamid='%s' LIMIT 1;", sid);
-        SQL_TQuery(g_hDB, SQL_OnLoadPrefs, q, GetClientUserId(client));
+        DB_RequestLoadPlayer(client);
     }
     else
     {
         KV_LoadPlayer(client);
+        g_PrefsLoaded[client] = true; // 使用 KV 路径也算已加载
+        g_PrefsDirty [client] = false;
     }
 }
 
@@ -335,14 +352,67 @@ public void OnClientDisconnect(int client)
     if (IsFakeClient(client)) return;
 
     if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE)
-        DB_SavePlayerPrefs(client);
+    {
+        if (g_PrefsLoaded[client] && g_PrefsDirty[client])
+        {
+            DB_SavePlayerPrefs(client);
+        }
+    }
     else
-        KV_SavePlayer(client);
+    {
+        if (g_PrefsDirty[client])
+        {
+            KV_SavePlayer(client);
+        }
+    }
 
     if (g_taskClean[client] != INVALID_HANDLE)
     {
         KillTimer(g_taskClean[client]);
         g_taskClean[client] = INVALID_HANDLE;
+    }
+
+    g_PrefsLoaded[client] = false;
+    g_PrefsDirty [client] = false;
+}
+
+// 主动为一个玩家发起 DB 读取
+public void DB_RequestLoadPlayer(int client)
+{
+    char sid[64];
+    GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
+
+    char table[64];
+    GetConVarString(cv_db_table, table, sizeof(table));
+
+    char q[384];
+    Format(q, sizeof(q),
+        "SELECT hitsound_cfg, hitsound_overlay FROM `%s` WHERE steamid='%s' LIMIT 1;",
+        table, sid);
+    SQL_TQuery(g_hDB, SQL_OnLoadPrefs, q, GetClientUserId(client));
+}
+
+// 为所有在线玩家重新加载偏好（插件重载 / 执行模式 cfg 后调用）
+public void ReloadAllPlayersPrefs()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i) || IsFakeClient(i))
+            continue;
+
+        g_PrefsLoaded[i] = false;
+        g_PrefsDirty [i] = false;
+
+        if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE)
+        {
+            DB_RequestLoadPlayer(i);
+        }
+        else
+        {
+            KV_LoadPlayer(i);
+            g_PrefsLoaded[i] = true;
+            g_PrefsDirty [i] = false;
+        }
     }
 }
 
@@ -355,6 +425,8 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any u
     {
         LogError("[hitsound] 加载玩家配置失败: %s", error);
         KV_LoadPlayer(client);
+        g_PrefsLoaded[client] = true;   // 视为完成加载
+        g_PrefsDirty [client] = false;
         return;
     }
 
@@ -364,14 +436,19 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any u
         int ov  = SQL_FetchInt(hndl, 1);
         g_SoundSelect[client] = (cfg >= 0 && cfg < g_SetCount) ? cfg : 0;
 
-        // 覆盖图套装编号（0=禁用；>=1）
+        // 覆盖图套装编号（0=禁用；>=1），仅运行期夹紧，不立刻回写
         if (ov < 0) ov = 0;
         if (ov > g_OvCount) ov = 0; // 越界则禁用
         g_OverlaySet[client] = ov;
+
+        g_PrefsLoaded[client] = true;
+        g_PrefsDirty [client] = false;
     }
     else
     {
-        DB_SavePlayerPrefs(client); // 首次：写入默认
+        // 无行：不立即 insert，等玩家实际改动时再写库
+        g_PrefsLoaded[client] = true;
+        g_PrefsDirty [client] = false;
     }
 }
 
@@ -385,10 +462,13 @@ void DB_SavePlayerPrefs(int client)
     int cfg = g_SoundSelect[client];
     int ov  = g_OverlaySet[client];
 
-    char q[384];
+    char table[64];
+    GetConVarString(cv_db_table, table, sizeof(table));
+
+    char q[512];
     Format(q, sizeof(q),
-        "INSERT INTO RPG (steamid, hitsound_cfg, hitsound_overlay) VALUES ('%s', %d, %d) ON DUPLICATE KEY UPDATE hitsound_cfg=VALUES(hitsound_cfg), hitsound_overlay=VALUES(hitsound_overlay);",
-        sid, cfg, ov);
+        "INSERT INTO `%s` (steamid, hitsound_cfg, hitsound_overlay) VALUES ('%s', %d, %d) ON DUPLICATE KEY UPDATE hitsound_cfg=VALUES(hitsound_cfg), hitsound_overlay=VALUES(hitsound_overlay);",
+        table, sid, cfg, ov);
 
     SQL_TQuery(g_hDB, SQL_OnSavePrefs, q);
 }
@@ -436,29 +516,29 @@ void KV_LoadPlayer(int client)
 bool GetSoundPath(int setId, int which, char[] out, int maxlen)
 {
     // which: 0=headshot, 1=hit, 2=kill
-    if (setId <= 0 || setId >= g_SetCount) { out[0] = '\0'; return false; }
+    if (setId <= 0 || setId >= g_SetCount) { out[0] = ' '; return false; }
 
     if (which == 0)      GetArrayString(g_SetHeadshot, setId, out, maxlen);
     else if (which == 1) GetArrayString(g_SetHit, setId, out, maxlen);
     else                 GetArrayString(g_SetKill, setId, out, maxlen);
 
-    return (out[0] != '\0');
+    return (out[0] != ' ');
 }
 
 // 玩家专属覆盖图：which 0=head 1=hit 2=kill
 static bool GetOverlayBase_Player(int client, int which, char[] out, int maxlen)
 {
     int set = g_OverlaySet[client]; // 0=禁用
-    if (set <= 0) { out[0] = '\0'; return false; }
+    if (set <= 0) { out[0] = ' '; return false; }
 
     int idx = set - 1;
-    if (idx < 0 || idx >= g_OvCount) { out[0] = '\0'; return false; }
+    if (idx < 0 || idx >= g_OvCount) { out[0] = ' '; return false; }
 
     if (which == 0)      GetArrayString(g_OvHead, idx, out, maxlen);
     else if (which == 1) GetArrayString(g_OvHit,  idx, out, maxlen);
     else                 GetArrayString(g_OvKill, idx, out, maxlen);
 
-    return (out[0] != '\0');
+    return (out[0] != ' ');
 }
 
 // ========================================================
@@ -476,9 +556,23 @@ public Action Cmd_ToggleUI(int client, int args)
 
     PrintToChat(client, "覆盖图标: %s", (g_OverlaySet[client] > 0) ? "开启" : "关闭");
 
-    if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
-    else KV_SavePlayer(client);
+    // 标记改动并保存（仅在已加载后写库，未加载时不写库以避免默认覆盖）
+    g_PrefsDirty[client] = true;
+    if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE && g_PrefsLoaded[client]) {
+        DB_SavePlayerPrefs(client);
+        g_PrefsDirty[client] = false;
+    } else {
+        KV_SavePlayer(client);
+    }
 
+    return Plugin_Handled;
+}
+
+public Action Cmd_ReloadAll(int client, int args)
+{
+    ReloadAllPlayersPrefs();
+    if (client > 0)
+        ReplyToCommand(client, "[hitsound] 已尝试重新读取所有在线玩家的设置。");
     return Plugin_Handled;
 }
 
@@ -495,8 +589,7 @@ public Action Cmd_MenuMain(int client, int args)
     if (g_OverlaySet[client] >= 1 && g_OverlaySet[client] <= g_OvCount)
         GetArrayString(g_OvNames, g_OverlaySet[client]-1, curOv, sizeof(curOv));
 
-    Format(title, sizeof(title), "命中反馈设置\n音效: %d - %s | 图标: %d - %s",
-           g_SoundSelect[client], curSnd, g_OverlaySet[client], curOv);
+    Format(title, sizeof(title), "命中反馈设置\n音效: %d - %s | 图标: %d - %s",g_SoundSelect[client], curSnd, g_OverlaySet[client], curOv);
     SetMenuTitle(menu, title);
 
     AddMenuItem(menu, "sound_sets", "音效套装（玩家）");
@@ -537,8 +630,13 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
 
             PrintToChat(client, "覆盖图标: %s", (g_OverlaySet[client] > 0) ? "开启" : "关闭");
 
-            if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
-            else KV_SavePlayer(client);
+            g_PrefsDirty[client] = true;
+            if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE && g_PrefsLoaded[client]) {
+                DB_SavePlayerPrefs(client);
+                g_PrefsDirty[client] = false;
+            } else {
+                KV_SavePlayer(client);
+            }
 
             Cmd_MenuMain(client, 0);
             return 0;
@@ -587,8 +685,13 @@ public int MenuHandler_SndSets(Handle menu, MenuAction action, int client, int i
         g_SoundSelect[client] = choice;
         PrintToChat(client, "已选择音效套装: %d", g_SoundSelect[client]);
 
-        if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
-        else KV_SavePlayer(client);
+        g_PrefsDirty[client] = true;
+        if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE && g_PrefsLoaded[client]) {
+            DB_SavePlayerPrefs(client);
+            g_PrefsDirty[client] = false;
+        } else {
+            KV_SavePlayer(client);
+        }
 
         OpenSoundSetMenu(client);
     }
@@ -641,10 +744,15 @@ public int MenuHandler_OvSets_Player(Handle menu, MenuAction action, int client,
 
             char name[64] = "禁用";
             if (val >= 1 && val <= g_OvCount) GetArrayString(g_OvNames, val-1, name, sizeof(name));
-            PrintToChat(client, "\x04[Hitsound] 你的图标套装已设置为: %d - %s", val, name);
+            PrintToChat(client, "[Hitsound] 你的图标套装已设置为: %d - %s", val, name);
 
-            if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) DB_SavePlayerPrefs(client);
-            else KV_SavePlayer(client);
+            g_PrefsDirty[client] = true;
+            if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE && g_PrefsLoaded[client]) {
+                DB_SavePlayerPrefs(client);
+                g_PrefsDirty[client] = false;
+            } else {
+                KV_SavePlayer(client);
+            }
 
             OpenIconSetMenu_Player(client);
         }
@@ -909,7 +1017,7 @@ public Action Timer_CleanOverlay(Handle timer, int client)
 
     int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
     SetCommandFlags("r_screenoverlay", iFlags);
-    ClientCommand(client, "r_screenoverlay \"\"");
+    ClientCommand(client, "r_screenoverlay \"\" ");
 
     return Plugin_Stop;
 }
