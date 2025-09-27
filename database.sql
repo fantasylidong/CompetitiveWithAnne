@@ -4,29 +4,6 @@ SET NAMES utf8;
 SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 
-CREATE DATABASE `chat` /*!40100 DEFAULT CHARACTER SET utf8 */;
-USE `chat`;
-
-SET NAMES utf8mb4;
-
-DROP TABLE IF EXISTS `chat_log`;
-CREATE TABLE `chat_log` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `date` datetime DEFAULT NULL,
-  `map` varchar(128) NOT NULL,
-  `steamid` varchar(21) NOT NULL,
-  `name` varchar(128) NOT NULL,
-  `message_style` tinyint(2) DEFAULT '0',
-  `message` varchar(126) NOT NULL,
-  `server` varchar(126) DEFAULT NULL,
-  `port` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-CREATE DATABASE `l4d2stats` /*!40100 DEFAULT CHARACTER SET utf8 COLLATE utf8_bin */;
-USE `l4d2stats`;
-
 DROP TABLE IF EXISTS `ip2country`;
 CREATE TABLE `ip2country` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
@@ -63,6 +40,8 @@ CREATE TABLE `ip2country_locations` (
   KEY `country_code` (`country_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+
+SET NAMES utf8mb4;
 
 DROP TABLE IF EXISTS `lilac_detections`;
 CREATE TABLE `lilac_detections` (
@@ -292,15 +271,35 @@ CREATE TABLE `players` (
 DROP TABLE IF EXISTS `RPG`;
 CREATE TABLE `RPG` (
   `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-  `MELEE_DATA` int(10) NOT NULL,
-  `BLOOD_DATA` int(10) NOT NULL,
+  `MELEE_DATA` int(10) NOT NULL DEFAULT '0',
+  `BLOOD_DATA` int(10) NOT NULL DEFAULT '0',
   `HAT` int(10) NOT NULL DEFAULT '0',
   `GLOW` int(10) NOT NULL DEFAULT '0',
   `SKIN` int(10) NOT NULL DEFAULT '0',
   `RECOIL` int(10) NOT NULL DEFAULT '0',
   `CHATTAG` varchar(128) CHARACTER SET utf8mb4 DEFAULT NULL,
+  `hitsound_cfg` tinyint(4) NOT NULL DEFAULT '0',
+  `hitsound_overlay` tinyint(4) NOT NULL DEFAULT '0',
   PRIMARY KEY (`steamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+DROP TABLE IF EXISTS `rpgdamage`;
+CREATE TABLE `rpgdamage` (
+  `steamid` varchar(255) NOT NULL,
+  `enable` tinyint(4) NOT NULL DEFAULT '0',
+  `see_others` tinyint(4) NOT NULL DEFAULT '1',
+  `share_scope` tinyint(4) NOT NULL DEFAULT '0',
+  `size` float NOT NULL DEFAULT '5',
+  `gap` float NOT NULL DEFAULT '5',
+  `alpha` int(11) NOT NULL DEFAULT '70',
+  `xoff` float NOT NULL DEFAULT '20',
+  `yoff` float NOT NULL DEFAULT '10',
+  `showdist` float NOT NULL DEFAULT '1500',
+  `summode` tinyint(4) NOT NULL DEFAULT '1',
+  `sg_merge` tinyint(4) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`steamid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 DROP TABLE IF EXISTS `server_settings`;
@@ -340,9 +339,6 @@ CREATE TABLE `timedmaps` (
   PRIMARY KEY (`map`,`gamemode`,`difficulty`,`steamid`,`time`,`mutation`,`mode`,`sinum`,`sitime`,`usebuy`,`anneversion`,`auto`,`players`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-
-CREATE DATABASE `sourcebans` /*!40100 DEFAULT CHARACTER SET utf8 COLLATE utf8_bin */;
-USE `sourcebans`;
 
 DROP TABLE IF EXISTS `sb_admins`;
 CREATE TABLE `sb_admins` (
@@ -610,4 +606,4 @@ CREATE TABLE `sb_submissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
--- 2024-11-06 03:42:44
+-- 2025-09-27 04:08:16
