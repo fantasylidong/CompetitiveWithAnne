@@ -1,4 +1,4 @@
-#pragma semicolon 1
+#pragma semicolon 1 
 #pragma newdecls required
 
 #include <sourcemod>
@@ -10,7 +10,7 @@
 // =========================
 // Plugin constants / config
 // =========================
-#define PLUGIN_VERSION  "2.2-mysql-cookie(db-first)+asyncconnect+queue-save+steam2"
+#define PLUGIN_VERSION  "2.2-mysql-cookie(db-first)+asyncconnect+queue-save+steam2+fixes"
 #define SPRITE_MATERIAL "materials/sprites/laserbeam.vmt"
 #define DMG_HEADSHOT    (1 << 30)
 #define L4D2_MAXPLAYERS 32
@@ -23,7 +23,6 @@
 #define COOKIE_NAME  "l4d2_dmgshow_v2"
 
 // rpgdamage 表结构（使用 Steam2 作为主键，保持与你现表一致）
-// 建表参考：
 // CREATE TABLE IF NOT EXISTS `rpgdamage` (
 //   `steamid`     VARCHAR(64) NOT NULL PRIMARY KEY,
 //   `enable`      TINYINT     NOT NULL DEFAULT 0,
@@ -129,7 +128,7 @@ float g_DbRetryAfter = 0.0;
 
 Cookie g_ck = null;
 
-// === 防止“加载前保存覆盖”的标记（改用更精细的状态机） ===
+// === 防止“加载前保存覆盖”的标记 ===
 enum LoadState
 {
     LS_None = 0,     // 未开始
@@ -339,8 +338,6 @@ static bool DB_EnsureReady()
     return (g_DbReady && g_DB != INVALID_HANDLE);
 }
 
-// SQL_TConnect 的正确回调签名（3参）
-// ✅ 老式回调原型：owner + hndl
 public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any data)
 {
     LogInfo("[DB] SQLCB_OnConnect fired. hndl=%p error='%s'",
@@ -360,13 +357,14 @@ public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any d
     g_DB = hndl;
     g_DbReady = true;
 
-    // 会话层兜底：SET NAMES utf8mb4（用异步查询）
+    // 统一会话字符集（双保险）
+    SQL_SetCharset(g_DB, "utf8mb4");
     SQL_TQuery(g_DB, SQLCB_OnSetNames, "SET NAMES utf8mb4", 0);
+
     DB_DebugDumpSession();
 
     LogInfo("[DB] connected (async), handle=%p", g_DB);
 }
-
 
 public void SQLCB_OnSetNames(Handle owner, Handle hndl, const char[] error, any data)
 {
@@ -399,26 +397,6 @@ public void SQLCB_Nop(Handle owner, Handle hndl, const char[] error, any data)
 }
 
 // ========== DB 加载 / 保存（DB 优先 + 队列保存） ==========
-static void CopySettings(PlayerSetData dst, const PlayerSetData src)
-{
-    dst.wpn_id        = src.wpn_id;
-    dst.wpn_type      = src.wpn_type;
-    dst.show_other    = src.show_other;
-    dst.last_set_time = src.last_set_time;
-
-    dst.enable        = src.enable;
-    dst.see_others    = src.see_others;
-    dst.share_scope   = src.share_scope;
-    dst.size          = src.size;
-    dst.gap           = src.gap;
-    dst.alpha         = src.alpha;
-    dst.xoff          = src.xoff;
-    dst.yoff          = src.yoff;
-    dst.showdist      = src.showdist;
-    dst.summode       = src.summode;
-    dst.sgmerge       = src.sgmerge;
-}
-
 static void DB_Load(int client)
 {
     if (IsFakeClient(client)) { g_LoadState[client] = LS_Ready; return; }
@@ -601,7 +579,7 @@ static int DB_Save(int client)
     // 1) 若还没 Ready：排队保存（拍快照），并写本地 Cookie 兜底
     if (g_LoadState[client] != LS_Ready)
     {
-        CopySettings(g_SaveSnapshot[client], g_Plr[client]);
+        g_SaveSnapshot[client] = g_Plr[client]; // 关键：真拷贝到快照
         g_PendingSave[client] = true;
 
         Cookie_Save(client, true); // 强制写 Cookie 防丢
@@ -678,7 +656,7 @@ public void SQLCB_Save(Handle owner, Handle hndl, const char[] error, any data)
 // ============ 插件信息 ============
 public Plugin myinfo =
 {
-    name        = "[L4D2] Damage HUD (MySQL+Cookie, DB-first)",
+    name        = "[L4D2] Damage HUD (MySQL+Cookie, DB-first, fixes)",
     author      = "Loqi + you (mod by ChatGPT)",
     description = "Per-client damage digits with DB-first persistence + cookies + menus + admin sharing gate",
     version     = PLUGIN_VERSION,
@@ -732,13 +710,25 @@ public void OnClientPutInServer(int client)
     g_PendingSave[client] = false;
 
     SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+
+    // 看门狗：2 秒后若仍未加载且 DB Ready，则补发一次 DB_Load
+    CreateTimer(2.0, Timer_DBEnsureLoad, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
+// 在玩家通过 Steam 认证/权限检查后，立即触发 DB 加载（不依赖 Cookie 回调）
+public void OnClientPostAdminCheck(int client)
+{
+    if (IsFakeClient(client)) return;
+
+    Settings_Default(client); // 占位，避免 UI 空白
+    DB_Load(client);          // DB 优先加载
+}
+
+// 仅缓存 Cookie（不在这里触发 DB_Load，避免某些时序下缺失）
 public void OnClientCookiesCached(int client)
 {
     if (IsFakeClient(client)) return;
 
-    // 取 Cookie 原始串，仅缓存，不应用（避免覆盖 DB）
     if (g_ck != null)
     {
         g_CookieRaw[client][0] = '\0';
@@ -750,12 +740,20 @@ public void OnClientCookiesCached(int client)
         g_HaveCookie[client] = false;
         g_CookieRaw[client][0] = '\0';
     }
+}
 
-    // 先给默认值占位，避免 UI 空值
-    Settings_Default(client);
+public Action Timer_DBEnsureLoad(Handle timer, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (!IsValidClient(client)) return Plugin_Stop;
 
-    // 启动 DB 加载（DB 优先）
-    DB_Load(client);
+    if (g_LoadState[client] == LS_None && DB_EnsureReady())
+    {
+        Settings_Default(client);
+        DB_Load(client);
+        LogInfo("[LoadWatchdog] reissue DB_Load for client %d", client);
+    }
+    return Plugin_Stop;
 }
 
 public void OnMapStart()
@@ -793,7 +791,17 @@ public void OnMapStart()
 public void OnClientDisconnect(int client)
 {
     if (IsClientConnected(client) && !IsFakeClient(client))
-        DB_Save(client); // 已准备好则写库；否则队列+写 Cookie
+    {
+        if (g_LoadState[client] == LS_Ready)
+        {
+            DB_Save(client); // Ready 才写库
+        }
+        else
+        {
+            Cookie_Save(client, true); // 未 Ready：仅 Cookie 兜底
+            LogInfo("[Save@Disconnect] Not ready (state=%d), skip DB save; cookie only.", g_LoadState[client]);
+        }
+    }
 }
 
 // ============ 调试命令 ============
@@ -1540,7 +1548,7 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
             x_start + scale * g_Plr[attacker].xoff, g_Plr[attacker].yoff + size, z_distance,
             x_end   + scale * g_Plr[attacker].xoff, g_Plr[attacker].yoff - size, z_distance
         );
-        DrawNumber(fval.startPt, fval.endPt, digit, recv, total, life, rgbaFull, 1, 0.8, size);
+        DrawNumber(fval.startPt, fval.endPt, digit, recv, total, life,  rgbaFull, 1, 0.8, size);
         v %= divisor;
         divisor /= 10;
         x_start = x_start - size - g_Plr[attacker].gap;
