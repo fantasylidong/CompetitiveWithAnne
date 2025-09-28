@@ -439,6 +439,8 @@ public void OnMapStart()
     // 只负责把需要的文件丢进下载表；这两函数内部会做 AddFileToDownloadsTable
     LoadHitSoundSets();
     LoadHitIconSets();
+    // 👇 加这一行：所有资源一次性 precache
+    PrecacheAllAssets();
 }
 public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any userid)
 {
@@ -999,49 +1001,78 @@ public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast
 // ========================================================
 void ShowOverlay(int client, OverlayType type)
 {
-    if (GetConVarInt(cv_pic_enable) == 0) return;   // 全局禁用
-    if (g_OverlaySet[client] <= 0) return;          // 玩家未启用
+    if (GetConVarInt(cv_pic_enable) == 0) return;
+    if (g_OverlaySet[client] <= 0) return;
 
-    // 取该玩家套装的三张贴图基名
-    char head[PLATFORM_MAX_PATH];
-    char hit [PLATFORM_MAX_PATH];
-    char kill[PLATFORM_MAX_PATH];
-    if (!GetOverlayBase_Player(client, 0, head, sizeof(head))) return;
-    if (!GetOverlayBase_Player(client, 1, hit,  sizeof(hit ))) return;
-    if (!GetOverlayBase_Player(client, 2, kill, sizeof(kill))) return;
+    // 只取这次要用的那一张
+    int which = (type == KILL_HEADSHOT) ? 0 : (type == HIT_ARMOR ? 1 : 2);
 
-    // 预缓存（注意：这里不加 "materials/" 前缀，和 r_screenoverlay 的资源习惯保持一致）
-    char path[PLATFORM_MAX_PATH];
-    Format(path, sizeof(path), "%s.vtf", head); PrecacheDecal(path, true);
-    Format(path, sizeof(path), "%s.vtf", hit ); PrecacheDecal(path, true);
-    Format(path, sizeof(path), "%s.vtf", kill); PrecacheDecal(path, true);
-    Format(path, sizeof(path), "%s.vmt", head); PrecacheDecal(path, true);
-    Format(path, sizeof(path), "%s.vmt", hit ); PrecacheDecal(path, true);
-    Format(path, sizeof(path), "%s.vmt", kill); PrecacheDecal(path, true);
+    char base[PLATFORM_MAX_PATH];
+    if (!GetOverlayBase_Player(client, which, base, sizeof(base))) {
+        DBG("Overlay missing: set=%d which=%d", g_OverlaySet[client], which);
+        return;
+    }
 
-    // 解除 cheat 标志并应用
+    // 预缓存仅此一张
+    char vmt[PLATFORM_MAX_PATH], vtf[PLATFORM_MAX_PATH];
+    Format(vmt, sizeof(vmt), "%s.vmt", base);
+    Format(vtf, sizeof(vtf), "%s.vtf", base);
+    PrecacheDecal(vmt, true);
+    PrecacheDecal(vtf, true);
+
     int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
     SetCommandFlags("r_screenoverlay", iFlags);
+    ClientCommand(client, "r_screenoverlay \"%s\"", base);
 
-    char useBase[PLATFORM_MAX_PATH];
-    if (type == KILL_HEADSHOT)
-        strcopy(useBase, sizeof(useBase), head);
-    else if (type == KILL_NORMAL)
-        strcopy(useBase, sizeof(useBase), kill);
-    else
-        strcopy(useBase, sizeof(useBase), hit);
-    DBG("Overlay show: client=%N set=%d type=%d base='%s'", client, g_OverlaySet[client], view_as<int>(type), useBase);
-
-    ClientCommand(client, "r_screenoverlay \"%s\"", useBase);
-
-    // 只在显示时创建清理定时器
-    if (g_taskClean[client] != INVALID_HANDLE)
-    {
+    if (g_taskClean[client] != INVALID_HANDLE) {
         KillTimer(g_taskClean[client]);
         g_taskClean[client] = INVALID_HANDLE;
     }
     float t = GetConVarFloat(cv_showtime);
     g_taskClean[client] = CreateTimer(t, Timer_CleanOverlay, client);
+}
+
+// 在 .sp 顶部现有变量的基础上新增
+static void PrecacheAllAssets()
+{
+    // ---- Sounds ----
+    char s[PLATFORM_MAX_PATH];
+    for (int i = 0; i < g_SetCount; i++)
+    {
+        GetArrayString(g_SetHeadshot, i, s, sizeof(s));
+        if (s[0]) PrecacheSound(s, true);
+
+        GetArrayString(g_SetHit, i, s, sizeof(s));
+        if (s[0]) PrecacheSound(s, true);
+
+        GetArrayString(g_SetKill, i, s, sizeof(s));
+        if (s[0]) PrecacheSound(s, true);
+    }
+
+    // ---- Overlays (materials) ----
+    char b[PLATFORM_MAX_PATH], vmt[PLATFORM_MAX_PATH], vtf[PLATFORM_MAX_PATH];
+    for (int j = 0; j < g_OvCount; j++)
+    {
+        GetArrayString(g_OvHead, j, b, sizeof(b));
+        if (b[0]) {
+            Format(vmt, sizeof(vmt), "%s.vmt", b); PrecacheDecal(vmt, true);
+            Format(vtf, sizeof(vtf), "%s.vtf", b); PrecacheDecal(vtf, true);
+        }
+
+        GetArrayString(g_OvHit, j, b, sizeof(b));
+        if (b[0]) {
+            Format(vmt, sizeof(vmt), "%s.vmt", b); PrecacheDecal(vmt, true);
+            Format(vtf, sizeof(vtf), "%s.vtf", b); PrecacheDecal(vtf, true);
+        }
+
+        GetArrayString(g_OvKill, j, b, sizeof(b));
+        if (b[0]) {
+            Format(vmt, sizeof(vmt), "%s.vmt", b); PrecacheDecal(vmt, true);
+            Format(vtf, sizeof(vtf), "%s.vtf", b); PrecacheDecal(vtf, true);
+        }
+    }
+
+    DBG("PrecacheAllAssets done: soundSets=%d, iconSets=%d", g_SetCount, g_OvCount);
 }
 
 public Action Timer_CleanOverlay(Handle timer, int client)
