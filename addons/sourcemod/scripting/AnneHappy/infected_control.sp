@@ -72,6 +72,7 @@
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
+#define PATH_NO_BUILD_PENALTY     9999.0
 
 // === Dispersion tuning (penalties at BASE=4) ===
 #define SECTOR_PREF_BONUS_BASE   -8.0
@@ -2439,7 +2440,7 @@ static void RebuildNavBuckets()
 // =========================
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
-    const int TOPK = 15;
+    const int TOPK = 10;
     int acceptedHits = 0;
 
     if (!GetSurPosData())
@@ -2544,6 +2545,9 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
                 if (!PassMinSeparation(p))            { cSep++;      continue; }
 
+                // ===== 新增：路径惩罚（不能 BuildPath 则给大分） =====
+                float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
+
                 // —— 原有扇区分散度 —— //
                 int sidx = ComputeSectorIndex(center, p, sectors);
                 float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
@@ -2584,7 +2588,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     else if (p[2] > allMaxZ + 250.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
                         extra += PEN_TOO_HIGH2;
                 }
-               if (firstFit)
+                extra += pathPenalty;
+               if (firstFit && pathPenalty >= PATH_NO_BUILD_PENALTY)
                 {
                     outPos = p;
                     outAreaIdx = ai;
@@ -2633,6 +2638,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (WillStuck(p))                     { cStuck++;    continue; }
             if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
             if (!PassMinSeparation(p))            { cSep++;      continue; }
+            // ===== 新增：路径惩罚（不能 BuildPath 则给大分） =====
+            float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
 
             int sidx = ComputeSectorIndex(center, p, sectors);
             float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
@@ -2673,8 +2680,9 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 else if (p[2] > allMaxZ + 300.0 && zc != view_as<int>(SI_Spitter) && zc != view_as<int>(SI_Boomer) && zc != view_as<int>(SI_Hunter))
                     extra += PEN_TOO_HIGH2;
             }
+            extra += pathPenalty;
 
-            if (gCV.bNavBucketFirstFit)
+            if (gCV.bNavBucketFirstFit && pathPenalty >= PATH_NO_BUILD_PENALTY)
             {
                 outPos = p;
                 outAreaIdx = ai;
@@ -2707,6 +2715,45 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     outPos = bestPos;
     outAreaIdx = bestIdx;
     return true;
+}
+
+stock float PathPenalty_NoBuild(const float candPos[3], int targetSur, float ring, float spawnmax)
+{
+    // 先选一个有效幸存者：优先 targetSur；否则遍历 1..MaxClients
+    int surv = -1;
+    if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
+    {
+        surv = targetSur;
+    }
+    else
+    {
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsValidSurvivor(i) && IsPlayerAlive(i) && !L4D_IsPlayerIncapacitated(i))
+            {
+                surv = i;
+                break;
+            }
+        }
+    }
+    if (surv == -1) return PATH_NO_BUILD_PENALTY; // 没有可用幸存者，按“不可达”处理
+
+    // 生还者位置（与你 SpawnInfected 的写法保持一致）
+    float survPos[3];
+    GetClientEyePosition(surv, survPos);
+    survPos[2] -= 60.0;
+
+    // 最近 nav（完全复用你 SpawnInfected 的用法/参数）
+    Address navGoal  = L4D_GetNearestNavArea(candPos, 120.0, false, false, false, TEAM_INFECTED);
+    Address navStart = L4D_GetNearestNavArea(survPos, 120.0, false, false, false, TEAM_INFECTED);
+    if (!navGoal || !navStart) return PATH_NO_BUILD_PENALTY;
+
+    // 代价上限：min(ring*2, spawnmax*1.5)
+    float limitCost = FloatMin(ring * 3.0, spawnmax * 1.5);
+
+    // 能 BuildPath 且代价不超 => 0；否则给大惩罚
+    bool ok = L4D2_NavAreaBuildPath(navGoal, navStart, limitCost, TEAM_INFECTED, false);
+    return ok ? 0.0 : PATH_NO_BUILD_PENALTY;
 }
 
 
