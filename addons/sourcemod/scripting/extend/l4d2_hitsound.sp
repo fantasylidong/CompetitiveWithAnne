@@ -244,9 +244,9 @@ void LoadHitSoundSets()
 
             if (!isbuiltin)
             {
-                if (sh[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); AddFileToDownloadsTable(p); }
-                if (hi[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); AddFileToDownloadsTable(p); }
-                if (ki[0] != ' ') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); AddFileToDownloadsTable(p); }
+                if (sh[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); AddFileToDownloadsTable(p); }
+                if (hi[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); AddFileToDownloadsTable(p); }
+                if (ki[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); AddFileToDownloadsTable(p); }
             }
         } while (KvGotoNextKey(kv));
     }
@@ -282,7 +282,7 @@ void LoadHitIconSets()
             KvGetString(kv, "name", name, sizeof(name), "未命名图标套装");
             // 支持 headshot/head
             KvGetString(kv, "head", head, sizeof(head), "");
-            if (head[0] == ' ') KvGetString(kv, "headshot", head, sizeof(head), "");
+            if (head[0] == '\0') KvGetString(kv, "headshot", head, sizeof(head), "");
             KvGetString(kv, "hit",  hit,  sizeof(hit),  "");
             KvGetString(kv, "kill", kill, sizeof(kill), "");
 
@@ -296,15 +296,15 @@ void LoadHitIconSets()
 
             if (!isbuiltin)
             {
-                if (head[0] != ' ') {
+                if (head[0] != '\0') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", head); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", head); AddFileToDownloadsTable(p2);
                 }
-                if (hit[0] != ' ') {
+                if (hit[0] != '\0') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hit); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hit); AddFileToDownloadsTable(p2);
                 }
-                if (kill[0] != ' ') {
+                if (kill[0] != '\0') {
                     char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", kill); AddFileToDownloadsTable(p1);
                     char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", kill); AddFileToDownloadsTable(p2);
                 }
@@ -415,7 +415,12 @@ public void ReloadAllPlayersPrefs()
         }
     }
 }
-
+public void OnMapStart()
+{
+    // 只负责把需要的文件丢进下载表；这两函数内部会做 AddFileToDownloadsTable
+    LoadHitSoundSets();
+    LoadHitIconSets();
+}
 public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any userid)
 {
     int client = GetClientOfUserId(userid);
@@ -516,29 +521,29 @@ void KV_LoadPlayer(int client)
 bool GetSoundPath(int setId, int which, char[] out, int maxlen)
 {
     // which: 0=headshot, 1=hit, 2=kill
-    if (setId <= 0 || setId >= g_SetCount) { out[0] = ' '; return false; }
+    if (setId <= 0 || setId >= g_SetCount) { out[0] = '\0'; return false; }
 
     if (which == 0)      GetArrayString(g_SetHeadshot, setId, out, maxlen);
     else if (which == 1) GetArrayString(g_SetHit, setId, out, maxlen);
     else                 GetArrayString(g_SetKill, setId, out, maxlen);
 
-    return (out[0] != ' ');
+    return (out[0] != '\0');
 }
 
 // 玩家专属覆盖图：which 0=head 1=hit 2=kill
 static bool GetOverlayBase_Player(int client, int which, char[] out, int maxlen)
 {
     int set = g_OverlaySet[client]; // 0=禁用
-    if (set <= 0) { out[0] = ' '; return false; }
+    if (set <= 0) { out[0] = '\0'; return false; }
 
     int idx = set - 1;
-    if (idx < 0 || idx >= g_OvCount) { out[0] = ' '; return false; }
+    if (idx < 0 || idx >= g_OvCount) { out[0] = '\0'; return false; }
 
     if (which == 0)      GetArrayString(g_OvHead, idx, out, maxlen);
     else if (which == 1) GetArrayString(g_OvHit,  idx, out, maxlen);
     else                 GetArrayString(g_OvKill, idx, out, maxlen);
 
-    return (out[0] != ' ');
+    return (out[0] != '\0');
 }
 
 // ========================================================
