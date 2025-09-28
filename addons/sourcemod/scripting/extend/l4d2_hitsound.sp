@@ -42,6 +42,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 // --------------------- ConVars ---------------------
 ConVar cv_enable;
+ConVar cv_debug; // 调试总开关
 ConVar cv_sound_enable;
 ConVar cv_pic_enable;     // 全局启/停覆盖图功能（大总开关）
 ConVar cv_blast;
@@ -125,6 +126,7 @@ public void OnPluginStart()
     cv_db_enable              = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储(1启用,0禁用)", CVAR_FLAGS);
     cv_db_conf                = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
     cv_db_table               = CreateConVar("sm_hitsound_db_table", "RPG", "存储表名", CVAR_FLAGS);
+    cv_debug                  = CreateConVar("sm_hitsound_debug", "1", "调试输出(0关,1开)", CVAR_FLAGS);
 
     // Fallback KV
     g_SoundStore = CreateKeyValues("SoundSelect");
@@ -235,6 +237,8 @@ void LoadHitSoundSets()
             KvGetString(kv, "hit",      hi, sizeof(hi), "");
             KvGetString(kv, "kill",     ki, sizeof(ki), "");
             isbuiltin = KvGetNum(kv, "builtin", 0);
+            DBG("SoundSet #%d '%s' builtin=%d hs='%s' hit='%s' kill='%s'",
+                g_SetCount, name, isbuiltin, sh, hi, ki);
 
             PushArrayString(g_SetNames, name);
             PushArrayString(g_SetHeadshot, sh);
@@ -244,9 +248,15 @@ void LoadHitSoundSets()
 
             if (!isbuiltin)
             {
-                if (sh[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); AddFileToDownloadsTable(p); }
-                if (hi[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); AddFileToDownloadsTable(p); }
-                if (ki[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); AddFileToDownloadsTable(p); }
+                if (sh[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
+                if (hi[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
+                if (ki[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
+            }
+            else
+            {
+                if (sh[0] != '\0') DBG("FDL skip(builtin): sound/%s", sh);
+                if (hi[0] != '\0') DBG("FDL skip(builtin): sound/%s", hi);
+                if (ki[0] != '\0') DBG("FDL skip(builtin): sound/%s", ki);
             }
         } while (KvGotoNextKey(kv));
     }
@@ -285,6 +295,8 @@ void LoadHitIconSets()
             if (head[0] == '\0') KvGetString(kv, "headshot", head, sizeof(head), "");
             KvGetString(kv, "hit",  hit,  sizeof(hit),  "");
             KvGetString(kv, "kill", kill, sizeof(kill), "");
+            DBG("IconSet  #%d '%s' builtin=%d head='%s' hit='%s' kill='%s'",
+                g_OvCount+1, name, isbuiltin, head, hit, kill);
 
             isbuiltin = KvGetNum(kv, "builtin", 0);
 
@@ -297,17 +309,23 @@ void LoadHitIconSets()
             if (!isbuiltin)
             {
                 if (head[0] != '\0') {
-                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", head); AddFileToDownloadsTable(p1);
-                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", head); AddFileToDownloadsTable(p2);
+                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", head); DBG("FDL add: %s", p1); AddFileToDownloadsTable(p1);
+                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", head); DBG("FDL add: %s", p2); AddFileToDownloadsTable(p2);
                 }
                 if (hit[0] != '\0') {
-                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hit); AddFileToDownloadsTable(p1);
-                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hit); AddFileToDownloadsTable(p2);
+                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", hit);  DBG("FDL add: %s", p1); AddFileToDownloadsTable(p1);
+                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", hit);  DBG("FDL add: %s", p2); AddFileToDownloadsTable(p2);
                 }
                 if (kill[0] != '\0') {
-                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", kill); AddFileToDownloadsTable(p1);
-                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", kill); AddFileToDownloadsTable(p2);
+                    char p1[PLATFORM_MAX_PATH]; Format(p1, sizeof(p1), "materials/%s.vmt", kill); DBG("FDL add: %s", p1); AddFileToDownloadsTable(p1);
+                    char p2[PLATFORM_MAX_PATH]; Format(p2, sizeof(p2), "materials/%s.vtf", kill); DBG("FDL add: %s", p2); AddFileToDownloadsTable(p2);
                 }
+            }
+            else
+            {
+                if (head[0] != '\0') { DBG("FDL skip(builtin): materials/%s.vmt", head); DBG("FDL skip(builtin): materials/%s.vtf", head); }
+                if (hit[0]  != '\0') { DBG("FDL skip(builtin): materials/%s.vmt", hit ); DBG("FDL skip(builtin): materials/%s.vtf", hit ); }
+                if (kill[0] != '\0') { DBG("FDL skip(builtin): materials/%s.vmt", kill); DBG("FDL skip(builtin): materials/%s.vtf", kill); }
             }
         } while (KvGotoNextKey(kv));
     }
@@ -417,6 +435,7 @@ public void ReloadAllPlayersPrefs()
 }
 public void OnMapStart()
 {
+    DBG("OnMapStart: rebuild downloads table (soundSets=%d, iconSets=%d)", g_SetCount, g_OvCount);
     // 只负责把需要的文件丢进下载表；这两函数内部会做 AddFileToDownloadsTable
     LoadHitSoundSets();
     LoadHitIconSets();
@@ -528,6 +547,14 @@ bool GetSoundPath(int setId, int which, char[] out, int maxlen)
     else                 GetArrayString(g_SetKill, setId, out, maxlen);
 
     return (out[0] != '\0');
+}
+
+stock void DBG(const char[] fmt, any ...)
+{
+    if (!GetConVarBool(cv_debug)) return;
+    char buf[512];
+    VFormat(buf, sizeof(buf), fmt, 2); // 2 = 第一个可变参数位置
+    LogMessage("[hitsound-dbg] %s", buf);
 }
 
 // 玩家专属覆盖图：which 0=head 1=hit 2=kill
@@ -1003,6 +1030,7 @@ void ShowOverlay(int client, OverlayType type)
         strcopy(useBase, sizeof(useBase), kill);
     else
         strcopy(useBase, sizeof(useBase), hit);
+    DBG("Overlay show: client=%N set=%d type=%d base='%s'", client, g_OverlaySet[client], view_as<int>(type), useBase);
 
     ClientCommand(client, "r_screenoverlay \"%s\"", useBase);
 
