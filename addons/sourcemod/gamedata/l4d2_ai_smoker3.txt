@@ -1,0 +1,141 @@
+"Games"
+{
+	"left4dead2"
+	{
+		"ActionConstructors"
+		{
+			"SmokerMoveToAttackPosition::SmokerMoveToAttackPosition"
+			{
+				"signature"		"SmokerMoveToAttackPosition::SmokerMoveToAttackPosition"
+
+				// v41 = (SmokerMoveToAttackPosition *)operator new(0x4830u);
+				// SmokerMoveToAttackPosition::SmokerMoveToAttackPosition(v41, v40);
+				// size: 0x4830 for 18480
+				"size"			"18480"
+				
+				"params"
+				{
+					"target"
+					{
+						/*
+                        * basic - plain generic data 
+                        * float - floating point data
+                        * object - raw struct/class/array?
+                        */
+						"type"		"basic"
+						
+						/*
+                        * byval - pass by val
+                        * byref - pass by ref
+                        * dtor - object has destructor
+                        * ctor - object has constructor
+                        * assignop - object has assignment operator
+                        * unalign - object contains unaligned fields
+                        */
+						"flags"		"byval"
+						
+						/*
+                        * entity - entity index to CBaseEntity
+                        * vector - raw array to Vector struct
+                        */
+						"encoder"	"entity"
+					}
+				}
+			}
+		}
+		
+		"Signatures"
+		{
+			// 1. search string 'Moving into attack position...'
+			// 2. check it's cross refs, you can see only one function related to this string
+			// 3. at the bottom of the function you can see v19 = (_DWORD *)sub_10001190(18480); this is v41 = (SmokerMoveToAttackPosition *)operator new(0x4830u);
+			// 4. v21 = sub_1045D080(v19, v20); sub_1045D080 is SmokerMoveToAttackPosition constructor
+			// 55 8B EC 53 56 8B F1 C7 46 04 ? ? ? ? C7 46 2C 01 00 00 00 33 DB 33 C0 89 46 20 33 C9 89 4E 24 57 33 D2 89 56 28 33 FF 89 5E 0C 89 5E 10 89 5E 14 89 5E 18 89 5E 1C 89 5E 08 66 89 5E 30 89 7E 2C C7 06 ? ? ? ? C7 46 04 ? ? ? ? 8D 4E 38 
+			"SmokerMoveToAttackPosition::SmokerMoveToAttackPosition"
+			{
+				"library"	"server"
+				"linux"		"@_ZN26SmokerMoveToAttackPositionC2EP13CTerrorPlayer"
+				"windows"	"\x55\x8B\xEC\x53\x56\x8B\xF1\xC7\x46\x04\x2A\x2A\x2A\x2A\xC7\x46\x2C\x01\x00\x00\x00\x33\xDB\x33\xC0\x89\x46\x20\x33\xC9\x89\x4E\x24\x57\x33\xD2\x89\x56\x28\x33\xFF\x89\x5E\x0C\x89\x5E\x10\x89\x5E\x14\x89\x5E\x18\x89\x5E\x1C\x89\x5E\x08\x66\x89\x5E\x30\x89\x7E\x2C\xC7\x06\x2A\x2A\x2A\x2A\xC7\x46\x04\x2A\x2A\x2A\x2A\x8D\x4E\x38"
+			}
+
+			// used to find "SmokerTongueVictim::SmokerTongueVictim" constructor, this is the parent fuction to call "SmokerTongueVictim::SmokerTongueVictim"
+			// 1. search string 'Victim is close, attack!'
+			// 2. check it's cross refs, normally, the last function that have: if ( sub_10001190(72) ) v12 = sub_1045EF70(v10); above 'Victim is close, attack!' is what you need
+			// 55 8B EC 83 EC 08 53 8B 5D 0C 8B 83 D0 30 00 00
+			"SmokerMoveToAttackPosition::Update"
+			{
+				"library"	"server"
+				"linux"		"@_ZN26SmokerMoveToAttackPosition6UpdateEP6Smokerf"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x08\x53\x8B\x5D\x0C\x8B\x83\xD0\x30\x00\x00"
+			}
+			
+			// windows signature is not unique
+			"SmokerTongueVictim::SmokerTongueVictim"
+			{
+				"library"	"server"
+				"linux"		"@_ZN18SmokerTongueVictimC2EP13CTerrorPlayer"
+				"windows"	""
+			}
+			
+			// 1. search string 'Tongue completed'
+			// 2. you may find only 1 function that related to this string, that's it
+			// 55 8B EC 83 EC 08 53 8D 59 34
+			"SmokerTongueVictim::Update"
+			{
+				"library"	"server"
+				"linux"		"@_ZN18SmokerTongueVictim6UpdateEP6Smokerf"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x08\x53\x8D\x59\x34"
+			}
+			
+			// CTerrorPlayer::GetRunTopSpeed(void)const
+			// Only references to float value 115.0 (00 00 E6 42) are in this func.
+			// 55 8B EC 83 EC ? 56 8B F1 8B 06 8B 90 ? ? ? ? FF D2 84 C0 74 0D A1 ? ? ? ? D9 40 ? 5E
+			"CTerrorPlayer::GetRunTopSpeed"
+			{
+				"library"	"server"
+				"linux"		"@_ZNK13CTerrorPlayer14GetRunTopSpeedEv"
+				"windows" 	"\x55\x8B\xEC\x83\xEC\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74\x0D\xA1\x2A\x2A\x2A\x2A\xD9\x40\x2A\x5E"
+			}
+		}
+		
+		"Offsets"
+		{
+			// the offset of the call statement: call SmokeTongueVictim constructor from the start of SmokeMoveToAttackPosition:: Update (Smoker *, float)
+			// 调用 SmokerTongueVictim 构造函数语句相对于 SmokerMoveToAttackPosition::Update(Smoker *,float) 起始的偏移
+			"SmokerTongueVictim::SmokerTongueVictim"
+			{
+				"windows"	"258"
+				"linux"		"685"
+			}
+		}
+		
+		// Smoker 秒拉内存补丁, 跳过 Smoker 即将拉人时的延迟, 和 smoker_tongue_delay 0 效果一样, 源码中并未使用
+		// Mem patch to skip the delay when Smoker is about to pull someone, with the same effect as Cvar: smoker_tongue_delay 0. Not used in the source code
+		// SourceScramble Memory Patches
+		"MemPatches"
+		{
+			"SmokerTongueVictim::Update"
+			{
+				"signature"	"SmokerTongueVictim::Update"
+				
+				// CountdownTimer::Now((Smoker *)((char *)a4 + 56));
+				// v9 = a2;
+				// if ( v9 < *((float *)a4 + 16) )
+				//     goto LABEL_19;
+				"linux"
+				{
+					"offset"	"16Fh"
+					"verify"	"\x0F\x2F\x46\x2A\x72\x2A"
+					"patch"		"\x90\x90\x90\x90\x90\x90"
+				}
+				
+				"windows"
+				{
+					"offset"	"116h"
+					"verify"	"\x0F\x82\x2A\x2A\x2A\x2A"
+					"patch"		"\x90\x90\x90\x90\x90\x90"
+				}
+			}
+		}
+	}
+}
