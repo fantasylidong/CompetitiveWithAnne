@@ -122,7 +122,7 @@ public void OnPluginStart() {
 	// allow tank to bhop?
 	g_cvTankBhop = CreateConVar("ai_tank_bhop", "1", "是否允许坦克连跳, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// tank can bhop when he and his target are within the distance (ai_tank3_bhop_min_dist, ai_tank3_bhop_max_dist) 
-	g_cvBhopMinDist = CreateConVar("ai_tank3_bhop_min_dist", "130", "停止连跳的最小距离", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMinDist = CreateConVar("ai_Tank_StopDistance", "135", "停止连跳的最小距离", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxDist = CreateConVar("ai_tank3_bhop_max_dist", "9999", "开始连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	// when tank's speed is higher than 'ai_tank3_bhop_min_speed', he is allowed to bhop, and his max bhop speed will not above 'ai_tank3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_tank3_bhop_min_speed", "200", "连跳的最小速度", CVAR_FLAGS, true, 0.0);
@@ -139,7 +139,7 @@ public void OnPluginStart() {
 	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
 	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
-	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "600", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
+	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "800", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	// you can use the value of 'ai_tank3_climb_anim_rate' to accelerate the animation rate when tank is climbing over some obstacle
 	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "5.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
 	// when tank throwing rock and his target is not visible, allow tank to switch target and throw to new survivor that is visible and closest to tank?
@@ -226,7 +226,7 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public void OnMapStart() {
-	//vectorShowOnMapStart();
+//	vectorShowOnMapStart();
 }
 
 public void OnMapEnd() {
@@ -321,7 +321,6 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
 	for (int i = 1; i <= MaxClients; i++) {
 		if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
 			continue;
-		if (IsClientIncapped(i) || IsClientPinned(i)) continue;
 		GetClientEyePosition(i, targetPos);
 		if (GetVectorDistance(pos, targetPos) > fistRange)
 			continue;
@@ -402,10 +401,6 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 			MakeVectorFromPoints(pos, vPredict, vDir);
 			vDir[2] = 0.0;
 			NormalizeVector(vDir, vDir);
-			// 计算右向向量, 右向向量垂直于水平与垂直方向向量
-			vFwd = vDir;
-			GetVectorCrossProduct({0.0, 0.0, 1.0}, vFwd, vRight);
-			NormalizeVector(vRight, vRight);
 		}
 
 		// 无生还视野不允许连跳
@@ -414,12 +409,50 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 
 		buttons |= IN_DUCK;
 		buttons |= IN_JUMP;
-		if (((buttons & IN_BACK) && !(buttons & IN_FORWARD)) || ((buttons & IN_FORWARD) && !(buttons & IN_BACK))) {
+
+		static bool fwdOnly, backOnly, leftOnly, rightOnly;
+		fwdOnly = ((buttons & IN_FORWARD) && !(buttons & IN_BACK));
+		backOnly = ((buttons & IN_BACK) && !(buttons & IN_FORWARD));
+		leftOnly = ((buttons & IN_LEFT) && !(buttons & IN_RIGHT));
+		rightOnly = ((buttons & IN_RIGHT) && !(buttons & IN_LEFT));
+
+		if (fwdOnly) {
+			vFwd = vDir;
+			NormalizeVector(vFwd, vFwd);
 			ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
 			AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
-		} else if (((buttons & IN_RIGHT) && !(buttons & IN_LEFT)) || ((buttons & IN_LEFT) && !(buttons & IN_RIGHT))) {
-			ScaleVector(vRight, g_cvBhopImpulse.FloatValue);
-			AddVectors(vAbsVelVec, vRight, vAbsVelVec);
+		} else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
+			// 仅按后退键, 向当前速度方向进行加速
+			vFwd[0] = velVec[0];
+			vFwd[1] = velVec[1];
+			vFwd[2] = 0.0;
+			NormalizeVector(vFwd, vFwd);
+			ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
+			AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+		} else {
+			// 按左右方向键的时候, 基于当前前向加速度方向计算侧向向量
+			static float baseFwd[3];
+			if (fwdOnly) {
+				baseFwd[0] = vFwd[0];
+				baseFwd[1] = vFwd[1];
+				baseFwd[2] = 0.0;
+			} else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
+				baseFwd[0] = velVec[0];
+				baseFwd[1] = velVec[1];
+				baseFwd[2] = 0.0;
+			} else {
+				baseFwd[0] = vDir[0];
+				baseFwd[1] = vDir[1];
+				baseFwd[2] = 0.0;
+			}
+			// 计算左向或者右向向量进行加速
+			GetVectorCrossProduct({0.0, 0.0, 1.0}, baseFwd, vRight);
+			NormalizeVector(vRight, vRight);
+			if (rightOnly ^ leftOnly) {
+				vRight[2] = 0.0;
+				ScaleVector(vRight, g_cvBhopImpulse.FloatValue * (rightOnly ? 1.0 : -1.0));
+				AddVectors(vAbsVelVec, vRight, vAbsVelVec);
+			}
 		}
 		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
 		return Plugin_Changed;
