@@ -2643,12 +2643,28 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
                 if (!PassMinSeparation(p))            { cSep++;      continue; }
 
-                // —— 极值兜底（硬拒） —— //
-                int candBucket = FlowDistanceToPercent(fFlow);
-                if (p[2] < allMinZ - 200.0 && candBucket < allMinFlowBucket )
-                    continue; // 地底且在后方
-                if (p[2] > allMaxZ + 650.0 && zc != view_as<int>(SI_Smoker))
-                    continue; // 过高极端（Smoker例外）
+                // —— 极值兜底（硬拒 + Finale/尾段豁免 + 桶抖动缓冲）—— //
+                int  candBucket   = FlowDistanceToPercent(fFlow);
+                bool inFinale     = L4D_IsMissionFinalMap();
+                bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
+
+                // 仅在“非终章激活”且“整体进度未到尾段”时启用这些硬拒
+                if (!(inFinale && finaleActive) && centerBucket < 95)
+                {
+                    // allMinZ 是眼睛高度，换算到脚当基准更稳
+                    const float EYE_TO_FEET = 60.0;
+                    float allMinFeetZ = allMinZ - EYE_TO_FEET;
+
+                    // ① 地底且在后方（带 ±1 桶缓冲，避免量化误杀）
+                    // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
+                    if (p[2] < (allMinFeetZ - 140.0) && candBucket <= (allMinFlowBucket + 1))
+                        continue;
+
+                    // ② 过高极端（Smoker 例外），650u 基本只挡离谱屋顶
+                    if (p[2] > (allMaxZ + 650.0) && zc != view_as<int>(SI_Smoker))
+                        continue;
+                }
+
 
                 // 路径可达性罚分（不可达给大分）
                 float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
@@ -2741,12 +2757,28 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
             if (!PassMinSeparation(p))            { cSep++;      continue; }
 
-            // —— 极值兜底（硬拒） —— //
-            int candBucket = FlowDistanceToPercent(fFlow);
-            if (p[2] < allMinZ - 200.0 && candBucket <= allMinFlowBucket + 1)
-                continue;
-            if (p[2] > allMaxZ + 650.0 && zc != view_as<int>(SI_Smoker))
-                continue;
+            // —— 极值兜底（硬拒 + Finale/尾段豁免 + 桶抖动缓冲）—— //
+            int  candBucket   = FlowDistanceToPercent(fFlow);
+            bool inFinale     = L4D_IsMissionFinalMap();
+            bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
+
+            // 仅在“非终章激活”且“整体进度未到尾段”时启用这些硬拒
+            if (!(inFinale && finaleActive) && centerBucket < 95)
+            {
+                // allMinZ 是眼睛高度，换算到脚当基准更稳
+                const float EYE_TO_FEET = 60.0;
+                float allMinFeetZ = allMinZ - EYE_TO_FEET;
+
+                // ① 地底且在后方（带 ±1 桶缓冲，避免量化误杀）
+                // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
+                if (p[2] < (allMinFeetZ - 200.0) && candBucket <= allMinFlowBucket)
+                    continue;
+
+                // ② 过高极端（Smoker 例外），650u 基本只挡离谱屋顶
+                if (p[2] > (allMaxZ + 650.0) && zc != view_as<int>(SI_Smoker))
+                    continue;
+            }
+
 
             // 路径可达性罚分
             float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
