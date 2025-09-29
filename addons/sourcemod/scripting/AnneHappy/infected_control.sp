@@ -2319,7 +2319,7 @@ static float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMax
     if (zNorm > 1.0) zNorm = 1.0;
 
     // 基础弹性：线性从 0..zRange
-    float base = zRange * zNorm;
+    float base = FloatMax(zRange, RING_SLACK) * zNorm;
 
     // 若高于“所有幸存者最大眼睛高度 + 120u”，对弹性做衰减，避免极端屋顶无限放宽
     float over   = FloatMax(0.0, p[2] - (allMaxEyeZ + 120.0));
@@ -2728,7 +2728,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 extra += pathPenalty;
 
                 // First-Fit 快速返回（保持原有语义）
-                if (firstFit && pathPenalty >= PATH_NO_BUILD_PENALTY)
+                if (firstFit && pathPenalty == 0.0)
                 {
                     outPos = p;
                     outAreaIdx = ai;
@@ -2859,7 +2859,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             extra += pathPenalty;
 
             // First-Fit 快速返回（保持你现有语义）
-            if (firstFit && pathPenalty >= PATH_NO_BUILD_PENALTY)
+            if (firstFit && pathPenalty == 0.0)
             {
                 outPos = p;
                 outAreaIdx = ai;
@@ -2926,7 +2926,7 @@ stock float PathPenalty_NoBuild(const float candPos[3], int targetSur, float rin
     Address navStart = L4D_GetNearestNavArea(survPos, 120.0, false, false, false, TEAM_INFECTED);
     if (!navGoal || !navStart) return PATH_NO_BUILD_PENALTY;
 
-    // 代价上限：min(ring*2, spawnmax*1.5)
+    // 代价上限：min(ring*3, spawnmax*1.5)
     float limitCost = FloatMin(ring * 3.0, spawnmax * 1.5);
 
     // 能 BuildPath 且代价不超 => 0；否则给大惩罚
