@@ -58,27 +58,27 @@
 #define FRAME_THINK_STEP          0.02
 
 // Support SI gating
-#define SUPPORT_SPAWN_DELAY_SECS  1.8
+#define SUPPORT_SPAWN_DELAY_SECS  1.0
 #define SUPPORT_NEED_KILLERS      1
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
-#define SEP_TTL                   8.0    // 最近刷点保留秒数
+#define SEP_TTL                   2.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                80.0
+#define SEP_RADIUS                60.0
 #define NAV_CD_SECS               0.8
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
-#define PATH_NO_BUILD_PENALTY     9999.0
+#define PATH_NO_BUILD_PENALTY     1999.0
 
 // === Dispersion tuning (penalties at BASE=4) ===
-#define SECTOR_PREF_BONUS_BASE   -8.0
-#define SECTOR_OFF_PENALTY_BASE   4.0
-#define RECENT_PENALTY_0_BASE     4.0
-#define RECENT_PENALTY_1_BASE     2.4
-#define RECENT_PENALTY_2_BASE     2.0
+#define SECTOR_PREF_BONUS_BASE   -6.0
+#define SECTOR_OFF_PENALTY_BASE   3.0
+#define RECENT_PENALTY_0_BASE     3.0
+#define RECENT_PENALTY_1_BASE     2.0
+#define RECENT_PENALTY_2_BASE     1.6
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
@@ -87,8 +87,8 @@
 #define PEN_LIMIT_MAXL            20
 
 // —— 前/后 均衡权重 —— //
-#define FB_STEP  2.0    // 每次前/后生成后施加的权重步进（别设太大）
-#define FB_CLAMP 8.0    // 权重饱和上限
+#define FB_STEP  3.0    // 每次前/后生成后施加的权重步进（别设太大）
+#define FB_CLAMP 16.0    // 权重饱和上限
 #define FB_DECAY 0.99  // 每帧衰减
 static float g_FrontBackBias = 0.0;
 
@@ -2681,9 +2681,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
                     if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
                         extra += 1000.0;
+                    // ① 地上高处且在后方（带 ±1 桶缓冲，避免量化误杀）
+                    else if(p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1))
+                        extra += 1000.0;
 
                     // 过高：不硬拒，给重罚；Smoker 更宽松
-                    float overH = FloatMax(0.0, p[2] - (allMaxZ + 250.0)); // 起罚阈值略放宽到 +250u
+                    float overH = FloatMax(0.0, p[2] - (allMaxZ + 400.0)); // 起罚阈值略放宽到 +400u
                     if (overH > 0.0)
                     {
                         float perUnit = (zc == view_as<int>(SI_Smoker)) ? 0.05 : 0.12; // 调参项
@@ -2806,20 +2809,26 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             // Finale/尾段前：极值软化（地底后方 → 大罚；过高 → 线性罚，Smoker 更宽）
             bool inFinale     = L4D_IsMissionFinalMap();
             bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
+            // 仅在“非终章激活”且“整体进度未到尾段”时启用这些硬拒
             if (!(inFinale && finaleActive) && centerBucket < 95)
             {
+                // allMinZ 是眼睛高度，换算到脚当基准更稳
                 const float EYE_TO_FEET = 60.0;
                 float allMinFeetZ = allMinZ - EYE_TO_FEET;
 
-                // 地底且在后方：不硬拒，加一笔大扣分（与 useBuckets 相同策略）
+                // ① 地底且在后方（带 ±1 桶缓冲，避免量化误杀）
+                // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
                 if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
                     extra += 1000.0;
+                // ① 地上高处且在后方（带 ±1 桶缓冲，避免量化误杀）
+                else if(p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1))
+                    extra += 1000.0;
 
-                // 过高：不硬拒，线性重罚；Smoker 更宽松
-                float overH = FloatMax(0.0, p[2] - (allMaxZ + 250.0));
+                // 过高：不硬拒，给重罚；Smoker 更宽松
+                float overH = FloatMax(0.0, p[2] - (allMaxZ + 400.0)); // 起罚阈值略放宽到 +400u
                 if (overH > 0.0)
                 {
-                    float perUnit = (zc == view_as<int>(SI_Smoker)) ? 0.05 : 0.12;
+                    float perUnit = (zc == view_as<int>(SI_Smoker)) ? 0.05 : 0.12; // 调参项
                     extra += overH * perUnit;
                 }
             }

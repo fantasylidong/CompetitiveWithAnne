@@ -488,7 +488,7 @@ stock bool traceRayFilter(int entity, int contentsMask, any data)
 // 注意：你的环境若使用 3 参签名，请改为带 distance 的版本
 public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 {
-    if (!isValidHunter(specialInfected) || !IsValidSurvivor(curTarget) || !IsPlayerAlive(curTarget))
+    if (!isValidHunter(specialInfected) || !IsValidSurvivor(curTarget) || !IsPlayerAlive(curTarget) || L4D_IsPlayerIncapacitated(curTarget))
         return Plugin_Continue;
 
     float targetPos[3];
