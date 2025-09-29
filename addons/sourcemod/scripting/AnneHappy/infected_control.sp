@@ -2305,6 +2305,28 @@ static bool IsValidFlags(int iFlags, bool bFinaleArea)
 
     return (iFlags & (TERROR_NAV_RESCUE_CLOSET|TERROR_NAV_RESCUE_VEHICLE|TERROR_NAV_CHECKPOINT)) == 0;
 }
+
+// 高度感知的 ring 弹性：越高 → 弹性越大，最多到 RING_SLACK；
+// 若明显高出所有幸存者眼睛很多，再做衰减避免“屋顶滥刷”。
+static float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMaxZ, float allMaxEyeZ)
+{
+    float zRange = bucketMaxZ - bucketMinZ;
+    if (zRange < 1.0) zRange = 1.0;
+
+    // 桶内高度归一化（越高越接近 1）
+    float zNorm  = (p[2] - bucketMinZ) / zRange;
+    if (zNorm < 0.0) zNorm = 0.0;
+    if (zNorm > 1.0) zNorm = 1.0;
+
+    // 基础弹性：线性从 0..zRange
+    float base = zRange * zNorm;
+
+    // 若高于“所有幸存者最大眼睛高度 + 120u”，对弹性做衰减，避免极端屋顶无限放宽
+    float over   = FloatMax(0.0, p[2] - (allMaxEyeZ + 120.0));
+    float taper  = 1.0 / (1.0 + over / 200.0);  // 200u 每级衰减
+    return base * taper;
+}
+
 // 仅按“硬距离窗口”筛选：SpawnMin ≤ 距离 ≤ ring
 static bool IsNearTheSur(float ring, const float pos[3], float &dist)
 {
@@ -2635,19 +2657,19 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 pArea.GetRandomPoint(p);
 
                 float dist;
-                if (!IsNearTheSur(searchRange, p, dist))
-                { cNearFail++; continue; }
-
-                if (dist < gCV.fSpawnMin)            { cNearFail++; continue; }
-                if (WillStuck(p))                     { cStuck++;    continue; }
-                if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
-                if (!PassMinSeparation(p))            { cSep++;      continue; }
-
                 // —— 极值兜底（硬拒 + Finale/尾段豁免 + 桶抖动缓冲）—— //
                 int  candBucket   = FlowDistanceToPercent(fFlow);
+                // 对“更高”的候选，按桶内高度给额外 ring 弹性
+                float slack = HeightRingSlack(p, g_BucketMinZ[candBucket], g_BucketMaxZ[candBucket], allMaxZ /*眼睛*/);
+                float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax); // 不突破 SpawnMax 的硬上限
+                if (!IsNearTheSur(ringEff, p, dist))  { cNearFail++; continue; }
+                if (dist < gCV.fSpawnMin)             { cNearFail++; continue; }
+                if (!PassMinSeparation(p))            { cSep++;      continue; }
+                if (WillStuck(p))                     { cStuck++;    continue; }
+                if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
+                float extra = 0.0;
                 bool inFinale     = L4D_IsMissionFinalMap();
                 bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
-
                 // 仅在“非终章激活”且“整体进度未到尾段”时启用这些硬拒
                 if (!(inFinale && finaleActive) && centerBucket < 95)
                 {
@@ -2657,14 +2679,17 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
                     // ① 地底且在后方（带 ±1 桶缓冲，避免量化误杀）
                     // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
-                    if (p[2] < (allMinFeetZ - 140.0) && candBucket <= (allMinFlowBucket + 1))
-                        continue;
+                    if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
+                        extra += 1000.0;
 
-                    // ② 过高极端（Smoker 例外），650u 基本只挡离谱屋顶
-                    if (p[2] > (allMaxZ + 650.0) && zc != view_as<int>(SI_Smoker))
-                        continue;
+                    // 过高：不硬拒，给重罚；Smoker 更宽松
+                    float overH = FloatMax(0.0, p[2] - (allMaxZ + 250.0)); // 起罚阈值略放宽到 +250u
+                    if (overH > 0.0)
+                    {
+                        float perUnit = (zc == view_as<int>(SI_Smoker)) ? 0.05 : 0.12; // 调参项
+                        extra += overH * perUnit;
+                    }
                 }
-
 
                 // 路径可达性罚分（不可达给大分）
                 float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
@@ -2683,8 +2708,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (recentSectors[0] == sidx) sectorPenalty += rpen0;
                 if (recentSectors[1] == sidx) sectorPenalty += rpen1;
                 if (recentSectors[2] == sidx) sectorPenalty += rpen2;
-
-                float extra = 0.0;
 
                 // —— 新增：高度偏好（同桶内高点更优；强度随桶内 zRange 自适应） —— //
                 float bMinZ = g_BucketMinZ[candBucket];
@@ -2730,7 +2753,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     }
     else
     {
-        // —— 无分桶：全量扫描，高度偏好用“相对生还者高度范围”归一 —— //
+        // —— 无分桶：全量扫描，但评分/判定完全对齐 useBuckets 的口径 —— //
         bool firstFit = gCV.bNavBucketFirstFit;
 
         for (int ai = 0; ai < iAreaCount; ai++)
@@ -2741,55 +2764,76 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
             { cFlagBad++; continue; }
 
+            // 每个 area 只算一次 flow → candBucket（和 useBuckets 一致）
             float fFlow = pArea.GetFlow();
             if (fFlow < 0.0 || fFlow > fMapMaxFlowDist)
             { cFlowBad++; continue; }
 
+            int candBucket = RoundToNearest(((fFlow + gCV.VsBossFlowBuffer.FloatValue) / fMapMaxFlowDist) * 100.0);
+            if (candBucket < 0) candBucket = 0;
+            if (candBucket > 100) candBucket = 100;
+
+            // 取一个该 area 的随机点
             float p[3];
             pArea.GetRandomPoint(p);
 
+            // —— 与 useBuckets 同步的 ring 弹性（优先用该桶的高度范围；否则退回到生还者范围） —— //
+            float bMinZ, bMaxZ;
+            if (g_BucketsReady) {
+                bMinZ = g_BucketMinZ[candBucket];
+                bMaxZ = g_BucketMaxZ[candBucket];
+                if (bMaxZ <= bMinZ) {  // 极端/空桶保护
+                    bMinZ = allMinZ - 50.0;
+                    bMaxZ = allMaxZ + 50.0;
+                }
+            } else {
+                bMinZ = allMinZ - 50.0;
+                bMaxZ = allMaxZ + 50.0;
+            }
+
             float dist;
-            if (!IsNearTheSur(searchRange, p, dist))
-            { cNearFail++; continue; }
+            float slack   = HeightRingSlack(p, bMinZ, bMaxZ, allMaxZ /*眼睛*/);
+            float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
+            if (!IsNearTheSur(ringEff, p, dist))     { cNearFail++; continue; }
+            if (dist < gCV.fSpawnMin)                { cNearFail++; continue; }
+            if (!PassMinSeparation(p))               { cSep++;      continue; }  // 便宜的尽早拦
+            if (WillStuck(p))                        { cStuck++;    continue; }
+            if (IsPosVisibleSDK(p, teleportMode))    { cVis++;      continue; }  // 可视较贵，放后
 
-            if (dist < gCV.fSpawnMin)            { cNearFail++; continue; }
-            if (WillStuck(p))                     { cStuck++;    continue; }
-            if (IsPosVisibleSDK(p, teleportMode)) { cVis++;      continue; }
-            if (!PassMinSeparation(p))            { cSep++;      continue; }
+            // —— 评分项（对齐 useBuckets） —— //
+            float extra = 0.0;
 
-            // —— 极值兜底（硬拒 + Finale/尾段豁免 + 桶抖动缓冲）—— //
-            int  candBucket   = FlowDistanceToPercent(fFlow);
+            // Finale/尾段前：极值软化（地底后方 → 大罚；过高 → 线性罚，Smoker 更宽）
             bool inFinale     = L4D_IsMissionFinalMap();
             bool finaleActive = (L4D2_GetCurrentFinaleStage() != FINALE_NONE);
-
-            // 仅在“非终章激活”且“整体进度未到尾段”时启用这些硬拒
             if (!(inFinale && finaleActive) && centerBucket < 95)
             {
-                // allMinZ 是眼睛高度，换算到脚当基准更稳
                 const float EYE_TO_FEET = 60.0;
                 float allMinFeetZ = allMinZ - EYE_TO_FEET;
 
-                // ① 地底且在后方（带 ±1 桶缓冲，避免量化误杀）
-                // 阈值：比最矮幸存者“脚”再低 140u（≈ 眼睛-200）
-                if (p[2] < (allMinFeetZ - 200.0) && candBucket <= allMinFlowBucket)
-                    continue;
+                // 地底且在后方：不硬拒，加一笔大扣分（与 useBuckets 相同策略）
+                if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
+                    extra += 1000.0;
 
-                // ② 过高极端（Smoker 例外），650u 基本只挡离谱屋顶
-                if (p[2] > (allMaxZ + 650.0) && zc != view_as<int>(SI_Smoker))
-                    continue;
+                // 过高：不硬拒，线性重罚；Smoker 更宽松
+                float overH = FloatMax(0.0, p[2] - (allMaxZ + 250.0));
+                if (overH > 0.0)
+                {
+                    float perUnit = (zc == view_as<int>(SI_Smoker)) ? 0.05 : 0.12;
+                    extra += overH * perUnit;
+                }
             }
 
-
-            // 路径可达性罚分
+            // 路径可达性罚分（不可达给大分；保持 useBuckets 的位置靠后）
             float pathPenalty = PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax);
 
-            // —— 扇区分散度 —— //
+            // —— 扇区分散度（完全一致）—— //
             int sidx = ComputeSectorIndex(center, p, sectors);
-            float prefBonus    = ScaleBySectors(SECTOR_PREF_BONUS_BASE, sectors);
-            float offPenalty   = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
-            float rpen0        = ScaleBySectors(RECENT_PENALTY_0_BASE, sectors);
-            float rpen1        = ScaleBySectors(RECENT_PENALTY_1_BASE, sectors);
-            float rpen2        = ScaleBySectors(RECENT_PENALTY_2_BASE, sectors);
+            float prefBonus     = ScaleBySectors(SECTOR_PREF_BONUS_BASE,  sectors);
+            float offPenalty    = ScaleBySectors(SECTOR_OFF_PENALTY_BASE, sectors);
+            float rpen0         = ScaleBySectors(RECENT_PENALTY_0_BASE,   sectors);
+            float rpen1         = ScaleBySectors(RECENT_PENALTY_1_BASE,   sectors);
+            float rpen2         = ScaleBySectors(RECENT_PENALTY_2_BASE,   sectors);
             float penScaleLimit = SectorPenaltyScaleByLimit();
             offPenalty *= penScaleLimit; rpen0 *= penScaleLimit; rpen1 *= penScaleLimit; rpen2 *= penScaleLimit;
 
@@ -2798,26 +2842,23 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (recentSectors[1] == sidx) sectorPenalty += rpen1;
             if (recentSectors[2] == sidx) sectorPenalty += rpen2;
 
-            float extra = 0.0;
-
-            // —— 新增：高度偏好（用生还者高度范围做归一） —— //
-            float bMinZ = allMinZ - 50.0;
-            float bMaxZ = allMaxZ + 50.0;
+            // —— 高度偏好（按“该桶”的 zRange 归一）—— //
             float zRange = bMaxZ - bMinZ; if (zRange < 1.0) zRange = 1.0;
-            float zNorm = (p[2] - bMinZ) / zRange; if (zNorm < 0.0) zNorm = 0.0; if (zNorm > 1.0) zNorm = 1.0;
-            float heightBonus = -(10.0 + 0.04 * zRange) * zNorm;
+            float zNorm  = (p[2] - bMinZ) / zRange; if (zNorm < 0.0) zNorm = 0.0; if (zNorm > 1.0) zNorm = 1.0;
+            float heightBonus = -(10.0 + 0.04 * zRange) * zNorm; // 负分=更优
             extra += heightBonus;
 
-            // —— 新增：前/后均衡偏置 —— //
-            int avgBucket = RoundToNearest(GetSurAvrFlow() * 100.0);
-            float fbBias = 0.0;
-            if (candBucket > avgBucket + 1)       fbBias = g_FrontBackBias;
-            else if (candBucket < avgBucket - 1)  fbBias -= g_FrontBackBias;
+            // —— 前/后均衡偏置 —— //
+            int   avgBucket = RoundToNearest(GetSurAvrFlow() * 100.0);
+            float fbBias    = 0.0;
+            if (candBucket > avgBucket + 1)      fbBias = g_FrontBackBias;
+            else if (candBucket < avgBucket - 1) fbBias = -g_FrontBackBias;
             extra += fbBias;
 
-            // 路径罚分
+            // 路径罚分叠加
             extra += pathPenalty;
 
+            // First-Fit 快速返回（保持你现有语义）
             if (firstFit && pathPenalty >= PATH_NO_BUILD_PENALTY)
             {
                 outPos = p;
@@ -2826,7 +2867,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             }
             else
             {
-                float score  = dist + sectorPenalty + extra;
+                float score = dist + sectorPenalty + extra;
                 if (!found || score < bestScore)
                 {
                     found     = true;
