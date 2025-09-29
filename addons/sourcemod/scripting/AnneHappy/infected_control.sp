@@ -27,7 +27,6 @@
 #undef REQUIRE_PLUGIN
 #include <si_target_limit>  // 可选
 #include <pause>            // 可选
-#include <ai_smoker_new>    // 可选
 
 // =========================
 // 常量/宏
@@ -1551,7 +1550,7 @@ static Action Timer_TeleportTick(Handle timer)
             int zc = GetInfectedClass(c);
             if (zc == view_as<int>(SI_Smoker) && g_bSmokerLib)
             {
-                int canUse = IsSmokerCanUseAbility(c); // 1 可用 / 0 不可用
+                int canUse = isSmokerReadyToAttack(c); // 1 可用 / 0 不可用
                 if (canUse == 0)
                 {
                     if (gST.teleCount[c] % 5 == 0)
@@ -1601,6 +1600,28 @@ static bool IsInfectedBot(int client)
 {
     return client > 0 && client <= MaxClients && IsClientInGame(client) && IsFakeClient(client)
            && GetClientTeam(client) == TEAM_INFECTED && (GetEntProp(client, Prop_Send, "m_zombieClass") >= 1 && GetEntProp(client, Prop_Send, "m_zombieClass") <= 6);
+}
+/**
+* 检查 Smoker 技能是否冷却完毕
+* @param client 客户端索引
+* @return bool 是否冷却完毕
+**/
+stock bool isSmokerReadyToAttack(int client) {
+	if (!IsAiSmoker(client))
+		return false;
+
+	static int ability;
+	ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+	if (!IsValidEdict(ability))
+		return false;
+	static char clsName[32];
+	GetEntityClassname(ability, clsName, sizeof(clsName));
+	if (strcmp(clsName, "ability_tongue", false) != 0)
+		return false;
+	
+	static float timestamp;
+	timestamp = GetEntPropFloat(ability, Prop_Send, "m_timestamp");
+	return GetGameTime() >= timestamp;
 }
 static bool IsValidClient(int c) { return c > 0 && c <= MaxClients && IsClientInGame(c); }
 static bool IsValidSurvivor(int c) { return IsValidClient(c) && GetClientTeam(c) == TEAM_SURVIVOR; }
@@ -1667,7 +1688,7 @@ static bool CanBeTeleport(int client)
     if (GetClosestSurvivorDistance(client) < gCV.fSpawnMin)
         return false;
 
-    if (IsAiSmoker(client) && g_bSmokerLib && !IsSmokerCanUseAbility(client))
+    if (IsAiSmoker(client) && g_bSmokerLib && !isSmokerReadyToAttack(client))
         return false;
 
     float p[3];
