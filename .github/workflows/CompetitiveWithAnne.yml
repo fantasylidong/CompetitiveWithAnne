@@ -39,6 +39,7 @@ jobs:
           cp -R CompetitiveWithAnne/* CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/left4dead2/sound/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/left4dead2/models/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
+          cp -R anne/left4dead2/materials/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/update/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/
           tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }}
           
