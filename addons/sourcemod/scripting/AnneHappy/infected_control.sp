@@ -66,7 +66,7 @@
 #define SEP_TTL                   3.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                100.0
+#define SEP_RADIUS                80.0
 #define NAV_CD_SECS               0.6
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -2387,7 +2387,7 @@ static float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMax
 
     // 若高于“所有幸存者最大眼睛高度 + 200u”，对弹性做衰减，避免极端屋顶无限放宽
     float over   = FloatMax(0.0, p[2] - (allMaxEyeZ + 200.0));
-    float taper  = 1.0 / (1.0 + over / 150.0);  // 100u 每级衰减
+    float taper  = 1.0 / (1.0 + over / 150.0);  // 150u 每级衰减
     return base * taper;
 }
 
@@ -2655,7 +2655,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     // ===== 调参常量（可改成 CVar）=====
     const float HEIGHT_PEAK_WINDOW = 350.0;  // 0..350u 区间越高越优
     const float TAPER_BASE_DIST    = 200.0;  // 超过 350 后按 1/(1+over/200) 衰减
-    const float HEADROOM           = 400.0;  // 需要感知补额的最大值（保证略超 ring 的高点能进候选）
     const float CJ_ALLOWED_PLANE   = 250.0;  // Charger/Jockey 允许的眼高±范围
     const float CJ_PLANE_BASE_PEN  = 20.0;   // 脱平面固定罚
     const float CJ_PLANE_SLOPE     = 0.6;    // 脱平面超出部分的线性罚系数
@@ -2714,21 +2713,11 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 float dminEye = GetMinEyeDistToAnySurvivor(p);      // 眼睛最小距离（与硬下限口径一致）
                 float slack   = 0.0;
 
-                // 非 CJ 给基础高度放宽 + 需要感知补额
+                // 非 CJ 给基础高度放宽
                 if (zc != view_as<int>(SI_Charger) && zc != view_as<int>(SI_Jockey))
                 {
                     // 基础放宽：沿用 HeightRingSlack（以全队最高眼高 allMaxZ 作为 allMaxEyeZ）
-                    float baseSlack = HeightRingSlack(p, bMinZ, bMaxZ, /*allMaxEyeZ=*/allMaxZ);
-
-                    // 需要感知补额：若该点高于参考眼高且“略在 ring 外”，补到能进候选
-                    float zRel = p[2] - refEyeZ;
-                    float topup = 0.0;
-                    if (zRel > 0.0)
-                    {
-                        float need = FloatMax(0.0, dminEye - searchRange);
-                        topup = FloatMin(need, HEADROOM);
-                    }
-                    slack = FloatMax(baseSlack, topup);
+                    slack = HeightRingSlack(p, bMinZ, bMaxZ, /*allMaxEyeZ=*/allMaxZ);
                 }
                 // Charger/Jockey 不吃任何放宽（保持 0）
 
@@ -2756,7 +2745,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
                     if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket ))
                         extra += 1000.0;         // 地底且靠后
-                    else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1) && zc != view_as<int>(SI_Smoker))
+                    else if (p[2] > (allMaxZ + 250.0) && candBucket <= (allMinFlowBucket ) && zc != view_as<int>(SI_Smoker))
                         extra += 1000.0;         // 过高且靠后
                 }
 
@@ -2867,17 +2856,11 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             // 距离资格（含高点需要感知补额）
             float dminEye = GetMinEyeDistToAnySurvivor(p);
             float slack   = 0.0;
+            // 非 CJ 给基础高度放宽
             if (zc != view_as<int>(SI_Charger) && zc != view_as<int>(SI_Jockey))
             {
-                float baseSlack = HeightRingSlack(p, bMinZ, bMaxZ, /*allMaxEyeZ=*/allMaxZ);
-                float zRel      = p[2] - refEyeZ;
-                float topup     = 0.0;
-                if (zRel > 0.0)
-                {
-                    float need = FloatMax(0.0, dminEye - searchRange);
-                    topup = FloatMin(need, HEADROOM);
-                }
-                slack = FloatMax(baseSlack, topup);
+                // 基础放宽：沿用 HeightRingSlack（以全队最高眼高 allMaxZ 作为 allMaxEyeZ）
+                slack = HeightRingSlack(p, bMinZ, bMaxZ, /*allMaxEyeZ=*/allMaxZ);
             }
             float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff))
@@ -2899,7 +2882,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
                 if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket ))
                     extra += 1000.0;         // 地底且靠后
-                else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1) && zc != view_as<int>(SI_Smoker))
+                else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket ) && zc != view_as<int>(SI_Smoker))
                     extra += 1000.0;         // 过高且靠后
             }
 
