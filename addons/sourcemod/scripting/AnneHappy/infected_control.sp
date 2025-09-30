@@ -114,6 +114,7 @@ static ArrayList g_AreaZMin  = null;   // float per areaIdx
 static ArrayList g_AreaZMax  = null;   // float per areaIdx
 static float g_BucketMinZ[FLOW_BUCKETS];
 static float g_BucketMaxZ[FLOW_BUCKETS];
+static float g_LastSpawnTime[MAXPLAYERS+1];
 
 // TheNavAreas / NavArea methodmap（参考 fdxx）
 methodmap TheNavAreas
@@ -249,6 +250,10 @@ enum struct Config
     ConVar ZSpitterLimit;
     ConVar ZJockeyLimit;
     ConVar ZChargerLimit;
+    ConVar TeleportSpawnGrace;   // 新刷出来后多少秒内不允许传送
+    ConVar TeleportRunnerFast;   // 跑男时的快速阈值（秒），最低也要有个门槛
+    float  fTeleportSpawnGrace;
+    float  fTeleportRunnerFast;
 
     float fSpawnMin;
     float fSpawnMax;
@@ -320,6 +325,13 @@ enum struct Config
         // —— 双保险 —— //
         this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.5","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
         this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.TeleportSpawnGrace = CreateConVar("inf_TeleportSpawnGrace", "2.5",
+            "特感生成后多少秒内禁止传送", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
+            "跑男时的快速传送阈值（秒），仍需达到该不可见时长才可传送", CVAR_FLAG, true, 0.0, true, 10.0);
+
+        this.TeleportSpawnGrace.AddChangeHook(OnCfgChanged);
+        this.TeleportRunnerFast.AddChangeHook(OnCfgChanged);
         this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
         this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
         this.ZSmokerLimit  = FindConVar("z_smoker_limit");
@@ -400,6 +412,8 @@ enum struct Config
         this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
         this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
         this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
+        this.fTeleportSpawnGrace = this.TeleportSpawnGrace.FloatValue;
+        this.fTeleportRunnerFast = this.TeleportRunnerFast.FloatValue;
     }
 
     void ApplyMaxZombieBound()
@@ -495,6 +509,7 @@ enum struct State
             this.teleCount[i]       = 0;
         }
         for (int i = 0; i < 6; i++) this.siAlive[i] = 0;
+        for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
     }
 }
 
@@ -663,6 +678,7 @@ public void OnMapEnd()
 
     ClearNavBuckets();
     g_BucketsReady = false;
+    for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
 }
 void TweakSettings()
 {
@@ -728,6 +744,7 @@ static void StopAll()
 
     g_LastSpawnOkTime = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
+    for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
 }
 static Action Timer_ApplyMaxSpecials(Handle timer)
 {
@@ -769,9 +786,15 @@ public void evt_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 public void evt_PlayerSpawn(Event event, const char[] name, bool dont_broadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!client || !IsClientInGame(client) || !IsFakeClient(client)) return;
+
+    g_LastSpawnTime[client] = GetGameTime();     // ★ 记录出生时间
+    gST.teleCount[client]   = 0;                 // ★ 清计数，避免继承旧值
+
     if (IsSpitter(client))
         gST.spitterSpitTime[client] = GetGameTime();
 }
+
 public void evt_AbilityUse(Event event, const char[] name, bool dont_broadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
@@ -1528,33 +1551,56 @@ static void UnpauseSpawnTimer(float delay)
 // =========================
 // 传送监督（1s）—接入 pause / ai_smoker_new
 // =========================
+// ===========================
+// 传送监督（1s）— 加入“出生宽限 + 跑男最小不可见秒数”
+// 依赖：g_LastSpawnTime[]、gCV.fTeleportSpawnGrace、gCV.fTeleportRunnerFast（若未加 CVar，也可设默认值为 0.0）
+// ===========================
 static Action Timer_TeleportTick(Handle timer)
 {
     if (g_bPauseLib && IsInPause())
         return Plugin_Continue;
 
+    // 全队被控或倒地：暂停传送监督
     if (CheckRushManAndAllPinned())
         return Plugin_Continue;
 
+    float now = GetGameTime();
+
     for (int c = 1; c <= MaxClients; c++)
     {
-        if (!CanBeTeleport(c)) continue;
+        // 基本资格
+        if (!CanBeTeleport(c))
+            continue;
 
+        // —— 出生宽限（避免“刚生成就传送”）——
+        // 若你尚未把宽限接到 CanBeTeleport，这里再兜一层
+        if (gCV.fTeleportSpawnGrace > 0.0)
+        {
+            float born = g_LastSpawnTime[c];  // 需要在 evt_PlayerSpawn 中记录
+            if (born > 0.0 && (now - born) < gCV.fTeleportSpawnGrace)
+            {
+                // 宽限期内不累计不可见秒数，重置计数防止溢出
+                if (gST.teleCount[c] != 0) gST.teleCount[c] = 0;
+                continue;
+            }
+        }
+
+        // 视线检测（以“眼睛”为目标点，与 IsPosVisibleSDK 的口径一致）
         float eyes[3];
         GetClientEyePosition(c, eyes);
         bool vis = IsPosVisibleSDK(eyes, true);
 
         if (!vis)
         {
+            // 第一次入队前，重置传送找点半径
             if (gST.teleportQueueSize == 0)
                 gST.teleportDistCur = gCV.fSpawnMin;
 
-            // Smoker：能力未就绪则暂不传（避免浪费）
+            // Smoker 能力未就绪则不传（避免浪费），并清空计数
             int zc = GetInfectedClass(c);
             if (zc == view_as<int>(SI_Smoker) && g_bSmokerLib)
             {
-                int canUse = isSmokerReadyToAttack(c); // 1 可用 / 0 不可用
-                if (canUse == 0)
+                if (!isSmokerReadyToAttack(c))
                 {
                     if (gST.teleCount[c] % 5 == 0)
                         LogMsg("[TP] smoker %N: ability not ready -> skip teleport (tick=%d)", c, gST.teleCount[c]);
@@ -1563,7 +1609,22 @@ static Action Timer_TeleportTick(Handle timer)
                 }
             }
 
-            if (gST.teleCount[c] > gCV.iTeleportCheckTime || (gST.bPickRushMan && gST.teleportQueueSize == 0 && gST.teleCount[c] > 0))
+            // —— 累计不可见秒数（本计时器 1s 调一次）——
+            gST.teleCount[c]++;
+
+            // 计算本次需要的不可见阈值（秒）
+            // 常规：iTeleportCheckTime；跑男快通道：min(常规, TeleportRunnerFast)，但不低于 0.8s
+            float needSecs = float(gCV.iTeleportCheckTime);
+            bool  runnerFastPath = (gST.bPickRushMan && gST.teleportQueueSize == 0);
+            if (runnerFastPath && gCV.fTeleportRunnerFast > 0.0)
+            {
+                if (gCV.fTeleportRunnerFast < needSecs)
+                    needSecs = gCV.fTeleportRunnerFast;
+            }
+            if (needSecs < 0.8) needSecs = 0.8; // 防止“闪现即传”
+
+            // 达标：进入传送队列
+            if (float(gST.teleCount[c]) >= needSecs)
             {
                 int zcx = GetInfectedClass(c);
                 if (zcx >= 1 && zcx <= 6)
@@ -1571,30 +1632,41 @@ static Action Timer_TeleportTick(Handle timer)
                     gQ.teleport.Push(zcx);
                     gST.teleportQueueSize++;
 
+                    // 从“在场计数”里扣除（保持与原逻辑一致）
                     if (gST.siAlive[zcx-1] > 0) gST.siAlive[zcx-1]--; else gST.siAlive[zcx-1] = 0;
                     if (gST.totalSI > 0) gST.totalSI--; else gST.totalSI = 0;
 
-                    LogMsg("[TP] %N class=%s invisible for %d sec -> teleport respawn",
-                           c, INFDN[zcx], gST.teleCount[c]);
+                    LogMsg("[TP] %N class=%s invisible for %.1f sec%s -> teleport respawn",
+                           c, INFDN[zcx], float(gST.teleCount[c]),
+                           runnerFastPath ? " (runner-fast)" : "");
 
+                    // 踢掉原实体，进入传送重生流程
                     KickClient(c, "Teleport SI");
+
+                    // 立刻刷新上限/剩余额度
                     RecalcSiCapFromAlive(false);
+
+                    // 清零计数，避免残留
                     gST.teleCount[c] = 0;
                 }
             }
-            gST.teleCount[c]++;
         }
         else
         {
-            if (gST.teleCount[c] > 0 && gST.teleCount[c] % 5 == 0)
-                LogMsg("[TP] %N visible again (reset tick)", c);
+            // 再次可见：每 5s 打一条复位日志，并清零计数
+            if (gST.teleCount[c] > 0 && (gST.teleCount[c] % 5 == 0))
+                LogMsg("[TP] %N visible again (reset tick=%d)", c, gST.teleCount[c]);
+
             gST.teleCount[c] = 0;
         }
     }
 
+    // 周期性刷新目标幸存者
     gST.targetSurvivor = ChooseTargetSurvivor();
+
     return Plugin_Continue;
 }
+
 
 // =========================
 // 资格/可传送
@@ -1680,10 +1752,18 @@ static bool CanBeTeleport(int client)
 {
     if (!IsInfectedBot(client) || !IsClientInGame(client) || !IsPlayerAlive(client))
         return false;
-    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8)
+    if (GetEntProp(client, Prop_Send, "m_zombieClass") == 8)  // Tank
         return false;
     if (IsPinningSomeone(client))
         return false;
+
+    // ★ 新增：出生宽限（统一闸门）
+    if (gCV.fTeleportSpawnGrace > 0.0)
+    {
+        float born = g_LastSpawnTime[client];
+        if (born > 0.0 && (GetGameTime() - born) < gCV.fTeleportSpawnGrace)
+            return false;
+    }
 
     if (IsSpitter(client) && (GetGameTime() - gST.spitterSpitTime[client]) < SPIT_INTERVAL)
         return false;
