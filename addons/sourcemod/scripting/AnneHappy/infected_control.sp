@@ -38,7 +38,7 @@
 #define PLAYER_CHEST              45.0
 
 #define BAIT_DISTANCE             200.0
-#define RING_SLACK                300.0
+#define RING_SLACK                350.0
 #define NOSCORE_RADIUS            1000.0
 #define SUPPORT_EXPAND_MAX        1200.0
 
@@ -63,22 +63,22 @@
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
-#define SEP_TTL                   2.0    // 最近刷点保留秒数
+#define SEP_TTL                   3.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                60.0
-#define NAV_CD_SECS               0.8
+#define SEP_RADIUS                100.0
+#define NAV_CD_SECS               0.6
 #define SECTORS_BASE              4       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           2       // 动态下限
 #define PATH_NO_BUILD_PENALTY     1999.0
 
 // === Dispersion tuning (penalties at BASE=4) ===
-#define SECTOR_PREF_BONUS_BASE   -6.0
-#define SECTOR_OFF_PENALTY_BASE   3.0
-#define RECENT_PENALTY_0_BASE     3.0
-#define RECENT_PENALTY_1_BASE     2.0
-#define RECENT_PENALTY_2_BASE     1.6
+#define SECTOR_PREF_BONUS_BASE   -8.0
+#define SECTOR_OFF_PENALTY_BASE   4.0
+#define RECENT_PENALTY_0_BASE     3.6
+#define RECENT_PENALTY_1_BASE     2.4
+#define RECENT_PENALTY_2_BASE     2.0
 
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
@@ -2589,7 +2589,7 @@ static void RebuildNavBuckets()
 // ===========================
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
 {
-    const int TOPK = 10;                 // 保持与你原本相同的候选上限
+    const int TOPK = 12;                 // 保持与你原本相同的候选上限
     int acceptedHits = 0;
 
     if (!GetSurPosData())
@@ -2656,8 +2656,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     const float HEIGHT_PEAK_WINDOW = 350.0;  // 0..350u 区间越高越优
     const float TAPER_BASE_DIST    = 200.0;  // 超过 350 后按 1/(1+over/200) 衰减
     const float HEADROOM           = 400.0;  // 需要感知补额的最大值（保证略超 ring 的高点能进候选）
-    const float CJ_ALLOWED_PLANE   = 200.0;  // Charger/Jockey 允许的眼高±范围
-    const float CJ_PLANE_BASE_PEN  = 50.0;   // 脱平面固定罚
+    const float CJ_ALLOWED_PLANE   = 250.0;  // Charger/Jockey 允许的眼高±范围
+    const float CJ_PLANE_BASE_PEN  = 20.0;   // 脱平面固定罚
     const float CJ_PLANE_SLOPE     = 0.6;    // 脱平面超出部分的线性罚系数
 
     // ============ 工具：基于“目标或全队最高”的参考眼高 ============
@@ -2754,9 +2754,9 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     const float EYE_TO_FEET = 60.0;
                     float allMinFeetZ = allMinZ - EYE_TO_FEET;
 
-                    if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
+                    if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket ))
                         extra += 1000.0;         // 地底且靠后
-                    else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1))
+                    else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1) && zc != view_as<int>(SI_Smoker))
                         extra += 1000.0;         // 过高且靠后
                 }
 
@@ -2896,10 +2896,11 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             {
                 const float EYE_TO_FEET = 60.0;
                 float allMinFeetZ = allMinZ - EYE_TO_FEET;
-                if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket + 1))
-                    extra += 1000.0;
-                else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1))
-                    extra += 1000.0;
+
+                if (p[2] < (allMinFeetZ - 200.0) && candBucket <= (allMinFlowBucket ))
+                    extra += 1000.0;         // 地底且靠后
+                else if (p[2] > (allMaxZ + 300.0) && candBucket <= (allMinFlowBucket + 1) && zc != view_as<int>(SI_Smoker))
+                    extra += 1000.0;         // 过高且靠后
             }
 
             int sidx = ComputeSectorIndex(center, p, sectors);
