@@ -2131,7 +2131,7 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
     Address navP = L4D2Direct_GetTerrorNavArea(ref);
     if (navP == Address_Null)
         navP = view_as<Address>(L4D_GetNearestNavArea(ref, 300.0, false, false, false, TEAM_INFECTED));
-    int posFlow = Calculate_Flow(navP);
+    int posFlow = FlowPercentNoBuf(navP);
 
     if (target == -1) target = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(target))
@@ -2144,7 +2144,7 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
         if (navT == Address_Null)
             navT = view_as<Address>(L4D_GetNearestNavArea(t, 300.0, false, false, false, TEAM_INFECTED));
 
-        int tFlow = Calculate_Flow(navT);
+        int tFlow = FlowPercentNoBuf(navT);
         return posFlow >= tFlow;
     }
     return false;
@@ -2152,17 +2152,56 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
 
 stock static int Calculate_Flow(Address area)
 {
-    float flow = L4D2Direct_GetTerrorNavAreaFlow(area) / L4D2Direct_GetMapMaxFlowDistance();
-    float prox = flow + gCV.VsBossFlowBuffer.FloatValue / L4D2Direct_GetMapMaxFlowDistance();
-    if (prox > 1.0) prox = 1.0;
-    return RoundToNearest(prox * 100.0);
+    float maxd = L4D2Direct_GetMapMaxFlowDistance();
+    if (maxd <= 1.0) maxd = 1.0;
+
+    // 读原始 flow 距离（单位：world units），对 NaN/负数/越界做钳位
+    float d = 0.0;
+    if (area != Address_Null)
+        d = L4D2Direct_GetTerrorNavAreaFlow(area);
+
+    if (!(d >= 0.0)) d = 0.0;     // 拦截 NaN 和负数
+    if (d > maxd)    d = maxd;    // 上界
+
+    // 叠加 BossBuffer（距离制），再做一次钳位
+    float prox = d + gCV.VsBossFlowBuffer.FloatValue;
+    if (!(prox >= 0.0)) prox = 0.0;
+    if (prox > maxd)    prox = maxd;
+
+    return RoundToNearest((prox / maxd) * 100.0); // → 0..100
 }
+
+static int FlowPercentNoBuf(Address area)
+{
+    float maxd = L4D2Direct_GetMapMaxFlowDistance();
+    if (maxd <= 1.0) maxd = 1.0;
+
+    float d = 0.0;
+    if (area != Address_Null)
+        d = L4D2Direct_GetTerrorNavAreaFlow(area);
+
+    if (!(d >= 0.0)) d = 0.0;
+    if (d > maxd)    d = maxd;
+
+    return RoundToNearest((d / maxd) * 100.0); // 0..100（不加 BossBuffer）
+}
+
 static int FlowDistanceToPercent(float flowDist)
 {
-    float flow = flowDist / L4D2Direct_GetMapMaxFlowDistance();
-    float prox = flow + gCV.VsBossFlowBuffer.FloatValue / L4D2Direct_GetMapMaxFlowDistance();
-    if (prox > 1.0) prox = 1.0;
-    return RoundToNearest(prox * 100.0);
+    float maxd = L4D2Direct_GetMapMaxFlowDistance();
+    if (maxd <= 1.0) maxd = 1.0;
+
+    // 传入的是“距离”而非比例：做 NaN/负数/越界钳位
+    float d = flowDist;
+    if (!(d >= 0.0)) d = 0.0;     // NaN/负数 → 0
+    if (d > maxd)    d = maxd;    // 距离上限
+
+    // 按距离口径叠加 BossBuffer（也是距离）
+    float prox = d + gCV.VsBossFlowBuffer.FloatValue;
+    if (!(prox >= 0.0)) prox = 0.0;
+    if (prox > maxd)    prox = maxd;
+
+    return RoundToNearest((prox / maxd) * 100.0); // → 0..100
 }
 
 // =========================
@@ -3000,6 +3039,89 @@ static void RebuildNavBuckets()
     BuildNavBuckets();
 }
 
+// 这四类更吃“高点空降”红利
+static float GetHeightClassMul(int zc)
+{
+    if (zc == view_as<int>(SI_Smoker))  return 1.40; // 舌头多高点视野好
+    if (zc == view_as<int>(SI_Hunter))  return 1.30; // 猎人最需要高度
+    if (zc == view_as<int>(SI_Spitter)) return 1.20; // 吐女高点抛物线更好
+    if (zc == view_as<int>(SI_Boomer))  return 1.10; // 蹦女空降爆更强
+    return 1.0; // 其它类不放大
+}
+
+static bool FindDropLanding(const float from[3], float outLand[3], float maxDrop = 480.0)
+{
+    float start[3];
+    start[0] = from[0];
+    start[1] = from[1];
+    start[2] = from[2] + 1.0;
+
+    float end[3];
+    end[0] = from[0];
+    end[1] = from[1];
+    end[2] = from[2] - maxDrop;
+
+    Handle tr = TR_TraceRayFilterEx(start, end, MASK_SOLID, RayType_EndPoint, TraceFilter);
+    if (!TR_DidHit(tr))
+    {
+        delete tr;
+        return false;
+    }
+
+    TR_GetEndPosition(outLand, tr);
+    delete tr;
+
+    Address nav = L4D_GetNearestNavArea(outLand, 120.0, false, false, false, TEAM_INFECTED);
+    return nav != Address_Null;
+}
+
+// “空降潜力”额外奖励（返回负数=更优）——仅对 Smo/Spit/Boom/Hunt 生效
+static float AirdropBonus(int zc, const float p[3], float refEyeZ)
+{
+    bool eligible =
+        (zc == view_as<int>(SI_Smoker))  ||
+        (zc == view_as<int>(SI_Spitter)) ||
+        (zc == view_as<int>(SI_Boomer))  ||
+        (zc == view_as<int>(SI_Hunter));
+    if (!eligible) return 0.0;
+
+    // 高度越高越好（在已有“高度加分”的基础上再给一层轻量奖励）
+    float zRel = p[2] - refEyeZ;
+    if (zRel <= 40.0) return 0.0;
+
+    float bonus = 0.0;
+    {
+        // 420u 内线性奖励，之后平滑衰减
+        float peak  = 420.0;
+        float base  = 10.0;   // 量级：和你现有罚分/加分同量纲
+        if (zRel <= peak)
+            bonus -= base * (zRel / peak);
+        else {
+            float over  = zRel - peak;
+            float taper = 1.0 / (1.0 + (over / 260.0));
+            bonus -= base * taper;
+        }
+    }
+
+    // 有真实“可落脚”的下落路径，且落点离幸存者更近 → 额外奖励
+    float land[3];
+    if (FindDropLanding(p, land))
+    {
+        float d = GetMinDistToAnySurvivor(land); // 到幸存者“脚”的最小距离
+        if (d < 420.0) bonus -= 2.5;
+        if (d < 340.0) bonus -= 3.0;
+        if (d < 260.0) bonus -= 3.0;
+    }
+
+    // 按职业再放大一点（和上面的高度权重一致）
+    if (zc == view_as<int>(SI_Smoker))       bonus *= 1.40;
+    else if (zc == view_as<int>(SI_Hunter))  bonus *= 1.30;
+    else if (zc == view_as<int>(SI_Spitter)) bonus *= 1.20;
+    else if (zc == view_as<int>(SI_Boomer))  bonus *= 1.10;
+
+    return bonus;
+}
+
 // ===========================
 // 主找点（fdxx NavArea 简化 + 分散度 + FLOW分桶）— 修改版
 // - 桶内按“核心高度”从高到低迭代
@@ -3216,7 +3338,11 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                         float taper = 1.0 / (1.0 + (over / TAPER_BASE_DIST));
                         heightBonus = - BONUS_BASE_FACTOR * (1.0 * taper);
                     }
+                    heightBonus *= GetHeightClassMul(zc);   // 高度加分对四类更给力
                     extra += heightBonus;
+
+                    // 新增：空降潜力奖励（只对四类生效，其他类此函数返回 0）
+                    extra += AirdropBonus(zc, p, refEyeZ);
                 }
 
                 // 路径可达性罚分（保持与原逻辑一致，最后叠加）
