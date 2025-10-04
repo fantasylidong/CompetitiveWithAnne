@@ -162,7 +162,7 @@ public void OnPluginStart() {
 	g_cvPluginName.GetString(cvName, sizeof(cvName));
 	FormatEx(cvName, sizeof(cvName), "%s_log_level", cvName);
 	// log level: 1=off, 2=console, 4=log file, 8=chat, 16=server console, 32=error file, add them together
-	g_cvLogLevel = CreateConVar(cvName, "38", "日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
+	g_cvLogLevel = CreateConVar(cvName, "32", "日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
 
 	HookEvent("round_start", evtRoundStart);
 	HookEvent("round_end", evtRoundEnd);
