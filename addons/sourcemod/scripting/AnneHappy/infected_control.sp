@@ -2134,7 +2134,7 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
 
     int posFlow = Calculate_Flow(navP);
 
-    if (target == -1) target = L4D_GetHighestFlowSurvivor();
+    if (target == -1) target = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(target))
     {
         float t[3]; GetClientAbsOrigin(target, t);
@@ -2146,6 +2146,7 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
     }
     return false;
 }
+
 stock static int Calculate_Flow(Address area)
 {
     float flow = L4D2Direct_GetTerrorNavAreaFlow(area) / L4D2Direct_GetMapMaxFlowDistance();
@@ -2183,10 +2184,11 @@ static int ChooseTargetSurvivor()
         }
     }
     if (n > 0) return cand[GetRandomInt(0, n-1)];
-    int fb = L4D_GetHighestFlowSurvivor();
+    int fb = GetHighestFlowSurvivorSafe();
     LogMsg("[TARGET] fallback to highest-flow %N", fb);
     return fb;
 }
+
 static bool CheckRushManAndAllPinned()
 {
     bool old = gST.bPickRushMan;
@@ -2212,7 +2214,7 @@ static bool CheckRushManAndAllPinned()
 
     if (ns == 1) return false;
 
-    int target = L4D_GetHighestFlowSurvivor();
+    int target = GetHighestFlowSurvivorSafe();
     if (ns >= 1 && IsValidClient(target))
     {
         GetClientAbsOrigin(target, tmp);
@@ -2247,7 +2249,7 @@ static bool CheckRushManAndAllPinned()
         if (old != gST.bPickRushMan)
         {
             LogMsg("Runner state ON: %N", target);
-            EmitRushmanForward(target);    // ← 这里触发 forward，告诉外部“检测到跑男”
+            EmitRushmanForward(target);
         }
     }
     return pinned == ns;
@@ -2274,12 +2276,20 @@ static bool IsAnyTankOrAboveHalfSurvivorDownOrDied(int limit = 0)
     else
         return down >= limit;
 }
+
 static float GetSurAvrFlow()
 {
-    int n = 0; float sum = 0.0;
+    int n = 0;
+    float sumPct = 0.0;
     for (int i = 1; i <= MaxClients; i++)
-        if (IsValidSurvivor(i)) { sum += L4D2_GetVersusCompletionPlayer(i); n++; }
-    return n > 0 ? (sum / float(n)) : 0.0;
+    {
+        if (!IsValidSurvivor(i)) continue;
+        int pct;
+        if (!TryGetClientFlowPercentSafe(i, pct)) continue;
+        sumPct += float(pct);
+        n++;
+    }
+    return n > 0 ? (sumPct / float(n)) : 0.0;
 }
 
 // =========================
@@ -2296,14 +2306,13 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
     float spawnMax = gCV.fSpawnMax;
     float spawnMin = gCV.fSpawnMin;
 
-    // --- 1) 选一个“有效目标幸存者”作为参考（容错 target=-1/已死/未初始化） ---
+    // 1) 选一个“有效目标幸存者”
     int tgt = target;
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
-        tgt = L4D_GetHighestFlowSurvivor();
+        tgt = GetHighestFlowSurvivorSafe();
 
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
     {
-        // 再扫一遍找任何还活着的幸存者
         for (int i = 1; i <= MaxClients; i++)
         {
             if (IsValidSurvivor(i) && IsPlayerAlive(i)) { tgt = i; break; }
@@ -2312,12 +2321,11 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
 
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
     {
-        // 场上没有可用幸存者，兜底无意义 → 返回失败，避免无效 GetClientAbsOrigin
         Debug_Print("[FALLBACK] no valid survivor to reference, abort");
         return false;
     }
 
-    // --- 2) 以该幸存者脚底所在区域作为大致参考（求一个邻近 nav） ---
+    // 2) 参考幸存者所在 Nav
     float tFeet[3];
     GetClientAbsOrigin(tgt, tFeet);
 
@@ -2331,14 +2339,14 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
         return false;
     }
 
-    // --- 3) 用导演随机点反复取样，挑一个接近 spawnMax 的、看不见/不卡的点 ---
+    // 3) 尝试导演点
     for (int i = 0; i < kTries; i++)
     {
         float pt[3];
         if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt))
             continue;
 
-        float minD = GetMinDistToAnySurvivor(pt); // 脚底距离；硬下限用眼睛距离在 DoSpawnAt 再把关
+        float minD = GetMinDistToAnySurvivor(pt);
         if (minD < spawnMin || minD > spawnMax + 200.0)
             continue;
 
@@ -2359,21 +2367,13 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
         {
             float bestMinD = GetMinDistToAnySurvivor(bestPt);
             bool bestPrefer = (bestMinD <= spawnMax);
-
-            // 优先选“<=spawnMax”的，再比谁更接近 spawnMax
             if ((prefer && !bestPrefer) || (prefer == bestPrefer && delta < bestDelta))
-            {
-                bestPt = pt; bestDelta = delta;
-            }
+            { bestPt = pt; bestDelta = delta; }
         }
     }
 
-    if (!have)
-        return false;
-
-    outPos[0] = bestPt[0];
-    outPos[1] = bestPt[1];
-    outPos[2] = bestPt[2];
+    if (!have) return false;
+    outPos[0] = bestPt[0]; outPos[1] = bestPt[1]; outPos[2] = bestPt[2];
     return true;
 }
 
@@ -2514,7 +2514,7 @@ stock void GetSectorCenter(float outCenter[3], int targetSur)
         return;
     }
 
-    int fb = L4D_GetHighestFlowSurvivor();
+    int fb = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(fb))
     {
         GetClientAbsOrigin(fb, outCenter);
@@ -2609,6 +2609,68 @@ static float ScaleBySectors(float baseAt4, int sectorsNow)
     return baseAt4 * (float(SECTORS_BASE) / float(sectorsNow));
 }
 
+// 判异常：flow < 0 或 > 地图最大 flow
+static bool IsFlowAbnormal(float flowDist, float maxFlow)
+{
+    if (maxFlow <= 0.0) return true;
+    return (flowDist < 0.0 || flowDist > maxFlow);
+}
+
+static bool TryGetFlowDistanceFromArea(Address area, float &outFlow)
+{
+    if (area == Address_Null) return false;
+    float d = L4D2Direct_GetTerrorNavAreaFlow(area);
+    float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
+    if (IsFlowAbnormal(d, maxFlow)) return false;
+    outFlow = d;
+    return true;
+}
+
+// 核心：为 client 拿“安全的 flow 距离”，异常则用 last-known-area 兜底，再不行用附近 NavArea
+static bool TryGetClientFlowDistanceSafe(int client, float &outFlow)
+{
+    float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
+    float d = L4D2Direct_GetFlowDistance(client);
+    if (!IsFlowAbnormal(d, maxFlow)) { outFlow = d; return true; }
+
+    Address last = view_as<Address>(L4D_GetLastKnownArea(client));
+    if (TryGetFlowDistanceFromArea(last, outFlow)) return true;
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    Address near = L4D_GetNearestNavArea(pos, 300.0, false, false, false, TEAM_SURVIVOR);
+    if (TryGetFlowDistanceFromArea(near, outFlow)) return true;
+
+    return false;
+}
+
+// 百分比封装
+static bool TryGetClientFlowPercentSafe(int client, int &outPct)
+{
+    float d;
+    if (!TryGetClientFlowDistanceSafe(client, d)) return false;
+    outPct = FlowDistanceToPercent(d);
+    if (outPct < 0) outPct = 0;
+    if (outPct > 100) outPct = 100;
+    return true;
+}
+
+// 最高进度幸存者（安全版）
+static int GetHighestFlowSurvivorSafe()
+{
+    int best = -1, bestPct = -1;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
+        int pct;
+        if (!TryGetClientFlowPercentSafe(i, pct)) continue;
+        if (pct > bestPct) { bestPct = pct; best = i; }
+    }
+    if (best != -1) return best;
+    // 若全部失败，退回引擎原生（极端保护）
+    return L4D_GetHighestFlowSurvivor();
+}
+
 // =========================
 // Survivor数据辅助
 // =========================
@@ -2624,7 +2686,13 @@ static bool GetSurPosData()
     {
         if (IsClientInGame(i) && GetClientTeam(i) == TEAM_SURVIVOR && IsPlayerAlive(i) && !L4D_IsPlayerIncapacitated(i))
         {
-            data.fFlow = L4D2Direct_GetFlowDistance(i);
+            float flowDist;
+            if (!TryGetClientFlowDistanceSafe(i, flowDist))
+            {
+                // 实在拿不到就按 0 处理（开局/重生点），避免把异常流量灌进 allMinFlowBucket
+                flowDist = 0.0;
+            }
+            data.fFlow = flowDist;
             GetClientEyePosition(i, data.fPos);
             g_aSurPosData.PushArray(data);
             g_iSurvivors[g_iSurCount++] = i;
@@ -2632,6 +2700,7 @@ static bool GetSurPosData()
     }
     return (g_iSurPosDataLen = g_aSurPosData.Length) > 0;
 }
+
 static bool IsValidFlags(int iFlags, bool bFinaleArea)
 {
     if (!iFlags)
@@ -2992,8 +3061,9 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int centerBucket = 50;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
     {
-        float tFlowDist = L4D2Direct_GetFlowDistance(targetSur);
-        centerBucket = FlowDistanceToPercent(tFlowDist);
+        int pct;
+        if (TryGetClientFlowPercentSafe(targetSur, pct))
+            centerBucket = pct;
     }
     else
     {
@@ -3004,7 +3074,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             g_aSurPosData.GetArray(si, data2);
             if (data2.fFlow > bestFlow) bestFlow = data2.fFlow;
         }
-        if (bestFlow > 0.0) centerBucket = FlowDistanceToPercent(bestFlow);
+        if (bestFlow >= 0.0) centerBucket = FlowDistanceToPercent(bestFlow);
     }
 
     bool  found     = false;
