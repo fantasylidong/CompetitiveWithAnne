@@ -2131,16 +2131,19 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
     Address navP = L4D2Direct_GetTerrorNavArea(ref);
     if (navP == Address_Null)
         navP = view_as<Address>(L4D_GetNearestNavArea(ref, 300.0, false, false, false, TEAM_INFECTED));
-
     int posFlow = Calculate_Flow(navP);
 
     if (target == -1) target = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(target))
     {
+        // ★ 目标 flow：先 last-known-area，再脚下/最近 Nav
         float t[3]; GetClientAbsOrigin(target, t);
-        Address navT = L4D2Direct_GetTerrorNavArea(t);
+        Address navT = view_as<Address>(L4D2Direct_GetTerrorNavArea(t));  // ★ 兜底首选
+        if (navT == Address_Null)
+            navT = L4D_GetLastKnownArea(target);
         if (navT == Address_Null)
             navT = view_as<Address>(L4D_GetNearestNavArea(t, 300.0, false, false, false, TEAM_INFECTED));
+
         int tFlow = Calculate_Flow(navT);
         return posFlow >= tFlow;
     }
@@ -2214,14 +2217,15 @@ static bool CheckRushManAndAllPinned()
 
     if (ns == 1) return false;
 
-    int target = GetHighestFlowSurvivorSafe();
+    int target = GetHighestFlowSurvivorSafe(); // ★
     if (ns >= 1 && IsValidClient(target))
     {
         GetClientAbsOrigin(target, tmp);
         bool nearAnotherSurvivor = false;
         for (int i = 0; i < ns; i++)
         {
-            if (IsPinned(target) || L4D_IsPlayerIncapacitated(target) || (surv[i] != target && GetVectorDistance(sPos[i], tmp, true) <= Pow(RUSH_MAN_DISTANCE, 2.0)))
+            if (IsPinned(target) || L4D_IsPlayerIncapacitated(target) ||
+                (surv[i] != target && GetVectorDistance(sPos[i], tmp, true) <= Pow(RUSH_MAN_DISTANCE, 2.0)))
             { nearAnotherSurvivor = true; break; }
         }
 
@@ -2235,7 +2239,8 @@ static bool CheckRushManAndAllPinned()
         {
             for (int i = 0; i < ni; i++)
             {
-                if (IsPinned(target) || L4D_IsPlayerIncapacitated(target) || (GetVectorDistance(iPos[i], tmp, true) <= Pow(RUSH_MAN_DISTANCE, 2.0) * 1.3))
+                if (IsPinned(target) || L4D_IsPlayerIncapacitated(target) ||
+                    (GetVectorDistance(iPos[i], tmp, true) <= Pow(RUSH_MAN_DISTANCE, 2.0) * 1.3))
                 {
                     gST.bPickRushMan = false; gST.rushManIndex = -1;
                     if (old != gST.bPickRushMan) LogMsg("Runner state OFF");
@@ -2254,6 +2259,7 @@ static bool CheckRushManAndAllPinned()
     }
     return pinned == ns;
 }
+
 
 // =========================
 // Flow / 平均
@@ -2306,63 +2312,42 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
     float spawnMax = gCV.fSpawnMax;
     float spawnMin = gCV.fSpawnMin;
 
-    // 1) 选一个“有效目标幸存者”
     int tgt = target;
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
-        tgt = GetHighestFlowSurvivorSafe();
+        tgt = GetHighestFlowSurvivorSafe(); // ★
 
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
     {
         for (int i = 1; i <= MaxClients; i++)
-        {
             if (IsValidSurvivor(i) && IsPlayerAlive(i)) { tgt = i; break; }
-        }
     }
-
     if (!IsValidSurvivor(tgt) || !IsPlayerAlive(tgt))
     {
         Debug_Print("[FALLBACK] no valid survivor to reference, abort");
         return false;
     }
 
-    // 2) 参考幸存者所在 Nav
-    float tFeet[3];
-    GetClientAbsOrigin(tgt, tFeet);
-
+    float tFeet[3]; GetClientAbsOrigin(tgt, tFeet);
     Address navTarget = L4D2Direct_GetTerrorNavArea(tFeet);
     if (navTarget == Address_Null)
         navTarget = view_as<Address>(L4D_GetNearestNavArea(tFeet, 300.0, false, false, false, TEAM_INFECTED));
-
     if (navTarget == Address_Null)
-    {
-        Debug_Print("[FALLBACK] no nav near survivor feet, abort");
         return false;
-    }
 
-    // 3) 尝试导演点
     for (int i = 0; i < kTries; i++)
     {
         float pt[3];
-        if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt))
-            continue;
+        if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt)) continue;
 
         float minD = GetMinDistToAnySurvivor(pt);
-        if (minD < spawnMin || minD > spawnMax + 200.0)
-            continue;
-
-        if (IsPosVisibleSDK(pt, teleportMode))
-            continue;
-
-        if (WillStuck(pt))
-            continue;
+        if (minD < spawnMin || minD > spawnMax + 200.0) continue;
+        if (IsPosVisibleSDK(pt, teleportMode)) continue;
+        if (WillStuck(pt)) continue;
 
         float delta = FloatAbs(spawnMax - minD);
         bool prefer = (minD <= spawnMax);
 
-        if (!have)
-        {
-            bestPt = pt; have = true; bestDelta = delta;
-        }
+        if (!have) { bestPt = pt; have = true; bestDelta = delta; }
         else
         {
             float bestMinD = GetMinDistToAnySurvivor(bestPt);
@@ -2373,9 +2358,10 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
     }
 
     if (!have) return false;
-    outPos[0] = bestPt[0]; outPos[1] = bestPt[1]; outPos[2] = bestPt[2];
+    outPos = bestPt;
     return true;
 }
+
 
 static float GetMinDistToAnySurvivor(const float p[3])
 {
@@ -2505,7 +2491,6 @@ stock int ComputeSectorIndex(const float center[3], const float pt[3], int secto
     return idx;
 }
 
-
 stock void GetSectorCenter(float outCenter[3], int targetSur)
 {
     if (IsValidSurvivor(targetSur))
@@ -2626,13 +2611,16 @@ static bool TryGetFlowDistanceFromArea(Address area, float &outFlow)
     return true;
 }
 
-// 核心：为 client 拿“安全的 flow 距离”，异常则用 last-known-area 兜底，再不行用附近 NavArea
+// ★核心兜底：为 client 拿“安全 flow 距离”
+// 1) 直接读玩家 flow；异常 → 2) 用 L4D_GetLastKnownArea(client) 取 Nav flow；仍异常 → 3) 最近 NavArea。
 static bool TryGetClientFlowDistanceSafe(int client, float &outFlow)
 {
     float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
+
     float d = L4D2Direct_GetFlowDistance(client);
     if (!IsFlowAbnormal(d, maxFlow)) { outFlow = d; return true; }
 
+    // ★ 显式兜底：使用 L4D_GetLastKnownArea（你要求的函数）
     Address last = view_as<Address>(L4D_GetLastKnownArea(client));
     if (TryGetFlowDistanceFromArea(last, outFlow)) return true;
 
@@ -3063,7 +3051,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     {
         int pct;
         if (TryGetClientFlowPercentSafe(targetSur, pct))
-            centerBucket = pct;
+            centerBucket = pct;                 // ★ 已经过 last-known-area 兜底
     }
     else
     {
@@ -3071,7 +3059,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         SurPosData data2;
         for (int si = 0; si < g_iSurPosDataLen; si++)
         {
-            g_aSurPosData.GetArray(si, data2);
+            g_aSurPosData.GetArray(si, data2);  // ← data2.fFlow 已经是安全 flowDist
             if (data2.fFlow > bestFlow) bestFlow = data2.fFlow;
         }
         if (bestFlow >= 0.0) centerBucket = FlowDistanceToPercent(bestFlow);
