@@ -75,7 +75,7 @@
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
 #define PEN_LIMIT_SCALE_LO        0.50   // L=20 时：正向惩罚明显减弱
 #define PEN_LIMIT_MINL            1
-#define PEN_LIMIT_MAXL            14
+#define PEN_LIMIT_MAXL            16
 // [新增] —— Path 构建结果的短期缓存（秒）
 #define PATH_CACHE_TTL            1.0
 
@@ -93,7 +93,7 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2025.10.04"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2025.10.05"  // 和插件版号保持同步
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -196,6 +196,31 @@ enum
     TERROR_NAV_DOOR                 = 1 << 18,
     TERROR_NAV_NOTHREAT             = 1 << 19
 }
+
+// [ADD] 单次最终入选刷点的评分快照（只打印最终点）
+enum struct SpawnScoreDbg
+{
+    float total;
+    float dist;
+    float hght;
+    float flow;
+    float dispRaw;
+    float dispScaled;
+    float penK;
+
+    float dminEye;
+    float ringEff;
+    float slack;
+
+    int candBucket;
+    int centerBucket;
+    int deltaFlow;
+    int sector;
+    int areaIdx;
+
+    float pos[3];
+}
+
 
 // =========================
 // 枚举/结构
@@ -1675,8 +1700,9 @@ static void TryNormalSpawnOnce()
     float maxR = gCV.fSpawnMax;
     if (isSupport && SUPPORT_EXPAND_MAX < maxR)
         maxR = SUPPORT_EXPAND_MAX;
-
-    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx);
+    // [ADD] 本地 best 调试包
+    SpawnScoreDbg bestDbg;
+    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx, bestDbg);
 
     if (ok && IsPosVisibleSDK(pos, false)) { ok = false; }
 
@@ -1691,6 +1717,7 @@ static void TryNormalSpawnOnce()
 
     if (ok && spawnOk)
     {
+        LogChosenSpawnScore(want, bestDbg);
         // 分散度：成功后记录冷却与最近刷点
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
         float center[3]; GetSectorCenter(center, gST.targetSurvivor);
@@ -1766,8 +1793,9 @@ static void TryTeleportSpawnOnce()
     int areaIdx = -1;
     float ring = gST.teleportDistCur;
     float maxR = gCV.fSpawnMax;
-
-    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, true, pos, areaIdx);
+    // [ADD] 本地 best 调试包
+    SpawnScoreDbg bestDbg;
+    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, true, pos, areaIdx, bestDbg);
 
     if (ok && IsPosVisibleSDK(pos, true)) { ok = false; }
 
@@ -1782,6 +1810,7 @@ static void TryTeleportSpawnOnce()
 
     if (ok && spawnOk)
     {
+        LogChosenSpawnScore(want, bestDbg);
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
         float center[3]; GetSectorCenter(center, gST.targetSurvivor);
         RememberSpawn(pos, center);
@@ -3399,10 +3428,14 @@ stock float PenLimitScale()
     return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
 }
 
-// [修改] —— 主找点：平滑评分 + 自适应 First-Fit + 每桶“百分比抽样”+ 楼层近距硬过滤
-static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode, float outPos[3], int &outAreaIdx)
+// ===========================
+// 主找点：平滑评分 + 自适应 First-Fit + 每桶“百分比抽样”+ 楼层近距硬过滤
+// 说明：不新增任何 ConVar。命中点后评分会在外层刷出成功时由 LogChosenSpawnScore 打印。
+// ===========================
+static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode,
+                                   float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
-    const int TOPK = 12; // 保持你的上限
+    const int TOPK = 12; // 每次最多采纳的候选个数
     if (!GetSurPosData()) { Debug_Print("[FIND FAIL] no survivor data"); return false; }
 
     // ====== 基础上下文 ======
@@ -3417,7 +3450,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int   sectors         = GetCurrentSectors();
     int   preferredSector = PickSector(sectors);
 
-    // ====== 生还者群体状态 ======
+    // ====== 生还者群体状态（高度/流程范围）======
     float allMinZ = 1.0e9, allMaxZ = -1.0e9;
     int   allMinFlowBucket = 100;
     SurPosData data;
@@ -3429,7 +3462,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         if (sb < allMinFlowBucket) allMinFlowBucket = sb;
     }
 
-    // ====== 中心桶计算 ======
+    // ====== 中心桶（以目标或最高进度为参考）======
     int centerBucket = 50;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur)) {
         int pct;
@@ -3443,13 +3476,13 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         if (bestFlow >= 0.0) centerBucket = FlowDistanceToPercent(bestFlow);
     }
 
-    // ====== 目标参考高度 ======
+    // ====== 目标参考高度（取目标眼睛为主，退回到组内最高眼睛）======
     float refEyeZ = allMaxZ;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur)) {
         float e[3]; GetClientEyePosition(targetSur, e); refEyeZ = e[2];
     }
 
-    // ====== 最佳选择与计数 ======
+    // ====== 选择循环状态 ======
     bool  found     = false;
     float bestScore = -1.0e9;
     int   bestIdx   = -1;
@@ -3457,9 +3490,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int acceptedHits = 0;
     int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0;
 
-    bool useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
-    bool firstFit   = gCV.bNavBucketFirstFit;
-    float ffThresh  = ComputeFFThresholdForClass(zc); // 自适应 FF 阈值
+    bool  useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
+    bool  firstFit   = gCV.bNavBucketFirstFit;
+    float ffThresh   = ComputeFFThresholdForClass(zc); // 自适应 FF 阈值
+
+    // [ADD] 本地 best 调试包
+    SpawnScoreDbg bestDbg;
 
     if (useBuckets)
     {
@@ -3474,18 +3510,17 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             int b = order[oi];
             if (b < 0 || b > 100 || g_FlowBuckets[b] == null) continue;
 
-            // —— 每桶“百分比抽样”：随机起点 + 计算 cap(=L×pct)
+            // —— 每桶“百分比抽样”：随机起点 + cap(=L×pct) —— //
             int L = g_FlowBuckets[b].Length;
             if (L <= 0) continue;
-            int cap   = ComputePerBucketCap(L);       // ★ 改为百分比
+            int cap   = ComputePerBucketCap(L);
             int start = GetRandomInt(0, L-1);
 
             for (int r = 0; r < cap && acceptedHits < TOPK; r++)
             {
-                int k  = (start + r) % L;
-                int ai = g_FlowBuckets[b].Get(k);
+                int ai = g_FlowBuckets[b].Get((start + r) % L);
 
-                // --- 硬过滤 --- 
+                // --- 硬过滤 ---
                 if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
 
                 NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(ai, false));
@@ -3507,10 +3542,10 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 float dminEye = GetMinEyeDistToAnySurvivor(p);
 
                 if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
-                if (!PassMinSeparation(p)) { cFilt_Sep++; continue; }
-                if (NearSameFloorTooClose(p)) { cFilt_Sep++; continue; }
-                if (WillStuck(p)) { cFilt_Stuck++; continue; }
-                if (IsPosVisibleSDK(p, teleportMode)) { cFilt_Vis++; continue; }
+                if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
+                if (NearSameFloorTooClose(p))        { cFilt_Sep++;   continue; }
+                if (WillStuck(p))                    { cFilt_Stuck++; continue; }
+                if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
                 if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
                 // --- 评分（平滑） ---
@@ -3524,19 +3559,47 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 float score_flow = ScoreFlowSmooth(deltaFlow);
                 float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
+                // —— 用上“负向分散度惩罚随上限 L 变弱”的缩放 —— //
+                float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
+                float dispScaled = ScaleNegativeOnly(score_disp, penK);
+
                 float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
-                                 + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*score_disp;
+                                 + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
 
                 acceptedHits++;
-                if (firstFit && totalScore >= ffThresh) { outPos = p; outAreaIdx = ai; return true; }
 
-                if (!found || totalScore > bestScore) { found = true; bestScore = totalScore; bestIdx = ai; bestPos = p; }
+                // === First-Fit：直接返回，并把当前候选的评分写入 dbgOut ===
+                if (firstFit && totalScore >= ffThresh) {
+                    dbgOut.total = totalScore; dbgOut.dist = score_dist; dbgOut.hght = score_hght; dbgOut.flow = score_flow;
+                    dbgOut.dispRaw = score_disp; dbgOut.dispScaled = dispScaled; dbgOut.penK = penK;
+                    dbgOut.dminEye = dminEye; dbgOut.ringEff = ringEff; dbgOut.slack = slack;
+                    dbgOut.candBucket = candBucket; dbgOut.centerBucket = centerBucket; dbgOut.deltaFlow = deltaFlow;
+                    dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
+
+                    outPos = p; outAreaIdx = ai;
+                    return true;
+                }
+
+                // === 常规 best：记录更优者，并同步 bestDbg ===
+                if (!found || totalScore > bestScore) {
+                    found     = true;
+                    bestScore = totalScore;
+                    bestIdx   = ai;
+                    bestPos   = p;
+
+                    bestDbg.total = totalScore; bestDbg.dist = score_dist; bestDbg.hght = score_hght; bestDbg.flow = score_flow;
+                    bestDbg.dispRaw = score_disp; bestDbg.dispScaled = dispScaled; bestDbg.penK = penK;
+                    bestDbg.dminEye = dminEye; bestDbg.ringEff = ringEff; bestDbg.slack = slack;
+                    bestDbg.candBucket = candBucket; bestDbg.centerBucket = centerBucket; bestDbg.deltaFlow = deltaFlow;
+                    bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
+                }
             }
             if (acceptedHits >= TOPK) break;
         }
     }
     else
     {
+        // —— 无分桶模式：线性扫全体 NavArea（保持与旧逻辑一致） —— //
         for (int ai = 0; ai < iAreaCount && acceptedHits < TOPK; ai++)
         {
             if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
@@ -3561,10 +3624,10 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             float dminEye = GetMinEyeDistToAnySurvivor(p);
 
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
-            if (!PassMinSeparation(p)) { cFilt_Sep++; continue; }
-            if (NearSameFloorTooClose(p)) { cFilt_Sep++; continue; }
-            if (WillStuck(p)) { cFilt_Stuck++; continue; }
-            if (IsPosVisibleSDK(p, teleportMode)) { cFilt_Vis++; continue; }
+            if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
+            if (NearSameFloorTooClose(p))        { cFilt_Sep++;   continue; }
+            if (WillStuck(p))                    { cFilt_Stuck++; continue; }
+            if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
             int   candBucket = FlowDistanceToPercent(fFlow);
@@ -3577,23 +3640,47 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             float score_flow = ScoreFlowSmooth(deltaFlow);
             float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
+            float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
+            float dispScaled = ScaleNegativeOnly(score_disp, penK);
+
             float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
-                             + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*score_disp;
+                             + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
 
             acceptedHits++;
-            if (firstFit && totalScore >= ffThresh) { outPos = p; outAreaIdx = ai; return true; }
 
-            if (!found || totalScore > bestScore) { found = true; bestScore = totalScore; bestIdx = ai; bestPos = p; }
+            if (firstFit && totalScore >= ffThresh) {
+                dbgOut.total = totalScore; dbgOut.dist = score_dist; dbgOut.hght = score_hght; dbgOut.flow = score_flow;
+                dbgOut.dispRaw = score_disp; dbgOut.dispScaled = dispScaled; dbgOut.penK = penK;
+                dbgOut.dminEye = dminEye; dbgOut.ringEff = ringEff; dbgOut.slack = slack;
+                dbgOut.candBucket = candBucket; dbgOut.centerBucket = centerBucket; dbgOut.deltaFlow = deltaFlow;
+                dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
+
+                outPos = p; outAreaIdx = ai;
+                return true;
+            }
+
+            if (!found || totalScore > bestScore) {
+                found     = true;
+                bestScore = totalScore;
+                bestIdx   = ai;
+                bestPos   = p;
+
+                bestDbg.total = totalScore; bestDbg.dist = score_dist; bestDbg.hght = score_hght; bestDbg.flow = score_flow;
+                bestDbg.dispRaw = score_disp; bestDbg.dispScaled = dispScaled; bestDbg.penK = penK;
+                bestDbg.dminEye = dminEye; bestDbg.ringEff = ringEff; bestDbg.slack = slack;
+                bestDbg.candBucket = candBucket; bestDbg.centerBucket = centerBucket; bestDbg.deltaFlow = deltaFlow;
+                bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
+            }
         }
     }
 
     if (!found) {
         Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d",
-            searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path);
+                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path);
         return false;
     }
 
-    outPos = bestPos; outAreaIdx = bestIdx; return true;
+    outPos = bestPos; outAreaIdx = bestIdx; dbgOut = bestDbg; return true;
 }
 
 // [新增] —— 生成缓存 Key（NavAreaID + 量化后的 limitCost）
@@ -4065,7 +4152,25 @@ void GetAddress(GameData hGameData, Address &address, const char[] name)
 stock float FloatMax(float a, float b) { return (a > b) ? a : b; } 
 stock float FloatMin(float a, float b) { return (a < b) ? a : b; }
 stock float Clamp01(float v) { if (v < 0.0) return 0.0; if (v > 1.0) return 1.0; return v; }
+// [ADD] int 夹取
+stock int clampi(int v, int lo, int hi) { if (v<lo) return lo; if (v>hi) return hi; return v; }
 
+// [ADD] 负向分散度惩罚随上限 L 变弱（用你给的宏）
+stock float ComputePenScaleByLimit(int L) {
+    int Lc = clampi(L, PEN_LIMIT_MINL, PEN_LIMIT_MAXL);
+    float t = float(Lc - PEN_LIMIT_MINL) / float(PEN_LIMIT_MAXL - PEN_LIMIT_MINL); // 0..1
+    return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
+}
+stock float ScaleNegativeOnly(float v, float k) { return (v < 0.0) ? (v * k) : v; }
+
+// [ADD] 只在 DebugMode>0 时打印一行评分
+static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg) {
+    if (gCV.iDebugMode <= 0) return;
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%+d sec=%d",
+        INFDN[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
+        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
+        dbg.dminEye, dbg.ringEff, dbg.slack, dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector);
+}
 // --- pause
 public void OnPause()
 {
