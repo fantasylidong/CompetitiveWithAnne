@@ -298,9 +298,6 @@ enum struct Config
     ConVar Score_w_hght;
     ConVar Score_w_flow;
     ConVar Score_w_disp;
-    // [新增] —— 每桶抽样百分比（1..100）
-    ConVar BucketSamplePct;
-    int   iBucketSamplePct;
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
@@ -411,11 +408,6 @@ enum struct Config
         this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.0 1.8 1.5 1.2 0.5 0.5", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
         this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.2 1.2 1.5 1.0 1.0 1.0", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
         this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.0 1.0 1.0 1.0 1.0 1.0", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        // [新增] —— 每桶抽样百分比（默认 35%）
-        this.BucketSamplePct = CreateConVar(
-            "inf_BucketSamplePct", "60",
-            "Max percent of NavAreas to sample per bucket (1-100)",
-            CVAR_FLAG, true, 1.0, true, 100.0);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -424,7 +416,6 @@ enum struct Config
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
-        this.BucketSamplePct.AddChangeHook(OnCfgChanged);
         this.Score_w_dist.AddChangeHook(OnCfgChanged);
         this.Score_w_hght.AddChangeHook(OnCfgChanged);
         this.Score_w_flow.AddChangeHook(OnCfgChanged);
@@ -562,10 +553,6 @@ enum struct Config
             this.w_disp[i+1] = StringToFloat(parts[i]);
         }
         
-        // [新增] —— 读取并夹取 1..100
-        this.iBucketSamplePct = this.BucketSamplePct.IntValue;
-        if (this.iBucketSamplePct < 1)   this.iBucketSamplePct = 1;
-        if (this.iBucketSamplePct > 100) this.iBucketSamplePct = 100;
         this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
         this.fPathCacheQuantize = this.PathCacheQuantize.FloatValue;
         if (this.fPathCacheQuantize < 1.0) this.fPathCacheQuantize = 1.0;
@@ -3444,18 +3431,6 @@ stock bool NearSameFloorTooClose(const float p[3])
     return false;
 }
 
-// [新增] —— 由桶长度 L 与百分比配置计算当次抽样上限
-stock int ComputePerBucketCap(int L)
-{
-    if (L <= 0) return 0;
-    int pct = (gCV.iBucketSamplePct >= 1 && gCV.iBucketSamplePct <= 100)
-              ? gCV.iBucketSamplePct : 35;
-    int cap = RoundToCeil(float(L) * float(pct) / 100.0);
-    if (cap < 1) cap = 1;
-    if (cap > L) cap = L;
-    return cap;
-}
-
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
 stock float PenLimitScale()
 {
@@ -3548,17 +3523,15 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             int b = order[oi];
             if (b < 0 || b > 100 || g_FlowBuckets[b] == null) continue;
 
-            // —— 每桶“百分比抽样”：随机起点 + cap(=L×pct) —— //
+            // —— 取消“百分比抽样”；改为遍历该桶的全部 NavArea —— //
             int L = g_FlowBuckets[b].Length;
             if (L <= 0) continue;
-            int cap   = ComputePerBucketCap(L);
-            int start = GetRandomInt(0, L-1);
 
-            for (int r = 0; r < cap && acceptedHits < TOPK; r++)
+            for (int r = 0; r < L && acceptedHits < TOPK; r++)
             {
-                int ai = g_FlowBuckets[b].Get((start + r) % L);
+                int ai = g_FlowBuckets[b].Get(r);
 
-                // --- 硬过滤 ---
+                // --- 硬过滤 ---（原逻辑保持不变）
                 if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
 
                 NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(ai, false));
@@ -3586,7 +3559,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
                 if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
-                // --- 评分（平滑） ---
+                // --- 评分（保持不变） ---
                 int   candBucket = FlowDistanceToPercent(fFlow);
                 int   sidx       = ComputeSectorIndex(center, p, sectors);
                 int   deltaFlow  = candBucket - centerBucket;
@@ -3597,16 +3570,14 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 float score_flow = ScoreFlowSmooth(deltaFlow);
                 float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
-                // —— 用上“负向分散度惩罚随上限 L 变弱”的缩放 —— //
                 float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
                 float dispScaled = ScaleNegativeOnly(score_disp, penK);
 
                 float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
-                                 + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
+                                + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
 
                 acceptedHits++;
 
-                // === First-Fit：直接返回，并把当前候选的评分写入 dbgOut ===
                 if (firstFit && totalScore >= ffThresh) {
                     dbgOut.total = totalScore; dbgOut.dist = score_dist; dbgOut.hght = score_hght; dbgOut.flow = score_flow;
                     dbgOut.dispRaw = score_disp; dbgOut.dispScaled = dispScaled; dbgOut.penK = penK;
@@ -3618,7 +3589,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                     return true;
                 }
 
-                // === 常规 best：记录更优者，并同步 bestDbg ===
                 if (!found || totalScore > bestScore) {
                     found     = true;
                     bestScore = totalScore;
