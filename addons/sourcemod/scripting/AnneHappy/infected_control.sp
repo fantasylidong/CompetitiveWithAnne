@@ -1580,12 +1580,16 @@ static int PickScarceClassImpl(bool relaxCD)
     return bestZc;
 }
 
+// -------------------------
+// 队列维护 & 选类规则（修复版）
+// -------------------------
 static void MaintainSpawnQueueOnce()
 {
     RecalcSiCapFromAlive(false);  // 入队前刷新“剩余额度”
     if (gST.spawnQueueSize >= gCV.iSiLimit) return;
 
     int zc = 0;
+    bool relax = ShouldRelaxDeathCD();  // 是否放宽死亡CD
 
     // 模式锁定
     if (gCV.AllCharger.BoolValue)      zc = view_as<int>(SI_Charger);
@@ -1603,33 +1607,67 @@ static void MaintainSpawnQueueOnce()
         bool preferKiller= (waveAge < SUPPORT_SPAWN_DELAY_SECS
                            && killersNow < SUPPORT_NEED_KILLERS
                            && AnyEligibleKillerToQueue());
-        if (preferKiller) zc = PickEligibleKillerClass();
+        if (preferKiller)
+            zc = PickEligibleKillerClass();
 
+        // 【修复点 #1】随机兜底分支在不放宽时也过滤死亡CD
         if (zc == 0)
         {
-            for (int tries = 0; tries < 6; tries++)
+            for (int tries = 0; tries < 8; tries++)
             {
                 int pick = GetRandomInt(1, 6);
-                if (CanQueueClass(pick) && CheckClassEnabled(pick))
-                { zc = pick; break; }
+                if (!CheckClassEnabled(pick) || !CanQueueClass(pick))
+                    continue;
+                if (!relax && !PassDeathCooldown(pick)) // ★ 不放宽时跳过处于CD的类
+                    continue;
+
+                zc = pick;
+                break;
             }
         }
     }
 
-    // 入队前：如果该类处于死亡CD且不满足放宽，就暂不入队，等待下一帧
+    // 入队前的最终资格判断 + CD处理
     if (zc != 0 && CanQueueClass(zc) && CheckClassEnabled(zc))
     {
-        if (!PassDeathCooldown(zc) && !ShouldRelaxDeathCD())
+        // 【修复点 #2】当稀缺度/兜底挑中的类处于CD，且当前不放宽时，尝试一次“替补”
+        if (!PassDeathCooldown(zc) && !relax)
         {
-            Debug_Print("<SpawnQ> skip %s: death-cooldown active", INFDN[zc]);
-            return;
+            int alt = PickEligibleKillerClass(); // 已内部考虑CD/放宽
+
+            // 仍找不到就再做一轮“非杀手限定”的随机替补（不放宽时必须通过CD）
+            if (alt == 0)
+            {
+                for (int tries = 0; tries < 8; tries++)
+                {
+                    int p = GetRandomInt(1, 6);
+                    if (!CheckClassEnabled(p) || !CanQueueClass(p))
+                        continue;
+                    if (!PassDeathCooldown(p)) // relax 为 false，此处必须通过CD
+                        continue;
+
+                    alt = p;
+                    break;
+                }
+            }
+
+            if (alt == 0)
+            {
+                Debug_Print("<SpawnQ> no eligible class (CD on %s) -> wait", INFDN[zc]);
+                return; // 本帧确实无可用类，等待下一帧
+            }
+
+            Debug_Print("<SpawnQ> substitute %s -> %s (CD active on original)", INFDN[zc], INFDN[alt]);
+            zc = alt; // 用替补继续入队
         }
 
+        // 入队
         gQ.spawn.Push(zc);
         gST.spawnQueueSize++;
         Debug_Print("<SpawnQ> +%s size=%d", INFDN[zc], gST.spawnQueueSize);
     }
 }
+
 static void BuildNavIdIndexMap()
 {
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
