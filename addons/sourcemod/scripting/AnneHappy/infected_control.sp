@@ -2585,7 +2585,9 @@ stock bool PassMinSeparation(const float pos[3])
     if (lastSpawns == null || lastSpawns.Length == 0) return true;
 
     float now = GetGameTime();
-    float sep2 = SEP_RADIUS * SEP_RADIUS;
+    float k = PenLimitScale();                     // 1.00 → 0.50 (随上限增大而变小)
+    float SEP_RADIUS_EFF = SEP_RADIUS * k;         // 半径随之缩小，更容易靠近
+    float sep2 = SEP_RADIUS_EFF * SEP_RADIUS_EFF;
 
     for (int i = lastSpawns.Length - 1; i >= 0; i--)
     {
@@ -3277,12 +3279,12 @@ stock float CalculateScore_Flow(int candBucket, int survBucket)
 // [修改] 解决 warning 219: local variable "recentSectors" shadows a variable
 stock float CalculateScore_Dispersion(int sidx, int preferredSector, const int a_recentSectors[3])
 {
-    if (sidx == preferredSector)      return 100.0;
-    if (sidx == a_recentSectors[0])   return -50.0; // 严厉惩罚
-    if (sidx == a_recentSectors[1])   return -25.0; // 中等惩罚
-    if (sidx == a_recentSectors[2])   return 0.0;   // 轻微惩罚
-
-    return 50.0; // 普通扇区
+    float k = PenLimitScale(); // 1.00..0.50
+    if (sidx == preferredSector)      return 100.0;      // 正向奖励不缩
+    if (sidx == a_recentSectors[0])   return -50.0 * k;  // 最近扇区的负分随上限减半
+    if (sidx == a_recentSectors[1])   return -25.0 * k;  // 次近扇区同理
+    if (sidx == a_recentSectors[2])   return 0.0;
+    return 50.0;
 }
 // [新增] —— 计算某类的自适应 First-Fit 阈值（按理论上限的比例）
 stock float ComputeFFThresholdForClass(int zc)
@@ -3365,7 +3367,11 @@ stock bool NearSameFloorTooClose(const float p[3])
         if (dz <= 64.0) {
             float dx = p[0]-rec[0], dy = p[1]-rec[1];
             float d2 = dx*dx + dy*dy;
-            if (d2 < 220.0*220.0) return true; // 同楼层且 XY < 220u 视为太近
+
+            float k = PenLimitScale();                 // 1.00 → 0.50
+            float xyLimit = 220.0 * k;                 // 上限越大，阈值越小 → 更宽松
+            if (xyLimit < 140.0) xyLimit = 140.0;      // 保底，别小到贴脸
+            if (d2 < xyLimit*xyLimit) return true;
         }
     }
     return false;
@@ -3381,6 +3387,16 @@ stock int ComputePerBucketCap(int L)
     if (cap < 1) cap = 1;
     if (cap > L) cap = L;
     return cap;
+}
+
+// === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
+stock float PenLimitScale()
+{
+    // iSiLimit 在 gCV 里；把它压到 [PEN_LIMIT_MINL .. PEN_LIMIT_MAXL]
+    float L = float(gCV.iSiLimit);
+    float t = Clamp01((L - float(PEN_LIMIT_MINL)) / float(PEN_LIMIT_MAXL - PEN_LIMIT_MINL));
+    // L=MINL 时返回 1.0（惩罚原强度）；L=MAXL 及以上时返回 0.5（惩罚减半）
+    return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
 }
 
 // [修改] —— 主找点：平滑评分 + 自适应 First-Fit + 每桶“百分比抽样”+ 楼层近距硬过滤
