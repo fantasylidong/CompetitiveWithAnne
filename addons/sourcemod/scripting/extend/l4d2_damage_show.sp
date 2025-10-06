@@ -106,6 +106,11 @@ SumShowMode        g_Sum[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 DamageTrans        g_AttackCache[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 
 ConVar g_hMaxTE;
+// ★ 新增：按管理员 Flag 白名单控制
+ConVar g_hAllowedFlags;
+char   g_sAllowedFlags[64];
+int    g_iAllowedBits = 0;
+bool   g_bGateActive  = false; // true=必须有这些flag之一才允许用
 
 bool  g_bNeverFire[L4D2_MAXPLAYERS + 1];
 int   g_sprite;
@@ -269,6 +274,8 @@ static bool ApplyCookieRawString(int client, const char[] raw)
 
     g_Plr[client].show_other = false; // cookie 模式非管理员也不允许开放
     ClampStyle(client);
+    // ★ 新增：Cookie 应用后也要过门禁
+    Gate_EnforceFor(client, "cookie-apply");
     return true;
 }
 
@@ -477,6 +484,8 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         ClampStyle(client);
 
         g_LoadState[client] = LS_Ready;
+        // ★ 新增：DB 数据落地后，执行门禁并保存
+        Gate_EnforceFor(client, "db-load");
         LogInfo("[Load] Loaded settings from DB for client %d.", client);
     }
     else
@@ -520,6 +529,8 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         SQL_TQuery(g_DB, SQLCB_Nop, q);
 
         g_LoadState[client] = LS_Ready;
+        // ★ 新增：DB 数据落地后，执行门禁并保存
+        Gate_EnforceFor(client, "db-load");
     }
 
     // 若期间用户点过“保存”，立即把当时的快照写库（避免丢变更）
@@ -692,6 +703,17 @@ public void OnPluginStart()
     RegAdminCmd("sm_dmgdbstat",          Cmd_DmgDBStat,        Admin_Generic, "Show DB status & session charset");
     RegAdminCmd("sm_dmgforcesavecookie", Cmd_DmgForceSaveCookie, Admin_Generic, "Force save current settings to cookie");
     RegAdminCmd("sm_dmgdbprobe",         Cmd_DmgDBProbe,       Admin_Generic, "One-shot sync DB probe");
+    // ★ 新增：允许使用本插件所需的管理员 Flag（留空=所有人可用；示例："bc"）
+    g_hAllowedFlags = CreateConVar(
+        "sm_dmg_allowed_flags",
+        "",
+        "Which admin flags are allowed to USE this plugin. Empty = everyone. Example: \"bc\"",
+        FCVAR_NOTIFY
+    );
+    Gate_UpdateFromCvar();
+
+    // ★ CVar 变更：即时重算并对全体生效
+    g_hAllowedFlags.AddChangeHook(OnCvarChanged_AllowedFlags);
 
     // 事件/钩子
     HookEvent("player_left_safe_area", E_LeftSafe, EventHookMode_PostNoCopy);
@@ -715,6 +737,18 @@ public void OnClientPutInServer(int client)
     CreateTimer(2.0, Timer_DBEnsureLoad, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
+public void OnCvarChanged_AllowedFlags(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    Gate_UpdateFromCvar();
+
+    // 对当前在线玩家逐一执行门禁并保存
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsClientInGame(i) && !IsFakeClient(i))
+            Gate_EnforceFor(i, "cvar-change");
+    }
+}
+
 // 在玩家通过 Steam 认证/权限检查后，立即触发 DB 加载（不依赖 Cookie 回调）
 public void OnClientPostAdminCheck(int client)
 {
@@ -722,6 +756,8 @@ public void OnClientPostAdminCheck(int client)
 
     Settings_Default(client); // 占位，避免 UI 空白
     DB_Load(client);          // DB 优先加载
+    // ★ 新增：即时门禁（先把占位/加载中的状态压回禁用）
+    Gate_EnforceFor(client, "postadmincheck");
 }
 
 // 仅缓存 Cookie（不在这里触发 DB_Load，避免某些时序下缺失）
@@ -901,6 +937,15 @@ public Action Cmd_DmgDBProbe(int client, int args)
 public Action Cmd_Menu(int client, int args)
 {
     if (!IsValidClient(client)) return Plugin_Handled;
+
+    // ★ 新增：不满足则直接关并提示（也会保存）
+    if (!Gate_ClientAllowed(client))
+    {
+        Gate_EnforceFor(client, "open-menu");
+        CPrintToChat(client, "{olive}[HUD]{default} 未满足管理员 Flag 要求，无法使用此菜单。");
+        return Plugin_Handled;
+    }
+
     OpenRootMenu(client);
     return Plugin_Handled;
 }
@@ -1108,7 +1153,8 @@ public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
 
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
-
+    // ★ 新增：门禁（就算其他插件改了 enable，也会被这里拦下）
+    if (!Gate_ClientAllowed(attacker)) return;
     // 自己的功能开关（默认 false）
     if (!g_Plr[attacker].enable) return;
 
@@ -1135,6 +1181,7 @@ public void SDK_OnTakeDamagePost(int victim, int attacker, int inflictor, float 
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (GetClientTeam(attacker) != 2 || IsFakeClient(attacker)) return;
     if (!g_Plr[attacker].enable) return;
+    if (!Gate_ClientAllowed(attacker)) return;
 
     int wpn = (weapon == -1) ? inflictor : weapon;
     int dval = g_AttackCache[attacker][victim].damage;
@@ -1395,6 +1442,7 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
 {
     if (!IsValidClient(attacker) || !IsValidClient(victim)) return;
     if (!g_Plr[attacker].enable) return;
+    if (!Gate_ClientAllowed(attacker)) return;
 
     if (g_Plr[attacker].wpn_id != weapon && weapon != -1 && IsValidEdict(weapon))
     {
@@ -1552,5 +1600,67 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
         v %= divisor;
         divisor /= 10;
         x_start = x_start - size - g_Plr[attacker].gap;
+    }
+}
+// ★ 工具：从 cvar 读取并解析 flag 字符串（如 "bc"）
+static void Gate_UpdateFromCvar()
+{
+    g_hAllowedFlags.GetString(g_sAllowedFlags, sizeof g_sAllowedFlags);
+    TrimString(g_sAllowedFlags);
+
+    if (g_sAllowedFlags[0] == '\0')
+    {
+        g_bGateActive = false;
+        g_iAllowedBits = 0;
+        return;
+    }
+
+    g_bGateActive = true;
+    ReadFlagString(g_sAllowedFlags, g_iAllowedBits); // 解析为位掩码
+}
+
+// ★ 判定：该玩家是否被允许使用插件
+static bool Gate_ClientAllowed(int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client)) return false;
+    if (!g_bGateActive) return true; // 没有限制 → 放行
+
+    // ROOT 永远放行
+    int ufb = GetUserFlagBits(client);
+    if ((ufb & ADMFLAG_ROOT) == ADMFLAG_ROOT) return true;
+
+    // 允许：拥有任意一个指定 flag
+    return (ufb & g_iAllowedBits) != 0;
+}
+
+// ★ 强制执行门禁 & 持久化（把不符合的人关掉并保存）
+static void Gate_EnforceFor(int client, const char[] reason = "")
+{
+    if (!IsValidClient(client) || IsFakeClient(client)) return;
+
+    if (Gate_ClientAllowed(client))
+        return;
+
+    bool changed = false;
+
+    if (g_Plr[client].enable)        { g_Plr[client].enable = false; changed = true; }
+    if (g_Plr[client].see_others)    { g_Plr[client].see_others = false; changed = true; }
+    if (g_Plr[client].show_other)    { g_Plr[client].show_other = false; changed = true; }
+    if (g_Plr[client].share_scope)   { g_Plr[client].share_scope = 0; changed = true; }
+
+    if (changed)
+    {
+        ClampStyle(client);
+
+        // 已加载 → 写 DB；未加载 → 写 Cookie 并排队
+        if (g_LoadState[client] == LS_Ready) DB_Save(client);
+        else Cookie_Save(client, true);
+
+        if (IsClientInGame(client))
+        {
+            CPrintToChat(client, "{olive}[HUD]{default} 功能已禁用：未满足管理员 Flag 要求（%s）。",
+                g_sAllowedFlags[0] ? g_sAllowedFlags : "无");
+        }
+        LogInfo("[Gate] client=%d blocked (%s), settings saved.", client, reason);
     }
 }
