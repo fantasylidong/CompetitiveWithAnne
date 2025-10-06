@@ -10077,6 +10077,11 @@ CheckSurvivorsAllDown()
 		Score = ModifyScoreDifficultyNR(GetConVarInt(cvar_Restart), 2, 3, TEAM_SURVIVORS);
 		Score = 400 - Score;
 	}
+	if(IsAnne() == 2)
+	{
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "\x03硬核模式所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
+		return;
+	}
 
 	for (i = 0; i < IncapCounter; i++)
 	{
