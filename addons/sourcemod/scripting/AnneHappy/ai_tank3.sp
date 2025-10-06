@@ -56,6 +56,7 @@ ConVar
 	g_cvBackFistRange,
 	g_cvBackFistAllowMaxSpd,
 	g_cvPunchLockVision,
+	cvTankSwingRange,
 	g_cvJumpRock;
 
 ConVar
@@ -68,6 +69,9 @@ StringMap
 Handle
 	g_hSdkTankClawSweepFist,
 	g_hSdkGetRunTopSpeed;
+
+float
+	g_fTankSwingRange;
 
 bool
 	g_bLateLoad;
@@ -134,8 +138,8 @@ public void OnPluginStart() {
 	// when tank has no sight of any survivors, he is allowed to bhop when his speed vector and eye angle forward vector within this degree
 	g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无生还者视野时速度向量与视角前向向量在这个角度范围内, 允许连跳", CVAR_FLAGS, true, 0.0);
 	// when the angle that tank's speed vector and his direction vector towards the target is within (ai_tank3_airvec_modify_degree, ai_tank3_airvec_modify_degree_max), when tank is in air, tank will modify the speed vector at interval: ai_tank3_airvec_modify_interval (this will push tank to his target direction)
-	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "50.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "115.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "135.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// tank is allowed to throw rock when he and his target are within the distance (ai_tank3_throw_min_dist, ai_tank3_throw_max_dist)
 	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
@@ -211,6 +215,13 @@ public void OnAllPluginsLoaded() {
 	delete hGamedata;
 }
 
+public void OnConfigsExecuted() {
+	cvTankSwingRange = FindConVar("tank_swing_range");
+	g_fTankSwingRange = !cvTankSwingRange ? DEFAULT_SWING_RANGE : cvTankSwingRange.FloatValue;
+	if (!cvTankSwingRange)
+		cvTankSwingRange.AddChangeHook(changeHookTankSwingRange);
+}
+
 public void OnPluginEnd() {
 	delete log;
 	delete g_hThrowAnimMap;
@@ -231,6 +242,11 @@ public void OnMapStart() {
 
 public void OnMapEnd() {
 
+}
+
+void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[] newValue) {
+	g_fTankSwingRange = convar.FloatValue;
+	log.debugAll("tank_swing_range changed to %d", convar.IntValue);
 }
 
 stock void initAnimMap() {
@@ -309,13 +325,8 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
 	if (speed > g_cvBackFistAllowMaxSpd.FloatValue)
 		return;
 
-	static ConVar cv_SwingRange;
-	if (!cv_SwingRange)
-		cv_SwingRange = FindConVar("tank_swing_range");
-
-	static float pos[3], targetPos[3], swingRange, fistRange;
-	swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
-	fistRange = g_cvBackFistRange.IntValue >= 0 ? g_cvBackFistRange.FloatValue : swingRange;
+	static float pos[3], targetPos[3], fistRange;
+	fistRange = g_cvBackFistRange.IntValue >= 0 ? g_cvBackFistRange.FloatValue : g_fTankSwingRange;
 
 	GetClientEyePosition(tank, pos);
 	for (int i = 1; i <= MaxClients; i++) {
@@ -360,150 +371,155 @@ Action punchLockVision(int client, int target, const float pos[3], const float t
 // 连跳操作 BunnyHop
 // ============================================================
 Action checkEnableBhop(int client, int target, int& buttons, const float pos[3], const float targetPos[3], float dist) {
-	if (!g_cvTankBhop.BoolValue || !isAiTank(client) || !IsValidSurvivor(target))
-		return Plugin_Continue;
-	
-	if (L4D_IsPlayerStaggering(client))
-		return Plugin_Continue;
-
-	// 爬梯子时或者水深超过浅水, 则不允许连跳
-	if (GetEntityMoveType(client) == MOVETYPE_LADDER || GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
-		return Plugin_Continue;
-
-	static float velVec[3], vel;
-	GetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
-	// 仅检测水平速度是否满足连跳速度要求
-	vel = SquareRoot(Pow(velVec[0], 2.0) + Pow(velVec[1], 2.0));
-	if (vel < g_cvBhopMinSpeed.FloatValue)
-		return Plugin_Continue;
-
-	if (dist < g_cvBhopMinDist.FloatValue || dist > g_cvBhopMaxDist.FloatValue)
-		return Plugin_Continue;
-
-	static float vAbsVelVec[3], vTargetAbsVelVec[3];
-	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
-	GetEntPropVector(target, Prop_Data, "m_vecAbsVelocity", vTargetAbsVelVec);
-
-	// 在地上的时候, 开始连跳
-	static bool visible;
-	static float l_targetPos[3];
-	l_targetPos = targetPos;
-	visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, 0, l_targetPos);
-	if (IsClientOnGround(client) && nextTickPosCheck(client, visible)) {
-		static float vPredict[3], vDir[3], vFwd[3], vRight[3];
-		// 不可见目标的情况下, 使用当前速度向量角度进行连跳加速
-		if (!visible) {
-			GetVectorAngles(velVec, vDir);
-			GetAngleVectors(vDir, vFwd, vRight, NULL_VECTOR);
-		} else {
-			// 计算目标下一帧的位置, 然后根据这个位置进行连跳加速
-			AddVectors(targetPos, vTargetAbsVelVec, vPredict);
-			MakeVectorFromPoints(pos, vPredict, vDir);
-			vDir[2] = 0.0;
-			NormalizeVector(vDir, vDir);
-		}
-
-		// 无生还视野不允许连跳
-		if (!g_cvBhopNoVision.BoolValue && !visible)
-			return Plugin_Continue;
-
-		buttons |= IN_DUCK;
-		buttons |= IN_JUMP;
-
-		static bool fwdOnly, backOnly, leftOnly, rightOnly;
-		fwdOnly = ((buttons & IN_FORWARD) && !(buttons & IN_BACK));
-		backOnly = ((buttons & IN_BACK) && !(buttons & IN_FORWARD));
-		leftOnly = ((buttons & IN_LEFT) && !(buttons & IN_RIGHT));
-		rightOnly = ((buttons & IN_RIGHT) && !(buttons & IN_LEFT));
-
-		if (fwdOnly) {
-			vFwd = vDir;
-			NormalizeVector(vFwd, vFwd);
-			ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
-			AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
-		} else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
-			// 仅按后退键, 向当前速度方向进行加速
-			vFwd[0] = velVec[0];
-			vFwd[1] = velVec[1];
-			vFwd[2] = 0.0;
-			NormalizeVector(vFwd, vFwd);
-			ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
-			AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
-		} else {
-			// 按左右方向键的时候, 基于当前前向加速度方向计算侧向向量
-			static float baseFwd[3];
-			if (fwdOnly) {
-				baseFwd[0] = vFwd[0];
-				baseFwd[1] = vFwd[1];
-				baseFwd[2] = 0.0;
-			} else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
-				baseFwd[0] = velVec[0];
-				baseFwd[1] = velVec[1];
-				baseFwd[2] = 0.0;
-			} else {
-				baseFwd[0] = vDir[0];
-				baseFwd[1] = vDir[1];
-				baseFwd[2] = 0.0;
-			}
-			// 计算左向或者右向向量进行加速
-			GetVectorCrossProduct({0.0, 0.0, 1.0}, baseFwd, vRight);
-			NormalizeVector(vRight, vRight);
-			if (rightOnly ^ leftOnly) {
-				vRight[2] = 0.0;
-				ScaleVector(vRight, g_cvBhopImpulse.FloatValue * (rightOnly ? 1.0 : -1.0));
-				AddVectors(vAbsVelVec, vRight, vAbsVelVec);
-			}
-		}
-		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
-		return Plugin_Changed;
-	}
-
-	// 检查空速是否大于限制速度
-	if (vel > g_cvBhopMaxSpeed.FloatValue) {
-		NormalizeVector(velVec, velVec);
-		ScaleVector(velVec, g_cvBhopMaxSpeed.FloatValue);
-		SetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
-	}
-	// 在空中的时候, 检查是否连跳过头
-	static float angle, vDir[3], vAbsVelVecCpy[3];
-	vAbsVelVecCpy = vAbsVelVec;
-	NormalizeVector(vAbsVelVec, vAbsVelVec);
-	MakeVectorFromPoints(pos, targetPos, vDir);
-	NormalizeVector(vDir, vDir);
-	vAbsVelVec[2] = vDir[2] = 0.0;
-
-	// 防止玩家在坦克上方或者下方时频繁触发空中速度修正
-	static float dx, dz, pitch, swingRange;
-	static ConVar cv_SwingRange;
-	if (!cv_SwingRange)
-		cv_SwingRange = FindConVar("tank_swing_range");
-	swingRange = !cv_SwingRange ? DEFAULT_SWING_RANGE : cv_SwingRange.FloatValue;
-	dx = SquareRoot(Pow(targetPos[0] - pos[0], 2.0) + Pow(targetPos[1] - pos[1], 2.0));
-	dz = targetPos[2] - pos[2];
-	pitch = RadToDeg(ArcTangent(dz / dx));
-	// 如果玩家不在坦克的攻击范围内且俯仰角大于 45 度, 放弃速度修正
-	// if target is not in tank's attack range and pitch is greater than 45 degrees, give up air speed modification
-	if (dz > (JUMP_HEIGHT + TANK_HEIGHT + swingRange) && pitch > 45.0)
-		return Plugin_Continue;
-
-	// 计算夹角, 夹角不超过范围, 且可视, 没有按后退键才允许修正
-	angle = RadToDeg(ArcCosine(GetVectorDotProduct(vAbsVelVec, vDir)));
-	if (visible
-		&& angle > g_cvAirVecModifyDegree.FloatValue && angle < g_cvAirVecModifyMaxDegree.FloatValue
-		&& GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime > g_cvAirVecModifyInterval.FloatValue
-		&& ((buttons & IN_FORWARD) && !(buttons & IN_BACK))) {
-			log.debugAll("%N triggered air speed modify, current vector angle: %.2f", client, angle);
-			static float runTopSpeed;
-			runTopSpeed = SDKCall(g_hSdkGetRunTopSpeed, client);
-			ScaleVector(vDir, runTopSpeed + g_cvBhopImpulse.FloatValue);
-			log.debugAll("%N's run top speed: %.2f, speed vec len: %.2f, new vector length: %.2f", client, runTopSpeed, vel, GetVectorLength(vDir));
-			vDir[2] = vAbsVelVecCpy[2];
-			// 应用新的速度方向
-			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir);
-			g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
-	}
-
-	return Plugin_Changed;
+    if (!g_cvTankBhop.BoolValue || !isAiTank(client) || !IsValidSurvivor(target))
+        return Plugin_Continue;
+    
+    if (L4D_IsPlayerStaggering(client))
+        return Plugin_Continue;
+ 
+    // 爬梯子时或者水深超过浅水, 则不允许连跳
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER || GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
+        return Plugin_Continue;
+ 
+    static float velVec[3], vel;
+    GetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
+    // 仅检测水平速度是否满足连跳速度要求
+    vel = SquareRoot(Pow(velVec[0], 2.0) + Pow(velVec[1], 2.0));
+    if (vel < g_cvBhopMinSpeed.FloatValue)
+        return Plugin_Continue;
+ 
+    if (dist < g_cvBhopMinDist.FloatValue || dist > g_cvBhopMaxDist.FloatValue)
+        return Plugin_Continue;
+ 
+    static float vAbsVelVec[3], vTargetAbsVelVec[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+    GetEntPropVector(target, Prop_Data, "m_vecAbsVelocity", vTargetAbsVelVec);
+ 
+    // 在地上的时候, 开始连跳
+    static bool visible;
+    static float l_targetPos[3];
+    l_targetPos = targetPos;
+    visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, 0, l_targetPos);
+    if (IsClientOnGround(client) && nextTickPosCheck(client, visible)) {
+        static float vPredict[3], vDir[3], vFwd[3], vRight[3];
+        // 不可见目标的情况下, 使用当前速度向量角度进行连跳加速
+        if (!visible) {
+            GetVectorAngles(velVec, vDir);
+            GetAngleVectors(vDir, vFwd, vRight, NULL_VECTOR);
+        } else {
+            // 计算目标下一帧的位置, 然后根据这个位置进行连跳加速
+            AddVectors(targetPos, vTargetAbsVelVec, vPredict);
+            MakeVectorFromPoints(pos, vPredict, vDir);
+            vDir[2] = 0.0;
+            NormalizeVector(vDir, vDir);
+        }
+ 
+        // 无生还视野不允许连跳
+        if (!g_cvBhopNoVision.BoolValue && !visible)
+            return Plugin_Continue;
+ 
+        buttons |= IN_DUCK;
+        buttons |= IN_JUMP;
+ 
+        static bool fwdOnly, backOnly, leftOnly, rightOnly;
+        fwdOnly = ((buttons & IN_FORWARD) && !(buttons & IN_BACK));
+        backOnly = ((buttons & IN_BACK) && !(buttons & IN_FORWARD));
+        leftOnly = ((buttons & IN_LEFT) && !(buttons & IN_RIGHT));
+        rightOnly = ((buttons & IN_RIGHT) && !(buttons & IN_LEFT));
+ 
+        if (fwdOnly) {
+            vFwd = vDir;
+            NormalizeVector(vFwd, vFwd);
+            ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
+            AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+        } else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
+            // 仅按后退键, 向当前速度方向进行加速
+            vFwd[0] = velVec[0];
+            vFwd[1] = velVec[1];
+            vFwd[2] = 0.0;
+            NormalizeVector(vFwd, vFwd);
+            ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
+            AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+        } else {
+            // 按左右方向键的时候, 基于当前前向加速度方向计算侧向向量
+            static float baseFwd[3];
+            if (fwdOnly) {
+                baseFwd[0] = vFwd[0];
+                baseFwd[1] = vFwd[1];
+                baseFwd[2] = 0.0;
+            } else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0)) {
+                baseFwd[0] = velVec[0];
+                baseFwd[1] = velVec[1];
+                baseFwd[2] = 0.0;
+            } else {
+                baseFwd[0] = vDir[0];
+                baseFwd[1] = vDir[1];
+                baseFwd[2] = 0.0;
+            }
+            // 计算左向或者右向向量进行加速
+            GetVectorCrossProduct({0.0, 0.0, 1.0}, baseFwd, vRight);
+            NormalizeVector(vRight, vRight);
+            if (rightOnly ^ leftOnly) {
+                vRight[2] = 0.0;
+                ScaleVector(vRight, g_cvBhopImpulse.FloatValue * (rightOnly ? 1.0 : -1.0));
+                AddVectors(vAbsVelVec, vRight, vAbsVelVec);
+            }
+        }
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
+        return Plugin_Changed;
+    }
+ 
+    // 检查空速是否大于限制速度
+    if (vel > g_cvBhopMaxSpeed.FloatValue) {
+        NormalizeVector(velVec, velVec);
+        ScaleVector(velVec, g_cvBhopMaxSpeed.FloatValue);
+        SetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
+    }
+    // 在空中的时候, 检查是否连跳过头
+    static float angle, vDir[3], vAbsVelVecCpy[3];
+    vAbsVelVecCpy = vAbsVelVec;
+    NormalizeVector(vAbsVelVec, vAbsVelVec);
+    MakeVectorFromPoints(pos, targetPos, vDir);
+    NormalizeVector(vDir, vDir);
+    vAbsVelVec[2] = vDir[2] = 0.0;
+ 
+    // 防止玩家在坦克上方或者下方时频繁触发空中速度修正
+    static float dx, dz, pitch;
+    dx = SquareRoot(Pow(targetPos[0] - pos[0], 2.0) + Pow(targetPos[1] - pos[1], 2.0));
+    dz = targetPos[2] - pos[2];
+    pitch = RadToDeg(ArcTangent(dz / dx));
+    // 如果玩家不在坦克的攻击范围内且俯仰角大于 45 度, 放弃速度修正
+    // if target is not in tank's attack range and pitch is greater than 45 degrees, give up air speed modification
+    if (dz > (JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange) && pitch > 45.0)
+        return Plugin_Continue;
+ 
+    /**
+    * 空中速度修正, 条件必须满足:
+    1. 可视
+    2. 当前速度方向向量和到目标的位置向量夹角在 min 和 max 间
+    3. 没有按后退键才允许修正
+    4. 速度方向修正间隔大于 g_cvAirVecModifyInterval.FloatValue (可选)
+    **/
+    angle = RadToDeg(ArcCosine(GetVectorDotProduct(vAbsVelVec, vDir)));
+    if (visible
+        && (angle > g_cvAirVecModifyDegree.FloatValue
+            && angle < g_cvAirVecModifyMaxDegree.FloatValue)
+        && (GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime > g_cvAirVecModifyInterval.FloatValue)
+        && !(buttons & IN_BACK))
+    {
+        log.debugAll("%N triggered air speed modify, current vector angle: %.2f", client, angle);
+        // 只改变速度方向, 不改变大小, 将 vDir 缩放到原来的速度大小, 然后与原来的速度合成, 得到一个二者的插值速度向量
+        ScaleVector(vDir, vel);
+        AddVectors(velVec, vDir, vDir);
+        // 将插值向量缩放成原速度大小
+        NormalizeVector(vDir, vDir);
+        ScaleVector(vDir, vel);
+        vDir[2] = vAbsVelVecCpy[2];
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir);
+        // 记录空中速度方向修正时间
+        g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
+    }
+    return Plugin_Changed;
 }
 
 stock bool nextTickPosCheck(int client, bool visible) {
