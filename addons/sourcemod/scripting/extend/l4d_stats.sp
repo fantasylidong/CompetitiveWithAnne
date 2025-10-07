@@ -1576,7 +1576,11 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 		Score = 0;
 	}
 	
-
+	if(IsAnne() == 2)
+	{
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "\x03硬核模式 \x04所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
+		return Plugin_Continue;
+	}
 	
 	for(int i = 1; i <= MaxClients; i++){
 		if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == 2 || ClientEnabled[i]) && !IsFakeClient(i) && Score > 0){
@@ -6339,6 +6343,11 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 		else {
 			Score= 0;
 		}
+		if(IsAnne() == 2)
+		{
+			StatsPrintToChat(User, "\x03硬核模式 \x04所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
+			return;
+		}
 		if (Mode && Score > 0)
 			StatsPrintToChat(User, "\x03所有幸存者 \x01都 \x03掉了 \x04%i \x01分 by \x03大家又坐牢了!", Score);
 		Mode=0;
@@ -10076,11 +10085,6 @@ CheckSurvivorsAllDown()
 	{
 		Score = ModifyScoreDifficultyNR(GetConVarInt(cvar_Restart), 2, 3, TEAM_SURVIVORS);
 		Score = 400 - Score;
-	}
-	if(IsAnne() == 2)
-	{
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "\x03硬核模式所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
-		return;
 	}
 
 	for (i = 0; i < IncapCounter; i++)
