@@ -24,7 +24,6 @@
 #include <sdktools_tempents>
 #include <left4dhooks>
 #include <sourcescramble>
-#include <sdktools_tempents>
 #undef REQUIRE_PLUGIN
 #include <si_target_limit>  // 可选
 #include <pause>            // 可选
@@ -76,8 +75,6 @@
 #define PEN_LIMIT_SCALE_LO        0.50   // L=20 时：正向惩罚明显减弱
 #define PEN_LIMIT_MINL            1
 #define PEN_LIMIT_MAXL            16
-// [新增] —— Path 构建结果的短期缓存（秒）
-#define PATH_CACHE_TTL            1.0
 
 // [新增] —— PathPenalty_NoBuild 结果缓存（key -> result / expire）
 static StringMap g_PathCacheRes = null;  // key -> int(0/1)
@@ -404,10 +401,10 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0);
         // [新增] 为新评分系统创建CVar
         // [ADD] Create CVars for the new scoring system
-        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.0 1.2 0.8 1.0 1.2 1.2", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.0 1.8 1.5 1.2 0.5 0.5", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.2 1.2 1.5 1.0 1.0 1.0", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.0 1.0 1.0 1.0 1.0 1.0", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.35 1.10 1.20 1.05 1.20 1.25", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.10 1.60 1.40 0.60 0.60", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.40 1.00 1.20 1.35 1.10 1.20", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.25 1.05 1.15 1.30 0.90 0.80", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -700,7 +697,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "Caibiii, 夜羽真白, 东, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2025.10.04",
+    version     = "2025.10.05",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -3159,27 +3156,16 @@ static void BuildNavBuckets()
         }
     }
 
-    // 3) 每桶内部按“核心高度 zCore 从高到低”排序（保持你原有的高处优先）
+    //随机打散
     for (int b = 0; b < FLOW_BUCKETS; b++)
     {
         ArrayList L = g_FlowBuckets[b];
         if (L == null) continue;
-        int n = L.Length;
-        for (int i = 0; i < n - 1; i++)
-        for (int j = 0; j < n - 1 - i; j++)
-        {
-            int ia = L.Get(j);
-            int ib = L.Get(j + 1);
-            float za = view_as<float>(g_AreaZCore.Get(ia));
-            float zb = view_as<float>(g_AreaZCore.Get(ib));
-            if (za < zb)
-            {
-                int tmp = ia; L.Set(j, ib); L.Set(j + 1, tmp);
-            }
-        }
 
-        // 桶空保护（这里理论上不会空，因为坏flow也被映射了；仍保底）
-        if (n == 0) { g_BucketMinZ[b] = 0.0; g_BucketMaxZ[b] = 0.0; }
+        // —— 高度排序 → 改为打乱 —— //
+        ShuffleArrayList(L);
+
+        if (L.Length == 0) { g_BucketMinZ[b] = 0.0; g_BucketMaxZ[b] = 0.0; }
         if (g_BucketMinZ[b] > g_BucketMaxZ[b]) { g_BucketMinZ[b] = g_BucketMaxZ[b] = 0.0; }
     }
 
@@ -3189,6 +3175,18 @@ static void BuildNavBuckets()
 
     // ★ 构建完成后落盘
     SaveBucketsToCache();
+}
+
+stock void ShuffleArrayList(ArrayList L)
+{
+    int n = L.Length;
+    for (int i = n - 1; i > 0; i--)
+    {
+        int j = GetRandomInt(0, i);
+        if (j == i) continue;
+        int ai = L.Get(i), aj = L.Get(j);
+        L.Set(i, aj); L.Set(j, ai);
+    }
 }
 
 
