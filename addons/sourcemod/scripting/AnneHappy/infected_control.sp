@@ -99,18 +99,9 @@ static const char INFDN[10][] =
 {
     "common","smoker","boomer","hunter","spitter","jockey","charger","witch","tank","survivor"
 };
-
-// -----------------------
-// SDK / Gamedata offsets
-// -----------------------
-static TheNavAreas g_pTheNavAreas;
-// === SDKCall 句柄（全局） ===
-static Handle g_hSDKFindRandomSpot = null;     // TerrorNavArea::FindRandomSpot
-static Handle g_hSDKIsVisibleToPlayer = null;  // IsVisibleToPlayer(...)
-static int g_iSpawnAttributesOffset = -1;
-static int g_iFlowDistanceOffset = -1;
-static int g_iNavCountOffset = -1;
-static int g_pPanicEventStage = -1;
+// ✅ 添加：NavAreas 全局缓存
+static ArrayList g_AllNavAreasCache = null;
+static int g_NavAreasCacheCount = 0;
 // —— Nav 高度“核心”缓存 & 每桶高度范围 —— //
 static ArrayList g_AreaZCore = null;   // float per areaIdx（核心高度=多次随机点的 z 均值）
 static ArrayList g_AreaZMin  = null;   // float per areaIdx
@@ -121,26 +112,31 @@ static float g_LastSpawnTime[MAXPLAYERS+1];
 
 static StringMap g_NavIdToIndex = null;  // navid -> areaIdx
 static char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
+static int cFilt_Pos = 0;  // 添加到计数器声明区
 
-// TheNavAreas / NavArea methodmap（参考 fdxx）
+// =========================
+// 修改 TheNavAreas methodmap
+// =========================
 methodmap TheNavAreas
 {
+    // 使用 left4dhooks 的 L4D_GetAllNavAreas 替代
     public int Count()
     {
-        return LoadFromAddress(view_as<Address>(this) + view_as<Address>(g_iNavCountOffset), NumberType_Int32);
+        EnsureNavAreasCache();  // ✅ 确保缓存存在
+        return g_NavAreasCacheCount;
     }
-    public Address Dereference()
+    
+    public Address GetAreaByIndex(int i)
     {
-        return LoadFromAddress(view_as<Address>(this), NumberType_Int32);
-    }
-    public Address GetAreaRaw(int i, bool bDereference = true)
-    {
-        if (!bDereference)
-            return LoadFromAddress(view_as<Address>(this) + view_as<Address>(i*4), NumberType_Int32);
-        return LoadFromAddress(this.Dereference() + view_as<Address>(i*4), NumberType_Int32);
+        EnsureNavAreasCache();  // ✅ 确保缓存存在
+        if (i < 0 || i >= g_NavAreasCacheCount)
+            return Address_Null;
+        return g_AllNavAreasCache.Get(i);
     }
 }
-
+// =========================
+// 修改 NavArea methodmap
+// =========================
 methodmap NavArea
 {
     public bool IsNull()
@@ -148,27 +144,29 @@ methodmap NavArea
         return view_as<Address>(this) == Address_Null;
     }
 
+    // ✅ 使用 L4D_FindRandomSpot 替代 SDK call
     public void GetRandomPoint(float outPos[3])
     {
-        SDKCall(g_hSDKFindRandomSpot, this, outPos);
+        L4D_FindRandomSpot(view_as<int>(this), outPos);
     }
 
+    // ✅ 使用 L4D_GetNavArea_SpawnAttributes 替代 offset
     property int SpawnAttributes
     {
         public get()
         {
-            return LoadFromAddress(view_as<Address>(this) + view_as<Address>(g_iSpawnAttributesOffset), NumberType_Int32);
+            return L4D_GetNavArea_SpawnAttributes(view_as<Address>(this));
         }
         public set(int v)
         {
-            StoreToAddress(view_as<Address>(this) + view_as<Address>(g_iSpawnAttributesOffset), v, NumberType_Int32);
+            L4D_SetNavArea_SpawnAttributes(view_as<Address>(this), v);
         }
     }
 
+    // ✅ 使用 L4D2Direct_GetTerrorNavAreaFlow 替代 offset
     public float GetFlow()
     {
-        // 更安全的读取：按位解释为 float
-        return view_as<float>(LoadFromAddress(view_as<Address>(this) + view_as<Address>(g_iFlowDistanceOffset), NumberType_Int32));
+        return L4D2Direct_GetTerrorNavAreaFlow(view_as<Address>(this));
     }
 }
 
@@ -298,6 +296,11 @@ enum struct Config
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
+    // [ADD] —— 轻度惩罚 badflow：仅扣 Flow 分项一点点分数（0 关闭）
+    ConVar FlowBadPenaltyPoints;
+
+    // [ADD] 缓存值
+    float fFlowBadPenalty;
 
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
@@ -410,6 +413,15 @@ enum struct Config
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
             "Quantization step for limitCost when caching (world units)",
             CVAR_FLAG, true, 1.0, true, 500.0);
+        // [ADD] badflow 轻度惩罚（仅影响 Flow 分项；默认 2 分）
+        this.FlowBadPenaltyPoints = CreateConVar(
+            "inf_flow_bad_penalty_points",
+            "20.0",
+            "Mild points to subtract from FLOW score when the area has invalid raw flow (mapped badflow). 0 disables.",
+            CVAR_FLAG, 
+            true, 0.0, true, 100.0
+        );
+        this.FlowBadPenaltyPoints.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -553,6 +565,10 @@ enum struct Config
         this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
         this.fPathCacheQuantize = this.PathCacheQuantize.FloatValue;
         if (this.fPathCacheQuantize < 1.0) this.fPathCacheQuantize = 1.0;
+        // [ADD] 读取 badflow 轻度惩罚
+        this.fFlowBadPenalty = this.FlowBadPenaltyPoints.FloatValue;
+        if (this.fFlowBadPenalty < 0.0) this.fFlowBadPenalty = 0.0;
+        if (this.fFlowBadPenalty > 100.0) this.fFlowBadPenalty = 100.0;
     }
 
     void ApplyMaxZombieBound()
@@ -794,6 +810,8 @@ public void OnPluginStart()
     RegAdminCmd("sm_rebuildnavcache", Cmd_RebuildNavCache, ADMFLAG_ROOT, "Rebuild Nav bucket cache for current map");
     RegAdminCmd("sm_navpeek", Cmd_NavPeek, ADMFLAG_GENERIC, "查看准星 Nav 的分桶与属性");
     RegAdminCmd("sm_np",      Cmd_NavPeek, ADMFLAG_GENERIC, "查看准星 Nav 的分桶与属性(别名)");
+    RegAdminCmd("sm_navtest", Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分");
+    RegAdminCmd("sm_nt",      Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分(别名)");
 
     HookEvent("finale_win",      evt_RoundEnd);
     HookEvent("mission_lost",    evt_RoundEnd);
@@ -835,6 +853,42 @@ public void OnMapEnd()
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     // [新增] —— 每波开始即清理 Path 缓存（波级作用域）
     ClearPathCache();
+    // ✅ 添加：清理 NavAreas 缓存
+    ClearNavAreasCache();
+}
+// =========================
+// NavAreas 缓存管理
+// =========================
+
+// ✅ 新增：确保缓存已初始化
+stock void EnsureNavAreasCache()
+{
+    if (g_AllNavAreasCache == null)
+    {
+        g_AllNavAreasCache = new ArrayList();
+        L4D_GetAllNavAreas(g_AllNavAreasCache);
+        g_NavAreasCacheCount = g_AllNavAreasCache.Length;
+        Debug_Print("[NAV CACHE] Initialized: %d areas", g_NavAreasCacheCount);
+    }
+}
+
+// ✅ 新增：清理缓存
+stock void ClearNavAreasCache()
+{
+    if (g_AllNavAreasCache != null)
+    {
+        delete g_AllNavAreasCache;
+        g_AllNavAreasCache = null;
+        g_NavAreasCacheCount = 0;
+        Debug_Print("[NAV CACHE] Cleared");
+    }
+}
+
+// ✅ 新增：强制重建缓存
+stock void RebuildNavAreasCache()
+{
+    ClearNavAreasCache();
+    EnsureNavAreasCache();
 }
 void TweakSettings()
 {
@@ -890,15 +944,21 @@ public Action Cmd_StopSpawn(int client, int args)
     return Plugin_Handled;
 }
 
+// ✅ 修改：重建时也重建 NavAreas 缓存
 public Action Cmd_RebuildNavCache(int client, int args)
 {
-    // 强制重建并覆盖缓存
+    // 强制重建 NavAreas 缓存
+    RebuildNavAreasCache();
+    
+    // 强制重建并覆盖 Bucket 缓存
     ClearNavBuckets();
     g_BucketsReady = false;
     BuildNavBuckets();
+    
     ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache.");
     return Plugin_Handled;
 }
+
 // ===== 准星 NavArea 查看命令 =====
 public Action Cmd_NavPeek(int client, int args)
 {
@@ -1007,17 +1067,224 @@ static bool GetAimHitPos(int client, float outPos[3])
     return true;
 }
 
-// —— 按地址找 Nav 索引（仅用于调试命令，线性扫描足够）——
+public Action Cmd_NavTest(int client, int args)
+{
+    if (!client || !IsClientInGame(client))
+        return Plugin_Handled;
+
+    // 获取准星命中点
+    float hit[3];
+    if (!GetAimHitPos(client, hit))
+    {
+        PrintToChat(client, "\x04[IC]\x01 未能获取准星命中点。");
+        return Plugin_Handled;
+    }
+
+    // 找到对应的 NavArea
+    Address area = L4D2Direct_GetTerrorNavArea(hit);
+    if (area == Address_Null)
+        area = view_as<Address>(L4D_GetNearestNavArea(hit, 300.0, false, false, false, TEAM_INFECTED));
+
+    if (area == Address_Null)
+    {
+        PrintToChat(client, "\x04[IC]\x01 附近没有 NavArea。");
+        return Plugin_Handled;
+    }
+
+    NavArea na = view_as<NavArea>(area);
+    int navid  = L4D_GetNavAreaID(area);
+    int index  = FindNavIndexByAddress(area);
+
+    // 获取一个随机点用于测试
+    float testPos[3];
+    na.GetRandomPoint(testPos);
+
+    PrintToConsole(client, "");
+    PrintToConsole(client, "========================================");
+    PrintToConsole(client, "=== [IC] Nav Spawn Test ===");
+    PrintToConsole(client, "========================================");
+    PrintToConsole(client, "NavID: %d | Index: %d", navid, index);
+    PrintToConsole(client, "Test Pos: (%.1f, %.1f, %.1f)", testPos[0], testPos[1], testPos[2]);
+    PrintToConsole(client, "");
+
+    // === 测试各种过滤条件 ===
+    float now = GetGameTime();
+    bool bFinaleArea = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
+    
+    // 1. 冷却检查
+    bool passCooldown = !IsNavOnCooldown(index, now);
+    PrintToConsole(client, "[1] Cooldown Check: %s", passCooldown ? "PASS" : "FAIL (on cooldown)");
+
+    // 2. Flag 检查
+    int flags = na.SpawnAttributes;
+    bool passFlags = IsValidFlags(flags, bFinaleArea);
+    char flagBuf[256];
+    DescribeNavFlags(flags, flagBuf, sizeof flagBuf);
+    PrintToConsole(client, "[2] Flags Check: %s | Flags: %s", passFlags ? "PASS" : "FAIL", flagBuf[0] ? flagBuf : "(none)");
+
+    // 3. Flow 检查
+    float flowDist = na.GetFlow();
+    float maxFlow  = L4D2Direct_GetMapMaxFlowDistance();
+    bool  passFlowRaw = (flowDist >= 0.0 && flowDist <= maxFlow);
+
+    // bucket 映射兜底：用当前 Nav 的分桶结果判定有效
+    int mappedPct = -1;
+    if (gCV.bNavBucketEnable && g_BucketsReady && g_AreaPct != null && index >= 0 && index < g_AreaPct.Length) {
+        mappedPct = view_as<int>(g_AreaPct.Get(index));  // 0..100 或 -1
+    }
+    bool passFlow = passFlowRaw || (mappedPct >= 0 && mappedPct <= 100);
+    int  flowPercent = passFlowRaw ? FlowDistanceToPercent(flowDist) : mappedPct;
+
+    PrintToConsole(client, "[3] Flow Check: %s | Flow: %.1f / %.1f (%d%%)%s",
+        passFlow ? "PASS" : "FAIL (invalid flow)",
+        flowDist, maxFlow, passFlow ? flowPercent : -1,
+        (!passFlowRaw && passFlow) ? " [mapped]" : "");
+
+    // 4. 距离检查
+    float dminEye = GetMinEyeDistToAnySurvivor(testPos);
+    float dminFeet = GetMinDistToAnySurvivor(testPos);
+    bool passDist = (dminEye >= gCV.fSpawnMin && dminEye <= gCV.fSpawnMax);
+    PrintToConsole(client, "[4] Distance Check: %s | Eye: %.1f | Feet: %.1f | Range: %.1f-%.1f", 
+        passDist ? "PASS" : "FAIL", dminEye, dminFeet, gCV.fSpawnMin, gCV.fSpawnMax);
+
+    // 5. 位置关系检查
+    int targetSur = ChooseTargetSurvivor();
+    bool passPosition = PassRealPositionCheck(testPos, targetSur);
+    int candPercent = GetPositionBucketPercent(testPos);
+    int surPercent = -1;
+    if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
+    int deltaReal = candPercent - surPercent;
+    PrintToConsole(client, "[5] Position Check: %s | Cand: %d%% | Sur: %d%% | Delta: %+d%%", 
+        passPosition ? "PASS" : "FAIL (behind/underfoot)", candPercent, surPercent, deltaReal);
+
+    // 6. 分散度检查
+    bool passSeparation = PassMinSeparation(testPos);
+    PrintToConsole(client, "[6] Dispersion Check: %s | Min Sep: %s ", 
+        (passSeparation ) ? "PASS" : "FAIL",
+        passSeparation ? "OK" : "FAIL");
+
+    // 7. 卡壳检查
+    bool passStuck = !WillStuck(testPos);
+    PrintToConsole(client, "[7] Stuck Check: %s", passStuck ? "PASS" : "FAIL (will stuck)");
+
+    // 8. 视线检查
+    bool passVis = !IsPosVisibleSDK(testPos, false);
+    PrintToConsole(client, "[8] Visibility Check: %s", passVis ? "PASS" : "FAIL (visible)");
+
+    // 9. 路径检查
+    float pathPenalty = PathPenalty_NoBuild(testPos, targetSur, gCV.fSpawnMax, gCV.fSpawnMax);
+    bool passPath = (pathPenalty == 0.0);
+    PrintToConsole(client, "[9] Path Check: %s | Penalty: %.1f", passPath ? "PASS" : "FAIL (no path)", pathPenalty);
+
+    // === 计算评分（假设为 Smoker） ===
+    PrintToConsole(client, "");
+    PrintToConsole(client, "--- Score Breakdown (as Smoker) ---");
+    
+    int zc = view_as<int>(SI_Smoker);
+    float center[3]; GetSectorCenter(center, targetSur);
+    int sectors = GetCurrentSectors();
+    int preferredSector = PickSector(sectors);
+    int sidx = ComputeSectorIndex(center, testPos, sectors);
+    
+    // 距离评分
+    float sweet, width;
+    GetClassDistanceProfile(zc, gCV.fSpawnMin, gCV.fSpawnMax, sweet, width);
+    float score_dist = ScoreDistSmooth(dminEye, sweet, width);
+    PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)", score_dist, sweet, width);
+
+    // 高度评分
+    float refEyeZ = 0.0;
+    if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
+    {
+        float e[3]; GetClientEyePosition(targetSur, e);
+        refEyeZ = e[2];
+    }
+    float score_hght = CalculateScore_Height(zc, testPos, refEyeZ);
+    PrintToConsole(client, "  Height Score: %.1f (refZ: %.1f, candZ: %.1f, delta: %.1f)", 
+        score_hght, refEyeZ, testPos[2], testPos[2] - refEyeZ);
+
+    // [MOD] Flow 评分（带 badflow 轻度惩罚展示）
+    int centerBucket = surPercent;
+    int deltaFlow    = candPercent - centerBucket;
+
+    float score_flow = ScoreFlowSmooth(deltaFlow);
+    float score_flow_raw = score_flow;
+    score_flow = ApplyBadFlowPenalty(na, score_flow);
+
+    if (score_flow < score_flow_raw)
+    {
+        PrintToConsole(client, "  Flow Score: %.1f (delta: %+d buckets) [badflow -%.1f]",
+            score_flow, deltaFlow, (score_flow_raw - score_flow));
+    }
+    else
+    {
+        PrintToConsole(client, "  Flow Score: %.1f (delta: %+d buckets)",
+            score_flow, deltaFlow);
+    }
+
+    // 分散度评分
+    float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
+    float penK = ComputePenScaleByLimit(gCV.iSiLimit);
+    float dispScaled = ScaleNegativeOnly(score_disp, penK);
+    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, sector: %d/%d, pref: %d)", 
+        score_disp, dispScaled, penK, sidx, sectors, preferredSector);
+
+    // 总分
+    float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
+                     + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
+    PrintToConsole(client, "");
+    PrintToConsole(client, "  TOTAL SCORE: %.1f", totalScore);
+    PrintToConsole(client, "  (weights: dist=%.2f, hght=%.2f, flow=%.2f, disp=%.2f)",
+        gCV.w_dist[zc], gCV.w_hght[zc], gCV.w_flow[zc], gCV.w_disp[zc]);
+
+    // === 最终结论 ===
+    PrintToConsole(client, "");
+    bool canSpawn = passCooldown && passFlags && passFlow && passDist && passPosition 
+                 && passSeparation && passStuck && passVis && passPath;
+    PrintToConsole(client, "========================================");
+    PrintToConsole(client, "=== RESULT: %s ===", canSpawn ? "CAN SPAWN" : "CANNOT SPAWN");
+    PrintToConsole(client, "========================================");
+    
+    // 聊天简要提示
+    if (canSpawn)
+        PrintToChat(client, "\x04[IC]\x01 Nav %d \x05可以生成\x01 | 总分: \x03%.1f\x01 | 详情见控制台", navid, totalScore);
+    else
+        PrintToChat(client, "\x04[IC]\x01 Nav %d \x03不能生成\x01 | 详情见控制台", navid);
+
+    // DebugMode>=3：画线标记测试点
+    if (gCV.iDebugMode >= 3)
+    {
+        int color[4] = {255, 255, 255, 255};
+        if (canSpawn)
+            color = {0, 255, 0, 255};  // 绿色 = 可以刷
+        else
+            color = {255, 0, 0, 255};  // 红色 = 不能刷
+        
+        float beamEnd[3];
+        beamEnd = testPos;
+        beamEnd[2] += 100.0;
+        TE_SetupBeamPoints(testPos, beamEnd, 0, 0, 0, 5, 2.0, 5.0, 5.0, 0, 0.0, color, 0);
+        TE_SendToClient(client);
+    }
+
+    return Plugin_Handled;
+}
+
+// =========================
+// 修改 FindNavIndexByAddress（用于调试命令）
+// =========================
 static int FindNavIndexByAddress(Address addr)
 {
     if (addr == Address_Null) return -1;
-    TheNavAreas navs = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
-    int count = navs.Count();
-    for (int i = 0; i < count; i++)
+    
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
+    
+    for (int i = 0; i < g_NavAreasCacheCount; i++)
     {
-        if (navs.GetAreaRaw(i, false) == addr)
+        if (g_AllNavAreasCache.Get(i) == addr)
             return i;
     }
+    
     return -1;
 }
 
@@ -1652,20 +1919,28 @@ static void MaintainSpawnQueueOnce()
     }
 }
 
+
+// =========================
+// 修改 BuildNavIdIndexMap（简化）
+// =========================
 static void BuildNavIdIndexMap()
 {
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     g_NavIdToIndex = new StringMap();
-    int n = g_pTheNavAreas.Count();
-    for (int i = 0; i < n; i++)
+    
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
+    
+    for (int i = 0; i < g_NavAreasCacheCount; i++)
     {
-        int navid = GetNavIDByIndex(i);
+        Address area = g_AllNavAreasCache.Get(i);
+        int navid = L4D_GetNavAreaID(area);
         if (navid < 0) continue;
-        char key[16]; IntToString(navid, key, sizeof key);
+        
+        char key[16]; 
+        IntToString(navid, key, sizeof key);
         g_NavIdToIndex.SetValue(key, view_as<any>(i));
     }
 }
-
 static int GetAreaIndexByNavID_Int(int navid)
 {
     if (g_NavIdToIndex == null) BuildNavIdIndexMap();
@@ -2282,28 +2557,45 @@ stock bool TraceFilter(int entity, int contentsMask)
 // =========================
 // 前方/Flow/层级判定
 // =========================
+// ✅ 新版：使用分桶百分比而非原始 flow（约第2100行）
 static bool IsPosAheadOfHighest(float ref[3], int target = -1)
 {
-    Address navP = L4D2Direct_GetTerrorNavArea(ref);
-    if (navP == Address_Null)
-        navP = view_as<Address>(L4D_GetNearestNavArea(ref, 300.0, false, false, false, TEAM_INFECTED));
-    int posFlow = FlowPercentNoBuf(navP);
+    // ✅ 使用分桶系统的百分比（已处理异常flow）
+    int posPercent = GetPositionBucketPercent(ref);
+    if (posPercent < 0) return false;  // 完全无法确定位置
 
     if (target == -1) target = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(target))
     {
-        // ★ 目标 flow：先 last-known-area，再脚下/最近 Nav
-        float t[3]; GetClientAbsOrigin(target, t);
-        Address navT = view_as<Address>(L4D2Direct_GetTerrorNavArea(t));  // ★ 兜底首选
-        if (navT == Address_Null)
-            navT = L4D_GetLastKnownArea(target);
-        if (navT == Address_Null)
-            navT = view_as<Address>(L4D_GetNearestNavArea(t, 300.0, false, false, false, TEAM_INFECTED));
-
-        int tFlow = FlowPercentNoBuf(navT);
-        return posFlow >= tFlow;
+        int tPct;
+        if (!TryGetClientFlowPercentSafe(target, tPct))
+            return false;
+        
+        return posPercent >= tPct;
     }
     return false;
+}
+
+// ✅ 新增：根据坐标查询其在分桶系统中的百分比
+stock int GetPositionBucketPercent(float pos[3])
+{
+    // 1. 先找最近的 NavArea
+    Address nav = L4D2Direct_GetTerrorNavArea(pos);
+    if (nav == Address_Null)
+        nav = L4D_GetNearestNavArea(pos, 300.0, false, false, false, TEAM_INFECTED);
+    
+    if (nav == Address_Null) return -1;
+    
+    // 2. 查询该 NavArea 在分桶系统中的归属
+    int navid = L4D_GetNavAreaID(nav);
+    int areaIdx = GetAreaIndexByNavID_Int(navid);
+    
+    if (areaIdx < 0 || areaIdx >= g_AreaPct.Length)
+        return -1;
+    
+    // 3. 返回分桶系统中的百分比（已处理异常flow映射）
+    int bucket = view_as<int>(g_AreaPct.Get(areaIdx));
+    return (bucket >= 0 && bucket <= 100) ? bucket : -1;
 }
 
 stock static int Calculate_Flow(Address area)
@@ -2325,21 +2617,6 @@ stock static int Calculate_Flow(Address area)
     if (prox > maxd)    prox = maxd;
 
     return RoundToNearest((prox / maxd) * 100.0); // → 0..100
-}
-
-static int FlowPercentNoBuf(Address area)
-{
-    float maxd = L4D2Direct_GetMapMaxFlowDistance();
-    if (maxd <= 1.0) maxd = 1.0;
-
-    float d = 0.0;
-    if (area != Address_Null)
-        d = L4D2Direct_GetTerrorNavAreaFlow(area);
-
-    if (!(d >= 0.0)) d = 0.0;
-    if (d > maxd)    d = maxd;
-
-    return RoundToNearest((d / maxd) * 100.0); // 0..100（不加 BossBuffer）
 }
 
 static int FlowDistanceToPercent(float flowDist)
@@ -2491,6 +2768,25 @@ static float GetSurAvrFlow()
         n++;
     }
     return n > 0 ? (sumPct / float(n)) : 0.0;
+}
+
+// [ADD] —— 仅对 FLOW 分项应用“badflow 轻度扣分”
+// 说明：
+//   - 只读原始 rawFlow 来判断是否 badflow；不改变过滤/映射逻辑
+//   - 不产生负分：最低 0
+stock float ApplyBadFlowPenalty(NavArea area, float flowScore)
+{
+    float pen = gCV.fFlowBadPenalty;
+    if (pen <= 0.0) return flowScore;
+
+    float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
+    float rawFlow = area.GetFlow(); // 仅用于识别 badflow
+    bool  badRaw  = (rawFlow < 0.0 || rawFlow > maxFlow);
+
+    if (!badRaw) return flowScore;
+
+    float v = flowScore - pen;
+    return (v > 0.0) ? v : 0.0;
 }
 
 // =========================
@@ -2665,13 +2961,72 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-// 根据枚举下标拿 NavArea 的 ID（失败返 -1）
+stock bool PassRealPositionCheck(float candPos[3], int targetSur)
+{
+    // 1. 获取候选点的分桶百分比
+    int candPercent = GetPositionBucketPercent(candPos);
+    if (candPercent < 0) return true;  // 无法判断则放行（避免误杀）
+    
+    // 2. 获取目标生还者的分桶百分比
+    int surPercent = -1;
+    if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
+    {
+        if (!TryGetClientFlowPercentSafe(targetSur, surPercent))
+            return true;
+    }
+    else
+    {
+        // 用最高进度生还者
+        int fb = GetHighestFlowSurvivorSafe();
+        if (!IsValidSurvivor(fb) || !TryGetClientFlowPercentSafe(fb, surPercent))
+            return true;
+    }
+    
+    // 3. 禁止刷在"生还者后方超过5个桶"的位置
+    if (candPercent < surPercent - 5)
+        return false;
+    
+    // 4. 禁止刷在"生还者脚下同层"（XY近 + Z近 + 桶相近）
+    float minXY = GetMinXYDistToAnySurvivor(candPos);
+    float minZ = GetMinZDistToAnySurvivor(candPos);
+    
+    if (minXY < 200.0 && minZ < 80.0 && FloatAbs(float(candPercent - surPercent)) <= 2)
+        return false;  // 脚下同层
+    
+    // 5. 禁止刷在"生还者后方脚下200u"（XY近 + Z近 + 桶相近）
+    if(minZ < 200.0 && FloatAbs(float(candPercent - surPercent)) <= 1)
+        return false;
+    
+    return true;
+}
+
+// ✅ 新增：最小Z轴距离
+stock float GetMinZDistToAnySurvivor(const float p[3])
+{
+    float best = 999999.0;
+    float s[3];
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
+        GetClientAbsOrigin(i, s);
+        float dz = FloatAbs(p[2] - s[2]);
+        if (dz < best) best = dz;
+    }
+    return best;
+}
+
+// =========================
+// 修改 GetNavIDByIndex（需要重新获取）
+// =========================
 stock int GetNavIDByIndex(int idx)
 {
-    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
-    Address areaAddr = pTheNavAreas.GetAreaRaw(idx, false);
-    if (areaAddr == Address_Null) return -1;
-    return L4D_GetNavAreaID(areaAddr);
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
+    
+    if (idx < 0 || idx >= g_NavAreasCacheCount)
+        return -1;
+    
+    Address area = g_AllNavAreasCache.Get(idx);
+    return L4D_GetNavAreaID(area);
 }
 
 stock int ComputeSectorIndex(const float center[3], const float pt[3], int sectors)
@@ -3024,73 +3379,102 @@ static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[F
     return n;
 }
 
+// =========================
+// 修改 BuildNavBuckets（核心逻辑）
+// =========================
 static void BuildNavBuckets()
 {
-    // ★ 优先尝试从缓存加载
     if (TryLoadBucketsFromCache())
         return;
+        
     ClearNavBuckets();
-    BuildNavIdIndexMap();   // 以防万一，保证 navid 索引表就绪
+    BuildNavIdIndexMap();
 
-    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
-    int iAreaCount = g_pTheNavAreas.Count();
+    // ✅ 使用缓存替代每次调用
+    EnsureNavAreasCache();
+    int iAreaCount = g_NavAreasCacheCount;
+    
     float fMapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
     bool  bFinaleArea     = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
 
     // 预分配缓存
-    g_AreaZCore = new ArrayList(); g_AreaZMin = new ArrayList(); g_AreaZMax = new ArrayList();
-    g_AreaCX    = new ArrayList(); g_AreaCY   = new ArrayList(); g_AreaPct  = new ArrayList();
+    g_AreaZCore = new ArrayList(); 
+    g_AreaZMin = new ArrayList(); 
+    g_AreaZMax = new ArrayList();
+    g_AreaCX    = new ArrayList(); 
+    g_AreaCY   = new ArrayList(); 
+    g_AreaPct  = new ArrayList();
+    
     for (int i = 0; i < iAreaCount; i++)
     {
-        g_AreaZCore.Push(0.0); g_AreaZMin.Push(0.0); g_AreaZMax.Push(0.0);
-        g_AreaCX.Push(0.0);    g_AreaCY.Push(0.0);   g_AreaPct.Push(-1);   // -1 = 未知/坏flow
+        g_AreaZCore.Push(0.0); 
+        g_AreaZMin.Push(0.0); 
+        g_AreaZMax.Push(0.0);
+        g_AreaCX.Push(0.0);    
+        g_AreaCY.Push(0.0);   
+        g_AreaPct.Push(-1);
     }
-    for (int b = 0; b < FLOW_BUCKETS; b++) { g_BucketMinZ[b] =  1.0e9; g_BucketMaxZ[b] = -1.0e9; }
+    
+    for (int b = 0; b < FLOW_BUCKETS; b++) 
+    { 
+        g_BucketMinZ[b] =  1.0e9; 
+        g_BucketMaxZ[b] = -1.0e9; 
+    }
 
-    // 桶容器初始化
     for (int b = 0; b < FLOW_BUCKETS; b++)
         g_FlowBuckets[b] = null;
 
-    // 记录：坏flow待映射 & 正常flow的索引集
-    ArrayList badIdxs   = new ArrayList();  // int areaIdx
-    ArrayList validIdxs = new ArrayList();  // int areaIdx
+    ArrayList badIdxs   = new ArrayList();
+    ArrayList validIdxs = new ArrayList();
 
     int addedValid = 0, addedBad = 0, skippedFlag = 0, skippedStuck = 0;
 
-    // === 第一遍：采样 + 直接入桶（正常flow）/登记待映射（坏flow） ===
+    // === 第一遍：采样 + 直接入桶 ===
     for (int i = 0; i < iAreaCount; i++)
     {
-        Address areaAddr = pTheNavAreas.GetAreaRaw(i, false);
+        // ✅ 直接从缓存获取
+        Address areaAddr = g_AllNavAreasCache.Get(i);
         if (areaAddr == Address_Null) continue;
 
         NavArea pArea = view_as<NavArea>(areaAddr);
-        if (!pArea) continue;
 
         // flag 过滤
-        if (!IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) { skippedFlag++; continue; }
+        if (!IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) 
+        { 
+            skippedFlag++; 
+            continue; 
+        }
 
-        // 会stuck过滤（抽样）
-        if (gCV.iNavBucketStuckProbe > 0 && AreaMostlyStuck(areaAddr, gCV.iNavBucketStuckProbe)) { skippedStuck++; continue; }
+        // 会stuck过滤
+        if (gCV.iNavBucketStuckProbe > 0 && AreaMostlyStuck(areaAddr, gCV.iNavBucketStuckProbe)) 
+        { 
+            skippedStuck++; 
+            continue; 
+        }
 
         // 采样中心 & Z
         float cx, cy, zAvg, zMin, zMax;
         SampleAreaCenterAndZ(areaAddr, cx, cy, zAvg, zMin, zMax, 3);
-        g_AreaCX.Set(i, cx); g_AreaCY.Set(i, cy);
-        g_AreaZCore.Set(i, zAvg); g_AreaZMin.Set(i, zMin); g_AreaZMax.Set(i, zMax);
+        g_AreaCX.Set(i, cx); 
+        g_AreaCY.Set(i, cy);
+        g_AreaZCore.Set(i, zAvg); 
+        g_AreaZMin.Set(i, zMin); 
+        g_AreaZMax.Set(i, zMax);
 
         // flow → 百分比
         float fFlow = pArea.GetFlow();
         bool  flowOK = (fFlow >= 0.0 && fFlow <= fMapMaxFlowDist);
+        
         if (flowOK)
         {
             int percent = FlowDistanceToPercent(fFlow);
-            if (percent < 0) percent = 0; if (percent > 100) percent = 100;
+            if (percent < 0) percent = 0; 
+            if (percent > 100) percent = 100;
 
             if (g_FlowBuckets[percent] == null)
                 g_FlowBuckets[percent] = new ArrayList();
             g_FlowBuckets[percent].Push(i);
 
-            // 每桶高度维护
             if (zMin < g_BucketMinZ[percent]) g_BucketMinZ[percent] = zMin;
             if (zMax > g_BucketMaxZ[percent]) g_BucketMaxZ[percent] = zMax;
 
@@ -3105,11 +3489,12 @@ static void BuildNavBuckets()
         }
     }
 
-    // === 第二遍：把坏flow的 area 映射到“最近的正常flow area”的桶 ===
+    // === 第二遍：映射坏flow的area ===
     int mapped = 0, dropped = 0;
     if (gCV.bNavBucketMapInvalid && validIdxs.Length > 0 && badIdxs.Length > 0)
     {
-        float maxR2 = (gCV.fNavBucketAssignRadius > 0.1) ? (gCV.fNavBucketAssignRadius * gCV.fNavBucketAssignRadius) : -1.0;
+        float maxR2 = (gCV.fNavBucketAssignRadius > 0.1) ? 
+                      (gCV.fNavBucketAssignRadius * gCV.fNavBucketAssignRadius) : -1.0;
 
         for (int bi = 0; bi < badIdxs.Length; bi++)
         {
@@ -3118,9 +3503,9 @@ static void BuildNavBuckets()
             float ax = view_as<float>(g_AreaCX.Get(aidx));
             float ay = view_as<float>(g_AreaCY.Get(aidx));
 
-            // 找最近的“正常flow” area
             float bestD2 = 1.0e12;
             int   bestV  = -1;
+            
             for (int vi = 0; vi < validIdxs.Length; vi++)
             {
                 int vidx = validIdxs.Get(vi);
@@ -3131,7 +3516,6 @@ static void BuildNavBuckets()
                 if (d2 < bestD2) { bestD2 = d2; bestV = vidx; }
             }
 
-            // 距离约束（可选）
             if (bestV == -1 || (maxR2 > 0.0 && bestD2 > maxR2))
             {
                 dropped++;
@@ -3145,7 +3529,6 @@ static void BuildNavBuckets()
                 g_FlowBuckets[percent] = new ArrayList();
             g_FlowBuckets[percent].Push(aidx);
 
-            // 维护该桶高度范围
             float zMin = view_as<float>(g_AreaZMin.Get(aidx));
             float zMax = view_as<float>(g_AreaZMax.Get(aidx));
             if (zMin < g_BucketMinZ[percent]) g_BucketMinZ[percent] = zMin;
@@ -3156,25 +3539,96 @@ static void BuildNavBuckets()
         }
     }
 
-    //随机打散
+    // === 改进：按 Z 轴智能排序（上方优先，下方延后）===
+    
+    // 先获取所有生还者的最低脚位置
+    float lowestSurvivorZ = GetLowestSurvivorFootZ();
+    
     for (int b = 0; b < FLOW_BUCKETS; b++)
     {
         ArrayList L = g_FlowBuckets[b];
-        if (L == null) continue;
+        if (L == null || L.Length == 0) continue;
 
-        // —— 高度排序 → 改为打乱 —— //
-        ShuffleArrayList(L);
+        // ✅ 按 Z 轴分成三组：上方、同层、下方
+        ArrayList above = new ArrayList();  // 在最低生还脚上方
+        ArrayList same = new ArrayList();   // 与生还脚同层（±80u）
+        ArrayList below = new ArrayList();  // 在最低生还脚下方
 
-        if (L.Length == 0) { g_BucketMinZ[b] = 0.0; g_BucketMaxZ[b] = 0.0; }
-        if (g_BucketMinZ[b] > g_BucketMaxZ[b]) { g_BucketMinZ[b] = g_BucketMaxZ[b] = 0.0; }
+        for (int i = 0; i < L.Length; i++)
+        {
+            int areaIdx = L.Get(i);
+            float zCore = view_as<float>(g_AreaZCore.Get(areaIdx));
+            
+            float deltaZ = zCore - lowestSurvivorZ;
+            
+            if (deltaZ > 80.0)
+                above.Push(areaIdx);
+            else if (deltaZ < -80.0)
+                below.Push(areaIdx);
+            else
+                same.Push(areaIdx);
+        }
+
+        // ✅ 每组内部随机打散
+        ShuffleArrayList(above);
+        ShuffleArrayList(same);
+        ShuffleArrayList(below);
+
+        // ✅ 重新组装：上方 → 同层 → 下方
+        L.Clear();
+        
+        for (int i = 0; i < above.Length; i++)
+            L.Push(above.Get(i));
+        for (int i = 0; i < same.Length; i++)
+            L.Push(same.Get(i));
+        for (int i = 0; i < below.Length; i++)
+            L.Push(below.Get(i));
+
+        delete above;
+        delete same;
+        delete below;
+
+        // 高度范围兜底
+        if (L.Length == 0) 
+        { 
+            g_BucketMinZ[b] = 0.0; 
+            g_BucketMaxZ[b] = 0.0; 
+        }
+        if (g_BucketMinZ[b] > g_BucketMaxZ[b]) 
+        { 
+            g_BucketMinZ[b] = g_BucketMaxZ[b] = 0.0; 
+        }
     }
 
-     g_BucketsReady = true;
+    // ✅ 不需要 delete allAreas，因为使用的是全局缓存
+    delete badIdxs;
+    delete validIdxs;
+
+    g_BucketsReady = true;
     Debug_Print("[BUCKET] valid=%d, bad=%d, mapped=%d, dropped=%d, skipFlag=%d, skipStuck=%d",
         addedValid, addedBad, mapped, dropped, skippedFlag, skippedStuck);
 
-    // ★ 构建完成后落盘
     SaveBucketsToCache();
+}
+
+// ✅ 新增：获取所有生还者的最低脚位置（约第2850行）
+stock float GetLowestSurvivorFootZ()
+{
+    float lowest = 999999.0;
+    float pos[3];
+    
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+        
+        GetClientAbsOrigin(i, pos);
+        if (pos[2] < lowest)
+            lowest = pos[2];
+    }
+    
+    // 如果没有生还者（异常情况），返回一个合理的默认值
+    return (lowest < 999999.0) ? lowest : 0.0;
 }
 
 stock void ShuffleArrayList(ArrayList L)
@@ -3189,12 +3643,22 @@ stock void ShuffleArrayList(ArrayList L)
     }
 }
 
-
+// ✅ 修改：重建 Buckets 时确保缓存新鲜
 static Action Timer_RebuildBuckets(Handle timer)
 {
-    RebuildNavBuckets();
+    // 如果本局本图已经有可用缓存，就别动了
+    if (g_BucketsReady && g_AllNavAreasCache != null && g_NavAreasCacheCount > 0)
+    {
+        // Debug_Print("[NAV CACHE] Skip rebuild (already warm)");
+        return Plugin_Stop;
+    }
+
+    // 只在“没有缓存”时，补齐一次（不会触发 Cleared 日志）
+    EnsureNavAreasCache();   // 仅确保存在，不清空
+    BuildNavBuckets();       // 内部会 TryLoadBucketsFromCache()
     return Plugin_Stop;
 }
+
 static void RebuildNavBuckets()
 {
     BuildNavBuckets();
@@ -3388,45 +3852,49 @@ stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, f
     }
 }
 
-// [新增] —— Flow 平滑评分（避免台阶效应）
+// ✅ 改进版 Flow 评分（约第2690行）
 stock float ScoreFlowSmooth(int deltaFlow)
 {
-    // 把“每 6 个桶”为一个尺度单位：±12 桶大约两格“可感区域”
-    float x = float(deltaFlow) / 6.0;
-
-    // 对称衰减：100 / (1 + e^(2|x|))，越远越低
-    float s = 100.0 / (1.0 + ExpF(2.0 * FloatAbs(x)));
-
-    // 向前（埋伏在前方）给最多 +20 的温和奖励
-    if (deltaFlow > 0)
+    // deltaFlow = candBucket - centerBucket
+    
+    // === 后方严惩（在生还者后面） ===
+    if (deltaFlow < -3)  // 落后超过3个桶（约18%进度）
     {
-        float bonus = 20.0 * Clamp01(float(deltaFlow) / 12.0);
-        s += bonus;
+        // 线性衰减：-3 → 30分，-6 → 10分，-12及以下 → 0分
+        float penalty = 30.0 + (float(deltaFlow + 3) / 9.0) * 20.0;  // -3→30, -12→0
+        return clamp(penalty, 0.0, 30.0);
     }
-
-    return clamp(s, 10.0, 100.0);
-}
-// [新增] —— 与最近刷点“同楼层且 XY 太近”的额外硬过滤
-stock bool NearSameFloorTooClose(const float p[3])
-{
-    if (lastSpawns == null || lastSpawns.Length == 0) return false;
-    float now = GetGameTime();
-    for (int i = lastSpawns.Length - 1; i >= 0; i--)
+    
+    // === 脚下/同层重罚（-3 到 +3 之间） ===
+    if (deltaFlow >= -3 && deltaFlow <= 3)
     {
-        float rec[4]; lastSpawns.GetArray(i, rec); // [x,y,z,t]
-        if (now - rec[3] > SEP_TTL) continue;
-        float dz = FloatAbs(p[2] - rec[2]);
-        if (dz <= 64.0) {
-            float dx = p[0]-rec[0], dy = p[1]-rec[1];
-            float d2 = dx*dx + dy*dy;
-
-            float k = PenLimitScale();                 // 1.00 → 0.50
-            float xyLimit = 220.0 * k;                 // 上限越大，阈值越小 → 更宽松
-            if (xyLimit < 140.0) xyLimit = 140.0;      // 保底，别小到贴脸
-            if (d2 < xyLimit*xyLimit) return true;
-        }
+        // 抛物线惩罚：0 处最低（20分），±3 处约 40分
+        float t = FloatAbs(float(deltaFlow)) / 3.0;  // 0..1
+        return 20.0 + t * 20.0;  // 20..40分
     }
-    return false;
+    
+    // === 前方小范围（+4 到 +8）：理想埋伏点 ===
+    if (deltaFlow >= 4 && deltaFlow <= 8)
+    {
+        return 100.0;  // 满分
+    }
+    
+    // === 前方中距离（+9 到 +15）：还行 ===
+    if (deltaFlow >= 9 && deltaFlow <= 15)
+    {
+        float t = (float(deltaFlow) - 9.0) / 6.0;  // 0..1
+        return 100.0 - t * 30.0;  // 100..70分
+    }
+    
+    // === 前方远距离（+16 及以上）：太远 ===
+    if (deltaFlow >= 16)
+    {
+        float over = float(deltaFlow - 15);
+        float s = 70.0 / (1.0 + over / 10.0);  // 指数衰减
+        return clamp(s, 10.0, 70.0);
+    }
+    
+    return 20.0;  // 兜底
 }
 
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
@@ -3446,13 +3914,14 @@ stock float PenLimitScale()
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode,
                                    float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
-    const int TOPK = 12; // 每次最多采纳的候选个数
+    const int TOPK = 12;
     if (!GetSurPosData()) { Debug_Print("[FIND FAIL] no survivor data"); return false; }
 
-    // ====== 基础上下文 ======
-    TheNavAreas pTheNavAreas = view_as<TheNavAreas>(g_pTheNavAreas.Dereference());
+    // ✅ 使用缓存替代创建新的 ArrayList
+    EnsureNavAreasCache();
+    int iAreaCount = g_NavAreasCacheCount;
+    
     float fMapMaxFlowDist    = L4D2Direct_GetMapMaxFlowDistance();
-    int   iAreaCount         = g_pTheNavAreas.Count();
     bool  bFinaleArea        = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
     float now                = GetGameTime();
 
@@ -3532,11 +4001,15 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 // --- 硬过滤 ---（原逻辑保持不变）
                 if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
 
-                NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(ai, false));
-                if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) { cFilt_Flag++; continue; }
-
-                float fFlow = pArea.GetFlow();
-                if (fFlow < 0.0 || fFlow > fMapMaxFlowDist) { cFilt_Flow++; continue; }
+                // ✅ 从全局缓存获取 NavArea
+                Address areaAddr = g_AllNavAreasCache.Get(ai);
+                NavArea pArea = view_as<NavArea>(areaAddr);
+                
+                if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) 
+                { 
+                    cFilt_Flag++; 
+                    continue; 
+                }
 
                 float p[3]; pArea.GetRandomPoint(p);
 
@@ -3552,20 +4025,29 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
                 if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
                 if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
-                if (NearSameFloorTooClose(p))        { cFilt_Sep++;   continue; }
+                // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
+                if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
                 if (WillStuck(p))                    { cFilt_Stuck++; continue; }
                 if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
                 if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
-                // --- 评分（保持不变） ---
-                int   candBucket = FlowDistanceToPercent(fFlow);
+                // --- 评分 ---
+                // 在分桶模式下，桶号就是候选点的 flow 桶；不要再依赖原始 flow
+                int   candBucket = b;
+                if (!gCV.bNavBucketMapInvalid) {
+                    float fFlow = pArea.GetFlow();
+                    if (fFlow < 0.0 || fFlow > fMapMaxFlowDist) { cFilt_Flow++; continue; }
+                    // 这里 candBucket 保持为 b 即可；b 与 FlowDistanceToPercent(fFlow) 一致
+                }
                 int   sidx       = ComputeSectorIndex(center, p, sectors);
                 int   deltaFlow  = candBucket - centerBucket;
 
                 float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
                 float score_dist = ScoreDistSmooth(dminEye, sweet, width);
                 float score_hght = CalculateScore_Height(zc, p, refEyeZ);
+                // [MOD] Flow 分项计算 + 轻度惩罚
                 float score_flow = ScoreFlowSmooth(deltaFlow);
+                score_flow = ApplyBadFlowPenalty(pArea, score_flow);
                 float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
                 float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
@@ -3610,13 +4092,22 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         {
             if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
 
-            NavArea pArea = view_as<NavArea>(pTheNavAreas.GetAreaRaw(ai, false));
-            if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) { cFilt_Flag++; continue; }
+            // ✅ 从全局缓存获取 NavArea
+            Address areaAddr = g_AllNavAreasCache.Get(ai);
+            NavArea pArea = view_as<NavArea>(areaAddr);
+            
+            if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) 
+            { 
+                cFilt_Flag++; 
+                continue; 
+            }
 
             float fFlow = pArea.GetFlow();
             if (fFlow < 0.0 || fFlow > fMapMaxFlowDist) { cFilt_Flow++; continue; }
 
             float p[3]; pArea.GetRandomPoint(p);
+            // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
+            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
 
             int candBucketForHeight = FlowDistanceToPercent(fFlow);
             float bMinZ = g_BucketMinZ[candBucketForHeight], bMaxZ = g_BucketMaxZ[candBucketForHeight];
@@ -3631,11 +4122,11 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
             if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
-            if (NearSameFloorTooClose(p))        { cFilt_Sep++;   continue; }
             if (WillStuck(p))                    { cFilt_Stuck++; continue; }
             if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
+            // --- 评分 ---
             int   candBucket = FlowDistanceToPercent(fFlow);
             int   sidx       = ComputeSectorIndex(center, p, sectors);
             int   deltaFlow  = candBucket - centerBucket;
@@ -3643,7 +4134,10 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
             float score_dist = ScoreDistSmooth(dminEye, sweet, width);
             float score_hght = CalculateScore_Height(zc, p, refEyeZ);
+            // [MOD] Flow 分项计算 + 轻度惩罚
             float score_flow = ScoreFlowSmooth(deltaFlow);
+            score_flow = ApplyBadFlowPenalty(pArea, score_flow);
+
             float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
             float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
@@ -3927,8 +4421,12 @@ static bool TryLoadBucketsFromCache()
     if (!StrEqual(map, mapCur))
     { delete kv; return false; }
 
+    // ✅ 使用缓存
+    EnsureNavAreasCache();
+    int currentAreaCount = g_NavAreasCacheCount;
+
     int areaCount = kv.GetNum("area_count", -1);
-    if (areaCount <= 0 || areaCount != g_pTheNavAreas.Count())
+    if (areaCount <= 0 || areaCount != currentAreaCount)
     { delete kv; return false; }
 
     float maxFlowCur = L4D2Direct_GetMapMaxFlowDistance();
@@ -4037,7 +4535,11 @@ static void SaveBucketsToCache()
     char map[64]; GetCurrentMap(map, sizeof map);
     kv.SetString("map", map);
 
-    kv.SetNum("area_count", g_pTheNavAreas.Count());
+    // ✅ 使用缓存
+    EnsureNavAreasCache();
+    int areaCount = g_NavAreasCacheCount;
+
+    kv.SetNum("area_count", areaCount);
     kv.SetFloat("max_flow", L4D2Direct_GetMapMaxFlowDistance());
     kv.SetFloat("vsboss_buffer", gCV.VsBossFlowBuffer.FloatValue);
     kv.SetNum("map_invalid", gCV.bNavBucketMapInvalid ? 1 : 0);
@@ -4058,8 +4560,8 @@ static void SaveBucketsToCache()
 
     // areas
     kv.JumpToKey("areas", true);
-    int N = g_pTheNavAreas.Count();
-    for (int i = 0; i < N; i++)
+    // ✅ 使用之前已经获取的 areaCount
+    for (int i = 0; i < areaCount; i++)
     {
         int navid = GetNavIDByIndex(i);
         if (navid < 0) continue;
@@ -4087,7 +4589,7 @@ static void SaveBucketsToCache()
 }
 
 // =========================
-// Gamedata / SDK
+// Gamedata / SDK（简化版 - 只保留 MaxSpecial unlock）
 // =========================
 static void InitSDK_FromGamedata()
 {
@@ -4098,40 +4600,7 @@ static void InitSDK_FromGamedata()
     if (hGameData == null)
         SetFailState("Failed to load \"%s.txt\" gamedata.", sBuffer);
 
-    GetOffset(hGameData, g_iSpawnAttributesOffset, "TerrorNavArea::SpawnAttributes");
-    GetOffset(hGameData, g_iFlowDistanceOffset, "TerrorNavArea::FlowDistance");
-    GetOffset(hGameData, g_iNavCountOffset, "TheNavAreas::Count");
-    
-    GetAddress(hGameData, view_as<Address>(g_pTheNavAreas), "TheNavAreas");
-    GetAddress(hGameData, view_as<Address>(g_pPanicEventStage), "CDirectorScriptedEventManager::m_PanicEventStage");
-
-    // Vector CNavArea::GetRandomPoint( void ) const
-    strcopy(sBuffer, sizeof(sBuffer), "TerrorNavArea::FindRandomSpot");
-    StartPrepSDKCall(SDKCall_Raw);
-    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
-    PrepSDKCall_SetReturnInfo(SDKType_Vector, SDKPass_ByValue);
-    g_hSDKFindRandomSpot = EndPrepSDKCall();
-    if(g_hSDKFindRandomSpot == null)
-        SetFailState("Failed to create SDKCall: %s", sBuffer);
-
-    // IsVisibleToPlayer(Vector const&, CBasePlayer *, int, int, float, CBaseEntity const*, TerrorNavArea **, bool *);
-    strcopy(sBuffer, sizeof(sBuffer), "IsVisibleToPlayer");
-    StartPrepSDKCall(SDKCall_Static);
-    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, sBuffer);
-    PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);            // target position
-    PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);     // client
-    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // client team
-    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // target position team
-    PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);             // unknown
-    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);      // unknown
-    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer);    // target position NavArea
-    PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Pointer);            // auto get NavArea if false
-    PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
-    g_hSDKIsVisibleToPlayer = EndPrepSDKCall();
-    if (g_hSDKIsVisibleToPlayer == null)
-        SetFailState("Failed to create SDKCall: %s", sBuffer);
-
-    // Unlock Max SI limit.
+    // Unlock Max SI limit - 这是唯一需要保留的 gamedata patch
     strcopy(sBuffer, sizeof(sBuffer), "CDirector::GetMaxPlayerZombies");
     MemoryPatch mPatch = MemoryPatch.CreateFromConf(hGameData, sBuffer);
     if (!mPatch.Validate())
@@ -4140,18 +4609,6 @@ static void InitSDK_FromGamedata()
         SetFailState("Failed to Enable patch: %s", sBuffer);
 
     delete hGameData;
-}
-void GetOffset(GameData hGameData, int &offset, const char[] name)
-{
-    offset = hGameData.GetOffset(name);
-    if (offset == -1)
-        SetFailState("Failed to get offset: %s", name);
-}
-void GetAddress(GameData hGameData, Address &address, const char[] name)
-{
-    address = hGameData.GetAddress(name);
-    if (address == Address_Null)
-        SetFailState("Failed to get address: %s", name);
 }
 
 // --- Math helpers --- 
@@ -4169,13 +4626,23 @@ stock float ComputePenScaleByLimit(int L) {
 }
 stock float ScaleNegativeOnly(float v, float k) { return (v < 0.0) ? (v * k) : v; }
 
-// [ADD] 只在 DebugMode>0 时打印一行评分
-static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg) {
+// 在 LogChosenSpawnScore 中增加（约第2900行）
+static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg) 
+{
     if (gCV.iDebugMode <= 0) return;
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%+d sec=%d",
+    
+    // ✅ 计算真实位置关系
+    int candReal = GetPositionBucketPercent(dbg.pos);
+    int surReal = -1;
+    int fb = GetHighestFlowSurvivorSafe();
+    TryGetClientFlowPercentSafe(fb, surReal);
+    
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%+d sec=%d | REAL: cand=%d%% sur=%d%% delta=%+d",
         INFDN[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
         dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
-        dbg.dminEye, dbg.ringEff, dbg.slack, dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector);
+        dbg.dminEye, dbg.ringEff, dbg.slack, 
+        dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
+        candReal, surReal, candReal - surReal);  // ✅ 真实位置关系
 }
 // --- pause
 public void OnPause()
