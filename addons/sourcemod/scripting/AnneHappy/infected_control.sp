@@ -381,7 +381,7 @@ enum struct Config
         this.NavBucketIncludeCtr = CreateConVar("inf_NavBucketIncludeCenter", "1", "是否把中心桶 s 也加入扫描序列(1=是,0=否)", CVAR_FLAG, true, 0.0, true, 1.0);
 
         // —— 死亡CD —— //
-        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "2.0","同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
+        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "1.0","同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
         this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0","同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
 
         // —— 双保险 —— //
@@ -2985,16 +2985,9 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur)
     // 3. 禁止刷在"生还者后方超过5个桶"的位置
     if (candPercent < surPercent - 5)
         return false;
-    
-    // 4. 禁止刷在"生还者脚下同层"（XY近 + Z近 + 桶相近）
-    float minXY = GetMinXYDistToAnySurvivor(candPos);
     float minZ = GetMinZDistToAnySurvivor(candPos);
-    
-    if (minXY < 200.0 && minZ < 80.0 && FloatAbs(float(candPercent - surPercent)) <= 2)
-        return false;  // 脚下同层
-    
-    // 5. 禁止刷在"生还者后方脚下200u"（XY近 + Z近 + 桶相近）
-    if(minZ < 200.0 && FloatAbs(float(candPercent - surPercent)) <= 1)
+    // 4. 禁止刷在"生还者后方脚下200u"（XY近 + Z近 + 桶相近）
+    if(minZ < 200.0 && (candPercent - surPercent <= 0))
         return false;
     
     return true;
@@ -3252,27 +3245,7 @@ static float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMax
     float over   = FloatMax(0.0, p[2] - (allMaxEyeZ + 200.0));
     float taperZ = 1.0 / (1.0 + over / 150.0);  // 150u 每级衰减
 
-    // [新增] —— 近距离屋顶：XY 越近，放宽越小（<500u 时线性从 0.5→1.0）
-    float xy = GetMinXYDistToAnySurvivor(p);
-    float taperXY = 1.0;
-    if (xy < 500.0) taperXY = 0.5 + 0.5 * (xy / 500.0);
-
-    return base * taperZ * taperXY;
-}
-// [新增] —— 仅 XY 的最小距离到任意幸存者
-stock float GetMinXYDistToAnySurvivor(const float p[3])
-{
-    float best2 = 1.0e12;
-    float s[3];
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
-        GetClientAbsOrigin(i, s);
-        float dx = p[0]-s[0], dy = p[1]-s[1];
-        float d2 = dx*dx + dy*dy;
-        if (d2 < best2) best2 = d2;
-    }
-    return (best2 < 1.0e11) ? SquareRoot(best2) : 999999.0;
+    return base * taperZ;
 }
 
 // =========================
@@ -4106,8 +4079,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (fFlow < 0.0 || fFlow > fMapMaxFlowDist) { cFilt_Flow++; continue; }
 
             float p[3]; pArea.GetRandomPoint(p);
-            // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
-            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
 
             int candBucketForHeight = FlowDistanceToPercent(fFlow);
             float bMinZ = g_BucketMinZ[candBucketForHeight], bMaxZ = g_BucketMaxZ[candBucketForHeight];
@@ -4122,6 +4093,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
             if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
+            // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
+            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
             if (WillStuck(p))                    { cFilt_Stuck++; continue; }
             if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
