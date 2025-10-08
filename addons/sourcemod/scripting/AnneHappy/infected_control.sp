@@ -416,7 +416,7 @@ enum struct Config
         // [ADD] badflow 轻度惩罚（仅影响 Flow 分项；默认 2 分）
         this.FlowBadPenaltyPoints = CreateConVar(
             "inf_flow_bad_penalty_points",
-            "20.0",
+            "30.0",
             "Mild points to subtract from FLOW score when the area has invalid raw flow (mapped badflow). 0 disables.",
             CVAR_FLAG, 
             true, 0.0, true, 100.0
@@ -2993,7 +2993,7 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur)
     if (TryGetLowestSurvivorFootZ(minFootZ))
     {
         // 严格“后方”：candPercent < surPercent（不含相等）
-        if (candPercent < surPercent && candPos[2] <= (minFootZ - 200.0))
+        if (candPercent < surPercent && (candPos[2] <= (minFootZ - 200.0)|| candPos[2] >= (minFootZ + 350.0)))
             return false;
     }
     // 如果没找到生还者（极端情况），保持放行
@@ -3539,7 +3539,7 @@ static void BuildNavBuckets()
 
         // ✅ 按 Z 轴分成三组：上方、同层、下方
         ArrayList above = new ArrayList();  // 在最低生还脚上方
-        ArrayList same = new ArrayList();   // 与生还脚同层（±80u）
+        ArrayList same = new ArrayList();   // 与生还脚同层（±120u）
         ArrayList below = new ArrayList();  // 在最低生还脚下方
 
         for (int i = 0; i < L.Length; i++)
@@ -3549,7 +3549,7 @@ static void BuildNavBuckets()
             
             float deltaZ = zCore - lowestSurvivorZ;
             
-            if (deltaZ > 80.0)
+            if (deltaZ > 120.0)
                 above.Push(areaIdx);
             else if (deltaZ < -80.0)
                 below.Push(areaIdx);
@@ -3562,13 +3562,13 @@ static void BuildNavBuckets()
         ShuffleArrayList(same);
         ShuffleArrayList(below);
 
-        // ✅ 重新组装：上方 → 同层 → 下方
+        // ✅ 重新组装：同层 → 上方 → 下方
         L.Clear();
         
-        for (int i = 0; i < above.Length; i++)
-            L.Push(above.Get(i));
         for (int i = 0; i < same.Length; i++)
             L.Push(same.Get(i));
+        for (int i = 0; i < above.Length; i++)
+            L.Push(above.Get(i));
         for (int i = 0; i < below.Length; i++)
             L.Push(below.Get(i));
 
