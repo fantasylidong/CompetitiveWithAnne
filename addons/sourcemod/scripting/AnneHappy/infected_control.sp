@@ -2537,27 +2537,10 @@ static bool WillStuck(const float at[3])
 {
     static const float mins[3] = { -16.0, -16.0, 0.0 };
     static const float maxs[3] = {  16.0,  16.0, 71.0 };
-    
-    // 1. 标准 Hull 检测
     Handle tr = TR_TraceHullFilterEx(at, at, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
     bool hit = TR_DidHit(tr);
     delete tr;
-    
-    if (!hit)
-        return false;
-    
-    // ✅ 对于45°斜面，理论最大穿透深度 = 32u
-    //    为了安全，抬高 40u（32u + 8u余量）
-    float above[3];
-    above[0] = at[0];
-    above[1] = at[1];
-    above[2] = at[2] + 32.0;  // ✅ 32u 可以容忍 45° 斜面
-    
-    Handle tr2 = TR_TraceHullFilterEx(above, above, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
-    bool hitAbove = TR_DidHit(tr2);
-    delete tr2;
-
-    return hitAbove;
+    return hit;
 }
 
 stock bool TraceFilter(int entity, int contentsMask)
