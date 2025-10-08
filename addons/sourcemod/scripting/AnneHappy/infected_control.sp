@@ -2532,15 +2532,34 @@ stock bool EnvBlockType(int entity)
     int BlockType = GetEntProp(entity, Prop_Data, "m_nBlockType");
     return !(BlockType == 1 || BlockType == 2);
 }
-static bool WillStuck(const float at[3])
+
+static bool WillStuck(const float at[3]) 
 {
     static const float mins[3] = { -16.0, -16.0, 0.0 };
     static const float maxs[3] = {  16.0,  16.0, 71.0 };
+    
+    // 1. 标准 Hull 检测
     Handle tr = TR_TraceHullFilterEx(at, at, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
     bool hit = TR_DidHit(tr);
     delete tr;
-    return hit;
+    
+    if (!hit)
+        return false;
+    
+    // ✅ 对于45°斜面，理论最大穿透深度 = 32u
+    //    为了安全，抬高 40u（32u + 8u余量）
+    float above[3];
+    above[0] = at[0];
+    above[1] = at[1];
+    above[2] = at[2] + 32.0;  // ✅ 32u 可以容忍 45° 斜面
+    
+    Handle tr2 = TR_TraceHullFilterEx(above, above, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
+    bool hitAbove = TR_DidHit(tr2);
+    delete tr2;
+
+    return hitAbove;
 }
+
 stock bool TraceFilter(int entity, int contentsMask)
 {
     if (entity <= MaxClients || !IsValidEntity(entity))
@@ -2961,13 +2980,14 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock bool PassRealPositionCheck(float candPos[3], int targetSur)
+stock bool PassRealPositionCheck(float candPos[3], int targetSur) 
 {
-    // 1. 获取候选点的分桶百分比
+    // 1) 候选点的分桶百分比
     int candPercent = GetPositionBucketPercent(candPos);
-    if (candPercent < 0) return true;  // 无法判断则放行（避免误杀）
-    
-    // 2. 获取目标生还者的分桶百分比
+    if (candPercent < 0) 
+        return true;  // 无法判断就放行，避免误杀
+
+    // 2) 目标（或最高进度）生还者的分桶百分比
     int surPercent = -1;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
     {
@@ -2976,38 +2996,50 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur)
     }
     else
     {
-        // 用最高进度生还者
         int fb = GetHighestFlowSurvivorSafe();
         if (!IsValidSurvivor(fb) || !TryGetClientFlowPercentSafe(fb, surPercent))
             return true;
     }
-    
-    // 3. 禁止刷在"生还者后方超过5个桶"的位置
-    if (candPercent < surPercent - 5)
+
+    // 3) 后方超过 6 个桶：直接禁止
+    if (candPercent < surPercent - 6)
         return false;
-    float minZ = GetMinZDistToAnySurvivor(candPos);
-    // 4. 禁止刷在"生还者后方脚下200u"（XY近 + Z近 + 桶相近）
-    if(minZ < 200.0 && (candPercent - surPercent <= 0))
-        return false;
-    
+
+    // 4) 你的需求：若“候选桶在生还进度后方” 且 “候选点 Z <= 所有生还者最低脚部 Z - 200u”，则禁止
+    float minFootZ;
+    if (TryGetLowestSurvivorFootZ(minFootZ))
+    {
+        // 严格“后方”：candPercent < surPercent（不含相等）
+        if (candPercent < surPercent && candPos[2] <= (minFootZ - 200.0))
+            return false;
+    }
+    // 如果没找到生还者（极端情况），保持放行
     return true;
 }
 
-// ✅ 新增：最小Z轴距离
-stock float GetMinZDistToAnySurvivor(const float p[3])
+// 返回 true 表示找到至少一名有效、生还且有坐标的生还者；outMinZ 为他们脚底 Z 的最小值
+stock bool TryGetLowestSurvivorFootZ(float &outMinZ)
 {
-    float best = 999999.0;
+    bool found = false;
+    float bestZ = 0.0;
     float s[3];
+
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
-        GetClientAbsOrigin(i, s);
-        float dz = FloatAbs(p[2] - s[2]);
-        if (dz < best) best = dz;
-    }
-    return best;
-}
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
 
+        GetClientAbsOrigin(i, s); // Source 中 origin 在脚底附近，符合“脚部 Z”的语义
+        if (!found || s[2] < bestZ)
+        {
+            bestZ = s[2];
+            found = true;
+        }
+    }
+
+    if (found) outMinZ = bestZ;
+    return found;
+}
 // =========================
 // 修改 GetNavIDByIndex（需要重新获取）
 // =========================
