@@ -3845,41 +3845,34 @@ stock float ScoreFlowSmooth(int deltaFlow)
 {
     // deltaFlow = candBucket - centerBucket
     
-    // === 后方严惩（在生还者后面） ===
-    if (deltaFlow < -3)  // 落后超过3个桶（约18%进度）
-    {
-        // 线性衰减：-3 → 30分，-6 → 10分，-12及以下 → 0分
-        float penalty = 30.0 + (float(deltaFlow + 3) / 9.0) * 20.0;  // -3→30, -12→0
-        return clamp(penalty, 0.0, 30.0);
-    }
+    if (deltaFlow < -3) 
+{
+    // deltaFlow ∈ (-∞, -3)
+    // 线性增长：-3 -> 0罚，-9 -> 30罚
+    float t = clamp((-deltaFlow - 3) / 6.0, 0.0, 1.0);
+    float penalty = t * 30.0;
+    return penalty;
+}
     
-    // === 脚下/同层重罚（-3 到 +3 之间） ===
-    if (deltaFlow >= -3 && deltaFlow <= 3)
-    {
-        // 抛物线惩罚：0 处最低（20分），±3 处约 40分
-        float t = FloatAbs(float(deltaFlow)) / 3.0;  // 0..1
-        return 20.0 + t * 20.0;  // 20..40分
-    }
-    
-    // === 前方小范围（+4 到 +8）：理想埋伏点 ===
-    if (deltaFlow >= 4 && deltaFlow <= 8)
+    // === 前方小范围（+1 到 +5）：理想埋伏点 ===
+    if (deltaFlow >= 1 && deltaFlow <= 5)
     {
         return 100.0;  // 满分
     }
     
-    // === 前方中距离（+9 到 +15）：还行 ===
-    if (deltaFlow >= 9 && deltaFlow <= 15)
+    // === 前方中距离（+6 到 +10）：还行 ===
+    if (deltaFlow >= 6 && deltaFlow <= 10)
     {
         float t = (float(deltaFlow) - 9.0) / 6.0;  // 0..1
-        return 100.0 - t * 30.0;  // 100..70分
+        return 80.0 - t * 50.0;  // 80..50分
     }
     
-    // === 前方远距离（+16 及以上）：太远 ===
-    if (deltaFlow >= 16)
+    // === 前方远距离（+10 及以上）：太远 ===
+    if (deltaFlow >= 10)
     {
         float over = float(deltaFlow - 15);
-        float s = 70.0 / (1.0 + over / 10.0);  // 指数衰减
-        return clamp(s, 10.0, 70.0);
+        float s = 30.0 / (1.0 + over / 10.0);  // 指数衰减
+        return clamp(s, 10.0, 30.0);
     }
     
     return 20.0;  // 兜底
