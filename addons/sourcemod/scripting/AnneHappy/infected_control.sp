@@ -1149,7 +1149,7 @@ public Action Cmd_NavTest(int client, int args)
 
     // 5. 位置关系检查
     int targetSur = ChooseTargetSurvivor();
-    bool passPosition = PassRealPositionCheck(testPos, targetSur);
+    bool passPosition = PassRealPositionCheck(testPos, targetSur, view_as<int>(SI_Smoker));
     int candPercent = GetPositionBucketPercent(testPos);
     int surPercent = -1;
     if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
@@ -2963,7 +2963,7 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock bool PassRealPositionCheck(float candPos[3], int targetSur) 
+stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si=0) 
 {
     // 1) 候选点的分桶百分比
     int candPercent = GetPositionBucketPercent(candPos);
@@ -2993,7 +2993,7 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur)
     if (TryGetLowestSurvivorFootZ(minFootZ))
     {
         // 严格“后方”：candPercent < surPercent（不含相等）
-        if (candPercent < surPercent && (candPos[2] <= (minFootZ - 200.0)|| candPos[2] >= (minFootZ + 350.0)))
+        if (candPercent < surPercent && (candPos[2] <= (minFootZ - 180.0)|| (si != view_as<int>(SI_Smoker) && candPos[2] >= (minFootZ + 200.0))))
             return false;
     }
     // 如果没找到生还者（极端情况），保持放行
@@ -4007,7 +4007,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
                 if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
                 // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
-                if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
+                if (!PassRealPositionCheck(p, targetSur, zc)) { cFilt_Pos++; continue; }
                 if (WillStuck(p))                    { cFilt_Stuck++; continue; }
                 if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
                 if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
@@ -4102,7 +4102,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
             if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
             // ✅ 新增：检查真实位置关系（防止刷在生还者脚下）
-            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
+            if (!PassRealPositionCheck(p, targetSur, zc)) { cFilt_Pos++; continue; }
             if (WillStuck(p))                    { cFilt_Stuck++; continue; }
             if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
