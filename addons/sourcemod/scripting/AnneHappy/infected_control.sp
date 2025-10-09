@@ -4046,12 +4046,18 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
                 float score_dist = ScoreDistSmooth(dminEye, sweet, width);
                 float score_hght = CalculateScore_Height(zc, p, refEyeZ);
-                float score_flow = ScoreFlowSmooth(deltaFlow);
 
-                // [MOD] 仅当“原始 flow 非法”时，叠加“高度差惩罚”
-                if (rawBadFlow) {
-                    score_flow = ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ);
-                }
+                // 使用 base - penalty（与 NavPeek 一致）
+                float flow_base = ScoreFlowSmooth(deltaFlow);
+                float flow_pen  = rawBadFlow ? ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ) : 0.0;
+                float score_flow = flow_base - flow_pen;
+
+                // 与 NavPeek 同样的上下限
+                if (score_flow > 100.0) score_flow = 100.0;
+                if (score_flow < -200.0) score_flow = -200.0;
+
+                // ★ 关键：坏 flow 且评分 < 0 直接丢弃，不进入总分
+                if (rawBadFlow && score_flow < 0.0) { cFilt_Flow++; continue; }
 
                 float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
@@ -4137,12 +4143,14 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
             float score_dist = ScoreDistSmooth(dminEye, sweet, width);
             float score_hght = CalculateScore_Height(zc, p, refEyeZ);
-            float score_flow = ScoreFlowSmooth(deltaFlow);
+            float flow_base = ScoreFlowSmooth(deltaFlow);
+            float flow_pen  = rawBadFlow ? ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ) : 0.0;
+            float score_flow = flow_base - flow_pen;
 
-            // [MOD] 仅当“原始 flow 非法”时，叠加“高度差惩罚”
-            if (rawBadFlow) {
-                score_flow = ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ);
-            }
+            if (score_flow > 100.0) score_flow = 100.0;
+            if (score_flow < -200.0) score_flow = -200.0;
+
+            if (rawBadFlow && score_flow < 0.0) { cFilt_Flow++; continue; }
 
             float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
