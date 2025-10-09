@@ -1,0 +1,368 @@
+"Games"
+{
+	"left4dead2"
+	{
+		"Addresses"
+		{
+			"CBaseServer::m_nReservationCookie"
+			{
+				"linux"
+				{
+					"signature"	"CVEngineServer::CreateFakeClient"
+					"read"		"12"
+					"offset"	"364"
+				}
+
+				"windows"
+				{
+					"signature" "CVEngineServer::CreateFakeClient"
+					"read"		"8"
+					"offset"	"368"
+				}
+			}
+
+			"DEFAULT_TICK_INTERVAL"
+			{
+				"linux"
+				{
+					"signature"	"CServerGameDLL::GetTickInterval"
+					"read"		"3"
+				}
+
+				"windows"
+				{
+					"signature"	"CServerGameDLL::GetTickInterval"
+					"read"		"2"
+				}
+			}
+		}
+
+		"MemPatches"
+		{
+			"CServerGameClients::GetPlayerLimits"
+			{
+				"linux"
+				{
+					"signature" "CServerGameClients::GetPlayerLimits"
+					"offset"	"9h"
+					"verify"	"\xC7\x00\x2A\x2A\x2A\x2A\xC7\x02\x2A\x2A\x2A\x2A"
+					"patch"		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+				}
+
+				"windows"
+				{
+					"signature" "CServerGameClients::GetPlayerLimits"
+					"offset"	"9h"
+					"verify"	"\xC7\x00\x2A\x2A\x2A\x2A\xC7\x01\x2A\x2A\x2A\x2A"
+					"patch"		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+				}
+			}
+
+			"CBaseServer::ConnectClient::m_numGameSlots"
+			{
+				"linux"
+				{
+					"signature" "CBaseServer::ConnectClient"
+					"offset"	"3D4h"
+					"verify"	"\x3B\x9F"
+					"patch"		"\x3B\x1D\x00\x00\x00\x00"
+				}
+
+				"windows"
+				{
+					"signature" "CBaseServer::ConnectClient"
+					"offset"	"253h"
+					"verify"	"\x3B\x86"
+					"patch"		"\x3B\x05\x00\x00\x00\x00"
+				}
+			}
+
+			"CTerrorGameRules::GetMaxHumanPlayers"
+			{
+				"linux"
+				{
+					"signature" "CTerrorGameRules::GetMaxHumanPlayers"
+					"offset"	"0"
+					"verify"	"\x55\x89"
+					"patch"		"\xA1\x00\x00\x00\x00\xC3"
+				}
+
+				"windows"
+				{
+					"signature" "CTerrorGameRules::GetMaxHumanPlayers"
+					"offset"	"0"
+					"verify"	"\xF7\x05"
+					"patch"		"\xA1\x00\x00\x00\x00\xC3"
+				}
+			}
+
+			"CMatchTitle::GetTotalNumPlayersSupported"
+			{
+				"linux"
+				{
+					"signature" "CMatchTitle::GetTotalNumPlayersSupported"
+					"offset"	"0"
+					"verify"	"\x55\xB8"
+					"patch"		"\xA1\x00\x00\x00\x00\xC3"
+				}
+
+				"windows"
+				{
+					"signature" "CMatchTitle::GetTotalNumPlayersSupported"
+					"offset"	"0"
+					"verify"	"\xB8\x08"
+					"patch"		"\xA1\x00\x00\x00\x00\xC3"
+				}
+			}
+
+			"CServerGameDLL::GetTickInterval"
+			{
+				"linux"
+				{
+					"address"	"DEFAULT_TICK_INTERVAL"
+					"offset"	"0"
+					"verify"	"\x89\x88\x08\x3D"
+					"patch"		"\x89\x88\x08\x3D"
+				}
+
+				"windows"
+				{
+					"address"	"DEFAULT_TICK_INTERVAL"
+					"offset"	"0"
+					"verify"	"\x89\x88\x08\x3D"
+					"patch"		"\x89\x88\x08\x3D"
+				}
+			}
+
+			"CVomit::UpdateAbility::patch1"
+			{
+				"linux"
+				{
+					"signature" "CVomit::UpdateAbility"
+					"offset"	"13Dh"
+					"verify"	"\xA1"
+					"patch"		"\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF"
+				}
+
+				"windows"
+				{
+					"signature" "CVomit::UpdateAbility"
+					"offset"	"1E4h"
+					"verify"	"\xA1"
+					"patch"		"\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF"
+				}
+			}
+
+			"CVomit::UpdateAbility::patch2"
+			{
+				"linux"
+				{
+					"signature" "CVomit::UpdateAbility"
+					"offset"	"5FEh"
+					"verify"	"\xA1"
+					"patch"		"\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF"
+				}
+
+				"windows"
+				{
+					"signature" "CVomit::UpdateAbility"
+					"offset"	"376h"
+					"verify"	"\xA1"
+					"patch"		"\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF"
+				}
+			}
+
+			"CVomit::UpdateAbility::patch3"
+			{
+				"windows"
+				{
+					"signature" "CVomit::UpdateAbility"
+					"offset"	"543h"
+					"verify"	"\xA1"
+					"patch"		"\x00\x00\x00\x00\x00"
+					"preserve"	"\xFF\xFF\xFF\xFF\xFF"
+				}
+			}
+
+			"CGameClient::SetRate"
+			{
+				"windows"
+				{
+					"signature" "CGameClient::SetRate"
+					"offset"	"39h"
+					"verify"	"\x7E"
+					"patch"		"\xEB"
+				}
+			}
+
+			"ClampClientRate"
+			{
+				"linux"
+				{
+					"signature" "ClampClientRate"
+					"offset"	"3Dh"
+					"verify"	"\x81\xFA"
+					"patch"		"\x81\xFA\x00\xE1\xF5\x05" // little-endian only
+				}
+
+				"windows"
+				{
+					"signature" "ClampClientRate"
+					"offset"	"35h"
+					"verify"	"\x7E"
+					"patch"		"\xEB"
+				}
+			}
+
+			"CNetChan::SetDataRate"
+			{
+				"linux"
+				{
+					"signature" "CNetChan::SetDataRate"
+					"offset"	"18h"
+					"verify"	"\x72\x0C"
+					"patch"		"\x90\x90"
+				}
+
+				"windows"
+				{
+					"signature" "CNetChan::SetDataRate"
+					"offset"	"13h"
+					"verify"	"\x76"
+					"patch"		"\xEB"
+				}
+			}
+
+			"CGameClient::SetUpdateRate"
+			{
+				"linux"
+				{
+					"signature" "CGameClient::SetUpdateRate"
+					"offset"	"41h"
+					"verify"	"\x7F"
+					"patch"		"\x90\x90"
+				}
+
+				"windows"
+				{
+					"signature" "CGameClient::SetUpdateRate"
+					"offset"	"3Fh"
+					"verify"	"\x7E"
+					"patch"		"\xEB"
+				}
+			}
+
+			"CBaseClient::SetUpdateRate"
+			{
+				"linux"
+				{
+					"signature" "CBaseClient::SetUpdateRate"
+					"offset"	"20h"
+					"verify"	"\x0F\x4E\xD0"
+					"patch"		"\x89\xC2\x90"
+				}
+
+				"windows"
+				{
+					"signature" "CBaseClient::SetUpdateRate"
+					"offset"	"9h"
+					"verify"	"\x7E"
+					"patch"		"\xEB"
+				}
+			}
+			
+		}
+
+		"Signatures"
+		{
+			"CServerGameClients::GetPlayerLimits"
+			{
+				"library"	"server"
+				"linux"		"@_ZNK18CServerGameClients15GetPlayerLimitsERiS0_S0_"
+				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x8B\x4D\x0C\xC7\x00\x2A\x00\x00\x00\xC7\x01"
+			}
+
+			"CBaseServer::ConnectClient"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN11CBaseServer13ConnectClientER8netadr_siiiPKcS3_S3_iR10CUtlVectorI22CLC_SplitPlayerConnect10CUtlMemoryIS5_iEEb"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x10\x56\x68"
+			}
+
+			"CTerrorGameRules::GetMaxHumanPlayers"
+			{
+				"library"	"server"
+				"linux"		"@_ZNK16CTerrorGameRules18GetMaxHumanPlayersEv"
+				"windows"	"\xF7\x05\x2A\x2A\x2A\x2A\x00\x10\x00\x00\x74\x2A\xB8\x2A\x2A\x2A\x2A\xEB\x2A\xA1\x2A\x2A\x2A\x2A\x8B\x40\x24\x85\xC0\x75\x2A\xB8\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x50\x8B\x42\x10\xFF\xD0\x85\xC0\x74\x2A\x6A\x00\x68\x2A\x2A\x2A\x2A\x8B\xC8\xE8\x2A\x2A\x2A\x2A\x85\xC0\xB8\x08\x00\x00\x00"
+			}
+
+			"CMatchTitle::GetTotalNumPlayersSupported"
+			{
+				"library"	"matchmaking_ds"
+				"linux"		"@_ZN11CMatchTitle27GetTotalNumPlayersSupportedEv"
+				"windows"	"\xB8\x2A\x2A\x2A\x2A\xC3\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xA1\x2A\x2A\x2A\x2A\x56\x8B\x70\x2A\x85\xF6\x74\x2A\x8B\x16\x8B\x42"
+			}
+
+			"CVEngineServer::CreateFakeClient"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN14CVEngineServer16CreateFakeClientEPKc"
+				"windows"	"\x55\x8B\x2A\x8B\x2A\x2A\x50\xB9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x85\x2A\x75\x2A\x5D\xC2"
+			}
+
+			"CServerGameDLL::GetTickInterval"
+			{
+				"library"	"server"
+				"linux"		"@_ZNK14CServerGameDLL15GetTickIntervalEv"
+				"windows"	"\xD9\x05\x2A\x2A\x2A\x2A\xC3\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xE8\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x01\x8B\x90\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\xFF\xD2"
+			}
+
+			"CVomit::UpdateAbility"
+			{
+				"library"	"server"
+				"linux"		"@_ZN6CVomit13UpdateAbilityEv"
+				"windows"	"\x55\x8B\xEC\x81\xEC\xFC\x00\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x53\x56"
+			}
+
+			"CGameClient::SetRate"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x53\x8B\x5D\x0C\x84\xDB"
+			}
+
+			"ClampClientRate"
+			{
+				"library"	"engine"
+				"linux"		"@_Z15ClampClientRatei"
+				"windows"	"\x55\x8B\xEC\xA1\x2A\x2A\x2A\x2A\x8B\x40\x30\x85\xC0"
+			}
+
+			"CNetChan::SetDataRate"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan11SetDataRateEf"
+				"windows"	"\x55\x8B\xEC\xF3\x0F\x10\x45\x08\xF3\x0F\x10\x0D\x2A\x2A\x2A\x2A\x0F\x2F\xC1\x76\x2A\x0F\x28\xC1"
+			}
+
+			"CGameClient::SetUpdateRate"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN11CGameClient13SetUpdateRateEib"
+				"windows"	"\x55\x8B\xEC\x53\x8B\x5D\x0C\x84\xDB\x75\x2A\xA1"
+			}
+
+			"CBaseClient::SetUpdateRate"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN11CBaseClient13SetUpdateRateEib"
+				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x83\xF8\x2A\x7E\x2A\xB8\x2A\x2A\x2A\x2A\xEB"
+			}
+		}
+	}
+}

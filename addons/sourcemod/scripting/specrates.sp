@@ -270,60 +270,81 @@ void AdjustRates(int client)
 // 旁观 30tick
 void SetSpectator30(int client)
 {
-	sv_mincmdrate.ReplicateToClient(client, "30");
-	sv_maxcmdrate.ReplicateToClient(client, "30");
-	sv_minupdaterate.ReplicateToClient(client, "30");
-	sv_maxupdaterate.ReplicateToClient(client, "30");
-	sv_minrate.ReplicateToClient(client, "10000");
-	sv_maxrate.ReplicateToClient(client, "10000");
+    sv_mincmdrate.ReplicateToClient(client, "30");
+    sv_maxcmdrate.ReplicateToClient(client, "30");
+    sv_minupdaterate.ReplicateToClient(client, "30");
+    sv_maxupdaterate.ReplicateToClient(client, "30");
+    sv_minrate.ReplicateToClient(client, "10000");
+    sv_maxrate.ReplicateToClient(client, "10000");
 
-	SetClientInfo(client, "cl_updaterate", "30");
-	SetClientInfo(client, "cl_cmdrate", "30");
+    SetClientInfo(client, "cl_updaterate", "30");
+    SetClientInfo(client, "cl_cmdrate", "30");
+    
+    // ✅ 关键：强制客户端立即应用这些设置
+    SendConVarValue(client, sv_mincmdrate, "30");
+    SendConVarValue(client, sv_maxcmdrate, "30");
+    SendConVarValue(client, sv_minupdaterate, "30");
+    SendConVarValue(client, sv_maxupdaterate, "30");
 }
 
-// 旁观 60tick（积分≥30W）
+// 旁观 60tick
 void SetSpectator60(int client)
 {
-	sv_mincmdrate.ReplicateToClient(client, "60");
-	sv_maxcmdrate.ReplicateToClient(client, "60");
-	sv_minupdaterate.ReplicateToClient(client, "60");
-	sv_maxupdaterate.ReplicateToClient(client, "60");
-	sv_minrate.ReplicateToClient(client, "10000");
-	sv_maxrate.ReplicateToClient(client, "10000");
+    sv_mincmdrate.ReplicateToClient(client, "60");
+    sv_maxcmdrate.ReplicateToClient(client, "60");
+    sv_minupdaterate.ReplicateToClient(client, "60");
+    sv_maxupdaterate.ReplicateToClient(client, "60");
+    sv_minrate.ReplicateToClient(client, "20000");
+    sv_maxrate.ReplicateToClient(client, "20000");
 
-	SetClientInfo(client, "cl_updaterate", "60");
-	SetClientInfo(client, "cl_cmdrate", "60");
+    SetClientInfo(client, "cl_updaterate", "60");
+    SetClientInfo(client, "cl_cmdrate", "60");
+    
+    // ✅ 强制刷新
+    SendConVarValue(client, sv_mincmdrate, "60");
+    SendConVarValue(client, sv_maxcmdrate, "60");
+    SendConVarValue(client, sv_minupdaterate, "60");
+    SendConVarValue(client, sv_maxupdaterate, "60");
 }
 
-// 对局：普通玩家 100tick
+// 对局 100tick
 void SetFull100(int client)
 {
-	sv_mincmdrate.ReplicateToClient(client, "100");
-	sv_maxcmdrate.ReplicateToClient(client, "100");
-	sv_minupdaterate.ReplicateToClient(client, "100");
-	sv_maxupdaterate.ReplicateToClient(client, "100");
+    sv_mincmdrate.ReplicateToClient(client, "100");
+    sv_maxcmdrate.ReplicateToClient(client, "100");
+    sv_minupdaterate.ReplicateToClient(client, "100");
+    sv_maxupdaterate.ReplicateToClient(client, "100");
+    sv_minrate.ReplicateToClient(client, g_sNetVars[4]);
+    sv_maxrate.ReplicateToClient(client, g_sNetVars[5]);
 
-	sv_minrate.ReplicateToClient(client, g_sNetVars[4]);
-	sv_maxrate.ReplicateToClient(client, g_sNetVars[5]);
-
-	SetClientInfo(client, "cl_updaterate", "100");
-	SetClientInfo(client, "cl_cmdrate", "100");
+    SetClientInfo(client, "cl_updaterate", "100");
+    SetClientInfo(client, "cl_cmdrate", "100");
+    
+    // ✅ 强制刷新
+    SendConVarValue(client, sv_mincmdrate, "100");
+    SendConVarValue(client, sv_maxcmdrate, "100");
+    SendConVarValue(client, sv_minupdaterate, "100");
+    SendConVarValue(client, sv_maxupdaterate, "100");
 }
 
-// 对局：管理员 128tick
+// 对局 128tick
 void SetFull128(int client)
 {
-	sv_mincmdrate.ReplicateToClient(client, "128");
-	sv_maxcmdrate.ReplicateToClient(client, "128");
-	sv_minupdaterate.ReplicateToClient(client, "128");
-	sv_maxupdaterate.ReplicateToClient(client, "128");
+    sv_mincmdrate.ReplicateToClient(client, "128");
+    sv_maxcmdrate.ReplicateToClient(client, "128");
+    sv_minupdaterate.ReplicateToClient(client, "128");
+    sv_maxupdaterate.ReplicateToClient(client, "128");
+    sv_minrate.ReplicateToClient(client, g_sNetVars[4]);
+    sv_maxrate.ReplicateToClient(client, g_sNetVars[5]);
 
-	// 速率沿用服务器配置的带宽上限；如需更高可自行调大服的 sv_maxrate
-	sv_minrate.ReplicateToClient(client, g_sNetVars[4]);
-	sv_maxrate.ReplicateToClient(client, g_sNetVars[5]);
-
-	SetClientInfo(client, "cl_updaterate", "128");
-	SetClientInfo(client, "cl_cmdrate", "128");
+    SetClientInfo(client, "cl_updaterate", "128");
+    SetClientInfo(client, "cl_cmdrate", "128");
+    
+    // ✅ 强制刷新
+    SendConVarValue(client, sv_mincmdrate, "128");
+    SendConVarValue(client, sv_maxcmdrate, "128");
+    SendConVarValue(client, sv_minupdaterate, "128");
+    SendConVarValue(client, sv_maxupdaterate, "128");
 }
 
 // 恢复到服务器默认（通常=100/100）
