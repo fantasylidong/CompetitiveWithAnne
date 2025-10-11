@@ -157,13 +157,16 @@ static void ClampSetIc(int &v)
 static void MarkDirtyAndSave(int client)
 {
     g_PrefsDirty[client] = true;
-    if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE && g_PrefsLoaded[client]) {
-        DB_SavePlayerPrefs(client);
+
+    if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE) {
+        DB_SavePlayerPrefs(client);         // 不再要求 g_PrefsLoaded==true
         g_PrefsDirty[client] = false;
     } else {
         KV_SavePlayer(client);
+        g_PrefsDirty[client] = false;
     }
 }
+
 
 // 根据“音效套装ID(1..N)”与类型取路径：which 0=headshot, 1=hit, 2=kill
 static bool GetSoundPath_BySet(int setId, int which, char[] out, int maxlen)
@@ -613,22 +616,20 @@ void DB_SavePlayerPrefs(int client)
 {
     if (g_hDB == INVALID_HANDLE) return;
 
-    char sid[64];
-    GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
+    char sid[64]; GetClientAuthId(client, AuthId_Steam2, sid, sizeof(sid), true);
+    char table[64]; GetConVarString(cv_db_table, table, sizeof(table));
 
     int hs_head = g_SndHead[client], hs_hit = g_SndHit[client], hs_kill = g_SndKill[client];
     int ic_head = g_IcHead [client], ic_hit = g_IcHit [client], ic_kill = g_IcKill[client];
 
-    char table[64];
-    GetConVarString(cv_db_table, table, sizeof(table));
-
-    char q[640];
+    char q[1024];
     Format(q, sizeof(q),
-        "INSERT INTO `%s` (steamid,  hitsound_head, hitsound_hit, hitsound_kill, hiticon_head,  hiticon_hit,  hiticon_kill) VALUES ('%s', %d, %d, %d, %d, %d, %d) ON DUPLICATE KEY UPDATE hitsound_head=VALUES(hitsound_head), hitsound_hit =VALUES(hitsound_hit), hitsound_kill=VALUES(hitsound_kill), hiticon_head =VALUES(hiticon_head), hiticon_hit  =VALUES(hiticon_hit), hiticon_kill =VALUES(hiticon_kill);",
+        "INSERT INTO `%s` (steamid, hitsound_head, hitsound_hit, hitsound_kill, hiticon_head, hiticon_hit, hiticon_kill) VALUES ('%s', %d, %d, %d, %d, %d, %d) ON DUPLICATE KEY UPDATE   hitsound_head=VALUES(hitsound_head),   hitsound_hit =VALUES(hitsound_hit),   hitsound_kill=VALUES(hitsound_kill),   hiticon_head =VALUES(hiticon_head),   hiticon_hit  =VALUES(hiticon_hit),   hiticon_kill =VALUES(hiticon_kill), hitsound_cfg=0, hiticon_overlay=0;",
         table, sid, hs_head, hs_hit, hs_kill, ic_head, ic_hit, ic_kill);
 
     SQL_TQuery(g_hDB, SQL_OnSavePrefs, q);
 }
+
 
 public void SQL_OnSavePrefs(Handle owner, Handle hndl, const char[] error, any data)
 {
