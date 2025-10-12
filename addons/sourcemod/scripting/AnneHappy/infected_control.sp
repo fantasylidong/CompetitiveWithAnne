@@ -4103,49 +4103,58 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
     return false;
 }
 
-// [MOD] —— 覆盖：无重叠、可读的 Flow 评分
-// 语义：略微领先（+1..+3）最好；过远前方衰减；同进度中性；落后扣分。
-stock float ScoreFlowSmooth(int deltaFlow)
+// Flow 打分（降权版，最大 60 分）
+// 目标：让 flow 的影响力 ≈ 其他分项，避免 100 分统治；
+//       略微前方(+1..+3) ≈ 60；同进度(0) ≈ 40；
+//       小幅后方(-3..-1) 也有 50~55，便于在“后/侧 + 合适距离/扇区”时胜出；
+//       深后方(≤-12) 和深前方(≥+20) → 0；+12..+20 线性到 0。
+stock float ScoreFlowSmooth(int dF)
 {
-    // 后方：-12 以下直接给极低
-    if (deltaFlow <= -12)
+    // 深后方：直接 0
+    if (dF <= -12)
         return 0.0;
 
-    // 后方：-11..-1 线性爬升到 70 分（略微放宽，仍偏低以鼓励前置）
-    if (deltaFlow < 0)
+    // 后方中段：-11..-4 -> 10..45（线性）
+    if (dF < -3)
     {
-        // -11 → 5 分，-1 → 70 分
-        float t = float(deltaFlow + 11) / 10.0;      // 0..1
-        return 5.0 + t * 65.0;                       // 5..50
+        float t = float(dF + 11) / 8.0;   // -11→0, -4→1
+        return 10.0 + t * 35.0;           // 10..45
     }
 
-    // 同进度：中性 70 分
-    if (deltaFlow == 0)
-        return 70.0;
-
-    // 前方近距离最佳：+1..+3 → 100 分
-    if (deltaFlow <= 3)
-        return 100.0;
-
-    // 前方中距离：+4..+12 从 85 线性降到约 25
-    if (deltaFlow <= 12)
+    // 小幅后方：-3..-1 -> 50..55（给一点优势，但不超过前方近距峰值）
+    if (dF < 0)
     {
-        float t = float(deltaFlow - 3) / 6.0;        // 0..1
-        return 85.0 - t * 40.0;                      // 85..≈25
+        float t = float(dF + 3) / 3.0;    // -3→0, -1→~0.667
+        return 50.0 + t * 5.0;            // 50..≈53.3
     }
 
-    // 前方太远（+12..+20）：线性衰减到 0
-    if (deltaFlow <= 20)
+    // 同进度：中性略低，避免“原地=稳赢”
+    if (dF == 0)
+        return 40.0;
+
+    // 前方近距：+1..+3 -> 60（但不再 100 封顶）
+    if (dF <= 3)
+        return 60.0;
+
+    // 前方中段：+4..+12 -> 52..25（线性衰减）
+    if (dF <= 12)
     {
-        float s12 = 85.0 - ((12.0 - 3.0) / 6.0) * 40.0; // ≈25 分
-        float t   = float(deltaFlow - 12) / 8.0;        // 0..1
-        float val = s12 * (1.0 - t);                    // 25→0
-        return (val > 0.0) ? val : 0.0;                 // 避免浮点误差出现负值
+        float u = float(dF - 4) / 8.0;    // 4→0, 12→1
+        return 52.0 - u * 27.0;           // 52..25
     }
 
-    // 超过 +20：完全无效
+    // 前方远段：+13..+20 -> 25..0（线性至 0）
+    if (dF <= 20)
+    {
+        float t = float(dF - 12) / 8.0;   // 12→0, 20→1
+        float val = 25.0 * (1.0 - t);     // 25..0
+        return (val > 0.0) ? val : 0.0;
+    }
+
+    // 太远：0
     return 0.0;
 }
+
 
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
 stock float PenLimitScale()
