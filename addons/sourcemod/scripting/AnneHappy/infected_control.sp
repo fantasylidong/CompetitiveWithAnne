@@ -315,6 +315,11 @@ enum struct Config
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
     ConVar CandTopK;               // <<<<<<< 新增: 声明 ConVar 句柄
+    // —— 距离甜点系数（α）与宽度系数（β），按“ID 顺序：S B H P J C”六槽字符串 —— //
+    ConVar DistAlphaLine;   // "α_S α_B α_H α_P α_J α_C"  例： "0.60 0.25 0.45 0.40 0.35 0.38"
+    ConVar DistBetaLine;    // "β_S β_B β_H β_P β_J β_C"  例： "0.30 0.22 0.28 0.25 0.24 0.26"
+    float  a_dist[7];       // a_dist[1..6] = α (sweet 因子)
+    float  b_dist[7];       // b_dist[1..6] = β (width 因子)
 
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
@@ -392,7 +397,7 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode         = CreateConVar("inf_DebugMode", "0","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
 
         // —— Nav 分桶（静态窗口） —— //
         this.NavBucketEnable   = CreateConVar("inf_NavBucketEnable", "1", "启用 Nav 进度分桶筛选(0=禁用,1=启用)", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -442,7 +447,7 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0);
 
         this.FlowBadPenaltyScale = CreateConVar(
-            "inf_flow_bad_penalty_scale", "1.0",
+            "inf_flow_bad_penalty_scale", "0.5",
             "raw badflow 高度惩罚的缩放系数（建议 0.6~1.2）。", 
             CVAR_FLAG, true, 0.0, true, 3.0);
 
@@ -470,15 +475,33 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0);
         // [新增] 为新评分系统创建CVar
         // [ADD] Create CVars for the new scoring system
-        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.35 1.10 1.20 1.05 1.20 1.25", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.10 1.60 1.40 0.60 0.60", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.40 1.00 1.20 1.35 1.10 1.20", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.25 1.05 1.15 1.30 0.90 0.80", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.00 0.95 1.10 0.95 1.05 1.05", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght", "1.85 1.00 1.30 1.10 0.60 0.60", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow", "0.70 1.25 1.20 1.10 1.25 1.25", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.35 0.80 0.95 1.00 0.70 0.70", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
             "Quantization step for limitCost when caching (world units)",
             CVAR_FLAG, true, 1.0, true, 500.0);
+                // —— 距离甜点/宽度（按 SI ID 顺序：S B H P J C）——
+        // 默认等价于你原来 GetClassDistanceProfile 里的常量
+        this.DistAlphaLine = CreateConVar(
+            "inf_dist_alpha",
+            "0.52 0.30 0.48 0.34 0.29 0.30",    // Smoker Boomer Hunter Spitter Jockey Charger
+            "Distance sweet factor α per SI (ID order: S B H P J C). smaller = closer",
+            CVAR_FLAG
+        );
+        this.DistBetaLine = CreateConVar(
+            "inf_dist_beta",
+            "0.26 0.26 0.26 0.30 0.24 0.24",    // Smoker Boomer Hunter Spitter Jockey Charger
+            "Distance width factor β per SI (ID order: S B H P J C). larger = wider",
+            CVAR_FLAG
+        );
+
+        // …你已有的 AddChangeHook 下面追加这两条……
+        this.DistAlphaLine.AddChangeHook(OnCfgChanged);
+        this.DistBetaLine.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -657,6 +680,43 @@ enum struct Config
         if (this.iCandTopK < 4)   this.iCandTopK = 4;
         if (this.iCandTopK > this.iCandGlobalCap)  // 与全局上限合并
             this.iCandTopK = this.iCandGlobalCap;
+        // —— 解析 inf_dist_alpha → a_dist[1..6] —— //
+        this.DistAlphaLine.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, 6, 16);
+        for (int i = 0; i < numParts && i < 6; i++) {
+            this.a_dist[i+1] = StringToFloat(parts[i]);
+            if (this.a_dist[i+1] < 0.0) this.a_dist[i+1] = 0.0;
+            if (this.a_dist[i+1] > 1.0) this.a_dist[i+1] = 1.0;
+        }
+
+        // —— 解析 inf_dist_beta → b_dist[1..6] —— //
+        this.DistBetaLine.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, 6, 16);
+        for (int i = 0; i < numParts && i < 6; i++) {
+            this.b_dist[i+1] = StringToFloat(parts[i]);
+            if (this.b_dist[i+1] < 0.0) this.b_dist[i+1] = 0.0;
+            if (this.b_dist[i+1] > 1.0) this.b_dist[i+1] = 1.0;
+        }
+
+        // （可选）兜底：没填值时用历史默认，避免 0 造成异常
+        if (this.a_dist[1] <= 0.0) { // Smoker
+            this.a_dist[1] = 0.60; this.b_dist[1] = (this.b_dist[1] > 0.0) ? this.b_dist[1] : 0.30;
+        }
+        if (this.a_dist[2] <= 0.0) { // Boomer
+            this.a_dist[2] = 0.25; this.b_dist[2] = (this.b_dist[2] > 0.0) ? this.b_dist[2] : 0.22;
+        }
+        if (this.a_dist[3] <= 0.0) { // Hunter
+            this.a_dist[3] = 0.45; this.b_dist[3] = (this.b_dist[3] > 0.0) ? this.b_dist[3] : 0.28;
+        }
+        if (this.a_dist[4] <= 0.0) { // Spitter
+            this.a_dist[4] = 0.40; this.b_dist[4] = (this.b_dist[4] > 0.0) ? this.b_dist[4] : 0.25;
+        }
+        if (this.a_dist[5] <= 0.0) { // Jockey
+            this.a_dist[5] = 0.35; this.b_dist[5] = (this.b_dist[5] > 0.0) ? this.b_dist[5] : 0.24;
+        }
+        if (this.a_dist[6] <= 0.0) { // Charger
+            this.a_dist[6] = 0.38; this.b_dist[6] = (this.b_dist[6] > 0.0) ? this.b_dist[6] : 0.26;
+        }
     }
 
     void ApplyMaxZombieBound()
@@ -3783,19 +3843,30 @@ stock float ScoreDistSmooth(float dminEye, float sweet, float width)
     return clamp(s, 10.0, 100.0);
 }
 
-// [新增] —— 各类的甜点距离与宽度（可按需改成 CVar）
 stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, float &width)
 {
     float span = FloatMax(1.0, max - min);
-    switch (zc) {
-        case view_as<int>(SI_Boomer): { sweet = min + 0.25*span; width = 0.22*span; }
-        case view_as<int>(SI_Hunter): { sweet = min + 0.45*span; width = 0.28*span; }
-        case view_as<int>(SI_Smoker): { sweet = min + 0.60*span; width = 0.30*span; }
-        case view_as<int>(SI_Spitter):{ sweet = min + 0.40*span; width = 0.25*span; }
-        case view_as<int>(SI_Jockey): { sweet = min + 0.35*span; width = 0.24*span; }
-        case view_as<int>(SI_Charger):{ sweet = min + 0.38*span; width = 0.26*span; }
-        default: { sweet = min + 0.40*span; width = 0.25*span; }
+
+    int id = (zc < 1 || zc > 6) ? 1 : zc;
+    float a = gCV.a_dist[id];  // α
+    float b = gCV.b_dist[id];  // β
+
+    // —— 兜底：某个 α 未配置（或被配成 0）时，回退到你历史默认，并仅在 b==0.0 时为其设置默认 —— //
+    if (a <= 0.0)
+    {
+        switch (id)
+        {
+            case 1: { a = 0.60; if (b <= 0.0) b = 0.30; } // Smoker
+            case 2: { a = 0.25; if (b <= 0.0) b = 0.22; } // Boomer
+            case 3: { a = 0.45; if (b <= 0.0) b = 0.28; } // Hunter
+            case 4: { a = 0.40; if (b <= 0.0) b = 0.25; } // Spitter
+            case 5: { a = 0.35; if (b <= 0.0) b = 0.24; } // Jockey
+            case 6: { a = 0.38; if (b <= 0.0) b = 0.26; } // Charger
+        }
     }
+
+    sweet = min + a * span;   // α 越小 → 甜点更近
+    width = b * span;         // β 越大 → 曲线更宽容
 }
 
 // [ADD] —— 通过 areaIdx 直接反查分桶（优先缓存，其次 Flow→Percent）
@@ -3834,38 +3905,47 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
 }
 
 // [MOD] —— 覆盖：无重叠、可读的 Flow 评分
-// 语义：略微领先（+1..+5）最好；过远前方衰减；同进度中性；落后扣分。
+// 语义：略微领先（+1..+3）最好；过远前方衰减；同进度中性；落后扣分。
 stock float ScoreFlowSmooth(int deltaFlow)
 {
     // 后方：-12 以下直接给极低
-    if (deltaFlow <= -12) return 0.0;
+    if (deltaFlow <= -12)
+        return 0.0;
 
-    // 后方：-11..-1 线性爬升到 30 分（仍然是偏低，鼓励前置）
+    // 后方：-11..-1 线性爬升到 70 分（略微放宽，仍偏低以鼓励前置）
     if (deltaFlow < 0)
     {
-        // -11 -> 5 分,  -1 -> 30 分
+        // -11 → 5 分，-1 → 70 分
         float t = float(deltaFlow + 11) / 10.0;      // 0..1
-        return 5.0 + t * 25.0;                       // 5..30
+        return 5.0 + t * 65.0;                       // 5..50
     }
 
-    // 同进度：给中性 50 分
-    if (deltaFlow == 0) return 50.0;
+    // 同进度：中性 70 分
+    if (deltaFlow == 0)
+        return 70.0;
 
-    // 前方近距离最佳：+1..+5 → 100 分
-    if (deltaFlow <= 5) return 100.0;
+    // 前方近距离最佳：+1..+3 → 100 分
+    if (deltaFlow <= 3)
+        return 100.0;
 
-    // 前方中距离：+6..+12 从 85 线性降到 45
+    // 前方中距离：+4..+12 从 85 线性降到约 25
     if (deltaFlow <= 12)
     {
-        float t = float(deltaFlow - 6) / 6.0;        // 0..1
-        return 85.0 - t * 40.0;                      // 85..45
+        float t = float(deltaFlow - 3) / 6.0;        // 0..1
+        return 85.0 - t * 40.0;                      // 85..≈25
     }
 
-    // 前方太远（>+12）：缓慢衰减到 30~40 的平台
-    // 用个平滑函数避免突变
-    float over = float(deltaFlow - 12);
-    float s = 40.0 / (1.0 + (over / 8.0));           // 40 → 渐近 0
-    return 30.0 + clamp(s, 0.0, 40.0);               // 30..70（但很快收敛到 30~40）
+    // 前方太远（+12..+20）：线性衰减到 0
+    if (deltaFlow <= 20)
+    {
+        float s12 = 85.0 - ((12.0 - 3.0) / 6.0) * 40.0; // ≈25 分
+        float t   = float(deltaFlow - 12) / 8.0;        // 0..1
+        float val = s12 * (1.0 - t);                    // 25→0
+        return (val > 0.0) ? val : 0.0;                 // 避免浮点误差出现负值
+    }
+
+    // 超过 +20：完全无效
+    return 0.0;
 }
 
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
