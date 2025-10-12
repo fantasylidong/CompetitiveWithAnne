@@ -474,30 +474,219 @@ enum struct Config
             "Enable on-disk cache for Nav flow buckets (0=off,1=on)",
             CVAR_FLAG, true, 0.0, true, 1.0);
         // [新增] 为新评分系统创建CVar
+        /**
+         * 距离“甜点”怎么工作（α/β）
+
+            距离分不是越近越好或越远越好，而是围绕一个“最佳距离”给高分。
+
+            在代码里：
+            sweet = min + α * (max - min)（最佳落点）
+            width = β * (max - min)（容错宽度，越大越“宽松”）
+
+            inf_dist_alpha（每职业一格，0..1，越小越近）
+
+            当前值：0.54 0.32 0.36 0.34 0.25 0.20（顺序以你的注释为 S B H P J C）
+
+            调大：甜点往更远处移动。体感：更倾向远点；若 w_dist 较高，会明显把刷位拉远。
+
+            调小：甜点往更近处移动。体感：更贴脸、更容易在近距离落点胜出。
+
+            建议范围：0.20 ~ 0.60（极端地图可到 0.70，但谨慎）。
+
+            典型用法：
+
+            想让 Charger/Jockey 更近 → α 调到 0.20~0.30；
+
+            想让 Smoker 中远 → α 调到 0.50~0.60；
+
+            想让 Hunter 稍远 → α ≈ 0.40~0.50；
+
+            想让 Spitter 近吐 → α ≈ 0.30~0.36；
+
+            想让 Boomer 近中 → α ≈ 0.28~0.35。
+
+            inf_dist_beta（每职业一格，0..1，越大越宽）
+
+            当前值：0.26 0.28 0.26 0.32 0.22 0.24（同上顺序）
+
+            调大：甜点峰更“胖”。体感：离 sweet 偏一点也能拿高分，“不挑剔”。适合路线复杂/空间紧的图。
+
+            调小：甜点峰更“尖”。体感：必须更贴 sweet 才能赢，“更刻板”。适合你想强迫某职业“固定距离打法”。
+
+            建议范围：0.20 ~ 0.35（>0.40 基本是“哪里都差不多分”）。
+
+            典型用法：
+
+            Spitter 找近高点但“没高点也要近” → β 稍大（0.30~0.35）；
+
+            Charger/Jockey 强推很近 → β 稍小（0.20~0.25），让偏远点掉分快；
+
+            Smoker/Hunter 适中（0.24~0.30）。
+
+            四个权重是什么、调大/调小会怎样
+
+            最终分大致是：
+            Score = w_dist·Dist + w_hght·Hght + w_flow·Flow + w_disp·Disp
+            （Flow 你已改成“峰值约 60 分”的新曲线）
+
+            范围建议（经验）：0.6 ~ 1.4。一步步调，步长 0.05~0.10。
+
+            inf_score_w_dist（距离分权重）
+
+            当前：1.00 0.95 1.10 0.95 1.05 1.05（S,H,P,B,J,C）
+
+            调大：更“听距离的”。贴近甜点就更容易赢；若 α 设得远，会把刷位拉远。
+
+            调小：距离影响弱化，Flow/扇区/高度更主导；体感更“随缘”。
+
+            什么时候调大：
+
+            Charger/Jockey 想“尽量近” → 提高它们的 w_dist，再把 α 设近、β 设窄；
+
+            想强迫 Hunter/Smoker 打“固定距离” → 提高它们的 w_dist。
+
+            什么时候调小：
+
+            距离总是把你拉到前方远点（尤其 sweet 设远）→ 先降 w_dist，再前移 α。
+
+            inf_score_w_hght（高度分权重）
+
+            当前：1.85 1.00 1.30 1.10 0.60 0.60
+
+            调大：更偏爱高台/屋顶/楼梯等高差位；
+
+            好处：Hunter/Smoker/Spitter 能拿到“功能位”；
+
+            风险：在很多图，高位更容易被看到（配合可见性/掩体规则看）。
+
+            调小：更偏同层近位；Charger/Jockey/Boomer 更好起手。
+
+            建议：
+
+            Smoker 1.85 偏高，会容易被“前方屋顶好位”吸走；如果你要后/侧多一点，可把 S 的 w_hght 降到 ~0.8~1.0，让扇区和距离主导。
+
+            Spitter 高一点是对的（1.3~1.5），Hunter 1.1~1.3 也合理；Charger/Jockey 0.6 左右合适。
+
+            inf_score_w_flow（流程/进度差权重）
+
+            当前：0.70 1.25 1.20 1.10 1.25 1.25
+
+            调大：更“听方向”。若你的 Flow 曲线对 +1~+3 评分高，则绝大多数→前方；如果你把 -1~-3 提高，那就是更偏后。
+
+            你已把 Flow 峰值降到 60，所以即使 w_flow=1.25，Flow 的“话语权”也没以前 100 分时那么压倒性，但仍然会显著影响方向分布。
+
+            调小：方向影响变轻，距离/高度/扇区说了算。
+
+            建议：
+
+            干扰类（Boomer/Jockey/Charger）要“前为主” → 维持 ~1.0~1.25；
+
+            Smoker 要后/侧 → 可把 S 的 w_flow 拉低到 0.4~0.7；
+
+            Spitter 不需要太听方向 → 0.8~1.0。
+
+            inf_score_w_disp（分散度/扇区权重）
+
+            当前：1.35 0.80 0.95 1.00 0.70 0.70
+
+            调大：更偏好“没被用过”的扇区；如果你实现了“背向/侧向首选”，会明显增加后/侧概率。
+
+            调小：更“就近就前”，重复在同一侧出现的概率更高。
+
+            建议：
+
+            Smoker 要后/侧 → 1.2~1.5 合理；
+
+            干扰类想“前多” → 0.7~1.0；
+
+            你想“整体更均衡，前后都有” → 大家都放 ~1.0 左右，再靠每职业的 α/β + w_flow 做细分。
+
+            快速“目标→怎么改”的配方（按你的目标描述）
+
+            Smoker：后方/侧方，中远距离
+
+            α(S) ≈ 0.50~0.60；β(S) ≈ 0.24~0.30
+
+            w_dist(S) ≈ 1.0~1.1（距离能说话）
+
+            w_hght(S) ≈ 0.8~1.0（别让高点把你吸去前方屋顶）
+
+            w_flow(S) ≈ 0.4~0.7（方向降权，避免前向主导）
+
+            w_disp(S) ≈ 1.2~1.5（强推后/侧扇区）
+
+            Hunter：多数前方、稍远+略高
+
+            α(H) ≈ 0.40~0.50；β(H) ≈ 0.24~0.30
+
+            w_dist(H) ≈ 1.0~1.1；w_hght(H) ≈ 1.1~1.3
+
+            w_flow(H) ≈ 0.9~1.1；w_disp(H) ≈ 0.9~1.0
+
+            Charger/Jockey：多数前方，小部分后方，尽量近
+
+            α(J/C) ≈ 0.20~0.30；β(J/C) ≈ 0.20~0.25（“窄”一点，逼近）
+
+            w_dist(J/C) ≈ 1.15~1.25（距离主导）
+
+            w_hght(J/C) ≈ 0.6；w_flow(J/C) ≈ 1.0~1.2；w_disp(J/C) ≈ 0.8~1.0
+
+            Spitter：尽量近的高点；没有高点就近位
+
+            α(P) ≈ 0.30~0.36；β(P) ≈ 0.30~0.35（宽一点）
+
+            w_hght(P) ≈ 1.3~1.5（优先高点）
+
+            w_dist(P) ≈ 0.8~1.0；w_flow(P) ≈ 0.8~1.0；w_disp(P) ≈ 1.0
+
+            Boomer：前方、近中
+
+            α(B) ≈ 0.28~0.35；β(B) ≈ 0.26~0.30
+
+            w_flow(B) ≈ 1.0~1.2；w_dist(B) ≈ 0.9~1.0；w_hght(B) ≈ 0.6~0.8；w_disp(B) ≈ 0.8~1.0
+
+            调参建议（实战流程）
+
+            先确认顺序一致（权重 vs α/β 的职业顺序）。
+
+            先把 α/β 调到你预期的落点带，再把 w_dist 调到 1.0 左右，跑一波看“距离分布”。
+
+            看 dF 直方图：
+
+            后方太少 → 降低目标职业 w_flow，提高 w_disp；（Flow 已降峰，仍偏前就继续降 w_flow）
+
+            前方太远 → 前移 α、降低 w_dist；
+
+            目标高点不常出 → 提高 w_hght；
+
+            太挑剔/难刷 → 增大 β（更宽）。
+
+            一次改 1~2 个旋钮，步长 0.05~0.10，看 1~2 波日志再下一步。
+         */
         // [ADD] Create CVars for the new scoring system
-        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.00 0.95 1.10 0.95 1.05 1.05", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_hght = CreateConVar("inf_score_w_hght", "1.85 1.00 1.30 1.10 0.60 0.60", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_flow = CreateConVar("inf_score_w_flow", "0.70 1.25 1.20 1.10 1.25 1.25", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.35 0.80 0.95 1.00 0.70 0.70", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        // 统一顺序： (S, B, H, P, J, C)
+        this.Score_w_dist = CreateConVar("inf_score_w_dist","1.00 0.95 0.95 1.10 1.15 1.25", "距离分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+
+        this.Score_w_hght = CreateConVar("inf_score_w_hght","1.45 1.10 1.00 1.30 0.60 0.60", "高度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+
+        this.Score_w_flow = CreateConVar("inf_score_w_flow","0.60 0.92 1.15 1.10 1.20 1.20", "流程分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+
+        this.Score_w_disp = CreateConVar("inf_score_w_disp","1.35 1.00 0.90 0.95 0.70 0.70", "分散度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        // —— 距离甜点/宽度（按 SI ID 顺序：S B H P J C）——
+        // 默认等价于你原来 GetClassDistanceProfile 里的常量
+        this.DistAlphaLine = CreateConVar("inf_dist_alpha","0.54 0.30 0.36 0.25 0.25 0.20",    // Smoker Boomer Hunter Spitter Jockey Charger
+            "Distance sweet factor α per SI (ID order: S B H P J C). smaller = closer",
+            CVAR_FLAG
+        );
+        this.DistBetaLine = CreateConVar("inf_dist_beta","0.26 0.30 0.26 0.32 0.20 0.20",    // Smoker Boomer Hunter Spitter Jockey Charger
+            "Distance width factor β per SI (ID order: S B H P J C). larger = wider",
+            CVAR_FLAG
+        );
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
             "Quantization step for limitCost when caching (world units)",
             CVAR_FLAG, true, 1.0, true, 500.0);
-                // —— 距离甜点/宽度（按 SI ID 顺序：S B H P J C）——
-        // 默认等价于你原来 GetClassDistanceProfile 里的常量
-        this.DistAlphaLine = CreateConVar(
-            "inf_dist_alpha",
-            "0.52 0.30 0.48 0.34 0.29 0.30",    // Smoker Boomer Hunter Spitter Jockey Charger
-            "Distance sweet factor α per SI (ID order: S B H P J C). smaller = closer",
-            CVAR_FLAG
-        );
-        this.DistBetaLine = CreateConVar(
-            "inf_dist_beta",
-            "0.26 0.26 0.26 0.30 0.24 0.24",    // Smoker Boomer Hunter Spitter Jockey Charger
-            "Distance width factor β per SI (ID order: S B H P J C). larger = wider",
-            CVAR_FLAG
-        );
 
         // …你已有的 AddChangeHook 下面追加这两条……
         this.DistAlphaLine.AddChangeHook(OnCfgChanged);
@@ -597,127 +786,137 @@ enum struct Config
         // 分桶策略增强
         this.bNavBucketFirstFit   = this.NavBucketFirstFit.BoolValue;
         this.bNavBucketIncludeCtr = this.NavBucketIncludeCtr.BoolValue;
-        // —— 选桶与配额（读取） —— //
-        this.iNavBucketPickCount   = this.NavBucketPickCount.IntValue;
+
+        // 选桶与配额（读取与合法化）
+        this.iNavBucketPickCount = this.NavBucketPickCount.IntValue;
         if (this.iNavBucketPickCount < 1)  this.iNavBucketPickCount = 1;
         if (this.iNavBucketPickCount > 25) this.iNavBucketPickCount = 25;
 
-        this.iCandGlobalCap        = this.CandGlobalCap.IntValue;
+        this.iCandGlobalCap = this.CandGlobalCap.IntValue;
         if (this.iCandGlobalCap < 8)    this.iCandGlobalCap = 8;
         if (this.iCandGlobalCap > 512)  this.iCandGlobalCap = 512;
 
-        this.iBucketBaseQuotaNum   = this.NavBucketBaseQuotaNum.IntValue;
-        this.iBucketBaseQuotaDen   = this.NavBucketBaseQuotaDen.IntValue;
-        this.iBucketOtherQuotaNum  = this.NavBucketOtherQuotaNum.IntValue;
-        this.iBucketOtherQuotaDen  = this.NavBucketOtherQuotaDen.IntValue;
+        this.iBucketBaseQuotaNum  = this.NavBucketBaseQuotaNum.IntValue;
+        this.iBucketBaseQuotaDen  = this.NavBucketBaseQuotaDen.IntValue;
+        this.iBucketOtherQuotaNum = this.NavBucketOtherQuotaNum.IntValue;
+        this.iBucketOtherQuotaDen = this.NavBucketOtherQuotaDen.IntValue;
         if (this.iBucketBaseQuotaDen <= 0)   this.iBucketBaseQuotaDen = 1;
         if (this.iBucketOtherQuotaDen <= 0)  this.iBucketOtherQuotaDen = 1;
 
-        /* 【新增】读取 topK，并与全局候选能力做 min()，避免超配 */
-        this.iCandTopK = this.CandTopK.IntValue;                 // [新增]
-        if (this.iCandTopK < 4)   this.iCandTopK = 4;            // [新增]
-        if (this.iCandTopK > this.iCandGlobalCap)                // [新增]
-            this.iCandTopK = this.iCandGlobalCap;                // [新增]
+        // 读取 topK，并与全局候选能力做 min()
+        this.iCandTopK = this.CandTopK.IntValue;
+        if (this.iCandTopK < 4)   this.iCandTopK = 4;
+        if (this.iCandTopK > this.iCandGlobalCap)
+            this.iCandTopK = this.iCandGlobalCap;
 
-        // 【新增】读取 raw badflow 惩罚配置
+        // raw badflow 惩罚
         this.bFlowBadPenaltyEnable = this.FlowBadPenaltyEnable.BoolValue;
         this.fFlowBadPenaltyScale  = this.FlowBadPenaltyScale.FloatValue;
         if (this.fFlowBadPenaltyScale < 0.0) this.fFlowBadPenaltyScale = 0.0;
 
         // 死亡CD & 放宽
-        this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
-        this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
-        this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
-        this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
-        this.fTeleportSpawnGrace = this.TeleportSpawnGrace.FloatValue;
-        this.fTeleportRunnerFast = this.TeleportRunnerFast.FloatValue;
+        this.fDeathCDKiller       = this.DeathCDKiller.FloatValue;
+        this.fDeathCDSupport      = this.DeathCDSupport.FloatValue;
+        this.fDeathCDBypassAfter  = this.DeathCDBypassAfter.FloatValue;
+        this.fDeathCDUnderfill    = this.DeathCDUnderfill.FloatValue;
+        this.fTeleportSpawnGrace  = this.TeleportSpawnGrace.FloatValue;
+        this.fTeleportRunnerFast  = this.TeleportRunnerFast.FloatValue;
 
         this.bNavBucketMapInvalid   = this.NavBucketMapInvalid.BoolValue;
         this.fNavBucketAssignRadius = this.NavBucketAssignRadius.FloatValue;
-        this.bNavCacheEnable = this.gCvarNavCacheEnable.BoolValue;
-        // [新增] 刷新新评分系统的权重值 (已修正 ExplodeString 用法)
-        // [ADD] Refresh weights for the new scoring system (ExplodeString usage corrected)
+        this.bNavCacheEnable        = this.gCvarNavCacheEnable.BoolValue;
+
+        // PathCache
+        this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
+        this.fPathCacheQuantize = this.PathCacheQuantize.FloatValue;
+        if (this.fPathCacheQuantize < 1.0) this.fPathCacheQuantize = 1.0;
+
+        // =========================
+        // 统一顺序 (S,B,H,P,J,C) 的 CVar 解析
+        // =========================
         char buffer[256];
         char parts[6][16];
         int numParts;
 
-        // [新增] —— 权重兜底：当 CVar 给的值不足或为 0 时，回退到 1.0，避免意外禁用某因子
-        for (int i = 1; i <= 6; i++) {
-            if (this.w_dist[i] <= 0.0) this.w_dist[i] = 1.0;
-            if (this.w_hght[i] <= 0.0) this.w_hght[i] = 1.0;
-            if (this.w_flow[i] <= 0.0) this.w_flow[i] = 1.0;
-            if (this.w_disp[i] <= 0.0) this.w_disp[i] = 1.0;
-        }
-
+        // 1) 四个权重 —— 直接把 token 写入 1..6 槽位（S,B,H,P,J,C）
         this.Score_w_dist.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.w_dist[i+1] = StringToFloat(parts[i]);
+        for (int i = 0; i < 6; i++) {
+            this.w_dist[i+1] = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
         }
 
         this.Score_w_hght.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.w_hght[i+1] = StringToFloat(parts[i]);
+        for (int i = 0; i < 6; i++) {
+            this.w_hght[i+1] = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
         }
 
         this.Score_w_flow.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.w_flow[i+1] = StringToFloat(parts[i]);
+        for (int i = 0; i < 6; i++) {
+            this.w_flow[i+1] = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
         }
 
         this.Score_w_disp.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.w_disp[i+1] = StringToFloat(parts[i]);
+        for (int i = 0; i < 6; i++) {
+            this.w_disp[i+1] = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
         }
-        
-        this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
-        this.fPathCacheQuantize = this.PathCacheQuantize.FloatValue;
-        if (this.fPathCacheQuantize < 1.0) this.fPathCacheQuantize = 1.0;
-        this.iCandTopK = this.CandTopK.IntValue;
-        if (this.iCandTopK < 4)   this.iCandTopK = 4;
-        if (this.iCandTopK > this.iCandGlobalCap)  // 与全局上限合并
-            this.iCandTopK = this.iCandGlobalCap;
-        // —— 解析 inf_dist_alpha → a_dist[1..6] —— //
+
+        // 2) 距离 α/β（S,B,H,P,J,C），裁剪到 [0,1]
         this.DistAlphaLine.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.a_dist[i+1] = StringToFloat(parts[i]);
-            if (this.a_dist[i+1] < 0.0) this.a_dist[i+1] = 0.0;
-            if (this.a_dist[i+1] > 1.0) this.a_dist[i+1] = 1.0;
+        for (int i = 0; i < 6; i++) {
+            float v = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
+            if (v < 0.0) v = 0.0;
+            if (v > 1.0) v = 1.0;
+            this.a_dist[i+1] = v;
         }
 
-        // —— 解析 inf_dist_beta → b_dist[1..6] —— //
         this.DistBetaLine.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, 6, 16);
-        for (int i = 0; i < numParts && i < 6; i++) {
-            this.b_dist[i+1] = StringToFloat(parts[i]);
-            if (this.b_dist[i+1] < 0.0) this.b_dist[i+1] = 0.0;
-            if (this.b_dist[i+1] > 1.0) this.b_dist[i+1] = 1.0;
+        for (int i = 0; i < 6; i++) {
+            float v = (i < numParts) ? StringToFloat(parts[i]) : 0.0;
+            if (v < 0.0) v = 0.0;
+            if (v > 1.0) v = 1.0;
+            this.b_dist[i+1] = v;
         }
 
-        // （可选）兜底：没填值时用历史默认，避免 0 造成异常
-        if (this.a_dist[1] <= 0.0) { // Smoker
-            this.a_dist[1] = 0.60; this.b_dist[1] = (this.b_dist[1] > 0.0) ? this.b_dist[1] : 0.30;
+        // 3) 兜底与合法化
+        // 权重为 0/负值 → 回退/裁剪，避免禁用分项
+        for (int id = 1; id <= 6; id++) {
+            if (this.w_dist[id] <= 0.0) this.w_dist[id] = 1.0;
+            if (this.w_hght[id] <  0.0) this.w_hght[id] = 0.0;
+            if (this.w_flow[id] <  0.0) this.w_flow[id] = 0.0;
+            if (this.w_disp[id] <  0.0) this.w_disp[id] = 0.0;
         }
-        if (this.a_dist[2] <= 0.0) { // Boomer
-            this.a_dist[2] = 0.25; this.b_dist[2] = (this.b_dist[2] > 0.0) ? this.b_dist[2] : 0.22;
-        }
-        if (this.a_dist[3] <= 0.0) { // Hunter
-            this.a_dist[3] = 0.45; this.b_dist[3] = (this.b_dist[3] > 0.0) ? this.b_dist[3] : 0.28;
-        }
-        if (this.a_dist[4] <= 0.0) { // Spitter
-            this.a_dist[4] = 0.40; this.b_dist[4] = (this.b_dist[4] > 0.0) ? this.b_dist[4] : 0.25;
-        }
-        if (this.a_dist[5] <= 0.0) { // Jockey
-            this.a_dist[5] = 0.35; this.b_dist[5] = (this.b_dist[5] > 0.0) ? this.b_dist[5] : 0.24;
-        }
-        if (this.a_dist[6] <= 0.0) { // Charger
-            this.a_dist[6] = 0.38; this.b_dist[6] = (this.b_dist[6] > 0.0) ? this.b_dist[6] : 0.26;
+
+        // α/β 为 0 → 回退到 CreateConVar 的默认；并再次 clamp 到 [0,1]
+        // 默认（S,B,H,P,J,C）：
+        //   α = 0.54,0.30,0.36,0.25,0.25,0.20
+        //   β = 0.26,0.30,0.26,0.32,0.20,0.20
+        if (this.a_dist[1] <= 0.0) { this.a_dist[1] = 0.54; }  // Smoker
+        if (this.a_dist[2] <= 0.0) { this.a_dist[2] = 0.30; }  // Boomer
+        if (this.a_dist[3] <= 0.0) { this.a_dist[3] = 0.36; }  // Hunter
+        if (this.a_dist[4] <= 0.0) { this.a_dist[4] = 0.25; }  // Spitter
+        if (this.a_dist[5] <= 0.0) { this.a_dist[5] = 0.25; }  // Jockey
+        if (this.a_dist[6] <= 0.0) { this.a_dist[6] = 0.20; }  // Charger
+
+        if (this.b_dist[1] <= 0.0) { this.b_dist[1] = 0.26; }  // Smoker
+        if (this.b_dist[2] <= 0.0) { this.b_dist[2] = 0.30; }  // Boomer
+        if (this.b_dist[3] <= 0.0) { this.b_dist[3] = 0.26; }  // Hunter
+        if (this.b_dist[4] <= 0.0) { this.b_dist[4] = 0.32; }  // Spitter
+        if (this.b_dist[5] <= 0.0) { this.b_dist[5] = 0.20; }  // Jockey
+        if (this.b_dist[6] <= 0.0) { this.b_dist[6] = 0.20; }  // Charger
+
+        for (int id2 = 1; id2 <= 6; id2++) {
+            if (this.a_dist[id2] < 0.0) this.a_dist[id2] = 0.0;
+            if (this.a_dist[id2] > 1.0) this.a_dist[id2] = 1.0;
+            if (this.b_dist[id2] < 0.0) this.b_dist[id2] = 0.0;
+            if (this.b_dist[id2] > 1.0) this.b_dist[id2] = 1.0;
         }
     }
+
 
     void ApplyMaxZombieBound()
     {
