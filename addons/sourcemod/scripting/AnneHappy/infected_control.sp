@@ -669,16 +669,16 @@ enum struct Config
 
         this.Score_w_hght = CreateConVar("inf_score_w_hght","1.45 1.10 1.00 1.30 0.60 0.60", "高度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
 
-        this.Score_w_flow = CreateConVar("inf_score_w_flow","0.60 0.92 1.15 1.10 1.20 1.20", "流程分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow","0.50 0.82 1.05 1.00 1.10 1.10", "流程分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
 
         this.Score_w_disp = CreateConVar("inf_score_w_disp","1.35 1.00 0.90 0.95 0.70 0.70", "分散度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
         // —— 距离甜点/宽度（按 SI ID 顺序：S B H P J C）——
         // 默认等价于你原来 GetClassDistanceProfile 里的常量
-        this.DistAlphaLine = CreateConVar("inf_dist_alpha","0.54 0.30 0.36 0.25 0.25 0.20",    // Smoker Boomer Hunter Spitter Jockey Charger
+        this.DistAlphaLine = CreateConVar("inf_dist_alpha","0.54 0.30 0.36 0.30 0.26 0.22",    // Smoker Boomer Hunter Spitter Jockey Charger
             "Distance sweet factor α per SI (ID order: S B H P J C). smaller = closer",
             CVAR_FLAG
         );
-        this.DistBetaLine = CreateConVar("inf_dist_beta","0.26 0.30 0.26 0.32 0.20 0.20",    // Smoker Boomer Hunter Spitter Jockey Charger
+        this.DistBetaLine = CreateConVar("inf_dist_beta","0.26 0.30 0.26 0.32 0.26 0.26",    // Smoker Boomer Hunter Spitter Jockey Charger
             "Distance width factor β per SI (ID order: S B H P J C). larger = wider",
             CVAR_FLAG
         );
