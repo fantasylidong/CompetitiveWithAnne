@@ -694,8 +694,8 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 * @return Action
 **/
 Action onSmokerMoveToAtkPosOnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
-	if (g_cvImmPull.BoolValue || !isAiSmoker(actor))
-		return Plugin_Continue;
+	if (!g_cvImmPull.BoolValue || !isAiSmoker(actor))
+    	return Plugin_Continue;
 	
 	static int target;
 	target = GetClientOfUserId(g_AiSmokers[actor].m_iTarget);
