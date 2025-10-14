@@ -1,0 +1,137 @@
+"Phrases"
+{
+    "Usage_Block"
+    {
+        "en"    "Usage: sm_block <#userid|steam64|name>"
+        "chi"   "用法：sm_block <#userid|steam64|名字>"
+    }
+    "Usage_Unblock"
+    {
+        "en"    "Usage: sm_unblock <#userid|steam64|name>"
+        "chi"   "用法：sm_unblock <#userid|steam64|名字>"
+    }
+    "DB_NotReady"
+    {
+        "en"    "[BlockList] Database not ready."
+        "chi"   "[BlockList] 数据库未就绪。"
+    }
+    "Resolve_Failed"
+    {
+        "en"    "[BlockList] Target resolve failed. Use #userid / steam64 / name."
+        "chi"   "[BlockList] 目标解析失败，请使用 #userid / steam64 / 名字。"
+    }
+    "Self_Steam_Failed"
+    {
+        "en"    "[BlockList] Your SteamID cannot be resolved."
+        "chi"   "[BlockList] 你的 SteamID 解析失败。"
+    }
+    "Block_SelfDenied"
+    {
+        "en"    "[BlockList] You cannot block yourself."
+        "chi"   "[BlockList] 不能屏蔽自己。"
+    }
+    "Block_LimitReached"
+    {
+        "#format"   "{1:i}"
+        "en"        "[BlockList] You have reached your block limit ({1})."
+        "chi"       "[BlockList] 你已达到屏蔽上限（{1}）。"
+    }
+    "Block_Added"
+    {
+        "#format"   "{1:s}"
+        "en"        "[BlockList] Added block: {1}"
+        "chi"       "[BlockList] 已屏蔽：{1}"
+    }
+    "Block_Failed_Generic"
+    {
+        "en"    "[BlockList] Block operation failed."
+        "chi"   "[BlockList] 屏蔽失败。"
+    }
+    "Unblock_Removed"
+    {
+        "en"    "[BlockList] Unblocked."
+        "chi"   "[BlockList] 已解除屏蔽。"
+    }
+    "Unblock_NotFound"
+    {
+        "en"    "[BlockList] No such block record."
+        "chi"   "[BlockList] 未找到对应的屏蔽记录。"
+    }
+    "Unblock_Failed_Generic"
+    {
+        "en"    "[BlockList] Unblock operation failed."
+        "chi"   "[BlockList] 解除屏蔽失败。"
+    }
+    "Query_Failed_Generic"
+    {
+        "en"    "[BlockList] Query failed."
+        "chi"   "[BlockList] 查询失败。"
+    }
+    "BlockList_Header"
+    {
+        "#format"   "{1:i}"
+        "en"        "[BlockList] {1} record(s):"
+        "chi"       "[BlockList] 共 {1} 条记录："
+    }
+    "BlockLimit_Info"
+    {
+        "#format"   "{1:i}"
+        "en"        "[BlockList] Your block limit: {1}"
+        "chi"       "[BlockList] 你的屏蔽上限：{1}"
+    }
+    "Notify_Blocker"
+    {
+        "#format"   "{1:N}"
+        "en"        "[BlockList] Your block prevented {1} from joining."
+        "chi"       "[BlockList] 你的屏蔽已阻止 {1} 加入。"
+    }
+    "Kick_By_Blocked"
+    {
+        "en"    "Someone in this server has blocked you. You cannot join."
+        "chi"   "服务器中有人屏蔽了你，无法进入。"
+    }
+    "Kick_By_Blocked_With_Blocker"
+    {
+        "#format"   "{1:s}"
+        "en"        "You are blocked by a player in this server (ID: {1}). Join denied."
+        "chi"       "你被本服玩家屏蔽（ID：{1}）。无法进入。"
+    }
+
+    /* 菜单相关 */
+    "Menu_Title"
+    {
+        "en"    "BlockList Menu"
+        "zh-CN" "黑名单菜单"
+        "chi"   "黑名单菜单"
+    }
+    "Menu_BlockOnline"
+    {
+        "en"    "Block/Unblock Online Players"
+        "zh-CN" "屏蔽/解屏蔽 在线玩家"
+        "chi"   "屏蔽/解屏蔽 在线玩家"
+    }
+    "Menu_MyBlockList"
+    {
+        "en"    "View/Remove My Blocklist"
+        "zh-CN" "查看/移除 我的黑名单"
+        "chi"   "查看/移除 我的黑名单"
+    }
+    "Menu_BlockOnline_Title"
+    {
+        "en"    "Online Players (select to toggle block)"
+        "zh-CN" "在线玩家（选择以切换屏蔽状态）"
+        "chi"   "在线玩家（选择以切换屏蔽状态）"
+    }
+    "Menu_MyBlockList_Title"
+    {
+        "en"    "My Blocklist (select to remove)"
+        "zh-CN" "我的黑名单（选择以移除）"
+        "chi"   "我的黑名单（选择以移除）"
+    }
+    "Target_Left"
+    {
+        "en"    "[BlockList] Target is no longer valid."
+        "zh-CN" "[BlockList] 目标已不在服务器。"
+        "chi"   "[BlockList] 目标已不在服务器。"
+    }
+}
