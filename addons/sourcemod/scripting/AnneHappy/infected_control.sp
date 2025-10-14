@@ -665,20 +665,20 @@ enum struct Config
          */
         // [ADD] Create CVars for the new scoring system
         // 统一顺序： (S, B, H, P, J, C)
-        this.Score_w_dist = CreateConVar("inf_score_w_dist","1.00 0.95 0.95 1.10 1.15 1.25", "距离分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        this.Score_w_dist = CreateConVar("inf_score_w_dist","1.05 1.10 1.10 1.10 1.25 1.25", "距离分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
 
-        this.Score_w_hght = CreateConVar("inf_score_w_hght","1.45 1.10 1.00 1.30 0.60 0.60", "高度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght","1.30 0.85 1.25 1.45 0.60 0.60", "高度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
 
-        this.Score_w_flow = CreateConVar("inf_score_w_flow","0.50 0.82 1.05 1.00 1.10 1.10", "流程分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow","0.45 1.10 0.95 0.95 1.00 1.15", "流程分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
 
-        this.Score_w_disp = CreateConVar("inf_score_w_disp","1.35 1.00 0.90 0.95 0.70 0.70", "分散度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp","1.40 1.10 0.95 1.00 1.00 0.80", "分散度分权重 (order: S,B,H,P,J,C)",CVAR_FLAG);
         // —— 距离甜点/宽度（按 SI ID 顺序：S B H P J C）——
         // 默认等价于你原来 GetClassDistanceProfile 里的常量
-        this.DistAlphaLine = CreateConVar("inf_dist_alpha","0.54 0.30 0.36 0.30 0.26 0.22",    // Smoker Boomer Hunter Spitter Jockey Charger
+        this.DistAlphaLine = CreateConVar("inf_dist_alpha","0.56 0.27 0.44 0.28 0.22 0.21",    // Smoker Boomer Hunter Spitter Jockey Charger
             "Distance sweet factor α per SI (ID order: S B H P J C). smaller = closer",
             CVAR_FLAG
         );
-        this.DistBetaLine = CreateConVar("inf_dist_beta","0.26 0.30 0.26 0.32 0.26 0.26",    // Smoker Boomer Hunter Spitter Jockey Charger
+        this.DistBetaLine = CreateConVar("inf_dist_beta","0.28 0.30 0.28 0.32 0.28 0.24",    // Smoker Boomer Hunter Spitter Jockey Charger
             "Distance width factor β per SI (ID order: S B H P J C). larger = wider",
             CVAR_FLAG
         );
@@ -1926,6 +1926,8 @@ public void OnGameFrame()
 
     if (!gST.bLate)
         return;
+    if( !CountAliveSurvivors())
+        return;//没活人了还算个啥
 
     if (gST.teleportQueueSize > 0 && gST.totalSI < gCV.iSiLimit)
     {
@@ -2360,7 +2362,19 @@ static void TryNormalSpawnOnce()
     }
 }
 
+stock int CountAliveSurvivors()
+{
+    int alive = 0;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i))          continue;
+        if (GetClientTeam(i) != 2)       continue;
+        if (!IsPlayerAlive(i))           continue;
+        alive++;
+    }
 
+    return alive;
+}
 // ===========================
 // 单次传送尝试（fdxx-NavArea 主路）
 // ===========================
@@ -3044,10 +3058,11 @@ static float GetSurAvrFlow()
 //  - 眼睛Z+120 .. 眼睛Z          -> 温和线性 0..60
 //  - 眼睛Z .. 眼睛Z-60           -> 陡峭线性 60..180 （到 -60 时 >100）
 //  - 眼睛Z-60 以下                -> 封顶 200
+// [PATCHED] Bad-flow height penalty (returns penalty to subtract). Only applied when raw badflow is true.
 stock float ComputeBadFlowHeightPenalty(float candZ, float refBestEyeZ)
 {
     const float CAP = 200.0;
-    float delta = refBestEyeZ - candZ;  // cand 低于“最好眼睛”的高度为正
+    float delta = refBestEyeZ - candZ;  // positive if candidate is below reference eye height
 
     if (delta < -120.0) return 0.0;
 
@@ -3063,6 +3078,7 @@ stock float ComputeBadFlowHeightPenalty(float candZ, float refBestEyeZ)
     if (pen > CAP) pen = CAP;
     return pen;
 }
+
 
 
 // =========================
@@ -4108,52 +4124,31 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
 //       略微前方(+1..+3) ≈ 60；同进度(0) ≈ 40；
 //       小幅后方(-3..-1) 也有 50~55，便于在“后/侧 + 合适距离/扇区”时胜出；
 //       深后方(≤-12) 和深前方(≥+20) → 0；+12..+20 线性到 0。
-stock float ScoreFlowSmooth(int dF)
+// [PATCHED] Balanced flow scoring: gentle rear allowance, peak at +1..+3, decay beyond +12, zero by +20.
+stock float ScoreFlowSmooth(int deltaFlow)
 {
-    // 深后方：直接 0
-    if (dF <= -12)
-        return 0.0;
-
-    // 后方中段：-11..-4 -> 10..45（线性）
-    if (dF < -3)
+    int df = deltaFlow;
+    if (df <= -12) return 20.0;
+    if (df < 0)
     {
-        float t = float(dF + 11) / 8.0;   // -11→0, -4→1
-        return 10.0 + t * 35.0;           // 10..45
+        float t = float(df + 12) / 12.0;        // 0..1 for -12..-1
+        return 20.0 + t * 45.0;                 // 20 -> ~65
     }
-
-    // 小幅后方：-3..-1 -> 50..55（给一点优势，但不超过前方近距峰值）
-    if (dF < 0)
+    if (df == 0) return 85.0;
+    if (df <= 3)  return 100.0;
+    if (df <= 12)
     {
-        float t = float(dF + 3) / 3.0;    // -3→0, -1→~0.667
-        return 50.0 + t * 5.0;            // 50..≈53.3
+        float t = float(df - 3) / 9.0;          // 0..1 for +3..+12
+        return 100.0 - t * 80.0;                // 100 -> 20
     }
-
-    // 同进度：中性略低，避免“原地=稳赢”
-    if (dF == 0)
-        return 40.0;
-
-    // 前方近距：+1..+3 -> 60（但不再 100 封顶）
-    if (dF <= 3)
-        return 60.0;
-
-    // 前方中段：+4..+12 -> 52..25（线性衰减）
-    if (dF <= 12)
+    if (df <= 20)
     {
-        float u = float(dF - 4) / 8.0;    // 4→0, 12→1
-        return 52.0 - u * 27.0;           // 52..25
+        float t = float(df - 12) / 8.0;         // 0..1 for +12..+20
+        return 20.0 * (1.0 - t);                // 20 -> 0
     }
-
-    // 前方远段：+13..+20 -> 25..0（线性至 0）
-    if (dF <= 20)
-    {
-        float t = float(dF - 12) / 8.0;   // 12→0, 20→1
-        float val = 25.0 * (1.0 - t);     // 25..0
-        return (val > 0.0) ? val : 0.0;
-    }
-
-    // 太远：0
     return 0.0;
 }
+
 
 
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
