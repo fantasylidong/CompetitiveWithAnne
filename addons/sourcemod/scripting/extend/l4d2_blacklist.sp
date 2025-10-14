@@ -1,16 +1,17 @@
 /*
- * L4D2 BlockList 1.3.0
+ * L4D2 BlockList 1.3.1 (Auto MySQL/SQLite)
  * ---------------------------------------------------------
  * - DB & 配额 & 管理免疫 & 多语言 & 日志
  * - 菜单操作（sm_blmenu）
  * - 延迟生效（按“被屏蔽者”的会话）：
  *   黑名单仅在“被屏蔽者下次入服”生效；
  *   只要他本次会话没有断线，换图/过关都不生效、不踢。
+ * - 自动兼容 MySQL / SQLite：连接后自动判断驱动并创建合适的表结构
  *
  * 作者: morzlee / ChatGPT
  * 依赖: SourceMod 1.10+（SQLite 或 MySQL）
- * 译文: 需要 translations/l4d2_blocklist.phrases.txt
- * 编译: spcomp l4d2_blocklist_1_3_0.sp
+ * 译文: 需要 translations/l4d2_blocklist.phrases.txt（UTF-8 无 BOM）
+ * 编译: spcomp l4d2_blocklist_1_3_1_mysql_auto.sp
  */
 
 #pragma semicolon 1
@@ -20,8 +21,8 @@
 
 #define PLUGIN_NAME        "L4D2 BlockList"
 #define PLUGIN_AUTHOR      "morzlee"
-#define PLUGIN_DESC        "DB-based per-player join block with limits, admin immunity, i18n, logging, menus, delayed activation (by blocked user's session)"
-#define PLUGIN_VERSION     "1.3.0"
+#define PLUGIN_DESC        "DB-based per-player join block with limits, admin immunity, i18n, logging, menus, delayed activation (by blocked user's session), MySQL/SQLite auto"
+#define PLUGIN_VERSION     "1.3.1"
 
 public Plugin myinfo =
 {
@@ -123,7 +124,7 @@ void BL_Log(const char[] fmt, any ...)
     LogToFileEx(path, "%s", buffer);
 }
 
-/* -------------------- DB 连接 -------------------- */
+/* -------------------- DB 连接（自动 MySQL/SQLite） -------------------- */
 void DB_Connect()
 {
     if (g_hDb != INVALID_HANDLE)
@@ -144,9 +145,24 @@ public void DB_OnConnected(Handle owner, Handle hndl, const char[] error, any da
 
     g_hDb = hndl;
 
-    char sql[256];
-    Format(sql, sizeof(sql),
-        "CREATE TABLE IF NOT EXISTS `%s` (  `blocker` TEXT NOT NULL,  `blocked` TEXT NOT NULL,  `created_at` INTEGER NOT NULL,  PRIMARY KEY (`blocker`,`blocked`));", g_sTable);
+    // 判断驱动
+    char ident[32];
+    bool isMySQL = SQL_GetDriverIdent(g_hDb, ident, sizeof(ident)) && StrEqual(ident, "mysql", false);
+
+    char sql[512];
+    if (isMySQL)
+    {
+        // MySQL: 主键列使用 VARCHAR，且推荐 utf8mb4 & InnoDB
+        Format(sql, sizeof(sql),
+            "CREATE TABLE IF NOT EXISTS `%s` (  `blocker` VARCHAR(32) NOT NULL,  `blocked` VARCHAR(32) NOT NULL,  `created_at` INT NOT NULL,  PRIMARY KEY (`blocker`,`blocked`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",g_sTable);
+    }
+    else
+    {
+        // SQLite: TEXT + INTEGER 均可作为主键/索引
+        Format(sql, sizeof(sql),
+            "CREATE TABLE IF NOT EXISTS `%s` (  `blocker` TEXT NOT NULL,  `blocked` TEXT NOT NULL,  `created_at` INTEGER NOT NULL,  PRIMARY KEY (`blocker`,`blocked`));",g_sTable);
+    }
+
     SQL_TQuery(g_hDb, DB_GenericCallback, sql);
 }
 
@@ -176,7 +192,7 @@ public void OnPluginStart()
     gCvarTableName       = CreateConVar("sm_bl_table",             g_sTable,     "数据库表名", FCVAR_NOTIFY);
     gCvarKickMsg         = CreateConVar("sm_bl_kick_msg",          g_sKickMsg,   "踢出提示（留空使用翻译短语）", FCVAR_NOTIFY);
     gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "5",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
-    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "20",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
+    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "30",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
     gCvarAdminFlag       = CreateConVar("sm_bl_admin_flag",        "b",    "享管理员上限的 flag(留空=无)", FCVAR_NOTIFY);
     gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "1",    "仅检查队伍2/3(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
@@ -209,7 +225,45 @@ public void OnPluginStart()
     gCvarImmuneFlag.GetString(flagstr, sizeof(flagstr));
     g_iImmuneFlags = (ReadFlagString(flagstr, f) ? f : 0);
 
+    // 监听 CVar 变化（运行中可热改）
+    HookConVarChange(gCvarTableName,     OnCvarChanged);
+    HookConVarChange(gCvarKickMsg,       OnCvarChanged);
+    HookConVarChange(gCvarDBSection,     OnCvarChanged);
+    HookConVarChange(gCvarLimitUser,     OnCvarChanged);
+    HookConVarChange(gCvarLimitAdmin,    OnCvarChanged);
+    HookConVarChange(gCvarAdminFlag,     OnCvarChanged);
+    HookConVarChange(gCvarConsiderTeams, OnCvarChanged);
+    HookConVarChange(gCvarImmuneFlag,    OnCvarChanged);
+    HookConVarChange(gCvarQuiet,         OnCvarChanged);
+    HookConVarChange(gCvarLogEnable,     OnCvarChanged);
+    HookConVarChange(gCvarLogFile,       OnCvarChanged);
+    HookConVarChange(gCvarExposeBlocker, OnCvarChanged);
+    HookConVarChange(gCvarUseI18NKick,   OnCvarChanged);
+
     DB_Connect();
+}
+
+public void OnCvarChanged(ConVar cvar, const char[] o, const char[] n)
+{
+    if (cvar == gCvarTableName)        strcopy(g_sTable, sizeof(g_sTable), n);
+    else if (cvar == gCvarKickMsg)     strcopy(g_sKickMsg, sizeof(g_sKickMsg), n);
+    else if (cvar == gCvarDBSection)   { strcopy(g_sDBSection, sizeof(g_sDBSection), n); DB_Connect(); }
+    else if (cvar == gCvarLimitUser)   g_iLimitUser = StringToInt(n);
+    else if (cvar == gCvarLimitAdmin)  g_iLimitAdmin = StringToInt(n);
+    else if (cvar == gCvarConsiderTeams) g_bConsiderTeamsOnly = StringToInt(n) != 0;
+    else if (cvar == gCvarQuiet)       g_bQuiet = StringToInt(n) != 0;
+    else if (cvar == gCvarLogEnable)   g_bLogEnable = StringToInt(n) != 0;
+    else if (cvar == gCvarLogFile)     strcopy(g_sLogFile, sizeof(g_sLogFile), n);
+    else if (cvar == gCvarExposeBlocker) g_bExposeBlocker = StringToInt(n) != 0;
+    else if (cvar == gCvarUseI18NKick)  g_bUseI18NForKick = StringToInt(n) != 0;
+    else if (cvar == gCvarAdminFlag)
+    {
+        int f; g_iAdminFlags = (ReadFlagString(n, f) ? f : 0);
+    }
+    else if (cvar == gCvarImmuneFlag)
+    {
+        int f; g_iImmuneFlags = (ReadFlagString(n, f) ? f : 0);
+    }
 }
 
 /* 注意：不在 OnClientPutInServer 里重置 session。
