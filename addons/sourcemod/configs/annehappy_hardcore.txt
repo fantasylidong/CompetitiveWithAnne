@@ -409,17 +409,6 @@
 			"message" "关闭坦克自动踢出系统"
 		}
 	}
-	"开关hud"
-	{
-		"sm_cvar l4d2_scripted_hud_enable 1"
-		{
-			"message" "打开hud"
-		}
-		"sm_cvar l4d2_scripted_hud_enable 0"
-		{
-			"message" "关闭hud"
-		}
-	}
 	"地图选择"
 	{
 		"exec vote/Anne/Annenew.cfg"

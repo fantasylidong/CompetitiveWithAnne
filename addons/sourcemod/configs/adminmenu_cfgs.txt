@@ -14,5 +14,7 @@ Configs
 	"cfg/vote/frequency/high.cfg"	"高频率同步"
 	"cfg/vote/frequency/medium.cfg"	"中频率同步"
 	"cfg/vote/frequency/low.cfg"	"低频率同步"
+	"cfg/vote/mod_on.cfg"	"开启mod"
+	"cfg/vote/mod_off.cfg"	"关闭mod"
 
 }
