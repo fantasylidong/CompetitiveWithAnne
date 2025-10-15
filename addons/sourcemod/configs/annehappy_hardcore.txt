@@ -195,46 +195,6 @@
 		{
 			"message" "20秒"
 		}
-		"sm_cvar versus_special_respawn_interval 21"
-		{
-			"message" "21秒"
-		}
-		"sm_cvar versus_special_respawn_interval 22"
-		{
-			"message" "22秒"
-		}
-		"sm_cvar versus_special_respawn_interval 23"
-		{
-			"message" "23秒"
-		}
-		"sm_cvar versus_special_respawn_interval 24"
-		{
-			"message" "24秒"
-		}
-		"sm_cvar versus_special_respawn_interval 25"
-		{
-			"message" "25秒"
-		}
-		"sm_cvar versus_special_respawn_interval 26"
-		{
-			"message" "26秒"
-		}
-		"sm_cvar versus_special_respawn_interval 27"
-		{
-			"message" "27秒"
-		}
-		"sm_cvar versus_special_respawn_interval 28"
-		{
-			"message" "28秒"
-		}
-		"sm_cvar versus_special_respawn_interval 29"
-		{
-			"message" "29秒"
-		}
-		"sm_cvar versus_special_respawn_interval 30"
-		{
-			"message" "30秒"
-		}
 	}
 	"人数控制"
 	{
