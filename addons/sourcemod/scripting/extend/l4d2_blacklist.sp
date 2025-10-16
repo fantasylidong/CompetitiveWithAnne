@@ -54,7 +54,7 @@ ConVar gCvarUseI18NKick;   // 踢出提示使用翻译短语
 
 char g_sTable[64]      = "player_blocks";
 char g_sKickMsg[192]   = "这个服务器有人屏蔽了你，无法进入。";
-char g_sDBSection[64]  = "l4dstats";
+char g_sDBSection[64]  = "storage-local";
 char g_sLogFile[64]    = "l4d2_blocklist.log";
 
 int  g_iLimitUser      = 20;
@@ -66,6 +66,10 @@ bool g_bQuiet          = true;
 bool g_bExposeBlocker  = false;
 bool g_bLogEnable      = true;
 bool g_bUseI18NForKick = true;
+
+// 互斥（双向不共存）
+ConVar gCvarMutual;
+bool g_bMutual = true;
 
 /* 以 SteamID64 为键，记录“该玩家本次在服会话开始时间”。
  * 仅在首次授权(OnClientAuthorized)写入；仅在断线(OnClientDisconnect)删除。
@@ -192,17 +196,20 @@ public void OnPluginStart()
     gCvarDBSection       = CreateConVar("sm_bl_db_section",        g_sDBSection, "databases.cfg 区块名", FCVAR_NOTIFY);
     gCvarTableName       = CreateConVar("sm_bl_table",             g_sTable,     "数据库表名", FCVAR_NOTIFY);
     gCvarKickMsg         = CreateConVar("sm_bl_kick_msg",          g_sKickMsg,   "踢出提示（留空使用翻译短语）", FCVAR_NOTIFY);
-    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "5",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
-    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "30",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
+    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "20",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
+    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "100",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
     gCvarAdminFlag       = CreateConVar("sm_bl_admin_flag",        "b",    "享管理员上限的 flag(留空=无)", FCVAR_NOTIFY);
     gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "1",    "仅检查队伍2/3(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
-    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "z",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NOTIFY);
+    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "b",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NOTIFY);
     gCvarQuiet           = CreateConVar("sm_bl_quiet",             "1",    "静音提示：不通知触发屏蔽的玩家(1=静默,0=通知)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarLogEnable       = CreateConVar("sm_bl_log",               "1",    "启用日志记录(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarLogFile         = CreateConVar("sm_bl_log_file",          g_sLogFile, "日志文件名(位于 logs/ 下)", FCVAR_NOTIFY);
     gCvarExposeBlocker   = CreateConVar("sm_bl_expose_blocker",    "0",    "踢出提示是否包含屏蔽者信息(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarUseI18NKick     = CreateConVar("sm_bl_use_i18n_kick",     "1",    "踢出提示使用翻译短语(1)；否则优先使用 cvar 文本", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+    // 双向不共存：加入者若屏蔽了在场玩家，也禁止加入
+    gCvarMutual         = CreateConVar("sm_bl_mutual",            "1",    "启用双向不共存(1/0)：加入者若屏蔽了在场玩家也禁止加入", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     AutoExecConfig(true, "l4d2_blocklist");
 
@@ -219,6 +226,7 @@ public void OnPluginStart()
     g_bLogEnable = gCvarLogEnable.BoolValue;
     g_bExposeBlocker = gCvarExposeBlocker.BoolValue;
     g_bUseI18NForKick = gCvarUseI18NKick.BoolValue;
+    g_bMutual = gCvarMutual.BoolValue;
 
     char flagstr[16]; int f;
     gCvarAdminFlag.GetString(flagstr, sizeof(flagstr));
@@ -240,6 +248,7 @@ public void OnPluginStart()
     HookConVarChange(gCvarLogFile,       OnCvarChanged);
     HookConVarChange(gCvarExposeBlocker, OnCvarChanged);
     HookConVarChange(gCvarUseI18NKick,   OnCvarChanged);
+    HookConVarChange(gCvarMutual,       OnCvarChanged);
 
     DB_Connect();
 }
@@ -257,6 +266,7 @@ public void OnCvarChanged(ConVar cvar, const char[] o, const char[] n)
     else if (cvar == gCvarLogFile)     strcopy(g_sLogFile, sizeof(g_sLogFile), n);
     else if (cvar == gCvarExposeBlocker) g_bExposeBlocker = StringToInt(n) != 0;
     else if (cvar == gCvarUseI18NKick)  g_bUseI18NForKick = StringToInt(n) != 0;
+    else if (cvar == gCvarMutual)       g_bMutual = StringToInt(n) != 0;
     else if (cvar == gCvarAdminFlag)
     {
         int f; g_iAdminFlags = (ReadFlagString(n, f) ? f : 0);
@@ -317,10 +327,13 @@ public void OnClientAuthorized(int client, const char[] auth)
     char joinerEsc[64];
     SQL_EscapeString(g_hDb, s64, joinerEsc, sizeof(joinerEsc));
 
-    // 查询所有命中记录：回调里用“被屏蔽者(加入者)的 session_start”过滤
+    // 查询两种命中：
+    // dir=0: 在场玩家屏蔽了加入者（受延迟生效保护）
+    // dir=1: 加入者屏蔽了在场玩家（双向不共存，可立即生效）
     char sql[1024];
     Format(sql, sizeof(sql),
-        "SELECT blocker, created_at FROM `%s` WHERE blocked='%s' AND blocker IN (%s);",
+        "SELECT 0 AS dir, blocker, created_at FROM `%s` WHERE blocked='%s' AND blocker IN (%s) UNION ALL SELECT 1 AS dir, blocked, created_at FROM `%s` WHERE blocker='%s' AND blocked IN (%s);",
+        g_sTable, joinerEsc, inClause,
         g_sTable, joinerEsc, inClause);
 
     DataPack pack = new DataPack();
@@ -366,40 +379,74 @@ public void DB_CheckJoinBlock_Callback(Handle owner, Handle hndl, const char[] e
     bool shouldKick = false;
     char kicker64[32]; kicker64[0] = '\0';
 
-    // 仅当 created_at < joiner_session_start 时，黑名单才视为已存在于“上一会话”，可拦截本次加入
+    // 遍历命中：
+    bool isSelf = false;            // true=加入者屏蔽了在场玩家
+    char other64[32]; other64[0] = '\0'; // byOthers: blocker / bySelf: target
+
     while (SQL_FetchRow(hndl))
     {
-        char blocker64[32]; SQL_FetchString(hndl, 0, blocker64, sizeof(blocker64));
-        int created_at = SQL_FetchInt(hndl, 1);
+        int dir = SQL_FetchInt(hndl, 0);
+        char id64[32]; SQL_FetchString(hndl, 1, id64, sizeof(id64));
+        int created_at = SQL_FetchInt(hndl, 2);
 
-        if (joinerSession > 0 && created_at < joinerSession)
+        if (dir == 0)
         {
+            // 在场玩家屏蔽了加入者：仅当黑名单早于加入者本会话开始才生效（防当场拉黑→踢）
+            if (joinerSession > 0 && created_at < joinerSession)
+            {
+                shouldKick = true;
+                isSelf = false;
+                strcopy(other64, sizeof(other64), id64);
+                break; // 优先此方向
+            }
+        }
+        else if (dir == 1 && g_bMutual)
+        {
+            // 加入者屏蔽了在场玩家：双向不共存，立即禁止加入
             shouldKick = true;
-            strcopy(kicker64, sizeof(kicker64), blocker64);
+            isSelf = true;
+            strcopy(other64, sizeof(other64), id64);
+            // 不 break 也行，但没有必要继续
             break;
         }
     }
 
     if (!shouldKick) return;
 
-    int blockerClient = FindClientBySteam64(kicker64);
-    BL_Log("[JoinBlocked] joiner=%N(%L) blockedBy=%s(%N)", client, client, kicker64, blockerClient);
-
-    if (!g_bQuiet && blockerClient > 0 && IsClientInGame(blockerClient))
+    if (!isSelf)
     {
-        PrintToChat(blockerClient, "%t", "Notify_Blocker", client);
+        int blockerClient = FindClientBySteam64(other64);
+        BL_Log("[JoinBlocked] joiner=%N(%L) blockedBy=%s(%N)", client, client, other64, blockerClient);
+
+        if (!g_bQuiet && blockerClient > 0 && IsClientInGame(blockerClient))
+        {
+            PrintToChat(blockerClient, "%t", "Notify_Blocker", client);
+        }
+
+        char msg[256];
+        bool useCustom = (g_sKickMsg[0] != '\0') && !g_bUseI18NForKick;
+        if (useCustom)
+            strcopy(msg, sizeof(msg), g_sKickMsg);
+        else
+            (g_bExposeBlocker)
+                ? FormatEx(msg, sizeof(msg), "%T", "Kick_By_Blocked_With_Blocker", client, other64)
+                : FormatEx(msg, sizeof(msg), "%T", "Kick_By_Blocked", client);
+
+        KickClient(client, "%s", msg);
     }
-
-    char msg[256];
-    bool useCustom = (g_sKickMsg[0] != '\0') && !g_bUseI18NForKick;
-    if (useCustom)
-        strcopy(msg, sizeof(msg), g_sKickMsg);
     else
-        (g_bExposeBlocker)
-            ? FormatEx(msg, sizeof(msg), "%T", "Kick_By_Blocked_With_Blocker", client, kicker64)
-            : FormatEx(msg, sizeof(msg), "%T", "Kick_By_Blocked", client);
+    {
+        // 自己屏蔽了在场玩家 → 禁止加入
+        BL_Log("[JoinDeniedSelf] joiner=%N(%L) conflictedWith=%s(%N)", client, client, other64, FindClientBySteam64(other64));
 
-    KickClient(client, "%s", msg);
+        char msg[256];
+        if (g_bExposeBlocker)
+            FormatEx(msg, sizeof(msg), "%T", "Kick_By_SelfBlocked_With_Target", client, other64);
+        else
+            FormatEx(msg, sizeof(msg), "%T", "Kick_By_SelfBlocked", client);
+
+        KickClient(client, "%s", msg);
+    }
 }
 
 /* -------------------- 文本命令 -------------------- */

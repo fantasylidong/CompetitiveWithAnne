@@ -101,37 +101,42 @@
     "Menu_Title"
     {
         "en"    "BlockList Menu"
-        "zh-CN" "黑名单菜单"
         "chi"   "黑名单菜单"
     }
     "Menu_BlockOnline"
     {
         "en"    "Block/Unblock Online Players"
-        "zh-CN" "屏蔽/解屏蔽 在线玩家"
         "chi"   "屏蔽/解屏蔽 在线玩家"
     }
     "Menu_MyBlockList"
     {
         "en"    "View/Remove My Blocklist"
-        "zh-CN" "查看/移除 我的黑名单"
         "chi"   "查看/移除 我的黑名单"
     }
     "Menu_BlockOnline_Title"
     {
         "en"    "Online Players (select to toggle block)"
-        "zh-CN" "在线玩家（选择以切换屏蔽状态）"
         "chi"   "在线玩家（选择以切换屏蔽状态）"
     }
     "Menu_MyBlockList_Title"
     {
         "en"    "My Blocklist (select to remove)"
-        "zh-CN" "我的黑名单（选择以移除）"
         "chi"   "我的黑名单（选择以移除）"
     }
     "Target_Left"
     {
         "en"    "[BlockList] Target is no longer valid."
-        "zh-CN" "[BlockList] 目标已不在服务器。"
         "chi"   "[BlockList] 目标已不在服务器。"
+    }
+    "Kick_By_SelfBlocked"
+    {
+        "en"    "You have blocked a player currently in this server. You cannot join."
+        "chi"   "你屏蔽了本服正在游玩的某位玩家，无法加入。"
+    }
+    "Kick_By_SelfBlocked_With_Target"
+    {
+        "#format"   "{1:s}"
+        "en"        "You have blocked a player currently in this server (ID: {1}). Join denied."
+        "chi"       "你屏蔽了本服正在游玩的玩家（ID：{1}），无法加入。"
     }
 }
