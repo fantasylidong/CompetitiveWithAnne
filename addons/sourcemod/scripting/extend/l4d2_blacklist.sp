@@ -29,7 +29,8 @@ public Plugin myinfo =
     name        = PLUGIN_NAME,
     author      = PLUGIN_AUTHOR,
     description = PLUGIN_DESC,
-    version     = PLUGIN_VERSION
+    version     = PLUGIN_VERSION,
+    url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
 /* -------------------- ConVars -------------------- */
@@ -53,7 +54,7 @@ ConVar gCvarUseI18NKick;   // 踢出提示使用翻译短语
 
 char g_sTable[64]      = "player_blocks";
 char g_sKickMsg[192]   = "这个服务器有人屏蔽了你，无法进入。";
-char g_sDBSection[64]  = "l4d2stats";
+char g_sDBSection[64]  = "l4dstats";
 char g_sLogFile[64]    = "l4d2_blocklist.log";
 
 int  g_iLimitUser      = 20;
