@@ -57,6 +57,10 @@ public Plugin myinfo =
 ConVar hMaxSurvivors, hSurvivorsManagerEnable, hCvarAutoKickTank;
 int iMaxSurvivors, iEnable, iAutoKickTankEnable, iRound = 0;
 bool g_bWitchAndTankSystemAvailable = false;
+// --- 黑白提醒 BEGIN ---
+ConVar g_cvBWEnable, g_cvBWTeam, g_cvBWSound;
+bool g_bwAnnounced[MAXPLAYERS + 1];
+char g_bwSound[PLATFORM_MAX_PATH];
 
 public void OnPluginStart()
 {
@@ -77,6 +81,16 @@ public void OnPluginStart()
 	hSurvivorsManagerEnable = CreateConVar("l4d_multislots_survivors_manager_enable", "0", "Enable or Disable survivors manage",CVAR_FLAGS, true, 0.0, true, 1.0);
 	hMaxSurvivors	= CreateConVar("l4d_multislots_max_survivors", "4", "Kick AI Survivor bots if numbers of survivors has exceeded the certain value. (does not kick real player, minimum is 4)", CVAR_FLAGS, true, 4.0, true, 8.0);
 	hCvarAutoKickTank = CreateConVar("l4d_multislots_autokicktank", "0", "Auto kick tank when tank number above one", CVAR_FLAGS, true, 0.0, true, 1.0);
+	// --- 黑白提醒 BEGIN ---
+    HookEvent("revive_success", Event_ReviveSuccess);
+    HookEvent("heal_success",   Event_HealSuccess);
+    HookEvent("defibrillator_used", Event_DefibUsed);
+
+    g_cvBWEnable = CreateConVar("l4d_bw_notify_enable", "1", "启用生还黑白提醒 (0/1)", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBWTeam   = CreateConVar("l4d_bw_notify_team",   "1", "0=只提醒本人, 1=全队广播", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBWSound  = CreateConVar("l4d_bw_notify_sound",  "ui/beep07.wav", "黑白时播放的音效（留空不播）", CVAR_FLAGS);
+    g_cvBWSound.GetString(g_bwSound, sizeof(g_bwSound));
+    g_cvBWSound.AddChangeHook(CvarChanged_BWSound);
 	hSurvivorsManagerEnable.AddChangeHook(ConVarChanged_Cvars);
 	hMaxSurvivors.AddChangeHook(ConVarChanged_Cvars);
 	hCvarAutoKickTank.AddChangeHook(ConVarChanged_Cvars);
@@ -177,6 +191,11 @@ public void Event_PlayerSpawn(Event hEvent, const char[] name, bool dontBroadcas
 	if( IsValidClient(client) && IsAiTank(client) && iAutoKickTankEnable){
 		KickMoreTank(true);
 	}
+	// --- 黑白提醒: 出生时清状态 ---
+    if (IsValidClient(client) && GetClientTeam(client) == 2)
+    {
+        g_bwAnnounced[client] = false;
+    }
 		
 }
 
@@ -393,6 +412,9 @@ public Action ResetSurvivors(Handle event, char[] name, bool dontBroadcast)
 	iRound = 0;
 	RestoreHealth();
 	ResetInventory();
+	 // --- 黑白提醒: 切图/通关清状态 ---
+    for (int i = 1; i <= MaxClients; i++)
+        g_bwAnnounced[i] = false;
 	return Plugin_Continue;
 }
 
@@ -616,3 +638,87 @@ stock bool IsPlayerIncap(int client)
 {
 	return view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
 }
+
+stock bool IsThirdStrike(int client)
+{
+    // 黑白判定
+    return view_as<bool>(GetEntProp(client, Prop_Send, "m_bIsOnThirdStrike"));
+}
+void AnnounceBW(int client)
+{
+    if (!IsValidClient(client) || GetClientTeam(client) != 2) return;
+
+    bool teamBroadcast = g_cvBWTeam.BoolValue;
+
+    if (teamBroadcast)
+    {
+        CPrintToChatAll("[{olive}提示{default}] {blue}%N{default} 已经 {red}黑白{default}，请优先保护并治疗！", client);
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsValidClient(i) && GetClientTeam(i) == 2)
+                PrintHintText(i, "%N 已经黑白（再次倒地会直接死亡）！", client);
+        }
+    }
+    else
+    {
+        CPrintToChat(client, "[{olive}提示{default}] 你现在 {red}黑白{default}，请尽快治疗！");
+        PrintHintText(client, "你现在黑白（再次倒地会直接死亡）！");
+    }
+
+    if (g_bwSound[0] != '\0')
+    {
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsValidClient(i) && GetClientTeam(i) == 2)
+                EmitSoundToClient(i, g_bwSound);
+        }
+    }
+}
+
+public Action Timer_CheckBW(Handle timer, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (!IsValidClient(client) || GetClientTeam(client) != 2)
+        return Plugin_Stop;
+
+    if (g_cvBWEnable.BoolValue && IsThirdStrike(client) && !g_bwAnnounced[client])
+    {
+        AnnounceBW(client);
+        g_bwAnnounced[client] = true;
+    }
+    return Plugin_Stop;
+}
+
+public void CvarChanged_BWSound(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    convar.GetString(g_bwSound, sizeof(g_bwSound));
+}
+
+// --- 黑白提醒 BEGIN ---
+public void Event_ReviveSuccess(Event event, const char[] name, bool dontBroadcast)
+{
+    int subject = GetClientOfUserId(event.GetInt("subject")); // 被救起的人
+    if (!IsValidClient(subject) || GetClientTeam(subject) != 2) return;
+
+    // 延迟一点点让游戏把 m_bIsOnThirdStrike 写好
+    CreateTimer(0.1, Timer_CheckBW, GetClientUserId(subject), TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public void Event_HealSuccess(Event event, const char[] name, bool dontBroadcast)
+{
+    int subject = GetClientOfUserId(event.GetInt("subject")); // 被治疗的人
+    if (IsValidClient(subject) && GetClientTeam(subject) == 2)
+    {
+        g_bwAnnounced[subject] = false; // 解除黑白后允许再次提醒
+    }
+}
+
+public void Event_DefibUsed(Event event, const char[] name, bool dontBroadcast)
+{
+    int subject = GetClientOfUserId(event.GetInt("subject")); // 被电击复活的人
+    if (IsValidClient(subject) && GetClientTeam(subject) == 2)
+    {
+        g_bwAnnounced[subject] = false; // 重生后清除提醒状态
+    }
+}
+// --- 黑白提醒 END ---
