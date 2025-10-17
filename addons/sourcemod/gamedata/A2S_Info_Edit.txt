@@ -1,0 +1,141 @@
+"Games"
+{
+	"#default"
+	{
+		"Offsets"
+		{
+			"OS"
+			{
+				"linux"		"1"
+				"windows"	"0"
+			}
+		}
+	}
+
+	"left4dead2" 
+	{
+		"MemPatches"
+		{
+			"RebuildInfo_MapName"
+			{
+				"signature"		"SendUpdatedServerDetails"
+
+				"linux"
+				{
+					"offset"	"F6h"
+					"verify"	"\xC7\x44\x24\x04"
+					"patch"		"\xC7\x44\x24\x04\x00\x00\x00\x00"
+				}
+				
+				"windows"
+				{
+					"offset"	"11Ah"
+					"verify"	"\x68"
+					"patch"		"\x68\x00\x00\x00\x00"
+				}
+			}
+
+			"GameDescription"
+			{
+				"signature"		"GetGameDescription"
+
+				"linux"
+				{
+					"offset"	"6h"
+					"verify"	"\xC7\x44\x24\x08"
+					"patch"		"\xC7\x44\x24\x08\x00\x00\x00\x00"
+				}
+				
+				"windows"
+				{
+					"offset"	"0h"
+					"verify"	"\x68"
+					"patch"		"\x68\x00\x00\x00\x00"
+				}
+			}
+		}
+
+		"Addresses"
+		{
+			"CDirector"
+			{
+				"linux"
+				{
+					"signature"	"TheDirector"
+				}
+				"windows"
+				{
+					"signature"	"CDirectorMusicBanks::OnRoundStart"
+					"read"		"12"
+				}
+				"read"	"0"
+			}
+
+			"g_pMatchExtL4D"
+			{
+				"linux"
+				{
+					"signature"	"CTerrorGameRules::GetMissionInfo"
+					"read"		"44"
+				}
+				"windows"
+				{
+					"signature"	"CTerrorGameRules::GetMissionInfo"
+					"read"		"42"
+				}
+				"read"	"0"
+			}
+		}
+
+		"Signatures"
+		{
+			/* GetGameDescription(void) */
+			"GetGameDescription"
+			{
+				"library"	"server"
+				"linux"		"@_Z18GetGameDescriptionv"
+				"windows"	"\x68\x2A\x2A\x2A\x2A\x68\x80\x00\x00\x00\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x83\xC4\x0C"
+				/* 68 ? ? ? ? 68 80 00 00 00 68 ? ? ? ? E8 ? ? ? ? 83 C4 0C */
+			}
+
+			"TheDirector"
+			{
+				"library"	"server"
+				"linux"		"@TheDirector"
+			}
+
+			/* CDirectorMusicBanks::OnRoundStart(CDirectorMusicBanks *__hidden this) */
+			"CDirectorMusicBanks::OnRoundStart"
+			{
+				"library"	"server"
+				"linux"		"@_ZN19CDirectorMusicBanks12OnRoundStartEv"
+				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x56\x57\x8B\x2A\x8B\x0D\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\x2A\x0F"
+				/* ? ? ? ? ? ? 56 57 8B ? 8B 0D ? ? ? ? E8 ? ? ? ? 84 ? 0F */
+			}
+
+			/* CTerrorGameRules::GetMissionInfo(CTerrorGameRules *__hidden this) */
+			"CTerrorGameRules::GetMissionInfo"
+			{
+				"library"	"server"
+				"linux"		"@_ZN16CTerrorGameRules14GetMissionInfoEv"
+				"windows"	"\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x8B\x2A\x2A\x56\xFF\x2A\x8B\x2A\x8B\x2A\x8B\x2A\x2A\x6A\x2A\xFF\x2A\x8B\x2A\x85\x2A\x75\x2A\x5E"
+				/* ? ? ? ? ? ? ? ? ? ? 8B ? 8B ? ? 56 FF ? 8B ? 8B ? 8B ? ? 6A ? FF ? 8B ? 85 ? 75 ? 5E */
+			}
+			
+			"GetSteam3Server"
+			{
+				"library"	"engine"
+				"linux"		"@_Z12Steam3Serverv"
+				"windows"	"\xB8\x2A\x2A\x2A\x2A\xC3\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\xFF\x15\x2A\x2A\x2A\x2A\xC3"
+			}
+			
+			"SendUpdatedServerDetails" // ss_disconnect %d\n
+			{
+				"library"	"engine"
+				"linux"		"@_ZN13CSteam3Server24SendUpdatedServerDetailsEv.part.27"
+				"windows"	"\x55\x8B\xEC\x81\xEC\x14\x01\x00\x00\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\xFC\x56\x8B\xF1"
+				/* 55 8B EC 81 EC 14 01 00 00 A1 ? ? ? ? 33 C5 89 45 FC 56 8B F1  */
+			}
+		}
+	}
+}

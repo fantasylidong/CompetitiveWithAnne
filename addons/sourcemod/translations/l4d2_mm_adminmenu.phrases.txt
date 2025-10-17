@@ -1,0 +1,32 @@
+"Phrases"
+{
+	"Switch Map/Mission"
+	{
+		"en"		"Switch Map/Mission"
+		"chi"		"切换地图/关卡"
+	}
+	
+	"Official Maps"
+	{
+		"en"		"Official Maps"
+		"chi"		"官方地图"
+	}
+	
+	"Addon Maps"
+	{
+		"en"		"Addon Maps"  
+		"chi"		"三方地图"
+	}
+
+	"Official Missions"
+	{
+		"en"		"Official Missions"
+		"chi"		"官方战役"
+	}
+	
+	"Addon Missions"
+	{
+		"en"		"Addon Missions"
+		"chi"		"三方战役"
+	}
+}

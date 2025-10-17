@@ -1,25 +1,34 @@
 // l4d2_dirspawn.sp
 //
 // Left 4 Dead 2 - Director Special Infected Spawner (Anne-style, VScript-only)
+// + MaxSpecial Unlock (sourcescramble + gamedata)
 // - Control total SI count, respawn interval, and per-class limits via SessionOptions.
-// - Reads per-count class caps from a KeyValues file (cfg/sourcemod/dirspawn_si_limits.cfg).
-// - Admin command to auto-generate that KV for a range (e.g., 1..30).
-// - Built-in "better_mutations4" style fixes via SessionOptions (no dhooks required).
+// - Read per-count class caps from KeyValues (cfg/sourcemod/dirspawn_si_limits.cfg).
+// - "better_mutations4" style fixes via SessionOptions.
 // - Optional auto-scaling by human player count.
+// - Announce ONCE when the first survivor leaves start area (difficulty + count + interval).
+// - Cull: kick dead SI bots (except Spitter) to free slot.
 //
-// Requirements: SourceMod 1.11+, Left4DHooks extension
+// Requirements:
+//   - SourceMod 1.11+
+//   - Left4DHooks extension
+//   - sourcescramble extension (for MaxSpecial unlock)
+//   - gamedata/infected_control.txt  (must contain key "CDirector::GetMaxPlayerZombies")
 //
-// Quickstart:
+// Quickstart (server.cfg):
 //   sm_cvar dirspawn_enable 1
 //   sm_cvar dirspawn_count 12
 //   sm_cvar dirspawn_interval 15
 //   sm_cvar dirspawn_apply_on_roundstart 1
+//   sm_cvar dirspawn_kv_enable 1
+//   sm_cvar dirspawn_kv_path "cfg/sourcemod/dirspawn_si_limits.cfg"
+//   sm_cvar dirspawn_unlock_maxspecial 1      <-- 解锁COOP 3特上限需要这个
 //   sm_dirspawn_apply
 //
-// KV (balanced split) for 1..30:
+// Generate KV (balanced split) for 1..30 (optional):
 //   sm_dirspawn_genkv 1 30
 //
-// Auto scaling (example):
+// Auto scaling (optional example):
 //   sm_cvar dirspawn_auto_enable 1
 //   sm_cvar dirspawn_auto_base_count 6
 //   sm_cvar dirspawn_auto_per_player_add 1
@@ -34,9 +43,10 @@
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
+#include <sourcescramble>   // MaxSpecial 解锁需要
 
-#define PLUGIN_NAME        "L4D2 Director SI Spawner (VScript-only)"
-#define PLUGIN_VERSION     "1.2.0"
+#define PLUGIN_NAME        "L4D2 Director SI Spawner (VScript-only) + MaxSpecial Unlock"
+#define PLUGIN_VERSION     "1.4.0"
 #define PLUGIN_AUTHOR      "morzlee"
 #define PLUGIN_URL         "https://github.com/fantasylidong/CompetitiveWithAnne"
 
@@ -52,19 +62,21 @@ ConVar gCvarKvPath;
 ConVar gCvarVerbose;
 ConVar gCvarActiveChallenge;
 
-// --- better_mutations4 修复项（VScript方式）---
+ConVar gCvarUnlockMaxSpecial;  // NEW: 解锁 MaxSpecial（COOP 3 特上限）
+
+// better_mutations4 style (VScript)
 ConVar gCvarAllowSIWithTank;   // ShouldAllowSpecialsWithTank (0/1)
 ConVar gCvarRelaxMin;          // RelaxMinInterval (sec)
 ConVar gCvarRelaxMax;          // RelaxMaxInterval (sec)
 ConVar gCvarLockTempo;         // LockTempo (0/1)
 
-// --- Auto scaling（按人数自动调参）---
+// Auto scaling
 ConVar gCvarAutoEnable;        // 0/1
-ConVar gCvarAutoCountMode;     // 0=全体真人 1=仅生还真人 2=非旁观真人
-ConVar gCvarAutoBaseCount;     // 4人基线总数
-ConVar gCvarAutoPerAdd;        // 每多1人 +几只
-ConVar gCvarAutoBaseInterval;  // 4人基线间隔(秒)
-ConVar gCvarAutoPerDecay;      // 每多1人 -几秒
+ConVar gCvarAutoCountMode;     // 0=all humans 1=survivor humans 2=non-spectating humans
+ConVar gCvarAutoBaseCount;     // base total at 4 humans
+ConVar gCvarAutoPerAdd;        // per extra human +count
+ConVar gCvarAutoBaseInterval;  // base interval at 4 humans
+ConVar gCvarAutoPerDecay;      // per extra human -seconds
 ConVar gCvarAutoMinCount;      // clamp
 ConVar gCvarAutoMaxCount;      // clamp
 ConVar gCvarAutoMinInterval;   // clamp
@@ -94,23 +106,33 @@ static const char g_SIKeys[SI_Count][] =
     "ChargerLimit"
 };
 
-// Anne-like distribution priority for remainder share
+// Anne-like remainder distribution priority
 static const SIClass g_DefaultDistributeOrder[SI_Count] =
 {
     SI_Hunter, SI_Charger, SI_Smoker, SI_Jockey, SI_Spitter, SI_Boomer
 };
 
+// L4D2 ZombieClass
+#define ZC_SMOKER   1
+#define ZC_BOOMER   2
+#define ZC_HUNTER   3
+#define ZC_SPITTER  4
+#define ZC_JOCKEY   5
+#define ZC_CHARGER  6
+
 // ---------------------------- State ------------------------------------
 Handle g_hApplyTimer = null;
 Handle g_hAutoTimer  = null;
-bool   g_bInternalSet = false; // suppress CvarChanged re-apply when we set cvars programmatically
+bool   g_bInternalSet = false;        // suppress change bounce when we set cvars in code
+bool   g_bAnnouncedThisRound = false; // announced once when first survivor leaves start area
+bool   g_bTriedUnlock = false;        // 避免重复尝试打补丁
 
 // ---------------------------- Plugin Info ------------------------------
 public Plugin myinfo =
 {
     name = PLUGIN_NAME,
     author = PLUGIN_AUTHOR,
-    description = "Control SI max count & respawn interval with Anne-style per-class caps (VScript-only) + M4-fixes + Auto scaling",
+    description = "Control SI max count & respawn interval with Anne-style per-class caps (VScript-only) + M4-fixes + Auto scaling + MaxSpecial Unlock",
     version = PLUGIN_VERSION,
     url = PLUGIN_URL
 };
@@ -133,13 +155,6 @@ stock void VS_RawSetInt(const char[] key, int value)
     L4D2_ExecVScriptCode(code);
 }
 
-stock void VS_RawSetBool(const char[] key, bool value)
-{
-    char code[96];
-    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %s)", key, value ? "true" : "false");
-    L4D2_ExecVScriptCode(code);
-}
-
 stock void VS_RawDelete(const char[] key)
 {
     char code[96];
@@ -157,7 +172,7 @@ stock void VS_EnsureBaseFlags()
     }
 }
 
-// Compute a balanced per-class split when no explicit mapping is provided.
+// Balanced split (fallback if no KV entry)
 stock void ComputeBalancedSplit(int total, int outCaps[SI_Count])
 {
     for (int i = 0; i < kSIClassCount; i++)
@@ -179,7 +194,7 @@ stock void ComputeBalancedSplit(int total, int outCaps[SI_Count])
     }
 }
 
-// Try to load caps from KV file, e.g. at "cfg/sourcemod/dirspawn_si_limits.cfg"
+// Load from KV "cfg/sourcemod/dirspawn_si_limits.cfg"
 stock bool LoadCapsFromKV(int total, int outCaps[SI_Count])
 {
     char path[PLATFORM_MAX_PATH];
@@ -213,7 +228,7 @@ stock bool LoadCapsFromKV(int total, int outCaps[SI_Count])
     return true;
 }
 
-// --- better_mutations4 fixes (VScript version) ---
+// better_mutations4 style VS keys
 stock void ApplyM4FixesByVScript()
 {
     int allow = gCvarAllowSIWithTank.IntValue; // 0/1
@@ -229,35 +244,34 @@ stock void ApplyM4FixesByVScript()
     VS_RawSetInt("LockTempo", lockt);
 }
 
-// Main VS apply
+// Main apply (VScript-only)
 stock void ApplyByVScript(int total, int interval)
 {
     VS_EnsureBaseFlags();
 
-    // Max specials & dominators
+    // max & dominator
     VS_RawSetInt("cm_MaxSpecials", total);
 
     int dom = gCvarDomLimit.IntValue;
     if (dom < 0) dom = total;
     VS_RawSetInt("DominatorLimit", dom);
 
-    // Respawn interval (seconds)
+    // respawn interval
     VS_RawSetInt("cm_SpecialRespawnInterval", interval);
 
-    // Per-class caps
+    // per-class caps
     int caps[SI_Count];
     bool haveKV = (gCvarKvEnable.BoolValue && LoadCapsFromKV(total, caps));
     if (!haveKV)
-    {
         ComputeBalancedSplit(total, caps);
-    }
+
     for (int i = 0; i < kSIClassCount; i++)
         VS_RawSetInt(g_SIKeys[i], caps[i]);
 
-    // Apply better_mutations4-style fixes (VScript)
+    // m4-fixes
     ApplyM4FixesByVScript();
 
-    LogMsg("Applied: total=%d, dom=%d, interval=%d, KV=%s | M4Fixes: allowSIWithTank=%d relax=[%d..%d] lockTempo=%d",
+    LogMsg("Applied: total=%d, dom=%d, interval=%d, KV=%s | M4: allow=%d relax=[%d..%d] lock=%d",
            total, dom, interval, haveKV ? "yes":"no",
            gCvarAllowSIWithTank.IntValue, gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue, gCvarLockTempo.IntValue);
 }
@@ -288,7 +302,7 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
     }
 }
 
-// Undo VScript keys (optional on unload or when disabling)
+// Cleanup VS keys
 stock void ShutdownVScript()
 {
     VS_RawDelete("cm_MaxSpecials");
@@ -311,6 +325,44 @@ stock void ShutdownVScript()
     LogMsg("VScript session options cleared.");
 }
 
+// ---------------------------- MaxSpecial Unlock ------------------------
+// 仅在需要时打补丁，避免重复尝试
+static void InitSDK_FromGamedata()
+{
+    char sBuffer[128];
+
+    strcopy(sBuffer, sizeof(sBuffer), "infected_control");
+    GameData hGameData = new GameData(sBuffer);
+    if (hGameData == null)
+        SetFailState("Failed to load \"%s.txt\" gamedata.", sBuffer);
+
+    // Unlock Max SI limit - 这是唯一需要保留的 gamedata patch
+    strcopy(sBuffer, sizeof(sBuffer), "CDirector::GetMaxPlayerZombies");
+    MemoryPatch mPatch = MemoryPatch.CreateFromConf(hGameData, sBuffer);
+    if (!mPatch.Validate())
+        SetFailState("Failed to verify patch: %s", sBuffer);
+    if (!mPatch.Enable())
+        SetFailState("Failed to Enable patch: %s", sBuffer);
+
+    delete hGameData;
+}
+
+static void MaybeApplyUnlock()
+{
+    if (g_bTriedUnlock) return;
+    g_bTriedUnlock = true;
+
+    if (!gCvarUnlockMaxSpecial.BoolValue)
+    {
+        PrintToServer("[DirSpawn] MaxSpecial unlock is disabled (dirspawn_unlock_maxspecial=0).");
+        return;
+    }
+
+    // sourcescramble 必须存在
+    InitSDK_FromGamedata();
+    PrintToServer("[DirSpawn] MaxSpecial unlock applied (patched CDirector::GetMaxPlayerZombies).");
+}
+
 // ---------------------------- Auto scaling -----------------------------
 // Count humans by mode
 int CountHumansByMode(int mode)
@@ -320,15 +372,15 @@ int CountHumansByMode(int mode)
     {
         if (!IsClientInGame(i) || IsFakeClient(i)) continue;
         int team = GetClientTeam(i);
-        if (mode == 0) // 全体真人（任意队伍，排除未分队0）
+        if (mode == 0) // all humans (exclude team 0)
         {
             if (team != 0) cnt++;
         }
-        else if (mode == 1) // 仅生还真人
+        else if (mode == 1) // survivor humans only
         {
             if (team == 2) cnt++;
         }
-        else // 2: 非旁观真人（生还+特感）
+        else // 2: non-spectating humans (survivor + infected)
         {
             if (team == 2 || team == 3) cnt++;
         }
@@ -358,13 +410,11 @@ void AutoRecomputeAndApply(bool announce)
     int newCnt   = baseCnt + perAdd * over4;
     int newIntv  = baseIntv - perDec * over4;
 
-    // clamps
     if (newCnt   < minCnt)   newCnt   = minCnt;
     if (newCnt   > maxCnt)   newCnt   = maxCnt;
     if (newIntv  < minIntv)  newIntv  = minIntv;
     if (newIntv  > maxIntv)  newIntv  = maxIntv;
 
-    // Set cvars programmatically (suppress change hook bounce)
     g_bInternalSet = true;
     gCvarCount.SetInt(newCnt);
     gCvarInterval.SetInt(newIntv);
@@ -393,7 +443,7 @@ void ScheduleAuto(float delay=0.25)
     g_hAutoTimer = CreateTimer(delay, TMR_AutoOnce, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-// ---------------------------- Console Commands -------------------------
+// ---------------------------- Commands ---------------------------------
 public Action Cmd_Apply(int client, int args)
 {
     if (args >= 1)
@@ -462,7 +512,8 @@ public Action Cmd_GenKV(int client, int args)
 // ---------------------------- Events / Timers --------------------------
 public Action EVT_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-    // 先按自动模式重算（若开启）
+    g_bAnnouncedThisRound = false; // reset announce flag per round
+
     if (gCvarAutoEnable.BoolValue) ScheduleAuto(0.6);
 
     if (!gCvarEnable.BoolValue || !gCvarApplyOnRoundStart.BoolValue)
@@ -490,7 +541,9 @@ public Action TMR_ApplyOnce(Handle timer, any data)
 
 public void OnConfigsExecuted()
 {
-    // 配置加载后，稍微延迟执行：先给其他cfg时间写cvar
+    // 这里也试一次，以防 sourcescramble 晚于本插件加载
+    MaybeApplyUnlock();
+
     if (gCvarAutoEnable.BoolValue) ScheduleAuto(1.0);
 
     if (gCvarEnable != null && gCvarEnable.BoolValue && gCvarApplyOnRoundStart.BoolValue)
@@ -506,7 +559,6 @@ public void OnConfigsExecuted()
     }
 }
 
-// 这些事件用来触发自动模式重算
 public void OnClientPutInServer(int client)
 {
     if (IsFakeClient(client)) return;
@@ -524,16 +576,79 @@ public Action EVT_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 }
 public void OnAllPluginsLoaded()
 {
-    // 在别的插件加载后，确保有团队事件钩住
     HookEvent("player_team", EVT_PlayerTeam, EventHookMode_Post);
+
+    // 插件与扩展均加载后，优先尝试解锁
+    MaybeApplyUnlock();
+}
+
+// ---------- Announce ONCE when first survivor leaves start area ----------
+void GetDifficultyString(char[] out, int maxlen)
+{
+    char diff[32]; diff[0] = '\0';
+    ConVar c = FindConVar("z_difficulty");
+    if (c != null) c.GetString(diff, sizeof(diff));
+
+    if (StrEqual(diff, "easy", false))        strcopy(out, maxlen, "简单");
+    else if (StrEqual(diff, "normal", false)) strcopy(out, maxlen, "普通");
+    else if (StrEqual(diff, "hard", false))   strcopy(out, maxlen, "高级");
+    else if (StrEqual(diff, "impossible", false) || StrEqual(diff, "expert", false))
+        strcopy(out, maxlen, "专家");
+    else if (diff[0] != '\0')
+        strcopy(out, maxlen, diff);
+    else
+        strcopy(out, maxlen, "未知");
+}
+
+void AnnounceNow()
+{
+    char diffcn[32];
+    GetDifficultyString(diffcn, sizeof(diffcn));
+
+    int total    = gCvarCount.IntValue;
+    int interval = gCvarInterval.IntValue;
+
+    PrintToChatAll("[导演] 难度：%s ｜ %d特 ｜ 目标间隔：%d秒", diffcn, total, interval);
+}
+
+public Action EVT_PlayerLeftStart(Event event, const char[] name, bool dontBroadcast)
+{
+    if (!g_bAnnouncedThisRound)
+    {
+        AnnounceNow();
+        g_bAnnouncedThisRound = true;
+    }
+    return Plugin_Continue;
+}
+
+// ---------- Cull: kick dead SI bots except Spitter ----------
+public Action TMR_KickDeadSIBot(Handle timer, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (client <= 0 || !IsClientInGame(client)) return Plugin_Stop;
+
+    if (GetClientTeam(client) != 3) return Plugin_Stop;  // only infected team
+    if (!IsFakeClient(client)) return Plugin_Stop;       // only bots
+
+    int zc = L4D2_GetPlayerZombieClass(client);
+    if (zc == ZC_SPITTER) return Plugin_Stop;            // exclude spitter
+
+    KickClient(client, "free SI slot");
+    return Plugin_Stop;
+}
+
+public Action EVT_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+    int userid = event.GetInt("userid");
+    CreateTimer(0.05, TMR_KickDeadSIBot, userid, TIMER_FLAG_NO_MAPCHANGE);
+    return Plugin_Continue;
 }
 
 // ---------------------------- ConVar Changed ---------------------------
 public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValue)
 {
     if (!gCvarEnable.BoolValue) return;
-
-    if (g_bInternalSet) return; // programmatic set; skip noisy re-apply
+    if (g_bInternalSet) return;
 
     if (cvar == gCvarCount || cvar == gCvarInterval || cvar == gCvarDomLimit
      || cvar == gCvarKvEnable || cvar == gCvarKvPath
@@ -552,8 +667,8 @@ public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValu
 public void OnPluginStart()
 {
     gCvarEnable            = CreateConVar("dirspawn_enable", "1", "Enable Director SI Spawner (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarCount             = CreateConVar("dirspawn_count", "12", "Total concurrent SI (cm_MaxSpecials)", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarInterval          = CreateConVar("dirspawn_interval", "15", "cm_SpecialRespawnInterval (seconds)", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarCount             = CreateConVar("dirspawn_count", "8", "Total concurrent SI (cm_MaxSpecials)", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarInterval          = CreateConVar("dirspawn_interval", "35", "cm_SpecialRespawnInterval (seconds)", FCVAR_NOTIFY, true, 0.0, true, 120.0);
     gCvarDomLimit          = CreateConVar("dirspawn_dominator_limit", "-1", "DominatorLimit (-1=auto=dirspawn_count)", FCVAR_NOTIFY, true, -1.0, true, 30.0);
     gCvarApplyOnRoundStart = CreateConVar("dirspawn_apply_on_roundstart", "1", "Apply automatically at round_start", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "Delay (sec) before apply at round_start/OnConfigsExecuted", FCVAR_NOTIFY, true, 0.1, true, 10.0);
@@ -561,6 +676,9 @@ public void OnPluginStart()
     gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "KeyValues file path for per-class caps", FCVAR_NOTIFY);
     gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "Verbose logs (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "Set ActiveChallenge/Aggressive/Assault flags (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+    // NEW: 解锁 MaxSpecial
+    gCvarUnlockMaxSpecial  = CreateConVar("dirspawn_unlock_maxspecial", "1", "Unlock max SI cap by patching CDirector::GetMaxPlayerZombies (requires sourcescramble + gamedata)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // better_mutations4 fixes via SessionOptions
     gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "ShouldAllowSpecialsWithTank (0=disallow SI when Tank alive)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
@@ -570,7 +688,7 @@ public void OnPluginStart()
 
     // Auto scaling
     gCvarAutoEnable        = CreateConVar("dirspawn_auto_enable", "0", "Enable auto scaling by human players (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarAutoCountMode     = CreateConVar("dirspawn_auto_count_mode", "0", "Count mode: 0=all humans, 1=humans on survivor, 2=humans not spectating", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    gCvarAutoCountMode     = CreateConVar("dirspawn_auto_count_mode", "0", "Count: 0=all humans, 1=survivor humans, 2=non-spectating humans", FCVAR_NOTIFY, true, 0.0, true, 2.0);
     gCvarAutoBaseCount     = CreateConVar("dirspawn_auto_base_count", "6",  "Base SI total at 4 humans", FCVAR_NOTIFY, true, 0.0, true, 30.0);
     gCvarAutoPerAdd        = CreateConVar("dirspawn_auto_per_player_add", "1", "Per extra human (+count)", FCVAR_NOTIFY, true, 0.0, true, 6.0);
     gCvarAutoBaseInterval  = CreateConVar("dirspawn_auto_base_interval", "25", "Base interval at 4 humans (seconds)", FCVAR_NOTIFY, true, 0.0, true, 120.0);
@@ -594,7 +712,9 @@ public void OnPluginStart()
     RegAdminCmd("sm_dirspawn_apply",  Cmd_Apply, ADMFLAG_GENERIC, "sm_dirspawn_apply [count] [interval] - apply settings now");
     RegAdminCmd("sm_dirspawn_genkv",  Cmd_GenKV, ADMFLAG_ROOT,    "sm_dirspawn_genkv [min] [max] - generate KV (balanced) to dirspawn_kv_path");
 
-    HookEvent("round_start", EVT_RoundStart, EventHookMode_PostNoCopy);
+    HookEvent("round_start",             EVT_RoundStart,       EventHookMode_PostNoCopy);
+    HookEvent("player_left_start_area",  EVT_PlayerLeftStart,  EventHookMode_PostNoCopy);
+    HookEvent("player_death",            EVT_PlayerDeath,      EventHookMode_Post);
 
     LogMsg("%s v%s loaded.", PLUGIN_NAME, PLUGIN_VERSION);
 }

@@ -79,6 +79,25 @@
 					"patch"		"\xEB\x64"
 				}
 			}
+
+			"ZombieManager::AccumulateSpawnAreaCollection::IgnoreClearState"
+			{
+				"signature"		"ZombieManager::AccumulateSpawnAreaCollection"
+
+				"linux"
+				{
+					"offset"	"2CAh"
+					"verify"	"\x0F\x84\x6C\x06\x00\x00"
+					"patch"		"\x90\x90\x90\x90\x90\x90"
+				}
+				
+				"windows"
+				{
+					"offset"	"38Ch"
+					"verify"	"\x75\x0F"
+					"patch"		"\xEB\x0F"
+				}
+			}
 		}
 
 		"Signatures"

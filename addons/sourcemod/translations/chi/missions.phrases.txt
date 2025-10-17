@@ -1,0 +1,283 @@
+"Phrases"
+{
+	"L4D2C1"
+	{
+		"chi"		"死亡中心"
+	}
+	"L4D2C2"
+	{
+		"chi"		"黑色狂欢节"
+	}
+	"L4D2C3"
+	{
+		"chi"		"沼泽激战"
+	}
+	"L4D2C4"
+	{
+		"chi"		"暴风骤雨"
+	}
+	"L4D2C5"
+	{
+		"chi"		"教区"
+	}
+	"L4D2C6"
+	{
+		"chi"		"短暂时刻"
+	}
+	"L4D2C7"
+	{
+		"chi"		"牺牲"
+	}
+	"L4D2C8"
+	{
+		"chi"		"毫不留情"
+	}
+	"L4D2C9"
+	{
+		"chi"		"坠机险途"
+	}
+	"L4D2C10"
+	{
+		"chi"		"死亡丧钟"
+	}
+	"L4D2C11"
+	{
+		"chi"		"静寂时分"
+	}
+	"L4D2C12"
+	{
+		"chi"		"血腥收获"
+	}
+	"L4D2C13"
+	{
+		"chi"		"刺骨寒溪"
+	}
+	"L4D2C14"
+	{
+		"chi"		"临死一搏"
+	}
+	"QuestionableEthics"
+	{
+		"chi"		"伦理问题1"
+	}
+	"QuestionableEthicsAlphaTest"
+	{
+		"chi"		"伦理问题2"
+	}
+	"CrashBandicootTheReturn"
+	{
+		"chi"		"崩溃的博士1"
+	}
+	"l4d2CrashBandicoot2"
+	{
+		"chi"		"崩溃的博士2"
+	}
+	"TanksPlayground"
+	{
+		"chi"		"坦克游乐场"
+	}
+	"WhiteForest"
+	{
+		"chi"		"白森林"
+	}
+	"YamaMSE"
+	{
+		"chi"		"摩耶山危机"
+	}
+	"ddntr1"
+	{
+		"chi"		"死亡陷阱"
+	}
+	"Diescraper36"
+	{
+		"chi"		"喋血蜃楼"
+	}
+	"SaltHellPark"
+	{
+		"chi"		"盐井地狱公园"
+	}
+	"TheBloodyMoors"
+	{
+		"chi"		"血腥荒野"
+	}
+	"FarewellChenming"
+	{
+		"chi"		"再见了晨茗"
+	}
+	"darkwood"
+	{
+		"chi"		"阴暗森林"
+	}
+	"DevilMountain"
+	{
+		"chi"		"魔鬼山"
+	}
+	"fallen"
+	{
+		"chi"		"坠落"
+	}
+	"Cure2"
+	{
+		"chi"		"治愈2"
+	}
+	"deadvacation2"
+	{
+		"chi"		"死亡度假2"
+	}
+	"Derailed"
+	{
+		"chi"		"脱轨"
+	}
+	"hauntedforest"
+	{
+		"chi"		"颤栗森林"
+	}
+	"TheCure"
+	{
+		"chi"		"治愈"
+	}
+	"2evileyes"
+	{
+		"chi"		"双邪眼"
+	}
+	"BloodTracks"
+	{
+		"chi"		"血之轨迹"
+	}
+	"drdegov21"
+	{
+		"chi"		"暴毙峡谷"
+	}
+	"DeadSeries"
+	{
+		"chi"		"连续死亡"
+	}
+	"HighwayToHell"
+	{
+		"chi"		"地狱之路"
+	}
+	"ihatemountains2"
+	{
+		"chi"		"我恨山2"
+	}
+	"JourneyToSplashMountain"
+	{
+		"chi"		"飞溅山之旅"
+	}
+	"undeadzone"
+	{
+		"chi"		"亡灵区"
+	}
+	"Zengchengone"
+	{
+		"chi"		"广州增城Lv7.3"
+	}
+	"2019"
+	{
+		"chi"		"2019 (周年纪念版)"
+	}
+	"JTB2"
+	{
+		"chi"		"恐惧2"
+	}
+	"bts"
+	{
+		"chi"		"回到学校"
+	}
+	"CityOfTheDeadBeta"
+	{
+		"chi"		"死亡之城"
+	}
+	"City17l4d2"
+	{
+		"chi"		"17号城市 v3.2"
+	}
+	"crashbandicoot"
+	{
+		"chi"		"崩溃的博士2"
+	}
+	"damitcomplete"
+	{
+		"chi"		"大坝完整版"
+	}
+	"DayBreak"
+	{
+		"chi"		"黎明"
+	}
+	"deadvacation"
+	{
+		"chi"		"死亡度假"
+	}
+	"deathaboard2"
+	{
+		"chi"		"幽灵船2"
+	}
+	"Escansion"
+	{
+		"chi"		"Escansion"
+	}
+	"escfromtoronto"
+	{
+		"chi"		"逃离多伦多"
+	}
+	"GettingOut"
+	{
+		"chi"		"Gettingout"
+	}
+	"Highway17L4D2"
+	{
+		"chi"		"半条命 2: 17号高速路"
+	}
+	"Diescraper361"
+	{
+		"chi"		"喋血蜃楼 3.61"
+	}
+	"One4Nine"
+	{
+		"chi"		"One 4 Nine"
+	}
+	"leftinprypiat"
+	{
+		"chi"		"逃离普里皮亚季"
+	}
+	"LeftTurnSilentHill3"
+	{
+		"chi"		"重回寂静岭3"
+	}
+	"mic3"
+	{
+		"chi"		"军事工厂3 v666"
+	}
+	"necrovirusfacility"
+	{
+		"chi"		"NecroVirus Facility"
+	}
+	"NightPresence"
+	{
+		"chi"		"夜幕降临"
+	}
+	"re3"
+	{
+		"chi"		"生化危机3"
+	}
+	"shenmejb2"
+	{
+		"chi"		"什么寄吧2"
+	}
+	"ajsSilentFear"
+	{
+		"chi"		"深度恐惧"
+	}
+	"shool"
+	{
+		"chi"		"寂静岭: 另一边的生活 V4.7"
+	}
+	"TheHive"
+	{
+		"chi"		"蜂巢"
+	}
+	"ThereIsOnlyOneWay"
+	{
+		"chi"		"只此一路"
+	}
+}

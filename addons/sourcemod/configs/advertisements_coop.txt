@@ -1,0 +1,53 @@
+"Advertisements"
+{
+	"1"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}[本章节地图]: {GREEN}{CURRENTMAP} \n{LIGHTGREEN}[服务器时间]: {GREEN}{TIME24} - {DATE}"
+	}
+	"2"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}输入{GREEN}!match加载模式 \n{LIGHTGREEN}如果需要更换模式，先使用{GREEN}!rmatch{LIGHTGREEN}卸载配置再重新{GREEN}!match{LIGHTGREEN}选择模式"
+	}
+	"3"
+	{
+		"type"		"S"
+		"text"		"{GREEN}!away{LIGHTGREEN} 旁观 {GREEN}!slots{LIGHTGREEN} 开位 {GREEN}!rpg{LIGHTGREEN} 娱乐商店"
+	}
+	"4"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}本服OP {GREEN}东{LIGHTGREEN}，欢迎加入组服务器qq群：{GREEN}883237206{LIGHTGREEN} 寻找小伙伴一起开黑"
+	}
+	"5"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}特感刷新时间{GREEN}只代表特感最低刷新时间，具体刷特时间由导演决定。"
+	}
+	"6"
+	{
+		"type"		"S"
+		"text"		" {GREEN}!cur {LIGHTGREEN}查看当前进度 按Z选择看来标记物品"
+	}
+	"7"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}称号、帽子和生还者轮廓系统已在商店系统上线\n{GREEN}50W积分{LIGHTGREEN}自定义称号可以使用{GREEN}!setch 进行设置和修改"
+	}
+	"9"
+	{
+		"type"		"S"
+		"text"		"{LIGHTGREEN}输入 {GREEN}!dance{LIGHTGREEN} 跳跳舞解解压，如果跳舞人物没动作\n请steam联机选项打开允许全部服务器内容后重新进入服务器"
+	}
+	"10"
+	{
+		"type"		"S"
+		"text"		"{GREEN}服务器Mod开关{LIGHTGREEN}可以在{GREEN}投票菜单{LIGHTGREEN}中开启"
+	}
+	"11"
+	{
+		"type"		"S"
+		"text"		"{GREEN}!votekick{LIGHTGREEN} 投票踢出不m闲置玩家{GREEN}[仅玩家参与投票]{LIGHTGREEN} \n{GREEN}!voteban{LIGHTGREEN} 投票封禁开挂/嘴臭玩家{GREEN}[所有人参与投票]{LIGHTGREEN}"
+	}
+}

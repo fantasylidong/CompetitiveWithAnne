@@ -3646,6 +3646,42 @@ stock bool IsAllCharger(){
 	}
 }
 
+stock bool IsRealismCoop()
+{
+	decl String:plugin_name[MAX_LINE_WIDTH];
+	if(cvar_mode == null && FindConVar("l4d_ready_cfg_name"))
+	{
+		cvar_mode = FindConVar("l4d_ready_cfg_name");
+	}
+	if(cvar_mode == null) return 0;
+	GetConVarString(cvar_mode, plugin_name, sizeof(plugin_name));
+	if(StrContains(plugin_name, "AnneCoop", false) != -1)
+	{
+		return true;
+	}else
+	{
+		return false;
+	}
+}
+
+stock bool IsRealismRealism()
+{
+	decl String:plugin_name[MAX_LINE_WIDTH];
+	if(cvar_mode == null && FindConVar("l4d_ready_cfg_name"))
+	{
+		cvar_mode = FindConVar("l4d_ready_cfg_name");
+	}
+	if(cvar_mode == null) return 0;
+	GetConVarString(cvar_mode, plugin_name, sizeof(plugin_name));
+	if(StrContains(plugin_name, "AnneRealism", false) != -1)
+	{
+		return true;
+	}else
+	{
+		return false;
+	}
+}
+
 stock bool Is1vht(){
 	decl String:plugin_name[MAX_LINE_WIDTH];
 	if(cvar_mode == null && FindConVar("l4d_ready_cfg_name"))
@@ -10245,9 +10281,13 @@ GetGamemodeID(const String:Gamemode[])
 	{
 		return GAMEMODE_SCAVENGE;
 	}
-	else if (StrEqual(Gamemode, "realism", false))
+	else if (StrEqual(Gamemode, "realism", false) && IsRealismRealism())
 	{
 		return GAMEMODE_REALISM;
+	}
+	else if (StrEqual(Gamemode, "realism", false) && IsRealismCoop())
+	{
+		return GAMEMODE_COOP;
 	}
 	else if (StrEqual(Gamemode, "mutation12", false))
 	{
