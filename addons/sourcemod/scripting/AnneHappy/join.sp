@@ -1,4 +1,4 @@
-/*
+/* 
 	SourcePawn is Copyright (C) 2006-2008 AlliedModders LLC.  All rights reserved.
 	SourceMod is Copyright (C) 2006-2008 AlliedModders LLC.  All rights reserved.
 	Pawn and SMALL are Copyright (C) 1997-2008 ITB CompuPhase.
@@ -41,9 +41,10 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.1",
+	version = "1.2", // ★ 升级版本号
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
+
 #define UPDATE_URL_ANNE "http://dl.trygek.com/left4dead2/addons/sourcemod/Anne_Updater.txt"
 #define UPDATE_URL_NEKO "http://dl.trygek.com/left4dead2/addons/sourcemod/Neko_Updater.txt"
 #define UPDATE_URL_VERSUS "http://dl.trygek.com/left4dead2/addons/sourcemod/Versus_Updater.txt"
@@ -65,7 +66,11 @@ ConVar
 	hCvarGamemode,
 	hCvarSvAllowLobbyCo,
 	hCvarEnableAutoRemoveLobby,
-	hCvarIPUrl;
+	hCvarIPUrl,
+
+	// ★ 新增：屏蔽提示相关
+	hCvarMuteLeave,          // join_mute_leave
+	hCvarMuteIdle;           // join_mute_idle
 
 
 public void OnPluginStart()
@@ -81,31 +86,50 @@ public void OnPluginStart()
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
 	hCvarMotdUrl = CreateConVar("sm_cfgmotd_url", "http://dl.trygek.com/l4d_stats/index.php");  // 以后更换为数据库控制
 	hCvarIPUrl = CreateConVar("sm_cfgip_url", "http://dl.trygek.com/index.php");	// 以后更换为数据库控制
+
+	// ★ 新增：屏蔽离开与闲置提示（默认开启）
+	hCvarMuteLeave = CreateConVar("join_mute_leave", "1", "屏蔽默认的离开提示（player_disconnect 默认广播）", _, true, 0.0, true, 1.0);
+	hCvarMuteIdle  = CreateConVar("join_mute_idle",  "1", "屏蔽默认的闲置/接管/旁观提示（player_bot_replace / bot_player_replace / player_team）", _, true, 0.0, true, 1.0);
+
 	hCvarEnableAutoupdate.AddChangeHook(UpdateStatuChange);
 	hCvarGamemode.AddChangeHook(GamemodeChange);
 	hCvarLobbyControl.AddChangeHook(GamemodeChange);
+
 	RegConsoleCmd("sm_away", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_afk", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_spec", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_s", AFKTurnClientToSpe);
+
 	RegConsoleCmd("sm_joininfected", TurnClientToInfected);
-	RegConsoleCmd("sm_team3", TurnClientToInfected);
-	RegConsoleCmd("sm_inf", TurnClientToInfected);
-	RegConsoleCmd("sm_infected", TurnClientToInfected);
-	RegConsoleCmd("sm_zombie", TurnClientToInfected);
-	RegConsoleCmd("sm_join", TurnClientToSurvivors);
-	RegConsoleCmd("sm_jg", TurnClientToSurvivors);
-	RegConsoleCmd("sm_team2", TurnClientToSurvivors);
+	RegConsoleCmd("sm_team3",       TurnClientToInfected);
+	RegConsoleCmd("sm_inf",         TurnClientToInfected);
+	RegConsoleCmd("sm_infected",    TurnClientToInfected);
+	RegConsoleCmd("sm_zombie",      TurnClientToInfected);
+
+	RegConsoleCmd("sm_join",     TurnClientToSurvivors);
+	RegConsoleCmd("sm_jg",       TurnClientToSurvivors);
+	RegConsoleCmd("sm_team2",    TurnClientToSurvivors);
 	RegConsoleCmd("sm_joingame", TurnClientToSurvivors);
 	RegConsoleCmd("sm_survivor", TurnClientToSurvivors);
-	AddCommandListener(Command_Setinfo, "jointeam");
+
+	AddCommandListener(Command_Setinfo,  "jointeam");
 	AddCommandListener(Command_Setinfo1, "chooseteam");
-	RegConsoleCmd("sm_ip", ShowAnneServerIP);
+
+	RegConsoleCmd("sm_ip",  ShowAnneServerIP);
 	RegConsoleCmd("sm_web", ShowAnneServerWeb);
 	//RegConsoleCmd("sm_getbot", GetBot);
 	RegAdminCmd("sm_restartmap", RestartMap, ADMFLAG_ROOT, "restarts map");
+
+	// ★ 事件拦截：Pre 阶段屏蔽系统广播
+	HookEvent("player_disconnect", PlayerDisconnect_BlockBroadcast, EventHookMode_Pre); // 屏蔽默认离开提示
+	HookEvent("player_team",       PlayerTeam_BlockBroadcast,      EventHookMode_Pre); // 屏蔽“加入旁观/队伍变更”等提示（可选）
+	HookEvent("player_bot_replace",PlayerBotReplace_BlockBroadcast,EventHookMode_Pre); // 屏蔽“玩家变闲置，由Bot接管”
+	HookEvent("bot_player_replace",BotPlayerReplace_BlockBroadcast,EventHookMode_Pre); // 屏蔽“玩家接管Bot”
+
+	// 原有业务钩子
 	HookEvent("player_disconnect", PlayerDisconnect_Event, EventHookMode_Pre);
-	HookEvent("player_team", Event_PlayerTeam);
+	HookEvent("player_team",       Event_PlayerTeam);
+
 	ChangeLobby();
 }
 
@@ -113,7 +137,6 @@ public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[]
 {
 	Updater_RemovePlugin();
 	if(g_bUpdateSystemAvailable && hCvarEnableAutoupdate.IntValue > 0){
-		//LogError("[updater]:%d", hCvarEnableAutoupdate.IntValue);
 		if(hCvarEnableAutoupdate.IntValue == 1)
 		{
 			Updater_AddPlugin(UPDATE_URL_ANNEALL);
@@ -121,7 +144,8 @@ public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[]
 		else if(hCvarEnableAutoupdate.IntValue == 2)
 		{
 			Updater_AddPlugin(UPDATE_URL_NEKO);
-		}else if(hCvarEnableAutoupdate.IntValue == 3)
+		}
+		else if(hCvarEnableAutoupdate.IntValue == 3)
 		{
 			Updater_AddPlugin(UPDATE_URL_VERSUS);
 		}
@@ -209,7 +233,8 @@ stock void CrashMap()
 	ServerCommand("changelevel %s", mapname);
 }
 
-//玩家加入游戏
+// --- 自定义提示：进服/离服 ---
+
 public void OnClientConnected(int client)
 {
 	if(!IsFakeClient(client))
@@ -218,6 +243,18 @@ public void OnClientConnected(int client)
 	}
 }
 
+// ★ 新增：Pre 钩子中屏蔽默认广播（受 join_mute_leave 控制）
+public Action PlayerDisconnect_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
+{
+	if (hCvarMuteLeave.BoolValue)
+	{
+		SetEventBroadcast(event, true);
+		return Plugin_Changed;
+	}
+	return Plugin_Continue;
+}
+
+//（原有）自定义离开信息输出
 public Action PlayerDisconnect_Event(Handle event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(GetEventInt(event,"userid"));
@@ -230,6 +267,12 @@ public Action PlayerDisconnect_Event(Handle event, const char[] name, bool dontB
 
     if (IsFakeClient(client))
         return Plugin_Handled;
+
+    // 如果开启了屏蔽，确保广播被关闭（双保险）
+    if (hCvarMuteLeave.BoolValue)
+    {
+        SetEventBroadcast(event, true);
+    }
 
     char reason[64], message[64];
     GetEventString(event, "reason", reason, sizeof(reason));
@@ -291,6 +334,53 @@ public Action PlayerDisconnect_Event(Handle event, const char[] name, bool dontB
     return Plugin_Handled;
 } 
 
+// --- 队伍/闲置相关 ---
+
+// ★ 新增：屏蔽旁观/换队/闲置/接管类系统提示（受 join_mute_idle 控制）
+public Action PlayerTeam_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
+{
+	if (!hCvarMuteIdle.BoolValue)
+		return Plugin_Continue;
+
+	int team     = GetEventInt(event, "team");
+	int oldteam  = GetEventInt(event, "oldteam");
+	bool disconn = GetEventBool(event, "disconnect");
+
+	// 常见几类：加入旁观(=1)、生还<->旁观切换、连接中变更等
+	if (!disconn)
+	{
+		if (team == 1 || oldteam == 1 || team != oldteam)
+		{
+			SetEventBroadcast(event, true);
+			return Plugin_Changed;
+		}
+	}
+	return Plugin_Continue;
+}
+
+public Action PlayerBotReplace_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
+{
+	if (hCvarMuteIdle.BoolValue)
+	{
+		// 玩家变为闲置，由Bot接管
+		SetEventBroadcast(event, true);
+		return Plugin_Changed;
+	}
+	return Plugin_Continue;
+}
+
+public Action BotPlayerReplace_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
+{
+	if (hCvarMuteIdle.BoolValue)
+	{
+		// 玩家从闲置回来，接管Bot
+		SetEventBroadcast(event, true);
+		return Plugin_Changed;
+	}
+	return Plugin_Continue;
+}
+
+//（原有）业务逻辑：不允许加入特感时把玩家弹到旁观
 public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 {
 	int client = GetEventInt(event, "userid");
@@ -306,7 +396,6 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 			return Plugin_Handled;
 		}
 	}
-	//CreateTimer(0.1, Timer_MobChange, 0, TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Continue;
 }
 
@@ -316,12 +405,10 @@ public Action Timer_CheckDetay2(Handle Timer, int client)
 	return Plugin_Continue;
 }
 
-
 public void OnClientPutInServer(int client)
 {
 	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && !hCvarEnableInf.BoolValue)
 	{
-		//ServerCommand("sm_addbot2");
 		CreateTimer(3.0, Timer_CheckDetay, client, TIMER_FLAG_NO_MAPCHANGE);
 		g_bEnableGetbotCommand[client] = true;
 	}
@@ -340,7 +427,6 @@ public void OnClientPutInServer(int client)
 			L4D_LobbyUnreserve();
 		SetAllowLobby(0);
 	}
-
 }
 
 public Action Timer_CheckDetay(Handle Timer, int client)
@@ -497,10 +583,6 @@ public int SwitchCharacterMenuHandler(Menu menu, MenuAction action, int param1, 
 		GetMenuItem(menu, param2, botname, sizeof(botname), _, botname, sizeof(botname));
 		ChangeClientTeam(param1, 1);
 		ClientCommand(param1, "jointeam survivor %s", botname);
-		//DataPack  dp;
-		//dp.WriteCell(param1);
-		//dp.WriteString(botname);
-		//CreateTimer(1.0, ChangeTeam, dp);
 	}
 	else if (action == MenuAction_Cancel)
 	{
@@ -512,18 +594,9 @@ public int SwitchCharacterMenuHandler(Menu menu, MenuAction action, int param1, 
 	}
 	return 0;
 }
-/*
-public Action ChangeTeam(Handle timer, DataPack  dp){
-	dp.Reset();
-	char botname[32];
-	int client = dp.ReadCell();
-	dp.ReadString(botname, 32);
-	ClientCommand(client, "jointeam survivor %s", botname);
-	return Plugin_Continue;
-}
-*/
 
-//判断特感是否已经满人
+// --- 各类工具函数 ---
+
 stock bool IsInfectTeamFull() 
 {
 	int count = 0;
@@ -543,7 +616,6 @@ stock bool IsInfectTeamFull()
 	}
 }
 
-//判断生还是否已经满人
 stock bool IsSuivivorTeamFull() 
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -555,7 +627,7 @@ stock bool IsSuivivorTeamFull()
 	}
 	return true;
 }
-//判断是否为生还者
+
 stock bool IsSurvivor(int client) 
 {
 	if(client > 0 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == 2) 
@@ -568,7 +640,6 @@ stock bool IsSurvivor(int client)
 	}
 }
 
-//判断是否为玩家再队伍里
 stock bool IsValidPlayerInTeam(int client,int team)
 {
 	if(IsValidPlayer(client))
@@ -602,7 +673,6 @@ stock bool IsValidPlayer(int client, bool AllowBot = true, bool AllowDeath = tru
 	return true;
 }
 
-//判断生还者是否已经被控
 stock bool IsPinned(int client) 
 {
 	bool bIsPinned = false;
