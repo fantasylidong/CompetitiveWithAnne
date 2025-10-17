@@ -196,12 +196,12 @@ public void OnPluginStart()
     gCvarDBSection       = CreateConVar("sm_bl_db_section",        g_sDBSection, "databases.cfg 区块名", FCVAR_NOTIFY);
     gCvarTableName       = CreateConVar("sm_bl_table",             g_sTable,     "数据库表名", FCVAR_NOTIFY);
     gCvarKickMsg         = CreateConVar("sm_bl_kick_msg",          g_sKickMsg,   "踢出提示（留空使用翻译短语）", FCVAR_NOTIFY);
-    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "20",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
-    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "100",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
+    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "3",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
+    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "10",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
     gCvarAdminFlag       = CreateConVar("sm_bl_admin_flag",        "b",    "享管理员上限的 flag(留空=无)", FCVAR_NOTIFY);
-    gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "1",    "仅检查队伍2/3(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "0",    "仅检查队伍2/3(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
-    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "b",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NOTIFY);
+    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "z",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NOTIFY);
     gCvarQuiet           = CreateConVar("sm_bl_quiet",             "1",    "静音提示：不通知触发屏蔽的玩家(1=静默,0=通知)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarLogEnable       = CreateConVar("sm_bl_log",               "1",    "启用日志记录(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarLogFile         = CreateConVar("sm_bl_log_file",          g_sLogFile, "日志文件名(位于 logs/ 下)", FCVAR_NOTIFY);
