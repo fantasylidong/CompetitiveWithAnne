@@ -1708,8 +1708,7 @@ void GetAura(int client, int id)
 		}
     }
 
-    if (0 <= id <= 15 || id >= 17) 
-    {
+	if ((id >= 0 && id <= 15) || id >= 17)    {
         SetEntProp(client, Prop_Send, "m_iGlowType", 3);
         SetEntProp(client, Prop_Send, "m_nGlowRange", 99999);
         SetEntProp(client, Prop_Send, "m_nGlowRangeMin", 0);

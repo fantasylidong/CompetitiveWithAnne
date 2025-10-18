@@ -53,8 +53,6 @@ public void OnPluginStart()
 	HookEvent("player_incapacitated", Incap_Event, EventHookMode_Post);
 	HookEvent("round_start", event_RoundStart);
 	HookEvent("player_death", player_death, EventHookMode_Post);
-	RegConsoleCmd("sm_zs", ZiSha);
-	RegConsoleCmd("sm_kill", ZiSha);
 	RegAdminCmd("sm_killall", killall, ADMFLAG_BAN, "处死所有玩家");
 }
 
@@ -70,11 +68,6 @@ public Action player_death(Handle event, char[] name, bool dontBroadcast)
 		SlaySurvivors();
 	}
 	return Plugin_Continue;
-}
-public Action ZiSha(int client, int args)
-{
-	ForcePlayerSuicide(client);
-	return Plugin_Handled;
 }
 
 public Action killall(int client, int args)

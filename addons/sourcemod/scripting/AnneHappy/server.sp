@@ -91,6 +91,8 @@ public void OnPluginStart()
     SetConVarBounds(FindConVar("survivor_limit"), ConVarBound_Upper, true, 31.0);
     RegAdminCmd("sm_addbot",   ADMAddBot, ADMFLAG_ROOT, "添加一个生还者Bot（不会被本插件踢）");
     RegAdminCmd("sm_delbot",   ADMDelBot, ADMFLAG_ROOT, "删除一个未被接管的生还者Bot");
+    RegConsoleCmd("sm_zs", ZiSha);
+	RegConsoleCmd("sm_kill", ZiSha);
 
     // ---- 生还管理 ConVar ----
     hSurvivorsManagerEnable = CreateConVar("l4d_multislots_survivors_manager_enable", "0",
@@ -306,6 +308,13 @@ public Action SetBot(int client, int args)
     }
     return Plugin_Handled;
 }
+
+public Action ZiSha(int client, int args)
+{
+	ForcePlayerSuicide(client);
+	return Plugin_Handled;
+}
+
 
 // ====== 生还工具 ======
 int GetSurvivorCount()

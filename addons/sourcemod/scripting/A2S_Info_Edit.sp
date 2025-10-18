@@ -574,7 +574,7 @@ bool InitKvFile() {
 		delete file;
 
 		// 写出默认值内容
-		kv.SetString("description", "AnneHappy欢迎你");
+		kv.SetString("description", "AnneHappy药役");
 		kv.SetString("inFinale", "救援正进行");
 		kv.SetString("notInFinale", "救援未进行");
 
@@ -587,7 +587,7 @@ bool InitKvFile() {
 	}
 
 	// 获取Kv文本内信息写入变量中
-	kv.GetString("description", g_cGameDes, sizeof(g_cGameDes), "AnneHappy欢迎你");
+	kv.GetString("description", g_cGameDes, sizeof(g_cGameDes), "AnneHappy药役");
 	kv.GetString("inFinale", g_cInFinale, sizeof(g_cInFinale), "救援正进行");
 	kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
 
