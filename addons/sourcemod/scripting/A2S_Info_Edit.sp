@@ -1,811 +1,853 @@
 #pragma semicolon 1
 #pragma newdecls required
+
 #include <sourcemod>
 #include <sdktools>
-#include <left4dhooks>				// https://forums.alliedmods.net/showthread.php?t=321696
-#include <sourcescramble>			// https://github.com/nosoop/SMExt-SourceScramble
-#include <localizer> 				// https://github.com/dragokas/SM-Localizer
-#include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
+#include <left4dhooks>             // https://forums.alliedmods.net/showthread.php?t=321696
+#include <sourcescramble>          // https://github.com/nosoop/SMExt-SourceScramble
+#include <localizer>               // https://github.com/dragokas/SM-Localizer
+#include <l4d2_source_keyvalues>   // https://github.com/fdxx/l4d2_source_keyvalues
 
 /*
-	部分代码来源:
-	fdxx => l4d2_source_keyvalues
-	umlka => map_changer
-	dragokas => SM-Localizer
+    部分代码来源:
+    fdxx => l4d2_source_keyvalues
+    umlka => map_changer
+    dragokas => SM-Localizer
 */
 
-#define GAMEDATA				"A2S_Info_Edit"
+#define GAMEDATA                "A2S_Info_Edit"
 
-#define PLUGIN_NAME				"A2S_INFO Edit | A2S_INFO 信息修改"
-#define PLUGIN_AUTHOR			"yuzumi"
-#define PLUGIN_VERSION			"1.1.3"
-#define PLUGIN_DESCRIPTION		"DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息"
-#define PLUGIN_URL				"https://github.com/joyrhyme/L4D2-Plugins/tree/main/A2S_Info_Edit"
-#define CVAR_FLAGS				FCVAR_NOTIFY
+#define PLUGIN_NAME             "A2S_INFO Edit | A2S_INFO 信息修改"
+#define PLUGIN_AUTHOR           "yuzumi (+desc dynamic by morzlee)"
+#define PLUGIN_VERSION          "1.1.3-descfmt"
+#define PLUGIN_DESCRIPTION      "DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息（含动态描述格式）"
+#define PLUGIN_URL              "https://github.com/joyrhyme/L4D2-Plugins/tree/main/A2S_Info_Edit"
+#define CVAR_FLAGS              FCVAR_NOTIFY
 
-#define DEBUG					0
-#define BENCHMARK				0
+#define DEBUG                   0
+#define BENCHMARK               0
 #if BENCHMARK
-	#include <profiler>
-	Profiler g_profiler;
+    #include <profiler>
+    Profiler g_profiler;
 #endif
 
-#define TRANSLATION_MISSIONS	"a2s_missions.phrases.txt"
-#define TRANSLATION_CHAPTERS	"a2s_chapters.phrases.txt"
-#define A2S_SETTING				"a2s_info_edit.cfg"
+#define TRANSLATION_MISSIONS    "a2s_missions.phrases.txt"
+#define TRANSLATION_CHAPTERS    "a2s_chapters.phrases.txt"
+#define A2S_SETTING             "a2s_info_edit.cfg"
 
 // 游戏本地化文本
-Localizer
-	loc;
+Localizer loc;
 
 // 记录内存修补数据
 MemoryPatch
-	g_mMapNamePatch,
-	g_mGameDesPatch;
+    g_mMapNamePatch,
+    g_mGameDesPatch;
 
 // SDKCall地址
 Address
-	g_pSteam3Server,
-	g_pDirector,
-	g_pMatchExtL4D;
+    g_pSteam3Server,
+    g_pDirector,
+    g_pMatchExtL4D;
 
 // SDKCall句柄
 Handle
-	g_hSDK_GetSteam3Server,
-	g_hSDK_SendServerInfo,
-	g_hSDK_GetAllMissions;
+    g_hSDK_GetSteam3Server,
+    g_hSDK_SendServerInfo,
+    g_hSDK_GetAllMissions;
 
 // 各初始化状态
 bool
-	g_bLocInit,
-	g_bIsFinalMap,
-	g_bMissionCached,
-	g_bFinaleStarted,
-	g_bisAllBotGame;
+    g_bLocInit,
+    g_bIsFinalMap,
+    g_bMissionCached,
+    g_bFinaleStarted,
+    g_bisAllBotGame;
 
 // ConVars
 ConVar
-	g_hMPGameMode,
-	g_hMapNameLang,
-	g_hMapNameType,
-	g_hAllBotGame;
+    g_hMPGameMode,          // 原 mp_gamemode（备用）
+    g_hMapNameLang,
+    g_hMapNameType,
+    g_hAllBotGame,
 
-// 存放修改后地图名称/游戏描述/模式名的变量
+    // 动态描述相关
+    g_hDescDynamic,         // a2s_info_desc_dynamic
+    g_hDescFormat,          // a2s_info_desc_format
+
+    // 参考你的 hostname 逻辑所需 ConVar
+    g_hReadyCfgName,        // l4d_ready_cfg_name
+    g_hInfectedLimit,       // l4d_infected_limit
+    g_hVsSIRespawn,         // versus_special_respawn_interval
+    g_hAddonsEclipse,       // l4d2_addons_eclipse (0=无MOD)
+    g_hSurvivorLimit,       // survivor_limit
+    g_hMaxPZ;               // z_max_player_zombies
+
+// 存放修改后地图名称/游戏描述/模式名的变量（适当放大缓冲区）
 char
-	g_cMap[64],
-	g_cMode[64],
-	g_cLanguage[5],
-	g_cGameDes[64],
-	g_cInFinale[32],
-	g_cNotInFinale[32],
-	g_cMapName[32],
-	g_cCampaignName[32],
-	g_cChapterName[32];
+    g_cMap[64],
+    g_cMode[64],
+    g_cLanguage[5],
+    g_cGameDes[192],        // 放大，避免拼装溢出
+    g_cInFinale[32],
+    g_cNotInFinale[32],
+    g_cMapName[64],         // 放大
+    g_cCampaignName[64],    // 放大
+    g_cChapterName[64],     // 放大
+    g_cGameDesBase[128];    // 配置中的基础描述（前缀）
 
 // 存放数值的变量
 int
-	g_iMapNameOS,
-	g_iGameDesOS,
-	g_iChapterNum,
-	g_iChapterMaxNum,
-	g_iMapNameType;
+    g_iMapNameOS,
+    g_iGameDesOS,
+    g_iChapterNum,
+    g_iChapterMaxNum,
+    g_iMapNameType;
 
 StringMap
-	g_smExclude,
-	g_smMissionMap;
+    g_smExclude,
+    g_smMissionMap;
 
 enum struct esPhrase {
-	char key[64];
-	char val[64];
-	int official;
+    char key[64];
+    char val[64];
+    int official;
 }
 
 public Plugin myinfo = {
-	name = PLUGIN_NAME,
-	author = PLUGIN_AUTHOR,
-	description = PLUGIN_DESCRIPTION,
-	version = PLUGIN_VERSION,
-	url = PLUGIN_URL
+    name = PLUGIN_NAME,
+    author = PLUGIN_AUTHOR,
+    description = PLUGIN_DESCRIPTION,
+    version = PLUGIN_VERSION,
+    url = PLUGIN_URL
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
-	EngineVersion iEngineVersion = GetEngineVersion();
-	if(iEngineVersion != Engine_Left4Dead2 && !IsDedicatedServer())
-	{
-		strcopy(error, err_max, "Plugin only supports Left 4 Dead 2 Dedicated Server!");
-		return APLRes_SilentFailure;
-	}
-	return APLRes_Success;
+    EngineVersion iEngineVersion = GetEngineVersion();
+    if(iEngineVersion != Engine_Left4Dead2 && !IsDedicatedServer())
+    {
+        strcopy(error, err_max, "Plugin only supports Left 4 Dead 2 Dedicated Server!");
+        return APLRes_SilentFailure;
+    }
+    return APLRes_Success;
 }
 
 public void OnPluginStart() {
-	g_smMissionMap = new StringMap();
+    g_smMissionMap = new StringMap();
 
-	// 初始化GameData和Kv文件
-	InitKvFile();
-	InitGameData();
+    // 初始化GameData和Kv文件
+    InitKvFile();
+    InitGameData();
 
-	// 创建Cvars
-	g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
-	g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi", "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)", CVAR_FLAGS);
-	
-	g_hMPGameMode = FindConVar("mp_gamemode");
-	g_hAllBotGame = FindConVar("sb_all_bot_game");
-	if (g_hAllBotGame.IntValue == 1)
-		g_bisAllBotGame = true;
-	else
-		g_hAllBotGame.IntValue = 1;
+    // 创建Cvars
+    g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5",
+        "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]",
+        CVAR_FLAGS, true, 1.0, true, 5.0);
+    g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi",
+        "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)",
+        CVAR_FLAGS);
 
-	// 初始化Cvars
-	GetCvars_Mode();
-	GetCvars_Lang();
-	GetCvars();
-	
-	g_hMapNameLang.AddChangeHook(ConVarChanged_Lang);
-	g_hMPGameMode.AddChangeHook(ConVarChanged_Mode);
-	g_hMapNameType.AddChangeHook(ConVarChanged_Cvars);
+    g_hMPGameMode    = FindConVar("mp_gamemode");
+    g_hAllBotGame    = FindConVar("sb_all_bot_game");
+    if (g_hAllBotGame.IntValue == 1) g_bisAllBotGame = true; else g_hAllBotGame.IntValue = 1;
 
-	//AutoExecConfig(true, "A2S_Edit");
+    // 动态描述开关与格式（默认：在 Base 前缀后拼 {AnneHappy}{Full}{MOD}{Confogl}）
+    g_hDescDynamic   = CreateConVar("a2s_info_desc_dynamic", "1", "是否根据模式和人数动态生成 A2S 描述（0=关闭，仅使用配置文件；1=开启）", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_hDescFormat    = CreateConVar("a2s_info_desc_format", "{Base}{AnneHappy}{Full}{MOD}{Confogl}", "A2S 描述格式占位符：{Base}{AnneHappy}{Full}{MOD}{Confogl}", CVAR_FLAGS);
 
-	/*	事件相关
-		地图名字只需要在地图有变更时进行变更,所以暂时绑MapStart和MapEnd
-		终局相关事件
-		finale_start // 少部分不触发(跑图类就不触发).
-		finale_radio_start // 绝大部分都触发(按照目前测试没遇到过不触发的).
-		gauntlet_finale_start // 从头跑到尾的貌似触发这个(像教区/三方图的冰点,闪电突袭2),都带提示向XXXXX前进.
-		explain_stage_finale_start // 未知作用.
-	*/
-	HookEvent("round_end",	Event_RoundEnd,	EventHookMode_PostNoCopy);
-	HookEvent("finale_start", Event_FinaleStart, EventHookMode_PostNoCopy);
-	#if DEBUG
-		HookEvent("finale_radio_start", Event_finale_radio, EventHookMode_PostNoCopy);
-		HookEvent("gauntlet_finale_start", Event_gauntlet_finale, EventHookMode_PostNoCopy);
-		HookEvent("explain_stage_finale_start", Event_explain_stage_finale, EventHookMode_PostNoCopy);
-	#else
-		HookEvent("finale_radio_start", Event_FinaleStart, EventHookMode_PostNoCopy);
-		HookEvent("gauntlet_finale_start", Event_FinaleStart, EventHookMode_PostNoCopy);
-	#endif
+    // 参考 hostname 逻辑需要的 ConVar
+    g_hReadyCfgName  = FindConVar("l4d_ready_cfg_name");
+    g_hInfectedLimit = FindConVar("l4d_infected_limit");
+    g_hVsSIRespawn   = FindConVar("versus_special_respawn_interval");
+    g_hAddonsEclipse = FindConVar("l4d2_addons_eclipse");
+    g_hSurvivorLimit = FindConVar("survivor_limit");
+    g_hMaxPZ         = FindConVar("z_max_player_zombies");
 
-	// 注册命令
-	RegAdminCmd("sm_a2s_edit_reload", cmdReload, ADMFLAG_ROOT, "Reload A2S_EDIT Setting");
+    // Hook 变更
+    g_hMapNameLang.AddChangeHook(ConVarChanged_Lang);
+    g_hMPGameMode.AddChangeHook(ConVarChanged_Cvars);
+    g_hMapNameType.AddChangeHook(ConVarChanged_Cvars);
+    g_hDescDynamic.AddChangeHook(ConVarChanged_Cvars);
+    g_hDescFormat.AddChangeHook(ConVarChanged_Cvars);
 
-	// 初始化游戏本地化文本
-	loc = new Localizer();
-	loc.Delegate_InitCompleted(OnPhrasesReady);
+    if (g_hReadyCfgName)  g_hReadyCfgName.AddChangeHook(ConVarChanged_Cvars);
+    if (g_hInfectedLimit) g_hInfectedLimit.AddChangeHook(ConVarChanged_Cvars);
+    if (g_hVsSIRespawn)   g_hVsSIRespawn.AddChangeHook(ConVarChanged_Cvars);
+    if (g_hAddonsEclipse) g_hAddonsEclipse.AddChangeHook(ConVarChanged_Cvars);
+    if (g_hSurvivorLimit) g_hSurvivorLimit.AddChangeHook(ConVarChanged_Cvars);
+    if (g_hMaxPZ)         g_hMaxPZ.AddChangeHook(ConVarChanged_Cvars);
+
+    // 触发人满/缺人刷新
+    HookEvent("player_team",         Event_PlayerTeam, EventHookMode_Post);
+    HookEvent("player_bot_replace",  Event_PlayerTeam, EventHookMode_Post);
+    HookEvent("bot_player_replace",  Event_PlayerTeam, EventHookMode_Post);
+
+    // 终局相关事件
+    HookEvent("round_end",           Event_RoundEnd,   EventHookMode_PostNoCopy);
+    HookEvent("finale_start",        Event_FinaleStart,EventHookMode_PostNoCopy);
+    #if DEBUG
+        HookEvent("finale_radio_start",       Event_finale_radio,      EventHookMode_PostNoCopy);
+        HookEvent("gauntlet_finale_start",    Event_gauntlet_finale,   EventHookMode_PostNoCopy);
+        HookEvent("explain_stage_finale_start", Event_explain_stage_finale, EventHookMode_PostNoCopy);
+    #else
+        HookEvent("finale_radio_start",       Event_FinaleStart,       EventHookMode_PostNoCopy);
+        HookEvent("gauntlet_finale_start",    Event_FinaleStart,       EventHookMode_PostNoCopy);
+    #endif
+
+    // 命令
+    RegAdminCmd("sm_a2s_edit_reload", cmdReload, ADMFLAG_ROOT, "Reload A2S_EDIT Setting");
+
+    // 初始化本地化文本
+    loc = new Localizer();
+    loc.Delegate_InitCompleted(OnPhrasesReady);
 }
 
-void ConVarChanged_Mode(ConVar convar, const char[] oldValue, const char[] newValue) {
-	GetCvars_Mode();
-}
-
-void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue) {
-	GetCvars();
-}
-
-void ConVarChanged_Lang(ConVar convar, const char[] oldValue, const char[] newValue) {
-	GetCvars_Lang();
-}
-
-void GetCvars_Mode() {
-	g_hMPGameMode.GetString(g_cMode, sizeof(g_cMode));
-}
-
-void GetCvars_Lang() {
-	g_hMapNameLang.GetString(g_cLanguage, sizeof(g_cLanguage));
-	if (GetLanguageByCode(g_cLanguage) == -1) {
-		LogError("SourceMod unsupport this language: %s , Please chcek language setting. A2S_Edit change to use chi generate phrases files!", g_cLanguage);
-		Format(g_cLanguage, sizeof(g_cLanguage), "chi");
-	}
-}
-
-void GetCvars() {
-	g_iMapNameType = g_hMapNameType.IntValue;
-	if (g_bLocInit && g_bMissionCached) {
-		ChangeMapName();
-	}
-
+public void OnAllPluginsLoaded()
+{
+    // 二次确认/补全 ConVar 句柄
+    if (!g_hInfectedLimit) g_hInfectedLimit = FindConVar("l4d_infected_limit");
+    if (!g_hVsSIRespawn)   g_hVsSIRespawn   = FindConVar("versus_special_respawn_interval");
+    if (!g_hReadyCfgName)  g_hReadyCfgName  = FindConVar("l4d_ready_cfg_name");
+    if (!g_hAddonsEclipse) g_hAddonsEclipse = FindConVar("l4d2_addons_eclipse");
+    if (!g_hSurvivorLimit) g_hSurvivorLimit = FindConVar("survivor_limit");
+    if (!g_hMaxPZ)         g_hMaxPZ         = FindConVar("z_max_player_zombies");
 }
 
 public void OnConfigsExecuted() {
-	GetCvars();
-	GetCvars_Mode();
+    GetCvars();
+    GetCvars_Mode();
 
-	if(!g_bMissionCached)
-		CacheMissionInfo();
+    if(!g_bMissionCached)
+        CacheMissionInfo();
+
+    RebuildGameDescription();
+    PushA2S();
 }
 
-// 重载插件所用的文本配置
-Action cmdReload(int client, int args) {
-	if (!InitKvFile()) {
-		PrintToServer("[A2S_Edit] Reload a2s_edit.cfg failed!");
-		return Plugin_Handled;
-	}
-	
-	PrintToServer("[A2S_Edit] a2s_edit.cfg is reloaded");
-	return Plugin_Handled;
-}
-
-// 地图开始
 public void OnMapStart() {
-	// 兼容新版的L4DHOOKS的检测
-	if (GetFeatureStatus(FeatureType_Native, "Left4DHooks_Version") != FeatureStatus_Available || Left4DHooks_Version() < 1135 || !L4D_HasMapStarted()) {
-		RequestFrame(OnMapStartedPost);
-	} else {
-		OnMapStartedPost();
-	}
+    // 兼容新版的L4DHOOKS的检测
+    if (GetFeatureStatus(FeatureType_Native, "Left4DHooks_Version") != FeatureStatus_Available || Left4DHooks_Version() < 1135 || !L4D_HasMapStarted()) {
+        RequestFrame(OnMapStartedPost);
+    } else {
+        OnMapStartedPost();
+    }
 }
 
-// 地图结束
 public void OnMapEnd() {
-	// 重置终局救援流程标记
-	g_bFinaleStarted = false;
+    g_bFinaleStarted = false;
 }
 
-// DEBUG用
+/* ---------- CVAR Hooks ---------- */
+void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue) {
+    GetCvars();
+    RebuildGameDescription();
+    PushA2S();
+}
+
+void ConVarChanged_Lang(ConVar convar, const char[] oldValue, const char[] newValue) {
+    GetCvars_Lang();
+}
+
+/* ---------- Events ---------- */
+public void Event_PlayerTeam(Event hEvent, const char[] name, bool db) {
+    RebuildGameDescription();
+    PushA2S();
+}
+
 #if DEBUG
 void Event_finale_radio(Event hEvent, const char[] name, bool dontBroadcast) {
-	PrintToServer("[A2S_Edit] Start finale_radio Process!");
-	if (!g_bFinaleStarted) {
-		g_bFinaleStarted = true;
-		ChangeMapName();
-	}
+    PrintToServer("[A2S_Edit] Start finale_radio Process!");
+    if (!g_bFinaleStarted) { g_bFinaleStarted = true; ChangeMapName(); }
 }
-#endif
-
-#if DEBUG
 void Event_gauntlet_finale(Event hEvent, const char[] name, bool dontBroadcast) {
-	PrintToServer("[A2S_Edit] Start gauntlet_finale Process!");
-	if (!g_bFinaleStarted) {
-		g_bFinaleStarted = true;
-		ChangeMapName();
-	}
+    PrintToServer("[A2S_Edit] Start gauntlet_finale Process!");
+    if (!g_bFinaleStarted) { g_bFinaleStarted = true; ChangeMapName(); }
 }
-#endif
-
-#if DEBUG
 void Event_explain_stage_finale(Event hEvent, const char[] name, bool dontBroadcast) {
-	PrintToServer("[A2S_Edit] Start explain_stage_finale Process!");
-	if (!g_bFinaleStarted) {
-		g_bFinaleStarted = true;
-		ChangeMapName();
-	}
+    PrintToServer("[A2S_Edit] Start explain_stage_finale Process!");
+    if (!g_bFinaleStarted) { g_bFinaleStarted = true; ChangeMapName(); }
 }
 #endif
 
-// 救援流程开始
 void Event_FinaleStart(Event hEvent, const char[] name, bool dontBroadcast) {
-	#if DEBUG
-		PrintToServer("[A2S_Edit] Start Finale Process!");
-	#endif
-
-	/* 
-		判断救援流程标记变量为false时
-		(因为此函数绑定多个救援事件(防止部分三方图的奇怪终局),防止重复触发)
-	*/
-	if (!g_bFinaleStarted) {
-		g_bFinaleStarted = true;
-		ChangeMapName();
-	}
+    #if DEBUG
+        PrintToServer("[A2S_Edit] Start Finale Process!");
+    #endif
+    if (!g_bFinaleStarted) {
+        g_bFinaleStarted = true;
+        ChangeMapName();
+    }
 }
 
-// 关卡结束
 void Event_RoundEnd(Event hEvent, const char[] name, bool dontBroadcast) {
-	OnMapEnd();
-	// 更改地图名称(针对在终局进行救援阶段时团灭后重置显示救援状态)
-	ChangeMapName();
+    OnMapEnd();
+    ChangeMapName();
 }
 
-// 服务端首次运行时更改地图名的计时器
+/* ---------- Core Get/Init ---------- */
+void GetCvars_Mode() {
+    if (g_hMPGameMode) g_hMPGameMode.GetString(g_cMode, sizeof(g_cMode));
+}
+
+void GetCvars_Lang() {
+    g_hMapNameLang.GetString(g_cLanguage, sizeof(g_cLanguage));
+    if (GetLanguageByCode(g_cLanguage) == -1) {
+        LogError("SourceMod unsupport this language: %s , Please chcek language setting. A2S_Edit change to use chi generate phrases files!", g_cLanguage);
+        Format(g_cLanguage, sizeof(g_cLanguage), "chi");
+    }
+}
+
+void GetCvars() {
+    g_iMapNameType = g_hMapNameType.IntValue;
+    if (g_bLocInit && g_bMissionCached) {
+        ChangeMapName();
+    }
+}
+
+/* ---------- Timers ---------- */
 Action tChangeMapName(Handle timer) {
-	#if DEBUG
-		PrintToServer("[A2S_Edit] ChangeMapName Timer Executed!");
-	#endif
-
-	// 本地化文本/Cvars/任务信息缓存都完成时
-	if (g_bLocInit && g_bMissionCached) {
-		ChangeMapName();
-		if (!g_bisAllBotGame)
-			g_hAllBotGame.IntValue = 0;
-		return Plugin_Stop;
-	}
-	return Plugin_Continue;
+    #if DEBUG
+        PrintToServer("[A2S_Edit] ChangeMapName Timer Executed!");
+    #endif
+    if (g_bLocInit && g_bMissionCached) {
+        RebuildGameDescription();
+        ChangeMapName();
+        if (!g_bisAllBotGame) g_hAllBotGame.IntValue = 0;
+        return Plugin_Stop;
+    }
+    return Plugin_Continue;
 }
 
-// 更改流程
+/* ---------- Map Start Flow ---------- */
 void OnMapStartedPost() {
-	// 是否为终局
-	g_bIsFinalMap = L4D_IsMissionFinalMap();
-	// 当前任务章节总数
-	g_iChapterMaxNum = L4D_GetMaxChapters();
-	// 当前章节号
-	g_iChapterNum = L4D_GetCurrentChapter();
+    g_bIsFinalMap   = L4D_IsMissionFinalMap();
+    g_iChapterMaxNum= L4D_GetMaxChapters();
+    g_iChapterNum   = L4D_GetCurrentChapter();
 
-	// 如果都没初始化完(主要针对开服时)
-	if (!g_bLocInit || !g_bMissionCached) {
-		CreateTimer(1.0, tChangeMapName, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-	} else {
-		ChangeMapName();
-	}
+    RebuildGameDescription();
+
+    if (!g_bLocInit || !g_bMissionCached) {
+        CreateTimer(1.0, tChangeMapName, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+    } else {
+        ChangeMapName();
+    }
 }
 
-// 更改地图名
+/* ---------- MapName (A2S Map) ---------- */
 void ChangeMapName() {
-	// 获取地图文件名
-	GetCurrentMap(g_cMap, sizeof(g_cMap));
-	// 获取此地图文件名所在的任务名 (ex. c1m1_hotel => L4D2C1)
-	g_smMissionMap.GetString(g_cMap, g_cCampaignName, sizeof(g_cCampaignName));
-	// 当前地图所在的任务译名 (ex. L4D2C1 => 死亡中心)
-	fmt_Translate(g_cCampaignName, g_cCampaignName, sizeof(g_cCampaignName), 0, g_cMap);
-	// 当前地图的章节译名 (ex. c1m1_hotel => 1:酒店)
-	fmt_Translate(g_cMap, g_cChapterName, sizeof(g_cChapterName), 0, "");
+    GetCurrentMap(g_cMap, sizeof(g_cMap));
+    g_smMissionMap.GetString(g_cMap, g_cCampaignName, sizeof(g_cCampaignName));
+    fmt_Translate(g_cCampaignName, g_cCampaignName, sizeof(g_cCampaignName), 0, g_cMap);
+    fmt_Translate(g_cMap, g_cChapterName, sizeof(g_cChapterName), 0, "");
 
-	// 获取要显示的的类型
-	switch (g_iMapNameType) {
-		case 1:
-			FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName); // ex. 死亡中心
+    switch (g_iMapNameType) {
+        case 1: FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName);
+        case 2: FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s]", g_cCampaignName, g_cChapterName);
+        case 3:
+        {
+            if (g_bIsFinalMap) {
+                if (g_bFinaleStarted) FormatEx(g_cMapName, sizeof(g_cMapName), "%s - %s", g_cCampaignName, g_cInFinale);
+                else                   FormatEx(g_cMapName, sizeof(g_cMapName), "%s - %s", g_cCampaignName, g_cNotInFinale);
+            } else FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName);
+        }
+        case 4:
+        {
+            if (g_bIsFinalMap) {
+                if (g_bFinaleStarted) FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s] - %s", g_cCampaignName, g_cChapterName, g_cInFinale);
+                else                   FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s] - %s", g_cCampaignName, g_cChapterName, g_cNotInFinale);
+            } else FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s]", g_cCampaignName, g_cChapterName);
+        }
+        case 5: FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%d/%d]", g_cCampaignName, g_iChapterNum, g_iChapterMaxNum);
+        default:FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName);
+    }
 
-		case 2:
-			FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s]", g_cCampaignName, g_cChapterName); // ex. 死亡中心 [1: 酒店]
+    g_pSteam3Server = SDKCall(g_hSDK_GetSteam3Server);
+    if (g_pSteam3Server && LoadFromAddress(g_pSteam3Server + view_as<Address>(4), NumberType_Int32)) {
+        SDKCall(g_hSDK_SendServerInfo, g_pSteam3Server);
+    } else {
+        LogError("[A2S_Edit] Failed to get Steam3Server, ChangeMapName Failed!");
+    }
 
-		case 3:
-		{
-			// 是否为终局地图
-			if (g_bIsFinalMap) {
-				// 是否已开始救援阶段
-				if (g_bFinaleStarted)
-					FormatEx(g_cMapName, sizeof(g_cMapName), "%s - %s", g_cCampaignName, g_cInFinale); // ex. 死亡中心 - 救援进行中
-				else
-					FormatEx(g_cMapName, sizeof(g_cMapName), "%s - %s", g_cCampaignName, g_cNotInFinale); // ex. 死亡中心 - 救援未进行
-			} else
-				FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName); // ex. 死亡中心
-		}
-
-		case 4:
-		{
-			// 是否为终局地图
-			if (g_bIsFinalMap) {
-				// 是否已开始救援阶段
-				if (g_bFinaleStarted)
-					FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s] - %s", g_cCampaignName, g_cChapterName, g_cInFinale); // ex. 死亡中心 [4: 中厅] - 救援进行中
-				else
-					FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s] - %s", g_cCampaignName, g_cChapterName, g_cNotInFinale); // ex. 死亡中心 [4: 中厅] - 救援进行中
-			} else
-				FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s]", g_cCampaignName, g_cChapterName); // ex. 死亡中心 [4: 中厅]
-		}
-
-		case 5:
-			FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%d/%d]", g_cCampaignName, g_iChapterNum, g_iChapterMaxNum); // ex. 死亡中心 [1/4]
-
-		default:
-			FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName); // ex. 死亡中心
-	}
-
-	g_pSteam3Server = SDKCall(g_hSDK_GetSteam3Server);
-	// 执行变更设定
-	if (g_pSteam3Server && LoadFromAddress(g_pSteam3Server + view_as<Address>(4), NumberType_Int32)) {
-		SDKCall(g_hSDK_SendServerInfo, g_pSteam3Server);
-	} else {
-		LogError("[A2S_Edit] Failed to get Steam3Server, ChangeMapName Failed!");	
-	}
-	
-	// 输出DEBUG内容
-	#if DEBUG
-		LogAction(0, -1, "======== [A2S_Edit DEBUG] ========");
-		LogAction(0, -1, "地图文件名: %s", g_cMap);
-		LogAction(0, -1, "地图名: %s", g_cCampaignName);
-		LogAction(0, -1, "章节名: %s", g_cChapterName);
-		LogAction(0, -1, "合成后的名字: %s", g_cMapName);
-		LogAction(0, -1, "地图章节号: %d", g_iChapterNum);
-		LogAction(0, -1, "是否为终局: %s", g_bIsFinalMap ? "是" : "否");
-		if (g_bIsFinalMap)
-			LogAction(0, -1, "是否已开始救援事件: %s", g_bFinaleStarted ? "是" : "否");
-		LogAction(0, -1, "=========== [DEBUG END] ===========");
-	#endif
+    #if DEBUG
+        LogAction(0, -1, "======== [A2S_Edit DEBUG] ========");
+        LogAction(0, -1, "地图文件名: %s", g_cMap);
+        LogAction(0, -1, "地图名: %s", g_cCampaignName);
+        LogAction(0, -1, "章节名: %s", g_cChapterName);
+        LogAction(0, -1, "合成后的名字: %s", g_cMapName);
+        LogAction(0, -1, "地图章节号: %d", g_iChapterNum);
+        LogAction(0, -1, "是否为终局: %s", g_bIsFinalMap ? "是" : "否");
+        if (g_bIsFinalMap) LogAction(0, -1, "是否已开始救援事件: %s", g_bFinaleStarted ? "是" : "否");
+        LogAction(0, -1, "=========== [DEBUG END] ===========");
+    #endif
 }
 
-// DEBUG用 输出Kv的全部内容
-stock void PrintAllKeyValues(SourceKeyValues root) {
-	char sName[128], sValue[256];
-	int type;
+/* ---------- Reload ---------- */
+Action cmdReload(int client, int args) {
+    if (!InitKvFile()) {
+        PrintToServer("[A2S_Edit] Reload a2s_edit.cfg failed!");
+        return Plugin_Handled;
+    }
+    PrintToServer("[A2S_Edit] a2s_edit.cfg is reloaded");
 
-	for (SourceKeyValues kv = root.GetFirstSubKey(); !kv.IsNull(); kv = kv.GetNextKey())
-	{
-		kv.GetName(sName, sizeof(sName));
-
-		if (!kv.GetFirstSubKey().IsNull())
-		{
-			PrintToServer("------ sub %s ------", sName);
-			PrintAllKeyValues(kv);
-		}
-		else
-		{
-			type = kv.GetDataType(NULL_STRING);
-			switch (type)
-			{
-				case TYPE_INT:
-					PrintToServer("%s = %i", sName, kv.GetInt(NULL_STRING));
-				case TYPE_FLOAT:
-					PrintToServer("%s = %f", sName, kv.GetFloat(NULL_STRING));
-				case TYPE_PTR:
-					PrintToServer("%s = 0x%x", sName, kv.GetPtr(NULL_STRING));
-				case TYPE_STRING:
-				{
-					kv.GetString(NULL_STRING, sValue, sizeof(sValue), "N/A");
-					PrintToServer("%s = %s", sName, sValue); 
-				}
-				default:
-					PrintToServer("%s type = %i, skip getting value", sName, type); 
-			}
-		}
-	}
-
-	if (root.SaveToFile("MissionTest.txt"))
-		PrintToServer("Save to file succeeded: MissionTest.txt");
+    RebuildGameDescription();
+    PushA2S();
+    return Plugin_Handled;
 }
 
-// 缓存地图对应的任务文件信息
-void CacheMissionInfo() {
-	g_bMissionCached = false;
-	PrintToServer("[A2S_Edit] MissionInfo Cacheing...");
-	g_smMissionMap.Clear();
-	char key[64], mission[64], map[128];
-	int i = 1;
-	bool have = true;
-
-	SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
-	for (SourceKeyValues kvSub = kvMissions.GetFirstTrueSubKey(); !kvSub.IsNull(); kvSub = kvSub.GetNextTrueSubKey()) {
-		i = 1;
-		have = true;
-		do {
-			FormatEx(key, sizeof(key), "modes/%s/%d/Map", g_cMode, i);
-			SourceKeyValues kvMap = kvSub.FindKey(key);
-			if (kvMap.IsNull()) {
-				have = false;
-			} else {
-				kvSub.GetName(mission, sizeof(mission)); // ex. L4D2C1
-				kvMap.GetString(NULL_STRING, map, sizeof(map)); // ex. c1m1_hotel
-				g_smMissionMap.SetString(map, mission); // ex. c1m1_hotel => L4D2C1
-				#if DEBUG
-					PrintToServer("[A2S_Edit] %s => %s", map, mission);
-				#endif
-				++i;
-			}
-		} while (have);
-	}
-	PrintToServer("[A2S_Edit] MissionInfo Cached...");
-	g_bMissionCached = true;
-}
-
-// 初始化游戏签名/偏移/所需内容等
-void InitGameData() {
-	char sPath[PLATFORM_MAX_PATH];
-	Format(g_cMapName, sizeof(g_cMapName), "服务器初始化中");
-
-	// 检查签名文件
-	BuildPath(Path_SM, sPath, sizeof(sPath), "gamedata/%s.txt", GAMEDATA);
-	if (!FileExists(sPath))
-		SetFailState("[A2S_EDIT] Missing required file: \"%s\" .", sPath);
-	GameData hGameData = new GameData(GAMEDATA);
-	if (!hGameData)
-		SetFailState("[A2S_EDIT] Failed to load \"%s.txt\" gamedata.", GAMEDATA);
-	
-	/* ----------------------------- SDKCall相关 ----------------------------- */
-	g_pDirector = hGameData.GetAddress("CDirector");
-	if (!g_pDirector)
-		SetFailState("[A2S_EDIT] Failed to find address: \"CDirector\"");
-
-	g_pMatchExtL4D = hGameData.GetAddress("g_pMatchExtL4D");
-	if (!g_pMatchExtL4D)
-		SetFailState("[A2S_EDIT] Failed to find address: \"g_pMatchExtL4D\"");
-
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetVirtual(0);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	if (!(g_hSDK_GetAllMissions = EndPrepSDKCall()))
-		SetFailState("[A2S_EDIT] Failed to create SDKCall: \"MatchExtL4D::GetAllMissions\"");
-
-	StartPrepSDKCall(SDKCall_Static);
-	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "GetSteam3Server");
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	if (!(g_hSDK_GetSteam3Server = EndPrepSDKCall()))
-		SetFailState("[A2S_EDIT] Failed to create SDKCall: \"GetSteamServer\"");
-
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "SendUpdatedServerDetails");
-	if (!(g_hSDK_SendServerInfo = EndPrepSDKCall()))
-		SetFailState("[A2S_EDIT] Failed to create SDKCall: \"SendServerInfo\"");
-
-
-	/* ----------------------------- 内存修补相关 ----------------------------- */
-	// A2S_INFO 的地图名
-	g_iMapNameOS = hGameData.GetOffset("OS") ? 4 : 1;
-	g_mMapNamePatch = MemoryPatch.CreateFromConf(hGameData, "RebuildInfo_MapName");
-	if (!g_mMapNamePatch.Validate())
-		SetFailState("[A2S_EDIT] Failed to verify patch: \"RebuildInfo_MapName\"");
-	else if (g_mMapNamePatch.Enable()) {
-		StoreToAddress(g_mMapNamePatch.Address + view_as<Address>(g_iMapNameOS), view_as<int>(GetAddressOfString(g_cMapName)), NumberType_Int32);
-		PrintToServer("[A2S_EDIT] Enabled patch: \"RebuildInfo_MapName\"");
-		//g_bMapNamePatchEnable = true;
-	}
-
-	// A2S_INFO 的游戏描述
-	g_iGameDesOS = hGameData.GetOffset("OS") ? 4 : 1;
-	g_mGameDesPatch = MemoryPatch.CreateFromConf(hGameData, "GameDescription");
-	if (!g_mGameDesPatch.Validate())
-		SetFailState("Failed to verify patch: \"GameDescription\"");
-	else if (g_mGameDesPatch.Enable()) {
-		StoreToAddress(g_mGameDesPatch.Address + view_as<Address>(g_iGameDesOS), view_as<int>(GetAddressOfString(g_cGameDes)), NumberType_Int32);
-		PrintToServer("[A2S_EDIT] Enabled patch: \"GameDescription\"");
-		//g_bGameDesPatchEnable = true;
-	}
-
-	delete hGameData;
-	/* ----------------------------- 不需要生成翻译的地图 ----------------------------- */
-	g_smExclude = new StringMap();
-	g_smExclude.SetValue("credits", 1);
-	g_smExclude.SetValue("HoldoutChallenge", 1);
-	g_smExclude.SetValue("HoldoutTraining", 1);
-	g_smExclude.SetValue("parishdash", 1);
-	g_smExclude.SetValue("shootzones", 1);
-}
-
-// 初始化插件的Kv文件
+/* ---------- Kv / Phrases ---------- */
 bool InitKvFile() {
-	char kvPath[PLATFORM_MAX_PATH];
-	KeyValues kv;
-	File file;
-	BuildPath(Path_SM, kvPath, sizeof(kvPath), "data/%s", A2S_SETTING);
+    char kvPath[PLATFORM_MAX_PATH];
+    KeyValues kv;
+    File file;
+    BuildPath(Path_SM, kvPath, sizeof(kvPath), "data/%s", A2S_SETTING);
 
-	// 文件不存在则创建
-	kv = new KeyValues("a2s_edit");
-	if (!FileExists(kvPath)) {
-		file = OpenFile(kvPath, "w");
-		// 无法打开文件
-		if (!file) {
-			LogError("Cannot open file: \"%s\"", kvPath);
-			return false;
-		}
-		// 无法写入行
-		if (!file.WriteLine("")) {
-			LogError("Cannot write file line: \"%s\"", kvPath);
-			delete file;
-			return false;
-		}
-		delete file;
+    kv = new KeyValues("a2s_edit");
+    if (!FileExists(kvPath)) {
+        file = OpenFile(kvPath, "w");
+        if (!file) { LogError("Cannot open file: \"%s\"", kvPath); return false; }
+        if (!file.WriteLine("")) { LogError("Cannot write file line: \"%s\"", kvPath); delete file; return false; }
+        delete file;
 
-		// 写出默认值内容
-		kv.SetString("description", "AnneHappy药役");
-		kv.SetString("inFinale", "救援正进行");
-		kv.SetString("notInFinale", "救援未进行");
+        kv.SetString("description", "Anne电信服");
+        kv.SetString("inFinale", "救援正进行");
+        kv.SetString("notInFinale", "救援未进行");
 
-		// 返回树顶部
-		kv.Rewind();
-		// 从当前树位置导出内容到文件
-		kv.ExportToFile(kvPath);
-	} else if (!kv.ImportFromFile(kvPath)) {
-		return false;
-	}
+        kv.Rewind();
+        kv.ExportToFile(kvPath);
+    } else if (!kv.ImportFromFile(kvPath)) {
+        return false;
+    }
 
-	// 获取Kv文本内信息写入变量中
-	kv.GetString("description", g_cGameDes, sizeof(g_cGameDes), "AnneHappy药役");
-	kv.GetString("inFinale", g_cInFinale, sizeof(g_cInFinale), "救援正进行");
-	kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
+    kv.GetString("description", g_cGameDesBase, sizeof(g_cGameDesBase), "Anne电信服");
+    strcopy(g_cGameDes, sizeof(g_cGameDes), g_cGameDesBase);
+    kv.GetString("inFinale", g_cInFinale, sizeof(g_cInFinale), "救援正进行");
+    kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
 
-	delete kv;
-	return true;
+    delete kv;
+    return true;
 }
 
-// 地图是否存在
-stock bool IsMapValidEx(const char[] map) {
-	if (!map[0])
-		return false;
-
-	char foundmap[1];
-	return FindMap(map, foundmap, sizeof foundmap) == FindMap_Found;
-}
-
-// 获取本地化后文本
-void fmt_Translate(const char[] phrase, char[] buffer, int maxlength, int client, const char[] defvalue="") {
-	if (!TranslationPhraseExists(phrase))
-		strcopy(buffer, maxlength, defvalue);
-	else
-		Format(buffer, maxlength, "%T", phrase, client);
-}
-
-// 进行地图信息本地化(官方图为多语言)
 void OnPhrasesReady() {
-	g_bLocInit = false;
-	PrintToServer("[A2S_Edit] Localizer Init...");
+    g_bLocInit = false;
+    PrintToServer("[A2S_Edit] Localizer Init...");
 
-	#if BENCHMARK
-		g_profiler = new Profiler();
-		g_profiler.Start();
-	#endif
+    #if BENCHMARK
+        g_profiler = new Profiler();
+        g_profiler.Start();
+    #endif
 
-	esPhrase esp;
-	ArrayList al_missions = new ArrayList(sizeof esPhrase);
-	ArrayList al_chapters = new ArrayList(sizeof esPhrase);
+    esPhrase esp;
+    ArrayList al_missions = new ArrayList(sizeof esPhrase);
+    ArrayList al_chapters = new ArrayList(sizeof esPhrase);
 
-	int value;
-	char phrase[64];
-	char translation[64];
-	// 获取全部地图信息
-	SourceKeyValues kvModes;
-	SourceKeyValues kvChapters;
-	SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
-	// 循环读取map信息
-	for (kvMissions = kvMissions.GetFirstTrueSubKey(); !kvMissions.IsNull(); kvMissions = kvMissions.GetNextTrueSubKey()) {
-		// 获取地图的任务名称
-		kvMissions.GetName(phrase, sizeof(phrase));
+    int value;
+    char phrase[64];
+    char translation[64];
 
-		// 在不需要生成翻译的地图列表里的跳过
-		if (g_smExclude.GetValue(phrase, value))
-			continue;
+    SourceKeyValues kvModes;
+    SourceKeyValues kvChapters;
+    SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
+    for (kvMissions = kvMissions.GetFirstTrueSubKey(); !kvMissions.IsNull(); kvMissions = kvMissions.GetNextTrueSubKey()) {
+        kvMissions.GetName(phrase, sizeof(phrase));
+        if (g_smExclude.GetValue(phrase, value)) continue;
 
-		// 在当前模式下没地图的跳过
-		kvModes = kvMissions.FindKey("modes");
-		if (kvModes.IsNull())
-			continue;
+        kvModes = kvMissions.FindKey("modes");
+        if (kvModes.IsNull()) continue;
 
-		// 如果为官方地图DLC地图? (C1-C6都不存在此key,DLC1后的地图皆有)
-		value = kvMissions.GetInt("builtin");
-		// 任务名数组里找不到的话,则获取名字和信息推入数组
-		if (al_missions.FindString(phrase) == -1) {
-			kvMissions.GetString("DisplayTitle", translation, sizeof(translation), "N/A");
-			strcopy(esp.key, sizeof(esp.key), phrase);
-			strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
-			esp.official = value;
-			al_missions.PushArray(esp);
-		}
+        value = kvMissions.GetInt("builtin");
+        if (al_missions.FindString(phrase) == -1) {
+            kvMissions.GetString("DisplayTitle", translation, sizeof(translation), "N/A");
+            strcopy(esp.key, sizeof(esp.key), phrase);
+            strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
+            esp.official = value;
+            al_missions.PushArray(esp);
+        }
 
-		// 获取任务文件里的全部章节的地图信息(地图文件名/地图的名称)
-		for (kvModes = kvModes.GetFirstTrueSubKey(); !kvModes.IsNull(); kvModes = kvModes.GetNextTrueSubKey()) {
-			for (kvChapters = kvModes.GetFirstTrueSubKey(); !kvChapters.IsNull(); kvChapters = kvChapters.GetNextTrueSubKey()) {
-				// 获取地图章节文件名
-				kvChapters.GetString("Map", phrase, sizeof(phrase), "N/A");
-				if (!strcmp(phrase, "N/A") || FindCharInString(phrase, '/') != -1)
-					continue;
-				// 获取地图章节描述
-				if (al_chapters.FindString(phrase) == -1) {
-					kvChapters.GetString("DisplayName", translation, sizeof(translation), "N/A");
-					strcopy(esp.key, sizeof(esp.key), phrase);
-					strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
-					esp.official = value;
-					al_chapters.PushArray(esp);
-				}
-			}
-		}
-	}
+        for (kvModes = kvModes.GetFirstTrueSubKey(); !kvModes.IsNull(); kvModes = kvModes.GetNextTrueSubKey()) {
+            for (kvChapters = kvModes.GetFirstTrueSubKey(); !kvChapters.IsNull(); kvChapters = kvChapters.GetNextTrueSubKey()) {
+                kvChapters.GetString("Map", phrase, sizeof(phrase), "N/A");
+                if (!strcmp(phrase, "N/A") || FindCharInString(phrase, '/') != -1) continue;
 
-	char FilePath[PLATFORM_MAX_PATH];
-	// 写出任务信息到文件
-	BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
-	BuildPhraseFile(FilePath, al_missions, esp);
+                if (al_chapters.FindString(phrase) == -1) {
+                    kvChapters.GetString("DisplayName", translation, sizeof(translation), "N/A");
+                    strcopy(esp.key, sizeof(esp.key), phrase);
+                    strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
+                    esp.official = value;
+                    al_chapters.PushArray(esp);
+                }
+            }
+        }
+    }
 
-	// 写出章节信息到文件
-	BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
-	BuildPhraseFile(FilePath, al_chapters, esp);
+    char FilePath[PLATFORM_MAX_PATH];
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
+    BuildPhraseFile(FilePath, al_missions, esp);
 
-	loc.Close();
-	delete al_missions;
-	delete al_chapters;
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
+    BuildPhraseFile(FilePath, al_chapters, esp);
 
-	value = 0;
-	// 把翻译内容写出文本(写入到en里,由于服务器自身使用文本为SM的Core.cfg里控制,默认这里使用上方Cvar里定义的翻译覆盖en)
-	BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
-	if (FileExists(FilePath)) {
-		value = 1;
-		LoadTranslations("a2s_missions.phrases");
-	}
+    loc.Close();
+    delete al_missions;
+    delete al_chapters;
 
-	BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
-	if (FileExists(FilePath)) {
-		value = 1;
-		LoadTranslations("a2s_chapters.phrases");
-	}
-	// 读取完毕后重载翻译数据
-	if (value) {
-		InsertServerCommand("sm_reload_translations");
-		ServerExecute();
-	}
+    value = 0;
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
+    if (FileExists(FilePath)) { value = 1; LoadTranslations("a2s_missions.phrases"); }
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
+    if (FileExists(FilePath)) { value = 1; LoadTranslations("a2s_chapters.phrases"); }
+    if (value) { InsertServerCommand("sm_reload_translations"); ServerExecute(); }
 
-	#if BENCHMARK
-		g_profiler.Stop();
-		LogError("Export Phrases Time: %f", g_profiler.Time);
-	#endif
+    #if BENCHMARK
+        g_profiler.Stop();
+        LogError("Export Phrases Time: %f", g_profiler.Time);
+    #endif
 
-	g_bLocInit = true;
-	PrintToServer("[A2S_Edit] Localizer Init Complete...");
+    g_bLocInit = true;
+    PrintToServer("[A2S_Edit] Localizer Init Complete...");
+
+    // 排除不生成翻译的地图
+    g_smExclude = new StringMap();
+    g_smExclude.SetValue("credits", 1);
+    g_smExclude.SetValue("HoldoutChallenge", 1);
+    g_smExclude.SetValue("HoldoutTraining", 1);
+    g_smExclude.SetValue("parishdash", 1);
+    g_smExclude.SetValue("shootzones", 1);
 }
 
-// 根据地图信息生成翻译文件
+/* ---------- Phrase file helpers ---------- */
 void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp) {
-	int x;
-	File file;
-	KeyValues kv;
-	char buffer[64];
-	int len = array.Length;
+    int x;
+    File file;
+    KeyValues kv;
+    char buffer[64];
+    int len = array.Length;
 
-	// 生成kv文件且定义头
-	kv = new KeyValues("Phrases");
-	// 文件不存在
-	if (!FileExists(FilePath)) {
-		file = OpenFile(FilePath, "w");
-		// 无法打开文件
-		if (!file) {
-			LogError("Cannot open file: \"%s\"", FilePath);
-			return;
-		}
-		// 无法写入行
-		if (!file.WriteLine("")) {
-			LogError("Cannot write file line: \"%s\"", FilePath);
-			delete file;
-			return;
-		}
+    kv = new KeyValues("Phrases");
+    if (!FileExists(FilePath)) {
+        file = OpenFile(FilePath, "w");
+        if (!file) { LogError("Cannot open file: \"%s\"", FilePath); return; }
+        if (!file.WriteLine("")) { LogError("Cannot write file line: \"%s\"", FilePath); delete file; return; }
+        delete file;
 
-		delete file;
-
-		// 根据数组长度遍历
-		for (x = 0; x < len; x++) {
-			// 获取数组指定位置的内容
-			array.GetArray(x, esp);
-			// 移动到此名的节点上,不存在则新建
-			if (kv.JumpToKey(esp.key, true)) {
-				// 非官方图,直接写入文本
-				if (!esp.official)
-					kv.SetString("en", esp.val);
-				else {
-					// 获取本地化文本写入
-					loc.PhraseTranslateToLang(esp.val, buffer, sizeof(buffer), _, _, g_cLanguage, esp.val);
-					kv.SetString("en", buffer);
-				}
-				// 返回树顶部
-				kv.Rewind();
-				// 写入内容到文件
-				kv.ExportToFile(FilePath);
-			}
-		}
-	}
-	// 文件存在则加载原有文件
-	else if(kv.ImportFromFile(FilePath)) {
-		for (x = 0; x < len; x++) {
-			array.GetArray(x, esp);
-			// 移动到此名的节点上,不存在则新建
-			if (kv.JumpToKey(esp.key, true)) {
-				// 此节点上的en不存在
-				if (!kv.JumpToKey("en")) {
-					// 非官方图,直接写入文本
-					if (!esp.official)
-						kv.SetString("en", esp.val);
-					else {
-						// 获取本地化文本写入
-						loc.PhraseTranslateToLang(esp.val, buffer, sizeof(buffer), _, _, g_cLanguage, esp.val);
-						kv.SetString("en", buffer);
-					}
-					// 返回树顶部
-					kv.Rewind();
-					// 写入内容到文件
-					kv.ExportToFile(FilePath);
-				}
-			}
-			// 返回树顶部
-			kv.Rewind();
-		}
-	}
-	delete kv;
+        for (x = 0; x < len; x++) {
+            array.GetArray(x, esp);
+            if (kv.JumpToKey(esp.key, true)) {
+                if (!esp.official) kv.SetString("en", esp.val);
+                else {
+                    loc.PhraseTranslateToLang(esp.val, buffer, sizeof(buffer), _, _, g_cLanguage, esp.val);
+                    kv.SetString("en", buffer);
+                }
+                kv.Rewind();
+                kv.ExportToFile(FilePath);
+            }
+        }
+    }
+    else if(kv.ImportFromFile(FilePath)) {
+        for (x = 0; x < len; x++) {
+            array.GetArray(x, esp);
+            if (kv.JumpToKey(esp.key, true)) {
+                if (!kv.JumpToKey("en")) {
+                    if (!esp.official) kv.SetString("en", esp.val);
+                    else {
+                        loc.PhraseTranslateToLang(esp.val, buffer, sizeof(buffer), _, _, g_cLanguage, esp.val);
+                        kv.SetString("en", buffer);
+                    }
+                    kv.Rewind();
+                    kv.ExportToFile(FilePath);
+                }
+            }
+            kv.Rewind();
+        }
+    }
+    delete kv;
 }
 
-// 根据语言代码获取对应保存的位置
 void BuildPhrasePath(char[] buffer, int maxlength, const char[] fliename, const char[] lang_code) {
-	strcopy(buffer, maxlength, "translations/");
+    strcopy(buffer, maxlength, "translations/");
+    int len;
+    if (strcmp(lang_code, "en")) {
+        len = strlen(buffer);
+        FormatEx(buffer[len], maxlength - len, "%s/", lang_code);
+    }
+    len = strlen(buffer);
+    FormatEx(buffer[len], maxlength - len, "%s", fliename);
+    BuildPath(Path_SM, buffer, maxlength, "%s", buffer);
+}
 
-	int len;
-	if (strcmp(lang_code, "en")) {
-		len = strlen(buffer);
-		FormatEx(buffer[len], maxlength - len, "%s/", lang_code);
-	}
+/* =========================
+   动态描述实现（参考 hostname 逻辑）
+   ========================= */
 
-	len = strlen(buffer);
-	FormatEx(buffer[len], maxlength - len, "%s", fliename);
-	BuildPath(Path_SM, buffer, maxlength, "%s", buffer);
+// 是否有效客户端
+bool IsValidClientEx(int client)
+{
+    return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client));
+}
+
+// 是否计入在线人数（2/3 队真人）
+bool IsHumanPlayerOnTeam23(int client)
+{
+    return IsValidClientEx(client) && !IsFakeClient(client) && (GetClientTeam(client) == 2 || GetClientTeam(client) == 3);
+}
+
+// 是否“满员”
+// - IsAnne = true：仅比较 survivor_limit
+// - IsAnne = false：比较 survivor_limit + z_max_player_zombies
+// - 空房间（sum==0）视为“满”（和你示例一致，不显示[缺人]）
+bool IsTeamFull(bool IsAnne)
+{
+    int sum = 0;
+    for (int i = 1; i <= MaxClients; i++) {
+        if (IsHumanPlayerOnTeam23(i)) sum++;
+    }
+    if (sum == 0) return true;
+
+    int surv = g_hSurvivorLimit ? g_hSurvivorLimit.IntValue : 4;
+    int pz   = g_hMaxPZ ? g_hMaxPZ.IntValue : 4;
+
+    if (IsAnne) return sum >= surv;
+    return sum >= (surv + pz);
+}
+
+// 根据 l4d_ready_cfg_name 生成模式标签：
+// - AnneHappy + HardCore => [硬核药役]
+// - AnneHappy => [普通药役]
+// - AllCharger => [牛牛冲刺]
+// - 1vHunters => [HT训练]
+// - WitchParty => [女巫派对]
+// - Alone => [单人装逼]
+// - 其他 => 用原 cfg 名称括号包裹，如 [MyCfg]
+void BuildConfoglLabel(const char[] cfg, char[] out, int maxlen, bool &isAnne)
+{
+    isAnne = false;
+    if (StrContains(cfg, "AnneHappy", false) != -1) {
+        if (StrContains(cfg, "HardCore", false) != -1) {
+            strcopy(out, maxlen, "[硬核药役]");
+        } else {
+            strcopy(out, maxlen, "[普通药役]");
+        }
+        isAnne = true;
+        return;
+    }
+    if (StrContains(cfg, "AllCharger", false) != -1) {
+        strcopy(out, maxlen, "[牛牛冲刺]");
+        isAnne = true;
+        return;
+    }
+    if (StrContains(cfg, "1vHunters", false) != -1) {
+        strcopy(out, maxlen, "[HT训练]");
+        isAnne = true;
+        return;
+    }
+    if (StrContains(cfg, "WitchParty", false) != -1) {
+        strcopy(out, maxlen, "[女巫派对]");
+        isAnne = true;
+        return;
+    }
+    if (StrContains(cfg, "Alone", false) != -1) {
+        strcopy(out, maxlen, "[单人装逼]");
+        isAnne = true;
+        return;
+    }
+    // 兜底：显示原 cfg
+    FormatEx(out, maxlen, "[%s]", cfg);
+}
+
+// 计算 {AnneHappy} 片段：只有 isAnne==true 且存在 l4d_infected_limit 时输出 "[<特感数>特<复活秒>秒]"，否则空
+void BuildAnneHappyChunk(bool isAnne, char[] out, int maxlen)
+{
+    out[0] = '\0';
+    if (!isAnne) return;
+    if (!g_hInfectedLimit) return;
+
+    int si = g_hInfectedLimit.IntValue;
+    int sec = g_hVsSIRespawn ? g_hVsSIRespawn.IntValue : 0;
+    if (si <= 0) return;
+
+    if (sec > 0) FormatEx(out, maxlen, "[%d特%d秒]", si, sec);
+    else         FormatEx(out, maxlen, "[%d特]", si);
+}
+
+// 计算 {Full} 片段：满员则空，否则 "[缺人]"
+void BuildFullChunk(bool isAnne, char[] out, int maxlen)
+{
+    out[0] = '\0';
+    if (!IsTeamFull(isAnne)) {
+        strcopy(out, maxlen, "[缺人]");
+    }
+}
+
+// 计算 {MOD} 片段：l4d2_addons_eclipse==0 时显示 "[无MOD]"，否则空
+void BuildModChunk(char[] out, int maxlen)
+{
+    out[0] = '\0';
+    if (!g_hAddonsEclipse) return;
+    if (g_hAddonsEclipse.IntValue == 0) strcopy(out, maxlen, "[无MOD]");
+}
+
+// 获取 “cfg 名称”（优先 l4d_ready_cfg_name；无则用 mp_gamemode）
+void GetCfgName(char[] out, int maxlen)
+{
+    out[0] = '\0';
+    if (g_hReadyCfgName) {
+        g_hReadyCfgName.GetString(out, maxlen);
+        if (out[0] != '\0') return;
+    }
+    if (g_hMPGameMode) g_hMPGameMode.GetString(out, maxlen);
+}
+
+// 重建 g_cGameDes（按格式占位符）
+void RebuildGameDescription()
+{
+    if (!g_hDescDynamic || g_hDescDynamic.IntValue == 0) {
+        strcopy(g_cGameDes, sizeof(g_cGameDes), g_cGameDesBase);
+        return;
+    }
+
+    char fmt[192];
+    g_hDescFormat.GetString(fmt, sizeof(fmt));
+    if (!fmt[0]) { strcopy(fmt, sizeof(fmt), "{Base}{AnneHappy}{Full}{MOD}{Confogl}"); }
+
+    char cfg[128];
+    GetCfgName(cfg, sizeof(cfg));
+
+    char confogl[64], anne[64], full[16], mod[16];
+    bool isAnne = false;
+
+    BuildConfoglLabel(cfg, confogl, sizeof(confogl), isAnne);
+    BuildAnneHappyChunk(isAnne, anne, sizeof(anne));
+    BuildFullChunk(isAnne, full, sizeof(full));
+    BuildModChunk(mod, sizeof(mod));
+
+    char final[192];
+    strcopy(final, sizeof(final), fmt);
+
+    // 顺序替换（多次调用 ReplaceString）
+    ReplaceString(final, sizeof(final), "{Base}", g_cGameDesBase, false);
+    ReplaceString(final, sizeof(final), "{AnneHappy}", anne, false);
+    ReplaceString(final, sizeof(final), "{Full}", full, false);
+    ReplaceString(final, sizeof(final), "{MOD}", mod, false);
+    ReplaceString(final, sizeof(final), "{Confogl}", confogl, false);
+
+    // 落到 g_cGameDes
+    strcopy(g_cGameDes, sizeof(g_cGameDes), final);
+}
+
+// 触发 A2S 刷新（GameDescription/MapName 一起推送）
+void PushA2S()
+{
+    g_pSteam3Server = SDKCall(g_hSDK_GetSteam3Server);
+    if (g_pSteam3Server && LoadFromAddress(g_pSteam3Server + view_as<Address>(4), NumberType_Int32)) {
+        SDKCall(g_hSDK_SendServerInfo, g_pSteam3Server);
+    } else {
+        LogError("[A2S_Edit] Failed to get Steam3Server, PushA2S Failed!");
+    }
+}
+
+/* ---------- Utils ---------- */
+stock bool IsMapValidEx(const char[] map) {
+    if (!map[0]) return false;
+    char foundmap[1];
+    return FindMap(map, foundmap, sizeof foundmap) == FindMap_Found;
+}
+
+void fmt_Translate(const char[] phrase, char[] buffer, int maxlength, int client, const char[] defvalue="") {
+    if (!TranslationPhraseExists(phrase))
+        strcopy(buffer, maxlength, defvalue);
+    else
+        Format(buffer, maxlength, "%T", phrase, client);
+}
+
+/* ---------- Missions Cache & Gamedata ---------- */
+void CacheMissionInfo() {
+    g_bMissionCached = false;
+    PrintToServer("[A2S_Edit] MissionInfo Cacheing...");
+    g_smMissionMap.Clear();
+    char key[64], mission[64], map[128];
+    int i = 1;
+    bool have = true;
+
+    SourceKeyValues kvMissions = SDKCall(g_hSDK_GetAllMissions, g_pMatchExtL4D);
+    for (SourceKeyValues kvSub = kvMissions.GetFirstTrueSubKey(); !kvSub.IsNull(); kvSub = kvSub.GetNextTrueSubKey()) {
+        i = 1; have = true;
+        do {
+            FormatEx(key, sizeof(key), "modes/%s/%d/Map", g_cMode, i);
+            SourceKeyValues kvMap = kvSub.FindKey(key);
+            if (kvMap.IsNull()) {
+                have = false;
+            } else {
+                kvSub.GetName(mission, sizeof(mission));     // ex. L4D2C1
+                kvMap.GetString(NULL_STRING, map, sizeof(map)); // ex. c1m1_hotel
+                g_smMissionMap.SetString(map, mission);
+                #if DEBUG
+                    PrintToServer("[A2S_Edit] %s => %s", map, mission);
+                #endif
+                ++i;
+            }
+        } while (have);
+    }
+    PrintToServer("[A2S_Edit] MissionInfo Cached...");
+    g_bMissionCached = true;
+}
+
+void InitGameData() {
+    char sPath[PLATFORM_MAX_PATH];
+    Format(g_cMapName, sizeof(g_cMapName), "服务器初始化中");
+
+    BuildPath(Path_SM, sPath, sizeof(sPath), "gamedata/%s.txt", GAMEDATA);
+    if (!FileExists(sPath)) SetFailState("[A2S_EDIT] Missing required file: \"%s\" .", sPath);
+    GameData hGameData = new GameData(GAMEDATA);
+    if (!hGameData) SetFailState("[A2S_EDIT] Failed to load \"%s.txt\" gamedata.", GAMEDATA);
+
+    g_pDirector = hGameData.GetAddress("CDirector");
+    if (!g_pDirector) SetFailState("[A2S_EDIT] Failed to find address: \"CDirector\"");
+
+    g_pMatchExtL4D = hGameData.GetAddress("g_pMatchExtL4D");
+    if (!g_pMatchExtL4D) SetFailState("[A2S_EDIT] Failed to find address: \"g_pMatchExtL4D\"");
+
+    StartPrepSDKCall(SDKCall_Raw);
+    PrepSDKCall_SetVirtual(0);
+    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+    if (!(g_hSDK_GetAllMissions = EndPrepSDKCall()))
+        SetFailState("[A2S_EDIT] Failed to create SDKCall: \"MatchExtL4D::GetAllMissions\"");
+
+    StartPrepSDKCall(SDKCall_Static);
+    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "GetSteam3Server");
+    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+    if (!(g_hSDK_GetSteam3Server = EndPrepSDKCall()))
+        SetFailState("[A2S_EDIT] Failed to create SDKCall: \"GetSteamServer\"");
+
+    StartPrepSDKCall(SDKCall_Raw);
+    PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "SendUpdatedServerDetails");
+    if (!(g_hSDK_SendServerInfo = EndPrepSDKCall()))
+        SetFailState("[A2S_EDIT] Failed to create SDKCall: \"SendServerInfo\"");
+
+    // MapName patch
+    g_iMapNameOS = hGameData.GetOffset("OS") ? 4 : 1;
+    g_mMapNamePatch = MemoryPatch.CreateFromConf(hGameData, "RebuildInfo_MapName");
+    if (!g_mMapNamePatch.Validate())
+        SetFailState("[A2S_EDIT] Failed to verify patch: \"RebuildInfo_MapName\"");
+    else if (g_mMapNamePatch.Enable()) {
+        StoreToAddress(g_mMapNamePatch.Address + view_as<Address>(g_iMapNameOS), view_as<int>(GetAddressOfString(g_cMapName)), NumberType_Int32);
+        PrintToServer("[A2S_EDIT] Enabled patch: \"RebuildInfo_MapName\"");
+    }
+
+    // GameDescription patch -> 指向 g_cGameDes
+    g_iGameDesOS = hGameData.GetOffset("OS") ? 4 : 1;
+    g_mGameDesPatch = MemoryPatch.CreateFromConf(hGameData, "GameDescription");
+    if (!g_mGameDesPatch.Validate())
+        SetFailState("Failed to verify patch: \"GameDescription\"");
+    else if (g_mGameDesPatch.Enable()) {
+        StoreToAddress(g_mGameDesPatch.Address + view_as<Address>(g_iGameDesOS), view_as<int>(GetAddressOfString(g_cGameDes)), NumberType_Int32);
+        PrintToServer("[A2S_EDIT] Enabled patch: \"GameDescription\"");
+    }
+
+    delete hGameData;
+
+    // 不生成翻译的地图 ————（在 OnPhrasesReady 里也会再建一次，保底）
+    g_smExclude = new StringMap();
+    g_smExclude.SetValue("credits", 1);
+    g_smExclude.SetValue("HoldoutChallenge", 1);
+    g_smExclude.SetValue("HoldoutTraining", 1);
+    g_smExclude.SetValue("parishdash", 1);
+    g_smExclude.SetValue("shootzones", 1);
 }

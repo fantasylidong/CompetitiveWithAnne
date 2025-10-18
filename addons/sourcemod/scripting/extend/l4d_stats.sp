@@ -3646,7 +3646,7 @@ stock bool IsAllCharger(){
 	}
 }
 
-stock bool IsRealismCoop()
+stock bool IsMutationCoop()
 {
 	decl String:plugin_name[MAX_LINE_WIDTH];
 	if(cvar_mode == null && FindConVar("l4d_ready_cfg_name"))
@@ -3664,7 +3664,7 @@ stock bool IsRealismCoop()
 	}
 }
 
-stock bool IsRealismRealism()
+stock bool IsRealism()
 {
 	decl String:plugin_name[MAX_LINE_WIDTH];
 	if(cvar_mode == null && FindConVar("l4d_ready_cfg_name"))
@@ -10281,11 +10281,11 @@ GetGamemodeID(const String:Gamemode[])
 	{
 		return GAMEMODE_SCAVENGE;
 	}
-	else if (StrEqual(Gamemode, "realism", false) && IsRealismRealism())
+	else if (StrEqual(Gamemode, "realism", false))
 	{
 		return GAMEMODE_REALISM;
 	}
-	else if (StrEqual(Gamemode, "realism", false) && IsRealismCoop())
+	else if (StrEqual(Gamemode, "mutation4", false) && IsMutationCoop())
 	{
 		return GAMEMODE_COOP;
 	}

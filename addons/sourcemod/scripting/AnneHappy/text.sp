@@ -157,9 +157,6 @@ public void CvarWeapon(ConVar convar, const char[] oldValue, const char[] newVal
 	}
 }
 
-public void OnGameFrame(){
-	SteamWorks_SetGameDescription("AnneHappy药役");
-}
 
 void printinfo(int client = 0, bool All = true){
 	//FormatTime(sBuffer, sizeof(sBuffer), "%Y/%m/%d");
