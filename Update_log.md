@@ -327,3 +327,46 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 同步zonemod 2.8.1更新
 - Anne武器：喷子没改，机枪换弹时间设定同步zonemod
 - Anne地图：c7m1 改为固定克，第二节车厢门在第一节车厢门打开之后20秒自动打开
+
+### 2025-10月更新
+#### 其他
+- 同步上游全部更新
+- l4dtoolz更改为fdxx版本
+- 增加战役模式和写实模式，其中战役模式占用了写实模式（Anne.vpk更改了写实模式的base模式，从realism改为了coop,所以纯净写实模式实际为纯净战役模式），所以战役模式左上角会显示写实模式，在steam大厅里会显示AnneCoop，写实模式依旧用的写实模式，不过在coop基础上把写实的convar写到了shared_cvar.cfg文件中
+- 优化了shared_plugin.cfg里的部分插件增减，增加Coop枪械
+- 部分没有源码插件功能合并到server.smx插件里（黑白提醒）,join.smx(屏蔽SM平台提示),l4d_info_editor名称不对，应该为l4d2_melee_spawn_control
+- 更新sourcemod到1.12.7195版本
+- 还有很多细小更新已经不太记得了，有兴趣可以翻找commit log。
+
+#### 更换地图插件更改
+- 不再启用 l4d2_mapchoose.smx（切图）和l4d2_abbw_votemap.smx（换写死的三方）
+- 管理员菜单增加adminmenu_mission_list.smx，可以方便更换三方图。 thanks Hoongdou
+- 增加l4d2_nativevote.smx,l4d2_source_keyvalues.smx作为更换三方图的前置插件
+- l4d2_map_vote.smx为投票下一张三方图插件，map_changer.smx为切换地图插件，两者相辅相成
+
+#### Anne刷特插件infected_control.smx
+- 本次刷特插件改动特别大，基本已经抛弃了原Caibiii的找点框架，换成了fdxx的找点框架，并且在fdxx框架里尽可能恢复原Anne插件的功能，然后优化了fdxx的找点框架，大幅降低运行开销，增加了评分系统，分散度系统，高度，距离权重，后面会跟着一篇AI写的详细介绍。
+
+#### 战役刷特 l4d2_dirspawn.smx
+- 采用脚本刷特，可以更改特感数量和特感最低刷新时间，支持按照人数增减特感
+
+#### 黑名单插件 l4d2_blacklist.smx
+- 普通玩家有3个人的屏蔽名额
+- 管理员玩家有10个人的屏蔽名额
+- 屏蔽是双向的
+- 本次对局内新加的屏蔽人不会直接踢出，只有屏蔽人自己退出对局后再次加入才会设计屏蔽检查
+
+#### rpg插件 rpg.smx
+- 增加了很多插件的调度和个性化保存，包括伤害显示、命中反馈、枪械抖动设置
+
+#### 积分插件 l4dstat.smx
+- 修改了很多评分细则
+- 旁观和娱乐模式不增加在线时长(除了Anne和Anne硬核计入时长)
+- 娱乐模式分数平衡
+- 硬核模式暂时免疫团灭分
+
+#### ai_tank3.smx 
+- 同步树树子上游更新
+
+#### ai_smoker3.smx
+- 同步树树子上游更新

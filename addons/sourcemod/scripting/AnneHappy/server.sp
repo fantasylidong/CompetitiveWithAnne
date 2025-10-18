@@ -101,11 +101,11 @@ public void OnPluginStart()
         "当场上Tank>1时，是否自动踢至只剩1只 (0/1)", CVAR_FLAGS, true, 0.0, true, 1.0);
 
     // ---- 切图/通关重置开关 ----
-    g_cvResetOnTransition = CreateConVar("anne_reset_on_transition", "1",
+    g_cvResetOnTransition = CreateConVar("anne_reset_on_transition", "0",
         "通关/切图时是否执行 RestoreHealth + ResetInventory (0=否,1=是)", CVAR_FLAGS, true, 0.0, true, 1.0);
 
     // ---- 新增：最低50实血（只在未启用满血清背包时使用）----
-    g_cvHeal50OnTransition = CreateConVar("anne_heal50_on_transition", "1",
+    g_cvHeal50OnTransition = CreateConVar("anne_heal50_on_transition", "0",
         "通关/切图时，若生还者实血<50则补至50，并重置倒地次数；>=50不变。仅在 anne_reset_on_transition=0 时生效", 
         CVAR_FLAGS, true, 0.0, true, 1.0);
 
@@ -702,11 +702,28 @@ bool IsThirdStrike(int client)
 public Action OnNormalSound(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH],
                             int &entity, int &channel, float &volume, int &level, int &pitch, int &flags)
 {
-    return (StrContains(sample, "firewerks", true) > -1) ? Plugin_Stop : Plugin_Continue;
+    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
 }
 
 public Action OnAmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float &volume,
                              int &level, int &pitch, float pos[3], int &flags, float &delay)
 {
-    return (StrContains(sample, "firewerks", true) > -1) ? Plugin_Stop : Plugin_Continue;
+    return (StrContains(sample, "firewerks", true) > -1&& !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
+}
+ 
+stock bool IsRealismCoop()
+{
+	char plugin_name[120];
+	if(FindConVar("l4d_ready_cfg_name") == null)
+	{
+		return false;
+	}
+	GetConVarString(FindConVar("l4d_ready_cfg_name"), plugin_name, sizeof(plugin_name));
+	if(StrContains(plugin_name, "AnneCoop", false) != -1)
+	{
+		return true;
+	}else
+	{
+		return false;
+	}
 }
