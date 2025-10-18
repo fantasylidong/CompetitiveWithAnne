@@ -148,7 +148,7 @@ public void OnPluginStart() {
     InitGameData();
 
     // 创建Cvars
-    g_hMapNameType = CreateConVar("a2s_info_mapname_type", "4", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
+    g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
     g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi", "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)", CVAR_FLAGS);
     
     g_hMPGameMode = FindConVar("mp_gamemode");
@@ -188,7 +188,7 @@ public void OnPluginStart() {
     if (g_hSurvivorLimit) g_hSurvivorLimit.AddChangeHook(ConVarChanged_Cvars);
     if (g_hMaxPZ)         g_hMaxPZ.AddChangeHook(ConVarChanged_Cvars);
 
-    AutoExecConfig(true, "A2S_Edit");
+    //AutoExecConfig(true, "A2S_Edit");
 
     // 事件：只更新内部状态/地图名，不推送
     HookEvent("round_end",    Event_RoundEnd,   EventHookMode_PostNoCopy);
@@ -425,7 +425,7 @@ bool InitKvFile() {
         if (!file.WriteLine("")) { LogError("Cannot write file line: \"%s\"", kvPath); delete file; return false; }
         delete file;
 
-        kv.SetString("description", "欢迎使用A2S_EDIT");
+        kv.SetString("description", "Anne电信服");
         kv.SetString("inFinale", "救援正进行");
         kv.SetString("notInFinale", "救援未进行");
 
@@ -435,8 +435,8 @@ bool InitKvFile() {
         return false;
     }
 
-    kv.GetString("description", g_cGameDes,     sizeof(g_cGameDes),     "欢迎使用A2S_EDIT");
-    kv.GetString("description", g_cGameDesBase, sizeof(g_cGameDesBase), "欢迎使用A2S_EDIT");
+    kv.GetString("description", g_cGameDes,     sizeof(g_cGameDes),     "Anne电信服");
+    kv.GetString("description", g_cGameDesBase, sizeof(g_cGameDesBase), "Anne电信服");
     kv.GetString("inFinale",    g_cInFinale,    sizeof(g_cInFinale),    "救援正进行");
     kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
 
