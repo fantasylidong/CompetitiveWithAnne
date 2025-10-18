@@ -126,7 +126,7 @@ public void OnPluginStart() {
 	InitGameData();
 
 	// 创建Cvars
-	g_hMapNameType = CreateConVar("a2s_info_mapname_type", "4", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
+	g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
 	g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi", "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)", CVAR_FLAGS);
 	
 	g_hMPGameMode = FindConVar("mp_gamemode");
@@ -574,7 +574,7 @@ bool InitKvFile() {
 		delete file;
 
 		// 写出默认值内容
-		kv.SetString("description", "欢迎使用A2S_EDIT");
+		kv.SetString("description", "AnneHappy欢迎你");
 		kv.SetString("inFinale", "救援正进行");
 		kv.SetString("notInFinale", "救援未进行");
 
@@ -587,7 +587,7 @@ bool InitKvFile() {
 	}
 
 	// 获取Kv文本内信息写入变量中
-	kv.GetString("description", g_cGameDes, sizeof(g_cGameDes), "欢迎使用A2S_EDIT");
+	kv.GetString("description", g_cGameDes, sizeof(g_cGameDes), "AnneHappy欢迎你");
 	kv.GetString("inFinale", g_cInFinale, sizeof(g_cInFinale), "救援正进行");
 	kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
 

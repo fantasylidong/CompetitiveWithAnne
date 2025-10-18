@@ -150,26 +150,41 @@ public void DB_OnConnected(Handle owner, Handle hndl, const char[] error, any da
 
     g_hDb = hndl;
 
-    // 判断驱动
     char ident[32];
-    bool isMySQL = SQL_GetDriverIdent(g_hDb, ident, sizeof(ident)) && StrEqual(ident, "mysql", false);
+    // 关键：这里应该传 owner（DBDriver 句柄）
+    if (!SQL_GetDriverIdent(owner, ident, sizeof(ident)))
+    {
+        LogError("[BlockList] Failed to get driver ident");
+        return;
+    }
+
+    bool isMySQL = StrEqual(ident, "mysql", false);
 
     char sql[512];
     if (isMySQL)
     {
-        // MySQL: 主键列使用 VARCHAR，且推荐 utf8mb4 & InnoDB
         Format(sql, sizeof(sql),
-            "CREATE TABLE IF NOT EXISTS `%s` (  `blocker` VARCHAR(32) NOT NULL,  `blocked` VARCHAR(32) NOT NULL,  `created_at` INT NOT NULL,  PRIMARY KEY (`blocker`,`blocked`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",g_sTable);
+            "CREATE TABLE IF NOT EXISTS `%s` ( \
+              `blocker` VARCHAR(32) NOT NULL, \
+              `blocked` VARCHAR(32) NOT NULL, \
+              `created_at` INT NOT NULL, \
+              PRIMARY KEY (`blocker`,`blocked`) \
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;", g_sTable);
     }
     else
     {
-        // SQLite: TEXT + INTEGER 均可作为主键/索引
         Format(sql, sizeof(sql),
-            "CREATE TABLE IF NOT EXISTS `%s` (  `blocker` TEXT NOT NULL,  `blocked` TEXT NOT NULL,  `created_at` INTEGER NOT NULL,  PRIMARY KEY (`blocker`,`blocked`));",g_sTable);
+            "CREATE TABLE IF NOT EXISTS `%s` ( \
+              `blocker` TEXT NOT NULL, \
+              `blocked` TEXT NOT NULL, \
+              `created_at` INTEGER NOT NULL, \
+              PRIMARY KEY (`blocker`,`blocked`) \
+            );", g_sTable);
     }
 
     SQL_TQuery(g_hDb, DB_GenericCallback, sql);
 }
+
 
 public void DB_GenericCallback(Handle owner, Handle hndl, const char[] error, any data)
 {
