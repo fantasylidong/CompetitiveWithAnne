@@ -495,7 +495,8 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 public Action L4D_OnFirstSurvivorLeftSafeArea()
 {
     SetBot(0, 0);
-    CreateTimer(0.5, Timer_AutoGive, _, TIMER_FLAG_NO_MAPCHANGE);
+    if(!IsRealismCoop())
+        CreateTimer(0.5, Timer_AutoGive, _, TIMER_FLAG_NO_MAPCHANGE);
     return Plugin_Stop;
 }
 

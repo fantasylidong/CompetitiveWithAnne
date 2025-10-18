@@ -34,6 +34,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
+#include <colors>
 
 // 尝试包含 sourcescramble（未安装也可编译，但无法打补丁）
 #tryinclude <sourcescramble>
@@ -132,6 +133,7 @@ static const SIClass g_DefaultDistributeOrder[SI_Count] =
 // ---------------------------- State ------------------------------------
 Handle g_hApplyTimer = null;
 Handle g_hAutoTimer  = null;
+Handle g_hApplyLateTimer = null; // round_start 2秒后的兜底重写
 bool   g_bInternalSet = false;        // 我们自己改 cvar 时防抖
 bool   g_bAnnouncedThisRound = false; // 本回合是否已公告
 bool   g_bTriedUnlock = false;        // 避免多次尝试补丁
@@ -369,6 +371,25 @@ stock void ApplyByVScript(int total, int interval)
            gCvarInitialMin.IntValue, gCvarInitialMax.IntValue);
 }
 
+stock bool ShouldAnnounceApply(int total, int interval)
+{
+    static int s_lastTotal = -999;
+    static int s_lastIntv  = -999;
+    static float s_lastTime = 0.0;
+
+    float now = GetGameTime();
+
+    // 如果【总数】和【间隔】都没变，就不再播报
+    if (total == s_lastTotal && interval == s_lastIntv)
+        return false;
+
+    // 记录最新一次播报
+    s_lastTotal = total;
+    s_lastIntv  = interval;
+    s_lastTime  = now;
+    return true;
+}
+
 stock void ApplyDirectorSettings(bool announceToChat=false)
 {
     if (!gCvarEnable.BoolValue)
@@ -384,23 +405,23 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
 
     ApplyByVScript(total, interval);
 
-    if (announceToChat)
+    if (announceToChat && ShouldAnnounceApply(total, interval))
     {
-        char msg[256];
-        Format(msg, sizeof(msg),
-            "\x01[\x04DirSpawn\x01] \
-            \x04导演刷特\x01： \
-            \x04总数\x01=\x03%d\x01 ｜ \
-            \x04间隔\x01=\x03%d\x01秒 ｜ \
-            \x04坦克并存\x01=\x03%d\x01 ｜ \
-            \x04Relax\x01[\x03%d\x01..\x03%d\x01] ｜ \
-            \x04锁节奏\x01=\x03%d\x01 ｜ \
-            \x04首刷\x01[\x03%d\x01..\x03%d\x01]",
+        CPrintToChatAll(
+            "{default}[{green}DirSpawn{default}]  \
+            {green}导演刷特{default}：  \
+            {green}总数{default}={teamcolor}%d{default} ｜  \
+            {green}间隔{default}={teamcolor}%d{default}秒 ｜  \
+            {green}坦克并存{default}={teamcolor}%d{default} ｜  \
+            {green}Relax{default}[{teamcolor}%d{default}..{teamcolor}%d{default}] ｜  \
+            {green}锁节奏{default}={teamcolor}%d{default} ｜  \
+            {green}首刷{default}[{teamcolor}%d{default}..{teamcolor}%d{default}]",
             total, interval,
-            gCvarAllowSIWithTank.IntValue, gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue, gCvarLockTempo.IntValue,
+            gCvarAllowSIWithTank.IntValue,
+            gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue,
+            gCvarLockTempo.IntValue,
             gCvarInitialMin.IntValue, gCvarInitialMax.IntValue
         );
-        PrintToChatAll("%s", msg);
     }
 }
 
@@ -522,6 +543,13 @@ void AutoRecomputeAndApply(bool announce)
            humans, mode, newCnt, newIntv);
 }
 
+public Action TMR_ApplyLate(Handle timer, any data)
+{
+    g_hApplyLateTimer = null;
+    ApplyDirectorSettings(false); // 不刷屏
+    return Plugin_Stop;
+}
+
 public Action TMR_AutoOnce(Handle timer, any data)
 {
     g_hAutoTimer = null;
@@ -630,6 +658,13 @@ public Action EVT_RoundStart(Event event, const char[] name, bool dontBroadcast)
     }
     g_hApplyTimer = CreateTimer(delay, TMR_ApplyOnce, _, TIMER_FLAG_NO_MAPCHANGE);
     LogMsg("已计划在 %.1f 秒后应用（round_start）。", delay);
+    // 第二枪：固定在 round_start 后 2.0 秒再覆盖一次，防导演/其他脚本迟到改写
+    if (g_hApplyLateTimer != null)
+    {
+        KillTimer(g_hApplyLateTimer);
+        g_hApplyLateTimer = null;
+    }
+    g_hApplyLateTimer = CreateTimer(2.0, TMR_ApplyLate, _, TIMER_FLAG_NO_MAPCHANGE);
     return Plugin_Continue;
 }
 
@@ -708,19 +743,23 @@ void AnnounceNow()
     int total    = gCvarCount.IntValue;
     int interval = gCvarInterval.IntValue;
 
-    PrintToChatAll(
-    "\x01[\x04导演\x01] \
-    \x04难度：\x03%s\x01 ｜ \
-    \x03%d\x04特\x01 ｜ \
-    \x04目标间隔：\x03%d\x01秒",
-    diffcn, total, interval
-);
+    CPrintToChatAll(
+        "{default}[{green}导演{default}] \
+        {green}难度：{teamcolor}%s{default} ｜  \
+        {teamcolor}%d{green}特{default} ｜  \
+        {green}目标间隔：{teamcolor}%d{default}秒",
+        diffcn, total, interval
+    );
 }
 
 public Action EVT_PlayerLeftStart(Event event, const char[] name, bool dontBroadcast)
 {
     if (!g_bAnnouncedThisRound)
     {
+        // 兜底：开跑瞬间再覆盖一次，保证设置不被迟到逻辑改没了
+        ApplyDirectorSettings(false);
+
+        // 你的难度公告（已颜色化的那句留用即可）
         AnnounceNow();
         g_bAnnouncedThisRound = true;
     }
@@ -826,7 +865,7 @@ public void OnPluginStart()
     gCvarAutoMaxCount      = CreateConVar("dirspawn_auto_max_count", "30", "总特上限", FCVAR_NOTIFY, true, 0.0, true, 30.0);
     gCvarAutoMinInterval   = CreateConVar("dirspawn_auto_min_interval", "5",  "刷新间隔下限（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
     gCvarAutoMaxInterval   = CreateConVar("dirspawn_auto_max_interval", "60", "刷新间隔上限（秒）", FCVAR_NOTIFY, true, 0.0, true, 300.0);
-    gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "1", "自动伸缩时在聊天栏提示（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "0", "自动伸缩时在聊天栏提示（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // 钩子与命令
     HookConVarChange(gCvarCount,             CvarChanged);
