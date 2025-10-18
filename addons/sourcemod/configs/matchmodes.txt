@@ -27,6 +27,17 @@
 			"name" "硬核药役模式"
 		}
 	}
+	"Normal Configs"
+	{
+		"coop"
+		{
+			"name" "战役模式"
+		}
+		realism"
+		{
+			"name" "写实模式"
+		}
+	}
 	"ZoneMod Configs"
 	{
 		"zonemod"

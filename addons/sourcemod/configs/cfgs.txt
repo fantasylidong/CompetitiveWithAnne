@@ -48,6 +48,14 @@
 		{
 			"message" "硬核药役模式"
 		}
+		"sm_fm coop"
+		{
+			"message" "战役模式"
+		}
+		"sm_fm 写实模式"
+		{
+			"message" "写实模式"
+		}
 	}
 	"杂项"
 	{
