@@ -31,26 +31,54 @@
 			"message" "8人运动"
 		}
 	}
-	"复活/节奏预设（全集）"
+	"固定特感预设配置"
 	{
-		"exec sourcemod/dirspawn_presets/campaign_easy.cfg"      { "message" "🟢 普通战役 轻松（8特/35s）" }
-		"exec sourcemod/dirspawn_presets/campaign_standard.cfg"  { "message" "🟢 普通战役 标准（8特/30s）" }
-		"exec sourcemod/dirspawn_presets/campaign_dense.cfg"     { "message" "🟢 普通战役 稠密（10特/25s）" }
+		"exec sourcemod/dirspawn_presets/campaign_easy.cfg"      { "message" "普通战役 轻松（8特/35s）" }
+		"exec sourcemod/dirspawn_presets/campaign_standard.cfg"  { "message" "普通战役 标准（8特/30s）" }
+		"exec sourcemod/dirspawn_presets/campaign_dense.cfg"     { "message" "普通战役 稠密（10特/25s）" }
 
-		"exec sourcemod/dirspawn_presets/realism_stable.cfg"     { "message" "🔶 绝境 稳压（10特/20s）" }
-		"exec sourcemod/dirspawn_presets/realism_high.cfg"       { "message" "🔶 绝境 高压（12特/10s）" }
-		"exec sourcemod/dirspawn_presets/realism_brutal.cfg"     { "message" "🔶 绝境 凶猛（14特/8s）" }
+		"exec sourcemod/dirspawn_presets/realism_stable.cfg"     { "message" "绝境 稳压（10特/20s）" }
+		"exec sourcemod/dirspawn_presets/realism_high.cfg"       { "message" "绝境 高压（12特/10s）" }
+		"exec sourcemod/dirspawn_presets/realism_brutal.cfg"     { "message" "绝境 凶猛（14特/8s）" }
 
-		"exec sourcemod/dirspawn_presets/nonstop_20t0s.cfg"      { "message" "🔥 20特/0s 不停刷" }
-		"exec sourcemod/dirspawn_presets/nonstop_28t0s.cfg"      { "message" "🔥 28特/0s 不停刷（经典）" }
-		"exec sourcemod/dirspawn_presets/nonstop_30t0s.cfg"      { "message" "🔥 30特/0s 不停刷（极限）" }
+		"exec sourcemod/dirspawn_presets/nonstop_12t0s.cfg"      { "message" "12特/0s 不停刷" }
+		"exec sourcemod/dirspawn_presets/nonstop_20t0s.cfg"      { "message" "20特/0s 不停刷" }
+		"exec sourcemod/dirspawn_presets/nonstop_28t0s.cfg"      { "message" "28特/0s 不停刷（经典）" }
+		"exec sourcemod/dirspawn_presets/nonstop_30t0s.cfg"      { "message" "30特/0s 不停刷（极限）" }
 
-		"exec sourcemod/dirspawn_presets/harass_light.cfg"       { "message" "🌊 （12特/20s）" }
-		"exec sourcemod/dirspawn_presets/harass_mid.cfg"         { "message" "🌊 （14特/25s）" }
-		"exec sourcemod/dirspawn_presets/harass_wavey.cfg"       { "message" "🌊 （16特/30s）" }
+		"exec sourcemod/dirspawn_presets/harass_light.cfg"       { "message" "（12特/20s）" }
+		"exec sourcemod/dirspawn_presets/harass_mid.cfg"         { "message" "（14特/25s）" }
+		"exec sourcemod/dirspawn_presets/harass_wavey.cfg"       { "message" " （16特/30s）" }
 
-		"exec sourcemod/dirspawn_presets/native_campaign.cfg"    { "message" "🟢 原生战役" }
-		"exec sourcemod/dirspawn_presets/native_realism.cfg"     { "message" "🔶 原生绝境" }
+		"exec sourcemod/dirspawn_presets/native_campaign.cfg"    { "message" "原生战役" }
+		"exec sourcemod/dirspawn_presets/native_realism.cfg"     { "message" "原生绝境" }
+	}
+	"多人多特预设配置"
+	{
+		"exec sourcemod/dirspawn_presets/auto_off.cfg"
+		{
+			"message" "关闭多人多特"
+		}
+		"exec sourcemod/dirspawn_presets/auto_surv_gentle.cfg"
+		{
+			"message" "简单：基线4特，每+1生还：+1特"
+		}
+		"exec sourcemod/dirspawn_presets/auto_surv_standard.cfg"
+		{
+			"message" "普通：基线6特，每+1生还：+1特"
+		}
+		"exec sourcemod/dirspawn_presets/auto_surv_versus.cfg"
+		{
+			"message" "高级：基线8特，每+1生还：+1特"
+		}
+		"exec sourcemod/dirspawn_presets/auto_surv_aggressive.cfg"
+		{
+			"message" "专家：基线10特（4生还），每+1生还：+2特"
+		}
+		"exec sourcemod/dirspawn_presets/auto_surv_extreme.cfg"
+		{
+			"message" "极限：基线16特（4生还），每+1生还：+2特"
+		}
 	}
 
 	"特感数量"

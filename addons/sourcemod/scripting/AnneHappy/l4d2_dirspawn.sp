@@ -10,10 +10,10 @@
 // - 开局离开安全区时公告一次
 // - 清理死亡特感（除Spitter）
 //
-// Requirements:
+// 需求：
 //   - SourceMod 1.11+
-//   - Left4DHooks extension
-//   - (可选) sourcescramble extension（解锁COOP 3特上限）
+//   - Left4DHooks 扩展
+//   - （可选）sourcescramble 扩展（解锁 COOP 3 特上限）
 //   - gamedata/infected_control.txt（包含 "CDirector::GetMaxPlayerZombies"）
 //
 // Quickstart (server.cfg):
@@ -35,11 +35,11 @@
 #include <sdktools>
 #include <left4dhooks>
 
-// 尝试包含 sourcescramble（未安装也可编译，只是无法打补丁）
+// 尝试包含 sourcescramble（未安装也可编译，但无法打补丁）
 #tryinclude <sourcescramble>
 
 #define PLUGIN_NAME        "L4D2 Director SI Spawner (VScript-only) + MaxSpecial Unlock"
-#define PLUGIN_VERSION     "1.5.0"
+#define PLUGIN_VERSION     "1.5.1"
 #define PLUGIN_AUTHOR      "morzlee"
 #define PLUGIN_URL         "https://github.com/fantasylidong/CompetitiveWithAnne"
 
@@ -132,7 +132,7 @@ static const SIClass g_DefaultDistributeOrder[SI_Count] =
 // ---------------------------- State ------------------------------------
 Handle g_hApplyTimer = null;
 Handle g_hAutoTimer  = null;
-bool   g_bInternalSet = false;        // 我们自己改cvar时防抖
+bool   g_bInternalSet = false;        // 我们自己改 cvar 时防抖
 bool   g_bAnnouncedThisRound = false; // 本回合是否已公告
 bool   g_bTriedUnlock = false;        // 避免多次尝试补丁
 
@@ -145,7 +145,7 @@ public Plugin myinfo =
 {
     name = PLUGIN_NAME,
     author = PLUGIN_AUTHOR,
-    description = "Control SI with Anne-style caps + M4-fixes + Auto scaling + MaxSpecial unlock + Auto-tuned tempo",
+    description = "控制特感总数/间隔/每类上限（KV） + M4修复 + 人数自动伸缩 + MaxSpecial 解锁 + 间隔联动节奏",
     version = PLUGIN_VERSION,
     url = PLUGIN_URL
 };
@@ -185,7 +185,7 @@ stock void VS_EnsureBaseFlags()
     }
 }
 
-// 均衡分配（无KV时回退）
+// 均衡分配（无 KV 时回退）
 stock void ComputeBalancedSplit(int total, int outCaps[SI_Count])
 {
     for (int i = 0; i < kSIClassCount; i++)
@@ -216,7 +216,7 @@ stock bool LoadCapsFromKV(int total, int outCaps[SI_Count])
     KeyValues kv = new KeyValues("DirSpawnLimits");
     if (!kv.ImportFromFile(path))
     {
-        LogMsg("KV file not found: %s", path);
+        LogMsg("KV 文件未找到: %s", path);
         delete kv;
         return false;
     }
@@ -226,7 +226,7 @@ stock bool LoadCapsFromKV(int total, int outCaps[SI_Count])
 
     if (!kv.JumpToKey(key, false))
     {
-        LogMsg("KV: no section for %d", total);
+        LogMsg("KV: 未找到总数 %d 的条目", total);
         delete kv;
         return false;
     }
@@ -268,7 +268,7 @@ stock void ApplyInitialSpawnDelayByVScript()
     VS_RawSetInt("SpecialInitialSpawnDelayMax", imax);
 }
 
-// interval 自动推导 Relax/LockTempo/Initial
+// 从 dirspawn_interval 自动推导 Relax/Lock/Initial
 stock void AutoTuneTempoFromInterval(int interval)
 {
     if (!gCvarRelaxAuto.BoolValue && !gCvarInitAuto.BoolValue)
@@ -279,10 +279,10 @@ stock void AutoTuneTempoFromInterval(int interval)
     // ---- Relax + LockTempo ----
     if (gCvarRelaxAuto.BoolValue)
     {
-        float kmin = gCvarRelaxKMin.FloatValue;   // e.g. 0.25
-        float kmax = gCvarRelaxKMax.FloatValue;   // e.g. 0.90
-        int   lo   = gCvarRelaxFloor.IntValue;    // e.g. 0
-        int   hi   = gCvarRelaxCeil.IntValue;     // e.g. 120
+        float kmin = gCvarRelaxKMin.FloatValue;   // 例如 0.25
+        float kmax = gCvarRelaxKMax.FloatValue;   // 例如 0.90
+        int   lo   = gCvarRelaxFloor.IntValue;    // 例如 0
+        int   hi   = gCvarRelaxCeil.IntValue;     // 例如 120
 
         int rmin, rmax, lockt;
 
@@ -311,8 +311,8 @@ stock void AutoTuneTempoFromInterval(int interval)
     // ---- 首刷延迟 ----
     if (gCvarInitAuto.BoolValue && gCvarInitialMin != null && gCvarInitialMax != null)
     {
-        float ikmin = gCvarInitKMin.FloatValue;   // e.g. 0.0
-        float ikmax = gCvarInitKMax.FloatValue;   // e.g. 0.5
+        float ikmin = gCvarInitKMin.FloatValue;   // 例如 0.0
+        float ikmax = gCvarInitKMax.FloatValue;   // 例如 0.5
 
         int imin, imax;
         if (interval == 0)
@@ -335,7 +335,7 @@ stock void AutoTuneTempoFromInterval(int interval)
     }
 }
 
-// 主应用（仅VScript）
+// 主应用（仅 VScript）
 stock void ApplyByVScript(int total, int interval)
 {
     VS_EnsureBaseFlags();
@@ -359,7 +359,7 @@ stock void ApplyByVScript(int total, int interval)
     for (int i = 0; i < kSIClassCount; i++)
         VS_RawSetInt(g_SIKeys[i], caps[i]);
 
-    // M4修复 + 首刷
+    // M4 修复 + 首刷
     ApplyM4FixesByVScript();
     ApplyInitialSpawnDelayByVScript();
 
@@ -373,7 +373,7 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
 {
     if (!gCvarEnable.BoolValue)
     {
-        LogMsg("dirspawn_enable=0: skipped apply.");
+        LogMsg("dirspawn_enable=0: 跳过应用。");
         return;
     }
 
@@ -386,13 +386,21 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
 
     if (announceToChat)
     {
-        char msg[192];
+        char msg[256];
         Format(msg, sizeof(msg),
-            "导演刷特：总数=%d，间隔=%d 秒 | 坦克并存=%d Relax[%d..%d] 锁节奏=%d 首刷[%d..%d]",
+            "\x01[\x04DirSpawn\x01] \
+            \x04导演刷特\x01： \
+            \x04总数\x01=\x03%d\x01 ｜ \
+            \x04间隔\x01=\x03%d\x01秒 ｜ \
+            \x04坦克并存\x01=\x03%d\x01 ｜ \
+            \x04Relax\x01[\x03%d\x01..\x03%d\x01] ｜ \
+            \x04锁节奏\x01=\x03%d\x01 ｜ \
+            \x04首刷\x01[\x03%d\x01..\x03%d\x01]",
             total, interval,
             gCvarAllowSIWithTank.IntValue, gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue, gCvarLockTempo.IntValue,
-            gCvarInitialMin.IntValue, gCvarInitialMax.IntValue);
-        PrintToChatAll("[DirSpawn] %s", msg);
+            gCvarInitialMin.IntValue, gCvarInitialMax.IntValue
+        );
+        PrintToChatAll("%s", msg);
     }
 }
 
@@ -419,7 +427,7 @@ stock void ShutdownVScript()
         VS_RawDelete("cm_AggressiveSpecials");
         VS_RawDelete("SpecialInfectedAssault");
     }
-    LogMsg("VScript session options cleared.");
+    LogMsg("VScript 会话参数已清理。");
 }
 
 // ---------------------------- MaxSpecial Unlock ------------------------
@@ -450,12 +458,12 @@ static void MaybeApplyUnlock()
 
     if (!gCvarUnlockMaxSpecial.BoolValue)
     {
-        PrintToServer("[DirSpawn] MaxSpecial unlock is disabled (dirspawn_unlock_maxspecial=0).");
+        PrintToServer("[DirSpawn] MaxSpecial 解锁已关闭（dirspawn_unlock_maxspecial=0）。");
         return;
     }
 
     InitSDK_FromGamedata();
-    PrintToServer("[DirSpawn] MaxSpecial unlock applied (patched CDirector::GetMaxPlayerZombies).");
+    PrintToServer("[DirSpawn] 已应用 MaxSpecial 解锁（已补丁 CDirector::GetMaxPlayerZombies）。");
 }
 
 // ---------------------------- Auto scaling -----------------------------
@@ -469,7 +477,7 @@ int CountHumansByMode(int mode)
         int team = GetClientTeam(i);
         if (mode == 0) { if (team != 0) cnt++; }       // 全部真人（排除观察）
         else if (mode == 1) { if (team == 2) cnt++; }  // 仅生还
-        else { if (team == 2 || team == 3) cnt++; }    // 生还+感染
+        else { if (team == 2 || team == 3) cnt++; }    // 生还 + 感染
     }
     return cnt;
 }
@@ -523,7 +531,9 @@ public Action TMR_AutoOnce(Handle timer, any data)
 
 void ScheduleAuto(float delay=0.25)
 {
-    if (!gCvarAutoEnable.BoolValue) return;
+    // 防止在极早期/极晚期阶段 ConVar 尚未就绪
+    if (gCvarAutoEnable == null || !gCvarAutoEnable.BoolValue) return;
+
     if (g_hAutoTimer != null)
     {
         KillTimer(g_hAutoTimer);
@@ -572,7 +582,7 @@ public Action Cmd_GenKV(int client, int args)
         IntToString(total, sec, sizeof(sec));
         if (!kv.JumpToKey(sec, true))
         {
-            PrintToServer("[DirSpawn] KV JumpToKey failed for %d", total);
+            PrintToServer("[DirSpawn] KV JumpToKey 失败: %d", total);
             continue;
         }
         kv.SetNum("Smoker",  caps[SI_Smoker]);
@@ -588,13 +598,13 @@ public Action Cmd_GenKV(int client, int args)
     delete kv;
     if (ok)
     {
-        PrintToServer("[DirSpawn] Generated KV to: %s (range %d..%d)", path, min, max);
-        if (client > 0) PrintToChat(client, "[DirSpawn] KV generated: %s", path);
+        PrintToServer("[DirSpawn] 已生成 KV: %s (范围 %d..%d)", path, min, max);
+        if (client > 0) PrintToChat(client, "[DirSpawn] KV 已生成: %s", path);
     }
     else
     {
-        PrintToServer("[DirSpawn] Failed to write KV: %s", path);
-        if (client > 0) PrintToChat(client, "[DirSpawn] Failed to write KV: %s", path);
+        PrintToServer("[DirSpawn] 写入 KV 失败: %s", path);
+        if (client > 0) PrintToChat(client, "[DirSpawn] 写入 KV 失败: %s", path);
     }
     return Plugin_Handled;
 }
@@ -604,7 +614,8 @@ public Action EVT_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     g_bAnnouncedThisRound = false;
 
-    if (gCvarAutoEnable.BoolValue) ScheduleAuto(0.6);
+    if (gCvarAutoEnable != null && gCvarAutoEnable.BoolValue)
+        ScheduleAuto(0.6);
 
     if (!gCvarEnable.BoolValue || !gCvarApplyOnRoundStart.BoolValue)
         return Plugin_Continue;
@@ -618,7 +629,7 @@ public Action EVT_RoundStart(Event event, const char[] name, bool dontBroadcast)
         g_hApplyTimer = null;
     }
     g_hApplyTimer = CreateTimer(delay, TMR_ApplyOnce, _, TIMER_FLAG_NO_MAPCHANGE);
-    LogMsg("Scheduled apply in %.1f sec (round_start).", delay);
+    LogMsg("已计划在 %.1f 秒后应用（round_start）。", delay);
     return Plugin_Continue;
 }
 
@@ -634,7 +645,8 @@ public void OnConfigsExecuted()
     // 防止扩展晚于插件加载
     MaybeApplyUnlock();
 
-    if (gCvarAutoEnable.BoolValue) ScheduleAuto(1.0);
+    if (gCvarAutoEnable != null && gCvarAutoEnable.BoolValue)
+        ScheduleAuto(1.0);
 
     if (gCvarEnable != null && gCvarEnable.BoolValue && gCvarApplyOnRoundStart.BoolValue)
     {
@@ -645,7 +657,7 @@ public void OnConfigsExecuted()
             g_hApplyTimer = null;
         }
         g_hApplyTimer = CreateTimer(delay, TMR_ApplyOnce, _, TIMER_FLAG_NO_MAPCHANGE);
-        LogMsg("Scheduled apply in %.1f sec (OnConfigsExecuted).", delay);
+        LogMsg("已计划在 %.1f 秒后应用（OnConfigsExecuted）。", delay);
     }
 }
 
@@ -696,7 +708,13 @@ void AnnounceNow()
     int total    = gCvarCount.IntValue;
     int interval = gCvarInterval.IntValue;
 
-    PrintToChatAll("[导演] 难度：%s ｜ %d特 ｜ 目标间隔：%d秒", diffcn, total, interval);
+    PrintToChatAll(
+    "\x01[\x04导演\x01] \
+    \x04难度：\x03%s\x01 ｜ \
+    \x03%d\x04特\x01 ｜ \
+    \x04目标间隔：\x03%d\x01秒",
+    diffcn, total, interval
+);
 }
 
 public Action EVT_PlayerLeftStart(Event event, const char[] name, bool dontBroadcast)
@@ -709,14 +727,14 @@ public Action EVT_PlayerLeftStart(Event event, const char[] name, bool dontBroad
     return Plugin_Continue;
 }
 
-// ---------- Cull: kick dead SI bots except Spitter ----------
+// ---------- 清理：踢掉死亡的 SI bot（Spitter 例外） ----------
 public Action TMR_KickDeadSIBot(Handle timer, any userid)
 {
     int client = GetClientOfUserId(userid);
     if (client <= 0 || !IsClientInGame(client)) return Plugin_Stop;
 
     if (GetClientTeam(client) != 3) return Plugin_Stop;  // 仅感染者
-    if (!IsFakeClient(client)) return Plugin_Stop;       // 仅bot
+    if (!IsFakeClient(client)) return Plugin_Stop;       // 仅 bot
 
     int zc = L4D2_GetPlayerZombieClass(client);
     if (zc == ZC_SPITTER) return Plugin_Stop;            // Spitter 例外
@@ -738,7 +756,7 @@ public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValu
     if (!gCvarEnable.BoolValue) return;
     if (g_bInternalSet) return;
 
-    // interval 改变时先联动
+    // 间隔改变时先联动
     if (cvar == gCvarInterval)
     {
         AutoTuneTempoFromInterval(gCvarInterval.IntValue);
@@ -761,42 +779,56 @@ public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValu
 // ---------------------------- Lifecycle --------------------------------
 public void OnPluginStart()
 {
-    gCvarEnable            = CreateConVar("dirspawn_enable", "1", "Enable Director SI Spawner (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarCount             = CreateConVar("dirspawn_count", "4", "Total concurrent SI (cm_MaxSpecials)", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarInterval          = CreateConVar("dirspawn_interval", "35", "cm_SpecialRespawnInterval (seconds)", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarDomLimit          = CreateConVar("dirspawn_dominator_limit", "-1", "DominatorLimit (-1=auto=dirspawn_count)", FCVAR_NOTIFY, true, -1.0, true, 30.0);
-    gCvarApplyOnRoundStart = CreateConVar("dirspawn_apply_on_roundstart", "1", "Apply automatically at round_start", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "Delay (sec) before apply at round_start/OnConfigsExecuted", FCVAR_NOTIFY, true, 0.1, true, 10.0);
-    gCvarKvEnable          = CreateConVar("dirspawn_kv_enable", "1", "Use KV file to set per-class caps (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "KeyValues file path for per-class caps", FCVAR_NOTIFY);
-    gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "Verbose logs (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "Set ActiveChallenge/Aggressive/Assault flags (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarEnable            = CreateConVar("dirspawn_enable", "1", "启用导演特感生成（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarCount             = CreateConVar("dirspawn_count", "4", "并发特感总数（cm_MaxSpecials）", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarInterval          = CreateConVar("dirspawn_interval", "35", "特感刷新目标间隔（秒）（cm_SpecialRespawnInterval）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarDomLimit          = CreateConVar("dirspawn_dominator_limit", "-1", "压制者上限（-1=自动=跟随 dirspawn_count）", FCVAR_NOTIFY, true, -1.0, true, 30.0);
+    gCvarApplyOnRoundStart = CreateConVar("dirspawn_apply_on_roundstart", "1", "回合开始自动应用（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "回合开始/配置执行后延迟应用时间（秒）", FCVAR_NOTIFY, true, 0.1, true, 10.0);
+    gCvarKvEnable          = CreateConVar("dirspawn_kv_enable", "1", "启用 KV 文件设置每类特感上限（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "每类特感上限的 KeyValues 文件路径", FCVAR_NOTIFY);
+    gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "输出详细日志（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "设置 ActiveChallenge/Aggressive/Assault 标志（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // MaxSpecial 解锁开关
-    gCvarUnlockMaxSpecial  = CreateConVar("dirspawn_unlock_maxspecial", "1", "Unlock max SI cap by patching CDirector::GetMaxPlayerZombies (requires sourcescramble + gamedata)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarUnlockMaxSpecial  = CreateConVar("dirspawn_unlock_maxspecial", "1", "解锁 MaxSpecial（需要 sourcescramble + gamedata）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // better_mutations4
-    gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "ShouldAllowSpecialsWithTank (0=disallow SI when Tank alive)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxMin          = CreateConVar("dirspawn_relax_min", "15",  "RelaxMinInterval (seconds)", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarRelaxMax          = CreateConVar("dirspawn_relax_max", "35",  "RelaxMaxInterval (seconds)", FCVAR_NOTIFY, true, 0.0, true, 180.0);
-    gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "LockTempo (0=unlocked)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "坦克存活时仍允许刷特（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarRelaxMin          = CreateConVar("dirspawn_relax_min", "15",  "Relax 最小间隔（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarRelaxMax          = CreateConVar("dirspawn_relax_max", "35",  "Relax 最大间隔（秒）", FCVAR_NOTIFY, true, 0.0, true, 180.0);
+    gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "锁节奏（0=关闭，1=开启）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // 首刷延迟
-    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "0", "SpecialInitialSpawnDelayMin (seconds)", FCVAR_NOTIFY, true, 0.0, true, 60.0);
-    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "0", "SpecialInitialSpawnDelayMax (seconds)", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "0", "首刷延迟下限（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "0", "首刷延迟上限（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
 
     // interval 联动
-    gCvarRelaxAuto          = CreateConVar("dirspawn_relax_auto", "1", "Auto tune relax window from dirspawn_interval (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.25", "RelaxMin = kmin * interval", FCVAR_NOTIFY);
-    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "0.90", "RelaxMax = kmax * interval", FCVAR_NOTIFY);
-    gCvarRelaxFloor         = CreateConVar("dirspawn_relax_floor", "0", "Lower bound for RelaxMin (sec)", FCVAR_NOTIFY);
-    gCvarRelaxCeil          = CreateConVar("dirspawn_relax_ceil", "120", "Upper bound for RelaxMax (sec)", FCVAR_NOTIFY);
-    gCvarTempoLockThreshold = CreateConVar("dirspawn_lock_tempo_threshold", "6", "Lock tempo if interval <= threshold (sec)", FCVAR_NOTIFY);
+    gCvarRelaxAuto          = CreateConVar("dirspawn_relax_auto", "1", "根据 dirspawn_interval 自动计算 Relax/Lock（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.25", "RelaxMin = kmin × interval", FCVAR_NOTIFY);
+    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "0.90", "RelaxMax = kmax × interval", FCVAR_NOTIFY);
+    gCvarRelaxFloor         = CreateConVar("dirspawn_relax_floor", "0", "RelaxMin 下限（秒）", FCVAR_NOTIFY);
+    gCvarRelaxCeil          = CreateConVar("dirspawn_relax_ceil", "120", "RelaxMax 上限（秒）", FCVAR_NOTIFY);
+    gCvarTempoLockThreshold = CreateConVar("dirspawn_lock_tempo_threshold", "6", "当 interval ≤ 阈值时自动开启锁节奏（秒）", FCVAR_NOTIFY);
 
-    gCvarInitAuto           = CreateConVar("dirspawn_initial_auto", "1", "Auto tune SpecialInitialSpawnDelay from dirspawn_interval (0/1)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "0.00", "InitialDelayMin = ikmin * interval", FCVAR_NOTIFY);
-    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "0.50", "InitialDelayMax = ikmax * interval", FCVAR_NOTIFY);
+    gCvarInitAuto           = CreateConVar("dirspawn_initial_auto", "1", "根据 dirspawn_interval 自动计算首刷延迟（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "0.00", "InitialDelayMin = ikmin × interval", FCVAR_NOTIFY);
+    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "0.50", "InitialDelayMax = ikmax × interval", FCVAR_NOTIFY);
 
+    // ---------------- 自动伸缩（按真人数量） ----------------
+    gCvarAutoEnable        = CreateConVar("dirspawn_auto_enable", "0", "按真人数量自动伸缩（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarAutoCountMode     = CreateConVar("dirspawn_auto_count_mode", "0", "统计模式：0=全部真人（含感染、排除观察），1=仅生还，2=生还+感染", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    gCvarAutoBaseCount     = CreateConVar("dirspawn_auto_base_count", "6",  "基线总特数（以4名真人为基准）", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarAutoPerAdd        = CreateConVar("dirspawn_auto_per_player_add", "1", "每多1名真人，额外 +特数", FCVAR_NOTIFY, true, 0.0, true, 6.0);
+    gCvarAutoBaseInterval  = CreateConVar("dirspawn_auto_base_interval", "25", "基线刷新间隔（秒，4名真人时）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarAutoPerDecay      = CreateConVar("dirspawn_auto_per_player_decay", "2", "每多1名真人，间隔 -秒数", FCVAR_NOTIFY, true, 0.0, true, 10.0);
+    gCvarAutoMinCount      = CreateConVar("dirspawn_auto_min_count", "1",  "总特下限", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarAutoMaxCount      = CreateConVar("dirspawn_auto_max_count", "30", "总特上限", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarAutoMinInterval   = CreateConVar("dirspawn_auto_min_interval", "5",  "刷新间隔下限（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarAutoMaxInterval   = CreateConVar("dirspawn_auto_max_interval", "60", "刷新间隔上限（秒）", FCVAR_NOTIFY, true, 0.0, true, 300.0);
+    gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "1", "自动伸缩时在聊天栏提示（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+    // 钩子与命令
     HookConVarChange(gCvarCount,             CvarChanged);
     HookConVarChange(gCvarInterval,          CvarChanged);
     HookConVarChange(gCvarDomLimit,          CvarChanged);
@@ -809,14 +841,14 @@ public void OnPluginStart()
     HookConVarChange(gCvarInitialMin,        CvarChanged);
     HookConVarChange(gCvarInitialMax,        CvarChanged);
 
-    RegAdminCmd("sm_dirspawn_apply",  Cmd_Apply, ADMFLAG_GENERIC, "sm_dirspawn_apply [count] [interval] - apply settings now");
-    RegAdminCmd("sm_dirspawn_genkv",  Cmd_GenKV, ADMFLAG_ROOT,    "sm_dirspawn_genkv [min] [max] - generate KV (balanced) to dirspawn_kv_path");
+    RegAdminCmd("sm_dirspawn_apply",  Cmd_Apply, ADMFLAG_GENERIC, "sm_dirspawn_apply [总特] [间隔] —— 立即按传入参数应用一次");
+    RegAdminCmd("sm_dirspawn_genkv",  Cmd_GenKV, ADMFLAG_ROOT,    "sm_dirspawn_genkv [最小] [最大] —— 生成每类上限 KV 到 dirspawn_kv_path");
 
     HookEvent("round_start",             EVT_RoundStart,       EventHookMode_PostNoCopy);
     HookEvent("player_left_start_area",  EVT_PlayerLeftStart,  EventHookMode_PostNoCopy);
     HookEvent("player_death",            EVT_PlayerDeath,      EventHookMode_Post);
 
-    LogMsg("%s v%s loaded.", PLUGIN_NAME, PLUGIN_VERSION);
+    LogMsg("%s v%s 已加载。", PLUGIN_NAME, PLUGIN_VERSION);
 }
 
 public void OnPluginEnd()
