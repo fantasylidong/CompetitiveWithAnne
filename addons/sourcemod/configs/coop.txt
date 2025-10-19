@@ -313,6 +313,14 @@
 		{
 			"message" "关闭Tank大致血量显示"
 		}
+		"exec vote/aidamageon.cfg"
+		{
+			"message" "关闭牛冲锋减伤"
+		}
+		"exec vote/aidamageoff.cfg"
+		{
+			"message" "开启牛冲锋减伤"
+		}
 	}
 	"mixmap插件开关"
 	{
