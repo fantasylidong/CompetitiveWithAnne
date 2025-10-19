@@ -215,7 +215,7 @@ public void UpdateServerName()
         } else if (cvarMpGameMin != null) {
             siInterval = GetConVarInt(cvarMpGameMin);
         }
-    } else if (isAnneHappy) {
+    } else if (IsAnne) {
         if (cvarSI != null) {
             siCount = GetConVarInt(cvarSI);
         }
