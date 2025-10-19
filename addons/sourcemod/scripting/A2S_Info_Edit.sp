@@ -1,5 +1,6 @@
-#pragma semicolon 1 
+#pragma semicolon 1
 #pragma newdecls required
+
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>               // https://forums.alliedmods.net/showthread.php?t=321696
@@ -17,9 +18,9 @@
 #define GAMEDATA                "A2S_Info_Edit"
 
 #define PLUGIN_NAME             "A2S_INFO Edit | A2S_INFO 信息修改"
-#define PLUGIN_AUTHOR           "yuzumi"
-#define PLUGIN_VERSION          "1.1.3"
-#define PLUGIN_DESCRIPTION      "DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息"
+#define PLUGIN_AUTHOR           "yuzumi + patch by morzlee"
+#define PLUGIN_VERSION          "1.1.3-fixed"
+#define PLUGIN_DESCRIPTION      "DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息（修复翻译生成时机 & 覆盖策略 & 加载路径）"
 #define PLUGIN_URL              "https://github.com/joyrhyme/L4D2-Plugins/tree/main/A2S_Info_Edit"
 #define CVAR_FLAGS              FCVAR_NOTIFY
 
@@ -30,12 +31,14 @@
     Profiler g_profiler;
 #endif
 
+// 把翻译文件统一写在 translations 根目录，避免 LoadTranslations 找不到
 #define TRANSLATION_MISSIONS    "a2s_missions.phrases.txt"
 #define TRANSLATION_CHAPTERS    "a2s_chapters.phrases.txt"
 #define A2S_SETTING             "a2s_info_edit.cfg"
 
 // 预声明
 void CacheMissionInfo();
+void BuildAllPhrases();
 
 // 游戏本地化文本
 Localizer loc;
@@ -63,7 +66,8 @@ bool
     g_bIsFinalMap,
     g_bMissionCached,
     g_bFinaleStarted,
-    g_bisAllBotGame;
+    g_bisAllBotGame,
+    g_bPhrasesGenerated;   // 新增：翻译是否已成功生成
 
 // ConVars
 ConVar
@@ -116,11 +120,11 @@ StringMap
     g_smExclude,
     g_smMissionMap;
 
-enum struct esPhrase 
-{ 
-	char key[64]; 
-	char val[64]; 
-	int official; 
+enum struct esPhrase
+{
+    char key[64];
+    char val[64];
+    int official;
 }
 
 public Plugin myinfo = {
@@ -150,7 +154,7 @@ public void OnPluginStart() {
     // 创建Cvars
     g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
     g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi", "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)", CVAR_FLAGS);
-    
+
     g_hMPGameMode = FindConVar("mp_gamemode");
     g_hAllBotGame = FindConVar("sb_all_bot_game");
     if (g_hAllBotGame.IntValue == 1) g_bisAllBotGame = true; else g_hAllBotGame.IntValue = 1;
@@ -173,7 +177,7 @@ public void OnPluginStart() {
     GetCvars_Mode();
     GetCvars_Lang();
     GetCvars();
-    
+
     g_hMapNameLang.AddChangeHook(ConVarChanged_Lang);
     g_hMPGameMode.AddChangeHook(ConVarChanged_Mode);
     g_hMapNameType.AddChangeHook(ConVarChanged_Cvars);
@@ -188,25 +192,25 @@ public void OnPluginStart() {
     if (g_hSurvivorLimit) g_hSurvivorLimit.AddChangeHook(ConVarChanged_Cvars);
     if (g_hMaxPZ)         g_hMaxPZ.AddChangeHook(ConVarChanged_Cvars);
 
-    //AutoExecConfig(true, "A2S_Edit");
-
     // 事件：只更新内部状态/地图名，不推送
     HookEvent("round_end",    Event_RoundEnd,   EventHookMode_PostNoCopy);
     HookEvent("finale_start", Event_FinaleStart,EventHookMode_PostNoCopy);
-    #if DEBUG
-        HookEvent("finale_radio_start",        Event_finale_radio,      EventHookMode_PostNoCopy);
-        HookEvent("gauntlet_finale_start",     Event_gauntlet_finale,   EventHookMode_PostNoCopy);
-        HookEvent("explain_stage_finale_start",Event_explain_stage_finale, EventHookMode_PostNoCopy);
-    #else
-        HookEvent("finale_radio_start",        Event_FinaleStart,       EventHookMode_PostNoCopy);
-        HookEvent("gauntlet_finale_start",     Event_FinaleStart,       EventHookMode_PostNoCopy);
-    #endif
+#if DEBUG
+    HookEvent("finale_radio_start",        Event_finale_radio,      EventHookMode_PostNoCopy);
+    HookEvent("gauntlet_finale_start",     Event_gauntlet_finale,   EventHookMode_PostNoCopy);
+    HookEvent("explain_stage_finale_start",Event_explain_stage_finale, EventHookMode_PostNoCopy);
+#else
+    HookEvent("finale_radio_start",        Event_FinaleStart,       EventHookMode_PostNoCopy);
+    HookEvent("gauntlet_finale_start",     Event_FinaleStart,       EventHookMode_PostNoCopy);
+#endif
 
     // 命令
     RegAdminCmd("sm_a2s_edit_reload", cmdReload, ADMFLAG_ROOT, "Reload A2S_EDIT Setting");
+    RegAdminCmd("sm_a2s_edit_regen",  cmdRegen,  ADMFLAG_ROOT, "Re-generate A2S mission/chapter phrases when ready");
 
     // 本地化
     loc = new Localizer();
+    // 注意：不在回调里直接写翻译文件，只标记已就绪，然后启动探针定时器
     loc.Delegate_InitCompleted(OnPhrasesReady);
 }
 
@@ -244,6 +248,10 @@ public void OnConfigsExecuted() {
     GetCvars_Mode();
     if(!g_bMissionCached) CacheMissionInfo();
     ChangeMapName(); // 配置执行后重算一次
+
+    // cfg（如 sv_language）生效后，再尝试生成翻译
+    if (!g_bPhrasesGenerated)
+        CreateTimer(1.0, tTryBuildPhrases, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 // 重载配置
@@ -257,6 +265,22 @@ Action cmdReload(int client, int args) {
     return Plugin_Handled;
 }
 
+// 强制再生翻译：删除旧文件，等待就绪后重建
+Action cmdRegen(int client, int args)
+{
+    char p1[PLATFORM_MAX_PATH], p2[PLATFORM_MAX_PATH];
+    BuildPhrasePath(p1, sizeof(p1), TRANSLATION_MISSIONS);
+    BuildPhrasePath(p2, sizeof(p2), TRANSLATION_CHAPTERS);
+    if (FileExists(p1)) DeleteFile(p1);
+    if (FileExists(p2)) DeleteFile(p2);
+
+    g_bPhrasesGenerated = false;
+    CreateTimer(0.5, tTryBuildPhrases, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+
+    ReplyToCommand(client, "[A2S_Edit] Phrases will be regenerated when localizer is ready.");
+    return Plugin_Handled;
+}
+
 // 地图开始
 public void OnMapStart() {
     ChangeMapName(); // 开图先算一次（可能是英文兜底）
@@ -265,6 +289,10 @@ public void OnMapStart() {
     } else {
         OnMapStartedPost();
     }
+
+    // 地图加载后再试一轮（资源更可能就绪）
+    if (!g_bPhrasesGenerated)
+        CreateTimer(1.0, tTryBuildPhrases, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 // 地图结束
@@ -357,7 +385,7 @@ void InitGameData() {
     if (!FileExists(sPath)) SetFailState("[A2S_EDIT] Missing required file: \"%s\" .", sPath);
     GameData hGameData = new GameData(GAMEDATA);
     if (!hGameData) SetFailState("[A2S_EDIT] Failed to load \"%s.txt\" gamedata.", GAMEDATA);
-    
+
     // SDKCall
     g_pDirector = hGameData.GetAddress("CDirector");
     if (!g_pDirector) SetFailState("[A2S_EDIT] Failed to find address: \"CDirector\"");
@@ -459,15 +487,54 @@ void fmt_Translate(const char[] phrase, char[] buffer, int maxlength, int client
         Format(buffer, maxlength, "%T", phrase, client);
 }
 
-// 本地化完成 → 写短语文件、加载、重算名字
+// ====================== 翻译生成：新逻辑 ==========================
+
+// Localizer 初始化完成
 void OnPhrasesReady() {
-    g_bLocInit = false;
+    g_bLocInit = true;
     PrintToServer("[A2S_Edit] Localizer Init...");
 
-    #if BENCHMARK
-        g_profiler = new Profiler();
-        g_profiler.Start();
-    #endif
+    // 不在这里直接生成翻译，启动探针定时器，等能把 token 解成可读文本
+    if (!g_bPhrasesGenerated)
+        CreateTimer(1.0, tTryBuildPhrases, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+}
+
+// 探针：能把一个已知 token 翻译出非 '#' 才认为就绪
+bool LocalizeReadyFor(char[] token, char[] lang)
+{
+    char buf[128];
+    loc.PhraseTranslateToLang(token, buf, sizeof(buf), _, _, lang, "");
+    return (buf[0] != '\0' && buf[0] != '#');
+}
+
+Action tTryBuildPhrases(Handle timer)
+{
+    // 没有 Localizer 或没有 Mission 列表就暂时不做
+    if (!g_bLocInit || !g_bMissionCached)
+        return Plugin_Continue;
+
+    bool enOK = LocalizeReadyFor("#L4D360UI_CampaignName_C1", "en");
+    bool tgOK = StrEqual(g_cLanguage, "en") ? true : LocalizeReadyFor("#L4D360UI_CampaignName_C1", g_cLanguage);
+
+    if (enOK && tgOK && !g_bPhrasesGenerated)
+    {
+        BuildAllPhrases();
+        g_bPhrasesGenerated = true;
+        ChangeMapName(); // 切换到本地化后的名称
+        PrintToServer("[A2S_Edit] Phrases generated and loaded.");
+        return Plugin_Stop;
+    }
+
+    return Plugin_Continue;
+}
+
+// 统一构建两类翻译并加载
+public void BuildAllPhrases()
+{
+#if BENCHMARK
+    g_profiler = new Profiler();
+    g_profiler.Start();
+#endif
 
     esPhrase esp;
     ArrayList al_missions = new ArrayList(sizeof esPhrase);
@@ -491,7 +558,7 @@ void OnPhrasesReady() {
         if (al_missions.FindString(phrase) == -1) {
             kvMissions.GetString("DisplayTitle", translation, sizeof(translation), "N/A");
             strcopy(esp.key, sizeof(esp.key), phrase);
-            strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
+            strcopy(esp.val, sizeof(esp.val), !StrEqual(translation, "N/A") ? translation : phrase);
             esp.official = value;
             al_missions.PushArray(esp);
         }
@@ -499,50 +566,40 @@ void OnPhrasesReady() {
         for (kvModes = kvModes.GetFirstTrueSubKey(); !kvModes.IsNull(); kvModes = kvModes.GetNextTrueSubKey()) {
             for (kvChapters = kvModes.GetFirstTrueSubKey(); !kvChapters.IsNull(); kvChapters = kvChapters.GetNextTrueSubKey()) {
                 kvChapters.GetString("Map", phrase, sizeof(phrase), "N/A");
-                if (!strcmp(phrase, "N/A") || FindCharInString(phrase, '/') != -1) continue;
-                if (al_chapters.FindString(phrase) == -1) {
-                    kvChapters.GetString("DisplayName", translation, sizeof(translation), "N/A");
-                    strcopy(esp.key, sizeof(esp.key), phrase);
-                    strcopy(esp.val, sizeof(esp.val), !strcmp(translation, "N/A") ? phrase : translation);
-                    esp.official = value;
-                    al_chapters.PushArray(esp);
+                if (!StrEqual(phrase, "N/A") && FindCharInString(phrase, '/') == -1) {
+                    if (al_chapters.FindString(phrase) == -1) {
+                        kvChapters.GetString("DisplayName", translation, sizeof(translation), "N/A");
+                        strcopy(esp.key, sizeof(esp.key), phrase);
+                        strcopy(esp.val, sizeof(esp.val), !StrEqual(translation, "N/A") ? translation : phrase);
+                        esp.official = value;
+                        al_chapters.PushArray(esp);
+                    }
                 }
             }
         }
     }
 
     char FilePath[PLATFORM_MAX_PATH];
-    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS);
     BuildPhraseFile(FilePath, al_missions, esp);
 
-    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
+    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS);
     BuildPhraseFile(FilePath, al_chapters, esp);
 
-    loc.Close();
     delete al_missions;
     delete al_chapters;
 
-    value = 0;
-    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
-    if (FileExists(FilePath)) { value = 1; LoadTranslations("a2s_missions.phrases"); }
-    BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_CHAPTERS, "en");
-    if (FileExists(FilePath)) { value = 1; LoadTranslations("a2s_chapters.phrases"); }
-    if (value) { InsertServerCommand("sm_reload_translations"); ServerExecute(); }
+    // 明确加载（根目录）
+    LoadTranslations("a2s_missions.phrases");
+    LoadTranslations("a2s_chapters.phrases");
 
-    #if BENCHMARK
-        g_profiler.Stop();
-        LogError("Export Phrases Time: %f", g_profiler.Time);
-    #endif
-
-    g_bLocInit = true;
-
-    // 本地化就绪后立刻重算一次（从英文兜底切到中文）
-    ChangeMapName();
-
-    PrintToServer("[A2S_Edit] Localizer Init Complete...");
+#if BENCHMARK
+    g_profiler.Stop();
+    LogError("Export Phrases Time: %f", g_profiler.Time);
+#endif
 }
 
-// 根据地图信息生成翻译文件（修正版：在各自区块下写 en 与 g_cLanguage）
+// 根据地图信息生成翻译文件（修正版：在各自区块下写 en 与 g_cLanguage；遇到 '#' 或空值会覆盖）
 void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp)
 {
     KeyValues kv = new KeyValues("Phrases");
@@ -561,7 +618,7 @@ void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp)
         delete f;
     }
 
-    char enbuf[64], langbuf[64], tmp[2];
+    char enbuf[64], langbuf[64], tmp[128];
     int len = array.Length;
 
     for (int i = 0; i < len; i++) {
@@ -574,15 +631,15 @@ void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp)
         if (esp.official) {
             // 官方图：从 Localizer 拿英文与目标语言
             loc.PhraseTranslateToLang(esp.val, enbuf,  sizeof(enbuf),  _, _, "en", esp.val);
-            if (strcmp(g_cLanguage, "en") != 0) {
+            if (!StrEqual(g_cLanguage, "en")) {
+                // 默认值给 enbuf，避免完全空
                 loc.PhraseTranslateToLang(esp.val, langbuf, sizeof(langbuf), _, _, g_cLanguage, enbuf);
             }
         } else {
             // 第三方图：用原值当英文
             strcopy(enbuf, sizeof(enbuf), esp.val);
-
-            // 想要没有中文资源时也写同样文本到 chi，可打开下面这行
-            // if (strcmp(g_cLanguage, "en") != 0) strcopy(langbuf, sizeof(langbuf), esp.val);
+            // 如果需要也可把第三方图的中文先写同原值（可选）
+            // if (!StrEqual(g_cLanguage, "en")) strcopy(langbuf, sizeof(langbuf), esp.val);
         }
 
         // 进入该地图/任务的块
@@ -591,21 +648,25 @@ void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp)
             continue;
         }
 
-        // 写 en（若已经存在，则保留用户手改的值）
+        // 写 en（当为空 / 为 '#' / 为 "N/A" 时覆盖）
         kv.GetString("en", tmp, sizeof(tmp), "");
-        if (!tmp[0]) {
-            kv.SetString("en", enbuf[0] ? enbuf : esp.val);
-        }
-
-        // 写指定语言（例如 chi），同样只在不存在时写入
-        if (strcmp(g_cLanguage, "en") != 0 && langbuf[0]) {
-            kv.GetString(g_cLanguage, tmp, sizeof(tmp), "");
-            if (!tmp[0]) {
-                kv.SetString(g_cLanguage, langbuf);
+        if (!tmp[0] || tmp[0] == '#' || StrEqual(tmp, "N/A", false)) {
+            if (enbuf[0] && enbuf[0] != '#') {
+                kv.SetString("en", enbuf);
             }
         }
 
-        // 退回到根（不是退回到父层级后继续下潜，避免把语言键写到顶层）
+        // 写指定语言（例如 chi），同样只在不存在或无效时写入
+        if (!StrEqual(g_cLanguage, "en")) {
+            kv.GetString(g_cLanguage, tmp, sizeof(tmp), "");
+            if (!tmp[0] || tmp[0] == '#' || StrEqual(tmp, "N/A", false)) {
+                if (langbuf[0] && langbuf[0] != '#') {
+                    kv.SetString(g_cLanguage, langbuf);
+                }
+            }
+        }
+
+        // 退回到根
         kv.Rewind();
     }
 
@@ -614,14 +675,9 @@ void BuildPhraseFile(char[] FilePath, ArrayList array, esPhrase esp)
     delete kv;
 }
 
-// 短语路径
-void BuildPhrasePath(char[] buffer, int maxlength, const char[] fliename, const char[] lang_code) {
-    strcopy(buffer, maxlength, "translations/");
-    int len;
-    if (strcmp(lang_code, "en")) { len = strlen(buffer); FormatEx(buffer[len], maxlength - len, "%s/", lang_code); }
-    len = strlen(buffer);
-    FormatEx(buffer[len], maxlength - len, "%s", fliename);
-    BuildPath(Path_SM, buffer, maxlength, "%s", buffer);
+// 短语路径（写到 translations 根目录）
+void BuildPhrasePath(char[] buffer, int maxlength, const char[] filename) {
+    BuildPath(Path_SM, buffer, maxlength, "translations/%s", filename);
 }
 
 /* =========================================================
@@ -651,8 +707,8 @@ void BuildConfoglLabel(const char[] cfg, char[] out, int maxlen, bool &isAnne) {
     if (StrContains(cfg, "1vHunters", false) != -1)  { strcopy(out, maxlen, "[HT训练]");   isAnne = true; return; }
     if (StrContains(cfg, "WitchParty", false) != -1) { strcopy(out, maxlen, "[女巫派对]"); isAnne = true; return; }
     if (StrContains(cfg, "Alone", false) != -1)      { strcopy(out, maxlen, "[单人装逼]"); isAnne = true; return; }
-	if (StrContains(cfg, "AnneCoop", false) != -1)      { strcopy(out, maxlen, "[Anne战役]"); isAnne = true; return; }
-	if (StrContains(cfg, "AnneRealism", false) != -1)      { strcopy(out, maxlen, "[Anne写实]"); isAnne = true; return; }
+    if (StrContains(cfg, "AnneCoop", false) != -1)      { strcopy(out, maxlen, "[Anne战役]"); isAnne = true; return; }
+    if (StrContains(cfg, "AnneRealism", false) != -1)      { strcopy(out, maxlen, "[Anne写实]"); isAnne = true; return; }
     FormatEx(out, maxlen, "[%s]", cfg);
 }
 void BuildAnneChunk(bool isAnne, char[] out, int maxlen) {
@@ -738,9 +794,9 @@ public void CacheMissionInfo() {
                 kvSub.GetName(mission, sizeof(mission)); // ex. L4D2C1
                 kvMap.GetString(NULL_STRING, map, sizeof(map)); // ex. c1m1_hotel
                 g_smMissionMap.SetString(map, mission); // c1m1_hotel => L4D2C1
-                #if DEBUG
-                    PrintToServer("[A2S_Edit] %s => %s", map, mission);
-                #endif
+#if DEBUG
+                PrintToServer("[A2S_Edit] %s => %s", map, mission);
+#endif
                 ++i;
             }
         } while (have);
