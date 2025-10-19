@@ -407,21 +407,27 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
 
     if (announceToChat && ShouldAnnounceApply(total, interval))
     {
+
         CPrintToChatAll(
             "{default}[{green}DirSpawn{default}]  \
             {green}导演刷特{default}：  \
             {green}总数{default}={teamcolor}%d{default} ｜  \
             {green}间隔{default}={teamcolor}%d{default}秒 ｜  \
-            {green}坦克并存{default}={teamcolor}%d{default} ｜  \
+            {green}坦克并存{default}={teamcolor}%d{default}",
+            total, interval, gCvarAllowSIWithTank.IntValue
+        );
+
+        CPrintToChatAll(
+            "{default}[{green}DirSpawn{default}]  \
             {green}Relax{default}[{teamcolor}%d{default}..{teamcolor}%d{default}] ｜  \
             {green}锁节奏{default}={teamcolor}%d{default} ｜  \
             {green}首刷{default}[{teamcolor}%d{default}..{teamcolor}%d{default}]",
-            total, interval,
-            gCvarAllowSIWithTank.IntValue,
             gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue,
             gCvarLockTempo.IntValue,
             gCvarInitialMin.IntValue, gCvarInitialMax.IntValue
         );
+
+
     }
 }
 
@@ -839,20 +845,20 @@ public void OnPluginStart()
     gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "锁节奏（0=关闭，1=开启）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // 首刷延迟
-    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "0", "首刷延迟下限（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
-    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "0", "首刷延迟上限（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "30", "首刷延迟下限（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "60", "首刷延迟上限（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
 
     // interval 联动
     gCvarRelaxAuto          = CreateConVar("dirspawn_relax_auto", "1", "根据 dirspawn_interval 自动计算 Relax/Lock（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.25", "RelaxMin = kmin × interval", FCVAR_NOTIFY);
-    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "0.90", "RelaxMax = kmax × interval", FCVAR_NOTIFY);
+    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.75", "RelaxMin = kmin × interval", FCVAR_NOTIFY);
+    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "1.00", "RelaxMax = kmax × interval", FCVAR_NOTIFY);
     gCvarRelaxFloor         = CreateConVar("dirspawn_relax_floor", "0", "RelaxMin 下限（秒）", FCVAR_NOTIFY);
     gCvarRelaxCeil          = CreateConVar("dirspawn_relax_ceil", "120", "RelaxMax 上限（秒）", FCVAR_NOTIFY);
     gCvarTempoLockThreshold = CreateConVar("dirspawn_lock_tempo_threshold", "6", "当 interval ≤ 阈值时自动开启锁节奏（秒）", FCVAR_NOTIFY);
 
     gCvarInitAuto           = CreateConVar("dirspawn_initial_auto", "1", "根据 dirspawn_interval 自动计算首刷延迟（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "0.00", "InitialDelayMin = ikmin × interval", FCVAR_NOTIFY);
-    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "0.50", "InitialDelayMax = ikmax × interval", FCVAR_NOTIFY);
+    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "1.00", "InitialDelayMin = ikmin × interval", FCVAR_NOTIFY);
+    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "1.00", "InitialDelayMax = ikmax × interval", FCVAR_NOTIFY);
 
     // ---------------- 自动伸缩（按真人数量） ----------------
     gCvarAutoEnable        = CreateConVar("dirspawn_auto_enable", "0", "按真人数量自动伸缩（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
