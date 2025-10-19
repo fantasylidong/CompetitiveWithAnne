@@ -1,4 +1,4 @@
-/* 
+/*
 	SourcePawn is Copyright (C) 2006-2008 AlliedModders LLC.  All rights reserved.
 	SourceMod is Copyright (C) 2006-2008 AlliedModders LLC.  All rights reserved.
 	Pawn and SMALL are Copyright (C) 1997-2008 ITB CompuPhase.
@@ -32,8 +32,8 @@
 #include <updater>
 #include <SteamWorks>
 
-#define IsValidClient(%1)		(1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
-#define IsValidAliveClient(%1)	(1 <= %1 && %1 <= MaxClients && IsClientInGame(%1) && IsPlayerAlive(%1))
+#define IsValidClient(%1)		(1 <= %1 <= MaxClients && IsClientInGame(%1))
+#define IsValidAliveClient(%1)	(1 <= %1 <= MaxClients && IsClientInGame(%1) && IsPlayerAlive(%1))
 #define GETBOTINTERVAL 3.0
 
 public Plugin myinfo =
@@ -41,10 +41,9 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.3",
+	version = "1.1",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
-
 #define UPDATE_URL_ANNE "http://dl.trygek.com/left4dead2/addons/sourcemod/Anne_Updater.txt"
 #define UPDATE_URL_NEKO "http://dl.trygek.com/left4dead2/addons/sourcemod/Neko_Updater.txt"
 #define UPDATE_URL_VERSUS "http://dl.trygek.com/left4dead2/addons/sourcemod/Versus_Updater.txt"
@@ -66,16 +65,7 @@ ConVar
 	hCvarGamemode,
 	hCvarSvAllowLobbyCo,
 	hCvarEnableAutoRemoveLobby,
-	hCvarIPUrl,
-
-	// 屏蔽离开/闲置提示
-	hCvarMuteLeave,          // join_mute_leave
-	hCvarMuteIdle,           // join_mute_idle
-
-	// 静默 sm_cvar & 控制 show_activity
-	hCvarMuteSmCvar,         // join_mute_sm_cvar
-	hCvarSilentReply,        // join_sm_cvar_silent_reply
-	hCvarForceShowActivity;  // join_force_show_activity
+	hCvarIPUrl;
 
 
 public void OnPluginStart()
@@ -91,80 +81,39 @@ public void OnPluginStart()
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
 	hCvarMotdUrl = CreateConVar("sm_cfgmotd_url", "http://dl.trygek.com/l4d_stats/index.php");  // 以后更换为数据库控制
 	hCvarIPUrl = CreateConVar("sm_cfgip_url", "http://dl.trygek.com/index.php");	// 以后更换为数据库控制
-
-	// 屏蔽默认离开/闲置提示（默认开启）
-	hCvarMuteLeave = CreateConVar("join_mute_leave", "1", "屏蔽默认的离开提示（player_disconnect 默认广播）", _, true, 0.0, true, 1.0);
-	hCvarMuteIdle  = CreateConVar("join_mute_idle",  "1", "屏蔽默认的闲置/接管/旁观提示（player_bot_replace / bot_player_replace / player_team）", _, true, 0.0, true, 1.0);
-
-	// 静默 sm_cvar（默认开启）；强制 sm_show_activity（默认不改）
-	hCvarMuteSmCvar  = CreateConVar("join_mute_sm_cvar", "1", "拦截 sm_cvar 并静默设置（不在聊天里广播）", _, true, 0.0, true, 1.0);
-	hCvarSilentReply = CreateConVar("join_sm_cvar_silent_reply", "1", "静默时仅给执行者一条回显（不进聊天）", _, true, 0.0, true, 1.0);
-	hCvarForceShowActivity = CreateConVar("join_force_show_activity", "1", ">=0 时强制设置 sm_show_activity（0~6）；-1 不改", _, true, -1.0, true, 6.0);
-
 	hCvarEnableAutoupdate.AddChangeHook(UpdateStatuChange);
 	hCvarGamemode.AddChangeHook(GamemodeChange);
 	hCvarLobbyControl.AddChangeHook(GamemodeChange);
-
-	// 玩家命令
 	RegConsoleCmd("sm_away", AFKTurnClientToSpe);
-	RegConsoleCmd("sm_afk",  AFKTurnClientToSpe);
+	RegConsoleCmd("sm_afk", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_spec", AFKTurnClientToSpe);
-	RegConsoleCmd("sm_s",    AFKTurnClientToSpe);
-
+	RegConsoleCmd("sm_s", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_joininfected", TurnClientToInfected);
-	RegConsoleCmd("sm_team3",       TurnClientToInfected);
-	RegConsoleCmd("sm_inf",         TurnClientToInfected);
-	RegConsoleCmd("sm_infected",    TurnClientToInfected);
-	RegConsoleCmd("sm_zombie",      TurnClientToInfected);
-
-	RegConsoleCmd("sm_join",     TurnClientToSurvivors);
-	RegConsoleCmd("sm_jg",       TurnClientToSurvivors);
-	RegConsoleCmd("sm_team2",    TurnClientToSurvivors);
+	RegConsoleCmd("sm_team3", TurnClientToInfected);
+	RegConsoleCmd("sm_inf", TurnClientToInfected);
+	RegConsoleCmd("sm_infected", TurnClientToInfected);
+	RegConsoleCmd("sm_zombie", TurnClientToInfected);
+	RegConsoleCmd("sm_join", TurnClientToSurvivors);
+	RegConsoleCmd("sm_jg", TurnClientToSurvivors);
+	RegConsoleCmd("sm_team2", TurnClientToSurvivors);
 	RegConsoleCmd("sm_joingame", TurnClientToSurvivors);
 	RegConsoleCmd("sm_survivor", TurnClientToSurvivors);
-
-	AddCommandListener(Command_Setinfo,  "jointeam");
+	AddCommandListener(Command_Setinfo, "jointeam");
 	AddCommandListener(Command_Setinfo1, "chooseteam");
-
-	RegConsoleCmd("sm_ip",  ShowAnneServerIP);
+	RegConsoleCmd("sm_ip", ShowAnneServerIP);
 	RegConsoleCmd("sm_web", ShowAnneServerWeb);
 	//RegConsoleCmd("sm_getbot", GetBot);
 	RegAdminCmd("sm_restartmap", RestartMap, ADMFLAG_ROOT, "restarts map");
-
-	// 事件拦截（Pre 阶段屏蔽系统广播）
-	HookEvent("player_disconnect", PlayerDisconnect_BlockBroadcast, EventHookMode_Pre);
-	HookEvent("player_team",       PlayerTeam_BlockBroadcast,      EventHookMode_Pre);
-	HookEvent("player_bot_replace",PlayerBotReplace_BlockBroadcast,EventHookMode_Pre);
-	HookEvent("bot_player_replace",BotPlayerReplace_BlockBroadcast,EventHookMode_Pre);
-
-	// 原有业务钩子
 	HookEvent("player_disconnect", PlayerDisconnect_Event, EventHookMode_Pre);
-	HookEvent("player_team",       Event_PlayerTeam);
-
-	// 拦截 sm_cvar（静默）
-	AddCommandListener(SilentCvar_Listener, "sm_cvar");
-
+	HookEvent("player_team", Event_PlayerTeam);
 	ChangeLobby();
-}
-
-// 在所有 cfg 执行后，必要时静默强制 sm_show_activity
-public void OnConfigsExecuted()
-{
-	int v = hCvarForceShowActivity.IntValue;
-	if (v >= 0)
-	{
-		ConVar sa = FindConVar("sm_show_activity");
-		if (sa != null)
-		{
-			SetConVarInt(sa, v, false, false); // 不 replicate、不 notify
-		}
-	}
 }
 
 public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	Updater_RemovePlugin();
 	if(g_bUpdateSystemAvailable && hCvarEnableAutoupdate.IntValue > 0){
+		//LogError("[updater]:%d", hCvarEnableAutoupdate.IntValue);
 		if(hCvarEnableAutoupdate.IntValue == 1)
 		{
 			Updater_AddPlugin(UPDATE_URL_ANNEALL);
@@ -172,8 +121,7 @@ public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[]
 		else if(hCvarEnableAutoupdate.IntValue == 2)
 		{
 			Updater_AddPlugin(UPDATE_URL_NEKO);
-		}
-		else if(hCvarEnableAutoupdate.IntValue == 3)
+		}else if(hCvarEnableAutoupdate.IntValue == 3)
 		{
 			Updater_AddPlugin(UPDATE_URL_VERSUS);
 		}
@@ -261,8 +209,7 @@ stock void CrashMap()
 	ServerCommand("changelevel %s", mapname);
 }
 
-// --- 自定义提示：进服/离服 ---
-
+//玩家加入游戏
 public void OnClientConnected(int client)
 {
 	if(!IsFakeClient(client))
@@ -271,98 +218,79 @@ public void OnClientConnected(int client)
 	}
 }
 
-// Pre 钩子：屏蔽默认离开广播（受 join_mute_leave 控制）
-public Action PlayerDisconnect_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (hCvarMuteLeave.BoolValue)
-	{
-		SetEventBroadcast(event, true);
-		return Plugin_Changed;
-	}
-	return Plugin_Continue;
-}
-
-// 自定义离开消息
 public Action PlayerDisconnect_Event(Handle event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(GetEventInt(event,"userid"));
 
-    if (!(1 <= client && client <= MaxClients))
-        return Plugin_Handled;
-    if (!IsClientInGame(client))
-        return Plugin_Handled;
-    if (IsFakeClient(client))
+    if (!(1 <= client <= MaxClients))
         return Plugin_Handled;
 
-    if (hCvarMuteLeave.BoolValue)
-    {
-        SetEventBroadcast(event, true);
-    }
+    if (!IsClientInGame(client))
+        return Plugin_Handled;
+
+    if (IsFakeClient(client))
+        return Plugin_Handled;
 
     char reason[64], message[64];
     GetEventString(event, "reason", reason, sizeof(reason));
 
-    if(StrContains(reason, "connection rejected", false) != -1)         { Format(message,sizeof(message),"连接被拒绝"); }
-    else if(StrContains(reason, "timed out", false) != -1)               { Format(message,sizeof(message),"超时"); }
-    else if(StrContains(reason, "by console", false) != -1)              { Format(message,sizeof(message),"控制台退出"); }
-    else if(StrContains(reason, "by user", false) != -1)                 { Format(message,sizeof(message),"自己主动断开连接"); }
-    else if(StrContains(reason, "ping is too high", false) != -1)        { Format(message,sizeof(message),"ping 太高了"); }
-    else if(StrContains(reason, "No Steam logon", false) != -1)          { Format(message,sizeof(message),"no steam logon/ steam验证失败"); }
-    else if(StrContains(reason, "Steam account is being used in another", false) != -1) { Format(message,sizeof(message),"steam账号被顶"); }
-    else if(StrContains(reason, "Steam Connection lost", false) != -1)   { Format(message,sizeof(message),"steam断线"); }
-    else if(StrContains(reason, "This Steam account does not own this game", false) != -1) { Format(message,sizeof(message),"没有这款游戏"); }
-    else if(StrContains(reason, "Validation Rejected", false) != -1)     { Format(message,sizeof(message),"验证失败"); }
-    else if(StrContains(reason, "Certificate Length", false) != -1)      { Format(message,sizeof(message),"certificate length"); }
-    else if(StrContains(reason, "Pure server", false) != -1)             { Format(message,sizeof(message),"纯净服务器"); }
-    else { message = reason; }
+    if(StrContains(reason, "connection rejected", false) != -1)
+    {
+        Format(message,sizeof(message),"连接被拒绝");
+    }
+    else if(StrContains(reason, "timed out", false) != -1)
+    {
+        Format(message,sizeof(message),"超时");
+    }
+    else if(StrContains(reason, "by console", false) != -1)
+    {
+        Format(message,sizeof(message),"控制台退出");
+    }
+    else if(StrContains(reason, "by user", false) != -1)
+    {
+        Format(message,sizeof(message),"自己主动断开连接");
+    }
+    else if(StrContains(reason, "ping is too high", false) != -1)
+    {
+        Format(message,sizeof(message),"ping 太高了");
+    }
+    else if(StrContains(reason, "No Steam logon", false) != -1)
+    {
+        Format(message,sizeof(message),"no steam logon/ steam验证失败");
+    }
+    else if(StrContains(reason, "Steam account is being used in another", false) != -1)
+    {
+        Format(message,sizeof(message),"steam账号被顶");
+    }
+    else if(StrContains(reason, "Steam Connection lost", false) != -1)
+    {
+        Format(message,sizeof(message),"steam断线");
+    }
+    else if(StrContains(reason, "This Steam account does not own this game", false) != -1)
+    {
+        Format(message,sizeof(message),"没有这款游戏");
+    }
+    else if(StrContains(reason, "Validation Rejected", false) != -1)
+    {
+        Format(message,sizeof(message),"验证失败");
+    }
+    else if(StrContains(reason, "Certificate Length", false) != -1)
+    {
+        Format(message,sizeof(message),"certificate length");
+    }
+    else if(StrContains(reason, "Pure server", false) != -1)
+    {
+        Format(message,sizeof(message),"纯净服务器");
+    }
+    else
+    {
+        message = reason;
+    }
 
     CPrintToChatAll("{green}%N {olive}离开了游戏 - 理由: [{green}%s{olive}]", client, message);
     return Plugin_Handled;
 } 
 
-// --- 队伍/闲置广播屏蔽 ---
-
-public Action PlayerTeam_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (!hCvarMuteIdle.BoolValue)
-		return Plugin_Continue;
-
-	int team     = GetEventInt(event, "team");
-	int oldteam  = GetEventInt(event, "oldteam");
-	bool disconn = GetEventBool(event, "disconnect");
-
-	if (!disconn)
-	{
-		if (team == 1 || oldteam == 1 || team != oldteam)
-		{
-			SetEventBroadcast(event, true);
-			return Plugin_Changed;
-		}
-	}
-	return Plugin_Continue;
-}
-
-public Action PlayerBotReplace_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (hCvarMuteIdle.BoolValue)
-	{
-		SetEventBroadcast(event, true);
-		return Plugin_Changed;
-	}
-	return Plugin_Continue;
-}
-
-public Action BotPlayerReplace_BlockBroadcast(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (hCvarMuteIdle.BoolValue)
-	{
-		SetEventBroadcast(event, true);
-		return Plugin_Changed;
-	}
-	return Plugin_Continue;
-}
-
-// 原有业务：限制加特感
 public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 {
 	int client = GetEventInt(event, "userid");
@@ -374,12 +302,11 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 		if(!IsFakeClient(target))
 		{
 			CreateTimer(0.5, Timer_CheckDetay2, target, TIMER_FLAG_NO_MAPCHANGE);
-		}
-		else
-		{
+		}else{
 			return Plugin_Handled;
 		}
 	}
+	//CreateTimer(0.1, Timer_MobChange, 0, TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Continue;
 }
 
@@ -389,10 +316,12 @@ public Action Timer_CheckDetay2(Handle Timer, int client)
 	return Plugin_Continue;
 }
 
+
 public void OnClientPutInServer(int client)
 {
 	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && !hCvarEnableInf.BoolValue)
 	{
+		//ServerCommand("sm_addbot2");
 		CreateTimer(3.0, Timer_CheckDetay, client, TIMER_FLAG_NO_MAPCHANGE);
 		g_bEnableGetbotCommand[client] = true;
 	}
@@ -411,6 +340,7 @@ public void OnClientPutInServer(int client)
 			L4D_LobbyUnreserve();
 		SetAllowLobby(0);
 	}
+
 }
 
 public Action Timer_CheckDetay(Handle Timer, int client)
@@ -537,6 +467,7 @@ public void DrawSwitchCharacterMenu(int client)
 {
 	Menu menu = new Menu(SwitchCharacterMenuHandler);
 	menu.SetTitle("请选择喜欢的人物：");
+	// 添加 Bot 到菜单中
 	int menuindex = 0;
 	for (int bot = 1; bot <= MaxClients; bot++)
 	{
@@ -547,6 +478,7 @@ public void DrawSwitchCharacterMenu(int client)
 			GetClientAuthId(bot, AuthId_Steam2, botid, sizeof(botid));
 			if (strcmp(botid, "BOT") == 0 && GetClientTeam(bot) == 2)
 			{
+				GetClientName(bot, botname, sizeof(botname));
 				IntToString(menuindex, menuitem, sizeof(menuitem));
 				menu.AddItem(menuitem, botname);
 				menuindex++;
@@ -565,6 +497,10 @@ public int SwitchCharacterMenuHandler(Menu menu, MenuAction action, int param1, 
 		GetMenuItem(menu, param2, botname, sizeof(botname), _, botname, sizeof(botname));
 		ChangeClientTeam(param1, 1);
 		ClientCommand(param1, "jointeam survivor %s", botname);
+		//DataPack  dp;
+		//dp.WriteCell(param1);
+		//dp.WriteString(botname);
+		//CreateTimer(1.0, ChangeTeam, dp);
 	}
 	else if (action == MenuAction_Cancel)
 	{
@@ -576,56 +512,18 @@ public int SwitchCharacterMenuHandler(Menu menu, MenuAction action, int param1, 
 	}
 	return 0;
 }
-
-// --- 静默 sm_cvar ---
-
-public Action SilentCvar_Listener(int client, const char[] command, int argc)
-{
-	if (!hCvarMuteSmCvar.BoolValue)
-		return Plugin_Continue;
-
-	// 与原 sm_cvar 权限一致
-	if (!CheckCommandAccess(client, "sm_cvar", ADMFLAG_CONVARS))
-		return Plugin_Continue;
-
-	// 需要至少两个参数：name value...
-	if (argc < 3)
-		return Plugin_Continue;
-
-	char name[64];
-	GetCmdArg(1, name, sizeof(name));
-
-	ConVar c = FindConVar(name);
-	if (c == null)
-		return Plugin_Continue; // 让原命令处理未知 cvar（含报错）
-
-	// 拼接 value（支持有空格的值）
-	char value[256] = "";
-	char part[192];
-	for (int i = 2; i <= argc; i++)
-	{
-		GetCmdArg(i, part, sizeof(part));
-		if (i > 2) StrCat(value, sizeof(value), " ");
-		StrCat(value, sizeof(value), part);
-	}
-
-	// 静默设置：不 replicate、不 notify
-	SetConVarString(c, value, false, false);
-
-	// 对执行者回显到控制台，不进聊天
-	if (hCvarSilentReply.BoolValue)
-	{
-		if (client == 0) // 服务器控制台
-			PrintToServer("[SM] (silent) Set \"%s\" to \"%s\".", name, value);
-		else
-			ReplyToCommand(client, "[SM] (silent) Set \"%s\" to \"%s\".", name, value);
-	}
-
-	return Plugin_Handled; // 阻止原 sm_cvar 的“更改 cvar …”广播
+/*
+public Action ChangeTeam(Handle timer, DataPack  dp){
+	dp.Reset();
+	char botname[32];
+	int client = dp.ReadCell();
+	dp.ReadString(botname, 32);
+	ClientCommand(client, "jointeam survivor %s", botname);
+	return Plugin_Continue;
 }
+*/
 
-// --- 工具函数 ---
-
+//判断特感是否已经满人
 stock bool IsInfectTeamFull() 
 {
 	int count = 0;
@@ -645,6 +543,7 @@ stock bool IsInfectTeamFull()
 	}
 }
 
+//判断生还是否已经满人
 stock bool IsSuivivorTeamFull() 
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -656,26 +555,54 @@ stock bool IsSuivivorTeamFull()
 	}
 	return true;
 }
-
+//判断是否为生还者
 stock bool IsSurvivor(int client) 
 {
-	return (client > 0 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == 2);
+	if(client > 0 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == 2) 
+	{
+		return true;
+	} 
+	else 
+	{
+		return false;
+	}
 }
 
+//判断是否为玩家再队伍里
 stock bool IsValidPlayerInTeam(int client,int team)
 {
-	return IsValidPlayer(client) && (GetClientTeam(client) == team);
+	if(IsValidPlayer(client))
+	{
+		if(GetClientTeam(client)==team)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 stock bool IsValidPlayer(int client, bool AllowBot = true, bool AllowDeath = true)
 {
-	if (client < 1 || client > MaxClients) return false;
-	if (!IsClientConnected(client) || !IsClientInGame(client)) return false;
-	if (!AllowBot && IsFakeClient(client)) return false;
-	if (!AllowDeath && !IsPlayerAlive(client)) return false;
+	if (client < 1 || client > MaxClients)
+		return false;
+	if (!IsClientConnected(client) || !IsClientInGame(client))
+		return false;
+	if (!AllowBot)
+	{
+		if (IsFakeClient(client))
+			return false;
+	}
+
+	if (!AllowDeath)
+	{
+		if (!IsPlayerAlive(client))
+			return false;
+	}	
+	
 	return true;
 }
 
+//判断生还者是否已经被控
 stock bool IsPinned(int client) 
 {
 	bool bIsPinned = false;

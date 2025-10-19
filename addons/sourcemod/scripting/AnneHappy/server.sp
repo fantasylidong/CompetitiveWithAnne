@@ -12,9 +12,9 @@
 #include <CreateSurvivorBot>
 #include <witch_and_tankifier>
 
-#define CVAR_FLAGS                 FCVAR_NOTIFY
-#define IsValidClient(%1)          (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
-#define IsValidAliveClient(%1)     (IsValidClient(%1) && IsPlayerAlive(%1))
+#define CVAR_FLAGS                     FCVAR_NOTIFY
+#define IsValidClient(%1)              (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
+#define IsValidAliveClient(%1)         (IsValidClient(%1) && IsPlayerAlive(%1))
 
 enum ZombieClass
 {
@@ -48,10 +48,10 @@ static const char sFinalMapName[14][] =
 
 public Plugin myinfo =
 {
-    name        = "AnneServer Server Function (structured)",
-    author      = "def075, Caibiii, 东, optimized by ChatGPT",
-    description = "Advanced server helpers: survivors manage, BW notify, finale tank rule, etc.",
-    version     = "2025.10.17",
+    name        = "AnneServer Server Function (structured + block msgs/cvar)",
+    author      = "def075, Caibiii, 东, integrated by ChatGPT",
+    description = "Advanced server helpers + message/cvar broadcast blocker.",
+    version     = "2025.10.19",
     url         = "https://github.com/Caibiii/AnneServer"
 };
 
@@ -70,13 +70,20 @@ ConVar g_cvBWEnable, g_cvBWTeam, g_cvBWSound;
 bool   g_bwAnnounced[MAXPLAYERS + 1];
 char   g_bwSound[PLATFORM_MAX_PATH];
 
+// ---- 新增：屏蔽提示 / cvar 广播 ----
+ConVar g_cvBlockTextMsg, g_cvBlockPZDmgMsg, g_cvBlockServerCvar;
+ConVar g_cvBlockPlayerDeath, g_cvBlockPlayerIncap, g_cvBlockPlayerDisconnect, g_cvBlockDefibUsed;
+
+int g_iBlockTextMsg, g_iBlockPZDmgMsg, g_iBlockServerCvar;
+int g_iBlockPlayerDeath, g_iBlockPlayerIncap, g_iBlockPlayerDisconnect, g_iBlockDefibUsed;
+
 public void OnPluginStart()
 {
     // ---- 声音屏蔽（烟花/演唱会）----
     AddNormalSoundHook(view_as<NormalSHook>(OnNormalSound));
     AddAmbientSoundHook(view_as<AmbientSHook>(OnAmbientSound));
 
-    // ---- 事件注册 ----
+    // ---- 事件注册（原逻辑）----
     HookEvent("witch_killed",            WitchKilled_Event);
     HookEvent("round_start",             RoundStart_Event);
     HookEvent("finale_win",              ResetSurvivors);
@@ -92,7 +99,7 @@ public void OnPluginStart()
     RegAdminCmd("sm_addbot",   ADMAddBot, ADMFLAG_ROOT, "添加一个生还者Bot（不会被本插件踢）");
     RegAdminCmd("sm_delbot",   ADMDelBot, ADMFLAG_ROOT, "删除一个未被接管的生还者Bot");
     RegConsoleCmd("sm_zs", ZiSha);
-	RegConsoleCmd("sm_kill", ZiSha);
+    RegConsoleCmd("sm_kill", ZiSha);
 
     // ---- 生还管理 ConVar ----
     hSurvivorsManagerEnable = CreateConVar("l4d_multislots_survivors_manager_enable", "0",
@@ -106,9 +113,9 @@ public void OnPluginStart()
     g_cvResetOnTransition = CreateConVar("anne_reset_on_transition", "0",
         "通关/切图时是否执行 RestoreHealth + ResetInventory (0=否,1=是)", CVAR_FLAGS, true, 0.0, true, 1.0);
 
-    // ---- 新增：最低50实血（只在未启用满血清背包时使用）----
+    // ---- 最低50实血（仅在未启用满血清背包时使用）----
     g_cvHeal50OnTransition = CreateConVar("anne_heal50_on_transition", "0",
-        "通关/切图时，若生还者实血<50则补至50，并重置倒地次数；>=50不变。仅在 anne_reset_on_transition=0 时生效", 
+        "通关/切图时，若生还者实血<50则补至50，并重置倒地次数；>=50不变。仅在 anne_reset_on_transition=0 时生效",
         CVAR_FLAGS, true, 0.0, true, 1.0);
 
     // ---- 黑白提醒 ----
@@ -122,11 +129,42 @@ public void OnPluginStart()
     g_cvBWSound.GetString(g_bwSound, sizeof(g_bwSound));
     g_cvBWSound.AddChangeHook(CvarChanged_BWSound);
 
-    // ---- 监听变更，初始化 ----
+    // ---- 新增：屏蔽提示 / cvar 广播 ConVar ----
+    g_cvBlockTextMsg        = CreateConVar("anne_block_text_msg", "1", "屏蔽闲置提示（TextMsg）? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockPZDmgMsg       = CreateConVar("anne_block_pz_msg", "1",  "屏蔽其它 PZDmgMsg 提示? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockServerCvar     = CreateConVar("anne_block_server_cvar", "1", "屏蔽服务器ConVar变更广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockPlayerDeath    = CreateConVar("anne_block_player_death", "1", "屏蔽玩家死亡广播? 0=显示,1=屏蔽（可能影响结算统计）", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockPlayerIncap    = CreateConVar("anne_block_player_incap", "1", "屏蔽玩家倒地广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockPlayerDisconnect = CreateConVar("anne_block_player_disconnect", "1", "屏蔽玩家离开广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBlockDefibUsed      = CreateConVar("anne_block_defib_used", "1", "屏蔽电击器使用广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+
+    // ---- 新增：消息/事件 Hook（预处理阶段用于阻止广播）----
+    HookUserMessage(GetUserMessageId("TextMsg"),   UM_TextMsg, true);
+    HookUserMessage(GetUserMessageId("PZDmgMsg"),  UM_PZDmgMsg, true);
+
+    HookEvent("server_cvar",          Event_Block_ServerCvar, EventHookMode_Pre);
+    HookEvent("player_death",         Event_Block_PlayerDeath, EventHookMode_Pre);
+    HookEvent("player_incapacitated", Event_Block_PlayerIncap, EventHookMode_Pre);
+    HookEvent("defibrillator_used",   Event_Block_DefibUsed, EventHookMode_Pre);
+    HookEvent("player_disconnect",    Event_Block_PlayerDisconnect, EventHookMode_Pre);
+
+    // ---- 监听变更 & 初始化 ----
     hSurvivorsManagerEnable.AddChangeHook(ConVarChanged_Cvars);
     hMaxSurvivors.AddChangeHook(ConVarChanged_Cvars);
     hCvarAutoKickTank.AddChangeHook(ConVarChanged_Cvars);
-    ConVarChanged_Cvars(null, "", ""); // 初始读取
+
+    g_cvBlockTextMsg.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockPZDmgMsg.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockServerCvar.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockPlayerDeath.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockPlayerIncap.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockPlayerDisconnect.AddChangeHook(BlockCvarsChanged);
+    g_cvBlockDefibUsed.AddChangeHook(BlockCvarsChanged);
+
+    AutoExecConfig(true, "anne_server_helper"); // 统一写入 cfg/sourcemod/anne_server_helper.cfg
+
+    ConVarChanged_Cvars(null, "", ""); // 初始化读取
+    UpdateBlockCvars();                 // 初始化读取
 }
 
 public void OnAllPluginsLoaded()
@@ -147,16 +185,19 @@ public void OnLibraryRemoved(const char[] name)
 public void OnMapStart()
 {
     if (g_bwSound[0] != '\0')
-    {
         PrecacheSound(g_bwSound, true);
-    }
+}
+
+public void OnConfigsExecuted()
+{
+    UpdateBlockCvars();
 }
 
 public void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    iEnable            = hSurvivorsManagerEnable.IntValue;
-    iMaxSurvivors      = hMaxSurvivors.IntValue;
-    iAutoKickTankEnable= hCvarAutoKickTank.IntValue;
+    iEnable             = hSurvivorsManagerEnable.IntValue;
+    iMaxSurvivors       = hMaxSurvivors.IntValue;
+    iAutoKickTankEnable = hCvarAutoKickTank.IntValue;
 
     if (!iEnable) return;
 
@@ -165,21 +206,91 @@ public void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char
     {
         int need = iMaxSurvivors - cur;
         for (int i = 0; i < need; i++)
-        {
             SpawnFakeClientNearRandomSurvivor();
-        }
     }
     else if (cur > iMaxSurvivors)
     {
         int over = cur - iMaxSurvivors;
         for (int i = 0; i < over; i++)
-        {
-            if (!KickAnySurvivorBot())
-                break;
-        }
+            if (!KickAnySurvivorBot()) break;
     }
 }
 
+// ====== 新增：屏蔽 ConVar 值缓存 & Hook 回调 ======
+void UpdateBlockCvars()
+{
+    g_iBlockTextMsg         = g_cvBlockTextMsg.IntValue;
+    g_iBlockPZDmgMsg        = g_cvBlockPZDmgMsg.IntValue;
+    g_iBlockServerCvar      = g_cvBlockServerCvar.IntValue;
+    g_iBlockPlayerDeath     = g_cvBlockPlayerDeath.IntValue;
+    g_iBlockPlayerIncap     = g_cvBlockPlayerIncap.IntValue;
+    g_iBlockPlayerDisconnect= g_cvBlockPlayerDisconnect.IntValue;
+    g_iBlockDefibUsed       = g_cvBlockDefibUsed.IntValue;
+}
+
+public void BlockCvarsChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    UpdateBlockCvars();
+}
+
+// ====== 新增：屏蔽 UserMessage / 事件广播 ======
+// 屏蔽其它提示（PZDmgMsg）
+public Action UM_PZDmgMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+{
+    if (g_iBlockPZDmgMsg == 0) return Plugin_Continue;
+    return Plugin_Handled;
+}
+
+// 屏蔽闲置提示（TextMsg -> "#L4D_idle_spectator"）
+public Action UM_TextMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+{
+    if (g_iBlockTextMsg == 0) return Plugin_Continue;
+
+    static char sMsg[254];
+    msg.ReadString(sMsg, sizeof sMsg);
+
+    if (strcmp(sMsg, "\x03#L4D_idle_spectator") == 0)
+        return Plugin_Handled;
+
+    return Plugin_Continue;
+}
+
+// 屏蔽服务器 cvar 变更
+public Action Event_Block_ServerCvar(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_iBlockServerCvar == 0) return Plugin_Continue;
+    return Plugin_Handled;
+}
+
+// 屏蔽玩家死亡（可能影响结算统计）
+public void Event_Block_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_iBlockPlayerDeath == 0) return;
+    event.BroadcastDisabled = true;
+}
+
+// 屏蔽玩家倒地
+public void Event_Block_PlayerIncap(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_iBlockPlayerIncap == 0) return;
+    event.BroadcastDisabled = true;
+}
+
+// 屏蔽玩家离开
+public void Event_Block_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_iBlockPlayerDisconnect == 0) return;
+    event.BroadcastDisabled = true;
+}
+
+// 屏蔽电击器使用
+public void Event_Block_DefibUsed(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_iBlockDefibUsed == 0) return;
+    event.BroadcastDisabled = true;
+}
+
+// ====== 原有逻辑：对局与管理 ======
 public Action L4D2_OnEndVersusModeRound(bool countSurvivors)
 {
     if (!countSurvivors && L4D_HasAnySurvivorLeftSafeArea())
@@ -195,14 +306,10 @@ public void Event_PlayerSpawn(Event hEvent, const char[] name, bool dontBroadcas
     int client = GetClientOfUserId(hEvent.GetInt("userid"));
 
     if (IsValidClient(client) && IsAiTank(client) && iAutoKickTankEnable)
-    {
         KickMoreTank(true);
-    }
 
     if (IsValidClient(client) && GetClientTeam(client) == 2)
-    {
         g_bwAnnounced[client] = false;
-    }
 }
 
 public void OnPlayerIncappedOrDeath(Event event, const char[] name, bool dontBroadcast)
@@ -212,9 +319,7 @@ public void OnPlayerIncappedOrDeath(Event event, const char[] name, bool dontBro
     if (GetClientTeam(client) != 2)    return;
 
     if (IsTeamImmobilised())
-    {
         SlaySurvivors();
-    }
 }
 
 bool IsTeamImmobilised()
@@ -235,9 +340,7 @@ void SlaySurvivors()
     for (int i = 1; i <= MaxClients; i++)
     {
         if (IsSurvivor(i) && IsPlayerAlive(i))
-        {
             ForcePlayerSuicide(i);
-        }
     }
 }
 
@@ -311,10 +414,9 @@ public Action SetBot(int client, int args)
 
 public Action ZiSha(int client, int args)
 {
-	ForcePlayerSuicide(client);
-	return Plugin_Handled;
+    ForcePlayerSuicide(client);
+    return Plugin_Handled;
 }
-
 
 // ====== 生还工具 ======
 int GetSurvivorCount()
@@ -474,17 +576,14 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 
     if (g_cvResetOnTransition.BoolValue)
     {
-        // 原逻辑：满血 + 清背包
         RestoreHealth();
         ResetInventory();
     }
     else if (g_cvHeal50OnTransition.BoolValue)
     {
-        // 新逻辑：最低 50 实血 + 重置倒地次数（>=50 不变）
         ApplyHealFloorTo50();
     }
 
-    // 黑白提醒状态清空
     for (int i = 1; i <= MaxClients; i++)
         g_bwAnnounced[i] = false;
 
@@ -495,7 +594,7 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 public Action L4D_OnFirstSurvivorLeftSafeArea()
 {
     SetBot(0, 0);
-    if(!IsRealismCoop())
+    if (!IsRealismCoop())
         CreateTimer(0.5, Timer_AutoGive, _, TIMER_FLAG_NO_MAPCHANGE);
     return Plugin_Stop;
 }
@@ -584,13 +683,11 @@ void ApplyHealFloorTo50()
 
         int hp = GetSurvivorPermHealth(i);
         if (hp < 50)
-        {
             SetSurvivorPermHealth(i, 50);
-        }
-        // 重置倒地次数与黑白标记
+
         SetEntProp(i, Prop_Send, "m_currentReviveCount", 0);
         SetEntProp(i, Prop_Send, "m_bIsOnThirdStrike", false);
-        // 不改临时血（保持现状），如需清零可解开下一行
+        // 如需清空临时血，取消注释下一行：
         // SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
     }
 }
@@ -718,22 +815,15 @@ public Action OnNormalSound(int clients[64], int &numClients, char sample[PLATFO
 public Action OnAmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float &volume,
                              int &level, int &pitch, float pos[3], int &flags, float &delay)
 {
-    return (StrContains(sample, "firewerks", true) > -1&& !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
+    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
 }
- 
+
 stock bool IsRealismCoop()
 {
-	char plugin_name[120];
-	if(FindConVar("l4d_ready_cfg_name") == null)
-	{
-		return false;
-	}
-	GetConVarString(FindConVar("l4d_ready_cfg_name"), plugin_name, sizeof(plugin_name));
-	if(StrContains(plugin_name, "AnneCoop", false) != -1)
-	{
-		return true;
-	}else
-	{
-		return false;
-	}
+    char plugin_name[120];
+    if (FindConVar("l4d_ready_cfg_name") == null)
+        return false;
+
+    GetConVarString(FindConVar("l4d_ready_cfg_name"), plugin_name, sizeof(plugin_name));
+    return (StrContains(plugin_name, "AnneCoop", false) != -1);
 }
