@@ -13,7 +13,7 @@
 	"3"
 	{
 		"type"		"S"
-		"text"		"{GREEN}!away{LIGHTGREEN} 旁观 {GREEN}!slots{LIGHTGREEN} 开位 {GREEN}!rpg{LIGHTGREEN} 娱乐商店"
+		"text"		"{GREEN}!vote{LIGHTGREEN} 投票设置{GREEN}!away{LIGHTGREEN} 旁观 {GREEN}!slots{LIGHTGREEN} 开位 {GREEN}!rpg{LIGHTGREEN} 娱乐商店"
 	}
 	"4"
 	{
@@ -33,7 +33,7 @@
 	"7"
 	{
 		"type"		"S"
-		"text"		"{LIGHTGREEN}称号、帽子和生还者轮廓系统已在商店系统上线\n{GREEN}50W积分{LIGHTGREEN}自定义称号可以使用{GREEN}!setch 进行设置和修改"
+		"text"		"{GREEN}过关低于50血的都会恢复50血且重置状态，不用自杀"
 	}
 	"9"
 	{
@@ -48,6 +48,6 @@
 	"11"
 	{
 		"type"		"S"
-		"text"		"{GREEN}!votekick{LIGHTGREEN} 投票踢出不m闲置玩家{GREEN}[仅玩家参与投票]{LIGHTGREEN} \n{GREEN}!voteban{LIGHTGREEN} 投票封禁开挂/嘴臭玩家{GREEN}[所有人参与投票]{LIGHTGREEN}"
+		"text"		"{GREEN}安全门内只有和{LIGHTGREEN}当前玩家数量一样的医疗包{GREEN}，请把{LIGHTGREEN}希望{GREEN}也留一份给他人"
 	}
 }
