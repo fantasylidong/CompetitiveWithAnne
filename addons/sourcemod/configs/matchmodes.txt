@@ -33,7 +33,7 @@
 		{
 			"name" "战役模式"
 		}
-		realism"
+		"realism"
 		{
 			"name" "写实模式"
 		}
