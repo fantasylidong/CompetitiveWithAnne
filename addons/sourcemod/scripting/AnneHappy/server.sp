@@ -5,12 +5,23 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <colors>
 #include <l4d2lib>
 #include <left4dhooks>
-#include <colors>
 #undef REQUIRE_PLUGIN
 #include <CreateSurvivorBot>
 #include <witch_and_tankifier>
+
+// =============================================
+// AnneServer Server Function (structured + BeQuiet-style)
+// 仅保留你要求的静音功能：
+//   - 抑制 server_cvar 改动广播
+//   - 抑制玩家改名广播（含仅旁观者的选项）
+//   - 旁观可见队内聊天
+//   - 屏蔽以 ! / 开头的聊天命令输出
+// 其他 TextMsg/PZDmgMsg、死亡/倒地/离开/电击器 等屏蔽项全部移除。
+// 版本：2025-10-20
+// =============================================
 
 #define CVAR_FLAGS                     FCVAR_NOTIFY
 #define IsValidClient(%1)              (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
@@ -48,14 +59,14 @@ static const char sFinalMapName[14][] =
 
 public Plugin myinfo =
 {
-    name        = "AnneServer Server Function (structured + block msgs/cvar)",
-    author      = "def075, Caibiii, 东, integrated by ChatGPT",
-    description = "Advanced server helpers + message/cvar broadcast blocker.",
-    version     = "2025.10.19",
+    name        = "AnneServer Server Function (quiet minimal)",
+    author      = "def075, Caibiii, 东, simplified by ChatGPT",
+    description = "Helpers + BeQuiet-style suppressors only (server_cvar / namechange / spec chat)",
+    version     = "2025.10.20",
     url         = "https://github.com/Caibiii/AnneServer"
 };
 
-// ====== 全局 ConVar / 状态 ======
+// ====== 全局 ConVar / 状态（保留原生还管理等） ======
 ConVar hMaxSurvivors, hSurvivorsManagerEnable, hCvarAutoKickTank;
 ConVar g_cvResetOnTransition;          // 满血+清背包（原逻辑）
 ConVar g_cvHeal50OnTransition;         // 新增：通关/切图最低50实血+重置倒地次数
@@ -70,12 +81,9 @@ ConVar g_cvBWEnable, g_cvBWTeam, g_cvBWSound;
 bool   g_bwAnnounced[MAXPLAYERS + 1];
 char   g_bwSound[PLATFORM_MAX_PATH];
 
-// ---- 新增：屏蔽提示 / cvar 广播 ----
-ConVar g_cvBlockTextMsg, g_cvBlockPZDmgMsg, g_cvBlockServerCvar;
-ConVar g_cvBlockPlayerDeath, g_cvBlockPlayerIncap, g_cvBlockPlayerDisconnect, g_cvBlockDefibUsed;
-
-int g_iBlockTextMsg, g_iBlockPZDmgMsg, g_iBlockServerCvar;
-int g_iBlockPlayerDeath, g_iBlockPlayerIncap, g_iBlockPlayerDisconnect, g_iBlockDefibUsed;
+// ---- 仅保留 BeQuiet 风格静音开关 ----
+ConVar hCvarCvarChange, hCvarNameChange, hCvarSpecNameChange, hCvarSpecSeeChat;
+bool   bCvarChange, bNameChange, bSpecNameChange, bSpecSeeChat;
 
 public void OnPluginStart()
 {
@@ -83,7 +91,7 @@ public void OnPluginStart()
     AddNormalSoundHook(view_as<NormalSHook>(OnNormalSound));
     AddAmbientSoundHook(view_as<AmbientSHook>(OnAmbientSound));
 
-    // ---- 事件注册（原逻辑）----
+    // ---- 事件注册（保留原逻辑）----
     HookEvent("witch_killed",            WitchKilled_Event);
     HookEvent("round_start",             RoundStart_Event);
     HookEvent("finale_win",              ResetSurvivors);
@@ -129,42 +137,39 @@ public void OnPluginStart()
     g_cvBWSound.GetString(g_bwSound, sizeof(g_bwSound));
     g_cvBWSound.AddChangeHook(CvarChanged_BWSound);
 
-    // ---- 新增：屏蔽提示 / cvar 广播 ConVar ----
-    g_cvBlockTextMsg        = CreateConVar("anne_block_text_msg", "1", "屏蔽闲置提示（TextMsg）? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockPZDmgMsg       = CreateConVar("anne_block_pz_msg", "1",  "屏蔽其它 PZDmgMsg 提示? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockServerCvar     = CreateConVar("anne_block_server_cvar", "1", "屏蔽服务器ConVar变更广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockPlayerDeath    = CreateConVar("anne_block_player_death", "1", "屏蔽玩家死亡广播? 0=显示,1=屏蔽（可能影响结算统计）", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockPlayerIncap    = CreateConVar("anne_block_player_incap", "1", "屏蔽玩家倒地广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockPlayerDisconnect = CreateConVar("anne_block_player_disconnect", "1", "屏蔽玩家离开广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvBlockDefibUsed      = CreateConVar("anne_block_defib_used", "1", "屏蔽电击器使用广播? 0=显示,1=屏蔽", CVAR_FLAGS, true, 0.0, true, 1.0);
+    // ---- BeQuiet 风格：CVAR + 事件 + 聊天监听 ----
+    hCvarCvarChange      = CreateConVar("bq_cvar_change_suppress", "1", "Silence Server Cvars being changed, this makes for a clean chat with no disturbances.");
+    hCvarNameChange      = CreateConVar("bq_name_change_suppress", "1", "Silence Player name Changes.");
+    hCvarSpecNameChange  = CreateConVar("bq_name_change_spec_suppress", "1", "Silence Spectating Player name Changes.");
+    hCvarSpecSeeChat     = CreateConVar("bq_show_player_team_chat_spec", "1", "Show Spectators Survivors and Infected Team chat?");
 
-    // ---- 新增：消息/事件 Hook（预处理阶段用于阻止广播）----
-    HookUserMessage(GetUserMessageId("TextMsg"),   UM_TextMsg, true);
-    HookUserMessage(GetUserMessageId("PZDmgMsg"),  UM_PZDmgMsg, true);
+    bCvarChange     = GetConVarBool(hCvarCvarChange);
+    bNameChange     = GetConVarBool(hCvarNameChange);
+    bSpecNameChange = GetConVarBool(hCvarSpecNameChange);
+    bSpecSeeChat    = GetConVarBool(hCvarSpecSeeChat);
 
-    HookEvent("server_cvar",          Event_Block_ServerCvar, EventHookMode_Pre);
-    HookEvent("player_death",         Event_Block_PlayerDeath, EventHookMode_Pre);
-    HookEvent("player_incapacitated", Event_Block_PlayerIncap, EventHookMode_Pre);
-    HookEvent("defibrillator_used",   Event_Block_DefibUsed, EventHookMode_Pre);
-    HookEvent("player_disconnect",    Event_Block_PlayerDisconnect, EventHookMode_Pre);
+    hCvarCvarChange.AddChangeHook(cvarChanged);
+    hCvarNameChange.AddChangeHook(cvarChanged);
+    hCvarSpecNameChange.AddChangeHook(cvarChanged);
+    hCvarSpecSeeChat.AddChangeHook(cvarChanged);
+
+    // Events (Pre)
+    HookEvent("server_cvar",       Event_ServerCvar_Pre,       EventHookMode_Pre);
+    HookEvent("player_changename", Event_PlayerChangeName_Pre, EventHookMode_Pre);
+
+    // Chat listeners
+    AddCommandListener(Say_Callback,     "say");
+    AddCommandListener(TeamSay_Callback, "say_team");
 
     // ---- 监听变更 & 初始化 ----
     hSurvivorsManagerEnable.AddChangeHook(ConVarChanged_Cvars);
     hMaxSurvivors.AddChangeHook(ConVarChanged_Cvars);
     hCvarAutoKickTank.AddChangeHook(ConVarChanged_Cvars);
 
-    g_cvBlockTextMsg.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockPZDmgMsg.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockServerCvar.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockPlayerDeath.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockPlayerIncap.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockPlayerDisconnect.AddChangeHook(BlockCvarsChanged);
-    g_cvBlockDefibUsed.AddChangeHook(BlockCvarsChanged);
-
     AutoExecConfig(true, "anne_server_helper"); // 统一写入 cfg/sourcemod/anne_server_helper.cfg
 
     ConVarChanged_Cvars(null, "", ""); // 初始化读取
-    UpdateBlockCvars();                 // 初始化读取
+    cvarChanged(null, "", "");        // 同步 BeQuiet 开关
 }
 
 public void OnAllPluginsLoaded()
@@ -184,13 +189,14 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnMapStart()
 {
-    if (g_bwSound[0] != '\0')
+    if (g_bwSound[0] != ' ')
         PrecacheSound(g_bwSound, true);
 }
 
 public void OnConfigsExecuted()
 {
-    UpdateBlockCvars();
+    // 同步一次 CVar
+    cvarChanged(null, "", "");
 }
 
 public void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -216,78 +222,78 @@ public void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char
     }
 }
 
-// ====== 新增：屏蔽 ConVar 值缓存 & Hook 回调 ======
-void UpdateBlockCvars()
+// ====== BeQuiet：变更监听聚合 ======
+void cvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    g_iBlockTextMsg         = g_cvBlockTextMsg.IntValue;
-    g_iBlockPZDmgMsg        = g_cvBlockPZDmgMsg.IntValue;
-    g_iBlockServerCvar      = g_cvBlockServerCvar.IntValue;
-    g_iBlockPlayerDeath     = g_cvBlockPlayerDeath.IntValue;
-    g_iBlockPlayerIncap     = g_cvBlockPlayerIncap.IntValue;
-    g_iBlockPlayerDisconnect= g_cvBlockPlayerDisconnect.IntValue;
-    g_iBlockDefibUsed       = g_cvBlockDefibUsed.IntValue;
+    bCvarChange     = GetConVarBool(hCvarCvarChange);
+    bNameChange     = GetConVarBool(hCvarNameChange);
+    bSpecNameChange = GetConVarBool(hCvarSpecNameChange);
+    bSpecSeeChat    = GetConVarBool(hCvarSpecSeeChat);
 }
 
-public void BlockCvarsChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+// ====== 事件抑制（仅保留这两个） ======
+public Action Event_ServerCvar_Pre(Event event, const char[] name, bool dontBroadcast)
 {
-    UpdateBlockCvars();
+    if (bCvarChange) return Plugin_Handled;
+    return Plugin_Continue;
 }
 
-// ====== 新增：屏蔽 UserMessage / 事件广播 ======
-// 屏蔽其它提示（PZDmgMsg）
-public Action UM_PZDmgMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+public Action Event_PlayerChangeName_Pre(Event event, const char[] name, bool dontBroadcast)
 {
-    if (g_iBlockPZDmgMsg == 0) return Plugin_Continue;
-    return Plugin_Handled;
-}
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsValidClient(client)) return Plugin_Continue;
 
-// 屏蔽闲置提示（TextMsg -> "#L4D_idle_spectator"）
-public Action UM_TextMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
-{
-    if (g_iBlockTextMsg == 0) return Plugin_Continue;
+    if (GetClientTeam(client) == 1 && bSpecNameChange)
+        return Plugin_Handled; // 旁观者改名静音
 
-    static char sMsg[254];
-    msg.ReadString(sMsg, sizeof sMsg);
-
-    if (strcmp(sMsg, "\x03#L4D_idle_spectator") == 0)
-        return Plugin_Handled;
+    if (bNameChange)
+        return Plugin_Handled; // 全部改名静音
 
     return Plugin_Continue;
 }
 
-// 屏蔽服务器 cvar 变更
-public Action Event_Block_ServerCvar(Event event, const char[] name, bool dontBroadcast)
+// ====== 聊天监听：拦截命令、旁观可见队内聊天 ======
+public Action Say_Callback(int client, const char[] command, int args)
 {
-    if (g_iBlockServerCvar == 0) return Plugin_Continue;
-    return Plugin_Handled;
+    // 无条件屏蔽以 ! 或 / 开头的命令输出（与 BeQuiet 一致）
+    if (args >= 1)
+    {
+        char first[MAX_NAME_LENGTH];
+        GetCmdArg(1, first, sizeof first);
+        if (first[0] == '!' || first[0] == '/')
+            return Plugin_Handled;
+    }
+    return Plugin_Continue;
 }
 
-// 屏蔽玩家死亡（可能影响结算统计）
-public void Event_Block_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+public Action TeamSay_Callback(int client, const char[] command, int args)
 {
-    if (g_iBlockPlayerDeath == 0) return;
-    event.BroadcastDisabled = true;
-}
+    // 无条件屏蔽以 ! 或 / 开头的命令输出
+    if (args >= 1)
+    {
+        char first[MAX_NAME_LENGTH];
+        GetCmdArg(1, first, sizeof first);
+        if (first[0] == '!' || first[0] == '/')
+            return Plugin_Handled;
+    }
 
-// 屏蔽玩家倒地
-public void Event_Block_PlayerIncap(Event event, const char[] name, bool dontBroadcast)
-{
-    if (g_iBlockPlayerIncap == 0) return;
-    event.BroadcastDisabled = true;
-}
+    // 旁观可见队内聊天
+    if (bSpecSeeChat && IsValidClient(client) && GetClientTeam(client) != 1)
+    {
+        char sChat[256];
+        GetCmdArgString(sChat, sizeof sChat);
+        StripQuotes(sChat);
 
-// 屏蔽玩家离开
-public void Event_Block_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
-{
-    if (g_iBlockPlayerDisconnect == 0) return;
-    event.BroadcastDisabled = true;
-}
-
-// 屏蔽电击器使用
-public void Event_Block_DefibUsed(Event event, const char[] name, bool dontBroadcast)
-{
-    if (g_iBlockDefibUsed == 0) return;
-    event.BroadcastDisabled = true;
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (!IsValidClient(i) || GetClientTeam(i) != 1) continue;
+            if (GetClientTeam(client) == 2)
+                CPrintToChat(i, "[{olive}旁观{default}] {blue}%N{default}：%s", client, sChat);
+            else
+                CPrintToChat(i, "[{olive}旁观{default}] {red}%N{default}：%s", client, sChat);
+        }
+    }
+    return Plugin_Continue;
 }
 
 // ====== 原有逻辑：对局与管理 ======
@@ -347,42 +353,48 @@ void SlaySurvivors()
 // ====== 管理命令：生还者 Bot 增/删 & 对齐 ======
 public Action ADMAddBot(int client, int args)
 {
-    if (client == 0 || (IsValidClient(client) && GetUserAdmin(client).ImmunityLevel < 90) || !iEnable)
+    if (client == 0 || !iEnable) return Plugin_Handled;
+
+    AdminId id = GetUserAdmin(client);
+    if (id == INVALID_ADMIN_ID || GetAdminImmunityLevel(id) < 90)
         return Plugin_Handled;
 
     if (IsAnySurvivorBotExists())
     {
-        PrintToChat(client, "\x04还有未接管的Bot，请先接管或等生还队满再试。");
+        PrintToChat(client, "还有未接管的Bot，请先接管或等生还队满再试。");
         return Plugin_Handled;
     }
 
     ConVar surLimit = FindConVar("survivor_limit");
     if (surLimit.IntValue < 8)
     {
-        PrintToChat(client, "\x04不是 8 人运动，还没达到上限呢！");
+        PrintToChat(client, "不是 8 人运动，还没达到上限呢！");
         return Plugin_Handled;
     }
 
     if (SpawnFakeClientNearRandomSurvivor())
     {
-        PrintToChat(client, "\x04一个生还者Bot已生成。");
+        PrintToChat(client, "一个生还者Bot已生成。");
         SetConVarInt(surLimit, surLimit.IntValue + 1);
     }
     else
     {
-        PrintToChat(client, "\x04暂时无法生成生还者Bot。");
+        PrintToChat(client, "暂时无法生成生还者Bot。");
     }
     return Plugin_Handled;
 }
 
 public Action ADMDelBot(int client, int args)
 {
-    if (client == 0 || (IsValidClient(client) && GetUserAdmin(client).ImmunityLevel < 90) || !iEnable)
+    if (client == 0 || !iEnable) return Plugin_Handled;
+
+    AdminId id = GetUserAdmin(client);
+    if (id == INVALID_ADMIN_ID || GetAdminImmunityLevel(id) < 90)
         return Plugin_Handled;
 
     if (!KickAnySurvivorBot())
     {
-        PrintToChat(client, "\x04不存在未接管的Bot。");
+        PrintToChat(client, "不存在未接管的Bot。");
     }
     else
     {
@@ -504,7 +516,7 @@ void KickMoreTank(bool autoKick)
     if (tn <= 1)
     {
         if (!autoKick)
-            PrintToChatAll("\x04一切正常，还想踢克逃课？");
+            PrintToChatAll("一切正常，还想踢克逃课？");
         return;
     }
 
@@ -517,7 +529,7 @@ void KickMoreTank(bool autoKick)
         if (c == keep) continue;
         KickClient(c, "过分了啊，一个克就够难了, %N 被踢出", c);
     }
-    PrintToChatAll("\x04已经踢出多余的克");
+    PrintToChatAll("已经踢出多余的克");
 }
 
 bool IsAiTank(int client)
@@ -594,7 +606,7 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 public Action L4D_OnFirstSurvivorLeftSafeArea()
 {
     SetBot(0, 0);
-    if (!IsRealismCoop())
+    if (!IsRealismORCoop())
         CreateTimer(0.5, Timer_AutoGive, _, TIMER_FLAG_NO_MAPCHANGE);
     return Plugin_Stop;
 }
@@ -611,8 +623,8 @@ public Action Timer_AutoGive(Handle timer)
         BypassAndExecuteCommand(i, "give", "pain_pills");
         BypassAndExecuteCommand(i, "give", "health");
         SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
-        SetEntProp(i, Prop_Send, "m_currentReviveCount", 0);
-        SetEntProp(i, Prop_Send, "m_bIsOnThirdStrike", false);
+        SetEntProp(i,   Prop_Send, "m_currentReviveCount", 0);
+        SetEntProp(i,   Prop_Send, "m_bIsOnThirdStrike", false);
 
         if (IsFakeClient(i))
         {
@@ -669,12 +681,12 @@ void RestoreHealth()
 
         BypassAndExecuteCommand(i, "give", "health");
         SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
-        SetEntProp(i, Prop_Send, "m_currentReviveCount", 0);
-        SetEntProp(i, Prop_Send, "m_bIsOnThirdStrike", false);
+        SetEntProp(i,   Prop_Send, "m_currentReviveCount", 0);
+        SetEntProp(i,   Prop_Send, "m_bIsOnThirdStrike", false);
     }
 }
 
-// 新增：最低 50 实血 + 重置倒地次数（>=50 不变）
+// 最低 50 实血 + 重置倒地次数（>=50 不变）
 void ApplyHealFloorTo50()
 {
     for (int i = 1; i <= MaxClients; i++)
@@ -687,8 +699,6 @@ void ApplyHealFloorTo50()
 
         SetEntProp(i, Prop_Send, "m_currentReviveCount", 0);
         SetEntProp(i, Prop_Send, "m_bIsOnThirdStrike", false);
-        // 如需清空临时血，取消注释下一行：
-        // SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
     }
 }
 
@@ -749,7 +759,7 @@ void AnnounceBW(int client)
         PrintHintText(client, "你现在黑白（再次倒地会直接死亡）！");
     }
 
-    if (g_bwSound[0] != '\0')
+    if (g_bwSound[0] != ' ')
     {
         for (int i = 1; i <= MaxClients; i++)
             if (IsValidClient(i) && GetClientTeam(i) == 2)
@@ -774,7 +784,7 @@ public Action Timer_CheckBW(Handle timer, any userid)
 public void CvarChanged_BWSound(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     convar.GetString(g_bwSound, sizeof(g_bwSound));
-    if (g_bwSound[0] != '\0')
+    if (g_bwSound[0] != ' ')
         PrecacheSound(g_bwSound, true);
 }
 
@@ -809,21 +819,22 @@ bool IsThirdStrike(int client)
 public Action OnNormalSound(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH],
                             int &entity, int &channel, float &volume, int &level, int &pitch, int &flags)
 {
-    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
+    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismORCoop()) ? Plugin_Stop : Plugin_Continue;
 }
 
 public Action OnAmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float &volume,
                              int &level, int &pitch, float pos[3], int &flags, float &delay)
 {
-    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismCoop()) ? Plugin_Stop : Plugin_Continue;
+    return (StrContains(sample, "firewerks", true) > -1 && !IsRealismORCoop()) ? Plugin_Stop : Plugin_Continue;
 }
 
-stock bool IsRealismCoop()
+stock bool IsRealismORCoop()
 {
     char plugin_name[120];
-    if (FindConVar("l4d_ready_cfg_name") == null)
+    ConVar h = FindConVar("l4d_ready_cfg_name");
+    if (h == null)
         return false;
 
-    GetConVarString(FindConVar("l4d_ready_cfg_name"), plugin_name, sizeof(plugin_name));
-    return (StrContains(plugin_name, "AnneCoop", false) != -1);
+    h.GetString(plugin_name, sizeof(plugin_name));
+    return (StrContains(plugin_name, "AnneCoop", false) != -1 || StrContains(plugin_name, "AnneRealism", false) != -1);
 }
