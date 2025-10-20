@@ -5,19 +5,33 @@
 #include <sdktools>
 #include <SteamWorks>
 
-// =====================================================
-//  Anne 系列：服务器名 + GameDescription 动态更新（按你的新规则）
-//  - 未载入配置：GameDescription = "电信服"
-//  - 已载入配置：GameDescription = "电信服-普通药役[几特几秒]"
-//  - 服务器名：hostname设置的名字[普通药役][缺人][无mod][几特几秒]
-// =====================================================
+/*
+ * =====================================================
+ *  Anne 系列：服务器名 + GameDescription 动态更新
+ *  规则：
+ *  - 未载入配置（l4d_ready_cfg_name 为空/无）：GameDescription = "电信服"
+ *  - 载入配置：GameDescription = "电信服-<模式>[<几特><几秒>]"
+ *      * <模式>：普通药役/硬核药役/Anne战役/Anne写实/牛牛冲刺/HT训练/女巫派对/单人装逼/或原 cfg 名
+ *      * Anne战役/Anne写实：几特几秒来自 dirspawn_count / dirspawn_interval
+ *      * 其它：来自 l4d_infected_limit / versus_special_respawn_interval
+ *  - 服务器名（房间名）：{hostname}{gamemode}
+ *      => hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]
+ *      * [缺人]：未满员显示（Anne 系列只看幸存者位）
+ *      * [无mod]：l4d2_addons_eclipse == 0 时显示
+ *
+ *  性能与节流：
+ *  - 开服 / OnConfigsExecuted：立即重算一次 description（仅写缓存）
+ *  - 每 10 秒重算一次 description（仅写缓存）
+ *  - OnGameFrame：仅在缓存与上次推送不同的时候调用 SteamWorks_SetGameDescription 推送
+ * =====================================================
+ */
 
 public Plugin myinfo =
 {
     name        = "Anne ServerName & GameDescription",
     author      = "东",
     description = "动态服务器名 + GameDescription [几特几秒]",
-    version     = "1.3.0",
+    version     = "1.4.0",
     url         = ""
 };
 
@@ -25,12 +39,12 @@ public Plugin myinfo =
 // ConVars
 // -----------------------------
 ConVar
-    cvarServerNameFormatCase1,   // 用于生成后缀（作为 {gamemode} 注入）
+    cvarServerNameFormatCase1,   // 用于生成服务器名后缀（{Confogl}{Full}{MOD}{AnneHappy}）
     cvarMpGameMode,              // 实际是 l4d_ready_cfg_name
     cvarSI,                      // l4d_infected_limit
     cvarMpGameMin,               // versus_special_respawn_interval
     cvarHostName,                // hostname
-    cvarMainName,                // sn_main_name
+    cvarMainName,                // sn_main_name（默认“电信服”）
     cvarMod,                     // l4d2_addons_eclipse
     cvarHostPort,                // hostport
     cvarDirCount,                // dirspawn_count
@@ -44,11 +58,11 @@ Handle HostName = INVALID_HANDLE; // KeyValues: 端口 → servername 映射
 char SavePath[256];
 char g_sDefaultN[68];
 
-ConVar g_hHostNameFormat;        // sn_hostname_format（{hostname}{gamemode}）
+ConVar g_hHostNameFormat;        // sn_hostname_format（默认 "{hostname}{gamemode}"）
 
-// ======= GameDescription 缓存与节流 =======
-static char  g_sLastDesc[128];
-static float g_fNextDescUpdate = 0.0;
+// ======= GameDescription 推送缓存与定时器 =======
+static char  g_sDescComputed[128];   // 最近一次“重算”得到的描述
+Handle       g_hDescTimer = null;    // 10s 周期定时器
 
 // -----------------------------
 // Lifecycle
@@ -64,27 +78,22 @@ public void OnPluginStart()
 
     cvarHostName = FindConVar("hostname");
     cvarHostPort = FindConVar("hostport");
-    // 按你的要求把默认主名改为“电信服”
+
+    // 默认主名按你的要求设为“电信服”
     cvarMainName = CreateConVar("sn_main_name", "电信服");
-    // 保留 {gamemode}，我们把“[普通药役][缺人][无mod][几特几秒]”作为 gamemode 注入
+
+    // {hostname}{gamemode}：{gamemode} 会被我们构造的后缀替换
     g_hHostNameFormat = CreateConVar("sn_hostname_format", "{hostname}{gamemode}");
-    // 这里的模板仅作为“后缀生成”的占位容器
+
+    // 用于生成服务器名后缀的模板
     cvarServerNameFormatCase1 = CreateConVar("sn_hostname_format1", "{Confogl}{Full}{MOD}{AnneHappy}");
+
     cvarMod = FindConVar("l4d2_addons_eclipse");
 
+    // 人数变化时刷新服务器名（不触发 description 重算）
     HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
     HookEvent("player_bot_replace", Event_PlayerTeam, EventHookMode_Post);
     HookEvent("bot_player_replace", Event_PlayerTeam, EventHookMode_Post);
-}
-
-public void OnPluginEnd()
-{
-    cvarMpGameMode   = null;
-    cvarMpGameMin    = null;
-    cvarSI           = null;
-    cvarMod          = null;
-    cvarDirCount     = null;
-    cvarDirInterval  = null;
 }
 
 public void OnAllPluginsLoaded()
@@ -107,6 +116,7 @@ public void OnConfigsExecuted()
     if (cvarDirCount == null)          cvarDirCount = FindConVar("dirspawn_count");
     if (cvarDirInterval == null)       cvarDirInterval = FindConVar("dirspawn_interval");
 
+    // 关心的 ConVar 仅用于“服务器名”即时刷新；description 改为定时重算
     if (cvarSI != null)                cvarSI.AddChangeHook(OnCvarChanged);
     if (cvarMpGameMin != null)         cvarMpGameMin.AddChangeHook(OnCvarChanged);
     if (cvarMpGameMode != null)        cvarMpGameMode.AddChangeHook(OnCvarChanged);
@@ -114,11 +124,17 @@ public void OnConfigsExecuted()
     if (cvarDirCount != null)          cvarDirCount.AddChangeHook(OnCvarChanged);
     if (cvarDirInterval != null)       cvarDirInterval.AddChangeHook(OnCvarChanged);
 
-    Update();
-}
+    // 开服后：立即重算一次（只写缓存）
+    RecomputeDescriptionCached();
 
-public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
-{
+    // 启动/重启 10s 定时器（只重算缓存，不推送）
+    if (g_hDescTimer != null) {
+        CloseHandle(g_hDescTimer);
+        g_hDescTimer = null;
+    }
+    g_hDescTimer = CreateTimer(10.0, Timer_RecomputeDesc, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+
+    // 刷新服务器名（房间名）
     Update();
 }
 
@@ -133,53 +149,83 @@ public void OnMapStart()
     {
         FileToKeyValues(HostName, SavePath);
     }
+
+    // 换图时也重算一次缓存
+    RecomputeDescriptionCached();
+}
+
+public void OnPluginEnd()
+{
+    if (g_hDescTimer != null) {
+        CloseHandle(g_hDescTimer);
+        g_hDescTimer = null;
+    }
+    if (HostName != INVALID_HANDLE) {
+        CloseHandle(HostName);
+        HostName = INVALID_HANDLE;
+    }
+
+    cvarMpGameMode   = null;
+    cvarMpGameMin    = null;
+    cvarSI           = null;
+    cvarMod          = null;
+    cvarDirCount     = null;
+    cvarDirInterval  = null;
+}
+
+public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
+{
+    // 人员变化：只更新服务器名（不重算 description）
+    Update();
 }
 
 public void OnCvarChanged(ConVar cvar, const char[] oldVal, const char[] newVal)
 {
+    // ConVar 变化：只更新服务器名（description 交给 10s 定时器）
     Update();
 }
 
 // -----------------------------
-// 主更新入口
+// 主更新入口（仅服务器名；description 不在此推送）
 // -----------------------------
 public void Update()
 {
     if (cvarMpGameMode == null) {
-        // 没有模式 cvar（极早期阶段）仅更名，不加后缀
         ChangeServerName();
     } else {
-        // 按你的规则构造“[普通药役][缺人][无mod][几特几秒]”后缀并注入
         UpdateServerName();
-    }
-
-    // 立即推一次 GameDescription
-    char desc[128];
-    BuildGameDescription(desc, sizeof(desc));
-    SteamWorks_SetGameDescription(desc);
-    strcopy(g_sLastDesc, sizeof(g_sLastDesc), desc);
-}
-
-// 每 2 秒检查一次差异，有变化才写
-public void OnGameFrame()
-{
-    float now = GetEngineTime();
-    if (now < g_fNextDescUpdate)
-        return;
-
-    g_fNextDescUpdate = now + 2.0;
-
-    char desc[128];
-    BuildGameDescription(desc, sizeof(desc));
-
-    if (!StrEqual(g_sLastDesc, desc)) {
-        SteamWorks_SetGameDescription(desc);
-        strcopy(g_sLastDesc, sizeof(g_sLastDesc), desc);
     }
 }
 
 // -----------------------------
-// 构造 GameDescription 文本（按你的新格式）
+// 每帧只负责“必要的推送”，完全不参与计算
+// -----------------------------
+public void OnGameFrame()
+{
+    SteamWorks_SetGameDescription(g_sDescComputed);
+}
+
+// -----------------------------
+// 定时重算（10s），只更新缓存
+// -----------------------------
+public Action Timer_RecomputeDesc(Handle timer, any data)
+{
+    RecomputeDescriptionCached();
+    return Plugin_Continue;
+}
+
+// -----------------------------
+// 立即按当前 cvar 重算一次描述（只写入缓存）
+// -----------------------------
+void RecomputeDescriptionCached()
+{
+    char desc[128];
+    BuildGameDescription(desc, sizeof(desc));
+    strcopy(g_sDescComputed, sizeof(g_sDescComputed), desc);
+}
+
+// -----------------------------
+// 构造 GameDescription 文本（跟随模式标签）：
 // 未载入配置：电信服
 // 已载入配置：电信服-<模式>[<几特><几秒>]
 // -----------------------------
@@ -198,7 +244,7 @@ void BuildGameDescription(char[] out, int maxlen)
         return;
     }
 
-    // 模式识别（与 UpdateServerName 保持一致）
+    // 模式识别
     bool isAnneHappy    = (StrContains(cfg, "AnneHappy",   false) != -1);
     bool isHardCore     = (StrContains(cfg, "HardCore",    false) != -1);
     bool isAnneCoop     = (StrContains(cfg, "AnneCoop",    false) != -1);
@@ -235,14 +281,14 @@ void BuildGameDescription(char[] out, int maxlen)
     int  siInterval   = -1;
 
     if (usesDirSpawn) {
-        if (cvarDirCount != null)    siCount = GetConVarInt(cvarDirCount);
-        else if (cvarSI != null)     siCount = GetConVarInt(cvarSI);
+        if (cvarDirCount != null)        siCount = GetConVarInt(cvarDirCount);
+        else if (cvarSI != null)         siCount = GetConVarInt(cvarSI);
 
-        if (cvarDirInterval != null) siInterval = RoundToNearest(GetConVarFloat(cvarDirInterval));
-        else if (cvarMpGameMin != null) siInterval = GetConVarInt(cvarMpGameMin);
+        if (cvarDirInterval != null)     siInterval = RoundToNearest(GetConVarFloat(cvarDirInterval));
+        else if (cvarMpGameMin != null)  siInterval = GetConVarInt(cvarMpGameMin);
     } else {
-        if (cvarSI != null)          siCount = GetConVarInt(cvarSI);
-        if (cvarMpGameMin != null)   siInterval = GetConVarInt(cvarMpGameMin);
+        if (cvarSI != null)              siCount = GetConVarInt(cvarSI);
+        if (cvarMpGameMin != null)       siInterval = GetConVarInt(cvarMpGameMin);
     }
 
     // 最终格式：电信服-<模式>[<几特><几秒>]
@@ -253,7 +299,9 @@ void BuildGameDescription(char[] out, int maxlen)
     }
 }
 
-
+// -----------------------------
+// 服务器名构建（hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]）
+// -----------------------------
 public void UpdateServerName()
 {
     char sReadyUpCfgName[128], FinalHostname[128], buffer[128];
@@ -355,8 +403,7 @@ public void UpdateServerName()
     ChangeServerName(FinalHostname);
 }
 
-
-// 是否满员（Anne：只看幸存者；其他不需要）
+// 是否满员（Anne：只看幸存者；其他：幸存者+特感玩家）
 bool IsTeamFull(bool IsAnne = false)
 {
     int sum = 0;
@@ -387,9 +434,9 @@ public bool IsValidClient(int client)
 
 // -----------------------------
 // 应用最终服务器名（支持端口映射）
-// {hostname}{gamemode}：gamemode 即我们构造的“[普通药役][缺人][无mod][几特几秒]”
+// {hostname}{gamemode}：gamemode 即我们构造的“[<模式>][缺人][无mod][<几特><几秒>]”
 // -----------------------------
-void ChangeServerName(char[] suffix = "")
+void ChangeServerName(const char[] suffix = "")
 {
     char sPath[128], ServerPort[128];
     GetConVarString(cvarHostPort, ServerPort, sizeof(ServerPort));
