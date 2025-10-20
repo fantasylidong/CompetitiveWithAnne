@@ -1,4 +1,4 @@
-#pragma semicolon 1 
+#pragma semicolon 1
 #pragma newdecls required
 #include <sourcemod>
 #include <sdktools>
@@ -17,9 +17,9 @@
 #define GAMEDATA				"A2S_Info_Edit"
 
 #define PLUGIN_NAME				"A2S_INFO Edit | A2S_INFO 信息修改"
-#define PLUGIN_AUTHOR			"yuzumi (mode suffix by morzlee)"
-#define PLUGIN_VERSION			"1.1.3-modesuffix"
-#define PLUGIN_DESCRIPTION		"DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息（自动追加模式与特感信息）"
+#define PLUGIN_AUTHOR			"yuzumi"
+#define PLUGIN_VERSION			"1.1.3"
+#define PLUGIN_DESCRIPTION		"DIY Server A2S_INFO Information | 定义自己服务器的A2S_INFO信息"
 #define PLUGIN_URL				"https://github.com/joyrhyme/L4D2-Plugins/tree/main/A2S_Info_Edit"
 #define CVAR_FLAGS				FCVAR_NOTIFY
 
@@ -40,8 +40,7 @@ Localizer
 
 // 记录内存修补数据
 MemoryPatch
-	g_mMapNamePatch,
-	g_mGameDesPatch;
+	g_mMapNamePatch;
 
 // SDKCall地址
 Address
@@ -65,36 +64,25 @@ bool
 
 // ConVars
 ConVar
-	g_hMPGameMode,           // mp_gamemode（仅备份）
+	g_hMPGameMode,
 	g_hMapNameLang,
 	g_hMapNameType,
-	g_hAllBotGame,
+	g_hAllBotGame;
 
-	// 新增：用于拼接描述的模式/特感相关 cvar
-	g_hReadyCfgName,         // l4d_ready_cfg_name（优先用于模式判定）
-	g_hInfectedLimit,        // l4d_infected_limit
-	g_hRespawnInterval,      // versus_special_respawn_interval
-	g_hDirCount,             // dirspawn_count
-	g_hDirInterval,          // dirspawn_interval
-	g_hModFlag;              // l4d2_addons_eclipse（备用，暂未加入描述）
-	
 // 存放修改后地图名称/游戏描述/模式名的变量
 char
-	g_cMap[64],
+	g_cMap[128],
 	g_cMode[64],
 	g_cLanguage[5],
-	g_cGameDes[192],         // 当前实际写入 A2S 的描述（含追加后缀）
-	g_cBaseGameDes[128],      // 基础描述（来自 cfg）
 	g_cInFinale[32],
 	g_cNotInFinale[32],
-	g_cMapName[196],
-	g_cCampaignName[96],
-	g_cChapterName[96];
+	g_cMapName[64],
+	g_cCampaignName[64],
+	g_cChapterName[64];
 
 // 存放数值的变量
 int
 	g_iMapNameOS,
-	g_iGameDesOS,
 	g_iChapterNum,
 	g_iChapterMaxNum,
 	g_iMapNameType;
@@ -135,23 +123,14 @@ public void OnPluginStart() {
 	InitGameData();
 
 	// 创建Cvars
-	g_hMapNameType = CreateConVar("a2s_info_mapname_type", "2", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
+	g_hMapNameType = CreateConVar("a2s_info_mapname_type", "5", "A2S_INFO MapName DisplayType. 1.Mission, 2.Mission&Chapter, 3.Mission&FinaleType, 4.Mission&Chapter&FinaleType, 5.Mission&[ChapterNum|MaxChapter]", CVAR_FLAGS, true, 1.0, true, 5.0);
 	g_hMapNameLang = CreateConVar("a2s_info_mapname_language", "chi", "What language is used in the generated PhraseFile to replace the TranslatedText of en? (Please Delete All A2S_Edit PhraseFile After Change This Cvar to Regenerate)", CVAR_FLAGS);
 	
-	g_hMPGameMode   = FindConVar("mp_gamemode"); // 备份
-	g_hAllBotGame   = FindConVar("sb_all_bot_game");
-
-	// 新增：用于模式与特感的 ConVar 获取
-	g_hReadyCfgName   = FindConVar("l4d_ready_cfg_name");
-	g_hInfectedLimit  = FindConVar("l4d_infected_limit");
-	g_hRespawnInterval= FindConVar("versus_special_respawn_interval");
-	g_hDirCount       = FindConVar("dirspawn_count");
-	g_hDirInterval    = FindConVar("dirspawn_interval");
-	g_hModFlag        = FindConVar("l4d2_addons_eclipse"); // 目前未用于 description
-
-	if (g_hAllBotGame && g_hAllBotGame.IntValue == 1)
+	g_hMPGameMode = FindConVar("mp_gamemode");
+	g_hAllBotGame = FindConVar("sb_all_bot_game");
+	if (g_hAllBotGame.IntValue == 1)
 		g_bisAllBotGame = true;
-	else if (g_hAllBotGame)
+	else
 		g_hAllBotGame.IntValue = 1;
 
 	// 初始化Cvars
@@ -159,18 +138,9 @@ public void OnPluginStart() {
 	GetCvars_Lang();
 	GetCvars();
 	
-	// 变更监听（原有）
 	g_hMapNameLang.AddChangeHook(ConVarChanged_Lang);
-	if (g_hMPGameMode) g_hMPGameMode.AddChangeHook(ConVarChanged_Mode);
+	g_hMPGameMode.AddChangeHook(ConVarChanged_Mode);
 	g_hMapNameType.AddChangeHook(ConVarChanged_Cvars);
-
-	// 新增：与拼接描述相关的变更监听
-	if (g_hReadyCfgName)   g_hReadyCfgName.AddChangeHook(ConVarChanged_DescRelated);
-	if (g_hInfectedLimit)  g_hInfectedLimit.AddChangeHook(ConVarChanged_DescRelated);
-	if (g_hRespawnInterval)g_hRespawnInterval.AddChangeHook(ConVarChanged_DescRelated);
-	if (g_hDirCount)       g_hDirCount.AddChangeHook(ConVarChanged_DescRelated);
-	if (g_hDirInterval)    g_hDirInterval.AddChangeHook(ConVarChanged_DescRelated);
-	if (g_hModFlag)        g_hModFlag.AddChangeHook(ConVarChanged_DescRelated);
 
 	AutoExecConfig(true, "A2S_Edit");
 
@@ -203,8 +173,6 @@ public void OnPluginStart() {
 
 void ConVarChanged_Mode(ConVar convar, const char[] oldValue, const char[] newValue) {
 	GetCvars_Mode();
-	// 模式变更时也更新描述（以防只配置 mp_gamemode 的情况）
-	UpdateGameDescription();
 }
 
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue) {
@@ -215,13 +183,8 @@ void ConVarChanged_Lang(ConVar convar, const char[] oldValue, const char[] newVa
 	GetCvars_Lang();
 }
 
-// 新增：凡是会影响描述拼接的 cvar，统一走这里
-void ConVarChanged_DescRelated(ConVar convar, const char[] oldValue, const char[] newValue) {
-	UpdateGameDescription();
-}
-
 void GetCvars_Mode() {
-	if (g_hMPGameMode) g_hMPGameMode.GetString(g_cMode, sizeof(g_cMode));
+	g_hMPGameMode.GetString(g_cMode, sizeof(g_cMode));
 }
 
 void GetCvars_Lang() {
@@ -237,8 +200,7 @@ void GetCvars() {
 	if (g_bLocInit && g_bMissionCached) {
 		ChangeMapName();
 	}
-	// 同步更新一次描述
-	UpdateGameDescription();
+
 }
 
 public void OnConfigsExecuted() {
@@ -247,8 +209,6 @@ public void OnConfigsExecuted() {
 
 	if(!g_bMissionCached)
 		CacheMissionInfo();
-	// 配置执行完，确保描述已经拼好
-	UpdateGameDescription();
 }
 
 // 重载插件所用的文本配置
@@ -259,8 +219,6 @@ Action cmdReload(int client, int args) {
 	}
 	
 	PrintToServer("[A2S_Edit] a2s_edit.cfg is reloaded");
-	// 重新读取 kv 后，刷新描述
-	UpdateGameDescription();
 	return Plugin_Handled;
 }
 
@@ -272,8 +230,6 @@ public void OnMapStart() {
 	} else {
 		OnMapStartedPost();
 	}
-	// 地图开始时也刷新描述
-	UpdateGameDescription();
 }
 
 // 地图结束
@@ -319,6 +275,10 @@ void Event_FinaleStart(Event hEvent, const char[] name, bool dontBroadcast) {
 		PrintToServer("[A2S_Edit] Start Finale Process!");
 	#endif
 
+	/* 
+		判断救援流程标记变量为false时
+		(因为此函数绑定多个救援事件(防止部分三方图的奇怪终局),防止重复触发)
+	*/
 	if (!g_bFinaleStarted) {
 		g_bFinaleStarted = true;
 		ChangeMapName();
@@ -341,7 +301,7 @@ Action tChangeMapName(Handle timer) {
 	// 本地化文本/Cvars/任务信息缓存都完成时
 	if (g_bLocInit && g_bMissionCached) {
 		ChangeMapName();
-		if (!g_bisAllBotGame && g_hAllBotGame)
+		if (!g_bisAllBotGame)
 			g_hAllBotGame.IntValue = 0;
 		return Plugin_Stop;
 	}
@@ -379,7 +339,7 @@ void ChangeMapName() {
 	// 获取要显示的的类型
 	switch (g_iMapNameType) {
 		case 1:
-			FormatEx(g_cMapName, sizeof(g_cMapName), "%s", g_cCampaignName); // ex. 死亡中心
+			FormatEx(g_cMapName, sizeof(g_cMapName), "%s[%d]", g_cCampaignName, g_iChapterNum); // ex. 死亡中心
 
 		case 2:
 			FormatEx(g_cMapName, sizeof(g_cMapName), "%s [%s]", g_cCampaignName, g_cChapterName); // ex. 死亡中心 [1: 酒店]
@@ -438,116 +398,6 @@ void ChangeMapName() {
 			LogAction(0, -1, "是否已开始救援事件: %s", g_bFinaleStarted ? "是" : "否");
 		LogAction(0, -1, "=========== [DEBUG END] ===========");
 	#endif
-}
-
-// =============== 新增：描述拼接 ===============
-// 读取 ready cfg 名称（优先 l4d_ready_cfg_name，次选 mp_gamemode）
-void GetReadyConfigName(char[] buffer, int maxlen) {
-	buffer[0] = '\0';
-	if (g_hReadyCfgName) {
-		g_hReadyCfgName.GetString(buffer, maxlen);
-	}
-	if (!buffer[0] && g_hMPGameMode) {
-		g_hMPGameMode.GetString(buffer, maxlen);
-	}
-}
-
-// 构造模式与特感信息的后缀（如 [普通药役][4特18秒]）
-void BuildModeSuffix(char[] buffer, int maxlen) {
-	char cfg[128];
-	GetReadyConfigName(cfg, sizeof(cfg));
-	
-	bool isAnneHappy   = (StrContains(cfg, "AnneHappy",  false) != -1);
-	bool isAnneCoop    = (StrContains(cfg, "AnneCoop",   false) != -1);
-	bool isAnneRealism = (StrContains(cfg, "AnneRealism",false) != -1);
-	bool otherMode     = false;
-
-	char modeTag[48] = "";
-	if (isAnneHappy) {
-		if (StrContains(cfg, "HardCore", false) != -1)
-			strcopy(modeTag, sizeof(modeTag), "[硬核药役]");
-		else
-			strcopy(modeTag, sizeof(modeTag), "[普通药役]");
-	}
-	else if (isAnneCoop) {
-		strcopy(modeTag, sizeof(modeTag), "[Anne战役]");
-	}
-	else if (isAnneRealism) {
-		strcopy(modeTag, sizeof(modeTag), "[Anne写实]");
-	}
-	else if (StrContains(cfg, "AllCharger", false) != -1) {
-		strcopy(modeTag, sizeof(modeTag), "[牛牛冲刺]");
-		otherMode = true;
-	}
-	else if (StrContains(cfg, "1vHunters", false) != -1) {
-		strcopy(modeTag, sizeof(modeTag), "[HT训练]");
-		otherMode = true;
-	}
-	else if (StrContains(cfg, "WitchParty", false) != -1) {
-		strcopy(modeTag, sizeof(modeTag), "[女巫派对]");
-		otherMode = true;
-	}
-	else if (StrContains(cfg, "Alone", false) != -1) {
-		strcopy(modeTag, sizeof(modeTag), "[单人装逼]");
-		otherMode = true;
-	}
-	else {
-		// 其它未知模式就不加模式名，保持干净
-		modeTag[0] = '\0';
-	}
-
-	int siCount = 0;
-	int siInterval = -1;
-	bool isAnne = (isAnneHappy || isAnneCoop || isAnneRealism || otherMode);
-
-	// AnneCoop/AnneRealism 优先用导演刷特（dirspawn），否则用 AnneHappy 的那组
-	if (isAnneCoop || isAnneRealism) {
-		if (g_hDirCount)      siCount = g_hDirCount.IntValue;
-		else if (g_hInfectedLimit) siCount = g_hInfectedLimit.IntValue;
-
-		if (g_hDirInterval)   siInterval = RoundToNearest(g_hDirInterval.FloatValue);
-		else if (g_hRespawnInterval) siInterval = g_hRespawnInterval.IntValue;
-	}
-	else if (isAnne) {
-		if (g_hInfectedLimit)     siCount = g_hInfectedLimit.IntValue;
-		if (g_hRespawnInterval)   siInterval = g_hRespawnInterval.IntValue;
-	}
-
-	char siTag[32] = "";
-	if (isAnne && siCount > 0 && siInterval >= 0) {
-		FormatEx(siTag, sizeof(siTag), "[%d特%d秒]", siCount, siInterval);
-	}
-
-	// 汇总输出
-	if (modeTag[0] || siTag[0]) {
-		FormatEx(buffer, maxlen, "%s%s", modeTag, siTag);
-	} else {
-		buffer[0] = '\0';
-	}
-}
-
-// 实际更新 g_cGameDes，并下发 A2S（SendUpdatedServerDetails）
-void UpdateGameDescription() {
-	char suffix[80];
-	BuildModeSuffix(suffix, sizeof(suffix));
-
-	if (suffix[0]) {
-		FormatEx(g_cGameDes, sizeof(g_cGameDes), "%s%s", g_cBaseGameDes, suffix);
-	} else {
-		// 没有可用信息则只用基础描述
-		strcopy(g_cGameDes, sizeof(g_cGameDes), g_cBaseGameDes);
-	}
-
-	// 推送到 A2S
-	g_pSteam3Server = SDKCall(g_hSDK_GetSteam3Server);
-	if (g_pSteam3Server && LoadFromAddress(g_pSteam3Server + view_as<Address>(4), NumberType_Int32)) {
-		SDKCall(g_hSDK_SendServerInfo, g_pSteam3Server);
-		#if DEBUG
-			PrintToServer("[A2S_Edit] GameDescription updated: %s", g_cGameDes);
-		#endif
-	} else {
-		LogError("[A2S_Edit] Failed to get Steam3Server, UpdateGameDescription Failed!");
-	}
 }
 
 // DEBUG用 输出Kv的全部内容
@@ -672,17 +522,7 @@ void InitGameData() {
 	else if (g_mMapNamePatch.Enable()) {
 		StoreToAddress(g_mMapNamePatch.Address + view_as<Address>(g_iMapNameOS), view_as<int>(GetAddressOfString(g_cMapName)), NumberType_Int32);
 		PrintToServer("[A2S_EDIT] Enabled patch: \"RebuildInfo_MapName\"");
-	}
-
-	// A2S_INFO 的游戏描述
-	g_iGameDesOS = hGameData.GetOffset("OS") ? 4 : 1;
-	g_mGameDesPatch = MemoryPatch.CreateFromConf(hGameData, "GameDescription");
-	if (!g_mGameDesPatch.Validate())
-		SetFailState("Failed to verify patch: \"GameDescription\"");
-	else if (g_mGameDesPatch.Enable()) {
-		// 注意：这里的指针指向 g_cGameDes（运行时我们会把 base + suffix 写进它）
-		StoreToAddress(g_mGameDesPatch.Address + view_as<Address>(g_iGameDesOS), view_as<int>(GetAddressOfString(g_cGameDes)), NumberType_Int32);
-		PrintToServer("[A2S_EDIT] Enabled patch: \"GameDescription\"");
+		//g_bMapNamePatchEnable = true;
 	}
 
 	delete hGameData;
@@ -720,7 +560,6 @@ bool InitKvFile() {
 		delete file;
 
 		// 写出默认值内容
-		kv.SetString("description", "电信服");
 		kv.SetString("inFinale", "救援正进行");
 		kv.SetString("notInFinale", "救援未进行");
 
@@ -732,13 +571,9 @@ bool InitKvFile() {
 		return false;
 	}
 
-	// 获取Kv文本内信息写入变量中（保留基础描述与可变描述）
-	kv.GetString("description", g_cBaseGameDes, sizeof(g_cBaseGameDes), "电信服");
+	// 获取Kv文本内信息写入变量中
 	kv.GetString("inFinale", g_cInFinale, sizeof(g_cInFinale), "救援正进行");
 	kv.GetString("notInFinale", g_cNotInFinale, sizeof(g_cNotInFinale), "救援未进行");
-
-	// 初始化时把当前描述设为基础描述，随后 UpdateGameDescription 会拼接后缀并下发
-	strcopy(g_cGameDes, sizeof(g_cGameDes), g_cBaseGameDes);
 
 	delete kv;
 	return true;
@@ -827,7 +662,7 @@ void OnPhrasesReady() {
 	}
 
 	char FilePath[PLATFORM_MAX_PATH];
-	// 写出任务信息到文件（写到 en，随后由 g_cLanguage 覆盖 en）
+	// 写出任务信息到文件
 	BuildPhrasePath(FilePath, sizeof(FilePath), TRANSLATION_MISSIONS, "en");
 	BuildPhraseFile(FilePath, al_missions, esp);
 

@@ -1,9 +1,32 @@
-#pragma semicolon 1 
+#pragma semicolon 1
 #pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
+#include <SteamWorks>
 
+// =====================================================
+//  Anne 系列：服务器名 + GameDescription 动态更新
+//  - 服务器名支持端口映射、多模式标签、缺人/无MOD 标签
+//  - GameDescription 显示：电信服-<模式>[<几特><几秒>]
+//    * Anne战役 / Anne写实：用 dirspawn_count / dirspawn_interval
+//    * 其它 Anne 系列（普通/硬核、牛牛冲刺、HT 训练、女巫派对、单人装逼）：
+//      用 l4d_infected_limit / versus_special_respawn_interval
+//  - 轻量节流：配置变化即刻推一次，OnGameFrame 每 2 秒检查差异后再更新
+// =====================================================
+
+public Plugin myinfo =
+{
+    name        = "Anne ServerName & GameDescription",
+    author      = "东",
+    description = "动态服务器名 + GameDescription [几特几秒]",
+    version     = "1.2.0",
+    url         = ""
+};
+
+// -----------------------------
+// ConVars
+// -----------------------------
 ConVar
     cvarServerNameFormatCase1,
     cvarMpGameMode,            // 实际上是 l4d_ready_cfg_name
@@ -13,23 +36,30 @@ ConVar
     cvarMainName,
     cvarMod,                   // l4d2_addons_eclipse
     cvarHostPort,
-    cvarDirCount,              // NEW: dirspawn_count（AnneCoop/AnneRealism 用）
-    cvarDirInterval;           // NEW: dirspawn_interval（AnneCoop/AnneRealism 用）
+    cvarDirCount,              // AnneCoop/AnneRealism → dirspawn_count
+    cvarDirInterval;           // AnneCoop/AnneRealism → dirspawn_interval
 
-Handle
-    HostName = INVALID_HANDLE;
+// -----------------------------
+// 其它全局
+// -----------------------------
+Handle HostName = INVALID_HANDLE; // KeyValues: 端口 → servername 映射
 
-char
-    SavePath[256],
-    g_sDefaultN[68];
+char SavePath[256];
+char g_sDefaultN[68];
 
-static Handle
-    g_hHostNameFormat;
+ConVar g_hHostNameFormat;        // sn_hostname_format
 
+// ======= GameDescription 缓存与节流 =======
+static char  g_sLastDesc[128];
+static float g_fNextDescUpdate = 0.0;
+
+// -----------------------------
+// Lifecycle
+// -----------------------------
 public void OnPluginStart()
 {
     HostName = CreateKeyValues("AnneHappy");
-    BuildPath(Path_SM, SavePath, 255, "configs/hostname/hostname.txt");
+    BuildPath(Path_SM, SavePath, sizeof(SavePath) - 1, "configs/hostname/hostname.txt");
     if (FileExists(SavePath))
     {
         FileToKeyValues(HostName, SavePath);
@@ -49,12 +79,12 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
-    cvarMpGameMode = null;
-    cvarMpGameMin = null;
-    cvarSI = null;
-    cvarMod = null;
-    cvarDirCount = null;
-    cvarDirInterval = null;
+    cvarMpGameMode   = null;
+    cvarMpGameMin    = null;
+    cvarSI           = null;
+    cvarMod          = null;
+    cvarDirCount     = null;
+    cvarDirInterval  = null;
 }
 
 public void OnAllPluginsLoaded()
@@ -64,7 +94,7 @@ public void OnAllPluginsLoaded()
     cvarMpGameMode  = FindConVar("l4d_ready_cfg_name");
     cvarMod         = FindConVar("l4d2_addons_eclipse");
 
-    // NEW: AnneCoop / AnneRealism
+    // AnneCoop / AnneRealism
     cvarDirCount    = FindConVar("dirspawn_count");
     cvarDirInterval = FindConVar("dirspawn_interval");
 }
@@ -87,20 +117,20 @@ public void OnConfigsExecuted()
 
     if (cvarMpGameMode != null) {
         cvarMpGameMode.AddChangeHook(OnCvarChanged);
-    } else if (FindConVar("l4d_ready_cfg_name")) {
+    } else if (FindConVar("l4d_ready_cfg_name") != null) {
         cvarMpGameMode = FindConVar("l4d_ready_cfg_name");
         cvarMpGameMode.AddChangeHook(OnCvarChanged);
     }
 
-    // FIX: 原来这里误把 eclipse 赋给 cvarMpGameMode 了
+    // FIX: 防止误把 eclipse 赋给 cvarMpGameMode
     if (cvarMod != null) {
         cvarMod.AddChangeHook(OnCvarChanged);
-    } else if (FindConVar("l4d2_addons_eclipse")) {
+    } else if (FindConVar("l4d2_addons_eclipse") != null) {
         cvarMod = FindConVar("l4d2_addons_eclipse");
         cvarMod.AddChangeHook(OnCvarChanged);
     }
 
-    // NEW: AnneCoop / AnneRealism 相关 ConVar 监听
+    // AnneCoop / AnneRealism 相关 ConVar 监听
     if (cvarDirCount != null) {
         cvarDirCount.AddChangeHook(OnCvarChanged);
     } else if (FindConVar("dirspawn_count") != null) {
@@ -125,17 +155,14 @@ public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadca
 
 public void OnMapStart()
 {
-    HostName = CreateKeyValues("AnneHappy");
-    BuildPath(Path_SM, SavePath, 255, "configs/hostname/hostname.txt");
-    FileToKeyValues(HostName, SavePath);
-}
+    if (HostName != INVALID_HANDLE)
+        CloseHandle(HostName);
 
-public void Update()
-{
-    if (cvarMpGameMode == null) {
-        ChangeServerName();
-    } else {
-        UpdateServerName();
+    HostName = CreateKeyValues("AnneHappy");
+    BuildPath(Path_SM, SavePath, sizeof(SavePath) - 1, "configs/hostname/hostname.txt");
+    if (FileExists(SavePath))
+    {
+        FileToKeyValues(HostName, SavePath);
     }
 }
 
@@ -144,6 +171,117 @@ public void OnCvarChanged(ConVar cvar, const char[] oldVal, const char[] newVal)
     Update();
 }
 
+// -----------------------------
+// 主更新入口
+// -----------------------------
+public void Update()
+{
+    if (cvarMpGameMode == null) {
+        ChangeServerName();
+    } else {
+        UpdateServerName();
+    }
+
+    // GameDescription 立即推一次，保证快速生效
+    char desc[128];
+    BuildGameDescription(desc, sizeof(desc));
+    SteamWorks_SetGameDescription(desc);
+    strcopy(g_sLastDesc, sizeof(g_sLastDesc), desc);
+}
+
+// 每 2 秒检查一次差异，有变化才写，避免刷爆
+public void OnGameFrame()
+{
+    float now = GetEngineTime();
+    if (now < g_fNextDescUpdate)
+        return;
+
+    g_fNextDescUpdate = now + 2.0; // 节流
+
+    char desc[128];
+    BuildGameDescription(desc, sizeof(desc));
+
+    if (!StrEqual(g_sLastDesc, desc)) {
+        SteamWorks_SetGameDescription(desc);
+        strcopy(g_sLastDesc, sizeof(g_sLastDesc), desc);
+    }
+}
+
+// -----------------------------
+// 构造 GameDescription 文本
+// -----------------------------
+void BuildGameDescription(char[] out, int maxlen)
+{
+    char cfg[128];
+    cfg[0] = '\0';
+    if (cvarMpGameMode != null) {
+        GetConVarString(cvarMpGameMode, cfg, sizeof(cfg));
+    }
+
+    // 模式识别
+    bool isAnneHappy    = (StrContains(cfg, "AnneHappy",   false) != -1);
+    bool isHardCore     = (StrContains(cfg, "HardCore",    false) != -1);
+    bool isAnneCoop     = (StrContains(cfg, "AnneCoop",    false) != -1);
+    bool isAnneRealism  = (StrContains(cfg, "AnneRealism", false) != -1);
+    bool isAllCharger   = (StrContains(cfg, "AllCharger",  false) != -1);
+    bool is1vHunters    = (StrContains(cfg, "1vHunters",   false) != -1);
+    bool isWitchParty   = (StrContains(cfg, "WitchParty",  false) != -1);
+    bool isAlone        = (StrContains(cfg, "Alone",       false) != -1);
+
+    // 标签文本
+    char mode[32];
+    if (isAnneHappy) {
+        strcopy(mode, sizeof(mode), isHardCore ? "硬核药役" : "普通药役");
+    } else if (isAnneCoop) {
+        strcopy(mode, sizeof(mode), "Anne战役");
+    } else if (isAnneRealism) {
+        strcopy(mode, sizeof(mode), "Anne写实");
+    } else if (isAllCharger) {
+        strcopy(mode, sizeof(mode), "牛牛冲刺");
+    } else if (is1vHunters) {
+        strcopy(mode, sizeof(mode), "HT训练");
+    } else if (isWitchParty) {
+        strcopy(mode, sizeof(mode), "女巫派对");
+    } else if (isAlone) {
+        strcopy(mode, sizeof(mode), "单人装逼");
+    } else if (cfg[0] != '\0') {
+        strcopy(mode, sizeof(mode), cfg);
+    } else {
+        strcopy(mode, sizeof(mode), "Unknown");
+    }
+
+    // 分组：用哪个“几特几秒”
+    bool usesDirSpawn      = (isAnneCoop || isAnneRealism);
+    bool usesAnneHappyPair = (isAnneHappy || isAllCharger || is1vHunters || isWitchParty || isAlone);
+
+    int   siCount    = 0;
+    int   siInterval = -1;
+
+    if (usesDirSpawn) {
+        if (cvarDirCount != null)    siCount = GetConVarInt(cvarDirCount);
+        else if (cvarSI != null)     siCount = GetConVarInt(cvarSI);
+
+        if (cvarDirInterval != null) {
+            siInterval = RoundToNearest(GetConVarFloat(cvarDirInterval));
+        } else if (cvarMpGameMin != null) {
+            siInterval = GetConVarInt(cvarMpGameMin);
+        }
+    } else if (usesAnneHappyPair) {
+        if (cvarSI != null)          siCount = GetConVarInt(cvarSI);
+        if (cvarMpGameMin != null)   siInterval = GetConVarInt(cvarMpGameMin);
+    }
+
+    // 最终格式：电信服-<模式>[<几特><几秒>]
+    if (siCount > 0 && siInterval >= 0) {
+        Format(out, maxlen, "电信服-%s[%d特%d秒]", mode, siCount, siInterval);
+    } else {
+        Format(out, maxlen, "电信服-%s", mode);
+    }
+}
+
+// -----------------------------
+// 服务器名构建（原有逻辑，补全模式标签）
+// -----------------------------
 public void UpdateServerName()
 {
     char sReadyUpCfgName[128], FinalHostname[128], buffer[128];
@@ -196,12 +334,10 @@ public void UpdateServerName()
     }
 
     // 统一拼接“[X特Y秒]”
-    // AnneHappy -> 用 l4d_infected_limit / versus_special_respawn_interval
-    // AnneCoop/AnneRealism -> 用 dirspawn_count / dirspawn_interval（若找不到则回退到 AnneHappy 的那对）
     int siCount = 0;
     int siInterval = 0;
 
-    if (isAnneCoop || isAnneRealism) {
+    if (StrContains(sReadyUpCfgName, "AnneCoop", false) != -1 || StrContains(sReadyUpCfgName, "AnneRealism", false) != -1) {
         if (cvarDirCount != null) {
             siCount = GetConVarInt(cvarDirCount);
         } else if (cvarSI != null) {
@@ -209,7 +345,6 @@ public void UpdateServerName()
         }
 
         if (cvarDirInterval != null) {
-            // dirspawn_interval 常为浮点秒，这里取整展示（与原先风格一致）
             float f = GetConVarFloat(cvarDirInterval);
             siInterval = RoundToNearest(f);
         } else if (cvarMpGameMin != null) {
@@ -246,6 +381,7 @@ public void UpdateServerName()
     ChangeServerName(FinalHostname);
 }
 
+// 是否满员（Anne 系列：只看幸存者位；其它：幸存者 + 特感玩家）
 bool IsTeamFull(bool IsAnne = false)
 {
     int sum = 0;
@@ -258,27 +394,33 @@ bool IsTeamFull(bool IsAnne = false)
         return true;
     }
     if (IsAnne) {
-        // Anne 系列：只看幸存者位是否满
-        return sum >= (GetConVarInt(FindConVar("survivor_limit")));
+        return sum >= GetConVarInt(FindConVar("survivor_limit"));
     } else {
-        // 其它：幸存者 + 特感玩家
         return sum >= (GetConVarInt(FindConVar("survivor_limit")) + GetConVarInt(FindConVar("z_max_player_zombies")));
     }
 }
 
 bool IsPlayer(int client)
 {
-    if (IsValidClient(client) && (GetClientTeam(client) == 2 || GetClientTeam(client) == 3)) {
-        return true;
-    } else {
-        return false;
-    }
+    return (IsValidClient(client) && (GetClientTeam(client) == 2 || GetClientTeam(client) == 3));
 }
 
+public bool IsValidClient(int client)
+{
+    return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client));
+}
+
+// -----------------------------
+// 应用最终服务器名（支持端口映射）
+// -----------------------------
 void ChangeServerName(char[] sReadyUpCfgName = "")
 {
     char sPath[128], ServerPort[128];
     GetConVarString(cvarHostPort, ServerPort, sizeof(ServerPort));
+
+    if (HostName == INVALID_HANDLE)
+        HostName = CreateKeyValues("AnneHappy");
+
     KvJumpToKey(HostName, ServerPort, false);
     KvGetString(HostName, "servername", sPath, sizeof(sPath));
     KvGoBack(HostName);
@@ -298,9 +440,4 @@ void ChangeServerName(char[] sReadyUpCfgName = "")
     SetConVarString(cvarHostName, sNewName);
     SetConVarString(cvarMainName, sNewName);
     Format(g_sDefaultN, sizeof(g_sDefaultN), "%s", sNewName);
-}
-
-public bool IsValidClient(int client)
-{
-    return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client));
 }

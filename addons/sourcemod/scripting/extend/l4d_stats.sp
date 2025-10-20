@@ -2690,7 +2690,7 @@ public UpdatePlayerFull(Client, const String:SteamID[], const String:Name[])
 		mode = 6;
 	}
 	//旁观者更新时间戳，但是不增加游戏时间，这样来方便统计在线人数
-	if(!IsPlayer(Client) || IsFunGame())
+	if(!IsPlayer(Client) || IsFunGame() > 2)
 		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s' WHERE steamid = '%s'", DbPrefix, mode, CurrentGamemodeID, Name, IP, SteamID);
 	else
 		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), %s = %s + 1, lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s' WHERE steamid = '%s'", DbPrefix, Playtime, Playtime, mode, CurrentGamemodeID, Name, IP, SteamID);
@@ -3626,7 +3626,11 @@ stock int IsFunGame(){
 	{
 		return 1;
 	}
-	return 2;
+	if(IsWitchParty() || IsAllCharger())
+	{
+		return 2;
+	}
+	return 3;
 }
 
 stock bool IsAllCharger(){
@@ -4493,10 +4497,11 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 		Score = RoundToFloor(1.5 * Score);
 	}
 
-	if(IsFunGame() == 2)
+	if(IsFunGame() > 1)
 	{
 		//娱乐模式完成关卡统一只给100分
-		Score = 100;
+		if(Score > 400)
+			Score = 400;
 		//return Plugin_Continue;
 	}
 
@@ -5413,12 +5418,12 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 {
 	int human = CheckSurvivorsHumans();
 	if (StatsDisabled() || CampaignOver || human < 3)
-		return;
+		return Plugin_Continue;
 
 	new Killer = GetClientOfUserId(GetEventInt(event, "attacker"));
 
 	if (Killer == 0 || IsClientBot(Killer) || !IsClientInGame(Killer))
-		return;
+		return Plugin_Continue;
 
 	new Charger = GetClientOfUserId(GetEventInt(event, "userid"));
 	decl String:query[1024], String:KillerName[MAX_LINE_WIDTH], String:KillerID[MAX_LINE_WIDTH], String:UpdatePoints[32];
@@ -5478,7 +5483,7 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 	SendSQLUpdate(query);
 
 	if (Score <= 0)
-		return;
+		return Plugin_Continue;
 
 	UpdateMapStat("points", Score);
 	AddScore(Killer, Score);
@@ -5491,6 +5496,8 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 
 		if (IsMatador)
 		{
+			if(IsFunGame() == 2)
+				return Plugin_Continue;
 			if (Mode == 1 || Mode == 2)
 				StatsPrintToChat(Killer, "你 \x04秒了个牛\x01 获得 \x04%i \x01分!", Score);
 			else if (Mode == 3)
@@ -5509,6 +5516,8 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 			}
 			else
 				Format(VictimName, sizeof(VictimName), "a survivor");
+			if(StrEqual(KillerName, VictimName))
+				return Plugin_Continue;
 
 			if (Mode == 1 || Mode == 2)
 				StatsPrintToChat(Killer, "你将 \x05%s\x01 从 \x04%s\x01 手里救下获得 \x04%i \x01分!", VictimName, ChargerName, Score);
@@ -5792,7 +5801,7 @@ public Action:event_GascanPoured(Handle:event, const String:name[], bool:dontBro
 			Format(UpdatePoints, sizeof(UpdatePoints), "points");
 		}
 	}
-	if(IsFunGame())
+	if(IsFunGame() > 1)
 	{
 		Score = 0;
 		//return Plugin_Continue;
@@ -9997,7 +10006,7 @@ public CheckSurvivorsWin()
 		Score = RoundToFloor(1.5 * Score);
 	}
 
-	if(IsFunGame())
+	if(IsFunGame() > 1)
 	{
 		if(Score > 200){
 			Score = 200;
