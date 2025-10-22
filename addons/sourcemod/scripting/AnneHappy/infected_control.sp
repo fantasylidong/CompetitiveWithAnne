@@ -235,6 +235,7 @@ enum struct Config
     ConVar SpawnMin;
     ConVar SpawnMax;
     ConVar TeleportEnable;
+    ConVar TeleportSpawnMin;
     ConVar TeleportCheckTime;
     ConVar EnableMask;
     ConVar AllCharger;
@@ -316,6 +317,7 @@ enum struct Config
 
     float fSpawnMin;
     float fSpawnMax;
+    float fTeleportSpawnMin;
     float fSiInterval;
     int   iSiLimit;
     int   iEnableMask;
@@ -349,6 +351,7 @@ enum struct Config
     void Create()
     {
         this.SpawnMin          = CreateConVar("inf_SpawnDistanceMin", "250.0", "特感复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
+        this.TeleportSpawnMin  = CreateConVar("inf_SpawnDistanceMin", "400.0", "特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
         this.SpawnMax          = CreateConVar("inf_SpawnDistanceMax", "1500.0", "特感复活离生还者最远的距离限制", CVAR_FLAG, true, this.SpawnMin.FloatValue);
         this.TeleportEnable    = CreateConVar("inf_TeleportSi", "1", "是否开启特感超时传送", CVAR_FLAG, true, 0.0, true, 1.0);
         this.TeleportCheckTime = CreateConVar("inf_TeleportCheckTime", "5", "特感几秒后没被看到开始传送", CVAR_FLAG, true, 0.0);
@@ -447,6 +450,7 @@ enum struct Config
 
         this.SpawnMax.AddChangeHook(OnCfgChanged);
         this.SpawnMin.AddChangeHook(OnCfgChanged);
+        this.TeleportSpawnMin.AddChangeHook(OnCfgChanged);
         this.TeleportEnable.AddChangeHook(OnCfgChanged);
         this.TeleportCheckTime.AddChangeHook(OnCfgChanged);
         this.SiInterval.AddChangeHook(OnCfgChanged);
@@ -480,6 +484,7 @@ enum struct Config
     {
         this.fSpawnMax          = this.SpawnMax.FloatValue;
         this.fSpawnMin          = this.SpawnMin.FloatValue;
+        this.fTeleportSpawnMin  = this.TeleportSpawnMin.FloatValue;
         this.bTeleport          = this.TeleportEnable.BoolValue;
         this.fSiInterval        = this.SiInterval.FloatValue;
         this.iSiLimit           = this.SiLimit.IntValue;
@@ -1465,7 +1470,7 @@ static void StartWave()
         if (IsValidSurvivor(i) && IsPlayerAlive(i))
             gST.survIdx[gST.survCount++] = i;
 
-    gST.teleportDistCur = gCV.fSpawnMin;
+    gST.teleportDistCur = gCV.fTeleportSpawnMin;
     gST.spawnDistCur    = gCV.fSpawnMin;
     gST.siQueueCount   += gCV.iSiLimit;
 
@@ -2462,16 +2467,31 @@ static bool CanBeTeleport(int client)
     return true;
 }
 
+// 工具：从 src 到 dst 的可视（只认“既挡视线又挡子弹”的阻挡）
+static bool RayClear(const float src[3], const float dst[3], int mask)
+{
+    Handle tr = TR_TraceRayFilterEx(src, dst, mask, RayType_EndPoint, TraceFilter);
+    bool ok = (!TR_DidHit(tr) || TR_GetFraction(tr) >= 0.99);
+    delete tr;
+    return ok;
+}
+
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    // 头/胸/脚大致对应 SI 模型高度
-    float head[3], chest[3], feet[3];
-    head = pos;  head[2]  += 62.0;
-    chest = pos; chest[2] += 32.0;
-    feet = pos;  feet[2]  +=  8.0;
+    // 头/胸 —— 不能用初始化器做表达式，逐项赋值
+    float head[3];
+    head[0] = pos[0];
+    head[1] = pos[1];
+    head[2] = pos[2] + 62.0;
 
-    // 交集掩码：只把“既挡视线又挡子弹”的东西当作阻挡
+    float chest[3];
+    chest[0] = pos[0];
+    chest[1] = pos[1];
+    chest[2] = pos[2] + 32.0;
+
+    // 只把“既挡视线又挡子弹”的东西当作阻挡
     const int visMask = (MASK_VISIBLE & MASK_SHOT);
+    const float SIDE = 16.0; // 眼睛左右偏移
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -2480,35 +2500,36 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         if (teleportMode && L4D_IsPlayerIncapacitated(i) && gCV.bIgnoreIncapSight)
             continue;
 
-        float eyes[3]; 
+        float eyes[3];
         GetClientEyePosition(i, eyes);
 
-        // 1) Ray: 眼睛 -> 头
-        Handle tr1 = TR_TraceRayFilterEx(eyes, head, visMask, RayType_EndPoint, TraceFilter);
-        bool block1 = TR_DidHit(tr1);
-        float frac1 = TR_GetFraction(tr1);
-        delete tr1;
-        if (!block1 || frac1 >= 0.99)   // 基本贯通 → 可见
+        float ang[3], fwd[3], right[3], up[3];
+        GetClientEyeAngles(i, ang);
+        GetAngleVectors(ang, fwd, right, up);
+
+        // 逐项计算左右 16u 偏移（同样不能用初始化器里的表达式）
+        float eyesL[3];
+        eyesL[0] = eyes[0] - right[0] * SIDE;
+        eyesL[1] = eyes[1] - right[1] * SIDE;
+        eyesL[2] = eyes[2] - right[2] * SIDE;
+
+        float eyesR[3];
+        eyesR[0] = eyes[0] + right[0] * SIDE;
+        eyesR[1] = eyes[1] + right[1] * SIDE;
+        eyesR[2] = eyes[2] + right[2] * SIDE;
+
+        // 1) 任意一个“中/左/右眼睛 -> 头”通畅即可见
+        if (RayClear(eyes, head, visMask) || RayClear(eyesL, head, visMask) || RayClear(eyesR, head, visMask))
             return true;
 
-        // 2) Ray: 眼睛 -> 脚
-        Handle tr2 = TR_TraceRayFilterEx(eyes, feet, visMask, RayType_EndPoint, TraceFilter);
-        bool block2 = TR_DidHit(tr2);
-        float frac2 = TR_GetFraction(tr2);
-        delete tr2;
-        if (!block2 || frac2 >= 0.99)
-            return true;
-
-        // 3) 引擎可视：到胸（team_target=INFECTED → 不考虑朝向，更保守）
+        // 2) 原生/引擎可视：到胸（更稳的兜底）
         if (L4D2_IsVisibleToPlayer(i, TEAM_SURVIVOR, TEAM_INFECTED, 0, chest))
             return true;
     }
-    // 对所有存活幸存者都“不可见” → 允许刷
+
+    // 对所有存活幸存者都不可见 → 允许刷
     return false;
 }
-
-
-
 
 stock bool TraceFilter_Stuck(int entity, int contentsMask)
 {

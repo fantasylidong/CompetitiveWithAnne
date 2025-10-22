@@ -1,4 +1,4 @@
-#pragma semicolon 1
+#pragma semicolon 1 
 #pragma newdecls required
 
 // 头文件
@@ -56,7 +56,9 @@ ConVar
 	g_cvBackFistRange,
 	g_cvBackFistAllowMaxSpd,
 	g_cvPunchLockVision,
-	g_cvJumpRock;
+	g_cvJumpRock,
+	// NEW: 通背拳窗口秒数
+	g_cvBackFistWindow;
 
 ConVar
 	g_cvBhopNoVisionMaxAng;
@@ -78,11 +80,13 @@ float
 	g_fTankSwingRange;
 
 enum struct AiTank {
-	int		target;						// 攻击目标 (userId)
+	int		target; 					// 攻击目标 (userId)
 	float	lastAirVecModifyTime; 		// 上次空中速度修正时间 (EngineTime)
-	float	nextAttackTime;				// 下次挥拳时间 (EngineTime)
-	bool	wasThrowing;				// 是否正在扔石头
-	float	lastHopSpeed;				// 上次起跳时的速度
+	float	nextAttackTime; 			// 下次挥拳时间 (EngineTime)
+	bool	wasThrowing; 				// 是否正在扔石头
+	float	lastHopSpeed; 				// 上次起跳时的速度
+	// NEW: 通背拳窗口到期时间（EngineTime，<=0 表示未开启）
+	float	backFistExpire;
 
 	void initData() {
 		this.target = -1;
@@ -90,6 +94,7 @@ enum struct AiTank {
 		this.nextAttackTime = 0.0;
 		this.wasThrowing = false;
 		this.lastHopSpeed = 0.0;
+		this.backFistExpire = 0.0;
 	}
 }
 AiTank g_AiTanks[MAXPLAYERS + 1];
@@ -155,12 +160,14 @@ public void OnPluginStart() {
 	g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "是否允许Tank使用通背拳(在背后的人也会被拍)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him and within this range (set to -1 to use default: tank_swing_range)
 	g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128.0", "允许使用通背拳时背后的打击检测距离, -1 使用默认(tank_swing_range)", CVAR_FLAGS, true, -1.0);
-	// allow tank to punch survivor who is behind him when his speed is lower than this value
-	g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "允许使用通背拳时Tank的最小速度", CVAR_FLAGS, true, -1.0);
+	// allow tank to punch survivor who is behind him when his speed is lower than this value (最大速度)
+	g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "允许使用通背拳时Tank的最大速度（超过则禁用）", CVAR_FLAGS, true, -1.0);
 	// allow tank to lock his vision to his target when punching?
 	g_cvPunchLockVision = CreateConVar("ai_tank3_punch_lock_vision", "1", "是否允许Tank打拳时锁定视角到目标", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to jump when he starts to grab a rock
 	g_cvJumpRock = CreateConVar("ai_tank3_jump_rock", "1", "是否允许Tank使用跳砖", CVAR_FLAGS, true, 0.0, true, 1.0);
+	// NEW: 通背拳窗口（秒）
+	g_cvBackFistWindow = CreateConVar("ai_tank3_back_fist_window", "3.0", "通背拳允许持续时间窗口（秒）。坦克爪击命中生还者后开启/刷新；到期自动关闭", CVAR_FLAGS, true, 0.0);
 
 	// 日志记录 logging
 	g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
@@ -173,6 +180,8 @@ public void OnPluginStart() {
 
 	HookEvent("round_start", evtRoundStart);
 	HookEvent("round_end", evtRoundEnd);
+	// NEW: 爪击命中时刷新通背拳窗口
+	HookEvent("player_hurt", evtPlayerHurt, EventHookMode_Post);
 
 	log = new Logger(PLUGIN_PREFIX, g_cvLogLevel.IntValue);
 	// 初始化动画序列 HashMap
@@ -227,11 +236,19 @@ public void OnPluginEnd() {
 }
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {
-
+	// NEW: 清空所有坦克的通背拳窗口
+	for (int i = 1; i <= MaxClients; i++) {
+		if (!IsValidClient(i)) continue;
+		g_AiTanks[i].backFistExpire = 0.0;
+	}
 }
 
 void evtRoundEnd(Event event, const char[] name, bool dontBroadcast) {
-
+	// NEW: 结束时也清空
+	for (int i = 1; i <= MaxClients; i++) {
+		if (!IsValidClient(i)) continue;
+		g_AiTanks[i].backFistExpire = 0.0;
+	}
 }
 
 public void OnMapStart() {
@@ -311,16 +328,32 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget) {
 // ============================================================
 // 通背拳 Back Fist
 // ============================================================
+// 小工具：当前是否允许通背拳（窗口 + 地面 + 基础开关）
+stock bool IsBackFistAllowedNow(int tank)
+{
+	if (!g_cvBackFist.BoolValue)             return false;
+	if (!isAiTank(tank))                     return false;
+	if (!IsClientOnGround(tank))             return false;                // 必须在地上
+	if (GetEntityMoveType(tank) == MOVETYPE_LADDER) return false;        // 梯子上不行
+	float now = GetEngineTime();
+	return (g_AiTanks[tank].backFistExpire > 0.0 && now <= g_AiTanks[tank].backFistExpire);
+}
+
 public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
 	if (!g_cvBackFist.BoolValue)
 		return;
 	if (!isAiTank(tank))
 		return;
-	// 通背拳 Tank 水平速度限制
+
+	// 速度阈值：速度过高则不允许通背拳（按你的要求保留）
 	static float vAbsVelVec[3], speed;
 	GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
 	speed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
 	if (speed > g_cvBackFistAllowMaxSpd.FloatValue)
+		return;
+
+	// 时间窗口 + 地面限制
+	if (!IsBackFistAllowedNow(tank))
 		return;
 
 	static float pos[3], targetPos[3], fistRange;
@@ -339,6 +372,36 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw) {
 		// SweepFist 从 start 到 end 扫描, 检测碰撞
 		SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
 	}
+}
+
+// NEW: 爪击命中 -> 刷新通背拳窗口
+void evtPlayerHurt(Event event, const char[] name, bool dontBroadcast)
+{
+	int victim   = GetClientOfUserId(GetEventInt(event, "userid"));
+	int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+	if (!IsValidSurvivor(victim))        return;
+	if (!IsValidClient(attacker))        return;
+	if (!isAiTank(attacker))             return;
+
+	// 仅认“爪击”
+	char wep[64];
+	GetEventString(event, "weapon", wep, sizeof(wep));
+	bool isClaw = StrEqual(wep, "tank_claw", false) || StrEqual(wep, "tank", false);
+	if (!isClaw) {
+		int claw = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+		if (claw > 0 && IsValidEdict(claw)) {
+			char cls[64];
+			GetEntityClassname(claw, cls, sizeof(cls));
+			if (StrEqual(cls, "weapon_tank_claw", false)) {
+				isClaw = true;
+			}
+		}
+	}
+	if (!isClaw) return;
+
+	// 命中 -> 开启/刷新窗口
+	g_AiTanks[attacker].backFistExpire = GetEngineTime() + g_cvBackFistWindow.FloatValue;
+	// log.debugAll("%N claw hit -> backfist window refresh to %.2f", attacker, g_AiTanks[attacker].backFistExpire);
 }
 
 Action punchLockVision(int client, int target, const float pos[3], const float targetPos[3]) {
@@ -489,7 +552,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 	dz = targetPos[2] - pos[2];
 	pitch = RadToDeg(ArcTangent(dz / dx));
 	// 如果玩家不在坦克的攻击范围内且俯仰角大于 45 度, 放弃速度修正
-	// if target is not in tank's attack range and pitch is greater than 45 degrees, give up air speed modification
+	// if target is not in tank's attack range and pitch is greater than 45.0, give up air speed modification
 	if (dz > (JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange) && pitch > 45.0)
 		return Plugin_Continue;
 
@@ -506,9 +569,9 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 	inAngleRange = (angle >= g_cvAirVecModifyDegree.FloatValue && angle <= g_cvAirVecModifyMaxDegree.FloatValue);
 	notPressBack = !(buttons & IN_BACK);
 	delayExpired = (GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime) > g_cvAirVecModifyInterval.FloatValue;
-	// log.debugAll("Condition visible=%d, inAngleRange=%d, notPressBack=%d, delayExpired=%d", visible, inAngleRange, notPressBack, delayExpired);
+	log.debugAll("Condition visible=%d, inAngleRange=%d, notPressBack=%d, delayExpired=%d", visible, inAngleRange, notPressBack, delayExpired);
 
-	if (visible && inAngleRange && notPressBack) {
+	if (visible && inAngleRange && notPressBack && delayExpired)  {
 		log.debugAll("%N triggered air speed modify, current vector angle: %.2f", client, angle);
 		// 将方向向量缩放成原速度大小, 刚起跳时加速度可能没有应用, 缩放使用的速度为起跳前的速度, 导致连跳无法加速, 因此这里保存加速度并取最大速度缩放
 		NormalizeVector(vDir, vDir);
@@ -813,7 +876,7 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 	// roll = 0
 	aimAng[2] = 0.0;
 	GetAngleVectors(aimAng, aimAng, NULL_VECTOR, NULL_VECTOR);
-	NormalizeVector(aimAng, aimAng);	
+	NormalizeVector(aimAng, aimAng);
 	ScaleVector(aimAng, throwSpeed);
 
 	vecVel = aimAng;
