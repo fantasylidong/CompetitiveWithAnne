@@ -105,6 +105,12 @@ public void OnAllPluginsLoaded()
 
     cvarDirCount    = FindConVar("dirspawn_count");
     cvarDirInterval = FindConVar("dirspawn_interval");
+    // 启动/重启 10s 定时器（只重算缓存，不推送）
+    if (g_hDescTimer != null) {
+        CloseHandle(g_hDescTimer);
+        g_hDescTimer = null;
+    }
+    g_hDescTimer = CreateTimer(10.0, Timer_RecomputeDesc, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnConfigsExecuted()
@@ -126,13 +132,6 @@ public void OnConfigsExecuted()
 
     // 开服后：立即重算一次（只写缓存）
     RecomputeDescriptionCached();
-
-    // 启动/重启 10s 定时器（只重算缓存，不推送）
-    if (g_hDescTimer != null) {
-        CloseHandle(g_hDescTimer);
-        g_hDescTimer = null;
-    }
-    g_hDescTimer = CreateTimer(10.0, Timer_RecomputeDesc, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 
     // 刷新服务器名（房间名）
     Update();
@@ -157,7 +156,7 @@ public void OnMapStart()
 public void OnPluginEnd()
 {
     if (g_hDescTimer != null) {
-        CloseHandle(g_hDescTimer);
+        KillTimer(g_hDescTimer);
         g_hDescTimer = null;
     }
     if (HostName != INVALID_HANDLE) {

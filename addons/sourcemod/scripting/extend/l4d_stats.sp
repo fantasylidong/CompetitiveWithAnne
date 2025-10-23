@@ -1578,8 +1578,7 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 	
 	if(IsAnne() == 2)
 	{
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "\x03硬核模式 \x04所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
-		return Plugin_Continue;
+		Score *= 0.4;
 	}
 
 	if(IsFunGame())
@@ -6459,8 +6458,7 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 		}
 		if(IsAnne() == 2)
 		{
-			StatsPrintToChat(User, "\x03硬核模式 \x04所有幸存者 \x01 \x03免除团灭  \x01分 但是 \x03全部坐牢\x01!" );
-			Score = 0;
+			Score = RoundToFloor(Score * 0.4);			
 		}
 		if (Mode && Score > 0)
 			StatsPrintToChat(User, "\x03所有幸存者 \x01都 \x03掉了 \x04%i \x01分 by \x03大家又坐牢了!", Score);
