@@ -1578,7 +1578,7 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 	
 	if(IsAnne() == 2)
 	{
-		Score *= 0.4;
+		Score = RoundToFloor(Score * 0.4);
 	}
 
 	if(IsFunGame())
