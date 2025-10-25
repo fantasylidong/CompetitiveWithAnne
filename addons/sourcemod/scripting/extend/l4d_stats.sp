@@ -1578,7 +1578,7 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 	
 	if(IsAnne() == 2)
 	{
-		Score = RoundToFloor(Score * 0.4);
+		Score = RoundToFloor(view_as<float>(Score) * 0.4);
 	}
 
 	if(IsFunGame())
@@ -4461,19 +4461,19 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 	if((AnneMultiPlayerMode() || SinglePlayerMode())){
 		if((g_brpgAvailable && !L4D_RPG_GetGlobalValue(INDEX_VALID)) || !IsThisRoundValid())
 		{
-			Score = RoundToFloor(Score * 0.4);
+			Score = RoundToFloor(view_as<float>(Score) * 0.4);
 		}
 		else
 		{
 			int inf= GetAnneInfectedNumber();
-			if(inf < 4)
+			if(inf <= 4)
 			{
 				if(AnneMultiPlayerMode())
 					Score = RoundToFloor(Score * (1 - (4 - inf) * 0.2));
 			}
-			else if(inf > 4)
+			else if(inf > 4 && inf <= 6)
 				Score = RoundToFloor(Score + Score * (inf - 4) * 0.1);
-			else if(inf > 6)
+			else if(inf > 6 && inf <= 8)
 				Score = RoundToFloor(Score + Score * (inf - 4) * 0.2);
 			else if(inf>8)
 				Score = RoundToFloor(Score + Score * (inf-4)*0.3);
@@ -6458,7 +6458,7 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 		}
 		if(IsAnne() == 2)
 		{
-			Score = RoundToFloor(Score * 0.4);			
+			Score = RoundToFloor(view_as<float>(Score) * 0.4);			
 		}
 		if (Mode && Score > 0)
 			StatsPrintToChat(User, "\x03所有幸存者 \x01都 \x03掉了 \x04%i \x01分 by \x03大家又坐牢了!", Score);
