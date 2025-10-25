@@ -1,20 +1,18 @@
 /**  
  * l4d2_hitsound_plus.sp
  *
- * 变更要点（本版）：
- * - 数据库存 6 项：hitsound_head/hit/kill、hiticon_head/hit/kill（0=关闭；>=1=套装编号）
- * - 非管理员：只能按“套装”选择音效/图标，但可在“特定开关”里将单项设为0（关闭）
- * - 管理员：可给“命中/击杀/爆头”的音效或图标分别指定某套（来自配置文件）
- * - 菜单增加：特定音效开关、特定图标开关、三项的管理员专用“单独设置”
- * - 兼容回退：优先读 6 列；若三项全0，则从旧的 hitsound_cfg/hitsound_overlay 继承一次
- * - KV fallback 同步改为 6 键（保留对旧键 Snd/Overlay 的一次性继承）
+ * 本版要点：
+ * - 仅使用 6 个数据库字段：hitsound_head/hit/kill、hiticon_head/hit/kill（0=关闭；>=1=套装编号）
+ * - 非管理员：按“套装”选择音效/图标；“特定开关”里可把单项设为 0（关闭）
+ * - 管理员：可将命中/击杀/爆头的音效或图标分别指定为任意套装
+ * - KV fallback 同步为 6 键（保留对旧 KV 键 Snd/Overlay 的一次性继承；数据库旧列已彻底移除）
  * - 保留 FastDL、builtin=1 跳过、统一预缓存、RegPluginLibrary、sm_hitui 快捷开关等
  *
  * 配置文件：
- *   addons/sourcemod/configs/hitsound_sets.cfg   （音效套装，headshot/hit/kill，支持 builtin）
- *   addons/sourcemod/configs/hiticon_sets.cfg    （图标套装，head/hit/kill，支持 builtin）
+ *   addons/sourcemod/configs/hitsound_sets.cfg   （音效套装：headshot/hit/kill，支持 builtin）
+ *   addons/sourcemod/configs/hiticon_sets.cfg    （图标套装：head/hit/kill，支持 builtin）
  *
- * 重要编号约定（统一）：
+ * 重要编号约定：
  *   - 套装ID：1..N，0 表示禁用
  *   - 数组索引：内部数组存放为 0..N-1（故读取时用 setId-1）
  *
@@ -27,13 +25,9 @@
  *     ADD COLUMN `hiticon_hit`    TINYINT NOT NULL DEFAULT 0,
  *     ADD COLUMN `hiticon_kill`   TINYINT NOT NULL DEFAULT 0;
  *
- * 老两列（若存在）：
- *   hitsound_cfg（音效套装编号） / hitsound_overlay（图标套装编号，0=禁用）
- *   —— 仅作为读时的“兜底迁移一次”，写入新值只动 6 列
- *
  * commands:
  *   !snd    -> 主菜单（音效/图标套装（玩家） + 特定开关 + 管理员单独设置）
- *   !hitui  -> 快速“覆盖图标三项”在 禁用/套装1 之间切换（玩家一键）
+ *   !hitui  -> 快速将覆盖图标三项在 禁用/套装1 之间切换（玩家一键）
  *   sm_hitsound_reload -> 重新从 DB/KV 读取所有在线玩家的偏好
  */
 
@@ -44,7 +38,7 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "2.0.0"
+#define PLUGIN_VERSION "2.1.0"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 
@@ -128,7 +122,7 @@ public Plugin myinfo =
 };
 
 // ========================================================
-// Helpers (NEW)
+// Helpers
 // ========================================================
 stock void DBG(const char[] fmt, any ...)
 {
@@ -166,7 +160,6 @@ static void MarkDirtyAndSave(int client)
         g_PrefsDirty[client] = false;
     }
 }
-
 
 // 根据“音效套装ID(1..N)”与类型取路径：which 0=headshot, 1=hit, 2=kill
 static bool GetSoundPath_BySet(int setId, int which, char[] out, int maxlen)
@@ -520,7 +513,14 @@ public void DB_RequestLoadPlayer(int client)
 
     char q[512];
     Format(q, sizeof(q),
-        "SELECT hitsound_head, hitsound_hit, hitsound_kill, hiticon_head,  hiticon_hit,  hiticon_kill, hitsound_cfg,  hitsound_overlay FROM `%s` WHERE steamid='%s' LIMIT 1;",table, sid);
+        "SELECT \
+           hitsound_head, hitsound_hit, hitsound_kill, \
+           hiticon_head,  hiticon_hit,  hiticon_kill \
+         FROM `%s` \
+         WHERE steamid='%s' \
+         LIMIT 1;",
+        table, sid);
+
     SQL_TQuery(g_hDB, SQL_OnLoadPrefs, q, GetClientUserId(client));
 }
 
@@ -571,21 +571,8 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any u
         int ic_hit  = SafeFetchInt(hndl, 4);
         int ic_kill = SafeFetchInt(hndl, 5);
 
-        int fieldCount = SQL_GetFieldCount(hndl);
-        int old_snd = (fieldCount >= 8) ? SafeFetchInt(hndl, 6) : 0;
-        int old_ic  = (fieldCount >= 8) ? SafeFetchInt(hndl, 7) : 0;
-
-
         ClampSetSnd(hs_head); ClampSetSnd(hs_hit); ClampSetSnd(hs_kill);
         ClampSetIc (ic_head); ClampSetIc (ic_hit); ClampSetIc (ic_kill);
-
-        // 若三项全0，尝试继承旧两列
-        if (hs_head==0 && hs_hit==0 && hs_kill==0 && old_snd>0) {
-            if (old_snd <= g_SetCount) { hs_head = hs_hit = hs_kill = old_snd; }
-        }
-        if (ic_head==0 && ic_hit==0 && ic_kill==0 && old_ic>0) {
-            if (old_ic <= g_OvCount)  { ic_head = ic_hit = ic_kill = old_ic; g_IcSuite[client] = old_ic; }
-        }
 
         g_SndHead[client] = hs_head;
         g_SndHit [client] = hs_hit;
@@ -624,12 +611,22 @@ void DB_SavePlayerPrefs(int client)
 
     char q[1024];
     Format(q, sizeof(q),
-        "INSERT INTO `%s` (steamid, hitsound_head, hitsound_hit, hitsound_kill, hiticon_head, hiticon_hit, hiticon_kill) VALUES ('%s', %d, %d, %d, %d, %d, %d) ON DUPLICATE KEY UPDATE   hitsound_head=VALUES(hitsound_head),   hitsound_hit =VALUES(hitsound_hit),   hitsound_kill=VALUES(hitsound_kill),   hiticon_head =VALUES(hiticon_head),   hiticon_hit  =VALUES(hiticon_hit),   hiticon_kill =VALUES(hiticon_kill), hitsound_cfg=0, hiticon_overlay=0;",
+        "INSERT INTO `%s` ( \
+            steamid, hitsound_head, hitsound_hit, hitsound_kill, \
+            hiticon_head, hiticon_hit, hiticon_kill \
+        ) \
+        VALUES ('%s', %d, %d, %d, %d, %d, %d) \
+        ON DUPLICATE KEY UPDATE \
+            hitsound_head=VALUES(hitsound_head), \
+            hitsound_hit =VALUES(hitsound_hit), \
+            hitsound_kill=VALUES(hitsound_kill), \
+            hiticon_head =VALUES(hiticon_head), \
+            hiticon_hit  =VALUES(hiticon_hit), \
+            hiticon_kill =VALUES(hiticon_kill);",
         table, sid, hs_head, hs_hit, hs_kill, ic_head, ic_hit, ic_kill);
 
     SQL_TQuery(g_hDB, SQL_OnSavePrefs, q);
 }
-
 
 public void SQL_OnSavePrefs(Handle owner, Handle hndl, const char[] error, any data)
 {
@@ -680,12 +677,12 @@ void KV_LoadPlayer(int client)
     g_IcHit [client]  = KvGetNum(g_SoundStore, "IcHit",  0);
     g_IcKill[client]  = KvGetNum(g_SoundStore, "IcKill", 0);
 
-    // 兼容老键：若音效三项全0，尝试旧 Snd
+    // 兼容旧 KV 键：若音效三项全0，尝试旧 Snd
     if (g_SndHead[client]==0 && g_SndHit[client]==0 && g_SndKill[client]==0) {
         int old = KvGetNum(g_SoundStore, "Snd", 0);
         if (old>0 && old<=g_SetCount) g_SndHead[client]=g_SndHit[client]=g_SndKill[client]=old;
     }
-    // 兼容老键：若图标三项全0，若 IcSuite>=1 就给三项=IcSuite；否则尝试旧 Overlay
+    // 兼容旧 KV 键：若图标三项全0，若 IcSuite>=1 就给三项=IcSuite；否则尝试旧 Overlay
     if (g_IcHead[client]==0 && g_IcHit[client]==0 && g_IcKill[client]==0) {
         if (g_IcSuite[client]>=1) {
             g_IcHead[client]=g_IcHit[client]=g_IcKill[client]=g_IcSuite[client];
