@@ -32,15 +32,15 @@ void SetupNatives()
 
 void SetupForwards()
 {
-	g_hPreInitiateForward 			= new GlobalForward("OnReadyUpInitiatePre", ET_Ignore);
-	g_hInitiateForward 				= new GlobalForward("OnReadyUpInitiate", ET_Ignore);
-	g_hPreCountdownForward 			= new GlobalForward("OnRoundLiveCountdownPre", ET_Ignore);
-	g_hCountdownForward 			= new GlobalForward("OnRoundLiveCountdown", ET_Ignore);
-	g_hPreLiveForward 				= new GlobalForward("OnRoundIsLivePre", ET_Ignore);
-	g_hLiveForward					= new GlobalForward("OnRoundIsLive", ET_Ignore);
-	g_hCountdownCancelledForward	= new GlobalForward("OnReadyCountdownCancelled", ET_Ignore, Param_Cell, Param_String);
-	g_hPlayerReadyForward			= new GlobalForward("OnPlayerReady", ET_Ignore, Param_Cell);
-	g_hPlayerUnreadyForward			= new GlobalForward("OnPlayerUnready", ET_Ignore, Param_Cell);
+	g_hPreInitiateForward = new GlobalForward("OnReadyUpInitiatePre", ET_Ignore);
+	g_hInitiateForward = new GlobalForward("OnReadyUpInitiate", ET_Ignore);
+	g_hPreCountdownForward = new GlobalForward("OnRoundLiveCountdownPre", ET_Ignore);
+	g_hCountdownForward = new GlobalForward("OnRoundLiveCountdown", ET_Ignore);
+	g_hPreLiveForward = new GlobalForward("OnRoundIsLivePre", ET_Ignore);
+	g_hLiveForward = new GlobalForward("OnRoundIsLive", ET_Ignore);
+	g_hCountdownCancelledForward = new GlobalForward("OnReadyCountdownCancelled", ET_Ignore, Param_Cell, Param_String);
+	g_hPlayerReadyForward = new GlobalForward("OnPlayerReady", ET_Ignore, Param_Cell);
+	g_hPlayerUnreadyForward = new GlobalForward("OnPlayerUnready", ET_Ignore, Param_Cell);
 }
 
 void SetupConVars()
@@ -50,7 +50,7 @@ void SetupConVars()
 	l4d_ready_cfg_name			= CreateConVar("l4d_ready_cfg_name", "", "Configname to display on the ready-up panel", FCVAR_NOTIFY|FCVAR_PRINTABLEONLY);
 	l4d_ready_server_cvar		= CreateConVar("l4d_ready_server_cvar", "sn_main_name", "ConVar to retrieve the server name for displaying on the ready-up panel", FCVAR_NOTIFY|FCVAR_PRINTABLEONLY);
 	l4d_ready_max_players		= CreateConVar("l4d_ready_max_players", "12", "Maximum number of players to show on the ready-up panel.", FCVAR_NOTIFY, true, 0.0, true, MAXPLAYERS+1.0);
-	
+
 	// game
 	l4d_ready_disable_spawns	= CreateConVar("l4d_ready_disable_spawns", "0", "Prevent SI from having spawns during ready-up", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	l4d_ready_survivor_freeze	= CreateConVar("l4d_ready_survivor_freeze", "1", "Freeze the survivors during ready-up.  When unfrozen they are unable to leave the saferoom but can move freely inside", FCVAR_NOTIFY, true, 0.0, true, 1.0);
@@ -72,15 +72,15 @@ void SetupConVars()
 	l4d_ready_autostart_min		= CreateConVar("l4d_ready_autostart_min", "0.25", "Percent of max players (Versus = 8) in game to allow auto-start to proceed.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	l4d_ready_unbalanced_start	= CreateConVar("l4d_ready_unbalanced_start", "0", "Allow game to go live when teams are not full.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	l4d_ready_unbalanced_min	= CreateConVar("l4d_ready_unbalanced_min", "2", "Minimum of players in each team to allow a unbalanced start.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_unready_limit		= CreateConVar("l4d_ready_unready_limit", "0", "Limits the amount of unready a player can do in a single game. Set to 0 to disable.", FCVAR_NOTIFY, true, 0.0);
-	
+	l4d_ready_autoready         = CreateConVar("l4d_ready_autoready", "0", "Automatically ready up a player after after <value> seconds if they are not afk (0 = disabled).", FCVAR_NOTIFY, true, 0.0);
+
 	// game convars
-	director_no_specials 		= FindConVar("director_no_specials");
-	god 						= FindConVar("god");
-	sb_stop 					= FindConVar("sb_stop");
-	survivor_limit 				= FindConVar("survivor_limit");
-	z_max_player_zombies		= FindConVar("z_max_player_zombies");
-	sv_infinite_primary_ammo	= FindConVar("sv_infinite_primary_ammo");
+	director_no_specials = FindConVar("director_no_specials");
+	god = FindConVar("god");
+	sb_stop = FindConVar("sb_stop");
+	survivor_limit = FindConVar("survivor_limit");
+	z_max_player_zombies = FindConVar("z_max_player_zombies");
+	sv_infinite_primary_ammo = FindConVar("sv_infinite_primary_ammo");
 }
 
 void SetupCommands()
