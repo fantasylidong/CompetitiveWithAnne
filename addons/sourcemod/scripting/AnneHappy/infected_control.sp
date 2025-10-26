@@ -1,22 +1,38 @@
 #pragma semicolon 1 
 #pragma newdecls required
 
+#pragma semicolon 1
+#pragma newdecls required
+
 /**
  * Infected Control (fdxx-style NavArea spot picking + max-distance fallback + 动态FLOW分桶)
- * - Nav 分桶：开局预扫全图 NavArea，按“进度百分比(0..100)”分桶
- *   - 选点仅在【目标幸存者附近 ±N 桶】里扫描（N 随 ring 动态从 Min→Max 线性变化）
- *   - 严格按中心向外成对扩散顺序扫描：s-1, s+1, s-2, s+2, ...（可选是否包含中心 s）
- *   - 支持 First-Fit 模式：命中第一处合格点立即返回，最大化速度
- * - 主找点（唯一）：TerrorNavArea::FindRandomSpot
- *   - 距离窗口（SpawnMin..ring）
- *   - 视线不可见（眼/脚/SDK 可视）
- *   - Hull 不会卡（WillStuck）
- *   - 轻量分散度（扇区偏好+最近点距离）
- * - 扩圈：SpawnMin → SpawnMax；到达 Max 触发“导演兜底”
- * - 保留：队列、跑男检测、传送监督、上限/间隔、暂停联动、死亡CD双保险等
  *
- * Compatible with SourceMod 1.10+ + L4D2 + left4dhooks
- * Authors: Caibiii, 夜羽真白, 东, Paimon-Kawaii, fdxx (思路), merge & cleanup by ChatGPT
+ * ── 模块地图（Modules）
+ *  1. 头文件 & 常量/宏
+ *  2. 数据结构：Config / State / Queues / 全局缓存（NavAreas/FlowBuckets/冷却/路径缓存…）
+ *  3. 插件生命周期：OnPluginStart/OnPluginEnd/Map & Round 事件
+ *  4. CVar 管理：Config::Create / Refresh / 变更回调
+ *  5. 运行时时序：
+ *     - 帧驱动 OnGameFrame → 队列维护 → 常规刷新尝试
+ *     - 传送监督定时器 Timer_TeleportTick（1s）
+ *     - Spawn 波控制：StartWave/Timer_CheckSpawnWindow/Timer_StartNewWave
+ *  6. 选类与队列：稀缺度优先、死亡CD与双保险、上限闸门
+ *  7. 刷点核心（NavArea主路）：距离/可视/卡壳/路径/分散度/Flow 评分与 First-Fit
+ *  8. Nav 分桶与缓存：BuildNavBuckets / KV 读写 / 桶窗口序列（含本文件补完的 BuildBucketOrder）
+ *  9. Flow 与 Survivor 进度：安全获取、回退 TTL、每秒刷新“最后一次有效团队进度”
+ * 10. 跑男检测与目标生还者选择
+ * 11. 工具函数：可视/线段/碰撞/冷却/扇区/日志
+ *
+ * ── 行为要点（Behavior）
+ *  - 预建 Nav Flow 分桶（0..100%），刷点时仅在“目标生还者附近 ±N 桶”内扫描
+ *  - 扩圈 SpawnMin→SpawnMax；到达上限走导演兜底
+ *  - 评分四因子：距离 / 高度偏好 / Flow / 分散度（可调权重）
+ *  - badflow 仅作轻度扣分（不强制禁用），支持空间映射就近归桶
+ *  - 传送监督：出生宽限、跑男快通道（但≥0.8s）、Smoker 技能未就绪不传
+ *  - 生还者进度“本地回退”：所有人统计失败时，短期采用“最后一次有效平均进度”
+ *
+ * Compatible with SM 1.10+ / L4D2 / left4dhooks
+ * Authors: 东, Caibiii, 夜羽真白 , Paimon-Kawaii, fdxx (思路), merge & cleanup by ChatGPT
  */
 
 #include <sourcemod>
@@ -90,7 +106,7 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2025.10.09"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2025.10.26"  // 和插件版号保持同步
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -112,6 +128,9 @@ static float g_LastSpawnTime[MAXPLAYERS+1];
 
 static StringMap g_NavIdToIndex = null;  // navid -> areaIdx
 static char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
+// —— 生还者进度回退（最后一次成功统计） —— //
+static int   g_LastGoodSurPct     = -1;   // 0..100
+static float g_LastGoodSurPctTime = 0.0;  // game time
 
 // =========================
 // 修改 TheNavAreas methodmap
@@ -297,6 +316,15 @@ enum struct Config
     ConVar PathCacheQuantize;
     // [ADD] —— 轻度惩罚 badflow：仅扣 Flow 分项一点点分数（0 关闭）
     ConVar FlowBadPenaltyPoints;
+    // === 可视射线控制 ===
+    ConVar VisEyeRayMode;        // 0=仅中线；1=中+左+右；2=自动：>4只中线，<=4三线
+    int    iVisRayMode;
+
+    // === 生还者进度本地回退 ===
+    ConVar SurFlowFallbackEnable; // 0/1：启用“最后一次有效进度”回退
+    ConVar SurFlowFallbackTTL;    // 回退进度的有效期（秒）
+    bool   bSurFlowFallback;
+    float  fSurFlowFallbackTTL;
 
     // [ADD] 缓存值
     float fFlowBadPenalty;
@@ -351,7 +379,7 @@ enum struct Config
     void Create()
     {
         this.SpawnMin          = CreateConVar("inf_SpawnDistanceMin", "250.0", "特感复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
-        this.TeleportSpawnMin  = CreateConVar("inf_SpawnDistanceMin", "400.0", "特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
+        this.TeleportSpawnMin  = CreateConVar("inf_TeleportDistanceMin", "400.0", "特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
         this.SpawnMax          = CreateConVar("inf_SpawnDistanceMax", "1500.0", "特感复活离生还者最远的距离限制", CVAR_FLAG, true, this.SpawnMin.FloatValue);
         this.TeleportEnable    = CreateConVar("inf_TeleportSi", "1", "是否开启特感超时传送", CVAR_FLAG, true, 0.0, true, 1.0);
         this.TeleportCheckTime = CreateConVar("inf_TeleportCheckTime", "5", "特感几秒后没被看到开始传送", CVAR_FLAG, true, 0.0);
@@ -419,6 +447,29 @@ enum struct Config
             CVAR_FLAG, 
             true, 0.0, true, 100.0
         );
+        // 可视射线：0=仅中线；1=三线；2=自动（>4生还者仅中线）
+        this.VisEyeRayMode = CreateConVar(
+            "inf_VisEyeRayMode", "2",
+            "0=center only; 1=center+left+right; 2=auto (if alive survivors > 4 -> center only)",
+            CVAR_FLAG, true, 0.0, true, 2.0
+        );
+
+        // 生还者进度回退
+        this.SurFlowFallbackEnable = CreateConVar(
+            "inf_SurProgressFallback", "1",
+            "Enable survivor progress fallback when all flows are invalid (0/1)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SurFlowFallbackTTL = CreateConVar(
+            "inf_SurProgressFallbackTTL", "20.0",
+            "TTL (seconds) for last-good survivor progress fallback",
+            CVAR_FLAG, true, 1.0, true, 120.0
+        );
+
+        // 变更回调
+        this.VisEyeRayMode.AddChangeHook(OnCfgChanged);
+        this.SurFlowFallbackEnable.AddChangeHook(OnCfgChanged);
+        this.SurFlowFallbackTTL.AddChangeHook(OnCfgChanged);
         this.FlowBadPenaltyPoints.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
@@ -566,6 +617,11 @@ enum struct Config
         this.fFlowBadPenalty = this.FlowBadPenaltyPoints.FloatValue;
         if (this.fFlowBadPenalty < 0.0) this.fFlowBadPenalty = 0.0;
         if (this.fFlowBadPenalty > 100.0) this.fFlowBadPenalty = 100.0;
+        this.iVisRayMode        = this.VisEyeRayMode.IntValue;
+
+        this.bSurFlowFallback   = this.SurFlowFallbackEnable.BoolValue;
+        this.fSurFlowFallbackTTL= this.SurFlowFallbackTTL.FloatValue;
+        if (this.fSurFlowFallbackTTL < 1.0) this.fSurFlowFallbackTTL = 1.0;
     }
 
     void ApplyMaxZombieBound()
@@ -708,9 +764,9 @@ Handle g_hRushManNotifyForward = INVALID_HANDLE;
 public Plugin myinfo =
 {
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
-    author      = "Caibiii, 夜羽真白, 东, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
+    author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2025.10.09",
+    version     = "2025.10.26",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -2233,9 +2289,36 @@ static void UnpauseSpawnTimer(float delay)
     }
 }
 
-// =========================
-// 传送监督（1s）—接入 pause / ai_smoker_new
-// =========================
+// 每秒轻量刷新一次“最后一次有效团队进度”(0..100)
+// 设计：至少有1名生还者拿到有效进度才更新；无效则保持旧值不变。
+static void RefreshLastGoodSurPctTick()
+{
+    if (!gCV.bSurFlowFallback) return;
+
+    int n = 0;
+    float sum = 0.0;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        int pct;
+        if (TryGetClientFlowPercentSafe(i, pct))
+        {
+            sum += float(pct);
+            n++;
+        }
+    }
+
+    if (n > 0)
+    {
+        int avgPct = RoundToNearest(sum / float(n));
+        TouchLastGoodSurPctFromAverage(avgPct);  // 会自动记录 g_LastGoodSurPct 与时间戳
+    }
+    // n==0: 所有人都拿不到进度 → 不更新，沿用旧值直到 TTL 过期
+}
+
 // ===========================
 // 传送监督（1s）— 加入“出生宽限 + 跑男最小不可见秒数”
 // 依赖：g_LastSpawnTime[]、gCV.fTeleportSpawnGrace、gCV.fTeleportRunnerFast（若未加 CVar，也可设默认值为 0.0）
@@ -2244,6 +2327,8 @@ static Action Timer_TeleportTick(Handle timer)
 {
     if (g_bPauseLib && IsInPause())
         return Plugin_Continue;
+    // ★ 每秒刷新一次团队平均进度（用于 SurProgressFallback）
+    RefreshLastGoodSurPctTick();
 
     // 全队被控或倒地：暂停传送监督
     if (CheckRushManAndAllPinned())
@@ -2478,20 +2563,20 @@ static bool RayClear(const float src[3], const float dst[3], int mask)
 
 static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
 {
-    // 头/胸 —— 不能用初始化器做表达式，逐项赋值
     float head[3];
-    head[0] = pos[0];
-    head[1] = pos[1];
-    head[2] = pos[2] + 62.0;
+    head[0] = pos[0]; head[1] = pos[1]; head[2] = pos[2] + 62.0;
 
     float chest[3];
-    chest[0] = pos[0];
-    chest[1] = pos[1];
-    chest[2] = pos[2] + 32.0;
+    chest[0] = pos[0]; chest[1] = pos[1]; chest[2] = pos[2] + 32.0;
 
-    // 只把“既挡视线又挡子弹”的东西当作阻挡
     const int visMask = (MASK_VISIBLE & MASK_SHOT);
-    const float SIDE = 16.0; // 眼睛左右偏移
+    const float SIDE = 16.0;
+
+    // 计算“有效射线模式”
+    // 0 = 仅中线；1 = 三线；2 = 自动（>4生还者→仅中线，否则三线）
+    int effMode = gCV.iVisRayMode;
+    if (effMode == 2)
+        effMode = (CountAliveSurvivors() > 4) ? 0 : 1;
 
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -2503,31 +2588,36 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         float eyes[3];
         GetClientEyePosition(i, eyes);
 
-        float ang[3], fwd[3], right[3], up[3];
-        GetClientEyeAngles(i, ang);
-        GetAngleVectors(ang, fwd, right, up);
-
-        // 逐项计算左右 16u 偏移（同样不能用初始化器里的表达式）
-        float eyesL[3];
-        eyesL[0] = eyes[0] - right[0] * SIDE;
-        eyesL[1] = eyes[1] - right[1] * SIDE;
-        eyesL[2] = eyes[2] - right[2] * SIDE;
-
-        float eyesR[3];
-        eyesR[0] = eyes[0] + right[0] * SIDE;
-        eyesR[1] = eyes[1] + right[1] * SIDE;
-        eyesR[2] = eyes[2] + right[2] * SIDE;
-
-        // 1) 任意一个“中/左/右眼睛 -> 头”通畅即可见
-        if (RayClear(eyes, head, visMask) || RayClear(eyesL, head, visMask) || RayClear(eyesR, head, visMask))
+        // 先试“中线 → 头”
+        if (RayClear(eyes, head, visMask))
             return true;
 
-        // 2) 原生/引擎可视：到胸（更稳的兜底）
+        // 若模式要求三线，再做左右偏移
+        if (effMode == 1)
+        {
+            float ang[3], fwd[3], right[3], up[3];
+            GetClientEyeAngles(i, ang);
+            GetAngleVectors(ang, fwd, right, up);
+
+            float eyesL[3];
+            eyesL[0] = eyes[0] - right[0] * SIDE;
+            eyesL[1] = eyes[1] - right[1] * SIDE;
+            eyesL[2] = eyes[2] - right[2] * SIDE;
+
+            float eyesR[3];
+            eyesR[0] = eyes[0] + right[0] * SIDE;
+            eyesR[1] = eyes[1] + right[1] * SIDE;
+            eyesR[2] = eyes[2] + right[2] * SIDE;
+
+            if (RayClear(eyesL, head, visMask) || RayClear(eyesR, head, visMask))
+                return true;
+        }
+
+        // 引擎可视（到胸）兜底
         if (L4D2_IsVisibleToPlayer(i, TEAM_SURVIVOR, TEAM_INFECTED, 0, chest))
             return true;
     }
 
-    // 对所有存活幸存者都不可见 → 允许刷
     return false;
 }
 
@@ -2575,22 +2665,25 @@ stock bool TraceFilter(int entity, int contentsMask)
 // =========================
 // 前方/Flow/层级判定
 // =========================
-// ✅ 新版：使用分桶百分比而非原始 flow（约第2100行）
 static bool IsPosAheadOfHighest(float ref[3], int target = -1)
 {
-    // ✅ 使用分桶系统的百分比（已处理异常flow）
     int posPercent = GetPositionBucketPercent(ref);
-    if (posPercent < 0) return false;  // 完全无法确定位置
+    if (posPercent < 0) return false;
 
+    int tPct = -1;
+
+    // 1) 正常路径：拿最高进度玩家
     if (target == -1) target = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(target))
     {
-        int tPct;
-        if (!TryGetClientFlowPercentSafe(target, tPct))
-            return false;
-        
-        return posPercent >= tPct;
+        if (TryGetClientFlowPercentSafe(target, tPct))
+            return posPercent >= tPct;
     }
+
+    // 2) 全部失效 → 尝试回退进度
+    if (GetFallbackSurPct(tPct))
+        return posPercent >= tPct;
+
     return false;
 }
 
@@ -2777,6 +2870,7 @@ static float GetSurAvrFlow()
 {
     int n = 0;
     float sumPct = 0.0;
+
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsValidSurvivor(i)) continue;
@@ -2785,7 +2879,20 @@ static float GetSurAvrFlow()
         sumPct += float(pct);
         n++;
     }
-    return n > 0 ? (sumPct / float(n)) : 0.0;
+
+    if (n > 0)
+    {
+        int avgPct = RoundToNearest(sumPct / float(n));
+        TouchLastGoodSurPctFromAverage(avgPct);   // ★ 记录“最后一次有效进度”
+        return sumPct / float(n);
+    }
+
+    // 没有任何有效进度 → 尝试回退
+    int fpct;
+    if (GetFallbackSurPct(fpct))
+        return float(fpct);
+
+    return 0.0;
 }
 
 // 【新增】只在 raw badflow 时使用：返回“应扣的分值”，而不是改后的分。
@@ -3004,13 +3111,21 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si=0)
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
     {
         if (!TryGetClientFlowPercentSafe(targetSur, surPercent))
-            return true;
+            surPercent = -1;
     }
     else
     {
         int fb = GetHighestFlowSurvivorSafe();
         if (!IsValidSurvivor(fb) || !TryGetClientFlowPercentSafe(fb, surPercent))
-            return true;
+            surPercent = -1;
+    }
+
+    // ★ 拿不到任何生还者进度 → 尝试“回退进度”
+    if (surPercent < 0)
+    {
+        int fpct;
+        if (GetFallbackSurPct(fpct))
+            surPercent = fpct;
     }
 
     // 3) 后方超过 6 个桶：直接禁止
@@ -3229,6 +3344,35 @@ static int GetHighestFlowSurvivorSafe()
     // 若全部失败，退回引擎原生（极端保护）
     return L4D_GetHighestFlowSurvivor();
 }
+// 存活生还者数量
+static int CountAliveSurvivors()
+{
+    int n = 0;
+    for (int i = 1; i <= MaxClients; i++)
+        if (IsValidSurvivor(i) && IsPlayerAlive(i))
+            n++;
+    return n;
+}
+
+// 取得“当前有效的回退进度”（满足开启且未过期）
+static bool GetFallbackSurPct(int &outPct)
+{
+    if (!gCV.bSurFlowFallback) return false;
+    if (g_LastGoodSurPct < 0)  return false;
+    float now = GetGameTime();
+    if ((now - g_LastGoodSurPctTime) > gCV.fSurFlowFallbackTTL) return false;
+    outPct = g_LastGoodSurPct;
+    return true;
+}
+
+// 在成功统计到生还者进度时，更新“最后一次有效进度”
+static void TouchLastGoodSurPctFromAverage(int avgPct)
+{
+    if (avgPct < 0)   avgPct = 0;
+    if (avgPct > 100) avgPct = 100;
+    g_LastGoodSurPct = avgPct;
+    g_LastGoodSurPctTime = GetGameTime();
+}
 
 // =========================
 // Survivor数据辅助
@@ -3339,35 +3483,44 @@ static int ComputeDynamicBucketWindow(float ring)
     return win;
 }
 
-// —— 新版：前2后1推进；若前>后差距>4，则前批量+1、后批量+1 ——
-// 例：+1,+2,-1,+3,+4,-2,+5,+6,-3,...；当前累计比后累计多 >4 时→
-//     下一轮起批量从 (FwdRun,BackRun) 变为 (FwdRun+1, BackRun+1)。
+// 小工具：整型夹取
+static int ClampInt(int v, int lo, int hi)
+{
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+
+/**
+ * 生成“扫描桶顺序”（中心 s 起，前2后1推进；若前>后累计差>4，则两侧批量+1）
+ * 例如：s, s+1, s+2, s-1, s+3, s+4, s-2, s+5, s+6, s-3, ...
+ * @param s             中心桶（0..100）
+ * @param win           窗口半径（±win）
+ * @param includeCenter 是否把中心桶也加入序列
+ * @param outBuckets    输出序列（长度上限 FLOW_BUCKETS）
+ * @return              实际写入数量
+ */
 static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[FLOW_BUCKETS])
 {
-    if (win < 0)  win = 0;
-    if (win > 100) win = 100;
-    if (s < 0) s = 0;
-    if (s > 100) s = 100;
+    s   = ClampInt(s,   0, 100);
+    win = ClampInt(win, 0, 100);
 
     int n = 0;
-    if (includeCenter && 0 <= s && s <= 100)
+    if (includeCenter)
         outBuckets[n++] = s;
 
-    // 距离指针（相对桶）
-    int fdist = 1; // 向前：s+1, s+2, ...
-    int bdist = 1; // 向后：s-1, s-2, ...
+    int fdist = 1;   // 向前偏移距离（s+fdist）
+    int bdist = 1;   // 向后偏移距离（s-bdist）
 
-    // 每轮批量（动态调整）
-    int fwdRun = 2;  // 初始“前2”
-    int backRun = 1; // 初始“后1”
+    int fwdRun  = 2; // 每轮先推“前”多少个
+    int backRun = 1; // 然后推“后”多少个
 
-    // 已实际添加的前/后计数（考虑边界过滤后有效入列数量）
-    int addedF = 0;
+    int addedF = 0;  // 实际加入的前/后桶累计（考虑越界后可能没加上）
     int addedB = 0;
 
     while ((fdist <= win || bdist <= win) && n < FLOW_BUCKETS)
     {
-        // 先推一轮“前 fwdRun”
+        // 前 fwdRun
         int pushedF = 0;
         for (int k = 0; k < fwdRun && fdist <= win && n < FLOW_BUCKETS; k++, fdist++)
         {
@@ -3376,7 +3529,7 @@ static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[F
         }
         addedF += pushedF;
 
-        // 再推一轮“后 backRun”
+        // 后 backRun
         int pushedB = 0;
         for (int k = 0; k < backRun && bdist <= win && n < FLOW_BUCKETS; k++, bdist++)
         {
@@ -3385,14 +3538,13 @@ static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[F
         }
         addedB += pushedB;
 
-        // 如果“前面累计 - 后面累计”> 4，则从下一轮起扩大两侧批量（前+1 / 后+1）
+        // 不平衡修正：前比后“实际加入”多 > 4，则两侧批量都+1
         if ((addedF - addedB) > 4)
         {
             fwdRun++;
             backRun++;
         }
     }
-
     return n;
 }
 

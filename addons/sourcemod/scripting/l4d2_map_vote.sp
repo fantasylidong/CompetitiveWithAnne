@@ -47,7 +47,9 @@ StringMap
 
 ConVar
     g_cvMPGameMode,
-    g_cvNotifyMapNext;
+    g_cvNotifyMapNext,
+    g_cvAutoReloadMode,          // 0=关闭；1=仅管理员触发；2=所有人触发
+    g_cvAutoReloadCooldown;  
 
 char
     g_sMode[128];
@@ -66,6 +68,8 @@ static char
         "en",
         "chi"
     };
+float g_fNextReloadAt = 0.0;     // 下一次允许自动刷新的时间戳（GetGameTime）
+
 
 public Plugin myinfo = {
     name = PLUGIN_NAME,
@@ -101,6 +105,15 @@ public void OnPluginStart() {
 
     CreateConVar("l4d2_map_vote_version", PLUGIN_VERSION, "L4D2 Map vote plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
     g_cvNotifyMapNext =  CreateConVar("notify_map_next", "1", "终局开始后提示投票下一张地图的方式. \n0=不提示, 1=聊天栏, 2=屏幕中央, 4=弹出菜单.", FCVAR_NOTIFY);
+    g_cvAutoReloadMode = CreateConVar(
+    "l4d2_mapvote_autoreload", "2",
+    "输入 !mapvote 时是否自动刷新 VPK 与战役列表：0=关；1=仅管理员触发；2=所有人触发。",
+    FCVAR_NOTIFY);
+
+    g_cvAutoReloadCooldown = CreateConVar(
+        "l4d2_mapvote_reload_cd", "10.0",
+        "自动刷新冷却（秒），避免被频繁触发导致卡顿。",
+        FCVAR_NOTIFY);
     g_cvNotifyMapNext.AddChangeHook(CvarChanged);
 
     //AutoExecConfig(true);
@@ -114,7 +127,7 @@ public void OnPluginStart() {
     RegConsoleCmd("sm_mapvote",   cmdMapVote);
     RegConsoleCmd("sm_votemap",   cmdMapVote);
 
-	RegConsoleCmd("sm_mapvote",		cmdMapNext);
+	//RegConsoleCmd("sm_mapvote",		cmdMapNext);
     RegConsoleCmd("sm_mapnext",   cmdMapNext);
     RegConsoleCmd("sm_votenext",  cmdMapNext);
 
@@ -411,14 +424,51 @@ void SetFirstMapString() {
         g_smFirstMap.SetString(map, mission);
     }
 }
-
-Action cmdReload(int client, int args) {
+// 统一的刷新逻辑：刷新 VPK 路径 + mission_reload + 重新生成短语和首章映射
+void DoReloadVPKAndMissions()
+{
     ServerCommand("update_addon_paths; mission_reload");
     ServerExecute();
+
+    // 你的原逻辑：重导翻译短语、重建首章映射
     OnPhrasesReady();
     SetFirstMapString();
 
-    ReplyToCommand(client, "更新VPK文件");
+    // 反馈给所有真人玩家
+    CPrintToChatAll("{olive}[MapVote]{default} 已刷新 VPK 与战役列表。");
+}
+
+bool MaybeAutoReloadOnMapvote(int client)
+{
+    int mode = g_cvAutoReloadMode.IntValue;       // 0/1/2
+    if (mode == 0) return false;
+
+    bool isAdmin = CheckCommandAccess(client, "sm_reload_vpk", ADMFLAG_ROOT, true);
+    if (mode == 1 && !isAdmin) {
+        // 仅管理员模式下，非管理员触发不会刷新
+        return false;
+    }
+
+    float now = GetGameTime();
+    float cd  = g_cvAutoReloadCooldown.FloatValue;
+
+    if (now < g_fNextReloadAt) {
+        // 冷却中只对发起者提示一下（避免刷屏）
+        float left = g_fNextReloadAt - now;
+        if (left < 0.1) left = 0.1;
+        PrintToChat(client, "VPK 刷新冷却中，还需 %.1f 秒。", left);
+        return false;
+    }
+
+    // 真正执行刷新
+    DoReloadVPKAndMissions();
+    g_fNextReloadAt = now + cd;
+    return true;
+}
+
+Action cmdReload(int client, int args) {
+    DoReloadVPKAndMissions();
+    ReplyToCommand(client, "已刷新 VPK 与战役列表。");
     return Plugin_Handled;
 }
 
@@ -650,7 +700,8 @@ Action cmdMapVote(int client, int args) {
         PrintToChat(client, "旁观者无法进行投票");
         return Plugin_Handled;
     }
-
+    // 在弹出菜单之前，按配置尝试自动刷新 VPK/战役列表
+    MaybeAutoReloadOnMapvote(client);
     Menu menu = new Menu(MapVote_MenuHandler);
     menu.SetTitle("选择地图类型:");
     menu.AddItem("", "官方地图");
