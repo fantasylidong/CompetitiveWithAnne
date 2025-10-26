@@ -394,7 +394,7 @@ enum struct Config
         // Create() 里，紧跟“Nav 分桶”相关 CVar 后面加入：
         this.NavBucketMapInvalid   = CreateConVar("inf_NavBucketMapInvalid", "1",
             "Map invalid-flow NavAreas to nearest valid-flow bucket (0=off,1=on)", CVAR_FLAG, true, 0.0, true, 1.0);
-        this.NavBucketAssignRadius = CreateConVar("inf_NavBucketAssignRadius", "0.0",
+        this.NavBucketAssignRadius = CreateConVar("inf_NavBucketAssignRadius", "2000.0",
             "Optional XY max distance when reassigning invalid-flow areas; 0 = unlimited", CVAR_FLAG, true, 0.0);
         this.gCvarNavCacheEnable = CreateConVar(
             "inf_NavCacheEnable", "1",
@@ -3398,54 +3398,53 @@ static int BuildBucketOrder(int s, int win, bool includeCenter, int outBuckets[F
 
 static void BuildNavBuckets()
 {
+    // 1) 尝试读缓存（成功就直接返回）
     if (TryLoadBucketsFromCache())
         return;
-        
+
+    // 2) 清理旧数据、准备索引与缓存
     ClearNavBuckets();
     BuildNavIdIndexMap();
-
     EnsureNavAreasCache();
+
     int iAreaCount = g_NavAreasCacheCount;
-    
     float fMapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
     bool  bFinaleArea     = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < 18;
 
-    g_AreaZCore = new ArrayList(); 
-    g_AreaZMin  = new ArrayList(); 
+    float t0 = GetEngineTime();
+    Debug_Print("[BUCKET] begin build: areas=%d", iAreaCount);
+
+    // 3) 初始化 per-area / per-bucket 容器
+    g_AreaZCore = new ArrayList();
+    g_AreaZMin  = new ArrayList();
     g_AreaZMax  = new ArrayList();
-    g_AreaCX    = new ArrayList(); 
-    g_AreaCY    = new ArrayList(); 
+    g_AreaCX    = new ArrayList();
+    g_AreaCY    = new ArrayList();
     g_AreaPct   = new ArrayList();
-    
+
     for (int i = 0; i < iAreaCount; i++)
     {
-        g_AreaZCore.Push(0.0); 
-        g_AreaZMin.Push(0.0); 
+        g_AreaZCore.Push(0.0);
+        g_AreaZMin.Push(0.0);
         g_AreaZMax.Push(0.0);
-        g_AreaCX.Push(0.0);    
-        g_AreaCY.Push(0.0);   
-        g_AreaPct.Push(-1);
-    }
-    
-    for (int b = 0; b < FLOW_BUCKETS; b++) 
-    { 
-        g_BucketMinZ[b] =  1.0e9; 
-        g_BucketMaxZ[b] = -1.0e9; 
+        g_AreaCX.Push(0.0);
+        g_AreaCY.Push(0.0);
+        g_AreaPct.Push(-1); // -1 = 未归桶/坏flow
     }
 
     for (int b = 0; b < FLOW_BUCKETS; b++)
+    {
         g_FlowBuckets[b] = null;
+        g_BucketMinZ[b]  =  1.0e9;
+        g_BucketMaxZ[b]  = -1.0e9;
+    }
 
     ArrayList badIdxs   = new ArrayList();
     ArrayList validIdxs = new ArrayList();
 
     int addedValid = 0, addedBad = 0, skippedFlag = 0;
 
-    // ★ 新增：标记“原始 flow 无效”的区域（后续用于同桶尾置）
-    ArrayList wasBad = new ArrayList();
-    for (int i = 0; i < iAreaCount; i++) wasBad.Push(0);
-
-    // === 第一遍：采样 + 直接入桶 ===
+    // 4) 第一遍：采样中心/高度，正常 flow 直接入桶
     for (int i = 0; i < iAreaCount; i++)
     {
         Address areaAddr = g_AllNavAreasCache.Get(i);
@@ -3453,27 +3452,30 @@ static void BuildNavBuckets()
 
         NavArea pArea = view_as<NavArea>(areaAddr);
 
-        if (!IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) 
-        { 
-            skippedFlag++; 
-            continue; 
+        // 过滤不合规的 Nav flags（救援/安全屋等）
+        if (!IsValidFlags(pArea.SpawnAttributes, bFinaleArea))
+        {
+            skippedFlag++;
+            continue;
         }
 
+        // 采样中心与高度统计（最多 3 次）
         float cx, cy, zAvg, zMin, zMax;
         SampleAreaCenterAndZ(areaAddr, cx, cy, zAvg, zMin, zMax, 3);
-        g_AreaCX.Set(i, cx); 
+        g_AreaCX.Set(i, cx);
         g_AreaCY.Set(i, cy);
-        g_AreaZCore.Set(i, zAvg); 
-        g_AreaZMin.Set(i, zMin); 
-        g_AreaZMax.Set(i, zMax);
+        g_AreaZCore.Set(i, zAvg);
+        g_AreaZMin.Set(i,  zMin);
+        g_AreaZMax.Set(i,  zMax);
 
+        // 原始 flow 到百分比（无效则进坏列表）
         float fFlow = pArea.GetFlow();
         bool  flowOK = (fFlow >= 0.0 && fFlow <= fMapMaxFlowDist);
-        
+
         if (flowOK)
         {
             int percent = FlowDistanceToPercent(fFlow);
-            if (percent < 0) percent = 0; 
+            if (percent < 0)   percent = 0;
             if (percent > 100) percent = 100;
 
             if (g_FlowBuckets[percent] == null)
@@ -3490,139 +3492,195 @@ static void BuildNavBuckets()
         else
         {
             badIdxs.Push(i);
-            wasBad.Set(i, 1); // ★ 标记为原始 bad flow
             addedBad++;
         }
     }
 
-    // === 第二遍：映射坏flow的area ===
-    int mapped = 0, dropped = 0;
+    Debug_Print("[BUCKET] pass1 done: valid=%d bad=%d skipped=%d took=%.3fs",
+        addedValid, addedBad, skippedFlag, GetEngineTime() - t0);
+
+    // 5) 第二遍：把坏 flow 的区域映射到最近“有效桶”（二维栅格 + 成本/时间保护）
     if (gCV.bNavBucketMapInvalid && validIdxs.Length > 0 && badIdxs.Length > 0)
     {
-        float maxR2 = (gCV.fNavBucketAssignRadius > 0.1) ? 
-                      (gCV.fNavBucketAssignRadius * gCV.fNavBucketAssignRadius) : -1.0;
+        // 5.1 估算成本与时间预算
+        int B = badIdxs.Length, V = validIdxs.Length;
+        float estCostM = float(B) * float(V) / 1.0e6;
+        const float hardCostM   = 5.0;  // ≈500万配对：超过则跳过映射
+        const float timeBudgetS = 0.60; // 总时间预算：>0.6s 就中止映射
 
-        for (int bi = 0; bi < badIdxs.Length; bi++)
+        float t1 = GetEngineTime();
+        if (estCostM > hardCostM)
         {
-            int aidx = badIdxs.Get(bi);
+            Debug_Print("[BUCKET] pass2 SKIP(cost): B=%d V=%d est≈%.1fM", B, V, estCostM);
+        }
+        else
+        {
+            // 5.2 构建“有效区”二维栅格
+            const float cell = 2000.0; // 栅格边长（可按地图尺度调整）
+            float radius = gCV.fNavBucketAssignRadius; // 0=不限
+            if (radius < 0.0) radius = 0.0;
 
-            float ax = view_as<float>(g_AreaCX.Get(aidx));
-            float ay = view_as<float>(g_AreaCY.Get(aidx));
+            StringMap cellMap = new StringMap();
+            ArrayList ownedLists = new ArrayList(); // 收尾 delete
 
-            float bestD2 = 1.0e12;
-            int   bestV  = -1;
-            
-            for (int vi = 0; vi < validIdxs.Length; vi++)
+            for (int i = 0; i < V; i++)
             {
-                int vidx = validIdxs.Get(vi);
+                int vidx = validIdxs.Get(i);
                 float vx = view_as<float>(g_AreaCX.Get(vidx));
                 float vy = view_as<float>(g_AreaCY.Get(vidx));
-                float dx = ax - vx, dy = ay - vy;
-                float d2 = dx*dx + dy*dy;
-                if (d2 < bestD2) { bestD2 = d2; bestV = vidx; }
-            }
+                int   cx = RoundToFloor(vx / cell);
+                int   cy = RoundToFloor(vy / cell);
 
-            if (bestV == -1 || (maxR2 > 0.0 && bestD2 > maxR2))
-            {
-                dropped++;
-                continue;
-            }
+                char key[32];
+                Format(key, sizeof key, "%d,%d", cx, cy);
 
-            int percent = view_as<int>(g_AreaPct.Get(bestV));
-            if (percent < 0) { dropped++; continue; }
-
-            if (g_FlowBuckets[percent] == null)
-                g_FlowBuckets[percent] = new ArrayList();
-            g_FlowBuckets[percent].Push(aidx);
-
-            float zMin = view_as<float>(g_AreaZMin.Get(aidx));
-            float zMax = view_as<float>(g_AreaZMax.Get(aidx));
-            if (zMin < g_BucketMinZ[percent]) g_BucketMinZ[percent] = zMin;
-            if (zMax > g_BucketMaxZ[percent]) g_BucketMaxZ[percent] = zMax;
-
-            g_AreaPct.Set(aidx, percent);
-            mapped++;
-        }
-    }
-
-    // === 改进：按 Z 轴智能排序（上方优先，下方延后） ===
-    float lowestSurvivorZ = GetLowestSurvivorFootZ();
-    
-    for (int b = 0; b < FLOW_BUCKETS; b++)
-    {
-        ArrayList L = g_FlowBuckets[b];
-        if (L == null || L.Length == 0) continue;
-
-        ArrayList above = new ArrayList();
-        ArrayList same  = new ArrayList();
-        ArrayList below = new ArrayList();
-
-        for (int i = 0; i < L.Length; i++)
-        {
-            int areaIdx = L.Get(i);
-            float zCore = view_as<float>(g_AreaZCore.Get(areaIdx));
-            float deltaZ = zCore - lowestSurvivorZ;
-            
-            if (deltaZ > 120.0)
-                above.Push(areaIdx);
-            else if (deltaZ < -80.0)
-                below.Push(areaIdx);
-            else
-                same.Push(areaIdx);
-        }
-
-        ShuffleArrayList(above);
-        ShuffleArrayList(same);
-        ShuffleArrayList(below);
-
-        L.Clear();
-        for (int i = 0; i < same.Length; i++)  L.Push(same.Get(i));
-        for (int i = 0; i < above.Length; i++) L.Push(above.Get(i));
-        for (int i = 0; i < below.Length; i++) L.Push(below.Get(i));
-
-        delete above;
-        delete same;
-        delete below;
-
-        // ★ 新增：把“原始 bad flow（被映射来的）”稳定移到桶的末尾
-        {
-            ArrayList normals = new ArrayList();
-            ArrayList mappedBad = new ArrayList();
-
-            for (int i = 0; i < L.Length; i++)
-            {
-                int areaIdx = L.Get(i);
-                int isBad = view_as<int>(wasBad.Get(areaIdx));
-                if (isBad != 0)
-                    mappedBad.Push(areaIdx);
+                any h;
+                ArrayList lst;
+                if (!cellMap.GetValue(key, h))
+                {
+                    lst = new ArrayList();
+                    ownedLists.Push(lst);
+                    cellMap.SetValue(key, view_as<any>(lst));
+                }
                 else
-                    normals.Push(areaIdx);
+                {
+                    lst = view_as<ArrayList>(h);
+                }
+                lst.Push(vidx);
             }
 
-            L.Clear();
-            for (int i = 0; i < normals.Length; i++)    L.Push(normals.Get(i));
-            for (int i = 0; i < mappedBad.Length; i++)  L.Push(mappedBad.Get(i));
+            // 5.3 邻格扩环检索参数
+            int   maxLayer = (radius > 0.1) ? RoundToCeil(radius / cell) : 6;
+            if (maxLayer < 0)  maxLayer = 0;
+            if (maxLayer > 48) maxLayer = 48;
+            float r2 = (radius > 0.1) ? (radius * radius) : -1.0;
 
-            delete normals;
-            delete mappedBad;
+            int mapped = 0, dropped = 0;
+            bool aborted = false;
+
+            // 5.4 对每个坏区做邻格扩环搜索
+            for (int bi = 0; bi < B; bi++)
+            {
+                // 时间预算：每 1024 个检查一次
+                if ((bi & 1023) == 0)
+                {
+                    float el = GetEngineTime() - t1;
+                    if (el > timeBudgetS)
+                    {
+                        Debug_Print("[BUCKET] pass2 ABORT(time): bi=%d/%d mapped=%d dropped=%d el=%.3fs",
+                                    bi, B, mapped, dropped, el);
+                        aborted = true;
+                        break;
+                    }
+                }
+
+                int aidx = badIdxs.Get(bi);
+                float ax = view_as<float>(g_AreaCX.Get(aidx));
+                float ay = view_as<float>(g_AreaCY.Get(aidx));
+                int   acx = RoundToFloor(ax / cell);
+                int   acy = RoundToFloor(ay / cell);
+
+                float bestD2 = 1.0e20;
+                int   bestV  = -1;
+
+                // 扩环：layer=0..maxLayer（只扫 ring 外框，避免 O(layer^2)）
+                for (int layer = 0; layer <= maxLayer; layer++)
+                {
+                    bool foundThisRing = false;
+                    int minX = acx - layer, maxX = acx + layer;
+                    int minY = acy - layer, maxY = acy + layer;
+
+                    for (int cy = minY; cy <= maxY; cy++)
+                    {
+                        for (int cx = minX; cx <= maxX; cx++)
+                        {
+                            bool onEdge = (cx == minX || cx == maxX || cy == minY || cy == maxY);
+                            if (!onEdge) continue;
+
+                            char key[32];
+                            Format(key, sizeof key, "%d,%d", cx, cy);
+
+                            any h;
+                            if (!cellMap.GetValue(key, h)) continue;
+                            ArrayList lst = view_as<ArrayList>(h);
+
+                            for (int k = 0; k < lst.Length; k++)
+                            {
+                                int vidx = lst.Get(k);
+                                float vx = view_as<float>(g_AreaCX.Get(vidx));
+                                float vy = view_as<float>(g_AreaCY.Get(vidx));
+                                float dx = ax - vx, dy = ay - vy;
+                                float d2 = dx*dx + dy*dy;
+
+                                if (r2 > 0.0 && d2 > r2) continue;
+                                if (d2 < bestD2)
+                                {
+                                    bestD2 = d2;
+                                    bestV  = vidx;
+                                    foundThisRing = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (foundThisRing)
+                        break;
+                }
+
+                if (bestV != -1)
+                {
+                    int percent = view_as<int>(g_AreaPct.Get(bestV));
+                    if (percent < 0)   percent = 0;
+                    if (percent > 100) percent = 100;
+
+                    if (g_FlowBuckets[percent] == null)
+                        g_FlowBuckets[percent] = new ArrayList();
+                    g_FlowBuckets[percent].Push(aidx);
+
+                    float zmin = view_as<float>(g_AreaZMin.Get(aidx));
+                    float zmax = view_as<float>(g_AreaZMax.Get(aidx));
+                    if (zmin < g_BucketMinZ[percent]) g_BucketMinZ[percent] = zmin;
+                    if (zmax > g_BucketMaxZ[percent]) g_BucketMaxZ[percent] = zmax;
+
+                    g_AreaPct.Set(aidx, percent);
+                    mapped++;
+                }
+                else
+                {
+                    dropped++;
+                }
+
+                if ((bi % 2048) == 0)
+                    Debug_Print("[BUCKET] pass2 prog: %d/%d mapped=%d dropped=%d", bi, B, mapped, dropped);
+            }
+
+            Debug_Print("[BUCKET] pass2 %s: B=%d V=%d mapped=%d dropped=%d took=%.3fs",
+                aborted ? "done(partial)" : "done",
+                B, V, mapped, dropped, GetEngineTime() - t1);
+
+            // 5.5 释放 cellMap 内存
+            for (int i = 0; i < ownedLists.Length; i++)
+            {
+                ArrayList lst = ownedLists.Get(i);
+                if (lst != null) delete lst;
+            }
+            delete ownedLists;
+            delete cellMap;
         }
-
-        if (L.Length == 0) { g_BucketMinZ[b] = 0.0; g_BucketMaxZ[b] = 0.0; }
-        if (g_BucketMinZ[b] > g_BucketMaxZ[b]) { g_BucketMinZ[b] = g_BucketMaxZ[b] = 0.0; }
+    }
+    else
+    {
+        Debug_Print("[BUCKET] pass2 skip: mapInvalid=%d valid=%d bad=%d",
+            gCV.bNavBucketMapInvalid ? 1 : 0, validIdxs.Length, badIdxs.Length);
     }
 
-    // ★ 清理标记表
-    delete wasBad;
-
-    delete badIdxs;
-    delete validIdxs;
-
+    // 6) 完成：标记就绪 & 存缓存
     g_BucketsReady = true;
-    Debug_Print("[BUCKET] valid=%d, bad=%d, mapped=%d, dropped=%d, skipFlag=%d",
-        addedValid, addedBad, mapped, dropped, skippedFlag);
+    Debug_Print("[BUCKET] build done: took=%.3fs", GetEngineTime() - t0);
 
-    SaveBucketsToCache();
+    SaveBucketsToCache(); // 若启用缓存将写入 .kv（你已有实现）
 }
+
 
 // ✅ 新增：获取所有生还者的最低脚位置（约第2850行）
 stock float GetLowestSurvivorFootZ()

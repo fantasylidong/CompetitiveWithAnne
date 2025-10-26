@@ -232,7 +232,7 @@ public void OnPluginStart()
     cv_db_enable              = CreateConVar("sm_hitsound_db_enable", "1", "是否启用 RPG 表存储(1启用,0禁用)", CVAR_FLAGS);
     cv_db_conf                = CreateConVar("sm_hitsound_db_conf", "rpg", "databases.cfg 中的连接名", CVAR_FLAGS);
     cv_db_table               = CreateConVar("sm_hitsound_db_table", "RPG", "存储表名", CVAR_FLAGS);
-    cv_debug                  = CreateConVar("sm_hitsound_debug", "1", "调试输出(0关,1开)", CVAR_FLAGS);
+    cv_debug                  = CreateConVar("sm_hitsound_debug", "0", "调试输出(0关,1开)", CVAR_FLAGS);
 
     // Fallback KV
     g_SoundStore = CreateKeyValues("SoundSelect6");
