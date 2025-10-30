@@ -340,14 +340,21 @@ public Action evt_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 
 public void evt_JockeyRide(Event event, const char[] name, bool dontBroadcast)
 {
-	if (IsCoop)
+	int attacker = GetClientOfUserId(event.GetInt("userid"));
+	int victim = GetClientOfUserId(event.GetInt("victim"));
+	if (attacker > 0 && IsAiJockey(attacker))
 	{
-		int attacker = GetClientOfUserId(event.GetInt("userid"));
-		int victim = GetClientOfUserId(event.GetInt("victim"));
-		if (attacker > 0 && victim > 0)
+		if (GetEntityMoveType(attacker) == MOVETYPE_NONE)
 		{
-			StumbleByStanders(victim, attacker);
+			SetEntityMoveType(attacker, MOVETYPE_CUSTOM);
 		}
+		g_fNoActionTime[attacker][0] = g_fNoActionTime[attacker][1] = 0.0;
+		g_bCanBackVision[attacker] = false;
+		g_bHasBeenShoved[attacker] = false;
+	}
+	if (IsCoop() && attacker > 0 && victim > 0)
+	{
+		StumbleByStanders(victim, attacker);
 	}
 }
 
@@ -447,6 +454,16 @@ int GetState(int client, int no)
 
 bool jockeyDoBhop(int client, int &buttons, float ang[3], float vec[3])
 {
+	float leapCooldown = (g_hJockeyLeapTime != null) ? g_hJockeyLeapTime.FloatValue : 1.0;
+	if (leapCooldown <= 0.0)
+	{
+		leapCooldown = 0.35;
+	}
+	if (g_fShovedTime[client] > 0.0 && GetGameTime() - g_fShovedTime[client] < leapCooldown)
+	{
+		buttons &= ~IN_JUMP;
+		return false;
+	}
 	if (buttons & IN_FORWARD || buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT)
 	{
 		TeleportEntity(client, NULL_VECTOR, ang, vec);
