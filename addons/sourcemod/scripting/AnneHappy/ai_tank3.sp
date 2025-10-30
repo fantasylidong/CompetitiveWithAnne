@@ -51,6 +51,7 @@ ConVar
 	g_cvAirVecModifyMaxDegree,
 	g_cvAirVecModifyInterval,
 	g_cvClimbAnimRate,
+	g_cvLowClimbAnimRate,
 	g_cvRockTargetAdjust,
 	g_cvBackFist,
 	g_cvBackFistRange,
@@ -68,7 +69,8 @@ ConVar
 
 StringMap
 	g_hThrowAnimMap,
-	g_hClimbAnimMap;
+	g_hClimbAnimMap,
+	g_hLowClimbAnimMap;
 
 Handle
 	g_hSdkTankClawSweepFist;
@@ -153,7 +155,9 @@ public void OnPluginStart() {
 	g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离(小于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "800", "允许扔石头的最大距离(大于这个距离不允许扔)", CVAR_FLAGS, true, 0.0);
 	// you can use the value of 'ai_tank3_climb_anim_rate' to accelerate the animation rate when tank is climbing over some obstacle
-	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "5.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
+	g_cvClimbAnimRate = CreateConVar("ai_tank3_climb_anim_rate", "3.0", "Tank攀爬动画播放速率(是否加速攀爬动作, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
+	// 低矮攀爬动作独立控制倍速
+	g_cvLowClimbAnimRate = CreateConVar("ai_tank3_low_climb_anim_rate", "2.0", "Tank低矮攀爬动画播放速率(ACT_RANGE_ATTACK1/2以及LOW序列, 1.0=正常倍速)", CVAR_FLAGS, true, 0.0);
 	// when tank throwing rock and his target is not visible, allow tank to switch target and throw to new survivor that is visible and closest to tank?
 	g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "扔石头时目标不可见是否允许切换目标", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow tank to punch survivor who is behind him?
@@ -233,6 +237,7 @@ public void OnPluginEnd() {
 	delete log;
 	delete g_hThrowAnimMap;
 	delete g_hClimbAnimMap;
+	delete g_hLowClimbAnimMap;
 }
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {
@@ -269,20 +274,23 @@ stock void initAnimMap() {
 		g_hThrowAnimMap = new StringMap();
 	if (!g_hClimbAnimMap)
 		g_hClimbAnimMap = new StringMap();
+	if (!g_hLowClimbAnimMap)
+		g_hLowClimbAnimMap = new StringMap();
 	
 	// 扔石头动画 ActivityName
 	g_hThrowAnimMap.SetValue("ACT_SIGNAL2", true);
     g_hThrowAnimMap.SetValue("ACT_SIGNAL3", true);
     g_hThrowAnimMap.SetValue("ACT_SIGNAL_ADVANCE", true);
 	// 攀爬动画 ActivityName
-	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK1", true);
-	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK2", true);
-	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK1_LOW", true);
-	g_hClimbAnimMap.SetValue("ACT_RANGE_ATTACK2_LOW", true);
 	g_hClimbAnimMap.SetValue("ACT_DIESIMPLE", true);
 	g_hClimbAnimMap.SetValue("ACT_DIEBACKWARD", true);
 	g_hClimbAnimMap.SetValue("ACT_DIEFORWARD", true);
 	g_hClimbAnimMap.SetValue("ACT_DIEVIOLENT", true);
+
+	g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK1", true);
+	g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK2", true);
+	g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK1_LOW", true);
+	g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK2_LOW", true);
 }
 
 // ============================================================
@@ -686,7 +694,7 @@ void climbRateModifyHookHandler(int client) {
 		SDKUnhook(client, SDKHook_PostThinkPost, climbRateModifyHookHandler);
 		return;
 	}
-	SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", g_cvClimbAnimRate.FloatValue);
+	SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", getClimbPlaybackRate(animSeq));
 }
 
 /**
@@ -713,7 +721,8 @@ Action tankAnimHookPostCb(int tank, int &sequence) {
 		g_AiTanks[tank].wasThrowing = true;
 		CreateTimer(0.5, timerResetThrowingFlagHandler, GetClientUserId(tank), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	} else if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Climb))) {
-		if (GetEntPropFloat(tank, Prop_Send, "m_flPlaybackRate") != g_cvClimbAnimRate.FloatValue)
+		float targetRate = getClimbPlaybackRate(sequence);
+		if (GetEntPropFloat(tank, Prop_Send, "m_flPlaybackRate") != targetRate)
 			SDKHook(tank, SDKHook_PostThinkPost, climbRateModifyHookHandler);
 	}
 	return Plugin_Continue;
@@ -735,6 +744,33 @@ bool isMatchedSequence(int sequence, TankSequenceType seqType) {
 		}
 	}
 	return false;
+}
+
+/**
+* 判断是否属于低矮攀爬动画
+* @param sequence 动画序列
+* @return bool
+**/
+bool isLowClimbSequence(int sequence) {
+	if (sequence < 0 || !g_hLowClimbAnimMap)
+		return false;
+
+	static char seqName[64];
+	if (!AnimGetActivity(sequence, seqName, sizeof(seqName)))
+		return false;
+
+	return g_hLowClimbAnimMap.ContainsKey(seqName);
+}
+
+/**
+* 根据动画类型获取应使用的攀爬速率
+* @param sequence 动画序列
+* @return float
+**/
+float getClimbPlaybackRate(int sequence) {
+	if (isLowClimbSequence(sequence))
+		return g_cvLowClimbAnimRate.FloatValue;
+	return g_cvClimbAnimRate.FloatValue;
 }
 
 // ============================================================
