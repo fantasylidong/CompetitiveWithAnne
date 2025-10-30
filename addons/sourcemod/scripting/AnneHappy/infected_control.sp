@@ -383,6 +383,9 @@ enum struct Config
     // —— 新增：死亡CD放宽的“双保险” —— //
     ConVar DeathCDBypassAfter;   
     ConVar DeathCDUnderfill;     
+    ConVar SupportUnlockKillers;
+    ConVar SupportUnlockRatio;
+    ConVar SupportUnlockGrace;
 
     ConVar ZSmokerLimit;
     ConVar ZBoomerLimit;
@@ -403,6 +406,11 @@ enum struct Config
     ConVar Score_w_hght;
     ConVar Score_w_flow;
     ConVar Score_w_disp;
+    // —— 距离甜点（可由 CVar 控制） —— //
+    ConVar Score_dist_from_cvar;   // 1=使用 CVar 指定的甜点/宽度/斜率；0=按旧逻辑自动推导
+    ConVar Score_sweet_dist;       // 6 个值：S B H P J C 对应的甜点距离（单位：uu）
+    ConVar Score_sweet_width;      // 6 个值：围绕甜点的“容忍宽度”（越大曲线越平）
+    ConVar Score_sweet_slope;      // 6 个值：曲线陡峭程度（>1 更挑剔，<1 更宽松）
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
@@ -427,7 +435,11 @@ enum struct Config
     float w_dist[7];
     float w_hght[7];
     float w_flow[7];
-    float w_disp[7];
+    float w_disp[7];  
+    float s_dist[7];               // 1..6 索引：按 SIClass 顺序
+    float s_width[7];
+    float s_slope[7];
+    bool  bDistFromCvar;
     bool  bNavCacheEnable;
 
     bool  bNavBucketMapInvalid;
@@ -472,6 +484,9 @@ enum struct Config
     float fDeathCDSupport;
     float fDeathCDBypassAfter;
     float fDeathCDUnderfill;
+    int   iSupportUnlockKillers;
+    float fSupportUnlockRatio;
+    float fSupportUnlockGrace;
 
     void Create()
     {
@@ -522,6 +537,15 @@ enum struct Config
         // —— 双保险 —— //
         this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.5","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
         this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.SupportUnlockKillers = CreateConVar("inf_support_unlock_killers", "-1",
+            "支援特感(Smoker/Spitter/Boomer)解锁所需的优先特感(Jockey/Hunter/Charger)数量；<0 表示按 inf_support_unlock_ratio 自动计算，0 关闭限制。",
+            CVAR_FLAG, true, -1.0, true, 12.0);
+        this.SupportUnlockRatio = CreateConVar("inf_support_unlock_ratio", "0.3333",
+            "当 inf_support_unlock_killers < 0 时，所需优先特感 = RoundToFloor(limit * ratio)。0 关闭比例限制。",
+            CVAR_FLAG, true, 0.0, true, 1.0);
+        this.SupportUnlockGrace = CreateConVar("inf_support_unlock_grace", "1.0",
+            "当优先类不足时等待多少秒后自动放开支援限制；0 = 永不自动放开。",
+            CVAR_FLAG, true, 0.0, true, 30.0);
         this.TeleportSpawnGrace = CreateConVar("inf_TeleportSpawnGrace", "2.5",
             "特感生成后多少秒内禁止传送", CVAR_FLAG, true, 0.0, true, 10.0);
         this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
@@ -537,10 +561,48 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0);
         // [新增] 为新评分系统创建CVar
         // [ADD] Create CVars for the new scoring system
-        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.45 1.20 1.05 0.95 1.55 1.70", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.00 1.10 1.35 1.20 0.50 0.55", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.40 1.15 1.30 1.10 1.30 1.45", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.40 1.15 1.25 1.35 1.10 1.00", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        // [调参指导]
+        // 1) inf_score_w_dist ↑：整体更看“离甜点有多近”，曲线越尖时（slope大）会进一步放大这个效果。
+        // 2) inf_score_w_hght ↑：更偏爱“高打低/上视野位”，Smoker/Spitter 在高点更容易出点。
+        // 3) inf_score_w_flow ↑：更偏爱“围绕推进线两侧”的点，Charger/Spitter 提高该值会更像“冲线”封口。
+        // 4) inf_score_w_disp ↑：更偏爱“分散扇区/不叠点”，Boomer 适合高分散，避免团灭节奏被对面连续清理。
+        this.Score_w_dist  = CreateConVar("inf_score_w_dist",  "1.45 0.95 1.20 1.05 1.55 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.00 1.20 1.50 1.40 0.50 0.55", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.40 1.10 1.15 1.30 1.30 1.50", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "1.40 1.35 1.15 1.25 1.10 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+
+        // —— 距离甜点 CVar ——
+        // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
+        // 距离带建议：近=250–500，中近=400–650，中=500–800，中远=600–1000，远=>1000
+        // [甜点三件套]
+        // - inf_score_sweet_dist：甜点位置（职业“舒适距离”）。
+        // - inf_score_sweet_width：容忍半宽（越大越宽容）。
+        // - inf_score_sweet_slope：曲线陡峭度；>1 更挑剔，<1 更宽松。
+        this.Score_dist_from_cvar = CreateConVar(
+            "inf_score_dist_from_cvar", "1",
+            "1=使用 CVar 指定的甜点/宽度/斜率；0=使用内建自适应规则",
+            CVAR_FLAG, true, 0.0, true, 1.0);
+
+        // 结合我们讨论：
+        // S(中远、偏紧、稍陡)  B(中近、适中、适中)  H(中近高、适中、适中)
+        // P(中等、适中、稍陡)  J(中近、适中、不陡)  C(近、适中、不陡)
+        this.Score_sweet_dist  = CreateConVar(
+            "inf_score_sweet_dist",  "800 560 560 650 480 440",
+            "距离甜点（单位uu）：S B H P J C", CVAR_FLAG);
+
+        this.Score_sweet_width = CreateConVar(
+            "inf_score_sweet_width", "320 500 500 500 500 520",
+            "甜点容忍宽度（单位uu，越大越宽容）：S B H P J C", CVAR_FLAG);
+
+        this.Score_sweet_slope = CreateConVar(
+            "inf_score_sweet_slope", "1.25 1.05 1.20 1.25 1.15 1.15",
+            "曲线陡峭度（>1 更挑剔；<1 更宽松）：S B H P J C", CVAR_FLAG);
+
+        // 变化回调
+        this.Score_dist_from_cvar.AddChangeHook(OnCfgChanged);
+        this.Score_sweet_dist.AddChangeHook(OnCfgChanged);
+        this.Score_sweet_width.AddChangeHook(OnCfgChanged);
+        this.Score_sweet_slope.AddChangeHook(OnCfgChanged);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -603,6 +665,9 @@ enum struct Config
         this.DeathCDSupport.AddChangeHook(OnCfgChanged);
         this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
         this.DeathCDUnderfill.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockKillers.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockRatio.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockGrace.AddChangeHook(OnCfgChanged);
 
         SetConVarInt(FindConVar("director_no_specials"), 1);
 
@@ -684,6 +749,21 @@ enum struct Config
         this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
         this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
         this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
+        int cfgUnlock = this.SupportUnlockKillers.IntValue;
+        if (cfgUnlock >= 0)
+        {
+            if (cfgUnlock > this.iSiLimit) cfgUnlock = this.iSiLimit;
+            this.iSupportUnlockKillers = cfgUnlock;
+        }
+        else
+        {
+            this.iSupportUnlockKillers = -1;
+        }
+        this.fSupportUnlockRatio = this.SupportUnlockRatio.FloatValue;
+        if (this.fSupportUnlockRatio < 0.0) this.fSupportUnlockRatio = 0.0;
+        if (this.fSupportUnlockRatio > 1.0) this.fSupportUnlockRatio = 1.0;
+        this.fSupportUnlockGrace = this.SupportUnlockGrace.FloatValue;
+        if (this.fSupportUnlockGrace < 0.0) this.fSupportUnlockGrace = 0.0;
         this.fTeleportSpawnGrace = this.TeleportSpawnGrace.FloatValue;
         this.fTeleportRunnerFast = this.TeleportRunnerFast.FloatValue;
 
@@ -740,6 +820,40 @@ enum struct Config
         this.bSurFlowFallback   = this.SurFlowFallbackEnable.BoolValue;
         this.fSurFlowFallbackTTL= this.SurFlowFallbackTTL.FloatValue;
         if (this.fSurFlowFallbackTTL < 1.0) this.fSurFlowFallbackTTL = 1.0;
+        // —— 距离甜点参数 —— //
+        this.bDistFromCvar = this.Score_dist_from_cvar.BoolValue;
+
+        char buf[256];
+        char parts2[6][16]; int n;
+
+        // 甜点距离
+        this.Score_sweet_dist.GetString(buf, sizeof(buf));
+        n = ExplodeString(buf, " ", parts2, 6, 16);
+        for (int i = 0; i < 6; i++) {
+            if (i < n) this.s_dist[i+1] = StringToFloat(parts2[i]);
+        }
+        // 甜点宽度
+        this.Score_sweet_width.GetString(buf, sizeof(buf));
+        n = ExplodeString(buf, " ", parts2, 6, 16);
+        for (int i = 0; i < 6; i++) {
+            if (i < n) this.s_width[i+1] = StringToFloat(parts2[i]);
+        }
+        // 曲线陡峭
+        this.Score_sweet_slope.GetString(buf, sizeof(buf));
+        n = ExplodeString(buf, " ", parts2, 6, 16);
+        for (int i = 0; i < 6; i++) {
+            if (i < n) this.s_slope[i+1] = StringToFloat(parts2[i]);
+        }
+
+        // —— 兜底与夹取 —— //
+        for (int zc = 1; zc <= 6; zc++) {
+            if (!(this.s_dist[zc]  > 0.0)) this.s_dist[zc]  = 500.0;   // 兜底甜点
+            if (!(this.s_width[zc] > 0.0)) this.s_width[zc] = 300.0;   // 兜底宽度
+            if (!(this.s_slope[zc] > 0.0)) this.s_slope[zc] = 1.20;    // 兜底陡峭
+            // 斜率合理区间：0.6 ~ 2.5
+            if (this.s_slope[zc] < 0.6) this.s_slope[zc] = 0.6;
+            if (this.s_slope[zc] > 2.5) this.s_slope[zc] = 2.5;
+        }
     }
 
     void ApplyMaxZombieBound()
@@ -790,6 +904,7 @@ enum struct State
     int    spawnQueueSize;
     int    waveIndex;
     int    lastSpawnSecs;
+    int    killersSpawnedThisWave;
     int    rushManIndex;
     int    targetSurvivor;
 
@@ -804,6 +919,7 @@ enum struct State
     float  spitterSpitTime[MAXPLAYERS+1];
 
     float  nextFrameThink;
+    float  supportDelayStart;
 
     void Reset()
     {
@@ -828,6 +944,8 @@ enum struct State
         this.spawnDistCur      = 0.0;
         this.teleportDistCur   = 0.0;
         this.nextFrameThink    = 0.0;
+        this.killersSpawnedThisWave = 0;
+        this.supportDelayStart = 0.0;
 
         for (int i = 0; i <= MAXPLAYERS; i++)
         {
@@ -1653,6 +1771,8 @@ static void StartWave()
     gST.waveIndex++;
     gST.lastWaveAvgFlow = GetSurAvrFlow();
     gST.lastSpawnSecs   = 0;
+    gST.killersSpawnedThisWave = 0;
+    gST.supportDelayStart = 0.0;
     gST.lastWaveStartTime = GetGameTime();
 
     if (gST.siQueueCount > gCV.iSiLimit)
@@ -1714,6 +1834,8 @@ static void ResetMatchState()
     // 重置死亡记录
     g_LastSpawnOkTime = 0.0;
     for (int k = 0; k < 6; k++) g_LastDeathTime[k] = 0.0;
+    gST.killersSpawnedThisWave = 0;
+    gST.supportDelayStart = 0.0;
 }
 // 扫描在场特感 → gST.siAlive[] / gST.totalSI；再用“上限 - 活着 = 剩余额度”写回 gST.siCap[]
 static void RecalcSiCapFromAlive(bool log = false)
@@ -1835,9 +1957,93 @@ static bool IsKillerClassInt(int zc)
 {
     return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Smoker);
 }
+static bool IsPriorityKillerClass(int zc)
+{
+    return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger);
+}
 static bool IsSupportClassInt(int zc)
 {
     return zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter);
+}
+static bool IsSupportDelayClass(int zc)
+{
+    return zc == view_as<int>(SI_Smoker) || IsSupportClassInt(zc);
+}
+static void ResetSupportDelayTimer()
+{
+    gST.supportDelayStart = 0.0;
+}
+static int GetSupportUnlockNeed()
+{
+    if (gCV.iSupportUnlockKillers >= 0)
+        return gCV.iSupportUnlockKillers;
+
+    if (gCV.fSupportUnlockRatio <= 0.0)
+        return 0;
+
+    int need = RoundToFloor(float(gCV.iSiLimit) * gCV.fSupportUnlockRatio);
+    if (need < 0) need = 0;
+    if (need == 0 && gCV.fSupportUnlockRatio > 0.0)
+        need = 1;
+    if (need > gCV.iSiLimit)
+        need = gCV.iSiLimit;
+    return need;
+}
+static bool SupportKillersUnlocked()
+{
+    int need = GetSupportUnlockNeed();
+    if (need <= 0 || gST.killersSpawnedThisWave >= need)
+    {
+        ResetSupportDelayTimer();
+        return true;
+    }
+    return false;
+}
+static bool ShouldBlockSupport(bool relax)
+{
+    if (SupportKillersUnlocked())
+        return false;
+
+    if (!AnyPriorityKillerToQueueEx(relax))
+    {
+        ResetSupportDelayTimer();
+        return false;
+    }
+
+    float grace = gCV.fSupportUnlockGrace;
+    float now = GetGameTime();
+    if (grace <= 0.0)
+    {
+        if (gST.supportDelayStart <= 0.0)
+            gST.supportDelayStart = now;
+        return true;
+    }
+
+    if (gST.supportDelayStart <= 0.0)
+    {
+        gST.supportDelayStart = now;
+        return true;
+    }
+
+    if ((now - gST.supportDelayStart) >= grace)
+    {
+        ResetSupportDelayTimer();
+        return false;
+    }
+
+    return true;
+}
+static void NoteSpawnSuccess(int zc)
+{
+    if (IsPriorityKillerClass(zc))
+    {
+        gST.killersSpawnedThisWave++;
+        ResetSupportDelayTimer();
+        if (gCV.iDebugMode >= 2)
+        {
+            Debug_Print("[KILLER COUNT] wave=%d killers=%d / need=%d", gST.waveIndex, gST.killersSpawnedThisWave, GetSupportUnlockNeed());
+        }
+    }
 }
 static int CountKillersAlive()
 {
@@ -1893,6 +2099,43 @@ static int PickEligibleKillerClass()
 
     // 兜底：线性扫一遍
     for (int i = 0; i < 4; i++)
+    {
+        int k = ks[i];
+        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k)))
+            return k;
+    }
+    return 0;
+}
+static bool AnyPriorityKillerToQueueEx(bool relax)
+{
+    static int ks[3] = { view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
+    for (int i = 0; i < 3; i++)
+    {
+        int k = ks[i];
+        if (!CheckClassEnabled(k) || !CanQueueClass(k))
+            continue;
+        if (!relax && !PassDeathCooldown(k))
+            continue;
+        return true;
+    }
+    return false;
+}
+
+static int PickPriorityKillerClassEx(bool relax)
+{
+    static int ks[3] = { view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
+
+    for (int tries = 0; tries < 6; tries++)
+    {
+        int k = ks[GetRandomInt(0, 2)];
+        if (!CheckClassEnabled(k) || HasReachedLimit(k))
+            continue;
+        if (!relax && !PassDeathCooldown(k))
+            continue;
+        return k;
+    }
+
+    for (int i = 0; i < 3; i++)
     {
         int k = ks[i];
         if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k)))
@@ -2087,6 +2330,22 @@ static void MaintainSpawnQueueOnce()
             zc = alt; // 用替补继续入队
         }
 
+        if (IsSupportDelayClass(zc) && ShouldBlockSupport(relax))
+        {
+            int killerAlt = PickPriorityKillerClassEx(relax);
+            if (killerAlt != 0 && CanQueueClass(killerAlt) && CheckClassEnabled(killerAlt))
+            {
+                Debug_Print("<SpawnQ> support blocked (%s) -> prefer killer %s (progress %d/%d)",
+                    INFDN[zc], INFDN[killerAlt], gST.killersSpawnedThisWave, GetSupportUnlockNeed());
+                zc = killerAlt;
+            }
+            else
+            {
+                Debug_Print("<SpawnQ> support blocked (%s) but no killer available -> wait", INFDN[zc]);
+                return;
+            }
+        }
+
         // 入队
         gQ.spawn.Push(zc);
         gST.spawnQueueSize++;
@@ -2144,6 +2403,7 @@ static void TryNormalSpawnOnce()
     static const float EPS_RADIUS = 1.0;
 
     int want = gQ.spawn.Get(0);
+    bool relax = ShouldRelaxDeathCD();
 
     // 生成前“只看活着的”上限闸门
     if (HasReachedLimit(want))
@@ -2160,6 +2420,14 @@ static void TryNormalSpawnOnce()
         gQ.spawn.Erase(0);
         gQ.spawn.Push(want);
         Debug_Print("[QUEUE ROTATE] %s under death-cooldown, rotate to tail", INFDN[want]);
+        return;
+    }
+
+    if (IsSupportDelayClass(want) && ShouldBlockSupport(relax))
+    {
+        gQ.spawn.Erase(0);
+        gQ.spawn.Push(want);
+        Debug_Print("[QUEUE ROTATE] support %s delayed until killers reach %d (now %d)", INFDN[want], GetSupportUnlockNeed(), gST.killersSpawnedThisWave);
         return;
     }
 
@@ -2210,6 +2478,7 @@ static void TryNormalSpawnOnce()
 
         gST.siQueueCount--;
         gST.siAlive[want - 1]++; gST.totalSI++;
+        NoteSpawnSuccess(want);
         gQ.spawn.Erase(0);        gST.spawnQueueSize--;
 
         BypassAndExecuteCommand("nb_assault");
@@ -2248,6 +2517,7 @@ static void TryNormalSpawnOnce()
 
             gST.siQueueCount--;
             gST.siAlive[want - 1]++; gST.totalSI++;
+            NoteSpawnSuccess(want);
             gQ.spawn.Erase(0);        gST.spawnQueueSize--;
 
             BypassAndExecuteCommand("nb_assault");
@@ -2314,6 +2584,7 @@ static void TryTeleportSpawnOnce()
         RememberSpawn(pos, center);
 
         gST.siAlive[want - 1]++; gST.totalSI++;
+        NoteSpawnSuccess(want);
         gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
         float nextTP = ring * 0.8;
@@ -2351,6 +2622,7 @@ static void TryTeleportSpawnOnce()
             RememberSpawn(pt, center);
 
             gST.siAlive[want - 1]++; gST.totalSI++;
+            NoteSpawnSuccess(want);
             gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
             gST.teleportDistCur = FloatMax(gCV.fSpawnMin, gST.teleportDistCur * 0.7);
@@ -4230,76 +4502,72 @@ stock float ExpF(float x)
     return Pow(M_E, x);
 }
 
-// [新增] —— Logistic 距离评分（0..100），围绕“类目甜点”对称衰减
-// [修改] —— 距离平滑评分：以“甜点距离 sweet”为中心的对称衰减
-stock float ScoreDistSmooth(float dminEye, float sweet, float width, float slope)
+/**
+ * 距离分（0..100），圆顶三角形的“平滑版”：
+ *   Δ = |d - sweet|
+ *   t = Clamp01( Δ / width )
+ *   score = 100 * pow(1 - t, slope)
+ *
+ * 性能轻、形状可控；slope 越大，曲线越尖锐（更“挑甜点”）。
+ */
+stock float ScoreDistSmooth(float d, float sweet, float width, float slope)
 {
-    // 防御：宽度太小会过于尖锐
-    if (width < 1.0) width = 1.0;
-
-    // 归一化偏差
-    float t = FloatAbs(dminEye - sweet) / width;
-
-    // 100 / (1 + e^(k*t))，t 越大衰减越多；k 适中给点锐度
-    float k = (slope < 0.1) ? 0.1 : slope;
-    float s = 100.0 / (1.0 + ExpF(k * t));
-
-    // 限幅，避免因为极端参数出 0 分或 100+ 分
-    return clamp(s, 10.0, 100.0);
+    float t = FloatAbs(d - sweet) / width;
+    if (t < 0.0) t = 0.0;
+    if (t > 1.0) t = 1.0;
+    float base = 1.0 - t;                 // 0..1
+    // pow 之前做一次小抬升，避免 slope 太小时过于平：
+    float shaped = Pow(base, slope);
+    float score = 100.0 * shaped;
+    if (score < 0.0) score = 0.0;
+    if (score > 100.0) score = 100.0;
+    return score;
 }
 
-// [新增] —— 各类的甜点距离与宽度（可按需改成 CVar）
-stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, float &width, float &slope)
+/**
+ * 计算“距离甜点曲线”的三个关键参数：
+ *  sweet：目标最佳距离（眼睛到候选点的最近距离，单位uu）
+ *  width：甜点两侧的“容忍半宽”（越大越宽容）
+ *  slope：曲线陡峭程度（>1 更挑剔，<1 更宽松）
+ *
+ * 逻辑：
+ *  - inf_score_dist_from_cvar=1 时，直接使用 CVar 的 6 组数值（并钳在 SpawnMin..SpawnMax）。
+ *  - =0 时按旧逻辑的“经验系数”从范围推导（保留你的手感）。
+ */
+stock void GetClassDistanceProfile(int zc, float spawnMin, float spawnMax,
+                                   float &sweet, float &width, float &slope)
 {
-    float span = FloatMax(1.0, max - min);
-    switch (zc) {
-        case view_as<int>(SI_Boomer):
-        {
-            sweet = min + 0.30 * span;
-            width = 0.45 * span;
-            slope = 0.9;
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            sweet = min + 0.55 * span;
-            width = 0.26 * span;
-            slope = 1.4;
-        }
-        case view_as<int>(SI_Smoker):
-        {
-            float base = min + 0.55 * span;
-            if (base < 500.0) base = FloatMax(min, 500.0);
-            if (base > 800.0) base = 800.0;
-            if (base > max)   base = max;
-            sweet = base;
-            width = FloatMax(200.0, 0.28 * span);
-            slope = 1.1;
-        }
-        case view_as<int>(SI_Spitter):
-        {
-            sweet = min + 0.50 * span;
-            width = 0.28 * span;
-            slope = 1.5;
-        }
-        case view_as<int>(SI_Jockey):
-        {
-            sweet = min + 0.35 * span;
-            width = 0.42 * span;
-            slope = 1.0;
-        }
-        case view_as<int>(SI_Charger):
-        {
-            sweet = min + 0.32 * span;
-            width = 0.40 * span;
-            slope = 0.95;
-        }
-        default:
-        {
-            sweet = min + 0.50 * span;
-            width = 0.28 * span;
-            slope = 1.3;
-        }
+    // 安全范围
+    float rmin = spawnMin;
+    float rmax = spawnMax;
+    if (rmax < rmin) { float t=rmax; rmax=rmin; rmin=t; }
+
+    if (gCV.bDistFromCvar) {
+        sweet = gCV.s_dist[zc];
+        width = gCV.s_width[zc];
+        slope = gCV.s_slope[zc];
+        // 钳界：甜点必须在范围内，宽度至少 64uu
+        if (sweet < rmin) sweet = rmin + 1.0;
+        if (sweet > rmax) sweet = rmax - 1.0;
+        if (width < 64.0) width = 64.0;
+        // 宽度不能超过 (rmax-rmin)
+        float span = rmax - rmin;
+        if (width > span) width = span;
+        return;
     }
+
+    // —— 自适应推导（旧风格保留） —— //
+    // 经验系数：按不同职业偏好决定甜点位置（相对范围）
+    static const float kPos[7]   = {0.0, 0.65, 0.55, 0.45, 0.60, 0.45, 0.55}; // S B H P J C
+    static const float kWidth[7] = {0.0, 0.45, 0.60, 0.35, 0.45, 0.35, 0.40};
+    static const float kSlope[7] = {0.0, 1.15, 1.00, 1.35, 1.10, 1.35, 1.40};
+
+    float span = rmax - rmin;
+    sweet = rmin + span * kPos[zc];
+    width = span * kWidth[zc];
+    slope = kSlope[zc];
+
+    if (width < 64.0) width = 64.0;
 }
 
 // [ADD] —— 通过 areaIdx 直接反查分桶（优先缓存，其次 Flow→Percent）
@@ -5226,6 +5494,7 @@ static void InitSDK_FromGamedata()
 stock float FloatMax(float a, float b) { return (a > b) ? a : b; } 
 stock float FloatMin(float a, float b) { return (a < b) ? a : b; }
 stock float Clamp01(float v) { if (v < 0.0) return 0.0; if (v > 1.0) return 1.0; return v; }
+stock float LerpFloat(float a, float b, float t) { return a + (b - a) * Clamp01(t); }
 stock int AbsInt(int v) { return (v < 0) ? -v : v; }
 // [ADD] int 夹取
 stock int clampi(int v, int lo, int hi) { if (v<lo) return lo; if (v>hi) return hi; return v; }
