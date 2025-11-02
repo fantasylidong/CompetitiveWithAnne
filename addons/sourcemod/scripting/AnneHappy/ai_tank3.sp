@@ -155,11 +155,11 @@ public void OnPluginStart()
     g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "800", "允许扔石头的最大距离", CVAR_FLAGS, true, 0.0);
 
     // 攀爬动画倍速（翻越）
-    g_cvClimbAnimRate    = CreateConVar("ai_tank3_climb_anim_rate", "3.0", "Tank 高翻越动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
-    g_cvLowClimbAnimRate = CreateConVar("ai_tank3_low_climb_anim_rate", "2.0", "Tank 低翻越动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
+    g_cvClimbAnimRate    = CreateConVar("ai_tank3_climb_anim_rate", "3.5", "Tank 高翻越动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
+    g_cvLowClimbAnimRate = CreateConVar("ai_tank3_low_climb_anim_rate", "2.5", "Tank 低翻越动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
 
     // NEW: 梯子攀爬独立倍速
-    g_cvLadderClimbAnimRate = CreateConVar("ai_tank3_ladder_climb_rate", "3.0", "Tank 梯子攀爬动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
+    g_cvLadderClimbAnimRate = CreateConVar("ai_tank3_ladder_climb_rate", "5.0", "Tank 梯子攀爬动画播放倍速（1.0=原速）", CVAR_FLAGS, true, 0.0);
 
     // 投石目标调整 / 通背拳 / 锁视角 / 跳砖
     g_cvRockTargetAdjust  = CreateConVar("ai_tank3_rock_target_adjust", "1", "扔石头时若原目标不可见，允许切换至最近可视目标", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -742,7 +742,11 @@ bool isMatchedSequence(int sequence, TankSequenceType seqType)
         case view_as<TankSequenceType>(tankSequence_Throw):
             return g_hThrowAnimMap.ContainsKey(seqName);
         case view_as<TankSequenceType>(tankSequence_Climb):
-            return g_hClimbAnimMap.ContainsKey(seqName);
+        {
+            bool matchedHigh = g_hClimbAnimMap && g_hClimbAnimMap.ContainsKey(seqName);
+            bool matchedLow = g_hLowClimbAnimMap && g_hLowClimbAnimMap.ContainsKey(seqName);
+            return matchedHigh || matchedLow;
+        }
     }
     return false;
 }
