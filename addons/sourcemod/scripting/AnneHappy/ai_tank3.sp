@@ -666,7 +666,12 @@ void climbRateModifyHookHandler(int client)
     // 仍处于翻越：按“高/低翻越”倍速
     if (isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Climb)))
     {
-        SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", getClimbPlaybackRate(animSeq));
+        float targetRate = getClimbPlaybackRate(animSeq);
+        float currentRate = GetEntPropFloat(client, Prop_Send, "m_flPlaybackRate");
+        if (currentRate != targetRate)
+        {
+            SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", targetRate);
+        }
         return;
     }
 
