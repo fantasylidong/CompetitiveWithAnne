@@ -294,6 +294,7 @@ enum struct FilterCounters
     int vis;
     int path;
     int pos;
+    int score;
 }
 
 enum struct SpawnEvalContext
@@ -403,6 +404,7 @@ enum struct Config
     ConVar Score_w_hght;
     ConVar Score_w_flow;
     ConVar Score_w_disp;
+    ConVar ScoreMinTotal;
     // —— 距离甜点（可由 CVar 控制） —— //
     ConVar Score_dist_from_cvar;   // 1=使用 CVar 指定的甜点/宽度/斜率；0=按旧逻辑自动推导
     ConVar Score_sweet_dist;       // 6 个值：S B H P J C 对应的甜点距离（单位：uu）
@@ -429,6 +431,7 @@ enum struct Config
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
 
+    float fScoreMinTotal;
     float w_dist[7];
     float w_hght[7];
     float w_flow[7];
@@ -561,6 +564,7 @@ enum struct Config
         this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.00 1.20 1.50 1.40 0.50 0.55", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.40 1.10 1.15 1.30 1.30 1.30", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.40 1.75 1.45 1.45 1.30 1.10", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "60.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
 
         // —— 距离甜点 CVar ——
         // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
@@ -638,6 +642,7 @@ enum struct Config
         this.Score_w_hght.AddChangeHook(OnCfgChanged);
         this.Score_w_flow.AddChangeHook(OnCfgChanged);
         this.Score_w_disp.AddChangeHook(OnCfgChanged);
+        this.ScoreMinTotal.AddChangeHook(OnCfgChanged);
         this.gCvarNavCacheEnable.AddChangeHook(OnCfgChanged);
 
         this.NavBucketMapInvalid.AddChangeHook(OnCfgChanged);
@@ -729,6 +734,9 @@ enum struct Config
         this.iBucketGroupSize      = ClampInt(this.BucketGroupSize.IntValue, 1, 12);
         this.fBucketRingStep       = this.BucketRingStep.FloatValue;
         if (this.fBucketRingStep < 0.0) this.fBucketRingStep = 0.0;
+        this.fScoreMinTotal        = this.ScoreMinTotal.FloatValue;
+        if (this.fScoreMinTotal < -200.0) this.fScoreMinTotal = -200.0;
+        if (this.fScoreMinTotal > 1000.0) this.fScoreMinTotal = 1000.0;
 
         // 死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
@@ -1421,7 +1429,7 @@ public Action Cmd_NavTest(int client, int args)
 
     // 5. 位置关系
     int targetSur = ChooseTargetSurvivor();
-    bool passPosition = PassRealPositionCheck(testPos, targetSur, view_as<int>(SI_Smoker));
+    bool passPosition = PassRealPositionCheck(testPos, targetSur);
     int candPercent = GetPositionBucketPercent(testPos);
     int surPercent = -1;
     if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
@@ -3532,7 +3540,7 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si=0) 
+stock bool PassRealPositionCheck(float candPos[3], int targetSur) 
 {
     // 1) 候选点的分桶百分比
     int candPercent = GetPositionBucketPercent(candPos);
@@ -3565,15 +3573,7 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si=0)
     if (candPercent < surPercent - 6)
         return false;
 
-    // 4) 你的需求：若“候选桶在生还进度后方” 且 “候选点 Z <= 所有生还者最低脚部 Z - 200u”，则禁止
-    float minFootZ;
-    if (TryGetLowestSurvivorFootZ(minFootZ))
-    {
-        // 严格“后方”：candPercent < surPercent（不含相等）
-        if (candPercent < surPercent && (candPos[2] <= (minFootZ - 180.0)|| (si != view_as<int>(SI_Smoker) && candPos[2] >= (minFootZ + 200.0))))
-            return false;
-    }
-    // 如果没找到生还者（极端情况），保持放行
+    // 其余高度差改为评分阶段惩罚处理，由 ComputeBehindHeightPenalty 负责
     return true;
 }
 
@@ -4511,36 +4511,65 @@ stock float ComputeFFThresholdForClass(int zc)
     return 0.85 * theoMax;
 }
 
+// —— 后方高度惩罚：按桶差 + 高度差线性扣分，替代硬禁用 —— //
 static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
                                         float candZ, float refEyeZ, float allMaxEyeZ,
                                         float lowestFootZ)
 {
-    if (candBucket >= centerBucket)
+    int bucketGap = centerBucket - candBucket;
+    if (bucketGap <= 0)
         return 0.0;
 
+    float softCoef, deepCoef, abyssCoef, highCoef;
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker):
+        {
+            softCoef = 0.20;
+            deepCoef = 0.34;
+            abyssCoef = 0.48;
+            highCoef = 0.12;
+        }
+        case view_as<int>(SI_Hunter):
+        {
+            softCoef = 0.22;
+            deepCoef = 0.38;
+            abyssCoef = 0.55;
+            highCoef = 0.14;
+        }
+        default:
+        {
+            softCoef = 0.28;
+            deepCoef = 0.46;
+            abyssCoef = 0.60;
+            highCoef = 0.18;
+        }
+    }
+
     float penalty = 0.0;
+
     bool haveFoot = (lowestFootZ < 1.0e8);
-
-    if (zc != view_as<int>(SI_Smoker))
+    float floorBase = haveFoot ? (lowestFootZ - 40.0) : (refEyeZ - 130.0);
+    float drop = floorBase - candZ;
+    if (drop > 0.0)
     {
-        float lowLimit = haveFoot ? (lowestFootZ - 48.0) : (refEyeZ - 120.0);
-        if (candZ < lowLimit)
-            penalty += 40.0;
+        float softDrop = FloatMin(drop, 70.0);
+        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));
+        float abyssDrop = FloatMax(0.0, drop - 130.0);
 
-        float highLimit = allMaxEyeZ + 120.0;
-        if (candZ > highLimit)
-            penalty += 40.0;
+        penalty += softDrop * softCoef;
+        penalty += deepDrop * deepCoef;
+        if (abyssDrop > 0.0)
+            penalty += FloatMin(60.0, abyssDrop * abyssCoef);
     }
 
-    if (zc != view_as<int>(SI_Hunter))
-    {
-        float deepLowLimit = haveFoot ? (lowestFootZ - 96.0) : (refEyeZ - 180.0);
-        if (candZ < deepLowLimit)
-            penalty += 50.0;
-    }
+    float highLimit = allMaxEyeZ + 150.0;
+    float rise = candZ - highLimit;
+    if (rise > 0.0)
+        penalty += FloatMin(50.0, rise * highCoef);
 
-    if (penalty > 100.0)
-        penalty = 100.0;
+    if (penalty > 150.0)
+        penalty = 150.0;
 
     return penalty;
 }
@@ -4766,7 +4795,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int   bestIdx   = -1;
     float bestPos[3];
     int acceptedHits = 0;
-    int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0;
+    int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0, cFilt_Score=0;
 
     bool  useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
     bool  firstFit   = gCV.bNavBucketFirstFit;
@@ -4960,6 +4989,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             cFilt_Vis  = accumCounters.vis;
             cFilt_Path = accumCounters.path;
             cFilt_Pos  = accumCounters.pos;
+            cFilt_Score= accumCounters.score;
 
             acceptedHits = totalAccepted;
 
@@ -5034,7 +5064,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
             if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
-            if (!PassRealPositionCheck(p, targetSur, zc)) { cFilt_Pos++; continue; }
+            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
             if (WillStuck(p))                    { cFilt_Stuck++; continue; }
             if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
@@ -5068,6 +5098,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                                                               p[2], refEyeZ, allMaxZ, lowestFootZ);
             if (behindPenalty > 0.0)
                 totalScore -= behindPenalty;
+
+            if (totalScore < gCV.fScoreMinTotal) { cFilt_Score++; continue; }
 
             float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
                                               : FloatMax(0.0, 40.0 - score_flow);
@@ -5120,8 +5152,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     }
 
     if (!found) {
-        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d",
-                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos);
+        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
+                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
         return false;
     }
 
@@ -5563,6 +5595,7 @@ static void ResetFilterCounters(FilterCounters fc)
     fc.vis = 0;
     fc.path = 0;
     fc.pos = 0;
+    fc.score = 0;
 }
 
 static void MergeFilterCounters(FilterCounters dst, const FilterCounters src)
@@ -5576,6 +5609,7 @@ static void MergeFilterCounters(FilterCounters dst, const FilterCounters src)
     dst.vis  += src.vis;
     dst.path += src.path;
     dst.pos  += src.pos;
+    dst.score+= src.score;
 }
 
 static void UpdateTopScores(float scores[GROUP_TOP_SCORES], int &count, float value)
@@ -5684,7 +5718,7 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
 
     if (!(dminEye >= ctx.spawnMin && dminEye <= ringEff)) { cnt.dist++; return false; }
     if (!PassMinSeparation(p)) { cnt.sep++; return false; }
-    if (!PassRealPositionCheck(p, ctx.targetSur, ctx.zc)) { cnt.pos++; return false; }
+    if (!PassRealPositionCheck(p, ctx.targetSur)) { cnt.pos++; return false; }
     if (WillStuck(p)) { cnt.stuck++; return false; }
     if (IsPosVisibleSDK(p, ctx.teleportMode)) { cnt.vis++; return false; }
     if (PathPenalty_NoBuild(p, ctx.targetSur, ctx.searchRange, ctx.spawnMax) != 0.0) { cnt.path++; return false; }
@@ -5714,6 +5748,24 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
     float dispScaled = ScaleNegativeOnly(score_disp, penK);
 
+    float totalScore = gCV.w_dist[ctx.zc]*score_dist
+                     + gCV.w_hght[ctx.zc]*score_hght
+                     + gCV.w_flow[ctx.zc]*score_flow
+                     + gCV.w_disp[ctx.zc]*dispScaled;
+
+    if (behindPenalty > 0.0)
+        totalScore -= behindPenalty;
+
+    if (totalScore < gCV.fScoreMinTotal)
+    {
+        cnt.score++;
+        return false;
+    }
+
+    float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
+                                       : FloatMax(0.0, 40.0 - score_flow);
+    if (riskBase > 100.0) riskBase = 100.0;
+
     CandidateScore cand;
     cand.valid = 1;
     cand.zc = ctx.zc;
@@ -5731,21 +5783,12 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     cand.dispRaw = score_disp;
     cand.dispScaled = dispScaled;
     cand.penK = penK;
-    float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
-                                       : FloatMax(0.0, 40.0 - score_flow);
-    if (riskBase > 100.0) riskBase = 100.0;
     cand.risk = riskBase;
     cand.dminEye = dminEye;
     cand.ringEff = ringEff;
     cand.slack = slack;
-    cand.total = gCV.w_dist[ctx.zc]*score_dist
-               + gCV.w_hght[ctx.zc]*score_hght
-               + gCV.w_flow[ctx.zc]*score_flow
-               + gCV.w_disp[ctx.zc]*dispScaled;
+    cand.total = totalScore;
     cand.extraPen = behindPenalty;
-
-    if (behindPenalty > 0.0)
-        cand.total -= behindPenalty;
 
     out = cand;
     return true;
