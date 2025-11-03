@@ -1,7 +1,4 @@
-#pragma semicolon 1 
-#pragma newdecls required
-
-#pragma semicolon 1
+﻿#pragma semicolon 1
 #pragma newdecls required
 
 /**
@@ -77,7 +74,6 @@
 #define SUPPORT_NEED_KILLERS      1
 
 #define GROUP_TOP_SCORES          4
-#define GROUP_MAX_EXTRA_WINDOWS   2
 #define GROUP_WEIGHT_PRESSURE     0.55
 #define GROUP_WEIGHT_COVERAGE     0.25
 #define GROUP_WEIGHT_VARIANCE     0.20
@@ -88,14 +84,14 @@
 #define SEP_TTL                   3.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                80.0
+#define SEP_RADIUS                100.0
 #define NAV_CD_SECS               0.5
-#define SECTORS_BASE              6       // 基准
+#define SECTORS_BASE              5       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           3       // 动态下限
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
-#define PEN_LIMIT_SCALE_LO        0.50   // L=20 时：正向惩罚明显减弱
+#define PEN_LIMIT_SCALE_LO        0.60   // L=20 时：正向惩罚明显减弱
 #define PEN_LIMIT_MINL            1
 #define PEN_LIMIT_MAXL            16
 
@@ -112,7 +108,7 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2025.10.26"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2025.11.03"  // 和插件版号保持同步
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -371,9 +367,7 @@ enum struct Config
     ConVar NavBucketIncludeCtr;   // 是否包含中心桶 s
 
     // —— 桶组评分 —— //
-    ConVar BucketGroupSize;       // 每次评分包含的桶数
-    ConVar BucketGroupMinScore;   // 评分阈值，低于则尝试备用窗口
-    ConVar BucketGroupExtraEval;  // 额外评估的窗口数量
+    ConVar BucketGroupSize;       // 参与评分的桶窗口数量上限
     ConVar BucketRingStep;        // 桶偏移带来的额外距离步进
 
     // —— 新增：死亡CD（两档） —— //
@@ -476,8 +470,6 @@ enum struct Config
     bool  bNavBucketIncludeCtr;
 
     int   iBucketGroupSize;
-    float fBucketGroupMinScore;
-    int   iBucketGroupExtraEval;
     float fBucketRingStep;
 
     float fDeathCDKiller;
@@ -522,11 +514,7 @@ enum struct Config
 
         // —— 桶组评分 —— //
         this.BucketGroupSize      = CreateConVar("inf_BucketGroupSize", "4",
-            "每次进入评分的桶数量(1=等效旧逻辑)", CVAR_FLAG, true, 1.0, true, 12.0);
-        this.BucketGroupMinScore  = CreateConVar("inf_BucketGroupMinScore", "70.0",
-            "主窗口组得分低于该值时尝试备用窗口", CVAR_FLAG, true, 0.0, true, 200.0);
-        this.BucketGroupExtraEval = CreateConVar("inf_BucketGroupExtraEval", "2",
-            "额外尝试的备用窗口数量(0-2)", CVAR_FLAG, true, 0.0, true, 2.0);
+            "用于限制参与评分的桶窗口数量(默认4,1=仅主窗口)", CVAR_FLAG, true, 1.0, true, 12.0);
         this.BucketRingStep       = CreateConVar("inf_BucketRingStep", "120.0",
             "每相差1个桶允许增加的额外距离步进(世界单位)", CVAR_FLAG, true, 0.0, true, 1000.0);
 
@@ -568,8 +556,8 @@ enum struct Config
         // 4) inf_score_w_disp ↑：更偏爱“分散扇区/不叠点”，Boomer 适合高分散，避免团灭节奏被对面连续清理。
         this.Score_w_dist  = CreateConVar("inf_score_w_dist",  "1.45 0.95 1.20 1.05 1.55 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.00 1.20 1.50 1.40 0.50 0.55", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.40 1.10 1.15 1.30 1.30 1.50", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "1.40 1.35 1.15 1.25 1.10 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.40 1.10 1.15 1.30 1.30 1.30", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.40 1.75 1.45 1.45 1.30 1.10", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
 
         // —— 距离甜点 CVar ——
         // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
@@ -697,8 +685,6 @@ enum struct Config
         this.NavBucketFirstFit.AddChangeHook(OnCfgChanged);
         this.NavBucketIncludeCtr.AddChangeHook(OnCfgChanged);
         this.BucketGroupSize.AddChangeHook(OnCfgChanged);
-        this.BucketGroupMinScore.AddChangeHook(OnCfgChanged);
-        this.BucketGroupExtraEval.AddChangeHook(OnCfgChanged);
         this.BucketRingStep.AddChangeHook(OnCfgChanged);
 
         this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 变更时重建桶
@@ -738,9 +724,6 @@ enum struct Config
         this.bNavBucketIncludeCtr = this.NavBucketIncludeCtr.BoolValue;
 
         this.iBucketGroupSize      = ClampInt(this.BucketGroupSize.IntValue, 1, 12);
-        this.fBucketGroupMinScore  = this.BucketGroupMinScore.FloatValue;
-        if (this.fBucketGroupMinScore < 0.0) this.fBucketGroupMinScore = 0.0;
-        this.iBucketGroupExtraEval = ClampInt(this.BucketGroupExtraEval.IntValue, 0, GROUP_MAX_EXTRA_WINDOWS);
         this.fBucketRingStep       = this.BucketRingStep.FloatValue;
         if (this.fBucketRingStep < 0.0) this.fBucketRingStep = 0.0;
 
@@ -1003,7 +986,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2025.10.26",
+    version     = "2025.11.03",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -4740,25 +4723,39 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         }
         else
         {
-            int groupSize = ClampInt(gCV.iBucketGroupSize, 1, candidateCount);
-            if (groupSize < 1) groupSize = 1;
-            if (groupSize > candidateCount) groupSize = candidateCount;
-
             int windowStarts[FLOW_BUCKETS];
             int windowCounts[FLOW_BUCKETS];
             int windowDelta[FLOW_BUCKETS];
             int windowOrder[FLOW_BUCKETS];
+            int windowQuota[FLOW_BUCKETS];
             int windowCount = 0;
 
+            float fTopK = float(TOPK);
+            int bucketPlan[4];
+            bucketPlan[0] = RoundToCeil(fTopK / 2.5);
+            if (bucketPlan[0] < 1) bucketPlan[0] = 1;
+            bucketPlan[1] = RoundToCeil(fTopK / 3.5);
+            if (bucketPlan[1] < 1) bucketPlan[1] = 1;
+            int tailPlan = RoundToCeil(fTopK / 5.0);
+            if (tailPlan < 1) tailPlan = 1;
+            bucketPlan[2] = tailPlan;
+            bucketPlan[3] = tailPlan;
+
+            int maxWindows = ClampInt(gCV.iBucketGroupSize, 1, FLOW_BUCKETS);
+
             int idxBucket = 0;
-            while (idxBucket < candidateCount)
+            while (idxBucket < candidateCount && windowCount < maxWindows)
             {
-                int count = groupSize;
-                if (idxBucket + count > candidateCount)
-                    count = candidateCount - idxBucket;
+                int planIdx = (windowCount < 4) ? windowCount : 3;
+                int desiredBuckets = bucketPlan[planIdx];
+                if (desiredBuckets < 1) desiredBuckets = 1;
+                int remainingBuckets = candidateCount - idxBucket;
+                int actualBuckets = (desiredBuckets <= remainingBuckets) ? desiredBuckets : remainingBuckets;
+                if (actualBuckets <= 0)
+                    break;
 
                 int minDelta = 999;
-                for (int j = 0; j < count; j++)
+                for (int j = 0; j < actualBuckets; j++)
                 {
                     int b = candidateBuckets[idxBucket + j];
                     int delta = AbsInt(b - centerBucket);
@@ -4767,11 +4764,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 }
 
                 windowStarts[windowCount] = idxBucket;
-                windowCounts[windowCount] = count;
+                windowCounts[windowCount] = actualBuckets;
                 windowDelta[windowCount] = (minDelta >= 0) ? minDelta : 0;
                 windowOrder[windowCount] = windowCount;
+                windowQuota[windowCount] = bucketPlan[planIdx];
 
-                idxBucket += count;
+                idxBucket += actualBuckets;
                 windowCount++;
             }
 
@@ -4790,17 +4788,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                         windowOrder[j] = tmp;
                     }
                 }
-            }
-
-            float orderedWeights[FLOW_BUCKETS];
-            float weightSum = 0.0;
-            for (int w = 0; w < windowCount; w++)
-            {
-                int idxWin = windowOrder[w];
-                float wgt = 1.0 / (1.0 + float(windowDelta[idxWin]));
-                if (wgt < 0.001) wgt = 0.001;
-                orderedWeights[w] = wgt;
-                weightSum += wgt;
             }
 
             SpawnEvalContext ctx;
@@ -4828,86 +4815,59 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             FilterCounters accumCounters;
             ResetFilterCounters(accumCounters);
 
-            CandidateScore bestCand;
-            bestCand.valid = 0;
+            CandidateScore bestCandGlobal;
+            bestCandGlobal.valid = 0;
             GroupEvalResult bestGroupRes;
-            bool groupFound = false;
+            bool anyCandidate = false;
+            int totalAccepted = 0;
 
-            int remainingHits = TOPK;
-            float remainingWeight = weightSum;
-
-            for (int wi = 0; wi < windowCount && remainingHits > 0; wi++)
+            for (int wi = 0; wi < windowCount && totalAccepted < TOPK; wi++)
             {
                 int idxWin = windowOrder[wi];
                 int start = windowStarts[idxWin];
                 int bucketCount = windowCounts[idxWin];
+                int plannedQuota = windowQuota[idxWin];
+                if (plannedQuota < 1) plannedQuota = 1;
 
-                float weight = orderedWeights[wi];
-                float denom = (remainingWeight > 0.0) ? remainingWeight : float(windowCount - wi);
-                float rawShare = (denom > 0.0) ? (weight / denom) * float(remainingHits) : float(remainingHits);
-
-                int windowsRemain = windowCount - wi;
-                int windowsLeftAfter = windowsRemain - 1;
-                if (windowsLeftAfter < 0) windowsLeftAfter = 0;
-
-                int maxBudget = remainingHits - windowsLeftAfter;
-                if (maxBudget < 0) maxBudget = 0;
-
-                int minBudget = (remainingHits > windowsLeftAfter) ? 1 : 0;
-                int allowed = RoundToNearest(rawShare);
-                if (allowed < minBudget) allowed = minBudget;
-                if (allowed > maxBudget) allowed = maxBudget;
-                if (allowed > remainingHits) allowed = remainingHits;
-
-                if (allowed <= 0)
-                {
-                    remainingWeight -= weight;
-                    if (remainingWeight < 0.0) remainingWeight = 0.0;
-                    continue;
-                }
+                int remainingHits = TOPK - totalAccepted;
+                if (remainingHits <= 0)
+                    break;
+                if (plannedQuota > remainingHits)
+                    plannedQuota = remainingHits;
 
                 int groupBuckets[FLOW_BUCKETS];
                 for (int gi = 0; gi < bucketCount; gi++)
                     groupBuckets[gi] = candidateBuckets[start + gi];
 
                 CandidateScore cand;
+                cand.valid = 0;
                 GroupEvalResult groupRes;
-                groupRes.total = 0.0;
-                groupRes.pressure = 0.0;
-                groupRes.coverage = 0.0;
-                groupRes.variance = 0.0;
-                groupRes.risk = 0.0;
-                groupRes.bucketCount = bucketCount;
                 groupRes.startIndex = start;
-                groupRes.acceptedHits = 0;
-                groupRes.candidateCount = 0;
 
                 FilterCounters localCnt;
                 ResetFilterCounters(localCnt);
 
-                bool okWindow = EvaluateGroupBuckets(ctx, groupBuckets, bucketCount, allowed, cand, groupRes, localCnt);
+                bool okWindow = EvaluateGroupBuckets(ctx, groupBuckets, bucketCount, plannedQuota, cand, groupRes, localCnt);
                 MergeFilterCounters(accumCounters, localCnt);
 
-                if (groupRes.acceptedHits > remainingHits)
-                    groupRes.acceptedHits = remainingHits;
+                if (groupRes.acceptedHits > plannedQuota)
+                    groupRes.acceptedHits = plannedQuota;
 
-                remainingHits -= groupRes.acceptedHits;
-                if (remainingHits < 0) remainingHits = 0;
-
-                remainingWeight -= weight;
-                if (remainingWeight < 0.0) remainingWeight = 0.0;
+                totalAccepted += groupRes.acceptedHits;
+                if (totalAccepted > TOPK)
+                    totalAccepted = TOPK;
 
                 if (!okWindow || !cand.valid)
                     continue;
 
-                if (!groupFound || groupRes.total > bestGroupRes.total)
+                if (!anyCandidate || cand.total > bestCandGlobal.total)
                 {
-                    groupFound = true;
+                    anyCandidate = true;
+                    bestCandGlobal = cand;
                     bestGroupRes = groupRes;
-                    bestCand = cand;
                 }
 
-                if (ctx.firstFit && bestCand.valid && bestCand.total >= ctx.ffThresh)
+                if (ctx.firstFit && cand.total >= ctx.ffThresh)
                 {
                     break;
                 }
@@ -4923,35 +4883,35 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             cFilt_Path = accumCounters.path;
             cFilt_Pos  = accumCounters.pos;
 
-            if (groupFound && bestCand.valid)
+            acceptedHits = totalAccepted;
+
+            if (anyCandidate && bestCandGlobal.valid)
             {
                 found = true;
-                bestScore = bestCand.total;
-                bestIdx = bestCand.areaIdx;
-                bestPos[0] = bestCand.pos[0];
-                bestPos[1] = bestCand.pos[1];
-                bestPos[2] = bestCand.pos[2];
-                acceptedHits = bestGroupRes.acceptedHits;
-
-                bestDbg.total = bestCand.total;
-                bestDbg.dist = bestCand.dist;
-                bestDbg.hght = bestCand.hght;
-                bestDbg.flow = bestCand.flow;
-                bestDbg.dispRaw = bestCand.dispRaw;
-                bestDbg.dispScaled = bestCand.dispScaled;
-                bestDbg.penK = bestCand.penK;
-                bestDbg.risk = bestCand.risk;
-                bestDbg.dminEye = bestCand.dminEye;
-                bestDbg.ringEff = bestCand.ringEff;
-                bestDbg.slack = bestCand.slack;
-                bestDbg.candBucket = bestCand.candBucket;
-                bestDbg.centerBucket = bestCand.centerBucket;
-              	bestDbg.deltaFlow = bestCand.deltaFlow;
-                bestDbg.sector = bestCand.sector;
-                bestDbg.areaIdx = bestCand.areaIdx;
-                bestDbg.pos[0] = bestCand.pos[0];
-                bestDbg.pos[1] = bestCand.pos[1];
-                bestDbg.pos[2] = bestCand.pos[2];
+                bestScore = bestCandGlobal.total;
+                bestIdx = bestCandGlobal.areaIdx;
+                bestPos[0] = bestCandGlobal.pos[0];
+                bestPos[1] = bestCandGlobal.pos[1];
+                bestPos[2] = bestCandGlobal.pos[2];
+                bestDbg.total = bestCandGlobal.total;
+                bestDbg.dist = bestCandGlobal.dist;
+                bestDbg.hght = bestCandGlobal.hght;
+                bestDbg.flow = bestCandGlobal.flow;
+                bestDbg.dispRaw = bestCandGlobal.dispRaw;
+                bestDbg.dispScaled = bestCandGlobal.dispScaled;
+                bestDbg.penK = bestCandGlobal.penK;
+                bestDbg.risk = bestCandGlobal.risk;
+                bestDbg.dminEye = bestCandGlobal.dminEye;
+                bestDbg.ringEff = bestCandGlobal.ringEff;
+                bestDbg.slack = bestCandGlobal.slack;
+                bestDbg.candBucket = bestCandGlobal.candBucket;
+                bestDbg.centerBucket = bestCandGlobal.centerBucket;
+              	bestDbg.deltaFlow = bestCandGlobal.deltaFlow;
+                bestDbg.sector = bestCandGlobal.sector;
+                bestDbg.areaIdx = bestCandGlobal.areaIdx;
+                bestDbg.pos[0] = bestCandGlobal.pos[0];
+                bestDbg.pos[1] = bestCandGlobal.pos[1];
+                bestDbg.pos[2] = bestCandGlobal.pos[2];
                 bestDbg.groupScore = bestGroupRes.total;
                 bestDbg.groupPressure = bestGroupRes.pressure;
                 bestDbg.groupCoverage = bestGroupRes.coverage;
