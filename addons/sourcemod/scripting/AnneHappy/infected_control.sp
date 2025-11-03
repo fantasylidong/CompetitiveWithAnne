@@ -101,9 +101,9 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 #define PATH_NO_BUILD_PENALTY     1999.0
 
 // === Dispersion scoring (base values before权重) ===
-#define DISP_SCORE_PREF          80.0
+#define DISP_SCORE_PREF          60.0
 #define DISP_SCORE_RECENT0      -40.0
-#define DISP_SCORE_RECENT1      -25.0
+#define DISP_SCORE_RECENT1      -30.0
 #define DISP_SCORE_OTHER         40.0
 
 // Nav Flow 分桶
@@ -560,11 +560,11 @@ enum struct Config
         // 2) inf_score_w_hght ↑：更偏爱“高打低/上视野位”，Smoker/Spitter 在高点更容易出点。
         // 3) inf_score_w_flow ↑：更偏爱“围绕推进线两侧”的点，Charger/Spitter 提高该值会更像“冲线”封口。
         // 4) inf_score_w_disp ↑：更偏爱“分散扇区/不叠点”，Boomer 适合高分散，避免团灭节奏被对面连续清理。
-        this.Score_w_dist  = CreateConVar("inf_score_w_dist",  "1.45 0.95 1.20 1.05 1.55 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.00 1.20 1.50 1.40 0.50 0.55", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.40 1.10 1.15 1.30 1.30 1.30", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.40 1.75 1.45 1.45 1.30 1.10", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "60.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
+        this.Score_w_dist  = CreateConVar("inf_score_w_dist",  "1.20 0.90 1.05 0.95 1.35 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "80.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
 
         // —— 距离甜点 CVar ——
         // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
@@ -582,15 +582,15 @@ enum struct Config
         // S(中远、偏紧、稍陡)  B(中近、适中、适中)  H(中近高、适中、适中)
         // P(中等、适中、稍陡)  J(中近、适中、不陡)  C(近、适中、不陡)
         this.Score_sweet_dist  = CreateConVar(
-            "inf_score_sweet_dist",  "800 560 560 650 480 440",
+            "inf_score_sweet_dist",  "780 540 540 660 500 420",
             "距离甜点（单位uu）：S B H P J C", CVAR_FLAG);
 
         this.Score_sweet_width = CreateConVar(
-            "inf_score_sweet_width", "320 500 500 500 500 520",
+            "inf_score_sweet_width", "320 520 460 520 540 560",
             "甜点容忍宽度（单位uu，越大越宽容）：S B H P J C", CVAR_FLAG);
 
         this.Score_sweet_slope = CreateConVar(
-            "inf_score_sweet_slope", "1.25 1.05 1.20 1.25 1.15 1.15",
+            "inf_score_sweet_slope", "1.35 0.95 1.15 1.30 1.00 1.05",
             "曲线陡峭度（>1 更挑剔；<1 更宽松）：S B H P J C", CVAR_FLAG);
 
         // 变化回调
@@ -4511,7 +4511,16 @@ stock float ComputeFFThresholdForClass(int zc)
     return 0.85 * theoMax;
 }
 
-// —— 后方高度惩罚：按桶差 + 高度差线性扣分，替代硬禁用 —— //
+// ───────────────────────────────────────────────────────────────────────────────
+// 后方高度惩罚（Behind-Height Penalty）
+// - 目的：当候选点在“参考地面/视线”以下时，加速惩罚曲线（更陡峭）
+// - 组成：桶差扣分 + 低位扣分（更陡）+ 过高扣分 + 全局封顶
+// - 不改变：桶差(gap)与过高(rise)的计算逻辑与阈值，仅对“低位(drop)”做陡峭化
+// - 陡峭化做法：
+//   1) 在各分段(soft/deep/abyss)内部增加随深度线性放大的增益（带宽内的 slope 提升）
+//   2) abyss 段允许更高上限，并轻度超线性（Pow^1.10）让深坑快速拉满
+//   3) 与后方距离(bucketGap)联动的 behindFactor：越在后方，低位惩罚放大越明显
+// ───────────────────────────────────────────────────────────────────────────────
 static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
                                         float candZ, float refEyeZ, float allMaxEyeZ,
                                         float lowestFootZ)
@@ -4520,59 +4529,93 @@ static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket
     if (bucketGap <= 0)
         return 0.0;
 
+    // —— 每类特感的“低位/深坑/过高”的权重（斜率基准） ——
+    // 设计理念：
+    // - Smoker：更容忍高低差与反打位，斜率较缓
+    // - Hunter：中等容忍，略强于 Smoker 的低位惩罚
+    // - 其他（Jockey/Charger/Spitter/Boomer 等）：对低位/深坑更敏感，斜率更陡
     float softCoef, deepCoef, abyssCoef, highCoef;
     switch (zc)
     {
         case view_as<int>(SI_Smoker):
         {
-            softCoef = 0.20;
-            deepCoef = 0.34;
-            abyssCoef = 0.48;
-            highCoef = 0.12;
+            softCoef = 0.20;  // 0~70 低位区：Smoker 低位惩罚较缓
+            deepCoef = 0.34;  // 70~130 深位区：适中
+            abyssCoef = 0.48; // >130 深坑区：较缓但会被陡峭化放大
+            highCoef  = 0.12; // 过高惩罚：Smoker 对高点相对友好
         }
         case view_as<int>(SI_Hunter):
         {
-            softCoef = 0.22;
+            softCoef = 0.22;  // Hunter 略高于 Smoker
             deepCoef = 0.38;
             abyssCoef = 0.55;
-            highCoef = 0.14;
+            highCoef  = 0.14;
         }
         default:
         {
-            softCoef = 0.28;
+            softCoef = 0.28;  // 其他 SI 更不适合“低位绕后”，给更陡的基准斜率
             deepCoef = 0.46;
             abyssCoef = 0.60;
-            highCoef = 0.18;
+            highCoef  = 0.18; // 过高惩罚也更重一些
         }
     }
 
     float penalty = 0.0;
 
+    // —— 桶差（越在后方，基准惩罚越高，维持原逻辑） ——
+    float gapPenalty = float(bucketGap) * 10.0;
+    if (gapPenalty > 60.0)
+    {
+        float extraGap = FloatMax(0.0, float(bucketGap) - 6.0);
+        gapPenalty = 60.0 + FloatMin(40.0, extraGap * 8.0);
+    }
+    penalty += FloatMin(110.0, gapPenalty);
+
+    // —— 低位（drop）基准参考：优先用队伍最低脚底（容错平台边/台阶），否则用视线-130 —— 
     bool haveFoot = (lowestFootZ < 1.0e8);
     float floorBase = haveFoot ? (lowestFootZ - 40.0) : (refEyeZ - 130.0);
     float drop = floorBase - candZ;
+
     if (drop > 0.0)
     {
-        float softDrop = FloatMin(drop, 70.0);
-        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));
-        float abyssDrop = FloatMax(0.0, drop - 130.0);
+        // —— 分段：保持原分段边界，但在段内增加“随深度成长”的倍率，形成更陡曲线 ——
+        float softDrop = FloatMin(drop, 70.0);                        //   0 ~ 70
+        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));  //  70 ~ 130
+        float abyssDrop = FloatMax(0.0, drop - 130.0);                // >130
 
-        penalty += softDrop * softCoef;
-        penalty += deepDrop * deepCoef;
-        if (abyssDrop > 0.0)
-            penalty += FloatMin(60.0, abyssDrop * abyssCoef);
+        // 后方联动放大：越在后方，低位越不被允许（最多 +60%）
+        float behindFactor = 1.0 + FloatMin(0.60, 0.06 * float(bucketGap));
+
+        // 段内增益：段内越深，斜率越大（线性增益，数值温和、可控）
+        float softGain = 1.0 + 0.5 * (softDrop / 70.0);   // 1.0 → 1.5
+        float deepGain = 1.0 + 0.8 * (deepDrop / 60.0);   // 1.0 → 1.8
+
+        // abyss 段轻度超线性：Pow(1.10) 让深坑更快冲顶；同时给线性项兜底
+        float abyssLinear = abyssCoef * abyssDrop;
+        float abyssCurve  = abyssCoef * Pow(abyssDrop, 1.10);
+        float abyssTerm   = FloatMax(abyssLinear, abyssCurve);
+        // 放宽 abyss 上限，让深坑的陡峭化有体现（从 60 → 80）
+        abyssTerm = FloatMin(80.0, abyssTerm);
+
+        float softTerm = softCoef * softDrop * softGain;
+        float deepTerm = deepCoef * deepDrop * deepGain;
+
+        penalty += (softTerm + deepTerm + abyssTerm) * behindFactor;
     }
 
+    // —— 过高（rise）维持原逻辑：超过“全队最高视线+150”开始线性扣分 —— 
     float highLimit = allMaxEyeZ + 150.0;
     float rise = candZ - highLimit;
     if (rise > 0.0)
         penalty += FloatMin(50.0, rise * highCoef);
 
+    // —— 全局封顶（不让惩罚失控） —— 
     if (penalty > 150.0)
         penalty = 150.0;
 
     return penalty;
 }
+
 
 // [新增] —— 简易 e^x 封装（SourcePawn 没有 Exp，改用 Pow）
 #define M_E 2.718281828459045
@@ -5154,6 +5197,15 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     if (!found) {
         Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
                     searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
+        return false;
+    }
+
+    if (bestScore < gCV.fScoreMinTotal)
+    {
+        cFilt_Score++;
+        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < min=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
+                    searchRange, bestScore, gCV.fScoreMinTotal,
+                    cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
         return false;
     }
 
