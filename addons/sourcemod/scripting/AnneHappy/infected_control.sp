@@ -1978,11 +1978,22 @@ static int GetSupportUnlockNeed()
 static bool SupportKillersUnlocked()
 {
     int need = GetSupportUnlockNeed();
-    if (need <= 0 || gST.killersSpawnedThisWave >= need)
+    if (need <= 0)
     {
         ResetSupportDelayTimer();
         return true;
     }
+
+    int effective = gST.killersSpawnedThisWave
+                  + CountPriorityKillersAlive()
+                  + CountPriorityKillersQueued();
+
+    if (effective >= need)
+    {
+        ResetSupportDelayTimer();
+        return true;
+    }
+
     return false;
 }
 static bool ShouldBlockSupport(bool relax)
@@ -2045,6 +2056,25 @@ static int CountKillersQueued()
     {
         int t = gQ.spawn.Get(i);
         if (IsKillerClassInt(t)) c++;
+    }
+    return c;
+}
+
+static int CountPriorityKillersAlive()
+{
+    return gST.siAlive[view_as<int>(SI_Hunter)-1]
+         + gST.siAlive[view_as<int>(SI_Jockey)-1]
+         + gST.siAlive[view_as<int>(SI_Charger)-1];
+}
+
+static int CountPriorityKillersQueued()
+{
+    int c = 0;
+    for (int i = 0; i < gQ.spawn.Length; i++)
+    {
+        int queued = gQ.spawn.Get(i);
+        if (IsPriorityKillerClass(queued))
+            c++;
     }
     return c;
 }
