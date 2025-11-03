@@ -101,10 +101,10 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 #define PATH_NO_BUILD_PENALTY     1999.0
 
 // === Dispersion scoring (base values before权重) ===
-#define DISP_SCORE_PREF          60.0
-#define DISP_SCORE_RECENT0      -30.0
-#define DISP_SCORE_RECENT1      -15.0
-#define DISP_SCORE_OTHER         25.0
+#define DISP_SCORE_PREF          80.0
+#define DISP_SCORE_RECENT0      -40.0
+#define DISP_SCORE_RECENT1      -25.0
+#define DISP_SCORE_OTHER         40.0
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
@@ -223,6 +223,7 @@ enum struct SpawnScoreDbg
     float dispScaled;
     float penK;
     float risk;
+    float extraPen;
 
     float dminEye;
     float ringEff;
@@ -263,6 +264,7 @@ enum struct CandidateScore
     float dispScaled;
     float penK;
     float risk;
+    float extraPen;
     float dminEye;
     float ringEff;
     float slack;
@@ -305,6 +307,7 @@ enum struct SpawnEvalContext
     float refEyeZ;
     float allMaxEyeZ;
     float allMinZ;
+    float lowestFootZ;
     float center[3];
     int   sectors;
     int   preferredSector;
@@ -4478,6 +4481,40 @@ stock float ComputeFFThresholdForClass(int zc)
     return 0.85 * theoMax;
 }
 
+static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
+                                        float candZ, float refEyeZ, float allMaxEyeZ,
+                                        float lowestFootZ)
+{
+    if (candBucket >= centerBucket)
+        return 0.0;
+
+    float penalty = 0.0;
+    bool haveFoot = (lowestFootZ < 1.0e8);
+
+    if (zc != view_as<int>(SI_Smoker))
+    {
+        float lowLimit = haveFoot ? (lowestFootZ - 48.0) : (refEyeZ - 120.0);
+        if (candZ < lowLimit)
+            penalty += 40.0;
+
+        float highLimit = allMaxEyeZ + 120.0;
+        if (candZ > highLimit)
+            penalty += 40.0;
+    }
+
+    if (zc != view_as<int>(SI_Hunter))
+    {
+        float deepLowLimit = haveFoot ? (lowestFootZ - 96.0) : (refEyeZ - 180.0);
+        if (candZ < deepLowLimit)
+            penalty += 50.0;
+    }
+
+    if (penalty > 100.0)
+        penalty = 100.0;
+
+    return penalty;
+}
+
 // [新增] —— 简易 e^x 封装（SourcePawn 没有 Exp，改用 Pow）
 #define M_E 2.718281828459045
 stock float ExpF(float x)
@@ -4658,6 +4695,8 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
     float allMinZ = 1.0e9, allMaxZ = -1.0e9;
     int   allMinFlowBucket = 100;
+    float lowestFootZ = 1.0e9;
+    bool  haveFootRef = false;
     SurPosData data;
     for (int si = 0; si < g_iSurPosDataLen; si++) {
         g_aSurPosData.GetArray(si, data);
@@ -4665,7 +4704,14 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         if (data.fPos[2] > allMaxZ) allMaxZ = data.fPos[2];
         int sb = FlowDistanceToPercent(data.fFlow);
         if (sb < allMinFlowBucket) allMinFlowBucket = sb;
+
+        float footApprox = data.fPos[2] - PLAYER_CHEST;
+        if (footApprox < lowestFootZ) lowestFootZ = footApprox;
+        haveFootRef = true;
     }
+
+    if (!haveFootRef)
+        lowestFootZ = allMinZ - PLAYER_CHEST;
 
     int centerBucket = 50;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur)) {
@@ -4800,6 +4846,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             ctx.refEyeZ = refEyeZ;
             ctx.allMaxEyeZ = allMaxZ;
             ctx.allMinZ = allMinZ;
+            ctx.lowestFootZ = lowestFootZ;
             ctx.center[0] = center[0];
             ctx.center[1] = center[1];
             ctx.center[2] = center[2];
@@ -4817,6 +4864,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             CandidateScore bestCandGlobal;
             bestCandGlobal.valid = 0;
+            bestCandGlobal.extraPen = 0.0;
             GroupEvalResult bestGroupRes;
             bool anyCandidate = false;
             int totalAccepted = 0;
@@ -4904,6 +4952,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.dminEye = bestCandGlobal.dminEye;
                 bestDbg.ringEff = bestCandGlobal.ringEff;
                 bestDbg.slack = bestCandGlobal.slack;
+                bestDbg.extraPen = bestCandGlobal.extraPen;
                 bestDbg.candBucket = bestCandGlobal.candBucket;
                 bestDbg.centerBucket = bestCandGlobal.centerBucket;
               	bestDbg.deltaFlow = bestCandGlobal.deltaFlow;
@@ -4985,6 +5034,10 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
                              + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
+            float behindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
+                                                              p[2], refEyeZ, allMaxZ, lowestFootZ);
+            if (behindPenalty > 0.0)
+                totalScore -= behindPenalty;
 
             float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
                                               : FloatMax(0.0, 40.0 - score_flow);
@@ -4999,6 +5052,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 dbgOut.candBucket = candBucket; dbgOut.centerBucket = centerBucket; dbgOut.deltaFlow = deltaFlow;
                 dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
                 dbgOut.risk = riskBase;
+                dbgOut.extraPen = behindPenalty;
                 dbgOut.groupScore = 0.0;
                 dbgOut.groupPressure = 0.0;
                 dbgOut.groupCoverage = 0.0;
@@ -5023,6 +5077,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.candBucket = candBucket; bestDbg.centerBucket = centerBucket; bestDbg.deltaFlow = deltaFlow;
                 bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
                 bestDbg.risk = riskBase;
+                bestDbg.extraPen = behindPenalty;
                 bestDbg.groupScore = 0.0;
                 bestDbg.groupPressure = 0.0;
                 bestDbg.groupCoverage = 0.0;
@@ -5622,6 +5677,9 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     if (score_flow < -200.0) score_flow = -200.0;
     if (rawBadFlow && score_flow < 0.0) { cnt.flow++; return false; }
 
+    float behindPenalty = ComputeBehindHeightPenalty(ctx.zc, candBucket, ctx.centerBucket,
+                                                     p[2], ctx.refEyeZ, ctx.allMaxEyeZ, ctx.lowestFootZ);
+
     float score_disp = CalculateScore_Dispersion(sidx, ctx.preferredSector, recentSectors);
     float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
     float dispScaled = ScaleNegativeOnly(score_disp, penK);
@@ -5654,6 +5712,10 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
                + gCV.w_hght[ctx.zc]*score_hght
                + gCV.w_flow[ctx.zc]*score_flow
                + gCV.w_disp[ctx.zc]*dispScaled;
+    cand.extraPen = behindPenalty;
+
+    if (behindPenalty > 0.0)
+        cand.total -= behindPenalty;
 
     out = cand;
     return true;
@@ -5771,9 +5833,9 @@ static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     int fb = GetHighestFlowSurvivorSafe();
     TryGetClientFlowPercentSafe(fb, surReal);
     
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) risk=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | GRP=%.1f(P=%.1f C=%.1f V=%.1f R=%.1f size=%d off=%d) | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) risk=%.1f extra=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | GRP=%.1f(P=%.1f C=%.1f V=%.1f R=%.1f size=%d off=%d) | REAL: cand=%d%% sur=%d%% delta=%d%%",
         INFDN[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.risk,
+        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.risk, dbg.extraPen,
         dbg.dminEye, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         dbg.groupScore, dbg.groupPressure, dbg.groupCoverage, dbg.groupVariance, dbg.groupRisk, dbg.groupSize, dbg.groupOffset,
