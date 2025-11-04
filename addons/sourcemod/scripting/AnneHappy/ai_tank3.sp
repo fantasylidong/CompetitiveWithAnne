@@ -60,7 +60,16 @@ ConVar
     g_cvBackFistAllowMaxSpd,
     g_cvPunchLockVision,
     g_cvJumpRock,
-    g_cvBackFistWindow;
+    g_cvBackFistWindow,
+    g_cvHeadBlockEnable,
+    g_cvHeadBlockTime,
+    g_cvHeadBlockVertical,
+    g_cvHeadBlockHorizontal,
+    g_cvHeadBlockIgnoreTime,
+    g_cvHeadBlockForceRockTime,
+    g_cvHeadBlockForceRockRange,
+    g_cvHeadBlockForceRockReleaseHoriz,
+    g_cvHeadBlockForceRockReleaseVert;
 
 ConVar g_cvBhopNoVisionMaxAng;
 ConVar cvTankSwingRange;
@@ -75,6 +84,7 @@ Handle g_hSdkTankClawSweepFist;
 
 bool  g_bLateLoad;
 float g_fTankSwingRange;
+float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
 
 // ===== 结构体 =====
 enum struct AiTank
@@ -85,6 +95,9 @@ enum struct AiTank
     bool  wasThrowing;          // 是否处于扔石头序列中
     float lastHopSpeed;         // 上次起跳时的速度（用于空中修正还原）
     float backFistExpire;       // 通背拳允许窗口到期时间（EngineTime <= 0 未开启）
+    float headBlockStart;       // 头顶卡检测开始时间
+    float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
+    int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
 
     void initData()
     {
@@ -94,6 +107,9 @@ enum struct AiTank
         this.wasThrowing = false;
         this.lastHopSpeed = 0.0;
         this.backFistExpire = 0.0;
+        this.headBlockStart = 0.0;
+        this.forceRockUntil = 0.0;
+        this.forceRockTarget = -1;
     }
 }
 AiTank g_AiTanks[MAXPLAYERS + 1];
@@ -170,6 +186,16 @@ public void OnPluginStart()
     g_cvJumpRock          = CreateConVar("ai_tank3_jump_rock", "1", "扔石头起手时允许“跳砖”", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBackFistWindow    = CreateConVar("ai_tank3_back_fist_window", "3.0", "通背拳窗口（秒），Tank 爪击命中后开启/刷新", CVAR_FLAGS, true, 0.0);
 
+    // 反头顶卡
+    g_cvHeadBlockEnable        = CreateConVar("ai_tank3_head_block_enable", "1", "是否启用 Tank 反头顶卡逻辑", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvHeadBlockTime          = CreateConVar("ai_tank3_head_block_time", "2.0", "Tank 位于目标脚下的持续时间阈值（秒）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockVertical      = CreateConVar("ai_tank3_head_block_vertical", "80.0", "触发头顶卡判定需要的垂直距离（单位）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockHorizontal    = CreateConVar("ai_tank3_head_block_horizontal", "65.0", "触发头顶卡判定的水平距离上限（单位）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockIgnoreTime    = CreateConVar("ai_tank3_head_block_ignore_time", "10.0", "判定恶意卡位后屏蔽该生还者的时间（秒）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockForceRockTime = CreateConVar("ai_tank3_head_block_force_rock_time", "20.0", "除卡位者外其他生还都倒地时，强制投石保持的最长时间（秒）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockForceRockRange= CreateConVar("ai_tank3_head_block_force_rock_range", "250.0", "触发强制投石时 Tank 需要与卡位者拉开的最小水平距离（单位）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockForceRockReleaseHoriz = CreateConVar("ai_tank3_head_block_force_rock_release_h", "400", "强制投石期间卡位者离开多远（水平距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockForceRockReleaseVert  = CreateConVar("ai_tank3_head_block_force_rock_release_v", "250", "强制投石期间卡位者离开多远（垂直距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
     // 日志
     g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
     char cvName[64];
@@ -254,8 +280,11 @@ void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidClient(i)) continue;
         g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
     }
 }
 
@@ -263,8 +292,11 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidClient(i)) continue;
         g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
     }
 }
 
@@ -299,14 +331,29 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     if (!g_cvEnable.BoolValue || !isAiTank(client))
         return Plugin_Continue;
 
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+
+    handleForceRock(client, buttons, pos);
+
     int target = GetClientOfUserId(g_AiTanks[client].target);
     if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
         return Plugin_Continue;
 
-    float pos[3], targetPos[3];
-    GetClientAbsOrigin(client, pos);
+    float targetPos[3];
     GetClientAbsOrigin(target, targetPos);
     float dist = GetVectorDistance(pos, targetPos);
+
+    bool targetIgnored = isSurvivorIgnored(target);
+    if (!targetIgnored)
+    {
+        handleHeadBlock(client, target, pos, targetPos);
+    }
+    else
+    {
+        g_AiTanks[client].headBlockStart = 0.0;
+        return Plugin_Continue;
+    }
 
     // 挥拳锁视角
     punchLockVision(client, target, pos, targetPos);
@@ -320,11 +367,245 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     return Plugin_Continue;
 }
 
-// 确保目标缓存一致
+bool isSurvivorIgnored(int survivor)
+{
+    if (!g_cvHeadBlockEnable.BoolValue)
+        return false;
+    if (!IsValidSurvivor(survivor))
+        return false;
+    return g_fHeadBlockIgnoreUntil[survivor] > GetEngineTime();
+}
+
+static bool isClientDownState(int client)
+{
+    return IsClientIncapped(client) || IsClientHanging(client);
+}
+
+void handleHeadBlock(int tank, int target, const float tankPos[3], const float targetPos[3])
+{
+    if (!g_cvHeadBlockEnable.BoolValue)
+        return;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return;
+    if (isClientDownState(target))
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float targetMins[3], tankMaxs[3];
+    GetClientMins(target, targetMins);
+    GetClientMaxs(tank, tankMaxs);
+
+    float targetFootZ = targetPos[2] + targetMins[2];
+    float tankHeadZ   = tankPos[2] + tankMaxs[2];
+    float verticalDiff = targetFootZ - tankHeadZ;
+    if (verticalDiff < g_cvHeadBlockVertical.FloatValue)
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float dx = targetPos[0] - tankPos[0];
+    float dy = targetPos[1] - tankPos[1];
+    float horizontalDiff = SquareRoot(dx * dx + dy * dy);
+    if (horizontalDiff > g_cvHeadBlockHorizontal.FloatValue)
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float now = GetEngineTime();
+    if (g_AiTanks[tank].headBlockStart <= 0.0)
+    {
+        g_AiTanks[tank].headBlockStart = now;
+        return;
+    }
+
+    if ((now - g_AiTanks[tank].headBlockStart) < g_cvHeadBlockTime.FloatValue)
+        return;
+
+    g_AiTanks[tank].headBlockStart = 0.0;
+    g_fHeadBlockIgnoreUntil[target] = now + g_cvHeadBlockIgnoreTime.FloatValue;
+    if (log != null)
+        log.debugAll("%N flagged %N for head blocking (v=%.1f h=%.1f)", tank, target, verticalDiff, horizontalDiff);
+}
+
+void handleForceRock(int tank, int& buttons, const float tankPos[3])
+{
+    if (!g_cvHeadBlockEnable.BoolValue)
+        return;
+
+    float now = GetEngineTime();
+    if (g_AiTanks[tank].forceRockUntil <= now)
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    int rockTarget = GetClientOfUserId(g_AiTanks[tank].forceRockTarget);
+    if (!IsValidSurvivor(rockTarget) || !IsPlayerAlive(rockTarget))
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    float blockedPos[3];
+    GetClientAbsOrigin(rockTarget, blockedPos);
+    float dx = blockedPos[0] - tankPos[0];
+    float dy = blockedPos[1] - tankPos[1];
+    float horizontal = SquareRoot(dx * dx + dy * dy);
+    float vertical = FloatAbs(blockedPos[2] - tankPos[2]);
+
+    float releaseHoriz = g_cvHeadBlockForceRockReleaseHoriz.FloatValue;
+    float releaseVert  = g_cvHeadBlockForceRockReleaseVert.FloatValue;
+    bool overHoriz = (releaseHoriz > 0.0 && horizontal > releaseHoriz);
+    bool overVert  = (releaseVert > 0.0 && vertical  > releaseVert);
+    if (overHoriz || overVert)
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    float needDistance = g_cvHeadBlockForceRockRange.FloatValue;
+    if (horizontal < needDistance)
+        return;
+
+    bool visible = clientIsVisibleToClient(tank, rockTarget);
+    if (!visible)
+    {
+        float eyeTarget[3];
+        GetClientEyePosition(rockTarget, eyeTarget);
+        visible = L4D2_IsVisibleToPlayer(tank, TEAM_INFECTED, 0, 0, eyeTarget);
+    }
+    if (!visible)
+        return;
+
+    buttons |= IN_ATTACK2;
+    g_AiTanks[tank].forceRockUntil = 0.0;
+    g_AiTanks[tank].forceRockTarget = -1;
+}
+
+int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &nearestDown)
+{
+    float tankPos[3];
+    GetClientAbsOrigin(tank, tankPos);
+
+    int bestStanding = -1;
+    float bestStandingDist = 999999.0;
+    nearestDown = -1;
+    float bestDownDist = 999999.0;
+    allOthersDown = true;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+        if (i == ignoreTarget)
+            continue;
+        if (isSurvivorIgnored(i))
+            continue;
+
+        bool down = isClientDownState(i);
+        if (!down)
+            allOthersDown = false;
+
+        float pos[3];
+        GetClientAbsOrigin(i, pos);
+        float dist = GetVectorDistance(tankPos, pos);
+
+        if (!down)
+        {
+            if (dist < bestStandingDist)
+            {
+                bestStandingDist = dist;
+                bestStanding = i;
+            }
+        }
+        else
+        {
+            if (dist < bestDownDist)
+            {
+                bestDownDist = dist;
+                nearestDown = i;
+            }
+        }
+    }
+
+    if (bestStanding != -1)
+        return bestStanding;
+    if (nearestDown != -1)
+        return nearestDown;
+
+    allOthersDown = false;
+    return -1;
+}
+
+// 确保目标缓存一致并处理反卡逻辑
 public Action L4D2_OnChooseVictim(int client, int &curTarget)
 {
     if (!isAiTank(client) || !IsValidSurvivor(curTarget))
         return Plugin_Continue;
+
+    float now = GetEngineTime();
+
+    int blockedClient = curTarget;
+
+    if (isSurvivorIgnored(blockedClient))
+    {
+        bool allOthersDown = false;
+        int nearestDown = -1;
+        int alternative = findAlternativeVictim(client, blockedClient, allOthersDown, nearestDown);
+        if (alternative > 0)
+        {
+            if (allOthersDown)
+            {
+                int moveTarget = (nearestDown > 0) ? nearestDown : blockedClient;
+                if (moveTarget > 0)
+                    curTarget = moveTarget;
+
+                int chaseUserId = GetClientUserId(curTarget);
+                if (chaseUserId > 0)
+                    g_AiTanks[client].target = chaseUserId;
+
+                int blockedUserId = GetClientUserId(blockedClient);
+                if (blockedUserId > 0)
+                {
+                    g_AiTanks[client].forceRockTarget = blockedUserId;
+                    g_AiTanks[client].forceRockUntil = now + g_cvHeadBlockForceRockTime.FloatValue;
+                }
+                else
+                {
+                    g_AiTanks[client].forceRockTarget = -1;
+                    g_AiTanks[client].forceRockUntil = 0.0;
+                }
+            }
+            else
+            {
+                curTarget = alternative;
+                g_AiTanks[client].target = GetClientUserId(curTarget);
+                g_AiTanks[client].forceRockTarget = -1;
+                g_AiTanks[client].forceRockUntil = 0.0;
+            }
+
+            return Plugin_Changed;
+        }
+    }
+
+    if (g_AiTanks[client].forceRockUntil > 0.0 && g_AiTanks[client].forceRockUntil <= now)
+    {
+        g_AiTanks[client].forceRockUntil = 0.0;
+        g_AiTanks[client].forceRockTarget = -1;
+    }
+
+    if (!isClientDownState(curTarget))
+    {
+        g_AiTanks[client].forceRockTarget = -1;
+        g_AiTanks[client].forceRockUntil = 0.0;
+    }
 
     int cachedTarget = GetClientOfUserId(g_AiTanks[client].target);
     if (!IsValidClient(cachedTarget) || cachedTarget != curTarget)
@@ -647,12 +928,24 @@ stock bool nextTickPosCheck(int client, bool visible)
 public void OnClientPutInServer(int client)
 {
     g_AiTanks[client].initData();
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
 
     // 后置动画钩子：识别投石/翻越等序列变化
     AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
 
     // NEW: 梯子播放速率常驻维护（PostThinkPost 每帧极轻量）
     SDKHook(client, SDKHook_PostThinkPost, ladderRateModifyHookHandler);
+}
+
+public void OnClientDisconnect(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    g_AiTanks[client].headBlockStart = 0.0;
+    g_AiTanks[client].forceRockUntil = 0.0;
+    g_AiTanks[client].forceRockTarget = -1;
 }
 
 // ===== 翻越播放速率维护（进入翻越时挂，退出解）=====
