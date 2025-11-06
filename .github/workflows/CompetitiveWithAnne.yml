@@ -6,31 +6,31 @@ env:
 on:
   workflow_dispatch:
     inputs:
-      tags: 
-         description: 'Run Tags'
+      tags:
+        description: 'Run Tags'
+        required: false
   push:
     paths:
-      - '*.md'
-      - '*.sp'
+      - '**/*.md'
+      - '**/*.sp'
     branches:
       - master
 
 jobs:
-
   release:
     if: github.repository == 'fantasylidong/CompetitiveWithAnne'
-    name: Upload  CompetitiveWithAnne Achieve if a new commit was been push.
-    runs-on: [ubuntu-latest]
-    
+    name: Upload CompetitiveWithAnne Achieve if a new commit was been push.
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         run: |
           git clone https://github.com/fantasylidong/CompetitiveWithAnne
           git clone --depth 1 -b zonemod https://github.com/fantasylidong/anne.git
-      
+
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - name: Gzip
         run: |
@@ -41,35 +41,35 @@ jobs:
           cp -R anne/left4dead2/models/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/left4dead2/materials/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/update/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/
-          tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }}
-                    
+          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
+
       - name: Gzip nomysql
         run: |
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/chat-processor.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/hextags.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/rpg.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/chatlog.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/veterans.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_damage_show.smx
-		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/punch_angle.smx
-		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_blacklist.smx
-		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/chat-processor.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/hextags.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/rpg.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/chatlog.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/veterans.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_damage_show.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/punch_angle.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_blacklist.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
           cp CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/disabled/rpg.smx CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/
-          tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }}
+          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
 
-	  - name: Gzip norank&&sourcebans&&lilac
+      - name: Gzip norank&&sourcebans&&lilac
         run: |
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
-          tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }} 
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
+          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
 
       - name: Update release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
-          files: | 
+          files: |
             CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz
             CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz
             CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz
