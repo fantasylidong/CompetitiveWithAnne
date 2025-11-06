@@ -133,6 +133,13 @@ static char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
 // —— 生还者进度回退（最后一次成功统计） —— //
 static int   g_LastGoodSurPct     = -1;   // 0..100
 static float g_LastGoodSurPctTime = 0.0;  // game time
+static float g_BucketScoreLimit[FLOW_BUCKETS];
+static float g_BucketScoreSum[FLOW_BUCKETS];
+static float g_BucketScoreSumSq[FLOW_BUCKETS];
+static float g_BucketScoreMinVal[FLOW_BUCKETS];
+static float g_BucketScoreMaxVal[FLOW_BUCKETS];
+static float g_BucketScoreLastUpdate[FLOW_BUCKETS];
+static int   g_BucketScoreSamples[FLOW_BUCKETS];
 
 // =========================
 // 修改 TheNavAreas methodmap
@@ -405,6 +412,12 @@ enum struct Config
     ConVar Score_w_flow;
     ConVar Score_w_disp;
     ConVar ScoreMinTotal;
+    ConVar ScoreDynamicEnable;
+    ConVar ScoreDynamicWindow;
+    ConVar ScoreDynamicSigma;
+    ConVar ScoreDynamicOutlierZ;
+    ConVar ScoreDynamicOutlierAbs;
+    ConVar ScoreDynamicMinSamples;
     // —— 距离甜点（可由 CVar 控制） —— //
     ConVar Score_dist_from_cvar;   // 1=使用 CVar 指定的甜点/宽度/斜率；0=按旧逻辑自动推导
     ConVar Score_sweet_dist;       // 6 个值：S B H P J C 对应的甜点距离（单位：uu）
@@ -432,6 +445,12 @@ enum struct Config
     float fPathCacheQuantize;
 
     float fScoreMinTotal;
+    bool  bScoreDynamic;
+    float fScoreDynamicWindow;
+    float fScoreDynamicSigma;
+    float fScoreDynamicOutlierZ;
+    float fScoreDynamicOutlierAbs;
+    int   iScoreDynamicMinSamples;
     float w_dist[7];
     float w_hght[7];
     float w_flow[7];
@@ -564,7 +583,13 @@ enum struct Config
         this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "80.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
+        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "0.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
+        this.ScoreDynamicEnable = CreateConVar("inf_score_dynamic_enable", "1", "是否启用动态分数阈值(0=固定,1=动态)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.ScoreDynamicWindow = CreateConVar("inf_score_dynamic_window", "1.5", "动态阈值缓存时长(秒)", CVAR_FLAG, true, 0.1, true, 5.0);
+        this.ScoreDynamicSigma  = CreateConVar("inf_score_dynamic_sigma", "0.75", "动态阈值 = 平均值 - σ * 系数", CVAR_FLAG, true, 0.0, true, 5.0);
+        this.ScoreDynamicOutlierZ = CreateConVar("inf_score_dynamic_outlier_z", "2.5", "离群过滤使用的Z值阈值(标准差倍数)", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.ScoreDynamicOutlierAbs = CreateConVar("inf_score_dynamic_outlier_abs", "45.0", "标准差极小时使用的绝对偏差过滤阈值", CVAR_FLAG, true, 0.0, true, 200.0);
+        this.ScoreDynamicMinSamples = CreateConVar("inf_score_dynamic_minsamples", "4", "动态阈值生效所需的样本数", CVAR_FLAG, true, 1.0, true, 20.0);
 
         // —— 距离甜点 CVar ——
         // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
@@ -643,6 +668,12 @@ enum struct Config
         this.Score_w_flow.AddChangeHook(OnCfgChanged);
         this.Score_w_disp.AddChangeHook(OnCfgChanged);
         this.ScoreMinTotal.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicEnable.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicWindow.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicSigma.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicOutlierZ.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicOutlierAbs.AddChangeHook(OnCfgChanged);
+        this.ScoreDynamicMinSamples.AddChangeHook(OnCfgChanged);
         this.gCvarNavCacheEnable.AddChangeHook(OnCfgChanged);
 
         this.NavBucketMapInvalid.AddChangeHook(OnCfgChanged);
@@ -737,6 +768,77 @@ enum struct Config
         this.fScoreMinTotal        = this.ScoreMinTotal.FloatValue;
         if (this.fScoreMinTotal < -200.0) this.fScoreMinTotal = -200.0;
         if (this.fScoreMinTotal > 1000.0) this.fScoreMinTotal = 1000.0;
+        this.bScoreDynamic        = this.ScoreDynamicEnable.BoolValue;
+        this.fScoreDynamicWindow  = this.ScoreDynamicWindow.FloatValue;
+        if (this.fScoreDynamicWindow < 0.1) this.fScoreDynamicWindow = 0.1;
+        if (this.fScoreDynamicWindow > 5.0) this.fScoreDynamicWindow = 5.0;
+        this.fScoreDynamicSigma   = this.ScoreDynamicSigma.FloatValue;
+        if (this.fScoreDynamicSigma < 0.0) this.fScoreDynamicSigma = 0.0;
+        if (this.fScoreDynamicSigma > 5.0) this.fScoreDynamicSigma = 5.0;
+        this.fScoreDynamicOutlierZ = this.ScoreDynamicOutlierZ.FloatValue;
+        if (this.fScoreDynamicOutlierZ < 0.0) this.fScoreDynamicOutlierZ = 0.0;
+        if (this.fScoreDynamicOutlierZ > 10.0) this.fScoreDynamicOutlierZ = 10.0;
+        this.fScoreDynamicOutlierAbs = this.ScoreDynamicOutlierAbs.FloatValue;
+        if (this.fScoreDynamicOutlierAbs < 0.0) this.fScoreDynamicOutlierAbs = 0.0;
+        if (this.fScoreDynamicOutlierAbs > 400.0) this.fScoreDynamicOutlierAbs = 400.0;
+        this.iScoreDynamicMinSamples = this.ScoreDynamicMinSamples.IntValue;
+        if (this.iScoreDynamicMinSamples < 1) this.iScoreDynamicMinSamples = 1;
+        if (this.iScoreDynamicMinSamples > 20) this.iScoreDynamicMinSamples = 20;
+
+        static bool sInitDyn = false;
+        static float sLastScoreMinTotal = 0.0;
+        static bool sLastScoreDynamic = false;
+        static float sLastDynamicWindow = 0.0;
+        static float sLastDynamicSigma = 0.0;
+        static float sLastDynamicOutlierZ = 0.0;
+        static float sLastDynamicOutlierAbs = 0.0;
+        static int   sLastDynamicMinSamples = 0;
+        bool needResetBuckets = false;
+
+        if (!sInitDyn)
+        {
+            needResetBuckets = true;
+            sInitDyn = true;
+        }
+        if (this.fScoreMinTotal != sLastScoreMinTotal)
+        {
+            needResetBuckets = true;
+            sLastScoreMinTotal = this.fScoreMinTotal;
+        }
+        if (this.bScoreDynamic != sLastScoreDynamic)
+        {
+            needResetBuckets = true;
+            sLastScoreDynamic = this.bScoreDynamic;
+        }
+        if (this.fScoreDynamicWindow != sLastDynamicWindow)
+        {
+            needResetBuckets = true;
+            sLastDynamicWindow = this.fScoreDynamicWindow;
+        }
+        if (this.fScoreDynamicSigma != sLastDynamicSigma)
+        {
+            needResetBuckets = true;
+            sLastDynamicSigma = this.fScoreDynamicSigma;
+        }
+        if (this.fScoreDynamicOutlierZ != sLastDynamicOutlierZ)
+        {
+            needResetBuckets = true;
+            sLastDynamicOutlierZ = this.fScoreDynamicOutlierZ;
+        }
+        if (this.fScoreDynamicOutlierAbs != sLastDynamicOutlierAbs)
+        {
+            needResetBuckets = true;
+            sLastDynamicOutlierAbs = this.fScoreDynamicOutlierAbs;
+        }
+        if (this.iScoreDynamicMinSamples != sLastDynamicMinSamples)
+        {
+            needResetBuckets = true;
+            sLastDynamicMinSamples = this.iScoreDynamicMinSamples;
+        }
+        if (needResetBuckets)
+        {
+            BucketScore_ResetAll();
+        }
 
         // 死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
@@ -1076,6 +1178,7 @@ public void OnPluginStart()
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
     BuildNavIdIndexMap();
     BuildNavBuckets();        // ← 预建 FLOW 分桶
+    BucketScore_ResetAll();   // 初始化动态阈值缓存
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
@@ -1128,11 +1231,11 @@ public void OnMapEnd()
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
+    ClearNavBuckets();
+    BucketScore_ResetAll();   // 重置动态阈值缓存
+    g_BucketsReady = false;
     g_LastSpawnOkTime = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
-
-    ClearNavBuckets();
-    g_BucketsReady = false;
     for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     // [新增] —— 每波开始即清理 Path 缓存（波级作用域）
@@ -1238,7 +1341,7 @@ public Action Cmd_RebuildNavCache(int client, int args)
     ClearNavBuckets();
     g_BucketsReady = false;
     BuildNavBuckets();
-    
+    BucketScore_ResetAll();   // 重建后刷新动态阈值缓存
     ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache.");
     return Plugin_Handled;
 }
@@ -4837,6 +4940,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     float bestScore = -1.0e9;
     int   bestIdx   = -1;
     float bestPos[3];
+    int   bestCandBucket = -1;
     int acceptedHits = 0;
     int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0, cFilt_Score=0;
 
@@ -5142,7 +5246,9 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (behindPenalty > 0.0)
                 totalScore -= behindPenalty;
 
-            if (totalScore < gCV.fScoreMinTotal) { cFilt_Score++; continue; }
+            BucketScore_AddSample(candBucket, totalScore);
+            float scoreLimit = BucketScore_GetLimit(candBucket);
+            if (totalScore < scoreLimit) { cFilt_Score++; continue; }
 
             float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
                                               : FloatMax(0.0, 40.0 - score_flow);
@@ -5175,6 +5281,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestScore = totalScore;
                 bestIdx   = ai;
                 bestPos   = p;
+                bestCandBucket = candBucket;
 
                 bestDbg.total = totalScore; bestDbg.dist = score_dist; bestDbg.hght = score_hght; bestDbg.flow = score_flow;
                 bestDbg.dispRaw = score_disp; bestDbg.dispScaled = dispScaled; bestDbg.penK = penK;
@@ -5200,11 +5307,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         return false;
     }
 
-    if (bestScore < gCV.fScoreMinTotal)
+    float finalLimit = BucketScore_GetLimit(bestCandBucket);
+    if (bestScore < finalLimit)
     {
         cFilt_Score++;
-        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < min=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
-                    searchRange, bestScore, gCV.fScoreMinTotal,
+        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < limit=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
+                    searchRange, bestScore, finalLimit,
                     cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
         return false;
     }
@@ -5725,6 +5833,169 @@ static void FinalizeGroupMetrics(GroupEvalResult group, int sectorsTotal,
                 - GROUP_WEIGHT_RISK * group.risk;
 }
 
+static void BucketScore_Reset(int bucket)
+{
+    if (bucket < 0 || bucket >= FLOW_BUCKETS) return;
+    g_BucketScoreLimit[bucket] = gCV.fScoreMinTotal;
+    g_BucketScoreSum[bucket] = 0.0;
+    g_BucketScoreSumSq[bucket] = 0.0;
+    g_BucketScoreMinVal[bucket] = 0.0;
+    g_BucketScoreMaxVal[bucket] = 0.0;
+    g_BucketScoreLastUpdate[bucket] = 0.0;
+    g_BucketScoreSamples[bucket] = 0;
+}
+
+static void BucketScore_ResetAll()
+{
+    for (int i = 0; i < FLOW_BUCKETS; i++)
+    {
+        BucketScore_Reset(i);
+    }
+}
+
+static bool BucketScore_ShouldAcceptSample(int bucket, float value)
+{
+    int count = g_BucketScoreSamples[bucket];
+    if (count <= 0) return true;
+
+    if (count < gCV.iScoreDynamicMinSamples)
+        return true;
+
+    float n = float(count);
+    float mean = g_BucketScoreSum[bucket] / n;
+
+    float denom = float(count - 1);
+    if (denom <= 0.0)
+        return true;
+
+    float variance = (g_BucketScoreSumSq[bucket] - n * mean * mean) / denom;
+    if (variance < 0.0) variance = 0.0;
+    float std = (variance > 0.0) ? SquareRoot(variance) : 0.0;
+
+    float diff = FloatAbs(value - mean);
+    if (std > 1.0)
+    {
+        if (diff > std * gCV.fScoreDynamicOutlierZ)
+            return false;
+    }
+    else if (diff > gCV.fScoreDynamicOutlierAbs)
+    {
+        return false;
+    }
+    return true;
+}
+
+static void BucketScore_RecalcLimit(int bucket)
+{
+    int count = g_BucketScoreSamples[bucket];
+    if (count < gCV.iScoreDynamicMinSamples)
+    {
+        g_BucketScoreLimit[bucket] = gCV.fScoreMinTotal;
+        return;
+    }
+
+    float sum = g_BucketScoreSum[bucket];
+    float trimmedSum = sum;
+    int trimmedCount = count;
+
+    if (count >= 5)
+    {
+        trimmedSum -= g_BucketScoreMinVal[bucket];
+        trimmedSum -= g_BucketScoreMaxVal[bucket];
+        trimmedCount -= 2;
+        if (trimmedCount <= 0)
+        {
+            trimmedCount = count;
+            trimmedSum = sum;
+        }
+    }
+
+    if (trimmedCount <= 0)
+    {
+        g_BucketScoreLimit[bucket] = gCV.fScoreMinTotal;
+        return;
+    }
+
+    float baseAvg = trimmedSum / float(trimmedCount);
+
+    float variance = 0.0;
+    if (count > 1)
+    {
+        float n = float(count);
+        float mean = sum / n;
+        float denom = float(count - 1);
+        if (denom > 0.0)
+        {
+            variance = (g_BucketScoreSumSq[bucket] - n * mean * mean) / denom;
+            if (variance < 0.0) variance = 0.0;
+        }
+    }
+
+    float std = (variance > 0.0) ? SquareRoot(variance) : 0.0;
+    float dynLimit = baseAvg - std * gCV.fScoreDynamicSigma;
+    if (dynLimit > baseAvg) dynLimit = baseAvg;
+    if (dynLimit < gCV.fScoreMinTotal) dynLimit = gCV.fScoreMinTotal;
+
+    g_BucketScoreLimit[bucket] = dynLimit;
+}
+
+static void BucketScore_AddSample(int bucket, float value)
+{
+    if (bucket < 0 || bucket >= FLOW_BUCKETS)
+        return;
+
+    float now = GetEngineTime();
+    if (now - g_BucketScoreLastUpdate[bucket] > gCV.fScoreDynamicWindow)
+    {
+        BucketScore_Reset(bucket);
+    }
+    g_BucketScoreLastUpdate[bucket] = now;
+
+    if (!gCV.bScoreDynamic)
+    {
+        g_BucketScoreLimit[bucket] = gCV.fScoreMinTotal;
+        return;
+    }
+
+    if (!BucketScore_ShouldAcceptSample(bucket, value))
+        return;
+
+    g_BucketScoreSamples[bucket]++;
+    g_BucketScoreSum[bucket] += value;
+    g_BucketScoreSumSq[bucket] += value * value;
+
+    if (g_BucketScoreSamples[bucket] == 1 || value < g_BucketScoreMinVal[bucket])
+        g_BucketScoreMinVal[bucket] = value;
+    if (g_BucketScoreSamples[bucket] == 1 || value > g_BucketScoreMaxVal[bucket])
+        g_BucketScoreMaxVal[bucket] = value;
+
+    BucketScore_RecalcLimit(bucket);
+}
+
+static float BucketScore_GetLimit(int bucket)
+{
+    if (!gCV.bScoreDynamic)
+        return gCV.fScoreMinTotal;
+
+    if (bucket < 0 || bucket >= FLOW_BUCKETS)
+        return gCV.fScoreMinTotal;
+
+    float now = GetEngineTime();
+    if (now - g_BucketScoreLastUpdate[bucket] > gCV.fScoreDynamicWindow)
+    {
+        BucketScore_Reset(bucket);
+        return gCV.fScoreMinTotal;
+    }
+
+    if (g_BucketScoreSamples[bucket] < gCV.iScoreDynamicMinSamples)
+        return gCV.fScoreMinTotal;
+
+    float limit = g_BucketScoreLimit[bucket];
+    if (limit < gCV.fScoreMinTotal)
+        limit = gCV.fScoreMinTotal;
+    return limit;
+}
+
 static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int areaIdx,
                                   CandidateScore out, FilterCounters cnt)
 {
@@ -5808,7 +6079,9 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     if (behindPenalty > 0.0)
         totalScore -= behindPenalty;
 
-    if (totalScore < gCV.fScoreMinTotal)
+    BucketScore_AddSample(candBucket, totalScore);
+    float limit = BucketScore_GetLimit(candBucket);
+    if (totalScore < limit)
     {
         cnt.score++;
         return false;
