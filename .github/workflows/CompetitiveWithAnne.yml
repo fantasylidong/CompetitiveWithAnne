@@ -42,14 +42,7 @@ jobs:
           cp -R anne/left4dead2/materials/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/update/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/
           tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }}
-          
-      - name: Gzip norank&&sourcebans&&lilac
-        run: |
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
-          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
-          tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }} 
-          
+                    
       - name: Gzip nomysql
         run: |
           rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/chat-processor.smx
@@ -58,11 +51,18 @@ jobs:
           rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/chatlog.smx
           rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/veterans.smx
           rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_damage_show.smx
-		      rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/punch_angle.smx
-		      rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_blacklist.smx
-		      rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
+		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/punch_angle.smx
+		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_blacklist.smx
+		  rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
           cp CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/disabled/rpg.smx CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/
           tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }}
+
+	  - name: Gzip norank&&sourcebans&&lilac
+        run: |
+          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
+          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
+          rm CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
+          tar -czvf  CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz  CompetitiveWithAnne-${{ steps.date.outputs.date }} 
 
       - name: Update release
         uses: softprops/action-gh-release@v1
