@@ -140,12 +140,20 @@ enum LoadState
     LS_DBPending,    // 等待 DB 回调
     LS_Ready         // 已完成（DB 优先；若无则 cookie/默认并回写）
 };
-int  g_LoadState[MAXPLAYERS + 1];
+LoadState g_LoadState[MAXPLAYERS + 1];
 bool g_HaveCookie[MAXPLAYERS + 1];
 char g_CookieRaw[MAXPLAYERS + 1][256];
 
 // 保存排队：在未加载完成时点了“保存”，把当时的设置拍个快照
 bool          g_PendingSave[MAXPLAYERS + 1];
+
+static void ResetClientState(int client)
+{
+    g_LoadState[client] = LS_None;
+    g_HaveCookie[client] = false;
+    g_CookieRaw[client][0] = '\0';
+    g_PendingSave[client] = false;
+}
 PlayerSetData g_SaveSnapshot[MAXPLAYERS + 1];
 
 static const int color[][3] = {
@@ -595,7 +603,7 @@ static int DB_Save(int client)
 
         Cookie_Save(client, true); // 强制写 Cookie 防丢
         CPrintToChat(client, "{olive}[HUD]{default} 已保存到本地（Cookie），并已排队，待加载完成后写入数据库。");
-        LogInfo("[Save] Queued (not ready). client=%d state=%d", client, g_LoadState[client]);
+        LogInfo("[Save] Queued (not ready). client=%d state=%d", client, view_as<int>(g_LoadState[client]));
         return 1;
     }
 
@@ -722,16 +730,26 @@ public void OnPluginStart()
         if (IsClientInGame(i)) SDKHook(i, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
 }
 
+public void OnClientConnected(int client)
+{
+    ResetClientState(client);
+}
+
 public void OnClientPutInServer(int client)
 {
     g_bAdminObsViewAll[client] = false;
 
-    g_LoadState[client]   = LS_None;
-    g_HaveCookie[client]  = false;
-    g_CookieRaw[client][0]= '\0';
-    g_PendingSave[client] = false;
-
     SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+
+    if (IsFakeClient(client))
+    {
+        g_LoadState[client] = LS_Ready;
+        return;
+    }
+
+    // 重新加入的真人默认置为“未加载”，但保留已经在进行中的 DB 读
+    if (g_LoadState[client] != LS_DBPending)
+        g_LoadState[client] = LS_None;
 
     // 看门狗：2 秒后若仍未加载且 DB Ready，则补发一次 DB_Load
     CreateTimer(2.0, Timer_DBEnsureLoad, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -782,6 +800,11 @@ public Action Timer_DBEnsureLoad(Handle timer, any userid)
 {
     int client = GetClientOfUserId(userid);
     if (!IsValidClient(client)) return Plugin_Stop;
+    if (IsFakeClient(client))
+    {
+        g_LoadState[client] = LS_Ready;
+        return Plugin_Stop;
+    }
 
     if (g_LoadState[client] == LS_None && DB_EnsureReady())
     {
@@ -835,9 +858,12 @@ public void OnClientDisconnect(int client)
         else
         {
             Cookie_Save(client, true); // 未 Ready：仅 Cookie 兜底
-            LogInfo("[Save@Disconnect] Not ready (state=%d), skip DB save; cookie only.", g_LoadState[client]);
+            LogInfo("[Save@Disconnect] Not ready (state=%d), skip DB save; cookie only.", view_as<int>(g_LoadState[client]));
         }
     }
+
+    ResetClientState(client);
+    g_bAdminObsViewAll[client] = false;
 }
 
 // ============ 调试命令 ============
@@ -846,7 +872,7 @@ public Action Cmd_DmgCookie(int client, int args)
     if (!IsValidClient(client)) return Plugin_Handled;
 
     PrintToConsole(client, "[DMGSHOW] ---- Cookie Dump ----");
-    PrintToConsole(client, "[DMGSHOW] LoadState=%d UseMySQL=%d", g_LoadState[client], g_UseMySQL ? 1 : 0);
+    PrintToConsole(client, "[DMGSHOW] LoadState=%d UseMySQL=%d", view_as<int>(g_LoadState[client]), g_UseMySQL ? 1 : 0);
 
     if (g_ck == null)
     {
@@ -1400,7 +1426,7 @@ public void OnGameFrame()
 // 3) 只有管理员可分享（show_other=true）并按 share_scope=0/1（仅自己/队友）分发；普通玩家强制仅自己，不对外分享。
 // 4) 旁观管理员可选“查看所有人生还者伤害”。
 
-static void BuildReceivers(int attacker, int victim, int recv[MAXPLAYERS], int &total)
+static void BuildReceivers(int attacker, int recv[MAXPLAYERS], int &total)
 {
     total = 0;
     for (int i=1;i<=MaxClients;i++)
@@ -1451,7 +1477,7 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     }
 
     int recv[MAXPLAYERS], total;
-    BuildReceivers(attacker, victim, recv, total);
+    BuildReceivers(attacker, recv, total);
     if (total <= 0) return;
 
     int zombieClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
@@ -1596,10 +1622,10 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
             x_start + scale * g_Plr[attacker].xoff, g_Plr[attacker].yoff + size, z_distance,
             x_end   + scale * g_Plr[attacker].xoff, g_Plr[attacker].yoff - size, z_distance
         );
-        DrawNumber(fval.startPt, fval.endPt, digit, recv, total, life,  rgbaFull, 1, 0.8, size);
+        DrawNumber(fval.startPt, fval.endPt, digit, recv, total, life,  rgbaFull, 1, width, size);
         v %= divisor;
         divisor /= 10;
-        x_start = x_start - size - g_Plr[attacker].gap;
+        x_start = x_start - size - gap;
     }
 }
 // ★ 工具：从 cvar 读取并解析 flag 字符串（如 "bc"）

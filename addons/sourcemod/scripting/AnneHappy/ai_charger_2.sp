@@ -125,13 +125,17 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 						}
 					}
 				}
-				// 目标正在看着自身，自身可以冲锋，目标没有拿着近战，且不在倒地或起身状态时则直接冲锋，目标拿着近战，则转到 OnChooseVictim 处理，转移新目标或继续挥拳
-				else if (Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue) && !Client_MeleeCheck(target) && !Is_InGetUp_Or_Incapped(target) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1 && IsGrounded(client))
+				// 目标正在看着自身，自身可以冲锋且目标未处于倒地/起身状态
+				else if (Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue) && !Is_InGetUp_Or_Incapped(target) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1 && IsGrounded(client))
 				{
-					SetCharge(client);
-					buttons |= IN_ATTACK2;
-					buttons |= IN_ATTACK;
-					return Plugin_Changed;
+					bool targetHasMelee = g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(target);
+					if (!targetHasMelee || GetClientHealth(client) >= g_hChargerMeleeDamage.IntValue)
+					{
+						SetCharge(client);
+						buttons |= IN_ATTACK2;
+						buttons |= IN_ATTACK;
+						return Plugin_Changed;
+					}
 				}
 				else if (Is_InGetUp_Or_Incapped(target))
 				{
@@ -143,33 +147,23 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			// 自身血量大于冲锋限制血量，且目标是被控的人时，检测冲锋范围内是否有其他人（可能拿着近战），有则对其冲锋，自身血量小于冲锋限制血量，对着被控的人冲锋
 			else if (has_sight && IsValidSurvivor(target) && IsClientPinned(target) && !IsInChargeDuration(client))
 			{
-				if (GetClientHealth(client) > g_hChargerMeleeDamage.IntValue)
+				if (GetClientHealth(client) >= g_hChargerMeleeDamage.IntValue)
 				{
+					can_attack_pinned[client] = true;
 					buttons &= ~IN_ATTACK;
 					BlockCharge(client);
-					for (int i = 0; i < ranged_index[client]; i++)
-					{
-						// 循环时，由于 ranged_index 增加时，数组中一定为有效生还者，故无需判断是否是有效生还者
-						if (!IsClientPinned(ranged_client[client][i]) && Is_Target_Watching_Attacker(client, ranged_client[client][i], g_hAimOffset.IntValue) && !Is_InGetUp_Or_Incapped(ranged_client[client][i]) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1 && IsGrounded(client))
-						{
-							SetCharge(client);
-							float new_target_pos[3] = {0.0};
-							GetClientAbsOrigin(ranged_client[client][i], new_target_pos);
-							MakeVectorFromPoints(self_pos, new_target_pos, new_target_pos);
-							GetVectorAngles(new_target_pos, new_target_pos);
-							TeleportEntity(client, NULL_VECTOR, new_target_pos, NULL_VECTOR);
-							buttons |= IN_ATTACK2;
-							buttons |= IN_ATTACK;
-							return Plugin_Changed;
-						}
-					}
+					buttons |= IN_ATTACK2;
+					return Plugin_Changed;
 				}
-				// 被控的人在起身或者倒地状态，阻止冲锋
 				else if (Is_InGetUp_Or_Incapped(target))
 				{
 					buttons &= ~IN_ATTACK;
 					BlockCharge(client);
 					buttons |= IN_ATTACK2;
+				}
+				else
+				{
+					can_attack_pinned[client] = false;
 				}
 			}
 		}
@@ -212,12 +206,12 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 	{
 		if(GetEntPropEnt(specialInfected, Prop_Send, "m_pummelVictim") > 0 || GetEntPropEnt(specialInfected, Prop_Send, "m_carryVictim") > 0)
 			return Plugin_Continue;
-		float self_pos[3] = {0.0}, target_pos[3] = {0.0};
+		float self_pos[3] = {0.0};
 		GetClientEyePosition(specialInfected, self_pos);
 		FindRangedClients(specialInfected, min_dist, max_dist);
 		if (IsValidSurvivor(curTarget) && IsPlayerAlive(curTarget))
 		{
-			GetClientEyePosition(curTarget, target_pos);
+			// curTarget 先验为有效目标，获取自身体位后进行可见性与目标转换判断
 			for (int i = 0; i < ranged_index[specialInfected]; i++)
 			{
 				// 1. 范围内有人被控且自身血量大于限制血量，则先去对被控的人挥拳
@@ -232,24 +226,37 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 			}
 			if (!IsClientIncapped(curTarget) && !IsClientPinned(curTarget))
 			{
-				// 允许近战回避且目标正拿着近战武器且血量高于冲锋限制血量，随机获取一个没有拿着近战武器且可视的目标，转移目标
-				if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) && GetVectorDistance(self_pos, target_pos) >= g_hChargeDist.FloatValue && GetClientHealth(specialInfected) >= g_hChargerMeleeDamage.IntValue)
+				bool target_has_melee = g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget);
+				bool is_low_health = (GetClientHealth(specialInfected) < g_hChargerMeleeDamage.IntValue);
+				// 仅在自身血量较低且对方拿着近战时才尝试换目标或停止冲锋
+				if (target_has_melee && is_low_health)
 				{
 					int melee_num = 0;
 					Get_MeleeNum(melee_num, new_target);
-					if (Client_MeleeCheck(curTarget) && melee_num < survivor_num && IsValidSurvivor(new_target) && Player_IsVisible_To(specialInfected, new_target))
+					// 1. 优先尝试换到没有近战的可视目标
+					if (melee_num < survivor_num && IsValidSurvivor(new_target) && Player_IsVisible_To(specialInfected, new_target))
 					{
 						curTarget = new_target;
 						return Plugin_Changed;
 					}
-				}
-				// 不满足近战回避距离限制或血量要求的牛，阻止其冲锋，令其对手持近战的目标挥拳
-				else if (g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(curTarget) 
-					&& !IsInChargeDuration(specialInfected)
-					&& (GetVectorDistance(self_pos, target_pos) < g_hChargeDist.FloatValue 
-						|| GetClientHealth(specialInfected) <= g_hChargerMeleeDamage.IntValue))
-				{
-					BlockCharge(specialInfected);
+					// 2. 找一个没有正面盯着自己的目标（无论武器）
+					for (int i = 0; i < ranged_index[specialInfected]; i++)
+					{
+						int altTarget = ranged_client[specialInfected][i];
+						if (IsValidSurvivor(altTarget) && IsPlayerAlive(altTarget) && !IsClientIncapped(altTarget) && !IsClientPinned(altTarget)
+							&& !Is_Target_Watching_Attacker(specialInfected, altTarget, g_hAimOffset.IntValue))
+						{
+							curTarget = altTarget;
+							return Plugin_Changed;
+						}
+					}
+					// 3. 实在没人可换，直接撞最近的活动生还者
+					int fallbackTarget = GetClosetMobileSurvivor(specialInfected);
+					if (IsValidSurvivor(fallbackTarget))
+					{
+						curTarget = fallbackTarget;
+						return Plugin_Changed;
+					}
 				}
 
 				// 目标选择
