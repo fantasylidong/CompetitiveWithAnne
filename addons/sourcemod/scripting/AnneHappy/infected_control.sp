@@ -78,7 +78,6 @@
 #define GROUP_WEIGHT_COVERAGE     0.25
 #define GROUP_WEIGHT_VARIANCE     0.20
 #define GROUP_WEIGHT_RISK         0.35
-#define SCORE_LIMIT_AUTO         -9.9e29
 
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
@@ -118,7 +117,7 @@ static const char INFDN[10][] =
 {
     "common","smoker","boomer","hunter","spitter","jockey","charger","witch","tank","survivor"
 };
-// ? 添加：NavAreas 全局缓存
+// ✅ 添加：NavAreas 全局缓存
 static ArrayList g_AllNavAreasCache = null;
 static int g_NavAreasCacheCount = 0;
 // —— Nav 高度“核心”缓存 & 每桶高度范围 —— //
@@ -134,13 +133,6 @@ static char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
 // —— 生还者进度回退（最后一次成功统计） —— //
 static int   g_LastGoodSurPct     = -1;   // 0..100
 static float g_LastGoodSurPctTime = 0.0;  // game time
-static float g_BucketScoreLimit[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static float g_BucketScoreSum[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static float g_BucketScoreSumSq[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static float g_BucketScoreMinVal[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static float g_BucketScoreMaxVal[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static float g_BucketScoreLastUpdate[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
-static int   g_BucketScoreSamples[FLOW_BUCKETS][view_as<int>(SI_Charger) + 1];
 
 // =========================
 // 修改 TheNavAreas methodmap
@@ -150,13 +142,13 @@ methodmap TheNavAreas
     // 使用 left4dhooks 的 L4D_GetAllNavAreas 替代
     public int Count()
     {
-        EnsureNavAreasCache();  // ? 确保缓存存在
+        EnsureNavAreasCache();  // ✅ 确保缓存存在
         return g_NavAreasCacheCount;
     }
     
     public Address GetAreaByIndex(int i)
     {
-        EnsureNavAreasCache();  // ? 确保缓存存在
+        EnsureNavAreasCache();  // ✅ 确保缓存存在
         if (i < 0 || i >= g_NavAreasCacheCount)
             return Address_Null;
         return g_AllNavAreasCache.Get(i);
@@ -172,13 +164,13 @@ methodmap NavArea
         return view_as<Address>(this) == Address_Null;
     }
 
-    // ? 使用 L4D_FindRandomSpot 替代 SDK call
+    // ✅ 使用 L4D_FindRandomSpot 替代 SDK call
     public void GetRandomPoint(float outPos[3])
     {
         L4D_FindRandomSpot(view_as<int>(this), outPos);
     }
 
-    // ? 使用 L4D_GetNavArea_SpawnAttributes 替代 offset
+    // ✅ 使用 L4D_GetNavArea_SpawnAttributes 替代 offset
     property int SpawnAttributes
     {
         public get()
@@ -191,7 +183,7 @@ methodmap NavArea
         }
     }
 
-    // ? 使用 L4D2Direct_GetTerrorNavAreaFlow 替代 offset
+    // ✅ 使用 L4D2Direct_GetTerrorNavAreaFlow 替代 offset
     public float GetFlow()
     {
         return L4D2Direct_GetTerrorNavAreaFlow(view_as<Address>(this));
@@ -236,8 +228,6 @@ enum struct SpawnScoreDbg
     float dminEye;
     float ringEff;
     float slack;
-    float scoreLimit;
-    char  bucketWindows[96];
 
     int candBucket;
     int centerBucket;
@@ -278,8 +268,6 @@ enum struct CandidateScore
     float dminEye;
     float ringEff;
     float slack;
-    float scoreLimit;
-    char  bucketWindows[96];
 }
 
 enum struct GroupEvalResult
@@ -417,12 +405,6 @@ enum struct Config
     ConVar Score_w_flow;
     ConVar Score_w_disp;
     ConVar ScoreMinTotal;
-    ConVar ScoreDynamicEnable;
-    ConVar ScoreDynamicWindow;
-    ConVar ScoreDynamicSigma;
-    ConVar ScoreDynamicOutlierZ;
-    ConVar ScoreDynamicOutlierAbs;
-    ConVar ScoreDynamicMinSamples;
     // —— 距离甜点（可由 CVar 控制） —— //
     ConVar Score_dist_from_cvar;   // 1=使用 CVar 指定的甜点/宽度/斜率；0=按旧逻辑自动推导
     ConVar Score_sweet_dist;       // 6 个值：S B H P J C 对应的甜点距离（单位：uu）
@@ -450,12 +432,6 @@ enum struct Config
     float fPathCacheQuantize;
 
     float fScoreMinTotal;
-    bool  bScoreDynamic;
-    float fScoreDynamicWindow;
-    float fScoreDynamicSigma;
-    float fScoreDynamicOutlierZ;
-    float fScoreDynamicOutlierAbs;
-    int   iScoreDynamicMinSamples;
     float w_dist[7];
     float w_hght[7];
     float w_flow[7];
@@ -588,13 +564,7 @@ enum struct Config
         this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "0.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
-        this.ScoreDynamicEnable = CreateConVar("inf_score_dynamic_enable", "1", "是否启用动态分数阈值(0=固定,1=动态)", CVAR_FLAG, true, 0.0, true, 1.0);
-        this.ScoreDynamicWindow = CreateConVar("inf_score_dynamic_window", "1.5", "动态阈值缓存时长(秒)", CVAR_FLAG, true, 0.1, true, 5.0);
-        this.ScoreDynamicSigma  = CreateConVar("inf_score_dynamic_sigma", "0.75", "动态阈值 = 平均值 - σ * 系数", CVAR_FLAG, true, 0.0, true, 5.0);
-        this.ScoreDynamicOutlierZ = CreateConVar("inf_score_dynamic_outlier_z", "2.5", "离群过滤使用的Z值阈值(标准差倍数)", CVAR_FLAG, true, 0.0, true, 10.0);
-        this.ScoreDynamicOutlierAbs = CreateConVar("inf_score_dynamic_outlier_abs", "45.0", "标准差极小时使用的绝对偏差过滤阈值", CVAR_FLAG, true, 0.0, true, 200.0);
-        this.ScoreDynamicMinSamples = CreateConVar("inf_score_dynamic_minsamples", "4", "动态阈值生效所需的样本数", CVAR_FLAG, true, 1.0, true, 20.0);
+        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "40.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
 
         // —— 距离甜点 CVar ——
         // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
@@ -673,12 +643,6 @@ enum struct Config
         this.Score_w_flow.AddChangeHook(OnCfgChanged);
         this.Score_w_disp.AddChangeHook(OnCfgChanged);
         this.ScoreMinTotal.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicEnable.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicWindow.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicSigma.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicOutlierZ.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicOutlierAbs.AddChangeHook(OnCfgChanged);
-        this.ScoreDynamicMinSamples.AddChangeHook(OnCfgChanged);
         this.gCvarNavCacheEnable.AddChangeHook(OnCfgChanged);
 
         this.NavBucketMapInvalid.AddChangeHook(OnCfgChanged);
@@ -773,77 +737,6 @@ enum struct Config
         this.fScoreMinTotal        = this.ScoreMinTotal.FloatValue;
         if (this.fScoreMinTotal < -200.0) this.fScoreMinTotal = -200.0;
         if (this.fScoreMinTotal > 1000.0) this.fScoreMinTotal = 1000.0;
-        this.bScoreDynamic        = this.ScoreDynamicEnable.BoolValue;
-        this.fScoreDynamicWindow  = this.ScoreDynamicWindow.FloatValue;
-        if (this.fScoreDynamicWindow < 0.1) this.fScoreDynamicWindow = 0.1;
-        if (this.fScoreDynamicWindow > 5.0) this.fScoreDynamicWindow = 5.0;
-        this.fScoreDynamicSigma   = this.ScoreDynamicSigma.FloatValue;
-        if (this.fScoreDynamicSigma < 0.0) this.fScoreDynamicSigma = 0.0;
-        if (this.fScoreDynamicSigma > 5.0) this.fScoreDynamicSigma = 5.0;
-        this.fScoreDynamicOutlierZ = this.ScoreDynamicOutlierZ.FloatValue;
-        if (this.fScoreDynamicOutlierZ < 0.0) this.fScoreDynamicOutlierZ = 0.0;
-        if (this.fScoreDynamicOutlierZ > 10.0) this.fScoreDynamicOutlierZ = 10.0;
-        this.fScoreDynamicOutlierAbs = this.ScoreDynamicOutlierAbs.FloatValue;
-        if (this.fScoreDynamicOutlierAbs < 0.0) this.fScoreDynamicOutlierAbs = 0.0;
-        if (this.fScoreDynamicOutlierAbs > 400.0) this.fScoreDynamicOutlierAbs = 400.0;
-        this.iScoreDynamicMinSamples = this.ScoreDynamicMinSamples.IntValue;
-        if (this.iScoreDynamicMinSamples < 1) this.iScoreDynamicMinSamples = 1;
-        if (this.iScoreDynamicMinSamples > 20) this.iScoreDynamicMinSamples = 20;
-
-        static bool sInitDyn = false;
-        static float sLastScoreMinTotal = 0.0;
-        static bool sLastScoreDynamic = false;
-        static float sLastDynamicWindow = 0.0;
-        static float sLastDynamicSigma = 0.0;
-        static float sLastDynamicOutlierZ = 0.0;
-        static float sLastDynamicOutlierAbs = 0.0;
-        static int   sLastDynamicMinSamples = 0;
-        bool needResetBuckets = false;
-
-        if (!sInitDyn)
-        {
-            needResetBuckets = true;
-            sInitDyn = true;
-        }
-        if (this.fScoreMinTotal != sLastScoreMinTotal)
-        {
-            needResetBuckets = true;
-            sLastScoreMinTotal = this.fScoreMinTotal;
-        }
-        if (this.bScoreDynamic != sLastScoreDynamic)
-        {
-            needResetBuckets = true;
-            sLastScoreDynamic = this.bScoreDynamic;
-        }
-        if (this.fScoreDynamicWindow != sLastDynamicWindow)
-        {
-            needResetBuckets = true;
-            sLastDynamicWindow = this.fScoreDynamicWindow;
-        }
-        if (this.fScoreDynamicSigma != sLastDynamicSigma)
-        {
-            needResetBuckets = true;
-            sLastDynamicSigma = this.fScoreDynamicSigma;
-        }
-        if (this.fScoreDynamicOutlierZ != sLastDynamicOutlierZ)
-        {
-            needResetBuckets = true;
-            sLastDynamicOutlierZ = this.fScoreDynamicOutlierZ;
-        }
-        if (this.fScoreDynamicOutlierAbs != sLastDynamicOutlierAbs)
-        {
-            needResetBuckets = true;
-            sLastDynamicOutlierAbs = this.fScoreDynamicOutlierAbs;
-        }
-        if (this.iScoreDynamicMinSamples != sLastDynamicMinSamples)
-        {
-            needResetBuckets = true;
-            sLastDynamicMinSamples = this.iScoreDynamicMinSamples;
-        }
-        if (needResetBuckets)
-        {
-            BucketScore_ResetAll();
-        }
 
         // 死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
@@ -1183,7 +1076,6 @@ public void OnPluginStart()
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
     BuildNavIdIndexMap();
     BuildNavBuckets();        // ← 预建 FLOW 分桶
-    BucketScore_ResetAll();   // 初始化动态阈值缓存
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
@@ -1236,23 +1128,23 @@ public void OnMapEnd()
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
-    ClearNavBuckets();
-    BucketScore_ResetAll();   // 重置动态阈值缓存
-    g_BucketsReady = false;
     g_LastSpawnOkTime = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
+
+    ClearNavBuckets();
+    g_BucketsReady = false;
     for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     // [新增] —— 每波开始即清理 Path 缓存（波级作用域）
     ClearPathCache();
-    // ? 添加：清理 NavAreas 缓存
+    // ✅ 添加：清理 NavAreas 缓存
     ClearNavAreasCache();
 }
 // =========================
 // NavAreas 缓存管理
 // =========================
 
-// ? 新增：确保缓存已初始化
+// ✅ 新增：确保缓存已初始化
 stock void EnsureNavAreasCache()
 {
     if (g_AllNavAreasCache == null)
@@ -1264,7 +1156,7 @@ stock void EnsureNavAreasCache()
     }
 }
 
-// ? 新增：清理缓存
+// ✅ 新增：清理缓存
 stock void ClearNavAreasCache()
 {
     if (g_AllNavAreasCache != null)
@@ -1276,7 +1168,7 @@ stock void ClearNavAreasCache()
     }
 }
 
-// ? 新增：强制重建缓存
+// ✅ 新增：强制重建缓存
 stock void RebuildNavAreasCache()
 {
     ClearNavAreasCache();
@@ -1336,7 +1228,7 @@ public Action Cmd_StopSpawn(int client, int args)
     return Plugin_Handled;
 }
 
-// ? 修改：重建时也重建 NavAreas 缓存
+// ✅ 修改：重建时也重建 NavAreas 缓存
 public Action Cmd_RebuildNavCache(int client, int args)
 {
     // 强制重建 NavAreas 缓存
@@ -1346,7 +1238,7 @@ public Action Cmd_RebuildNavCache(int client, int args)
     ClearNavBuckets();
     g_BucketsReady = false;
     BuildNavBuckets();
-    BucketScore_ResetAll();   // 重建后刷新动态阈值缓存
+    
     ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache.");
     return Plugin_Handled;
 }
@@ -1672,7 +1564,7 @@ static int FindNavIndexByAddress(Address addr)
 {
     if (addr == Address_Null) return -1;
     
-    EnsureNavAreasCache();  // ? 确保缓存存在
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
     
     for (int i = 0; i < g_NavAreasCacheCount; i++)
     {
@@ -2494,7 +2386,7 @@ static void BuildNavIdIndexMap()
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     g_NavIdToIndex = new StringMap();
     
-    EnsureNavAreasCache();  // ? 确保缓存存在
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
     
     for (int i = 0; i < g_NavAreasCacheCount; i++)
     {
@@ -2581,40 +2473,13 @@ static void TryNormalSpawnOnce()
     float pos[3];
     int areaIdx = -1;
     float ring = gST.spawnDistCur;
-    float overrideMin = SCORE_LIMIT_AUTO;
-    float overrideMax = SCORE_LIMIT_AUTO;
-    float nextStartBase = ring;
-
-    float sweet, width, slope;
-    GetClassDistanceProfile(want, gCV.fSpawnMin, gCV.fSpawnMax, sweet, width, slope);
-    float sweetMin = sweet - width;
-    float sweetMax = sweet + width;
-    if (sweetMin < gCV.fSpawnMin) sweetMin = gCV.fSpawnMin;
-    if (sweetMax > gCV.fSpawnMax) sweetMax = gCV.fSpawnMax;
-    if (sweetMax - sweetMin > 5.0)
-    {
-        if (ring < sweetMin)
-            ring = sweetMin;
-        if (ring <= sweetMax)
-        {
-            overrideMin = sweetMin;
-            overrideMax = sweetMax;
-            if (ring > sweetMax)
-                ring = sweetMax;
-            nextStartBase = ClampFloat(sweet, sweetMin, sweetMax);
-        }
-    }
 
     float maxR = gCV.fSpawnMax;
     if (isSupport && SUPPORT_EXPAND_MAX < maxR)
         maxR = SUPPORT_EXPAND_MAX;
     // [ADD] 本地 best 调试包
     SpawnScoreDbg bestDbg;
-    bestDbg.bucketWindows[0] = '-';
-    bestDbg.bucketWindows[1] = '\0';
-    bestDbg.bucketWindows[0] = '-';
-    bestDbg.bucketWindows[1] = '\0';
-    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx, bestDbg, overrideMin, overrideMax);
+    bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx, bestDbg);
 
     if (ok && IsPosVisibleSDK(pos, false)) { ok = false; }
 
@@ -2642,12 +2507,12 @@ static void TryNormalSpawnOnce()
 
         BypassAndExecuteCommand("nb_assault");
 
-        float nextStart = nextStartBase * 0.7;
+        float nextStart = ring * 0.7;
         if (nextStart < gCV.fSpawnMin) nextStart = gCV.fSpawnMin;
         if (nextStart > gCV.fSpawnMax) nextStart = gCV.fSpawnMax;
         gST.spawnDistCur = nextStart;
 
-        Debug_Print("[SPAWN] success ring=%.1f -> nextStart=%.1f", nextStartBase, gST.spawnDistCur);
+        Debug_Print("[SPAWN] success ring=%.1f -> nextStart=%.1f", ring, gST.spawnDistCur);
         return;
     }
     else
@@ -3263,7 +3128,7 @@ static bool IsPosAheadOfHighest(float ref[3], int target = -1)
     return false;
 }
 
-// ? 新增：根据坐标查询其在分桶系统中的百分比
+// ✅ 新增：根据坐标查询其在分桶系统中的百分比
 stock int GetPositionBucketPercent(float pos[3])
 {
     // 1. 先找最近的 NavArea
@@ -3480,7 +3345,7 @@ float ComputeBadFlowHeightPenalty(float candZ, float refBestEyeZ)
     // candZ 相对眼睛高度（低为正）
     float delta = refBestEyeZ - candZ;
 
-    // 高于 眼睛+120u ? 不扣
+    // 高于 眼睛+120u ⇒ 不扣
     if (delta < -120.0)
         return 0.0;
 
@@ -3740,7 +3605,7 @@ stock bool TryGetLowestSurvivorFootZ(float &outMinZ)
 // =========================
 stock int GetNavIDByIndex(int idx)
 {
-    EnsureNavAreasCache();  // ? 确保缓存存在
+    EnsureNavAreasCache();  // ✅ 确保缓存存在
     
     if (idx < 0 || idx >= g_NavAreasCacheCount)
         return -1;
@@ -4093,13 +3958,6 @@ static int ClampInt(int v, int lo, int hi)
     return v;
 }
 
-static float ClampFloat(float v, float lo, float hi)
-{
-    if (v < lo) return lo;
-    if (v > hi) return hi;
-    return v;
-}
-
 /**
  * 生成“扫描桶顺序”（中心 s 起，前2后1推进；若前>后累计差>4，则两侧批量+1）
  * 例如：s, s+1, s+2, s-1, s+3, s+4, s-2, s+5, s+6, s-3, ...
@@ -4443,7 +4301,7 @@ static void BuildNavBuckets()
 }
 
 
-// ? 新增：获取所有生还者的最低脚位置（约第2850行）
+// ✅ 新增：获取所有生还者的最低脚位置（约第2850行）
 stock float GetLowestSurvivorFootZ()
 {
     float lowest = 999999.0;
@@ -4475,7 +4333,7 @@ stock void ShuffleArrayList(ArrayList L)
     }
 }
 
-// ? 修改：重建 Buckets 时确保缓存新鲜
+// ✅ 修改：重建 Buckets 时确保缓存新鲜
 static Action Timer_RebuildBuckets(Handle timer)
 {
     // 如果本局本图已经有可用缓存，就别动了
@@ -4921,8 +4779,7 @@ stock float PenLimitScale()
 }
 
 static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, bool teleportMode,
-                                   float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut,
-                                   float overrideMin = SCORE_LIMIT_AUTO, float overrideMax = SCORE_LIMIT_AUTO)
+                                   float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     const int TOPK = 12;
     if (!GetSurPosData()) { Debug_Print("[FIND FAIL] no survivor data"); return false; }
@@ -4980,58 +4837,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     float bestScore = -1.0e9;
     int   bestIdx   = -1;
     float bestPos[3];
-    int   bestCandBucket = -1;
     int acceptedHits = 0;
     int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0, cFilt_Score=0;
 
     bool  useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
     bool  firstFit   = gCV.bNavBucketFirstFit;
     float ffThresh   = ComputeFFThresholdForClass(zc);
-    bool  trackedBuckets = false;
-    int   trackedBucketMin = -1;
-    int   trackedBucketMax = -1;
-    int   trackedBucketCount = 0;
-    char  bucketWindowInfo[128];
-    bucketWindowInfo[0] = '-';
-    bucketWindowInfo[1] = '\0';
-    bool  bucketWindowInfoValid = false;
-
-    SpawnEvalContext ctx;
-    ctx.zc = zc;
-    ctx.targetSur = targetSur;
-    ctx.teleportMode = teleportMode;
-    ctx.searchRange = searchRange;
-    ctx.spawnMin = gCV.fSpawnMin;
-    ctx.spawnMax = gCV.fSpawnMax;
-    if (overrideMin != SCORE_LIMIT_AUTO)
-    {
-        if (overrideMin < gCV.fSpawnMin) overrideMin = gCV.fSpawnMin;
-        if (overrideMin > gCV.fSpawnMax) overrideMin = gCV.fSpawnMax;
-        ctx.spawnMin = overrideMin;
-    }
-    if (overrideMax != SCORE_LIMIT_AUTO)
-    {
-        if (overrideMax < ctx.spawnMin) overrideMax = ctx.spawnMin;
-        if (overrideMax > gCV.fSpawnMax) overrideMax = gCV.fSpawnMax;
-        ctx.spawnMax = overrideMax;
-        if (searchRange > overrideMax)
-            searchRange = overrideMax;
-    }
-    ctx.refEyeZ = refEyeZ;
-    ctx.allMaxEyeZ = allMaxZ;
-    ctx.allMinZ = allMinZ;
-    ctx.lowestFootZ = lowestFootZ;
-    ctx.center[0] = center[0];
-    ctx.center[1] = center[1];
-    ctx.center[2] = center[2];
-    ctx.sectors = sectors;
-    ctx.preferredSector = preferredSector;
-    ctx.centerBucket = centerBucket;
-    ctx.mapMaxFlowDist = fMapMaxFlowDist;
-    ctx.finaleArea = bFinaleArea;
-    ctx.now = now;
-    ctx.firstFit = firstFit;
-    ctx.ffThresh = ffThresh;
 
     SpawnScoreDbg bestDbg;
 
@@ -5060,18 +4871,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         }
         else
         {
-            char windowInfo[128];
-            windowInfo[0] = '\0';
-            bool haveWindowInfo = false;
-            trackedBuckets = true;
-            trackedBucketCount = candidateCount;
-            for (int ci = 0; ci < candidateCount; ci++)
-            {
-                int cb = candidateBuckets[ci];
-                if (trackedBucketMin == -1 || cb < trackedBucketMin) trackedBucketMin = cb;
-                if (trackedBucketMax == -1 || cb > trackedBucketMax) trackedBucketMax = cb;
-            }
-
             int windowStarts[FLOW_BUCKETS];
             int windowCounts[FLOW_BUCKETS];
             int windowDelta[FLOW_BUCKETS];
@@ -5139,24 +4938,28 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 }
             }
 
-            for (int wi = 0; wi < windowCount && wi < 4; wi++)
-            {
-                int idxWin = windowOrder[wi];
-                int start = windowStarts[idxWin];
-                int cnt = windowCounts[idxWin];
-                int quota = windowQuota[idxWin];
-                int firstBucket = candidateBuckets[start];
-                int lastBucket = candidateBuckets[start + cnt - 1];
-                char tmp[48];
-                Format(tmp, sizeof tmp, "%sW%d:%d[%d..%d]/q%d", (windowInfo[0] != '\0') ? " " : "", wi, cnt, firstBucket, lastBucket, quota);
-                StrCat(windowInfo, sizeof windowInfo, tmp);
-                haveWindowInfo = true;
-            }
-            if (haveWindowInfo)
-            {
-                strcopy(bucketWindowInfo, sizeof bucketWindowInfo, windowInfo);
-                bucketWindowInfoValid = true;
-            }
+            SpawnEvalContext ctx;
+            ctx.zc = zc;
+            ctx.targetSur = targetSur;
+            ctx.teleportMode = teleportMode;
+            ctx.searchRange = searchRange;
+            ctx.spawnMin = gCV.fSpawnMin;
+            ctx.spawnMax = gCV.fSpawnMax;
+            ctx.refEyeZ = refEyeZ;
+            ctx.allMaxEyeZ = allMaxZ;
+            ctx.allMinZ = allMinZ;
+            ctx.lowestFootZ = lowestFootZ;
+            ctx.center[0] = center[0];
+            ctx.center[1] = center[1];
+            ctx.center[2] = center[2];
+            ctx.sectors = sectors;
+            ctx.preferredSector = preferredSector;
+            ctx.centerBucket = centerBucket;
+            ctx.mapMaxFlowDist = fMapMaxFlowDist;
+            ctx.finaleArea = bFinaleArea;
+            ctx.now = now;
+            ctx.firstFit = firstFit;
+            ctx.ffThresh = ffThresh;
 
             FilterCounters accumCounters;
             ResetFilterCounters(accumCounters);
@@ -5255,13 +5058,12 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.extraPen = bestCandGlobal.extraPen;
                 bestDbg.candBucket = bestCandGlobal.candBucket;
                 bestDbg.centerBucket = bestCandGlobal.centerBucket;
-                bestDbg.deltaFlow = bestCandGlobal.deltaFlow;
+              	bestDbg.deltaFlow = bestCandGlobal.deltaFlow;
                 bestDbg.sector = bestCandGlobal.sector;
                 bestDbg.areaIdx = bestCandGlobal.areaIdx;
                 bestDbg.pos[0] = bestCandGlobal.pos[0];
                 bestDbg.pos[1] = bestCandGlobal.pos[1];
                 bestDbg.pos[2] = bestCandGlobal.pos[2];
-                bestDbg.scoreLimit = bestCandGlobal.scoreLimit;
                 bestDbg.groupScore = bestGroupRes.total;
                 bestDbg.groupPressure = bestGroupRes.pressure;
                 bestDbg.groupCoverage = bestGroupRes.coverage;
@@ -5269,10 +5071,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.groupRisk = bestGroupRes.risk;
                 bestDbg.groupSize = bestGroupRes.bucketCount;
                 bestDbg.groupOffset = bestGroupRes.startIndex;
-                if (bucketWindowInfoValid)
-                    strcopy(bestDbg.bucketWindows, sizeof bestDbg.bucketWindows, bucketWindowInfo);
-                else
-                    strcopy(bestDbg.bucketWindows, sizeof bestDbg.bucketWindows, "-");
             }
         }
     }
@@ -5344,8 +5142,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
             if (behindPenalty > 0.0)
                 totalScore -= behindPenalty;
 
-            float scoreLimit = BucketScore_EnsureLimit(ctx, candBucket);
-            if (totalScore < scoreLimit) { cFilt_Score++; continue; }
+            if (totalScore < gCV.fScoreMinTotal) { cFilt_Score++; continue; }
 
             float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
                                               : FloatMax(0.0, 40.0 - score_flow);
@@ -5361,11 +5158,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
                 dbgOut.risk = riskBase;
                 dbgOut.extraPen = behindPenalty;
-                dbgOut.scoreLimit = scoreLimit;
-                if (bucketWindowInfoValid)
-                    strcopy(dbgOut.bucketWindows, sizeof dbgOut.bucketWindows, bucketWindowInfo);
-                else
-                    strcopy(dbgOut.bucketWindows, sizeof dbgOut.bucketWindows, "-");
                 dbgOut.groupScore = 0.0;
                 dbgOut.groupPressure = 0.0;
                 dbgOut.groupCoverage = 0.0;
@@ -5383,7 +5175,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestScore = totalScore;
                 bestIdx   = ai;
                 bestPos   = p;
-                bestCandBucket = candBucket;
 
                 bestDbg.total = totalScore; bestDbg.dist = score_dist; bestDbg.hght = score_hght; bestDbg.flow = score_flow;
                 bestDbg.dispRaw = score_disp; bestDbg.dispScaled = dispScaled; bestDbg.penK = penK;
@@ -5392,7 +5183,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
                 bestDbg.risk = riskBase;
                 bestDbg.extraPen = behindPenalty;
-                bestDbg.scoreLimit = scoreLimit;
                 bestDbg.groupScore = 0.0;
                 bestDbg.groupPressure = 0.0;
                 bestDbg.groupCoverage = 0.0;
@@ -5400,58 +5190,22 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.groupRisk = 0.0;
                 bestDbg.groupSize = 0;
                 bestDbg.groupOffset = -1;
-                if (bucketWindowInfoValid)
-                    strcopy(bestDbg.bucketWindows, sizeof bestDbg.bucketWindows, bucketWindowInfo);
-                else
-                    strcopy(bestDbg.bucketWindows, sizeof bestDbg.bucketWindows, "-");
             }
         }
     }
 
     if (!found) {
-        char sweetMinStr[16], sweetMaxStr[16];
-        if (overrideMin != SCORE_LIMIT_AUTO)
-            Format(sweetMinStr, sizeof sweetMinStr, "%.1f", overrideMin);
-        else
-            strcopy(sweetMinStr, sizeof sweetMinStr, "-");
-        if (overrideMax != SCORE_LIMIT_AUTO)
-            Format(sweetMaxStr, sizeof sweetMaxStr, "%.1f", overrideMax);
-        else
-            strcopy(sweetMaxStr, sizeof sweetMaxStr, "-");
-
-        char bucketInfo[32];
-        if (trackedBuckets)
-            Format(bucketInfo, sizeof bucketInfo, "%d[%d..%d]", trackedBucketCount, trackedBucketMin, trackedBucketMax);
-        else
-            strcopy(bucketInfo, sizeof bucketInfo, "-");
-
-        char windowInfoOut[128];
-        if (bucketWindowInfoValid)
-            strcopy(windowInfoOut, sizeof windowInfoOut, bucketWindowInfo);
-        else
-            strcopy(windowInfoOut, sizeof windowInfoOut, "-");
-
-        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d | sweetWin=%s[%s..%s] centerBucket=%d buckets=%s windows=%s",
-                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score,
-                    (overrideMin != SCORE_LIMIT_AUTO) ? "Y" : "N",
-                    sweetMinStr, sweetMaxStr,
-                    centerBucket, bucketInfo, windowInfoOut);
+        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
+                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
         return false;
     }
 
-    float finalLimit = BucketScore_EnsureLimit(ctx, bestCandBucket);
-    if (bestScore < finalLimit)
+    if (bestScore < gCV.fScoreMinTotal)
     {
         cFilt_Score++;
-        char windowInfoOut[128];
-        if (bucketWindowInfoValid)
-            strcopy(windowInfoOut, sizeof windowInfoOut, bucketWindowInfo);
-        else
-            strcopy(windowInfoOut, sizeof windowInfoOut, "-");
-        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < limit=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d | windows=%s",
-                    searchRange, bestScore, finalLimit,
-                    cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score,
-                    windowInfoOut);
+        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < min=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
+                    searchRange, bestScore, gCV.fScoreMinTotal,
+                    cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
         return false;
     }
 
@@ -5678,7 +5432,7 @@ static bool TryLoadBucketsFromCache()
     if (!StrEqual(map, mapCur))
     { delete kv; return false; }
 
-    // ? 使用缓存
+    // ✅ 使用缓存
     EnsureNavAreasCache();
     int currentAreaCount = g_NavAreasCacheCount;
 
@@ -5791,7 +5545,7 @@ static void SaveBucketsToCache()
     char map[64]; GetCurrentMap(map, sizeof map);
     kv.SetString("map", map);
 
-    // ? 使用缓存
+    // ✅ 使用缓存
     EnsureNavAreasCache();
     int areaCount = g_NavAreasCacheCount;
 
@@ -5971,153 +5725,8 @@ static void FinalizeGroupMetrics(GroupEvalResult group, int sectorsTotal,
                 - GROUP_WEIGHT_RISK * group.risk;
 }
 
-// =========================
-// 动态分数阈值缓存 (flow 桶)
-// =========================
-static void BucketScore_Reset(int bucket)
-{
-    if (bucket < 0 || bucket >= FLOW_BUCKETS) return;
-    for (int zc = 0; zc <= view_as<int>(SI_Charger); zc++)
-    {
-        g_BucketScoreLimit[bucket][zc] = gCV.fScoreMinTotal;
-        g_BucketScoreSum[bucket][zc] = 0.0;
-        g_BucketScoreSumSq[bucket][zc] = 0.0;
-        g_BucketScoreMinVal[bucket][zc] = 0.0;
-        g_BucketScoreMaxVal[bucket][zc] = 0.0;
-        g_BucketScoreLastUpdate[bucket][zc] = 0.0;
-        g_BucketScoreSamples[bucket][zc] = 0;
-    }
-}
-
-static void BucketScore_ResetAll()
-{
-    for (int i = 0; i < FLOW_BUCKETS; i++)
-    {
-        BucketScore_Reset(i);
-    }
-}
-
-static float BucketScore_RebuildLimit(const SpawnEvalContext ctx, int bucket)
-{
-    if (!gCV.bScoreDynamic)
-        return gCV.fScoreMinTotal;
-    if (bucket < 0 || bucket >= FLOW_BUCKETS)
-        return gCV.fScoreMinTotal;
-    if (g_FlowBuckets[bucket] == null || g_FlowBuckets[bucket].Length <= 0)
-    {
-        BucketScore_Reset(bucket);
-        g_BucketScoreLastUpdate[bucket][ctx.zc] = GetEngineTime();
-        return gCV.fScoreMinTotal;
-    }
-
-    int len = g_FlowBuckets[bucket].Length;
-    ArrayList values = new ArrayList();
-
-    for (int ri = 0; ri < len; ri++)
-    {
-        int areaIdx = g_FlowBuckets[bucket].Get(ri);
-        CandidateScore tmp;
-        FilterCounters dummy;
-        ResetFilterCounters(dummy);
-        if (!EvaluateAreaCandidate(ctx, bucket, areaIdx, tmp, dummy, false))
-            continue;
-
-        values.Push(tmp.total);
-    }
-
-    int count = values.Length;
-    if (count <= 0)
-    {
-        delete values;
-        BucketScore_Reset(bucket);
-        g_BucketScoreLastUpdate[bucket][ctx.zc] = GetEngineTime();
-        return gCV.fScoreMinTotal;
-    }
-
-    values.Sort(Sort_Ascending, Sort_Float);
-
-    float sum = 0.0;
-    float sumSq = 0.0;
-    for (int i = 0; i < count; i++)
-    {
-        float v = values.Get(i);
-        sum += v;
-        sumSq += v * v;
-    }
-
-    int trim = RoundToNearest(float(count) * 0.05);
-    int maxTrim = (count - 1) / 2;
-    if (trim > maxTrim) trim = maxTrim;
-
-    int startIdx = trim;
-    int endIdx = count - trim;
-    float trimmedSum = 0.0;
-    float trimmedSumSq = 0.0;
-    int trimmedCount = endIdx - startIdx;
-    if (trimmedCount > 0)
-    {
-        for (int i = startIdx; i < endIdx; i++)
-        {
-            float v = values.Get(i);
-            trimmedSum += v;
-            trimmedSumSq += v * v;
-        }
-    }
-    else
-    {
-        trimmedSum = sum;
-        trimmedSumSq = sumSq;
-        trimmedCount = count;
-    }
-
-    float baseAvg = trimmedSum / float(trimmedCount);
-    float variance = 0.0;
-    if (trimmedCount > 1)
-    {
-        float denom = float(trimmedCount - 1);
-        variance = (trimmedSumSq - float(trimmedCount) * baseAvg * baseAvg) / denom;
-        if (variance < 0.0) variance = 0.0;
-    }
-
-    float std = (variance > 0.0) ? SquareRoot(variance) : 0.0;
-    float dynLimit = baseAvg - std * gCV.fScoreDynamicSigma;
-    if (dynLimit > baseAvg) dynLimit = baseAvg;
-    if (dynLimit < gCV.fScoreMinTotal) dynLimit = gCV.fScoreMinTotal;
-
-    float effectiveMin = values.Get(startIdx < count ? startIdx : 0);
-    float effectiveMax = values.Get((endIdx - 1) >= 0 ? (endIdx - 1) : (count - 1));
-
-    delete values;
-
-    g_BucketScoreSum[bucket][ctx.zc] = trimmedSum;
-    g_BucketScoreSumSq[bucket][ctx.zc] = trimmedSumSq;
-    g_BucketScoreMinVal[bucket][ctx.zc] = effectiveMin;
-    g_BucketScoreMaxVal[bucket][ctx.zc] = effectiveMax;
-    g_BucketScoreSamples[bucket][ctx.zc] = trimmedCount;
-    g_BucketScoreLimit[bucket][ctx.zc] = dynLimit;
-    g_BucketScoreLastUpdate[bucket][ctx.zc] = GetEngineTime();
-    return dynLimit;
-}
-
-static float BucketScore_EnsureLimit(const SpawnEvalContext ctx, int bucket)
-{
-    if (!gCV.bScoreDynamic)
-        return gCV.fScoreMinTotal;
-    if (bucket < 0 || bucket >= FLOW_BUCKETS)
-        return gCV.fScoreMinTotal;
-
-    float now = GetEngineTime();
-    if (g_BucketScoreSamples[bucket][ctx.zc] <= 0 || now - g_BucketScoreLastUpdate[bucket][ctx.zc] > gCV.fScoreDynamicWindow)
-        return BucketScore_RebuildLimit(ctx, bucket);
-
-    float limit = g_BucketScoreLimit[bucket][ctx.zc];
-    if (limit < gCV.fScoreMinTotal)
-        limit = gCV.fScoreMinTotal;
-    return limit;
-}
 static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int areaIdx,
-                                  CandidateScore out, FilterCounters cnt,
-                                  bool applyLimit = true, float limitValue = SCORE_LIMIT_AUTO)
+                                  CandidateScore out, FilterCounters cnt)
 {
     if (IsNavOnCooldown(areaIdx, ctx.now)) { cnt.cd++; return false; }
 
@@ -6199,16 +5808,7 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     if (behindPenalty > 0.0)
         totalScore -= behindPenalty;
 
-    float activeLimit = gCV.fScoreMinTotal;
-    if (applyLimit)
-    {
-        if (limitValue == SCORE_LIMIT_AUTO)
-            activeLimit = BucketScore_EnsureLimit(ctx, candBucket);
-        else
-            activeLimit = limitValue;
-    }
-
-    if (applyLimit && totalScore < activeLimit)
+    if (totalScore < gCV.fScoreMinTotal)
     {
         cnt.score++;
         return false;
@@ -6241,9 +5841,6 @@ static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int ar
     cand.slack = slack;
     cand.total = totalScore;
     cand.extraPen = behindPenalty;
-    cand.scoreLimit = applyLimit ? activeLimit : gCV.fScoreMinTotal;
-    cand.bucketWindows[0] = '-';
-    cand.bucketWindows[1] = '\0';
 
     out = cand;
     return true;
@@ -6280,7 +5877,6 @@ static bool EvaluateGroupBuckets(const SpawnEvalContext ctx, const int[] buckets
         if (bucket < 0 || bucket > 100) continue;
         if (g_FlowBuckets[bucket] == null) continue;
 
-        float bucketLimit = BucketScore_EnsureLimit(ctx, bucket);
         int len = g_FlowBuckets[bucket].Length;
         for (int ri = 0; ri < len && group.acceptedHits < maxHits; ri++)
         {
@@ -6289,7 +5885,7 @@ static bool EvaluateGroupBuckets(const SpawnEvalContext ctx, const int[] buckets
             CandidateScore cand;
             FilterCounters localCnt;
             ResetFilterCounters(localCnt);
-            if (!EvaluateAreaCandidate(ctx, bucket, areaIdx, cand, localCnt, true, bucketLimit))
+            if (!EvaluateAreaCandidate(ctx, bucket, areaIdx, cand, localCnt))
             {
                 MergeFilterCounters(accum, localCnt);
                 continue;
@@ -6355,29 +5951,20 @@ static bool EvaluateGroupBuckets(const SpawnEvalContext ctx, const int[] buckets
 static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg) 
 {
     if (gCV.iDebugMode <= 0) return;
-    float limit = dbg.scoreLimit;
-    if (limit <= 0.0) limit = gCV.fScoreMinTotal;
-    float limitDelta = dbg.total - limit;
     
-    // ? 计算真实位置关系
+    // ✅ 计算真实位置关系
     int candReal = GetPositionBucketPercent(dbg.pos);
     int surReal = -1;
     int fb = GetHighestFlowSurvivorSafe();
     TryGetClientFlowPercentSafe(fb, surReal);
-    char bucketWinOut[128];
-    if (dbg.bucketWindows[0] != '\0' && dbg.bucketWindows[0] != '-')
-        strcopy(bucketWinOut, sizeof bucketWinOut, dbg.bucketWindows);
-    else
-        strcopy(bucketWinOut, sizeof bucketWinOut, "-");
     
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f lim=%.1f (d=%.1f) | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) risk=%.1f extra=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | GRP=%.1f(P=%.1f C=%.1f V=%.1f R=%.1f size=%d off=%d) | BW=%s | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) risk=%.1f extra=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | GRP=%.1f(P=%.1f C=%.1f V=%.1f R=%.1f size=%d off=%d) | REAL: cand=%d%% sur=%d%% delta=%d%%",
         INFDN[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, limit, limitDelta, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.risk, dbg.extraPen,
+        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.risk, dbg.extraPen,
         dbg.dminEye, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         dbg.groupScore, dbg.groupPressure, dbg.groupCoverage, dbg.groupVariance, dbg.groupRisk, dbg.groupSize, dbg.groupOffset,
-        bucketWinOut,
-        candReal, surReal, candReal - surReal);  // ? 真实位置关系
+        candReal, surReal, candReal - surReal);  // ✅ 真实位置关系
 }
 // --- pause
 public void OnPause()
@@ -6406,11 +5993,3 @@ stock int GetSepMax()
     if (cap > 20) cap = 20;       // 上限保护（可按需调大）
     return cap;
 }
-
-
-
-
-
-
-
-
