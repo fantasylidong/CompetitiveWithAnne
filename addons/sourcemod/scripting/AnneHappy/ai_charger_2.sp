@@ -21,7 +21,7 @@ public Plugin myinfo =
 }
 
 // ConVars
-ConVar g_hAllowBhop, g_hBhopSpeed, g_hChargeDist, g_hExtraTargetDist, g_hAimOffset, g_hChargerTarget, g_hAllowMeleeAvoid, g_hChargerMeleeDamage, g_hChargeInterval;
+ConVar g_hAllowBhop, g_hBhopSpeed, g_hChargeDist, g_hExtraTargetDist, g_hAimOffset, g_hChargerTarget, g_hAllowMeleeAvoid, g_hChargerMeleeDamage, g_hChargeInterval, g_hChargeHeightDiff;
 // Float
 float
 	charge_interval[MAXPLAYERS + 1] = {0.0},
@@ -43,6 +43,7 @@ public void OnPluginStart()
 	g_hAllowMeleeAvoid = CreateConVar("ai_ChargerMeleeAvoid", "1", "是否开启 Charger 近战回避", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hChargerMeleeDamage = CreateConVar("ai_ChargerMeleeDamage", "350", "Charger 血量小于这个值，将不会直接冲锋拿着近战的生还者", CVAR_FLAG, true, 0.0);
 	g_hChargerTarget = CreateConVar("ai_ChargerTarget", "1", "Charger目标选择：1=自然目标选择，2=优先取最近目标，3=优先撞人多处", CVAR_FLAG, true, 1.0, true, 2.0);
+	g_hChargeHeightDiff = CreateConVar("ai_ChargerChargeHeightDiff", "80.0", "允许直接冲锋时目标高出自身的最大高度差（小于等于 0 关闭检测）", CVAR_FLAG);
 	g_hChargeInterval = FindConVar("z_charge_interval");
 	g_hExtraTargetDist.AddChangeHook(extraTargetDistChangeHandler);
 	// HookEvents
@@ -129,7 +130,17 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				else if (Is_Target_Watching_Attacker(client, target, g_hAimOffset.IntValue) && !Is_InGetUp_Or_Incapped(target) && GetEntProp(ability, Prop_Send, "m_isCharging") != 1 && IsGrounded(client))
 				{
 					bool targetHasMelee = g_hAllowMeleeAvoid.BoolValue && Client_MeleeCheck(target);
-					if (!targetHasMelee || GetClientHealth(client) >= g_hChargerMeleeDamage.IntValue)
+					bool allowHeightCharge = true;
+					float heightLimit = g_hChargeHeightDiff != null ? g_hChargeHeightDiff.FloatValue : 0.0;
+					if (heightLimit > 0.0)
+					{
+						GetClientAbsOrigin(target, target_pos);
+						if ((target_pos[2] - self_pos[2]) > heightLimit)
+						{
+							allowHeightCharge = false;
+						}
+					}
+					if (allowHeightCharge && (!targetHasMelee || GetClientHealth(client) >= g_hChargerMeleeDamage.IntValue))
 					{
 						SetCharge(client);
 						buttons |= IN_ATTACK2;
