@@ -73,25 +73,19 @@
 #define SUPPORT_SPAWN_DELAY_SECS  1.0
 #define SUPPORT_NEED_KILLERS      1
 
-#define GROUP_TOP_SCORES          4
-#define GROUP_WEIGHT_PRESSURE     0.55
-#define GROUP_WEIGHT_COVERAGE     0.25
-#define GROUP_WEIGHT_VARIANCE     0.20
-#define GROUP_WEIGHT_RISK         0.35
-
 // —— 分散度四件套参数 —— //
 #define PI                        3.1415926535
 #define SEP_TTL                   3.0    // 最近刷点保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                100.0
+#define SEP_RADIUS                80.0
 #define NAV_CD_SECS               0.5
-#define SECTORS_BASE              5       // 基准
+#define SECTORS_BASE              6       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           3       // 动态下限
 // 可调参数（想热调也能做成 CVar，这里先给常量）
 #define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
-#define PEN_LIMIT_SCALE_LO        0.60   // L=20 时：正向惩罚明显减弱
+#define PEN_LIMIT_SCALE_LO        0.50   // L=20 时：正向惩罚明显减弱
 #define PEN_LIMIT_MINL            1
 #define PEN_LIMIT_MAXL            16
 
@@ -100,15 +94,16 @@ static StringMap g_PathCacheRes = null;  // key -> int(0/1)
 
 #define PATH_NO_BUILD_PENALTY     1999.0
 
-// === Dispersion scoring (base values before权重) ===
-#define DISP_SCORE_PREF          60.0
-#define DISP_SCORE_RECENT0      -40.0
-#define DISP_SCORE_RECENT1      -30.0
-#define DISP_SCORE_OTHER         40.0
+// === Dispersion tuning (penalties at BASE=4) ===
+#define SECTOR_PREF_BONUS_BASE   -8.0
+#define SECTOR_OFF_PENALTY_BASE   4.0
+#define RECENT_PENALTY_0_BASE     3.6
+#define RECENT_PENALTY_1_BASE     2.4
+#define RECENT_PENALTY_2_BASE     2.0
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2025.11.03"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2025.10.26"  // 和插件版号保持同步
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -222,8 +217,6 @@ enum struct SpawnScoreDbg
     float dispRaw;
     float dispScaled;
     float penK;
-    float risk;
-    float extraPen;
 
     float dminEye;
     float ringEff;
@@ -232,92 +225,10 @@ enum struct SpawnScoreDbg
     int candBucket;
     int centerBucket;
     int deltaFlow;
-   int sector;
+    int sector;
     int areaIdx;
 
     float pos[3];
-
-    float groupScore;
-    float groupPressure;
-    float groupCoverage;
-    float groupVariance;
-    float groupRisk;
-    int   groupSize;
-    int   groupOffset;
-}
-
-enum struct CandidateScore
-{
-    int   valid;
-    int   zc;
-    int   candBucket;
-    int   centerBucket;
-    int   deltaFlow;
-    int   sector;
-    int   areaIdx;
-    float pos[3];
-    float total;
-    float dist;
-    float hght;
-    float flow;
-    float dispRaw;
-    float dispScaled;
-    float penK;
-    float risk;
-    float extraPen;
-    float dminEye;
-    float ringEff;
-    float slack;
-}
-
-enum struct GroupEvalResult
-{
-    float total;
-    float pressure;
-    float coverage;
-    float variance;
-    float risk;
-    int   bucketCount;
-    int   startIndex;
-    int   acceptedHits;
-    int   candidateCount;
-}
-
-enum struct FilterCounters
-{
-    int cd;
-    int flag;
-    int flow;
-    int dist;
-    int sep;
-    int stuck;
-    int vis;
-    int path;
-    int pos;
-    int score;
-}
-
-enum struct SpawnEvalContext
-{
-    int   zc;
-    int   targetSur;
-    bool  teleportMode;
-    float searchRange;
-    float spawnMin;
-    float spawnMax;
-    float refEyeZ;
-    float allMaxEyeZ;
-    float allMinZ;
-    float lowestFootZ;
-    float center[3];
-    int   sectors;
-    int   preferredSector;
-    int   centerBucket;
-    float mapMaxFlowDist;
-    bool  finaleArea;
-    float now;
-    bool  firstFit;
-    float ffThresh;
 }
 
 
@@ -370,10 +281,6 @@ enum struct Config
     ConVar NavBucketFirstFit;     // 找到第一个合格点就返回
     ConVar NavBucketIncludeCtr;   // 是否包含中心桶 s
 
-    // —— 桶组评分 —— //
-    ConVar BucketGroupSize;       // 参与评分的桶窗口数量上限
-    ConVar BucketRingStep;        // 桶偏移带来的额外距离步进
-
     // —— 新增：死亡CD（两档） —— //
     ConVar DeathCDKiller;        
     ConVar DeathCDSupport;       
@@ -381,9 +288,6 @@ enum struct Config
     // —— 新增：死亡CD放宽的“双保险” —— //
     ConVar DeathCDBypassAfter;   
     ConVar DeathCDUnderfill;     
-    ConVar SupportUnlockKillers;
-    ConVar SupportUnlockRatio;
-    ConVar SupportUnlockGrace;
 
     ConVar ZSmokerLimit;
     ConVar ZBoomerLimit;
@@ -393,6 +297,10 @@ enum struct Config
     ConVar ZChargerLimit;
     ConVar TeleportSpawnGrace;   // 新刷出来后多少秒内不允许传送
     ConVar TeleportRunnerFast;   // 跑男时的快速阈值（秒），最低也要有个门槛
+    // —— 支援特感解锁 —— //
+    ConVar SupportUnlockKillers;
+    ConVar SupportUnlockRatio;
+    ConVar SupportUnlockGrace;
     // Config 字段（在 enum struct Config 里补充）
     ConVar NavBucketMapInvalid;        // 将坏flow的NavArea映射到就近正常桶
     ConVar NavBucketAssignRadius;      // 可选：就近半径上限(0=不限)
@@ -404,17 +312,13 @@ enum struct Config
     ConVar Score_w_hght;
     ConVar Score_w_flow;
     ConVar Score_w_disp;
-    ConVar ScoreMinTotal;
-    // —— 距离甜点（可由 CVar 控制） —— //
-    ConVar Score_dist_from_cvar;   // 1=使用 CVar 指定的甜点/宽度/斜率；0=按旧逻辑自动推导
-    ConVar Score_sweet_dist;       // 6 个值：S B H P J C 对应的甜点距离（单位：uu）
-    ConVar Score_sweet_width;      // 6 个值：围绕甜点的“容忍宽度”（越大曲线越平）
-    ConVar Score_sweet_slope;      // 6 个值：曲线陡峭程度（>1 更挑剔，<1 更宽松）
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
     // [ADD] —— 轻度惩罚 badflow：仅扣 Flow 分项一点点分数（0 关闭）
     ConVar FlowBadPenaltyPoints;
+    ConVar SpawnScoreFloor;      // 总分下限
+    ConVar FlowBucketShare;      // Flow 桶占比上限
     // === 可视射线控制 ===
     ConVar VisEyeRayMode;        // 0=仅中线；1=中+左+右；2=自动：>4只中线，<=4三线
     int    iVisRayMode;
@@ -431,21 +335,19 @@ enum struct Config
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
 
-    float fScoreMinTotal;
     float w_dist[7];
     float w_hght[7];
     float w_flow[7];
-    float w_disp[7];  
-    float s_dist[7];               // 1..6 索引：按 SIClass 顺序
-    float s_width[7];
-    float s_slope[7];
-    bool  bDistFromCvar;
+    float w_disp[7];
     bool  bNavCacheEnable;
 
     bool  bNavBucketMapInvalid;
     float fNavBucketAssignRadius;
     float  fTeleportSpawnGrace;
     float  fTeleportRunnerFast;
+    int   iSupportUnlockKillers;
+    float fSupportUnlockRatio;
+    float fSupportUnlockGrace;
 
     float fSpawnMin;
     float fSpawnMax;
@@ -475,16 +377,13 @@ enum struct Config
     bool  bNavBucketFirstFit;
     bool  bNavBucketIncludeCtr;
 
-    int   iBucketGroupSize;
-    float fBucketRingStep;
-
     float fDeathCDKiller;
     float fDeathCDSupport;
     float fDeathCDBypassAfter;
     float fDeathCDUnderfill;
-    int   iSupportUnlockKillers;
-    float fSupportUnlockRatio;
-    float fSupportUnlockGrace;
+    float fSpawnScoreFloor;
+    float fBucketSpawnRatio;
+    int   iBucketMaxPerFlow;
 
     void Create()
     {
@@ -518,12 +417,6 @@ enum struct Config
         this.NavBucketFirstFit   = CreateConVar("inf_NavBucketFirstFit", "0",  "找到第一个合格点就返回(1=是,0=否)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.NavBucketIncludeCtr = CreateConVar("inf_NavBucketIncludeCenter", "1", "是否把中心桶 s 也加入扫描序列(1=是,0=否)", CVAR_FLAG, true, 0.0, true, 1.0);
 
-        // —— 桶组评分 —— //
-        this.BucketGroupSize      = CreateConVar("inf_BucketGroupSize", "4",
-            "用于限制参与评分的桶窗口数量(默认4,1=仅主窗口)", CVAR_FLAG, true, 1.0, true, 12.0);
-        this.BucketRingStep       = CreateConVar("inf_BucketRingStep", "120.0",
-            "每相差1个桶允许增加的额外距离步进(世界单位)", CVAR_FLAG, true, 0.0, true, 1000.0);
-
         // —— 死亡CD —— //
         this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "1.0","同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
         this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0","同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
@@ -531,19 +424,19 @@ enum struct Config
         // —— 双保险 —— //
         this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.5","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
         this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.TeleportSpawnGrace = CreateConVar("inf_TeleportSpawnGrace", "2.5",
+            "特感生成后多少秒内禁止传送", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
+            "跑男时的快速传送阈值（秒），仍需达到该不可见时长才可传送", CVAR_FLAG, true, 0.0, true, 10.0);
         this.SupportUnlockKillers = CreateConVar("inf_support_unlock_killers", "-1",
             "支援特感(Smoker/Spitter/Boomer)解锁所需的优先特感(Jockey/Hunter/Charger)数量；<0 表示按 inf_support_unlock_ratio 自动计算，0 关闭限制。",
             CVAR_FLAG, true, -1.0, true, 12.0);
-        this.SupportUnlockRatio = CreateConVar("inf_support_unlock_ratio", "0.3333",
+        this.SupportUnlockRatio = CreateConVar("inf_support_unlock_ratio", "0.4",
             "当 inf_support_unlock_killers < 0 时，所需优先特感 = RoundToFloor(limit * ratio)。0 关闭比例限制。",
             CVAR_FLAG, true, 0.0, true, 1.0);
         this.SupportUnlockGrace = CreateConVar("inf_support_unlock_grace", "1.0",
             "当优先类不足时等待多少秒后自动放开支援限制；0 = 永不自动放开。",
             CVAR_FLAG, true, 0.0, true, 30.0);
-        this.TeleportSpawnGrace = CreateConVar("inf_TeleportSpawnGrace", "2.5",
-            "特感生成后多少秒内禁止传送", CVAR_FLAG, true, 0.0, true, 10.0);
-        this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
-            "跑男时的快速传送阈值（秒），仍需达到该不可见时长才可传送", CVAR_FLAG, true, 0.0, true, 10.0);
         // Create() 里，紧跟“Nav 分桶”相关 CVar 后面加入：
         this.NavBucketMapInvalid   = CreateConVar("inf_NavBucketMapInvalid", "1",
             "Map invalid-flow NavAreas to nearest valid-flow bucket (0=off,1=on)", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -555,49 +448,10 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0);
         // [新增] 为新评分系统创建CVar
         // [ADD] Create CVars for the new scoring system
-        // [调参指导]
-        // 1) inf_score_w_dist ↑：整体更看“离甜点有多近”，曲线越尖时（slope大）会进一步放大这个效果。
-        // 2) inf_score_w_hght ↑：更偏爱“高打低/上视野位”，Smoker/Spitter 在高点更容易出点。
-        // 3) inf_score_w_flow ↑：更偏爱“围绕推进线两侧”的点，Charger/Spitter 提高该值会更像“冲线”封口。
-        // 4) inf_score_w_disp ↑：更偏爱“分散扇区/不叠点”，Boomer 适合高分散，避免团灭节奏被对面连续清理。
-        this.Score_w_dist  = CreateConVar("inf_score_w_dist",  "1.20 0.90 1.05 0.95 1.35 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_hght  = CreateConVar("inf_score_w_hght",  "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_flow  = CreateConVar("inf_score_w_flow",  "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_disp  = CreateConVar("inf_score_w_disp",  "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.ScoreMinTotal = CreateConVar("inf_score_min_total", "40.0", "刷点最低总分要求(低于此值视为无效)", CVAR_FLAG, true, -200.0, true, 1000.0);
-
-        // —— 距离甜点 CVar ——
-        // 说明：值顺序均为 S B H P J C（Smoker/Boomer/Hunter/Spitter/Jockey/Charger）
-        // 距离带建议：近=250–500，中近=400–650，中=500–800，中远=600–1000，远=>1000
-        // [甜点三件套]
-        // - inf_score_sweet_dist：甜点位置（职业“舒适距离”）。
-        // - inf_score_sweet_width：容忍半宽（越大越宽容）。
-        // - inf_score_sweet_slope：曲线陡峭度；>1 更挑剔，<1 更宽松。
-        this.Score_dist_from_cvar = CreateConVar(
-            "inf_score_dist_from_cvar", "1",
-            "1=使用 CVar 指定的甜点/宽度/斜率；0=使用内建自适应规则",
-            CVAR_FLAG, true, 0.0, true, 1.0);
-
-        // 结合我们讨论：
-        // S(中远、偏紧、稍陡)  B(中近、适中、适中)  H(中近高、适中、适中)
-        // P(中等、适中、稍陡)  J(中近、适中、不陡)  C(近、适中、不陡)
-        this.Score_sweet_dist  = CreateConVar(
-            "inf_score_sweet_dist",  "780 540 540 660 500 420",
-            "距离甜点（单位uu）：S B H P J C", CVAR_FLAG);
-
-        this.Score_sweet_width = CreateConVar(
-            "inf_score_sweet_width", "320 520 460 520 540 560",
-            "甜点容忍宽度（单位uu，越大越宽容）：S B H P J C", CVAR_FLAG);
-
-        this.Score_sweet_slope = CreateConVar(
-            "inf_score_sweet_slope", "1.35 0.95 1.15 1.30 1.00 1.05",
-            "曲线陡峭度（>1 更挑剔；<1 更宽松）：S B H P J C", CVAR_FLAG);
-
-        // 变化回调
-        this.Score_dist_from_cvar.AddChangeHook(OnCfgChanged);
-        this.Score_sweet_dist.AddChangeHook(OnCfgChanged);
-        this.Score_sweet_width.AddChangeHook(OnCfgChanged);
-        this.Score_sweet_slope.AddChangeHook(OnCfgChanged);
+        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.35 1.10 1.20 1.05 1.20 1.25", "距离分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.10 1.60 1.40 0.60 0.60", "高度分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.40 1.00 1.20 1.35 1.10 1.20", "流程分权重(S,H,P,B,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.25 1.05 1.15 1.30 0.90 0.80", "分散度分权重(S,H,P,B,J,C)", CVAR_FLAG);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -617,6 +471,16 @@ enum struct Config
             "0=center only; 1=center+left+right; 2=auto (if alive survivors > 4 -> center only)",
             CVAR_FLAG, true, 0.0, true, 2.0
         );
+        this.SpawnScoreFloor = CreateConVar(
+            "inf_spawn_score_floor", "50.0",
+            "最小总评分阈值，低于该值的刷点直接丢弃；0=关闭限制。",
+            CVAR_FLAG, true, -1000.0, true, 5000.0
+        );
+        this.FlowBucketShare = CreateConVar(
+            "inf_spawn_bucket_ratio", "50.0",
+            "同一 Flow 桶中允许同时存在的特感占比（相对 l4d_infected_limit）；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
 
         // 生还者进度回退
         this.SurFlowFallbackEnable = CreateConVar(
@@ -635,6 +499,8 @@ enum struct Config
         this.SurFlowFallbackEnable.AddChangeHook(OnCfgChanged);
         this.SurFlowFallbackTTL.AddChangeHook(OnCfgChanged);
         this.FlowBadPenaltyPoints.AddChangeHook(OnCfgChanged);
+        this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
+        this.FlowBucketShare.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -642,13 +508,15 @@ enum struct Config
         this.Score_w_hght.AddChangeHook(OnCfgChanged);
         this.Score_w_flow.AddChangeHook(OnCfgChanged);
         this.Score_w_disp.AddChangeHook(OnCfgChanged);
-        this.ScoreMinTotal.AddChangeHook(OnCfgChanged);
         this.gCvarNavCacheEnable.AddChangeHook(OnCfgChanged);
 
         this.NavBucketMapInvalid.AddChangeHook(OnCfgChanged);
         this.NavBucketAssignRadius.AddChangeHook(OnCfgChanged);
         this.TeleportSpawnGrace.AddChangeHook(OnCfgChanged);
         this.TeleportRunnerFast.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockKillers.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockRatio.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockGrace.AddChangeHook(OnCfgChanged);
         this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
         this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
         this.ZSmokerLimit  = FindConVar("z_smoker_limit");
@@ -661,9 +529,6 @@ enum struct Config
         this.DeathCDSupport.AddChangeHook(OnCfgChanged);
         this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
         this.DeathCDUnderfill.AddChangeHook(OnCfgChanged);
-        this.SupportUnlockKillers.AddChangeHook(OnCfgChanged);
-        this.SupportUnlockRatio.AddChangeHook(OnCfgChanged);
-        this.SupportUnlockGrace.AddChangeHook(OnCfgChanged);
 
         SetConVarInt(FindConVar("director_no_specials"), 1);
 
@@ -692,8 +557,6 @@ enum struct Config
         this.NavBucketMaxAt.AddChangeHook(OnCfgChanged);
         this.NavBucketFirstFit.AddChangeHook(OnCfgChanged);
         this.NavBucketIncludeCtr.AddChangeHook(OnCfgChanged);
-        this.BucketGroupSize.AddChangeHook(OnCfgChanged);
-        this.BucketRingStep.AddChangeHook(OnCfgChanged);
 
         this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 变更时重建桶
 
@@ -731,35 +594,19 @@ enum struct Config
         this.bNavBucketFirstFit   = this.NavBucketFirstFit.BoolValue;
         this.bNavBucketIncludeCtr = this.NavBucketIncludeCtr.BoolValue;
 
-        this.iBucketGroupSize      = ClampInt(this.BucketGroupSize.IntValue, 1, 12);
-        this.fBucketRingStep       = this.BucketRingStep.FloatValue;
-        if (this.fBucketRingStep < 0.0) this.fBucketRingStep = 0.0;
-        this.fScoreMinTotal        = this.ScoreMinTotal.FloatValue;
-        if (this.fScoreMinTotal < -200.0) this.fScoreMinTotal = -200.0;
-        if (this.fScoreMinTotal > 1000.0) this.fScoreMinTotal = 1000.0;
-
         // 死亡CD & 放宽
         this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
         this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
         this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
         this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
-        int cfgUnlock = this.SupportUnlockKillers.IntValue;
-        if (cfgUnlock >= 0)
-        {
-            if (cfgUnlock > this.iSiLimit) cfgUnlock = this.iSiLimit;
-            this.iSupportUnlockKillers = cfgUnlock;
-        }
-        else
-        {
-            this.iSupportUnlockKillers = -1;
-        }
-        this.fSupportUnlockRatio = this.SupportUnlockRatio.FloatValue;
-        if (this.fSupportUnlockRatio < 0.0) this.fSupportUnlockRatio = 0.0;
-        if (this.fSupportUnlockRatio > 1.0) this.fSupportUnlockRatio = 1.0;
-        this.fSupportUnlockGrace = this.SupportUnlockGrace.FloatValue;
-        if (this.fSupportUnlockGrace < 0.0) this.fSupportUnlockGrace = 0.0;
         this.fTeleportSpawnGrace = this.TeleportSpawnGrace.FloatValue;
         this.fTeleportRunnerFast = this.TeleportRunnerFast.FloatValue;
+        this.iSupportUnlockKillers = this.SupportUnlockKillers.IntValue;
+        this.fSupportUnlockRatio   = this.SupportUnlockRatio.FloatValue;
+        if (this.fSupportUnlockRatio < 0.0) this.fSupportUnlockRatio = 0.0;
+        if (this.fSupportUnlockRatio > 1.0) this.fSupportUnlockRatio = 1.0;
+        this.fSupportUnlockGrace   = this.SupportUnlockGrace.FloatValue;
+        if (this.fSupportUnlockGrace < 0.0) this.fSupportUnlockGrace = 0.0;
 
         this.bNavBucketMapInvalid   = this.NavBucketMapInvalid.BoolValue;
         this.fNavBucketAssignRadius = this.NavBucketAssignRadius.FloatValue;
@@ -810,44 +657,24 @@ enum struct Config
         if (this.fFlowBadPenalty < 0.0) this.fFlowBadPenalty = 0.0;
         if (this.fFlowBadPenalty > 100.0) this.fFlowBadPenalty = 100.0;
         this.iVisRayMode        = this.VisEyeRayMode.IntValue;
+        this.fSpawnScoreFloor   = this.SpawnScoreFloor.FloatValue;
+        this.fBucketSpawnRatio  = this.FlowBucketShare.FloatValue;
+        if (this.fBucketSpawnRatio <= 0.0)
+        {
+            this.fBucketSpawnRatio = 0.0;
+            this.iBucketMaxPerFlow = 0;
+        }
+        else
+        {
+            if (this.fBucketSpawnRatio > 1.0) this.fBucketSpawnRatio = 1.0;
+            int cap = RoundToCeil(float(this.iSiLimit) * this.fBucketSpawnRatio);
+            if (cap < 1) cap = 1;
+            this.iBucketMaxPerFlow = cap;
+        }
 
         this.bSurFlowFallback   = this.SurFlowFallbackEnable.BoolValue;
         this.fSurFlowFallbackTTL= this.SurFlowFallbackTTL.FloatValue;
         if (this.fSurFlowFallbackTTL < 1.0) this.fSurFlowFallbackTTL = 1.0;
-        // —— 距离甜点参数 —— //
-        this.bDistFromCvar = this.Score_dist_from_cvar.BoolValue;
-
-        char buf[256];
-        char parts2[6][16]; int n;
-
-        // 甜点距离
-        this.Score_sweet_dist.GetString(buf, sizeof(buf));
-        n = ExplodeString(buf, " ", parts2, 6, 16);
-        for (int i = 0; i < 6; i++) {
-            if (i < n) this.s_dist[i+1] = StringToFloat(parts2[i]);
-        }
-        // 甜点宽度
-        this.Score_sweet_width.GetString(buf, sizeof(buf));
-        n = ExplodeString(buf, " ", parts2, 6, 16);
-        for (int i = 0; i < 6; i++) {
-            if (i < n) this.s_width[i+1] = StringToFloat(parts2[i]);
-        }
-        // 曲线陡峭
-        this.Score_sweet_slope.GetString(buf, sizeof(buf));
-        n = ExplodeString(buf, " ", parts2, 6, 16);
-        for (int i = 0; i < 6; i++) {
-            if (i < n) this.s_slope[i+1] = StringToFloat(parts2[i]);
-        }
-
-        // —— 兜底与夹取 —— //
-        for (int zc = 1; zc <= 6; zc++) {
-            if (!(this.s_dist[zc]  > 0.0)) this.s_dist[zc]  = 500.0;   // 兜底甜点
-            if (!(this.s_width[zc] > 0.0)) this.s_width[zc] = 300.0;   // 兜底宽度
-            if (!(this.s_slope[zc] > 0.0)) this.s_slope[zc] = 1.20;    // 兜底陡峭
-            // 斜率合理区间：0.6 ~ 2.5
-            if (this.s_slope[zc] < 0.6) this.s_slope[zc] = 0.6;
-            if (this.s_slope[zc] > 2.5) this.s_slope[zc] = 2.5;
-        }
     }
 
     void ApplyMaxZombieBound()
@@ -898,7 +725,6 @@ enum struct State
     int    spawnQueueSize;
     int    waveIndex;
     int    lastSpawnSecs;
-    int    killersSpawnedThisWave;
     int    rushManIndex;
     int    targetSurvivor;
 
@@ -913,7 +739,6 @@ enum struct State
     float  spitterSpitTime[MAXPLAYERS+1];
 
     float  nextFrameThink;
-    float  supportDelayStart;
 
     void Reset()
     {
@@ -938,8 +763,6 @@ enum struct State
         this.spawnDistCur      = 0.0;
         this.teleportDistCur   = 0.0;
         this.nextFrameThink    = 0.0;
-        this.killersSpawnedThisWave = 0;
-        this.supportDelayStart = 0.0;
 
         for (int i = 0; i <= MAXPLAYERS; i++)
         {
@@ -975,7 +798,7 @@ ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
 // —— 新增：死亡CD时间戳 & 最近一次成功刷出 —— //
 static float g_LastDeathTime[6];     // zc-1 索引
 static float g_LastSpawnOkTime = 0.0;
-static float g_NextNoSurvivorLogTime = 0.0;
+static float g_SupportShortageStart = 0.0;
 
 // —— Nav Flow 分桶 —— //
 static ArrayList g_FlowBuckets[FLOW_BUCKETS]; // 每桶存 NavArea 索引 i
@@ -997,7 +820,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration), ChatGPT",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2025.11.03",
+    version     = "2025.10.26",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -1087,6 +910,7 @@ public void OnPluginStart()
 
     // 初始化死亡时间戳
     g_LastSpawnOkTime = 0.0;
+    g_SupportShortageStart = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
 
     RegAdminCmd("sm_startspawn", Cmd_StartSpawn, ADMFLAG_ROOT, "管理员重置刷特时钟");
@@ -1129,6 +953,7 @@ public void OnMapEnd()
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
     g_LastSpawnOkTime = 0.0;
+    g_SupportShortageStart = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
 
     ClearNavBuckets();
@@ -1429,7 +1254,7 @@ public Action Cmd_NavTest(int client, int args)
 
     // 5. 位置关系
     int targetSur = ChooseTargetSurvivor();
-    bool passPosition = PassRealPositionCheck(testPos, targetSur);
+    bool passPosition = PassRealPositionCheck(testPos, targetSur, view_as<int>(SI_Smoker));
     int candPercent = GetPositionBucketPercent(testPos);
     int surPercent = -1;
     if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
@@ -1466,10 +1291,10 @@ public Action Cmd_NavTest(int client, int args)
     int preferredSector = PickSector(sectors);
     int sidx = ComputeSectorIndex(center, testPos, sectors);
     
-    float sweet, width, slope;
-    GetClassDistanceProfile(zc, gCV.fSpawnMin, gCV.fSpawnMax, sweet, width, slope);
-    float score_dist = ScoreDistSmooth(dminEye, sweet, width, slope);
-    PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f, slope: %.2f)", score_dist, sweet, width, slope);
+    float sweet, width;
+    GetClassDistanceProfile(zc, gCV.fSpawnMin, gCV.fSpawnMax, sweet, width);
+    float score_dist = ScoreDistSmooth(dminEye, sweet, width);
+    PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)", score_dist, sweet, width);
 
     // 高度“偏好”分（独立正向项，不是扣分器）
     float refEyeZ = 0.0;
@@ -1512,7 +1337,7 @@ public Action Cmd_NavTest(int client, int args)
         PrintToConsole(client, "  Flow Score: base=%.1f, penalty=%.1f -> %.1f (delta: %d)%s",
             flow_base, flow_pen, score_flow, deltaFlow, " [mapped]");
     }
-    if (!rawBadFlow)
+    else
     {
         PrintToConsole(client, "  Flow Score: %.1f (delta: %d)", score_flow, deltaFlow);
     }
@@ -1629,6 +1454,7 @@ static void StopAll()
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
     g_LastSpawnOkTime = 0.0;
+    g_SupportShortageStart = 0.0;
     for (int i = 0; i < 6; i++) g_LastDeathTime[i] = 0.0;
     for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
 }
@@ -1765,8 +1591,6 @@ static void StartWave()
     gST.waveIndex++;
     gST.lastWaveAvgFlow = GetSurAvrFlow();
     gST.lastSpawnSecs   = 0;
-    gST.killersSpawnedThisWave = 0;
-    gST.supportDelayStart = 0.0;
     gST.lastWaveStartTime = GetGameTime();
 
     if (gST.siQueueCount > gCV.iSiLimit)
@@ -1806,6 +1630,7 @@ static void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 
     // 立刻按新上限收缩记录
     CleanupLastSpawns(GetGameTime());
+    gCV.Refresh();
 }
 static void ResetMatchState()
 {
@@ -1827,9 +1652,8 @@ static void ResetMatchState()
     }
     // 重置死亡记录
     g_LastSpawnOkTime = 0.0;
+    g_SupportShortageStart = 0.0;
     for (int k = 0; k < 6; k++) g_LastDeathTime[k] = 0.0;
-    gST.killersSpawnedThisWave = 0;
-    gST.supportDelayStart = 0.0;
 }
 // 扫描在场特感 → gST.siAlive[] / gST.totalSI；再用“上限 - 活着 = 剩余额度”写回 gST.siCap[]
 static void RecalcSiCapFromAlive(bool log = false)
@@ -1951,104 +1775,21 @@ static bool IsKillerClassInt(int zc)
 {
     return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Smoker);
 }
-static bool IsPriorityKillerClass(int zc)
-{
-    return  zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger);
-}
 static bool IsSupportClassInt(int zc)
 {
     return zc == view_as<int>(SI_Boomer) || zc == view_as<int>(SI_Spitter);
 }
-static bool IsSupportDelayClass(int zc)
+static bool IsSupportGateClassInt(int zc)
 {
-    return zc == view_as<int>(SI_Smoker) || IsSupportClassInt(zc);
+    return zc == view_as<int>(SI_Smoker)
+        || zc == view_as<int>(SI_Boomer)
+        || zc == view_as<int>(SI_Spitter);
 }
-static void ResetSupportDelayTimer()
+static bool IsPriorityUnlockClassInt(int zc)
 {
-    gST.supportDelayStart = 0.0;
-}
-static int GetSupportUnlockNeed()
-{
-    if (gCV.iSupportUnlockKillers >= 0)
-        return gCV.iSupportUnlockKillers;
-
-    if (gCV.fSupportUnlockRatio <= 0.0)
-        return 0;
-
-    int need = RoundToFloor(float(gCV.iSiLimit) * gCV.fSupportUnlockRatio);
-    if (need < 0) need = 0;
-    if (need == 0 && gCV.fSupportUnlockRatio > 0.0)
-        need = 1;
-    if (need > gCV.iSiLimit)
-        need = gCV.iSiLimit;
-    return need;
-}
-static bool SupportKillersUnlocked()
-{
-    int need = GetSupportUnlockNeed();
-    if (need <= 0)
-    {
-        ResetSupportDelayTimer();
-        return true;
-    }
-
-    int effective = gST.killersSpawnedThisWave
-                  + CountPriorityKillersAlive()
-                  + CountPriorityKillersQueued();
-
-    if (effective >= need)
-    {
-        ResetSupportDelayTimer();
-        return true;
-    }
-
-    return false;
-}
-static bool ShouldBlockSupport(bool relax)
-{
-    if (SupportKillersUnlocked())
-        return false;
-
-    if (!AnyPriorityKillerToQueueEx(relax))
-    {
-        ResetSupportDelayTimer();
-        return false;
-    }
-
-    float grace = gCV.fSupportUnlockGrace;
-    float now = GetGameTime();
-    if (grace <= 0.0)
-    {
-        if (gST.supportDelayStart <= 0.0)
-            gST.supportDelayStart = now;
-        return true;
-    }
-
-    if (gST.supportDelayStart <= 0.0)
-    {
-        gST.supportDelayStart = now;
-        return true;
-    }
-
-    if ((now - gST.supportDelayStart) >= grace)
-    {
-        ResetSupportDelayTimer();
-        return false;
-    }
-
-    return true;
-}
-static void NoteSpawnSuccess(int zc)
-{
-    if (IsPriorityKillerClass(zc))
-    {
-        gST.killersSpawnedThisWave++;
-        ResetSupportDelayTimer();
-        if (gCV.iDebugMode >= 2)
-        {
-            Debug_Print("[KILLER COUNT] wave=%d killers=%d / need=%d", gST.waveIndex, gST.killersSpawnedThisWave, GetSupportUnlockNeed());
-        }
-    }
+    return zc == view_as<int>(SI_Hunter)
+        || zc == view_as<int>(SI_Jockey)
+        || zc == view_as<int>(SI_Charger);
 }
 static int CountKillersAlive()
 {
@@ -2067,24 +1808,71 @@ static int CountKillersQueued()
     }
     return c;
 }
-
-static int CountPriorityKillersAlive()
+static int CountPriorityUnlockersAlive()
 {
     return gST.siAlive[view_as<int>(SI_Hunter)-1]
          + gST.siAlive[view_as<int>(SI_Jockey)-1]
          + gST.siAlive[view_as<int>(SI_Charger)-1];
 }
-
-static int CountPriorityKillersQueued()
+static int CountPriorityUnlockersQueued()
 {
-    int c = 0;
+    int total = 0;
     for (int i = 0; i < gQ.spawn.Length; i++)
     {
-        int queued = gQ.spawn.Get(i);
-        if (IsPriorityKillerClass(queued))
-            c++;
+        int t = gQ.spawn.Get(i);
+        if (IsPriorityUnlockClassInt(t))
+            total++;
     }
-    return c;
+    return total;
+}
+static int GetSupportUnlockNeed()
+{
+    int req = gCV.iSupportUnlockKillers;
+    if (req == 0)
+        return 0;
+
+    if (req < 0)
+    {
+        if (gCV.fSupportUnlockRatio <= 0.0)
+            return 0;
+
+        req = RoundToFloor(float(gCV.iSiLimit) * gCV.fSupportUnlockRatio);
+    }
+
+    if (req < 0) req = 0;
+    return req;
+}
+static bool SupportRestrictionActive()
+{
+    int need = GetSupportUnlockNeed();
+    if (need <= 0)
+    {
+        g_SupportShortageStart = 0.0;
+        return false;
+    }
+
+    int have = CountPriorityUnlockersAlive() + CountPriorityUnlockersQueued();
+    if (have >= need)
+    {
+        g_SupportShortageStart = 0.0;
+        return false;
+    }
+
+    float grace = gCV.fSupportUnlockGrace;
+    if (grace > 0.0)
+    {
+        float now = GetGameTime();
+        if (g_SupportShortageStart <= 0.0)
+            g_SupportShortageStart = now;
+        else if ((now - g_SupportShortageStart) >= grace)
+            return false;
+    }
+    else
+    {
+        g_SupportShortageStart = 0.0;
+    }
+
+    return true;
 }
 
 // 让“是否存在可入队的杀手类”也考虑死亡CD或放宽逻辑
@@ -2092,12 +1880,15 @@ static bool AnyEligibleKillerToQueue()
 {
     static int ks[4] = { view_as<int>(SI_Smoker), view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
     bool relax = ShouldRelaxDeathCD();
+    bool supportLocked = SupportRestrictionActive();
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
         if (!CheckClassEnabled(k) || !CanQueueClass(k) )
             continue;
         if (!relax && !PassDeathCooldown(k))
+            continue;
+        if (supportLocked && IsSupportGateClassInt(k))
             continue;
         return true;
     }
@@ -2109,6 +1900,7 @@ static int PickEligibleKillerClass()
 {
     static int ks[4] = { view_as<int>(SI_Smoker), view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
     bool relax = ShouldRelaxDeathCD();
+    bool supportLocked = SupportRestrictionActive();
 
     // 随机尝试若干次，先走随机
     for (int tries = 0; tries < 8; tries++)
@@ -2118,6 +1910,8 @@ static int PickEligibleKillerClass()
             continue;
         if (!relax && !PassDeathCooldown(k))
             continue;
+        if (supportLocked && IsSupportGateClassInt(k))
+            continue;
         return k;
     }
 
@@ -2125,44 +1919,8 @@ static int PickEligibleKillerClass()
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k)))
-            return k;
-    }
-    return 0;
-}
-static bool AnyPriorityKillerToQueueEx(bool relax)
-{
-    static int ks[3] = { view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
-    for (int i = 0; i < 3; i++)
-    {
-        int k = ks[i];
-        if (!CheckClassEnabled(k) || !CanQueueClass(k))
-            continue;
-        if (!relax && !PassDeathCooldown(k))
-            continue;
-        return true;
-    }
-    return false;
-}
-
-static int PickPriorityKillerClassEx(bool relax)
-{
-    static int ks[3] = { view_as<int>(SI_Hunter), view_as<int>(SI_Jockey), view_as<int>(SI_Charger) };
-
-    for (int tries = 0; tries < 6; tries++)
-    {
-        int k = ks[GetRandomInt(0, 2)];
-        if (!CheckClassEnabled(k) || HasReachedLimit(k))
-            continue;
-        if (!relax && !PassDeathCooldown(k))
-            continue;
-        return k;
-    }
-
-    for (int i = 0; i < 3; i++)
-    {
-        int k = ks[i];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k)))
+        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k))
+            && (!supportLocked || !IsSupportGateClassInt(k)))
             return k;
     }
     return 0;
@@ -2245,12 +2003,14 @@ static int PickScarceClassImpl(bool relaxCD)
 {
     float bestScore = 9999.0;
     int bestZc = 0;
+    bool supportLocked = SupportRestrictionActive();
 
     for (int zc = 1; zc <= 6; zc++)
     {
         if (!CheckClassEnabled(zc))    continue;
         if (!CanQueueClass(zc))        continue;
         if (!relaxCD && !PassDeathCooldown(zc)) continue;
+        if (supportLocked && IsSupportGateClassInt(zc)) continue;
 
         int idx      = zc - 1;
         int alive    = gST.siAlive[idx];
@@ -2283,6 +2043,7 @@ static void MaintainSpawnQueueOnce()
 
     int zc = 0;
     bool relax = ShouldRelaxDeathCD();  // 是否放宽死亡CD
+    bool supportLocked = SupportRestrictionActive();
 
     // 模式锁定
     if (gCV.AllCharger.BoolValue)      zc = view_as<int>(SI_Charger);
@@ -2313,6 +2074,8 @@ static void MaintainSpawnQueueOnce()
                     continue;
                 if (!relax && !PassDeathCooldown(pick)) // ★ 不放宽时跳过处于CD的类
                     continue;
+                if (supportLocked && IsSupportGateClassInt(pick))
+                    continue;
 
                 zc = pick;
                 break;
@@ -2338,6 +2101,8 @@ static void MaintainSpawnQueueOnce()
                         continue;
                     if (!PassDeathCooldown(p)) // relax 为 false，此处必须通过CD
                         continue;
+                    if (supportLocked && IsSupportGateClassInt(p))
+                        continue;
 
                     alt = p;
                     break;
@@ -2354,20 +2119,17 @@ static void MaintainSpawnQueueOnce()
             zc = alt; // 用替补继续入队
         }
 
-        if (IsSupportDelayClass(zc) && ShouldBlockSupport(relax))
+        if (supportLocked && IsSupportGateClassInt(zc))
         {
-            int killerAlt = PickPriorityKillerClassEx(relax);
-            if (killerAlt != 0 && CanQueueClass(killerAlt) && CheckClassEnabled(killerAlt))
+            int alt2 = PickEligibleKillerClass();
+            if (alt2 == 0)
             {
-                Debug_Print("<SpawnQ> support blocked (%s) -> prefer killer %s (progress %d/%d)",
-                    INFDN[zc], INFDN[killerAlt], gST.killersSpawnedThisWave, GetSupportUnlockNeed());
-                zc = killerAlt;
-            }
-            else
-            {
-                Debug_Print("<SpawnQ> support blocked (%s) but no killer available -> wait", INFDN[zc]);
+                Debug_Print("<SpawnQ> support %s locked (need killers) -> wait", INFDN[zc]);
                 return;
             }
+
+            Debug_Print("<SpawnQ> substitute %s -> %s (support locked)", INFDN[zc], INFDN[alt2]);
+            zc = alt2;
         }
 
         // 入队
@@ -2425,9 +2187,23 @@ static void MakeBucketCachePath()
 static void TryNormalSpawnOnce()
 {
     static const float EPS_RADIUS = 1.0;
+    if (gST.spawnQueueSize <= 0)
+        return;
 
-    int want = gQ.spawn.Get(0);
-    bool relax = ShouldRelaxDeathCD();
+    int want = 0;
+    while (gST.spawnQueueSize > 0)
+    {
+        want = gQ.spawn.Get(0);
+        if (!IsSupportGateClassInt(want) || !SupportRestrictionActive())
+            break;
+
+        Debug_Print("[QUEUE DROP] support %s blocked (need killers)", INFDN[want]);
+        gQ.spawn.Erase(0);
+        gST.spawnQueueSize--;
+    }
+
+    if (gST.spawnQueueSize <= 0)
+        return;
 
     // 生成前“只看活着的”上限闸门
     if (HasReachedLimit(want))
@@ -2447,28 +2223,7 @@ static void TryNormalSpawnOnce()
         return;
     }
 
-    if (IsSupportDelayClass(want) && ShouldBlockSupport(relax))
-    {
-        gQ.spawn.Erase(0);
-        gQ.spawn.Push(want);
-        Debug_Print("[QUEUE ROTATE] support %s delayed until killers reach %d (now %d)", INFDN[want], GetSupportUnlockNeed(), gST.killersSpawnedThisWave);
-        return;
-    }
-
     bool isSupport = (want == view_as<int>(SI_Boomer) || want == view_as<int>(SI_Spitter));
-
-    if (!EnsureActiveSurvivorOrHalt("SPAWN"))
-    {
-        gST.spawnDistCur = gCV.fSpawnMin;
-
-        float teleBase = gCV.fTeleportSpawnMin;
-        if (teleBase <= 0.0 || teleBase < gCV.fSpawnMin)
-            teleBase = gCV.fSpawnMin;
-        if (teleBase > gCV.fSpawnMax)
-            teleBase = gCV.fSpawnMax;
-        gST.teleportDistCur = teleBase;
-        return;
-    }
 
     float pos[3];
     int areaIdx = -1;
@@ -2502,7 +2257,6 @@ static void TryNormalSpawnOnce()
 
         gST.siQueueCount--;
         gST.siAlive[want - 1]++; gST.totalSI++;
-        NoteSpawnSuccess(want);
         gQ.spawn.Erase(0);        gST.spawnQueueSize--;
 
         BypassAndExecuteCommand("nb_assault");
@@ -2541,7 +2295,6 @@ static void TryNormalSpawnOnce()
 
             gST.siQueueCount--;
             gST.siAlive[want - 1]++; gST.totalSI++;
-            NoteSpawnSuccess(want);
             gQ.spawn.Erase(0);        gST.spawnQueueSize--;
 
             BypassAndExecuteCommand("nb_assault");
@@ -2567,19 +2320,6 @@ static void TryTeleportSpawnOnce()
     int want = gQ.teleport.Get(0);
     if (gST.totalSI >= gCV.iSiLimit || HasReachedLimit(want))
         return;
-
-    if (!EnsureActiveSurvivorOrHalt("TP"))
-    {
-        gST.spawnDistCur = gCV.fSpawnMin;
-
-        float base = gCV.fTeleportSpawnMin;
-        if (base <= 0.0 || base < gCV.fSpawnMin)
-            base = gCV.fSpawnMin;
-        if (base > gCV.fSpawnMax)
-            base = gCV.fSpawnMax;
-        gST.teleportDistCur = base;
-        return;
-    }
 
     float pos[3];
     int areaIdx = -1;
@@ -2608,7 +2348,6 @@ static void TryTeleportSpawnOnce()
         RememberSpawn(pos, center);
 
         gST.siAlive[want - 1]++; gST.totalSI++;
-        NoteSpawnSuccess(want);
         gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
         float nextTP = ring * 0.8;
@@ -2646,7 +2385,6 @@ static void TryTeleportSpawnOnce()
             RememberSpawn(pt, center);
 
             gST.siAlive[want - 1]++; gST.totalSI++;
-            NoteSpawnSuccess(want);
             gQ.teleport.Erase(0);    gST.teleportQueueSize--;
 
             gST.teleportDistCur = FloatMax(gCV.fSpawnMin, gST.teleportDistCur * 0.7);
@@ -3030,7 +2768,7 @@ static bool IsPosVisibleSDK(float pos[3], bool teleportMode)
         GetClientEyePosition(i, eyes);
 
         // 先试“中线 → 头”
-        if (RayClear(eyes, head, visMask))
+        if (effMode != 1 && RayClear(eyes, head, visMask))
             return true;
 
         // 若模式要求三线，再做左右偏移
@@ -3148,6 +2886,33 @@ stock int GetPositionBucketPercent(float pos[3])
     // 3. 返回分桶系统中的百分比（已处理异常flow映射）
     int bucket = view_as<int>(g_AreaPct.Get(areaIdx));
     return (bucket >= 0 && bucket <= 100) ? bucket : -1;
+}
+
+static int CountAliveSpecialsInBucket(int bucket)
+{
+    if (bucket < 0 || bucket > 100) return 0;
+
+    int count = 0;
+    float pos[3];
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsInfectedBot(i) || !IsPlayerAlive(i) || IsGhost(i))
+            continue;
+
+        GetClientAbsOrigin(i, pos);
+        int b = GetPositionBucketPercent(pos);
+        if (b == bucket)
+            count++;
+    }
+    return count;
+}
+static bool PassBucketShareLimit(int bucket)
+{
+    int cap = gCV.iBucketMaxPerFlow;
+    if (cap <= 0) return true;
+    if (bucket < 0 || bucket > 100) return true;
+
+    return CountAliveSpecialsInBucket(bucket) < cap;
 }
 
 stock static int Calculate_Flow(Address area)
@@ -3540,7 +3305,7 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock bool PassRealPositionCheck(float candPos[3], int targetSur) 
+stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si=0) 
 {
     // 1) 候选点的分桶百分比
     int candPercent = GetPositionBucketPercent(candPos);
@@ -3573,7 +3338,15 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur)
     if (candPercent < surPercent - 6)
         return false;
 
-    // 其余高度差改为评分阶段惩罚处理，由 ComputeBehindHeightPenalty 负责
+    // 4) 你的需求：若“候选桶在生还进度后方” 且 “候选点 Z <= 所有生还者最低脚部 Z - 200u”，则禁止
+    float minFootZ;
+    if (TryGetLowestSurvivorFootZ(minFootZ))
+    {
+        // 严格“后方”：candPercent < surPercent（不含相等）
+        if (candPercent < surPercent && (candPos[2] <= (minFootZ - 180.0)|| (si != view_as<int>(SI_Smoker) && candPos[2] >= (minFootZ + 200.0))))
+            return false;
+    }
+    // 如果没找到生还者（极端情况），保持放行
     return true;
 }
 
@@ -3707,13 +3480,7 @@ int PickSector(int sectors)
 static int GetCurrentSectors()
 {
     int T = gCV.iSiLimit;
-    int n;
-
-    if (T <= 4)       n = 3;   // 1~4 特感：保持 3 个扇区即可
-    else if (T <= 7)  n = 4;   // 中等规模 → 4 个扇区
-    else if (T <= 10) n = 5;   // 大部分对抗配置
-    else              n = 6;   // 极限高上限时最多 6 个扇区
-
+    int n = (T <= 2) ? 2 : (RoundToCeil(float(T) / 2.0) + 1);
     if (n < DYN_SECTORS_MIN) n = DYN_SECTORS_MIN;
     if (n > SECTORS_MAX)     n = SECTORS_MAX;
     return n;
@@ -3791,34 +3558,6 @@ static int CountAliveSurvivors()
         if (IsValidSurvivor(i) && IsPlayerAlive(i))
             n++;
     return n;
-}
-
-static bool HasActiveUprightSurvivor()
-{
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (IsValidSurvivor(i) && IsPlayerAlive(i) && !L4D_IsPlayerIncapacitated(i))
-            return true;
-    }
-    return false;
-}
-
-static bool EnsureActiveSurvivorOrHalt(const char[] tag)
-{
-    if (HasActiveUprightSurvivor())
-        return true;
-
-    if (gCV.iDebugMode > 0)
-    {
-        float now = GetGameTime();
-        if (now >= g_NextNoSurvivorLogTime)
-        {
-            g_NextNoSurvivorLogTime = now + 1.0;
-            Debug_Print("[%s] skip: no active survivors", tag);
-        }
-    }
-
-    return false;
 }
 
 // 取得“当前有效的回退进度”（满足开启且未过期）
@@ -4485,21 +4224,12 @@ stock float CalculateScore_Flow(int candBucket, int survBucket)
 // [修改] 解决 warning 219: local variable "recentSectors" shadows a variable
 stock float CalculateScore_Dispersion(int sidx, int preferredSector, const int a_recentSectors[3])
 {
-    float k = PenLimitScale(); // 1.00..0.50，限制越高惩罚越轻
-
-    if (sidx == preferredSector)
-        return DISP_SCORE_PREF;
-
-    if (sidx == a_recentSectors[0])
-        return DISP_SCORE_RECENT0 * k;
-
-    if (sidx == a_recentSectors[1])
-        return DISP_SCORE_RECENT1 * k;
-
-    if (sidx == a_recentSectors[2])
-        return 0.0;
-
-    return DISP_SCORE_OTHER;
+    float k = PenLimitScale(); // 1.00..0.50
+    if (sidx == preferredSector)      return 100.0;      // 正向奖励不缩
+    if (sidx == a_recentSectors[0])   return -50.0 * k;  // 最近扇区的负分随上限减半
+    if (sidx == a_recentSectors[1])   return -25.0 * k;  // 次近扇区同理
+    if (sidx == a_recentSectors[2])   return 0.0;
+    return 50.0;
 }
 // [新增] —— 计算某类的自适应 First-Fit 阈值（按理论上限的比例）
 stock float ComputeFFThresholdForClass(int zc)
@@ -4511,112 +4241,6 @@ stock float ComputeFFThresholdForClass(int zc)
     return 0.85 * theoMax;
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-// 后方高度惩罚（Behind-Height Penalty）
-// - 目的：当候选点在“参考地面/视线”以下时，加速惩罚曲线（更陡峭）
-// - 组成：桶差扣分 + 低位扣分（更陡）+ 过高扣分 + 全局封顶
-// - 不改变：桶差(gap)与过高(rise)的计算逻辑与阈值，仅对“低位(drop)”做陡峭化
-// - 陡峭化做法：
-//   1) 在各分段(soft/deep/abyss)内部增加随深度线性放大的增益（带宽内的 slope 提升）
-//   2) abyss 段允许更高上限，并轻度超线性（Pow^1.10）让深坑快速拉满
-//   3) 与后方距离(bucketGap)联动的 behindFactor：越在后方，低位惩罚放大越明显
-// ───────────────────────────────────────────────────────────────────────────────
-static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
-                                        float candZ, float refEyeZ, float allMaxEyeZ,
-                                        float lowestFootZ)
-{
-    int bucketGap = centerBucket - candBucket;
-    if (bucketGap <= 0)
-        return 0.0;
-
-    // —— 每类特感的“低位/深坑/过高”的权重（斜率基准） ——
-    // 设计理念：
-    // - Smoker：更容忍高低差与反打位，斜率较缓
-    // - Hunter：中等容忍，略强于 Smoker 的低位惩罚
-    // - 其他（Jockey/Charger/Spitter/Boomer 等）：对低位/深坑更敏感，斜率更陡
-    float softCoef, deepCoef, abyssCoef, highCoef;
-    switch (zc)
-    {
-        case view_as<int>(SI_Smoker):
-        {
-            softCoef = 0.20;  // 0~70 低位区：Smoker 低位惩罚较缓
-            deepCoef = 0.34;  // 70~130 深位区：适中
-            abyssCoef = 0.48; // >130 深坑区：较缓但会被陡峭化放大
-            highCoef  = 0.12; // 过高惩罚：Smoker 对高点相对友好
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            softCoef = 0.22;  // Hunter 略高于 Smoker
-            deepCoef = 0.38;
-            abyssCoef = 0.55;
-            highCoef  = 0.14;
-        }
-        default:
-        {
-            softCoef = 0.28;  // 其他 SI 更不适合“低位绕后”，给更陡的基准斜率
-            deepCoef = 0.46;
-            abyssCoef = 0.60;
-            highCoef  = 0.18; // 过高惩罚也更重一些
-        }
-    }
-
-    float penalty = 0.0;
-
-    // —— 桶差（越在后方，基准惩罚越高，维持原逻辑） ——
-    float gapPenalty = float(bucketGap) * 10.0;
-    if (gapPenalty > 60.0)
-    {
-        float extraGap = FloatMax(0.0, float(bucketGap) - 6.0);
-        gapPenalty = 60.0 + FloatMin(40.0, extraGap * 8.0);
-    }
-    penalty += FloatMin(110.0, gapPenalty);
-
-    // —— 低位（drop）基准参考：优先用队伍最低脚底（容错平台边/台阶），否则用视线-130 —— 
-    bool haveFoot = (lowestFootZ < 1.0e8);
-    float floorBase = haveFoot ? (lowestFootZ - 40.0) : (refEyeZ - 130.0);
-    float drop = floorBase - candZ;
-
-    if (drop > 0.0)
-    {
-        // —— 分段：保持原分段边界，但在段内增加“随深度成长”的倍率，形成更陡曲线 ——
-        float softDrop = FloatMin(drop, 70.0);                        //   0 ~ 70
-        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));  //  70 ~ 130
-        float abyssDrop = FloatMax(0.0, drop - 130.0);                // >130
-
-        // 后方联动放大：越在后方，低位越不被允许（最多 +60%）
-        float behindFactor = 1.0 + FloatMin(0.60, 0.06 * float(bucketGap));
-
-        // 段内增益：段内越深，斜率越大（线性增益，数值温和、可控）
-        float softGain = 1.0 + 0.5 * (softDrop / 70.0);   // 1.0 → 1.5
-        float deepGain = 1.0 + 0.8 * (deepDrop / 60.0);   // 1.0 → 1.8
-
-        // abyss 段轻度超线性：Pow(1.10) 让深坑更快冲顶；同时给线性项兜底
-        float abyssLinear = abyssCoef * abyssDrop;
-        float abyssCurve  = abyssCoef * Pow(abyssDrop, 1.10);
-        float abyssTerm   = FloatMax(abyssLinear, abyssCurve);
-        // 放宽 abyss 上限，让深坑的陡峭化有体现（从 60 → 80）
-        abyssTerm = FloatMin(80.0, abyssTerm);
-
-        float softTerm = softCoef * softDrop * softGain;
-        float deepTerm = deepCoef * deepDrop * deepGain;
-
-        penalty += (softTerm + deepTerm + abyssTerm) * behindFactor;
-    }
-
-    // —— 过高（rise）维持原逻辑：超过“全队最高视线+150”开始线性扣分 —— 
-    float highLimit = allMaxEyeZ + 150.0;
-    float rise = candZ - highLimit;
-    if (rise > 0.0)
-        penalty += FloatMin(50.0, rise * highCoef);
-
-    // —— 全局封顶（不让惩罚失控） —— 
-    if (penalty > 150.0)
-        penalty = 150.0;
-
-    return penalty;
-}
-
-
 // [新增] —— 简易 e^x 封装（SourcePawn 没有 Exp，改用 Pow）
 #define M_E 2.718281828459045
 stock float ExpF(float x)
@@ -4624,72 +4248,37 @@ stock float ExpF(float x)
     return Pow(M_E, x);
 }
 
-/**
- * 距离分（0..100），圆顶三角形的“平滑版”：
- *   Δ = |d - sweet|
- *   t = Clamp01( Δ / width )
- *   score = 100 * pow(1 - t, slope)
- *
- * 性能轻、形状可控；slope 越大，曲线越尖锐（更“挑甜点”）。
- */
-stock float ScoreDistSmooth(float d, float sweet, float width, float slope)
+// [新增] —— Logistic 距离评分（0..100），围绕“类目甜点”对称衰减
+// [修改] —— 距离平滑评分：以“甜点距离 sweet”为中心的对称衰减
+stock float ScoreDistSmooth(float dminEye, float sweet, float width)
 {
-    float t = FloatAbs(d - sweet) / width;
-    if (t < 0.0) t = 0.0;
-    if (t > 1.0) t = 1.0;
-    float base = 1.0 - t;                 // 0..1
-    // pow 之前做一次小抬升，避免 slope 太小时过于平：
-    float shaped = Pow(base, slope);
-    float score = 100.0 * shaped;
-    if (score < 0.0) score = 0.0;
-    if (score > 100.0) score = 100.0;
-    return score;
+    // 防御：宽度太小会过于尖锐
+    if (width < 1.0) width = 1.0;
+
+    // 归一化偏差
+    float t = FloatAbs(dminEye - sweet) / width;
+
+    // 100 / (1 + e^(k*t))，t 越大衰减越多；k 适中给点锐度
+    float k = 1.5;
+    float s = 100.0 / (1.0 + ExpF(k * t));
+
+    // 限幅，避免因为极端参数出 0 分或 100+ 分
+    return clamp(s, 10.0, 100.0);
 }
 
-/**
- * 计算“距离甜点曲线”的三个关键参数：
- *  sweet：目标最佳距离（眼睛到候选点的最近距离，单位uu）
- *  width：甜点两侧的“容忍半宽”（越大越宽容）
- *  slope：曲线陡峭程度（>1 更挑剔，<1 更宽松）
- *
- * 逻辑：
- *  - inf_score_dist_from_cvar=1 时，直接使用 CVar 的 6 组数值（并钳在 SpawnMin..SpawnMax）。
- *  - =0 时按旧逻辑的“经验系数”从范围推导（保留你的手感）。
- */
-stock void GetClassDistanceProfile(int zc, float spawnMin, float spawnMax,
-                                   float &sweet, float &width, float &slope)
+// [新增] —— 各类的甜点距离与宽度（可按需改成 CVar）
+stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, float &width)
 {
-    // 安全范围
-    float rmin = spawnMin;
-    float rmax = spawnMax;
-    if (rmax < rmin) { float t=rmax; rmax=rmin; rmin=t; }
-
-    if (gCV.bDistFromCvar) {
-        sweet = gCV.s_dist[zc];
-        width = gCV.s_width[zc];
-        slope = gCV.s_slope[zc];
-        // 钳界：甜点必须在范围内，宽度至少 64uu
-        if (sweet < rmin) sweet = rmin + 1.0;
-        if (sweet > rmax) sweet = rmax - 1.0;
-        if (width < 64.0) width = 64.0;
-        // 宽度不能超过 (rmax-rmin)
-        float span = rmax - rmin;
-        if (width > span) width = span;
-        return;
+    float span = FloatMax(1.0, max - min);
+    switch (zc) {
+        case view_as<int>(SI_Boomer): { sweet = min + 0.25*span; width = 0.22*span; }
+        case view_as<int>(SI_Hunter): { sweet = min + 0.45*span; width = 0.28*span; }
+        case view_as<int>(SI_Smoker): { sweet = min + 0.60*span; width = 0.30*span; }
+        case view_as<int>(SI_Spitter):{ sweet = min + 0.40*span; width = 0.25*span; }
+        case view_as<int>(SI_Jockey): { sweet = min + 0.35*span; width = 0.24*span; }
+        case view_as<int>(SI_Charger):{ sweet = min + 0.38*span; width = 0.26*span; }
+        default: { sweet = min + 0.40*span; width = 0.25*span; }
     }
-
-    // —— 自适应推导（旧风格保留） —— //
-    // 经验系数：按不同职业偏好决定甜点位置（相对范围）
-    static const float kPos[7]   = {0.0, 0.65, 0.55, 0.45, 0.60, 0.45, 0.55}; // S B H P J C
-    static const float kWidth[7] = {0.0, 0.45, 0.60, 0.35, 0.45, 0.35, 0.40};
-    static const float kSlope[7] = {0.0, 1.15, 1.00, 1.35, 1.10, 1.35, 1.40};
-
-    float span = rmax - rmin;
-    sweet = rmin + span * kPos[zc];
-    width = span * kWidth[zc];
-    slope = kSlope[zc];
-
-    if (width < 64.0) width = 64.0;
 }
 
 // [ADD] —— 通过 areaIdx 直接反查分桶（优先缓存，其次 Flow→Percent）
@@ -4732,40 +4321,34 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
 stock float ScoreFlowSmooth(int deltaFlow)
 {
     // 后方：-12 以下直接给极低
-    if (deltaFlow <= -5) return 0.0;
+    if (deltaFlow <= -12) return 0.0;
 
+    // 后方：-11..-1 线性爬升到 30 分（仍然是偏低，鼓励前置）
     if (deltaFlow < 0)
     {
-        float ratio = float(deltaFlow + 5) / 4.0;   // -4..-1 -> 0.25..1.0
-        return clamp(ratio * 40.0, 0.0, 40.0);      // 线性 0 → 40
+        // -11 -> 5 分,  -1 -> 30 分
+        float t = float(deltaFlow + 11) / 10.0;      // 0..1
+        return 5.0 + t * 25.0;                       // 5..30
     }
 
+    // 同进度：给中性 50 分
     if (deltaFlow == 0) return 50.0;
 
-    if (deltaFlow <= 3) return 60.0;
+    // 前方近距离最佳：+1..+5 → 100 分
+    if (deltaFlow <= 5) return 100.0;
 
-    if (deltaFlow <= 6)
+    // 前方中距离：+6..+12 从 85 线性降到 45
+    if (deltaFlow <= 12)
     {
-        float ratio = float(deltaFlow - 4) / 2.0;   // 4→0, 6→1
-        return 60.0 - 30.0 * ratio;                 // 60 → 30
+        float t = float(deltaFlow - 6) / 6.0;        // 0..1
+        return 85.0 - t * 40.0;                      // 85..45
     }
 
-    if (deltaFlow <= 10)
-    {
-        float ratio = float(deltaFlow - 7) / 3.0;   // 7→0, 10→1
-        return 30.0 - 20.0 * ratio;                 // 30 → 10
-    }
-
-    if (deltaFlow <= 18)
-    {
-        float ratio = float(deltaFlow - 11) / 7.0;  // 11→0, 18→1
-        float base = 10.0 * (1.0 - clamp(ratio, 0.0, 1.0));
-        return clamp(base, 0.0, 10.0);
-    }
-
-    if (deltaFlow >= 19) return 0.0;
-
-    return 0.0;
+    // 前方太远（>+12）：缓慢衰减到 30~40 的平台
+    // 用个平滑函数避免突变
+    float over = float(deltaFlow - 12);
+    float s = 40.0 / (1.0 + (over / 8.0));           // 40 → 渐近 0
+    return 30.0 + clamp(s, 0.0, 40.0);               // 30..70（但很快收敛到 30~40）
 }
 
 // === Limit-aware penalty scale (uses PEN_LIMIT_* macros) ===
@@ -4797,8 +4380,6 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
     float allMinZ = 1.0e9, allMaxZ = -1.0e9;
     int   allMinFlowBucket = 100;
-    float lowestFootZ = 1.0e9;
-    bool  haveFootRef = false;
     SurPosData data;
     for (int si = 0; si < g_iSurPosDataLen; si++) {
         g_aSurPosData.GetArray(si, data);
@@ -4806,14 +4387,7 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         if (data.fPos[2] > allMaxZ) allMaxZ = data.fPos[2];
         int sb = FlowDistanceToPercent(data.fFlow);
         if (sb < allMinFlowBucket) allMinFlowBucket = sb;
-
-        float footApprox = data.fPos[2] - PLAYER_CHEST;
-        if (footApprox < lowestFootZ) lowestFootZ = footApprox;
-        haveFootRef = true;
     }
-
-    if (!haveFootRef)
-        lowestFootZ = allMinZ - PLAYER_CHEST;
 
     int centerBucket = 50;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur)) {
@@ -4838,11 +4412,13 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
     int   bestIdx   = -1;
     float bestPos[3];
     int acceptedHits = 0;
-    int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0, cFilt_Score=0;
+    int cFilt_CD=0, cFilt_Flag=0, cFilt_Flow=0, cFilt_Dist=0, cFilt_Sep=0, cFilt_Stuck=0, cFilt_Vis=0, cFilt_Path=0, cFilt_Pos=0, cFilt_Score=0, cFilt_Bucket=0;
 
     bool  useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
     bool  firstFit   = gCV.bNavBucketFirstFit;
     float ffThresh   = ComputeFFThresholdForClass(zc);
+    float minScore   = gCV.fSpawnScoreFloor;
+    float ffScoreThresh = FloatMax(ffThresh, minScore);
 
     SpawnScoreDbg bestDbg;
 
@@ -4854,224 +4430,112 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
         int order[FLOW_BUCKETS];
         int orderLen = BuildBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order);
 
-        int candidateBuckets[FLOW_BUCKETS];
-        int candidateCount = 0;
         for (int oi = 0; oi < orderLen; oi++)
         {
             int b = order[oi];
-            if (b < 0 || b > 100) continue;
-            if (g_FlowBuckets[b] == null) continue;
-            if (g_FlowBuckets[b].Length <= 0) continue;
-            candidateBuckets[candidateCount++] = b;
-        }
+            if (b < 0 || b > 100 || g_FlowBuckets[b] == null) continue;
 
-        if (candidateCount <= 0)
-        {
-            useBuckets = false;
-        }
-        else
-        {
-            int windowStarts[FLOW_BUCKETS];
-            int windowCounts[FLOW_BUCKETS];
-            int windowDelta[FLOW_BUCKETS];
-            int windowOrder[FLOW_BUCKETS];
-            int windowQuota[FLOW_BUCKETS];
-            int windowCount = 0;
+            int L = g_FlowBuckets[b].Length;
+            if (L <= 0) continue;
 
-            float fTopK = float(TOPK);
-            int bucketPlan[4];
-            bucketPlan[0] = RoundToCeil(fTopK / 2.5);
-            if (bucketPlan[0] < 1) bucketPlan[0] = 1;
-            bucketPlan[1] = RoundToCeil(fTopK / 3.5);
-            if (bucketPlan[1] < 1) bucketPlan[1] = 1;
-            int tailPlan = RoundToCeil(fTopK / 5.0);
-            if (tailPlan < 1) tailPlan = 1;
-            bucketPlan[2] = tailPlan;
-            bucketPlan[3] = tailPlan;
-
-            int maxWindows = ClampInt(gCV.iBucketGroupSize, 1, FLOW_BUCKETS);
-
-            int idxBucket = 0;
-            while (idxBucket < candidateCount && windowCount < maxWindows)
+            for (int r = 0; r < L && acceptedHits < TOPK; r++)
             {
-                int planIdx = (windowCount < 4) ? windowCount : 3;
-                int desiredBuckets = bucketPlan[planIdx];
-                if (desiredBuckets < 1) desiredBuckets = 1;
-                int remainingBuckets = candidateCount - idxBucket;
-                int actualBuckets = (desiredBuckets <= remainingBuckets) ? desiredBuckets : remainingBuckets;
-                if (actualBuckets <= 0)
-                    break;
+                int ai = g_FlowBuckets[b].Get(r);
 
-                int minDelta = 999;
-                for (int j = 0; j < actualBuckets; j++)
-                {
-                    int b = candidateBuckets[idxBucket + j];
-                    int delta = AbsInt(b - centerBucket);
-                    if (delta < minDelta)
-                        minDelta = delta;
+                if (IsNavOnCooldown(ai, now)) { cFilt_CD++; continue; }
+
+                Address areaAddr = g_AllNavAreasCache.Get(ai);
+                NavArea pArea = view_as<NavArea>(areaAddr);
+                
+                if (!pArea || !IsValidFlags(pArea.SpawnAttributes, bFinaleArea)) 
+                { 
+                    cFilt_Flag++; 
+                    continue; 
                 }
 
-                windowStarts[windowCount] = idxBucket;
-                windowCounts[windowCount] = actualBuckets;
-                windowDelta[windowCount] = (minDelta >= 0) ? minDelta : 0;
-                windowOrder[windowCount] = windowCount;
-                windowQuota[windowCount] = bucketPlan[planIdx];
+                float p[3]; pArea.GetRandomPoint(p);
 
-                idxBucket += actualBuckets;
-                windowCount++;
-            }
+                float bMinZ = g_BucketMinZ[b], bMaxZ = g_BucketMaxZ[b];
+                if (bMaxZ <= bMinZ) { bMinZ = allMinZ - 50.0; bMaxZ = allMaxZ + 50.0; }
 
-            for (int i = 0; i < windowCount - 1; i++)
-            {
-                for (int j = i + 1; j < windowCount; j++)
-                {
-                    int oi = windowOrder[i];
-                    int oj = windowOrder[j];
-                    int di = windowDelta[oi];
-                    int dj = windowDelta[oj];
-                    if (di > dj || (di == dj && windowStarts[oi] > windowStarts[oj]))
-                    {
-                        int tmp = windowOrder[i];
-                        windowOrder[i] = windowOrder[j];
-                        windowOrder[j] = tmp;
-                    }
-                }
-            }
+                float slack = 0.0;
+                if (zc != view_as<int>(SI_Charger) && zc != view_as<int>(SI_Jockey))
+                    slack = HeightRingSlack(p, bMinZ, bMaxZ, allMaxZ);
 
-            SpawnEvalContext ctx;
-            ctx.zc = zc;
-            ctx.targetSur = targetSur;
-            ctx.teleportMode = teleportMode;
-            ctx.searchRange = searchRange;
-            ctx.spawnMin = gCV.fSpawnMin;
-            ctx.spawnMax = gCV.fSpawnMax;
-            ctx.refEyeZ = refEyeZ;
-            ctx.allMaxEyeZ = allMaxZ;
-            ctx.allMinZ = allMinZ;
-            ctx.lowestFootZ = lowestFootZ;
-            ctx.center[0] = center[0];
-            ctx.center[1] = center[1];
-            ctx.center[2] = center[2];
-            ctx.sectors = sectors;
-            ctx.preferredSector = preferredSector;
-            ctx.centerBucket = centerBucket;
-            ctx.mapMaxFlowDist = fMapMaxFlowDist;
-            ctx.finaleArea = bFinaleArea;
-            ctx.now = now;
-            ctx.firstFit = firstFit;
-            ctx.ffThresh = ffThresh;
+                float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
+                float dminEye = GetMinEyeDistToAnySurvivor(p);
 
-            FilterCounters accumCounters;
-            ResetFilterCounters(accumCounters);
+                if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
+                if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
+                if (!PassRealPositionCheck(p, targetSur, zc)) { cFilt_Pos++; continue; }
+                if (WillStuck(p))                    { cFilt_Stuck++; continue; }
+                if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
+                if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
-            CandidateScore bestCandGlobal;
-            bestCandGlobal.valid = 0;
-            bestCandGlobal.extraPen = 0.0;
-            GroupEvalResult bestGroupRes;
-            bool anyCandidate = false;
-            int totalAccepted = 0;
+                // --- 评分 ---
+                int   candBucket = b;
+                if (!PassBucketShareLimit(candBucket)) { cFilt_Bucket++; continue; }
 
-            for (int wi = 0; wi < windowCount && totalAccepted < TOPK; wi++)
-            {
-                int idxWin = windowOrder[wi];
-                int start = windowStarts[idxWin];
-                int bucketCount = windowCounts[idxWin];
-                int plannedQuota = windowQuota[idxWin];
-                if (plannedQuota < 1) plannedQuota = 1;
+                // 这里 candBucket 仍用桶号；但我们额外取一遍原始 flow，判断“raw badflow”
+                float fRaw = pArea.GetFlow();
+                bool  rawBadFlow = IsFlowAbnormal(fRaw, fMapMaxFlowDist);   // [MOD] 新增：只用于决定是否套高度惩罚
 
-                int remainingHits = TOPK - totalAccepted;
-                if (remainingHits <= 0)
-                    break;
-                if (plannedQuota > remainingHits)
-                    plannedQuota = remainingHits;
+                int   sidx       = ComputeSectorIndex(center, p, sectors);
+                int   deltaFlow  = candBucket - centerBucket;
 
-                int groupBuckets[FLOW_BUCKETS];
-                for (int gi = 0; gi < bucketCount; gi++)
-                    groupBuckets[gi] = candidateBuckets[start + gi];
+                float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
+                float score_dist = ScoreDistSmooth(dminEye, sweet, width);
+                float score_hght = CalculateScore_Height(zc, p, refEyeZ);
 
-                CandidateScore cand;
-                cand.valid = 0;
-                GroupEvalResult groupRes;
-                groupRes.startIndex = start;
+                // 使用 base - penalty（与 NavPeek 一致）
+                float flow_base = ScoreFlowSmooth(deltaFlow);
+                float flow_pen  = rawBadFlow ? ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ) : 0.0;
+                float score_flow = flow_base - flow_pen;
 
-                FilterCounters localCnt;
-                ResetFilterCounters(localCnt);
+                // 与 NavPeek 同样的上下限
+                if (score_flow > 100.0) score_flow = 100.0;
+                if (score_flow < -200.0) score_flow = -200.0;
 
-                bool okWindow = EvaluateGroupBuckets(ctx, groupBuckets, bucketCount, plannedQuota, cand, groupRes, localCnt);
-                MergeFilterCounters(accumCounters, localCnt);
+                // ★ 关键：坏 flow 且评分 < 0 直接丢弃，不进入总分
+                if (rawBadFlow && score_flow < 0.0) { cFilt_Flow++; continue; }
 
-                if (groupRes.acceptedHits > plannedQuota)
-                    groupRes.acceptedHits = plannedQuota;
+                float score_disp = CalculateScore_Dispersion(sidx, preferredSector, recentSectors);
 
-                totalAccepted += groupRes.acceptedHits;
-                if (totalAccepted > TOPK)
-                    totalAccepted = TOPK;
+                float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
+                float dispScaled = ScaleNegativeOnly(score_disp, penK);
 
-                if (!okWindow || !cand.valid)
-                    continue;
+                float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
+                                + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
 
-                if (!anyCandidate || cand.total > bestCandGlobal.total)
-                {
-                    anyCandidate = true;
-                    bestCandGlobal = cand;
-                    bestGroupRes = groupRes;
+                if (totalScore < minScore) { cFilt_Score++; continue; }
+
+                acceptedHits++;
+
+                if (firstFit && totalScore >= ffScoreThresh) {
+                    dbgOut.total = totalScore; dbgOut.dist = score_dist; dbgOut.hght = score_hght; dbgOut.flow = score_flow;
+                    dbgOut.dispRaw = score_disp; dbgOut.dispScaled = dispScaled; dbgOut.penK = penK;
+                    dbgOut.dminEye = dminEye; dbgOut.ringEff = ringEff; dbgOut.slack = slack;
+                    dbgOut.candBucket = candBucket; dbgOut.centerBucket = centerBucket; dbgOut.deltaFlow = deltaFlow;
+                    dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
+
+                    outPos = p; outAreaIdx = ai;
+                    return true;
                 }
 
-                if (ctx.firstFit && cand.total >= ctx.ffThresh)
-                {
-                    break;
+                if (!found || totalScore > bestScore) {
+                    found     = true;
+                    bestScore = totalScore;
+                    bestIdx   = ai;
+                    bestPos   = p;
+
+                    bestDbg.total = totalScore; bestDbg.dist = score_dist; bestDbg.hght = score_hght; bestDbg.flow = score_flow;
+                    bestDbg.dispRaw = score_disp; bestDbg.dispScaled = dispScaled; bestDbg.penK = penK;
+                    bestDbg.dminEye = dminEye; bestDbg.ringEff = ringEff; bestDbg.slack = slack;
+                    bestDbg.candBucket = candBucket; bestDbg.centerBucket = centerBucket; bestDbg.deltaFlow = deltaFlow;
+                    bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
                 }
             }
-
-            cFilt_CD   = accumCounters.cd;
-            cFilt_Flag = accumCounters.flag;
-            cFilt_Flow = accumCounters.flow;
-            cFilt_Dist = accumCounters.dist;
-            cFilt_Sep  = accumCounters.sep;
-            cFilt_Stuck= accumCounters.stuck;
-            cFilt_Vis  = accumCounters.vis;
-            cFilt_Path = accumCounters.path;
-            cFilt_Pos  = accumCounters.pos;
-            cFilt_Score= accumCounters.score;
-
-            acceptedHits = totalAccepted;
-
-            if (anyCandidate && bestCandGlobal.valid)
-            {
-                found = true;
-                bestScore = bestCandGlobal.total;
-                bestIdx = bestCandGlobal.areaIdx;
-                bestPos[0] = bestCandGlobal.pos[0];
-                bestPos[1] = bestCandGlobal.pos[1];
-                bestPos[2] = bestCandGlobal.pos[2];
-                bestDbg.total = bestCandGlobal.total;
-                bestDbg.dist = bestCandGlobal.dist;
-                bestDbg.hght = bestCandGlobal.hght;
-                bestDbg.flow = bestCandGlobal.flow;
-                bestDbg.dispRaw = bestCandGlobal.dispRaw;
-                bestDbg.dispScaled = bestCandGlobal.dispScaled;
-                bestDbg.penK = bestCandGlobal.penK;
-                bestDbg.risk = bestCandGlobal.risk;
-                bestDbg.dminEye = bestCandGlobal.dminEye;
-                bestDbg.ringEff = bestCandGlobal.ringEff;
-                bestDbg.slack = bestCandGlobal.slack;
-                bestDbg.extraPen = bestCandGlobal.extraPen;
-                bestDbg.candBucket = bestCandGlobal.candBucket;
-                bestDbg.centerBucket = bestCandGlobal.centerBucket;
-              	bestDbg.deltaFlow = bestCandGlobal.deltaFlow;
-                bestDbg.sector = bestCandGlobal.sector;
-                bestDbg.areaIdx = bestCandGlobal.areaIdx;
-                bestDbg.pos[0] = bestCandGlobal.pos[0];
-                bestDbg.pos[1] = bestCandGlobal.pos[1];
-                bestDbg.pos[2] = bestCandGlobal.pos[2];
-                bestDbg.groupScore = bestGroupRes.total;
-                bestDbg.groupPressure = bestGroupRes.pressure;
-                bestDbg.groupCoverage = bestGroupRes.coverage;
-                bestDbg.groupVariance = bestGroupRes.variance;
-                bestDbg.groupRisk = bestGroupRes.risk;
-                bestDbg.groupSize = bestGroupRes.bucketCount;
-                bestDbg.groupOffset = bestGroupRes.startIndex;
-            }
+            if (acceptedHits >= TOPK) break;
         }
     }
     else
@@ -5107,19 +4571,20 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff)) { cFilt_Dist++; continue; }
             if (!PassMinSeparation(p))           { cFilt_Sep++;   continue; }
-            if (!PassRealPositionCheck(p, targetSur)) { cFilt_Pos++; continue; }
+            if (!PassRealPositionCheck(p, targetSur, zc)) { cFilt_Pos++; continue; }
             if (WillStuck(p))                    { cFilt_Stuck++; continue; }
             if (IsPosVisibleSDK(p, teleportMode)){ cFilt_Vis++;   continue; }
             if (PathPenalty_NoBuild(p, targetSur, searchRange, gCV.fSpawnMax) != 0.0) { cFilt_Path++; continue; }
 
             // --- 评分 ---
             int   candBucket = FlowDistanceToPercent(fFlow);
+            if (!PassBucketShareLimit(candBucket)) { cFilt_Bucket++; continue; }
             bool  rawBadFlow = IsFlowAbnormal(fFlow, fMapMaxFlowDist);   // [MOD] 新增：只用于决定是否套高度惩罚
             int   sidx       = ComputeSectorIndex(center, p, sectors);
             int   deltaFlow  = candBucket - centerBucket;
 
-            float sweet, width, slope; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width, slope);
-            float score_dist = ScoreDistSmooth(dminEye, sweet, width, slope);
+            float sweet, width; GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
+            float score_dist = ScoreDistSmooth(dminEye, sweet, width);
             float score_hght = CalculateScore_Height(zc, p, refEyeZ);
             float flow_base = ScoreFlowSmooth(deltaFlow);
             float flow_pen  = rawBadFlow ? ComputeBadFlowHeightPenalty(/*candZ=*/p[2], /*refBestEyeZ=*/allMaxZ) : 0.0;
@@ -5137,34 +4602,17 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
 
             float totalScore = gCV.w_dist[zc]*score_dist + gCV.w_hght[zc]*score_hght
                              + gCV.w_flow[zc]*score_flow + gCV.w_disp[zc]*dispScaled;
-            float behindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
-                                                              p[2], refEyeZ, allMaxZ, lowestFootZ);
-            if (behindPenalty > 0.0)
-                totalScore -= behindPenalty;
 
-            if (totalScore < gCV.fScoreMinTotal) { cFilt_Score++; continue; }
-
-            float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
-                                              : FloatMax(0.0, 40.0 - score_flow);
-            if (riskBase > 100.0) riskBase = 100.0;
+            if (totalScore < minScore) { cFilt_Score++; continue; }
 
             acceptedHits++;
 
-            if (firstFit && totalScore >= ffThresh) {
+            if (firstFit && totalScore >= ffScoreThresh) {
                 dbgOut.total = totalScore; dbgOut.dist = score_dist; dbgOut.hght = score_hght; dbgOut.flow = score_flow;
                 dbgOut.dispRaw = score_disp; dbgOut.dispScaled = dispScaled; dbgOut.penK = penK;
                 dbgOut.dminEye = dminEye; dbgOut.ringEff = ringEff; dbgOut.slack = slack;
                 dbgOut.candBucket = candBucket; dbgOut.centerBucket = centerBucket; dbgOut.deltaFlow = deltaFlow;
                 dbgOut.sector = sidx; dbgOut.areaIdx = ai; dbgOut.pos = p;
-                dbgOut.risk = riskBase;
-                dbgOut.extraPen = behindPenalty;
-                dbgOut.groupScore = 0.0;
-                dbgOut.groupPressure = 0.0;
-                dbgOut.groupCoverage = 0.0;
-                dbgOut.groupVariance = 0.0;
-                dbgOut.groupRisk = 0.0;
-                dbgOut.groupSize = 0;
-                dbgOut.groupOffset = -1;
 
                 outPos = p; outAreaIdx = ai;
                 return true;
@@ -5181,31 +4629,13 @@ static bool FindSpawnPosViaNavArea(int zc, int targetSur, float searchRange, boo
                 bestDbg.dminEye = dminEye; bestDbg.ringEff = ringEff; bestDbg.slack = slack;
                 bestDbg.candBucket = candBucket; bestDbg.centerBucket = centerBucket; bestDbg.deltaFlow = deltaFlow;
                 bestDbg.sector = sidx; bestDbg.areaIdx = ai; bestDbg.pos = p;
-                bestDbg.risk = riskBase;
-                bestDbg.extraPen = behindPenalty;
-                bestDbg.groupScore = 0.0;
-                bestDbg.groupPressure = 0.0;
-                bestDbg.groupCoverage = 0.0;
-                bestDbg.groupVariance = 0.0;
-                bestDbg.groupRisk = 0.0;
-                bestDbg.groupSize = 0;
-                bestDbg.groupOffset = -1;
             }
         }
     }
 
     if (!found) {
-        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
-                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
-        return false;
-    }
-
-    if (bestScore < gCV.fScoreMinTotal)
-    {
-        cFilt_Score++;
-        Debug_Print("[FIND FAIL] ring=%.1f bestScore=%.1f < min=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d",
-                    searchRange, bestScore, gCV.fScoreMinTotal,
-                    cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score);
+        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+                    searchRange, cFilt_CD, cFilt_Flag, cFilt_Flow, cFilt_Dist, cFilt_Sep, cFilt_Stuck, cFilt_Vis, cFilt_Path, cFilt_Pos, cFilt_Score, cFilt_Bucket);
         return false;
     }
 
@@ -5623,8 +5053,6 @@ static void InitSDK_FromGamedata()
 stock float FloatMax(float a, float b) { return (a > b) ? a : b; } 
 stock float FloatMin(float a, float b) { return (a < b) ? a : b; }
 stock float Clamp01(float v) { if (v < 0.0) return 0.0; if (v > 1.0) return 1.0; return v; }
-stock float LerpFloat(float a, float b, float t) { return a + (b - a) * Clamp01(t); }
-stock int AbsInt(int v) { return (v < 0) ? -v : v; }
 // [ADD] int 夹取
 stock int clampi(int v, int lo, int hi) { if (v<lo) return lo; if (v>hi) return hi; return v; }
 
@@ -5635,317 +5063,6 @@ stock float ComputePenScaleByLimit(int L) {
     return PEN_LIMIT_SCALE_HI + (PEN_LIMIT_SCALE_LO - PEN_LIMIT_SCALE_HI) * t;
 }
 stock float ScaleNegativeOnly(float v, float k) { return (v < 0.0) ? (v * k) : v; }
-
-static void ResetFilterCounters(FilterCounters fc)
-{
-    fc.cd = 0;
-    fc.flag = 0;
-    fc.flow = 0;
-    fc.dist = 0;
-    fc.sep = 0;
-    fc.stuck = 0;
-    fc.vis = 0;
-    fc.path = 0;
-    fc.pos = 0;
-    fc.score = 0;
-}
-
-static void MergeFilterCounters(FilterCounters dst, const FilterCounters src)
-{
-    dst.cd   += src.cd;
-    dst.flag += src.flag;
-    dst.flow += src.flow;
-    dst.dist += src.dist;
-    dst.sep  += src.sep;
-    dst.stuck+= src.stuck;
-    dst.vis  += src.vis;
-    dst.path += src.path;
-    dst.pos  += src.pos;
-    dst.score+= src.score;
-}
-
-static void UpdateTopScores(float scores[GROUP_TOP_SCORES], int &count, float value)
-{
-    if (count < GROUP_TOP_SCORES)
-    {
-        scores[count++] = value;
-    }
-    else if (value > scores[count - 1])
-    {
-        scores[count - 1] = value;
-    }
-    else
-    {
-        return;
-    }
-
-    for (int i = count - 1; i > 0; i--)
-    {
-        if (scores[i] > scores[i - 1])
-        {
-            float tmp      = scores[i - 1];
-            scores[i - 1]  = scores[i];
-            scores[i]      = tmp;
-        }
-    }
-}
-
-static void FinalizeGroupMetrics(GroupEvalResult group, int sectorsTotal,
-                                 const float scores[GROUP_TOP_SCORES], int topCount,
-                                 int uniqueSectors, int maxSectorCount, float riskAccum)
-{
-    if (topCount > 0)
-    {
-        float sum = 0.0;
-        for (int i = 0; i < topCount; i++)
-            sum += scores[i];
-        group.pressure = sum / float(topCount);
-    }
-    else
-    {
-        group.pressure = 0.0;
-    }
-
-    if (sectorsTotal <= 0) sectorsTotal = 1;
-    group.coverage = FloatMin(100.0, (float(uniqueSectors) / float(sectorsTotal)) * 100.0);
-
-    float varianceBase = (group.candidateCount > 0)
-        ? (1.0 - (float(maxSectorCount) / float(group.candidateCount)))
-        : 0.0;
-    if (varianceBase < 0.0) varianceBase = 0.0;
-    group.variance = FloatMin(100.0, varianceBase * 100.0);
-
-    group.risk = (group.candidateCount > 0)
-        ? FloatMin(100.0, riskAccum / float(group.candidateCount))
-        : 0.0;
-
-    group.total = GROUP_WEIGHT_PRESSURE * group.pressure
-                + GROUP_WEIGHT_COVERAGE * group.coverage
-                + GROUP_WEIGHT_VARIANCE * group.variance
-                - GROUP_WEIGHT_RISK * group.risk;
-}
-
-static bool EvaluateAreaCandidate(const SpawnEvalContext ctx, int bucket, int areaIdx,
-                                  CandidateScore out, FilterCounters cnt)
-{
-    if (IsNavOnCooldown(areaIdx, ctx.now)) { cnt.cd++; return false; }
-
-    Address areaAddr = g_AllNavAreasCache.Get(areaIdx);
-    NavArea pArea = view_as<NavArea>(areaAddr);
-    if (!pArea || !IsValidFlags(pArea.SpawnAttributes, ctx.finaleArea))
-    {
-        cnt.flag++;
-        return false;
-    }
-
-    float p[3];
-    pArea.GetRandomPoint(p);
-
-    float bMinZ = g_BucketMinZ[bucket];
-    float bMaxZ = g_BucketMaxZ[bucket];
-    if (bMaxZ <= bMinZ)
-    {
-        bMinZ = ctx.allMinZ - 50.0;
-        bMaxZ = ctx.allMaxEyeZ + 50.0;
-    }
-
-    float slack = 0.0;
-    if (ctx.zc != view_as<int>(SI_Charger) && ctx.zc != view_as<int>(SI_Jockey))
-        slack = HeightRingSlack(p, bMinZ, bMaxZ, ctx.allMaxEyeZ);
-
-    float ringBase = ctx.searchRange + slack;
-    if (gCV.fBucketRingStep > 0.0)
-    {
-        int deltaBuckets = AbsInt(bucket - ctx.centerBucket);
-        if (deltaBuckets > 0)
-        {
-            // 每偏移一个桶，额外放宽一定距离，避免远桶因 SpawnMin/环半径被硬卡
-            float extra = gCV.fBucketRingStep * float(deltaBuckets);
-            ringBase += extra;
-        }
-    }
-
-    float ringEff = FloatMin(ringBase, ctx.spawnMax);
-    float dminEye = GetMinEyeDistToAnySurvivor(p);
-
-    if (!(dminEye >= ctx.spawnMin && dminEye <= ringEff)) { cnt.dist++; return false; }
-    if (!PassMinSeparation(p)) { cnt.sep++; return false; }
-    if (!PassRealPositionCheck(p, ctx.targetSur)) { cnt.pos++; return false; }
-    if (WillStuck(p)) { cnt.stuck++; return false; }
-    if (IsPosVisibleSDK(p, ctx.teleportMode)) { cnt.vis++; return false; }
-    if (PathPenalty_NoBuild(p, ctx.targetSur, ctx.searchRange, ctx.spawnMax) != 0.0) { cnt.path++; return false; }
-
-    float rawFlow = pArea.GetFlow();
-    bool rawBadFlow = IsFlowAbnormal(rawFlow, ctx.mapMaxFlowDist);
-
-    int candBucket = bucket;
-    int sidx = ComputeSectorIndex(ctx.center, p, ctx.sectors);
-    int deltaFlow = candBucket - ctx.centerBucket;
-
-    float sweet, width, slope; GetClassDistanceProfile(ctx.zc, ctx.spawnMin, ringEff, sweet, width, slope);
-    float score_dist = ScoreDistSmooth(dminEye, sweet, width, slope);
-    float score_hght = CalculateScore_Height(ctx.zc, p, ctx.refEyeZ);
-    float flow_base  = ScoreFlowSmooth(deltaFlow);
-    float flow_pen   = rawBadFlow ? ComputeBadFlowHeightPenalty(p[2], ctx.allMaxEyeZ) : 0.0;
-    float score_flow = flow_base - flow_pen;
-
-    if (score_flow > 100.0)  score_flow = 100.0;
-    if (score_flow < -200.0) score_flow = -200.0;
-    if (rawBadFlow && score_flow < 0.0) { cnt.flow++; return false; }
-
-    float behindPenalty = ComputeBehindHeightPenalty(ctx.zc, candBucket, ctx.centerBucket,
-                                                     p[2], ctx.refEyeZ, ctx.allMaxEyeZ, ctx.lowestFootZ);
-
-    float score_disp = CalculateScore_Dispersion(sidx, ctx.preferredSector, recentSectors);
-    float penK       = ComputePenScaleByLimit(gCV.iSiLimit);
-    float dispScaled = ScaleNegativeOnly(score_disp, penK);
-
-    float totalScore = gCV.w_dist[ctx.zc]*score_dist
-                     + gCV.w_hght[ctx.zc]*score_hght
-                     + gCV.w_flow[ctx.zc]*score_flow
-                     + gCV.w_disp[ctx.zc]*dispScaled;
-
-    if (behindPenalty > 0.0)
-        totalScore -= behindPenalty;
-
-    if (totalScore < gCV.fScoreMinTotal)
-    {
-        cnt.score++;
-        return false;
-    }
-
-    float riskBase = (score_flow < 0.0) ? FloatMin(100.0, FloatAbs(score_flow))
-                                       : FloatMax(0.0, 40.0 - score_flow);
-    if (riskBase > 100.0) riskBase = 100.0;
-
-    CandidateScore cand;
-    cand.valid = 1;
-    cand.zc = ctx.zc;
-    cand.candBucket = candBucket;
-    cand.centerBucket = ctx.centerBucket;
-    cand.deltaFlow = deltaFlow;
-    cand.sector = sidx;
-    cand.areaIdx = areaIdx;
-    cand.pos[0] = p[0];
-    cand.pos[1] = p[1];
-    cand.pos[2] = p[2];
-    cand.dist = score_dist;
-    cand.hght = score_hght;
-    cand.flow = score_flow;
-    cand.dispRaw = score_disp;
-    cand.dispScaled = dispScaled;
-    cand.penK = penK;
-    cand.risk = riskBase;
-    cand.dminEye = dminEye;
-    cand.ringEff = ringEff;
-    cand.slack = slack;
-    cand.total = totalScore;
-    cand.extraPen = behindPenalty;
-
-    out = cand;
-    return true;
-}
-
-static bool EvaluateGroupBuckets(const SpawnEvalContext ctx, const int[] buckets, int bucketCount,
-                                 int maxHits, CandidateScore best, GroupEvalResult group,
-                                 FilterCounters accum)
-{
-    ResetFilterCounters(accum);
-    group.total = 0.0;
-    group.pressure = 0.0;
-    group.coverage = 0.0;
-    group.variance = 0.0;
-    group.risk = 0.0;
-    group.bucketCount = bucketCount;
-    group.acceptedHits = 0;
-    group.candidateCount = 0;
-
-    float topScores[GROUP_TOP_SCORES] = {0.0, 0.0, 0.0, 0.0};
-    int topCount = 0;
-
-    bool sectorUsed[SECTORS_MAX];
-    int  sectorFreq[SECTORS_MAX];
-    for (int i = 0; i < SECTORS_MAX; i++) { sectorUsed[i] = false; sectorFreq[i] = 0; }
-
-    float riskAccum = 0.0;
-    bool found = false;
-    best.valid = 0;
-
-    for (int bi = 0; bi < bucketCount && group.acceptedHits < maxHits; bi++)
-    {
-        int bucket = buckets[bi];
-        if (bucket < 0 || bucket > 100) continue;
-        if (g_FlowBuckets[bucket] == null) continue;
-
-        int len = g_FlowBuckets[bucket].Length;
-        for (int ri = 0; ri < len && group.acceptedHits < maxHits; ri++)
-        {
-            int areaIdx = g_FlowBuckets[bucket].Get(ri);
-
-            CandidateScore cand;
-            FilterCounters localCnt;
-            ResetFilterCounters(localCnt);
-            if (!EvaluateAreaCandidate(ctx, bucket, areaIdx, cand, localCnt))
-            {
-                MergeFilterCounters(accum, localCnt);
-                continue;
-            }
-
-            MergeFilterCounters(accum, localCnt);
-
-            group.acceptedHits++;
-            group.candidateCount++;
-            riskAccum += cand.risk;
-
-            if (cand.sector >= 0 && cand.sector < SECTORS_MAX)
-            {
-                sectorUsed[cand.sector] = true;
-                sectorFreq[cand.sector]++;
-            }
-
-            UpdateTopScores(topScores, topCount, cand.total);
-
-            if (!found || cand.total > best.total)
-            {
-                best = cand;
-                found = true;
-            }
-
-            if (ctx.firstFit && cand.total >= ctx.ffThresh)
-            {
-                int unique = 0, maxFreq = 0;
-                for (int s = 0; s < ctx.sectors && s < SECTORS_MAX; s++)
-                {
-                    if (sectorFreq[s] > 0)
-                    {
-                        unique++;
-                        if (sectorFreq[s] > maxFreq) maxFreq = sectorFreq[s];
-                    }
-                }
-                group.bucketCount = bucketCount;
-                FinalizeGroupMetrics(group, ctx.sectors, topScores, topCount, unique, maxFreq, riskAccum);
-                return true;
-            }
-        }
-    }
-
-    if (!found)
-        return false;
-
-    int unique = 0, maxFreq = 0;
-    for (int s = 0; s < ctx.sectors && s < SECTORS_MAX; s++)
-    {
-        if (sectorFreq[s] > 0)
-        {
-            unique++;
-            if (sectorFreq[s] > maxFreq) maxFreq = sectorFreq[s];
-        }
-    }
-
-    group.bucketCount = bucketCount;
-    FinalizeGroupMetrics(group, ctx.sectors, topScores, topCount, unique, maxFreq, riskAccum);
-    return true;
-}
 
 // 在 LogChosenSpawnScore 中增加（约第2900行）
 static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg) 
@@ -5958,12 +5075,11 @@ static void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     int fb = GetHighestFlowSurvivorSafe();
     TryGetClientFlowPercentSafe(fb, surReal);
     
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) risk=%.1f extra=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | GRP=%.1f(P=%.1f C=%.1f V=%.1f R=%.1f size=%d off=%d) | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         INFDN[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.risk, dbg.extraPen,
-        dbg.dminEye, dbg.ringEff, dbg.slack,
+        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
+        dbg.dminEye, dbg.ringEff, dbg.slack, 
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
-        dbg.groupScore, dbg.groupPressure, dbg.groupCoverage, dbg.groupVariance, dbg.groupRisk, dbg.groupSize, dbg.groupOffset,
         candReal, surReal, candReal - surReal);  // ✅ 真实位置关系
 }
 // --- pause
