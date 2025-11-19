@@ -43,6 +43,13 @@ jobs:
           cp -R anne/update/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/
           tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
 
+      - name: Gzip norank&&sourcebans&&lilac
+        run: |
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
+          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
+          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
+
       - name: Gzip nomysql
         run: |
           rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/chat-processor.smx
@@ -56,13 +63,6 @@ jobs:
           rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
           cp CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/disabled/rpg.smx CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/
           tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
-
-      - name: Gzip norank&&sourcebans&&lilac
-        run: |
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
-          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
 
       - name: Update release
         uses: softprops/action-gh-release@v1
