@@ -102,8 +102,8 @@ public void OnPluginStart()
     g_hCvar_UpdateFrequency[NPC_SPITTER]      = CreateConVar("nb_uf_Spitter", "0.1", "Spitter的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_hCvar_UpdateFrequency[NPC_JOCKEY]       = CreateConVar("nb_uf_Jockey", "0.1", "Jockey的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_hCvar_UpdateFrequency[NPC_CHARGER]      = CreateConVar("nb_uf_Charger", "0.03", "Charger的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_hCvar_UpdateFrequency[NPC_WITCH]        = CreateConVar("nb_uf_Witch", "0.1", "Witch的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_hCvar_UpdateFrequency[NPC_TANK]         = CreateConVar("nb_uf_Tank", "0.1", "Tank的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_hCvar_UpdateFrequency[NPC_WITCH]        = CreateConVar("nb_uf_Witch", "0.24", "Witch的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_hCvar_UpdateFrequency[NPC_TANK]         = CreateConVar("nb_uf_Tank", "0.01", "Tank的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_hCvar_UpdateFrequency[NPC_SURVIVOR_BOT] = CreateConVar("nb_uf_sb", "0.01", "Survivor Bot的update frequency更新频率.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     for (int i = 0; i < NPC_COUNT; i++)
