@@ -367,17 +367,6 @@
 			"message" "关闭mixmap插件"
 		}
 	}
-	"开关Mod"
-	{
-		"exec vote/mod_on.cfg"
-		{
-			"message" "开启Mod"
-		}
-		"exec vote/mod_off.cfg"
-		{
-			"message" "关闭Mod"
-		}
-	}
 	"Tank选项"
 	{
 		"sm_cvar ai_tank_bhop 1"
