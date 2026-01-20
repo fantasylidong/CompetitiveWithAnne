@@ -1488,8 +1488,8 @@ public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
-    CreateTimer(0.2, Timer_RebuildBuckets, _, TIMER_FLAG_NO_MAPCHANGE); // 地图开局重建分桶
     CreateTimer(1.0,  Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
+    CreateTimer(2.0, Timer_RebuildBuckets, _, TIMER_FLAG_NO_MAPCHANGE); // 地图开局重建分桶
     // [新增] —— 每波开始即清理 Path 缓存（波级作用域）
     ClearPathCache();
 }

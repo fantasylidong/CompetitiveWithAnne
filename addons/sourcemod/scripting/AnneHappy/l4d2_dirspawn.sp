@@ -179,6 +179,15 @@ stock void ComputeBalancedSplit(int total, int outCaps[SI_Count])
 
     if (total <= 0) return;
 
+    // When no KV is used, keep every class available even if total < class count.
+    // cm_MaxSpecials still limits the simultaneous count, caps here just avoid 0.
+    if (total <= kSIClassCount)
+    {
+        for (int i = 0; i < kSIClassCount; i++)
+            outCaps[i] = 1;
+        return;
+    }
+
     int base = total / kSIClassCount;
     int rem  = total % kSIClassCount;
 

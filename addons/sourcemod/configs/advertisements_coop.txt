@@ -48,6 +48,6 @@
 	"11"
 	{
 		"type"		"S"
-		"text"		"{GREEN}安全门内只有和{LIGHTGREEN}当前玩家数量一样的医疗包{GREEN}，请把{LIGHTGREEN}希望{GREEN}也留一份给他人"
+		"text"		"{GREEN}安全门内{LIGHTGREEN}没有理疗包，过关后出门会发一个医疗包{GREEN}"
 	}
 }
