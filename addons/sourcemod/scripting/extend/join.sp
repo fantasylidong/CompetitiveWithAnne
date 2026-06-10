@@ -48,6 +48,9 @@ public Plugin myinfo =
 #define AUTOUPDATE_URL_LENGTH 256
 #define UPDATE_URL_PUBLIC "http://anne.trygek.com/plugin_update/Anne_Updater_All.txt"
 #define UPDATE_URL_PRIVATE "http://anne.trygek.com/plugin_update/private/Anne_Updater_Private.txt"
+#define AUTOUPDATE_DISABLED 0
+#define AUTOUPDATE_PUBLIC 1
+#define AUTOUPDATE_PRIVATE 2
 
 bool  
 	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
@@ -81,9 +84,9 @@ public void OnPluginStart()
 	LoadTranslations("join.phrases");
 	hCvarEnableInf = CreateConVar("join_enable_inf", "1", "是否可以开启加入特感", _, true, 0.0, true, 1.0);
 	hCvarKickFamilyAccount = CreateConVar("join_enable_kickfamilyaccount", "1", "是否开启踢出家庭共享账户", _, true, 0.0, true, 1.0);
-	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "是否开启AnneHappy核心插件自动更新：0关闭，1公开核心清单，2/3/4私用清单", _, true, 0.0, true, 4.0);
+	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "是否开启AnneHappy核心插件自动更新：0关闭，1公开核心清单，2私用清单", _, true, 0.0, true, 2.0);
 	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的公开核心更新清单URL");
-	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2/3/4时使用的私用更新清单URL");
+	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的私用更新清单URL");
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
 	hCvarMotdUrl = CreateConVar("sm_cfgmotd_url", "http://anne.trygek.com/l4d2/");  // 主页以后更换为数据库控制
 	hCvarIPUrl = CreateConVar("sm_cfgip_url", "http://anne.trygek.com/ip.php");	// 服务器ip页面，以后更换为数据库控制
@@ -153,11 +156,11 @@ bool GetAutoUpdateUrl(char[] updateUrl, int maxLength)
 
 	switch (hCvarEnableAutoupdate.IntValue)
 	{
-		case 1:
+		case AUTOUPDATE_PUBLIC:
 		{
 			hCvarAutoupdatePublicUrl.GetString(updateUrl, maxLength);
 		}
-		case 2, 3, 4:
+		case AUTOUPDATE_PRIVATE:
 		{
 			hCvarAutoupdatePrivateUrl.GetString(updateUrl, maxLength);
 		}
