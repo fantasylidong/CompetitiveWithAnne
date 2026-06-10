@@ -381,18 +381,7 @@
 			"message" "关闭坦克自动踢出系统"
 		}
 	}
-	"地图选择"
-	{
-		"exec vote/Anne/Annenew.cfg"
-		{
-			"message" "zonemod版本"
-		}
-		"exec vote/Anne/Anneold.cfg"
-		{
-			"message" "AnneHappy原版"
-		}
-	}
-	"开关击杀音效"
+		"开关击杀音效"
 	{
 		"exec vote/sound_on.cfg"
 		{

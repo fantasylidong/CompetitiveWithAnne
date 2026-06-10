@@ -39,7 +39,6 @@
 #include <kento_rankme/rankme>
 #include <warden>
 #include <myjbwarden>
-#include <hl_gangs>
 #include <SteamWorks>
 #define REQUIRE_EXTENSIONS
 #define REQUIRE_PLUGIN
@@ -67,7 +66,6 @@ Handle hIsAnonymousCookie;
 
 Handle hRoundStatusTimer;
 
-ConVar cv_sDefaultGang;
 ConVar cv_bParseRoundEnd;
 ConVar cv_bEnableTagsList;
 
@@ -76,7 +74,6 @@ bool bCSGO;
 bool bRankme;
 bool bWarden;
 bool bMyJBWarden;
-bool bGangs;
 bool bSteamWorks = true;
 bool bCanUseClanTags;
 bool bHideTag[MAXPLAYERS + 1];
@@ -140,7 +137,6 @@ public void OnPluginStart()
 	LoadTranslations("hextags.phrases");
 	//ConVars
 	CreateConVar("sm_hextags_version", PLUGIN_VERSION, "HexTags plugin version", FCVAR_SPONLY | FCVAR_REPLICATED | FCVAR_NOTIFY);
-	cv_sDefaultGang = CreateConVar("sm_hextags_nogang", "", "Text to use if user has no tag - needs hl_gangs.");
 	cv_bParseRoundEnd = CreateConVar("sm_hextags_roundend", "0", "If 1 the tags will be reloaded even on round end - Suggested to be used with plugins like mostactive or rankme.");
 	cv_bEnableTagsList = CreateConVar("sm_hextags_enable_tagslist", "1", "Set to 1 to enable the sm_tagslist command.");
 	
@@ -185,7 +181,6 @@ public void OnAllPluginsLoaded()
 	bRankme = LibraryExists("rankme");
 	bWarden = LibraryExists("warden");
 	bMyJBWarden = LibraryExists("myjbwarden");
-	bGangs = LibraryExists("hl_gangs");
 	bSteamWorks = LibraryExists("SteamWorks");
 
 	LoadKv();
@@ -219,10 +214,6 @@ public void OnLibraryAdded(const char[] name)
 	{
 		bMyJBWarden = true;
 	}
-	else if (StrEqual(name, "hl_gangs"))
-	{
-		bGangs = true;
-	}
 	else if (StrEqual(name, "SteamWorks", false))
 	{
 		bSteamWorks = true;
@@ -246,11 +237,6 @@ public void OnLibraryRemoved(const char[] name)
 	else if (StrEqual(name, "myjbwarden"))
 	{
 		bMyJBWarden = false;
-		LoadKv();
-	}
-	else if (StrEqual(name, "hl_gangs"))
-	{
-		bGangs = false;
 		LoadKv();
 	}
 	else if (StrEqual(name, "SteamWorks", false))
@@ -690,16 +676,6 @@ public Action CP_OnChatMessage(int & author, ArrayList recipients, char[] flagst
 	ReplaceString(sNewName, sizeof(sNewName), "{country}", sCountry);
 	ReplaceString(sNewMessage, sizeof(sNewMessage), "{country}", sCountry);
 	
-	if (bGangs)
-	{
-		Debug_Print("Apply gans");
-		static char sGang[32];
-		Gangs_HasGang(author) ? Gangs_GetGangName(author, sGang, sizeof(sGang)) : cv_sDefaultGang.GetString(sGang, sizeof(sGang));
-		
-		ReplaceString(sNewName, sizeof(sNewName), "{gang}", sGang);
-		ReplaceString(sNewMessage, sizeof(sNewMessage), "{gang}", sGang);
-	}
-	
 	if (bRankme)
 	{
 		Debug_Print("Apply rankme");
@@ -1085,12 +1061,6 @@ bool CheckSelector(const char[] selector, int client)
 		}
 	}
 	
-	/* CHECK GANG */
-	if (bGangs && StrEqual(selector, "Gang", false) && Gangs_HasGang(client))
-	{
-		return true;
-	}
-	
 	/* CHECK RANKME */
 	if (bRankme && selector[0] == '!')
 	{
@@ -1193,12 +1163,6 @@ void GetTags(int client, KeyValues kv)
 				LogError("Unable to get %L ip!", client);
 			GeoipCode2(sIP, sCountry);
 			ReplaceString(tags.ScoreTag, sizeof(CustomTags::ScoreTag), "{country}", sCountry);
-		}
-		if (bGangs && StrContains(tags.ScoreTag, "{gang}") != -1)
-		{
-			static char sGang[32];
-			Gangs_HasGang(client) ? Gangs_GetGangName(client, sGang, sizeof(sGang)) : cv_sDefaultGang.GetString(sGang, sizeof(sGang));
-			ReplaceString(tags.ScoreTag, sizeof(CustomTags::ScoreTag), "{gang}", sGang);
 		}
 		if (bRankme && StrContains(tags.ScoreTag, "{rmPoints}") != -1)
 		{
