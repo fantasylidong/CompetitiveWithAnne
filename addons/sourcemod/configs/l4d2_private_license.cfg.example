@@ -1,0 +1,10 @@
+"PrivateLicense"
+{
+	// Do not commit the real key. Put the production file at:
+	// addons/sourcemod/configs/l4d2_private_license.cfg
+	"license_key"	""
+	"server_id"	""
+	"feature"	"player_weapon_attrs"
+	"database"	"sourcebans"
+	"table"		"l4d2_private_plugin_licenses"
+}

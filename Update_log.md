@@ -373,7 +373,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 ### 2026年6月10日-6月11日更新记录
 #### 私有玩家武器属性系统
-- 新增私有 per-player 枪械/近战属性实验链路，包含 `l4d2_pwa_native_attrs.smx`、`l4d2_pma_native_attrs.smx`、`l4d2_pma_trace_attrs.smx`、`l4d2_pma_attackseg_attrs.smx`、`l4d2_player_attr_db.smx`、`l4d2_weaponinfo_dump.smx`。
+- 新增私有 per-player 枪械/近战属性实验链路，包含 `l4d2_private_license.smx`、`l4d2_pwa_native_attrs.smx`、`l4d2_pma_native_attrs.smx`、`l4d2_pma_trace_attrs.smx`、`l4d2_pma_attackseg_attrs.smx`、`l4d2_player_attr_db.smx`、`l4d2_weaponinfo_dump.smx`。
+- `l4d2_private_license.smx` 新增 DB 授权守卫，所有私有武器属性插件启动时会校验 license key、feature、server_id、port 和过期时间；缺少授权时直接加载失败，避免插件文件外流后被普通服务器直接使用。
 - 枪械层支持按玩家覆盖伤害、射速、换弹/部署/循环、弹夹、子弹数、散布/后坐/穿透/射程、衰减、Tank 伤害倍率等已验证字段；native 字段通过 detour 极短窗口 apply/restore，避免多人同 tick 串值。
 - 近战层拆成基础属性、Trace 轨迹和 Attack Segment 三层：基础属性处理伤害、挥速、idle、伤害类型；Trace 处理范围、方向缩放、yaw 偏移；Attack Segment 处理脚本攻击段里的 start/end dir、命中窗口、duration、动画和 force_dir。
 - `l4d2_player_attr_db.smx` 接入 NewAnneWeb 数据库，玩家进服/换配置时读取缓存后的属性表，插件不依赖游戏服之间共享本地文件。

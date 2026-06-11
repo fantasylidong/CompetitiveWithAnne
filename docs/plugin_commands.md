@@ -491,12 +491,22 @@
 
 这些插件目前是私有实验层，通常放在 `plugins/optional/AnneHappy/` 下按需加载。网页后台“玩家武器属性”写入数据库后，由 `l4d2_player_attr_db` 读取并调用 PWA/PMA/PMA-Trace/PMA-AttackSeg native；调试时也可以直接用下表命令手动设置。
 
+所有武器属性插件现在强依赖 `l4d2_private_license.smx`。如果没有 `addons/sourcemod/configs/l4d2_private_license.cfg`、数据库授权表没有匹配行，或服务器不在授权绑定范围内，PWA/PMA/Trace/AttackSeg/DB/Dump 会在启动阶段拒绝加载。
+
 ### 生效和默认值链路
 
 - 原生默认：由 `l4d2_weaponinfo_dump` 执行 `sm_widump_all_defaults` 生成 JSON，Web 后台读取 `addons/sourcemod/data/l4d2_weaponinfo_defaults.json`；近战轨迹会额外 dump `scripts/melee/*.txt` 的主/副攻击段，若服务器不能通过 Valve 文件系统读取 VPK 内脚本，可把脚本镜像放到 `addons/sourcemod/data/l4d2_melee_scripts/*.txt`。
 - vote 默认：来自 `cfg/vote/weapon` 下当前模式 cfg 的 `sm_weapon <weapon> <attr> <value>` 行，只是全局默认，不是玩家覆盖。
 - 玩家覆盖：存入 `l4d2_player_attr_profiles`，游戏服 `l4d2_player_attr_db` 在进服、切枪、定时刷新或手动 reload/apply 时下发。
+- 私有授权：`l4d2_private_license` 读取 `l4d2_private_plugin_licenses` 和本服 license key，只允许授权服务器使用私有武器属性插件；`.smx` 外流但没有授权时不能直接加载。
 - 日志：PWA `logs/l4d2_pwa_native_attrs.log`，PMA `logs/l4d2_pma_native_attrs.log`，Trace `logs/l4d2_pma_trace_attrs.log`，AttackSeg `logs/l4d2_pma_attackseg_attrs.log`，DB 协调器 `logs/l4d2_player_attr_db.log`。
+
+### 私有授权守卫
+
+| 插件 | 命令 | 类型 | 权限 | 说明 |
+| --- | --- | --- | --- | --- |
+| `optional/AnneHappy/l4d2_private_license.smx` | `sm_private_license_status` | 管理员 | ADMFLAG_ROOT | 显示当前服务器授权状态、feature、server_id、端口和失败原因。 |
+| `optional/AnneHappy/l4d2_private_license.smx` | `sm_private_license_reload` | 管理员 | ADMFLAG_ROOT | 重新读取 `configs/l4d2_private_license.cfg` 并重新校验数据库授权。 |
 
 ### DB 协调器
 
@@ -509,6 +519,8 @@
 常用流程：
 
 ```text
+sm plugins load optional/AnneHappy/l4d2_private_license
+sm_private_license_status
 sm plugins load optional/AnneHappy/l4d2_pwa_native_attrs
 sm plugins load optional/AnneHappy/l4d2_pma_native_attrs
 sm plugins load optional/AnneHappy/l4d2_pma_trace_attrs

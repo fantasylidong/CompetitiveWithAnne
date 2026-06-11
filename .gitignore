@@ -61,6 +61,10 @@ addons/sourcemod/scripting/optional/AnneHappy/l4d2_pma_attackseg_attrs.sp
 addons/sourcemod/plugins/optional/AnneHappy/l4d2_pma_attackseg_attrs.smx
 addons/sourcemod/gamedata/l4d2_pma_attackseg_attrs.txt
 addons/sourcemod/scripting/include/l4d2_player_attr_api.inc
+addons/sourcemod/scripting/include/l4d2_private_license.inc
+addons/sourcemod/scripting/optional/AnneHappy/l4d2_private_license.sp
+addons/sourcemod/plugins/optional/AnneHappy/l4d2_private_license.smx
+addons/sourcemod/configs/l4d2_private_license.cfg
 addons/sourcemod/scripting/optional/AnneHappy/l4d2_player_attr_db.sp
 addons/sourcemod/plugins/optional/AnneHappy/l4d2_player_attr_db.smx
 addons/sourcemod/configs/l4d2_player_attr_db.sql

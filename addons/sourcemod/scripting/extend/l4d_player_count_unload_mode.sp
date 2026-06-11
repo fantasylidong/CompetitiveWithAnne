@@ -49,7 +49,7 @@
 #include <sdkhooks>
 #include <multicolors>      // https://github.com/fbef0102/L4D1_2-Plugins/releases
 
-#define PLUGIN_VERSION			"1.1.0-2026/06/10"
+#define PLUGIN_VERSION			"1.1.1-2026/06/11"
 #define PLUGIN_NAME			    "l4d_player_count_unload_mode"
 #define DEBUG 0
 
@@ -693,15 +693,52 @@ public void SQLCB_EnsureStatusGoodServerColumn(Handle owner, Handle hndl, const 
         LogError("[%s] Add status good-server column failed: %s", PLUGIN_NAME, error);
     }
 
+    CleanupConflictingStatusAddressKeys();
+}
+
+void CleanupConflictingStatusAddressKeys()
+{
+    if (!g_bIsMySQL)
+    {
+        MigrateStatusAddressKeys();
+        return;
+    }
+
+    char sQuery[1024];
+    FormatEx(sQuery, sizeof(sQuery),
+        "DELETE stale FROM `%s` AS stale \
+         INNER JOIN `%s` AS target ON target.`address_key` = stale.`server_id` \
+         WHERE (stale.`address_key` = '' OR stale.`address_key` IS NULL) AND stale.`server_id` <> ''",
+        g_sCvarStatusTable, g_sCvarStatusTable);
+    SQL_TQuery(g_hDB, SQLCB_CleanupConflictingStatusAddressKeys, sQuery);
+}
+
+public void SQLCB_CleanupConflictingStatusAddressKeys(Handle owner, Handle hndl, const char[] error, any data)
+{
+    if (hndl == null && error[0] != '\0')
+    {
+        LogError("[%s] Cleanup duplicate status address_key rows failed: %s", PLUGIN_NAME, error);
+    }
+
     MigrateStatusAddressKeys();
 }
 
 void MigrateStatusAddressKeys()
 {
     char sQuery[512];
-    FormatEx(sQuery, sizeof(sQuery),
-        "UPDATE `%s` SET `address_key` = `server_id` WHERE `address_key` = '' OR `address_key` IS NULL",
-        g_sCvarStatusTable);
+    if (g_bIsMySQL)
+    {
+        FormatEx(sQuery, sizeof(sQuery),
+            "UPDATE IGNORE `%s` SET `address_key` = `server_id` WHERE (`address_key` = '' OR `address_key` IS NULL) AND `server_id` <> ''",
+            g_sCvarStatusTable);
+    }
+    else
+    {
+        FormatEx(sQuery, sizeof(sQuery),
+            "UPDATE OR IGNORE `%s` SET `address_key` = `server_id` WHERE (`address_key` = '' OR `address_key` IS NULL) AND `server_id` <> ''",
+            g_sCvarStatusTable);
+    }
+
     SQL_TQuery(g_hDB, SQLCB_MigrateStatusAddressKeys, sQuery);
 }
 
