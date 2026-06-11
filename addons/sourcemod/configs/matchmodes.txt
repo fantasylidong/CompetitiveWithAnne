@@ -35,15 +35,15 @@
 	{
 		"coop"
 		{
-			"name" "战役模式"
+			"name" "Anne战役"
 		}
 		"mutation4"
 		{
-			"name" "绝境求生模式"
+			"name" "Anne绝境"
 		}
 		"realism"
 		{
-			"name" "写实模式"
+			"name" "Anne写实"
 		}
 	}
 	"ZoneMod Configs"

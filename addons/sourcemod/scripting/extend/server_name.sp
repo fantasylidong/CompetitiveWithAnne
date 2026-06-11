@@ -13,8 +13,8 @@
  *  规则：
  *  - 未载入配置（l4d_ready_cfg_name 为空/无）：GameDescription = "电信服"
  *  - 载入配置：GameDescription = "电信服-<模式>[<几特><几秒>]"
- *      * <模式>：普通药役/硬核药役/Anne战役/Anne写实/牛牛冲刺/HT训练/女巫派对/单人装逼/或原 cfg 名
- *      * Anne战役/Anne写实：几特几秒来自 dirspawn_count / dirspawn_interval
+ *      * <模式>：普通药役/硬核药役/Anne战役/Anne写实/Anne绝境/牛牛冲刺/HT训练/女巫派对/单人装逼/或原 cfg 名
+ *      * Anne战役/Anne写实/Anne绝境：几特几秒来自 dirspawn_count / dirspawn_interval
  *      * 其它：来自 l4d_infected_limit / versus_special_respawn_interval
  *  - 服务器名（房间名）：{hostname}{gamemode}
  *      => hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]
@@ -33,7 +33,7 @@ public Plugin myinfo =
     name        = "Anne ServerName & GameDescription",
     author      = "东",
     description = "动态服务器名 + GameDescription [几特几秒]",
-    version     = "1.4.5",
+    version     = "1.4.6",
     url         = ""
 };
 
@@ -247,8 +247,9 @@ void BuildGameDescription(char[] out, int maxlen)
     bool isAnneHappy    = (StrContains(cfg, "AnneHappy",   false) != -1);
     bool isHardCore     = (StrContains(cfg, "HardCore",    false) != -1);
     bool isShotgun      = (StrContains(cfg, "Shotgun",     false) != -1);
-    bool isAnneCoop     = (StrContains(cfg, "AnneCoop",    false) != -1);
-    bool isAnneRealism  = (StrContains(cfg, "AnneRealism", false) != -1);
+    bool isAnneCoop      = (StrContains(cfg, "AnneCoop",      false) != -1);
+    bool isAnneRealism   = (StrContains(cfg, "AnneRealism",   false) != -1);
+    bool isAnneMutation4 = (StrContains(cfg, "AnneMutation4", false) != -1);
     bool isAllCharger   = (StrContains(cfg, "AllCharger",  false) != -1);
     bool is1vHunters    = (StrContains(cfg, "1vHunters",   false) != -1);
     bool isWitchParty   = (StrContains(cfg, "WitchParty",  false) != -1);
@@ -266,6 +267,8 @@ void BuildGameDescription(char[] out, int maxlen)
         strcopy(mode, sizeof(mode), "Anne战役");
     } else if (isAnneRealism) {
         strcopy(mode, sizeof(mode), "Anne写实");
+    } else if (isAnneMutation4) {
+        strcopy(mode, sizeof(mode), "Anne绝境");
     } else if (isAllCharger) {
         strcopy(mode, sizeof(mode), "牛牛冲刺");
     } else if (is1vHunters) {
@@ -280,7 +283,7 @@ void BuildGameDescription(char[] out, int maxlen)
     }
 
     // 选择“几特几秒”的来源
-    bool usesDirSpawn = (isAnneCoop || isAnneRealism);
+    bool usesDirSpawn = (isAnneCoop || isAnneRealism || isAnneMutation4);
     int  siCount      = 0;
     int  siInterval   = -1;
 
@@ -322,8 +325,9 @@ public void UpdateServerName()
     bool isAnneHappy    = (StrContains(sReadyUpCfgName, "AnneHappy",   false) != -1);
     bool isHardCore     = (StrContains(sReadyUpCfgName, "HardCore",    false) != -1);
     bool isShotgun      = (StrContains(sReadyUpCfgName, "Shotgun",     false) != -1);
-    bool isAnneCoop     = (StrContains(sReadyUpCfgName, "AnneCoop",    false) != -1);
-    bool isAnneRealism  = (StrContains(sReadyUpCfgName, "AnneRealism", false) != -1);
+    bool isAnneCoop      = (StrContains(sReadyUpCfgName, "AnneCoop",      false) != -1);
+    bool isAnneRealism   = (StrContains(sReadyUpCfgName, "AnneRealism",   false) != -1);
+    bool isAnneMutation4 = (StrContains(sReadyUpCfgName, "AnneMutation4", false) != -1);
     bool isAllCharger   = (StrContains(sReadyUpCfgName, "AllCharger",  false) != -1);
     bool is1vHunters    = (StrContains(sReadyUpCfgName, "1vHunters",   false) != -1);
     bool isWitchParty   = (StrContains(sReadyUpCfgName, "WitchParty",  false) != -1);
@@ -343,6 +347,10 @@ public void UpdateServerName()
     }
     else if (isAnneRealism) {
         ReplaceString(FinalHostname, sizeof(FinalHostname), "{Confogl}", "[Anne写实]");
+        IsAnne = true;
+    }
+    else if (isAnneMutation4) {
+        ReplaceString(FinalHostname, sizeof(FinalHostname), "{Confogl}", "[Anne绝境]");
         IsAnne = true;
     }
     else if (isAllCharger) {
@@ -390,7 +398,7 @@ public void UpdateServerName()
     int siCount = 0;
     int siInterval = -1;
 
-    if (isAnneCoop || isAnneRealism) {
+    if (isAnneCoop || isAnneRealism || isAnneMutation4) {
         if (cvarDirCount != null)        siCount = GetConVarInt(cvarDirCount);
         else if (cvarSI != null)         siCount = GetConVarInt(cvarSI);
 

@@ -33,14 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout Anne nav assets
-        uses: actions/checkout@v5
-        with:
-          repository: fantasylidong/anne
-          ref: zonemod
-          path: .anne
-          fetch-depth: 1
-
       # Same upstream compiler our check_plugins.yml CI gates on — pinned to
       # SourceMod 1.12. Putting `spcomp` on PATH for the next step.
       - name: Setup SourcePawn Compiler (SourceMod 1.12)
@@ -158,12 +150,10 @@ jobs:
 
           # Lean runtime overlay: only what gets dropped over left4dead2/.
           cp -a \
-            addons cfg scripts \
+            addons cfg maps scripts \
             host.txt motd.txt myhost.txt mymotd.txt \
             README.md LICENSE \
             "$STAGE"/
-          mkdir -p "$STAGE/maps/anne_nav"
-          cp -a "$GITHUB_WORKSPACE/.anne/update/maps/." "$STAGE/maps/anne_nav/"
 
           # Exclude the SourcePawn sources and the bundled compiler from the
           # shipped overlay (the compiled .smx in plugins/ are what runs).

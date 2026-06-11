@@ -57,15 +57,15 @@
 	{
 		"sm_fm coop"
 		{
-			"message" "战役模式"
+			"message" "Anne战役"
 		}
 		"sm_fm mutation4"
 		{
-			"message" "绝境求生模式"
+			"message" "Anne绝境"
 		}
 		"sm_fm realism"
 		{
-			"message" "写实模式"
+			"message" "Anne写实"
 		}
 	}
 	"杂项"
