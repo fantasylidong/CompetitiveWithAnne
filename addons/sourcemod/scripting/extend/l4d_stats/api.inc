@@ -10,7 +10,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 {
 	//API
 	RegPluginLibrary("l4d_stats");
-	
+
 	CreateNative("l4dstats_GetClientScore", Native_GetClientScore);
 	CreateNative("l4dstats_GetClientQuarterScore", Native_GetClientQuarterScore);
 	CreateNative("l4dstats_GetClientQuarterPlayTime", Native_GetClientQuarterPlayTime);
@@ -21,6 +21,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("l4dstats_GetClientPlayTime", Native_GetClientPlayTime);
 	CreateNative("l4dstats_IsTopPlayer", Native_IsTopPlayer);
 	CreateNative("l4dstats_IsQuarterTopPlayer", Native_IsQuarterTopPlayer);
+	CreateNative("l4dstats_IsTopPlayerCacheReady", Native_IsTopPlayerCacheReady);
+	CreateNative("l4dstats_IsClientScoreReady", Native_IsClientScoreReady);
+	CreateNative("l4dstats_GetClientRank", Native_GetClientRank);
 
 	//forward
 	AnnounceGameTime = CreateGlobalForward("l4dstats_AnnounceGameTime", ET_Ignore,Param_Cell);
@@ -33,7 +36,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public int Native_GetClientScore(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -45,14 +48,14 @@ public int Native_GetClientScore(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	return ClientPoints[client];
 }
 
 public int Native_GetClientPlayTime(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -64,14 +67,52 @@ public int Native_GetClientPlayTime(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	return ClientPlayTime[client];
+}
+
+public int Native_IsClientScoreReady(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+
+	if (client < 1 || client > MaxClients)
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+	}
+	if (!IsClientConnected(client))
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	}
+	if(IsFakeClient(client)){
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
+	}
+
+	return ClientScoreReady[client] ? 1 : 0;
+}
+
+public int Native_GetClientRank(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+
+	if (client < 1 || client > MaxClients)
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+	}
+	if (!IsClientConnected(client))
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	}
+	if(IsFakeClient(client)){
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
+	}
+
+	return ClientRank[client];
 }
 
 public int Native_GetClientQuarterScore(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -83,7 +124,7 @@ public int Native_GetClientQuarterScore(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	QuarterRank_EnsureCurrentQuarter();
 	return ClientQuarterPoints[client];
 }
@@ -91,7 +132,7 @@ public int Native_GetClientQuarterScore(Handle plugin, int numParams)
 public int Native_GetClientQuarterPlayTime(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -103,7 +144,7 @@ public int Native_GetClientQuarterPlayTime(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	QuarterRank_EnsureCurrentQuarter();
 	return ClientQuarterPlayTime[client];
 }
@@ -111,7 +152,7 @@ public int Native_GetClientQuarterPlayTime(Handle plugin, int numParams)
 public int Native_GetClientQuarterRank(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -123,7 +164,7 @@ public int Native_GetClientQuarterRank(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	QuarterRank_EnsureCurrentQuarter();
 	return ClientQuarterRank[client];
 }
@@ -152,10 +193,18 @@ public int Native_IsTopPlayer(Handle plugin, int numParams)
 		return ThrowNativeError(SP_ERROR_NATIVE, "rank limit value wrong");
 	}
 
+	if (!g_bTopPlayerCacheReady || !ClientScoreReady[client])
+		return 0;
+
 	if(ClientPoints[client] >= CheckPlayerPoint[ranklimit-1] && CheckPlayerPoint[ranklimit-1]> 0)
 		return 1;
 	else
 		return 0;
+}
+
+public int Native_IsTopPlayerCacheReady(Handle plugin, int numParams)
+{
+	return g_bTopPlayerCacheReady ? 1 : 0;
 }
 
 public int Native_IsQuarterTopPlayer(Handle plugin, int numParams)
@@ -203,18 +252,24 @@ public GetTop100PlayersScore(Handle:owner, Handle:hndl, const String:error[], an
 		LogError("GetPlayerScore failed! Reason: %s", error);
 		return;
 	}
-	
+
+	for (int j = 0; j < 100; j++)
+	{
+		CheckPlayerPoint[j] = 0;
+	}
+
 	int i=0;
 	while (SQL_FetchRow(hndl))
 	{
 		CheckPlayerPoint[i++] = SQL_FetchInt(hndl, 0);
 	}
+	g_bTopPlayerCacheReady = true;
 }
 
 public int Native_AddClientScore(Handle plugin, int numParams)
 {
 	int client = GetNativeCell(1);
-	
+
 	if (client < 1 || client > MaxClients)
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
@@ -226,7 +281,7 @@ public int Native_AddClientScore(Handle plugin, int numParams)
 	if(IsFakeClient(client)){
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
 	}
-	
+
 	int Score = GetNativeCell(2);
 	decl String:Reason[MAX_LINE_WIDTH];
 	strcopy(Reason, sizeof(Reason), "native_add_score");
@@ -239,9 +294,7 @@ public int Native_AddClientScore(Handle plugin, int numParams)
 	}
 
 	ScoreLog_SetContext(Reason, "native=l4dstats_AddClientScore");
-	if (Stats_AwardClientScore(client, Score))
-		ClientPoints[client] += Score;
-	else
+	if (!Stats_AwardClientScore(client, Score))
 		ScoreLog_ClearContext();
 	return ClientPoints[client];
 }

@@ -654,6 +654,7 @@ public GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:clie
 	if (SQL_FetchRow(hndl))
 	{
 		ClientPoints[client] = SQL_FetchInt(hndl, 0);
+		ClientScoreReady[client] = true;
 	}
 }
 
@@ -2920,6 +2921,7 @@ public DisplayClearPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 
 		ClientPoints[client] = 0;
 		ClientRank[client] = 0;
+		ClientScoreReady[client] = true;
 
 		decl String:Name[32];
 		GetClientName(client, Name, sizeof(Name));

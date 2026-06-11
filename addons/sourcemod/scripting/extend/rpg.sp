@@ -40,6 +40,7 @@ bool IsStart=false;
 bool IsAllowBigGun = false;
 bool g_bEnableGlow = true;
 bool  g_bAllowUseB = true;
+bool g_bPendingGlowRetry[MAXPLAYERS + 1];
 ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
 // === Admin Anti-Kick ===
@@ -318,6 +319,14 @@ static bool CanClientUseGlow(int client, int glowType)
 	return false;
 }
 
+static bool IsGlowRankDataReady(int client)
+{
+	if (!g_bl4dstatsSystemAvailable)
+		return true;
+
+	return l4dstats_IsTopPlayerCacheReady() != 0 && l4dstats_IsClientScoreReady(client) != 0;
+}
+
 static void ClearClientGlow(int client, bool persist, bool notify = false)
 {
 	if (!IsValidClient(client))
@@ -336,10 +345,36 @@ static void ClearClientGlow(int client, bool persist, bool notify = false)
 static bool ValidateClientGlow(int client, bool persist, bool notify = false)
 {
 	if (player[client].GlowType == 0 || CanClientUseGlow(client, player[client].GlowType))
+	{
+		g_bPendingGlowRetry[client] = false;
 		return true;
+	}
+
+	if (!IsGlowRankDataReady(client))
+	{
+		if (!g_bPendingGlowRetry[client])
+		{
+			g_bPendingGlowRetry[client] = true;
+			CreateTimer(3.0, Timer_RetryGlowApply, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+		}
+		return false;
+	}
 
 	ClearClientGlow(client, persist, notify);
 	return false;
+}
+
+public Action Timer_RetryGlowApply(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (!client || !IsClientInGame(client))
+		return Plugin_Stop;
+
+	g_bPendingGlowRetry[client] = false;
+	if (player[client].GlowType && g_bEnableGlow && GetClientTeam(client) == 2 && ValidateClientGlow(client, true, true))
+		GetAura(client, player[client].GlowType);
+
+	return Plugin_Stop;
 }
 
 // 解析 callvote/ sm_kick 里的目标参数，支持 "#userid" 或 精确姓名；
@@ -559,6 +594,7 @@ public void  OnPluginStart()
 	RegConsoleCmd("sm_applytags", ApplyTags, "佩戴自定义称号");
 	RegConsoleCmd("sm_rpg", BuyMenu, "打开购买菜单(只能在游戏中)");
 	RegAdminCmd("sm_rpginfo", RpgInfo, ADMFLAG_ROOT ,"输出rpg人物信息");
+	RegAdminCmd("sm_rpgglowdebug", RpgGlowDebug, ADMFLAG_ROOT, "输出RPG轮廓权限调试信息");
 	//RegAdminCmd("sm_skintest", Tryskin, ADMFLAG_ROOT ,"测试皮肤rgb值");
 	//RegAdminCmd("sm_aruatest", Tryskin, ADMFLAG_ROOT ,"测试轮廓rgb值");
 	for(int i=1;i<MaxClients;i++){
@@ -597,6 +633,11 @@ public void OnConfigsExecuted()
 // *********************
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	if (convar == AllowBigGun)
+		IsAllowBigGun = GetConVarBool(AllowBigGun);
+	else if (convar == g_hEnableGlow)
+		g_bEnableGlow = GetConVarBool(g_hEnableGlow);
+
 	// 先单独处理 rpg_allow_UseB（不依赖 infected_control）
 	if (convar == g_hAllowUseB)
 	{
@@ -616,9 +657,6 @@ void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newV
 		if(valid)CPrintToChatAll("%t", "RPG_RANKVariablesRequiredDetermineExtra");
 		SetRoundValid(false);
 	}
-
-	IsAllowBigGun = GetConVarBool(AllowBigGun);
-	g_bEnableGlow = GetConVarBool(g_hEnableGlow);
 }
 
 public void Event_PlayerDisconnectOrAFK( Event hEvent, const char[] sName, bool bDontBroadcast )
@@ -890,6 +928,62 @@ public void OnClientDisconnect(int client)
 {
 	g_iDbLoadRetryCount[client] = 0;
 	g_bPendingCustomTagApply[client] = false;
+	g_bPendingGlowRetry[client] = false;
+}
+
+public Action RpgGlowDebug(int client, int args)
+{
+	if (client != 0 && !IsValidClient(client))
+		return Plugin_Handled;
+
+	int target = client;
+	if (args >= 1)
+	{
+		char arg[64];
+		GetCmdArg(1, arg, sizeof(arg));
+		int found = FindTarget(client, arg, true, false);
+		if (found > 0)
+			target = found;
+	}
+	else if (client == 0)
+	{
+		ReplyToCommand(client, "[RPGGlow] Usage: sm_rpgglowdebug <player>");
+		return Plugin_Handled;
+	}
+
+	if (!IsValidClient(target) || IsFakeClient(target))
+	{
+		ReplyToCommand(client, "[RPGGlow] invalid human target.");
+		return Plugin_Handled;
+	}
+
+	char cfgName[128] = "";
+	char gameMode[32] = "";
+	ConVar cfgCvar = FindConVar("l4d_ready_cfg_name");
+	ConVar gameModeCvar = FindConVar("mp_gamemode");
+	if (cfgCvar != null)
+		cfgCvar.GetString(cfgName, sizeof(cfgName));
+	if (gameModeCvar != null)
+		gameModeCvar.GetString(gameMode, sizeof(gameMode));
+
+	int score = -1;
+	int rank = 0;
+	int cacheReady = -1;
+	int scoreReady = -1;
+	int top1 = 0;
+	if (g_bl4dstatsSystemAvailable && IsValidClient(target) && !IsFakeClient(target))
+	{
+		score = l4dstats_GetClientScore(target);
+		rank = l4dstats_GetClientRank(target);
+		cacheReady = l4dstats_IsTopPlayerCacheReady();
+		scoreReady = l4dstats_IsClientScoreReady(target);
+		top1 = l4dstats_IsTopPlayer(target, 1);
+	}
+
+	ReplyToCommand(client, "[RPGGlow] target=%N glow=%d allow_glow=%d pending_retry=%d", target, player[target].GlowType, g_bEnableGlow ? 1 : 0, g_bPendingGlowRetry[target] ? 1 : 0);
+	ReplyToCommand(client, "[RPGGlow] l4d_stats=%d cache_ready=%d score_ready=%d score=%d rank=%d top1=%d root=%d", g_bl4dstatsSystemAvailable ? 1 : 0, cacheReady, scoreReady, score, rank, top1, HasRootGlowAccess(target) ? 1 : 0);
+	ReplyToCommand(client, "[RPGGlow] can_basic=%d can_gold=%d can_rainbow=%d cfg=\"%s\" mp_gamemode=\"%s\"", HasBasicGlowAccess(target) ? 1 : 0, CanClientUseGlow(target, 15) ? 1 : 0, CanClientUseGlow(target, 16) ? 1 : 0, cfgName, gameMode);
+	return Plugin_Handled;
 }
 
 public Action SetClientTag(Handle timer, int client)

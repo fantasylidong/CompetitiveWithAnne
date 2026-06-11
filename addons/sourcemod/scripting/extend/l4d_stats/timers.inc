@@ -319,6 +319,7 @@ public Action:timer_UpdatePlayers(Handle:timer, Handle:hndl)
 	if (Stats_HasPlaytimeStarted())
 		UpdateMapStat("playtime", 1);
 
+	GetTop100PlayerScore();
 	QuarterRank_QueryTop100Scores();
 
 	new maxplayers = MaxClients;
@@ -389,6 +390,7 @@ public GetBasicInf(Handle:owner, Handle:hndl, const String:error[], any:client)
 		Playtime = SQL_FetchInt(hndl, 0);
 		ClientPlayTime[client] = Playtime;
 		ClientPoints[client] = SQL_FetchInt(hndl, 1);
+		ClientScoreReady[client] = true;
 		Call_StartForward(SuccessGetPlayerTime);//转发触发
 		Call_PushCell(client);//按顺序将参数push进forward传参列表里
 		Call_Finish();//转发结束

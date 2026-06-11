@@ -168,6 +168,9 @@ public Action:AnnounceConnect(Handle:timer, any:client)
 public OnClientDisconnect(client)
 {
 	InitializeClientInf(client);
+	ClientScoreReady[client] = false;
+	ClientPoints[client] = 0;
+	ClientRank[client] = 0;
 	PlayerRankVote[client] = RANKVOTE_NOVOTE;
 	ClientRankMute[client] = false;
 	QuarterRankChangeLastRank[client] = 0;

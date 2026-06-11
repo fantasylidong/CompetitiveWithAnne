@@ -503,6 +503,8 @@ public AddScore(Client, Score)
 {
 	// ToDo: use cvar_MaxPoints to check if the score is within the map limits
 	CurrentPoints[Client] += Score;
+	ClientPoints[Client] += Score;
+	ClientScoreReady[Client] = true;
 	ScoreLog_Record(Client, Score);
 	QuarterRank_RecordScore(Client, Score);
 	ModeStats_RecordScore(Client, Score);

@@ -23,6 +23,9 @@ public void __pl_l4d_stats_SetNTVOptional()
 	MarkNativeAsOptional("l4dstats_GetCurrentQuarter");
 	MarkNativeAsOptional("l4dstats_IsTopPlayer");
 	MarkNativeAsOptional("l4dstats_IsQuarterTopPlayer");
+	MarkNativeAsOptional("l4dstats_IsTopPlayerCacheReady");
+	MarkNativeAsOptional("l4dstats_IsClientScoreReady");
+	MarkNativeAsOptional("l4dstats_GetClientRank");
 	MarkNativeAsOptional("l4dstats_GetClientPlayTime");
 	MarkNativeAsOptional("l4dstats_AddClientScore");
 	MarkNativeAsOptional("l4dstats_AdddClientScore");
@@ -75,6 +78,28 @@ native int l4dstats_GetCurrentQuarter();
  * @return		0 for false, 1 for true.
  */
 native int l4dstats_IsTopPlayer(int client, int ranklimit);
+/**
+ * get whether total Top100 cache has loaded.
+ *
+ * @return		0 for false, 1 for true.
+ */
+native int l4dstats_IsTopPlayerCacheReady();
+/**
+ * get whether a player's total score has loaded.
+ *
+ * @param client		Client Index.
+ *
+ * @return		0 for false, 1 for true.
+ */
+native int l4dstats_IsClientScoreReady(int client);
+/**
+ * get a player's total rank.
+ *
+ * @param client		Client Index.
+ *
+ * @return		Player rank, 0 if not loaded or not ranked.
+ */
+native int l4dstats_GetClientRank(int client);
 /**
  * get whether a player is in the current-quarter top ranklimit.
  *
