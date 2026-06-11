@@ -371,6 +371,23 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 #### ai_smoker3.smx
 - 同步树树子上游更新
 
+### 2026年6月10日-6月11日更新记录
+#### 私有玩家武器属性系统
+- 新增私有 per-player 枪械/近战属性实验链路，包含 `l4d2_pwa_native_attrs.smx`、`l4d2_pma_native_attrs.smx`、`l4d2_pma_trace_attrs.smx`、`l4d2_pma_attackseg_attrs.smx`、`l4d2_player_attr_db.smx`、`l4d2_weaponinfo_dump.smx`。
+- 枪械层支持按玩家覆盖伤害、射速、换弹/部署/循环、弹夹、子弹数、散布/后坐/穿透/射程、衰减、Tank 伤害倍率等已验证字段；native 字段通过 detour 极短窗口 apply/restore，避免多人同 tick 串值。
+- 近战层拆成基础属性、Trace 轨迹和 Attack Segment 三层：基础属性处理伤害、挥速、idle、伤害类型；Trace 处理范围、方向缩放、yaw 偏移；Attack Segment 处理脚本攻击段里的 start/end dir、命中窗口、duration、动画和 force_dir。
+- `l4d2_player_attr_db.smx` 接入 NewAnneWeb 数据库，玩家进服/换配置时读取缓存后的属性表，插件不依赖游戏服之间共享本地文件。
+- 管理员枪械手感 preset 改为按当前 vote 武器配置的基线做百分比增强，避免 Anne/coop/其他模式已经改过的武器被原生默认值覆盖；当前 preset 为后坐降低 5%、蹲下准确率增加 5%、衰减降低 3%。
+- 管理员原版小刀 preset 改为写入 `attackseg` 轨迹层，只覆盖和服务器当前小刀不同的攻击段字段：主攻击窗口恢复 `0.05-0.35` 并使用 AXE 动画，副攻击恢复 `.7 / 0.08-0.4`，不再写无差异的伤害、挥速和普通 trace 覆盖。
+- `weaponinfo_dump` 用于只读 dump weapon info、melee info、trace/attack segment 默认值，方便后续补齐反编译字段和做实机审计。
+
+#### NewAnneWeb 后台与私有部署
+- NewAnneWeb 新增“默认值”和“玩家武器属性”后台入口，可查看枪械默认值、近战默认值、近战轨迹默认值，并按玩家、模式、武器、属性新增/修改/删除覆盖。
+- 前台玩家页同步开放武器默认值查看入口；后台额外提供管理员小刀轨迹 preset、管理员枪械手感 preset 和 vote 武器默认值编辑。
+- NewAnneWeb 私有 Updater 镜像新增 `private/Anne_Updater_PlayerWeaponAttrs.txt`，用于只给白名单服务器下发玩家武器属性相关插件；私有文件登记到后台文件管理并保持前台隐藏。
+- `join.smx` 支持私有更新链接部署，anne2 已验证能通过 `join_autoupdate=2` 下载并 reload 私有插件。
+- 因 anne2 的 `addons/sourcemod/gamedata` 目录当前不可写，私有 Updater 清单只下发 `.smx`；gamedata、cfg、sql 支持文件仍保存在 NewAnneWeb 私有镜像中，由人工或后续权限修复后再下发。
+
 ### 2026年4月16日-5月16日更新记录
 #### 基础环境与上游同步
 - SourceMod 更新到 1.12.0.7230，同步 bin、extensions、基础插件和 spcomp 编译器。

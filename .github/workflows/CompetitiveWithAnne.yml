@@ -44,8 +44,8 @@ jobs:
           cp -R anne/left4dead2/sound/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/left4dead2/models/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
           cp -R anne/left4dead2/materials/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          mkdir -p CompetitiveWithAnne-${{ steps.date.outputs.date }}/update/maps/anne_nav/
-          cp anne/update/maps/* CompetitiveWithAnne-${{ steps.date.outputs.date }}/update/maps/anne_nav/
+          mkdir -p CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/maps/anne_nav/
+          cp -R anne/update/maps/. CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/maps/anne_nav/
           tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
 
       - name: Gzip norank&&sourcebans&&lilac
