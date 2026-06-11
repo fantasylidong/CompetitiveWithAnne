@@ -101,11 +101,6 @@ public void OnConfigsExecuted()
 	EnsureStripperCfgPathHook();
 }
 
-public void OnMapStart()
-{
-	ResetLastStatus("not attempted for current map");
-}
-
 public void OnPluginEnd()
 {
 	if (g_iReadFilePreHookId != INVALID_HOOK_ID)
