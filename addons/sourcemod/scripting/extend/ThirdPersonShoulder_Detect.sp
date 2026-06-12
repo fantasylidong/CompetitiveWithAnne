@@ -4,7 +4,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.5.3"
+#define PLUGIN_VERSION "1.5.4"
 
 public Plugin myinfo =
 {
@@ -20,6 +20,7 @@ static bool bThirdPerson[MAXPLAYERS+1];
 static bool bThirdPersonFix[MAXPLAYERS+1];
 
 static Handle hCvar_GameMode = INVALID_HANDLE;
+static Handle hCvar_AllowVersus = INVALID_HANDLE;
 Handle g_hOnThirdPersonChanged = INVALID_HANDLE;
 
 
@@ -34,14 +35,15 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	CreateConVar("ThirdPersonShoulder_Detect_Version", PLUGIN_VERSION, "Version Of Plugin", FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_DONTRECORD);
+	hCvar_AllowVersus = CreateConVar("thirdpersonshoulder_detect_allow_versus", "0", "0=force firstperson state in versus, 1=detect actual client thirdperson state in versus-based configs.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
 	HookEvent("player_team", eTeamChange);
 	HookEvent("player_death", ePlayerDeath);
 	HookEvent("survivor_rescued", eSurvivorRescued);
 
-	
 	hCvar_GameMode = FindConVar("mp_gamemode");
 	HookConVarChange(hCvar_GameMode, eConvarChanged);
+	HookConVarChange(hCvar_AllowVersus, eConvarChanged);
 	
 	
 	CreateTimer(0.25, tThirdPersonCheck, INVALID_HANDLE, TIMER_REPEAT);
@@ -62,23 +64,22 @@ void CvarsChanged()
 	char sGamemode[7];
 	GetConVarString(hCvar_GameMode, sGamemode, sizeof(sGamemode));
 	
-	static bool bWasVersus;
+	static bool bWasBlockedVersus;
 	bVersus = StrEqual("versus", sGamemode, false);
-	if(bVersus)
+	if(ShouldForceFirstPersonInVersus())
 	{
 		for(int i = 1; i <= MaxClients; i++)
 			if(__IsValidClient(i))
 				TP_PushForwardToPlugins(i, true, false);
-		bWasVersus = true;
+		bWasBlockedVersus = true;
 	}
 	else
 	{
-		if(bWasVersus)
+		if(bWasBlockedVersus)
 			for(int i = 1; i <= MaxClients; i++)
 				if(__IsValidClient(i))
 					TP_PushForwardToPlugins(i);
-				
-		bWasVersus = false;
+			bWasBlockedVersus = false;
 	}
 }
 
@@ -119,12 +120,17 @@ public void QueryClientConVarCallback(QueryCookie sCookie, int iClient, ConVarQu
 	if(bLastVal == bThirdPerson[iClient])
 		return;
 	
-	if(bVersus)
+	if(ShouldForceFirstPersonInVersus())
 	{
 		TP_PushForwardToPlugins(iClient, true, false);
 		return;
 	}
 	TP_PushForwardToPlugins(iClient);
+}
+
+static bool ShouldForceFirstPersonInVersus()
+{
+	return bVersus && !GetConVarBool(hCvar_AllowVersus);
 }
 
 static void TP_PushForwardToPlugins(int iClient, bool bOverride=false, bool bIsThirdPerson=false)
