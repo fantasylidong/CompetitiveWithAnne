@@ -3,36 +3,24 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <SteamWorks>
-
-#define DESC_RECOMPUTE_INTERVAL 10.0
 
 /*
  * =====================================================
- *  Anne 系列：服务器名 + GameDescription 动态更新
+ *  Anne 系列：服务器名动态更新
  *  规则：
- *  - 未载入配置（l4d_ready_cfg_name 为空/无）：GameDescription = "电信服"
- *  - 载入配置：GameDescription = "电信服-<模式>[<几特><几秒>]"
- *      * <模式>：普通药役/硬核药役/Anne战役/Anne写实/Anne绝境/牛牛冲刺/HT训练/女巫派对/单人装逼/或原 cfg 名
- *      * Anne战役/Anne写实/Anne绝境：几特几秒来自 dirspawn_count / dirspawn_interval
- *      * 其它：来自 l4d_infected_limit / versus_special_respawn_interval
  *  - 服务器名（房间名）：{hostname}{gamemode}
  *      => hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]
  *      * [缺人]：未满员显示（Anne 系列只看幸存者位）
  *      * [无mod]：l4d2_addons_eclipse == 0 时显示
- *
- *  性能与节流：
- *  - 开服 / OnConfigsExecuted：立即重算一次 description（仅写缓存）
- *  - 每 10 秒重算一次 description（仅写缓存）
- *  - OnGameFrame：每帧推送当前缓存到 SteamWorks
+ *  - A2S_INFO GameDescription 由 a2s-proxy-go 按服务器名标签重写
  * =====================================================
  */
 
 public Plugin myinfo =
 {
-    name        = "Anne ServerName & GameDescription",
+    name        = "Anne ServerName",
     author      = "东",
-    description = "动态服务器名 + GameDescription [几特几秒]",
+    description = "动态服务器名",
     version     = "1.4.6",
     url         = ""
 };
@@ -62,9 +50,6 @@ char g_sDefaultN[68];
 
 ConVar g_hHostNameFormat;        // sn_hostname_format（默认 "{hostname}{gamemode}"）
 
-// ======= GameDescription 推送缓存与定时器 =======
-static char  g_sDescComputed[128];   // 最近一次“重算”得到的描述
-
 // -----------------------------
 // Lifecycle
 // -----------------------------
@@ -91,7 +76,7 @@ public void OnPluginStart()
 
     cvarMod = FindConVar("l4d2_addons_eclipse");
 
-    // 人数变化时刷新服务器名（不触发 description 重算）
+    // 人数变化时刷新服务器名
     HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
     HookEvent("player_bot_replace", Event_PlayerTeam, EventHookMode_Post);
     HookEvent("bot_player_replace", Event_PlayerTeam, EventHookMode_Post);
@@ -106,7 +91,6 @@ public void OnAllPluginsLoaded()
 
     cvarDirCount    = FindConVar("dirspawn_count");
     cvarDirInterval = FindConVar("dirspawn_interval");
-    StartDescriptionTimer();
 }
 
 public void OnConfigsExecuted()
@@ -118,16 +102,13 @@ public void OnConfigsExecuted()
     if (cvarDirCount == null)          cvarDirCount = FindConVar("dirspawn_count");
     if (cvarDirInterval == null)       cvarDirInterval = FindConVar("dirspawn_interval");
 
-    // 关心的 ConVar 仅用于“服务器名”即时刷新；description 改为定时重算
+    // 关心的 ConVar 用于“服务器名”即时刷新
     if (cvarSI != null)                cvarSI.AddChangeHook(OnCvarChanged);
     if (cvarMpGameMin != null)         cvarMpGameMin.AddChangeHook(OnCvarChanged);
     if (cvarMpGameMode != null)        cvarMpGameMode.AddChangeHook(OnCvarChanged);
     if (cvarMod != null)               cvarMod.AddChangeHook(OnCvarChanged);
     if (cvarDirCount != null)          cvarDirCount.AddChangeHook(OnCvarChanged);
     if (cvarDirInterval != null)       cvarDirInterval.AddChangeHook(OnCvarChanged);
-
-    // 开服后：立即重算一次（只写缓存）
-    RecomputeDescriptionCached();
 
     // 刷新服务器名（房间名）
     Update();
@@ -145,8 +126,7 @@ public void OnMapStart()
         FileToKeyValues(HostName, SavePath);
     }
 
-    // 换图时也重算一次缓存
-    RecomputeDescriptionCached();
+    Update();
 }
 
 public void OnPluginEnd()
@@ -166,18 +146,18 @@ public void OnPluginEnd()
 
 public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
 {
-    // 人员变化：只更新服务器名（不重算 description）
+    // 人员变化：只更新服务器名
     Update();
 }
 
 public void OnCvarChanged(ConVar cvar, const char[] oldVal, const char[] newVal)
 {
-    // ConVar 变化：只更新服务器名（description 交给 10s 定时器）
+    // ConVar 变化：只更新服务器名
     Update();
 }
 
 // -----------------------------
-// 主更新入口（仅服务器名；description 不在此推送）
+// 主更新入口（仅服务器名）
 // -----------------------------
 public void Update()
 {
@@ -185,124 +165,6 @@ public void Update()
         ChangeServerName();
     } else {
         UpdateServerName();
-    }
-}
-
-// -----------------------------
-// 每帧推送当前缓存到 SteamWorks。
-// -----------------------------
-public void OnGameFrame()
-{
-    SteamWorks_SetGameDescription(g_sDescComputed);
-}
-
-// -----------------------------
-// 启动 10s GameDescription 缓存重算定时器
-// -----------------------------
-void StartDescriptionTimer()
-{
-    CreateTimer(DESC_RECOMPUTE_INTERVAL, Timer_RecomputeDesc, _, TIMER_REPEAT);
-}
-
-// -----------------------------
-// 定时重算（10s），只更新缓存
-// -----------------------------
-public Action Timer_RecomputeDesc(Handle timer, any data)
-{
-    RecomputeDescriptionCached();
-    return Plugin_Continue;
-}
-
-// -----------------------------
-// 立即按当前 cvar 重算一次描述（只写入缓存）
-// -----------------------------
-void RecomputeDescriptionCached()
-{
-    char desc[128];
-    BuildGameDescription(desc, sizeof(desc));
-    strcopy(g_sDescComputed, sizeof(g_sDescComputed), desc);
-}
-
-// -----------------------------
-// 构造 GameDescription 文本（跟随模式标签）：
-// 未载入配置：电信服
-// 已载入配置：电信服-<模式>[<几特><几秒>]
-// -----------------------------
-void BuildGameDescription(char[] out, int maxlen)
-{
-    // 读取模式 cvar
-    char cfg[128];
-    cfg[0] = '\0';
-    if (cvarMpGameMode != null) {
-        GetConVarString(cvarMpGameMode, cfg, sizeof(cfg));
-    }
-
-    // 未载入配置：只显示“电信服”
-    if (cfg[0] == '\0') {
-        Format(out, maxlen, "电信服");
-        return;
-    }
-
-    // 模式识别
-    bool isAnneHappy    = (StrContains(cfg, "AnneHappy",   false) != -1);
-    bool isHardCore     = (StrContains(cfg, "HardCore",    false) != -1);
-    bool isShotgun      = (StrContains(cfg, "Shotgun",     false) != -1);
-    bool isAnneCoop      = (StrContains(cfg, "AnneCoop",      false) != -1);
-    bool isAnneRealism   = (StrContains(cfg, "AnneRealism",   false) != -1);
-    bool isAnneMutation4 = (StrContains(cfg, "AnneMutation4", false) != -1);
-    bool isAllCharger   = (StrContains(cfg, "AllCharger",  false) != -1);
-    bool is1vHunters    = (StrContains(cfg, "1vHunters",   false) != -1);
-    bool isWitchParty   = (StrContains(cfg, "WitchParty",  false) != -1);
-    bool isAlone        = (StrContains(cfg, "Alone",       false) != -1);
-
-    // 标签文本
-    char mode[32];
-    if (isAnneHappy) {
-        if (isShotgun) {
-            strcopy(mode, sizeof(mode), "喷子药役");
-        } else {
-            strcopy(mode, sizeof(mode), isHardCore ? "硬核药役" : "普通药役");
-        }
-    } else if (isAnneCoop) {
-        strcopy(mode, sizeof(mode), "Anne战役");
-    } else if (isAnneRealism) {
-        strcopy(mode, sizeof(mode), "Anne写实");
-    } else if (isAnneMutation4) {
-        strcopy(mode, sizeof(mode), "Anne绝境");
-    } else if (isAllCharger) {
-        strcopy(mode, sizeof(mode), "牛牛冲刺");
-    } else if (is1vHunters) {
-        strcopy(mode, sizeof(mode), "HT训练");
-    } else if (isWitchParty) {
-        strcopy(mode, sizeof(mode), "女巫派对");
-    } else if (isAlone) {
-        strcopy(mode, sizeof(mode), "单人装逼");
-    } else {
-        // 未识别到 Anne 系列就直接显示原 cfg 值
-        strcopy(mode, sizeof(mode), cfg);
-    }
-
-    // 选择“几特几秒”的来源
-    bool usesDirSpawn = (isAnneCoop || isAnneRealism || isAnneMutation4);
-    int  siCount      = 0;
-    int  siInterval   = -1;
-
-    if (usesDirSpawn) {
-        if (cvarDirCount != null)        siCount = GetConVarInt(cvarDirCount);
-        else if (cvarSI != null)         siCount = GetConVarInt(cvarSI);
-
-        if (cvarDirInterval != null)     siInterval = RoundToNearest(GetConVarFloat(cvarDirInterval));
-        else if (cvarMpGameMin != null)  siInterval = GetConVarInt(cvarMpGameMin);
-    } else {
-        if (cvarSI != null)              siCount = GetConVarInt(cvarSI);
-        if (cvarMpGameMin != null)       siInterval = GetConVarInt(cvarMpGameMin);
-    }
-
-    // 最终格式：电信服-<模式>[<几特><几秒>]
-    if (siCount > 0 && siInterval >= 0) {
-        Format(out, maxlen, "电信服-%s[%d特%d秒]", mode, siCount, siInterval);
-    } else {
-        Format(out, maxlen, "电信服-%s", mode);
     }
 }
 
