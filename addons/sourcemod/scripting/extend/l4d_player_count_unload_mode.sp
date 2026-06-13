@@ -48,8 +48,9 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <multicolors>      // https://github.com/fbef0102/L4D1_2-Plugins/releases
+#include <SteamWorks>
 
-#define PLUGIN_VERSION			"1.1.1-2026/06/11"
+#define PLUGIN_VERSION			"1.1.2-2026/06/13"
 #define PLUGIN_NAME			    "l4d_player_count_unload_mode"
 #define DEBUG 0
 
@@ -132,6 +133,7 @@ bool g_bAutoServerId;
 int g_iLastActiveServers, g_iLastTotalServers;
 int g_iLastStatusWriteTime, g_iLastStatusPlayerCount = -1;
 int g_iPeakHoldUntil;
+int g_iLastAddressWarnTime;
 
 public void OnPluginStart()
 {
@@ -149,7 +151,7 @@ public void OnPluginStart()
     g_hCvarPeakHoldTime = CreateConVar( PLUGIN_NAME ... "_peak_hold_time", "3600",          "peak_mode=1 时，一旦进入高峰期后至少持续限制多少秒；0=不保持", CVAR_FLAGS, true, 0.0);
     g_hCvarDBConfig     = CreateConVar( PLUGIN_NAME ... "_db_config",     "l4dstats",        "peak_mode=1 使用的 databases.cfg 区块名", CVAR_FLAGS);
     g_hCvarServerId     = CreateConVar( PLUGIN_NAME ... "_server_id",     "",               "本服务器唯一ID；留空时优先从hostname提取前缀#编号，如Anne云服#21，失败则使用hostname:hostport", CVAR_FLAGS);
-    g_hCvarServerIp     = CreateConVar( PLUGIN_NAME ... "_server_ip",     "",               "写入网页状态表的服务器公网IP/域名；可填host或host:port；留空时自动读取net_public_adr/ip/hostip", CVAR_FLAGS);
+    g_hCvarServerIp     = CreateConVar( PLUGIN_NAME ... "_server_ip",     "",               "写入网页状态表的服务器公网IP/域名；可填host或host:port；留空时自动读取SteamWorks公网IP/net_public_adr/ip/hostip，自动值必须是公网地址", CVAR_FLAGS);
     g_hCvarServerPort   = CreateConVar( PLUGIN_NAME ... "_server_port",   "0",              "写入网页状态表的服务器外网端口；0=自动读取hostport/port；server_ip填host:port时优先使用其中端口", CVAR_FLAGS, true, 0.0, true, 65535.0);
     g_hCvarStatusTable  = CreateConVar( PLUGIN_NAME ... "_status_table",  "l4d_server_status", "peak_mode=1 使用的服务器状态表名", CVAR_FLAGS);
     g_hCvarStatusInterval = CreateConVar(PLUGIN_NAME ... "_status_interval", "180.0",       "peak_mode=1 本服人数写入数据库的心跳间隔秒数；人数变化时会尽快写入", CVAR_FLAGS, true, 5.0);
@@ -1290,8 +1292,10 @@ void BuildServerIdFromHostname(const char[] hostname, char[] buffer, int maxlen)
 
 bool BuildCurrentServerAddress(char[] ipBuffer, int ipMaxLen, int &port, char[] addressKey, int addressKeyMaxLen)
 {
+    bool bManualAddress = false;
     if (g_sCvarServerIp[0] != '\0')
     {
+        bManualAddress = true;
         strcopy(ipBuffer, ipMaxLen, g_sCvarServerIp);
         int configuredPort = 0;
         ExtractAddressPort(ipBuffer, configuredPort);
@@ -1315,6 +1319,12 @@ bool BuildCurrentServerAddress(char[] ipBuffer, int ipMaxLen, int &port, char[] 
     TrimString(ipBuffer);
     if (ipBuffer[0] == '\0' || port <= 0)
         return false;
+
+    if (!IsUsableServerHost(ipBuffer))
+    {
+        LogInvalidServerAddress(ipBuffer, bManualAddress);
+        return false;
+    }
 
     FormatEx(addressKey, addressKeyMaxLen, "%s:%d", ipBuffer, port);
     TrimString(addressKey);
@@ -1378,12 +1388,15 @@ int GetCurrentServerPort()
 
 bool GetCurrentServerPublicIp(char[] buffer, int maxlen)
 {
+    if (GetSteamWorksPublicIp(buffer, maxlen))
+        return true;
+
     ConVar hPublicAdr = FindConVar("net_public_adr");
     if (hPublicAdr != null)
     {
         hPublicAdr.GetString(buffer, maxlen);
         TrimString(buffer);
-        if (buffer[0] != '\0')
+        if (IsUsableServerHost(buffer))
             return true;
     }
 
@@ -1392,7 +1405,7 @@ bool GetCurrentServerPublicIp(char[] buffer, int maxlen)
     {
         hIp.GetString(buffer, maxlen);
         TrimString(buffer);
-        if (buffer[0] != '\0' && !StrEqual(buffer, "0.0.0.0") && !StrEqual(buffer, "localhost", false))
+        if (IsUsableServerHost(buffer))
             return true;
     }
 
@@ -1407,12 +1420,135 @@ bool GetCurrentServerPublicIp(char[] buffer, int maxlen)
                 (iHostIp >> 16) & 0xFF,
                 (iHostIp >> 8) & 0xFF,
                 iHostIp & 0xFF);
-            return true;
+            if (IsUsableServerHost(buffer))
+                return true;
         }
     }
 
     buffer[0] = '\0';
     return false;
+}
+
+bool GetSteamWorksPublicIp(char[] buffer, int maxlen)
+{
+    if (GetFeatureStatus(FeatureType_Native, "SteamWorks_GetPublicIP") != FeatureStatus_Available)
+        return false;
+
+    int ipaddr[4];
+    if (!SteamWorks_GetPublicIP(ipaddr))
+        return false;
+
+    FormatEx(buffer, maxlen, "%d.%d.%d.%d", ipaddr[0], ipaddr[1], ipaddr[2], ipaddr[3]);
+    TrimString(buffer);
+    return IsUsableServerHost(buffer);
+}
+
+bool IsUsableServerHost(const char[] host)
+{
+    if (host[0] == '\0')
+        return false;
+
+    if (StrEqual(host, "localhost", false))
+        return false;
+
+    int octets[4];
+    if (!ParseIpv4(host, octets))
+    {
+        if (LooksLikeIpv4(host))
+            return false;
+        return true;
+    }
+
+    return IsPublicIpv4(octets);
+}
+
+bool LooksLikeIpv4(const char[] value)
+{
+    bool hasDigit = false;
+    bool hasDot = false;
+    int len = strlen(value);
+    for (int i = 0; i < len; i++)
+    {
+        if (value[i] >= '0' && value[i] <= '9')
+        {
+            hasDigit = true;
+            continue;
+        }
+        if (value[i] == '.')
+        {
+            hasDot = true;
+            continue;
+        }
+
+        return false;
+    }
+
+    return hasDigit && hasDot;
+}
+
+bool ParseIpv4(const char[] value, int octets[4])
+{
+    char parts[4][4];
+    if (ExplodeString(value, ".", parts, 4, sizeof(parts[])) != 4)
+        return false;
+
+    for (int i = 0; i < 4; i++)
+    {
+        int len = strlen(parts[i]);
+        if (len <= 0 || len > 3)
+            return false;
+
+        for (int j = 0; j < len; j++)
+        {
+            if (parts[i][j] < '0' || parts[i][j] > '9')
+                return false;
+        }
+
+        octets[i] = StringToInt(parts[i]);
+        if (octets[i] < 0 || octets[i] > 255)
+            return false;
+    }
+
+    return true;
+}
+
+bool IsPublicIpv4(const int octets[4])
+{
+    if (octets[0] == 0 || octets[0] == 10 || octets[0] == 127)
+        return false;
+    if (octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127)
+        return false;
+    if (octets[0] == 169 && octets[1] == 254)
+        return false;
+    if (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
+        return false;
+    if (octets[0] == 192 && octets[1] == 0 && (octets[2] == 0 || octets[2] == 2))
+        return false;
+    if (octets[0] == 192 && octets[1] == 88 && octets[2] == 99)
+        return false;
+    if (octets[0] == 192 && octets[1] == 168)
+        return false;
+    if (octets[0] == 198 && (octets[1] == 18 || octets[1] == 19))
+        return false;
+    if (octets[0] == 198 && octets[1] == 51 && octets[2] == 100)
+        return false;
+    if (octets[0] == 203 && octets[1] == 0 && octets[2] == 113)
+        return false;
+    if (octets[0] >= 224)
+        return false;
+
+    return true;
+}
+
+void LogInvalidServerAddress(const char[] host, bool manual)
+{
+    int now = GetTime();
+    if (now - g_iLastAddressWarnTime < 300)
+        return;
+
+    g_iLastAddressWarnTime = now;
+    LogError("[%s] %s server address '%s' is not a public address; status heartbeat address upload skipped. Set %s_server_ip to the public IP/domain if auto detection cannot see it.",
+        PLUGIN_NAME, manual ? "Configured" : "Detected", host, PLUGIN_NAME);
 }
 
 bool BuildCurrentServerId(const char[] hostname, char[] buffer, int maxlen)
