@@ -4,6 +4,7 @@
 #define _infected_control_wave_control_included
 
 // 波控制：负责开波、自动刷特窗口以及暂停恢复。
+// 重构后使用 WaveDecider 进行决策，本模块只负责执行。
 void StartWave()
 {
     ClearPathCache();
@@ -30,6 +31,7 @@ void StartWave()
         gST.siQueueCount = gCV.iSiLimit;
 
     AntiBait_OnWaveStart();
+    WaveDecider_OnWaveStart();  // 通知波决策器
     Debug_Print("Start wave %d", gST.waveIndex);
 }
 
@@ -49,6 +51,7 @@ static void ScheduleNextWave()
 
 Action Timer_CheckSpawnWindow(Handle timer)
 {
+    // 暂停检查
     if (g_bPauseLib && IsInPause())
     {
         if (gST.hSpawn != INVALID_HANDLE)
@@ -65,28 +68,33 @@ Action Timer_CheckSpawnWindow(Handle timer)
 
     gST.lastSpawnSecs++;
     if (!gST.bLate) return Plugin_Stop;
+
+    // 更新 Anti-Bait 状态
     AntiBait_Update();
 
-    if (!gST.bShouldCheck || gST.hSpawn != INVALID_HANDLE) return Plugin_Continue;
+    // 更新波决策器（核心逻辑）
+    WaveDecider_Update();
 
-    int survivorLimit = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
-    if (survivorLimit >= 2 && IsAnyTankOrAboveHalfSurvivorDownOrDied(1) && !DifficultyStrategy_CanEvaluateWave())
-        return Plugin_Continue;
-
-    bool reachedConfiguredSpawnTime = DifficultyStrategy_CanStartConfiguredWave();
-    bool shouldHoldByAntiBait = AntiBait_ShouldHoldWave();
-
-    // 注意：0.1s 定时器只用于延迟调用，真正的间隔保护由
-    // versus_special_respawn_interval 负责；anti-baiter 只会在到点后拦截或放行。
-    if (reachedConfiguredSpawnTime)
+    // 兼容性：保持原有的手动触发逻辑（如果波决策器未激活）
+    if (!WaveDecider_IsActive() && gST.bShouldCheck && gST.hSpawn == INVALID_HANDLE)
     {
-        if (gST.siQueueCount == gCV.iSiLimit)
+        int survivorLimit = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
+        if (survivorLimit >= 2 && IsAnyTankOrAboveHalfSurvivorDownOrDied(1) && !DifficultyStrategy_CanEvaluateWave())
+            return Plugin_Continue;
+
+        bool reachedConfiguredSpawnTime = DifficultyStrategy_CanStartConfiguredWave();
+        bool shouldHoldByAntiBait = AntiBait_ShouldHoldWave();
+
+        if (reachedConfiguredSpawnTime)
         {
-            gST.lastSpawnSecs = 0;
-        }
-        else if (!shouldHoldByAntiBait)
-        {
-            ScheduleNextWave();
+            if (gST.siQueueCount == gCV.iSiLimit)
+            {
+                gST.lastSpawnSecs = 0;
+            }
+            else if (!shouldHoldByAntiBait)
+            {
+                ScheduleNextWave();
+            }
         }
     }
 

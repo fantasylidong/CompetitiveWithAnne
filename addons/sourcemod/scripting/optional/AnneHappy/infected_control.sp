@@ -185,6 +185,9 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 #include "infected_control/nav_cache.inc"
 #include "infected_control/nav_persist.inc"
 #include "infected_control/nav_buckets.inc"
+#include "infected_control/spawn_perf_optimizer.inc"
+#include "infected_control/spawn_perf_config.inc"
+#include "infected_control/wave_decider.inc"
 #include "infected_control/wave_control.inc"
 #include "infected_control/spawn_core.inc"
 #include "infected_control/spawn_attempts.inc"
@@ -255,6 +258,7 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 public void OnPluginStart()
 {
 	LoadTranslations("infected_control.phrases");
+    SpawnPerfConfig_Create();
     gCV.Create();
     gQ.Create();
     gST.Reset();
@@ -282,6 +286,9 @@ public void OnPluginStart()
     RegAdminCmd("sm_np",      Cmd_NavPeek, ADMFLAG_GENERIC, "查看准星 Nav 的分桶与属性(别名)");
     RegAdminCmd("sm_navtest", Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分");
     RegAdminCmd("sm_nt",      Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分(别名)");
+    RegAdminCmd("sm_wavestatus", Cmd_WaveStatus, ADMFLAG_GENERIC, "查看当前波决策器状态");
+
+    RegisterSpawnPerfCommands();
 
     HookEvent("finale_win",      Event_RoundEnd);
     HookEvent("mission_lost",    Event_RoundEnd);
@@ -314,6 +321,9 @@ public void OnMapEnd()
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     ClearPathCache();
     ClearNavAreasCache();
+
+    if (SpawnPerfConfig_ShowStats())
+        SpawnPerf_OnMapEnd();
 }
 
 // =========================
@@ -356,6 +366,29 @@ public Action Cmd_StopSpawn(int client, int args)
     return Plugin_Handled;
 }
 
+public Action Cmd_WaveStatus(int client, int args)
+{
+    if (!gST.bLate)
+    {
+        ReplyToCommand(client, "[IC] 刷特系统尚未启动");
+        return Plugin_Handled;
+    }
+
+    WaveDecisionState state = WaveDecider_GetState();
+    float elapsed = GetGameTime() - gST.lastWaveStartTime;
+
+    char stateName[32];
+    WaveDecider_GetStateName(state, stateName, sizeof(stateName));
+
+    ReplyToCommand(client, "[IC] 波决策器状态: %s", stateName);
+    ReplyToCommand(client, "  波序号: %d", gST.waveIndex);
+    ReplyToCommand(client, "  已用时: %.1f秒", elapsed);
+    ReplyToCommand(client, "  特感: %d/%d", gST.totalSI, gCV.iSiLimit);
+    ReplyToCommand(client, "  Anti-Bait: %s", AntiBait_IsTeamHolding() ? "拦截中" : "放行");
+
+    return Plugin_Handled;
+}
+
 // 重建 NavArea 缓存和分桶缓存
 public Action Cmd_RebuildNavCache(int client, int args)
 {
@@ -386,6 +419,7 @@ static void StopAll()
     Queue_SyncSizes();
     gST.Reset();
     AntiBait_OnRoundStart();
+    WaveDecider_OnRoundStart();
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
@@ -422,6 +456,8 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
     AntiBait_OnRoundStart();
+    SpawnPerf_OnRoundStart();
+    WaveDecider_OnRoundStart();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
     CreateTimer(1.0,  Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
     CreateTimer(2.0, Timer_RebuildBuckets, _, TIMER_FLAG_NO_MAPCHANGE); // 地图开局重建分桶

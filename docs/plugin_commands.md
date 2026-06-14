@@ -621,14 +621,14 @@ sm_pma_trace_attr_live_audit "#userid_a" "#userid_b"
 | `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_clear <target>` | 管理员 | ADMFLAG_ROOT | 清除目标 AttackSeg profile。 |
 | `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_status` | 管理员 | ADMFLAG_ROOT | 查看 detour 计数、apply/restore 计数、未恢复事务数量和在线 profile。 |
 | `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_dump_current <target>` | 管理员 | ADMFLAG_ROOT | dump 目标当前 `weapon+0x1824` 指向的挥砍段内容。通常需要目标刚挥砍过或正在挥砍。 |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_apply_original_knife <target>` | 管理员 | ADMFLAG_ROOT | 给目标写入原版小刀攻击段 preset。当前覆盖方向、窗口、duration、forcedir，不覆盖 ACT 字符串动画。 |
+| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_apply_original_knife <target>` | 管理员 | ADMFLAG_ROOT | 给目标写入 VPK 原版小刀攻击段 preset，覆盖方向、窗口、duration、forcedir 和 AXE 动画 activity 编号。 |
 | `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_live_audit <target_a> <target_b> [melee\|@active]` | 管理员 | ADMFLAG_ROOT | 临时写入两套不同攻击段，强制同 tick 挥砍，并在日志里检查 Start/GetActivity/DoSwing/apply/restore 是否完整。 |
 
 原版小刀攻击段手动测试：
 
 ```text
-sm_pma_attackseg_set "#userid" knife primary 0 startdir W enddir E duration 1.1 starttime 0.05 endtime 0.35 forcedir 8 -4 0
-sm_pma_attackseg_set "#userid" knife secondary 0 startdir W enddir E duration 0.7 starttime 0.08 endtime 0.4
+sm_pma_attackseg_set "#userid" knife primary 0 activity 197 playeractivity 1125 playeractivityidle 1126 startdir W enddir E duration 1.1 starttime 0.05 endtime 0.35 forcedir 8 -4 0
+sm_pma_attackseg_set "#userid" knife secondary 0 activity 192 playeractivity 1133 playeractivityidle 1133 startdir W enddir E duration 0.7 starttime 0.08 endtime 0.4
 sm_pma_attackseg_status
 sm_pma_attackseg_live_audit "#userid_a" "#userid_b" knife
 ```

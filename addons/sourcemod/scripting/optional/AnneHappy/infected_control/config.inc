@@ -621,6 +621,7 @@ enum struct Config
 
         this.Refresh();
         this.ApplyMaxZombieBound();
+        SpawnPerfConfig_Refresh();
     }
 
     void Refresh()

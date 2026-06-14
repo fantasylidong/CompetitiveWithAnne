@@ -100,6 +100,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!area || !IsValidFlags(area.SpawnAttributes, finaleArea))
     {
         stats.flags++;
+        SpawnPerf_RecordFilterByFlags();
         return false;
     }
 
@@ -131,11 +132,20 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         slack = HeightRingSlack(pos, bucketMinZ, bucketMaxZ, allMaxZ);
 
     float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
+
+    if (!SpawnCore_QuickDistancePrecheckAnySurvivor(pos, ringEff))
+    {
+        stats.distance++;
+        SpawnPerf_RecordFilterByDist();
+        return false;
+    }
+
     float dminEye = GetMinEyeDistToAnySurvivor(pos);
 
     if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff))
     {
         stats.distance++;
+        SpawnPerf_RecordFilterByDist();
         return false;
     }
     if (!PassMinSeparation(pos))
@@ -156,6 +166,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (IsPosVisibleSDK(pos, teleportMode))
     {
         stats.visibility++;
+        SpawnPerf_RecordFilterByVisibility();
         return false;
     }
     if (PathPenalty_NoBuild(pos, targetSurvivor, searchRange, gCV.fSpawnMax) != 0.0)
@@ -166,11 +177,13 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!PassBucketShareLimit(candidateBucket))
     {
         stats.bucket++;
+        SpawnPerf_RecordFilterByBucket();
         return false;
     }
 
     bool rawBadFlow = IsFlowAbnormal(flow, mapMaxFlowDist);
     int sector = ComputeSectorIndex(center, pos, sectors);
+    SpawnPerf_RecordFullEvaluation();
     if (!SpawnScore_BuildCandidate(zc, pos, dminEye, ringEff, slack,
                                    candidateBucket, centerBucket, rawBadFlow,
                                    refEyeZ, allMaxZ, sector, preferredSector,
@@ -189,12 +202,33 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     return true;
 }
 
+static bool SpawnCore_QuickDistancePrecheckAnySurvivor(const float pos[3], float maxDist)
+{
+    if (!SpawnPerfConfig_UseEarlyDistanceFilter())
+        return true;
+
+    float surPos[3];
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        GetClientAbsOrigin(i, surPos);
+        if (QuickDistancePrecheck(pos, surPos, 0.0, maxDist))
+            return true;
+    }
+    return false;
+}
+
 bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool teleportMode,
                             float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
+    float perfStart = GetEngineTime();
+
     if (!GetSurPosData())
     {
         Debug_Print("[FIND FAIL] no survivor data");
+        SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, false);
         return false;
     }
 
@@ -263,8 +297,13 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
     if (useBuckets)
     {
         int win = ClampInt(ComputeDynamicBucketWindow(searchRange), 0, 100);
+        if (SpawnPerfConfig_UseAdaptiveBucketWindow())
+            win = ClampInt(ComputeAdaptiveBucketWindow(searchRange, win), 0, 100);
+
         int order[FLOW_BUCKETS];
-        int orderLen = BuildBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order);
+        int orderLen = SpawnPerfConfig_UseProgressiveSampling()
+            ? BuildOptimizedBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order)
+            : BuildBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order);
 
         for (int orderIdx = 0; orderIdx < orderLen; orderIdx++)
         {
@@ -297,6 +336,7 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
                     SpawnScore_CopyDbg(dbgOut, candDbg);
                     SpawnCore_CopyPos(outPos, candDbg.pos);
                     outAreaIdx = areaIdx;
+                    SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
                     return true;
                 }
 
@@ -333,6 +373,7 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
                 SpawnScore_CopyDbg(dbgOut, candDbg);
                 SpawnCore_CopyPos(outPos, candDbg.pos);
                 outAreaIdx = areaIdx;
+                SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
                 return true;
             }
 
@@ -350,12 +391,14 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
         Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
                     searchRange, stats.cooldown, stats.flags, stats.flow, stats.distance, stats.separation,
                     stats.stuck, stats.visibility, stats.path, stats.position, stats.score, stats.bucket);
+        SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, false);
         return false;
     }
 
     SpawnScore_CopyDbg(dbgOut, bestDbg);
     SpawnCore_CopyPos(outPos, bestDbg.pos);
     outAreaIdx = bestDbg.areaIdx;
+    SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
     return true;
 }
 

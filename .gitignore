@@ -94,3 +94,4 @@ tools/a2s-proxy-go/
 scripts/l4d2-docker.README.md
 scripts/l4d2-docker.README.md
 docs/l4d2-docker.sh
+addons/sourcemod/configs/hextags.cfg.backup

@@ -31,6 +31,7 @@ enum struct AntiBaitRuntime
     bool teamHolding;
     bool attackableSpread;
     bool allPinned;
+    bool spreadStallPressure;
 
     void Reset()
     {
@@ -51,6 +52,7 @@ enum struct AntiBaitRuntime
         this.teamHolding = false;
         this.attackableSpread = false;
         this.allPinned = false;
+        this.spreadStallPressure = false;
     }
 }
 
@@ -85,6 +87,8 @@ static void AntiBait_SetState(AntiBaitState next, float now, const char[] reason
     gAB.stateSince = now;
     if (next == AB_Pressure)
         gAB.pressureSince = now;
+    else
+        gAB.spreadStallPressure = false;
 }
 
 static int AntiBait_ClampPct(int pct)
@@ -322,6 +326,25 @@ static bool AntiBait_TeamAttackableSpread(float spreadDist, int isolatedCount, i
     return gCV.fAntiBaitTeamDist > 0.0 && spreadDist >= gCV.fAntiBaitTeamDist;
 }
 
+// === 新增：供 WaveDecider 使用的公共接口 ===
+stock bool AntiBait_IsStalled()
+{
+    // 检查生还者是否停滞不前
+    float now = GetGameTime();
+    float stalledTime = now - gAB.lastProgressTime;
+    return stalledTime >= gCV.fAntiBaitWindow;
+}
+
+stock bool AntiBait_IsTeamHolding()
+{
+    return gAB.teamHolding;
+}
+
+stock bool AntiBait_IsAttackableSpread()
+{
+    return gAB.attackableSpread;
+}
+
 static bool AntiBait_IsRunnerCandidate(int client, int maxPct, int medianPct)
 {
     if (!IsValidSurvivor(client) || !IsPlayerAlive(client) || IsPinned(client) || L4D_IsPlayerIncapacitated(client))
@@ -467,18 +490,28 @@ void AntiBait_Update()
                    || ((maxPct - gAB.baselineMaxPct) >= gCV.iAntiBaitProgressPct);
     bool releasedBySpread = gAB.attackableSpread;
 
-    if (progressed || releasedBySpread)
+    if (progressed)
     {
-        if (progressed)
-        {
-            gAB.baselineAvgPct = avgPct;
-            gAB.baselineMaxPct = maxPct;
-        }
+        gAB.baselineAvgPct = avgPct;
+        gAB.baselineMaxPct = maxPct;
         gAB.lastProgressTime = now;
+        gAB.spreadStallPressure = false;
         if (gAB.state == AB_Pressure)
-            AntiBait_SetState(AB_Recover, now, progressed ? "progress" : "spread");
+            AntiBait_SetState(AB_Recover, now, "progress");
         else if (gAB.state == AB_Recover && (now - gAB.stateSince) >= gCV.fAntiBaitRecover)
             AntiBait_SetState(AB_Observe, now, "recovered");
+        return;
+    }
+
+    if (releasedBySpread && gAB.state == AB_Pressure && !gAB.spreadStallPressure)
+    {
+        gAB.lastProgressTime = now;
+        AntiBait_SetState(AB_Recover, now, "spread");
+        return;
+    }
+    else if (releasedBySpread && gAB.state == AB_Recover && (now - gAB.stateSince) >= gCV.fAntiBaitRecover)
+    {
+        AntiBait_SetState(AB_Observe, now, "recovered");
         return;
     }
 
@@ -499,8 +532,21 @@ void AntiBait_Update()
     if (gAB.state == AB_Observe)
     {
         bool stalled = (now - gAB.lastProgressTime) >= gCV.fAntiBaitWindow;
+
+        // 新增：分散但停滞，也主动施压（不推进+无卡位也打一波）
+        if (stalled && !gAB.teamHolding && gAB.attackableSpread)
+        {
+            AntiBait_SetState(AB_Pressure, now, "spread but stalled - apply pressure");
+            gAB.spreadStallPressure = true;
+            return;
+        }
+
+        // 原有：密集且停滞
         if (stalled && AntiBait_IsSpawnWindowPressure() && gAB.teamHolding)
+        {
+            gAB.spreadStallPressure = false;
             AntiBait_SetState(AB_Pressure, now, "team holding near spawn window");
+        }
     }
 }
 

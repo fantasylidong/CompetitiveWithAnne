@@ -82,6 +82,9 @@ int
 float
     g_fUpdateFrequency[NPC_COUNT];
 
+int
+    g_iUpdateTick[NPC_COUNT];
+
 public Plugin myinfo =
 {
     name        = "l4d2_npc_manager",
@@ -143,6 +146,9 @@ void UpdateCvars()
     {
         g_fUpdateFrequency[i] = g_hCvar_UpdateFrequency[i].FloatValue;
         g_fUpdateFrequency[i] = g_fUpdateFrequency[i] <= tickinterval ? tickinterval : g_fUpdateFrequency[i];
+
+        g_iUpdateTick[i] = RoundToNearest(g_fUpdateFrequency[i] / tickinterval);
+        g_iUpdateTick[i] = g_iUpdateTick[i] < 1 ? 1 : g_iUpdateTick[i];
     }
     updatetick = RoundToNearest(g_hCvar_Origin_UpdateFrequency.FloatValue / tickinterval);
     updatetick = updatetick < 1 ? 1 : updatetick;
@@ -167,7 +173,9 @@ MRESReturn DTR_NextBotManager_Register_Post(Address pManager, DHookReturn hRetur
 
 MRESReturn DTR_NextBotManager_UnRegister_Post(Address pManager, DHookReturn hReturn, DHookParam hParams)
 {
-    int ptr               = hParams.GetObjectVar(1, 8, ObjectValueType_Int);
+    int ptr = hParams.GetObjectVar(1, 8, ObjectValueType_Int);
+    if (ptr < 0 || ptr >= sizeof(m_botlist)) return MRES_Ignored;
+
     m_botlist[ptr].entity = -1;
     return MRES_Ignored;
 }
@@ -229,14 +237,16 @@ int GetEntityClassID(int entity)
 MRESReturn DTR_NextBotManager_ShouldUpdate_Pre(Address pManager, DHookReturn hReturn, DHookParam hParams)
 {
     int ptr = hParams.GetObjectVar(1, 8, ObjectValueType_Int);
+    if (ptr < 0 || ptr >= sizeof(m_botlist)) return MRES_Ignored;
+
     if (m_botlist[ptr].entity != -1)
     {
         int current = GetGameTickCount();
         int class   = m_botlist[ptr].class;
-        if (class == -1) return MRES_Ignored;
+        if (class < 0 || class >= NPC_COUNT) return MRES_Ignored;
 
         int last   = hParams.GetObjectVar(1, 16, ObjectValueType_Int);
-        int update = RoundToNearest(g_fUpdateFrequency[m_botlist[ptr].class] / GetTickInterval());
+        int update = g_iUpdateTick[class];
         if (current < last + update)
         {
             hReturn.Value = 0;

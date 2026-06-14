@@ -379,7 +379,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 近战层拆成基础属性、Trace 轨迹和 Attack Segment 三层：基础属性处理伤害、挥速、idle、伤害类型；Trace 处理范围、方向缩放、yaw 偏移；Attack Segment 处理脚本攻击段里的 start/end dir、命中窗口、duration、动画和 force_dir。
 - `l4d2_player_attr_db.smx` 接入 NewAnneWeb 数据库，玩家进服/换配置时读取缓存后的属性表，插件不依赖游戏服之间共享本地文件。
 - 管理员枪械手感 preset 改为按当前 vote 武器配置的基线做百分比增强，避免 Anne/coop/其他模式已经改过的武器被原生默认值覆盖；当前 preset 为后坐降低 5%、蹲下准确率增加 5%、衰减降低 3%。
-- 管理员原版小刀 preset 改为写入 `attackseg` 轨迹层，只覆盖和服务器当前小刀不同的攻击段字段：主攻击窗口恢复 `0.05-0.35` 并使用 AXE 动画，副攻击恢复 `.7 / 0.08-0.4`，不再写无差异的伤害、挥速和普通 trace 覆盖。
+- 管理员原版小刀 preset 改为严格按 `【武器】恢复原版小刀.vpk` 的 `scripts/melee/knife.txt` 写入 `attackseg` 覆盖：主攻击窗口 `0.05-0.35` 并使用 AXE 动画，副攻击 `.7 / 0.08-0.4` 并使用 AXE 副攻击动画；写入前会清理所有模式旧的管理员小刀 PMA/Trace/AttackSeg 覆盖，不再写伤害、挥速或 trace 距离增强。
 - `weaponinfo_dump` 用于只读 dump weapon info、melee info、trace/attack segment 默认值，方便后续补齐反编译字段和做实机审计。
 
 #### NewAnneWeb 后台与私有部署
