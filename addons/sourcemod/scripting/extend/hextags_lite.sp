@@ -11,7 +11,7 @@
 #include <rpg>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.3"
 
 // ===== 全局变量 =====
 CustomTags g_PlayerTags[MAXPLAYERS + 1];
@@ -60,10 +60,6 @@ public void OnPluginStart() {
     RegConsoleCmd("sm_chenghao", Cmd_TagsList, "选择称号");
     RegConsoleCmd("sm_ch", Cmd_TagsList, "选择称号");
     RegConsoleCmd("sm_toggletags", Cmd_ToggleTags, "切换称号显示");
-
-    // 聊天监听
-    AddCommandListener(Listener_Say, "say");
-    AddCommandListener(Listener_Say, "say_team");
 
     // 配置路径
     BuildPath(Path_SM, g_sConfigPath, sizeof(g_sConfigPath), "configs/hextags_lite.cfg");
@@ -159,20 +155,44 @@ public Action Cmd_ToggleTags(int client, int args) {
 }
 
 // ===== 聊天处理 =====
-public Action Listener_Say(int client, const char[] command, int argc) {
-    if (!IsValidClient(client) || g_bHideTag[client]) {
+public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs) {
+    if (!IsValidClient(client)) {
         return Plugin_Continue;
     }
 
     char sMessage[MAXLENGTH_MESSAGE];
-    GetCmdArgString(sMessage, sizeof(sMessage));
+    strcopy(sMessage, sizeof(sMessage), sArgs);
     StripQuotes(sMessage);
 
     if (strlen(sMessage) == 0) {
         return Plugin_Continue;
     }
 
-    // 构建带称号的消息
+    char sChatCommand[64];
+    char sArguments[MAXLENGTH_MESSAGE];
+
+    if (GetChatTriggerCommand(sMessage, sChatCommand, sizeof(sChatCommand), sArguments, sizeof(sArguments))) {
+        if (IsVisibleChatCommand(sChatCommand)) {
+            if (sMessage[0] == '!' && !g_bHideTag[client]) {
+                PrintTaggedChatMessage(client, command, sMessage);
+                return Plugin_Handled;
+            }
+
+            return Plugin_Continue;
+        }
+
+        return Plugin_Handled;
+    }
+
+    if (g_bHideTag[client]) {
+        return Plugin_Continue;
+    }
+
+    PrintTaggedChatMessage(client, command, sMessage);
+    return Plugin_Handled;
+}
+
+void PrintTaggedChatMessage(int client, const char[] command, const char[] message) {
     char sName[MAXLENGTH_NAME];
     GetClientName(client, sName, sizeof(sName));
 
@@ -185,9 +205,8 @@ public Action Listener_Say(int client, const char[] command, int argc) {
     char sFullMessage[MAXLENGTH_MESSAGE];
     FormatEx(sFullMessage, sizeof(sFullMessage), "%s%s",
         g_PlayerTags[client].ChatColor,
-        sMessage);
+        message);
 
-    // 发送消息
     int team = GetClientTeam(client);
     bool teamChat = StrEqual(command, "say_team");
 
@@ -197,8 +216,6 @@ public Action Listener_Say(int client, const char[] command, int argc) {
 
         CPrintToChat(i, "{default}%s{default} : %s", sFullName, sFullMessage);
     }
-
-    return Plugin_Handled;
 }
 
 // ===== 配置加载 =====
@@ -456,4 +473,66 @@ public int Native_ResetClientTag(Handle plugin, int numParams) {
 // ===== 辅助函数 =====
 bool IsValidClient(int client) {
     return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client));
+}
+
+// 提取聊天触发器命令，例如 !rygive -> rygive，/sm_ban -> sm_ban。
+bool GetChatTriggerCommand(const char[] message, char[] command, int commandLen, char[] arguments, int argumentsLen) {
+    command[0] = '\0';
+    arguments[0] = '\0';
+
+    if (message[0] != '!' && message[0] != '/') {
+        return false;
+    }
+
+    char body[MAXLENGTH_MESSAGE];
+    strcopy(body, sizeof(body), message[1]);
+    TrimString(body);
+
+    if (body[0] == '\0') {
+        return false;
+    }
+
+    int next = BreakString(body, command, commandLen);
+    TrimString(command);
+
+    if (command[0] == '\0') {
+        return false;
+    }
+
+    if (next != -1) {
+        strcopy(arguments, argumentsLen, body[next]);
+        TrimString(arguments);
+    }
+
+    return true;
+}
+
+// 白名单命令允许像普通聊天一样显示，其余 ! / 命令只执行不显示。
+bool IsVisibleChatCommand(const char[] command) {
+    char normalized[64];
+
+    if (StrContains(command, "sm_", false) == 0) {
+        strcopy(normalized, sizeof(normalized), command[3]);
+    } else {
+        strcopy(normalized, sizeof(normalized), command);
+    }
+
+    for (int i = 0; normalized[i] != '\0'; i++) {
+        normalized[i] = CharToLower(normalized[i]);
+    }
+
+    static const char allowedCommands[][] = {
+        "vote",
+        "rtv",
+        "nominate",
+        "revote"
+    };
+
+    for (int i = 0; i < sizeof(allowedCommands); i++) {
+        if (StrEqual(normalized, allowedCommands[i], false)) {
+            return true;
+        }
+    }
+
+    return false;
 }
