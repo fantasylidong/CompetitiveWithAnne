@@ -60,19 +60,25 @@
 
 
 
-// Natives: 283 (including 3 for L4D1 only)
-// L4D1 = 31 [left4downtown] + 47 [l4d_direct] + 16 [l4d2addresses] + 79 [silvers - mine!] + 4 [anim] = 178
-// L4D2 = 61 [left4downtown] + 59 [l4d_direct] + 31 [l4d2addresses] + 127 [silvers - mine!] + 4 [anim] = 282
+// DEFINES:
+// For the "L4D_GetPVSForCluster" and "L4D_CheckOriginInPVS" natives
+#define PVS_BUFFER_SIZE 8192
+
+
+
+// Natives: 301 (including 3 for L4D1 only)
+// L4D1 = 198
+// L4D2 = 298
 // Methods and Natives by "Forgetest": 53 [PlayerAnimState] + 22 [Ammo_t] + 15 [AmmoDef] = 90
 
-// Forwards: 248 (including 5 for L4D1 only)
-// L4D1 = 158
-// L4D2 = 243
+// Forwards: 256 (including 8 for L4D1 only)
+// L4D1 = 177
+// L4D2 = 248
 
-// Stocks: 169 (L4D1 = 114, L4D2 = 167)
-// left4dhooks_silver			46 stocks	(L4D1 = 39,		L4D2 = 53)
-// left4dhooks_stocks			86 stocks	(L4D1 = 46,		L4D2 = 81)
-// left4dhooks_lux_library		34 stocks	(L4D1 = 30,		L4D2 = 34)
+// Stocks: 187 (L4D1 = 127, L4D2 = 181)		(including 6 for L4D1 only)
+// left4dhooks_silver			58 stocks	(L4D1 = 43,		L4D2 = 57)		(including 1 for L4D1 only)
+// left4dhooks_stocks			86 stocks	(L4D1 = 45,		L4D2 = 81)		(including 5 for L4D1 only)
+// left4dhooks_lux_library		43 stocks	(L4D1 = 39,		L4D2 = 43)
 
 
 
@@ -111,6 +117,8 @@ public void __pl_l4dh_SetNTVOptional()
 	MarkNativeAsOptional("L4D_OnITExpired");
 	MarkNativeAsOptional("L4D_EstimateFallingDamage");
 	MarkNativeAsOptional("L4D_GetEntityWorldSpaceCenter");
+	MarkNativeAsOptional("L4D_GetMass");
+	MarkNativeAsOptional("L4D_SetMass");
 	MarkNativeAsOptional("L4D_AngularVelocity");
 	MarkNativeAsOptional("L4D_GetRandomPZSpawnPosition");
 	MarkNativeAsOptional("L4D_GetNearestNavArea");
@@ -124,6 +132,13 @@ public void __pl_l4dh_SetNTVOptional()
 	MarkNativeAsOptional("L4D2_SetFirstSpawnClass");
 	MarkNativeAsOptional("L4D_FindRandomSpot");
 	MarkNativeAsOptional("L4D2_IsVisibleToPlayer");
+	MarkNativeAsOptional("L4D_IsPotentiallyVisibleToTeam");
+	MarkNativeAsOptional("L4D_IsPotentiallyVisible");
+	MarkNativeAsOptional("L4D_IsCompletelyVisibleToTeam");
+	MarkNativeAsOptional("L4D_IsCompletelyVisible");
+	MarkNativeAsOptional("L4D_GetClusterForOrigin");
+	MarkNativeAsOptional("L4D_GetPVSForCluster");
+	MarkNativeAsOptional("L4D_CheckOriginInPVS");
 	MarkNativeAsOptional("L4D2_GetSpecialInfectedDominatingMe");
 	MarkNativeAsOptional("L4D_HasAnySurvivorLeftSafeArea");
 	MarkNativeAsOptional("L4D_IsAnySurvivorInStartArea");
@@ -228,9 +243,13 @@ public void __pl_l4dh_SetNTVOptional()
 	MarkNativeAsOptional("L4D_GetNavAreaPos");
 	MarkNativeAsOptional("L4D_GetNavAreaCenter");
 	MarkNativeAsOptional("L4D_GetNavAreaSize");
+	MarkNativeAsOptional("L4D_NavArea_GetCorner");
+	MarkNativeAsOptional("L4D_NavArea_GetZ");
 	MarkNativeAsOptional("L4D_NavArea_GetAdjacentCount");
 	MarkNativeAsOptional("L4D_NavArea_GetAdjacentAreas");
 	MarkNativeAsOptional("L4D_NavArea_IsConnected");
+	MarkNativeAsOptional("L4D_GetNavArea_GetElevator");
+	MarkNativeAsOptional("L4D_GetNavArea_GetLadder");
 	MarkNativeAsOptional("L4D_NavArea_IsBlocked");
 	MarkNativeAsOptional("L4D_GetNavArea_SpawnAttributes");
 	MarkNativeAsOptional("L4D_SetNavArea_SpawnAttributes");
@@ -558,7 +577,8 @@ enum PointerType
 	POINTER_MUSICBANKS		= 17,	// pMusicBanks (L4D2 Only)
 	POINTER_SESSIONMANAGER	= 18,	// pSessionManager (L4D2 Only)
 	POINTER_CHALLENGEMODE	= 19,	// pChallengeMode (L4D2 Only) (mutation modes)
-	POINTER_THENEXTBOTS		= 20	// TheNextBots pointer (L4D2 Only)
+	POINTER_THENEXTBOTS		= 20,	// TheNextBots pointer (L4D2 Only)
+	POINTER_ENGINE			= 21,	// @engine
 };
 
 // Provided by "BHaType":
@@ -704,6 +724,14 @@ enum
 	NAV_WEST = 3,
 	NAV_ALL = 4
 };
+
+enum NavCornerType
+{
+	NORTH_WEST = 0,
+	NORTH_EAST = 1,
+	SOUTH_EAST = 2,
+	SOUTH_WEST = 3
+}
 
 // List provided by "A1m`" taken from: https://github.com/A1mDev/l4d2_structs/blob/master/terror_player_animstate.h
 // There are constants that are not used, these constants were already inside the engine, the developers added their own over the existing code
@@ -1328,7 +1356,7 @@ methodmap AmmoDef
 // ====================================================================================================
 
 /**
- * @brief Returns a weapons classname from the WeaponType valu
+ * @brief Returns a weapons classname from the WeaponType value
  * @remarks This is only to prevent SM 1.12 warnings about unused variables
  *
  * @param type			WeaponType
@@ -4302,7 +4330,7 @@ forward void L4D1_FirstAidKit_StartHealing_PostHandled(int client, int entity);
  * @return					Plugin_Handled to block action, Plugin_Continue otherwise
  */
 // L4D2 only
-forward Action L4D2_OnStartUseAction(any action, int client, int target);
+forward Action L4D2_OnStartUseAction(L4D2UseAction action, int client, int target);
 
 /**
  * @brief Called whenever CTerrorPlayer::StartUseAction() is invoked
@@ -4317,7 +4345,7 @@ forward Action L4D2_OnStartUseAction(any action, int client, int target);
  * @noreturn
  */
 // L4D2 only
-forward void L4D2_OnStartUseAction_Post(any action, int client, int target);
+forward void L4D2_OnStartUseAction_Post(L4D2UseAction action, int client, int target);
 
 /**
  * @brief Called whenever CTerrorPlayer::StartUseAction() is invoked
@@ -4331,7 +4359,7 @@ forward void L4D2_OnStartUseAction_Post(any action, int client, int target);
  * @noreturn
  */
 // L4D2 only
-forward void L4D2_OnStartUseAction_PostHandled(any action, int client, int target);
+forward void L4D2_OnStartUseAction_PostHandled(L4D2UseAction action, int client, int target);
 
 /**
  * @brief Called whenever CBaseBackpackItem::StartAction() is invoked
@@ -4524,6 +4552,16 @@ forward void L4D2_CGasCan_ActionComplete_Post(int client, int gascan, int nozzle
  */
 // L4D2 only
 forward void L4D2_CGasCan_ActionComplete_PostHandled(int client, int gascan, int nozzle);
+
+/**
+ * @brief Called when the "OnMapStart" forward has fired for "Left4DHooks" and this plugin is ready
+ * @remarks Plugins can use this forward for natives that require waiting until Left4DHooks is fully setup
+ * @remarks This is a better option than waiting 1 frame after "OnMapStart" fires in other plugins
+ * @remarks This avoids having to use "L4D_HasMapStarted" in "OnMapStart"
+ *
+ * @noreturn
+ */
+forward void L4D_OnLeft4DHooks_OnMapStart();
 
 /**
  * @brief Returns the current game mode type when it changes. 0=Unknown or error. 1=Coop. 2=Versus. 4=Survival. 8=Scavenge (L4D2)
@@ -5050,6 +5088,25 @@ native float L4D_EstimateFallingDamage(int client);
 native void L4D_GetEntityWorldSpaceCenter(int entity, float vecPos[3]);
 
 /**
+ * @brief Returns the mass of an object
+ *
+ * @param entity	The physics object entity
+ *
+ * @return			Mass of object or 1.0 if invalid object
+ */
+native float L4D_GetMass(int entity);
+
+/**
+ * @brief Sets the mass of an object
+ *
+ * @param entity	The physics object entity
+ * @param mass		New mass of the object
+ *
+ * @noreturn
+ */
+native void L4D_SetMass(int entity, float mass);
+
+/**
  * @brief Sets a physics entity angular velocity vector
  * @remarks Spins an entity, for example used in "Throwable Melee Weapons" plugin by Silvers
  * @remarks See the "left4dhooks_test" plugin for an example on spinning the entity top over or sideways
@@ -5189,12 +5246,84 @@ native void L4D_FindRandomSpot(int NavArea, float vecPos[3]);
  * @param client			Client to check visibility from
  * @param team				The team of the client, can possibly pass 0 to 3
  * @param team_target		Target point team, if it is 0, the client's angle will be considered
- * @param NavArea			NavArea of ​​the target, or 0 to automatically get with GetNearestNavArea
+ * @param navArea			NavArea of ​​the target, or 0 to automatically get with GetNearestNavArea
  * @param vecPos			The vector position of the target location
  *
  * @return					True if visible, false otherwise
  */
+// L4D2 only
 native bool L4D2_IsVisibleToPlayer(int client, int team, int team_target, int NavArea, float vecPos[3]);
+
+/**
+ * @brief Returns true if any portion of the NavArea is visible to anyone on the given team
+ *
+ * @param navArea			The NavArea you want to check if visible
+ * @param team				The team to check
+ *
+ * @return					True if visible, false otherwise
+ */
+native bool L4D_IsPotentiallyVisibleToTeam(int navArea, int team);
+
+/**
+ * @brief Returns true if any portion of the NavArea is visible to the otherArea
+ *
+ * @param navArea			The NavArea you want to check if visible
+ * @param otherArea			The otherArea to check from
+ * @param ignoreDistance	True = ignored. False = if the navArea is marked as NAV_SPAWN_OBSCURED then the areas must be within "nav_obscure_range" (default: 400) or it will return false
+ *
+ * @return					True if visible, false otherwise
+ */
+native bool L4D_IsPotentiallyVisible(int navArea, int otherArea, bool ignoreDistance = true);
+
+/**
+ * @brief Returns true if the given area is completely visible from somewhere in this area by someone on the team
+ *
+ * @param navArea			The navArea you want to check if visible
+ * @param team				The team to check
+ *
+ * @return					True if visible, false otherwise
+ */
+native bool L4D_IsCompletelyVisibleToTeam(int navArea, int team);
+
+/**
+ * @brief Returns true if the NavArea is visible to the otherArea is completely visible from somewhere in this area
+ *
+ * @param navArea			The navArea you want to check if visible
+ * @param otherArea			The otherArea to check from
+ *
+ * @return					True if visible, false otherwise
+ */
+native bool L4D_IsCompletelyVisible(int navArea, int otherArea);
+
+/**
+ * @brief Gets the cluster for the given origin
+ *
+ * @param vecPos			The vector position to check
+ *
+ * @return					The cluster of the vector position, can be -1 if out-of-world
+ */
+native int L4D_GetClusterForOrigin(float vecPos[3]);
+
+/**
+ * @brief Gets the PVS for the given cluster
+ *
+ * @param cluster			The cluster get check
+ * @param pvsBuffer			The buffer to store the PVS
+ *
+ * @noreturn
+ */
+native void L4D_GetPVSForCluster(int cluster, int pvsBuffer[PVS_BUFFER_SIZE]);
+
+/**
+ * @brief Determines whether the given location is within the given PVS
+ * @remarks This is not a live trace like other visibility methods
+ *
+ * @param vecPos			The vector position to check
+ * @param pvsBuffer			The PVS check
+ *
+ * @return					True if inside, false if not
+ */
+native bool L4D_CheckOriginInPVS(float vecPos[3], int pvsBuffer[PVS_BUFFER_SIZE]);
 
 /**
  * @brief Given a victim client index, returns the client index of the Special Infected that is dominating the victim
@@ -5324,8 +5453,8 @@ native bool L4D2_IsReachable(int client, const float vecPos[3]);
 /**
  * @brief Returns the nav distance between two areas. Does not account for out-of-bounds areas
  *
- * @param startArea				NavArea address
- * @param endArea				NavArea address
+ * @param startArea				Vector coordinate start point
+ * @param endArea				Vector coordinate end point
  * @param ignoreNavBlockers		Bool to ignore blocked areas while checking (does not seem to work as expected) (ignored in L4D1)
  *
  * @return						Distance between the areas, 0.0 if the same area or -1.0 on failure
@@ -5358,7 +5487,7 @@ enum BOT_CMD
 };
 
 /**
- * @brief Uses the VScript "CommandABot" function to command a bot to attack, move, retreat or reset previous command
+ * @brief Uses the VScript "CommandABot" function to command a survivor/special infected bot or common infected to attack, move, retreat or reset previous command
  *
  * @param		entity			The bot or infected to command
  * @param		target			The Special Infected to target (used for types "BOT_CMD_ATTACK" and "BOT_CMD_RETREAT")
@@ -5406,18 +5535,6 @@ native bool L4D_HasPlayerControlledZombies();
  * @noreturn
  */
 native void L4D_DetonateProjectile(int entity);
-
-/**
- * @brief Detonates an active grenade projectile
- * @remarks Can detonate in L4D1 & L4D2: "molotov_projectile", "pipebomb_projectile", "tank_rock"
- * @remarks Can detonate in L4D2: "vomitjar_projectile", "grenadelauncher_projectile", "spitter_projectile"
- *
- * @param entity	The projectile entity to detonate
- *
- * @noreturn
- */
-// NOT IMPLEMENTED
-// native int L4D_StartBurning(int entity, float vecPos[3], float vecNorm[3], float vecVel[3]);
 
 /**
  * @brief Creates an activated Tank Rock projectile
@@ -6318,6 +6435,27 @@ native void L4D_GetNavAreaCenter(Address area, float vecPos[3]);
 native void L4D_GetNavAreaSize(Address area, float vecSize[3]);
 
 /**
+ * @brief Returns the given corner origin of a given NavArea
+ *
+ *param area		The address of the NavArea to read
+ *param corner		The corner you want, see the NavCornerType enum
+ *param vecPos		The vector to store the position read
+ *
+ * @noreturn
+ */
+native void L4D_NavArea_GetCorner(Address area, NavCornerType corner, float vecPos[3]);
+
+/**
+ * @brief Returns the height of the area at the specified point
+ *
+ *param area		The address of the NavArea to read
+ *param vecPos		The vector origin you want the Z height for
+ *
+ * @return			The Z height of the given position
+ */
+native float L4D_NavArea_GetZ(Address area, float vecPos[3]);
+
+/**
  * @brief Returns the number of adjacent areas in the given direction
  *
  *param area		The address of the NavArea
@@ -6343,6 +6481,17 @@ native int L4D_NavArea_GetAdjacentAreas(Address area, int direction, ArrayList l
  *
  *param area1		The address of the first NavArea
  *param area2		The address of the second NavArea
+ *param direction	The direction to connect in (NAV_NORTH, NAV_EAST, NAV_SOUTH, NAV_WEST, NAV_ALL) - If you set direction to -1, it will be automatically applied. 
+ *
+ * @noreturn
+ */
+native void L4D_NavArea_ConnectTo(Address area1, Address area2, int direction);
+
+/**
+ * @brief Returns true if this area is connected to other area in given direction. (If you set direction to 4, it will automatically check all directions for a connection)
+ *
+ *param area1		The address of the first NavArea
+ *param area2		The address of the second NavArea
  *param direction	The direction to check in (NAV_NORTH, NAV_EAST, NAV_SOUTH, NAV_WEST, NAV_ALL) - provide value 0 to 4 only
  *
  * @return			Result of calculation, true or false
@@ -6359,6 +6508,25 @@ native bool L4D_NavArea_IsConnected(Address area1, Address area2, int direction)
  * @return			Result of calculation, true or false
  */
 native bool L4D_NavArea_IsBlocked(Address area, int team, bool affectsFlow);
+
+/**
+ * @brief Returns the func_elevator if in an elevator's path
+ *
+ *param area		Pointer to a NavArea
+ *
+ * @return			Elevator entity index or -1 if none
+ */
+native int L4D_NavArea_GetElevator(Address area);
+
+/**
+ * @brief Returns the func_simpleladder if connected to the area
+ *
+ *param area		Pointer to a NavArea
+ *param aList		The ArrayList to store all the ladder entities
+ *
+ * @return			Number of ladders being returned
+ */
+native int L4D_NavArea_GetLadder(Address area, ArrayList aList);
 
 /**
  * @brief Returns the nav area attribute flags

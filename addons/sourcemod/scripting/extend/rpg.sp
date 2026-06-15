@@ -334,6 +334,7 @@ static void ClearClientGlow(int client, bool persist, bool notify = false)
 
 	player[client].GlowType = 0;
 	DisableGlow(client);
+	g_bPendingGlowRetry[client] = false;
 
 	if (persist)
 		ClientSaveToFileSave(client);
@@ -372,7 +373,7 @@ public Action Timer_RetryGlowApply(Handle timer, any userid)
 
 	g_bPendingGlowRetry[client] = false;
 	if (player[client].GlowType && g_bEnableGlow && GetClientTeam(client) == 2 && ValidateClientGlow(client, true, true))
-		GetAura(client, player[client].GlowType);
+		GetAura(client, player[client].GlowType, false, false);
 
 	return Plugin_Stop;
 }
@@ -716,8 +717,7 @@ public Action PlayerSpawnTimer( Handle hTimer, any UserID )
 	{
 		if(player[client].GlowType && g_bEnableGlow)
 		{
-			if (ValidateClientGlow(client, true, true))
-				GetAura(client,player[client].GlowType);
+			GetAura(client, player[client].GlowType, false, false);
 		}
 		if(player[client].ClientHat)
 			ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
@@ -741,8 +741,7 @@ public void Event_PlayerTeam(Event hEvent, const char[] name, bool dontBroadcast
 	{
 		if(player[client].GlowType && g_bEnableGlow)
 		{
-			if (ValidateClientGlow(client, true, true))
-				GetAura(client,player[client].GlowType);
+			GetAura(client, player[client].GlowType, false, false);
 		}
 		if(player[client].ClientHat)
 			ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
@@ -1041,8 +1040,7 @@ public void SetPlayer(int client)
 		
 		if(player[client].GlowType && g_bEnableGlow)
 		{
-			if (ValidateClientGlow(client, true, true))
-				GetAura(client,player[client].GlowType);
+			GetAura(client, player[client].GlowType, false, false);
 		}
 
 		if(player[client].ClientHat)
@@ -1855,7 +1853,7 @@ public int VIPAuraMenuHandler(Menu menu, MenuAction action, int param1, int para
 	                ClearClientGlow(param1, true, true);
 	                return 0;
 	            }
-	            GetAura(param1, glowType);
+	            GetAura(param1, glowType, true, true);
 	            ClientSaveToFileSave(param1);
             //SetCookie(param1, cookie, param2);
 			
@@ -1866,9 +1864,9 @@ public int VIPAuraMenuHandler(Menu menu, MenuAction action, int param1, int para
     return 0;
 }
 
-void GetAura(int client, int id) 
+void GetAura(int client, int id, bool validate = true, bool announce = true) 
 {
-	if (id != 0 && !CanClientUseGlow(client, id))
+	if (validate && id != 0 && !CanClientUseGlow(client, id))
 	{
 		ClearClientGlow(client, true, true);
 		return;
@@ -1886,97 +1884,97 @@ void GetAura(int client, int id)
         case 1: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 0 + (255 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_ChangeOutlineColorGreen");
+            if (announce) CPrintToChat(client, "%t", "RPG_ChangeOutlineColorGreen");
         }
         case 2: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 7 + (19 * 256) + (250 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorBlue");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorBlue");
         }
         case 3: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 249 + (19 * 256) + (250 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorBlueViolet");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorBlueViolet");
         }
         case 4: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 66 + (250 * 256) + (250 * 65536));
-            CPrintToChat(client, "%t", "RPG_ChangeOutlineColorCyan");
+            if (announce) CPrintToChat(client, "%t", "RPG_ChangeOutlineColorCyan");
         }
         case 5: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 249 + (155 * 256) + (84 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorOrange");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorOrange");
         }
         case 6: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (0 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorRed");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorRed");
         }
         case 7: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 50 + (50 * 256) + (50 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorGray");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorGray");
         }
         case 8: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (255 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorYellow");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorYellow");
         }
         case 9: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 128 + (255 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorLime");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorLime");
         }
         case 10: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 128 + (0 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorMaroon");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorMaroon");
         }
         case 11: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 0 + (128 * 256) + (128 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorTeal");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorTeal");
         }
         case 12:
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (0 * 256) + (150 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorPink");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorPink");
         }
         case 13:
         {        
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 155 + (0 * 256) + (255 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorPurple");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorPurple");
         }
         case 14: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", -1 + (-1 * 256) + (-1 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorWhite");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorWhite");
         }
         case 15: 
         {
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (155 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorGold");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorGold");
         }
         case 16: 
         {
             SDKHook(client, SDKHook_PreThink, RainbowPlayer);
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorRainbow");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorRainbow");
         }
 		case 17:
 		{
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (69 * 256) + (0 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
 		}
 		case 18:
 		{
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (110 * 256) + (156 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
 		}
 		case 19:
 		{
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (115 * 256) + (215 * 65536));
-            CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
+            if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorCustomOutline");
 		}
     }
 

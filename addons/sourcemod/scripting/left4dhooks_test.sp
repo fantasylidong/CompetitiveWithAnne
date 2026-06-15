@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"1.166"
+#define PLUGIN_VERSION		"1.167"
 
 /*=======================================================================================
 	Plugin Info:
@@ -108,7 +108,6 @@ public void OnAllPluginsLoaded()
 
 public void OnPluginStart()
 {
-	LoadTranslations("left4dhooks_test.phrases");
 	RegAdminCmd("sm_l4df", sm_l4df, ADMFLAG_ROOT);
 	RegAdminCmd("sm_l4dd", sm_l4dd, ADMFLAG_ROOT);
 	RegAdminCmd("sm_l4dd_calls", sm_calls, ADMFLAG_ROOT, "Increase the number of calls forwards are allowed to log by 1.");
@@ -360,6 +359,152 @@ Action sm_l4dd(int client, int args)
 		Uncomment the things you want to test. All disabled by default.
 		Must test individual sections on their own otherwise you'll receive errors about symbols already defined..
 	*/
+
+
+
+
+
+	/*
+	float vPos[3], vLoc[3];
+
+	int survivor = GetRandomSurvivor(-1, -1);
+	if( survivor )
+	{
+		GetClientEyePosition(survivor, vPos);
+		int otherArea = L4D_GetNearestNavArea(vPos, 300.0);
+
+		ArrayList navList = new ArrayList();
+		ArrayList navDist = new ArrayList(2);
+		L4D_GetAllNavAreas(navList);
+		int size = navList.Length;
+
+		int pvsBuffer[PVS_BUFFER_SIZE];
+		Address area;
+		int index, cluster;
+		float dist;
+		bool visible;
+
+		for( int i = 0; i < size; i++ )
+		{
+			area = navList.Get(i);
+			L4D_GetNavAreaCenter(area, vLoc);
+			dist = GetVectorDistance(vPos, vLoc);
+
+			index = navDist.Push(dist);
+			navDist.Set(index, area, 1);
+		}
+
+		SortADTArray(navDist, Sort_Ascending, Sort_Float);
+
+		for( int i = 0; i < 10; i++ )
+		{
+			if( i == 9 ) i = size - 1;
+
+			PrintToServer("---");
+			PrintToServer("[%d] Area: %d - Distance: %f", i, navDist.Get(i, 1), navDist.Get(i, 0));
+
+			PrintToServer("[%d] %d L4D_IsPotentiallyVisibleToTeam", i, L4D_IsPotentiallyVisibleToTeam(navDist.Get(i, 1), 2));
+			PrintToServer("[%d] %d L4D_IsPotentiallyVisible", i, L4D_IsPotentiallyVisible(navDist.Get(i, 1), otherArea));
+			PrintToServer("[%d] %d L4D_IsCompletelyVisibleToTeam", i, L4D_IsCompletelyVisibleToTeam(navDist.Get(i, 1), 2));
+			PrintToServer("[%d] %d L4D_IsCompletelyVisible", i, L4D_IsCompletelyVisible(navDist.Get(i, 1), otherArea));
+
+			L4D_GetNavAreaCenter(navDist.Get(i, 1), vLoc);
+			cluster = L4D_GetClusterForOrigin(vLoc);
+			PrintToServer("[%d] %d L4D_GetClusterForOrigin", i, cluster);
+
+			L4D_GetPVSForCluster(cluster, pvsBuffer);
+			PrintToServer("[%d] L4D_GetPVSForCluster (%s)", i, pvsBuffer);
+
+			visible = L4D_CheckOriginInPVS(vPos, pvsBuffer);
+			PrintToServer("[%d] %d L4D_CheckOriginInPVS", i, visible);
+		}
+
+		delete navList;
+		delete navDist;
+	}
+	// */
+
+
+
+	/*
+	// NavArea list
+	ArrayList navList = new ArrayList();
+	L4D_GetAllNavAreas(navList);
+	int size = navList.Length;
+
+	// Random nav
+	Address area = navList.Get(GetRandomInt(0, size - 1));
+
+	float vPos[3], vLoc[3];
+
+	L4D_GetNavAreaCenter(area, vPos);
+
+	// Corner
+	L4D_NavArea_GetCorner(area, NORTH_WEST, vLoc);
+	PrintToServer("Area: (%d) Pos: (%0.1f, %0.1f, %0.1f) Corner 0 (%0.1f, %0.1f, %f)", area, vPos[0], vPos[1], vPos[2], vLoc[0], vLoc[1], vLoc[2]);
+	L4D_NavArea_GetCorner(area, NORTH_EAST, vLoc);
+	PrintToServer("Area: (%d) Pos: (%0.1f, %0.1f, %0.1f) Corner 1 (%0.1f, %0.1f, %f)", area, vPos[0], vPos[1], vPos[2], vLoc[0], vLoc[1], vLoc[2]);
+	L4D_NavArea_GetCorner(area, SOUTH_EAST, vLoc);
+	PrintToServer("Area: (%d) Pos: (%0.1f, %0.1f, %0.1f) Corner 2 (%0.1f, %0.1f, %f)", area, vPos[0], vPos[1], vPos[2], vLoc[0], vLoc[1], vLoc[2]);
+	L4D_NavArea_GetCorner(area, SOUTH_WEST, vLoc);
+	PrintToServer("Area: (%d) Pos: (%0.1f, %0.1f, %0.1f) Corner 3 (%0.1f, %0.1f, %f)", area, vPos[0], vPos[1], vPos[2], vLoc[0], vLoc[1], vLoc[2]);
+
+	// GetZ
+	float z = L4D_NavArea_GetZ(area, vPos);
+	PrintToServer("Area: (%d) Pos: (%0.1f, %0.1f, %f) Height Z: %f", area, vLoc[0], vLoc[1], vLoc[2], z);
+
+	// Elevator
+	for( int i = 0; i < size; i++ )
+	{
+		area = navList.Get(i);
+
+		int elevator = L4D_NavArea_GetElevator(area);
+		if( elevator != -1 )
+		{
+			PrintToServer("Elevator %d in area %d", elevator, area);
+		}
+	}
+
+	// Ladders
+	for( int i = 0; i < size; i++ )
+	{
+		area = navList.Get(i);
+
+		ArrayList aList = new ArrayList();
+		int entity, count;
+
+		count = L4D_NavArea_GetLadder(area, aList);
+
+		if( count )
+		{
+			for( int x = 0; x < count; x++ )
+			{
+				entity = aList.Get(x);
+				PrintToServer("Ladder: %d in area %d", entity, area);
+			}
+		}
+
+		delete aList;
+	}
+
+	// Clean up
+	delete navList;
+	// */
+
+
+
+
+
+	// Mass
+	/*
+	int entity = GetClientAimTarget(client, false);
+	if( entity != -1 )
+	{
+		PrintToChatAll("L4D_GetMass A %f", L4D_GetMass(entity));
+		L4D_SetMass(entity, L4D_GetMass(entity) * 2);
+		PrintToChatAll("L4D_GetMass B %f", L4D_GetMass(entity));
+	}
+	// */
 
 
 
@@ -1662,6 +1807,7 @@ Action sm_l4dd(int client, int args)
 	// TEST: L4D_GetPointer
 	PrintToServer("POINTER_DIRECTOR = %d",			L4D_GetPointer(POINTER_DIRECTOR));
 	PrintToServer("POINTER_SERVER = %d",			L4D_GetPointer(POINTER_SERVER));
+	PrintToServer("POINTER_ENGINE = %d",			L4D_GetPointer(POINTER_ENGINE));
 	PrintToServer("POINTER_GAMERULES = %d",			L4D_GetPointer(POINTER_GAMERULES));
 	PrintToServer("POINTER_NAVMESH = %d",			L4D_GetPointer(POINTER_NAVMESH));
 	PrintToServer("POINTER_ZOMBIEMANAGER = %d",		L4D_GetPointer(POINTER_ZOMBIEMANAGER));
@@ -2753,9 +2899,9 @@ stock Action TimerDetonateVomitjar(Handle timer, int entity)
 	{
 		float vPos[3];
 		GetEntPropVector(entity, Prop_Send, "m_vecOrigin", vPos);
-		PrintToChatAll("%t", "Left4DHooksTest_Deton", vPos[0], vPos[1], vPos[2]);
+		PrintToChatAll("DETON A (%0.0f %0.0f %0.0f)", vPos[0], vPos[1], vPos[2]);
 		GetGroundAngles(vPos);
-		PrintToChatAll("%t", "Left4DHooksTest_Deton_2", vPos[0], vPos[1], vPos[2]);
+		PrintToChatAll("DETON B (%0.0f %0.0f %0.0f)", vPos[0], vPos[1], vPos[2]);
 		vPos[2] += 1.0;
 		TeleportEntity(entity, vPos, NULL_VECTOR, view_as<float>({ 0.0, 0.0, -1.0}));
 	}
@@ -2780,7 +2926,7 @@ stock void GetGroundAngles(float vOrigin[3])
 	if( TR_DidHit(trace) )
 	{
 		TR_GetEndPosition(vOrigin, trace); // retrieve our trace endpoint
-		PrintToChatAll("%t", "Left4DHooksTest_Trace", vOrigin[0], vOrigin[1], vOrigin[2]);
+		PrintToChatAll("Trace (%0.0f %0.0f %0.0f)", vOrigin[0], vOrigin[1], vOrigin[2]);
 	}
 
 	delete trace;
@@ -5280,7 +5426,7 @@ public void L4D1_FirstAidKit_StartHealing_PostHandled(int client, int entity)
 	}
 }
 
-public Action L4D2_OnStartUseAction(any action, int client, int target)
+public Action L4D2_OnStartUseAction(L4D2UseAction action, int client, int target)
 {
 	static int called;
 	if( called < MAX_CALLS )
@@ -5302,7 +5448,7 @@ public Action L4D2_OnStartUseAction(any action, int client, int target)
 	return Plugin_Continue;
 }
 
-public void L4D2_OnStartUseAction_Post(any action, int client, int target)
+public void L4D2_OnStartUseAction_Post(L4D2UseAction action, int client, int target)
 {
 	static int called;
 	if( called < MAX_CALLS )
@@ -5319,7 +5465,7 @@ public void L4D2_OnStartUseAction_Post(any action, int client, int target)
 	}
 }
 
-public void L4D2_OnStartUseAction_PostHandled(any action, int client, int target)
+public void L4D2_OnStartUseAction_PostHandled(L4D2UseAction action, int client, int target)
 {
 	static int called;
 	if( called < MAX_CALLS )
@@ -6252,6 +6398,18 @@ public Action L4D2_OnClientDisableAddons(const char[] SteamID)
 	// Requires l4d2_addons_eclipse 1 to be used.
 	// return Plugin_Continue; // Block addons.
 	return Plugin_Handled; // Allow addons.
+}
+
+public void L4D_OnLeft4DHooks_OnMapStart()
+{
+	static int called;
+	if( called < MAX_CALLS )
+	{
+		if( called == 0 ) g_iForwards++;
+		called++;
+
+		ForwardCalled("\"L4D_OnLeft4DHooks_OnMapStart\"");
+	}
 }
 
 public void L4D_OnGameModeChange(int gamemode)

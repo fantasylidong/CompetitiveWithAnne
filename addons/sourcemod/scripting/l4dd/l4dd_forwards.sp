@@ -32,6 +32,7 @@
 
 // FORWARDS
 GlobalForward g_hFWD_GameModeChange;
+GlobalForward g_hFWD_OnMapStartPost;
 GlobalForward g_hFWD_ZombieManager_SpawnSpecial;
 GlobalForward g_hFWD_ZombieManager_SpawnSpecial_Post;
 GlobalForward g_hFWD_ZombieManager_SpawnSpecial_PostHandled;
@@ -717,7 +718,7 @@ void CreateDetour(GameData hGameData, DHookCallback fCallback, DHookCallback fPo
 			else
 			{
 				DynamicDetour hDetour = DynamicDetour.FromConf(hGameData, sName);
-				if( !hDetour ) LogError("Failed to load detour \"%s\" signature (%s).", sName, g_sSystem);
+				if( !hDetour ) LogError("\n==========\nFailed to load detour \"%s\" signature (%s)\n==========\n", sName, g_sSystem);
 
 				g_aDetoursHooked.Push(0);			// Default disabled
 				g_aDetourHandles.Push(hDetour);		// Store handle
@@ -746,8 +747,8 @@ void CreateDetour(GameData hGameData, DHookCallback fCallback, DHookCallback fPo
 						#endif
 						#endif
 
-						if( fCallback != INVALID_FUNCTION && !hDetour.Enable(Hook_Pre, fCallback) ) LogError("Failed to detour pre \"%s\" (%s).", sName, g_sSystem);
-						if( fPostCallback != INVALID_FUNCTION && !hDetour.Enable(Hook_Post, fPostCallback) ) LogError("Failed to detour post \"%s\" (%s).", sName, g_sSystem);
+						if( fCallback != INVALID_FUNCTION && !hDetour.Enable(Hook_Pre, fCallback) ) LogError("\n==========\nFailed to detour pre \"%s\" (%s)\n==========\n", sName, g_sSystem);
+						if( fPostCallback != INVALID_FUNCTION && !hDetour.Enable(Hook_Post, fPostCallback) ) LogError("\n==========\nFailed to detour post \"%s\" (%s)\n==========\n", sName, g_sSystem);
 					}
 					else
 					{
@@ -758,8 +759,8 @@ void CreateDetour(GameData hGameData, DHookCallback fCallback, DHookCallback fPo
 						#endif
 						#endif
 
-						if( fCallback != INVALID_FUNCTION && !hDetour.Disable(Hook_Pre, fCallback) ) LogError("Failed to disable detour pre \"%s\" (%s).", sName, g_sSystem);
-						if( fPostCallback != INVALID_FUNCTION && !hDetour.Disable(Hook_Post, fPostCallback) ) LogError("Failed to disable detour post \"%s\" (%s).", sName, g_sSystem);
+						if( fCallback != INVALID_FUNCTION && !hDetour.Disable(Hook_Pre, fCallback) ) LogError("\n==========\nFailed to disable detour pre \"%s\" (%s)\n==========\n", sName, g_sSystem);
+						if( fPostCallback != INVALID_FUNCTION && !hDetour.Disable(Hook_Post, fPostCallback) ) LogError("\n==========\nFailed to disable detour post \"%s\" (%s)\n==========\n", sName, g_sSystem);
 					}
 				}
 				else if( hHook )

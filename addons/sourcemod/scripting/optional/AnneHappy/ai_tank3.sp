@@ -41,6 +41,7 @@
 #define THROW_OVERHEAD_POS_Z       104.01 // 双手过头出手高度
 
 #define JUMP_SPEED_Z               300.0  // 跳砖时给的Z轴速度
+#define LADDER_NEARBY_CACHE_DEFAULT 0.20  // 梯子附近检测缓存，避免每帧扫实体/nav
 
 // ===== ConVar =====
 ConVar g_cvPluginName, g_cvLogLevel;
@@ -76,13 +77,17 @@ ConVar
     g_cvHeadBlockForceRockTime,
     g_cvHeadBlockForceRockRange,
     g_cvHeadBlockForceRockReleaseHoriz,
-    g_cvHeadBlockForceRockReleaseVert;
+    g_cvHeadBlockForceRockReleaseVert,
+    g_cvLadderNearbyDisable,
+    g_cvLadderNearbyRadius,
+    g_cvLadderNearbyCacheTime;
 
 ConVar g_cvBhopNoVisionMaxAng;
 ConVar cvTankSwingRange;
 
 // ===== 运行时对象 =====
 StringMap g_hThrowAnimMap;
+ArrayList g_hNearbyLadderList;
 
 Handle g_hSdkTankClawSweepFist;
 Handle g_hSdkNextBotGetCombatCharacter;
@@ -94,6 +99,8 @@ Handle g_hPathFollowerDetour;
 bool  g_bLateLoad;
 float g_fTankSwingRange;
 float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
+float g_fLastLadderNearbyCheck[MAXPLAYERS + 1];
+bool  g_bLastLadderNearby[MAXPLAYERS + 1];
 
 // ===== 结构体 =====
 enum struct PathSegment
@@ -192,6 +199,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
         strcopy(error, err_max, "本插件仅支持 Left 4 Dead 2");
         return APLRes_SilentFailure;
     }
+    MarkNativeAsOptional("L4D_FindEntityByClassnameNearest");
+    MarkNativeAsOptional("L4D_FindEntityByClassnameWithin");
+    MarkNativeAsOptional("L4D_NavArea_GetLadder");
     g_bLateLoad = late;
     return APLRes_Success;
 }
@@ -242,6 +252,12 @@ public void OnPluginStart()
     g_cvHeadBlockForceRockRange= CreateConVar("ai_tank3_head_block_force_rock_range", "250.0", "触发强制投石时 Tank 需要与卡位者拉开的最小水平距离（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseHoriz = CreateConVar("ai_tank3_head_block_force_rock_release_h", "400", "强制投石期间卡位者离开多远（水平距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseVert  = CreateConVar("ai_tank3_head_block_force_rock_release_v", "250", "强制投石期间卡位者离开多远（垂直距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
+
+    // 梯子附近让出本插件移动/目标/投石逻辑，交还 NextBot 和梯子加速插件处理
+    g_cvLadderNearbyDisable = CreateConVar("ai_tank3_ladder_nearby_disable", "1", "Tank 在梯子附近时暂停 ai_tank3 行为处理", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvLadderNearbyRadius = CreateConVar("ai_tank3_ladder_nearby_radius", "180.0", "Tank 距离梯子多近时暂停 ai_tank3 行为处理", CVAR_FLAGS, true, 0.0);
+    g_cvLadderNearbyCacheTime = CreateConVar("ai_tank3_ladder_nearby_cache", "0.20", "梯子附近检测缓存时间（秒）", CVAR_FLAGS, true, 0.0);
+
     // 日志
     g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
     char cvName[64];
@@ -259,6 +275,7 @@ public void OnPluginStart()
 
     // 初始化动画活动映射
     initAnimMap();
+    g_hNearbyLadderList = new ArrayList();
 
     // 迟加载：给已在服玩家挂钩
     if (g_bLateLoad)
@@ -398,6 +415,7 @@ public void OnPluginEnd()
 {
     delete log;
     delete g_hThrowAnimMap;
+    delete g_hNearbyLadderList;
     delete g_hPathFollowerDetour;
     delete g_hSdkNextBotGetCombatCharacter;
     delete g_hSdkPathGetCurGoal;
@@ -421,6 +439,8 @@ void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].airCorrGoal = NULL_VECTOR;
         g_AiTanks[i].bhopType = TankBhopType_None;
         g_fHeadBlockIgnoreUntil[i] = 0.0;
+        g_fLastLadderNearbyCheck[i] = 0.0;
+        g_bLastLadderNearby[i] = false;
     }
 }
 
@@ -439,6 +459,8 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].airCorrGoal = NULL_VECTOR;
         g_AiTanks[i].bhopType = TankBhopType_None;
         g_fHeadBlockIgnoreUntil[i] = 0.0;
+        g_fLastLadderNearbyCheck[i] = 0.0;
+        g_bLastLadderNearby[i] = false;
     }
 }
 
@@ -461,6 +483,12 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
     float pos[3];
     GetClientAbsOrigin(client, pos);
+
+    if (isTankNearLadder(client, pos))
+    {
+        resetTankMovementOverrides(client);
+        return Plugin_Continue;
+    }
 
     handleForceRock(client, buttons, pos);
 
@@ -502,6 +530,105 @@ bool isSurvivorIgnored(int survivor)
     if (!IsValidSurvivor(survivor))
         return false;
     return g_fHeadBlockIgnoreUntil[survivor] > GetEngineTime();
+}
+
+bool isTankNearLadder(int client, const float pos[3])
+{
+    if (!g_cvLadderNearbyDisable.BoolValue)
+        return false;
+
+    float now = GetEngineTime();
+    float cacheTime = g_cvLadderNearbyCacheTime.FloatValue;
+    if (cacheTime <= 0.0)
+        cacheTime = LADDER_NEARBY_CACHE_DEFAULT;
+
+    if ((now - g_fLastLadderNearbyCheck[client]) < cacheTime)
+        return g_bLastLadderNearby[client];
+
+    g_fLastLadderNearbyCheck[client] = now;
+    g_bLastLadderNearby[client] = findNearbyLadderEntity(pos, g_cvLadderNearbyRadius.FloatValue) ||
+        currentNavAreaHasLadder(pos);
+
+    return g_bLastLadderNearby[client];
+}
+
+bool findNearbyLadderEntity(const float pos[3], float radius)
+{
+    if (radius <= 0.0)
+        return false;
+
+    if (GetFeatureStatus(FeatureType_Native, "L4D_FindEntityByClassnameNearest") == FeatureStatus_Available)
+    {
+        float searchPos[3];
+        searchPos = pos;
+
+        if (L4D_FindEntityByClassnameNearest("func_simpleladder", searchPos, radius) != INVALID_ENT_REFERENCE)
+            return true;
+        if (L4D_FindEntityByClassnameNearest("func_ladder", searchPos, radius) != INVALID_ENT_REFERENCE)
+            return true;
+    }
+
+    return findNearbyLadderEntityFallback(pos, radius);
+}
+
+bool findNearbyLadderEntityFallback(const float pos[3], float radius)
+{
+    int entity = INVALID_ENT_REFERENCE;
+    while ((entity = FindEntityByClassname(entity, "func_simpleladder")) != INVALID_ENT_REFERENCE)
+    {
+        if (isEntityNearPos2D(entity, pos, radius))
+            return true;
+    }
+
+    entity = INVALID_ENT_REFERENCE;
+    while ((entity = FindEntityByClassname(entity, "func_ladder")) != INVALID_ENT_REFERENCE)
+    {
+        if (isEntityNearPos2D(entity, pos, radius))
+            return true;
+    }
+
+    return false;
+}
+
+bool currentNavAreaHasLadder(const float pos[3])
+{
+    if (GetFeatureStatus(FeatureType_Native, "L4D_NavArea_GetLadder") != FeatureStatus_Available)
+        return false;
+
+    Address area = L4D_GetNearestNavArea(pos, g_cvLadderNearbyRadius.FloatValue, true, false, false, TEAM_INFECTED);
+    if (area == Address_Null)
+        return false;
+
+    if (g_hNearbyLadderList == null)
+        g_hNearbyLadderList = new ArrayList();
+
+    g_hNearbyLadderList.Clear();
+    return L4D_NavArea_GetLadder(area, g_hNearbyLadderList) > 0;
+}
+
+bool isEntityNearPos2D(int entity, const float pos[3], float radius)
+{
+    if (!IsValidEntity(entity))
+        return false;
+
+    float entPos[3], mins[3], maxs[3], center[3];
+    GetEntPropVector(entity, Prop_Send, "m_vecOrigin", entPos);
+    GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+    GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+
+    center[0] = entPos[0] + (mins[0] + maxs[0]) * 0.5;
+    center[1] = entPos[1] + (mins[1] + maxs[1]) * 0.5;
+    center[2] = entPos[2] + (mins[2] + maxs[2]) * 0.5;
+
+    return getVectorDistance2D(pos, center) <= radius;
+}
+
+void resetTankMovementOverrides(int client)
+{
+    g_AiTanks[client].airCorrGoal = NULL_VECTOR;
+    g_AiTanks[client].bhopType = TankBhopType_None;
+    g_AiTanks[client].lastLookAheadTime = 0.0;
+    g_AiTanks[client].lastAirVecModifyTime = 0.0;
 }
 
 static bool isClientDownState(int client)
@@ -1390,6 +1517,8 @@ public void OnClientDisconnect(int client)
     g_AiTanks[client].lastPathSegment.initData();
     g_AiTanks[client].airCorrGoal = NULL_VECTOR;
     g_AiTanks[client].bhopType = TankBhopType_None;
+    g_fLastLadderNearbyCheck[client] = 0.0;
+    g_bLastLadderNearby[client] = false;
 }
 
 // ===== 动画后置钩子：识别投石序列并触发相应逻辑 =====
