@@ -32,10 +32,6 @@ enum struct State
     bool   bShouldCheck;
     bool   bPausedSpawnTimer;
 
-    bool   bPauseLib;
-    bool   bSmokerLib;
-    bool   bTargetLimitLib;
-
     int    totalSI;
     int    siQueueCount;
     int    teleCount[MAXPLAYERS+1];
@@ -62,9 +58,9 @@ enum struct State
 
     void Reset()
     {
-        if (this.hTeleport != INVALID_HANDLE) { delete this.hTeleport; this.hTeleport = INVALID_HANDLE; }
-        if (this.hCheck    != INVALID_HANDLE) { delete this.hCheck;    this.hCheck    = INVALID_HANDLE; }
-        if (this.hSpawn    != INVALID_HANDLE) { KillTimer(this.hSpawn); this.hSpawn    = INVALID_HANDLE; }
+        if (this.hTeleport != INVALID_HANDLE) { KillTimer(this.hTeleport); this.hTeleport = INVALID_HANDLE; }
+        if (this.hCheck    != INVALID_HANDLE) { KillTimer(this.hCheck);    this.hCheck    = INVALID_HANDLE; }
+        if (this.hSpawn    != INVALID_HANDLE) { KillTimer(this.hSpawn);    this.hSpawn    = INVALID_HANDLE; }
 
         this.bPickRushMan = false;
         this.bShouldCheck = false;

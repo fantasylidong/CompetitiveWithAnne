@@ -186,7 +186,7 @@ bool PassDeathCooldown(int zc)
 void TouchDeathCooldownOnce(int zc)
 {
     int idx = zc - 1;
-    if (idx < 0 || idx >= 6) return;
+    if (idx < 0 || idx >= SI_COUNT) return;
 
     float need = IsSupportClassInt(zc) ? gCV.fDeathCDSupport : gCV.fDeathCDKiller;
     if (need <= 0.01)
@@ -397,7 +397,7 @@ static bool CheckClassEnabled(int zc)
 bool HasReachedLimit(int zc)
 {
     int idx = zc - 1;
-    if (idx < 0 || idx >= 6) return true;
+    if (idx < 0 || idx >= SI_COUNT) return true;
 
     int cap = gST.siAlive[idx] + gST.siCap[idx];
     return gST.siAlive[idx] >= cap;
@@ -419,7 +419,7 @@ static int CountQueuedOfClass(int zc)
 static bool CanQueueClass(int zc)
 {
     int idx = zc - 1;
-    if (idx < 0 || idx >= 6) return false;
+    if (idx < 0 || idx >= SI_COUNT) return false;
 
     int capTotal = gST.siAlive[idx] + gST.siCap[idx];
     return (gST.siAlive[idx] + CountQueuedOfClass(zc)) < capTotal;

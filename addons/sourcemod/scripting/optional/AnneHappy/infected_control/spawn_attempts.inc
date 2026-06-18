@@ -3,6 +3,14 @@
 #endif
 #define _infected_control_spawn_attempts_included
 
+// 本文件只做“一次尝试”的执行层：
+// - TryNormalSpawnOnce：从普通刷特队列取一个 class，找点并生成。
+// - TryTeleportSpawnOnce：从传送队列取一个 class，按 teleportMode 找点并生成。
+// - FallbackDirectorPosAtMax：NavArea 主路扩到最大仍失败时，向导演要一个兜底点。
+//
+// 选类、队列补位、波释放时机不在这里改；分别看 class_queue.inc、wave_decider.inc、wave_control.inc。
+// 找点质量和性能不在这里改；看 spawn_core.inc / spawn_score.inc。
+
 static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, float outPos[3])
 {
     float bestPt[3];
@@ -102,14 +110,20 @@ static bool DoSpawnAt(const float pos[3], int zc)
 
 static void BypassAndExecuteCommand(const char[] cmd)
 {
-    if (!CheatsOn()) return;
-    ServerCommand("%s", cmd);
-}
-
-static bool CheatsOn()
-{
-    ConVar sv = FindConVar("sv_cheats");
-    return (sv != null && sv.BoolValue);
+    // 临时去除 FCVAR_CHEAT 标志以在非作弊服务器上执行命令。
+    // nb_assault 是让 AI 特感立即进攻的关键命令，不应依赖 sv_cheats。
+    ConVar cv = FindConVar(cmd);
+    if (cv != null)
+    {
+        int flags = cv.Flags;
+        cv.Flags = flags & ~FCVAR_CHEAT;
+        ServerCommand("%s", cmd);
+        cv.Flags = flags;
+    }
+    else
+    {
+        ServerCommand("%s", cmd);
+    }
 }
 
 void TryNormalSpawnOnce()
@@ -118,6 +132,8 @@ void TryNormalSpawnOnce()
     if (SpawnQueue_Length() <= 0)
         return;
 
+    // 普通刷特只看队首。若队首是被支援解锁规则拦住的 Boomer/Spitter，直接丢弃；
+    // 若是死亡 CD，则旋到队尾，给其他 class 机会。
     int want = 0;
     while (SpawnQueue_Length() > 0)
     {
@@ -159,6 +175,8 @@ void TryNormalSpawnOnce()
     SpawnScoreDbg bestDbg;
     bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, false, pos, areaIdx, bestDbg);
 
+    // 防御性复查：FindSpawnPosViaNavArea 内已经做过可见性精判，但生成前再确认一次，
+    // 防止候选评估和真正刷出之间幸存者视线/位置变化。
     if (ok && IsPosVisibleSDK(pos, false)) ok = false;
 
     bool triedSpawn = false;
@@ -175,6 +193,10 @@ void TryNormalSpawnOnce()
         LogChosenSpawnScore(want, bestDbg);
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
 
+        // 成功后必须同步三类状态：
+        // 1) 记录最近刷点和 Nav 冷却，影响后续分散度/重复区域；
+        // 2) 更新 siAlive/totalSI/队列计数，影响上限和下一帧是否继续刷；
+        // 3) 收缩 ring，让下一只优先从更近的距离重新扩圈。
         float center[3];
         GetSectorCenter(center, gST.targetSurvivor);
         RememberSpawn(pos, center);
@@ -195,9 +217,12 @@ void TryNormalSpawnOnce()
         return;
     }
 
+    // DoSpawnAt 失败通常表示点位附近运行时状态不适合生成。短冷却这个 NavArea，
+    // 避免下一帧马上重复命中同一块区域。
     if (triedSpawn && !spawnOk && areaIdx >= 0)
         TouchNavCooldown(areaIdx, GetGameTime(), 0.8);
 
+    // 找不到/刷不出时扩圈。支援特感有 SUPPORT_EXPAND_MAX，避免 Boomer/Spitter 被推得过远。
     float nextR = gST.spawnDistCur + LOW_SCORE_EXPAND;
     if (nextR > maxR) nextR = maxR;
     gST.spawnDistCur = nextR;
@@ -262,6 +287,8 @@ void TryTeleportSpawnOnce()
     SpawnScoreDbg bestDbg;
     bool ok = FindSpawnPosViaNavArea(want, gST.targetSurvivor, ring, true, pos, areaIdx, bestDbg);
 
+    // teleportMode 下 IsPosVisibleSDK 会按配置忽略倒地视线；NavArea 团队可见 native 无法表达这个口径，
+    // 所以最终仍以这里的旧可见性复查为准。
     if (ok && IsPosVisibleSDK(pos, true)) ok = false;
 
     bool triedSpawn = false;
@@ -278,6 +305,8 @@ void TryTeleportSpawnOnce()
         LogChosenSpawnScore(want, bestDbg);
         if (areaIdx >= 0) TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
 
+        // 传送成功不消耗普通 siQueueCount，只移除 teleport queue。
+        // 仍要更新 siAlive/totalSI，因为 DoSpawnAt 实际生成了一只新的 bot。
         float center[3];
         GetSectorCenter(center, gST.targetSurvivor);
         RememberSpawn(pos, center);

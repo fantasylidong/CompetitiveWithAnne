@@ -295,7 +295,7 @@ static bool AntiBait_IsSpawnWindowPressure()
     if (gST.siQueueCount > 0 || SpawnQueue_Length() > 0 || TeleportQueue_Length() > 0)
         return true;
 
-    return true;
+    return false;
 }
 
 static bool AntiBait_TeamHoldingFormation(float spreadDist, float avgNearestDist, int isolatedCount, int groupCount)

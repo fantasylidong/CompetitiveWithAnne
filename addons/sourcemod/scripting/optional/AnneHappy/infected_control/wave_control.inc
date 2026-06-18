@@ -32,6 +32,7 @@ void StartWave()
 
     AntiBait_OnWaveStart();
     WaveDecider_OnWaveStart();  // 通知波决策器
+    LeftDHooks_PVS_OnWaveStart(); // 清理 PVS 缓存
     Debug_Print("Start wave %d", gST.waveIndex);
 }
 
@@ -39,7 +40,6 @@ Action Timer_StartNewWave(Handle timer)
 {
     StartWave();
     gST.hSpawn = INVALID_HANDLE;
-    gST.lastWaveStartTime = GetGameTime();
     return Plugin_Stop;
 }
 

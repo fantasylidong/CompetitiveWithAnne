@@ -10,7 +10,7 @@ Action Timer_TeleportTick(Handle timer)
         return Plugin_Continue;
 
     RefreshLastGoodSurPctTick();
-    AntiBait_Update();
+    // AntiBait_Update() 已在 Timer_CheckSpawnWindow 中每秒调用，此处不重复调用
 
     if (Survivors_AllPinnedOrDown())
         return Plugin_Continue;

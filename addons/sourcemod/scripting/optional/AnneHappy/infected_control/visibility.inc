@@ -100,7 +100,7 @@ stock bool TraceFilter(int entity, int contentsMask)
     if (entity <= MaxClients || !IsValidEntity(entity))
         return false;
 
-    static char sClassName[9];
+    static char sClassName[32];
     GetEntityClassname(entity, sClassName, sizeof(sClassName));
     if (strcmp(sClassName, "infected") == 0 || strcmp(sClassName, "witch") == 0)
         return false;

@@ -158,8 +158,8 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | `inf_ai_wave_low_si_ratio` | `0.12 0.20 0.27 0.34 0.50` | 场上存活特感低于该比例时允许补波 |
 | `inf_ai_dist_sweet_offset` | `0.00 0.00 0.00 0.00 0.00` | 刷点距离甜区偏移；默认不动各特感自己的甜点距离 |
 | `inf_ai_dist_width_scale` | `1.25 1.15 1.08 1.00 1.00` | 刷点距离评分宽度；低档更宽容，专家/极限保持当前基准，避免影响刷出速度 |
-| `inf_spawn_candidate_budget` | `8` | 单次刷点最多接受多少候选点进入评分 |
-| `inf_ai_spawn_budget_bonus` | `-3 -2 -1 0 0` | 1-5 档对候选预算的额外加减；专家/极限不增加服务器压力 |
+| `inf_spawn_candidate_budget` | `12` | 单次刷点基础候选预算；实际预算还会按 AI 难度档位调整 |
+| `inf_ai_spawn_budget_bonus` | `-3 -2 -1 0 0` | 1-5 档对候选预算的额外加减；默认实际预算为 `9/10/11/12/12` |
 | `inf_FrameThinkStep` | `0.05` | 空闲刷特帧思考间隔，降低无队列时的单核负担 |
 | `inf_FrameThinkStepActive` | `0.02` | 有待补波/待刷/待传送时使用原版响应间隔 |
 | `inf_BucketCountCacheTTL` | `0.20` | Flow 桶存活特感计数缓存 TTL，减少候选点重复扫描 |

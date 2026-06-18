@@ -90,6 +90,11 @@ stock bool PassMinSeparation(const float pos[3])
 stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si = 0)
 {
     int candPercent = GetPositionBucketPercent(candPos);
+    return PassRealBucketPositionCheck(candPercent, candPos[2], targetSur, si);
+}
+
+stock bool PassRealBucketPositionCheck(int candPercent, float candZ, int targetSur, int si = 0)
+{
     if (candPercent < 0)
         return true;
 
@@ -124,8 +129,8 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si = 0)
     if (TryGetLowestSurvivorFootZ(minFootZ))
     {
         if (candPercent < surPercent
-            && (candPos[2] <= (minFootZ - 180.0)
-                || (si != view_as<int>(SI_Smoker) && candPos[2] >= (minFootZ + 200.0))))
+            && (candZ <= (minFootZ - 180.0)
+                || (si != view_as<int>(SI_Smoker) && candZ >= (minFootZ + 200.0))))
             return false;
     }
 

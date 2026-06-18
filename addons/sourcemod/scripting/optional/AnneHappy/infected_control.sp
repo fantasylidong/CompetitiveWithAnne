@@ -28,6 +28,13 @@
  *  - 传送监督：出生宽限、跑男快通道（但≥0.8s）、Smoker 技能未就绪不传
  *  - 生还者进度“本地回退”：所有人统计失败时，短期采用“最后一次有效平均进度”
  *
+ * ── 维护入口（Maintainer notes）
+ *  - 刷特架构总览见：infected_control/README_SPAWN_ARCHITECTURE.md
+ *  - 单次找位入口：spawn_core.inc::FindSpawnPosViaNavArea
+ *  - 单个 NavArea 候选评估：spawn_core.inc::SpawnCore_EvaluateNavCandidate
+ *  - 普通/传送刷出尝试：spawn_attempts.inc::TryNormalSpawnOnce / TryTeleportSpawnOnce
+ *  - 波释放时机：wave_decider.inc + wave_control.inc
+ *
  * Compatible with SM 1.10+ / L4D2 / left4dhooks
  * Authors: 东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (思路)
  */
@@ -136,7 +143,7 @@ int recentSectors[3] = { -1, -1, -1 };   // 最近 3 次使用的扇区
 ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
 
 // —— 死亡CD时间戳 & 最近一次成功刷出 —— //
-float g_LastDeathTime[6];     // zc-1 索引
+float g_LastDeathTime[SI_COUNT]; // zc-1 索引
 float g_LastSpawnOkTime = 0.0;
 float g_SupportShortageStart = 0.0;
 
@@ -174,6 +181,12 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 #include "infected_control/queue.inc"
 #include "infected_control/class_queue.inc"
 #include "infected_control/client_state.inc"
+
+// 刷特管线的依赖顺序很重要：
+// 1) 先加载基础状态、队列、玩家状态和可见性工具；
+// 2) 再加载评分、Nav/Flow 缓存和性能优化；
+// 3) 最后加载 wave 控制、刷点核心和实际刷出尝试。
+// SourcePawn include 是文本拼接，新增模块时要确认被调用函数已经在前面可见。
 #include "infected_control/visibility.inc"
 #include "infected_control/difficulty_strategy.inc"
 #include "infected_control/anti_baiter.inc"
@@ -187,6 +200,7 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 #include "infected_control/nav_buckets.inc"
 #include "infected_control/spawn_perf_optimizer.inc"
 #include "infected_control/spawn_perf_config.inc"
+#include "infected_control/leftdhooks_pvs.inc"
 #include "infected_control/wave_decider.inc"
 #include "infected_control/wave_control.inc"
 #include "infected_control/spawn_core.inc"
@@ -267,6 +281,9 @@ public void OnPluginStart()
     BuildNavBuckets();        // ← 预建 FLOW 分桶
     RecalcSiCapFromAlive(true);
 
+    // 初始化 leftdhooks PVS 优化
+    LeftDHooks_PVS_Init();
+
     // 分散度：初始化
     g_NavCooldown = new StringMap();
     lastSpawns = new ArrayList(4);
@@ -323,7 +340,13 @@ public void OnMapEnd()
     ClearNavAreasCache();
 
     if (SpawnPerfConfig_ShowStats())
+    {
         SpawnPerf_OnMapEnd();
+        LeftDHooks_PVS_PrintStats();
+    }
+
+    // 清理 PVS 优化模块
+    LeftDHooks_PVS_OnMapEnd();
 }
 
 // =========================
@@ -429,7 +452,7 @@ static void StopAll()
 static Action Timer_ApplyMaxSpecials(Handle timer)
 {
     gCV.ApplyMaxZombieBound();
-    return Plugin_Continue;
+    return Plugin_Stop;
 }
 static Action Timer_ResetAtSaferoom(Handle timer)
 {
@@ -455,7 +478,6 @@ static Action Timer_SpawnFirstWave(Handle timer)
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
-    AntiBait_OnRoundStart();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
@@ -466,7 +488,6 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
-    AntiBait_OnRoundStart();
     ClearPathCache();
 }
 public void Event_PlayerSpawn(Event event, const char[] name, bool dont_broadcast)
@@ -564,6 +585,7 @@ void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 {
     gCV.iSiLimit = gCV.SiLimit.IntValue;
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
+    RecalcSiCapFromAlive(false);
 
     // 立刻按新上限收缩记录
     CleanupLastSpawns(GetGameTime());
@@ -575,7 +597,7 @@ void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 public void OnGameFrame()
 {
     if (gCV.iSiLimit > gCV.MaxPlayerZombies.IntValue)
-        CreateTimer(0.1, Timer_ApplyMaxSpecials);
+        gCV.ApplyMaxZombieBound();
 
     float now = GetGameTime();
     if (now < gST.nextFrameThink)
@@ -588,6 +610,8 @@ public void OnGameFrame()
     if (gST.totalSI >= gCV.iSiLimit)
         return;
 
+    // 每个 think slice 先维护普通刷特队列：按上限、稀缺度、死亡 CD 和支援特感规则补队列。
+    // 真正刷出时优先处理传送队列，因为传送一般意味着已有特感失去作用或跑男压力更高。
     MaintainSpawnQueueOnce();
 
     if (!gST.bLate)

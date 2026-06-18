@@ -3,7 +3,7 @@
 #endif
 #define _infected_control_si_cap_included
 
-// 按当前在场特感和 CVar 上限刷新剩余额度。
+// 按当前在场特感和 Anne 内部职业上限刷新剩余额度。
 void ResetMatchState()
 {
     gST.totalSI = 0;
@@ -26,6 +26,38 @@ void ResetMatchState()
     }
 
     ResetDeathState();
+}
+
+static int AnneMainClassCap(int siLimit)
+{
+    if (siLimit < 1)
+        siLimit = 1;
+
+    return ClampInt(RoundToCeil(float(siLimit) / 4.0), 1, 6);
+}
+
+static int AnneSpitterClassCap()
+{
+    int survivorLimit = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
+    return (survivorLimit >= 7) ? 2 : 1;
+}
+
+static void BuildAnneClassCaps(int siLimit, int caps[SI_COUNT])
+{
+    for (int i = 0; i < SI_COUNT; i++)
+        caps[i] = 0;
+
+    if (siLimit <= 0)
+        return;
+
+    int mainCap = AnneMainClassCap(siLimit);
+
+    caps[view_as<int>(SI_Smoker)  - 1] = (siLimit <= 6) ? 1 : mainCap;
+    caps[view_as<int>(SI_Boomer)  - 1] = 1;
+    caps[view_as<int>(SI_Hunter)  - 1] = mainCap;
+    caps[view_as<int>(SI_Spitter) - 1] = AnneSpitterClassCap();
+    caps[view_as<int>(SI_Jockey)  - 1] = (siLimit <= 5) ? 1 : mainCap;
+    caps[view_as<int>(SI_Charger) - 1] = mainCap;
 }
 
 static void ApplyForcedClassMode()
@@ -61,12 +93,7 @@ void RecalcSiCapFromAlive(bool log = false)
     }
 
     int baseCap[SI_COUNT];
-    baseCap[0] = gCV.ZSmokerLimit.IntValue;
-    baseCap[1] = gCV.ZBoomerLimit.IntValue;
-    baseCap[2] = gCV.ZHunterLimit.IntValue;
-    baseCap[3] = gCV.ZSpitterLimit.IntValue;
-    baseCap[4] = gCV.ZJockeyLimit.IntValue;
-    baseCap[5] = gCV.ZChargerLimit.IntValue;
+    BuildAnneClassCaps(gCV.iSiLimit, baseCap);
 
     for (int i = 0; i < SI_COUNT; i++)
     {
@@ -85,12 +112,7 @@ void RecalcSiCapFromAlive(bool log = false)
 
 void ReadSiCap()
 {
-    gST.siCap[0] = gCV.ZSmokerLimit.IntValue;
-    gST.siCap[1] = gCV.ZBoomerLimit.IntValue;
-    gST.siCap[2] = gCV.ZHunterLimit.IntValue;
-    gST.siCap[3] = gCV.ZSpitterLimit.IntValue;
-    gST.siCap[4] = gCV.ZJockeyLimit.IntValue;
-    gST.siCap[5] = gCV.ZChargerLimit.IntValue;
+    BuildAnneClassCaps(gCV.iSiLimit, gST.siCap);
 
     ApplyForcedClassMode();
 

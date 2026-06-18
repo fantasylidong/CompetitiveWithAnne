@@ -92,7 +92,7 @@ stock int GetPositionBucketPercent(float pos[3])
     int navid = L4D_GetNavAreaID(nav);
     int areaIdx = GetAreaIndexByNavID_Int(navid);
 
-    if (areaIdx < 0 || areaIdx >= g_AreaPct.Length)
+    if (g_AreaPct == null || areaIdx < 0 || areaIdx >= g_AreaPct.Length)
         return -1;
 
     // 3. 返回分桶系统中的百分比（已处理异常flow映射）

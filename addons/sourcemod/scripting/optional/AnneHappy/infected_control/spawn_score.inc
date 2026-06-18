@@ -289,6 +289,9 @@ bool SpawnScore_BuildCandidate(int zc,
                                       int areaIdx,
                                       SpawnScoreDbg dbg)
 {
+    // 评分只排序“已经通过硬过滤”的候选点，不负责可见性、卡壳、路径等安全判定。
+    // 想让某类点完全不能刷，应放在 SpawnCore_EvaluateNavCandidate 的过滤阶段；
+    // 想调整偏好强弱，才改这里的四因子或 config.inc 里的权重。
     float sweet, width;
     GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
 

@@ -85,12 +85,6 @@ enum struct Config
     ConVar DeathCDBypassAfter;
     ConVar DeathCDUnderfill;
 
-    ConVar ZSmokerLimit;
-    ConVar ZBoomerLimit;
-    ConVar ZHunterLimit;
-    ConVar ZSpitterLimit;
-    ConVar ZJockeyLimit;
-    ConVar ZChargerLimit;
     ConVar TeleportSpawnGrace;   // 新刷出来后多少秒内不允许传送
     ConVar TeleportRunnerFast;   // 跑男时的快速阈值（秒），最低也要有个门槛
     // —— 支援特感解锁 —— //
@@ -372,8 +366,8 @@ enum struct Config
             CVAR_FLAG, true, 0.01, true, 0.25
         );
         this.SpawnCandidateBudget = CreateConVar(
-            "inf_spawn_candidate_budget", "8",
-            "Accepted spawn candidates to score per attempt before choosing best",
+            "inf_spawn_candidate_budget", "12",
+            "Base accepted spawn candidates to score per attempt before AI difficulty adjustments",
             CVAR_FLAG, true, 1.0, true, 24.0
         );
         this.BucketCountCacheTTL = CreateConVar(
@@ -576,12 +570,6 @@ enum struct Config
         this.AiDifficultyLevel = FindConVar("ah_ai_dynamic_current_level");
         if (this.AiDifficultyLevel != null)
             this.AiDifficultyLevel.AddChangeHook(OnCfgChanged);
-        this.ZSmokerLimit  = FindConVar("z_smoker_limit");
-        this.ZBoomerLimit  = FindConVar("z_boomer_limit");
-        this.ZHunterLimit  = FindConVar("z_hunter_limit");
-        this.ZSpitterLimit = FindConVar("z_spitter_limit");
-        this.ZJockeyLimit  = FindConVar("z_jockey_limit");
-        this.ZChargerLimit = FindConVar("z_charger_limit");
         this.DeathCDKiller.AddChangeHook(OnCfgChanged);
         this.DeathCDSupport.AddChangeHook(OnCfgChanged);
         this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
@@ -688,14 +676,6 @@ enum struct Config
         char parts[SI_COUNT][16];
         int numParts;
 
-        // 权重兜底：CVar 值不足或为 0 时回退到 1.0，避免意外禁用某因子。
-        for (int i = 1; i <= SI_COUNT; i++) {
-            if (this.w_dist[i] <= 0.0) this.w_dist[i] = 1.0;
-            if (this.w_hght[i] <= 0.0) this.w_hght[i] = 1.0;
-            if (this.w_flow[i] <= 0.0) this.w_flow[i] = 1.0;
-            if (this.w_disp[i] <= 0.0) this.w_disp[i] = 1.0;
-        }
-
         this.Score_w_dist.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
         for (int i = 0; i < numParts && i < SI_COUNT; i++) {
@@ -718,6 +698,15 @@ enum struct Config
         numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
         for (int i = 0; i < numParts && i < SI_COUNT; i++) {
             this.w_disp[i+1] = StringToFloat(parts[i]);
+        }
+
+        // 权重兜底：CVar 值不足或为 0 时回退到 1.0，避免意外禁用某因子。
+        // 必须在 ConVar 解析之后执行，确保验证的是新解析的值。
+        for (int i = 1; i <= SI_COUNT; i++) {
+            if (this.w_dist[i] <= 0.0) this.w_dist[i] = 1.0;
+            if (this.w_hght[i] <= 0.0) this.w_hght[i] = 1.0;
+            if (this.w_flow[i] <= 0.0) this.w_flow[i] = 1.0;
+            if (this.w_disp[i] <= 0.0) this.w_disp[i] = 1.0;
         }
 
         this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
