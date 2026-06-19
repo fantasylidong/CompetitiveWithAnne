@@ -193,7 +193,7 @@ static bool LeftDHooks_PVS_BufferContainsCluster(int slot, int cluster)
         return true;
 
     int byteIndex = cluster / 8;
-    if (byteIndex < 0 || byteIndex >= PVS_BUFFER_SIZE)
+    if (byteIndex < 0 || byteIndex >= PVS_BUFFER_SIZE * 4)
         return true;
 
     int cell = g_SurvivorPVSBuffer[slot][byteIndex / 4];

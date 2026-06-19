@@ -251,7 +251,7 @@ static int PickScarceClassImpl(bool relaxCD)
     int bestZc = 0;
     bool supportLocked = SupportRestrictionActive();
 
-    for (int zc = 1; zc <= 6; zc++)
+    for (int zc = 1; zc <= SI_COUNT; zc++)
     {
         if (!CheckClassEnabled(zc))    continue;
         if (!CanQueueClass(zc))        continue;

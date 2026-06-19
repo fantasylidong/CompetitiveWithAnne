@@ -65,7 +65,7 @@ Action Timer_TeleportTick(Handle timer)
 
             if (float(gST.teleCount[c]) >= needSecs)
             {
-                if (zc >= 1 && zc <= 6)
+                if (zc >= 1 && zc <= SI_COUNT)
                 {
                     TeleportQueue_Push(zc);
 

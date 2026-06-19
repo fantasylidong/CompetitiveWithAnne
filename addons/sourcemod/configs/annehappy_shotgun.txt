@@ -15,7 +15,11 @@
 	{
 		"sm_fchmatch AnneHappy"
 		{
-			"message" "喷子硬核最新版本"
+			"message" "喷子硬核26-7月最新版本"
+		}
+		"exec vote/Anne/Anne25-11.cfg"
+		{
+			"message" "25-11月版本"
 		}
 		"exec vote/Anne/Anne25-10.cfg"
 		{

@@ -192,6 +192,35 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 `cfg/vote/hard_on.cfg` 里属于投票/样本或刷点节奏的项目没有加入动态难度：`sm_veterans_*` 不是特感/Tank 行为属性，`inf_TeleportCheckTime` 属于传送检查节奏。
 
+### 极限档新增属性合并记录
+
+动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_interval 0` 在 `level5` 里对应 `"z_lunge_interval" "0"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `0`。
+
+| 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| Hunter | `z_pounce_crouch_delay` | patch 已运行时置 0 | 0 | 0 | 显式锁定无蹲伏等待 |
+| Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 未在极限档设置 | 0 / 0 | 0 / 0 | 飞扑间隔和冷却压到最低 |
+| Hunter | `z_lunge_reflect` / `z_lunge_up` | 未在极限档设置 | 1 / 150 | 1 / 150 | 保留反射与上抬力 |
+| Hunter | `z_hunter_lunge_distance` | 基础 5000 | 99999 | 99999 | 极限档允许超远飞扑判定 |
+| Hunter | `hunter_leap_away_give_up_range` | 未在极限档设置 | 99999 | 99999 | 不轻易放弃远距离 leap away 逻辑 |
+| Hunter | `ai_hunter_angle_mean` / `ai_hunter_angle_std` | 默认 10 / 极限 20 | 30 / 10 | 30 / 10 | 侧飞角更偏，随机波动更收束 |
+| Hunter | `ai_hunter_angle_diff` | 3 | 6 | 6 | 放宽左右侧飞次数差 |
+| Hunter | `ai_hunter_no_sight_pounce_range` | 300,250 | 500,250 | 500,250 | `no_sign` 是旧兼容名，配置使用当前正名 `no_sight` |
+| Hunter | `ai_hunter_back_vision` | 25 | 0 | 0 | 关闭空中背视角概率 |
+| Hunter | `ai_hunter_melee_first` | 300.0,1000.0 | 1 | 300.0,1000.0 | 本插件里它是距离范围，不是布尔开关，写 1 会削弱 |
+| Hunter | `ai_hunter_sight_revise` | 无此 ConVar | 1 | 未合并 | 当前 `ai_hunter_2.smx` 源码没有定义，写入不会生效 |
+| Jockey | `z_jockey_leap_range` / `z_leap_interval` | 未在极限档设置 | 99999 / 0.1 | 99999 / 0.1 | 扩大骑乘跳跃范围，降低跳跃间隔 |
+| Jockey | `ai_JockeyBhopSpeed` | 150 | 100 | 150 | 当前极限更强，保留不降级 |
+| Jockey | `ai_JockeySpecialJumpChance` | 75 | 20 | 75 | 当前极限骗推概率更高，保留不降级 |
+| Jockey | `ai_JockeyStartHopDistance` | 900 | 600 | 900 | 当前极限更早开始主动连跳，保留不降级 |
+| Jockey | `ai_JockeySpecialJumpRange` | 无此 ConVar | 400 | 未合并 | 当前 `ai_jockey_2.smx` 源码没有定义，写入不会生效 |
+| Spitter | `l4d2_spit_dmg` / `l4d2_spit_alternate_dmg` | 基础 2 / 3 | 3 / 2 | 3 / 2 | 主 tick 更疼，交替 tick 稍低 |
+| Smoker | `smoker_tongue_delay` | 0.0 | 0.1 | 0.0 | 当前基础值更快，极限档显式保留 0.0 |
+| Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1200 | 3 / 800 / 1200 | 舌头失败冷却、距离、飞行速度进入极限档 |
+| Witch | `z_witch_anger_rate` | 未在极限档设置 | 1 | 1 | 极限档固定激怒速率 |
+| Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 0 / 400 / 500 | 0 / 400 / 500 | 取消喷吐疲劳并扩大喷吐判定 |
+| Boomer | `ai_BoomerBhopSpeed` | 250 | 120 | 250 | 当前极限连跳速度更高，保留不降级 |
+
 ## 五档对比
 
 | 属性组 | 简单 `<30.89` | 普通 `30.89-43.23` | 困难 `43.23-63.70` | 专家 `63.70-77.57` | 极限 `>=77.57` |

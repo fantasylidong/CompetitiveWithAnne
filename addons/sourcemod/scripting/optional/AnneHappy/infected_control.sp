@@ -105,7 +105,7 @@
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2025.10.26"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2026-07"  // 和插件版号保持同步
 
 // 记录最近使用过的 navArea -> 过期时间
 StringMap g_NavCooldown;
@@ -167,7 +167,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2025.10.26",
+    version     = "2026-07",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -421,9 +421,14 @@ public Action Cmd_RebuildNavCache(int client, int args)
     // 强制重建并覆盖 Bucket 缓存
     ClearNavBuckets();
     g_BucketsReady = false;
+
+    // 删除旧的 .kv 缓存文件，防止 BuildNavBuckets 直接从旧缓存加载
+    if (g_sBucketCachePath[0] != '\0' && FileExists(g_sBucketCachePath))
+        DeleteFile(g_sBucketCachePath);
+
     BuildNavBuckets();
     
-    ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache.");
+    ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache (forced, old cache deleted).");
     return Plugin_Handled;
 }
 
@@ -539,7 +544,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
     if (zc != view_as<int>(SI_Spitter))
         CreateTimer(0.5, Timer_KickBot, GetClientUserId(client));
 
-    if (zc >= 1 && zc <= 6)
+    if (zc >= 1 && zc <= SI_COUNT)
     {
         // 只在未处于冷却期时触发一次 CD，冷却中死亡不重置。
         TouchDeathCooldownOnce(zc);
