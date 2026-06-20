@@ -36,6 +36,8 @@ ConVar g_cvCurrentMode;
 ConVar g_cvCurrentPPM;
 ConVar g_cvCurrentLocked;
 
+ArrayList g_ControlledCvars = null;
+StringMap g_ControlledCvarBaselines = null;
 Database g_hThresholdDb = null;
 Handle g_hTimer = null;
 Handle g_hThresholdDbReconnectTimer = null;
@@ -1052,6 +1054,95 @@ bool ApplyTankBhopOverride()
     return true;
 }
 
+void EnsureControlledCvarStores()
+{
+    if (g_ControlledCvars == null)
+        g_ControlledCvars = new ArrayList(ByteCountToCells(64));
+
+    if (g_ControlledCvarBaselines == null)
+        g_ControlledCvarBaselines = new StringMap();
+}
+
+void BuildControlledCvarBaselines(KeyValues kv)
+{
+    EnsureControlledCvarStores();
+    kv.Rewind();
+
+    if (!kv.GotoFirstSubKey())
+        return;
+
+    do
+    {
+        if (!kv.GotoFirstSubKey(false))
+            continue;
+
+        do
+        {
+            char cvarName[64];
+            char value[128];
+            kv.GetSectionName(cvarName, sizeof(cvarName));
+            kv.GetString(NULL_STRING, value, sizeof(value), "");
+
+            if (cvarName[0] == '\0' || value[0] == '\0')
+                continue;
+
+            CacheControlledCvarBaseline(cvarName);
+        }
+        while (kv.GotoNextKey(false));
+
+        kv.GoBack();
+    }
+    while (kv.GotoNextKey());
+
+    kv.Rewind();
+}
+
+void CacheControlledCvarBaseline(const char[] name)
+{
+    EnsureControlledCvarStores();
+    if (g_ControlledCvarBaselines.ContainsKey(name))
+        return;
+
+    ConVar cvar = FindConVar(name);
+    if (cvar == null)
+    {
+        if (g_cvDebug.BoolValue)
+            LogMessage("[AnneHappyAI] controlled cvar not found while caching baseline: %s", name);
+
+        return;
+    }
+
+    char baseline[128];
+    cvar.GetString(baseline, sizeof(baseline));
+    g_ControlledCvarBaselines.SetString(name, baseline);
+    g_ControlledCvars.PushString(name);
+}
+
+int ResetControlledCvarsToBaseline()
+{
+    if (g_ControlledCvars == null || g_ControlledCvarBaselines == null)
+        return 0;
+
+    int reset = 0;
+    for (int i = 0; i < g_ControlledCvars.Length; i++)
+    {
+        char cvarName[64];
+        char baseline[128];
+        g_ControlledCvars.GetString(i, cvarName, sizeof(cvarName));
+        if (!g_ControlledCvarBaselines.GetString(cvarName, baseline, sizeof(baseline)))
+            continue;
+
+        ConVar cvar = FindConVar(cvarName);
+        if (cvar == null)
+            continue;
+
+        cvar.SetString(baseline, true, false);
+        reset++;
+    }
+
+    return reset;
+}
+
 void EnforceSurvivorLifeCvars()
 {
     int maxIncaps = g_cvSurvivorMaxIncaps.IntValue;
@@ -1078,6 +1169,9 @@ int ApplyProfileCvars(int level)
         delete kv;
         return 0;
     }
+
+    BuildControlledCvarBaselines(kv);
+    int reset = ResetControlledCvarsToBaseline();
 
     char levelKey[16];
     FormatEx(levelKey, sizeof(levelKey), "level%d", ClampLevel(level));
@@ -1115,6 +1209,8 @@ int ApplyProfileCvars(int level)
 
     if (applied <= 0)
         LogError("[AnneHappyAI] No cvars applied from section \"%s\" in config: %s", levelKey, path);
+    else if (g_cvDebug.BoolValue)
+        LogMessage("[AnneHappyAI] reset=%d controlled cvars before applying section \"%s\", applied=%d", reset, levelKey, applied);
 
     return applied;
 }

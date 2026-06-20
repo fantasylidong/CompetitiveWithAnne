@@ -196,6 +196,8 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_interval 0` 在 `level5` 里对应 `"z_lunge_interval" "0"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `0`。
 
+插件会把五档配置里出现过的所有 ConVar 作为受控范围，首次接管时记录当前服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限档独有参数不会在切回专家、困难、普通或简单后残留。
+
 | 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Hunter | `z_pounce_crouch_delay` | patch 已运行时置 0 | 0 | 0 | 显式锁定无蹲伏等待 |
@@ -217,7 +219,6 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | Spitter | `l4d2_spit_dmg` / `l4d2_spit_alternate_dmg` | 基础 2 / 3 | 3 / 2 | 3 / 2 | 主 tick 更疼，交替 tick 稍低 |
 | Smoker | `smoker_tongue_delay` | 0.0 | 0.1 | 0.0 | 当前基础值更快，极限档显式保留 0.0 |
 | Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1200 | 3 / 800 / 1200 | 舌头失败冷却、距离、飞行速度进入极限档 |
-| Witch | `z_witch_anger_rate` | 未在极限档设置 | 1 | 1 | 极限档固定激怒速率 |
 | Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 0 / 400 / 500 | 0 / 400 / 500 | 取消喷吐疲劳并扩大喷吐判定 |
 | Boomer | `ai_BoomerBhopSpeed` | 250 | 120 | 250 | 当前极限连跳速度更高，保留不降级 |
 
