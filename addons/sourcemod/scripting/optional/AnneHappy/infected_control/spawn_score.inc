@@ -343,7 +343,8 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     int candReal = GetPositionBucketPercent(dbg.pos);
     int surReal = -1;
     int fb = GetHighestFlowSurvivorSafe();
-    TryGetClientFlowPercentSafe(fb, surReal);
+    if (IsValidSurvivor(fb))
+        TryGetClientFlowPercentSafe(fb, surReal);
 
     Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,

@@ -195,10 +195,9 @@ stock QueueMeleeSpawnRetry( any:roundSerial )
     if( g_hSpawnRetryTimer != INVALID_HANDLE ) return;
 
     g_iSpawnAttempts++;
-    if( g_iSpawnAttempts >= MELEE_SPAWN_MAX_ATTEMPTS )
+    if( g_iSpawnAttempts == MELEE_SPAWN_MAX_ATTEMPTS )
     {
-        LogError( "Failed to find an alive survivor for saferoom melee spawning after %d attempts.", g_iSpawnAttempts );
-        return;
+        LogMessage( "Still waiting for an alive survivor for saferoom melee spawning after %d attempts.", g_iSpawnAttempts );
     }
 
     g_hSpawnRetryTimer = CreateTimer( MELEE_SPAWN_RETRY_DELAY, Timer_SpawnMelee, roundSerial );

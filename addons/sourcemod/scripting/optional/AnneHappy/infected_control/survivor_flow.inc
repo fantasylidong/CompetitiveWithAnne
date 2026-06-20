@@ -297,16 +297,22 @@ bool TryGetClientFlowPercentSafe(int client, int &outPct)
 int GetHighestFlowSurvivorSafe()
 {
     int best = -1, bestPct = -1;
+    int firstAlive = -1;
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsValidSurvivor(i) || !IsPlayerAlive(i)) continue;
+        if (firstAlive == -1)
+            firstAlive = i;
+
         int pct;
         if (!TryGetClientFlowPercentSafe(i, pct)) continue;
         if (pct > bestPct) { bestPct = pct; best = i; }
     }
     if (best != -1) return best;
-    // 若全部失败，退回引擎原生（极端保护）
-    return L4D_GetHighestFlowSurvivor();
+
+    // 不再回退到 left4dhooks 的最高进度 native：
+    // left4dhooks 在安全门外/无有效 flow 时可能输出内部提示，debug>=2 会被放大成刷屏。
+    return firstAlive;
 }
 
 // 存活生还者数量

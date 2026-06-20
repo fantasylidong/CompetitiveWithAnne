@@ -101,7 +101,7 @@ public void OnClientPostAdminCheck(int client) {
 }
 
 public void OnClientCookiesCached(int client) {
-    if (!IsValidClient(client)) return;
+    if (!IsValidClient(client) || IsFakeClient(client)) return;
 
     char sValue[32];
     GetClientCookie(client, g_hVisibilityCookie, sValue, sizeof(sValue));
@@ -232,7 +232,7 @@ void LoadConfig() {
 }
 
 void LoadClientTags(int client) {
-    if (!IsValidClient(client) || g_bHideTag[client]) return;
+    if (!IsValidClient(client) || IsFakeClient(client) || g_bHideTag[client]) return;
 
     ResetClientTags(client);
 
