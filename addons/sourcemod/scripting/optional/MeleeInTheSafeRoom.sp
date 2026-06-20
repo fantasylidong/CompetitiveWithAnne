@@ -215,7 +215,7 @@ Action:Timer_SpawnMelee( Handle:timer, any:roundSerial )
         return Plugin_Stop;
     }
 
-    new client = GetAliveSurvivorClient();
+    new client = GetMeleeSpawnClient();
 
     if( client != 0 && !g_bSpawnedMelee )
     {
@@ -539,6 +539,26 @@ stock GetAliveSurvivorClient()
         }
     }
     return 0;
+}
+
+stock GetInGameSurvivorClient()
+{
+    for( new x = 1; x <= MaxClients; x++ )
+    {
+        if( IsSurvivorClient( x ) )
+        {
+            return x;
+        }
+    }
+    return 0;
+}
+
+stock GetMeleeSpawnClient()
+{
+    new client = GetAliveSurvivorClient();
+    if( client != 0 ) return client;
+
+    return GetInGameSurvivorClient();
 }
 
 stock bool:IsVersus()
