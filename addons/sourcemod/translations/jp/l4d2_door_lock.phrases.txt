@@ -132,4 +132,32 @@
 	{
 		"jp"		"{olive}[ドアロック]{default} サバイバーボットは最初のレベルで凍結が解除されました。"
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：人間プレイヤーのチーム参加を待っています。"
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：プレイヤーのロード完了を待っています。"
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：Ready/カウントダウン確認を準備中です。"
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：チームの準備率が足りません。"
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：カウントダウン中です。"
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：管理者がセーフルームロックを制御しています。"
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"jp"		"{olive}[DoorLock]{default} ドアはまだロック中です：ロック解除条件がまだ満たされていません。"
+	}
 }

@@ -132,4 +132,32 @@
 	{
 		"zho"		"{olive}[DoorLock]{default} 第一關已解凍生還者Bot。"
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：正在等待真人玩家加入隊伍。"
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：正在等待玩家載入完成。"
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：正在準備 Ready/倒數檢查。"
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：隊伍準備比例還沒有達標。"
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：倒數還沒有結束。"
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：管理員正在控制安全門鎖。"
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"zho"		"{olive}[DoorLock]{default} 門仍然鎖著：鎖門條件還沒有解除。"
+	}
 }

@@ -132,4 +132,32 @@
 	{
 		"chi"		"{olive}[DoorLock]{default} 第一关已解冻生还者Bot。"
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：正在等待真人玩家加入队伍。"
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：正在等待玩家加载完成。"
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：正在准备 Ready/倒计时检查。"
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：队伍准备比例还没有达标。"
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：倒计时还没有结束。"
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：管理员正在控制安全门锁。"
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"chi"		"{olive}[DoorLock]{default} 门仍然锁着：锁门条件还没有解除。"
+	}
 }

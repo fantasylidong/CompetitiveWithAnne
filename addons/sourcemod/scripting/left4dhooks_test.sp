@@ -348,7 +348,6 @@ stock Action TimerCancelStagger(Handle timer, int client)
 		L4D_CancelStagger(client);
 	}
 
-	if( timer ) timer = null; // Fix SM 1.12 warnings about unused variables -_-
 	return Plugin_Continue;
 }
 
@@ -2888,7 +2887,6 @@ stock Action TimerDetonate(Handle timer, int entity)
 		L4D_DetonateProjectile(entity);
 	}
 
-	if( timer ) timer = null; // Fix SM 1.12 warnings about unused variables -_-
 	return Plugin_Continue;
 }
 
@@ -2906,7 +2904,6 @@ stock Action TimerDetonateVomitjar(Handle timer, int entity)
 		TeleportEntity(entity, vPos, NULL_VECTOR, view_as<float>({ 0.0, 0.0, -1.0}));
 	}
 
-	if( timer ) timer = null; // Fix SM 1.12 warnings about unused variables -_-
 	return Plugin_Continue;
 }
 
@@ -6580,7 +6577,6 @@ stock Action TimerOnPummelResetAnim(Handle timer, int victim) // Don't need clie
 {
 	AnimHookDisable(victim, OnPummelOnAnimPre);
 
-	if( timer ) timer = null; // Fix SM 1.12 warnings about unused variables -_-
 	return Plugin_Continue;
 }
 
@@ -6980,6 +6976,5 @@ stock bool TraceFilter(int entity, int contentsMask, int client)
 	if( entity == client )
 		return false;
 
-	if( contentsMask ) contentsMask = 0; // Fix SM 1.12 warnings about unused variables -_-
 	return true;
 }

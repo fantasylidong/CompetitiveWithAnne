@@ -2,6 +2,7 @@
 
 	General Updates:
 
+ *	19-06-2026 > Version 2.12: Remove lock-phase ammo/damage cheats and print door block reasons.
  *	31-05-2026 > Version 2.11: Lock once after each non-first-map transition, not only chapter two.
  *	31-05-2026 > Version 2.10: Keep survivor bot freeze independent from one-time door locking.
  *	31-05-2026 > Version 2.9: Only lock once on the first round after transitioning into the second chapter.
@@ -37,7 +38,8 @@
 
 #pragma semicolon 1
 #pragma newdecls required
-#define PLUGIN_VERSION "2.11"
+#define PLUGIN_VERSION "2.12"
+#define DOOR_LOCK_REASON_COOLDOWN 5
 
 /* =============================================================================================================== *
  *										Bools, Handles, Integers and ConVars				   			 		   *
@@ -55,6 +57,7 @@ bool g_bIgnoreLoaders;
 bool g_bLeftSafeAreas;
 bool g_bNoBotMoveChanged;
 bool g_bSurvivorBotFreezeActive;
+bool g_bDoorUseHooked;
 bool g_bClientIsReady [MAXPLAYERS+1];
 bool g_bPanelIsOpened [MAXPLAYERS+1];
 bool g_bSurvivorBotFrozen [MAXPLAYERS+1];
@@ -70,8 +73,20 @@ int g_iUnlocksTime;
 int g_iLoadersTime;
 int g_iGiveUpsTime;
 int g_iCurrentMaps;
+int g_iNextBlockReasonTime;
 int g_iUnrdyCounts [MAXPLAYERS+1];
 int g_iClientDelay [MAXPLAYERS+1];
+
+enum DoorLockBlockReason
+{
+	DoorLockBlockReason_Generic = 0,
+	DoorLockBlockReason_NoHuman,
+	DoorLockBlockReason_Loaders,
+	DoorLockBlockReason_Warmup,
+	DoorLockBlockReason_ReadyUp,
+	DoorLockBlockReason_Countdown,
+	DoorLockBlockReason_Admin
+}
 
 void StopDoorLockTimer(Handle &timer)
 {
@@ -124,7 +139,6 @@ enum
 
 ConVar Cvar_DoorLock_AllowLock;
 ConVar Cvar_DoorLock_GameModes;
-ConVar Cvar_DoorLock_AddCheats;
 ConVar Cvar_DoorLock_Countdown;
 ConVar Cvar_DoorLock_LoaderMax;
 ConVar Cvar_DoorLock_AllowGlow;
@@ -142,7 +156,6 @@ ConVar Cvar_DoorLock_FreezeSurvivorBots;
 
 ConVar Cvar_DoorLock_MPGameMod;
 ConVar Cvar_DoorLock_NoBotMove;
-ConVar Cvar_DoorLock_MaxesAmmo;
 ConVar Cvar_DoorLock_ExitTimer;
 
 /* =============================================================================================================== *
@@ -183,7 +196,6 @@ public void OnPluginStart()
 	CreateConVar ("l4d2_door_lock_version", PLUGIN_VERSION, "L4D2 Door Lock", FCVAR_SPONLY | FCVAR_NOTIFY | FCVAR_DONTRECORD);
 	Cvar_DoorLock_AllowLock = CreateConVar("l4d2_doorlock_plugin_enable", "1", "如果为1，启用插件", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	Cvar_DoorLock_GameModes = CreateConVar("l4d2_doorlock_game_mode", "versus,coop", "在这些模式中启用插件，用英文逗号隔开 (无空格, 无内容 = 全模式).", FCVAR_NOTIFY);
-	Cvar_DoorLock_AddCheats = CreateConVar("l4d2_doorlock_add_cheats", "1", "安全区准备锁定模式 (0 = 无特殊锁定, 1 = 禁友伤, 2 = 无限弹药, 3 = 1和2)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
 	Cvar_DoorLock_Countdown = CreateConVar("l4d2_doorlock_countdown", "0", "你想设置多长时间的倒计时来解锁安全区？ (秒)", FCVAR_NOTIFY);
 	Cvar_DoorLock_LoaderMax = CreateConVar("l4d2_doorlock_loaders_time", "40", "最多等待加载玩家多长时间 (秒)", FCVAR_NOTIFY);
 	Cvar_DoorLock_AllowGlow = CreateConVar("l4d2_doorlock_glow_enable", "1", "如果为1，为安全室的门设置发光轮毂", FCVAR_NOTIFY, true, 0.0, true, 1.0);
@@ -202,7 +214,6 @@ public void OnPluginStart()
 
 	Cvar_DoorLock_MPGameMod = FindConVar("mp_gamemode");
 	Cvar_DoorLock_NoBotMove = FindConVar("nb_player_stop");
-	Cvar_DoorLock_MaxesAmmo = FindConVar("sv_infinite_ammo");
 	Cvar_DoorLock_ExitTimer = FindConVar("versus_force_start_time");
 
 	RegAdminCmd("sm_lock", Command_Lock, ADMFLAG_GENERIC, "Force Saferoom To Be Locked");
@@ -246,7 +257,9 @@ public void OnMapStart()
 	g_bFirstScenario = false;
 	g_bLockThisMap = false;
 	g_bLockUsedThisMap = false;
+	g_bDoorUseHooked = false;
 	g_iCurrentMaps = 0;
+	g_iNextBlockReasonTime = 0;
 
 	char sMap[32];
 	GetCurrentMap(sMap, sizeof(sMap));
@@ -332,6 +345,7 @@ void Event_RoundFreezeEnd(Event event, const char[] name, bool dontBroadcast)
 	g_bLeftSafeAreas = false;
 	g_bNoBotMoveChanged = false;
 	g_bSurvivorBotFreezeActive = false;
+	g_iNextBlockReasonTime = 0;
 
 	g_iLoadersTime = Cvar_DoorLock_LoaderMax.IntValue;
 	g_iGiveUpsTime = Cvar_DoorLock_RdyTimeUp.IntValue;
@@ -390,10 +404,15 @@ Action Timer_DisregardLoaders(Handle timer)
 {
 	int Human = GetRealPlayers();
 
-	if(Human < 1) return Plugin_Continue;
+	if(Human < 1)
+	{
+		PrintDoorLockBlockReason(0, DoorLockBlockReason_NoHuman, true);
+		return Plugin_Continue;
+	}
 	else if(g_iLoadersTime > 0)
 	{
 		g_iLoadersTime -= 1;
+		PrintDoorLockBlockReason(0, DoorLockBlockReason_Loaders, true);
 		return Plugin_Continue;
 	}
 
@@ -413,6 +432,7 @@ Action Timer_PendingLoaders(Handle timer)
 		g_hTimer_PendingLoader = null;
 		return Plugin_Stop;
 	}
+	PrintDoorLockBlockReason(0, DoorLockBlockReason_Loaders, true);
 	return Plugin_Continue;
 }
 
@@ -422,6 +442,8 @@ Action Timer_PendingLoaders(Handle timer)
 
 Action Timer_WarmingUpBeforeStartingCountdown(Handle timer)
 {
+	PrintDoorLockBlockReason(0, DoorLockBlockReason_Warmup, true);
+
 	if(Cvar_DoorLock_EnableRdy.BoolValue)
 	{
 		for(int i = 1; i <= MaxClients; i++)
@@ -441,6 +463,7 @@ Action Timer_StartCountdownToUnlock(Handle timer)
 	if(Cvar_DoorLock_EnableRdy.BoolValue && (!TeamReadyUpPercentageReached(2) || !TeamReadyUpPercentageReached(3)))
 	{
 		g_hTimer_CountdownTime = null;
+		PrintDoorLockBlockReason(0, DoorLockBlockReason_ReadyUp, true);
 		return Plugin_Stop;
 	}
 
@@ -457,11 +480,14 @@ Action Timer_StartCountdownToUnlock(Handle timer)
 	if(g_bAdminTakeover || !g_bLockSafeAreas)
 	{
 		g_hTimer_CountdownTime = null;
+		if(g_bAdminTakeover)
+			PrintDoorLockBlockReason(0, DoorLockBlockReason_Admin, true);
 		return Plugin_Stop;
 	}
 
 	g_iUnlocksTime -= 1;
 	PrintHintTextToAll("%t", "Round Begin Countdown", g_iUnlocksTime);
+	PrintDoorLockBlockReason(0, DoorLockBlockReason_Countdown, true);
 	return Plugin_Continue;
 }
 
@@ -484,11 +510,14 @@ Action Timer_WaitingForUnreadyPlayers(Handle timer)
 	if(g_bAdminTakeover || !g_bLockSafeAreas)
 	{
 		g_hTimer_UnreadyGiveUp = null;
+		if(g_bAdminTakeover)
+			PrintDoorLockBlockReason(0, DoorLockBlockReason_Admin, true);
 		return Plugin_Stop;
 	}
 
 	g_iGiveUpsTime -= 1;
 	PrintHintTextToAll("%t", "Ready Up Countdown", g_iGiveUpsTime);
+	PrintDoorLockBlockReason(0, DoorLockBlockReason_ReadyUp, true);
 	return Plugin_Continue;
 }
 
@@ -714,6 +743,102 @@ int Handle_ShowPlayersReadyStatus(Menu panel, MenuAction action, int param1, int
 }
 
 /* =============================================================================================================== *
+ *                                      Door Block Reason Diagnostics                                               *
+ *================================================================================================================ */
+
+DoorLockBlockReason GetDoorLockBlockReason()
+{
+	if(g_bAdminTakeover)
+		return DoorLockBlockReason_Admin;
+
+	if(GetRealPlayers() < 1)
+		return DoorLockBlockReason_NoHuman;
+
+	if(g_hTimer_PendingLoader != null || !g_bIgnoreLoaders && GetLoadingPlayers() > 0)
+		return DoorLockBlockReason_Loaders;
+
+	if(g_hTimer_WarmingUpTime != null)
+		return DoorLockBlockReason_Warmup;
+
+	if(Cvar_DoorLock_EnableRdy.BoolValue && (!TeamReadyUpPercentageReached(2) || !TeamReadyUpPercentageReached(3)))
+		return DoorLockBlockReason_ReadyUp;
+
+	if(g_hTimer_CountdownTime != null && g_iUnlocksTime > 0)
+		return DoorLockBlockReason_Countdown;
+
+	return DoorLockBlockReason_Generic;
+}
+
+void GetDoorLockBlockReasonPhrase(DoorLockBlockReason reason, char[] phrase, int maxlen)
+{
+	switch(reason)
+	{
+		case DoorLockBlockReason_NoHuman:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_NoHuman");
+		case DoorLockBlockReason_Loaders:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_Loaders");
+		case DoorLockBlockReason_Warmup:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_Warmup");
+		case DoorLockBlockReason_ReadyUp:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_ReadyUp");
+		case DoorLockBlockReason_Countdown:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_Countdown");
+		case DoorLockBlockReason_Admin:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_Admin");
+		default:
+			strcopy(phrase, maxlen, "DoorLock_BlockReason_Generic");
+	}
+}
+
+void PrintDoorLockBlockReason(int client, DoorLockBlockReason reason, bool throttle)
+{
+	if(!g_bLockSafeAreas || g_bLeftSafeAreas)
+		return;
+
+	int now = GetTime();
+	if(throttle && now < g_iNextBlockReasonTime)
+		return;
+
+	if(throttle)
+		g_iNextBlockReasonTime = now + DOOR_LOCK_REASON_COOLDOWN;
+
+	char phrase[64];
+	GetDoorLockBlockReasonPhrase(reason, phrase, sizeof(phrase));
+
+	if(client > 0 && client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client))
+		CPrintToChat(client, "%t", phrase);
+	else
+		CPrintToChatAll("%t", phrase);
+}
+
+void HookCheckpointDoorUse()
+{
+	int door = L4D_GetCheckpointFirst();
+	if(!IsValidEnt(door) || g_bDoorUseHooked)
+		return;
+
+	SDKHook(door, SDKHook_Use, OnCheckpointDoorUse);
+	g_bDoorUseHooked = true;
+}
+
+void UnhookCheckpointDoorUse()
+{
+	int door = L4D_GetCheckpointFirst();
+	if(IsValidEnt(door) && g_bDoorUseHooked)
+		SDKUnhook(door, SDKHook_Use, OnCheckpointDoorUse);
+
+	g_bDoorUseHooked = false;
+}
+
+Action OnCheckpointDoorUse(int entity, int activator, int caller, UseType type, float value)
+{
+	if(g_bLockSafeAreas && !g_bLeftSafeAreas && activator > 0 && activator <= MaxClients)
+		PrintDoorLockBlockReason(activator, GetDoorLockBlockReason(), false);
+
+	return Plugin_Continue;
+}
+
+/* =============================================================================================================== *
  *										Adding Features While Safe Area Is Locked								   *
  *================================================================================================================ */
 
@@ -727,17 +852,12 @@ void TriggerSafeAreaLocksFeatures()
 		g_bNoBotMoveChanged = true;
 	}
 	FreezeSurvivorBots();
+	HookCheckpointDoorUse();
 
-	if(Cvar_DoorLock_AddCheats.IntValue > 1) Cvar_DoorLock_MaxesAmmo.SetString("1");
 	for(int i = 1; i <= MaxClients; i++)
 	{
 		if(IsClientInGame(i) && IsPlayerAlive(i))
-		{
-			if(Cvar_DoorLock_AddCheats.IntValue == 1 || Cvar_DoorLock_AddCheats.IntValue == 3)
-				SetEntProp(i, Prop_Data, "m_takedamage", 1);
-
 			AcceptEntityInput(i, "DisableLedgeHang");
-		}
 	}
 }
 
@@ -752,10 +872,6 @@ void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 	if(!g_bLockSafeAreas) return;
 
 	AcceptEntityInput(client, "DisableLedgeHang");
-
-	if(Cvar_DoorLock_AddCheats.IntValue == 1 || Cvar_DoorLock_AddCheats.IntValue == 3)
-		SetEntProp(client, Prop_Data, "m_takedamage", 1);
-
 }
 
 void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
@@ -799,9 +915,6 @@ public void OnClientPutInServer(int client)
 	if(g_bLockSafeAreas && !g_bLeftSafeAreas)
 	{
 		AcceptEntityInput(client, "DisableLedgeHang");
-
-		if(Cvar_DoorLock_AddCheats.IntValue == 1 || Cvar_DoorLock_AddCheats.IntValue == 3)
-			SetEntProp(client, Prop_Data, "m_takedamage", 1);
 	}
 }
 
@@ -840,6 +953,7 @@ Action Timer_DisplayPanelOnConnect(Handle timer, int userid)
 void UnTriggerSafeAreaLocksFeatures()
 {
 	g_bLockSafeAreas = false;
+	UnhookCheckpointDoorUse();
 	// 真人出门前不解冻Bot，也不恢复nb_player_stop
 	/*
 	g_bSurvivorBotFreezeActive = false;
@@ -851,16 +965,10 @@ void UnTriggerSafeAreaLocksFeatures()
 	UnFreezeSurvivorBots();
 	*/
 
-	if(Cvar_DoorLock_AddCheats.IntValue > 1) ResetConVar(Cvar_DoorLock_MaxesAmmo);
 	for(int i = 1; i <= MaxClients; i++)
 	{
 		if(IsClientInGame(i) && IsPlayerAlive(i))
-		{
 			AcceptEntityInput(i, "EnableLedgeHang");
-
-			if(Cvar_DoorLock_AddCheats.IntValue == 1 || Cvar_DoorLock_AddCheats.IntValue == 3)
-				SetEntProp(i, Prop_Data, "m_takedamage", 2);
-		}
 	}
 }
 
@@ -880,9 +988,6 @@ public void OnClientDisconnect(int client)
 	if(!g_bLockSafeAreas || g_bLeftSafeAreas)
 	{
 		AcceptEntityInput(client, "EnableLedgeHang");
-
-		if(Cvar_DoorLock_AddCheats.IntValue == 1 || Cvar_DoorLock_AddCheats.IntValue == 3)
-			SetEntProp(client, Prop_Data, "m_takedamage", 2);
 	}
 }
 
@@ -909,6 +1014,7 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 	// 只在本图第一次锁门期间拦截真人并传送回安全区
 	if(g_bLockThisMap && g_bLockSafeAreas && !g_bLeftSafeAreas && g_iGiveUpsTime > 0)
 	{
+		PrintDoorLockBlockReason(client, GetDoorLockBlockReason(), false);
 		Activate_SurvivorTeleport(client);
 		return Plugin_Handled;
 	}

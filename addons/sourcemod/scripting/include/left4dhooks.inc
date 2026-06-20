@@ -1352,28 +1352,6 @@ methodmap AmmoDef
 
 
 // ====================================================================================================
-// STOCKS
-// ====================================================================================================
-
-/**
- * @brief Returns a weapons classname from the WeaponType value
- * @remarks This is only to prevent SM 1.12 warnings about unused variables
- *
- * @param type			WeaponType
- * @return				Classname string
- * @error				Invalid type index
- */
-// L4D2 only
-stock char[] L4D2_GetWeaponClassname(WeaponType type)
-{
-	return g_sWeaponTypes[type];
-}
-
-
-
-
-
-// ====================================================================================================
 // ANIMATION HOOK
 // ====================================================================================================
 /* The PRE hook can utilize the "ACT_*" enum defines from the "include/left4dhooks_anim.inc" include file. */

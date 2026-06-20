@@ -132,4 +132,32 @@
 	{
 		"ko"		"{olive}[DoorLock]{default} 생존자 봇이 첫 번째 레벨에서 동결 해제되었습니다."
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 실제 플레이어가 팀에 들어오기를 기다리는 중입니다."
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 플레이어 로딩 완료를 기다리는 중입니다."
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: Ready/카운트다운 확인을 준비 중입니다."
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 팀 준비 비율이 아직 부족합니다."
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 카운트다운이 진행 중입니다."
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 관리자가 안전실 잠금을 제어 중입니다."
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"ko"		"{olive}[DoorLock]{default} 문이 아직 잠겨 있습니다: 잠금 해제 조건이 아직 충족되지 않았습니다."
+	}
 }

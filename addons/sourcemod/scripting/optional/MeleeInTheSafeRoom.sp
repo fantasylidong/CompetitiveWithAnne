@@ -5,6 +5,10 @@
 
 #define VERSION "2.0.7"
 #define MAX_MELEE_CLASSES 16
+#define MELEE_SPAWN_ROUND_DELAY 1.0
+#define MELEE_SPAWN_PLAYER_DELAY 0.5
+#define MELEE_SPAWN_RETRY_DELAY 1.0
+#define MELEE_SPAWN_MAX_ATTEMPTS 12
 
 new Handle:g_hEnabled;
 new Handle:g_hWeaponRandom;
@@ -23,10 +27,13 @@ new Handle:g_hWeaponRiotShield;
 new Handle:g_hWeaponTonfa;
 
 new bool:g_bSpawnedMelee;
+new Handle:g_hSpawnRetryTimer = INVALID_HANDLE;
 
 new g_iMeleeClassCount = 0;
 new g_iMeleeRandomSpawn[20];
 new g_iRound = 2;
+new g_iSpawnAttempts = 0;
+new g_iSpawnRoundSerial = 0;
 
 new String:g_sMeleeClass[MAX_MELEE_CLASSES][32];
 
@@ -80,6 +87,7 @@ public OnPluginStart()
     g_hWeaponTonfa          = CreateConVar( "l4d2_MITSR_Tonfa",     "1", "Number of tonfas to spawn (l4d2_MITSR_Random must be 0)");
     
     HookEvent( "round_start", Event_RoundStart );
+    HookEvent( "player_spawn", Event_PlayerSpawn );
     
     RegAdminCmd("sm_melee", Command_SMMelee, ADMFLAG_KICK, "Lists all melee weapons spawnable in current campaign" );
 }
@@ -151,22 +159,72 @@ Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
     if( !GetConVarBool( g_hEnabled ) ) return Plugin_Continue;
     
     g_bSpawnedMelee = false;
+    g_hSpawnRetryTimer = INVALID_HANDLE;
+    g_iSpawnAttempts = 0;
+    g_iSpawnRoundSerial++;
     
     if( g_iRound == 2 && IsVersus() ) g_iRound = 1; else g_iRound = 2;
     
     GetMeleeClasses();
     
-    CreateTimer( 1.0, Timer_SpawnMelee );
+    QueueMeleeSpawn( MELEE_SPAWN_ROUND_DELAY );
     
     return Plugin_Continue;
 }
 
-Action:Timer_SpawnMelee( Handle:timer )
+Action:Event_PlayerSpawn( Handle:event, const String:name[], bool:dontBroadcast )
 {
-    new client = GetInGameClient();
+    if( !GetConVarBool( g_hEnabled ) || g_bSpawnedMelee ) return Plugin_Continue;
+
+    new client = GetClientOfUserId( GetEventInt( event, "userid" ) );
+    if( IsSurvivorClient( client ) )
+    {
+        QueueMeleeSpawn( MELEE_SPAWN_PLAYER_DELAY );
+    }
+
+    return Plugin_Continue;
+}
+
+stock QueueMeleeSpawn( Float:delay )
+{
+    CreateTimer( delay, Timer_SpawnMelee, g_iSpawnRoundSerial );
+}
+
+stock QueueMeleeSpawnRetry( any:roundSerial )
+{
+    if( g_hSpawnRetryTimer != INVALID_HANDLE ) return;
+
+    g_iSpawnAttempts++;
+    if( g_iSpawnAttempts >= MELEE_SPAWN_MAX_ATTEMPTS )
+    {
+        LogError( "Failed to find an alive survivor for saferoom melee spawning after %d attempts.", g_iSpawnAttempts );
+        return;
+    }
+
+    g_hSpawnRetryTimer = CreateTimer( MELEE_SPAWN_RETRY_DELAY, Timer_SpawnMelee, roundSerial );
+}
+
+Action:Timer_SpawnMelee( Handle:timer, any:roundSerial )
+{
+    if( timer == g_hSpawnRetryTimer )
+    {
+        g_hSpawnRetryTimer = INVALID_HANDLE;
+    }
+
+    if( roundSerial != g_iSpawnRoundSerial || g_bSpawnedMelee || !GetConVarBool( g_hEnabled ) )
+    {
+        return Plugin_Stop;
+    }
+
+    new client = GetAliveSurvivorClient();
 
     if( client != 0 && !g_bSpawnedMelee )
     {
+        if( g_iMeleeClassCount <= 0 )
+        {
+            GetMeleeClasses();
+        }
+
         if( g_iMeleeClassCount <= 0 )
         {
             LogError( "No melee classes are available for saferoom melee spawning." );
@@ -202,7 +260,7 @@ Action:Timer_SpawnMelee( Handle:timer )
     }
     else
     {
-        if( !g_bSpawnedMelee ) CreateTimer( 1.0, Timer_SpawnMelee );
+        QueueMeleeSpawnRetry( roundSerial );
     }
 
     return Plugin_Stop;
@@ -462,11 +520,21 @@ stock GetScriptName( const String:Class[32], String:ScriptName[32] )
     Format( ScriptName, 32, "%s", g_sMeleeClass[0] );   
 }
 
-stock GetInGameClient()
+stock bool:IsSurvivorClient( client )
+{
+    return ( client > 0 && client <= MaxClients && IsClientInGame( client ) && GetClientTeam( client ) == 2 );
+}
+
+stock bool:IsAliveSurvivor( client )
+{
+    return ( IsSurvivorClient( client ) && IsPlayerAlive( client ) );
+}
+
+stock GetAliveSurvivorClient()
 {
     for( new x = 1; x <= MaxClients; x++ )
     {
-        if( IsClientInGame( x ) && GetClientTeam( x ) == 2 )
+        if( IsAliveSurvivor( x ) )
         {
             return x;
         }

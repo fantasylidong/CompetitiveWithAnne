@@ -21,9 +21,11 @@
 ### 备份文件
 - `addons/sourcemod/configs/hextags.cfg.backup` (原始配置备份)
 
-### 已禁用文件
-- `addons/sourcemod/plugins/disabled/hextags.smx` (旧版本)
-- `addons/sourcemod/plugins/disabled/chat-processor.smx` (不再需要)
+### 已删除文件
+- `addons/sourcemod/plugins/extend/hextags.smx` (旧版本)
+- `addons/sourcemod/plugins/chat-processor.smx` (不再需要)
+- `addons/sourcemod/plugins/disabled/hextags.smx` (旧备份)
+- `addons/sourcemod/plugins/disabled/chat-processor.smx` (旧备份)
 
 ### 已更新文件
 - `cfg/sharedplugins.cfg` (更新加载配置)

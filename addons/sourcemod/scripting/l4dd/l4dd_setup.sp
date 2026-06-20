@@ -67,7 +67,7 @@ void SetupForwardsNatives()
 	g_hFWD_CDirector_IsTeamFull												= new GlobalForward("L4D_OnIsTeamFull",									ET_Event, Param_Cell, Param_CellByRef);
 	g_hFWD_CTerrorGameRules_ClearTeamScores									= new GlobalForward("L4D_OnClearTeamScores",							ET_Event, Param_Cell);
 	g_hFWD_CTerrorGameRules_SetCampaignScores								= new GlobalForward("L4D_OnSetCampaignScores",							ET_Event, Param_CellByRef, Param_CellByRef);
-	g_hFWD_CTerrorGameRules_SetCampaignScores_Post							= new GlobalForward("L4D_OnSetCampaignScores_Post",						ET_Event, Param_CellByRef, Param_CellByRef);
+	g_hFWD_CTerrorGameRules_SetCampaignScores_Post							= new GlobalForward("L4D_OnSetCampaignScores_Post",						ET_Event, Param_Cell, Param_Cell);
 	if( !g_bLeft4Dead2 )
 	{
 		g_hFWD_CTerrorPlayer_RecalculateVersusScore							= new GlobalForward("L4D_OnRecalculateVersusScore",						ET_Event, Param_Cell);

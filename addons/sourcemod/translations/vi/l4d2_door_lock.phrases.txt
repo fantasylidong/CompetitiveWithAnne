@@ -132,4 +132,32 @@
 	{
 		"vi"		"{olive}[DoorLock]{default} Bot sống sót đã được gỡ đóng băng ở cấp độ đầu tiên."
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: đang chờ người chơi thật tham gia đội."
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: đang chờ người chơi tải xong."
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: đang chuẩn bị kiểm tra Ready/đếm ngược."
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: tỷ lệ sẵn sàng của đội chưa đủ."
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: bộ đếm ngược vẫn đang chạy."
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: quản trị viên đang điều khiển khóa phòng an toàn."
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"vi"		"{olive}[DoorLock]{default} Cửa vẫn bị khóa: điều kiện mở khóa chưa được đáp ứng."
+	}
 }

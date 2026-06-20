@@ -1,3 +1,33 @@
+1.168 (18-Jun-2026)
+	- Fixed forwards "L4D_OnSetCampaignScores*" from crashing with "Invalid parameter or parameter type" error. Thanks to "Marttt" for reporting.
+	- Fixed "iSkin" not being used in "TE_SetupPhysicsProp" from the "left4dhooks_lux_library" include file. Thanks to "Lux" for fixing.
+	- Fixed stocks "L4D1_GetZombieClassname" and "L4D2_GetZombieClassname" from the "left4dhooks_stocks" include file from throwing errors in SM 1.12.
+	- Removed stock "L4D2_GetWeaponClassname" which was only a temporary filler to fix SM 1.12 warnings
+
+	- Updated: Plugin and test plugin.
+	- Updated: "/scripting/include/left4dhooks.inc" Include file.
+	- Updated: "/scripting/include/left4dhooks_lux_library.inc" Include file.
+	- Updated: "/scripting/include/left4dhooks_stocks.inc" Include file.
+	- Updated: "/scripting/l4dd/l4dd_setup.sp" project file.
+
+1.167 (12-Jun-2026)
+	- Added forward "L4D_OnLeft4DHooks_OnMapStart" to trigger when "Left4DHooks" has finished it's own "OnMapStart" and is ready. Requested by "SCP-076".
+	- Added natives "L4D_IsPotentiallyVisibleToTeam", "L4D_IsPotentiallyVisible", "L4D_IsCompletelyVisibleToTeam" and "L4D_IsCompletelyVisible" to check if NavAreas are visible to players. Requested by "gvazdas".
+	- Added natives "L4D_GetClusterForOrigin", "L4D_GetPVSForCluster" and "L4D_CheckOriginInPVS" to check PVS - potentially visible set. Thanks to "zyiks" and "gvazdas" for the original code creation.
+	- Added native "L4D_NavArea_GetCorner" to get the corner positions of a NavArea. Requested by "gvazdas".
+	- Added native "L4D_NavArea_GetZ" to get the height of a NavArea at a given position. Requested by "gvazdas".
+	- Added native "L4D_NavArea_GetElevator" to get the elevator entity of an area, if available. Requested by "gvazdas".
+	- Added native "L4D_NavArea_GetLadder" to get the ladder entities of an area, if available. Requested by "gvazdas".
+	- Added native "L4D_NavArea_ConnectTo" to connect NavAreas. Requested by "Marttt".
+	- Added natives "L4D_GetMass" and "L4D_SetMass" to get and set the mass of a physics object. Requested by "Marttt".
+	- Changed forwards "L4D2_OnStartUseAction*" to use the "L4D2UseAction" type. Requested by "lechuga16".
+	- Change stock "L4D2_GetPlayerZombieClass" to return "L4D2ZombieClassType" type. Requested by "lechuga16".
+	- Fixed native "AnimHookDisable" not disabling correctly. Thanks to "Piplup" for reporting.
+	- Consolidated some error messages.
+
+	- Updated to the latest version of the "lux_library" include file. Thanks to "Lux" for reporting.
+	- Added "TE_SetupBreakModel", "ShakeClientScreenAll" and "ShakeClientScreen" stocks.
+
 1.166 (15-Mar-2026)
 	- Added native "L4D_FindByClassnameTargetname" to search for an entity by classname and targetname.
 	- Added native "L4D_NavArea_IsBlocked" to check if a NavArea is blocked. Requested by "gvazdas".
@@ -6,15 +36,6 @@
 
 	- Fixed native "L4D_IsInIntro" not working on "c3m1_plankcountry" and "c7m1_docks". If other maps are broken please report. Thanks to "gvazdas" for reporting.
 	- Fixed forward "L4D2_OnEntityShoved" not working on Common Infected in recent updates. Thanks to "HwanGyul" for reporting.
-
-	- Updated: Plugin and test plugin.
-	- Updated: "/gamedata/left4dhooks.l4d1.txt" GameData file.
-	- Updated: "/gamedata/left4dhooks.l4d2.txt" GameData file.
-	- Updated: "/scripting/include/left4dhooks.inc" Include file.
-	- Updated: "/scripting/l4dd/l4dd_forwards.sp" project file.
-	- Updated: "/scripting/l4dd/l4dd_natives.sp" project file.
-	- Updated: "/scripting/l4dd/l4dd_gamedata.sp" project file.
-	- Updated: "/scripting/l4dd/l4dd_setup.sp" project file.
 
 1.165 (14-Mar-2026)
 	- Fixed the "GetMeleePointer" SDKCall being accidentality removed. Thanks to "zuaLdakid05" for reporting.
@@ -263,7 +284,7 @@
 	- Added native "L4D_SetPlayerSpawnTime" to set the spawn timer of a SI. Requested by "A1m`".
 
 	- Fixed native "L4D_OnGameModeChange" in L4D2 returning 0 for realism. Thanks to "HarryPotter" for reporting.
-	- Fixed forward "L4D2_CGasCan_EventKilled" not setting the correct modified values. Thanks to " 4NTEP xD " for reporting.
+	- Fixed forward "L4D2_CGasCan_EventKilled" not setting the correct modified values. Thanks to "4NTEP xD" for reporting.
 
 	- Fixed stocks "L4D2_GetWeaponUpgradeAmmoCount" and "L4D2_GetWeaponUpgrades" in the "left4dhooks_stocks" file, to return values other than 0 and 1. Thanks to "BHaType" for reporting.
 	- Plugins using either of these stocks should be recompiled against the updated file.
@@ -578,7 +599,7 @@
 
 	- Added enums "L4D1ZombieClassname" and "L4D2ZombieClassname" to the "left4dhooks_stocks.inc" include file to retrieve a classname from the relative "L4D1ZombieClassType" and "L4D2ZombieClassType" enums.
 
-	- Added target filters "@blackwhite" and "@bw" to target people who are on their third strike (black and white - about to die). Requested by "eyal282".
+	- Added target filters "@blackwhite" and "@bw" to target people who are on their third strike (black and white - about to die). Requested by "Eyal282".
 	- Added target filters "@survivorbots" and "@sb" to target Survivor Bots. Requested by "LordVGames".
 	- Added target filters "@infectedbots" and "@ib" to target Infected Bots. Requested by "LordVGames".
 
@@ -1232,7 +1253,7 @@
 	- Fixed creating forwards and natives in the wrong place. Thanks to "Accelerator74" for reporting.
 	- Fixed some signatures failing when other plugins detour them. Thanks to "hoanganh810972" for reporting.
 	- Fixed cvar "l4d2_addons_eclipse" - values 0 and 1 now disable/enable addons unless otherwise handled.
-	- Fixed not forwarding some Director Variables that were initialized too early. Thanks to "hoanganh81097" for reporting.
+	- Fixed not forwarding some Director Variables that were initialized too early. Thanks to "hoanganh810972" for reporting.
 	- Thanks to "Spirit_12" for ideas with the Director Variables fix.
 	- Removed unused actions from some forwards.
 

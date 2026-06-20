@@ -66,8 +66,7 @@
 > 由于我的数据库不会对外放开，所以有些插件你需要删除或者自建数据库[数据库脚本在项目内]
 - extend/l4d_stats.smx 积分插件，需要数据库，很多插件也依赖这个插件提供的积分，不过后面经过修改，这些依赖于这个积分插件的插件
 也能在无积分插件情况下运行了
-- chat-processor.smx 聊天语句处理插件，称号插件的前置插件
-- extend/hextags.smx 称号插件 其中自定义称号需要rpg插件， 积分插件相互配合才能使用，无积分的情况下你可以直接去configs/hextags.cfg文件内增加自定义称号
+- extend/hextags_lite.smx 称号插件，已移除 chat-processor 依赖；无积分插件时也能运行，自定义称号请改 `configs/hextags_lite.cfg`
 - extend/lilac.smx 会保存检测记录到数据库l4d2_stats数据库
 - extend/sbpp_******.smx sourcebans插件，方便进行所有服务器封禁
 - extend/rpg.smx 商店插件，会自动检测依赖，没数据库也能用，或者你自己改用原来anne的，问题不大

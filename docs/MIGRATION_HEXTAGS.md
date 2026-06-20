@@ -20,8 +20,8 @@
 - ✅ 备份原配置到 `hextags.cfg.backup`
 
 ### 3. 插件管理
-- ✅ 禁用 `chat-processor.smx` → `plugins/disabled/`
-- ✅ 禁用 `hextags.smx` → `plugins/disabled/`
+- ✅ 删除旧版 `chat-processor.smx`
+- ✅ 删除旧版 `hextags.smx`
 - ✅ 编译并安装 `hextags_lite.smx` (13KB)
 - ✅ 更新 `cfg/sharedplugins.cfg` 加载配置
 
@@ -49,9 +49,11 @@ addons/sourcemod/configs/hextags_lite.cfg
 addons/sourcemod/configs/hextags.cfg.backup
 ```
 
-### 禁用文件（已移至 disabled/）
+### 删除文件
 ```
 addons/sourcemod/plugins/chat-processor.smx
+addons/sourcemod/plugins/extend/hextags.smx
+addons/sourcemod/plugins/disabled/chat-processor.smx
 addons/sourcemod/plugins/disabled/hextags.smx
 ```
 

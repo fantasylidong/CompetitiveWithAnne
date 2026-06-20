@@ -132,4 +132,32 @@
 	{
 		"en"		"{olive}[DoorLock]{default} The Survivor Bot has been unfrozen in the first level."
 	}
+	"DoorLock_BlockReason_NoHuman"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: waiting for a human player to join a team."
+	}
+	"DoorLock_BlockReason_Loaders"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: waiting for players to finish loading."
+	}
+	"DoorLock_BlockReason_Warmup"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: preparing the ready/countdown check."
+	}
+	"DoorLock_BlockReason_ReadyUp"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: teams have not reached the ready percentage."
+	}
+	"DoorLock_BlockReason_Countdown"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: countdown is still running."
+	}
+	"DoorLock_BlockReason_Admin"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: an admin is controlling the saferoom lock."
+	}
+	"DoorLock_BlockReason_Generic"
+	{
+		"en"		"{olive}[DoorLock]{default} Door is still locked: door lock conditions have not been cleared."
+	}
 }

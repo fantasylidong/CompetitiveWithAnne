@@ -550,11 +550,11 @@ stock void TE_SetupPhysicsProp(float vecModelOrigin[3],
 	TE_WriteVector("m_vecVelocity", vecVelocity);
 	TE_WriteNum("m_nModelIndex", iPrecacheModel);
 	TE_WriteNum("m_nFlags", iFlags);
+	TE_WriteNum("m_nSkin", iSkin);
 	TE_WriteNum("m_nEffects", iEffects);
 	TE_WriteNum("r", RGB[0]);
 	TE_WriteNum("g", RGB[1]);
 	TE_WriteNum("b", RGB[2]);
-	if( iSkin ) iSkin += 1; // Fix "symbol is never used" in SM 1.12
 }
 
 /**
