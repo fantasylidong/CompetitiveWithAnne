@@ -3,7 +3,7 @@
 #endif
 #define _infected_control_si_cap_included
 
-// 按当前在场特感和 Anne 内部职业上限刷新剩余额度。
+// 按当前在场特感和 vote/cvar 职业上限刷新剩余额度。
 void ResetMatchState()
 {
     gST.totalSI = 0;
@@ -28,36 +28,31 @@ void ResetMatchState()
     ResetDeathState();
 }
 
-static int AnneMainClassCap(int siLimit)
+static void RefreshClassLimitCvars()
 {
-    if (siLimit < 1)
-        siLimit = 1;
-
-    return ClampInt(RoundToCeil(float(siLimit) / 4.0), 1, 6);
+    if (gCV.ZSmokerLimit == null)  gCV.ZSmokerLimit = FindConVar("z_smoker_limit");
+    if (gCV.ZBoomerLimit == null)  gCV.ZBoomerLimit = FindConVar("z_boomer_limit");
+    if (gCV.ZHunterLimit == null)  gCV.ZHunterLimit = FindConVar("z_hunter_limit");
+    if (gCV.ZSpitterLimit == null) gCV.ZSpitterLimit = FindConVar("z_spitter_limit");
+    if (gCV.ZJockeyLimit == null)  gCV.ZJockeyLimit = FindConVar("z_jockey_limit");
+    if (gCV.ZChargerLimit == null) gCV.ZChargerLimit = FindConVar("z_charger_limit");
 }
 
-static int AnneSpitterClassCap()
+static int ReadClassLimit(ConVar convar)
 {
-    int survivorLimit = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
-    return (survivorLimit >= 7) ? 2 : 1;
+    return (convar != null) ? convar.IntValue : 0;
 }
 
-static void BuildAnneClassCaps(int siLimit, int caps[SI_COUNT])
+static void ReadBaseClassCaps(int caps[SI_COUNT])
 {
-    for (int i = 0; i < SI_COUNT; i++)
-        caps[i] = 0;
+    RefreshClassLimitCvars();
 
-    if (siLimit <= 0)
-        return;
-
-    int mainCap = AnneMainClassCap(siLimit);
-
-    caps[view_as<int>(SI_Smoker)  - 1] = (siLimit <= 6) ? 1 : mainCap;
-    caps[view_as<int>(SI_Boomer)  - 1] = 1;
-    caps[view_as<int>(SI_Hunter)  - 1] = mainCap;
-    caps[view_as<int>(SI_Spitter) - 1] = AnneSpitterClassCap();
-    caps[view_as<int>(SI_Jockey)  - 1] = (siLimit <= 5) ? 1 : mainCap;
-    caps[view_as<int>(SI_Charger) - 1] = mainCap;
+    caps[view_as<int>(SI_Smoker)  - 1] = ReadClassLimit(gCV.ZSmokerLimit);
+    caps[view_as<int>(SI_Boomer)  - 1] = ReadClassLimit(gCV.ZBoomerLimit);
+    caps[view_as<int>(SI_Hunter)  - 1] = ReadClassLimit(gCV.ZHunterLimit);
+    caps[view_as<int>(SI_Spitter) - 1] = ReadClassLimit(gCV.ZSpitterLimit);
+    caps[view_as<int>(SI_Jockey)  - 1] = ReadClassLimit(gCV.ZJockeyLimit);
+    caps[view_as<int>(SI_Charger) - 1] = ReadClassLimit(gCV.ZChargerLimit);
 }
 
 static void ApplyForcedClassMode()
@@ -93,7 +88,7 @@ void RecalcSiCapFromAlive(bool log = false)
     }
 
     int baseCap[SI_COUNT];
-    BuildAnneClassCaps(gCV.iSiLimit, baseCap);
+    ReadBaseClassCaps(baseCap);
 
     for (int i = 0; i < SI_COUNT; i++)
     {
@@ -112,7 +107,7 @@ void RecalcSiCapFromAlive(bool log = false)
 
 void ReadSiCap()
 {
-    BuildAnneClassCaps(gCV.iSiLimit, gST.siCap);
+    ReadBaseClassCaps(gST.siCap);
 
     ApplyForcedClassMode();
 

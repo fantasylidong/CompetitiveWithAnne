@@ -16,8 +16,6 @@ enum struct SpawnFilterStats
     int position;
     int score;
     int bucket;
-    int navarea_vis;  // NavArea 级别可见性过滤
-    int pvs_skip;     // PVS 已确认不可见，跳过昂贵点位可见性精判
 }
 
 // 刷点核心分两层：
@@ -88,6 +86,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            float allMaxZ,
                                            int centerBucket,
                                            float refEyeZ,
+                                           float lowestFootZ,
                                            float minScore,
                                            SpawnScoreDbg candDbg,
                                            SpawnFilterStats stats)
@@ -154,14 +153,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
     }
 
-    // NavArea 级别完全可见初筛：整块区域暴露时直接跳过，再进入点位级检测。
-    if (IsNavAreaVisibleToSurvivors(areaAddr, teleportMode))
-    {
-        stats.navarea_vis++;
-        LeftDHooks_PVS_RecordNavAreaFilter();
-        return false;
-    }
-
     // 4) 从这里开始才进入点位级成本。GetRandomPoint 会调用 leftdhooks 随机 Nav 点。
     float pos[3];
     area.GetRandomPoint(pos);
@@ -173,7 +164,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
     }
 
-    // 6) 高度 slack 会放宽 ring，但只用于非 Charger/Jockey，避免这些类刷得过远。
+    // 6) 高度 slack 只给真正吃高点收益的职业，避免普通候选被屋顶高度大面积放宽。
     float bucketMinZ = g_BucketMinZ[candidateBucket];
     float bucketMaxZ = g_BucketMaxZ[candidateBucket];
     if (bucketMaxZ <= bucketMinZ)
@@ -183,7 +174,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     }
 
     float slack = 0.0;
-    if (zc != view_as<int>(SI_Charger) && zc != view_as<int>(SI_Jockey))
+    if (zc == view_as<int>(SI_Smoker) || zc == view_as<int>(SI_Hunter))
         slack = HeightRingSlack(pos, bucketMinZ, bucketMaxZ, allMaxZ);
 
     float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
@@ -216,21 +207,13 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         stats.stuck++;
         return false;
     }
-    // PVS 只能证明“不在任何生还者潜在可见集合内”，命中时跳过旧 trace；
-    // 如果仍在 PVS 内，必须继续跑 IsPosVisibleSDK 精判。
-    if (!IsPointInAnySurvivorPVS(pos))
-    {
-        stats.pvs_skip++;
-        LeftDHooks_PVS_RecordPointTraceSkipped();
-    }
-    else if (IsPosVisibleSDK(pos, teleportMode))
+    if (IsPosVisibleSDK(pos, teleportMode))
     {
         stats.visibility++;
         SpawnPerf_RecordFilterByVisibility();
         return false;
     }
-    // 候选 NavArea 已知，传给 path 检查可避免对 candPos 再做一次 L4D_GetNearestNavArea。
-    if (PathPenalty_NoBuildFromArea(pos, areaAddr, targetSurvivor, searchRange, gCV.fSpawnMax) != 0.0)
+    if (PathPenalty_NoBuild(pos, targetSurvivor, searchRange, gCV.fSpawnMax) != 0.0)
     {
         stats.path++;
         return false;
@@ -249,7 +232,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     SpawnPerf_RecordFullEvaluation();
     if (!SpawnScore_BuildCandidate(zc, pos, dminEye, ringEff, slack,
                                    candidateBucket, centerBucket, rawBadFlow,
-                                   refEyeZ, allMaxZ, sector, preferredSector,
+                                   refEyeZ, allMaxZ, lowestFootZ, sector, preferredSector,
                                    areaIdx, candDbg))
     {
         stats.flow++;
@@ -346,6 +329,8 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
         GetClientEyePosition(targetSurvivor, eye);
         refEyeZ = eye[2];
     }
+    float lowestFootZ = 1.0e9;
+    TryGetLowestSurvivorFootZ(lowestFootZ);
 
     bool found = false;
     float bestScore = -1.0e9;
@@ -392,7 +377,7 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
                                                      areaIdx, bucketIdx, false,
                                                      mapMaxFlowDist, finaleArea, center,
                                                      sectors, preferredSector, allMinZ, allMaxZ,
-                                                     centerBucket, refEyeZ, minScore,
+                                                     centerBucket, refEyeZ, lowestFootZ, minScore,
                                                      candDbg, stats))
                 {
                     continue;
@@ -430,7 +415,7 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
                                                  areaIdx, -1, true,
                                                  mapMaxFlowDist, finaleArea, center,
                                                  sectors, preferredSector, allMinZ, allMaxZ,
-                                                 centerBucket, refEyeZ, minScore,
+                                                 centerBucket, refEyeZ, lowestFootZ, minScore,
                                                  candDbg, stats))
             {
                 continue;
@@ -458,10 +443,9 @@ bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool 
 
     if (!found)
     {
-        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d,navvis=%d,pvsskip=%d",
+        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
                     searchRange, stats.cooldown, stats.flags, stats.flow, stats.distance, stats.separation,
-                    stats.stuck, stats.visibility, stats.path, stats.position, stats.score, stats.bucket,
-                    stats.navarea_vis, stats.pvs_skip);
+                    stats.stuck, stats.visibility, stats.path, stats.position, stats.score, stats.bucket);
         SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, false);
         return false;
     }

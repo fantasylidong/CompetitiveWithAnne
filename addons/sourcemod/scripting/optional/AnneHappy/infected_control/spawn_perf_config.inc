@@ -14,8 +14,6 @@ ConVar g_cvSpawnPerfProgressiveSampling;
 ConVar g_cvSpawnPerfAdaptiveBucketWindow;
 ConVar g_cvSpawnPerfEarlyDistanceFilter;
 ConVar g_cvSpawnPerfStats;
-ConVar g_cvUseNavAreaVisFilter;
-ConVar g_cvUsePVSBucketFilter;
 
 enum SpawnPerfMode
 {
@@ -31,8 +29,6 @@ bool g_bProgressiveSampling = false;
 bool g_bAdaptiveBucketWindow = false;
 bool g_bEarlyDistanceFilter = false;
 bool g_bShowPerfStats = false;
-bool g_bUseNavAreaVisFilter = true;
-bool g_bUsePVSBucketFilter = true;
 
 // ==================== 初始化 ====================
 
@@ -68,25 +64,11 @@ void SpawnPerfConfig_Create()
         CVAR_FLAG, true, 0.0, true, 1.0
     );
 
-    g_cvUseNavAreaVisFilter = CreateConVar(
-        "inf_spawn_navarea_vis_filter", "1",
-        "使用 NavArea 完全可见初筛（需 leftdhooks 1.167+ 支持）",
-        CVAR_FLAG, true, 0.0, true, 1.0
-    );
-
-    g_cvUsePVSBucketFilter = CreateConVar(
-        "inf_spawn_pvs_bucket_filter", "1",
-        "使用 PVS 对候选点做粗筛，不在任何生还者PVS内时跳过旧可见性trace（需 leftdhooks 1.167+ 支持）",
-        CVAR_FLAG, true, 0.0, true, 1.0
-    );
-
     g_cvSpawnPerfMode.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfProgressiveSampling.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfAdaptiveBucketWindow.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfEarlyDistanceFilter.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfStats.AddChangeHook(OnSpawnPerfConfigChanged);
-    g_cvUseNavAreaVisFilter.AddChangeHook(OnSpawnPerfConfigChanged);
-    g_cvUsePVSBucketFilter.AddChangeHook(OnSpawnPerfConfigChanged);
 }
 
 void SpawnPerfConfig_Refresh()
@@ -99,8 +81,6 @@ void SpawnPerfConfig_Refresh()
     g_bAdaptiveBucketWindow = g_cvSpawnPerfAdaptiveBucketWindow.BoolValue;
     g_bEarlyDistanceFilter = g_cvSpawnPerfEarlyDistanceFilter.BoolValue;
     g_bShowPerfStats = g_cvSpawnPerfStats.BoolValue;
-    g_bUseNavAreaVisFilter = g_cvUseNavAreaVisFilter.BoolValue;
-    g_bUsePVSBucketFilter = g_cvUsePVSBucketFilter.BoolValue;
 
     // 根据性能模式应用预设
     ApplyPerfModePreset(g_CurrentPerfMode);
@@ -164,16 +144,6 @@ stock SpawnPerfMode SpawnPerfConfig_GetMode()
     return g_CurrentPerfMode;
 }
 
-stock bool SpawnPerfConfig_UseNavAreaVisibilityFilter()
-{
-    return g_bUseNavAreaVisFilter;
-}
-
-stock bool SpawnPerfConfig_UsePVSBucketFilter()
-{
-    return g_bUsePVSBucketFilter;
-}
-
 // ==================== 调试命令 ====================
 
 public Action Cmd_SpawnPerfStats(int client, int args)
@@ -200,8 +170,6 @@ public Action Cmd_SpawnPerfMode(int client, int args)
         ReplyToCommand(client, "  渐进式采样: %s", g_bProgressiveSampling ? "开启" : "关闭");
         ReplyToCommand(client, "  自适应桶窗口: %s", g_bAdaptiveBucketWindow ? "开启" : "关闭");
         ReplyToCommand(client, "  早期距离过滤: %s", g_bEarlyDistanceFilter ? "开启" : "关闭");
-        ReplyToCommand(client, "  NavArea可见性过滤: %s", g_bUseNavAreaVisFilter ? "开启" : "关闭");
-        ReplyToCommand(client, "  PVS点位粗筛: %s", g_bUsePVSBucketFilter ? "开启" : "关闭");
         return Plugin_Handled;
     }
 

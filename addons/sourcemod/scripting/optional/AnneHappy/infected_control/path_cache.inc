@@ -47,11 +47,6 @@ void ClearPathCache()
 // 使用波级缓存（无 TTL）。
 stock float PathPenalty_NoBuild(const float candPos[3], int targetSur, float ring, float spawnmax)
 {
-    return PathPenalty_NoBuildFromArea(candPos, Address_Null, targetSur, ring, spawnmax);
-}
-
-stock float PathPenalty_NoBuildFromArea(const float candPos[3], Address navGoalHint, int targetSur, float ring, float spawnmax)
-{
     // 选目标幸存者：优先 targetSur，其次任意存活
     int surv = -1;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur) && !L4D_IsPlayerIncapacitated(targetSur))
@@ -73,10 +68,9 @@ stock float PathPenalty_NoBuildFromArea(const float candPos[3], Address navGoalH
     GetClientEyePosition(surv, survPos);
     survPos[2] -= 60.0;
 
-    // 找最近 NavArea
-    Address navGoal  = navGoalHint;
-    if (navGoal == Address_Null)
-        navGoal = L4D_GetNearestNavArea(candPos, 120.0, false, false, false, TEAM_INFECTED);
+    // 必须用最终随机坐标重新找最近 NavArea。
+    // 只信任扫描中的 areaAddr 会放过边缘/重叠/断层上的坏落点。
+    Address navGoal = L4D_GetNearestNavArea(candPos, 120.0, false, false, false, TEAM_INFECTED);
     Address navStart = L4D_GetNearestNavArea(survPos, 120.0, false, false, false, TEAM_INFECTED);
     if (!navGoal || !navStart) return PATH_NO_BUILD_PENALTY;
 

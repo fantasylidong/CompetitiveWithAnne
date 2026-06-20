@@ -250,16 +250,19 @@ public Action Cmd_NavTest(int client, int args)
 
     int centerBucket = surPercent;
     bool  rawBadFlow = (!passFlowRaw && passFlow);
+    float lowestFootZ = 1.0e9;
+    TryGetLowestSurvivorFootZ(lowestFootZ);
     SpawnScoreDbg scoreDbg;
     bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dminEye, gCV.fSpawnMax, 0.0,
                                                    candPercent, centerBucket, rawBadFlow,
-                                                   refEyeZ, bestEyeZ, sidx, preferredSector,
+                                                   refEyeZ, bestEyeZ, lowestFootZ, sidx, preferredSector,
                                                    index, scoreDbg);
 
     PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)",
         scoreDbg.dist, scoreDbg.sweet, scoreDbg.width);
     PrintToConsole(client, "  Height Score: %.1f (refZ: %.1f, candZ: %.1f, delta: %.1f)",
         scoreDbg.hght, refEyeZ, testPos[2], testPos[2] - refEyeZ);
+    PrintToConsole(client, "  Extra Penalty: %.1f", scoreDbg.extraPen);
 
     if (rawBadFlow)
     {

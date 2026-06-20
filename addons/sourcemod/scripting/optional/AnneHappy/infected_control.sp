@@ -200,7 +200,6 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 #include "infected_control/nav_buckets.inc"
 #include "infected_control/spawn_perf_optimizer.inc"
 #include "infected_control/spawn_perf_config.inc"
-#include "infected_control/leftdhooks_pvs.inc"
 #include "infected_control/wave_decider.inc"
 #include "infected_control/wave_control.inc"
 #include "infected_control/spawn_core.inc"
@@ -281,9 +280,6 @@ public void OnPluginStart()
     BuildNavBuckets();        // ← 预建 FLOW 分桶
     RecalcSiCapFromAlive(true);
 
-    // 初始化 leftdhooks PVS 优化
-    LeftDHooks_PVS_Init();
-
     // 分散度：初始化
     g_NavCooldown = new StringMap();
     lastSpawns = new ArrayList(4);
@@ -342,11 +338,7 @@ public void OnMapEnd()
     if (SpawnPerfConfig_ShowStats())
     {
         SpawnPerf_OnMapEnd();
-        LeftDHooks_PVS_PrintStats();
     }
-
-    // 清理 PVS 优化模块
-    LeftDHooks_PVS_OnMapEnd();
 }
 
 // =========================

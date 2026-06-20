@@ -152,6 +152,7 @@ public Action:event_RoundStart(Handle:event, const String:name[], bool:dontBroad
 	CheckCurrentMapDB();
 	MapTimingStartTime = 0.0;
 	MapTimingBlocked = false;
+	g_bMapTimingNoFastestPromptSent = false;
 	g_bStatsPlaytimeStarted = false;
 	g_broundend = false;
 	NewPlayerBonus_ResetRound();

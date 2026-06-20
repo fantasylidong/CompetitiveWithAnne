@@ -86,13 +86,63 @@ static bool FallbackDirectorPosAtMax(int zc, int target, bool teleportMode, floa
     return true;
 }
 
-static bool DoSpawnAt(const float pos[3], int zc)
+static Action Timer_AssaultBurst(Handle timer)
+{
+    BypassAndExecuteCommand("nb_assault");
+    return Plugin_Stop;
+}
+
+static void TriggerAssaultBurst()
+{
+    BypassAndExecuteCommand("nb_assault");
+    CreateTimer(0.25, Timer_AssaultBurst, _, TIMER_FLAG_NO_MAPCHANGE);
+    CreateTimer(0.60, Timer_AssaultBurst, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+static Action Timer_LogSpawnedSIState(Handle timer, any userid)
+{
+    if (gCV.iDebugMode <= 0)
+        return Plugin_Stop;
+
+    int client = GetClientOfUserId(userid);
+    if (!IsInfectedBot(client))
+    {
+        Debug_Print("[SPAWN STATE] userid=%d no longer a valid infected bot", userid);
+        return Plugin_Stop;
+    }
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+
+    float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vel);
+    float speed = GetVectorLength(vel);
+
+    Address nav = L4D_GetNearestNavArea(pos, 120.0, false, false, false, TEAM_INFECTED);
+    int navid = (nav != Address_Null) ? L4D_GetNavAreaID(nav) : -1;
+    float pathPenalty = PathPenalty_NoBuild(pos, gST.targetSurvivor, gCV.fSpawnMax, gCV.fSpawnMax);
+    int ground = GetEntPropEnt(client, Prop_Send, "m_hGroundEntity");
+
+    Debug_Print("[SPAWN STATE] %s idx=%d ghost=%d alive=%d move=%d ground=%d speed=%.1f nav=%d path=%s stuck=%d pos=(%.1f %.1f %.1f)",
+                g_sInfectedClassNames[GetInfectedClass(client)], client,
+                IsGhost(client) ? 1 : 0,
+                IsPlayerAlive(client) ? 1 : 0,
+                view_as<int>(GetEntityMoveType(client)),
+                ground, speed, navid,
+                (pathPenalty == 0.0) ? "ok" : "fail",
+                WillStuck(pos) ? 1 : 0,
+                pos[0], pos[1], pos[2]);
+
+    return Plugin_Stop;
+}
+
+static int DoSpawnAt(const float pos[3], int zc)
 {
     if (GetMinEyeDistToAnySurvivor(pos) < gCV.fSpawnMin)
     {
         Debug_Print("[SPAWN BLOCK] too close (< SpawnMin=%.1f) at (%.1f %.1f %.1f)",
                     gCV.fSpawnMin, pos[0], pos[1], pos[2]);
-        return false;
+        return 0;
     }
 
     int idx = L4D2_SpawnSpecial(zc, pos, NULL_VECTOR);
@@ -101,29 +151,56 @@ static bool DoSpawnAt(const float pos[3], int zc)
         g_LastSpawnOkTime = GetGameTime();
         InvalidateBucketShareCache();
         Debug_Print("[SPAWN OK] %s idx=%d at (%.1f %.1f %.1f)", g_sInfectedClassNames[zc], idx, pos[0], pos[1], pos[2]);
-        return true;
+        CreateTimer(0.15, Timer_LogSpawnedSIState, GetClientUserId(idx), TIMER_FLAG_NO_MAPCHANGE);
+        return idx;
     }
 
     Debug_Print("[SPAWN FAIL] %s at (%.1f %.1f %.1f) -> idx=%d", g_sInfectedClassNames[zc], pos[0], pos[1], pos[2], idx);
-    return false;
+    return 0;
+}
+
+static int GetAssaultCommandClient()
+{
+    if (IsValidSurvivor(gST.targetSurvivor) && IsPlayerAlive(gST.targetSurvivor))
+        return gST.targetSurvivor;
+
+    int fb = GetHighestFlowSurvivorSafe();
+    if (IsValidSurvivor(fb) && IsPlayerAlive(fb))
+        return fb;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsValidSurvivor(i) && IsPlayerAlive(i))
+            return i;
+    }
+
+    return 0;
 }
 
 static void BypassAndExecuteCommand(const char[] cmd)
 {
     // 临时去除 FCVAR_CHEAT 标志以在非作弊服务器上执行命令。
     // nb_assault 是让 AI 特感立即进攻的关键命令，不应依赖 sv_cheats。
-    ConVar cv = FindConVar(cmd);
-    if (cv != null)
+    int flags = GetCommandFlags(cmd);
+    if (flags == INVALID_FCVAR_FLAGS)
     {
-        int flags = cv.Flags;
-        cv.Flags = flags & ~FCVAR_CHEAT;
-        ServerCommand("%s", cmd);
-        cv.Flags = flags;
+        Debug_Print("[ASSAULT FAIL] command not found: %s", cmd);
+        return;
+    }
+
+    int client = GetAssaultCommandClient();
+    SetCommandFlags(cmd, flags & ~FCVAR_CHEAT);
+
+    if (client > 0)
+    {
+        FakeClientCommand(client, "%s", cmd);
     }
     else
     {
         ServerCommand("%s", cmd);
     }
+
+    SetCommandFlags(cmd, flags);
 }
 
 void TryNormalSpawnOnce()
@@ -185,7 +262,7 @@ void TryNormalSpawnOnce()
     if (ok)
     {
         triedSpawn = true;
-        spawnOk = DoSpawnAt(pos, want);
+        spawnOk = (DoSpawnAt(pos, want) > 0);
     }
 
     if (ok && spawnOk)
@@ -206,7 +283,7 @@ void TryNormalSpawnOnce()
         gST.totalSI++;
         SpawnQueue_DropHead(want);
 
-        BypassAndExecuteCommand("nb_assault");
+        TriggerAssaultBurst();
 
         float nextStart = ring * 0.7;
         if (nextStart < gCV.fSpawnMin) nextStart = gCV.fSpawnMin;
@@ -232,7 +309,7 @@ void TryNormalSpawnOnce()
     if (gST.spawnDistCur + EPS_RADIUS >= maxR)
     {
         float pt[3];
-        if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, false, pt) && DoSpawnAt(pt, want))
+        if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, false, pt) && DoSpawnAt(pt, want) > 0)
         {
             float center[3];
             GetSectorCenter(center, gST.targetSurvivor);
@@ -243,7 +320,7 @@ void TryNormalSpawnOnce()
             gST.totalSI++;
             SpawnQueue_DropHead(want);
 
-            BypassAndExecuteCommand("nb_assault");
+            TriggerAssaultBurst();
 
             gST.spawnDistCur *= 0.8;
             Debug_Print("[SPAWN] fallback@max success");
@@ -297,7 +374,7 @@ void TryTeleportSpawnOnce()
     if (ok)
     {
         triedSpawn = true;
-        spawnOk = DoSpawnAt(pos, want);
+        spawnOk = (DoSpawnAt(pos, want) > 0);
     }
 
     if (ok && spawnOk)
@@ -314,6 +391,7 @@ void TryTeleportSpawnOnce()
         gST.siAlive[want - 1]++;
         gST.totalSI++;
         TeleportQueue_DropHead(want);
+        TriggerAssaultBurst();
 
         float nextTP = ring * 0.8;
         if (nextTP < gCV.fSpawnMin) nextTP = gCV.fSpawnMin;
@@ -339,7 +417,7 @@ void TryTeleportSpawnOnce()
     if (gST.teleportDistCur + EPS_RADIUS >= maxR)
     {
         float pt[3];
-        if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, true, pt) && DoSpawnAt(pt, want))
+        if (FallbackDirectorPosAtMax(want, gST.targetSurvivor, true, pt) && DoSpawnAt(pt, want) > 0)
         {
             float center[3];
             GetSectorCenter(center, gST.targetSurvivor);
@@ -348,6 +426,7 @@ void TryTeleportSpawnOnce()
             gST.siAlive[want - 1]++;
             gST.totalSI++;
             TeleportQueue_DropHead(want);
+            TriggerAssaultBurst();
 
             gST.teleportDistCur = FloatMax(gCV.fSpawnMin, gST.teleportDistCur * 0.7);
             Debug_Print("[TP] fallback@max success, ring now %.1f", gST.teleportDistCur);

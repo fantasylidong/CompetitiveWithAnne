@@ -50,6 +50,12 @@ enum struct Config
     ConVar SurvivorLimit;
     ConVar DirectorNoSpecials;
     ConVar AiDifficultyLevel;
+    ConVar ZSmokerLimit;
+    ConVar ZBoomerLimit;
+    ConVar ZHunterLimit;
+    ConVar ZSpitterLimit;
+    ConVar ZJockeyLimit;
+    ConVar ZChargerLimit;
 
     // —— AI 难度联动策略 —— //
     ConVar AiDifficultyLink;
@@ -346,10 +352,10 @@ enum struct Config
             "Enable on-disk cache for Nav flow buckets (0=off,1=on)",
             CVAR_FLAG, true, 0.0, true, 1.0);
         // 评分系统权重
-        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.35 1.10 1.20 1.05 1.20 1.25", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.10 1.60 1.40 0.60 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.40 1.00 1.20 1.35 1.10 1.20", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "1.25 1.05 1.15 1.30 0.90 0.80", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.20 0.90 1.05 0.95 1.35 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -568,6 +574,12 @@ enum struct Config
         this.SurvivorLimit     = FindConVar("survivor_limit");
         this.DirectorNoSpecials = FindConVar("director_no_specials");
         this.AiDifficultyLevel = FindConVar("ah_ai_dynamic_current_level");
+        this.ZSmokerLimit      = FindConVar("z_smoker_limit");
+        this.ZBoomerLimit      = FindConVar("z_boomer_limit");
+        this.ZHunterLimit      = FindConVar("z_hunter_limit");
+        this.ZSpitterLimit     = FindConVar("z_spitter_limit");
+        this.ZJockeyLimit      = FindConVar("z_jockey_limit");
+        this.ZChargerLimit     = FindConVar("z_charger_limit");
         if (this.AiDifficultyLevel != null)
             this.AiDifficultyLevel.AddChangeHook(OnCfgChanged);
         this.DeathCDKiller.AddChangeHook(OnCfgChanged);

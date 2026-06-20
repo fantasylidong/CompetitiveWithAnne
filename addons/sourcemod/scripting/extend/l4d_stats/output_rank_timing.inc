@@ -80,6 +80,7 @@ public StartMapTiming()
 
 	MapTimingStartTime = GetEngineTime();
 	g_bMapTimingGlobalBroadcastSent = false;
+	g_bMapTimingNoFastestPromptSent = false;
 
 	new ClientTeam, maxplayers = MaxClients;
 	decl String:ClientID[MAX_LINE_WIDTH];
@@ -518,12 +519,13 @@ public GetFastTime(Handle:owner, Handle:hndl, const String:error[], any:dp)
 			StatsPrintToChatAll("当前模式该难度{green} [%s使用B数] {default}最快通关速度为{green} %s {default}." , (g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY))?"":"不", TimeLabel);
 		}
 	}
-	else{
-		if (Mode)
-		{
-			StatsPrintToChatAll("你来到无人的荒野，当前模式该难度没有最快纪录，快来挑战一下吧");
+		else{
+			if (Mode && !g_bMapTimingNoFastestPromptSent)
+			{
+				g_bMapTimingNoFastestPromptSent = true;
+				StatsPrintToChatAll("你来到无人的荒野，当前模式该难度没有最快纪录，快来挑战一下吧");
+			}
 		}
-	}
 }
 
 

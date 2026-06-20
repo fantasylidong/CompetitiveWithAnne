@@ -102,46 +102,91 @@ float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMaxZ, floa
 }
 
 
+static float HeightScore_NearPlane(float zRel, float planeWindow, float peakScore, float windowDrop, float falloff, float floorScore)
+{
+    if (planeWindow < 1.0)
+        planeWindow = 1.0;
+
+    float distPlane = FloatAbs(zRel);
+    float score;
+    if (distPlane <= planeWindow)
+    {
+        score = peakScore - (distPlane / planeWindow) * windowDrop;
+    }
+    else
+    {
+        score = peakScore - windowDrop - (distPlane - planeWindow) * falloff;
+    }
+
+    return ClampFloat(score, floorScore, peakScore);
+}
+
+static float HeightScore_ModerateAbove(float zRel, float baseScore, float peakScore, float peakZ, float falloff, float floorScore)
+{
+    if (peakZ < 1.0)
+        peakZ = 1.0;
+
+    float score;
+    if (zRel <= 0.0)
+    {
+        score = baseScore + zRel * 0.10;
+    }
+    else if (zRel <= peakZ)
+    {
+        score = baseScore + (peakScore - baseScore) * (zRel / peakZ);
+    }
+    else
+    {
+        score = peakScore - (zRel - peakZ) * falloff;
+    }
+
+    return ClampFloat(score, floorScore, peakScore);
+}
+
 stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
 {
     float zRel = p[2] - refEyeZ;
 
     if (zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Jockey))
+        return HeightScore_NearPlane(zRel, 150.0, 90.0, 20.0, 0.20, -60.0);
+
+    float score;
+    switch (zc)
     {
-        const float CJ_ALLOWED_PLANE = 150.0;
-        float distPlane = FloatAbs(zRel);
-        if (distPlane <= CJ_ALLOWED_PLANE)
-            return 90.0 - (distPlane / CJ_ALLOWED_PLANE) * 20.0;
-        return 60.0 - (distPlane - CJ_ALLOWED_PLANE) * 0.2;
+        case view_as<int>(SI_Boomer):
+        {
+            score = HeightScore_NearPlane(zRel, 80.0, 82.0, 12.0, 0.16, 18.0);
+        }
+        case view_as<int>(SI_Hunter):
+        {
+            score = HeightScore_ModerateAbove(zRel, 42.0, 90.0, 260.0, 0.13, 22.0);
+        }
+        case view_as<int>(SI_Smoker):
+        {
+            score = HeightScore_ModerateAbove(zRel, 46.0, 82.0, 220.0, 0.16, 20.0);
+        }
+        case view_as<int>(SI_Spitter):
+        {
+            score = HeightScore_ModerateAbove(zRel, 58.0, 72.0, 140.0, 0.12, 28.0);
+        }
+        default:
+        {
+            score = HeightScore_ModerateAbove(zRel, 50.0, 76.0, 180.0, 0.14, 24.0);
+        }
     }
 
-    float score = 0.0;
-    const float HEIGHT_PEAK_WINDOW = 400.0;
-    const float TAPER_BASE_DIST = 250.0;
-
-    if (zRel <= 20.0)
+    if (zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Smoker))
     {
-        score = 0.0;
-    }
-    else if (zRel <= HEIGHT_PEAK_WINDOW)
-    {
-        score = (zRel / HEIGHT_PEAK_WINDOW) * 100.0;
-    }
-    else
-    {
-        float over = zRel - HEIGHT_PEAK_WINDOW;
-        float taper = 1.0 / (1.0 + (over / TAPER_BASE_DIST));
-        score = 100.0 * taper;
+        float land[3];
+        if (FindDropLanding(p, land))
+        {
+            float d = GetMinDistToAnySurvivor(land);
+            if (d < 450.0)
+                score += 18.0 * (1.0 - d / 450.0);
+        }
     }
 
-    float land[3];
-    if (FindDropLanding(p, land))
-    {
-        float d = GetMinDistToAnySurvivor(land);
-        if (d < 450.0) score += 40.0 * (1.0 - d / 450.0);
-    }
-
-    return score;
+    return ClampFloat(score, -60.0, 110.0);
 }
 
 
@@ -153,6 +198,84 @@ stock float CalculateScore_Dispersion(int sidx, int preferredSector, const int a
     if (sidx == a_recentSectors[1]) return -25.0 * k;
     if (sidx == a_recentSectors[2]) return 0.0;
     return 50.0;
+}
+
+static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
+                                        float candZ, float refEyeZ, float allMaxEyeZ,
+                                        float lowestFootZ)
+{
+    int bucketGap = centerBucket - candBucket;
+    if (bucketGap <= 0)
+        return 0.0;
+
+    float softCoef;
+    float deepCoef;
+    float abyssCoef;
+    float highCoef;
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker):
+        {
+            softCoef = 0.20;
+            deepCoef = 0.34;
+            abyssCoef = 0.48;
+            highCoef = 0.12;
+        }
+        case view_as<int>(SI_Hunter):
+        {
+            softCoef = 0.22;
+            deepCoef = 0.38;
+            abyssCoef = 0.55;
+            highCoef = 0.14;
+        }
+        default:
+        {
+            softCoef = 0.28;
+            deepCoef = 0.46;
+            abyssCoef = 0.60;
+            highCoef = 0.18;
+        }
+    }
+
+    float penalty = 0.0;
+
+    float gapPenalty = float(bucketGap) * 10.0;
+    if (gapPenalty > 60.0)
+    {
+        float extraGap = FloatMax(0.0, float(bucketGap) - 6.0);
+        gapPenalty = 60.0 + FloatMin(40.0, extraGap * 8.0);
+    }
+    penalty += FloatMin(110.0, gapPenalty);
+
+    bool haveFoot = (lowestFootZ < 1.0e8);
+    float floorBase = haveFoot ? (lowestFootZ - 40.0) : (refEyeZ - 130.0);
+    float drop = floorBase - candZ;
+    if (drop > 0.0)
+    {
+        float softDrop = FloatMin(drop, 70.0);
+        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));
+        float abyssDrop = FloatMax(0.0, drop - 130.0);
+        float behindFactor = 1.0 + FloatMin(0.60, 0.06 * float(bucketGap));
+        float softGain = 1.0 + 0.5 * (softDrop / 70.0);
+        float deepGain = 1.0 + 0.8 * (deepDrop / 60.0);
+        float abyssLinear = abyssCoef * abyssDrop;
+        float abyssCurve = abyssCoef * Pow(abyssDrop, 1.10);
+        float abyssTerm = FloatMin(80.0, FloatMax(abyssLinear, abyssCurve));
+        float softTerm = softCoef * softDrop * softGain;
+        float deepTerm = deepCoef * deepDrop * deepGain;
+
+        penalty += (softTerm + deepTerm + abyssTerm) * behindFactor;
+    }
+
+    float highLimit = allMaxEyeZ + 150.0;
+    float rise = candZ - highLimit;
+    if (rise > 0.0)
+        penalty += FloatMin(50.0, rise * highCoef);
+
+    if (penalty > 150.0)
+        penalty = 150.0;
+
+    return penalty;
 }
 
 stock float ComputeFFThresholdForClass(int zc)
@@ -260,6 +383,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.dispRaw = src.dispRaw;
     dest.dispScaled = src.dispScaled;
     dest.penK = src.penK;
+    dest.extraPen = src.extraPen;
     dest.dminEye = src.dminEye;
     dest.ringEff = src.ringEff;
     dest.slack = src.slack;
@@ -284,6 +408,7 @@ bool SpawnScore_BuildCandidate(int zc,
                                       bool rawBadFlow,
                                       float refEyeZ,
                                       float bestSurvivorEyeZ,
+                                      float lowestFootZ,
                                       int sector,
                                       int preferredSector,
                                       int areaIdx,
@@ -308,11 +433,15 @@ bool SpawnScore_BuildCandidate(int zc,
     float scoreDisp = CalculateScore_Dispersion(sector, preferredSector, recentSectors);
     float penK = ComputePenScaleByLimit(gCV.iSiLimit);
     float dispScaled = ScaleNegativeOnly(scoreDisp, penK);
+    float behindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
+                                                     pos[2], refEyeZ, bestSurvivorEyeZ,
+                                                     lowestFootZ);
 
     dbg.total = gCV.w_dist[zc] * scoreDist
               + gCV.w_hght[zc] * scoreHeight
               + gCV.w_flow[zc] * scoreFlow
               + gCV.w_disp[zc] * dispScaled;
+    dbg.total -= behindPenalty;
     dbg.dist = scoreDist;
     dbg.hght = scoreHeight;
     dbg.flow = scoreFlow;
@@ -321,6 +450,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.dispRaw = scoreDisp;
     dbg.dispScaled = dispScaled;
     dbg.penK = penK;
+    dbg.extraPen = behindPenalty;
     dbg.dminEye = dminEye;
     dbg.ringEff = ringEff;
     dbg.slack = slack;
@@ -346,9 +476,9 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
+        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
         dbg.dminEye, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         candReal, surReal, candReal - surReal);
