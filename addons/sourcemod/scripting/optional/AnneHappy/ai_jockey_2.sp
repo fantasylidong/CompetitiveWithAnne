@@ -12,6 +12,7 @@
 #define BACK_JUMP_DIST 70.0
 #define FREEZE_MAX_TIME 0.8
 #define SHOVE_INTERVAL 1.0
+#define MAX_BHOP_BASE_SPEED 400.0
 #define DEBUG_ALL 0
 
 enum AimType
@@ -89,7 +90,7 @@ void GetInterControl_Cvars(ConVar convar, const char[] oldValue, const char[] ne
 public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
 	if (!IsAiJockey(jockey) || !IsPlayerAlive(jockey)) { return Plugin_Continue; }
-	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey) || !IsGrounded(jockey) || GetEntityMoveType(jockey) == MOVETYPE_NONE)
+	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey) || GetEntityMoveType(jockey) == MOVETYPE_NONE)
 		return Plugin_Continue;
 	float fSpeed[3] = {0.0}, fCurrentSpeed = 0.0, fJockeyPos[3] = {0.0};
 	GetEntPropVector(jockey, Prop_Data, "m_vecVelocity", fSpeed);
@@ -185,7 +186,8 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 					angles[0] = getRandomFloatInRange(20.0, 35.0) * -1.0;
 					GetAngleVectors(angles, AngleVec, NULL_VECTOR, NULL_VECTOR);
 					NormalizeVector(AngleVec, AngleVec);
-					ScaleVector(AngleVec, fCurrentSpeed);
+					float tempspeed = CapJockeyBhopBaseSpeed(fCurrentSpeed);
+					ScaleVector(AngleVec, tempspeed);
 					TeleportEntity(jockey, NULL_VECTOR, angles, AngleVec);
 					buttons |= IN_ATTACK;
 					SetState(jockey, 0, IN_ATTACK);
@@ -211,9 +213,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 				GetAngleVectors(eyeAngles, eyeAngleVec, NULL_VECTOR, NULL_VECTOR);
 				NormalizeVector(eyeAngleVec, eyeAngleVec);
 				eyeAngleVec[2] = 0.0;
-				float tempspeed = fCurrentSpeed;
-				if(tempspeed > 400.0)
-					tempspeed = 400.0;
+				float tempspeed = CapJockeyBhopBaseSpeed(fCurrentSpeed);
 				ScaleVector(eyeAngleVec, tempspeed + g_hBhopSpeed.FloatValue);
 				buttons |= IN_JUMP;
 				if (jockeyDoBhop(jockey, buttons, eyeAngles, eyeAngleVec))
@@ -229,9 +229,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 			{
 				NormalizeVector(eyeAngleVec, eyeAngleVec);
 				eyeAngleVec[2] = 0.0;
-				float tempspeed = fCurrentSpeed;
-				if(tempspeed > 400.0)
-					tempspeed = 400.0;
+				float tempspeed = CapJockeyBhopBaseSpeed(fCurrentSpeed);
 				ScaleVector(eyeAngleVec, tempspeed + g_hBhopSpeed.FloatValue);
 				if(jockeyDoBhop(jockey, buttons, eyeAngleVec, eyeAngleVec))
 					SetState(jockey, 0, IN_JUMP);
@@ -450,6 +448,11 @@ void SetState(int client, int no, int value)
 int GetState(int client, int no)
 {
 	return g_iState[client][no];
+}
+
+float CapJockeyBhopBaseSpeed(float speed)
+{
+	return speed > MAX_BHOP_BASE_SPEED ? MAX_BHOP_BASE_SPEED : speed;
 }
 
 bool jockeyDoBhop(int client, int &buttons, float ang[3], float vec[3])

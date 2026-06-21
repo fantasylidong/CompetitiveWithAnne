@@ -186,7 +186,7 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 - Boomer：所有档都开启连跳和转视角，主要区分连跳速度与转视角帧数；专家保持 15 帧，极限为 10 帧。
 - Charger：所有档都开启连跳，主要区分 `ai_ChagrerBhopSpeed`。
 - Spitter：所有档都开启连跳，主要区分 `ai_SpitterBhopSpeed`。
-- Jockey：所有档都开启连跳，主要区分连跳速度和行为复杂度。`ai_JockeyAllowInterControl` 全档固定为 `0`，抢控目标由 `target_override` 控制。
+- Jockey：所有档都开启连跳，连跳启动距离统一为 `600`，骗推行为概率统一为冻结/后跳/高跳 `40/10/50`。`ai_JockeyAllowInterControl` 全档固定为 `0`，抢控目标由 `target_override` 控制。
 - Hunter：主要区分基础飞扑空速和低飞角度。简单档垂直角度更大，Hunter 更容易飞高，给玩家更多空爆窗口；越难越低飞。极限档额外启用 `l4d2_hunter_patch_convert_leap 1` + `l4d2_hunter_patch_crouch_pounce 2`，等同原 `crouch_on` 强化。
 - Smoker：所有档都开启连跳和无视野连跳，主要区分连跳速度、左右偏角、无视野角度和空中速度修正角度。越难空中修正阈值越小，修正更早介入。
 
@@ -214,12 +214,13 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | Jockey | `z_jockey_leap_range` / `z_leap_interval` | 未在极限档设置 | 99999 / 0.1 | 99999 / 0.1 | 扩大骑乘跳跃范围，降低跳跃间隔 |
 | Jockey | `ai_JockeyBhopSpeed` | 150 | 100 | 150 | 当前极限更强，保留不降级 |
 | Jockey | `ai_JockeySpecialJumpChance` | 75 | 20 | 75 | 当前极限骗推概率更高，保留不降级 |
-| Jockey | `ai_JockeyStartHopDistance` | 900 | 600 | 900 | 当前极限更早开始主动连跳，保留不降级 |
+| Jockey | `ai_JockeyStartHopDistance` | 900 | 600 | 600 | 按当前配置统一为 600，避免动态难度高档覆盖基础设置 |
 | Jockey | `ai_JockeySpecialJumpRange` | 无此 ConVar | 400 | 未合并 | 当前 `ai_jockey_2.smx` 源码没有定义，写入不会生效 |
 | Spitter | `l4d2_spit_dmg` / `l4d2_spit_alternate_dmg` | 基础 2 / 3 | 3 / 2 | 3 / 2 | 主 tick 更疼，交替 tick 稍低 |
 | Smoker | `smoker_tongue_delay` | 0.0 | 0.1 | 0.0 | 当前基础值更快，极限档显式保留 0.0 |
 | Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1200 | 3 / 800 / 1200 | 舌头失败冷却、距离、飞行速度进入极限档 |
-| Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 0 / 400 / 500 | 0 / 400 / 500 | 取消喷吐疲劳并扩大喷吐判定 |
+| Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 专家疲劳一半 / 专家距离 / 保持极限原值 | 1500 / 300 / 500 | 喷吐距离回专家基线，只降低疲劳到专家值的一半；最大伤害距离不改 |
+| Boomer | `boomer_horde_amount` 基准值 | 12 / 13 / 10 / 10 | 保持专家基准 | 12 / 13 / 10 / 10 | 基准已迁到 Anne 三套 `confogl_plugins.cfg` 的插件加载后，只初始化一次；极限覆盖值按专家值 + `5 * 被喷人数` 计算为 17 / 23 / 25 / 30 |
 | Boomer | `ai_BoomerBhopSpeed` | 250 | 120 | 250 | 当前极限连跳速度更高，保留不降级 |
 
 ## 五档对比
@@ -231,10 +232,10 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | Hunter 垂直角度 | 12，更容易飞高 | 10 | 8 | 7 | 6 |
 | Hunter patch | 关闭 | 关闭 | 关闭 | 关闭 | `convert_leap=1`，`crouch_pounce=2` |
 | Smoker 连跳 | 开启，速度 70，修正角 70 | 速度 90，修正角 60 | 速度 105，修正角 55 | 速度 120，修正角 50 | 速度 150，修正角 45 |
-| Jockey | 速度 50，低骗推 | 速度 60，低复杂度 | 速度 70，中复杂度 | 速度 80，高复杂度 | 速度 150，更远启动和更高骗推 |
+| Jockey | 速度 50，距离 600，骗推 40/10/50 | 速度 60，距离 600，骗推 40/10/50 | 速度 70，距离 600，骗推 40/10/50 | 速度 80，距离 600，骗推 40/10/50 | 速度 150，距离 600，骗推 40/10/50，背视角 100% |
 | Spitter | 连跳速度 45 | 65 | 85 | 100 | 250 |
 | Charger | 连跳速度 45 | 60 | 75 | 90 | 150 |
-| Boomer | 速度 70，30 帧转目标 | 95，25 帧 | 125，20 帧 | 150，15 帧 | 250，10 帧 |
+| Boomer | 速度 70，30 帧转目标 | 95，25 帧 | 125，20 帧 | 150，15 帧 | 250，10 帧，喷吐距离 300，疲劳 1500；尸潮基准仍由 `confogl_plugins.cfg` 初始化 |
 | Tank | 无视野 57，220 / 650 / 60 | 57，190 / 720 / 55 | 57，170 / 820 / 50 | 57，150 / 920 / 45 | 57，135 / 980 / 45 |
 
 ## confogl_plugins.cfg 中 AI 和 Hunter Patch 的 ConVar
@@ -266,6 +267,19 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 ### `ai_boomer_2.smx`
 
 `ai_BoomerBhop`, `ai_BoomerBhopSpeed`, `ai_BoomerUpVision`, `ai_BoomerTurnVision`, `ai_BoomerForceBile`, `ai_BoomerBileFindRange`, `ai_BoomerTurnInterval`, `ai_BoomerDegreeForceBile`, `ai_BoomerAutoFrame`
+
+### `boomer_horde_equalizer_refactored.smx`
+
+插件本体保持原版逻辑，不读取 `ah_ai_dynamic_current_level`。AnneHappy、AnneHappy Hardcore、AnneHappy Shotgun 三套模式在各自 `confogl_plugins.cfg` 中，紧跟 `sm plugins load optional/boomer_horde_equalizer_refactored.smx` 后初始化当前专家基准：
+
+| 被喷人数 | 专家/基准值 | 极限覆盖参考值 |
+| --- | --- | --- |
+| 1 | 12 | 17 |
+| 2 | 13 | 23 |
+| 3 | 10 | 25 |
+| 4 | 10 | 30 |
+
+三套模式 cfg 里的旧 `boomer_horde_amount` 行已注释保留，只作为基准记录，避免模式配置重复执行时覆盖运行期调整。
 
 ### `ai_tank3.smx`
 
