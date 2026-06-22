@@ -345,6 +345,17 @@ stock bool AntiBait_IsAttackableSpread()
     return gAB.attackableSpread;
 }
 
+stock bool AntiBait_ShouldReleaseFromIntensive()
+{
+    if (gAB.attackableSpread)
+        return true;
+
+    if (!AntiBait_IsStalled() && !gAB.teamHolding)
+        return true;
+
+    return false;
+}
+
 static bool AntiBait_IsRunnerCandidate(int client, int maxPct, int medianPct)
 {
     if (!IsValidSurvivor(client) || !IsPlayerAlive(client) || IsPinned(client) || L4D_IsPlayerIncapacitated(client))
@@ -496,6 +507,13 @@ void AntiBait_Update()
         gAB.baselineMaxPct = maxPct;
         gAB.lastProgressTime = now;
         gAB.spreadStallPressure = false;
+
+        if (gAB.state == AB_Pressure && gAB.teamHolding)
+        {
+            AntiBait_Debug("progress while still holding: baseline updated, keep pressure");
+            return;
+        }
+
         if (gAB.state == AB_Pressure)
             AntiBait_SetState(AB_Recover, now, "progress");
         else if (gAB.state == AB_Recover && (now - gAB.stateSince) >= gCV.fAntiBaitRecover)

@@ -171,26 +171,18 @@ enum struct WaveDecider
 
     void UpdateIntensiveCheck()
     {
-        // 密集检测：无超时，直到玩家推进或分散才刷新
+        // 密集检测：无超时，直到玩家推进到可攻击队形或主动分散才刷新
 
-        bool isProgressing = !AntiBait_IsStalled();
-        bool isSpread = AntiBait_IsAttackableSpread();
-
-        // 推进了 → 刷新
-        if (isProgressing)
+        if (AntiBait_ShouldReleaseFromIntensive())
         {
-            this.ReleaseWave("survivors progressed");
+            if (AntiBait_IsAttackableSpread())
+                this.ReleaseWave("survivors spread out");
+            else
+                this.ReleaseWave("survivors progressed into attackable formation");
             return;
         }
 
-        // 分散了 → 刷新
-        if (isSpread)
-        {
-            this.ReleaseWave("survivors spread out");
-            return;
-        }
-
-        // 继续卡位 → 继续等待（无超时兜底）
+        // 继续卡位，或推进后仍是抱团卡点 → 继续等待（无超时兜底）
         this.intensiveCheckCount++;
     }
 
@@ -304,6 +296,7 @@ stock bool WaveDecider_IsSurvivorsHealthy()
 // AntiBait_IsStalled() - 已在 anti_baiter.inc 中定义
 // AntiBait_IsTeamHolding() - 已在 anti_baiter.inc 中定义
 // AntiBait_IsAttackableSpread() - 已在 anti_baiter.inc 中定义
+// AntiBait_ShouldReleaseFromIntensive() - 已在 anti_baiter.inc 中定义
 
 // ==================== 公共接口 ====================
 

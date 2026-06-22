@@ -239,8 +239,9 @@ Off -> Grace -> Observe -> Pressure -> Recover
 
 退出或缓和：
 
-- 平均或最高 Flow 进度推进至少 `inf_antibait_progress_pct 2`。
+- 平均或最高 Flow 进度推进至少 `inf_antibait_progress_pct 2`，并且队伍不再维持抱团卡点。
 - 或队伍分散到能被各个击破：有人离最近队友太远、整体跨度过大、或队伍断成多个小组。
+- 如果推进超过阈值但仍然抱团卡点，只更新新的 Flow 基线，继续保持 Pressure/密集检测。
 - 进入 Recover 后等待 `inf_antibait_recover 4.0` 秒，再回到 Observe。
 
 Action：
@@ -272,9 +273,9 @@ Action：
 
 结果：即使每组内部靠得近，也会按多个小组处理，认为能被各个击破，不继续 anti-bait 压力。
 
-反例 3：生还抱团，但每隔几秒稳定推进 2%。
+反例 3：生还抱团从一个卡点换到另一个卡点，期间推进超过 2%。
 
-结果：更新基线，不进入 Pressure。
+结果：更新基线，但如果已经处于 Pressure/密集检测，不会因为这次推进直接放波；后续仍要等队伍分散或推进到不再抱团卡点。
 
 反例 4：Tank 在场或半数以上倒地/死亡。
 
