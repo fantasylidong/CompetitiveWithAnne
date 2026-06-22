@@ -235,7 +235,7 @@ Off -> Grace -> Observe -> Pressure -> Recover
 3. 过了波开始后的宽限期，默认 `inf_antibait_grace 8.0`。
 4. 一段时间没有推进，默认 `inf_antibait_window 12.0` 秒。
 5. 进入压力窗口：场上有足够活特，或已经有待刷/待传送队列，或已经到达可判定下一波窗口。
-6. 生还是一个互相覆盖的整体队形：硬抱团看 `inf_antibait_cluster_dist 650.0`；软队形还会看整体跨度、平均最近队友距离和是否断成多个小组。
+6. 生还是一个互相覆盖的整体队形：硬抱团看 `inf_antibait_cluster_dist 800.0`；软队形还会看整体跨度、平均最近队友距离和是否断成多个小组。
 
 退出或缓和：
 
@@ -257,14 +257,14 @@ Action：
 
 6 特上限，4 名生还在楼梯口抱团等刷：
 
-- 最大队友间距约 300，小于 650。
+- 最大队友间距约 300，小于 800。
 - 12 秒内平均/最高进度都没涨 2%。
 - 场上可能已经没活特，但 `lastSpawnSecs` 到达可判定窗口，或队列里已有待刷特。
 - 当前不在 Tank、暂停、全员被控等保护场景。
 
 结果：进入 Pressure。若 `inf_antibait_action 2`，不可见 SI 可以按 `1.5s` 阈值走快速传送重刷，逼生还推进或拉开；开新波仍由 `DifficultyStrategy_CanStartNormalWave()` 的普通补波下限控制。
 
-反例 1：生还停了，但 1 人离最近队友超过 `inf_antibait_isolate_dist 950`。
+反例 1：生还停了，但 1 人离最近队友超过 `inf_antibait_isolate_dist 1300`。
 
 结果：认为队伍已经有可被单抓的人，不进入 Pressure 或从 Pressure 进入 Recover。
 
@@ -345,10 +345,10 @@ Action：
 | `inf_antibait_fast_tp` | `1.5` | Pressure 快速传送阈值 |
 | `inf_antibait_latest_scale` | `1.50` | 最晚开波倍率基准 |
 | `inf_antibait_latest_scale_step` | `0.10` | 难度越高倍率越低 |
-| `inf_antibait_cluster_dist` | `650.0` | 抱团判断距离 |
-| `inf_antibait_team_dist` | `1300.0` | 整体跨度超过该值时认为可被拆开攻击 |
-| `inf_antibait_pair_dist` | `700.0` | 队形连通/最近队友距离阈值 |
-| `inf_antibait_isolate_dist` | `950.0` | 单人离最近队友超过该值时释放 anti-bait 压力 |
+| `inf_antibait_cluster_dist` | `800.0` | 抱团判断距离 |
+| `inf_antibait_team_dist` | `1800.0` | 整体跨度超过该值时认为可被拆开攻击 |
+| `inf_antibait_pair_dist` | `900.0` | 队形连通/最近队友距离阈值 |
+| `inf_antibait_isolate_dist` | `1300.0` | 单人离最近队友超过该值时释放 anti-bait 压力 |
 | `inf_antibait_debug` | `0` | anti-baiter 调试日志 |
 
 ### 默认值有意变更
@@ -477,8 +477,10 @@ sm_cvar inf_antibait_isolate_dist 800
 ```cfg
 sm_cvar inf_antibait_window 8
 sm_cvar inf_antibait_force_after 15
-sm_cvar inf_antibait_cluster_dist 800
-sm_cvar inf_antibait_team_dist 1500
+sm_cvar inf_antibait_cluster_dist 900
+sm_cvar inf_antibait_team_dist 2200
+sm_cvar inf_antibait_pair_dist 1100
+sm_cvar inf_antibait_isolate_dist 1500
 ```
 
 如果要完全回到专家/当前节奏基准：
