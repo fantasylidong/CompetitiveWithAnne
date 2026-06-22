@@ -74,6 +74,7 @@ ConVar
     g_cvHeadBlockVertical,
     g_cvHeadBlockHorizontal,
     g_cvHeadBlockIgnoreTime,
+    g_cvHeadBlockSwitchCooldown,
     g_cvHeadBlockForceRockTime,
     g_cvHeadBlockForceRockRange,
     g_cvHeadBlockForceRockReleaseHoriz,
@@ -144,6 +145,7 @@ enum struct AiTank
     float lastHopSpeed;         // 上次起跳时的速度（用于空中修正还原）
     float backFistExpire;       // 通背拳允许窗口到期时间（EngineTime <= 0 未开启）
     float headBlockStart;       // 头顶卡检测开始时间
+    float lastHeadBlockTargetSwitch; // 上次因头顶拉黑强制换目标时间
     float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
     int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
     Address pathFollower;       // Tank 当前 NextBot PathFollower
@@ -162,6 +164,7 @@ enum struct AiTank
         this.lastHopSpeed = 0.0;
         this.backFistExpire = 0.0;
         this.headBlockStart = 0.0;
+        this.lastHeadBlockTargetSwitch = 0.0;
         this.forceRockUntil = 0.0;
         this.forceRockTarget = -1;
         this.pathFollower = Address_Null;
@@ -248,6 +251,7 @@ public void OnPluginStart()
     g_cvHeadBlockVertical      = CreateConVar("ai_tank3_head_block_vertical", "80.0", "触发头顶卡判定需要的垂直距离（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockHorizontal    = CreateConVar("ai_tank3_head_block_horizontal", "65.0", "触发头顶卡判定的水平距离上限（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockIgnoreTime    = CreateConVar("ai_tank3_head_block_ignore_time", "10.0", "判定恶意卡位后屏蔽该生还者的时间（秒）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockSwitchCooldown= CreateConVar("ai_tank3_head_block_switch_cooldown", "0.75", "头顶卡目标被屏蔽后，强制换目标命令的最小间隔（秒）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockTime = CreateConVar("ai_tank3_head_block_force_rock_time", "20.0", "除卡位者外其他生还都倒地时，强制投石保持的最长时间（秒）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockRange= CreateConVar("ai_tank3_head_block_force_rock_range", "250.0", "触发强制投石时 Tank 需要与卡位者拉开的最小水平距离（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseHoriz = CreateConVar("ai_tank3_head_block_force_rock_release_h", "400", "强制投石期间卡位者离开多远（水平距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
@@ -430,6 +434,7 @@ void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
     {
         g_AiTanks[i].backFistExpire = 0.0;
         g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
@@ -450,6 +455,7 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
     {
         g_AiTanks[i].backFistExpire = 0.0;
         g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
@@ -508,6 +514,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     else
     {
         g_AiTanks[client].headBlockStart = 0.0;
+        trySwitchHeadBlockTarget(client, target, false);
         return Plugin_Continue;
     }
 
@@ -799,6 +806,60 @@ int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &
     return -1;
 }
 
+bool trySwitchHeadBlockTarget(int tank, int blockedTarget, bool updateVictimOnly)
+{
+    if (!g_cvHeadBlockEnable.BoolValue || !isAiTank(tank) || !IsValidSurvivor(blockedTarget))
+        return false;
+    if (!isSurvivorIgnored(blockedTarget))
+        return false;
+
+    bool allOthersDown = false;
+    int nearestDown = -1;
+    int alternative = findAlternativeVictim(tank, blockedTarget, allOthersDown, nearestDown);
+    if (alternative <= 0)
+        return false;
+
+    float now = GetEngineTime();
+    int chaseTarget = alternative;
+    if (allOthersDown)
+    {
+        chaseTarget = (nearestDown > 0) ? nearestDown : blockedTarget;
+
+        int blockedUserId = GetClientUserId(blockedTarget);
+        if (blockedUserId > 0)
+        {
+            g_AiTanks[tank].forceRockTarget = blockedUserId;
+            g_AiTanks[tank].forceRockUntil = now + g_cvHeadBlockForceRockTime.FloatValue;
+        }
+    }
+    else
+    {
+        g_AiTanks[tank].forceRockTarget = -1;
+        g_AiTanks[tank].forceRockUntil = 0.0;
+    }
+
+    int chaseUserId = GetClientUserId(chaseTarget);
+    if (chaseUserId <= 0)
+        return false;
+
+    g_AiTanks[tank].target = chaseUserId;
+
+    if (!updateVictimOnly)
+    {
+        float cooldown = g_cvHeadBlockSwitchCooldown.FloatValue;
+        if (cooldown <= 0.0 || now - g_AiTanks[tank].lastHeadBlockTargetSwitch >= cooldown)
+        {
+            Logic_RunScript(COMMANDABOT_ATTACK, GetClientUserId(tank), chaseUserId);
+            g_AiTanks[tank].lastHeadBlockTargetSwitch = now;
+        }
+    }
+
+    if (log != null)
+        log.debugAll("%N switched head-block target from %N to %N", tank, blockedTarget, chaseTarget);
+
+    return true;
+}
+
 // 确保目标缓存一致并处理反卡逻辑
 public Action L4D2_OnChooseVictim(int client, int &curTarget)
 {
@@ -865,6 +926,24 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget)
     int cachedTarget = GetClientOfUserId(g_AiTanks[client].target);
     if (!IsValidClient(cachedTarget) || cachedTarget != curTarget)
         g_AiTanks[client].target = GetClientUserId(curTarget);
+
+    return Plugin_Continue;
+}
+
+public Action L4D_OnTargetOverride(int attacker, int &victim, int order)
+{
+    if (!isAiTank(attacker) || !IsValidSurvivor(victim))
+        return Plugin_Continue;
+
+    if (trySwitchHeadBlockTarget(attacker, victim, true))
+    {
+        int switchedTarget = GetClientOfUserId(g_AiTanks[attacker].target);
+        if (IsValidSurvivor(switchedTarget) && switchedTarget != victim)
+        {
+            victim = switchedTarget;
+            return Plugin_Changed;
+        }
+    }
 
     return Plugin_Continue;
 }
@@ -1509,6 +1588,7 @@ public void OnClientDisconnect(int client)
 
     g_fHeadBlockIgnoreUntil[client] = 0.0;
     g_AiTanks[client].headBlockStart = 0.0;
+    g_AiTanks[client].lastHeadBlockTargetSwitch = 0.0;
     g_AiTanks[client].forceRockUntil = 0.0;
     g_AiTanks[client].forceRockTarget = -1;
     g_AiTanks[client].lastLookAheadTime = 0.0;

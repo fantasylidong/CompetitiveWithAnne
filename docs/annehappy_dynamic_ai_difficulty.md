@@ -194,14 +194,14 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 ### 极限档新增属性合并记录
 
-动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_interval 0` 在 `level5` 里对应 `"z_lunge_interval" "0"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `0`。
+动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_reflect 1` 在 `level5` 里对应 `"z_lunge_reflect" "1"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `1`。
 
 插件会把五档配置里出现过的所有 ConVar 作为受控范围，首次接管时记录当前服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限档独有参数不会在切回专家、困难、普通或简单后残留。
 
 | 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Hunter | `z_pounce_crouch_delay` | patch 已运行时置 0 | 0 | 0 | 显式锁定无蹲伏等待 |
-| Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 未在极限档设置 | 0 / 0 | 0 / 0 | 飞扑间隔和冷却压到最低 |
+| Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 默认 0.1 / 0.1 | 0 / 0 | 未合并 | 极限档不覆盖，保持默认 `0.1` |
 | Hunter | `z_lunge_reflect` / `z_lunge_up` | 未在极限档设置 | 1 / 150 | 1 / 150 | 保留反射与上抬力 |
 | Hunter | `z_hunter_lunge_distance` | 基础 5000 | 99999 | 99999 | 极限档允许超远飞扑判定 |
 | Hunter | `hunter_leap_away_give_up_range` | 未在极限档设置 | 99999 | 99999 | 不轻易放弃远距离 leap away 逻辑 |
