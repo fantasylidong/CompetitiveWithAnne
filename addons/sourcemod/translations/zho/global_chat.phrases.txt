@@ -16,6 +16,14 @@
 	{
 		"zho"		"{green}%s {olive}%s {default}玩家在 {lightgreen}%s {default}召喚隊友\n{default}留言: {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"zho"		"找隊友提醒\n%s 在 %s 召喚隊友"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"zho"		"找隊友提醒\n%s 在 %s 召喚隊友\n留言: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"zho"		"接收"

@@ -15,6 +15,7 @@ Handle g_hPollTimer = null;
 Handle g_hBlacklistRefreshTimer = null;
 Handle g_hDatabaseReconnectTimer = null;
 Handle g_hBlacklistReconnectTimer = null;
+Handle g_hLFGHudSync = null;
 
 #define DB_RECONNECT_DELAY 10.0
 
@@ -99,6 +100,7 @@ public int Native_GlobalChatBroadcast(Handle plugin, int numParams)
 public void OnPluginStart()
 {
 	LoadTranslations("global_chat.phrases");
+	g_hLFGHudSync = CreateHudSynchronizer();
 	g_cvEnabled = CreateConVar("sm_qf_enabled", "1", "是否启用全服聊天。", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvDatabaseConfig = CreateConVar("sm_qf_database", "globalchat", "databases.cfg 里的数据库配置名称。");
 	g_cvPollInterval = CreateConVar("sm_qf_poll_interval", "5.0", "全服聊天轮询间隔，单位秒。", FCVAR_NONE, true, 2.0, true, 30.0);
@@ -1410,12 +1412,12 @@ void DispatchGlobalChatMessage(const char[] senderSteam64, const char[] server, 
 			{
 				if (count < 2 || parts[1][0] == '\0')
 				{
-					PrintCenterText(i, "%s 玩家在 %s 召唤队友", parts[0], server);
+					ShowLFGHudReminder(i, parts[0], server, "");
 					CPrintToChat(i, "%t", "GlobalChat_SummonTeammates", prefix, parts[0], server);
 				}
 				else
 				{
-					PrintCenterText(i, "%s 玩家在 %s 召唤队友", parts[0], server);
+					ShowLFGHudReminder(i, parts[0], server, parts[1]);
 					CPrintToChat(i, "%t", "GlobalChat_SummonTeammatesWithMessage", prefix, parts[0], server, parts[1]);
 				}
 			}
@@ -1441,6 +1443,18 @@ void DispatchGlobalChatMessage(const char[] senderSteam64, const char[] server, 
 		if (CanReceiveGlobalMessage(i, senderSteam64))
 			CPrintToChat(i, "{green}%s {lightgreen}[%s] {olive}%s{default}: %s", prefix, shortServer, name, message);
 	}
+}
+
+void ShowLFGHudReminder(int client, const char[] playerName, const char[] server, const char[] message)
+{
+	char text[256];
+	if (message[0] == '\0')
+		FormatEx(text, sizeof(text), "%T", "GlobalChat_LFGHud", client, playerName, server);
+	else
+		FormatEx(text, sizeof(text), "%T", "GlobalChat_LFGHudWithMessage", client, playerName, server, message);
+
+	SetHudTextParams(-1.0, 0.18, 6.0, 180, 255, 80, 255, 1, 0.1, 0.1, 0.5);
+	ShowSyncHudText(client, g_hLFGHudSync, "%s", text);
 }
 
 public void OnClientPostAdminCheck(int client)

@@ -16,6 +16,14 @@
 	{
 		"vi"		"{green}%s {olive}%s {default}Người chơi để lại lời nhắn tại {lightgreen}%s {default} để triệu hồi đồng đội \n{default}: {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"vi"		"Tìm đồng đội\n%s đang tìm đồng đội tại %s"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"vi"		"Tìm đồng đội\n%s đang tìm đồng đội tại %s\nTin nhắn: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"vi"		"nhận"

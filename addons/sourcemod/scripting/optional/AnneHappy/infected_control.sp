@@ -158,6 +158,7 @@ ArrayList g_AreaPct = null;  // int   per areaIdx（-1=未知/坏flow，否则0.
 
 // 跑男通知 forward
 Handle g_hRushManNotifyForward = INVALID_HANDLE;
+Handle g_hFirstWaveTimer = INVALID_HANDLE;
 
 // =========================
 // 全局
@@ -367,13 +368,14 @@ stock void LogMsg(const char[] fmt, any ...)
 // =========================
 public Action Cmd_StartSpawn(int client, int args)
 {
-    if (L4D_HasAnySurvivorLeftSafeArea())
-    {
-        ResetMatchState();
-        CreateTimer(0.1, Timer_SpawnFirstWave);
-        ReadSiCap();
-    }
+    RequestStartSpawn();
     return Plugin_Handled;
+}
+
+public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+{
+    RequestStartSpawn();
+    return Plugin_Continue;
 }
 public Action Cmd_StopSpawn(int client, int args)
 {
@@ -435,6 +437,12 @@ void ResetDeathState()
 
 static void StopAll()
 {
+    if (g_hFirstWaveTimer != INVALID_HANDLE)
+    {
+        KillTimer(g_hFirstWaveTimer);
+        g_hFirstWaveTimer = INVALID_HANDLE;
+    }
+
     gQ.Clear();
     Queue_SyncSizes();
     gST.Reset();
@@ -453,11 +461,27 @@ static Action Timer_ApplyMaxSpecials(Handle timer)
 }
 static Action Timer_ResetAtSaferoom(Handle timer)
 {
+    if (gST.bLate || g_hFirstWaveTimer != INVALID_HANDLE)
+        return Plugin_Stop;
+
     ResetMatchState();
-    return Plugin_Continue;
+    return Plugin_Stop;
 }
+
+static void RequestStartSpawn()
+{
+    if (gST.bLate || g_hFirstWaveTimer != INVALID_HANDLE)
+        return;
+
+    ResetMatchState();
+    g_hFirstWaveTimer = CreateTimer(0.1, Timer_SpawnFirstWave, _, TIMER_FLAG_NO_MAPCHANGE);
+    ReadSiCap();
+}
+
 static Action Timer_SpawnFirstWave(Handle timer)
 {
+    g_hFirstWaveTimer = INVALID_HANDLE;
+
     if (!gST.bLate)
     {
         gST.bLate = true;

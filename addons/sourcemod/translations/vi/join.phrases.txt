@@ -14,7 +14,15 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"vi"		"{olive}!finish{default} nhắc nhở quản trị viên xác minh."
+		"vi"		"{green}[AnneDonate]{default} Sau khi thanh toán, nhập {olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default} để nhắc quản trị viên xác minh."
+	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"vi"		"{green}[AnneDonate]{default} Vui lòng nhập email sau lệnh, ví dụ: {olive}!wc user@example.com{default}."
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"vi"		"{green}[AnneDonate]{default} Định dạng email không hợp lệ. Vui lòng nhập lại, ví dụ: {olive}!wc user@example.com{default}."
 	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{

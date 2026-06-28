@@ -14,7 +14,15 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"ko"		"{olive}!finish{default}는 관리자에게 확인을 요청합니다."
+		"ko"		"{green}[AnneDonate]{default} 결제 후 {olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default}을 입력하여 관리자에게 확인을 요청하세요."
+	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"ko"		"{green}[AnneDonate]{default} 명령 뒤에 이메일을 입력하세요. 예: {olive}!wc user@example.com{default}"
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"ko"		"{green}[AnneDonate]{default} 이메일 형식이 올바르지 않습니다. 다시 입력하세요. 예: {olive}!wc user@example.com{default}"
 	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{

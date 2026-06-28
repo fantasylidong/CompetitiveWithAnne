@@ -16,6 +16,14 @@
 	{
 		"jp"		"{green}%s {olive}%s {default}プレイヤーは {lightgreen}%s {default} にチームメイトを召喚するメッセージを残しました \n{default}: {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"jp"		"チーム募集\n%s が %s でチームメイトを探しています"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"jp"		"チーム募集\n%s が %s でチームメイトを探しています\nメッセージ: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"jp"		"受信"

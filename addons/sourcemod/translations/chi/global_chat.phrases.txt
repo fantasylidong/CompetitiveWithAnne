@@ -16,6 +16,14 @@
 	{
 		"chi"		"{green}%s {olive}%s {default}玩家在 {lightgreen}%s {default}召唤队友\n{default}留言: {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"chi"		"找队友提醒\n%s 在 %s 召唤队友"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"chi"		"找队友提醒\n%s 在 %s 召唤队友\n留言: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"chi"		"接收"

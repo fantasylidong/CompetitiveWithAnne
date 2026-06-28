@@ -16,6 +16,14 @@
 	{
 		"zho"		"{green}[AnneDonate]{default} 掃碼支付完成後，請輸入 {olive}!wc 郵箱{default} / {olive}!wanchen 郵箱{default} / {olive}!finish 郵箱{default} 提醒管理者核實。"
 	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"zho"		"{green}[AnneDonate]{default} 請在指令後輸入郵箱，例如：{olive}!wc user@example.com{default}。"
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"zho"		"{green}[AnneDonate]{default} 郵箱格式不正確，請重新輸入，例如：{olive}!wc user@example.com{default}。"
+	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{
 		"zho"		"{green}[AnneDonate]{default} 暫時找不到你的待確認贊助，請先輸入 {olive}!donate{default} 選擇檔位和付款方式。"

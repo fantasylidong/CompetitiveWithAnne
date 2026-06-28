@@ -9,7 +9,10 @@
 
 public OnMapStart()
 {
-	MapChangingForConnectAnnounce = false;
+	if (MapChangingForConnectAnnounce)
+	{
+		CreateTimer(CONNECT_ANNOUNCE_MAPCHANGE_GRACE, Timer_ResetConnectAnnounceMapChange, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
 	GetConVarString(cvar_Gamemode, CurrentGamemode, sizeof(CurrentGamemode));
 	CurrentGamemodeID = GetCurrentGamemodeID();
 	SetCurrentGamemodeName();
@@ -79,6 +82,33 @@ public Action:ClientPostAdminCheck(Handle:timer, any:client)
 
 		AnnouncePlayerConnect(client);
 	}
+
+	ConnectAnnouncePendingDisconnect[client][0] = '\0';
+}
+
+public Action:Timer_ResetConnectAnnounceMapChange(Handle:timer)
+{
+	MapChangingForConnectAnnounce = false;
+
+	if (ConnectAnnounceTrie != INVALID_HANDLE)
+	{
+		for (new i = 1; i <= MaxClients; i++)
+		{
+			if (ConnectAnnouncePendingDisconnect[i][0] == '\0')
+			{
+				continue;
+			}
+
+			if (!IsClientConnected(i))
+			{
+				RemoveFromTrie(ConnectAnnounceTrie, ConnectAnnouncePendingDisconnect[i]);
+			}
+
+			ConnectAnnouncePendingDisconnect[i][0] = '\0';
+		}
+	}
+
+	return Plugin_Stop;
 }
 
 public OnPluginEnd()
@@ -189,6 +219,10 @@ public OnClientDisconnect(client)
 	if (!MapChangingForConnectAnnounce && ConnectAnnounceTrie != INVALID_HANDLE)
 	{
 		RemoveFromTrie(ConnectAnnounceTrie, ClientID);
+	}
+	else if (MapChangingForConnectAnnounce)
+	{
+		strcopy(ConnectAnnouncePendingDisconnect[client], sizeof(ConnectAnnouncePendingDisconnect[]), ClientID);
 	}
 
 	if (MapTimingStartTime >= 0.0)

@@ -521,11 +521,22 @@ public Action FinishDonatePayment(int client, int args)
 	{
 		GetCmdArg(1, email, sizeof(email));
 	}
+	TrimString(email);
 
 	if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
 	{
 		CPrintToChat(client, "%t", "Join_AnneDonateSponsorshipConfirmedNot");
 		ShowDonateAmountMenu(client);
+		return Plugin_Handled;
+	}
+	if(email[0] == '\0')
+	{
+		CPrintToChat(client, "%t", "Join_AnneDonateEmailRequired");
+		return Plugin_Handled;
+	}
+	if(!IsDonateEmailValid(email))
+	{
+		CPrintToChat(client, "%t", "Join_AnneDonateEmailInvalid");
 		return Plugin_Handled;
 	}
 
@@ -646,6 +657,32 @@ void ShowDonateMethodMenu(int client)
 bool IsDonateMethodAllowed(const char[] method)
 {
 	return StrEqual(method, "wechat", false) || StrEqual(method, "alipay", false);
+}
+
+bool IsDonateEmailValid(char[] email)
+{
+	TrimString(email);
+
+	int length = strlen(email);
+	if(length < 3)
+		return false;
+
+	int atPos = FindCharInString(email, '@');
+	int lastAtPos = FindCharInString(email, '@', true);
+	int dotPos = FindCharInString(email, '.', true);
+
+	if(atPos <= 0 || atPos != lastAtPos)
+		return false;
+	if(dotPos <= atPos + 1 || dotPos >= length - 1)
+		return false;
+
+	for(int i = 0; i < length; i++)
+	{
+		if(IsCharSpace(email[i]))
+			return false;
+	}
+
+	return true;
 }
 
 public int DonateMethodMenuHandler(Menu menu, MenuAction action, int client, int item)

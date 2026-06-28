@@ -16,6 +16,14 @@
 	{
 		"ko"		"{green}%s {olive}%s {default}플레이어가 {lightgreen}%s {default}에 팀원 \n{default}를 소환하라는 메시지를 남겼습니다. {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"ko"		"팀원 찾기\n%s 님이 %s 에서 팀원을 찾고 있습니다"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"ko"		"팀원 찾기\n%s 님이 %s 에서 팀원을 찾고 있습니다\n메시지: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"ko"		"수신"

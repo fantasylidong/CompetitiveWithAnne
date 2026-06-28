@@ -16,6 +16,14 @@
 	{
 		"en"		"{green}[AnneDonate]{default} After payment, enter {olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default} to remind the administrator to verify."
 	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"en"		"{green}[AnneDonate]{default} Please enter your email after the command, for example: {olive}!wc user@example.com{default}."
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"en"		"{green}[AnneDonate]{default} The email format looks invalid. Please enter it again, for example: {olive}!wc user@example.com{default}."
+	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{
 		"en"		"{green}[AnneDonate]{default} Your sponsorship to be confirmed has not been found yet. Please enter {olive}!donate{default} to select the gear and payment method."

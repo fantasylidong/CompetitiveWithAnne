@@ -237,7 +237,11 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 		int style;
 		GetMenuItem(menu, param2, sInfo, sizeof(sInfo), style, sBuffer, sizeof(sBuffer));
 		strcopy(g_sCfg, sizeof(g_sCfg), sInfo);
-		if (!StrEqual(g_sCfg, "sm_votekick", true))
+		if (IsSpawnVoteMenuCommand(sInfo))
+		{
+			FakeClientCommand(param1, sInfo);
+		}
+		else if (!StrEqual(g_sCfg, "sm_votekick", true))
 		{
 			if (StartVote(param1, sBuffer, sInfo))
 			{
@@ -262,6 +266,13 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 		ShowVoteMenu(param1);
 	}
 	return 0;
+}
+
+bool IsSpawnVoteMenuCommand(const char[] command)
+{
+	return StrEqual(command, "sm_spawnvote", false)
+		|| StrEqual(command, "sm_sivote", false)
+		|| StrEqual(command, "sm刷特", false);
 }
 
 bool IsRestartMapVoteCommand(const char[] command)

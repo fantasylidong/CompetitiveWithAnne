@@ -16,6 +16,14 @@
 	{
 		"chi"		"{green}[AnneDonate]{default} 扫码支付完成后，请输入 {olive}!wc 邮箱{default} / {olive}!wanchen 邮箱{default} / {olive}!finish 邮箱{default} 提醒管理员核实。"
 	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"chi"		"{green}[AnneDonate]{default} 请在命令后输入邮箱，例如：{olive}!wc user@example.com{default}。"
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"chi"		"{green}[AnneDonate]{default} 邮箱格式不正确，请重新输入，例如：{olive}!wc user@example.com{default}。"
+	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{
 		"chi"		"{green}[AnneDonate]{default} 暂未找到你的待确认赞助，请先输入 {olive}!donate{default} 选择档位和支付方式。"

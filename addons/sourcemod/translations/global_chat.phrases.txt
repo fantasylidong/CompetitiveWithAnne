@@ -16,6 +16,14 @@
 	{
 		"en"		"{green}%s {olive}%s {default}is looking for teammates on {lightgreen}%s{default}\n{default}Message: {olive}%s"
 	}
+	"GlobalChat_LFGHud"
+	{
+		"en"		"TEAM FINDER\n%s is looking for teammates on %s"
+	}
+	"GlobalChat_LFGHudWithMessage"
+	{
+		"en"		"TEAM FINDER\n%s is looking for teammates on %s\nMessage: %s"
+	}
 	"GlobalChat_StatusReceive"
 	{
 		"en"		"receive"

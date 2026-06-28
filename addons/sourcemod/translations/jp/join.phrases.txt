@@ -14,7 +14,15 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"jp"		"{olive}!finish{default} は管理者に確認を促します。"
+		"jp"		"{green}[AnneDonate]{default} 支払い後、{olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default} と入力して管理者に確認を依頼してください。"
+	}
+	"Join_AnneDonateEmailRequired"
+	{
+		"jp"		"{green}[AnneDonate]{default} コマンドの後にメールアドレスを入力してください。例: {olive}!wc user@example.com{default}"
+	}
+	"Join_AnneDonateEmailInvalid"
+	{
+		"jp"		"{green}[AnneDonate]{default} メールアドレスの形式が正しくありません。例: {olive}!wc user@example.com{default}"
 	}
 	"Join_AnneDonateSponsorshipConfirmedNot"
 	{
