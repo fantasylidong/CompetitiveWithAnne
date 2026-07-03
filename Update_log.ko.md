@@ -1,0 +1,34 @@
+# L4D2 AnneHappy Rework 업데이트 기록
+
+## 업데이트
+
+### 2026년 6월 12일-7월 3일 업데이트 기록
+#### Anne 모드와 특수 감염자 스폰 시스템
+- Anne 계열 대전 모드에서 3인칭 시점을 사용할 수 없던 문제를 수정했습니다. `!tp` 및 3인칭 관련 cvar는 Anne 계열 공유 설정을 통해 적용됩니다.
+- `infected_control.smx` 리팩터링과 최적화를 계속 진행했습니다. Left4DHooks PVS/가시성 보조, 스폰 성능 설정, 큐 조정, 웨이브 판정 정리를 추가해 비정상 스폰, Smoker 이중 혀, 너무 빠른 보충 웨이브를 줄였습니다.
+- `anne_cvar_shield.smx`를 추가해 Anne 핵심 cvar를 보호합니다. 플러그인이나 투표 잔여 설정이 다른 모드 난이도로 섞이는 문제를 방지합니다.
+- 26-7 테스트 설정 `Anne25-11.cfg`를 추가하고, 롤백용으로 기존 `infected_control25-11.smx`를 유지했습니다. 동적 난이도 문서도 함께 갱신했습니다.
+- 극한 난이도 값이 다른 난이도에 영향을 주던 문제를 수정했습니다. 동적 난이도 전환 시 Tank, Hunter 등 단계별 파라미터가 더 명확히 초기화됩니다.
+- 일부 상황에서 안전실 근접 무기가 나오지 않을 수 있던 문제를 수정하고 `MeleeInTheSafeRoom` 로직을 정리했습니다.
+- `extra_menu`를 사용하는 스폰 투표 메뉴 `spawn_vote_menu.smx`를 추가했습니다. Anne/캠페인 특수 감염자 수, 간격, 자동 모드, 텔레포트 검사, preset을 투표로 조정할 수 있습니다.
+- not0721 계열 coop/community/mutation 모드, dirspawn preset, 무기 설정, SI limit 설정을 추가하고 정리했습니다.
+- `infected_control`에 배신자 모드 관련 로직, 스폰 preset 테이블, 다국어 문구를 추가해 이후 게임플레이 확장에 대비했습니다.
+
+#### 플레이어 경험, 투표와 피드백
+- 기존 `hextags`를 `hextags_lite.smx`로 교체하고 칭호 색상 문제를 수정했습니다. 관리자 명령을 숨겼으며 설정 파일은 `hextags_lite.cfg`로 이동했습니다.
+- `global_chat.smx`, `join.smx` 및 관련 메시지에 다국어 문구를 보강했습니다. 전체 채팅 상태와 팀 찾기 수신 상태 문구도 추가했습니다.
+- `l4d_stats.smx`의 분기 랭킹과 영속화 세부 문제를 수정하고 라운드 상태 기록을 보강했습니다. 일부 데이터베이스 처리와 피크 시간 상태 쓰기 부담도 낮췄습니다.
+- 기존 `killsound`와 딩딩딩 사운드 투표 기능을 `l4d2_hitsound.smx`에 통합했습니다. 오래된 `sound_on/off` 투표 파일을 제거하고 명중, 처치, 헤드샷 사운드와 아이콘을 피드백 플러그인에서 통합 관리합니다.
+- `spechud.sp`를 업데이트했습니다. ping 표시, 보너스 비율 상세 표시, 관전 지연 표시 수정이 포함됩니다.
+- `basevotes.smx`를 비활성화하고 무차지 Hunter 직접 투표 항목을 삭제했습니다. Anne 동적 난이도 및 새 투표 메뉴와의 충돌을 줄입니다.
+- `server_name.smx`는 더 이상 SourceBans description을 직접 덮어쓰지 않습니다. 표시 처리는 외부 proxy 흐름으로 이동했습니다.
+- 피크 시간 언로드와 NPC 관리의 검사/안내 빈도를 낮춰 바쁜 시간대의 추가 부하를 줄였습니다.
+- 일부 관리자 명령 출력을 숨겨 플레이어 채팅 영역의 불필요한 메시지를 줄였습니다.
+
+#### 업스트림 동기화, 맵과 핵심 의존성
+- Left4DHooks, gamedata, include, 테스트 소스를 업데이트하고 새 native/forward를 보강했습니다. 관련 플러그인도 다시 빌드했습니다.
+- `ai_tank3.smx`를 업데이트해 RPG 점수 권한 처리와 극한 난이도 callback/파라미터 문제를 수정하고 Tank 행동 설정을 조정했습니다.
+- Dead Center 2025, City 17, No Echo m3, Carried Off `cwm1_intro` 등 업스트림 map/stripper 수정을 동기화했습니다. 적용 가능한 zonemod 변경은 `zonemod_anne`에도 반영했습니다.
+- `cwm1_intro` hittable/clipwall 수정과 여러 모드의 `mapinfo.txt`를 동기화했습니다.
+- Rust 서버 브라우저 도구와 Docker 배포 README를 이 저장소에서 제거했습니다. 관련 워크플로는 외부 도구/웹 경로에서 유지합니다.
+- `basevotes.smx` 위치, SourceMod 설정, 데이터베이스 필드, 여러 문서를 갱신해 플러그인 팩 구조를 더 깔끔하게 정리했습니다.

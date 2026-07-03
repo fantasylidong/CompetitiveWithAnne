@@ -586,3 +586,34 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 #### 文档与配置
 - 新增 `docs/annehappy_dynamic_ai_difficulty.md`，记录 PPM 分档、数据库阈值表结构、动态难度配置说明、投票/命令用法和特感属性差异。
 - 新增 `cfg/sourcemod/annehappy_dynamic_ai_difficulty.cfg` 作为默认 cvar 配置，方便服务器直接调整阈值来源、季度统计开关和固定难度模式。
+
+### 2026年6月12日-7月3日更新记录
+#### Anne 模式与刷特系统
+- 修复 Anne 对抗模式无法使用第三人称的问题，`!tp` 和第三人称相关 cvar 已按 Anne 系模式写入共享配置。
+- `infected_control.smx` 持续重构并优化：加入 Left4DHooks PVS/可见性辅助、刷点性能配置、队列和波次决策优化，减少重构版异常刷特、双舌头和过快补波问题。
+- 新增 `anne_cvar_shield.smx`，保护 Anne 关键 cvar，避免插件或投票残留把本局难度串到其他模式。
+- 新增 26-7 测试配置 `Anne25-11.cfg`，保留旧版 `infected_control25-11.smx` 作为回退，并同步动态难度说明。
+- 修复极限难度参数影响其他难度的问题，动态难度切换时会更明确地重置 Tank、Hunter 等档位参数。
+- 修复部分情况下安全室近战没有掉落的问题，并整理 `MeleeInTheSafeRoom` 逻辑。
+- 新增刷特投票菜单 `spawn_vote_menu.smx` 和 `extra_menu` 支持，Anne/战役刷特数量、间隔、自动模式、传送检测等可以通过投票和预设管理调整。
+- 新增并整理 not0721 系列 coop/community/mutation 模式、dirspawn preset、武器配置和 SI limit 配置。
+- `infected_control` 增加叛徒模式相关逻辑、刷特预设表和多语言短语，便于后续扩展玩法。
+
+#### 玩家体验、投票与反馈
+- `hextags_lite.smx` 替换旧 `hextags`，修复称号颜色问题，隐藏管理员命令，配置改为 `hextags_lite.cfg`。
+- `global_chat.smx`、`join.smx` 和相关翻译补齐更多多语言提示，加入全服聊天状态、找队友接收状态等短语。
+- `l4d_stats.smx` 修复季度排名和持久化细节，补充回合状态记录，降低部分数据库和高峰期状态写入问题。
+- `l4d2_hitsound.smx` 合并原 `killsound`/叮叮叮音效投票能力，删除 `sound_on/off` 旧投票文件，把命中、击杀、爆头音效与图标统一到反馈插件管理。
+- `spechud.sp` 更新旁观 HUD：显示 ping，调整奖励百分比拆分，并修复旁观延迟显示问题。
+- 禁用 `basevotes.smx`，删除无蓄力 Hunter 直投入口，减少和 Anne 动态难度/投票菜单冲突。
+- `server_name.smx` 不再直接改写 SourceBans description，相关展示交给外部 proxy 程序处理。
+- 高峰期卸载与 NPC 管理降低检测/提示频率，减少高峰期额外开销。
+- 隐藏部分管理员命令输出，减少普通玩家聊天区干扰。
+
+#### 上游同步、地图与核心依赖
+- 更新 Left4DHooks、gamedata、include 与测试源码，补齐新 native/forward，并同步重新编译相关插件。
+- 更新 `ai_tank3.smx`，修复 RPG 分数权限错误和极限难度回调/参数问题，调整 Tank 行为配置。
+- 同步上游地图和 stripper 修复：Dead Center 2025、City 17、No Echo m3、Carried Off `cwm1_intro` 等，并把适用的 zonemod 更新同步到 `zonemod_anne`。
+- 同步 `cwm1_intro` hittable/clipwall 等修复，补齐多个模式的 `mapinfo.txt`。
+- 删除仓库内 Rust 刷服器工具和 Docker 部署 README，相关能力迁移到外部工具/网页链路维护。
+- 更新 `basevotes.smx` 位置、SourceMod 配置、数据库表字段和若干文档，保持插件包结构更清晰。
