@@ -48,7 +48,7 @@ public Plugin myinfo =
 	name = "RateMonitor",
 	author = "Visor, Sir, A1m`",
 	description = "Keep track of players' netsettings",
-	version = "2.6.1",
+	version = "2.6.2",
 	url = "https://github.com/A1mDev/L4D2-Competitive-Plugins"
 };
 
@@ -213,7 +213,7 @@ void RegisterSettings(int client)
 			sCounter = "[bad cmd/upd]";
 			Format(sCmdRate, sizeof(sCmdRate), "%s", sCmdRate);
 			Format(sUpdateRate, sizeof(sUpdateRate), "%s", sUpdateRate);
-			Format(sRate, sizeof(sRate), "%d", iRate);
+			FormatEx(sRate, sizeof(sRate), "%d", iRate);
 			
 			PunishPlayer(client, sCmdRate, sUpdateRate, sRate, sCounter, iIndex);
 			return;
@@ -223,9 +223,9 @@ void RegisterSettings(int client)
 	 // Punish for low rate settings(if we're good on previous check)
 	if ((iCmdRate < iMinCmd && iMinCmd > -1) || (iRate < iMinRate && iMinRate > -1) || (iUpdateRate < iMinUpd && iMinUpd > -1)) {
 		sCounter = "[low cmd/update/rate]";
-		Format(sCmdRate, sizeof(sCmdRate), "%s%d%s", iCmdRate < iMinCmd ? ">" : "", iCmdRate, iCmdRate < iMinCmd ? "<" : "");
-		Format(sUpdateRate, sizeof(sCmdRate), "%s%d%s", iUpdateRate < iMinUpd ? ">" : "", iUpdateRate, iUpdateRate < iMinUpd ? "<" : "");
-		Format(sRate, sizeof(sRate), "%s%d%s", iRate < iMinRate ? ">" : "", iRate, iRate < iMinRate ? "<" : "");
+		FormatEx(sCmdRate, sizeof(sCmdRate), "%s%d%s", iCmdRate < iMinCmd ? ">" : "", iCmdRate, iCmdRate < iMinCmd ? "<" : "");
+		FormatEx(sUpdateRate, sizeof(sCmdRate), "%s%d%s", iUpdateRate < iMinUpd ? ">" : "", iUpdateRate, iUpdateRate < iMinUpd ? "<" : "");
+		FormatEx(sRate, sizeof(sRate), "%s%d%s", iRate < iMinRate ? ">" : "", iRate, iRate < iMinRate ? "<" : "");
 		
 		PunishPlayer(client, sCmdRate, sUpdateRate, sRate, sCounter, iIndex);
 		return;
@@ -241,13 +241,13 @@ void RegisterSettings(int client)
 		
 		if (bIsMatchLive && iAllowedRateChanges > -1) {
 			player.Client_Changes += 1;
-			Format(sCounter, sizeof(sCounter), "[%d/%d]", player.Client_Changes, iAllowedRateChanges);
+			FormatEx(sCounter, sizeof(sCounter), "[%d/%d]", player.Client_Changes, iAllowedRateChanges);
 			
 			// If not punished for bad rate settings yet, punish for overlimit rate change(if any)
 			if (player.Client_Changes > iAllowedRateChanges) {
-				Format(sCmdRate, sizeof(sCmdRate), "%s%d", iCmdRate != player.Client_Cmdrate ? "*" : "", iCmdRate);
-				Format(sUpdateRate, sizeof(sUpdateRate), "%s%d\x01", iUpdateRate != player.Client_Updaterate ? "*" : "", iUpdateRate);
-				Format(sRate, sizeof(sRate), "%s%d\x01", iRate != player.Client_Rate ? "*" : "", iRate);
+				FormatEx(sCmdRate, sizeof(sCmdRate), "%s%d", iCmdRate != player.Client_Cmdrate ? "*" : "", iCmdRate);
+				FormatEx(sUpdateRate, sizeof(sUpdateRate), "%s%d\x01", iUpdateRate != player.Client_Updaterate ? "*" : "", iUpdateRate);
+				FormatEx(sRate, sizeof(sRate), "%s%d\x01", iRate != player.Client_Rate ? "*" : "", iRate);
 			
 				PunishPlayer(client, sCmdRate, sUpdateRate, sRate, sCounter, iIndex);
 				return;

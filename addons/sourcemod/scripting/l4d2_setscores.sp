@@ -22,7 +22,7 @@
 
 #define L4D_TEAM_SPECTATE 1
 
-#define PLUGIN_VERSION "1.5"
+#define PLUGIN_VERSION "1.5.1"
 
 public Plugin myinfo =
 {
@@ -145,7 +145,7 @@ void StartScoreVote(const int survScore, const int infectScore, const int initia
 		
 		//Set the text for the vote, initiating client and handler
 		char sBuffer[64];
-		Format(sBuffer, sizeof(sBuffer), "Change scores to %d - %d?", survivorScore, infectedScore);
+		FormatEx(sBuffer, sizeof(sBuffer), "Change scores to %d - %d?", survivorScore, infectedScore);
 		SetBuiltinVoteArgument(voteHandler, sBuffer);
 		SetBuiltinVoteInitiator(voteHandler, initiator);
 		SetBuiltinVoteResultCallback(voteHandler, ScoreVoteResultHandler);

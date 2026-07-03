@@ -19,7 +19,7 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.9.0"
+#define PLUGIN_VERSION "3.9.1"
 
 public Plugin myinfo =
 {
@@ -592,7 +592,7 @@ void FillHeaderInfo(Panel hSpecHud)
 		iTickrate = RoundToNearest(1.0 / GetTickInterval());
 	
 	static char buf[64];
-	Format(buf, sizeof(buf), "%s [%i/%i | %iT]", sHostname, GetRealClientCount(), iMaxPlayers, iTickrate);
+	FormatEx(buf, sizeof(buf), "%s [%i/%i | %iT]", sHostname, GetRealClientCount(), iMaxPlayers, iTickrate);
 	DrawPanelText(hSpecHud, buf);
 }
 
@@ -634,7 +634,7 @@ void GetWeaponInfo(int client, char[] info, int length)
 			{
 				// Dual Pistols Scenario
 				// Straight use the prefix since full name is a bit long.
-				Format(buffer, sizeof(buffer), "DP");
+				strcopy(buffer, sizeof(buffer), "DP");
 			}
 			else GetLongWeaponName(activeWepId, buffer, sizeof(buffer));
 			
@@ -693,12 +693,12 @@ void GetClientPing(int client, char[] buffer, int bufferSize)
 {
 	if (IsFakeClient(client))
 	{
-		Format(buffer, bufferSize, "BOT");
+		strcopy(buffer, bufferSize, "BOT");
 	}
 	else
 	{
 		int latency = RoundToNearest(GetClientAvgLatency(client, NetFlow_Both) * 1000.0);
-		Format(buffer, bufferSize, "%ims", latency);
+		FormatEx(buffer, bufferSize, "%ims", latency);
 	}
 }
 
@@ -1070,7 +1070,7 @@ bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
 	int passCount = L4D2Direct_GetTankPassedCount();
 	switch (passCount)
 	{
-		case 0: FormatEx(info, sizeof(info), "native");
+		case 0: strcopy(info, sizeof(info), "native");
 		case 1: FormatEx(info, sizeof(info), "%ist", passCount);
 		case 2: FormatEx(info, sizeof(info), "%ind", passCount);
 		case 3: FormatEx(info, sizeof(info), "%ird", passCount);
@@ -1358,8 +1358,8 @@ stock int FormatScavengeRoundTime(char[] buffer, int maxlen, int teamIndex, bool
 	seconds -= 60 * minutes;
 	
 	return nodecimalpoint ?
-				Format(buffer, maxlen, "%d:%02.0f", minutes, seconds) :
-				Format(buffer, maxlen, "%d:%05.2f", minutes, seconds);
+				FormatEx(buffer, maxlen, "%d:%02.0f", minutes, seconds) :
+				FormatEx(buffer, maxlen, "%d:%05.2f", minutes, seconds);
 }
 
 /*

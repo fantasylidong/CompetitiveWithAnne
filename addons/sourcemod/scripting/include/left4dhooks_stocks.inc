@@ -1476,7 +1476,7 @@ stock bool L4D2_CreateInstructorHint(const char[] name,
 	}
 
 	char finalizedColor[16];
-	Format(finalizedColor, 16, "%d,%d,%d", color[0], color[1], color[2]);
+	FormatEx(finalizedColor, 16, "%d,%d,%d", color[0], color[1], color[2]);
 
 	event.SetString("hint_name", name);
 	event.SetInt("hint_target", target);

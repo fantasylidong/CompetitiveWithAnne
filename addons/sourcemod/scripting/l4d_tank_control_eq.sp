@@ -54,7 +54,7 @@ public Plugin myinfo =
     name = "L4D2 Tank Control",
     author = "arti, (Contributions by: Sheo, Sir, Altair-Sossai)",
     description = "Distributes the role of the tank evenly throughout the team, allows for overrides. (Includes forwards)",
-    version = "0.0.27",
+    version = "0.0.28",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 }
 
@@ -738,7 +738,7 @@ stock void LoadTranslation(const char[] translation)
 		sPath[PLATFORM_MAX_PATH],
 		sName[64];
 
-	Format(sName, sizeof(sName), "translations/%s.txt", translation);
+	FormatEx(sName, sizeof(sName), "translations/%s.txt", translation);
 	BuildPath(Path_SM, sPath, sizeof(sPath), sName);
 	if (!FileExists(sPath))
 		SetFailState("Missing translation file %s.txt", translation);

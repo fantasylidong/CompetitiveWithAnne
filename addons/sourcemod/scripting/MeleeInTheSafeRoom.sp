@@ -3,7 +3,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "2.0.7"
+#define VERSION "2.0.8"
 
 new Handle:g_hEnabled;
 new Handle:g_hWeaponRandom;
@@ -341,11 +341,11 @@ stock GetScriptName( const String:Class[32], String:ScriptName[32] )
     {
         if( StrContains( g_sMeleeClass[i], Class, false ) == 0 )
         {
-            Format( ScriptName, 32, "%s", g_sMeleeClass[i] );
+            strcopy( ScriptName, 32, g_sMeleeClass[i] );
             return;
         }
     }
-    Format( ScriptName, 32, "%s", g_sMeleeClass[0] );   
+    strcopy( ScriptName, 32, g_sMeleeClass[0] );   
 }
 
 stock GetInGameClient()

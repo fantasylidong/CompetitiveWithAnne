@@ -70,7 +70,7 @@ public Plugin myinfo =
 	name = "Weapon Loadout",
 	author = "Sir, A1m`",
 	description = "Allows the Players to choose which weapons to play the mode in.",
-	version = "2.3.1",
+	version = "2.3.2",
 	url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -222,7 +222,7 @@ int Menu_VoteMenuHandler(Menu hMenu, MenuAction iAction, int iClient, int iIndex
 
 			char sInfo[32], sVoteTitle[64];
 			if (hMenu.GetItem(iIndex, sInfo, sizeof(sInfo))) {
-				Format(sVoteTitle, sizeof(sVoteTitle), "Survivors get %s?", sInfo);
+				FormatEx(sVoteTitle, sizeof(sVoteTitle), "Survivors get %s?", sInfo);
 				g_iVotingMode = iIndex + 1;
 
 				// Get all non-spectating players

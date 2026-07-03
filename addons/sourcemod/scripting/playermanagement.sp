@@ -15,7 +15,7 @@ public Plugin myinfo =
 	name		= "Player Management Plugin",
 	author		= "CanadaRox",
 	description = "Player management!  Swap players/teams and spectate!",
-	version		= "7.1.1",
+	version		= "7.1.2",
 	url			= ""
 };
 
@@ -579,7 +579,7 @@ stock void LoadTranslation(const char[] translation)
 		sPath[PLATFORM_MAX_PATH],
 		sName[64];
 
-	Format(sName, sizeof(sName), "translations/%s.txt", translation);
+	FormatEx(sName, sizeof(sName), "translations/%s.txt", translation);
 	BuildPath(Path_SM, sPath, sizeof(sPath), sName);
 	if (!FileExists(sPath))
 	{
