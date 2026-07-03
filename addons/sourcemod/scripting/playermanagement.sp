@@ -15,7 +15,7 @@ public Plugin myinfo =
 	name		= "Player Management Plugin",
 	author		= "CanadaRox",
 	description = "Player management!  Swap players/teams and spectate!",
-	version		= "7.1.2",
+	version		= "7.1.3",
 	url			= ""
 };
 
@@ -161,7 +161,7 @@ Action Spectate_Cmd(int client, int args)
 		return Plugin_Handled;
 	}
 
-	if (!IsClientInGame(client))
+	if (!client || !IsClientInGame(client))
 	{
 		return Plugin_Handled;
 	}

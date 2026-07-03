@@ -14,7 +14,7 @@ public Plugin myinfo =
 	name = "L4D2 Survivor Progress",
 	author = "CanadaRox, Visor",
 	description = "Print survivor progress in flow percents ",
-	version = "2.0.6",
+	version = "2.0.7",
 	url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -29,6 +29,9 @@ public void OnPluginStart()
 
 Action CurrentCmd(int client, int args)
 {
+	if (!client || !IsClientInGame(client))
+		return Plugin_Handled;
+
 	int boss_proximity = RoundToNearest(GetBossProximity() * 100.0);
 	CPrintToChat(client, "%t %t", "Tag", "Current", boss_proximity);
 	return Plugin_Handled;

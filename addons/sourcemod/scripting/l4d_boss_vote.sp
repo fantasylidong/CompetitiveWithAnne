@@ -11,7 +11,7 @@
 #include <l4d2_boss_percents>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.2.7"
+#define PLUGIN_VERSION "3.2.8"
 
 public Plugin myinfo =
 {
@@ -82,6 +82,12 @@ bool RunVoteChecks(int client)
 
 Action VoteBossCmd(int client, int args)
 {
+	if (!client || !IsClientInGame(client))
+	{
+		ReplyToCommand(client, "[Boss Vote] This command can only be used by an in-game player.");
+		return Plugin_Handled;
+	}
+
 	if (!GetConVarBool(g_hCvarBossVoting)) {
 		return Plugin_Handled;
 	}
@@ -334,49 +340,52 @@ bool IsInteger(const char[] buffer)
 
 Action ForceTankCommand(int client, int args)
 {
+	if (client && !IsClientInGame(client))
+		return Plugin_Handled;
+
 	if (!GetConVarBool(g_hCvarBossVoting)) {
 		return Plugin_Handled;
 	}
 	
 	if (IsDarkCarniRemix())
 	{
-		CPrintToChat(client, "%t", "CommandNotAvailable");
+		CReplyToCommand(client, "%t", "CommandNotAvailable");
 		return Plugin_Handled;
 	}
-	
+
 	if (IsStaticTankMap())
 	{
-		CPrintToChat(client, "%t", "TankSpawnStatic");
+		CReplyToCommand(client, "%t", "TankSpawnStatic");
 		return Plugin_Handled;
 	}
-	
+
 	if (!IsInReady())
 	{
-		CPrintToChat(client, "%t", "OnlyReadyUp");
+		CReplyToCommand(client, "%t", "OnlyReadyUp");
 		return Plugin_Handled;
 	}
-	
+
 	// Get Requested Tank Percent
 	char bv_sTank[32];
 	GetCmdArg(1, bv_sTank, 32);
-	
+
 	// Make sure the cmd argument is a number
 	if (!IsInteger(bv_sTank))
 		return Plugin_Handled;
-	
+
 	// Convert it to in int boy
 	int p_iRequestedPercent = StringToInt(bv_sTank);
-	
+
 	if (p_iRequestedPercent < 0)
 	{
-		CPrintToChat(client, "%t", "PercentageInvalid");
+		CReplyToCommand(client, "%t", "PercentageInvalid");
 		return Plugin_Handled;
 	}
-	
+
 	// Check if percent is within limits
 	if (!IsTankPercentValid(p_iRequestedPercent))
 	{
-		CPrintToChat(client, "%t", "Percentagebanned");
+		CReplyToCommand(client, "%t", "Percentagebanned");
 		return Plugin_Handled;
 	}
 	
@@ -402,49 +411,52 @@ Action ForceTankCommand(int client, int args)
 
 Action ForceWitchCommand(int client, int args)
 {
+	if (client && !IsClientInGame(client))
+		return Plugin_Handled;
+
 	if (!GetConVarBool(g_hCvarBossVoting)) {
 		return Plugin_Handled;
 	}
 	
 	if (IsDarkCarniRemix())
 	{
-		CPrintToChat(client, "%t", "CommandNotAvailable");
+		CReplyToCommand(client, "%t", "CommandNotAvailable");
 		return Plugin_Handled;
 	}
-	
+
 	if (IsStaticWitchMap())
 	{
-		CPrintToChat(client, "%t", "WitchSpawnStatic");
+		CReplyToCommand(client, "%t", "WitchSpawnStatic");
 		return Plugin_Handled;
 	}
-	
+
 	if (!IsInReady())
 	{
-		CPrintToChat(client, "%t", "OnlyReadyUp");
+		CReplyToCommand(client, "%t", "OnlyReadyUp");
 		return Plugin_Handled;
 	}
-	
+
 	// Get Requested Witch Percent
 	char bv_sWitch[32];
 	GetCmdArg(1, bv_sWitch, 32);
-	
+
 	// Make sure the cmd argument is a number
 	if (!IsInteger(bv_sWitch))
 		return Plugin_Handled;
-	
+
 	// Convert it to in int boy
 	int p_iRequestedPercent = StringToInt(bv_sWitch);
-	
+
 	if (p_iRequestedPercent < 0)
 	{
-		CPrintToChat(client, "%t", "PercentageInvalid");
+		CReplyToCommand(client, "%t", "PercentageInvalid");
 		return Plugin_Handled;
 	}
-	
+
 	// Check if percent is within limits
 	if (!IsWitchPercentValid(p_iRequestedPercent))
 	{
-		CPrintToChat(client, "%t", "Percentagebanned");
+		CReplyToCommand(client, "%t", "Percentagebanned");
 		return Plugin_Handled;
 	}
 	
