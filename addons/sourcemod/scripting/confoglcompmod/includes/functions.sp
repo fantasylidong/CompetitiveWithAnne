@@ -26,7 +26,7 @@ stock ConVar CreateConVarEx(const char[] name, const char[] defaultValue, const 
 	char sBuffer[128];
 	ConVar cvar = null;
 
-	Format(sBuffer, sizeof(sBuffer), "%s%s", CVAR_PREFIX, name);
+	FormatEx(sBuffer, sizeof(sBuffer), "%s%s", CVAR_PREFIX, name);
 	flags = flags | CVAR_FLAGS;
 	cvar = CreateConVar(sBuffer, defaultValue, description, flags, hasMin, min, hasMax, max);
 
@@ -36,7 +36,7 @@ stock ConVar CreateConVarEx(const char[] name, const char[] defaultValue, const 
 stock ConVar FindConVarEx(const char[] name)
 {
 	char sBuffer[128];
-	Format(sBuffer, sizeof(sBuffer), "%s%s", CVAR_PREFIX, name);
+	FormatEx(sBuffer, sizeof(sBuffer), "%s%s", CVAR_PREFIX, name);
 
 	return FindConVar(sBuffer);
 }

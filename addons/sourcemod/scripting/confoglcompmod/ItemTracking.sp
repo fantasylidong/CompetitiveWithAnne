@@ -128,8 +128,8 @@ void IT_OnModuleStart()
     char sNameBuf[64], sCvarDescBuf[256];
     // Create itemlimit cvars
     for (int i = 0; i < ItemList_Size; i++) {
-        Format(sNameBuf, sizeof(sNameBuf), "%s_limit", g_sItemNames[i][IN_shortname]);
-        Format(sCvarDescBuf, sizeof(sCvarDescBuf), "Limits the number of %s on each map. -1: no limit; >=0: limit to cvar value", g_sItemNames[i][IN_longname]);
+        FormatEx(sNameBuf, sizeof(sNameBuf), "%s_limit", g_sItemNames[i][IN_shortname]);
+        FormatEx(sCvarDescBuf, sizeof(sCvarDescBuf), "Limits the number of %s on each map. -1: no limit; >=0: limit to cvar value", g_sItemNames[i][IN_longname]);
 
         g_hCvarLimits[i] = CreateConVarEx(sNameBuf, "-1", sCvarDescBuf);
     }
@@ -315,7 +315,7 @@ static void SpawnItems()
     char sModelname[PLATFORM_MAX_PATH];
 
     for (int itemidx = 0; itemidx < ItemList_Size; itemidx++) {
-        Format(sModelname, sizeof(sModelname), "models/w_models/weapons/w_eq_%s.mdl", g_sItemNames[itemidx][IN_modelname]);
+        FormatEx(sModelname, sizeof(sModelname), "models/w_models/weapons/w_eq_%s.mdl", g_sItemNames[itemidx][IN_modelname]);
 
         arrsize = g_hItemSpawns[itemidx].Length;
 

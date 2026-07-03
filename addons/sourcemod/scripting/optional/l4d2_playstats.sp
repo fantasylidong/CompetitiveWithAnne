@@ -7004,7 +7004,7 @@ int GetWeaponTypeForClassname(const char[] classname)
 
 int GetPlayerIndexForClient(int client)
 {
-	if (client < 1 || client >= MaxClients || !IsClientInGame(client)) {
+	if (client < 1 || client > MaxClients || !IsClientInGame(client)) {
 		return -1;
 	}
 

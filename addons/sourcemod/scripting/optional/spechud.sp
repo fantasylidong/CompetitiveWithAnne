@@ -19,7 +19,7 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.9.0"
+#define PLUGIN_VERSION "3.9.1"
 
 public Plugin myinfo =
 {
@@ -693,12 +693,12 @@ void GetClientPing(int client, char[] buffer, int bufferSize)
 {
 	if (IsFakeClient(client))
 	{
-		Format(buffer, bufferSize, "BOT");
+		strcopy(buffer, bufferSize, "BOT");
 	}
 	else
 	{
 		int latency = RoundToNearest(GetClientAvgLatency(client, NetFlow_Both) * 1000.0);
-		Format(buffer, bufferSize, "%ims", latency);
+		FormatEx(buffer, bufferSize, "%ims", latency);
 	}
 }
 

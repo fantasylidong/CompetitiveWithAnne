@@ -11,7 +11,7 @@
 #include <l4d2_boss_percents>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.2.6"
+#define PLUGIN_VERSION "3.2.7"
 
 public Plugin myinfo =
 {
@@ -164,43 +164,43 @@ Action VoteBossCmd(int client, int args)
 	// Set vote title
 	if (bv_bTank && bv_bWitch)	// Both Tank and Witch can be changed 
 	{
-		Format(bv_voteTitle, 64, "%T", "SetBosses", LANG_SERVER, bv_sTank, bv_sWitch);
+		FormatEx(bv_voteTitle, 64, "%T", "SetBosses", LANG_SERVER, bv_sTank, bv_sWitch);
 	}
 	else if (bv_bTank)	// Only Tank can be changed
 	{
 		if (bv_iWitch == 0)
 		{
-			Format(bv_voteTitle, 64, "%T", "SetTank", LANG_SERVER, bv_sTank);
+			FormatEx(bv_voteTitle, 64, "%T", "SetTank", LANG_SERVER, bv_sTank);
 		}
 		else
 		{
-			Format(bv_voteTitle, 64, "%T", "SetOnlyTank", LANG_SERVER, bv_sTank);
+			FormatEx(bv_voteTitle, 64, "%T", "SetOnlyTank", LANG_SERVER, bv_sTank);
 		}
 	}
 	else if (bv_bWitch) // Only Witch can be changed
 	{
 		if (bv_iTank == 0)
 		{
-			Format(bv_voteTitle, 64, "%T", "SetWitch", LANG_SERVER, bv_sWitch);
+			FormatEx(bv_voteTitle, 64, "%T", "SetWitch", LANG_SERVER, bv_sWitch);
 		}
 		else
 		{
-			Format(bv_voteTitle, 64, "%T", "SetOnlyWitch", LANG_SERVER, bv_sWitch);
+			FormatEx(bv_voteTitle, 64, "%T", "SetOnlyWitch", LANG_SERVER, bv_sWitch);
 		}
 	}
 	else // Neither can be changed... ok...
 	{
 		if (bv_iTank == 0 && bv_iWitch == 0)
 		{
-			Format(bv_voteTitle, 64, "%T", "SetBossesDisabled", LANG_SERVER);
+			FormatEx(bv_voteTitle, 64, "%T", "SetBossesDisabled", LANG_SERVER);
 		}
 		else if (bv_iTank == 0)
 		{
-			Format(bv_voteTitle, 64, "%T", "SetTankDisabled", LANG_SERVER);
+			FormatEx(bv_voteTitle, 64, "%T", "SetTankDisabled", LANG_SERVER);
 		}
 		else if (bv_iWitch == 0)
 		{
-			Format(bv_voteTitle, 64, "%T", "SetWitchDisabled", LANG_SERVER);
+			FormatEx(bv_voteTitle, 64, "%T", "SetWitchDisabled", LANG_SERVER);
 		}
 		else // Probably not.
 		{
@@ -253,25 +253,25 @@ void BossVoteResultHandler(Handle vote, int num_votes, int num_clients, const in
 				if (bv_bTank && bv_bWitch)	// Both Tank and Witch can be changed 
 				{
 					char buffer[64];
-					Format(buffer, sizeof(buffer), "%T", "SettingBoss", LANG_SERVER);
+					FormatEx(buffer, sizeof(buffer), "%T", "SettingBoss", LANG_SERVER);
 					DisplayBuiltinVotePass(vote, buffer);
 				}
 				else if (bv_bTank)	// Only Tank can be changed -- Witch must be static
 				{
 					char buffer[64];
-					Format(buffer, sizeof(buffer), "%T", "SettingTank", LANG_SERVER);
+					FormatEx(buffer, sizeof(buffer), "%T", "SettingTank", LANG_SERVER);
 					DisplayBuiltinVotePass(vote, buffer);
 				}
 				else if (bv_bWitch) // Only Witch can be changed -- Tank must be static
 				{
 					char buffer[64];
-					Format(buffer, sizeof(buffer), "%T", "SettingWitch", LANG_SERVER);
+					FormatEx(buffer, sizeof(buffer), "%T", "SettingWitch", LANG_SERVER);
 					DisplayBuiltinVotePass(vote, buffer);
 				}
 				else // Neither can be changed... ok...
 				{
 					char buffer[64];
-					Format(buffer, sizeof(buffer), "%T", "SettingBossDisabled", LANG_SERVER);
+					FormatEx(buffer, sizeof(buffer), "%T", "SettingBossDisabled", LANG_SERVER);
 					DisplayBuiltinVotePass(vote, buffer);
 				}
 				

@@ -36,24 +36,22 @@ bool
 	announcedInChat,
 	announcedEventEnd,
 	checkpointAnnounced[MAX_CHECKPOINTS];
-Handle
-	g_hForward;
 
 public Plugin myinfo = 
 {
 	name = "L4D2 Horde Equaliser",
 	author = "Visor (original idea by Sir), A1m`",
 	description = "Make certain event hordes finite",
-	version = "3.0.9",
+	version = "3.0.11",
 	url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
 public void OnPluginStart()
 {
+	LoadTranslation("l4d2_horde_equaliser.phrases");
 	InitGameData();
-	g_hForward = CreateGlobalForward("L4D2_HordeStatus", ET_Ignore, Param_Cell);
 	
-	hCvarNoEventHordeDuringTanks = CreateConVar("l4d2_heq_no_tank_horde", "1", "Put infinite hordes on a 'hold up' during Tank fights");
+	hCvarNoEventHordeDuringTanks = CreateConVar("l4d2_heq_no_tank_horde", "0", "Put infinite hordes on a 'hold up' during Tank fights");
 	hCvarHordeCheckpointAnnounce = CreateConVar("l4d2_heq_checkpoint_sound", "1", "Play the incoming mob sound at checkpoints (each 1/4 of total commons killed off) to simulate L4D1 behaviour");
 
 	HookEvent("round_start", RoundStartEvent, EventHookMode_PostNoCopy);
@@ -94,7 +92,7 @@ public void OnMapStart()
 	PrecacheSound(HORDE_SOUND);
 }
 
-public void RoundStartEvent(Event hEvent, const char[] name, bool dontBroadcast)
+void RoundStartEvent(Event hEvent, const char[] name, bool dontBroadcast)
 {
 	commonTotal = 0;
 	lastCheckpoint = 0;
@@ -117,8 +115,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 		// Our job here is done
 		if (commonTotal >= commonLimit) {
 			if (!announcedEventEnd){
-				SendForward(0);
-				CPrintToChatAll("<{olive}Horde{default}> {olive}尸潮事件 {default}结束，开始冲锋!");
+				CPrintToChatAll("%t %t", "Tag", "NoCommonRemaining");
 				announcedEventEnd = true;
 			}
 			return;
@@ -134,7 +131,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 			
 			int remaining = commonLimit - commonTotal;
 			if (remaining != 0) {
-				CPrintToChatAll("<{olive}Horde{default}> 还剩 {olive}%i{default} 个..", remaining);
+				CPrintToChatAll("%t %t", "Tag", "CommonRemaining", remaining);
 			}
 			
 			checkpointAnnounced[lastCheckpoint] = true;
@@ -171,9 +168,8 @@ public Action L4D_OnSpawnMob(int &amount)
 
 	// If it's a "finite" infinite horde...
 	if (IsInfiniteHordeActive()) {
-		SendForward(1);
 		if (!announcedInChat) {
-			CPrintToChatAll("<{olive}Horde{default}> {blue}有限尸潮事件{default} 已经开始, 将刷出 {olive}%i{default} 个僵尸! 冲或者守，决定在于你们!", commonLimit);
+			CPrintToChatAll("%t %t", "Tag", "FiniteEventStarted", commonLimit);
 			announcedInChat = true;
 		}
 		
@@ -226,8 +222,22 @@ bool IsTankUp()
 	return false;
 }
 
-public void SendForward(int client){
-	Call_StartForward(g_hForward);
-	Call_PushCell(client);
-	Call_Finish();
+/**
+ * Check if the translation file exists
+ *
+ * @param translation	Translation name.
+ * @noreturn
+ */
+stock void LoadTranslation(const char[] translation)
+{
+	char
+		sPath[PLATFORM_MAX_PATH],
+		sName[64];
+
+	FormatEx(sName, sizeof(sName), "translations/%s.txt", translation);
+	BuildPath(Path_SM, sPath, sizeof(sPath), sName);
+	if (!FileExists(sPath))
+		SetFailState("Missing translation file %s.txt", translation);
+
+	LoadTranslations(translation);
 }

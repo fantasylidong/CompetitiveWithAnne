@@ -35,7 +35,7 @@ public Plugin myinfo =
     name = "Pause plugin",
     author = "CanadaRox, Sir, Forgetest, A1m`",
     description = "Adds pause functionality without breaking pauses, also prevents SI from spawning because of the Pause.",
-    version = "6.8",
+    version = "6.8.1",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -639,13 +639,13 @@ void UpdatePanel()
     menuPanel.DrawText(" ");
 
     char Titlebuffer[32];
-    Format(Titlebuffer, sizeof(Titlebuffer), "%T", "PanelTitle", LANG_SERVER);
+    FormatEx(Titlebuffer, sizeof(Titlebuffer), "%T", "PanelTitle", LANG_SERVER);
     menuPanel.DrawText(Titlebuffer);
 
     if (adminPause && initiatorId > 0)
     {
         char buffer[32];
-        Format(buffer, sizeof(buffer), "%T", "RequireAdmin", LANG_SERVER);
+        FormatEx(buffer, sizeof(buffer), "%T", "RequireAdmin", LANG_SERVER);
         menuPanel.DrawText(buffer);
         menuPanel.DrawText(teamReady[L4D2Team_Survivor] ? SurvivorUnPaused() : SurvivorPaused() );
         menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
@@ -674,12 +674,12 @@ void UpdatePanel()
 
     if (adminPause)
     {
-        if (!initiatorId) Format(info, sizeof(info), "%T", "AutoPauseCrash", LANG_SERVER);
-        else Format(info, sizeof(info), "%T", "ForcePauseAdmin", LANG_SERVER, strlen(name) ? name : initiatorName);
+        if (!initiatorId) FormatEx(info, sizeof(info), "%T", "AutoPauseCrash", LANG_SERVER);
+        else FormatEx(info, sizeof(info), "%T", "ForcePauseAdmin", LANG_SERVER, strlen(name) ? name : initiatorName);
     }
     else
     {
-        Format(info, sizeof(info), "%T", "InitiatorPause", LANG_SERVER, strlen(name) ? name : initiatorName, L4D2_TeamName[pauseTeam]);
+        FormatEx(info, sizeof(info), "%T", "InitiatorPause", LANG_SERVER, strlen(name) ? name : initiatorName, L4D2_TeamName[pauseTeam]);
     }
 	
     menuPanel.DrawText(info);
@@ -974,48 +974,48 @@ stock void SetClientButtons(int client, int buttons)
 stock char[] AsInitiator()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "AsInitiator", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "AsInitiator", LANG_SERVER);
     return buffer;
 }
 
 stock char[] SurvivorUnPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "SurvivorUnPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "SurvivorUnPaused", LANG_SERVER);
     return buffer;
 }
 
 stock char[] SurvivorPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "SurvivorPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "SurvivorPaused", LANG_SERVER);
     return buffer;
 }
 
 stock char[] InfectedUnPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "InfectedUnPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "InfectedUnPaused", LANG_SERVER);
     return buffer;
 }
 
 stock char[] InfectedPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "InfectedPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "InfectedPaused", LANG_SERVER);
     return buffer;
 }
 
 stock char[] InitiatorUnPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "InitiatorUnPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "InitiatorUnPaused", LANG_SERVER);
     return buffer;
 }
 
 stock char[] InitiatorPaused()
 {
     char buffer[64];
-    Format(buffer, sizeof(buffer), "%T", "InitiatorPaused", LANG_SERVER);
+    FormatEx(buffer, sizeof(buffer), "%T", "InitiatorPaused", LANG_SERVER);
     return buffer;
 }

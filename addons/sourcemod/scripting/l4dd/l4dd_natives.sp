@@ -494,7 +494,7 @@ int Native_VS_GetMapNumber(Handle plugin, int numParams) // Native "L4D2_VScript
 	char buffer[8];
 
 	// Code
-	FormatEx(code, sizeof(code), "ret <- Director.GetMapNumber(); <RETURN>ret</RETURN>");
+	strcopy(code, sizeof(code), "ret <- Director.GetMapNumber(); <RETURN>ret</RETURN>");
 
 	// Exec
 	if( GetVScriptOutput(code, buffer, sizeof(buffer)) )

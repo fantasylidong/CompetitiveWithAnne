@@ -26,7 +26,7 @@ out what's going on :D Kinda makes my other plugins look bad huh :/
 #include <readyup>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.2.6"
+#define PLUGIN_VERSION "3.2.7"
 
 public Plugin myinfo =
 {
@@ -661,11 +661,11 @@ Action Timer_UpdateReadyUpFooter(Handle timer)
 		}
 		else if (g_bCvarWitchPercent)    // Display just Witch Percent
 		{
-			FormatEx(p_sNewFooter, sizeof(p_sNewFooter), "%s", p_sWitchString);
+			strcopy(p_sNewFooter, sizeof(p_sNewFooter), p_sWitchString);
 		}
 		else if (g_bCvarTankPercent)    // Display just Tank Percent
 		{
-			FormatEx(p_sNewFooter, sizeof(p_sNewFooter), "%s", p_sTankString);
+			strcopy(p_sNewFooter, sizeof(p_sNewFooter), p_sTankString);
 		}
 
 		// Check to see if the Ready Up footer has already been added

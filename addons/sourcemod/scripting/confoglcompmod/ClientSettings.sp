@@ -148,15 +148,15 @@ static Action _ClientSettings_Cmd(int client, int args)
 	char message[256], shortbuf[64];
 	for (int i = 0; i < iSize; i++) {
 		ClientSettingsArray.GetArray(i, clsetting, sizeof(clsetting));
-		Format(message, sizeof(message), "[Confogl] Client CVar: %s ", clsetting.CLSE_cvar);
+		FormatEx(message, sizeof(message), "[Confogl] Client CVar: %s ", clsetting.CLSE_cvar);
 
 		if (clsetting.CLSE_hasMin) {
-			Format(shortbuf, sizeof(shortbuf), "Min: %f ", clsetting.CLSE_min);
+			FormatEx(shortbuf, sizeof(shortbuf), "Min: %f ", clsetting.CLSE_min);
 			StrCat(message, sizeof(message), shortbuf);
 		}
 
 		if (clsetting.CLSE_hasMax) {
-			Format(shortbuf, sizeof(shortbuf), "Max: %f ", clsetting.CLSE_max);
+			FormatEx(shortbuf, sizeof(shortbuf), "Max: %f ", clsetting.CLSE_max);
 			StrCat(message, sizeof(message), shortbuf);
 		}
 
