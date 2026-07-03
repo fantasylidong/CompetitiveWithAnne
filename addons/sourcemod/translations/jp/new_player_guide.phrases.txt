@@ -1,0 +1,31 @@
+"Phrases"
+{
+	"NPG_Header"
+	{
+		"jp"		"{default}[{green}Anne Guide{default}] L4D2 総時間 {green}%s h{default}、このサーバー {green}%s h{default}。今ならこのあたりがおすすめです："
+	}
+	"NPG_Beginner"
+	{
+		"jp"		"{olive}まずは通常キャンペーンで大丈夫です。モード切替はいりません。少し速い展開を試したくなったら Anne Campaign へ。特殊感染者の戻りが早めです。"
+	}
+	"NPG_Intermediate"
+	{
+		"jp"		"{olive}Anne Campaign と Survival を試してみてください。ルールは分かりやすいまま、テンポは Anne モードに近くなります。"
+	}
+	"NPG_Experienced"
+	{
+		"jp"		"{olive}!match メニューを一通り見て大丈夫です。AnneHappy、Hardcore、Shotgun、1vHT、WitchParty、AllCharger、Anne Campaign/Survival/Realism、Not0721、ZoneMod・NextMod・EQ・AMR・Apex・ZoneHunters があります。"
+	}
+	"NPG_Commands"
+	{
+		"jp"		"{default}よく使うコマンド：{green}!join{default} 生存者参加、{green}!away{default} 観戦、{green}!match{default} モード、{green}!rmatch{default} 解除、{green}!mapvote{default} マップ投票、{green}!xx{default} Anne 状態、{green}!rank{default} ランキング、{green}!web{default}/{green}!ip{default} ページ。"
+	}
+	"NPG_AutoStops"
+	{
+		"jp"		"{default}この自動案内は、このサーバーで {green}%s h{default} 遊ぶと止まります。あとで見るなら {green}!guide{default} または {green}!modes{default}。"
+	}
+	"NPG_MatchLoaded"
+	{
+		"jp"		"{olive}今はすでにモードが入っているので、自動案内は出ない状態です。戻すときは {green}!rmatch{olive} の前にチームへ確認してください。"
+	}
+}

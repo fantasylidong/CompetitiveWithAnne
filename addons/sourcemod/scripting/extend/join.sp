@@ -29,6 +29,7 @@
 #undef REQUIRE_PLUGIN
 #include <veterans>
 #include <updater>
+#include <infected_control>
 #include <SteamWorks>
 
 #define IsValidClient(%1)		(1 <= %1 <= MaxClients && IsClientInGame(%1))
@@ -55,7 +56,8 @@ public Plugin myinfo =
 bool  
 	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
 	g_bUpdateSystemAvailable = false, 
-	g_bGroupSystemAvailable = false;
+	g_bGroupSystemAvailable = false,
+	g_bInfectedControlAvailable = false;
 
 char
 	g_sDonateAmount[MAXPLAYERS + 1][16],
@@ -189,17 +191,20 @@ bool GetAutoUpdateUrl(char[] updateUrl, int maxLength)
 public void OnAllPluginsLoaded(){
 	g_bGroupSystemAvailable = LibraryExists("veterans");
 	g_bUpdateSystemAvailable = LibraryExists("updater");
+	g_bInfectedControlAvailable = LibraryExists("infected_control");
 	RefreshAutoUpdater();
 }
 public void OnLibraryAdded(const char[] name)
 {
     if ( StrEqual(name, "veterans") ) { g_bGroupSystemAvailable = true; }
 	else if(StrEqual(name, "updater")) { g_bUpdateSystemAvailable = true; RefreshAutoUpdater(); }
+	else if(StrEqual(name, "infected_control")) { g_bInfectedControlAvailable = true; }
 }
 public void OnLibraryRemoved(const char[] name)
 {
     if ( StrEqual(name, "veterans") ) { g_bGroupSystemAvailable = false; }
 	else if (StrEqual(name, "updater")){ g_bUpdateSystemAvailable = false; }
+	else if (StrEqual(name, "infected_control")){ g_bInfectedControlAvailable = false; }
 }
 
 public void Updater_OnLoaded()
@@ -351,7 +356,16 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 
 public Action Timer_CheckDetay2(Handle Timer, int client)
 {
-	ChangeClientTeam(client, 1); 
+	if(IsProtectedInfectedControlTraitor(client))
+		return Plugin_Continue;
+
+	MoveClientToSpectator(client);
+	return Plugin_Continue;
+}
+
+public Action Timer_MoveClientToSpectator(Handle Timer, int client)
+{
+	MoveClientToSpectator(client);
 	return Plugin_Continue;
 }
 
@@ -387,9 +401,12 @@ public void OnClientDisconnect(int client)
 
 public Action Timer_CheckDetay(Handle Timer, int client)
 {
+	if(IsProtectedInfectedControlTraitor(client))
+		return Plugin_Continue;
+
 	if(IsValidPlayerInTeam(client, 3))
 	{
-		ChangeClientTeam(client, 1); 
+		MoveClientToSpectator(client);
 	}
 	return Plugin_Continue;
 }
@@ -430,8 +447,22 @@ public Action TurnClientToSurvivors(int client, int args)
 public Action AFKTurnClientToSpe(int client, int args) 
 {
 	if(!IsPinned(client))
-		CreateTimer(1.0, Timer_CheckDetay2, client, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(1.0, Timer_MoveClientToSpectator, client, TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Handled;
+}
+
+void MoveClientToSpectator(int client)
+{
+	if(IsValidClient(client))
+		ChangeClientTeam(client, 1);
+}
+
+bool IsProtectedInfectedControlTraitor(int client)
+{
+	return g_bInfectedControlAvailable
+		&& GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorClient") == FeatureStatus_Available
+		&& IsValidClient(client)
+		&& InfectedControl_IsTraitorClient(client);
 }
 
 public Action Command_Setinfo(int client, const char[] command, int args)

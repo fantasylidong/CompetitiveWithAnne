@@ -64,9 +64,33 @@
 	{
 		"zho"		"{green}[IC]{default} 你已登記為內鬼 {olive}%s{default}。"
 	}
+	"InfectedControl_TraitorWaiting"
+	{
+		"zho"		"{green}[IC]{default} 內鬼槽位已滿，你正在等待成為 {olive}%s{default}（第 %d 位）。"
+	}
+	"InfectedControl_TraitorWaitPromoted"
+	{
+		"zho"		"{green}[IC]{default} 內鬼槽位已空出，你已登記為 {olive}%s{default}。"
+	}
 	"InfectedControl_TraitorPending"
 	{
-		"zho"		"{green}[IC]{default} 你已進入靈魂狀態，請等待下一波普通特感生成完成。"
+		"zho"		"{green}[IC]{default} 你已進入靈魂狀態，請等待下一波特感刷新時間。"
+	}
+	"InfectedControl_TraitorWaveCountdown"
+	{
+		"zho"		"{green}[IC]{default} AI 特感大約還有 {olive}%d{default} 秒刷新。"
+	}
+	"InfectedControl_TraitorSpawnWindow"
+	{
+		"zho"		"{green}[IC]{default} 特感刷新時間已到，你有 {olive}%d{default} 秒自己復活。"
+	}
+	"InfectedControl_TraitorSpawnCountdown"
+	{
+		"zho"		"立即復活：還剩 %d 秒"
+	}
+	"InfectedControl_TraitorSpawnExpired"
+	{
+		"zho"		"{green}[IC]{default} 你沒有及時復活，AI 特感將替代這個槽位。"
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{

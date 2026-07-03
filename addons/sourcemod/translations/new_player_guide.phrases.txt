@@ -1,0 +1,31 @@
+"Phrases"
+{
+	"NPG_Header"
+	{
+		"en"		"{default}[{green}Anne Guide{default}] L4D2: {green}%s h{default}; this server: {green}%s h{default}. Quick route:"
+	}
+	"NPG_Beginner"
+	{
+		"en"		"{olive}Start with the default campaign. No mode switch needed. When you want a faster pace, try Anne Campaign; specials come back quicker there."
+	}
+	"NPG_Intermediate"
+	{
+		"en"		"{olive}Try Anne Campaign and Survival. They keep the rules readable, but the tempo is already closer to Anne mode."
+	}
+	"NPG_Experienced"
+	{
+		"en"		"{olive}You can browse the full !match menu now: AnneHappy, Hardcore, Shotgun, 1vHT, WitchParty, AllCharger, Anne Campaign/Survival/Realism, Not0721, and versus sets like ZoneMod, NextMod, EQ, AMR, Apex, and ZoneHunters."
+	}
+	"NPG_Commands"
+	{
+		"en"		"{default}Useful: {green}!join{default} survivors, {green}!away{default} spec, {green}!match{default} modes, {green}!rmatch{default} unload, {green}!mapvote{default} maps, {green}!xx{default} Anne status, {green}!rank{default} stats, {green}!web{default}/{green}!ip{default} pages."
+	}
+	"NPG_AutoStops"
+	{
+		"en"		"{default}This reminder stops after {green}%s h{default} on this server. Need it later? Type {green}!guide{default} or {green}!modes{default}."
+	}
+	"NPG_MatchLoaded"
+	{
+		"en"		"{olive}A mode is already loaded, so the auto reminder would stay quiet. Use {green}!rmatch{olive} only when everyone agrees to go back."
+	}
+}

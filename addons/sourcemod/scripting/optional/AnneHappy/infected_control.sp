@@ -226,6 +226,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     g_hRushManNotifyForward = CreateGlobalForward("OnDetectRushman", // 跑男 forward：传入幸存者 index
                                                   ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
+    CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
     return APLRes_Success;
 }
 public void OnAllPluginsLoaded()
@@ -664,10 +665,7 @@ public void OnGameFrame()
     gST.nextFrameThink = now + (hasSpawnWork ? gCV.fFrameThinkStepActive : gCV.fFrameThinkStep);
 
     if (gST.totalSI >= gCV.iSiLimit)
-    {
-        Traitor_UnlockSpawnAttempts();
         return;
-    }
 
     // 每个 think slice 先维护普通刷特队列：按上限、稀缺度、死亡 CD 和支援特感规则补队列。
     // 真正刷出时优先处理传送队列，因为传送一般意味着已有特感失去作用或跑男压力更高。
@@ -686,8 +684,6 @@ public void OnGameFrame()
     {
         TryNormalSpawnOnce();
     }
-
-    Traitor_UnlockSpawnAttempts();
 }
 
 

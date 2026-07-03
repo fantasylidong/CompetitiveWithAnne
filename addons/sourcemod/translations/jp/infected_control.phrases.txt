@@ -64,9 +64,33 @@
 	{
 		"jp"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
 	}
+	"InfectedControl_TraitorWaiting"
+	{
+		"jp"		"{green}[IC]{default} Traitor slots are full. You are waiting as {olive}%s{default} (position %d)."
+	}
+	"InfectedControl_TraitorWaitPromoted"
+	{
+		"jp"		"{green}[IC]{default} A traitor slot opened. You are now queued as {olive}%s{default}."
+	}
 	"InfectedControl_TraitorPending"
 	{
-		"jp"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave to finish spawning."
+		"jp"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
+	}
+	"InfectedControl_TraitorWaveCountdown"
+	{
+		"jp"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
+	}
+	"InfectedControl_TraitorSpawnWindow"
+	{
+		"jp"		"{green}[IC]{default} The SI refresh point has arrived. You have {olive}%d{default} seconds to spawn yourself."
+	}
+	"InfectedControl_TraitorSpawnCountdown"
+	{
+		"jp"		"Spawn now: %d seconds left"
+	}
+	"InfectedControl_TraitorSpawnExpired"
+	{
+		"jp"		"{green}[IC]{default} You did not spawn in time. An AI special infected will take this slot."
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{

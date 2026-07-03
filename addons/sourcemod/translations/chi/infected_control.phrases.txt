@@ -64,9 +64,33 @@
 	{
 		"chi"		"{green}[IC]{default} 你已登记为内鬼 {olive}%s{default}。"
 	}
+	"InfectedControl_TraitorWaiting"
+	{
+		"chi"		"{green}[IC]{default} 内鬼槽位已满，你正在等待成为 {olive}%s{default}（第 %d 位）。"
+	}
+	"InfectedControl_TraitorWaitPromoted"
+	{
+		"chi"		"{green}[IC]{default} 内鬼槽位已空出，你已登记为 {olive}%s{default}。"
+	}
 	"InfectedControl_TraitorPending"
 	{
-		"chi"		"{green}[IC]{default} 你已进入灵魂状态，请等待下一波普通特感生成完成。"
+		"chi"		"{green}[IC]{default} 你已进入灵魂状态，请等待下一波特感刷新时间。"
+	}
+	"InfectedControl_TraitorWaveCountdown"
+	{
+		"chi"		"{green}[IC]{default} AI 特感大约还有 {olive}%d{default} 秒刷新。"
+	}
+	"InfectedControl_TraitorSpawnWindow"
+	{
+		"chi"		"{green}[IC]{default} 特感刷新时间已到，你有 {olive}%d{default} 秒自己复活。"
+	}
+	"InfectedControl_TraitorSpawnCountdown"
+	{
+		"chi"		"立即复活：还剩 %d 秒"
+	}
+	"InfectedControl_TraitorSpawnExpired"
+	{
+		"chi"		"{green}[IC]{default} 你没有及时复活，AI 特感将替代这个槽位。"
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{

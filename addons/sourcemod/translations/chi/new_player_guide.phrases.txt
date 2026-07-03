@@ -1,0 +1,31 @@
+"Phrases"
+{
+	"NPG_Header"
+	{
+		"chi"		"{default}[{green}Anne玩法{default}] 你总时长 {green}%s h{default}，本服 {green}%s h{default}。大概给你指个路："
+	}
+	"NPG_Beginner"
+	{
+		"chi"		"{olive}先打默认战役，不用切模式。想节奏快一点再试 Anne 战役，特感刷新会明显更快。"
+	}
+	"NPG_Intermediate"
+	{
+		"chi"		"{olive}可以试 Anne 战役和绝境求生。规则不绕，但节奏已经接近 Anne 模式，路线熟了再往更硬的配置上走。"
+	}
+	"NPG_Experienced"
+	{
+		"chi"		"{olive}可以直接翻完整 !match 菜单了：AnneHappy、硬核、喷子、1vHT、女巫派对、牛牛，Anne 战役/绝境/写实，Not0721，还有 ZoneMod、NextMod、EQ、AMR、Apex、ZoneHunters 这些对抗配置。"
+	}
+	"NPG_Commands"
+	{
+		"chi"		"{default}常用：{green}!join{default} 加入生还，{green}!away{default} 旁观，{green}!match{default} 选模式，{green}!rmatch{default} 卸载模式，{green}!mapvote{default} 投图，{green}!xx{default} 看 Anne 状态，{green}!rank{default} 排名，{green}!web{default}/{green}!ip{default} 网页和地址。"
+	}
+	"NPG_AutoStops"
+	{
+		"chi"		"{default}本服玩到 {green}%s h{default} 后就不再自动提示。以后想看，输入 {green}!guide{default} 或 {green}!modes{default}。"
+	}
+	"NPG_MatchLoaded"
+	{
+		"chi"		"{olive}当前已经加载模式，所以自动提示本来会保持安静。要退回默认，用 {green}!rmatch{olive} 前最好先问一下队友。"
+	}
+}

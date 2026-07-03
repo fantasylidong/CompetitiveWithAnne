@@ -12,6 +12,15 @@
 native float GetNextSpawnTime();
 
 /**
+ * @brief Returns whether a client is managed by infected_control traitor mode.
+ * @remarks True for waitlisted, queued, locked, spawn-allowed, and alive traitor clients.
+ *
+ * @param client Client index.
+ * @return true when join/team-management plugins should not force this player away.
+ */
+native bool InfectedControl_IsTraitorClient(int client);
+
+/**
  * @brief When a RushMan be detected
  * @remarks you must send alive Player client index.
  * @para DetectRushMan the rush man client index
@@ -33,6 +42,7 @@ public SharedPlugin __pl_infected_control =
 #if !defined REQUIRE_PLUGIN
 public void __pl_infected_control_SetNTVOptional()
 {
-	MarkNativeAsOptional("GetNextSpawnTime");
+    MarkNativeAsOptional("GetNextSpawnTime");
+    MarkNativeAsOptional("InfectedControl_IsTraitorClient");
 }
 #endif

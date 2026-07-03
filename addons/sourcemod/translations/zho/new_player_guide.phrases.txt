@@ -1,0 +1,31 @@
+"Phrases"
+{
+	"NPG_Header"
+	{
+		"zho"		"{default}[{green}Anne玩法{default}] 你總時長 {green}%s h{default}，本服 {green}%s h{default}。大概給你指個路："
+	}
+	"NPG_Beginner"
+	{
+		"zho"		"{olive}先打預設戰役，不用切模式。想節奏快一點再試 Anne 戰役，特感刷新會明顯更快。"
+	}
+	"NPG_Intermediate"
+	{
+		"zho"		"{olive}可以試 Anne 戰役和絕境求生。規則不繞，但節奏已經接近 Anne 模式，路線熟了再往更硬的配置上走。"
+	}
+	"NPG_Experienced"
+	{
+		"zho"		"{olive}可以直接翻完整 !match 選單了：AnneHappy、硬核、霰彈、1vHT、女巫派對、牛牛，Anne 戰役/絕境/寫實，Not0721，還有 ZoneMod、NextMod、EQ、AMR、Apex、ZoneHunters 這些對抗配置。"
+	}
+	"NPG_Commands"
+	{
+		"zho"		"{default}常用：{green}!join{default} 加入生還，{green}!away{default} 旁觀，{green}!match{default} 選模式，{green}!rmatch{default} 卸載模式，{green}!mapvote{default} 投圖，{green}!xx{default} 看 Anne 狀態，{green}!rank{default} 排名，{green}!web{default}/{green}!ip{default} 網頁和地址。"
+	}
+	"NPG_AutoStops"
+	{
+		"zho"		"{default}本服玩到 {green}%s h{default} 後就不再自動提示。以後想看，輸入 {green}!guide{default} 或 {green}!modes{default}。"
+	}
+	"NPG_MatchLoaded"
+	{
+		"zho"		"{olive}目前已經載入模式，所以自動提示本來會保持安靜。要退回預設，用 {green}!rmatch{olive} 前最好先問一下隊友。"
+	}
+}

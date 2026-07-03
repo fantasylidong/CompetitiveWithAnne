@@ -1,0 +1,31 @@
+"Phrases"
+{
+	"NPG_Header"
+	{
+		"ko"		"{default}[{green}Anne Guide{default}] L4D2 총 플레이 {green}%s h{default}, 이 서버 {green}%s h{default}. 지금은 이쪽이 좋아요:"
+	}
+	"NPG_Beginner"
+	{
+		"ko"		"{olive}먼저 기본 캠페인을 해도 됩니다. 모드를 바꿀 필요는 없어요. 조금 빠른 진행을 원하면 Anne Campaign을 해 보세요. 특수 감염자가 더 빨리 돌아옵니다."
+	}
+	"NPG_Intermediate"
+	{
+		"ko"		"{olive}Anne Campaign과 Survival을 추천합니다. 규칙은 크게 꼬이지 않지만, 템포는 Anne 모드에 꽤 가까워집니다."
+	}
+	"NPG_Experienced"
+	{
+		"ko"		"{olive}이제 !match 메뉴를 넓게 봐도 됩니다: AnneHappy, Hardcore, Shotgun, 1vHT, WitchParty, AllCharger, Anne Campaign/Survival/Realism, Not0721, ZoneMod, NextMod, EQ, AMR, Apex, ZoneHunters가 있습니다."
+	}
+	"NPG_Commands"
+	{
+		"ko"		"{default}자주 쓰는 명령어: {green}!join{default} 생존자 참가, {green}!away{default} 관전, {green}!match{default} 모드 선택, {green}!rmatch{default} 모드 해제, {green}!mapvote{default} 맵 투표, {green}!xx{default} Anne 상태, {green}!rank{default} 순위, {green}!web{default}/{green}!ip{default} 페이지."
+	}
+	"NPG_AutoStops"
+	{
+		"ko"		"{default}이 자동 안내는 이 서버에서 {green}%s h{default} 플레이하면 멈춥니다. 나중에 다시 보려면 {green}!guide{default} 또는 {green}!modes{default}."
+	}
+	"NPG_MatchLoaded"
+	{
+		"ko"		"{olive}지금은 이미 모드가 로드되어 있어서 자동 안내가 나오지 않습니다. 기본으로 돌릴 때는 {green}!rmatch{olive} 전에 팀원에게 먼저 물어보세요."
+	}
+}
