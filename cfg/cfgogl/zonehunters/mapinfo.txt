@@ -2348,7 +2348,6 @@
 		"start_extra_dist"	"150.000000"
 		"end_dist"			"100.000000"
 		"max_distance"		"500"
-		"max_distance"		"500"
 	}
 	"l4d2_fallindeath02"
 	{
