@@ -70,6 +70,12 @@ int
 ConVar
 	hCvarMotdTitle,
 	hCvarMotdUrl,
+	hCvarMotdLanguageRedirect,
+	hCvarMotdUrlEn,
+	hCvarMotdUrlChi,
+	hCvarMotdUrlZho,
+	hCvarMotdUrlJp,
+	hCvarMotdUrlKo,
 	hCvarEnableAutoupdate,
 	hCvarAutoupdatePublicUrl,
 	hCvarAutoupdatePrivateUrl,
@@ -89,6 +95,12 @@ public void OnPluginStart()
 	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的私用更新清单URL");
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
 	hCvarMotdUrl = CreateConVar("sm_cfgmotd_url", "http://anne.trygek.com/l4d2/");  // 主页以后更换为数据库控制
+	hCvarMotdLanguageRedirect = CreateConVar("sm_cfgmotd_language_redirect", "1", "是否根据客户端语言为!web/MOTD添加lang参数或使用语言专用URL", _, true, 0.0, true, 1.0);
+	hCvarMotdUrlEn = CreateConVar("sm_cfgmotd_url_en", "", "英语客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
+	hCvarMotdUrlChi = CreateConVar("sm_cfgmotd_url_chi", "", "简体中文客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
+	hCvarMotdUrlZho = CreateConVar("sm_cfgmotd_url_zho", "", "繁体中文客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
+	hCvarMotdUrlJp = CreateConVar("sm_cfgmotd_url_jp", "", "日语客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
+	hCvarMotdUrlKo = CreateConVar("sm_cfgmotd_url_ko", "", "韩语客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
 	hCvarIPUrl = CreateConVar("sm_cfgip_url", "http://anne.trygek.com/ip.php");	// 服务器ip页面，以后更换为数据库控制
 	hCvarDonateUrl = CreateConVar("sm_donate_url", "http://anne.trygek.com/sponsor/l4d2.php"); //赞助页面
 	hCvarEnableAutoupdate.AddChangeHook(UpdateStatuChange);
@@ -463,6 +475,7 @@ public Action ShowAnneServerIP(int client, int args)
 	UrlEncode(serverName, encodedServerName, sizeof(encodedServerName));
 	strcopy(separator, sizeof(separator), StrContains(baseUrl, "?", false) == -1 ? "?" : "&");
 	Format(url, sizeof(url), "%s%sserver=%s", baseUrl, separator, encodedServerName);
+	AppendClientLanguageParam(client, url, sizeof(url));
 
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);
 	return Plugin_Handled;
@@ -470,9 +483,9 @@ public Action ShowAnneServerIP(int client, int args)
 
 public Action ShowAnneServerWeb(int client, int args) 
 {
-	char title[64], url[192];
+	char title[64], url[768];
 	GetConVarString(hCvarMotdTitle, title, sizeof(title));
-	GetConVarString(hCvarMotdUrl, url, sizeof(url));
+	BuildLocalizedMotdUrl(client, url, sizeof(url));
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);	
 	return Plugin_Handled;
 }
@@ -566,10 +579,134 @@ public void ResetMode()
 
 public void ShowMotdToPlayer(int client)
 {
-	char title[64], url[192];
+	char title[64], url[768];
 	GetConVarString(hCvarMotdTitle, title, sizeof(title));
-	GetConVarString(hCvarMotdUrl, url, sizeof(url));
+	BuildLocalizedMotdUrl(client, url, sizeof(url));
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);	
+}
+
+void BuildLocalizedMotdUrl(int client, char[] url, int maxlen)
+{
+	GetConVarString(hCvarMotdUrl, url, maxlen);
+	if(!hCvarMotdLanguageRedirect.BoolValue || !IsValidClient(client))
+	{
+		return;
+	}
+
+	char sourceCode[16], webCode[16];
+	GetClientLanguageCode(client, sourceCode, sizeof(sourceCode));
+	GetWebLanguageCode(sourceCode, webCode, sizeof(webCode));
+	if(webCode[0] == '\0')
+	{
+		return;
+	}
+
+	char localizedUrl[768];
+	if(GetLocalizedMotdOverride(sourceCode, localizedUrl, sizeof(localizedUrl)))
+	{
+		strcopy(url, maxlen, localizedUrl);
+		return;
+	}
+
+	AppendUrlParam(url, maxlen, "lang", webCode);
+}
+
+void GetClientLanguageCode(int client, char[] code, int maxlen)
+{
+	code[0] = '\0';
+	int language = GetClientLanguage(client);
+	GetLanguageInfo(language, code, maxlen);
+}
+
+void GetWebLanguageCode(const char[] sourceCode, char[] webCode, int maxlen)
+{
+	webCode[0] = '\0';
+	if(StrEqual(sourceCode, "chi", false))
+	{
+		strcopy(webCode, maxlen, "zh-CN");
+	}
+	else if(StrEqual(sourceCode, "zho", false))
+	{
+		strcopy(webCode, maxlen, "zh-CN");
+	}
+	else if(StrEqual(sourceCode, "en", false))
+	{
+		strcopy(webCode, maxlen, "en");
+	}
+	else if(StrEqual(sourceCode, "jp", false) || StrEqual(sourceCode, "ja", false))
+	{
+		strcopy(webCode, maxlen, "ja");
+	}
+	else if(StrEqual(sourceCode, "ko", false))
+	{
+		strcopy(webCode, maxlen, "ko");
+	}
+}
+
+void GetLocalizedWebLanguageCode(int client, char[] webCode, int maxlen)
+{
+	webCode[0] = '\0';
+	if(!hCvarMotdLanguageRedirect.BoolValue || !IsValidClient(client))
+	{
+		return;
+	}
+
+	char sourceCode[16];
+	GetClientLanguageCode(client, sourceCode, sizeof(sourceCode));
+	GetWebLanguageCode(sourceCode, webCode, maxlen);
+}
+
+bool GetLocalizedMotdOverride(const char[] sourceCode, char[] url, int maxlen)
+{
+	url[0] = '\0';
+	if(StrEqual(sourceCode, "chi", false))
+	{
+		hCvarMotdUrlChi.GetString(url, maxlen);
+	}
+	else if(StrEqual(sourceCode, "zho", false))
+	{
+		hCvarMotdUrlZho.GetString(url, maxlen);
+	}
+	else if(StrEqual(sourceCode, "en", false))
+	{
+		hCvarMotdUrlEn.GetString(url, maxlen);
+	}
+	else if(StrEqual(sourceCode, "jp", false) || StrEqual(sourceCode, "ja", false))
+	{
+		hCvarMotdUrlJp.GetString(url, maxlen);
+	}
+	else if(StrEqual(sourceCode, "ko", false))
+	{
+		hCvarMotdUrlKo.GetString(url, maxlen);
+	}
+	TrimString(url);
+	return url[0] != '\0';
+}
+
+void AppendClientLanguageParam(int client, char[] url, int maxlen)
+{
+	char webCode[16];
+	GetLocalizedWebLanguageCode(client, webCode, sizeof(webCode));
+	if(webCode[0] == '\0')
+	{
+		return;
+	}
+
+	AppendUrlParam(url, maxlen, "lang", webCode);
+}
+
+void AppendUrlParam(char[] url, int maxlen, const char[] key, const char[] value)
+{
+	if(url[0] == '\0' || value[0] == '\0')
+	{
+		return;
+	}
+
+	char encodedValue[64], separator[2], nextUrl[768];
+	UrlEncode(value, encodedValue, sizeof(encodedValue));
+	strcopy(separator, sizeof(separator), StrContains(url, "?", false) == -1 ? "?" : "&");
+	Format(nextUrl, sizeof(nextUrl), "%s%s%s=%s", url, separator, key, encodedValue);
+	strcopy(url, maxlen, nextUrl);
 }
 
 void ShowDonateWebToPlayer(int client, const char[] amount, const char[] method)
@@ -598,6 +735,7 @@ void ShowDonateWebToPlayer(int client, const char[] amount, const char[] method)
 	{
 		Format(url, sizeof(url), "%s%ssteam_id=%s&name=%s", baseUrl, separator, steam64, encodedName);
 	}
+	AppendClientLanguageParam(client, url, sizeof(url));
 
 	PrintToConsole(client, "[AnneDonate] Open donate url: %s", url);
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);

@@ -1,0 +1,111 @@
+"Phrases"
+{
+	"SpawnVote_SpectatorsNotAllowed"
+	{
+		"zho"		"[{blue}刷特{default}] 旁觀者不允許發起刷特投票。"
+	}
+	"SpawnVote_AlreadyVoteProgress"
+	{
+		"zho"		"[{blue}刷特{default}] 已有投票正在進行。"
+	}
+	"SpawnVote_NoSpawnController"
+	{
+		"zho"		"[{blue}刷特{default}] 目前模式沒有可用的刷特控制插件。"
+	}
+	"SpawnVote_CampaignStatus"
+	{
+		"zho"		"[{blue}刷特{default}] 目前選單控制戰役 dirspawn。"
+	}
+	"SpawnVote_AnneStatus"
+	{
+		"zho"		"[{blue}刷特{default}] 目前選單控制 Anne infected_control。"
+	}
+	"SpawnVote_MenuClosed"
+	{
+		"zho"		"[{blue}刷特{default}] 已關閉刷特選單。"
+	}
+	"SpawnVote_InitiatedVote"
+	{
+		"zho"		"[{blue}刷特{default}] %N 發起刷特設定投票。"
+	}
+	"SpawnVote_AppliedByRequester"
+	{
+		"zho"		"[{blue}刷特{default}] %N 的刷特設定投票已通過。"
+	}
+	"SpawnVote_Applied"
+	{
+		"zho"		"[{blue}刷特{default}] 刷特設定投票已通過。"
+	}
+	"SpawnVote_CampaignVoteTitle"
+	{
+		"zho"		"套用戰役刷特: %d特/%d秒?"
+	}
+	"SpawnVote_CampaignVoteTitleRelax"
+	{
+		"zho"		"套用戰役刷特: %d特/%d秒，Relax%s?"
+	}
+	"SpawnVote_AnneVoteTitle"
+	{
+		"zho"		"套用Anne刷特: %d特/%d秒?"
+	}
+	"SpawnVote_RelaxOn"
+	{
+		"zho"		"開啟"
+	}
+	"SpawnVote_RelaxOff"
+	{
+		"zho"		"關閉"
+	}
+	"SpawnVote_AppliedVoteTitle"
+	{
+		"zho"		"刷特設定已套用"
+	}
+	"SpawnVote_ModeCampaign"
+	{
+		"zho"		"戰役"
+	}
+	"SpawnVote_ModeAnne"
+	{
+		"zho"		"Anne"
+	}
+	"SpawnVote_ModeUnknown"
+	{
+		"zho"		"目前"
+	}
+	"SpawnVote_PresetDbUnavailable"
+	{
+		"zho"		"[{blue}刷特{default}] 預設資料庫不可用。"
+	}
+	"SpawnVote_PresetNameRequired"
+	{
+		"zho"		"[{blue}刷特{default}] 用法: sm_spawnpreset_save <名稱> 或 sm_spawnpreset_delete <名稱>。"
+	}
+	"SpawnVote_PresetSaved"
+	{
+		"zho"		"[{blue}刷特{default}] 已儲存預設: %s"
+	}
+	"SpawnVote_PresetDeleted"
+	{
+		"zho"		"[{blue}刷特{default}] 已刪除預設: %s"
+	}
+	"SpawnVote_PresetListHeader"
+	{
+		"zho"		"[{blue}刷特{default}] %s 模式預設:"
+	}
+	"SpawnVote_PresetListItem"
+	{
+		"zho"		"[{blue}刷特{default}] - %s"
+	}
+	"SpawnVote_PresetListEmpty"
+	{
+		"zho"		"[{blue}刷特{default}] 目前模式沒有已儲存預設。"
+	}
+	"SpawnVote_PresetVoteTitle"
+	{
+		"zho"		"套用預設: %s?"
+	}
+	"SpawnVote_PresetVoteTitleRelax"
+	{
+		"zho"		"套用預設: %s，Relax%s?"
+	}
+}

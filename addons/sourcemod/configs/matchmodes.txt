@@ -46,6 +46,25 @@
 			"name" "Anne写实"
 		}
 	}
+	"Not0721 Coop Profiles"
+	{
+		"not0721_coop_base"
+		{
+			"name" "Not0721基础战役"
+		}
+		"not0721_coop_hard"
+		{
+			"name" "Not0721进阶战役"
+		}
+		"not0721_mutation4"
+		{
+			"name" "Not0721绝境"
+		}
+		"not0721_community5"
+		{
+			"name" "Not0721写专"
+		}
+	}
 	"ZoneMod Configs"
 	{
 		"zonemod"

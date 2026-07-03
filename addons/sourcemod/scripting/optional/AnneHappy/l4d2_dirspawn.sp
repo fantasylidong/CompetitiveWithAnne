@@ -42,9 +42,16 @@ ConVar gCvarUnlockMaxSpecial;    // MaxSpecial解锁（需要sourcescramble+game
 
 // better_mutations4（VScript）
 ConVar gCvarAllowSIWithTank;     // 坦克在场是否允许刷特（0/1）
+ConVar gCvarRelaxEnable;         // 是否保留导演 Relax 阶段（0=按 Not0721 源服方式压掉 Relax）
 ConVar gCvarRelaxMin;            // Relax最小（秒）
 ConVar gCvarRelaxMax;            // Relax最大（秒）
 ConVar gCvarLockTempo;           // 锁节奏（0/1）
+ConVar gCvarRelaxOffBattlefieldRespawn;
+ConVar gCvarRelaxOffInitialDelayMax;
+ConVar gCvarRelaxOffInitialDelayMaxExtra;
+ConVar gCvarRelaxOffInitialDelayMin;
+ConVar gCvarRelaxOffFinaleOffer;
+ConVar gCvarRelaxOffOriginalOffer;
 
 // 首刷延迟
 ConVar gCvarInitialMin;          // SpecialInitialSpawnDelayMin
@@ -154,10 +161,38 @@ stock void VS_RawSetInt(const char[] key, int value)
     L4D2_ExecVScriptCode(code);
 }
 
+stock void VS_RawSetBool(const char[] key, bool value)
+{
+    char code[96];
+    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %s)", key, value ? "true" : "false");
+    L4D2_ExecVScriptCode(code);
+}
+
+stock void VS_RawSetFloat(const char[] key, float value)
+{
+    char code[128];
+    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %.3f)", key, value);
+    L4D2_ExecVScriptCode(code);
+}
+
 stock void VS_RawDelete(const char[] key)
 {
     char code[96];
     Format(code, sizeof(code), "::SessionOptions.rawdelete(\"%s\")", key);
+    L4D2_ExecVScriptCode(code);
+}
+
+stock void VS_RawDeleteIfExists(const char[] key)
+{
+    char code[160];
+    Format(code, sizeof(code), "if (::SessionOptions.rawin(\"%s\")) ::SessionOptions.rawdelete(\"%s\")", key, key);
+    L4D2_ExecVScriptCode(code);
+}
+
+stock void VS_SetDirectorConVar(const char[] key, int value)
+{
+    char code[128];
+    Format(code, sizeof(code), "Convars.SetValue(\"%s\", %d)", key, value);
     L4D2_ExecVScriptCode(code);
 }
 
@@ -249,6 +284,45 @@ stock void ApplyM4FixesByVScript()
     VS_RawSetInt("RelaxMinInterval", rmin);
     VS_RawSetInt("RelaxMaxInterval", rmax);
     VS_RawSetInt("LockTempo", lockt);
+}
+
+stock void ApplyRelaxDisableByVScript()
+{
+    if (gCvarRelaxEnable.BoolValue)
+    {
+        VS_RawDeleteIfExists("LookTempo");
+        VS_RawDeleteIfExists("IntensityRelaxThreshold");
+        VS_RawDeleteIfExists("RelaxMaxFlowTravel");
+        VS_RawDeleteIfExists("SustainPeakMinTime");
+        VS_RawDeleteIfExists("SustainPeakMaxTime");
+        VS_SetDirectorConVar("director_special_battlefield_respawn_interval", 10);
+        VS_SetDirectorConVar("director_special_initial_spawn_delay_max", 60);
+        VS_SetDirectorConVar("director_special_initial_spawn_delay_max_extra", 180);
+        VS_SetDirectorConVar("director_special_initial_spawn_delay_min", 30);
+        VS_SetDirectorConVar("director_special_finale_offer_length", 10);
+        VS_SetDirectorConVar("director_special_original_offer_length", 30);
+        return;
+    }
+
+    // Mirrors the source Not0721 scripts' no-relax profile without script_reload_code.
+    VS_RawSetBool("LookTempo", true);
+    VS_RawSetFloat("IntensityRelaxThreshold", 1.01);
+    VS_RawSetFloat("RelaxMaxFlowTravel", 0.0);
+    VS_RawSetFloat("SustainPeakMinTime", 0.0);
+    VS_RawSetFloat("SustainPeakMaxTime", 0.1);
+    VS_RawSetInt("RelaxMinInterval", 0);
+    VS_RawSetFloat("RelaxMaxInterval", 0.5);
+    VS_RawSetInt("LockTempo", 1);
+    VS_RawSetInt("SpecialInitialSpawnDelayMin", gCvarRelaxOffInitialDelayMin.IntValue);
+    VS_RawSetInt("SpecialInitialSpawnDelayMax", gCvarRelaxOffInitialDelayMax.IntValue);
+    VS_RawSetInt("SpecialInitialSpawnDelayMaxExtra", gCvarRelaxOffInitialDelayMaxExtra.IntValue);
+
+    VS_SetDirectorConVar("director_special_battlefield_respawn_interval", gCvarRelaxOffBattlefieldRespawn.IntValue);
+    VS_SetDirectorConVar("director_special_initial_spawn_delay_max", gCvarRelaxOffInitialDelayMax.IntValue);
+    VS_SetDirectorConVar("director_special_initial_spawn_delay_max_extra", gCvarRelaxOffInitialDelayMaxExtra.IntValue);
+    VS_SetDirectorConVar("director_special_initial_spawn_delay_min", gCvarRelaxOffInitialDelayMin.IntValue);
+    VS_SetDirectorConVar("director_special_finale_offer_length", gCvarRelaxOffFinaleOffer.IntValue);
+    VS_SetDirectorConVar("director_special_original_offer_length", gCvarRelaxOffOriginalOffer.IntValue);
 }
 
 // 首刷延迟
@@ -350,6 +424,7 @@ stock void ApplyByVScript(int total, int interval)
 
     ApplyM4FixesByVScript();
     ApplyInitialSpawnDelayByVScript();
+    ApplyRelaxDisableByVScript();
 
     LogMsg("Applied: total=%d, dom=%d, interval=%d, KV=%s | M4: allow=%d relax=[%d..%d] lock=%d | init=[%d..%d]",
            total, dom, interval, haveKV ? "yes":"no",
@@ -421,6 +496,11 @@ stock void ShutdownVScript()
     VS_RawDelete("RelaxMinInterval");
     VS_RawDelete("RelaxMaxInterval");
     VS_RawDelete("LockTempo");
+    VS_RawDelete("LookTempo");
+    VS_RawDelete("IntensityRelaxThreshold");
+    VS_RawDelete("RelaxMaxFlowTravel");
+    VS_RawDelete("SustainPeakMinTime");
+    VS_RawDelete("SustainPeakMaxTime");
 
     VS_RawDelete("SpecialInitialSpawnDelayMin");
     VS_RawDelete("SpecialInitialSpawnDelayMax");
@@ -809,8 +889,10 @@ public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValu
 
     if (cvar == gCvarCount || cvar == gCvarInterval || cvar == gCvarDomLimit
      || cvar == gCvarKvEnable || cvar == gCvarKvPath
-     || cvar == gCvarAllowSIWithTank || cvar == gCvarRelaxMin || cvar == gCvarRelaxMax || cvar == gCvarLockTempo
-     || cvar == gCvarInitialMin || cvar == gCvarInitialMax)
+     || cvar == gCvarAllowSIWithTank || cvar == gCvarRelaxEnable || cvar == gCvarRelaxMin || cvar == gCvarRelaxMax || cvar == gCvarLockTempo
+     || cvar == gCvarInitialMin || cvar == gCvarInitialMax
+     || cvar == gCvarRelaxOffBattlefieldRespawn || cvar == gCvarRelaxOffInitialDelayMax || cvar == gCvarRelaxOffInitialDelayMaxExtra
+     || cvar == gCvarRelaxOffInitialDelayMin || cvar == gCvarRelaxOffFinaleOffer || cvar == gCvarRelaxOffOriginalOffer)
     {
         if (g_hApplyTimer != null)
         {
@@ -842,9 +924,16 @@ public void OnPluginStart()
 
     // better_mutations4
     gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "坦克在场是否允许刷特（0=禁刷，1=允许并存）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarRelaxEnable       = CreateConVar("dirspawn_relax_enable", "1", "是否保留导演 Relax 阶段（0=按 Not0721 源服方式压掉 Relax）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarRelaxMin          = CreateConVar("dirspawn_relax_min", "30",  "Relax最小（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
     gCvarRelaxMax          = CreateConVar("dirspawn_relax_max", "45", "Relax最大（秒）", FCVAR_NOTIFY, true, 0.0, true, 180.0);
     gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "锁节奏（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarRelaxOffBattlefieldRespawn = CreateConVar("dirspawn_relax_off_battlefield_respawn", "2", "Relax 关闭时 director_special_battlefield_respawn_interval", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarRelaxOffInitialDelayMax = CreateConVar("dirspawn_relax_off_initial_delay_max", "1", "Relax 关闭时 director_special_initial_spawn_delay_max", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarRelaxOffInitialDelayMaxExtra = CreateConVar("dirspawn_relax_off_initial_delay_max_extra", "2", "Relax 关闭时 director_special_initial_spawn_delay_max_extra", FCVAR_NOTIFY, true, 0.0, true, 180.0);
+    gCvarRelaxOffInitialDelayMin = CreateConVar("dirspawn_relax_off_initial_delay_min", "0", "Relax 关闭时 director_special_initial_spawn_delay_min", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarRelaxOffFinaleOffer = CreateConVar("dirspawn_relax_off_finale_offer", "1", "Relax 关闭时 director_special_finale_offer_length", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarRelaxOffOriginalOffer = CreateConVar("dirspawn_relax_off_original_offer", "1", "Relax 关闭时 director_special_original_offer_length", FCVAR_NOTIFY, true, 0.0, true, 60.0);
 
     // 首刷延迟
     gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "30", "首刷最小延迟（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
@@ -877,11 +966,18 @@ public void OnPluginStart()
     HookConVarChange(gCvarKvEnable,          CvarChanged);
     HookConVarChange(gCvarKvPath,            CvarChanged);
     HookConVarChange(gCvarAllowSIWithTank,   CvarChanged);
+    HookConVarChange(gCvarRelaxEnable,       CvarChanged);
     HookConVarChange(gCvarRelaxMin,          CvarChanged);
     HookConVarChange(gCvarRelaxMax,          CvarChanged);
     HookConVarChange(gCvarLockTempo,         CvarChanged);
     HookConVarChange(gCvarInitialMin,        CvarChanged);
     HookConVarChange(gCvarInitialMax,        CvarChanged);
+    HookConVarChange(gCvarRelaxOffBattlefieldRespawn, CvarChanged);
+    HookConVarChange(gCvarRelaxOffInitialDelayMax, CvarChanged);
+    HookConVarChange(gCvarRelaxOffInitialDelayMaxExtra, CvarChanged);
+    HookConVarChange(gCvarRelaxOffInitialDelayMin, CvarChanged);
+    HookConVarChange(gCvarRelaxOffFinaleOffer, CvarChanged);
+    HookConVarChange(gCvarRelaxOffOriginalOffer, CvarChanged);
 
     RegAdminCmd("sm_dirspawn_apply",  Cmd_Apply, ADMFLAG_GENERIC, "sm_dirspawn_apply [总特] [间隔] - 立即应用设置");
     RegAdminCmd("sm_dirspawn_genkv",  Cmd_GenKV, ADMFLAG_ROOT,    "sm_dirspawn_genkv [min] [max] - 生成均衡每类上限KV文件到 dirspawn_kv_path");

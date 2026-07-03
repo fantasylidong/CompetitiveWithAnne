@@ -11,7 +11,7 @@ void ResetMatchState()
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsInfectedBot(i) && IsPlayerAlive(i) && !IsGhost(i))
+        if (IsCountedSpecial(i) && IsPlayerAlive(i) && !IsGhost(i))
         {
             gST.teleCount[i] = 0;
             int zc = GetEntProp(i, Prop_Send, "m_zombieClass");
@@ -76,7 +76,7 @@ void RecalcSiCapFromAlive(bool log = false)
 
     for (int c = 1; c <= MaxClients; c++)
     {
-        if (IsInfectedBot(c) && IsPlayerAlive(c) && !IsGhost(c))
+        if (IsCountedSpecial(c) && IsPlayerAlive(c) && !IsGhost(c))
         {
             int zc = GetEntProp(c, Prop_Send, "m_zombieClass");
             if (1 <= zc && zc <= SI_COUNT)
@@ -92,7 +92,7 @@ void RecalcSiCapFromAlive(bool log = false)
 
     for (int i = 0; i < SI_COUNT; i++)
     {
-        int remain = baseCap[i] - gST.siAlive[i];
+        int remain = baseCap[i] - gST.siAlive[i] - Traitor_CountReservedClassSlots(i + 1);
         if (remain < 0) remain = 0;
         gST.siCap[i] = remain;
     }

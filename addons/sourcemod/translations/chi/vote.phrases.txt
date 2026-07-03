@@ -24,6 +24,10 @@
 	{
 		"chi"		"[{olive}vote{default}] {red}已经有一个投票正在进行."
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"chi"		"[{olive}vote{default}] {red}没有投票正在进行."
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"chi"		"[{olive}vote{default}] {blue}%N {default}发起投票踢出 {blue} %N"

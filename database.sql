@@ -629,7 +629,7 @@ CREATE TABLE `score_quarter` (
   `award_left4dead` int(11) NOT NULL DEFAULT '0',
   `award_letinsafehouse` int(11) NOT NULL DEFAULT '0',
   `award_witchdisturb` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`steamid`),
+  PRIMARY KEY (`steamid`,`quarter_key`),
   KEY `quarter_points` (`quarter_key`,`points`),
   KEY `points` (`points`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

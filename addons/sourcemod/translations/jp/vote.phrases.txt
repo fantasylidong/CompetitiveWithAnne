@@ -24,6 +24,10 @@
 	{
 		"jp"		"[{olive}vote{default}] {red} すでに投票が行われています。"
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"jp"		"[{olive}vote{default}] {red}現在進行中の投票はありません。"
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"jp"		"[{olive}vote{default}] {blue}%N {default} が {blue} %N を排除するための投票を開始します"

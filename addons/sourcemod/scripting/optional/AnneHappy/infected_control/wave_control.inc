@@ -19,10 +19,13 @@ void StartWave()
 
     gST.teleportDistCur = gCV.fTeleportSpawnMin;
     gST.spawnDistCur    = gCV.fSpawnMin;
-    gST.siQueueCount   += gCV.iSiLimit;
+    int waveNumber = gST.waveIndex + 1;
+    int aiBudget = Traitor_AdjustWaveSpawnBudget(gCV.iSiLimit, waveNumber);
+    gST.siQueueCount   += aiBudget;
 
     gST.bShouldCheck = true;
     gST.waveIndex++;
+    Traitor_OnWaveReleased(gST.waveIndex);
     gST.lastWaveAvgFlow = GetSurAvrFlow();
     gST.lastSpawnSecs   = 0;
     gST.lastWaveStartTime = GetGameTime();

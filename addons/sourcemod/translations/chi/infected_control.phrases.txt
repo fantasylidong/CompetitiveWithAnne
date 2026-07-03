@@ -24,4 +24,106 @@
 	{
 		"chi"		"{green}[IC]{default} Nav %d {lightgreen}不能生成{default} | 详情见控制台"
 	}
+	"InfectedControl_TraitorUsage"
+	{
+		"chi"		"{green}[IC]{default} 用法: !it 打开内鬼类型菜单；!it [random|smoker|boomer|hunter|spitter|jockey|charger] 直接登记。"
+	}
+	"InfectedControl_TraitorMenuTitle"
+	{
+		"chi"		"选择内鬼特感类型"
+	}
+	"InfectedControl_TraitorMenuRandom"
+	{
+		"chi"		"随机可用类型"
+	}
+	"InfectedControl_TraitorLimitReached"
+	{
+		"chi"		"{green}[IC]{default} 你本回合的内鬼登记次数已用完（%d）。"
+	}
+	"InfectedControl_TraitorDisabled"
+	{
+		"chi"		"{green}[IC]{default} 内鬼模式未启用。"
+	}
+	"InfectedControl_TraitorUnsupportedClass"
+	{
+		"chi"		"{green}[IC]{default} 不支持这个内鬼特感类型。"
+	}
+	"InfectedControl_TraitorClassDisabled"
+	{
+		"chi"		"{green}[IC]{default} 当前刷特设置未启用这个特感类型。"
+	}
+	"InfectedControl_TraitorNoEnabledClass"
+	{
+		"chi"		"{green}[IC]{default} 当前没有可用于内鬼的启用特感类型。"
+	}
+	"InfectedControl_TraitorWindowClosed"
+	{
+		"chi"		"{green}[IC]{default} 本波内鬼登记窗口已关闭。"
+	}
+	"InfectedControl_TraitorQueued"
+	{
+		"chi"		"{green}[IC]{default} 你已登记为内鬼 {olive}%s{default}。"
+	}
+	"InfectedControl_TraitorPending"
+	{
+		"chi"		"{green}[IC]{default} 你已进入灵魂状态，请等待下一波普通特感生成完成。"
+	}
+	"InfectedControl_TraitorWaitForWave"
+	{
+		"chi"		"{green}[IC]{default} 请等待普通特感波次生成后再复活。"
+	}
+	"InfectedControl_TraitorSpawnAllowed"
+	{
+		"chi"		"{green}[IC]{default} 现在可以按正常灵魂规则寻找位置复活。"
+	}
+	"InfectedControl_TraitorNoSlot"
+	{
+		"chi"		"{green}[IC]{default} 当前没有可用内鬼槽位。"
+	}
+	"InfectedControl_TraitorNotQueued"
+	{
+		"chi"		"{green}[IC]{default} 你当前没有登记内鬼。"
+	}
+	"InfectedControl_TraitorCancelled"
+	{
+		"chi"		"{green}[IC]{default} 已取消内鬼登记。"
+	}
+	"InfectedControl_TraitorSpawned"
+	{
+		"chi"		"{green}[IC]{default} 你已作为内鬼 {olive}%s{default} 复活。"
+	}
+	"InfectedControl_TraitorFailed"
+	{
+		"chi"		"{green}[IC]{default} 准备内鬼灵魂状态失败。"
+	}
+	"InfectedControl_TraitorClassSmoker"
+	{
+		"chi"		"舌头"
+	}
+	"InfectedControl_TraitorClassBoomer"
+	{
+		"chi"		"胖子"
+	}
+	"InfectedControl_TraitorClassHunter"
+	{
+		"chi"		"猎人"
+	}
+	"InfectedControl_TraitorClassSpitter"
+	{
+		"chi"		"口水"
+	}
+	"InfectedControl_TraitorClassJockey"
+	{
+		"chi"		"猴子"
+	}
+	"InfectedControl_TraitorClassCharger"
+	{
+		"chi"		"牛"
+	}
+
+	"InfectedControl_TraitorWaveStatusReserved"
+	{
+		"chi"		"{green}[IC]{default} 内鬼预留槽位: %d"
+	}
+
 }

@@ -39,7 +39,10 @@ bool:ConnectDB()
 		return false;
 	}
 
-	// 表结构由外部 SQL 管理，插件启动时只连接和读写，不自动建表/迁移。
+	g_bQuarterRankTableReady = false;
+	QuarterRank_EnsureCurrentQuarter();
+
+	// 大部分表结构由外部 SQL 管理；季度表保留一次兼容迁移，避免旧主键继续覆盖历史季度。
 	return true;
 }
 

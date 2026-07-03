@@ -95,3 +95,13 @@ scripts/l4d2-docker.README.md
 scripts/l4d2-docker.README.md
 docs/l4d2-docker.sh
 addons/sourcemod/configs/hextags.cfg.backup
+addons/sourcemod/plugins/extend/anne_status_privacy.smx
+addons/sourcemod/scripting/extend/anne_status_privacy.sp
+addons/sourcemod/translations/anne_server_redirect.phrases.txt
+addons/sourcemod/translations/chi/anne_server_redirect.phrases.txt
+addons/sourcemod/translations/zho/anne_server_redirect.phrases.txt
+scripts/l4d2-docker.README.md
+scripts/l4d2-docker.README.md
+scripts/anne-compressor-latest.tar.gz
+scripts/anne-compressor-latest.tar.gz
+scripts/l4d2-docker.README.md

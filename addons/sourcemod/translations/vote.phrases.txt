@@ -24,6 +24,10 @@
 	{
 		"en"		"[{olive}vote{default}] {red} There is already a vote in progress."
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"en"		"[{olive}vote{default}] {red}There is no vote in progress."
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"en"		"[{olive}vote{default}] {blue}%N {default} initiates a vote to kick out {blue} %N"

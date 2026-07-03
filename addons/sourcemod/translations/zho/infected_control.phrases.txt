@@ -24,4 +24,106 @@
 	{
 		"zho"		"{green}[IC]{default} Nav %d {lightgreen}不能產生{default} | 詳情請見控制台"
 	}
+	"InfectedControl_TraitorUsage"
+	{
+		"zho"		"{green}[IC]{default} 用法: !it 開啟內鬼類型選單；!it [random|smoker|boomer|hunter|spitter|jockey|charger] 直接登記。"
+	}
+	"InfectedControl_TraitorMenuTitle"
+	{
+		"zho"		"選擇內鬼特感類型"
+	}
+	"InfectedControl_TraitorMenuRandom"
+	{
+		"zho"		"隨機可用類型"
+	}
+	"InfectedControl_TraitorLimitReached"
+	{
+		"zho"		"{green}[IC]{default} 你本回合的內鬼登記次數已用完（%d）。"
+	}
+	"InfectedControl_TraitorDisabled"
+	{
+		"zho"		"{green}[IC]{default} 內鬼模式未啟用。"
+	}
+	"InfectedControl_TraitorUnsupportedClass"
+	{
+		"zho"		"{green}[IC]{default} 不支援這個內鬼特感類型。"
+	}
+	"InfectedControl_TraitorClassDisabled"
+	{
+		"zho"		"{green}[IC]{default} 目前刷特設定未啟用這個特感類型。"
+	}
+	"InfectedControl_TraitorNoEnabledClass"
+	{
+		"zho"		"{green}[IC]{default} 目前沒有可用於內鬼的啟用特感類型。"
+	}
+	"InfectedControl_TraitorWindowClosed"
+	{
+		"zho"		"{green}[IC]{default} 本波內鬼登記視窗已關閉。"
+	}
+	"InfectedControl_TraitorQueued"
+	{
+		"zho"		"{green}[IC]{default} 你已登記為內鬼 {olive}%s{default}。"
+	}
+	"InfectedControl_TraitorPending"
+	{
+		"zho"		"{green}[IC]{default} 你已進入靈魂狀態，請等待下一波普通特感生成完成。"
+	}
+	"InfectedControl_TraitorWaitForWave"
+	{
+		"zho"		"{green}[IC]{default} 請等待普通特感波次生成後再復活。"
+	}
+	"InfectedControl_TraitorSpawnAllowed"
+	{
+		"zho"		"{green}[IC]{default} 現在可以按正常靈魂規則尋找位置復活。"
+	}
+	"InfectedControl_TraitorNoSlot"
+	{
+		"zho"		"{green}[IC]{default} 目前沒有可用內鬼槽位。"
+	}
+	"InfectedControl_TraitorNotQueued"
+	{
+		"zho"		"{green}[IC]{default} 你目前沒有登記內鬼。"
+	}
+	"InfectedControl_TraitorCancelled"
+	{
+		"zho"		"{green}[IC]{default} 已取消內鬼登記。"
+	}
+	"InfectedControl_TraitorSpawned"
+	{
+		"zho"		"{green}[IC]{default} 你已作為內鬼 {olive}%s{default} 復活。"
+	}
+	"InfectedControl_TraitorFailed"
+	{
+		"zho"		"{green}[IC]{default} 準備內鬼靈魂狀態失敗。"
+	}
+	"InfectedControl_TraitorClassSmoker"
+	{
+		"zho"		"舌頭"
+	}
+	"InfectedControl_TraitorClassBoomer"
+	{
+		"zho"		"胖子"
+	}
+	"InfectedControl_TraitorClassHunter"
+	{
+		"zho"		"獵人"
+	}
+	"InfectedControl_TraitorClassSpitter"
+	{
+		"zho"		"口水"
+	}
+	"InfectedControl_TraitorClassJockey"
+	{
+		"zho"		"猴子"
+	}
+	"InfectedControl_TraitorClassCharger"
+	{
+		"zho"		"牛"
+	}
+
+	"InfectedControl_TraitorWaveStatusReserved"
+	{
+		"zho"		"{green}[IC]{default} 內鬼預留槽位: %d"
+	}
+
 }

@@ -191,6 +191,7 @@ enum struct WaveDecider
         float now = GetGameTime();
         this.timerStartTime = now;
         this.TransitionTo(WD_TimerRunning, reason);
+        Traitor_OnFinalRefreshStarted();
 
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
         WaveDecider_Debug("Start %0.fs timer (%s)", interval, reason);

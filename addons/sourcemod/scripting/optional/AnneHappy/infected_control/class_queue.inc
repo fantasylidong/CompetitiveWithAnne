@@ -387,20 +387,15 @@ void MaintainSpawnQueueOnce()
 // =========================
 // SI 选择 / 限制
 // =========================
-static bool CheckClassEnabled(int zc)
-{
-    int bit = 1 << (zc - 1);
-    return (gCV.iEnableMask & bit) != 0;
-}
-
 // 重要：只按“活着的”判断是否到达每类上限（不把队列算进上限）
 bool HasReachedLimit(int zc)
 {
     int idx = zc - 1;
     if (idx < 0 || idx >= SI_COUNT) return true;
 
-    int cap = gST.siAlive[idx] + gST.siCap[idx];
-    return gST.siAlive[idx] >= cap;
+    int reserved = Traitor_CountReservedClassSlots(zc);
+    int cap = gST.siAlive[idx] + gST.siCap[idx] + reserved;
+    return (gST.siAlive[idx] + reserved) >= cap;
 }
 
 // 统计 spawn 队列中某类的数量（不含 teleport 队列）
@@ -421,6 +416,7 @@ static bool CanQueueClass(int zc)
     int idx = zc - 1;
     if (idx < 0 || idx >= SI_COUNT) return false;
 
-    int capTotal = gST.siAlive[idx] + gST.siCap[idx];
-    return (gST.siAlive[idx] + CountQueuedOfClass(zc)) < capTotal;
+    int reserved = Traitor_CountReservedClassSlots(zc);
+    int capTotal = gST.siAlive[idx] + gST.siCap[idx] + reserved;
+    return (gST.siAlive[idx] + reserved + CountQueuedOfClass(zc)) < capTotal;
 }

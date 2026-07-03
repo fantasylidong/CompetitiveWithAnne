@@ -24,6 +24,10 @@
 	{
 		"vi"		"[{olive}vote{default}] {red} Hiện đã có một cuộc bỏ phiếu đang diễn ra."
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"vi"		"[{olive}vote{default}] {red}Hiện không có cuộc bỏ phiếu nào đang diễn ra."
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"vi"		"[{olive}vote{default}] {blue}%N {default} bắt đầu bỏ phiếu loại bỏ {blue} %N"

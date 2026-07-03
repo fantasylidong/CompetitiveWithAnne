@@ -24,6 +24,10 @@
 	{
 		"zho"		"[{olive}vote{default}] {red}已經有一個投票正在進行."
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"zho"		"[{olive}vote{default}] {red}目前沒有投票正在進行."
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"zho"		"[{olive}vote{default}] {blue}%N {default}發起投票踢出 {blue} %N"

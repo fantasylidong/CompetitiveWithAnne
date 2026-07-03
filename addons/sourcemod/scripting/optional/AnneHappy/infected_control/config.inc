@@ -146,6 +146,10 @@ enum struct Config
     ConVar AntiBaitPairDist;
     ConVar AntiBaitIsolateDist;
     ConVar AntiBaitDebug;
+    ConVar TraitorEnable;
+    ConVar TraitorMaxSlots;
+    ConVar TraitorAdminLimit;
+    ConVar TraitorClassMask;
     bool   bAntiBaitEnable;
     float  fAntiBaitGrace;
     float  fAntiBaitWindow;
@@ -164,6 +168,10 @@ enum struct Config
     float  fAntiBaitPairDist;
     float  fAntiBaitIsolateDist;
     bool   bAntiBaitDebug;
+    bool   bTraitorEnable;
+    int    iTraitorMaxSlots;
+    int    iTraitorAdminLimit;
+    int    iTraitorClassMask;
 
     // 缓存值
     float fFlowBadPenalty;
@@ -513,6 +521,26 @@ enum struct Config
             "Log anti-bait state transitions even when inf_DebugMode is off",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
+        this.TraitorEnable = CreateConVar(
+            "inf_traitor_enable", "0",
+            "Enable admin traitor SI mode (0/1).",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.TraitorMaxSlots = CreateConVar(
+            "inf_traitor_max_slots", "1",
+            "Max pending/alive traitor players that may reserve infected_control slots.",
+            CVAR_FLAG, true, 0.0, true, 4.0
+        );
+        this.TraitorAdminLimit = CreateConVar(
+            "inf_traitor_admin_limit", "1",
+            "Per-admin traitor queue uses per round. 0 = unlimited.",
+            CVAR_FLAG, true, 0.0, true, 32.0
+        );
+        this.TraitorClassMask = CreateConVar(
+            "inf_traitor_class_mask", "0",
+            "Allowed traitor classes bitmask. 0 = follow inf_EnableSIoption; otherwise intersect with enabled SI classes.",
+            CVAR_FLAG, true, 0.0, true, 63.0
+        );
 
         // 变更回调
         this.AiDifficultyLink.AddChangeHook(OnCfgChanged);
@@ -549,6 +577,10 @@ enum struct Config
         this.AntiBaitPairDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitIsolateDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitDebug.AddChangeHook(OnCfgChanged);
+        this.TraitorEnable.AddChangeHook(OnCfgChanged);
+        this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
+        this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
+        this.TraitorClassMask.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -641,6 +673,16 @@ enum struct Config
         this.bAutoSpawn         = this.AutoSpawnTime.BoolValue;
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.iDebugMode         = this.DebugMode.IntValue;
+        this.bTraitorEnable     = this.TraitorEnable.BoolValue;
+        this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
+        if (this.iTraitorMaxSlots < 0) this.iTraitorMaxSlots = 0;
+        if (this.iTraitorMaxSlots > 4) this.iTraitorMaxSlots = 4;
+        this.iTraitorAdminLimit = this.TraitorAdminLimit.IntValue;
+        if (this.iTraitorAdminLimit < 0) this.iTraitorAdminLimit = 0;
+        if (this.iTraitorAdminLimit > 32) this.iTraitorAdminLimit = 32;
+        this.iTraitorClassMask = this.TraitorClassMask.IntValue;
+        if (this.iTraitorClassMask < 0) this.iTraitorClassMask = 0;
+        if (this.iTraitorClassMask > 63) this.iTraitorClassMask = 63;
 
         this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
         this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);

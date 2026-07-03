@@ -78,6 +78,7 @@ int   iMaxSurvivors, iEnable, iAutoKickTankEnable;
 int   g_RoundWipeCount = 0;
 
 bool  g_bWitchAndTankSystemAvailable = false;
+bool  g_bFirstMapInScenario = false;
 
 // ---- 黑白提醒 ----
 ConVar g_cvBWEnable, g_cvBWTeam, g_cvBWSound;
@@ -196,6 +197,8 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnMapStart()
 {
+    g_bFirstMapInScenario = L4D_IsFirstMapInScenario();
+
     if (g_bwSound[0] != ' ')
         PrecacheSound(g_bwSound, true);
 }
@@ -330,10 +333,7 @@ public void Event_PlayerSpawn(Event hEvent, const char[] name, bool dontBroadcas
 
 void QueueSpawnWarpToStart(int client)
 {
-	if (!g_cvWarpSpawnToStart.BoolValue || !IsValidAliveClient(client) || GetClientTeam(client) != 2)
-		return;
-
-	if (L4D_HasAnySurvivorLeftSafeArea())
+	if (!ShouldAllowSpawnWarpToStart(client))
 		return;
 
 	CreateTimer(0.1, Timer_WarpSpawnToStart, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -342,14 +342,22 @@ void QueueSpawnWarpToStart(int client)
 public Action Timer_WarpSpawnToStart(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (!g_cvWarpSpawnToStart.BoolValue || !IsValidAliveClient(client) || GetClientTeam(client) != 2)
-		return Plugin_Stop;
-
-	if (L4D_HasAnySurvivorLeftSafeArea())
+	if (!ShouldAllowSpawnWarpToStart(client))
 		return Plugin_Stop;
 
 	BypassAndExecuteCommandNoArgs(client, "warp_to_start_area");
 	return Plugin_Stop;
+}
+
+bool ShouldAllowSpawnWarpToStart(int client)
+{
+	if (!g_cvWarpSpawnToStart.BoolValue || g_bFirstMapInScenario || !IsValidAliveClient(client) || GetClientTeam(client) != 2)
+		return false;
+
+	if (L4D_HasAnySurvivorLeftSafeArea())
+		return false;
+
+	return true;
 }
 
 public void OnPlayerIncappedOrDeath(Event event, const char[] name, bool dontBroadcast)

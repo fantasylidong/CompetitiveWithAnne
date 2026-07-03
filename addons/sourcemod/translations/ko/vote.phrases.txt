@@ -24,6 +24,10 @@
 	{
 		"ko"		"[{olive}vote{default}] {red} 이미 투표가 진행 중입니다."
 	}
+	"Vote_NoVoteInProgress"
+	{
+		"ko"		"[{olive}vote{default}] {red}현재 진행 중인 투표가 없습니다."
+	}
 	"Vote_InitiatesVoteKick"
 	{
 		"ko"		"[{olive}vote{default}] {blue}%N {default}가 {blue} %N를 쫓아내기 위한 투표를 시작합니다."

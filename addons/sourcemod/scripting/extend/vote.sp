@@ -6,23 +6,30 @@
 #include <left4dhooks>
 #include <colors>
 #undef REQUIRE_PLUGIN
+#include <extra_menu>
 #include <sourcebanspp>
 #include <l4dstats>
+
+#define VOTE_MENU_NAME_LENGTH 128
+#define VOTE_MENU_MAX_CATEGORIES 64
 
 bool g_bSourceBansSystemAvailable = false, g_bl4dstatsSystemAvailable = false;
 public void OnAllPluginsLoaded(){
 	g_bSourceBansSystemAvailable = LibraryExists("sourcebans++");
 	g_bl4dstatsSystemAvailable = LibraryExists("l4d_stats");
+	CreateExtraVoteMenusIfReady();
 }
 public void OnLibraryAdded(const char[] name)
 {
     if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
+	else if ( StrEqual(name, "extra_menu") ) { CreateExtraVoteMenusIfReady(); }
 }
 public void OnLibraryRemoved(const char[] name)
 {
     if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
+	else if ( StrEqual(name, "extra_menu") ) { DeleteExtraVoteMenus(); }
 }
 
 public Plugin myinfo =
@@ -30,7 +37,7 @@ public Plugin myinfo =
 	name = "Vote for run command or cfg file",
 	description = "使用!vote投票执行命令或cfg文件",
 	author = "东",
-	version = "1.3",
+	version = "1.4",
 	url = "https://github.com/fantasylidong/"
 };
 /*
@@ -57,6 +64,11 @@ int
 	banclient,
 	kickclient;
 
+int g_iExtraVoteMenu = -1;
+int g_iExtraCommandMenus[VOTE_MENU_MAX_CATEGORIES];
+int g_iExtraCommandMenuCount;
+char g_sExtraCommandMenuCategories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
+
 
 
 public void OnPluginStart()
@@ -77,10 +89,12 @@ public void OnPluginStart()
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
+	CreateExtraVoteMenusIfReady();
 }
 
 public void FileLocationChanged(ConVar convar, const char[] oldValue, const char[] newValue){
 	char g_sBuffer[128];
+	DeleteExtraVoteMenus();
 	GetConVarString(g_hVoteFilelocation, g_sVoteFile, sizeof(g_sVoteFile));
 	//GetGameFolderName(g_sBuffer, sizeof(g_sBuffer));
 	g_hCfgsKV = CreateKeyValues("Cfgs", "", "");
@@ -89,6 +103,12 @@ public void FileLocationChanged(ConVar convar, const char[] oldValue, const char
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
+	CreateExtraVoteMenusIfReady();
+}
+
+public void OnPluginEnd()
+{
+	DeleteExtraVoteMenus();
 }
 
 public Action VoteCancle(int client, int args)
@@ -99,7 +119,7 @@ public Action VoteCancle(int client, int args)
 		CPrintToChatAll("%t", "Vote_AdministratorCanceledCurrentVote");
 		return Plugin_Handled;
 	}
-	ReplyToCommand(client, "没有投票在进行!");
+	ReplyToCommand(client, "%t", "Vote_NoVoteInProgress");
 	return Plugin_Handled;
 }
 
@@ -176,6 +196,31 @@ bool FindConfigName(char[] cfg, char[] message, int maxlength)
 
 void ShowVoteMenu(int client)
 {
+	if (DisplayVoteExtraMenu(client))
+	{
+		return;
+	}
+
+	DisplayBuiltinVoteMenu(client);
+}
+
+bool DisplayVoteExtraMenu(int client)
+{
+	if (g_iExtraVoteMenu == -1)
+	{
+		CreateExtraVoteMenusIfReady();
+	}
+
+	if (g_iExtraVoteMenu == -1 || GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") != FeatureStatus_Available)
+	{
+		return false;
+	}
+
+	return ExtraMenu_Display(client, g_iExtraVoteMenu, MENU_TIME_FOREVER);
+}
+
+void DisplayBuiltinVoteMenu(int client)
+{
 	Handle hMenu = CreateMenu(VoteMenuHandler, MENU_ACTIONS_DEFAULT);
 	SetMenuTitle(hMenu, "选择:");
 	char sBuffer[64];
@@ -190,36 +235,56 @@ void ShowVoteMenu(int client)
 	DisplayMenu(hMenu, client, 20);
 }
 
+bool DisplayExtraVoteCommandMenu(int client, const char[] category)
+{
+	if (GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") != FeatureStatus_Available)
+	{
+		return false;
+	}
+
+	int menu = FindExtraVoteCommandMenu(category);
+	if (menu == -1)
+	{
+		return false;
+	}
+
+	return ExtraMenu_Display(client, menu, MENU_TIME_FOREVER);
+}
+
+bool DisplayBuiltinVoteCommandMenu(int client, const char[] category)
+{
+	char sInfo[128];
+	char sBuffer[128];
+	KvRewind(g_hCfgsKV);
+	if (KvJumpToKey(g_hCfgsKV, category, false) && KvGotoFirstSubKey(g_hCfgsKV, true))
+	{
+		Handle hMenu = CreateMenu(ConfigsMenuHandler, MENU_ACTIONS_DEFAULT);
+		Format(sBuffer, sizeof(sBuffer), "选择 %s :", category);
+		SetMenuTitle(hMenu, sBuffer);
+		do {
+			KvGetSectionName(g_hCfgsKV, sInfo,  sizeof(sInfo));
+			KvGetString(g_hCfgsKV, "message", sBuffer, sizeof(sBuffer), "");
+			int itemStyle = ITEMDRAW_DEFAULT;
+			if (L4D_HasAnySurvivorLeftSafeArea() && IsRestartMapVoteCommand(sInfo))
+			{
+				itemStyle = ITEMDRAW_DISABLED;
+			}
+			AddMenuItem(hMenu, sInfo, sBuffer, itemStyle);
+		} while (KvGotoNextKey(g_hCfgsKV, true));
+		DisplayMenu(hMenu, client, 20);
+		return true;
+	}
+
+	return false;
+}
+
 public int VoteMenuHandler(Handle menu, MenuAction action, int param1, int param2)
 {
 	if (action == MenuAction_Select)
 	{
 		char sInfo[128];
-		char sBuffer[128];
 		GetMenuItem(menu, param2, sInfo, sizeof(sInfo));
-		KvRewind(g_hCfgsKV);
-		if (KvJumpToKey(g_hCfgsKV, sInfo, false) && KvGotoFirstSubKey(g_hCfgsKV, true))
-		{
-			Handle hMenu = CreateMenu(ConfigsMenuHandler, MENU_ACTIONS_DEFAULT);
-			Format(sBuffer, sizeof(sBuffer), "选择 %s :", sInfo);
-			SetMenuTitle(hMenu, sBuffer);
-			do {
-				KvGetSectionName(g_hCfgsKV, sInfo,  sizeof(sInfo));
-				KvGetString(g_hCfgsKV, "message", sBuffer, sizeof(sBuffer), "");
-				int itemStyle = ITEMDRAW_DEFAULT;
-				if (L4D_HasAnySurvivorLeftSafeArea() && IsRestartMapVoteCommand(sInfo))
-				{
-					itemStyle = ITEMDRAW_DISABLED;
-				}
-				AddMenuItem(hMenu, sInfo, sBuffer, itemStyle);
-			} while (KvGotoNextKey(g_hCfgsKV, true));
-			DisplayMenu(hMenu, param1, 20);
-		}
-		else
-		{
-			CPrintToChat(param1, "%t", "Vote_NoRelatedFilesExist");
-			ShowVoteMenu(param1);
-		}
+		HandleVoteCategorySelected(param1, sInfo);
 	}
 	if (action == MenuAction_End)
 	{
@@ -236,26 +301,7 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 		char sBuffer[128];
 		int style;
 		GetMenuItem(menu, param2, sInfo, sizeof(sInfo), style, sBuffer, sizeof(sBuffer));
-		strcopy(g_sCfg, sizeof(g_sCfg), sInfo);
-		if (IsSpawnVoteMenuCommand(sInfo))
-		{
-			FakeClientCommand(param1, sInfo);
-		}
-		else if (!StrEqual(g_sCfg, "sm_votekick", true))
-		{
-			if (StartVote(param1, sBuffer, sInfo))
-			{
-				FakeClientCommand(param1, "Vote Yes");
-			}
-			else
-			{
-				ShowVoteMenu(param1);
-			}
-		}
-		else
-		{
-			FakeClientCommand(param1, "sm_votekick");
-		}
+		HandleVoteCommandSelected(param1, sInfo, sBuffer);
 	}
 	if (action == MenuAction_End)
 	{
@@ -266,6 +312,235 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 		ShowVoteMenu(param1);
 	}
 	return 0;
+}
+
+void HandleVoteCategorySelected(int client, const char[] category)
+{
+	if (DisplayExtraVoteCommandMenu(client, category))
+	{
+		return;
+	}
+
+	if (!DisplayBuiltinVoteCommandMenu(client, category))
+	{
+		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
+		ShowVoteMenu(client);
+	}
+}
+
+void HandleVoteCommandSelected(int client, const char[] command, const char[] message)
+{
+	strcopy(g_sCfg, sizeof(g_sCfg), command);
+	if (IsSpawnVoteMenuCommand(command))
+	{
+		FakeClientCommand(client, command);
+	}
+	else if (!StrEqual(g_sCfg, "sm_votekick", true))
+	{
+		if (StartVote(client, message, command))
+		{
+			FakeClientCommand(client, "Vote Yes");
+		}
+		else
+		{
+			ShowVoteMenu(client);
+		}
+	}
+	else
+	{
+		FakeClientCommand(client, "sm_votekick");
+	}
+}
+
+public void ExtraMenu_OnSelect(int client, int menu_id, int option, int value)
+{
+	if (menu_id == g_iExtraVoteMenu)
+	{
+		if (option < 0)
+		{
+			return;
+		}
+
+		char category[VOTE_MENU_NAME_LENGTH];
+		if (FindVoteCategoryByOption(option, category, sizeof(category)))
+		{
+			HandleVoteCategorySelected(client, category);
+		}
+		return;
+	}
+
+	char category[VOTE_MENU_NAME_LENGTH];
+	if (!FindExtraVoteCommandMenuCategory(menu_id, category, sizeof(category)))
+	{
+		return;
+	}
+
+	if (option < 0)
+	{
+		ShowVoteMenu(client);
+		return;
+	}
+
+	char command[VOTE_MENU_NAME_LENGTH];
+	char message[VOTE_MENU_NAME_LENGTH];
+	if (FindVoteCommandByOption(category, option, command, sizeof(command), message, sizeof(message)))
+	{
+		HandleVoteCommandSelected(client, command, message);
+	}
+	else
+	{
+		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
+		ShowVoteMenu(client);
+	}
+}
+
+void CreateExtraVoteMenusIfReady()
+{
+	if (g_hCfgsKV == null || GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") != FeatureStatus_Available)
+	{
+		return;
+	}
+
+	DeleteExtraVoteMenus();
+
+	g_iExtraVoteMenu = ExtraMenu_Create(false, "", false);
+	if (g_iExtraVoteMenu == -1)
+	{
+		return;
+	}
+
+	ExtraMenu_AddEntry(g_iExtraVoteMenu, "选择:", MENU_ENTRY);
+
+	char category[VOTE_MENU_NAME_LENGTH];
+	KvRewind(g_hCfgsKV);
+	if (KvGotoFirstSubKey(g_hCfgsKV, true))
+	{
+		do {
+			KvGetSectionName(g_hCfgsKV, category, sizeof(category));
+			ExtraMenu_AddEntry(g_iExtraVoteMenu, category, MENU_SELECT_ONLY);
+			CreateExtraVoteCommandMenu(category);
+		} while (KvGotoNextKey(g_hCfgsKV, true));
+	}
+}
+
+void CreateExtraVoteCommandMenu(const char[] category)
+{
+	if (g_iExtraCommandMenuCount >= VOTE_MENU_MAX_CATEGORIES)
+	{
+		return;
+	}
+
+	KvRewind(g_hCfgsKV);
+	if (!KvJumpToKey(g_hCfgsKV, category, false) || !KvGotoFirstSubKey(g_hCfgsKV, true))
+	{
+		return;
+	}
+
+	int menu = ExtraMenu_Create(true, "", false);
+	if (menu == -1)
+	{
+		return;
+	}
+
+	char entry[VOTE_MENU_NAME_LENGTH];
+	Format(entry, sizeof(entry), "选择 %s :", category);
+	ExtraMenu_AddEntry(menu, entry, MENU_ENTRY);
+
+	do {
+		KvGetString(g_hCfgsKV, "message", entry, sizeof(entry), "");
+		ExtraMenu_AddEntry(menu, entry, MENU_SELECT_ONLY, true);
+	} while (KvGotoNextKey(g_hCfgsKV, true));
+
+	g_iExtraCommandMenus[g_iExtraCommandMenuCount] = menu;
+	strcopy(g_sExtraCommandMenuCategories[g_iExtraCommandMenuCount], VOTE_MENU_NAME_LENGTH, category);
+	g_iExtraCommandMenuCount++;
+}
+
+void DeleteExtraVoteMenus()
+{
+	bool canDelete = GetFeatureStatus(FeatureType_Native, "ExtraMenu_Delete") == FeatureStatus_Available;
+	if (canDelete && g_iExtraVoteMenu != -1)
+	{
+		ExtraMenu_Delete(g_iExtraVoteMenu);
+	}
+	g_iExtraVoteMenu = -1;
+
+	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
+	{
+		if (canDelete && g_iExtraCommandMenus[i] != -1)
+		{
+			ExtraMenu_Delete(g_iExtraCommandMenus[i]);
+		}
+		g_iExtraCommandMenus[i] = -1;
+		g_sExtraCommandMenuCategories[i][0] = '\0';
+	}
+	g_iExtraCommandMenuCount = 0;
+}
+
+int FindExtraVoteCommandMenu(const char[] category)
+{
+	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
+	{
+		if (StrEqual(g_sExtraCommandMenuCategories[i], category, false))
+		{
+			return g_iExtraCommandMenus[i];
+		}
+	}
+
+	return -1;
+}
+
+bool FindExtraVoteCommandMenuCategory(int menu, char[] category, int maxlength)
+{
+	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
+	{
+		if (g_iExtraCommandMenus[i] == menu)
+		{
+			strcopy(category, maxlength, g_sExtraCommandMenuCategories[i]);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool FindVoteCategoryByOption(int option, char[] category, int maxlength)
+{
+	int currentOption;
+	KvRewind(g_hCfgsKV);
+	if (KvGotoFirstSubKey(g_hCfgsKV, true))
+	{
+		do {
+			if (currentOption == option)
+			{
+				KvGetSectionName(g_hCfgsKV, category, maxlength);
+				return true;
+			}
+			currentOption++;
+		} while (KvGotoNextKey(g_hCfgsKV, true));
+	}
+
+	return false;
+}
+
+bool FindVoteCommandByOption(const char[] category, int option, char[] command, int commandMaxLength, char[] message, int messageMaxLength)
+{
+	int currentOption;
+	KvRewind(g_hCfgsKV);
+	if (KvJumpToKey(g_hCfgsKV, category, false) && KvGotoFirstSubKey(g_hCfgsKV, true))
+	{
+		do {
+			if (currentOption == option)
+			{
+				KvGetSectionName(g_hCfgsKV, command, commandMaxLength);
+				KvGetString(g_hCfgsKV, "message", message, messageMaxLength, "");
+				return true;
+			}
+			currentOption++;
+		} while (KvGotoNextKey(g_hCfgsKV, true));
+	}
+
+	return false;
 }
 
 bool IsSpawnVoteMenuCommand(const char[] command)

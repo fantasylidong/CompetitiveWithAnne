@@ -178,6 +178,15 @@ Queues gQ;
 
 static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_control_fdxxnav.txt";
 
+bool CheckClassEnabled(int zc)
+{
+    if (zc < 1 || zc > SI_COUNT)
+        return false;
+
+    int bit = 1 << (zc - 1);
+    return (gCV.iEnableMask & bit) != 0;
+}
+
 #include "infected_control/runtime_state.inc"
 #include "infected_control/queue.inc"
 #include "infected_control/class_queue.inc"
@@ -202,6 +211,7 @@ static char g_sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/infected_cont
 #include "infected_control/spawn_perf_optimizer.inc"
 #include "infected_control/spawn_perf_config.inc"
 #include "infected_control/wave_decider.inc"
+#include "infected_control/traitor_mode.inc"
 #include "infected_control/wave_control.inc"
 #include "infected_control/spawn_core.inc"
 #include "infected_control/spawn_attempts.inc"
@@ -301,6 +311,9 @@ public void OnPluginStart()
     RegAdminCmd("sm_navtest", Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分");
     RegAdminCmd("sm_nt",      Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分(别名)");
     RegAdminCmd("sm_wavestatus", Cmd_WaveStatus, ADMFLAG_GENERIC, "查看当前波决策器状态");
+    RegAdminCmd("sm_neigui", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_neigui [class]");
+    RegAdminCmd("sm_it", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_it [class]");
+    RegAdminCmd("sm_neiguicancel", Cmd_TraitorCancel, ADMFLAG_ROOT, "取消内鬼刷特队列");
 
     RegisterSpawnPerfCommands();
 
@@ -310,6 +323,7 @@ public void OnPluginStart()
     HookEvent("round_start",     Event_RoundStart);
     HookEvent("player_spawn",    Event_PlayerSpawn);
     HookEvent("player_death",    Event_PlayerDeath);
+    HookEvent("player_team",     Event_PlayerTeam);
     HookEvent("ability_use",     Event_AbilityUse);
     HookEvent("player_hurt",     Event_PlayerHurt);
 }
@@ -328,6 +342,7 @@ public void OnMapEnd()
     g_LastSpawnOkTime = 0.0;
     g_SupportShortageStart = 0.0;
     for (int i = 0; i < SI_COUNT; i++) g_LastDeathTime[i] = 0.0;
+    Traitor_ResetAll(true);
 
     ClearNavBuckets();
     g_BucketsReady = false;
@@ -401,6 +416,7 @@ public Action Cmd_WaveStatus(int client, int args)
     ReplyToCommand(client, "  波序号: %d", gST.waveIndex);
     ReplyToCommand(client, "  已用时: %.1f秒", elapsed);
     ReplyToCommand(client, "  特感: %d/%d", gST.totalSI, gCV.iSiLimit);
+    ReplyToCommand(client, "%t", "InfectedControl_TraitorWaveStatusReserved", Traitor_CountReservedSlots());
     ReplyToCommand(client, "  Anti-Bait: %s", AntiBait_IsTeamHolding() ? "拦截中" : "放行");
 
     return Plugin_Handled;
@@ -446,6 +462,7 @@ static void StopAll()
     gQ.Clear();
     Queue_SyncSizes();
     gST.Reset();
+    Traitor_ResetAll(true);
     AntiBait_OnRoundStart();
     WaveDecider_OnRoundStart();
     if (lastSpawns != null) lastSpawns.Clear();
@@ -554,6 +571,9 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    if (Traitor_OnPlayerDeath(client))
+        return;
+
     if (!IsInfectedBot(client)) return;
 
     int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
@@ -572,6 +592,20 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
     }
     gST.teleCount[client] = 0;
     RecalcSiCapFromAlive(false);  // 保持：死亡后刷新剩余额度
+}
+
+public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!client)
+        return;
+
+    Traitor_OnClientTeamChanged(client, event.GetInt("oldteam"), event.GetInt("team"));
+}
+
+public void OnClientDisconnect(int client)
+{
+    Traitor_OnClientDisconnect(client);
 }
 static Action Timer_KickBot(Handle timer, int userid)
 {
@@ -624,12 +658,16 @@ public void OnGameFrame()
     if (now < gST.nextFrameThink)
         return;
 
-    bool hasSpawnWork = (gST.bLate && gST.totalSI < gCV.iSiLimit
-        && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0));
+    bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
+        || (gST.totalSI < gCV.iSiLimit
+            && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
     gST.nextFrameThink = now + (hasSpawnWork ? gCV.fFrameThinkStepActive : gCV.fFrameThinkStep);
 
     if (gST.totalSI >= gCV.iSiLimit)
+    {
+        Traitor_UnlockSpawnAttempts();
         return;
+    }
 
     // 每个 think slice 先维护普通刷特队列：按上限、稀缺度、死亡 CD 和支援特感规则补队列。
     // 真正刷出时优先处理传送队列，因为传送一般意味着已有特感失去作用或跑男压力更高。
@@ -648,6 +686,8 @@ public void OnGameFrame()
     {
         TryNormalSpawnOnce();
     }
+
+    Traitor_UnlockSpawnAttempts();
 }
 
 

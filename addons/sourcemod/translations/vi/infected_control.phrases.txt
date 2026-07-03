@@ -24,4 +24,106 @@
 	{
 		"vi"		"{green}[IC]{default} Nav %d {lightgreen} không thể tạo {default} | Xem bảng điều khiển để biết chi tiết"
 	}
+	"InfectedControl_TraitorUsage"
+	{
+		"vi"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly."
+	}
+	"InfectedControl_TraitorMenuTitle"
+	{
+		"vi"		"Select traitor class"
+	}
+	"InfectedControl_TraitorMenuRandom"
+	{
+		"vi"		"Random enabled class"
+	}
+	"InfectedControl_TraitorLimitReached"
+	{
+		"vi"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
+	}
+	"InfectedControl_TraitorDisabled"
+	{
+		"vi"		"{green}[IC]{default} Traitor mode is disabled."
+	}
+	"InfectedControl_TraitorUnsupportedClass"
+	{
+		"vi"		"{green}[IC]{default} Unsupported traitor class."
+	}
+	"InfectedControl_TraitorClassDisabled"
+	{
+		"vi"		"{green}[IC]{default} That infected class is disabled in the current spawn settings."
+	}
+	"InfectedControl_TraitorNoEnabledClass"
+	{
+		"vi"		"{green}[IC]{default} No enabled infected class is available for traitor mode."
+	}
+	"InfectedControl_TraitorWindowClosed"
+	{
+		"vi"		"{green}[IC]{default} Traitor registration is closed for this wave."
+	}
+	"InfectedControl_TraitorQueued"
+	{
+		"vi"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
+	}
+	"InfectedControl_TraitorPending"
+	{
+		"vi"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave to finish spawning."
+	}
+	"InfectedControl_TraitorWaitForWave"
+	{
+		"vi"		"{green}[IC]{default} Wait for the normal SI wave before spawning."
+	}
+	"InfectedControl_TraitorSpawnAllowed"
+	{
+		"vi"		"{green}[IC]{default} You may now spawn using normal ghost rules."
+	}
+	"InfectedControl_TraitorNoSlot"
+	{
+		"vi"		"{green}[IC]{default} No traitor slot is available."
+	}
+	"InfectedControl_TraitorNotQueued"
+	{
+		"vi"		"{green}[IC]{default} You are not queued as a traitor."
+	}
+	"InfectedControl_TraitorCancelled"
+	{
+		"vi"		"{green}[IC]{default} Traitor queue cancelled."
+	}
+	"InfectedControl_TraitorSpawned"
+	{
+		"vi"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
+	}
+	"InfectedControl_TraitorFailed"
+	{
+		"vi"		"{green}[IC]{default} Failed to prepare traitor ghost state."
+	}
+	"InfectedControl_TraitorClassSmoker"
+	{
+		"vi"		"Smoker"
+	}
+	"InfectedControl_TraitorClassBoomer"
+	{
+		"vi"		"Boomer"
+	}
+	"InfectedControl_TraitorClassHunter"
+	{
+		"vi"		"Hunter"
+	}
+	"InfectedControl_TraitorClassSpitter"
+	{
+		"vi"		"Spitter"
+	}
+	"InfectedControl_TraitorClassJockey"
+	{
+		"vi"		"Jockey"
+	}
+	"InfectedControl_TraitorClassCharger"
+	{
+		"vi"		"Charger"
+	}
+
+	"InfectedControl_TraitorWaveStatusReserved"
+	{
+		"vi"		"{green}[IC]{default} Traitor reserved slots: %d"
+	}
+
 }

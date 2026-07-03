@@ -4,11 +4,10 @@
 #define _l4d_stats_quarter_rank_included
 
 // 季度榜模块。
-// 每次 AddScore 同步写入当前季度积分；季度切换时自动把当前榜清零。
+// 每次 AddScore 同步写入当前季度积分；每个季度保留独立记录。
 
 new Handle:cvar_QuarterRankEnable = INVALID_HANDLE;
-new bool:g_bQuarterRankTableReady = true;
-new bool:g_bQuarterRankDbChecked = false;
+new bool:g_bQuarterRankTableReady = false;
 new g_iQuarterRankKey = 0;
 new QuarterRankTotal = 0;
 new ClientQuarterPoints[MAXPLAYERS + 1];
@@ -68,48 +67,85 @@ stock QuarterRank_ResetLocalCache()
 stock QuarterRank_EnsureCurrentQuarter()
 {
 	new CurrentKey = QuarterRank_GetCurrentKey();
-	if (g_iQuarterRankKey == CurrentKey && (!g_bQuarterRankTableReady || g_bQuarterRankDbChecked))
-		return;
-
 	if (g_iQuarterRankKey != CurrentKey)
 	{
 		g_iQuarterRankKey = CurrentKey;
-		g_bQuarterRankDbChecked = false;
 		QuarterRank_ResetLocalCache();
 	}
 
-	if (db == INVALID_HANDLE || !g_bQuarterRankTableReady)
+	if (db == INVALID_HANDLE || g_bQuarterRankTableReady)
 		return;
 
-	// 先异步查有没有旧季度行，COUNT = 0 就跳过 UPDATE，
-	// 避免连接刚建立时在这条季度切换 SQL 上触发断连。
-	decl String:query[512];
-	Format(query, sizeof(query), "SELECT COUNT(*) FROM `%sscore_quarter` WHERE quarter_key <> %i LIMIT 1", DbPrefix, g_iQuarterRankKey);
-	SQL_TQuery(db, QuarterRank_CheckOldRows, query);
+	QuarterRank_MigrateSchema();
 }
 
-public QuarterRank_CheckOldRows(Handle:owner, Handle:hndl, const String:error[], any:data)
+stock bool:QuarterRank_MigrateSchema()
 {
-	if (hndl == INVALID_HANDLE || error[0] != '\0')
+	if (db == INVALID_HANDLE)
+		return false;
+
+	if (cvar_QuarterRankEnable == INVALID_HANDLE || !GetConVarBool(cvar_QuarterRankEnable))
+		return false;
+
+	decl String:query[512];
+	Format(query, sizeof(query), "SHOW KEYS FROM `%sscore_quarter` WHERE Key_name = 'PRIMARY'", DbPrefix);
+
+	new Handle:hndl = SQL_Query(db, query);
+	if (hndl == INVALID_HANDLE)
 	{
-		if (error[0] != '\0')
-			LogError("QuarterRank_CheckOldRows failed: %s", error);
-		return;
+		decl String:Error[256];
+		if (SQL_GetError(db, Error, sizeof(Error)))
+			LogError("QuarterRank_MigrateSchema failed to inspect score_quarter primary key: %s", Error);
+		else
+			LogError("QuarterRank_MigrateSchema failed to inspect score_quarter primary key: unknown");
+
+		g_bQuarterRankTableReady = false;
+		return false;
 	}
 
-	new count = 0;
-	if (SQL_FetchRow(hndl))
-		count = SQL_FetchInt(hndl, 0);
+	new PrimaryColumnCount = 0;
+	new SteamIDSeq = 0;
+	new QuarterKeySeq = 0;
+	decl String:ColumnName[64];
 
-	if (count > 0)
+	while (SQL_FetchRow(hndl))
 	{
-		decl String:query[1024];
-		Format(query, sizeof(query), "UPDATE `%sscore_quarter` SET quarter_key = %i, points = 0, playtime = 0, updated = UNIX_TIMESTAMP() WHERE quarter_key <> %i", DbPrefix, g_iQuarterRankKey, g_iQuarterRankKey);
-		SendSQLUpdate(query);
-		LogMessage("[l4d_stats] 检测到 %i 条旧季度行，已发送季度切换 UPDATE。", count);
+		PrimaryColumnCount++;
+		SQL_FetchString(hndl, 4, ColumnName, sizeof(ColumnName));
+		if (StrEqual(ColumnName, "steamid", false))
+			SteamIDSeq = SQL_FetchInt(hndl, 3);
+		else if (StrEqual(ColumnName, "quarter_key", false))
+			QuarterKeySeq = SQL_FetchInt(hndl, 3);
 	}
 
-	g_bQuarterRankDbChecked = true;
+	CloseHandle(hndl);
+
+	if (PrimaryColumnCount == 2 && SteamIDSeq == 1 && QuarterKeySeq == 2)
+	{
+		g_bQuarterRankTableReady = true;
+		return true;
+	}
+
+	if (PrimaryColumnCount == 0)
+		Format(query, sizeof(query), "ALTER TABLE `%sscore_quarter` ADD PRIMARY KEY (`steamid`, `quarter_key`)", DbPrefix);
+	else
+		Format(query, sizeof(query), "ALTER TABLE `%sscore_quarter` DROP PRIMARY KEY, ADD PRIMARY KEY (`steamid`, `quarter_key`)", DbPrefix);
+
+	if (!SQL_FastQuery(db, query))
+	{
+		decl String:Error[256];
+		if (SQL_GetError(db, Error, sizeof(Error)))
+			LogError("QuarterRank_MigrateSchema failed to migrate score_quarter primary key: %s", Error);
+		else
+			LogError("QuarterRank_MigrateSchema failed to migrate score_quarter primary key: unknown");
+
+		g_bQuarterRankTableReady = false;
+		return false;
+	}
+
+	g_bQuarterRankTableReady = true;
+	LogMessage("[l4d_stats] score_quarter 已迁移为按玩家和季度共同分组的主键。");
+	return true;
 }
 
 stock bool:QuarterRank_Enabled()
@@ -117,7 +153,10 @@ stock bool:QuarterRank_Enabled()
 	if (cvar_QuarterRankEnable == INVALID_HANDLE || !GetConVarBool(cvar_QuarterRankEnable))
 		return false;
 
-	if (db == INVALID_HANDLE || !g_bQuarterRankTableReady)
+	if (db == INVALID_HANDLE)
+		return false;
+
+	if (!g_bQuarterRankTableReady && !QuarterRank_MigrateSchema())
 		return false;
 
 	return true;
@@ -172,8 +211,8 @@ stock QuarterRank_RecordScore(Client, Score)
 	QuarterRank_GetModePointsColumn(Client, ModePointsColumn, sizeof(ModePointsColumn));
 
 	decl String:query[1024];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = IF(quarter_key = VALUES(quarter_key), GREATEST(points + %i, 0), VALUES(points)), `%s` = IF(quarter_key = VALUES(quarter_key), GREATEST(`%s` + %i, 0), VALUES(`%s`)), quarter_key = VALUES(quarter_key), updated = VALUES(updated)",
-		DbPrefix, ModePointsColumn, EscSteamID, g_iQuarterRankKey, InsertScore, InsertScore, Score, ModePointsColumn, ModePointsColumn, Score, ModePointsColumn);
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = GREATEST(points + %i, 0), `%s` = GREATEST(`%s` + %i, 0), updated = VALUES(updated)",
+		DbPrefix, ModePointsColumn, EscSteamID, g_iQuarterRankKey, InsertScore, InsertScore, Score, ModePointsColumn, ModePointsColumn, Score);
 	SendSQLUpdate(query);
 }
 
@@ -193,8 +232,8 @@ stock QuarterRank_RecordField(Client, const String:Field[], Amount)
 	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
 
 	decl String:query[1024];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, `%s`, updated) VALUES ('%s', %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE `%s` = IF(quarter_key = VALUES(quarter_key), `%s` + VALUES(`%s`), VALUES(`%s`)), quarter_key = VALUES(quarter_key), updated = VALUES(updated)",
-		DbPrefix, Field, EscSteamID, g_iQuarterRankKey, Amount, Field, Field, Field, Field);
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, `%s`, updated) VALUES ('%s', %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
+		DbPrefix, Field, EscSteamID, g_iQuarterRankKey, Amount, Field, Field, Field);
 	SendSQLUpdate(query);
 }
 
@@ -220,8 +259,8 @@ stock QuarterRank_RecordInfectedKill(Client, const String:InfectedType[], Kills,
 	Format(KillColumn, sizeof(KillColumn), "kill_%s", InfectedType);
 
 	decl String:query[1024];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE kills = IF(quarter_key = VALUES(quarter_key), kills + VALUES(kills), VALUES(kills)), headshots = IF(quarter_key = VALUES(quarter_key), headshots + VALUES(headshots), VALUES(headshots)), `%s` = IF(quarter_key = VALUES(quarter_key), `%s` + VALUES(`%s`), VALUES(`%s`)), quarter_key = VALUES(quarter_key), updated = VALUES(updated)",
-		DbPrefix, KillColumn, EscSteamID, g_iQuarterRankKey, Kills, Headshots, Kills, KillColumn, KillColumn, KillColumn, KillColumn);
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE kills = kills + VALUES(kills), headshots = headshots + VALUES(headshots), `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
+		DbPrefix, KillColumn, EscSteamID, g_iQuarterRankKey, Kills, Headshots, Kills, KillColumn, KillColumn, KillColumn);
 	SendSQLUpdate(query);
 }
 
@@ -247,7 +286,7 @@ stock QuarterRank_RecordPlaytime(Client, Minutes)
 	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
 
 	decl String:query[512];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, playtime, updated) VALUES ('%s', %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE playtime = IF(quarter_key = VALUES(quarter_key), playtime + VALUES(playtime), VALUES(playtime)), quarter_key = VALUES(quarter_key), updated = VALUES(updated)",
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, playtime, updated) VALUES ('%s', %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE playtime = playtime + VALUES(playtime), updated = VALUES(updated)",
 		DbPrefix, EscSteamID, g_iQuarterRankKey, Minutes);
 	SendSQLUpdate(query);
 }

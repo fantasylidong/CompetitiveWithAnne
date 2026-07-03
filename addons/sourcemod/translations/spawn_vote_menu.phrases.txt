@@ -1,0 +1,111 @@
+"Phrases"
+{
+	"SpawnVote_SpectatorsNotAllowed"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Spectators cannot start spawn votes."
+	}
+	"SpawnVote_AlreadyVoteProgress"
+	{
+		"en"		"[{blue}Spawn Vote{default}] A vote is already in progress."
+	}
+	"SpawnVote_NoSpawnController"
+	{
+		"en"		"[{blue}Spawn Vote{default}] No supported spawn controller is available in the current mode."
+	}
+	"SpawnVote_CampaignStatus"
+	{
+		"en"		"[{blue}Spawn Vote{default}] This menu controls campaign dirspawn settings."
+	}
+	"SpawnVote_AnneStatus"
+	{
+		"en"		"[{blue}Spawn Vote{default}] This menu controls Anne infected_control settings."
+	}
+	"SpawnVote_MenuClosed"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Spawn vote menu closed."
+	}
+	"SpawnVote_InitiatedVote"
+	{
+		"en"		"[{blue}Spawn Vote{default}] %N started a spawn settings vote."
+	}
+	"SpawnVote_AppliedByRequester"
+	{
+		"en"		"[{blue}Spawn Vote{default}] %N's spawn settings vote passed."
+	}
+	"SpawnVote_Applied"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Spawn settings vote passed."
+	}
+	"SpawnVote_CampaignVoteTitle"
+	{
+		"en"		"Apply campaign spawn settings: %d SI/%d sec?"
+	}
+	"SpawnVote_CampaignVoteTitleRelax"
+	{
+		"en"		"Apply campaign spawn settings: %d SI/%d sec, Relax %s?"
+	}
+	"SpawnVote_AnneVoteTitle"
+	{
+		"en"		"Apply Anne spawn settings: %d SI/%d sec?"
+	}
+	"SpawnVote_RelaxOn"
+	{
+		"en"		"on"
+	}
+	"SpawnVote_RelaxOff"
+	{
+		"en"		"off"
+	}
+	"SpawnVote_AppliedVoteTitle"
+	{
+		"en"		"Spawn settings applied"
+	}
+	"SpawnVote_ModeCampaign"
+	{
+		"en"		"campaign"
+	}
+	"SpawnVote_ModeAnne"
+	{
+		"en"		"Anne"
+	}
+	"SpawnVote_ModeUnknown"
+	{
+		"en"		"current"
+	}
+	"SpawnVote_PresetDbUnavailable"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Preset database is not available."
+	}
+	"SpawnVote_PresetNameRequired"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Usage: sm_spawnpreset_save <name> or sm_spawnpreset_delete <name>."
+	}
+	"SpawnVote_PresetSaved"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Preset saved: %s"
+	}
+	"SpawnVote_PresetDeleted"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Preset deleted: %s"
+	}
+	"SpawnVote_PresetListHeader"
+	{
+		"en"		"[{blue}Spawn Vote{default}] Presets for %s:"
+	}
+	"SpawnVote_PresetListItem"
+	{
+		"en"		"[{blue}Spawn Vote{default}] - %s"
+	}
+	"SpawnVote_PresetListEmpty"
+	{
+		"en"		"[{blue}Spawn Vote{default}] No presets saved for this mode."
+	}
+	"SpawnVote_PresetVoteTitle"
+	{
+		"en"		"Apply preset: %s?"
+	}
+	"SpawnVote_PresetVoteTitleRelax"
+	{
+		"en"		"Apply preset: %s, Relax %s?"
+	}
+}
