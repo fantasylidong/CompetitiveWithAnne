@@ -1040,6 +1040,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
     int dmg        = GetEventInt(event, "dmg_health");
     int health     = GetEventInt(event, "health");
     int damagetype = GetEventInt(event, "type");
+    bool headshot  = (GetEventInt(event, "hitgroup") == 1);
 
     char weapon[64]; GetEventString(event, "weapon", weapon, sizeof(weapon));
     bool inferno = (StrEqual(weapon, "entityflame", false) || StrEqual(weapon, "inferno", false));
@@ -1056,19 +1057,19 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
 
         if (!g_IsVictimDeadPlayer[victim])
         {
-            // 图标：命中
+            // 图标：爆头/命中
             if (GetConVarInt(cv_pic_enable) == 1 && ShouldShowIconFeedback(attacker, specialTarget))
             {
-                int setId = g_IcHit[attacker];
-                if (setId > 0) ShowOverlayBySet(attacker, setId, 1);
+                int setId = headshot ? g_IcHead[attacker] : g_IcHit[attacker];
+                if (setId > 0) ShowOverlayBySet(attacker, setId, headshot ? 0 : 1);
             }
 
-            // 音效：命中
+            // 音效：爆头/命中
             if (GetConVarInt(cv_sound_enable) == 1 && !inferno && ShouldPlaySoundFeedback(attacker, specialTarget))
             {
                 char s2[PLATFORM_MAX_PATH];
-                int setId = g_SndHit[attacker];
-                if (setId > 0 && GetSoundPath_BySet(setId, 1, s2, sizeof(s2)))
+                int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
+                if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
                 {
                     PrecacheSound(s2, true);
                     EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
@@ -1122,6 +1123,7 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
     int dmg        = GetEventInt(event, "amount");
     int hp         = GetEntProp(victim, Prop_Data, "m_iHealth");
     int damagetype = GetEventInt(event, "type");
+    bool headshot  = (GetEventInt(event, "hitgroup") == 1);
 
     if (damagetype & DMG_DIRECT) return Plugin_Changed;
     if (GetConVarInt(cv_blast) == 0 && (damagetype & DMG_BLAST)) return Plugin_Changed;
@@ -1133,19 +1135,19 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
 
         if (!dead)
         {
-            // 图标：命中
+            // 图标：爆头/命中
             if (GetConVarInt(cv_pic_enable) == 1 && ShouldShowIconFeedback(attacker, specialTarget))
             {
-                int setId = g_IcHit[attacker];
-                if (setId > 0) ShowOverlayBySet(attacker, setId, 1);
+                int setId = headshot ? g_IcHead[attacker] : g_IcHit[attacker];
+                if (setId > 0) ShowOverlayBySet(attacker, setId, headshot ? 0 : 1);
             }
 
-            // 音效：命中
+            // 音效：爆头/命中
             if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
             {
                 char s2[PLATFORM_MAX_PATH];
-                int setId = g_SndHit[attacker];
-                if (setId > 0 && GetSoundPath_BySet(setId, 1, s2, sizeof(s2)))
+                int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
+                if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
                 {
                     PrecacheSound(s2, true);
                     EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);

@@ -140,17 +140,6 @@
 			"message" "关闭坦克自动踢出系统"
 		}
 	}
-		"开关击杀音效"
-	{
-		"exec vote/sound_on.cfg"
-		{
-			"message" "开启音效"
-		}
-		"exec vote/sound_off.cfg"
-		{
-			"message" "关闭音效"
-		}
-	}
 	"开关击杀HUD"
 	{
 		"exec vote/killhud_on.cfg"

@@ -163,14 +163,6 @@
 	}
 	"开关特殊插件"
 	{
-		"exec vote/sound_on.cfg"
-		{
-			"message" "开启音效"
-		}
-		"exec vote/sound_off.cfg"
-		{
-			"message" "关闭音效"
-		}
 		"exec vote/killhud_on.cfg"
 		{
 			"message" "开启击杀HUD"
