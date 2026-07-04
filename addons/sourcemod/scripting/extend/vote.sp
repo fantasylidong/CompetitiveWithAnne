@@ -435,15 +435,26 @@ void CreateExtraVoteMenusIfReady()
 
 	ExtraMenu_AddEntry(g_iExtraVoteMenu, "选择:", MENU_ENTRY);
 
-	char category[VOTE_MENU_NAME_LENGTH];
+	char categories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
+	int categoryCount;
 	KvRewind(g_hCfgsKV);
 	if (KvGotoFirstSubKey(g_hCfgsKV, true))
 	{
 		do {
-			KvGetSectionName(g_hCfgsKV, category, sizeof(category));
-			ExtraMenu_AddEntry(g_iExtraVoteMenu, category, MENU_SELECT_ONLY);
-			CreateExtraVoteCommandMenu(category);
+			if (categoryCount >= VOTE_MENU_MAX_CATEGORIES)
+			{
+				break;
+			}
+
+			KvGetSectionName(g_hCfgsKV, categories[categoryCount], VOTE_MENU_NAME_LENGTH);
+			ExtraMenu_AddEntry(g_iExtraVoteMenu, categories[categoryCount], MENU_SELECT_ONLY);
+			categoryCount++;
 		} while (KvGotoNextKey(g_hCfgsKV, true));
+	}
+
+	for (int i = 0; i < categoryCount; i++)
+	{
+		CreateExtraVoteCommandMenu(categories[i]);
 	}
 }
 
