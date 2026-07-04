@@ -17,13 +17,13 @@ bool g_bSourceBansSystemAvailable = false, g_bl4dstatsSystemAvailable = false;
 public void OnAllPluginsLoaded(){
 	g_bSourceBansSystemAvailable = LibraryExists("sourcebans++");
 	g_bl4dstatsSystemAvailable = LibraryExists("l4d_stats");
-	CreateExtraVoteMenusIfReady();
+	QueueCreateExtraVoteMenus();
 }
 public void OnLibraryAdded(const char[] name)
 {
     if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
-	else if ( StrEqual(name, "extra_menu") ) { CreateExtraVoteMenusIfReady(); }
+	else if ( StrEqual(name, "extra_menu") ) { QueueCreateExtraVoteMenus(); }
 }
 public void OnLibraryRemoved(const char[] name)
 {
@@ -68,6 +68,7 @@ int g_iExtraVoteMenu = -1;
 int g_iExtraCommandMenus[VOTE_MENU_MAX_CATEGORIES];
 int g_iExtraCommandMenuCount;
 char g_sExtraCommandMenuCategories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
+Handle g_hExtraVoteMenuCreateTimer = null;
 
 
 
@@ -89,7 +90,7 @@ public void OnPluginStart()
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
-	CreateExtraVoteMenusIfReady();
+	QueueCreateExtraVoteMenus();
 }
 
 public void FileLocationChanged(ConVar convar, const char[] oldValue, const char[] newValue){
@@ -103,11 +104,17 @@ public void FileLocationChanged(ConVar convar, const char[] oldValue, const char
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
-	CreateExtraVoteMenusIfReady();
+	QueueCreateExtraVoteMenus();
 }
 
 public void OnPluginEnd()
 {
+	if (g_hExtraVoteMenuCreateTimer != null)
+	{
+		KillTimer(g_hExtraVoteMenuCreateTimer);
+		g_hExtraVoteMenuCreateTimer = null;
+	}
+
 	DeleteExtraVoteMenus();
 }
 
@@ -392,6 +399,23 @@ public void ExtraMenu_OnSelect(int client, int menu_id, int option, int value)
 		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
 		ShowVoteMenu(client);
 	}
+}
+
+void QueueCreateExtraVoteMenus()
+{
+	if (g_hExtraVoteMenuCreateTimer != null)
+	{
+		return;
+	}
+
+	g_hExtraVoteMenuCreateTimer = CreateTimer(0.1, Timer_CreateExtraVoteMenus, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+Action Timer_CreateExtraVoteMenus(Handle timer)
+{
+	g_hExtraVoteMenuCreateTimer = null;
+	CreateExtraVoteMenusIfReady();
+	return Plugin_Stop;
 }
 
 void CreateExtraVoteMenusIfReady()

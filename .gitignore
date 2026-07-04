@@ -102,3 +102,6 @@ scripts/l4d2-docker.README.md
 scripts/anne-compressor-latest.tar.gz
 scripts/anne-compressor-latest.tar.gz
 scripts/l4d2-docker.README.md
+addons/sourcemod/translations/zho/anne_server_redirect.phrases.txt
+addons/sourcemod/translations/chi/anne_server_redirect.phrases.txt
+addons/sourcemod/translations/anne_server_redirect.phrases.txt
