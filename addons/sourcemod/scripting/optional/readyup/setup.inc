@@ -73,6 +73,7 @@ void SetupConVars()
 	l4d_ready_unbalanced_start	= CreateConVar("l4d_ready_unbalanced_start", "0", "Allow game to go live when teams are not full.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	l4d_ready_unbalanced_min	= CreateConVar("l4d_ready_unbalanced_min", "2", "Minimum of players in each team to allow a unbalanced start.", FCVAR_NOTIFY, true, 0.0);
 	l4d_ready_autoready         = CreateConVar("l4d_ready_autoready", "0", "Automatically ready up a player after after <value> seconds if they are not afk (0 = disabled).", FCVAR_NOTIFY, true, 0.0);
+	l4d_ready_unready_limit		= CreateConVar("l4d_ready_unready_limit", "0", "Maximum times a player can cancel a live countdown by unreadiness per round. 0 disables the limit.", FCVAR_NOTIFY, true, 0.0);
 
 	// game convars
 	director_no_specials = FindConVar("director_no_specials");

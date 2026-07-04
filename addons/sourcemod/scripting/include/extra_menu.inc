@@ -43,11 +43,13 @@ enum EXTRA_MENU_TYPE
 	MENU_SELECT_ONOFF,
 	MENU_SELECT_LIST,
 	MENU_SELECT_ADD,
+	MENU_SELECT_CVARADD,
+	MENU_SELECT_CVARONOFF,
 }
 
 native int ExtraMenu_Create(bool back = false, char[] translation = "", bool buttons_nums = false);
 native bool ExtraMenu_Delete(int menu_id);
-native bool ExtraMenu_AddEntry(int menu_id, char[] entry, EXTRA_MENU_TYPE type, bool close = false, int default_value = 0, any add_value = 0, any add_min = -999999, any add_max = 999999);
+native int ExtraMenu_AddEntry(int menu_id, char[] entry, EXTRA_MENU_TYPE type, bool close = false, int default_value = 0, any add_value = 0, any add_min = -999999, any add_max = 999999, char[] cvar = "", bool return_index = false);
 native bool ExtraMenu_AddOptions(int menu_id, char[] entry);
 native void ExtraMenu_NewPage(int menu_id);
 native bool ExtraMenu_Display(int client, int menu_id, int time = MENU_TIME_FOREVER);
