@@ -24,6 +24,42 @@
 	{
 		"zho"		"{default}本服玩到 {green}%s h{default} 後就不再自動提示。以後想看，輸入 {green}!guide{default} 或 {green}!modes{default}。"
 	}
+	"NPG_PanelTitle"
+	{
+		"zho"		"Anne玩法"
+	}
+	"NPG_PanelPlaytime"
+	{
+		"zho"		"L4D2: %s h | 本服: %s h"
+	}
+	"NPG_PanelBeginner"
+	{
+		"zho"		"先打預設戰役；想快節奏再試 Anne 戰役。"
+	}
+	"NPG_PanelIntermediate"
+	{
+		"zho"		"試 Anne 戰役或絕境求生。路線熟了再上更硬配置。"
+	}
+	"NPG_PanelExperienced"
+	{
+		"zho"		"用 !match 選 Anne、Not0721 或各類對抗配置。"
+	}
+	"NPG_PanelCommands1"
+	{
+		"zho"		"常用: !join !away !match !rmatch !mapvote"
+	}
+	"NPG_PanelCommands2"
+	{
+		"zho"		"更多: !xx !rank !web !ip | 以後: !guide / !modes"
+	}
+	"NPG_PanelAutoStops"
+	{
+		"zho"		"本服 %s h 後不再自動提示。"
+	}
+	"NPG_PanelClose"
+	{
+		"zho"		"關閉"
+	}
 	"NPG_MatchLoaded"
 	{
 		"zho"		"{olive}目前已經載入模式，所以自動提示本來會保持安靜。要退回預設，用 {green}!rmatch{olive} 前最好先問一下隊友。"

@@ -157,7 +157,7 @@ public OnPluginStart()
 	cvar_excludeGroupMemberCount = CreateConVar(
 		"sm_veterans_excludegroupmembercount",
 		"2",
-		"How many leading sv_steamgroup groups should be excluded from advertisement/time punishment? 0 disables group count matching.",
+		"How many leading sv_steamgroup groups should be excluded from advertisement/time punishment? 0 checks all configured groups.",
 		FCVAR_NONE, true, 0.0, true, MAX_FLOAT
 	);
 	/*
@@ -367,13 +367,22 @@ public OnClientAuthorized(client, const String:steamId[])
 	}
 	if (QueryCachedData(SteamIdToInt(steamId), player[client].totalplaytime, player[client].last2weektime, player[client].isGroupMember, player[client].servertime, player[client].realplaytime))
 	{
-
+		RefreshCachedGroupMembership(client);
 		//LogError("VeteransOnly: New client, playtime loaded from cache for SteamId %s", steamId);
 		//CheckIfUserQualified(client);
 	}else {
 		//LogError("VeteransOnly: New client, requesting playtime for SteamId %s", steamId);
 		RequestUserInfo(client);
 	}
+}
+
+void RefreshCachedGroupMembership(int client)
+{
+	if (!Veterans_IsValidHumanClient(client))
+		return;
+
+	CreateTimer(1.0, GetGroup, client, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(35.0, CachePlayer, client, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void l4dstats_SuccessGetPlayerTime(int client){
@@ -804,17 +813,13 @@ public void HTTPResponse_GetUserGroups(HTTPResponse response, int client)
 bool:IsConfiguredGroupExempt(const String:steamGroupId[])
 {
 	int exemptCount = GetConVarInt(cvar_excludeGroupMemberCount);
-	if (exemptCount <= 0)
-	{
-		return false;
-	}
 
 	char groupIDs[256];
 	GetConVarString(cvar_groupID, groupIDs, sizeof(groupIDs));
 
 	char groups[32][32];
 	int groupCount = ExplodeString(groupIDs, ",", groups, sizeof(groups), sizeof(groups[]));
-	if (groupCount > exemptCount)
+	if (exemptCount > 0 && groupCount > exemptCount)
 	{
 		groupCount = exemptCount;
 	}

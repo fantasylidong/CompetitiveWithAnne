@@ -7,23 +7,28 @@
 #include <colors>
 #undef REQUIRE_PLUGIN
 #include <extra_menu>
+#include <confogl>
 #include <sourcebanspp>
 #include <l4dstats>
 
+#define VOTE_DEFAULT_CONFIG "configs/cfgs.txt"
 #define VOTE_MENU_NAME_LENGTH 128
 #define VOTE_MENU_MAX_CATEGORIES 64
+#define VOTE_EXTRA_MENU_HELP "W/S/方向键上下移动，A/D/方向键左右选择"
 
 bool g_bSourceBansSystemAvailable = false, g_bl4dstatsSystemAvailable = false;
 public void OnAllPluginsLoaded(){
 	g_bSourceBansSystemAvailable = LibraryExists("sourcebans++");
 	g_bl4dstatsSystemAvailable = LibraryExists("l4d_stats");
+	RestoreDefaultVoteFileIfNoMatchMode();
 	QueueCreateExtraVoteMenus();
 }
 public void OnLibraryAdded(const char[] name)
 {
-    if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
+	if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
 	else if ( StrEqual(name, "extra_menu") ) { QueueCreateExtraVoteMenus(); }
+	else if ( StrEqual(name, "confogl") ) { RestoreDefaultVoteFileIfNoMatchMode(); }
 }
 public void OnLibraryRemoved(const char[] name)
 {
@@ -69,6 +74,7 @@ int g_iExtraCommandMenus[VOTE_MENU_MAX_CATEGORIES];
 int g_iExtraCommandMenuCount;
 char g_sExtraCommandMenuCategories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
 Handle g_hExtraVoteMenuCreateTimer = null;
+Handle g_hDefaultVoteFileTimer = null;
 
 
 
@@ -76,7 +82,7 @@ public void OnPluginStart()
 {
 	LoadTranslations("vote.phrases");
 	char g_sBuffer[128];
-	g_hVoteFilelocation = CreateConVar("votecfgfile", "configs/cfgs.txt", "投票文件的位置(位于sourcemod/文件夹)", FCVAR_NOTIFY);
+	g_hVoteFilelocation = CreateConVar("votecfgfile", VOTE_DEFAULT_CONFIG, "投票文件的位置(位于sourcemod/文件夹)", FCVAR_NOTIFY);
 	//GetGameFolderName(g_sBuffer, sizeof(g_sBuffer));
 	GetConVarString(g_hVoteFilelocation, g_sVoteFile, sizeof(g_sVoteFile));
 	RegConsoleCmd("sm_vote", VoteRequest);
@@ -114,8 +120,18 @@ public void OnPluginEnd()
 		KillTimer(g_hExtraVoteMenuCreateTimer);
 		g_hExtraVoteMenuCreateTimer = null;
 	}
+	if (g_hDefaultVoteFileTimer != null)
+	{
+		KillTimer(g_hDefaultVoteFileTimer);
+		g_hDefaultVoteFileTimer = null;
+	}
 
 	DeleteExtraVoteMenus();
+}
+
+public void LGO_OnMatchModeUnloaded()
+{
+	QueueRestoreDefaultVoteFile();
 }
 
 public Action VoteCancle(int client, int args)
@@ -418,6 +434,60 @@ Action Timer_CreateExtraVoteMenus(Handle timer)
 	return Plugin_Stop;
 }
 
+void QueueRestoreDefaultVoteFile()
+{
+	if (g_hDefaultVoteFileTimer != null)
+	{
+		return;
+	}
+
+	g_hDefaultVoteFileTimer = CreateTimer(0.2, Timer_RestoreDefaultVoteFile, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+Action Timer_RestoreDefaultVoteFile(Handle timer)
+{
+	g_hDefaultVoteFileTimer = null;
+	RestoreDefaultVoteFileIfNoMatchMode();
+	return Plugin_Stop;
+}
+
+void RestoreDefaultVoteFileIfNoMatchMode()
+{
+	if (IsConfoglMatchModeLoaded())
+	{
+		return;
+	}
+
+	RestoreDefaultVoteFile();
+}
+
+bool IsConfoglMatchModeLoaded()
+{
+	if (GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") != FeatureStatus_Available)
+	{
+		return false;
+	}
+
+	return LGO_IsMatchModeLoaded();
+}
+
+void RestoreDefaultVoteFile()
+{
+	if (g_hVoteFilelocation == null)
+	{
+		return;
+	}
+
+	char currentFile[128];
+	g_hVoteFilelocation.GetString(currentFile, sizeof(currentFile));
+	if (StrEqual(currentFile, VOTE_DEFAULT_CONFIG, false))
+	{
+		return;
+	}
+
+	g_hVoteFilelocation.RestoreDefault();
+}
+
 void CreateExtraVoteMenusIfReady()
 {
 	if (g_hCfgsKV == null || GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") != FeatureStatus_Available)
@@ -434,6 +504,7 @@ void CreateExtraVoteMenusIfReady()
 	}
 
 	ExtraMenu_AddEntry(g_iExtraVoteMenu, "选择:", MENU_ENTRY);
+	AddExtraVoteMenuHelp(g_iExtraVoteMenu);
 
 	char categories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
 	int categoryCount;
@@ -480,6 +551,7 @@ void CreateExtraVoteCommandMenu(const char[] category)
 	char entry[VOTE_MENU_NAME_LENGTH];
 	Format(entry, sizeof(entry), "选择 %s :", category);
 	ExtraMenu_AddEntry(menu, entry, MENU_ENTRY);
+	AddExtraVoteMenuHelp(menu);
 
 	do {
 		KvGetString(g_hCfgsKV, "message", entry, sizeof(entry), "");
@@ -489,6 +561,11 @@ void CreateExtraVoteCommandMenu(const char[] category)
 	g_iExtraCommandMenus[g_iExtraCommandMenuCount] = menu;
 	strcopy(g_sExtraCommandMenuCategories[g_iExtraCommandMenuCount], VOTE_MENU_NAME_LENGTH, category);
 	g_iExtraCommandMenuCount++;
+}
+
+void AddExtraVoteMenuHelp(int menu)
+{
+	ExtraMenu_AddEntry(menu, VOTE_EXTRA_MENU_HELP, MENU_ENTRY);
 }
 
 void DeleteExtraVoteMenus()

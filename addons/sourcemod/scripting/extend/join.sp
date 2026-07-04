@@ -37,6 +37,7 @@
 #define GETBOTINTERVAL 3.0
 #define DONATE_CONFIG_FILE "configs/anne_donate.cfg"
 #define DONATE_MAX_OPTIONS 16
+#define JOIN_MOTD_DELAY 4.0
 
 public Plugin myinfo =
 {
@@ -78,6 +79,7 @@ ConVar
 	hCvarMotdUrlZho,
 	hCvarMotdUrlJp,
 	hCvarMotdUrlKo,
+	hCvarNewPlayerGuideUrl,
 	hCvarEnableAutoupdate,
 	hCvarAutoupdatePublicUrl,
 	hCvarAutoupdatePrivateUrl,
@@ -103,6 +105,7 @@ public void OnPluginStart()
 	hCvarMotdUrlZho = CreateConVar("sm_cfgmotd_url_zho", "", "繁体中文客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
 	hCvarMotdUrlJp = CreateConVar("sm_cfgmotd_url_jp", "", "日语客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
 	hCvarMotdUrlKo = CreateConVar("sm_cfgmotd_url_ko", "", "韩语客户端专用MOTD URL，留空则使用sm_cfgmotd_url并追加lang参数");
+	hCvarNewPlayerGuideUrl = CreateConVar("sm_new_player_guide_url", "http://anne.trygek.com/l4d2/guide", "新玩家进服自动打开的玩法指南URL，留空则使用sm_cfgmotd_url");
 	hCvarIPUrl = CreateConVar("sm_cfgip_url", "http://anne.trygek.com/ip.php");	// 服务器ip页面，以后更换为数据库控制
 	hCvarDonateUrl = CreateConVar("sm_donate_url", "http://anne.trygek.com/sponsor/l4d2.php"); //赞助页面
 	hCvarEnableAutoupdate.AddChangeHook(UpdateStatuChange);
@@ -379,14 +382,38 @@ public void OnClientPutInServer(int client)
 		g_bEnableGetbotCommand[client] = true;
 	}
 
-	if(g_bGroupSystemAvailable){
-		if(!Veterans_Get(client, view_as<TARGET_OPTION_INDEX>(GOURP_MEMBER)) && !(CheckCommandAccess(client, "", ADMFLAG_SLAY))){
-			ShowMotdToPlayer(client);
-		}
-	}else{
-		ShowMotdToPlayer(client);
-	}
+	QueueJoinMotd(client);
+}
 
+void QueueJoinMotd(int client)
+{
+	if(!IsValidClient(client) || IsFakeClient(client))
+		return;
+
+	CreateTimer(JOIN_MOTD_DELAY, Timer_ShowJoinMotd, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_ShowJoinMotd(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if(!IsValidClient(client) || IsFakeClient(client))
+		return Plugin_Stop;
+
+	if (IsClientExemptFromJoinMotd(client))
+		return Plugin_Stop;
+
+	ShowNewPlayerGuideToPlayer(client);
+	return Plugin_Stop;
+}
+
+bool IsClientExemptFromJoinMotd(int client)
+{
+	if(CheckCommandAccess(client, "", ADMFLAG_SLAY))
+		return true;
+
+	return g_bGroupSystemAvailable
+		&& GetFeatureStatus(FeatureType_Native, "Veterans_Get") == FeatureStatus_Available
+		&& Veterans_Get(client, view_as<TARGET_OPTION_INDEX>(GOURP_MEMBER));
 }
 
 public void OnClientDisconnect(int client)
@@ -614,6 +641,27 @@ public void ShowMotdToPlayer(int client)
 	GetConVarString(hCvarMotdTitle, title, sizeof(title));
 	BuildLocalizedMotdUrl(client, url, sizeof(url));
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);	
+}
+
+public void ShowNewPlayerGuideToPlayer(int client)
+{
+	char title[64], url[768];
+	GetConVarString(hCvarMotdTitle, title, sizeof(title));
+	BuildNewPlayerGuideUrl(client, url, sizeof(url));
+	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);
+}
+
+void BuildNewPlayerGuideUrl(int client, char[] url, int maxlen)
+{
+	hCvarNewPlayerGuideUrl.GetString(url, maxlen);
+	TrimString(url);
+	if(url[0] == '\0')
+	{
+		BuildLocalizedMotdUrl(client, url, maxlen);
+		return;
+	}
+
+	AppendClientLanguageParam(client, url, maxlen);
 }
 
 void BuildLocalizedMotdUrl(int client, char[] url, int maxlen)

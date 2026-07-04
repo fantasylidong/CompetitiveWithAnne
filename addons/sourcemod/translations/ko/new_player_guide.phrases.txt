@@ -24,6 +24,42 @@
 	{
 		"ko"		"{default}이 자동 안내는 이 서버에서 {green}%s h{default} 플레이하면 멈춥니다. 나중에 다시 보려면 {green}!guide{default} 또는 {green}!modes{default}."
 	}
+	"NPG_PanelTitle"
+	{
+		"ko"		"Anne Guide"
+	}
+	"NPG_PanelPlaytime"
+	{
+		"ko"		"L4D2: %s h | 이 서버: %s h"
+	}
+	"NPG_PanelBeginner"
+	{
+		"ko"		"먼저 기본 캠페인. 더 빠른 진행은 Anne Campaign."
+	}
+	"NPG_PanelIntermediate"
+	{
+		"ko"		"Anne Campaign / Survival 추천. 익숙해지면 더 어려운 설정으로."
+	}
+	"NPG_PanelExperienced"
+	{
+		"ko"		"!match로 Anne, Not0721, 대전 설정을 고를 수 있습니다."
+	}
+	"NPG_PanelCommands1"
+	{
+		"ko"		"Commands: !join !away !match !rmatch !mapvote"
+	}
+	"NPG_PanelCommands2"
+	{
+		"ko"		"More: !xx !rank !web !ip | !guide / !modes"
+	}
+	"NPG_PanelAutoStops"
+	{
+		"ko"		"이 서버 %s h 후 자동 안내가 멈춥니다."
+	}
+	"NPG_PanelClose"
+	{
+		"ko"		"닫기"
+	}
 	"NPG_MatchLoaded"
 	{
 		"ko"		"{olive}지금은 이미 모드가 로드되어 있어서 자동 안내가 나오지 않습니다. 기본으로 돌릴 때는 {green}!rmatch{olive} 전에 팀원에게 먼저 물어보세요."

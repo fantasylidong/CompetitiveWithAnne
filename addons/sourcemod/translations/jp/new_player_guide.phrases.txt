@@ -24,6 +24,42 @@
 	{
 		"jp"		"{default}この自動案内は、このサーバーで {green}%s h{default} 遊ぶと止まります。あとで見るなら {green}!guide{default} または {green}!modes{default}。"
 	}
+	"NPG_PanelTitle"
+	{
+		"jp"		"Anne Guide"
+	}
+	"NPG_PanelPlaytime"
+	{
+		"jp"		"L4D2: %s h | このサーバー: %s h"
+	}
+	"NPG_PanelBeginner"
+	{
+		"jp"		"まずは通常キャンペーン。速い展開なら Anne Campaign。"
+	}
+	"NPG_PanelIntermediate"
+	{
+		"jp"		"Anne Campaign / Survival がおすすめ。慣れたら上の設定へ。"
+	}
+	"NPG_PanelExperienced"
+	{
+		"jp"		"!match で Anne、Not0721、対戦系設定を選べます。"
+	}
+	"NPG_PanelCommands1"
+	{
+		"jp"		"Commands: !join !away !match !rmatch !mapvote"
+	}
+	"NPG_PanelCommands2"
+	{
+		"jp"		"More: !xx !rank !web !ip | !guide / !modes"
+	}
+	"NPG_PanelAutoStops"
+	{
+		"jp"		"このサーバー %s h で自動案内は停止。"
+	}
+	"NPG_PanelClose"
+	{
+		"jp"		"閉じる"
+	}
 	"NPG_MatchLoaded"
 	{
 		"jp"		"{olive}今はすでにモードが入っているので、自動案内は出ない状態です。戻すときは {green}!rmatch{olive} の前にチームへ確認してください。"

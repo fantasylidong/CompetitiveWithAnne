@@ -6,6 +6,7 @@
 #undef REQUIRE_PLUGIN
 #include <veterans>
 #include <confogl>
+#include <left4dhooks>
 
 #define PLUGIN_VERSION "1.0"
 #define TOTAL_BEGINNER_MINUTES (50 * 60)
@@ -35,6 +36,7 @@ public Plugin myinfo =
 bool g_bAutoShown[MAXPLAYERS + 1];
 bool g_bVeteransAvailable = false;
 bool g_bConfoglAvailable = false;
+bool g_bLeft4DHooksAvailable = false;
 int g_iRetryCount[MAXPLAYERS + 1];
 
 ConVar g_hEnabled = null;
@@ -80,6 +82,10 @@ public void OnLibraryAdded(const char[] name)
 	{
 		g_bConfoglAvailable = true;
 	}
+	else if (StrEqual(name, "left4dhooks"))
+	{
+		g_bLeft4DHooksAvailable = true;
+	}
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -91,6 +97,10 @@ public void OnLibraryRemoved(const char[] name)
 	else if (StrEqual(name, "confogl"))
 	{
 		g_bConfoglAvailable = false;
+	}
+	else if (StrEqual(name, "left4dhooks"))
+	{
+		g_bLeft4DHooksAvailable = false;
 	}
 }
 
@@ -179,6 +189,11 @@ void TryAutoGuide(int client)
 		return;
 	}
 
+	if (!IsFirstMapForAutoGuide())
+	{
+		return;
+	}
+
 	if (!CanReadVeterans())
 	{
 		RetryAutoGuide(client);
@@ -198,7 +213,7 @@ void TryAutoGuide(int client)
 		return;
 	}
 
-	ShowGuide(client, false);
+	ShowAutoGuidePanel(client);
 	g_bAutoShown[client] = true;
 }
 
@@ -251,6 +266,72 @@ void ShowGuide(int client, bool manual)
 	{
 		CPrintToChat(client, "%t", "NPG_MatchLoaded");
 	}
+}
+
+void ShowAutoGuidePanel(int client)
+{
+	int totalMinutes = GetBestTotalMinutes(client);
+	int serverMinutes = GetServerMinutes(client);
+
+	char totalHours[16];
+	char serverHours[16];
+	char stopHours[16];
+	FormatHours(totalMinutes, totalHours, sizeof(totalHours));
+	FormatHours(serverMinutes, serverHours, sizeof(serverHours));
+	FormatHours(GetServerAutoStopMinutes(), stopHours, sizeof(stopHours));
+
+	char buffer[192];
+	Panel panel = new Panel();
+
+	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelTitle", client);
+	panel.SetTitle(buffer);
+
+	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelPlaytime", client, totalHours, serverHours);
+	panel.DrawText(buffer);
+	panel.DrawText(" ");
+
+	switch (GetGuideTier(totalMinutes))
+	{
+		case GuideTier_Beginner:
+		{
+			AddGuidePanelText(client, panel, "NPG_PanelBeginner");
+		}
+		case GuideTier_Intermediate:
+		{
+			AddGuidePanelText(client, panel, "NPG_PanelIntermediate");
+		}
+		case GuideTier_Experienced:
+		{
+			AddGuidePanelText(client, panel, "NPG_PanelExperienced");
+		}
+	}
+
+	panel.DrawText(" ");
+	AddGuidePanelText(client, panel, "NPG_PanelCommands1");
+	AddGuidePanelText(client, panel, "NPG_PanelCommands2");
+
+	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelAutoStops", client, stopHours);
+	panel.DrawText(buffer);
+	panel.DrawItem("", ITEMDRAW_SPACER);
+
+	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelClose", client);
+	panel.CurrentKey = GetMaxPageItems(panel.Style);
+	panel.DrawItem(buffer, ITEMDRAW_CONTROL);
+
+	panel.Send(client, GuidePanelHandler, 45);
+	delete panel;
+}
+
+void AddGuidePanelText(int client, Panel panel, const char[] phrase)
+{
+	char buffer[192];
+	FormatEx(buffer, sizeof(buffer), "%T", phrase, client);
+	panel.DrawText(buffer);
+}
+
+public int GuidePanelHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return 0;
 }
 
 GuideTier GetGuideTier(int totalMinutes)
@@ -357,6 +438,16 @@ bool IsServerModeLoaded()
 	return LGO_IsMatchModeLoaded();
 }
 
+bool IsFirstMapForAutoGuide()
+{
+	if (!g_bLeft4DHooksAvailable || GetFeatureStatus(FeatureType_Native, "L4D_IsFirstMapInScenario") != FeatureStatus_Available)
+	{
+		return false;
+	}
+
+	return L4D_IsFirstMapInScenario();
+}
+
 bool IsValidHumanClient(int client)
 {
 	return 1 <= client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client);
@@ -366,4 +457,5 @@ void RefreshLibraries()
 {
 	g_bVeteransAvailable = LibraryExists("veterans");
 	g_bConfoglAvailable = LibraryExists("confogl");
+	g_bLeft4DHooksAvailable = LibraryExists("left4dhooks");
 }

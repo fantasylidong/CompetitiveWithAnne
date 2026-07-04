@@ -24,6 +24,42 @@
 	{
 		"chi"		"{default}本服玩到 {green}%s h{default} 后就不再自动提示。以后想看，输入 {green}!guide{default} 或 {green}!modes{default}。"
 	}
+	"NPG_PanelTitle"
+	{
+		"chi"		"Anne玩法"
+	}
+	"NPG_PanelPlaytime"
+	{
+		"chi"		"L4D2: %s h | 本服: %s h"
+	}
+	"NPG_PanelBeginner"
+	{
+		"chi"		"先打默认战役；想快节奏再试 Anne 战役。"
+	}
+	"NPG_PanelIntermediate"
+	{
+		"chi"		"试 Anne 战役或绝境求生。路线熟了再上更硬配置。"
+	}
+	"NPG_PanelExperienced"
+	{
+		"chi"		"用 !match 选 Anne、Not0721 或各类对抗配置。"
+	}
+	"NPG_PanelCommands1"
+	{
+		"chi"		"常用: !join !away !match !rmatch !mapvote"
+	}
+	"NPG_PanelCommands2"
+	{
+		"chi"		"更多: !xx !rank !web !ip | 以后: !guide / !modes"
+	}
+	"NPG_PanelAutoStops"
+	{
+		"chi"		"本服 %s h 后不再自动提示。"
+	}
+	"NPG_PanelClose"
+	{
+		"chi"		"关闭"
+	}
 	"NPG_MatchLoaded"
 	{
 		"chi"		"{olive}当前已经加载模式，所以自动提示本来会保持安静。要退回默认，用 {green}!rmatch{olive} 前最好先问一下队友。"

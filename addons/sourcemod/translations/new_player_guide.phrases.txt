@@ -24,6 +24,42 @@
 	{
 		"en"		"{default}This reminder stops after {green}%s h{default} on this server. Need it later? Type {green}!guide{default} or {green}!modes{default}."
 	}
+	"NPG_PanelTitle"
+	{
+		"en"		"Anne Guide"
+	}
+	"NPG_PanelPlaytime"
+	{
+		"en"		"L4D2: %s h | this server: %s h"
+	}
+	"NPG_PanelBeginner"
+	{
+		"en"		"Start with default Campaign. Try Anne Campaign when you want faster specials."
+	}
+	"NPG_PanelIntermediate"
+	{
+		"en"		"Try Anne Campaign or Survival. Move up when the routes feel familiar."
+	}
+	"NPG_PanelExperienced"
+	{
+		"en"		"Use !match for Anne sets, Not0721, and versus configs."
+	}
+	"NPG_PanelCommands1"
+	{
+		"en"		"Commands: !join !away !match !rmatch !mapvote"
+	}
+	"NPG_PanelCommands2"
+	{
+		"en"		"More: !xx !rank !web !ip | later: !guide / !modes"
+	}
+	"NPG_PanelAutoStops"
+	{
+		"en"		"Auto guide stops at %s h on this server."
+	}
+	"NPG_PanelClose"
+	{
+		"en"		"Close"
+	}
 	"NPG_MatchLoaded"
 	{
 		"en"		"{olive}A mode is already loaded, so the auto reminder would stay quiet. Use {green}!rmatch{olive} only when everyone agrees to go back."
