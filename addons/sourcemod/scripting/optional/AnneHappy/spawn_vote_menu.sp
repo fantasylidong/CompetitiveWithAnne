@@ -8,6 +8,7 @@
 #include <colors>
 #undef REQUIRE_PLUGIN
 #include <extra_menu>
+#include <anne_cvar_shield>
 
 #define PLUGIN_VERSION "1.0.1"
 #define VOTE_TIME 20
@@ -462,6 +463,16 @@ bool CanDisplayExtraMenus()
 	return GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") == FeatureStatus_Available;
 }
 
+bool TryAuthorizeCvarShieldTarget(const char[] cvarName, int value)
+{
+	if (GetFeatureStatus(FeatureType_Native, "AnneCvarShield_AuthorizeTarget") != FeatureStatus_Available)
+	{
+		return false;
+	}
+
+	return AnneCvarShield_AuthorizeTarget(cvarName, value);
+}
+
 bool DisplayCampaignSpawnVoteMenu(int client)
 {
 	if (g_iCampaignMenu == -1)
@@ -500,8 +511,8 @@ bool IsPluginRunningByFile(const char[] filename)
 
 void BuildCampaignMenu(int menu)
 {
-	ExtraMenu_AddEntry(menu, "洛琪导航控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "W/S移动、A/D控制", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "W/S或方向键移动，A/D或方向键调整/确认", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "1. 插件状态: 战役模式", MENU_SELECT_ONLY);
@@ -512,14 +523,14 @@ void BuildCampaignMenu(int menu)
 	ExtraMenu_AddEntry(menu, "6. Relax阶段: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvDirRelaxEnable, 1));
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1. 应用当前设置", MENU_SELECT_ONLY, true);
+	ExtraMenu_AddEntry(menu, "应用当前设置（右确认）", MENU_SELECT_ONLY, true);
 	AddCampaignPresetEntries(menu);
 }
 
 void BuildAnneMenu(int menu)
 {
-	ExtraMenu_AddEntry(menu, "洛琪导航控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "W/S移动、A/D控制", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "W/S或方向键移动，A/D或方向键调整/确认", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "1. 插件状态: Anne模式", MENU_SELECT_ONLY);
@@ -531,7 +542,7 @@ void BuildAnneMenu(int menu)
 	ExtraMenu_AddEntry(menu, "6. 传送检测: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneTeleportCheck, 5), 1, 0, 30);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1. 应用当前设置", MENU_SELECT_ONLY, true);
+	ExtraMenu_AddEntry(menu, "应用当前设置（右确认）", MENU_SELECT_ONLY, true);
 	AddAnnePresetEntries(menu);
 }
 
@@ -880,10 +891,12 @@ void ApplyPendingSpawnSettings()
 	{
 		if (g_cvAnneLimit != null)
 		{
+			TryAuthorizeCvarShieldTarget("l4d_infected_limit", g_iPendingLimit);
 			g_cvAnneLimit.SetInt(g_iPendingLimit);
 		}
 		if (g_cvAnneInterval != null)
 		{
+			TryAuthorizeCvarShieldTarget("versus_special_respawn_interval", g_iPendingInterval);
 			g_cvAnneInterval.SetInt(g_iPendingInterval);
 		}
 		if (g_cvAnneAutoSpawn != null)

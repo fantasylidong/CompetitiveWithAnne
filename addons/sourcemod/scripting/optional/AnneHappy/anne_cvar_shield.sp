@@ -10,9 +10,9 @@
 #include <sourcemod>
 
 #define PLUGIN_NAME                   "Anne CVar Shield"
-#define PLUGIN_VERSION                "2.0.0"
+#define PLUGIN_VERSION                "2.1.0"
 
-#define PROTECTED_COUNT               13
+#define PROTECTED_COUNT               14
 #define INDEX_SI_LIMIT                0
 #define INDEX_CLASS_BASE_START        1
 #define INDEX_CLASS_VERSUS_START      7
@@ -36,7 +36,8 @@ static const char g_sProtectedCvars[PROTECTED_COUNT][] =
     "z_versus_hunter_limit",
     "z_versus_spitter_limit",
     "z_versus_jockey_limit",
-    "z_versus_charger_limit"
+    "z_versus_charger_limit",
+    "versus_special_respawn_interval"
 };
 
 ConVar g_hEnable;
@@ -67,6 +68,22 @@ public Plugin myinfo =
     version = PLUGIN_VERSION,
     url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
+{
+    RegPluginLibrary("anne_cvar_shield");
+    CreateNative("AnneCvarShield_AuthorizeTarget", Native_AuthorizeTarget);
+    return APLRes_Success;
+}
+
+public any Native_AuthorizeTarget(Handle plugin, int numParams)
+{
+    char cvarName[64];
+    GetNativeString(1, cvarName, sizeof(cvarName));
+    int value = GetNativeCell(2);
+
+    return AuthorizeTargetByName(cvarName, value, "native");
+}
 
 public void OnPluginStart()
 {
@@ -308,6 +325,19 @@ static void AuthorizeTargetFromCommand(int index, int value, const char[] reason
 
     ShieldLog("authorize %s=%d via %s", g_sProtectedCvars[index], value, reason);
     StartGuardBurst();
+}
+
+static bool AuthorizeTargetByName(const char[] cvarName, int value, const char[] reason)
+{
+    if (!IsShieldEnabled())
+        return false;
+
+    int index = FindProtectedNameIndex(cvarName);
+    if (index < 0)
+        return false;
+
+    AuthorizeTargetFromCommand(index, value, reason);
+    return true;
 }
 
 static bool IsAuthorizedChange(int index, int value)
