@@ -112,6 +112,10 @@
     {
         "es"        "Comando no disponible en este mapa."
     }
+    "InGameOnly"
+    {
+        "es"        "Este comando solo puede usarlo un jugador dentro de la partida."
+    }
     "TankSpawnStatic"
     {
         "es"        "La reaparición de Tank es estática y no se puede cambiar en este mapa."

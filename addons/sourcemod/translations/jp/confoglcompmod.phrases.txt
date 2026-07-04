@@ -68,4 +68,8 @@
 	{
 		"jp"		"{blue}[{default}Confogl{blue}]{default} 各生存者の固定生存ボーナスポイント: {olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"jp"		"{blue}[{default}Confogl{blue}]{default} このコマンドはゲーム内のプレイヤーのみ使用できます。"
+	}
 }

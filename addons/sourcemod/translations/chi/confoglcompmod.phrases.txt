@@ -68,4 +68,8 @@
 	{
 		"chi"		"{blue}[{default}Confogl{blue}]{default} 每个幸存者的固定生还奖励分：{olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"chi"		"{blue}[{default}Confogl{blue}]{default} 该命令只能由游戏内玩家使用。"
+	}
 }

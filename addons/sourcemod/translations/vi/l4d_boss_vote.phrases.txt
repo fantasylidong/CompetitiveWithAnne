@@ -108,6 +108,10 @@
 	{
 		"vi"		"Lệnh không thể được sử dụng cho hình ảnh này."
 	}
+	"InGameOnly"
+	{
+		"vi"		"Lệnh này chỉ có thể được dùng bởi người chơi đang ở trong game."
+	}
 	"TankSpawnStatic"
 	{
 		"vi"		"Vị trí của Tank trên bản đồ này là cố định và không thể thay đổi."

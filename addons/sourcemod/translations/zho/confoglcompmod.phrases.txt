@@ -68,4 +68,8 @@
 	{
 		"zho"		"{blue}[{default}Confogl{blue}]{default} 每個倖存者的固定生還獎勵分：{olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"zho"		"{blue}[{default}Confogl{blue}]{default} 該命令只能由遊戲內玩家使用。"
+	}
 }

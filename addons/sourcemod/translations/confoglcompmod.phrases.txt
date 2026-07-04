@@ -68,4 +68,8 @@
 	{
 		"en"		"{blue}[{default}Confogl{blue}]{default} Static Survival Bonus Per Survivor: {olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"en"		"{blue}[{default}Confogl{blue}]{default} This command can only be used by an in-game player."
+	}
 }

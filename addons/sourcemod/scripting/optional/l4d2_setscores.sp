@@ -23,7 +23,7 @@
 
 #define L4D_TEAM_SPECTATE 1
 
-#define PLUGIN_VERSION "1.5.1"
+#define PLUGIN_VERSION "1.5.2"
 
 public Plugin myinfo =
 {
@@ -94,9 +94,10 @@ Action Command_SetScores(int client, int args)
 	bool IsAdmin = false;
 	
 	//Determine whether the user is admin and what action to take
-	if (GetUserAdmin(client) != INVALID_ADMIN_ID) {
+	//client 0 is the server console/RCON, which is always authorized and sets the scores directly
+	if (!client || GetUserAdmin(client) != INVALID_ADMIN_ID) {
 		//If we are forcing admins to start votes, start a vote
-		if (!forceAdminsToVote.BoolValue) {
+		if (!client || !forceAdminsToVote.BoolValue) {
 			SetScores(tempSurvivorScore, tempInfectedScore, client);
 			return Plugin_Handled;
 		}

@@ -100,6 +100,12 @@ static Action MI_KV_CmdSave(int client, int args)
 
 static Action MI_KV_CmdSaveLoc(int client, int args)
 {
+	// This command saves the caller's own position, so it needs an in-game caller.
+	if (!client || !IsClientInGame(client)) {
+		ReplyToCommand(client, "%t", "ConfoglCompMod_InGameOnly");
+		return Plugin_Handled;
+	}
+
 	bool updateinfo = false;
 	char sCurMap[128];
 	GetCurrentMap(sCurMap, sizeof(sCurMap));

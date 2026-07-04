@@ -108,6 +108,10 @@
 	{
 		"zho"		"指令不能用於這張圖."
 	}
+	"InGameOnly"
+	{
+		"zho"		"該命令只能由遊戲內玩家使用。"
+	}
 	"TankSpawnStatic"
 	{
 		"zho"		"這張地圖Tank位置是固定的，所以不能進行更改."

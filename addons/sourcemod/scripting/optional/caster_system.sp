@@ -6,7 +6,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.0.1"
 
 public Plugin myinfo = 
 {
@@ -214,7 +214,7 @@ Action CasterCheck(Handle timer, int userid)
 
 Action Cast_Cmd(int client, int args)
 {
-	if (!client) return Plugin_Continue;
+	if (!client || !IsClientInGame(client)) return Plugin_Continue;
 	
  	char buffer[64];
 	GetClientAuthId(client, AuthId_Steam2, buffer, sizeof(buffer));
@@ -283,15 +283,20 @@ Action Caster_Cmd(int client, int args)
 
 Action NotCasting_Cmd(int client, int args)
 {
+	if (!client) return Plugin_Continue;
+
 	char buffer[64];
-	
+
 	if (args < 1) // If no target is specified, assumes self-uncasting
 	{
 		GetClientAuthId(client, AuthId_Steam2, buffer, sizeof(buffer));
 		if (casterTrie.Remove(buffer))
 		{
-			CPrintToChat(client, "%t", "Reconnect1");
-			CPrintToChat(client, "%t", "Reconnect2");
+			if (IsClientInGame(client))
+			{
+				CPrintToChat(client, "%t", "Reconnect1");
+				CPrintToChat(client, "%t", "Reconnect2");
+			}
 			
 			Call_StartForward(g_hFWD_CasterUnregistered);
 			Call_PushCell(client);
@@ -420,14 +425,14 @@ Action PrintCasters_Cmd(int client, int args)
 
 Action KickSpecs_Cmd(int client, int args)
 {
-	AdminId id = GetUserAdmin(client);
-	if (id != INVALID_ADMIN_ID && GetAdminFlag(id, Admin_Ban)) // Check for specific admin flag
+	AdminId id = client ? GetUserAdmin(client) : INVALID_ADMIN_ID;
+	if (!client || (id != INVALID_ADMIN_ID && GetAdminFlag(id, Admin_Ban))) // Console (client 0) has full authority; otherwise check for specific admin flag
 	{
 		CreateTimer(2.0, Timer_KickSpecs);
 		CPrintToChatAll("%t", "KickSpecsAdmin", client);
 		return Plugin_Handled;
 	}
-	
+
 	// Filter spectator
 	if (GetClientTeam(client) == L4D2Team_Spectator)
 	{

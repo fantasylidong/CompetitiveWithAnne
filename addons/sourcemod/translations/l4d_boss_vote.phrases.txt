@@ -108,6 +108,10 @@
 	{
 		"en"		"Command not available on this map."
 	}
+	"InGameOnly"
+	{
+		"en"		"This command can only be used by an in-game player."
+	}
 	"TankSpawnStatic"
 	{
 		"en"		"Tank spawn is static and can not be changed on this map."

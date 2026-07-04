@@ -68,4 +68,8 @@
 	{
 		"vi"		"{blue}[{default}Confogl{blue}]{default} Điểm thưởng sinh tồn cố định cho mỗi người sống sót: {olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"vi"		"{blue}[{default}Confogl{blue}]{default} Lệnh này chỉ có thể được dùng bởi người chơi đang ở trong game."
+	}
 }

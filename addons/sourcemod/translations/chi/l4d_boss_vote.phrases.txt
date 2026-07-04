@@ -108,6 +108,10 @@
 	{
 		"chi"		"指令不能用于这张图."
 	}
+	"InGameOnly"
+	{
+		"chi"		"该命令只能由游戏内玩家使用。"
+	}
 	"TankSpawnStatic"
 	{
 		"chi"		"这张地图Tank位置是固定的，所以不能进行更改."

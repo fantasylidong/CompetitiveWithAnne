@@ -53,7 +53,7 @@ public Plugin myinfo =
     name = "L4D2 Tank Control",
     author = "arti, (Contributions by: Sheo, Sir, Altair-Sossai)",
     description = "Distributes the role of the tank evenly throughout the team, allows for overrides. (Includes forwards)",
-    version = "0.0.22",
+    version = "0.0.29",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 }
 
@@ -362,7 +362,7 @@ public void TankKilled_Event(Event hEvent, const char[] eName, bool dontBroadcas
 Action Tank_Cmd(int client, int args)
 {
     // Only output if client is in-game and we have a queued tank
-    if (!IsClientInGame(client) || strcmp(queuedTankSteamId, "") == 0)
+    if (!client || !IsClientInGame(client) || StrEqual(queuedTankSteamId, ""))
         return Plugin_Handled;
     
     int tankClientId = getInfectedPlayerBySteamId(queuedTankSteamId);
@@ -396,7 +396,10 @@ Action TankShuffle_Cmd(int client, int args)
  * Give the tank to a specific player.
  */
 Action GiveTank_Cmd(int client, int args)
-{    
+{
+    if (client && !IsClientInGame(client))
+        return Plugin_Handled;
+
     // Who are we targetting?
     char arg1[32];
     GetCmdArg(1, arg1, sizeof(arg1));
@@ -406,14 +409,14 @@ Action GiveTank_Cmd(int client, int args)
 
     if (target == -1 || !IsClientInGame(target) || IsFakeClient(target))
     {
-        CPrintToChat(client, "%t", "L4DTankControlEq_TankControlInvalidTargetUnable");
+        CReplyToCommand(client, "%t %t", "TagControl", "InvalidTarget");
         return Plugin_Handled;
     }
 
     // Checking if on our desired team
     if (!IS_INFECTED(target))
     {
-        CPrintToChat(client, "%t", "L4DTankControlEq_TankControlNotInfectedTeam", target);
+        CReplyToCommand(client, "%t %t", "TagControl", "NoInfected", target);
         return Plugin_Handled;
     }
     

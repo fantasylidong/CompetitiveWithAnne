@@ -35,7 +35,7 @@ public Plugin myinfo =
     name = "Pause plugin",
     author = "CanadaRox, Sir, Forgetest, A1m`",
     description = "Adds pause functionality without breaking pauses, also prevents SI from spawning because of the Pause.",
-    version = "6.8.1",
+    version = "6.8.2",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -800,6 +800,11 @@ void ToggleCommandListeners(bool enable)
 
 Action Callvote_Callback(int client, char[] command, int argc)
 {
+    if (!client || !IsClientInGame(client))
+    {
+        return Plugin_Continue;
+    }
+
     if (GetClientTeam(client) == L4D2Team_Spectator)
     {
         CPrintToChat(client, "%t %t", "Tag", "CallvoteNoSpec");

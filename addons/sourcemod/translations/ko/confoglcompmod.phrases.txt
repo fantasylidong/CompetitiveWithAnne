@@ -68,4 +68,8 @@
 	{
 		"ko"		"{blue}[{default}Confogl{blue}]{default} 각 생존자의 고정 생존 보너스 포인트: {olive}%d"
 	}
+	"ConfoglCompMod_InGameOnly"
+	{
+		"ko"		"{blue}[{default}Confogl{blue}]{default} 이 명령은 게임 내 플레이어만 사용할 수 있습니다."
+	}
 }
