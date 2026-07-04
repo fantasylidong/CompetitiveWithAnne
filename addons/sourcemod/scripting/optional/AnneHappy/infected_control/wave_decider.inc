@@ -18,7 +18,7 @@ enum WaveDecisionState
     WD_Idle = 0,           // 空闲：没有活跃波
     WD_EarlyCheck,         // 提前检查：0-checkWindow 秒，评估是否提前触发
     WD_TimerRunning,       // 定时器运行中：16秒倒计时，监控玩家行为
-    WD_IntensiveCheck      // 密集检测：卡位时改为1秒检测，无超时，直到推进/分散
+    WD_IntensiveCheck      // 密集检测：卡位时改为1秒检测，推进/分散时放行
 }
 
 enum struct WaveDecider
@@ -171,18 +171,18 @@ enum struct WaveDecider
 
     void UpdateIntensiveCheck()
     {
-        // 密集检测：无超时，直到玩家推进到可攻击队形或主动分散才刷新
+        // 密集检测：只等玩家推进或主动分散，不按超时兜底放波。
 
         if (AntiBait_ShouldReleaseFromIntensive())
         {
             if (AntiBait_IsAttackableSpread())
                 this.ReleaseWave("survivors spread out");
             else
-                this.ReleaseWave("survivors progressed into attackable formation");
+                this.ReleaseWave("survivors progressed");
             return;
         }
 
-        // 继续卡位，或推进后仍是抱团卡点 → 继续等待（无超时兜底）
+        // 继续卡位时等待下一次检测。
         this.intensiveCheckCount++;
     }
 

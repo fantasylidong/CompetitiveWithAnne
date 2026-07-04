@@ -502,17 +502,17 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 3000.0
         );
         this.AntiBaitTeamDist = CreateConVar(
-            "inf_antibait_team_dist", "1800.0",
+            "inf_antibait_team_dist", "1500.0",
             "Soft team spread distance: above this, survivors are considered spread enough to attack normally",
             CVAR_FLAG, true, 0.0, true, 5000.0
         );
         this.AntiBaitPairDist = CreateConVar(
-            "inf_antibait_pair_dist", "900.0",
+            "inf_antibait_pair_dist", "800.0",
             "Average nearest-teammate distance under this means the team still has mutual cover",
             CVAR_FLAG, true, 0.0, true, 3000.0
         );
         this.AntiBaitIsolateDist = CreateConVar(
-            "inf_antibait_isolate_dist", "1300.0",
+            "inf_antibait_isolate_dist", "1200.0",
             "A survivor whose nearest teammate is farther than this releases anti-bait pressure as pickable",
             CVAR_FLAG, true, 0.0, true, 3000.0
         );

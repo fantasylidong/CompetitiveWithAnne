@@ -10,12 +10,14 @@
 #include <sourcemod>
 
 #define PLUGIN_NAME                   "Anne CVar Shield"
-#define PLUGIN_VERSION                "2.1.0"
+#define PLUGIN_VERSION                "2.2.0"
 
-#define PROTECTED_COUNT               14
+#define PROTECTED_COUNT               20
 #define INDEX_SI_LIMIT                0
 #define INDEX_CLASS_BASE_START        1
 #define INDEX_CLASS_VERSUS_START      7
+#define INDEX_RESPAWN_INTERVAL        13
+#define INDEX_CLASS_INF_START         14
 #define SI_CLASS_COUNT                6
 
 #define AUTHORIZE_WINDOW              0.35
@@ -37,7 +39,13 @@ static const char g_sProtectedCvars[PROTECTED_COUNT][] =
     "z_versus_spitter_limit",
     "z_versus_jockey_limit",
     "z_versus_charger_limit",
-    "versus_special_respawn_interval"
+    "versus_special_respawn_interval",
+    "inf_smoker_limit",
+    "inf_boomer_limit",
+    "inf_hunter_limit",
+    "inf_spitter_limit",
+    "inf_jockey_limit",
+    "inf_charger_limit"
 };
 
 ConVar g_hEnable;
@@ -99,7 +107,7 @@ public void OnPluginStart()
     );
     g_hSyncVersus = CreateConVar(
         "anne_cvar_shield_sync_versus_limits", "1",
-        "Mirror z_*_limit and z_versus_*_limit targets for each SI class.",
+        "Mirror z_*_limit, z_versus_*_limit, and infected_control inf_*_limit targets for each SI class.",
         FCVAR_NOTIFY, true, 0.0, true, 1.0
     );
 
@@ -221,7 +229,7 @@ public void OnProtectedCvarChanged(ConVar convar, const char[] oldValue, const c
     if (IsAuthorizedChange(index, newInt))
     {
         AcceptAuthorizedChange(index, newInt);
-        SyncClassPair(index);
+        SyncClassLimitGroup(index);
         StartGuardBurst();
         return;
     }
@@ -232,7 +240,7 @@ public void OnProtectedCvarChanged(ConVar convar, const char[] oldValue, const c
     if (!g_bTargetReady[index])
     {
         CaptureTarget(index, newInt, "first-observed change");
-        SyncClassPair(index);
+        SyncClassLimitGroup(index);
         StartGuardBurst();
         return;
     }
@@ -252,7 +260,7 @@ public void OnControlCvarChanged(ConVar convar, const char[] oldValue, const cha
     if (!IsShieldEnabled())
         return;
 
-    NormalizeAllClassPairTargets();
+    NormalizeAllClassLimitTargets();
     StartGuardBurst();
 }
 
@@ -313,14 +321,14 @@ static void BindGameModeCvar()
 
 static void AuthorizeTargetFromCommand(int index, int value, const char[] reason)
 {
-    SetTarget(index, value, reason);
-    ArmAuthorization(index, value);
-
-    int pair = GetPairIndex(index);
-    if (ShouldSyncClassPairs() && pair >= 0)
+    if (ShouldSyncClassLimits() && IsClassLimitIndex(index))
     {
-        SetTarget(pair, value, reason);
-        ArmAuthorization(pair, value);
+        SetClassLimitGroupTarget(index, value, reason, true);
+    }
+    else
+    {
+        SetTarget(index, value, reason);
+        ArmAuthorization(index, value);
     }
 
     ShieldLog("authorize %s=%d via %s", g_sProtectedCvars[index], value, reason);
@@ -395,7 +403,7 @@ static void CaptureCurrentTargets()
         CaptureTarget(i, g_hProtected[i].IntValue, "manual capture");
     }
 
-    NormalizeAllClassPairTargets();
+    NormalizeAllClassLimitTargets();
 }
 
 static void CaptureMissingTargets()
@@ -419,7 +427,7 @@ static void CaptureMissingTargets()
         CaptureTarget(i, g_hProtected[i].IntValue, "initial capture");
     }
 
-    NormalizeAllClassPairTargets();
+    NormalizeAllClassLimitTargets();
 }
 
 static void CaptureTarget(int index, int value, const char[] reason)
@@ -448,7 +456,7 @@ static void EnforceTargets()
         return;
 
     BindConVars();
-    NormalizeAllClassPairTargets();
+    NormalizeAllClassLimitTargets();
 
     g_bApplying = true;
 
@@ -467,55 +475,109 @@ static void EnforceTargets()
     g_bApplying = false;
 }
 
-static void SyncClassPair(int index)
+static void SyncClassLimitGroup(int index)
 {
-    if (!ShouldSyncClassPairs())
+    if (!ShouldSyncClassLimits())
         return;
 
-    int pair = GetPairIndex(index);
-    if (pair < 0 || !g_bTargetReady[index])
+    if (!IsClassLimitIndex(index) || !g_bTargetReady[index])
         return;
 
-    SetTarget(pair, g_iTarget[index], "class pair sync");
-
-    if (g_hProtected[pair] == null || g_hProtected[pair].IntValue == g_iTarget[pair])
-        return;
+    int offset = GetClassLimitOffset(index);
+    int value = g_iTarget[index];
+    int starts[3] = { INDEX_CLASS_BASE_START, INDEX_CLASS_VERSUS_START, INDEX_CLASS_INF_START };
 
     g_bApplying = true;
-    ShieldLog("%s sync: %d -> %d", g_sProtectedCvars[pair], g_hProtected[pair].IntValue, g_iTarget[pair]);
-    g_hProtected[pair].SetInt(g_iTarget[pair]);
+
+    for (int i = 0; i < sizeof(starts); i++)
+    {
+        int member = starts[i] + offset;
+        if (!g_bTargetReady[member] || g_iTarget[member] != value)
+            SetTarget(member, value, "class limit group sync");
+
+        if (g_hProtected[member] == null || g_hProtected[member].IntValue == value)
+            continue;
+
+        ShieldLog("%s sync: %d -> %d", g_sProtectedCvars[member], g_hProtected[member].IntValue, value);
+        g_hProtected[member].SetInt(value);
+    }
+
     g_bApplying = false;
 }
 
-static void NormalizeAllClassPairTargets()
+static void NormalizeAllClassLimitTargets()
 {
-    if (!ShouldSyncClassPairs())
+    if (!ShouldSyncClassLimits())
         return;
 
     for (int offset = 0; offset < SI_CLASS_COUNT; offset++)
     {
-        int base = INDEX_CLASS_BASE_START + offset;
-        int versus = INDEX_CLASS_VERSUS_START + offset;
+        int source = FindClassLimitGroupSource(offset);
+        if (source < 0)
+            continue;
 
-        if (g_bTargetReady[base])
-        {
-            if (!g_bTargetReady[versus] || g_iTarget[versus] != g_iTarget[base])
-                SetTarget(versus, g_iTarget[base], "base class pair target");
-        }
-        else if (g_bTargetReady[versus])
-        {
-            SetTarget(base, g_iTarget[versus], "versus class pair target");
-        }
+        SetClassLimitGroupTarget(source, g_iTarget[source], "class limit group target", false);
     }
 }
 
-static int GetPairIndex(int index)
+static int FindClassLimitGroupSource(int offset)
+{
+    int starts[3] = { INDEX_CLASS_BASE_START, INDEX_CLASS_VERSUS_START, INDEX_CLASS_INF_START };
+
+    for (int i = 0; i < sizeof(starts); i++)
+    {
+        int member = starts[i] + offset;
+        if (g_bTargetReady[member])
+            return member;
+    }
+
+    return -1;
+}
+
+static void SetClassLimitGroupTarget(int index, int value, const char[] reason, bool armAuthorization)
+{
+    int offset = GetClassLimitOffset(index);
+    if (offset < 0)
+        return;
+
+    int starts[3] = { INDEX_CLASS_BASE_START, INDEX_CLASS_VERSUS_START, INDEX_CLASS_INF_START };
+
+    for (int i = 0; i < sizeof(starts); i++)
+    {
+        int member = starts[i] + offset;
+        SetTarget(member, value, reason);
+
+        if (armAuthorization)
+            ArmAuthorization(member, value);
+    }
+}
+
+static bool IsClassLimitIndex(int index)
+{
+    return GetClassGroupStartIndex(index) >= 0;
+}
+
+static int GetClassLimitOffset(int index)
+{
+    int start = GetClassGroupStartIndex(index);
+    if (start < 0)
+        return -1;
+
+    return index - start;
+}
+
+static int GetClassGroupStartIndex(int index)
 {
     if (index >= INDEX_CLASS_BASE_START && index < INDEX_CLASS_BASE_START + SI_CLASS_COUNT)
-        return INDEX_CLASS_VERSUS_START + (index - INDEX_CLASS_BASE_START);
+        return INDEX_CLASS_BASE_START;
 
     if (index >= INDEX_CLASS_VERSUS_START && index < INDEX_CLASS_VERSUS_START + SI_CLASS_COUNT)
-        return INDEX_CLASS_BASE_START + (index - INDEX_CLASS_VERSUS_START);
+        return INDEX_CLASS_VERSUS_START;
+
+    if (index >= INDEX_CLASS_INF_START && index < INDEX_CLASS_INF_START + SI_CLASS_COUNT)
+    {
+        return INDEX_CLASS_INF_START;
+    }
 
     return -1;
 }
@@ -576,7 +638,7 @@ static bool ReadCommandIntArg(int arg, int &value)
     return true;
 }
 
-static bool ShouldSyncClassPairs()
+static bool ShouldSyncClassLimits()
 {
     return (g_hSyncVersus == null || g_hSyncVersus.BoolValue);
 }

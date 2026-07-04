@@ -412,13 +412,13 @@ void CreateMenusIfReady()
 
 	if (g_iCampaignMenu == -1)
 	{
-		g_iCampaignMenu = ExtraMenu_Create(false, "", false);
+		g_iCampaignMenu = ExtraMenu_Create(false, "", true);
 		BuildCampaignMenu(g_iCampaignMenu);
 	}
 
 	if (g_iAnneMenu == -1)
 	{
-		g_iAnneMenu = ExtraMenu_Create(false, "", false);
+		g_iAnneMenu = ExtraMenu_Create(false, "", true);
 		BuildAnneMenu(g_iAnneMenu);
 	}
 }
@@ -512,7 +512,7 @@ bool IsPluginRunningByFile(const char[] filename)
 void BuildCampaignMenu(int menu)
 {
 	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "W/S或方向键移动，A/D或方向键调整/确认", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "1/2调整/确认，3/4移动，0退出", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "1. 插件状态: 战役模式", MENU_SELECT_ONLY);
@@ -523,14 +523,14 @@ void BuildCampaignMenu(int menu)
 	ExtraMenu_AddEntry(menu, "6. Relax阶段: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvDirRelaxEnable, 1));
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用当前设置（右确认）", MENU_SELECT_ONLY, true);
+	ExtraMenu_AddEntry(menu, "应用当前设置（2确认）", MENU_SELECT_ONLY, true);
 	AddCampaignPresetEntries(menu);
 }
 
 void BuildAnneMenu(int menu)
 {
 	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "W/S或方向键移动，A/D或方向键调整/确认", MENU_ENTRY);
+	ExtraMenu_AddEntry(menu, "1/2调整/确认，3/4移动，0退出", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "1. 插件状态: Anne模式", MENU_SELECT_ONLY);
@@ -542,7 +542,7 @@ void BuildAnneMenu(int menu)
 	ExtraMenu_AddEntry(menu, "6. 传送检测: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneTeleportCheck, 5), 1, 0, 30);
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用当前设置（右确认）", MENU_SELECT_ONLY, true);
+	ExtraMenu_AddEntry(menu, "应用当前设置（2确认）", MENU_SELECT_ONLY, true);
 	AddAnnePresetEntries(menu);
 }
 

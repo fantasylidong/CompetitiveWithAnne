@@ -350,6 +350,9 @@ stock bool AntiBait_ShouldReleaseFromIntensive()
     if (gAB.attackableSpread)
         return true;
 
+    if (gAB.state == AB_Recover)
+        return true;
+
     if (!AntiBait_IsStalled() && !gAB.teamHolding)
         return true;
 
@@ -507,12 +510,6 @@ void AntiBait_Update()
         gAB.baselineMaxPct = maxPct;
         gAB.lastProgressTime = now;
         gAB.spreadStallPressure = false;
-
-        if (gAB.state == AB_Pressure && gAB.teamHolding)
-        {
-            AntiBait_Debug("progress while still holding: baseline updated, keep pressure");
-            return;
-        }
 
         if (gAB.state == AB_Pressure)
             AntiBait_SetState(AB_Recover, now, "progress");

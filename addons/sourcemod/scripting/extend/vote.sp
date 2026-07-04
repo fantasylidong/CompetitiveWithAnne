@@ -6,35 +6,29 @@
 #include <left4dhooks>
 #include <colors>
 #undef REQUIRE_PLUGIN
-#include <extra_menu>
 #include <confogl>
 #include <sourcebanspp>
 #include <l4dstats>
 
 #define VOTE_DEFAULT_CONFIG "configs/cfgs.txt"
 #define VOTE_MENU_NAME_LENGTH 128
-#define VOTE_MENU_MAX_CATEGORIES 64
-#define VOTE_EXTRA_MENU_HELP "W/S/方向键上下移动，A/D/方向键左右选择"
 
 bool g_bSourceBansSystemAvailable = false, g_bl4dstatsSystemAvailable = false;
 public void OnAllPluginsLoaded(){
 	g_bSourceBansSystemAvailable = LibraryExists("sourcebans++");
 	g_bl4dstatsSystemAvailable = LibraryExists("l4d_stats");
 	RestoreDefaultVoteFileIfNoMatchMode();
-	QueueCreateExtraVoteMenus();
 }
 public void OnLibraryAdded(const char[] name)
 {
 	if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
-	else if ( StrEqual(name, "extra_menu") ) { QueueCreateExtraVoteMenus(); }
 	else if ( StrEqual(name, "confogl") ) { RestoreDefaultVoteFileIfNoMatchMode(); }
 }
 public void OnLibraryRemoved(const char[] name)
 {
     if ( StrEqual(name, "sourcebans++") ) { g_bSourceBansSystemAvailable = true; }
 	else if ( StrEqual(name, "l4d_stats") ) { g_bl4dstatsSystemAvailable = true; }
-	else if ( StrEqual(name, "extra_menu") ) { DeleteExtraVoteMenus(); }
 }
 
 public Plugin myinfo =
@@ -69,11 +63,6 @@ int
 	banclient,
 	kickclient;
 
-int g_iExtraVoteMenu = -1;
-int g_iExtraCommandMenus[VOTE_MENU_MAX_CATEGORIES];
-int g_iExtraCommandMenuCount;
-char g_sExtraCommandMenuCategories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
-Handle g_hExtraVoteMenuCreateTimer = null;
 Handle g_hDefaultVoteFileTimer = null;
 
 
@@ -96,12 +85,10 @@ public void OnPluginStart()
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
-	QueueCreateExtraVoteMenus();
 }
 
 public void FileLocationChanged(ConVar convar, const char[] oldValue, const char[] newValue){
 	char g_sBuffer[128];
-	DeleteExtraVoteMenus();
 	GetConVarString(g_hVoteFilelocation, g_sVoteFile, sizeof(g_sVoteFile));
 	//GetGameFolderName(g_sBuffer, sizeof(g_sBuffer));
 	g_hCfgsKV = CreateKeyValues("Cfgs", "", "");
@@ -110,23 +97,15 @@ public void FileLocationChanged(ConVar convar, const char[] oldValue, const char
 	{
 		SetFailState("无法加载%s文件!", g_sVoteFile);
 	}
-	QueueCreateExtraVoteMenus();
 }
 
 public void OnPluginEnd()
 {
-	if (g_hExtraVoteMenuCreateTimer != null)
-	{
-		KillTimer(g_hExtraVoteMenuCreateTimer);
-		g_hExtraVoteMenuCreateTimer = null;
-	}
 	if (g_hDefaultVoteFileTimer != null)
 	{
 		KillTimer(g_hDefaultVoteFileTimer);
 		g_hDefaultVoteFileTimer = null;
 	}
-
-	DeleteExtraVoteMenus();
 }
 
 public void LGO_OnMatchModeUnloaded()
@@ -219,27 +198,7 @@ bool FindConfigName(char[] cfg, char[] message, int maxlength)
 
 void ShowVoteMenu(int client)
 {
-	if (DisplayVoteExtraMenu(client))
-	{
-		return;
-	}
-
 	DisplayBuiltinVoteMenu(client);
-}
-
-bool DisplayVoteExtraMenu(int client)
-{
-	if (g_iExtraVoteMenu == -1)
-	{
-		CreateExtraVoteMenusIfReady();
-	}
-
-	if (g_iExtraVoteMenu == -1 || GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") != FeatureStatus_Available)
-	{
-		return false;
-	}
-
-	return ExtraMenu_Display(client, g_iExtraVoteMenu, MENU_TIME_FOREVER);
 }
 
 void DisplayBuiltinVoteMenu(int client)
@@ -256,22 +215,6 @@ void DisplayBuiltinVoteMenu(int client)
 		} while (KvGotoNextKey(g_hCfgsKV, true));
 	}
 	DisplayMenu(hMenu, client, 20);
-}
-
-bool DisplayExtraVoteCommandMenu(int client, const char[] category)
-{
-	if (GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") != FeatureStatus_Available)
-	{
-		return false;
-	}
-
-	int menu = FindExtraVoteCommandMenu(category);
-	if (menu == -1)
-	{
-		return false;
-	}
-
-	return ExtraMenu_Display(client, menu, MENU_TIME_FOREVER);
 }
 
 bool DisplayBuiltinVoteCommandMenu(int client, const char[] category)
@@ -339,11 +282,6 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 
 void HandleVoteCategorySelected(int client, const char[] category)
 {
-	if (DisplayExtraVoteCommandMenu(client, category))
-	{
-		return;
-	}
-
 	if (!DisplayBuiltinVoteCommandMenu(client, category))
 	{
 		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
@@ -373,65 +311,6 @@ void HandleVoteCommandSelected(int client, const char[] command, const char[] me
 	{
 		FakeClientCommand(client, "sm_votekick");
 	}
-}
-
-public void ExtraMenu_OnSelect(int client, int menu_id, int option, int value)
-{
-	if (menu_id == g_iExtraVoteMenu)
-	{
-		if (option < 0)
-		{
-			return;
-		}
-
-		char category[VOTE_MENU_NAME_LENGTH];
-		if (FindVoteCategoryByOption(option, category, sizeof(category)))
-		{
-			HandleVoteCategorySelected(client, category);
-		}
-		return;
-	}
-
-	char category[VOTE_MENU_NAME_LENGTH];
-	if (!FindExtraVoteCommandMenuCategory(menu_id, category, sizeof(category)))
-	{
-		return;
-	}
-
-	if (option < 0)
-	{
-		ShowVoteMenu(client);
-		return;
-	}
-
-	char command[VOTE_MENU_NAME_LENGTH];
-	char message[VOTE_MENU_NAME_LENGTH];
-	if (FindVoteCommandByOption(category, option, command, sizeof(command), message, sizeof(message)))
-	{
-		HandleVoteCommandSelected(client, command, message);
-	}
-	else
-	{
-		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
-		ShowVoteMenu(client);
-	}
-}
-
-void QueueCreateExtraVoteMenus()
-{
-	if (g_hExtraVoteMenuCreateTimer != null)
-	{
-		return;
-	}
-
-	g_hExtraVoteMenuCreateTimer = CreateTimer(0.1, Timer_CreateExtraVoteMenus, _, TIMER_FLAG_NO_MAPCHANGE);
-}
-
-Action Timer_CreateExtraVoteMenus(Handle timer)
-{
-	g_hExtraVoteMenuCreateTimer = null;
-	CreateExtraVoteMenusIfReady();
-	return Plugin_Stop;
 }
 
 void QueueRestoreDefaultVoteFile()
@@ -486,173 +365,6 @@ void RestoreDefaultVoteFile()
 	}
 
 	g_hVoteFilelocation.RestoreDefault();
-}
-
-void CreateExtraVoteMenusIfReady()
-{
-	if (g_hCfgsKV == null || GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") != FeatureStatus_Available)
-	{
-		return;
-	}
-
-	DeleteExtraVoteMenus();
-
-	g_iExtraVoteMenu = ExtraMenu_Create(false, "", false);
-	if (g_iExtraVoteMenu == -1)
-	{
-		return;
-	}
-
-	ExtraMenu_AddEntry(g_iExtraVoteMenu, "选择:", MENU_ENTRY);
-	AddExtraVoteMenuHelp(g_iExtraVoteMenu);
-
-	char categories[VOTE_MENU_MAX_CATEGORIES][VOTE_MENU_NAME_LENGTH];
-	int categoryCount;
-	KvRewind(g_hCfgsKV);
-	if (KvGotoFirstSubKey(g_hCfgsKV, true))
-	{
-		do {
-			if (categoryCount >= VOTE_MENU_MAX_CATEGORIES)
-			{
-				break;
-			}
-
-			KvGetSectionName(g_hCfgsKV, categories[categoryCount], VOTE_MENU_NAME_LENGTH);
-			ExtraMenu_AddEntry(g_iExtraVoteMenu, categories[categoryCount], MENU_SELECT_ONLY);
-			categoryCount++;
-		} while (KvGotoNextKey(g_hCfgsKV, true));
-	}
-
-	for (int i = 0; i < categoryCount; i++)
-	{
-		CreateExtraVoteCommandMenu(categories[i]);
-	}
-}
-
-void CreateExtraVoteCommandMenu(const char[] category)
-{
-	if (g_iExtraCommandMenuCount >= VOTE_MENU_MAX_CATEGORIES)
-	{
-		return;
-	}
-
-	KvRewind(g_hCfgsKV);
-	if (!KvJumpToKey(g_hCfgsKV, category, false) || !KvGotoFirstSubKey(g_hCfgsKV, true))
-	{
-		return;
-	}
-
-	int menu = ExtraMenu_Create(true, "", false);
-	if (menu == -1)
-	{
-		return;
-	}
-
-	char entry[VOTE_MENU_NAME_LENGTH];
-	Format(entry, sizeof(entry), "选择 %s :", category);
-	ExtraMenu_AddEntry(menu, entry, MENU_ENTRY);
-	AddExtraVoteMenuHelp(menu);
-
-	do {
-		KvGetString(g_hCfgsKV, "message", entry, sizeof(entry), "");
-		ExtraMenu_AddEntry(menu, entry, MENU_SELECT_ONLY, true);
-	} while (KvGotoNextKey(g_hCfgsKV, true));
-
-	g_iExtraCommandMenus[g_iExtraCommandMenuCount] = menu;
-	strcopy(g_sExtraCommandMenuCategories[g_iExtraCommandMenuCount], VOTE_MENU_NAME_LENGTH, category);
-	g_iExtraCommandMenuCount++;
-}
-
-void AddExtraVoteMenuHelp(int menu)
-{
-	ExtraMenu_AddEntry(menu, VOTE_EXTRA_MENU_HELP, MENU_ENTRY);
-}
-
-void DeleteExtraVoteMenus()
-{
-	bool canDelete = GetFeatureStatus(FeatureType_Native, "ExtraMenu_Delete") == FeatureStatus_Available;
-	if (canDelete && g_iExtraVoteMenu != -1)
-	{
-		ExtraMenu_Delete(g_iExtraVoteMenu);
-	}
-	g_iExtraVoteMenu = -1;
-
-	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
-	{
-		if (canDelete && g_iExtraCommandMenus[i] != -1)
-		{
-			ExtraMenu_Delete(g_iExtraCommandMenus[i]);
-		}
-		g_iExtraCommandMenus[i] = -1;
-		g_sExtraCommandMenuCategories[i][0] = '\0';
-	}
-	g_iExtraCommandMenuCount = 0;
-}
-
-int FindExtraVoteCommandMenu(const char[] category)
-{
-	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
-	{
-		if (StrEqual(g_sExtraCommandMenuCategories[i], category, false))
-		{
-			return g_iExtraCommandMenus[i];
-		}
-	}
-
-	return -1;
-}
-
-bool FindExtraVoteCommandMenuCategory(int menu, char[] category, int maxlength)
-{
-	for (int i = 0; i < g_iExtraCommandMenuCount; i++)
-	{
-		if (g_iExtraCommandMenus[i] == menu)
-		{
-			strcopy(category, maxlength, g_sExtraCommandMenuCategories[i]);
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool FindVoteCategoryByOption(int option, char[] category, int maxlength)
-{
-	int currentOption;
-	KvRewind(g_hCfgsKV);
-	if (KvGotoFirstSubKey(g_hCfgsKV, true))
-	{
-		do {
-			if (currentOption == option)
-			{
-				KvGetSectionName(g_hCfgsKV, category, maxlength);
-				return true;
-			}
-			currentOption++;
-		} while (KvGotoNextKey(g_hCfgsKV, true));
-	}
-
-	return false;
-}
-
-bool FindVoteCommandByOption(const char[] category, int option, char[] command, int commandMaxLength, char[] message, int messageMaxLength)
-{
-	int currentOption;
-	KvRewind(g_hCfgsKV);
-	if (KvJumpToKey(g_hCfgsKV, category, false) && KvGotoFirstSubKey(g_hCfgsKV, true))
-	{
-		do {
-			if (currentOption == option)
-			{
-				KvGetSectionName(g_hCfgsKV, command, commandMaxLength);
-				KvGetString(g_hCfgsKV, "message", message, messageMaxLength, "");
-				return true;
-			}
-			currentOption++;
-		} while (KvGotoNextKey(g_hCfgsKV, true));
-	}
-
-	return false;
 }
 
 bool IsSpawnVoteMenuCommand(const char[] command)

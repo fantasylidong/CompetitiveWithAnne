@@ -280,16 +280,19 @@ public void Event_MapTransition(Event event, const char[] name, bool dontBroadca
 
 public void Event_FinaleVehicleLeaving(Event event, const char[] name, bool dontBroadcast)
 {
-	char sMapName_New[BUF_SZ], sMapName_Old[BUF_SZ];
-	GetArrayString(g_hArrayMapOrder, g_iMapsPlayed, sMapName_New, BUF_SZ);
-	GetArrayString(g_hArrayMapOrder, g_iMapsPlayed - 1, sMapName_Old, BUF_SZ);
-	
-	if (IsCoop() && !(StrEqual(sMapName_Old, "c9m2_lots"))) {
-		if (g_bMapsetInitialized) {
-			PerformMapProgression();
+	if (!g_bMapsetInitialized || !g_bMaplistFinalized || !IsCoop()) {
+		return;
+	}
+
+	char sMapName_Old[BUF_SZ];
+	if (g_iMapsPlayed > 0) {
+		GetArrayString(g_hArrayMapOrder, g_iMapsPlayed - 1, sMapName_Old, BUF_SZ);
+		if (StrEqual(sMapName_Old, "c9m2_lots")) {
 			return;
 		}
 	}
+
+	PerformMapProgression();
 }
 
 public void L4D2_OnEndVersusModeRound_Post() 
