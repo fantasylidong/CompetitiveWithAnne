@@ -6,9 +6,10 @@
 #include <builtinvotes>
 #include <builtinvotes_stocks>
 #include <colors>
+#undef REQUIRE_PLUGIN
 #include <extra_menu>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 #define VOTE_TIME 20
 #define MENU_TIME MENU_TIME_FOREVER
 #define SPAWN_MENU_UNSET -999999
@@ -190,24 +191,16 @@ Action Cmd_SpawnVote(int client, int args)
 	{
 		case SpawnVoteMode_Campaign:
 		{
-			if (g_iCampaignMenu == -1)
+			if (!DisplayCampaignSpawnVoteMenu(client))
 			{
-				CreateMenusIfReady();
-			}
-			if (g_iCampaignMenu != -1)
-			{
-				ExtraMenu_Display(client, g_iCampaignMenu, MENU_TIME);
+				CPrintToChat(client, "%t", "SpawnVote_MenuBackendUnavailable");
 			}
 		}
 		case SpawnVoteMode_Anne:
 		{
-			if (g_iAnneMenu == -1)
+			if (!DisplayAnneSpawnVoteMenu(client))
 			{
-				CreateMenusIfReady();
-			}
-			if (g_iAnneMenu != -1)
-			{
-				ExtraMenu_Display(client, g_iAnneMenu, MENU_TIME);
+				CPrintToChat(client, "%t", "SpawnVote_MenuBackendUnavailable");
 			}
 		}
 		default:
@@ -389,14 +382,19 @@ void RefreshSpawnVoteConVars()
 
 SpawnVoteMode DetectSpawnVoteMode()
 {
-	if (g_cvDirCount != null && g_cvDirInterval != null)
-	{
-		return SpawnVoteMode_Campaign;
-	}
-
-	if (g_cvAnneLimit != null && g_cvAnneInterval != null && g_cvAnneAutoSpawn != null)
+	if (IsPluginRunningByFile("optional/AnneHappy/infected_control.smx")
+		&& g_cvAnneLimit != null
+		&& g_cvAnneInterval != null
+		&& g_cvAnneAutoSpawn != null)
 	{
 		return SpawnVoteMode_Anne;
+	}
+
+	if (IsPluginRunningByFile("optional/AnneHappy/l4d2_dirspawn.smx")
+		&& g_cvDirCount != null
+		&& g_cvDirInterval != null)
+	{
+		return SpawnVoteMode_Campaign;
 	}
 
 	return SpawnVoteMode_None;
@@ -406,7 +404,7 @@ void CreateMenusIfReady()
 {
 	RefreshSpawnVoteConVars();
 
-	if (GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") != FeatureStatus_Available)
+	if (!CanBuildExtraMenus())
 	{
 		return;
 	}
@@ -432,6 +430,13 @@ void RebuildSpawnVoteMenus()
 
 void DeleteSpawnVoteMenus()
 {
+	if (GetFeatureStatus(FeatureType_Native, "ExtraMenu_Delete") != FeatureStatus_Available)
+	{
+		g_iCampaignMenu = -1;
+		g_iAnneMenu = -1;
+		return;
+	}
+
 	if (g_iCampaignMenu != -1)
 	{
 		ExtraMenu_Delete(g_iCampaignMenu);
@@ -443,6 +448,54 @@ void DeleteSpawnVoteMenus()
 		ExtraMenu_Delete(g_iAnneMenu);
 		g_iAnneMenu = -1;
 	}
+}
+
+bool CanBuildExtraMenus()
+{
+	return GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") == FeatureStatus_Available
+		&& GetFeatureStatus(FeatureType_Native, "ExtraMenu_AddEntry") == FeatureStatus_Available
+		&& GetFeatureStatus(FeatureType_Native, "ExtraMenu_AddOptions") == FeatureStatus_Available;
+}
+
+bool CanDisplayExtraMenus()
+{
+	return GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") == FeatureStatus_Available;
+}
+
+bool DisplayCampaignSpawnVoteMenu(int client)
+{
+	if (g_iCampaignMenu == -1)
+	{
+		CreateMenusIfReady();
+	}
+
+	if (g_iCampaignMenu == -1 || !CanDisplayExtraMenus())
+	{
+		return false;
+	}
+
+	return ExtraMenu_Display(client, g_iCampaignMenu, MENU_TIME);
+}
+
+bool DisplayAnneSpawnVoteMenu(int client)
+{
+	if (g_iAnneMenu == -1)
+	{
+		CreateMenusIfReady();
+	}
+
+	if (g_iAnneMenu == -1 || !CanDisplayExtraMenus())
+	{
+		return false;
+	}
+
+	return ExtraMenu_Display(client, g_iAnneMenu, MENU_TIME);
+}
+
+bool IsPluginRunningByFile(const char[] filename)
+{
+	Handle plugin = FindPluginByFile(filename);
+	return plugin != INVALID_HANDLE && GetPluginStatus(plugin) == Plugin_Running;
 }
 
 void BuildCampaignMenu(int menu)

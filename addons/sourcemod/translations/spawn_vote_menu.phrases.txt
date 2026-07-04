@@ -12,6 +12,10 @@
 	{
 		"en"		"[{blue}Spawn Vote{default}] No supported spawn controller is available in the current mode."
 	}
+	"SpawnVote_MenuBackendUnavailable"
+	{
+		"en"		"[{blue}Spawn Vote{default}] The extra_menu plugin is not loaded, so the spawn menu cannot be displayed."
+	}
 	"SpawnVote_CampaignStatus"
 	{
 		"en"		"[{blue}Spawn Vote{default}] This menu controls campaign dirspawn settings."

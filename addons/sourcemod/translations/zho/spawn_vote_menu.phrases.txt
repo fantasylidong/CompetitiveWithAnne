@@ -12,6 +12,10 @@
 	{
 		"zho"		"[{blue}刷特{default}] 目前模式沒有可用的刷特控制插件。"
 	}
+	"SpawnVote_MenuBackendUnavailable"
+	{
+		"zho"		"[{blue}刷特{default}] extra_menu 插件沒有載入，無法顯示刷特選單。"
+	}
 	"SpawnVote_CampaignStatus"
 	{
 		"zho"		"[{blue}刷特{default}] 目前選單控制戰役 dirspawn。"
