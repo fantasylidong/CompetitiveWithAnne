@@ -285,6 +285,7 @@ public void OnPluginStart()
 	LoadTranslations("infected_control.phrases");
     SpawnPerfConfig_Create();
     gCV.Create();
+    ClassCapMirrors_Create();
     gQ.Create();
     gST.Reset();
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
