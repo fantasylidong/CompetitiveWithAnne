@@ -129,11 +129,11 @@
 	}
 	"Tank选项"
 	{
-		"sm_cvar ai_tank_bhop 1"
+		"exec vote/tank_bhop_on.cfg"
 		{
 			"message" "开启Tank连跳"
 		}
-		"sm_cvar ai_tank_bhop 0"
+		"exec vote/tank_bhop_off.cfg"
 		{
 			"message" "关闭Tank连跳"
 		}

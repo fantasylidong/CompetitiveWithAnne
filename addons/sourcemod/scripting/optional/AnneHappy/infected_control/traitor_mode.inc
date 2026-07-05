@@ -4,6 +4,13 @@
 #define _infected_control_traitor_mode_included
 
 #define TRAITOR_SPAWN_WINDOW_SECONDS 5
+#define TRAITOR_ROUND_AUTH_LENGTH 64
+#define TRAITOR_CLASS_TANK ZC_TANK
+#define TRAITOR_CLASS_MASK_TANK (1 << SI_COUNT)
+#define TRAITOR_CLASS_MASK_ALL ((1 << (SI_COUNT + 1)) - 1)
+#define TRAITOR_TANK_MIN_DAMAGE 100
+#define TRAITOR_TANK_BLOCK_SECONDS (3 * 24 * 60 * 60)
+#define TRAITOR_TANK_BLOCK_DAYS 3
 
 enum TraitorState
 {
@@ -21,8 +28,12 @@ static int g_ITReleaseWave[MAXPLAYERS + 1];
 static int g_ITUsesThisRound[MAXPLAYERS + 1];
 static int g_ITWaitOrder[MAXPLAYERS + 1];
 static int g_ITNextWaitOrder = 1;
+static bool g_ITDidDamage[MAXPLAYERS + 1];
+static int g_ITDamageTotal[MAXPLAYERS + 1];
+static bool g_ITNoDamageBlockedThisRound[MAXPLAYERS + 1];
 static float g_ITSpawnDeadline[MAXPLAYERS + 1];
 static Handle g_ITSpawnTimer[MAXPLAYERS + 1];
+static StringMap g_ITNoDamageBlockedAuths = null;
 
 static bool Traitor_IsManagedClient(int client)
 {
@@ -37,14 +48,18 @@ public any Native_InfectedControlIsTraitorClient(Handle plugin, int numParams)
 
 bool Traitor_IsActiveClient(int client)
 {
+    return Traitor_IsAliveClient(client) && g_ITClass[client] >= 1 && g_ITClass[client] <= SI_COUNT;
+}
+
+bool Traitor_IsAliveClient(int client)
+{
     return IsValidClient(client)
         && !IsFakeClient(client)
         && GetClientTeam(client) == TEAM_INFECTED
         && g_ITState[client] == Traitor_Alive
         && IsPlayerAlive(client)
         && !IsGhost(client)
-        && g_ITClass[client] >= 1
-        && g_ITClass[client] <= SI_COUNT;
+        && Traitor_IsSupportedClass(g_ITClass[client]);
 }
 
 bool IsCountedSpecial(int client)
@@ -78,6 +93,62 @@ static void Traitor_CancelSpawnTimer(int client)
     g_ITSpawnDeadline[client] = 0.0;
 }
 
+static void Traitor_EnsureNoDamageBlockMap()
+{
+    if (g_ITNoDamageBlockedAuths == null)
+        g_ITNoDamageBlockedAuths = new StringMap();
+}
+
+static bool Traitor_GetClientAuth(int client, char[] auth, int maxlen)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return false;
+
+    if (!GetClientAuthId(client, AuthId_Steam2, auth, maxlen, true))
+        return false;
+
+    return auth[0] != '\0'
+        && !StrEqual(auth, "BOT", false)
+        && !StrEqual(auth, "STEAM_ID_PENDING", false)
+        && !StrEqual(auth, "STEAM_ID_STOP_IGNORING_RETVALS", false);
+}
+
+static void Traitor_SetNoDamageRoundBlock(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_ITNoDamageBlockedThisRound[client] = true;
+    Traitor_EnsureNoDamageBlockMap();
+
+    char auth[TRAITOR_ROUND_AUTH_LENGTH];
+    if (Traitor_GetClientAuth(client, auth, sizeof(auth)))
+        g_ITNoDamageBlockedAuths.SetValue(auth, 1);
+}
+
+static bool Traitor_IsNoDamageRoundBlocked(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return false;
+
+    if (g_ITNoDamageBlockedThisRound[client])
+        return true;
+
+    if (g_ITNoDamageBlockedAuths == null)
+        return false;
+
+    char auth[TRAITOR_ROUND_AUTH_LENGTH];
+    if (!Traitor_GetClientAuth(client, auth, sizeof(auth)))
+        return false;
+
+    int blocked;
+    if (!g_ITNoDamageBlockedAuths.GetValue(auth, blocked))
+        return false;
+
+    g_ITNoDamageBlockedThisRound[client] = true;
+    return true;
+}
+
 int Traitor_CountReservedClassSlots(int zc)
 {
     if (zc < 1 || zc > SI_COUNT)
@@ -108,8 +179,12 @@ static int Traitor_CountReservedSlotsForWave(int waveIndex)
     int count = 0;
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (Traitor_IsReservedState(g_ITState[client]) && g_ITReleaseWave[client] == waveIndex)
+        if (Traitor_IsReservedState(g_ITState[client])
+            && g_ITReleaseWave[client] == waveIndex
+            && g_ITClass[client] != TRAITOR_CLASS_TANK)
+        {
             count++;
+        }
     }
     return count;
 }
@@ -187,6 +262,12 @@ static int Traitor_FindNextWaitingClient()
             continue;
         }
 
+        if (g_ITClass[client] == TRAITOR_CLASS_TANK && !TraitorQuota_CanUseTank(client))
+        {
+            Traitor_ClearClient(client);
+            continue;
+        }
+
         int order = g_ITWaitOrder[client];
         if (order <= 0)
             order = 999999;
@@ -229,7 +310,7 @@ static void Traitor_ReplaceExpiredSlotWithAI(int client)
     if (client < 1 || client > MaxClients)
         return;
 
-    if (gST.siQueueCount < gCV.iSiLimit)
+    if (g_ITClass[client] != TRAITOR_CLASS_TANK && gST.siQueueCount < gCV.iSiLimit)
         gST.siQueueCount++;
 
     Debug_Print("[TRAITOR] %N spawn window expired, returned slot to AI queue=%d", client, gST.siQueueCount);
@@ -249,28 +330,35 @@ static void Traitor_ShowSpawnCountdown(int client)
 
 static int Traitor_GetAllowedClassMask()
 {
-    int mask = gCV.iEnableMask & 63;
-    if (gCV.iTraitorClassMask > 0)
-        mask &= gCV.iTraitorClassMask;
+    int mask = gCV.iTraitorClassMask;
+    if (mask <= 0)
+        mask = TRAITOR_CLASS_MASK_ALL;
 
-    if (gCV.AllCharger.BoolValue)
-        mask &= ENABLE_CHARGER;
+    return mask & TRAITOR_CLASS_MASK_ALL;
+}
 
-    if (gCV.AllHunter.BoolValue)
-        mask &= ENABLE_HUNTER;
+static bool Traitor_IsSupportedClass(int zc)
+{
+    return (zc >= 1 && zc <= SI_COUNT) || zc == TRAITOR_CLASS_TANK;
+}
 
-    return mask;
+static int Traitor_GetClassBit(int zc)
+{
+    if (zc >= 1 && zc <= SI_COUNT)
+        return 1 << (zc - 1);
+
+    if (zc == TRAITOR_CLASS_TANK)
+        return TRAITOR_CLASS_MASK_TANK;
+
+    return 0;
 }
 
 static bool Traitor_IsClassSelectable(int zc)
 {
-    if (zc < 1 || zc > SI_COUNT)
+    if (!Traitor_IsSupportedClass(zc))
         return false;
 
-    if (!CheckClassEnabled(zc))
-        return false;
-
-    int bit = 1 << (zc - 1);
+    int bit = Traitor_GetClassBit(zc);
     return (Traitor_GetAllowedClassMask() & bit) != 0;
 }
 
@@ -282,12 +370,16 @@ static int Traitor_CountSelectableClasses()
         if (Traitor_IsClassSelectable(zc))
             count++;
     }
+
+    if (Traitor_IsClassSelectable(TRAITOR_CLASS_TANK))
+        count++;
+
     return count;
 }
 
 int Traitor_PickRandomEnabledClass()
 {
-    int classes[SI_COUNT];
+    int classes[SI_COUNT + 1];
     int count = 0;
 
     for (int zc = 1; zc <= SI_COUNT; zc++)
@@ -297,6 +389,9 @@ int Traitor_PickRandomEnabledClass()
 
         classes[count++] = zc;
     }
+
+    if (Traitor_IsClassSelectable(TRAITOR_CLASS_TANK))
+        classes[count++] = TRAITOR_CLASS_TANK;
 
     if (count <= 0)
         return 0;
@@ -329,7 +424,26 @@ static int Traitor_ParseClass(const char[] arg)
     if (StrEqual(arg, "ch", false) || StrEqual(arg, "charger", false) || StrEqual(arg, "牛", false))
         return view_as<int>(SI_Charger);
 
+    if (StrEqual(arg, "tank", false) || StrEqual(arg, "tk", false) || StrEqual(arg, "坦克", false))
+        return TRAITOR_CLASS_TANK;
+
     return 0;
+}
+
+static int Traitor_GetClassCost(int zc)
+{
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker): return 3;
+        case view_as<int>(SI_Boomer): return 3;
+        case view_as<int>(SI_Hunter): return 1;
+        case view_as<int>(SI_Spitter): return 3;
+        case view_as<int>(SI_Jockey): return 1;
+        case view_as<int>(SI_Charger): return 3;
+        case TRAITOR_CLASS_TANK: return 50;
+    }
+
+    return 1;
 }
 
 static bool Traitor_GetClassPhrase(int zc, char[] phrase, int maxlen)
@@ -366,6 +480,11 @@ static bool Traitor_GetClassPhrase(int zc, char[] phrase, int maxlen)
             strcopy(phrase, maxlen, "InfectedControl_TraitorClassCharger");
             return true;
         }
+        case TRAITOR_CLASS_TANK:
+        {
+            strcopy(phrase, maxlen, "InfectedControl_TraitorClassTank");
+            return true;
+        }
     }
 
     phrase[0] = '\0';
@@ -387,15 +506,61 @@ static void Traitor_FormatClassName(int zc, int client, char[] buffer, int maxle
         strcopy(buffer, maxlen, "unknown");
 }
 
-static bool Traitor_CheckUseLimit(int client)
+static bool Traitor_CheckUseLimit(int client, int zc = 0)
 {
-    if (gCV.iTraitorAdminLimit <= 0)
-        return true;
+    if (zc == TRAITOR_CLASS_TANK && !TraitorQuota_CanUseTank(client))
+        return false;
 
     if (g_ITState[client] != Traitor_None)
         return true;
 
-    return g_ITUsesThisRound[client] < gCV.iTraitorAdminLimit;
+    if (Traitor_IsNoDamageRoundBlocked(client))
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorRoundBlockedNoDamage");
+        return false;
+    }
+
+    if (gCV.iTraitorAdminLimit > 0 && g_ITUsesThisRound[client] >= gCV.iTraitorAdminLimit)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorLimitReached", gCV.iTraitorAdminLimit);
+        return false;
+    }
+
+    return TraitorQuota_CanUse(client, Traitor_GetClassCost(zc));
+}
+
+static void Traitor_PrintPenaltyWarnings(int client, int zc)
+{
+    CPrintToChat(client, "%t", "InfectedControl_TraitorPenaltyNoDamageWarning");
+
+    if (zc == TRAITOR_CLASS_TANK)
+    {
+        CPrintToChat(client, "%t",
+            "InfectedControl_TraitorPenaltyTankDamageWarning",
+            TRAITOR_TANK_MIN_DAMAGE,
+            TRAITOR_TANK_BLOCK_DAYS);
+    }
+}
+
+static void Traitor_FinalizeAliveClient(int client)
+{
+    if (client < 1 || client > MaxClients || g_ITState[client] != Traitor_Alive)
+        return;
+
+    if (g_ITClass[client] != TRAITOR_CLASS_TANK)
+        return;
+
+    if (g_ITDamageTotal[client] >= TRAITOR_TANK_MIN_DAMAGE)
+        return;
+
+    if (TraitorQuota_BlockTank(client, TRAITOR_TANK_BLOCK_SECONDS))
+    {
+        CPrintToChat(client, "%t",
+            "InfectedControl_TraitorTankDamagePunished",
+            g_ITDamageTotal[client],
+            TRAITOR_TANK_MIN_DAMAGE,
+            TRAITOR_TANK_BLOCK_DAYS);
+    }
 }
 
 static void Traitor_ClearClient(int client)
@@ -407,11 +572,16 @@ static void Traitor_ClearClient(int client)
     g_ITClass[client] = 0;
     g_ITReleaseWave[client] = 0;
     g_ITWaitOrder[client] = 0;
+    g_ITDidDamage[client] = false;
+    g_ITDamageTotal[client] = 0;
     Traitor_CancelSpawnTimer(client);
 }
 
 void Traitor_ResetAll(bool moveClientsToSpec)
 {
+    Traitor_EnsureNoDamageBlockMap();
+    g_ITNoDamageBlockedAuths.Clear();
+
     for (int client = 1; client <= MaxClients; client++)
     {
         if (moveClientsToSpec && Traitor_IsManagedClient(client) && IsClientInGame(client) && GetClientTeam(client) == TEAM_INFECTED)
@@ -419,6 +589,7 @@ void Traitor_ResetAll(bool moveClientsToSpec)
 
         Traitor_ClearClient(client);
         g_ITUsesThisRound[client] = 0;
+        g_ITNoDamageBlockedThisRound[client] = false;
     }
     g_ITNextWaitOrder = 1;
 }
@@ -443,6 +614,13 @@ static bool Traitor_PrepareGhostClient(int client, int zc)
     if (GetClientTeam(client) != TEAM_INFECTED)
         ChangeClientTeam(client, TEAM_INFECTED);
 
+    if (zc == TRAITOR_CLASS_TANK)
+    {
+        L4D_State_Transition(client, STATE_GHOST);
+        L4D_SetClass(client, zc);
+        return IsGhost(client) && GetEntProp(client, Prop_Send, "m_zombieClass") == TRAITOR_CLASS_TANK;
+    }
+
     L4D_SetClass(client, zc);
     L4D_RespawnPlayer(client, false);
     L4D_SetClass(client, zc);
@@ -465,12 +643,6 @@ static bool Traitor_QueueClient(int client, int zc)
         return false;
     }
 
-    if (!Traitor_CheckUseLimit(client))
-    {
-        CPrintToChat(client, "%t", "InfectedControl_TraitorLimitReached", gCV.iTraitorAdminLimit);
-        return false;
-    }
-
     if (g_ITState[client] != Traitor_None && g_ITState[client] != Traitor_Waiting && g_ITState[client] != Traitor_Armed)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorPending");
@@ -488,6 +660,9 @@ static bool Traitor_QueueClient(int client, int zc)
         CPrintToChat(client, "%t", "InfectedControl_TraitorClassDisabled");
         return false;
     }
+
+    if (!Traitor_CheckUseLimit(client, zc))
+        return false;
 
     bool isNewQueue = (g_ITState[client] == Traitor_None);
     bool hasSlot = (g_ITState[client] == Traitor_Armed || Traitor_CountManagedSlots() < gCV.iTraitorMaxSlots);
@@ -515,6 +690,7 @@ static bool Traitor_QueueClient(int client, int zc)
         CPrintToChat(client, "%t", "InfectedControl_TraitorWaiting", className, Traitor_GetWaitingPosition(client));
         Debug_Print("[TRAITOR] %N waitlisted as %s pos=%d use=%d/%d", client, g_sInfectedClassNames[zc], Traitor_GetWaitingPosition(client), g_ITUsesThisRound[client], gCV.iTraitorAdminLimit);
     }
+    Traitor_PrintPenaltyWarnings(client, zc);
     return true;
 }
 
@@ -543,10 +719,7 @@ static void Traitor_ShowClassMenu(int client)
     }
 
     if (!Traitor_CheckUseLimit(client))
-    {
-        CPrintToChat(client, "%t", "InfectedControl_TraitorLimitReached", gCV.iTraitorAdminLimit);
         return;
-    }
 
     if (gCV.iTraitorMaxSlots <= 0)
     {
@@ -575,6 +748,9 @@ static void Traitor_ShowClassMenu(int client)
 
         Traitor_AddClassMenuItem(menu, zc, client);
     }
+
+    if (Traitor_IsClassSelectable(TRAITOR_CLASS_TANK))
+        Traitor_AddClassMenuItem(menu, TRAITOR_CLASS_TANK, client);
 
     if (!menu.Display(client, MENU_TIME_FOREVER))
         delete menu;
@@ -614,8 +790,93 @@ public int Traitor_MenuHandler(Menu menu, MenuAction action, int client, int ite
     return 0;
 }
 
+void Traitor_OnPlayerHurt(int attacker, int victim, int damage)
+{
+    if (damage <= 0)
+        return;
+
+    if (!Traitor_IsAliveClient(attacker))
+        return;
+
+    if (!IsValidSurvivor(victim))
+        return;
+
+    g_ITDidDamage[attacker] = true;
+    g_ITDamageTotal[attacker] += damage;
+}
+
+static void Traitor_PunishNoDamageClients()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (g_ITState[client] != Traitor_Alive || g_ITDidDamage[client])
+            continue;
+
+        if (!IsValidClient(client)
+            || GetClientTeam(client) != TEAM_INFECTED
+            || !IsPlayerAlive(client)
+            || IsGhost(client))
+        {
+            continue;
+        }
+
+        Traitor_SetNoDamageRoundBlock(client);
+        CPrintToChat(client, "%t", "InfectedControl_TraitorNoDamagePunished");
+        Debug_Print("[TRAITOR] %N slayed and round-blocked for no damage before next countdown", client);
+        ForcePlayerSuicide(client);
+    }
+}
+
+static void Traitor_BroadcastNextWaveStatus(int releaseWave)
+{
+    bool announced = false;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!(g_ITState[client] == Traitor_SpawnLocked && g_ITReleaseWave[client] == releaseWave))
+            continue;
+
+        if (!IsValidClient(client))
+            continue;
+
+        char playerName[MAX_NAME_LENGTH];
+        GetClientName(client, playerName, sizeof(playerName));
+
+        char className[64];
+        Traitor_FormatClassName(g_ITClass[client], client, className, sizeof(className));
+
+        CPrintToChatAll("%t", "InfectedControl_TraitorNextWaveRegistered", playerName, className);
+        announced = true;
+    }
+
+    if (!announced)
+        CPrintToChatAll("%t", "InfectedControl_TraitorNextWaveNone");
+}
+
+Action Traitor_OnPlayerRunCmd(int client, int &buttons)
+{
+    return Traitor_TryAutoBhop(client, buttons);
+}
+
+static Action Traitor_TryAutoBhop(int client, int &buttons)
+{
+    if (!(buttons & IN_JUMP))
+        return Plugin_Continue;
+
+    if (!Traitor_IsAliveClient(client))
+        return Plugin_Continue;
+
+    if (GetEntityFlags(client) & FL_ONGROUND)
+        return Plugin_Continue;
+
+    buttons &= ~IN_JUMP;
+    return Plugin_Changed;
+}
+
 void Traitor_OnFinalRefreshStarted()
 {
+    Traitor_PunishNoDamageClients();
+
     int releaseWave = gST.waveIndex + 1;
     bool freedSlot = false;
 
@@ -640,6 +901,8 @@ void Traitor_OnFinalRefreshStarted()
         CPrintToChat(client, "%t", "InfectedControl_TraitorPending");
         Debug_Print("[TRAITOR] %N locked for wave %d as %s", client, releaseWave, g_sInfectedClassNames[g_ITClass[client]]);
     }
+
+    Traitor_BroadcastNextWaveStatus(releaseWave);
 
     if (freedSlot)
         Traitor_ActivateWaitingClients();
@@ -760,11 +1023,17 @@ public Action L4D_OnMaterializeFromGhostPre(int client)
     if (!IsValidClient(client)
         || g_ITState[client] != Traitor_SpawnAllowed
         || gST.waveIndex < g_ITReleaseWave[client]
-        || gST.totalSI >= gCV.iSiLimit)
+        || (g_ITClass[client] != TRAITOR_CLASS_TANK && gST.totalSI >= gCV.iSiLimit))
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorWaitForWave");
         return Plugin_Handled;
     }
+
+    if (!TraitorQuota_CanUse(client, Traitor_GetClassCost(g_ITClass[client])))
+        return Plugin_Handled;
+
+    if (g_ITClass[client] == TRAITOR_CLASS_TANK && !TraitorQuota_CanUseTank(client))
+        return Plugin_Handled;
 
     return Plugin_Continue;
 }
@@ -775,23 +1044,31 @@ public void L4D_OnMaterializeFromGhost(int client)
         return;
 
     int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
-    if (zc < 1 || zc > SI_COUNT)
+    if (!Traitor_IsSupportedClass(zc))
         zc = g_ITClass[client];
 
-    if (zc < 1 || zc > SI_COUNT)
+    if (!Traitor_IsSupportedClass(zc))
     {
         Traitor_ClearClient(client);
         return;
     }
 
+    TraitorQuota_Consume(client, Traitor_GetClassCost(zc));
+
     g_ITState[client] = Traitor_Alive;
     g_ITClass[client] = zc;
+    g_ITDidDamage[client] = false;
+    g_ITDamageTotal[client] = 0;
     Traitor_CancelSpawnTimer(client);
-    gST.siAlive[zc - 1]++;
-    gST.totalSI++;
+    if (zc >= 1 && zc <= SI_COUNT)
+    {
+        gST.siAlive[zc - 1]++;
+        gST.totalSI++;
+    }
     char className[64];
     Traitor_FormatClassName(zc, client, className, sizeof(className));
     CPrintToChat(client, "%t", "InfectedControl_TraitorSpawned", className);
+    CPrintToChat(client, "%t", "InfectedControl_TraitorBhopEnabled");
     Debug_Print("[TRAITOR] %N materialized as %s", client, g_sInfectedClassNames[zc]);
 }
 
@@ -800,6 +1077,7 @@ bool Traitor_OnPlayerDeath(int client)
     if (!Traitor_IsManagedClient(client))
         return false;
 
+    Traitor_FinalizeAliveClient(client);
     Traitor_ClearClient(client);
     InvalidateBucketShareCache();
     RecalcSiCapFromAlive(false);
@@ -810,9 +1088,13 @@ bool Traitor_OnPlayerDeath(int client)
 void Traitor_OnClientDisconnect(int client)
 {
     bool freedSlot = (client >= 1 && client <= MaxClients && Traitor_IsSlotState(g_ITState[client]));
+    Traitor_FinalizeAliveClient(client);
     Traitor_ClearClient(client);
     if (client >= 1 && client <= MaxClients)
+    {
         g_ITUsesThisRound[client] = 0;
+        g_ITNoDamageBlockedThisRound[client] = false;
+    }
     if (freedSlot)
         Traitor_ActivateWaitingClients();
 }
@@ -830,6 +1112,7 @@ void Traitor_OnClientTeamChanged(int client, int oldTeam, int newTeam)
 
     bool wasAlive = (g_ITState[client] == Traitor_Alive);
     bool freedSlot = Traitor_IsSlotState(g_ITState[client]);
+    Traitor_FinalizeAliveClient(client);
     Traitor_ClearClient(client);
 
     if (wasAlive)

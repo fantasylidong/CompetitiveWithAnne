@@ -41,6 +41,7 @@
 
 #include <sourcemod>
 #include <colors>
+#include <dbi>
 #include <sdktools>
 #include <sdktools_tempents>
 #include <left4dhooks>
@@ -211,6 +212,7 @@ bool CheckClassEnabled(int zc)
 #include "infected_control/spawn_perf_optimizer.inc"
 #include "infected_control/spawn_perf_config.inc"
 #include "infected_control/wave_decider.inc"
+#include "infected_control/traitor_quota.inc"
 #include "infected_control/traitor_mode.inc"
 #include "infected_control/wave_control.inc"
 #include "infected_control/spawn_core.inc"
@@ -285,6 +287,7 @@ public void OnPluginStart()
 	LoadTranslations("infected_control.phrases");
     SpawnPerfConfig_Create();
     gCV.Create();
+    TraitorQuota_Init();
     ClassCapMirrors_Create();
     gQ.Create();
     gST.Reset();
@@ -316,6 +319,7 @@ public void OnPluginStart()
     RegAdminCmd("sm_neigui", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_neigui [class]");
     RegAdminCmd("sm_it", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_it [class]");
     RegAdminCmd("sm_neiguicancel", Cmd_TraitorCancel, ADMFLAG_ROOT, "取消内鬼刷特队列");
+    AddCommandListener(InfectedControl_OnTraitorCvarCommand, "sm_cvar");
 
     RegisterSpawnPerfCommands();
 
@@ -334,6 +338,7 @@ public void OnPluginEnd()
 {
     // 插件结束时清理 Path 缓存
     ClearPathCache();
+    TraitorQuota_Close();
 }
 public void OnMapEnd()
 {
@@ -383,6 +388,23 @@ stock void LogMsg(const char[] fmt, any ...)
 // =========================
 // 管理指令
 // =========================
+public Action InfectedControl_OnTraitorCvarCommand(int client, const char[] command, int argc)
+{
+    if (argc < 2)
+        return Plugin_Continue;
+
+    char cvarName[64];
+    GetCmdArg(1, cvarName, sizeof(cvarName));
+    if (!StrEqual(cvarName, "inf_traitor_max_slots", false))
+        return Plugin_Continue;
+
+    if (client == 0 || CheckCommandAccess(client, "infected_control_traitor_slot_cvar", ADMFLAG_ROOT, true))
+        return Plugin_Continue;
+
+    CPrintToChat(client, "%t", "InfectedControl_TraitorRootCvarOnly", cvarName);
+    return Plugin_Handled;
+}
+
 public Action Cmd_StartSpawn(int client, int args)
 {
     RequestStartSpawn();
@@ -554,10 +576,13 @@ public void Event_AbilityUse(Event event, const char[] name, bool dont_broadcast
 }
 public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast)
 {
-    if (!gCV.bAddDmgSmoker) return;
     int victim   = GetClientOfUserId(GetEventInt(event, "userid"));
     int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
     int dmg      = GetEventInt(event, "dmg_health");
+    Traitor_OnPlayerHurt(attacker, victim, dmg);
+
+    if (!gCV.bAddDmgSmoker) return;
+
     int evHealth = GetEventInt(event, "health");
     if (IsValidSurvivor(attacker) && IsInfectedBot(victim) && GetEntProp(victim, Prop_Send, "m_zombieClass") == view_as<int>(SI_Smoker))
     {
@@ -609,6 +634,12 @@ public void OnClientDisconnect(int client)
 {
     Traitor_OnClientDisconnect(client);
 }
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
+{
+    return Traitor_OnPlayerRunCmd(client, buttons);
+}
+
 static Action Timer_KickBot(Handle timer, int userid)
 {
     int client = GetClientOfUserId(userid);

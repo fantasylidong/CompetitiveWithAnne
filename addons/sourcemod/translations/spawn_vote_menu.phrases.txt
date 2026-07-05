@@ -52,6 +52,10 @@
 	{
 		"en"		"Apply Anne spawn settings: %d SI/%d sec?"
 	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"en"		"Apply Anne spawn settings: %d SI/%d sec, traitor %s?"
+	}
 	"SpawnVote_RelaxOn"
 	{
 		"en"		"on"

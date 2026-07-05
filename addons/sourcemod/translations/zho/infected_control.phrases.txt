@@ -40,6 +40,54 @@
 	{
 		"zho"		"{green}[IC]{default} 你本回合的內鬼登記次數已用完（%d）。"
 	}
+	"InfectedControl_TraitorQuotaDbUnavailable"
+	{
+		"zho"		"{green}[IC]{default} 內鬼次數資料庫不可用。"
+	}
+	"InfectedControl_TraitorQuotaExhausted"
+	{
+		"zho"		"{green}[IC]{default} 你今天的內鬼次數已用完（{olive}%d{default}/{olive}%d{default}），明天恢復。"
+	}
+	"InfectedControl_TraitorRootCvarOnly"
+	{
+		"zho"		"{green}[IC]{default} 只有 z 管理可以修改 {olive}%s{default}。"
+	}
+	"InfectedControl_TraitorNoDamagePunished"
+	{
+		"zho"		"{green}[IC]{default} 你在下一波特感倒計時前沒有造成傷害，已被處死並禁用本回合內鬼。"
+	}
+	"InfectedControl_TraitorRoundBlockedNoDamage"
+	{
+		"zho"		"{green}[IC]{default} 你本回合已被禁止再扮演內鬼（上次內鬼沒有造成傷害）。"
+	}
+	"InfectedControl_TraitorPenaltyNoDamageWarning"
+	{
+		"zho"		"{green}[IC]{default} 懲罰提示：生成內鬼後，如果到下一波特感倒計時前仍未對生還造成傷害，會被處死並禁用本回合內鬼。"
+	}
+	"InfectedControl_TraitorPenaltyTankDamageWarning"
+	{
+		"zho"		"{green}[IC]{default} Tank 提示：如果內鬼 Tank 對生還傷害低於 {olive}%d{default}，會被禁用 Tank 扮演 {olive}%d{default} 天。"
+	}
+	"InfectedControl_TraitorTankBlocked"
+	{
+		"zho"		"{green}[IC]{default} 你的 Tank 扮演仍被禁用，剩餘約 {olive}%d{default} 分鐘。"
+	}
+	"InfectedControl_TraitorTankDamagePunished"
+	{
+		"zho"		"{green}[IC]{default} 你的內鬼 Tank 傷害為 {olive}%d{default}/{olive}%d{default}，已禁用 Tank 扮演 {olive}%d{default} 天。"
+	}
+	"InfectedControl_TraitorNextWaveRegistered"
+	{
+		"zho"		"{green}[IC]{default} 下一波內鬼：{olive}%s{default}，註冊類型：{olive}%s{default}。"
+	}
+	"InfectedControl_TraitorNextWaveNone"
+	{
+		"zho"		"{green}[IC]{default} 下一波沒有註冊內鬼。"
+	}
+	"InfectedControl_TraitorBhopEnabled"
+	{
+		"zho"		"{green}[IC]{default} 你的內鬼已開啟自動連跳，按住空格即可連續跳躍。"
+	}
 	"InfectedControl_TraitorDisabled"
 	{
 		"zho"		"{green}[IC]{default} 內鬼模式未啟用。"
@@ -143,6 +191,10 @@
 	"InfectedControl_TraitorClassCharger"
 	{
 		"zho"		"牛"
+	}
+	"InfectedControl_TraitorClassTank"
+	{
+		"zho"		"坦克"
 	}
 
 	"InfectedControl_TraitorWaveStatusReserved"

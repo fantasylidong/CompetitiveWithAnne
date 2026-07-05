@@ -10,7 +10,7 @@
 #include <extra_menu>
 #include <anne_cvar_shield>
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define VOTE_TIME 20
 #define MENU_TIME MENU_TIME_FOREVER
 #define SPAWN_MENU_UNSET -999999
@@ -20,7 +20,8 @@
 #define PRESET_MODE_LENGTH 16
 #define PRESET_AUTHOR_LENGTH 64
 #define CAMPAIGN_PRESET_OPTION_FIRST 7
-#define ANNE_PRESET_OPTION_FIRST 7
+#define ANNE_PRESET_OPTION_FIRST 8
+#define NATIVE_VOTE_LANGUAGE_CODE "chi"
 
 enum SpawnVoteMode
 {
@@ -48,6 +49,7 @@ enum
 	ANNE_OPTION_AUTO_MODE,
 	ANNE_OPTION_DISTANCE,
 	ANNE_OPTION_TELEPORT_CHECK,
+	ANNE_OPTION_TRAITOR_ENABLE,
 	ANNE_OPTION_APPLY
 }
 
@@ -63,6 +65,7 @@ public Plugin myinfo =
 int g_iCampaignMenu = -1;
 int g_iAnneMenu = -1;
 Handle g_hVote = INVALID_HANDLE;
+KeyValues g_kvNativeVotePhrases = null;
 
 SpawnVoteMode g_iPendingMode = SpawnVoteMode_None;
 int g_iPendingLimit;
@@ -70,6 +73,7 @@ int g_iPendingInterval;
 int g_iPendingAutoMode;
 int g_iPendingDistance;
 int g_iPendingTeleportCheck;
+int g_iPendingTraitorEnable;
 int g_iPendingAssault;
 int g_iPendingTankTogether;
 int g_iPendingRelax;
@@ -85,6 +89,7 @@ ConVar g_cvAnneInterval;
 ConVar g_cvAnneAutoSpawn;
 ConVar g_cvAnneDistance;
 ConVar g_cvAnneTeleportCheck;
+ConVar g_cvAnneTraitorEnable;
 ConVar g_cvPresetDbConfig;
 ConVar g_cvPresetTable;
 
@@ -116,6 +121,7 @@ public void OnPluginStart()
 	LoadTranslations("common.phrases");
 	LoadTranslations("vote.phrases");
 	LoadTranslations("spawn_vote_menu.phrases");
+	LoadNativeVotePhrases();
 
 	RegConsoleCmd("sm_spawnvote", Cmd_SpawnVote, "打开刷特投票菜单");
 	RegConsoleCmd("sm_sivote", Cmd_SpawnVote, "打开刷特投票菜单");
@@ -158,6 +164,7 @@ public void OnPluginEnd()
 {
 	DeleteSpawnVoteMenus();
 	ClosePresetDatabase();
+	CloseNativeVotePhrases();
 }
 
 Action Cmd_SpawnVote(int client, int args)
@@ -379,11 +386,12 @@ void RefreshSpawnVoteConVars()
 	g_cvAnneAutoSpawn = FindConVar("inf_EnableAutoSpawnTime");
 	g_cvAnneDistance = FindConVar("inf_SpawnDistanceMin");
 	g_cvAnneTeleportCheck = FindConVar("inf_TeleportCheckTime");
+	g_cvAnneTraitorEnable = FindConVar("inf_traitor_enable");
 }
 
 SpawnVoteMode DetectSpawnVoteMode()
 {
-	if (IsPluginRunningByFile("optional/AnneHappy/infected_control.smx")
+	if (HasAnneInfectedControlController()
 		&& g_cvAnneLimit != null
 		&& g_cvAnneInterval != null
 		&& g_cvAnneAutoSpawn != null)
@@ -399,6 +407,40 @@ SpawnVoteMode DetectSpawnVoteMode()
 	}
 
 	return SpawnVoteMode_None;
+}
+
+bool HasAnneInfectedControlController()
+{
+	return LibraryExists("infected_control")
+		|| IsPluginRunningByFile("optional/AnneHappy/infected_control.smx")
+		|| IsAnyVersionedInfectedControlRunning();
+}
+
+bool IsAnyVersionedInfectedControlRunning()
+{
+	Handle iter = GetPluginIterator();
+	bool found = false;
+
+	while (MorePlugins(iter))
+	{
+		Handle plugin = ReadPlugin(iter);
+		if (plugin == INVALID_HANDLE || GetPluginStatus(plugin) != Plugin_Running)
+		{
+			continue;
+		}
+
+		char filename[PLATFORM_MAX_PATH];
+		GetPluginFilename(plugin, filename, sizeof(filename));
+		if (StrContains(filename, "optional/AnneHappy/infected_control", false) == 0
+			&& StrContains(filename, ".smx", false) != -1)
+		{
+			found = true;
+			break;
+		}
+	}
+
+	CloseHandle(iter);
+	return found;
 }
 
 void CreateMenusIfReady()
@@ -540,6 +582,7 @@ void BuildAnneMenu(int menu)
 	ExtraMenu_AddOptions(menu, "自动时间|固定时间");
 	ExtraMenu_AddEntry(menu, "5. 刷特距离: [_OPT_]码", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneDistance, 250), 50, 0, 1500);
 	ExtraMenu_AddEntry(menu, "6. 传送检测: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneTeleportCheck, 5), 1, 0, 30);
+	ExtraMenu_AddEntry(menu, "7. 内鬼模式: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvAnneTraitorEnable, 0));
 	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
 	ExtraMenu_AddEntry(menu, "应用当前设置（2确认）", MENU_SELECT_ONLY, true);
@@ -640,6 +683,10 @@ void HandleAnneSelect(int client, int option, int value)
 		{
 			g_iPendingTeleportCheck = value;
 		}
+		case ANNE_OPTION_TRAITOR_ENABLE:
+		{
+			g_iPendingTraitorEnable = value;
+		}
 		case ANNE_OPTION_APPLY:
 		{
 			g_bPendingPreset = false;
@@ -662,6 +709,7 @@ void ResetPendingSpawnSettings()
 	g_iPendingAutoMode = SPAWN_MENU_UNSET;
 	g_iPendingDistance = SPAWN_MENU_UNSET;
 	g_iPendingTeleportCheck = SPAWN_MENU_UNSET;
+	g_iPendingTraitorEnable = SPAWN_MENU_UNSET;
 	g_iPendingAssault = SPAWN_MENU_UNSET;
 	g_iPendingTankTogether = SPAWN_MENU_UNSET;
 	g_iPendingRelax = SPAWN_MENU_UNSET;
@@ -716,6 +764,10 @@ void PrepareAnnePendingFromCurrent()
 	if (g_iPendingTeleportCheck == SPAWN_MENU_UNSET && g_cvAnneTeleportCheck != null)
 	{
 		g_iPendingTeleportCheck = g_cvAnneTeleportCheck.IntValue;
+	}
+	if (g_iPendingTraitorEnable == SPAWN_MENU_UNSET)
+	{
+		g_iPendingTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 0);
 	}
 }
 
@@ -783,6 +835,7 @@ bool StartPresetApplyVote(int client, SpawnVoteMode mode, int presetIndex)
 		g_iPendingAutoMode = g_iAnnePresetAutoMode[presetIndex];
 		g_iPendingDistance = g_iAnnePresetDistance[presetIndex];
 		g_iPendingTeleportCheck = g_iAnnePresetTeleportCheck[presetIndex];
+		PrepareAnnePendingFromCurrent();
 		g_bPendingPreset = true;
 		bool started = StartApplyVote(client, mode);
 		if (!started)
@@ -802,24 +855,27 @@ void FormatVoteTitle(char[] buffer, int maxlen, SpawnVoteMode mode)
 		if (mode == SpawnVoteMode_Campaign)
 		{
 			char relax[32];
-			FormatRelaxState(relax, sizeof(relax), LANG_SERVER, g_iPendingRelax);
-			Format(buffer, maxlen, "%T", "SpawnVote_PresetVoteTitleRelax", LANG_SERVER, g_sPendingPresetName, relax);
+			FormatNativeVoteOnOffState(relax, sizeof(relax), g_iPendingRelax);
+			FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_PresetVoteTitleRelax", g_sPendingPresetName, relax);
 			return;
 		}
 
-		Format(buffer, maxlen, "%T", "SpawnVote_PresetVoteTitle", LANG_SERVER, g_sPendingPresetName);
+		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_PresetVoteTitle", g_sPendingPresetName);
 		return;
 	}
 
 	if (mode == SpawnVoteMode_Campaign)
 	{
 		char relax[32];
-		FormatRelaxState(relax, sizeof(relax), LANG_SERVER, g_iPendingRelax);
-		Format(buffer, maxlen, "%T", "SpawnVote_CampaignVoteTitleRelax", LANG_SERVER, g_iPendingLimit, g_iPendingInterval, relax);
+		FormatNativeVoteOnOffState(relax, sizeof(relax), g_iPendingRelax);
+		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_CampaignVoteTitleRelax", g_iPendingLimit, g_iPendingInterval, relax);
 	}
 	else
 	{
-		Format(buffer, maxlen, "%T", "SpawnVote_AnneVoteTitle", LANG_SERVER, g_iPendingLimit, g_iPendingInterval);
+		char traitorState[32];
+		FormatNativeVoteOnOffState(traitorState, sizeof(traitorState), g_iPendingTraitorEnable);
+		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_AnneVoteTitleTraitor",
+			g_iPendingLimit, g_iPendingInterval, traitorState);
 	}
 }
 
@@ -847,7 +903,7 @@ public void VoteResultHandler(Handle vote, int num_votes, int num_clients, const
 			&& item_info[i][BUILTINVOTEINFO_ITEM_VOTES] >= RoundToCeil(float(num_votes) * 0.6))
 		{
 			char message[64];
-			Format(message, sizeof(message), "%T", "SpawnVote_AppliedVoteTitle", LANG_SERVER);
+			FormatNativeVotePhrase(message, sizeof(message), "SpawnVote_AppliedVoteTitle");
 			DisplayBuiltinVotePass(vote, message);
 			ApplyPendingSpawnSettings();
 			AnnounceAppliedSettings();
@@ -911,6 +967,10 @@ void ApplyPendingSpawnSettings()
 		{
 			g_cvAnneTeleportCheck.SetInt(g_iPendingTeleportCheck);
 		}
+		if (g_cvAnneTraitorEnable != null && g_iPendingTraitorEnable != SPAWN_MENU_UNSET)
+		{
+			g_cvAnneTraitorEnable.SetInt(g_iPendingTraitorEnable);
+		}
 	}
 }
 
@@ -964,20 +1024,75 @@ void ResolvePendingRelaxFromCurrent()
 	g_iPendingRelax = 1;
 }
 
-void FormatRelaxState(char[] buffer, int maxlen, int target, int value)
+void FormatNativeVoteOnOffState(char[] buffer, int maxlen, int value)
 {
 	if (value == SPAWN_MENU_UNSET)
 	{
 		value = 1;
 	}
 
-	if (value != 0)
+	FormatNativeVotePhrase(buffer, maxlen, value != 0 ? "SpawnVote_RelaxOn" : "SpawnVote_RelaxOff");
+}
+
+void FormatNativeVotePhrase(char[] buffer, int maxlen, const char[] phrase, any ...)
+{
+	char format[256];
+	if (!GetNativeVotePhraseTemplate(phrase, format, sizeof(format)))
 	{
-		Format(buffer, maxlen, "%T", "SpawnVote_RelaxOn", target);
+		strcopy(format, sizeof(format), phrase);
 	}
-	else
+
+	VFormat(buffer, maxlen, format, 4);
+}
+
+bool GetNativeVotePhraseTemplate(const char[] phrase, char[] buffer, int maxlen)
+{
+	buffer[0] = '\0';
+	if (g_kvNativeVotePhrases == null)
 	{
-		Format(buffer, maxlen, "%T", "SpawnVote_RelaxOff", target);
+		LoadNativeVotePhrases();
+	}
+
+	if (g_kvNativeVotePhrases == null)
+	{
+		return false;
+	}
+
+	if (!g_kvNativeVotePhrases.JumpToKey(phrase))
+	{
+		g_kvNativeVotePhrases.Rewind();
+		return false;
+	}
+
+	g_kvNativeVotePhrases.GetString(NATIVE_VOTE_LANGUAGE_CODE, buffer, maxlen);
+	g_kvNativeVotePhrases.Rewind();
+	return buffer[0] != '\0';
+}
+
+void LoadNativeVotePhrases()
+{
+	CloseNativeVotePhrases();
+
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), "translations/%s/spawn_vote_menu.phrases.txt", NATIVE_VOTE_LANGUAGE_CODE);
+
+	KeyValues phrases = new KeyValues("Phrases");
+	if (!phrases.ImportFromFile(path))
+	{
+		delete phrases;
+		LogError("[SpawnVote] failed to load native vote phrases from \"%s\".", path);
+		return;
+	}
+
+	g_kvNativeVotePhrases = phrases;
+}
+
+void CloseNativeVotePhrases()
+{
+	if (g_kvNativeVotePhrases != null)
+	{
+		delete g_kvNativeVotePhrases;
+		g_kvNativeVotePhrases = null;
 	}
 }
 

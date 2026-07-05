@@ -150,6 +150,9 @@ enum struct Config
     ConVar TraitorMaxSlots;
     ConVar TraitorAdminLimit;
     ConVar TraitorClassMask;
+    ConVar TraitorDailyQuota;
+    ConVar TraitorQuotaDb;
+    ConVar TraitorQuotaTable;
     bool   bAntiBaitEnable;
     float  fAntiBaitGrace;
     float  fAntiBaitWindow;
@@ -172,6 +175,7 @@ enum struct Config
     int    iTraitorMaxSlots;
     int    iTraitorAdminLimit;
     int    iTraitorClassMask;
+    int    iTraitorDailyQuota;
 
     // 缓存值
     float fFlowBadPenalty;
@@ -532,14 +536,29 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 4.0
         );
         this.TraitorAdminLimit = CreateConVar(
-            "inf_traitor_admin_limit", "1",
-            "Per-admin traitor queue uses per round. 0 = unlimited.",
+            "inf_traitor_admin_limit", "0",
+            "Legacy per-admin traitor queue uses per round. 0 = disabled; daily DB quota is the normal limit.",
             CVAR_FLAG, true, 0.0, true, 32.0
         );
         this.TraitorClassMask = CreateConVar(
-            "inf_traitor_class_mask", "0",
-            "Allowed traitor classes bitmask. 0 = follow inf_EnableSIoption; otherwise intersect with enabled SI classes.",
-            CVAR_FLAG, true, 0.0, true, 63.0
+            "inf_traitor_class_mask", "127",
+            "Allowed traitor classes bitmask: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger, 64 tank. 0 = all.",
+            CVAR_FLAG, true, 0.0, true, 127.0
+        );
+        this.TraitorDailyQuota = CreateConVar(
+            "inf_traitor_daily_quota", "100",
+            "Default daily traitor SI total_count for new admins.",
+            CVAR_FLAG, true, 0.0, true, 10000.0
+        );
+        this.TraitorQuotaDb = CreateConVar(
+            "inf_traitor_quota_db", "storage-local",
+            "databases.cfg section for traitor daily quota storage.",
+            CVAR_FLAG
+        );
+        this.TraitorQuotaTable = CreateConVar(
+            "inf_traitor_quota_table", "infected_control_traitor_quota",
+            "SQL table name for traitor daily quota storage.",
+            CVAR_FLAG
         );
 
         // 变更回调
@@ -581,6 +600,7 @@ enum struct Config
         this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
         this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
         this.TraitorClassMask.AddChangeHook(OnCfgChanged);
+        this.TraitorDailyQuota.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -682,7 +702,10 @@ enum struct Config
         if (this.iTraitorAdminLimit > 32) this.iTraitorAdminLimit = 32;
         this.iTraitorClassMask = this.TraitorClassMask.IntValue;
         if (this.iTraitorClassMask < 0) this.iTraitorClassMask = 0;
-        if (this.iTraitorClassMask > 63) this.iTraitorClassMask = 63;
+        if (this.iTraitorClassMask > 127) this.iTraitorClassMask = 127;
+        this.iTraitorDailyQuota = this.TraitorDailyQuota.IntValue;
+        if (this.iTraitorDailyQuota < 0) this.iTraitorDailyQuota = 0;
+        if (this.iTraitorDailyQuota > 10000) this.iTraitorDailyQuota = 10000;
 
         this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
         this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);

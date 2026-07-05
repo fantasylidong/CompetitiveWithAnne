@@ -40,6 +40,54 @@
 	{
 		"chi"		"{green}[IC]{default} 你本回合的内鬼登记次数已用完（%d）。"
 	}
+	"InfectedControl_TraitorQuotaDbUnavailable"
+	{
+		"chi"		"{green}[IC]{default} 内鬼次数数据库不可用。"
+	}
+	"InfectedControl_TraitorQuotaExhausted"
+	{
+		"chi"		"{green}[IC]{default} 你今天的内鬼次数已用完（{olive}%d{default}/{olive}%d{default}），明天恢复。"
+	}
+	"InfectedControl_TraitorRootCvarOnly"
+	{
+		"chi"		"{green}[IC]{default} 只有 z 管理可以修改 {olive}%s{default}。"
+	}
+	"InfectedControl_TraitorNoDamagePunished"
+	{
+		"chi"		"{green}[IC]{default} 你在下一波特感倒计时前没有造成伤害，已被处死并禁用本回合内鬼。"
+	}
+	"InfectedControl_TraitorRoundBlockedNoDamage"
+	{
+		"chi"		"{green}[IC]{default} 你本回合已被禁止再扮演内鬼（上次内鬼没有造成伤害）。"
+	}
+	"InfectedControl_TraitorPenaltyNoDamageWarning"
+	{
+		"chi"		"{green}[IC]{default} 惩罚提示：生成内鬼后，如果到下一波特感倒计时前仍未对生还造成伤害，会被处死并禁用本回合内鬼。"
+	}
+	"InfectedControl_TraitorPenaltyTankDamageWarning"
+	{
+		"chi"		"{green}[IC]{default} Tank 提示：如果内鬼 Tank 对生还伤害低于 {olive}%d{default}，会被禁用 Tank 扮演 {olive}%d{default} 天。"
+	}
+	"InfectedControl_TraitorTankBlocked"
+	{
+		"chi"		"{green}[IC]{default} 你的 Tank 扮演仍被禁用，剩余约 {olive}%d{default} 分钟。"
+	}
+	"InfectedControl_TraitorTankDamagePunished"
+	{
+		"chi"		"{green}[IC]{default} 你的内鬼 Tank 伤害为 {olive}%d{default}/{olive}%d{default}，已禁用 Tank 扮演 {olive}%d{default} 天。"
+	}
+	"InfectedControl_TraitorNextWaveRegistered"
+	{
+		"chi"		"{green}[IC]{default} 下一波内鬼：{olive}%s{default}，注册类型：{olive}%s{default}。"
+	}
+	"InfectedControl_TraitorNextWaveNone"
+	{
+		"chi"		"{green}[IC]{default} 下一波没有注册内鬼。"
+	}
+	"InfectedControl_TraitorBhopEnabled"
+	{
+		"chi"		"{green}[IC]{default} 你的内鬼已开启自动连跳，按住空格即可连续跳跃。"
+	}
 	"InfectedControl_TraitorDisabled"
 	{
 		"chi"		"{green}[IC]{default} 内鬼模式未启用。"
@@ -143,6 +191,10 @@
 	"InfectedControl_TraitorClassCharger"
 	{
 		"chi"		"牛"
+	}
+	"InfectedControl_TraitorClassTank"
+	{
+		"chi"		"坦克"
 	}
 
 	"InfectedControl_TraitorWaveStatusReserved"

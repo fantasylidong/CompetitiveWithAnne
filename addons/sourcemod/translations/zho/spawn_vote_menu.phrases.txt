@@ -52,6 +52,10 @@
 	{
 		"zho"		"套用Anne刷特: %d特/%d秒?"
 	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"zho"		"套用Anne刷特: %d特/%d秒，內鬼%s?"
+	}
 	"SpawnVote_RelaxOn"
 	{
 		"zho"		"開啟"

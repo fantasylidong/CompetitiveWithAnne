@@ -40,6 +40,54 @@
 	{
 		"jp"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
 	}
+	"InfectedControl_TraitorQuotaDbUnavailable"
+	{
+		"jp"		"{green}[IC]{default} Traitor quota database is unavailable."
+	}
+	"InfectedControl_TraitorQuotaExhausted"
+	{
+		"jp"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."
+	}
+	"InfectedControl_TraitorRootCvarOnly"
+	{
+		"jp"		"{green}[IC]{default} Only root admins may change {olive}%s{default}."
+	}
+	"InfectedControl_TraitorNoDamagePunished"
+	{
+		"jp"		"{green}[IC]{default} You dealt no survivor damage before the next SI countdown. You were slain and cannot play traitor for this round."
+	}
+	"InfectedControl_TraitorRoundBlockedNoDamage"
+	{
+		"jp"		"{green}[IC]{default} You cannot play traitor again this round because your last traitor caused no damage."
+	}
+	"InfectedControl_TraitorPenaltyNoDamageWarning"
+	{
+		"jp"		"{green}[IC]{default} Penalty notice: if your traitor deals no survivor damage before the next SI countdown, you will be slain and cannot play traitor again this round."
+	}
+	"InfectedControl_TraitorPenaltyTankDamageWarning"
+	{
+		"jp"		"{green}[IC]{default} Tank notice: if your traitor Tank deals less than {olive}%d{default} survivor damage, Tank traitor will be blocked for {olive}%d{default} days."
+	}
+	"InfectedControl_TraitorTankBlocked"
+	{
+		"jp"		"{green}[IC]{default} Your Tank traitor is blocked for about {olive}%d{default} more minutes."
+	}
+	"InfectedControl_TraitorTankDamagePunished"
+	{
+		"jp"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} damage. Tank traitor is blocked for {olive}%d{default} days."
+	}
+	"InfectedControl_TraitorNextWaveRegistered"
+	{
+		"jp"		"{green}[IC]{default} Next wave traitor: {olive}%s{default} registered as {olive}%s{default}."
+	}
+	"InfectedControl_TraitorNextWaveNone"
+	{
+		"jp"		"{green}[IC]{default} No traitor is registered for the next wave."
+	}
+	"InfectedControl_TraitorBhopEnabled"
+	{
+		"jp"		"{green}[IC]{default} Auto-bhop is enabled for your traitor. Hold SPACE to jump continuously."
+	}
 	"InfectedControl_TraitorDisabled"
 	{
 		"jp"		"{green}[IC]{default} Traitor mode is disabled."
@@ -143,6 +191,10 @@
 	"InfectedControl_TraitorClassCharger"
 	{
 		"jp"		"Charger"
+	}
+	"InfectedControl_TraitorClassTank"
+	{
+		"jp"		"Tank"
 	}
 
 	"InfectedControl_TraitorWaveStatusReserved"

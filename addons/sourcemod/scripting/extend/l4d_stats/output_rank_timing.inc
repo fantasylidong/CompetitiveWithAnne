@@ -862,26 +862,43 @@ stock GetRankTeamMaxHumans(team)
 	return -1;
 }
 
-GetClientRankAuthString(client, String:auth[], maxlength)
+stock bool:Stats_IsInvalidRankAuthString(const String:auth[])
 {
+	return auth[0] == '\0' || StrEqual(auth, "STEAM_ID_STOP_IGNORING_RETVALS", false);
+}
+
+bool:GetClientRankAuthString(client, String:auth[], maxlength)
+{
+	if (maxlength > 0)
+		auth[0] = '\0';
+
+	if (client <= 0 || client > MaxClients || !IsClientConnected(client))
+		return false;
+
 	if (GetConVarInt(cvar_Lan))
 	{
-		GetClientAuthId(client,AuthId_Engine, auth, maxlength);
+		if (!GetClientAuthId(client, AuthId_Engine, auth, maxlength))
+			return false;
 
 		if (!StrEqual(auth, "BOT", false))
 		{
-			GetClientIP(client, auth, maxlength);
+			if (!GetClientIP(client, auth, maxlength))
+				return false;
 		}
 	}
 	else
 	{
-		GetClientAuthId(client, AuthId_Engine,auth, maxlength);
+		if (!GetClientAuthId(client, AuthId_Engine, auth, maxlength))
+			return false;
 
 		if (StrEqual(auth, "STEAM_ID_LAN", false))
 		{
-			GetClientIP(client, auth, maxlength);
+			if (!GetClientIP(client, auth, maxlength))
+				return false;
 		}
 	}
+
+	return !Stats_IsInvalidRankAuthString(auth);
 }
 
 public StatsPrintToChatAll(const String:Message[], any:...)

@@ -64,7 +64,8 @@ stock ScoreLog_Record(Client, Score)
 		return;
 
 	decl String:ClientID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Client, ClientID, sizeof(ClientID));
+	if (!GetClientRankAuthString(Client, ClientID, sizeof(ClientID)) || Stats_IsInvalidRankAuthString(ClientID))
+		return;
 
 	decl String:ClientName[128];
 	GetClientName(Client, ClientName, sizeof(ClientName));

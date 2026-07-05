@@ -52,6 +52,10 @@
 	{
 		"chi"		"应用Anne刷特: %d特/%d秒?"
 	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"chi"		"应用Anne刷特: %d特/%d秒，内鬼%s?"
+	}
 	"SpawnVote_RelaxOn"
 	{
 		"chi"		"开启"
