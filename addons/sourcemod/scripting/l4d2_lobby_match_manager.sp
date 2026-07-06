@@ -12,6 +12,7 @@
 #include <dhooks>
 #include <sourcescramble>			// https://github.com/nosoop/SMExt-SourceScramble
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
+#include <l4d2_lobby_match_manager_policy>
 
 #define VERSION "0.8"
 
@@ -19,10 +20,6 @@
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
 #define RMFLAG_FORCE_ACCESS_PUBLIC		4	// private, friends -> public
 #define RMFLAG_FORCE_OFFICIAL_MAP		8	// unofficial map -> official map
-
-#define UNRESERVE_ALWAYS	1
-#define UNRESERVE_WHEN_FULL	2
-#define UNRESERVE_DEFAULT_EMPTY	3
 
 #define MAX_COOKIE_LENGTH	20
 
@@ -77,7 +74,7 @@ public void OnPluginStart()
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
 
 	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"3",	"0=Keep reservation, 1=Always unreserve and reject reservations, 2=Unreserve when lobby full, 3=Default/no mode: clear stale reservation while empty, but keep player-created lobby matchmaking.");
+	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"3",	"0=Keep reservation, 1=Unreserve when no active reservation or when active reservation is full, 2=Unreserve when lobby full, 3=Default/no mode: clear stale reservation while empty, but keep player-created lobby matchmaking.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	
 	OnConVarChanged(null, "", "");
@@ -98,17 +95,16 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 	g_iUnreserveType = g_cvUnreserveType.IntValue;
 	g_iReserveModifyFlags = g_cvReserveModifyFlags.IntValue;
 
-	g_mBlockReserve.Disable();
 	if (g_iUnreserveType == UNRESERVE_ALWAYS)
 	{
-		OnConfigsExecuted();
-		if (!g_mBlockReserve.Enable())
-			SetFailState("Failed to enable patch.");
+		ClearAlwaysLobbyReservationIfAllowed();
 	}
 	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
 	{
 		ClearDefaultLobbyIfIdle(false);
 	}
+
+	RefreshReserveBlockPatch();
 }
 
 public void OnConfigsExecuted()
@@ -117,8 +113,8 @@ public void OnConfigsExecuted()
 	
 	if (g_iUnreserveType == UNRESERVE_ALWAYS)
 	{
-		SetReservationCookie(false);
-		sv_allow_lobby_connect_only.BoolValue = false;
+		ClearAlwaysLobbyReservationIfAllowed();
+		RefreshReserveBlockPatch();
 	}
 	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
 	{
@@ -128,7 +124,7 @@ public void OnConfigsExecuted()
 
 MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
 {
-	if (g_iUnreserveType == UNRESERVE_ALWAYS || hParams.IsNull(1))
+	if (hParams.IsNull(1))
 		return MRES_Ignored;
 
 	char sBuffer[256];
@@ -139,6 +135,12 @@ MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
 		return MRES_Ignored;
 
 	g_bLobbyReservationObserved = true;
+
+	if (g_iUnreserveType == UNRESERVE_ALWAYS)
+	{
+		RefreshReserveBlockPatch();
+		return MRES_Ignored;
+	}
 
 	if (!g_iReserveModifyFlags)
 		return MRES_Ignored;
@@ -192,7 +194,7 @@ public void OnClientPutInServer(int client)
 	if (HasReservationCookie())
 		g_bLobbyReservationObserved = true;
 
-	if (g_iUnreserveType == UNRESERVE_WHEN_FULL)
+	if (g_iUnreserveType == UNRESERVE_ALWAYS || g_iUnreserveType == UNRESERVE_WHEN_FULL)
 		CreateTimer(1.0, Timer_ClearLobbyIfFull, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -217,28 +219,47 @@ Action Timer_ClearLobbyIfFull(Handle timer, any userid)
 	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
 		return Plugin_Stop;
 
-	if (g_iUnreserveType != UNRESERVE_WHEN_FULL)
-		return Plugin_Stop;
-
-	if (GetPlayerCount() >= GetMaxLobbySlots(g_sGameMode))
+	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
 	{
 		SetReservationCookie(false);
 		sv_allow_lobby_connect_only.BoolValue = false;
 	}
+
+	RefreshReserveBlockPatch();
 
 	return Plugin_Stop;
 }
 
 void ClearDefaultLobbyIfIdle(bool forceClearObserved)
 {
-	if (g_iUnreserveType != UNRESERVE_DEFAULT_EMPTY || GetPlayerCount() > 0)
-		return;
-
-	if (!forceClearObserved && g_bLobbyReservationObserved)
+	if (!LobbyPolicy_ShouldClearDefaultReservation(g_iUnreserveType, GetPlayerCount(), forceClearObserved, g_bLobbyReservationObserved))
 		return;
 
 	SetReservationCookie(false);
 	sv_allow_lobby_connect_only.BoolValue = false;
+}
+
+void ClearAlwaysLobbyReservationIfAllowed()
+{
+	if (g_iUnreserveType != UNRESERVE_ALWAYS)
+		return;
+
+	if (!LobbyPolicy_ShouldClearAlwaysReservation(HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
+		return;
+
+	SetReservationCookie(false);
+	sv_allow_lobby_connect_only.BoolValue = false;
+}
+
+void RefreshReserveBlockPatch()
+{
+	g_mBlockReserve.Disable();
+
+	if (!LobbyPolicy_ShouldBlockReservePatch(g_iUnreserveType, HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
+		return;
+
+	if (!g_mBlockReserve.Enable())
+		SetFailState("Failed to enable patch.");
 }
 
 Action Cmd_Status(int client, int args)

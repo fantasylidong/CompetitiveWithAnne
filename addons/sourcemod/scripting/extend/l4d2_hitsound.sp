@@ -1272,28 +1272,39 @@ public Action Cmd_ReloadAll(int client, int args)
     return Plugin_Handled;
 }
 
+static void FormatMenuSetValue(int setId, int maxCount, char[] buffer, int maxlen)
+{
+    if (setId > 0 && setId <= maxCount)
+    {
+        Format(buffer, maxlen, "#%d", setId);
+        return;
+    }
+
+    strcopy(buffer, maxlen, "关");
+}
+
 public Action Cmd_MenuMain(int client, int args)
 {
     Handle menu = CreateMenu(MenuHandler_Main);
     char title[256];
 
-    char sndHead[32], sndHit[32], sndKill[32];
-    char icHead[32],  icHit[32],  icKill[32];
+    char sndHead[8], sndHit[8], sndKill[8];
+    char icHead[8],  icHit[8],  icKill[8];
     char sndScope[16], icScope[16];
 
-    if (g_SndHead[client] > 0 && g_SndHead[client] <= g_SetCount) GetArrayString(g_SetNames, g_SndHead[client]-1, sndHead, sizeof(sndHead)); else strcopy(sndHead, sizeof(sndHead), "关闭");
-    if (g_SndHit [client] > 0 && g_SndHit [client] <= g_SetCount) GetArrayString(g_SetNames, g_SndHit [client]-1, sndHit,  sizeof(sndHit )); else strcopy(sndHit , sizeof(sndHit ), "关闭");
-    if (g_SndKill[client] > 0 && g_SndKill[client] <= g_SetCount) GetArrayString(g_SetNames, g_SndKill[client]-1, sndKill, sizeof(sndKill)); else strcopy(sndKill, sizeof(sndKill), "关闭");
+    FormatMenuSetValue(g_SndHead[client], g_SetCount, sndHead, sizeof(sndHead));
+    FormatMenuSetValue(g_SndHit [client], g_SetCount, sndHit,  sizeof(sndHit ));
+    FormatMenuSetValue(g_SndKill[client], g_SetCount, sndKill, sizeof(sndKill));
 
-    if (g_IcHead[client]  > 0 && g_IcHead[client]  <= g_OvCount) GetArrayString(g_OvNames, g_IcHead[client]-1,  icHead, sizeof(icHead)); else strcopy(icHead, sizeof(icHead), "关闭");
-    if (g_IcHit [client]  > 0 && g_IcHit [client]  <= g_OvCount) GetArrayString(g_OvNames, g_IcHit [client]-1,  icHit,  sizeof(icHit )); else strcopy(icHit , sizeof(icHit ), "关闭");
-    if (g_IcKill[client]  > 0 && g_IcKill[client]  <= g_OvCount) GetArrayString(g_OvNames, g_IcKill[client]-1,  icKill, sizeof(icKill)); else strcopy(icKill, sizeof(icKill), "关闭");
+    FormatMenuSetValue(g_IcHead[client], g_OvCount, icHead, sizeof(icHead));
+    FormatMenuSetValue(g_IcHit [client], g_OvCount, icHit,  sizeof(icHit ));
+    FormatMenuSetValue(g_IcKill[client], g_OvCount, icKill, sizeof(icKill));
 
     strcopy(sndScope, sizeof(sndScope), g_SndSpecialOnly[client] ? "仅特感" : "全部");
     strcopy(icScope,  sizeof(icScope),  g_IcSpecialOnly [client] ? "仅特感" : "全部");
 
     Format(title, sizeof(title),
-        "命中反馈设置\n音效(爆头/命中/击杀): %s / %s / %s [%s]\n图标(爆头/命中/击杀): %s / %s / %s [%s]",
+        "命中反馈设置\n音效(爆头/命中/击杀): %s/%s/%s [%s]\n图标(爆头/命中/击杀): %s/%s/%s [%s]",
         sndHead, sndHit, sndKill, sndScope, icHead, icHit, icKill, icScope);
     SetMenuTitle(menu, title);
 
