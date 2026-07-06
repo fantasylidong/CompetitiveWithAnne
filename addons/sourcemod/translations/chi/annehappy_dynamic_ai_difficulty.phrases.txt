@@ -28,4 +28,32 @@
 	{
 		"chi"		"{green}[AnneHappyAI]{default} l4d_stats 平均个人PPM %.2f，%d人积分 %d / %d分钟（季度%d人/总榜回退%d人），动态难度调整为 {lightgreen}%s{default}。"
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"chi"		"未定档"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"chi"		"简单"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"chi"		"普通"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"chi"		"困难"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"chi"		"专家"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"chi"		"极限"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"chi"		"音理"
+	}
 }

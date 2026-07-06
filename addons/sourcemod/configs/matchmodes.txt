@@ -37,13 +37,29 @@
 		{
 			"name" "Anne战役"
 		}
+		"purecoop"
+		{
+			"name" "纯净战役"
+		}
 		"mutation4"
 		{
 			"name" "Anne绝境"
 		}
+		"puremutation4"
+		{
+			"name" "纯净绝境"
+		}
 		"realism"
 		{
 			"name" "Anne写实"
+		}
+		"purerealism"
+		{
+			"name" "纯净写实"
+		}
+		"purecommunity5"
+		{
+			"name" "纯净死亡之门"
 		}
 	}
 	"Not0721 Coop Profiles"

@@ -14,7 +14,7 @@
 	}
 	"SpawnVote_MenuBackendUnavailable"
 	{
-		"chi"		"[{blue}刷特{default}] extra_menu 插件没有加载，无法显示刷特菜单。"
+		"chi"		"[{blue}刷特{default}] 现在无法显示刷特菜单。"
 	}
 	"SpawnVote_CampaignStatus"
 	{
@@ -67,6 +67,10 @@
 	"SpawnVote_AppliedVoteTitle"
 	{
 		"chi"		"刷特设置已应用"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"chi"		"应用修改: %s?"
 	}
 	"SpawnVote_ModeCampaign"
 	{

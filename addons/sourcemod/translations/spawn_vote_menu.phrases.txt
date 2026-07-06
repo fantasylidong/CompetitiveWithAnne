@@ -14,7 +14,7 @@
 	}
 	"SpawnVote_MenuBackendUnavailable"
 	{
-		"en"		"[{blue}Spawn Vote{default}] The extra_menu plugin is not loaded, so the spawn menu cannot be displayed."
+		"en"		"[{blue}Spawn Vote{default}] The spawn menu cannot be displayed right now."
 	}
 	"SpawnVote_CampaignStatus"
 	{
@@ -67,6 +67,10 @@
 	"SpawnVote_AppliedVoteTitle"
 	{
 		"en"		"Spawn settings applied"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"en"		"Apply change: %s?"
 	}
 	"SpawnVote_ModeCampaign"
 	{

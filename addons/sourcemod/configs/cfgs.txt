@@ -59,13 +59,29 @@
 		{
 			"message" "Anne战役"
 		}
+		"sm_fm purecoop"
+		{
+			"message" "纯净战役"
+		}
 		"sm_fm mutation4"
 		{
 			"message" "Anne绝境"
 		}
+		"sm_fm puremutation4"
+		{
+			"message" "纯净绝境"
+		}
 		"sm_fm realism"
 		{
 			"message" "Anne写实"
+		}
+		"sm_fm purerealism"
+		{
+			"message" "纯净写实"
+		}
+		"sm_fm purecommunity5"
+		{
+			"message" "纯净死亡之门"
 		}
 	}
 	"杂项"

@@ -28,4 +28,32 @@
 	{
 		"en"		"{green}[AnneHappyAI]{default} l4d_stats Average personal PPM %.2f, %d person points %d / %d minutes (%d people in the quarter/%d people in the overall rankings), and the dynamic difficulty is adjusted to {lightgreen}%s{default}."
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"en"		"unassigned"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"en"		"Easy"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"en"		"Normal"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"en"		"Hard"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"en"		"Expert"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"en"		"Extreme"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"en"		"Neri"
+	}
 }

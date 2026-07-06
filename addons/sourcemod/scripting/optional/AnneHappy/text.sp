@@ -277,6 +277,10 @@ void GetAiLevelName(int level, char[] buffer, int maxlen)
 		{
 			strcopy(buffer, maxlen, "极限");
 		}
+		case 6:
+		{
+			strcopy(buffer, maxlen, "音理");
+		}
 		default:
 		{
 			strcopy(buffer, maxlen, "待定");

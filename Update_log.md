@@ -595,7 +595,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新增 26-7 测试配置 `Anne25-11.cfg`，保留旧版 `infected_control25-11.smx` 作为回退，并同步动态难度说明。
 - 修复极限难度参数影响其他难度的问题，动态难度切换时会更明确地重置 Tank、Hunter 等档位参数。
 - 修复部分情况下安全室近战没有掉落的问题，并整理 `MeleeInTheSafeRoom` 逻辑。
-- 新增刷特投票菜单 `spawn_vote_menu.smx` 和 `extra_menu` 支持，Anne/战役刷特数量、间隔、自动模式、传送检测等可以通过投票和预设管理调整。
+- 刷特投票菜单 `spawn_vote_menu.smx` 回退为 SourceMod 老菜单实现，移除外部菜单依赖；Anne/战役刷特数量、间隔、自动模式、传送检测等设置改为选择一项就发起一次单项投票，预设仍按整套配置投票。
 - 新增并整理 not0721 系列 coop/community/mutation 模式、dirspawn preset、武器配置和 SI limit 配置。
 - `infected_control` 增加叛徒模式相关逻辑、刷特预设表和多语言短语，便于后续扩展玩法。
 

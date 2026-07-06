@@ -28,4 +28,32 @@
 	{
 		"jp"		"{green}[AnneHappyAI]{default} l4d_stats 平均個人 PPM %.2f、%d 人ポイント %d / %d 分 (四半期の %d 人/総合ランキングの %d 人)、および動的難易度は次のように調整されます。 {lightgreen}%s{default}。"
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"jp"		"未定"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"jp"		"簡単"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"jp"		"普通"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"jp"		"ハード"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"jp"		"エキスパート"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"jp"		"極限"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"jp"		"音理"
+	}
 }

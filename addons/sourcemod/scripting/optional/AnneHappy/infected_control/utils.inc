@@ -11,8 +11,8 @@
 #define DIRECTOR_FALLBACK_TRIES   48
 #define MIN_TELEPORT_SECONDS      0.8
 #define FLOAT_EULER               2.71828182845904523536
-#define AI_DIFFICULTY_LEVELS      5
-#define AI_LEVEL_SLOTS            6
+#define AI_DIFFICULTY_LEVELS      6
+#define AI_LEVEL_SLOTS            7
 
 stock float FloatMax(float a, float b)
 {

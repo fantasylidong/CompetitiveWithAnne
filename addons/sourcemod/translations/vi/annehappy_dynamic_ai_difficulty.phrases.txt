@@ -28,4 +28,32 @@
 	{
 		"vi"		"{green}[AnneHappyAI]{default} l4d_stats PPM cá nhân trung bình %.2f, %d điểm người %d / %d phút (%d người trong quý/%d người trong bảng xếp hạng tổng thể) và độ khó động được điều chỉnh thành {lightgreen}%s{default}."
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"vi"		"chưa đặt"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"vi"		"Dễ"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"vi"		"Thường"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"vi"		"Khó"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"vi"		"Chuyên gia"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"vi"		"Cực hạn"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"vi"		"Neri"
+	}
 }

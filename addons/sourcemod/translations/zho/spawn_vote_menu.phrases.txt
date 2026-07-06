@@ -14,7 +14,7 @@
 	}
 	"SpawnVote_MenuBackendUnavailable"
 	{
-		"zho"		"[{blue}刷特{default}] extra_menu 插件沒有載入，無法顯示刷特選單。"
+		"zho"		"[{blue}刷特{default}] 目前無法顯示刷特選單。"
 	}
 	"SpawnVote_CampaignStatus"
 	{
@@ -67,6 +67,10 @@
 	"SpawnVote_AppliedVoteTitle"
 	{
 		"zho"		"刷特設定已套用"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"zho"		"套用修改: %s?"
 	}
 	"SpawnVote_ModeCampaign"
 	{

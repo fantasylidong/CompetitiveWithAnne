@@ -28,4 +28,32 @@
 	{
 		"ko"		"{green}[AnneHappyAI]{default} l4d_stats 평균 개인 PPM %.2f, %d인 포인트 %d / %d분(분기 내 %d명/전체 순위 %d명)으로 동적 난이도가 조정됩니다. {lightgreen}%s{default}."
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"ko"		"미정"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"ko"		"쉬움"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"ko"		"보통"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"ko"		"어려움"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"ko"		"전문가"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"ko"		"극한"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"ko"		"Neri"
+	}
 }

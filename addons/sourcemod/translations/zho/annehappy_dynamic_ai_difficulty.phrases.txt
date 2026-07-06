@@ -28,4 +28,32 @@
 	{
 		"zho"		"{green}[AnneHappyAI]{default} l4d_stats 平均個人PPM %.2f，%d人積分 %d / %d分鐘（季度%d人/總榜回退%d人），動態難度調整為 {lightgreen}%s{default}。"
 	}
+	"DynamicAIDifficulty_LevelUnset"
+	{
+		"zho"		"未定檔"
+	}
+	"DynamicAIDifficulty_LevelEasy"
+	{
+		"zho"		"簡單"
+	}
+	"DynamicAIDifficulty_LevelNormal"
+	{
+		"zho"		"普通"
+	}
+	"DynamicAIDifficulty_LevelHard"
+	{
+		"zho"		"困難"
+	}
+	"DynamicAIDifficulty_LevelExpert"
+	{
+		"zho"		"專家"
+	}
+	"DynamicAIDifficulty_LevelExtreme"
+	{
+		"zho"		"極限"
+	}
+	"DynamicAIDifficulty_LevelNeri"
+	{
+		"zho"		"音理"
+	}
 }

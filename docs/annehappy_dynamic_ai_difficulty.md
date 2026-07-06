@@ -30,6 +30,7 @@ PPM 从 `l4d_stats` 获取。当前默认对每个真人生还者使用总积分
 | 3 困难 | `43.23 <= PPM < 63.70` | 标准偏高 |
 | 4 专家 | `63.70 <= PPM < 77.57` | 当前 AnneHappy 专家强度 |
 | 5 极限 | `>= 77.57` | 参考 `cfg/vote/hard_on.cfg` 的高压 AI/Tank 属性 |
+| 6 音理 | 不参与自动分档 | 固定-only 档，以极限档为底，只叠同级 `Anne-Neri` 的 `si_level_hard` / `hunter_hentai` 中更难的特感/Tank 行为 CVar；不覆盖人数、尸潮、Tank 血量、刷点/传送距离等基础环境，必须通过投票或 `sm_aidiff 6` 手动开启 |
 
 可调 cvar：
 
@@ -49,7 +50,7 @@ PPM 从 `l4d_stats` 获取。当前默认对每个真人生还者使用总积分
 | `ah_ai_dynamic_threshold_db_config` | `l4dstats` | 每日阈值表所在数据库配置名，对应 `databases.cfg` |
 | `ah_ai_dynamic_threshold_table` | `ai_dynamic_ppm_thresholds` | 每日阈值表名 |
 | `ah_ai_dynamic_threshold_max_age` | `172800` | 数据库阈值最大有效秒数；默认 2 天，过期回退固定 cfg |
-| `ah_ai_dynamic_fixed_level` | `0` | `0=自动`，`1-5=固定简单/普通/困难/专家/极限` |
+| `ah_ai_dynamic_fixed_level` | `0` | `0=自动`，`1-5=固定简单/普通/困难/专家/极限`，`6=音理`；音理不会被自动难度选中 |
 | `ah_ai_dynamic_config` | `configs/AnneHappy/dynamic_ai_difficulty.cfg` | 每档难度的特感/Tank cvar 配置文件，相对 `addons/sourcemod` |
 | `ah_ai_dynamic_enforce_interval` | `0.0` | 难度锁定后定期重刷当前档位 cvar；默认关闭，避免覆盖投票或手动 `sm_cvar` |
 | `ah_ai_dynamic_tank_bhop_override` | `-1` | Tank 连跳覆盖：`-1=跟随档位配置`，`0=强制关闭`，`1=强制开启`；Alone 使用 `0` |
@@ -63,7 +64,7 @@ PPM 从 `l4d_stats` 获取。当前默认对每个真人生还者使用总积分
 | 命令 | 说明 |
 | --- | --- |
 | `sm_aippm` | 查看当前积分、时间、PPM、难度 |
-| `sm_aidiff <0-5>` | 管理员切换模式；`0=自动`，`1-5=固定难度` |
+| `sm_aidiff <0-6>` | 管理员切换模式；`0=自动`，`1-5=固定自动档`，`6=音理固定档` |
 | `sm_aidiff_reload` | 重新读取配置文件，并把当前难度重新应用一次 |
 
 ## 每日分位阈值
@@ -137,13 +138,13 @@ ON DUPLICATE KEY UPDATE
 }
 ```
 
-插件定档后只读取对应的 `level1` / `level2` / `level3` / `level4` / `level5` 节点，把里面的键名当作 cvar、值当作 cvar 值应用。不存在的 cvar 会被忽略；开启 `ah_ai_dynamic_debug 1` 后会在日志里提示。
+插件定档后只读取对应的 `level1` / `level2` / `level3` / `level4` / `level5` / `level6` 节点，把里面的键名当作 cvar、值当作 cvar 值应用。不存在的 cvar 会被忽略；开启 `ah_ai_dynamic_debug 1` 后会在日志里提示。`level6` 是固定音理档，不会被自动难度选中。
 
 改完配置后可以执行 `sm_aidiff_reload` 热重载当前难度；下一回合也会自动读取最新配置。
 
 ## 分档主要改动的属性
 
-AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件会读取 `ah_ai_dynamic_current_level`，按当前档位调整“什么时候开始判定下一波”“什么时候允许补下一波”“刷点评分甜区”和 anti-baiter 压力。`l4d_infected_limit`、`versus_special_respawn_interval`、`inf_SpawnDistanceMin` 仍由当前章节/配置决定基础值，动态难度只在这些基础值上做策略缩放。
+AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件会读取 `ah_ai_dynamic_current_level`，按当前档位调整“什么时候开始判定下一波”“什么时候允许补下一波”“刷点评分甜区”和 anti-baiter 压力。1-5 自动档里，`l4d_infected_limit`、`versus_special_respawn_interval`、`inf_SpawnDistanceMin` 仍由当前章节/配置决定基础值，动态难度只在这些基础值上做策略缩放。固定音理 `level6` 也不覆盖这些基础环境；它以极限档为底，只额外叠加 `Anne-Neri` 高难投票档里更坐牢的特感/Tank 行为 CVar，Hunter 使用 `si_level_hard` 中更狠的 `hunter_hentai` 值。插件应用任意档位前都会先把受控 CVar 恢复到首次接管时的基线，避免音理档残留影响正常难度。
 
 ### 刷特策略联动
 
@@ -153,13 +154,13 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | --- | --- | --- |
 | `inf_ai_difficulty_link` | `1` | 是否读取 `ah_ai_dynamic_current_level` 联动刷特策略 |
 | `inf_ai_difficulty_fallback_level` | `3` | 动态难度未定档或插件缺失时使用的刷特策略档 |
-| `inf_ai_wave_check_ratio` | `0.90 0.80 0.65 0.50 0.35` | 1-5 档分别在刷新间隔的多少比例后开始判定下一波；专家档等于原来的半间隔 |
-| `inf_ai_wave_floor_ratio` | `1.50 1.40 1.25 1.15 1.10` | 1-5 档普通补波的最早时间，乘以 `versus_special_respawn_interval`；新版 `0.1s` 开波 timer 下用它恢复旧版实战节奏 |
-| `inf_ai_wave_low_si_ratio` | `0.12 0.20 0.27 0.34 0.50` | 场上存活特感低于该比例时允许补波 |
-| `inf_ai_dist_sweet_offset` | `0.00 0.00 0.00 0.00 0.00` | 刷点距离甜区偏移；默认不动各特感自己的甜点距离 |
-| `inf_ai_dist_width_scale` | `1.25 1.15 1.08 1.00 1.00` | 刷点距离评分宽度；低档更宽容，专家/极限保持当前基准，避免影响刷出速度 |
+| `inf_ai_wave_check_ratio` | `1.00 0.75 0.625 0.50 0.375 0.375` | 1-6 档分别在刷新间隔的多少比例后开始判定下一波；第 6 档沿用极限节奏 |
+| `inf_ai_wave_floor_ratio` | `1.50 1.40 1.25 1.15 1.10 1.10` | 1-6 档普通补波的最早时间，乘以 `versus_special_respawn_interval`；新版 `0.1s` 开波 timer 下用它恢复旧版实战节奏 |
+| `inf_ai_wave_low_si_ratio` | `0.12 0.20 0.27 0.34 0.50 0.50` | 场上存活特感低于该比例时允许补波 |
+| `inf_ai_dist_sweet_offset` | `0.00 0.00 0.00 0.00 0.00 0.00` | 刷点距离甜区偏移；默认不动各特感自己的甜点距离 |
+| `inf_ai_dist_width_scale` | `1.25 1.15 1.08 1.00 1.00 1.00` | 刷点距离评分宽度；低档更宽容，专家/极限/音理保持当前基准，避免影响刷出速度 |
 | `inf_spawn_candidate_budget` | `12` | 单次刷点基础候选预算；实际预算还会按 AI 难度档位调整 |
-| `inf_ai_spawn_budget_bonus` | `-3 -2 -1 0 0` | 1-5 档对候选预算的额外加减；默认实际预算为 `9/10/11/12/12` |
+| `inf_ai_spawn_budget_bonus` | `-3 -2 -1 0 0 0` | 1-6 档对候选预算的额外加减；默认实际预算为 `9/10/11/12/12/12` |
 | `inf_FrameThinkStep` | `0.05` | 空闲刷特帧思考间隔，降低无队列时的单核负担 |
 | `inf_FrameThinkStepActive` | `0.02` | 有待补波/待刷/待传送时使用原版响应间隔 |
 | `inf_BucketCountCacheTTL` | `0.20` | Flow 桶存活特感计数缓存 TTL，减少候选点重复扫描 |
@@ -196,7 +197,7 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_reflect 1` 在 `level5` 里对应 `"z_lunge_reflect" "1"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `1`。
 
-插件会把五档配置里出现过的所有 ConVar 作为受控范围，首次接管时记录当前服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限档独有参数不会在切回专家、困难、普通或简单后残留。
+插件会把各档配置里出现过的所有 ConVar 作为受控范围，首次接管时记录当前服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限/音理独有参数不会在切回专家、困难、普通或简单后残留。
 
 | 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
 | --- | --- | --- | --- | --- | --- |

@@ -6,11 +6,9 @@
 #include <builtinvotes>
 #include <builtinvotes_stocks>
 #include <colors>
-#undef REQUIRE_PLUGIN
-#include <extra_menu>
 #include <anne_cvar_shield>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.4"
 #define VOTE_TIME 20
 #define MENU_TIME MENU_TIME_FOREVER
 #define SPAWN_MENU_UNSET -999999
@@ -19,9 +17,11 @@
 #define PRESET_TABLE_LENGTH 64
 #define PRESET_MODE_LENGTH 16
 #define PRESET_AUTHOR_LENGTH 64
-#define CAMPAIGN_PRESET_OPTION_FIRST 7
-#define ANNE_PRESET_OPTION_FIRST 8
 #define NATIVE_VOTE_LANGUAGE_CODE "chi"
+#define MENU_STEP_LIMIT 1
+#define MENU_STEP_INTERVAL 1
+#define MENU_STEP_DISTANCE 50
+#define MENU_STEP_TELEPORT_CHECK 1
 
 enum SpawnVoteMode
 {
@@ -30,40 +30,15 @@ enum SpawnVoteMode
 	SpawnVoteMode_Anne
 }
 
-enum
-{
-	CAMPAIGN_OPTION_STATUS = 0,
-	CAMPAIGN_OPTION_LIMIT,
-	CAMPAIGN_OPTION_INTERVAL,
-	CAMPAIGN_OPTION_ASSAULT,
-	CAMPAIGN_OPTION_TANK_TOGETHER,
-	CAMPAIGN_OPTION_RELAX,
-	CAMPAIGN_OPTION_APPLY
-}
-
-enum
-{
-	ANNE_OPTION_STATUS = 0,
-	ANNE_OPTION_LIMIT,
-	ANNE_OPTION_INTERVAL,
-	ANNE_OPTION_AUTO_MODE,
-	ANNE_OPTION_DISTANCE,
-	ANNE_OPTION_TELEPORT_CHECK,
-	ANNE_OPTION_TRAITOR_ENABLE,
-	ANNE_OPTION_APPLY
-}
-
 public Plugin myinfo =
 {
 	name = "Anne Spawn Vote Menu",
 	author = "morzlee",
-	description = "ExtraMenu based spawn tuning vote menu for Anne and campaign modes.",
+	description = "SourceMod menu based spawn tuning vote menu for Anne and campaign modes.",
 	version = PLUGIN_VERSION,
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
-int g_iCampaignMenu = -1;
-int g_iAnneMenu = -1;
 Handle g_hVote = INVALID_HANDLE;
 KeyValues g_kvNativeVotePhrases = null;
 
@@ -115,6 +90,7 @@ int g_iAnnePresetCount;
 
 bool g_bPendingPreset;
 char g_sPendingPresetName[SPAWN_PRESET_NAME_LENGTH];
+char g_sPendingChangeSummary[128];
 
 public void OnPluginStart()
 {
@@ -136,7 +112,6 @@ public void OnPluginStart()
 	ResetPendingSpawnSettings();
 	RefreshSpawnVoteConVars();
 	ConnectPresetDatabase();
-	CreateMenusIfReady();
 }
 
 public void OnAllPluginsLoaded()
@@ -144,25 +119,8 @@ public void OnAllPluginsLoaded()
 	RefreshSpawnVoteConVars();
 }
 
-public void OnLibraryAdded(const char[] name)
-{
-	if (StrEqual(name, "extra_menu"))
-	{
-		CreateMenusIfReady();
-	}
-}
-
-public void OnLibraryRemoved(const char[] name)
-{
-	if (StrEqual(name, "extra_menu"))
-	{
-		DeleteSpawnVoteMenus();
-	}
-}
-
 public void OnPluginEnd()
 {
-	DeleteSpawnVoteMenus();
 	ClosePresetDatabase();
 	CloseNativeVotePhrases();
 }
@@ -193,23 +151,16 @@ Action Cmd_SpawnVote(int client, int args)
 	{
 		LoadSpawnPresets();
 	}
-	RebuildSpawnVoteMenus();
 
 	switch (mode)
 	{
 		case SpawnVoteMode_Campaign:
 		{
-			if (!DisplayCampaignSpawnVoteMenu(client))
-			{
-				CPrintToChat(client, "%t", "SpawnVote_MenuBackendUnavailable");
-			}
+			DisplayCampaignSpawnVoteMenu(client);
 		}
 		case SpawnVoteMode_Anne:
 		{
-			if (!DisplayAnneSpawnVoteMenu(client))
-			{
-				CPrintToChat(client, "%t", "SpawnVote_MenuBackendUnavailable");
-			}
+			DisplayAnneSpawnVoteMenu(client);
 		}
 		default:
 		{
@@ -265,7 +216,6 @@ Action Cmd_SaveSpawnPreset(int client, int args)
 	if (SaveCurrentSpawnPreset(client, mode, name))
 	{
 		LoadSpawnPresets();
-		RebuildSpawnVoteMenus();
 		ReplyToPresetSaved(client, name);
 	}
 	else
@@ -311,7 +261,6 @@ Action Cmd_DeleteSpawnPreset(int client, int args)
 	if (DeleteSpawnPreset(mode, name))
 	{
 		LoadSpawnPresets();
-		RebuildSpawnVoteMenus();
 		ReplyToPresetDeleted(client, name);
 	}
 	else
@@ -443,68 +392,6 @@ bool IsAnyVersionedInfectedControlRunning()
 	return found;
 }
 
-void CreateMenusIfReady()
-{
-	RefreshSpawnVoteConVars();
-
-	if (!CanBuildExtraMenus())
-	{
-		return;
-	}
-
-	if (g_iCampaignMenu == -1)
-	{
-		g_iCampaignMenu = ExtraMenu_Create(false, "", true);
-		BuildCampaignMenu(g_iCampaignMenu);
-	}
-
-	if (g_iAnneMenu == -1)
-	{
-		g_iAnneMenu = ExtraMenu_Create(false, "", true);
-		BuildAnneMenu(g_iAnneMenu);
-	}
-}
-
-void RebuildSpawnVoteMenus()
-{
-	DeleteSpawnVoteMenus();
-	CreateMenusIfReady();
-}
-
-void DeleteSpawnVoteMenus()
-{
-	if (GetFeatureStatus(FeatureType_Native, "ExtraMenu_Delete") != FeatureStatus_Available)
-	{
-		g_iCampaignMenu = -1;
-		g_iAnneMenu = -1;
-		return;
-	}
-
-	if (g_iCampaignMenu != -1)
-	{
-		ExtraMenu_Delete(g_iCampaignMenu);
-		g_iCampaignMenu = -1;
-	}
-
-	if (g_iAnneMenu != -1)
-	{
-		ExtraMenu_Delete(g_iAnneMenu);
-		g_iAnneMenu = -1;
-	}
-}
-
-bool CanBuildExtraMenus()
-{
-	return GetFeatureStatus(FeatureType_Native, "ExtraMenu_Create") == FeatureStatus_Available
-		&& GetFeatureStatus(FeatureType_Native, "ExtraMenu_AddEntry") == FeatureStatus_Available
-		&& GetFeatureStatus(FeatureType_Native, "ExtraMenu_AddOptions") == FeatureStatus_Available;
-}
-
-bool CanDisplayExtraMenus()
-{
-	return GetFeatureStatus(FeatureType_Native, "ExtraMenu_Display") == FeatureStatus_Available;
-}
-
 bool TryAuthorizeCvarShieldTarget(const char[] cvarName, int value)
 {
 	if (GetFeatureStatus(FeatureType_Native, "AnneCvarShield_AuthorizeTarget") != FeatureStatus_Available)
@@ -517,32 +404,34 @@ bool TryAuthorizeCvarShieldTarget(const char[] cvarName, int value)
 
 bool DisplayCampaignSpawnVoteMenu(int client)
 {
-	if (g_iCampaignMenu == -1)
-	{
-		CreateMenusIfReady();
-	}
+	PrepareCampaignPendingFromCurrent();
 
-	if (g_iCampaignMenu == -1 || !CanDisplayExtraMenus())
-	{
-		return false;
-	}
+	Menu menu = new Menu(SpawnVoteMenuHandler);
+	BuildCampaignMenu(menu);
+	menu.ExitButton = true;
 
-	return ExtraMenu_Display(client, g_iCampaignMenu, MENU_TIME);
+	bool displayed = menu.Display(client, MENU_TIME);
+	if (!displayed)
+	{
+		delete menu;
+	}
+	return displayed;
 }
 
 bool DisplayAnneSpawnVoteMenu(int client)
 {
-	if (g_iAnneMenu == -1)
-	{
-		CreateMenusIfReady();
-	}
+	PrepareAnnePendingFromCurrent();
 
-	if (g_iAnneMenu == -1 || !CanDisplayExtraMenus())
-	{
-		return false;
-	}
+	Menu menu = new Menu(SpawnVoteMenuHandler);
+	BuildAnneMenu(menu);
+	menu.ExitButton = true;
 
-	return ExtraMenu_Display(client, g_iAnneMenu, MENU_TIME);
+	bool displayed = menu.Display(client, MENU_TIME);
+	if (!displayed)
+	{
+		delete menu;
+	}
+	return displayed;
 }
 
 bool IsPluginRunningByFile(const char[] filename)
@@ -551,154 +440,282 @@ bool IsPluginRunningByFile(const char[] filename)
 	return plugin != INVALID_HANDLE && GetPluginStatus(plugin) == Plugin_Running;
 }
 
-void BuildCampaignMenu(int menu)
+void BuildCampaignMenu(Menu menu)
 {
-	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1/2调整/确认，3/4移动，0退出", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1. 插件状态: 战役模式", MENU_SELECT_ONLY);
-	ExtraMenu_AddEntry(menu, "2. 特感上限: [_OPT_]特", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvDirCount, 8), 1, 1, 30);
-	ExtraMenu_AddEntry(menu, "3. 刷新时间: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvDirInterval, 30), 1, 0, 120);
-	ExtraMenu_AddEntry(menu, "4. 特感强攻: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvDirLockTempo, 0));
-	ExtraMenu_AddEntry(menu, "5. 坦克同刷: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvDirAllowTank, 1));
-	ExtraMenu_AddEntry(menu, "6. Relax阶段: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvDirRelaxEnable, 1));
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用当前设置（2确认）", MENU_SELECT_ONLY, true);
+	menu.SetTitle("刷特控制菜单\n模式: 战役\n选择设置项发起单项投票");
+	menu.AddItem("cs", "插件状态: 战役模式");
+
+	char text[128];
+	char state[16];
+
+	FormatEx(text, sizeof(text), "特感上限: %d特", g_iPendingLimit);
+	menu.AddItem("cl", text);
+
+	FormatEx(text, sizeof(text), "刷新时间: %d秒", g_iPendingInterval);
+	menu.AddItem("ci", text);
+
+	FormatMenuOnOff(state, sizeof(state), g_iPendingAssault);
+	FormatEx(text, sizeof(text), "特感强攻: %s", state);
+	menu.AddItem("ca", text);
+
+	FormatMenuOnOff(state, sizeof(state), g_iPendingTankTogether);
+	FormatEx(text, sizeof(text), "坦克同刷: %s", state);
+	menu.AddItem("ct", text);
+
+	FormatMenuOnOff(state, sizeof(state), g_iPendingRelax);
+	FormatEx(text, sizeof(text), "Relax阶段: %s", state);
+	menu.AddItem("cr", text);
+
 	AddCampaignPresetEntries(menu);
 }
 
-void BuildAnneMenu(int menu)
+void BuildAnneMenu(Menu menu)
 {
-	ExtraMenu_AddEntry(menu, "刷特控制菜单:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1/2调整/确认，3/4移动，0退出", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "通用选项:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "1. 插件状态: Anne模式", MENU_SELECT_ONLY);
-	ExtraMenu_AddEntry(menu, "2. 特感上限: [_OPT_]特", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneLimit, 4), 1, 1, 30);
-	ExtraMenu_AddEntry(menu, "3. 刷新时间: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneInterval, 16), 1, 0, 120);
-	ExtraMenu_AddEntry(menu, "4. 刷特模式: _OPT_", MENU_SELECT_LIST, false, GetConVarIntOrDefault(g_cvAnneAutoSpawn, 1) == 1 ? 0 : 1);
-	ExtraMenu_AddOptions(menu, "自动时间|固定时间");
-	ExtraMenu_AddEntry(menu, "5. 刷特距离: [_OPT_]码", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneDistance, 250), 50, 0, 1500);
-	ExtraMenu_AddEntry(menu, "6. 传送检测: [_OPT_]秒", MENU_SELECT_ADD, false, GetConVarIntOrDefault(g_cvAnneTeleportCheck, 5), 1, 0, 30);
-	ExtraMenu_AddEntry(menu, "7. 内鬼模式: _OPT_", MENU_SELECT_ONOFF, false, GetConVarIntOrDefault(g_cvAnneTraitorEnable, 0));
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用:", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "应用当前设置（2确认）", MENU_SELECT_ONLY, true);
+	menu.SetTitle("刷特控制菜单\n模式: Anne\n选择设置项发起单项投票");
+	menu.AddItem("as", "插件状态: Anne模式");
+
+	char text[128];
+	char state[16];
+
+	FormatEx(text, sizeof(text), "特感上限: %d特", g_iPendingLimit);
+	menu.AddItem("al", text);
+
+	FormatEx(text, sizeof(text), "刷新时间: %d秒", g_iPendingInterval);
+	menu.AddItem("ai", text);
+
+	FormatAnneAutoMode(state, sizeof(state), g_iPendingAutoMode);
+	FormatEx(text, sizeof(text), "刷特模式: %s", state);
+	menu.AddItem("am", text);
+
+	FormatEx(text, sizeof(text), "刷特距离: %d码", g_iPendingDistance);
+	menu.AddItem("ad", text);
+
+	FormatEx(text, sizeof(text), "传送检测: %d秒", g_iPendingTeleportCheck);
+	menu.AddItem("atc", text);
+
+	FormatMenuOnOff(state, sizeof(state), g_iPendingTraitorEnable);
+	FormatEx(text, sizeof(text), "内鬼模式: %s", state);
+	menu.AddItem("atr", text);
+
 	AddAnnePresetEntries(menu);
 }
 
-public void ExtraMenu_OnSelect(int client, int menu_id, int option, int value)
+public int SpawnVoteMenuHandler(Menu menu, MenuAction action, int client, int item)
 {
-	if (menu_id == g_iCampaignMenu)
+	if (action == MenuAction_End)
 	{
-		HandleCampaignSelect(client, option, value);
-	}
-	else if (menu_id == g_iAnneMenu)
-	{
-		HandleAnneSelect(client, option, value);
-	}
-}
-
-void HandleCampaignSelect(int client, int option, int value)
-{
-	if (option >= CAMPAIGN_PRESET_OPTION_FIRST && option < CAMPAIGN_PRESET_OPTION_FIRST + g_iCampaignPresetCount)
-	{
-		StartPresetApplyVote(client, SpawnVoteMode_Campaign, option - CAMPAIGN_PRESET_OPTION_FIRST);
-		return;
+		delete menu;
+		return 0;
 	}
 
-	switch (option)
+	if (action == MenuAction_Cancel)
 	{
-		case CAMPAIGN_OPTION_STATUS:
-		{
-			CPrintToChat(client, "%t", "SpawnVote_CampaignStatus");
-		}
-		case CAMPAIGN_OPTION_LIMIT:
-		{
-			g_iPendingLimit = value;
-		}
-		case CAMPAIGN_OPTION_INTERVAL:
-		{
-			g_iPendingInterval = value;
-		}
-		case CAMPAIGN_OPTION_ASSAULT:
-		{
-			g_iPendingAssault = value;
-		}
-		case CAMPAIGN_OPTION_TANK_TOGETHER:
-		{
-			g_iPendingTankTogether = value;
-		}
-		case CAMPAIGN_OPTION_RELAX:
-		{
-			g_iPendingRelax = value;
-		}
-		case CAMPAIGN_OPTION_APPLY:
-		{
-			g_bPendingPreset = false;
-			g_sPendingPresetName[0] = '\0';
-			PrepareCampaignPendingFromCurrent();
-			StartApplyVote(client, SpawnVoteMode_Campaign);
-		}
-		case -1:
+		if (item == MenuCancel_Exit && IsValidPlayer(client))
 		{
 			CPrintToChat(client, "%t", "SpawnVote_MenuClosed");
 		}
+		return 0;
 	}
+
+	if (action != MenuAction_Select)
+	{
+		return 0;
+	}
+
+	char info[32];
+	menu.GetItem(item, info, sizeof(info));
+
+	if (IsCampaignMenuInfo(info))
+	{
+		HandleCampaignSelect(client, info);
+	}
+	else if (IsAnneMenuInfo(info))
+	{
+		HandleAnneSelect(client, info);
+	}
+
+	return 0;
 }
 
-void HandleAnneSelect(int client, int option, int value)
+bool IsCampaignMenuInfo(const char[] info)
 {
-	if (option >= ANNE_PRESET_OPTION_FIRST && option < ANNE_PRESET_OPTION_FIRST + g_iAnnePresetCount)
+	return info[0] == 'c';
+}
+
+bool IsAnneMenuInfo(const char[] info)
+{
+	return info[0] == 'a';
+}
+
+void HandleCampaignSelect(int client, const char[] info)
+{
+	PrepareCampaignPendingFromCurrent();
+
+	if (info[0] == 'c' && info[1] == 'p')
 	{
-		StartPresetApplyVote(client, SpawnVoteMode_Anne, option - ANNE_PRESET_OPTION_FIRST);
+		int presetIndex = ParseMenuIndex(info, 2);
+		if (!StartPresetApplyVote(client, SpawnVoteMode_Campaign, presetIndex))
+		{
+			DisplayCampaignSpawnVoteMenu(client);
+		}
 		return;
 	}
 
-	switch (option)
+	if (StrEqual(info, "cs"))
 	{
-		case ANNE_OPTION_STATUS:
+		CPrintToChat(client, "%t", "SpawnVote_CampaignStatus");
+		DisplayCampaignSpawnVoteMenu(client);
+	}
+	else if (StrEqual(info, "cl"))
+	{
+		g_iPendingLimit = NextMenuValue(g_iPendingLimit, MENU_STEP_LIMIT, 1, 30);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "特感上限 -> %d特", g_iPendingLimit);
+		if (!StartCampaignChangeVote(client))
 		{
-			CPrintToChat(client, "%t", "SpawnVote_AnneStatus");
-		}
-		case ANNE_OPTION_LIMIT:
-		{
-			g_iPendingLimit = value;
-		}
-		case ANNE_OPTION_INTERVAL:
-		{
-			g_iPendingInterval = value;
-		}
-		case ANNE_OPTION_AUTO_MODE:
-		{
-			g_iPendingAutoMode = (value == 0) ? 1 : 0;
-		}
-		case ANNE_OPTION_DISTANCE:
-		{
-			g_iPendingDistance = value;
-		}
-		case ANNE_OPTION_TELEPORT_CHECK:
-		{
-			g_iPendingTeleportCheck = value;
-		}
-		case ANNE_OPTION_TRAITOR_ENABLE:
-		{
-			g_iPendingTraitorEnable = value;
-		}
-		case ANNE_OPTION_APPLY:
-		{
-			g_bPendingPreset = false;
-			g_sPendingPresetName[0] = '\0';
-			PrepareAnnePendingFromCurrent();
-			StartApplyVote(client, SpawnVoteMode_Anne);
-		}
-		case -1:
-		{
-			CPrintToChat(client, "%t", "SpawnVote_MenuClosed");
+			DisplayCampaignSpawnVoteMenu(client);
 		}
 	}
+	else if (StrEqual(info, "ci"))
+	{
+		g_iPendingInterval = NextMenuValue(g_iPendingInterval, MENU_STEP_INTERVAL, 0, 120);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "刷新时间 -> %d秒", g_iPendingInterval);
+		if (!StartCampaignChangeVote(client))
+		{
+			DisplayCampaignSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "ca"))
+	{
+		g_iPendingAssault = ToggleMenuValue(g_iPendingAssault);
+		FormatPendingOnOffChange("特感强攻", g_iPendingAssault);
+		if (!StartCampaignChangeVote(client))
+		{
+			DisplayCampaignSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "ct"))
+	{
+		g_iPendingTankTogether = ToggleMenuValue(g_iPendingTankTogether);
+		FormatPendingOnOffChange("坦克同刷", g_iPendingTankTogether);
+		if (!StartCampaignChangeVote(client))
+		{
+			DisplayCampaignSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "cr"))
+	{
+		g_iPendingRelax = ToggleMenuValue(g_iPendingRelax);
+		FormatPendingOnOffChange("Relax阶段", g_iPendingRelax);
+		if (!StartCampaignChangeVote(client))
+		{
+			DisplayCampaignSpawnVoteMenu(client);
+		}
+	}
+}
+
+void HandleAnneSelect(int client, const char[] info)
+{
+	PrepareAnnePendingFromCurrent();
+
+	if (info[0] == 'a' && info[1] == 'p')
+	{
+		int presetIndex = ParseMenuIndex(info, 2);
+		if (!StartPresetApplyVote(client, SpawnVoteMode_Anne, presetIndex))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+		return;
+	}
+
+	if (StrEqual(info, "as"))
+	{
+		CPrintToChat(client, "%t", "SpawnVote_AnneStatus");
+		DisplayAnneSpawnVoteMenu(client);
+	}
+	else if (StrEqual(info, "al"))
+	{
+		g_iPendingLimit = NextMenuValue(g_iPendingLimit, MENU_STEP_LIMIT, 1, 30);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "特感上限 -> %d特", g_iPendingLimit);
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "ai"))
+	{
+		g_iPendingInterval = NextMenuValue(g_iPendingInterval, MENU_STEP_INTERVAL, 0, 120);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "刷新时间 -> %d秒", g_iPendingInterval);
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "am"))
+	{
+		g_iPendingAutoMode = ToggleMenuValue(g_iPendingAutoMode);
+		FormatPendingAutoModeChange();
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "ad"))
+	{
+		g_iPendingDistance = NextMenuValue(g_iPendingDistance, MENU_STEP_DISTANCE, 0, 1500);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "刷特距离 -> %d码", g_iPendingDistance);
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "atc"))
+	{
+		g_iPendingTeleportCheck = NextMenuValue(g_iPendingTeleportCheck, MENU_STEP_TELEPORT_CHECK, 0, 30);
+		FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "传送检测 -> %d秒", g_iPendingTeleportCheck);
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+	else if (StrEqual(info, "atr"))
+	{
+		g_iPendingTraitorEnable = ToggleMenuValue(g_iPendingTraitorEnable);
+		FormatPendingOnOffChange("内鬼模式", g_iPendingTraitorEnable);
+		if (!StartAnneChangeVote(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+	}
+}
+
+bool StartCampaignChangeVote(int client)
+{
+	g_bPendingPreset = false;
+	g_sPendingPresetName[0] = '\0';
+	PrepareCampaignPendingFromCurrent();
+
+	bool started = StartApplyVote(client, SpawnVoteMode_Campaign);
+	if (!started)
+	{
+		ResetPendingSpawnSettings();
+	}
+
+	return started;
+}
+
+bool StartAnneChangeVote(int client)
+{
+	g_bPendingPreset = false;
+	g_sPendingPresetName[0] = '\0';
+	PrepareAnnePendingFromCurrent();
+
+	bool started = StartApplyVote(client, SpawnVoteMode_Anne);
+	if (!started)
+	{
+		ResetPendingSpawnSettings();
+	}
+
+	return started;
 }
 
 void ResetPendingSpawnSettings()
@@ -715,6 +732,7 @@ void ResetPendingSpawnSettings()
 	g_iPendingRelax = SPAWN_MENU_UNSET;
 	g_bPendingPreset = false;
 	g_sPendingPresetName[0] = '\0';
+	g_sPendingChangeSummary[0] = '\0';
 }
 
 void PrepareCampaignPendingFromCurrent()
@@ -864,6 +882,12 @@ void FormatVoteTitle(char[] buffer, int maxlen, SpawnVoteMode mode)
 		return;
 	}
 
+	if (g_sPendingChangeSummary[0] != '\0')
+	{
+		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_ChangeVoteTitle", g_sPendingChangeSummary);
+		return;
+	}
+
 	if (mode == SpawnVoteMode_Campaign)
 	{
 		char relax[32];
@@ -1008,6 +1032,67 @@ int GetConVarIntOrDefault(ConVar convar, int fallback)
 	return convar.IntValue;
 }
 
+int NextMenuValue(int value, int step, int minValue, int maxValue)
+{
+	if (value == SPAWN_MENU_UNSET)
+	{
+		value = minValue;
+	}
+
+	value += step;
+	if (value > maxValue)
+	{
+		value = minValue;
+	}
+
+	return value;
+}
+
+int ToggleMenuValue(int value)
+{
+	return value == 0 ? 1 : 0;
+}
+
+void FormatMenuOnOff(char[] buffer, int maxlen, int value)
+{
+	strcopy(buffer, maxlen, value != 0 ? "开启" : "关闭");
+}
+
+void FormatAnneAutoMode(char[] buffer, int maxlen, int value)
+{
+	strcopy(buffer, maxlen, value == 1 ? "自动时间" : "固定时间");
+}
+
+void FormatPendingOnOffChange(const char[] name, int value)
+{
+	char state[16];
+	FormatMenuOnOff(state, sizeof(state), value);
+	FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "%s -> %s", name, state);
+}
+
+void FormatPendingAutoModeChange()
+{
+	char state[16];
+	FormatAnneAutoMode(state, sizeof(state), g_iPendingAutoMode);
+	FormatEx(g_sPendingChangeSummary, sizeof(g_sPendingChangeSummary), "刷特模式 -> %s", state);
+}
+
+int ParseMenuIndex(const char[] info, int start)
+{
+	int value = 0;
+	for (int i = start; info[i] != '\0'; i++)
+	{
+		if (info[i] < '0' || info[i] > '9')
+		{
+			return -1;
+		}
+
+		value = value * 10 + info[i] - '0';
+	}
+
+	return value;
+}
+
 void ResolvePendingRelaxFromCurrent()
 {
 	if (g_iPendingRelax != SPAWN_MENU_UNSET)
@@ -1096,37 +1181,39 @@ void CloseNativeVotePhrases()
 	}
 }
 
-void AddCampaignPresetEntries(int menu)
+void AddCampaignPresetEntries(Menu menu)
 {
 	if (g_iCampaignPresetCount == 0)
 	{
 		return;
 	}
 
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "常用预设:", MENU_ENTRY);
+	menu.AddItem("cp_header", "常用预设:", ITEMDRAW_DISABLED);
 	for (int i = 0; i < g_iCampaignPresetCount; i++)
 	{
+		char info[16];
 		char entry[SPAWN_PRESET_NAME_LENGTH + 16];
+		FormatEx(info, sizeof(info), "cp%d", i);
 		FormatEx(entry, sizeof(entry), "%d. %s", i + 1, g_sCampaignPresetNames[i]);
-		ExtraMenu_AddEntry(menu, entry, MENU_SELECT_ONLY, true);
+		menu.AddItem(info, entry);
 	}
 }
 
-void AddAnnePresetEntries(int menu)
+void AddAnnePresetEntries(Menu menu)
 {
 	if (g_iAnnePresetCount == 0)
 	{
 		return;
 	}
 
-	ExtraMenu_AddEntry(menu, " ", MENU_ENTRY);
-	ExtraMenu_AddEntry(menu, "常用预设:", MENU_ENTRY);
+	menu.AddItem("ap_header", "常用预设:", ITEMDRAW_DISABLED);
 	for (int i = 0; i < g_iAnnePresetCount; i++)
 	{
+		char info[16];
 		char entry[SPAWN_PRESET_NAME_LENGTH + 16];
+		FormatEx(info, sizeof(info), "ap%d", i);
 		FormatEx(entry, sizeof(entry), "%d. %s", i + 1, g_sAnnePresetNames[i]);
-		ExtraMenu_AddEntry(menu, entry, MENU_SELECT_ONLY, true);
+		menu.AddItem(info, entry);
 	}
 }
 

@@ -10,7 +10,7 @@
 - Added the 26-7 test config `Anne25-11.cfg`, kept `infected_control25-11.smx` as a rollback build, and updated the dynamic difficulty notes.
 - Fixed extreme-difficulty values affecting other difficulty levels; dynamic difficulty switches now reset Tank, Hunter, and related tier parameters more explicitly.
 - Fixed cases where saferoom melee weapons might fail to appear, and cleaned up `MeleeInTheSafeRoom` logic.
-- Added the `spawn_vote_menu.smx` spawn-vote menu with `extra_menu` support. Anne and campaign spawn count, interval, auto mode, teleport checks, and presets can now be adjusted through votes.
+- Reverted `spawn_vote_menu.smx` to the classic SourceMod menu and removed the external menu dependency. Anne and campaign spawn count, interval, auto mode, and teleport checks now start one vote per selected setting, while presets still vote on the full preset.
 - Added and reorganized the not0721 coop/community/mutation modes, dirspawn presets, weapon configs, and SI limit configs.
 - Added traitor-mode logic, spawn preset tables, and multilingual phrases to `infected_control` for future gameplay extensions.
 

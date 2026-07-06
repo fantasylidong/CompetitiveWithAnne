@@ -3,12 +3,12 @@
 #endif
 #define _infected_control_config_included
 
-static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0 };
-static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10 };
-static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50 };
-static const float DEFAULT_AI_DIST_SWEET_OFFSET[AI_LEVEL_SLOTS] = { 0.0, 0.00, 0.00, 0.00, 0.00, 0.00 };
-static const float DEFAULT_AI_DIST_WIDTH_SCALE[AI_LEVEL_SLOTS] = { 0.0, 1.25, 1.15, 1.08, 1.00, 1.00 };
-static const float DEFAULT_AI_SPAWN_BUDGET_BONUS[AI_LEVEL_SLOTS] = { 0.0, -3.0, -2.0, -1.0, 0.0, 0.0 };
+static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0, 6.0 };
+static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10, 1.10 };
+static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50, 0.50 };
+static const float DEFAULT_AI_DIST_SWEET_OFFSET[AI_LEVEL_SLOTS] = { 0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 };
+static const float DEFAULT_AI_DIST_WIDTH_SCALE[AI_LEVEL_SLOTS] = { 0.0, 1.25, 1.15, 1.08, 1.00, 1.00, 1.00 };
+static const float DEFAULT_AI_SPAWN_BUDGET_BONUS[AI_LEVEL_SLOTS] = { 0.0, -3.0, -2.0, -1.0, 0.0, 0.0, 0.0 };
 
 static void Config_ParseDifficultyFloatList(ConVar convar, const float defaults[AI_LEVEL_SLOTS], float values[AI_LEVEL_SLOTS], float minValue, float maxValue)
 {
@@ -281,41 +281,41 @@ enum struct Config
         );
         this.AiDifficultyFallbackLevel = CreateConVar(
             "inf_ai_difficulty_fallback_level", "3",
-            "Fallback spawn strategy level when dynamic AI difficulty is missing or not locked (1-5)",
-            CVAR_FLAG, true, 1.0, true, 5.0
+            "Fallback spawn strategy level when dynamic AI difficulty is missing or not locked (1-6)",
+            CVAR_FLAG, true, 1.0, true, 6.0
         );
         this.AiWaveCheckTime = CreateConVar(
-            "inf_ai_wave_check_time", "16.0 12.0 10.0 8.0 6.0",
+            "inf_ai_wave_check_time", "16.0 12.0 10.0 8.0 6.0 6.0",
             "Per AI level absolute seconds before anti-bait/AutoSpawn starts evaluating next-wave pressure; spawn still respects versus_special_respawn_interval",
             CVAR_FLAG
         );
         this.AiWaveCheckRatio = CreateConVar(
-            "inf_ai_wave_check_ratio", "1.00 0.75 0.625 0.50 0.375",
+            "inf_ai_wave_check_ratio", "1.00 0.75 0.625 0.50 0.375 0.375",
             "Legacy ratio-based check window; kept for old cfgs, replaced by inf_ai_wave_check_time",
             CVAR_FLAG
         );
         this.AiWaveFloorRatio = CreateConVar(
-            "inf_ai_wave_floor_ratio", "1.50 1.40 1.25 1.15 1.10",
+            "inf_ai_wave_floor_ratio", "1.50 1.40 1.25 1.15 1.10 1.10",
             "Legacy per AI level normal-wave floor ratio; current spawn lower bound is versus_special_respawn_interval",
             CVAR_FLAG
         );
         this.AiWaveLowSiRatio = CreateConVar(
-            "inf_ai_wave_low_si_ratio", "0.12 0.20 0.27 0.34 0.50",
+            "inf_ai_wave_low_si_ratio", "0.12 0.20 0.27 0.34 0.50 0.50",
             "Legacy per AI level low-SI pressure ratio; no longer allows waves before base respawn interval",
             CVAR_FLAG
         );
         this.AiDistSweetOffset = CreateConVar(
-            "inf_ai_dist_sweet_offset", "0.00 0.00 0.00 0.00 0.00",
+            "inf_ai_dist_sweet_offset", "0.00 0.00 0.00 0.00 0.00 0.00",
             "Per AI level: normalized offset applied to class spawn distance sweet spot; default keeps class-specific sweet spots unchanged",
             CVAR_FLAG
         );
         this.AiDistWidthScale = CreateConVar(
-            "inf_ai_dist_width_scale", "1.25 1.15 1.08 1.00 1.00",
+            "inf_ai_dist_width_scale", "1.25 1.15 1.08 1.00 1.00 1.00",
             "Per AI level: width multiplier for spawn distance scoring sweet zone",
             CVAR_FLAG
         );
         this.AiSpawnBudgetBonus = CreateConVar(
-            "inf_ai_spawn_budget_bonus", "-3 -2 -1 0 0",
+            "inf_ai_spawn_budget_bonus", "-3 -2 -1 0 0 0",
             "Per AI level: additive candidate budget adjustment for spawn scoring",
             CVAR_FLAG
         );

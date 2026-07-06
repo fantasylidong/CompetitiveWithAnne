@@ -10,7 +10,7 @@
 - 26-7 테스트 설정 `Anne25-11.cfg`를 추가하고, 롤백용으로 기존 `infected_control25-11.smx`를 유지했습니다. 동적 난이도 문서도 함께 갱신했습니다.
 - 극한 난이도 값이 다른 난이도에 영향을 주던 문제를 수정했습니다. 동적 난이도 전환 시 Tank, Hunter 등 단계별 파라미터가 더 명확히 초기화됩니다.
 - 일부 상황에서 안전실 근접 무기가 나오지 않을 수 있던 문제를 수정하고 `MeleeInTheSafeRoom` 로직을 정리했습니다.
-- `extra_menu`를 사용하는 스폰 투표 메뉴 `spawn_vote_menu.smx`를 추가했습니다. Anne/캠페인 특수 감염자 수, 간격, 자동 모드, 텔레포트 검사, preset을 투표로 조정할 수 있습니다.
+- 스폰 투표 메뉴 `spawn_vote_menu.smx`를 기존 SourceMod 메뉴로 되돌리고 외부 메뉴 의존성을 제거했습니다. Anne/캠페인 특수 감염자 수, 간격, 자동 모드, 텔레포트 검사는 항목을 선택할 때마다 단일 항목 투표를 시작하며, preset은 계속 전체 preset 기준으로 투표합니다.
 - not0721 계열 coop/community/mutation 모드, dirspawn preset, 무기 설정, SI limit 설정을 추가하고 정리했습니다.
 - `infected_control`에 배신자 모드 관련 로직, 스폰 preset 테이블, 다국어 문구를 추가해 이후 게임플레이 확장에 대비했습니다.
 

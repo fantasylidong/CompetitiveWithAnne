@@ -11,6 +11,8 @@
 #define DEFAULT_CONFIG_PATH "configs/AnneHappy/dynamic_ai_difficulty.cfg"
 #define DEFAULT_THRESHOLD_DB_CONFIG "l4dstats"
 #define DEFAULT_THRESHOLD_TABLE "ai_dynamic_ppm_thresholds"
+#define MAX_AUTO_DIFFICULTY_LEVEL 5
+#define MAX_DIFFICULTY_LEVEL 6
 
 ConVar g_cvEnable;
 ConVar g_cvCheckInterval;
@@ -84,7 +86,7 @@ public void OnPluginStart()
     g_cvLevel3PPM = CreateConVar("ah_ai_dynamic_ppm_hard", "43.23", "进入困难难度的 l4d_stats 平均 PPM 阈值", FCVAR_NOTIFY, true, 0.0);
     g_cvLevel4PPM = CreateConVar("ah_ai_dynamic_ppm_expert", "63.70", "进入专家难度的 l4d_stats 平均 PPM 阈值", FCVAR_NOTIFY, true, 0.0);
     g_cvLevel5PPM = CreateConVar("ah_ai_dynamic_ppm_extreme", "77.57", "进入极限难度的 l4d_stats 平均 PPM 阈值", FCVAR_NOTIFY, true, 0.0);
-    g_cvFixedLevel = CreateConVar("ah_ai_dynamic_fixed_level", "0", "固定动态难度：0=自动，1=简单，2=普通，3=困难，4=专家，5=极限", FCVAR_NOTIFY, true, 0.0, true, 5.0);
+    g_cvFixedLevel = CreateConVar("ah_ai_dynamic_fixed_level", "0", "固定动态难度：0=自动，1=简单，2=普通，3=困难，4=专家，5=极限，6=音理", FCVAR_NOTIFY, true, 0.0, true, 6.0);
     g_cvConfigPath = CreateConVar("ah_ai_dynamic_config", DEFAULT_CONFIG_PATH, "难度配置文件路径，相对 addons/sourcemod", FCVAR_NOTIFY);
     g_cvUseQuarterStats = CreateConVar("ah_ai_dynamic_use_quarter_stats", "0", "是否优先使用季度积分/季度时间计算玩家 PPM；当前季度数据失真时应关闭", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvQuarterMinMinutes = CreateConVar("ah_ai_dynamic_quarter_min_minutes", "300", "玩家本季度样本低于该分钟数时回退使用总积分 PPM", FCVAR_NOTIFY, true, 0.0);
@@ -97,7 +99,7 @@ public void OnPluginStart()
     g_cvSurvivorMaxIncaps = CreateConVar("ah_ai_dynamic_survivor_max_incaps", "2", "动态难度应用时强制恢复的生还者最大倒地次数；-1=不处理", FCVAR_NOTIFY, true, -1.0, true, 10.0);
     g_cvAnnounce = CreateConVar("ah_ai_dynamic_announce", "1", "调档时是否在聊天框提示", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvDebug = CreateConVar("ah_ai_dynamic_debug", "0", "是否输出动态难度调试日志", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvCurrentLevel = CreateConVar("ah_ai_dynamic_current_level", "0", "当前回合动态难度：0=未定档，1=简单，2=普通，3=困难，4=专家，5=极限", FCVAR_DONTRECORD, true, 0.0, true, 5.0);
+    g_cvCurrentLevel = CreateConVar("ah_ai_dynamic_current_level", "0", "当前回合动态难度：0=未定档，1=简单，2=普通，3=困难，4=专家，5=极限，6=音理", FCVAR_DONTRECORD, true, 0.0, true, 6.0);
     g_cvCurrentMode = CreateConVar("ah_ai_dynamic_current_mode", "0", "当前回合动态难度来源：0=自动，1=固定", FCVAR_DONTRECORD, true, 0.0, true, 1.0);
     g_cvCurrentPPM = CreateConVar("ah_ai_dynamic_current_ppm", "0.0", "当前回合自动定档使用的平均个人 PPM；固定模式为 0", FCVAR_DONTRECORD, true, 0.0);
     g_cvCurrentLocked = CreateConVar("ah_ai_dynamic_current_locked", "0", "当前回合动态难度是否已经锁定", FCVAR_DONTRECORD, true, 0.0, true, 1.0);
@@ -107,7 +109,7 @@ public void OnPluginStart()
     HookEvent("player_left_start_area", Event_PlayerLeftStartArea, EventHookMode_PostNoCopy);
 
     RegConsoleCmd("sm_aippm", Cmd_ShowPPM, "显示当前 AnneHappy 动态难度和 PPM");
-    RegAdminCmd("sm_aidiff", Cmd_SetDifficulty, ADMFLAG_CONFIG, "sm_aidiff <0-5> 设置动态难度；0=自动，1-5=固定难度");
+    RegAdminCmd("sm_aidiff", Cmd_SetDifficulty, ADMFLAG_CONFIG, "sm_aidiff <0-6> 设置动态难度；0=自动，1-5=固定自动档，6=音理固定档");
     RegAdminCmd("sm_aidiff_reload", Cmd_ReloadDifficulty, ADMFLAG_CONFIG, "重新读取难度配置并应用当前难度");
 
     StartDifficultyTimer();
@@ -185,9 +187,7 @@ public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontB
 
     if (g_cvAnnounce.BoolValue)
     {
-        char levelName[16];
-        GetLevelName(g_iCurrentLevel, levelName, sizeof(levelName));
-        CPrintToChatAll("%t", "DynamicAIDifficulty_DynamicDifficultyRoundLocked", levelName);
+        CPrintLevelPhraseToChatAll("DynamicAIDifficulty_DynamicDifficultyRoundLocked", g_iCurrentLevel);
     }
 }
 
@@ -268,9 +268,7 @@ bool ApplyFixedDifficultyIfNeeded(bool silent)
 
     if (!silent && g_cvAnnounce.BoolValue)
     {
-        char levelName[16];
-        GetLevelName(g_iCurrentLevel, levelName, sizeof(levelName));
-        CPrintToChatAll("%t", "DynamicAIDifficulty_FixedDynamicDifficulty", levelName);
+        CPrintLevelPhraseToChatAll("DynamicAIDifficulty_FixedDynamicDifficulty", g_iCurrentLevel);
     }
 
     return true;
@@ -343,7 +341,7 @@ public Action Cmd_ShowPPM(int client, int args)
     float ppmHard;
     float ppmExpert;
     float ppmExtreme;
-    GetLevelName(g_iCurrentLevel, levelName, sizeof(levelName));
+    GetLevelName(g_iCurrentLevel, levelName, sizeof(levelName), client);
     GetThresholdSourceName(thresholdSource, sizeof(thresholdSource));
     GetActiveThresholds(ppmNormal, ppmHard, ppmExpert, ppmExtreme);
     ReplyToCommand(client, "[AnneHappyAI] 难度=%d(%s) 平均PPM=%.2f 积分=%d 时间=%d分钟 人数=%d 季度样本=%d 总榜回退=%d 阈值=%s %.2f/%.2f/%.2f/%.2f 锁定=%s 固定=%d",
@@ -357,7 +355,7 @@ public Action Cmd_SetDifficulty(int client, int args)
 {
     if (args < 1)
     {
-        ReplyToCommand(client, "用法: sm_aidiff <0-5>，0=自动，1=简单，2=普通，3=困难，4=专家，5=极限");
+        ReplyToCommand(client, "用法: sm_aidiff <0-6>，0=自动，1=简单，2=普通，3=困难，4=专家，5=极限，6=音理");
         return Plugin_Handled;
     }
 
@@ -394,10 +392,10 @@ public Action Cmd_SetDifficulty(int client, int args)
     if (g_bSurvivorsLeftStartArea)
     {
         char levelName[16];
-        GetLevelName(level, levelName, sizeof(levelName));
+        GetLevelName(level, levelName, sizeof(levelName), client);
         ReplyToCommand(client, "[AnneHappyAI] 已固定难度为 %d(%s)，将从下一回合开始生效；当前回合难度不变。", level, levelName);
         if (g_cvAnnounce.BoolValue)
-            CPrintToChatAll("%t", "DynamicAIDifficulty_DifficultyNextRoundFixedDifficulty", levelName);
+            CPrintLevelPhraseToChatAll("DynamicAIDifficulty_DifficultyNextRoundFixedDifficulty", level);
         return Plugin_Handled;
     }
 
@@ -409,10 +407,10 @@ public Action Cmd_SetDifficulty(int client, int args)
     PublishCurrentDifficulty();
 
     char levelName[16];
-    GetLevelName(level, levelName, sizeof(levelName));
+    GetLevelName(level, levelName, sizeof(levelName), client);
     ReplyToCommand(client, "[AnneHappyAI] 已固定难度为 %d(%s)", level, levelName);
     if (g_cvAnnounce.BoolValue)
-        CPrintToChatAll("%t", "DynamicAIDifficulty_DifficultyCurrentRoundFixed", levelName);
+        CPrintLevelPhraseToChatAll("DynamicAIDifficulty_DifficultyCurrentRoundFixed", level);
     return Plugin_Handled;
 }
 
@@ -527,7 +525,7 @@ int GetLevelForPPM(float ppm)
     GetActiveThresholds(ppmNormal, ppmHard, ppmExpert, ppmExtreme);
 
     if (ppm >= ppmExtreme)
-        level = 5;
+        level = MAX_AUTO_DIFFICULTY_LEVEL;
     else if (ppm >= ppmExpert)
         level = 4;
     else if (ppm >= ppmHard)
@@ -535,7 +533,7 @@ int GetLevelForPPM(float ppm)
     else if (ppm >= ppmNormal)
         level = 2;
 
-    return level;
+    return ClampLevel(level, MAX_AUTO_DIFFICULTY_LEVEL);
 }
 
 void GetActiveThresholds(float &ppmNormal, float &ppmHard, float &ppmExpert, float &ppmExtreme)
@@ -948,11 +946,18 @@ public void SQL_OnThresholdRowLoaded(Database db, DBResultSet results, const cha
     }
 }
 
-void GetLevelName(int level, char[] buffer, int maxlen)
+void GetLevelName(int level, char[] buffer, int maxlen, int client = LANG_SERVER)
+{
+    char phrase[64];
+    GetLevelNamePhrase(level, phrase, sizeof(phrase));
+    Format(buffer, maxlen, "%T", phrase, client > 0 ? client : LANG_SERVER);
+}
+
+void GetLevelNamePhrase(int level, char[] buffer, int maxlen)
 {
     if (level <= 0)
     {
-        strcopy(buffer, maxlen, "未定档");
+        strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelUnset");
         return;
     }
 
@@ -960,24 +965,54 @@ void GetLevelName(int level, char[] buffer, int maxlen)
     {
         case 1:
         {
-            strcopy(buffer, maxlen, "简单");
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelEasy");
         }
         case 2:
         {
-            strcopy(buffer, maxlen, "普通");
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelNormal");
         }
         case 3:
         {
-            strcopy(buffer, maxlen, "困难");
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelHard");
         }
         case 4:
         {
-            strcopy(buffer, maxlen, "专家");
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelExpert");
+        }
+        case 5:
+        {
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelExtreme");
         }
         default:
         {
-            strcopy(buffer, maxlen, "极限");
+            strcopy(buffer, maxlen, "DynamicAIDifficulty_LevelNeri");
         }
+    }
+}
+
+void CPrintLevelPhraseToChatAll(const char[] phrase, int level)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client))
+            continue;
+
+        char levelName[16];
+        GetLevelName(level, levelName, sizeof(levelName), client);
+        CPrintToChat(client, "%t", phrase, levelName);
+    }
+}
+
+void CPrintAutoDifficultyToChatAll(float ppm, int players, int score, int minutes, int quarterPlayers, int fallbackPlayers, int level)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client))
+            continue;
+
+        char levelName[16];
+        GetLevelName(level, levelName, sizeof(levelName), client);
+        CPrintToChat(client, "%t", "DynamicAIDifficulty_L4DStatsAveragePersonalPPM", ppm, players, score, minutes, quarterPlayers, fallbackPlayers, levelName);
     }
 }
 
@@ -992,19 +1027,15 @@ void ApplyDifficulty(int level, bool force, float ppm = 0.0, int score = 0, int 
     ApplyProfileCvars(level);
 
     if (g_cvAnnounce.BoolValue && !force)
-    {
-        char levelName[16];
-        GetLevelName(level, levelName, sizeof(levelName));
-        CPrintToChatAll("%t", "DynamicAIDifficulty_L4DStatsAveragePersonalPPM", ppm, players, score, minutes, quarterPlayers, fallbackPlayers, levelName);
-    }
+        CPrintAutoDifficultyToChatAll(ppm, players, score, minutes, quarterPlayers, fallbackPlayers, level);
 }
 
-int ClampLevel(int level)
+int ClampLevel(int level, int maxLevel = MAX_DIFFICULTY_LEVEL)
 {
     if (level < 1)
         return 1;
-    if (level > 5)
-        return 5;
+    if (level > maxLevel)
+        return maxLevel;
     return level;
 }
 
