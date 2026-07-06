@@ -12,7 +12,7 @@ public Plugin myinfo =
 	name        = "[L4D/2] Incap Fire Fix",
 	author      = "Sir",
 	description = "Lets incapacitated survivors fire their weapon normally (with sound) while holding shove",
-	version     = "1.0",
+	version     = "1.0.1",
 	url         = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -24,10 +24,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) > 0)
 	{
 		int wep = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-		if (wep != -1)
+		if (wep != -1 && GetEntProp(wep, Prop_Send, "m_iClip1") > 0)
+		{
 			SetEntPropFloat(wep, Prop_Send, "m_flNextSecondaryAttack", GetGameTime() + BUFFER_TIME);
-
-		g_bBlocked[client] = true;
+			g_bBlocked[client] = true;
+		}
 	}
 	else if (g_bBlocked[client])
 	{
