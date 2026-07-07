@@ -316,9 +316,9 @@ public void OnPluginStart()
     RegAdminCmd("sm_navtest", Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分");
     RegAdminCmd("sm_nt",      Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分(别名)");
     RegAdminCmd("sm_wavestatus", Cmd_WaveStatus, ADMFLAG_GENERIC, "查看当前波决策器状态");
-    RegAdminCmd("sm_neigui", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_neigui [class]");
-    RegAdminCmd("sm_it", Cmd_Traitor, ADMFLAG_ROOT, "管理员进入内鬼刷特队列: sm_it [class]");
-    RegAdminCmd("sm_neiguicancel", Cmd_TraitorCancel, ADMFLAG_ROOT, "取消内鬼刷特队列");
+    RegAdminCmd("sm_neigui", Cmd_Traitor, ADMFLAG_GENERIC, "管理员进入内鬼刷特队列: sm_neigui [class]");
+    RegAdminCmd("sm_it", Cmd_Traitor, ADMFLAG_GENERIC, "管理员进入内鬼刷特队列: sm_it [class]");
+    RegAdminCmd("sm_neiguicancel", Cmd_TraitorCancel, ADMFLAG_GENERIC, "取消内鬼刷特队列");
     AddCommandListener(InfectedControl_OnTraitorCvarCommand, "sm_cvar");
 
     RegisterSpawnPerfCommands();
