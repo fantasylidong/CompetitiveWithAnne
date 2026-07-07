@@ -94,3 +94,38 @@ stock bool:Stats_ShouldCountClientPlaytime(Client)
 	new team = GetClientTeam(Client);
 	return team == TEAM_SURVIVORS || team == TEAM_INFECTED;
 }
+
+stock Stats_ClearRoundParticipant(client)
+{
+	if (client <= 0 || client > MaxClients)
+		return;
+
+	ClientEnabled[client] = false;
+	ClientEnabledAuth[client][0] = '\0';
+}
+
+stock bool:Stats_MarkRoundParticipant(client)
+{
+	if (!Stats_IsSurvivorHuman(client))
+		return false;
+
+	decl String:ClientID[MAX_LINE_WIDTH];
+	if (!GetClientRankAuthString(client, ClientID, sizeof(ClientID)))
+		return false;
+
+	ClientEnabled[client] = true;
+	strcopy(ClientEnabledAuth[client], sizeof(ClientEnabledAuth[]), ClientID);
+	return true;
+}
+
+stock bool:Stats_IsRoundParticipant(client)
+{
+	if (!ClientEnabled[client] || !Stats_IsValidHumanClient(client))
+		return false;
+
+	decl String:ClientID[MAX_LINE_WIDTH];
+	if (!GetClientRankAuthString(client, ClientID, sizeof(ClientID)))
+		return false;
+
+	return StrEqual(ClientEnabledAuth[client], ClientID);
+}

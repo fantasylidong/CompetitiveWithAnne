@@ -1576,16 +1576,26 @@ public Action:event_StartArea(Handle:event, const String:name[], bool:dontBroadc
 
 public Action:event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	if(MapTimingBlocked || MapTimingStartTime != 0.0 || GetEventBool(event, "isbot"))
+	if(GetEventBool(event, "isbot"))
 	{
 		return Plugin_Continue;
 	}
 
 	new Player = GetClientOfUserId(GetEventInt(event, "userid"));
-	//new NewTeam = GetEventInt(event, "team");
+	new NewTeam = GetEventInt(event, "team");
 	//new OldTeam = GetEventInt(event, "oldteam");
 
 	if (Player <= 0)
+	{
+		return Plugin_Continue;
+	}
+
+	if (NewTeam == TEAM_SURVIVORS && Stats_HasPlaytimeStarted() && !StatsDisabled())
+	{
+		Stats_MarkRoundParticipant(Player);
+	}
+
+	if(MapTimingBlocked || MapTimingStartTime != 0.0)
 	{
 		return Plugin_Continue;
 	}

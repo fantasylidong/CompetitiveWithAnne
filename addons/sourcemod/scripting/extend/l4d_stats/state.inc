@@ -347,6 +347,7 @@ new Handle:MeleeKillTimer[MAXPLAYERS + 1];
 new MeleeKillCounter[MAXPLAYERS + 1];
 new ClientPlayTime[MAXPLAYERS + 1];
 new bool:ClientEnabled[MAXPLAYERS + 1];
+new String:ClientEnabledAuth[MAXPLAYERS + 1][MAX_LINE_WIDTH];
 new CheckPlayerPoint[100];
 new bool:g_bTopPlayerCacheReady = false;
 Handle AnnounceGameTime, SuccessGetPlayerTime;

@@ -87,7 +87,7 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 	}
 	
 	for(int i = 1; i <= MaxClients; i++){
-		if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == 2 || ClientEnabled[i]) && !IsFakeClient(i) && Score > 0){
+		if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == TEAM_SURVIVORS || Stats_IsRoundParticipant(i)) && !IsFakeClient(i) && Score > 0){
 			StatsPrintToChat(i, "{lightgreen}所有参与玩家 {default}都 {lightgreen}掉了 {green}%i {default}分 by {lightgreen}大家又坐牢了!", Score);
 			decl String:UpdatePoints[32];
 			decl String:UserID[MAX_LINE_WIDTH];

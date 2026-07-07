@@ -360,7 +360,7 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client){
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if(IsClientInGame(i) && GetClientTeam(i) == 2)
-			ClientEnabled[i] = true;
+			Stats_MarkRoundParticipant(i);
 	}
 	NewPlayerBonus_AnnounceRoundStart();
 	//开局提示该难度完成最快速度
@@ -399,7 +399,7 @@ ResetVars()
 		AnnounceCounter[i] = 0;
 		CurrentPoints[i] = 0;
 		ClientRankMute[i] = false;
-		ClientEnabled[i] = false;
+		Stats_ClearRoundParticipant(i);
 		HealingFirstAid[i] = 0;
 		SupportMedicineAwardCount[i] = 0;
 		SupportMedkitAwardCount[i] = 0;

@@ -24,6 +24,8 @@ public OnMapStart()
 
 public OnClientPostAdminCheck(client)
 {
+	Stats_ClearRoundParticipant(client);
+
 	if (db == INVALID_HANDLE)
 	{
 		return;
@@ -197,6 +199,7 @@ public Action:AnnounceConnect(Handle:timer, any:client)
 
 public OnClientDisconnect(client)
 {
+	Stats_ClearRoundParticipant(client);
 	InitializeClientInf(client);
 	ClientScoreReady[client] = false;
 	ClientPoints[client] = 0;
