@@ -526,7 +526,7 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.TraitorEnable = CreateConVar(
-            "inf_traitor_enable", "0",
+            "inf_traitor_enable", "1",
             "Enable admin traitor SI mode (0/1).",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
