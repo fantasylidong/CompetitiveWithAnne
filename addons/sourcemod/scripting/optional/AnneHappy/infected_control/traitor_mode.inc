@@ -829,8 +829,6 @@ static void Traitor_PunishNoDamageClients()
 
 static void Traitor_BroadcastNextWaveStatus(int releaseWave)
 {
-    bool announced = false;
-
     for (int client = 1; client <= MaxClients; client++)
     {
         if (!(g_ITState[client] == Traitor_SpawnLocked && g_ITReleaseWave[client] == releaseWave))
@@ -846,11 +844,7 @@ static void Traitor_BroadcastNextWaveStatus(int releaseWave)
         Traitor_FormatClassName(g_ITClass[client], client, className, sizeof(className));
 
         CPrintToChatAll("%t", "InfectedControl_TraitorNextWaveRegistered", playerName, className);
-        announced = true;
     }
-
-    if (!announced)
-        CPrintToChatAll("%t", "InfectedControl_TraitorNextWaveNone");
 }
 
 Action Traitor_OnPlayerRunCmd(int client, int &buttons)
