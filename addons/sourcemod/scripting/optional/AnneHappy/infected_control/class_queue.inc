@@ -387,14 +387,51 @@ void MaintainSpawnQueueOnce()
 // =========================
 // SI 选择 / 限制
 // =========================
-// 重要：只按“活着的”判断是否到达每类上限（不把队列算进上限）
+void ResetWaveClassSpawnCounts()
+{
+    for (int i = 0; i < SI_COUNT; i++)
+        gST.siSpawnedThisWave[i] = 0;
+}
+
+void MarkWaveClassSpawned(int zc)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return;
+
+    gST.siSpawnedThisWave[idx]++;
+}
+
+static int GetClassTotalCap(int zc)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return 0;
+
+    return gST.siAlive[idx] + gST.siCap[idx] + Traitor_CountReservedClassSlots(zc);
+}
+
+bool HasReachedWaveClassLimit(int zc)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return true;
+
+    int capTotal = GetClassTotalCap(zc);
+    if (capTotal <= 0)
+        return true;
+
+    return gST.siSpawnedThisWave[idx] >= capTotal;
+}
+
+// 重要：这里判断的是“当前活体窗口”是否到达每类上限。
 bool HasReachedLimit(int zc)
 {
     int idx = zc - 1;
     if (idx < 0 || idx >= SI_COUNT) return true;
 
     int reserved = Traitor_CountReservedClassSlots(zc);
-    int cap = gST.siAlive[idx] + gST.siCap[idx] + reserved;
+    int cap = GetClassTotalCap(zc);
     return (gST.siAlive[idx] + reserved) >= cap;
 }
 
@@ -410,13 +447,19 @@ static int CountQueuedOfClass(int zc)
     return n;
 }
 
-// 是否还能把该类加入 spawn 队列：活着 + 已入队 < 该类总额度（alive + remain）
+// 是否还能把该类加入 spawn 队列：
+// 1) 当前活着 + 已入队不能超过该类同时上限；
+// 2) 本波普通刷出 + 已入队不能超过该类本波预算。
 static bool CanQueueClass(int zc)
 {
     int idx = zc - 1;
     if (idx < 0 || idx >= SI_COUNT) return false;
 
     int reserved = Traitor_CountReservedClassSlots(zc);
-    int capTotal = gST.siAlive[idx] + gST.siCap[idx] + reserved;
-    return (gST.siAlive[idx] + reserved + CountQueuedOfClass(zc)) < capTotal;
+    int capTotal = GetClassTotalCap(zc);
+    if (capTotal <= 0)
+        return false;
+
+    return (gST.siAlive[idx] + reserved + CountQueuedOfClass(zc)) < capTotal
+        && (gST.siSpawnedThisWave[idx] + CountQueuedOfClass(zc)) < capTotal;
 }

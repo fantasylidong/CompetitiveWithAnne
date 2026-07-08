@@ -9,6 +9,7 @@ void StartWave()
 {
     ClearPathCache();
     RecalcSiCapFromAlive(true);
+    ResetWaveClassSpawnCounts();
 
     gST.survCount = 0;
     for (int i = 1; i <= MaxClients; i++)

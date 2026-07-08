@@ -37,6 +37,7 @@ enum struct State
     int    teleCount[MAXPLAYERS+1];
     int    siAlive[SI_COUNT];
     int    siCap[SI_COUNT];
+    int    siSpawnedThisWave[SI_COUNT];
     int    teleportQueueSize;
     int    spawnQueueSize;
     int    waveIndex;
@@ -86,7 +87,11 @@ enum struct State
             this.spitterSpitTime[i] = 0.0;
             this.teleCount[i]       = 0;
         }
-        for (int i = 0; i < SI_COUNT; i++) this.siAlive[i] = 0;
+        for (int i = 0; i < SI_COUNT; i++)
+        {
+            this.siAlive[i] = 0;
+            this.siSpawnedThisWave[i] = 0;
+        }
         for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
     }
 }

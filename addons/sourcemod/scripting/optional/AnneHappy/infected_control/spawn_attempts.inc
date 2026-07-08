@@ -231,6 +231,12 @@ void TryNormalSpawnOnce()
         SpawnQueue_DropHead(want);
         return;
     }
+    if (HasReachedWaveClassLimit(want))
+    {
+        Debug_Print("[SPAWN DROP] class=%s reached wave-cap, drop head", g_sInfectedClassNames[want]);
+        SpawnQueue_DropHead(want);
+        return;
+    }
 
     if (!PassDeathCooldown(want) && !ShouldRelaxDeathCD())
     {
@@ -281,6 +287,7 @@ void TryNormalSpawnOnce()
         gST.siQueueCount--;
         gST.siAlive[want - 1]++;
         gST.totalSI++;
+        MarkWaveClassSpawned(want);
         SpawnQueue_DropHead(want);
 
         TriggerAssaultBurst();
@@ -318,6 +325,7 @@ void TryNormalSpawnOnce()
             gST.siQueueCount--;
             gST.siAlive[want - 1]++;
             gST.totalSI++;
+            MarkWaveClassSpawned(want);
             SpawnQueue_DropHead(want);
 
             TriggerAssaultBurst();
