@@ -610,7 +610,7 @@ void PrepareAnnePendingFromCurrent()
 	}
 	if (g_iPendingTraitorEnable == SPAWN_MENU_UNSET)
 	{
-		g_iPendingTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 0);
+		g_iPendingTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 1);
 	}
 }
 
