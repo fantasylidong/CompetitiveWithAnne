@@ -31,7 +31,7 @@
 			"name" "喷子硬核模式"
 		}
 	}
-	"Coop/Realism Configs"
+	"Coop and Realism Configs"
 	{
 		"coop"
 		{
