@@ -448,8 +448,13 @@ void BuildCampaignMenu(Menu menu)
 
 void BuildAnneMenu(Menu menu)
 {
-	menu.SetTitle("刷特设置\n选择特感数量:");
+	menu.SetTitle("刷特设置\n选择投票选项:");
 	AddAnneLimitVoteEntries(menu);
+	AddAnneIntervalVoteEntries(menu);
+	AddAnneAutoModeVoteEntries(menu);
+	AddAnneDistanceVoteEntries(menu);
+	AddAnneTeleportVoteEntries(menu);
+	AddAnneTraitorVoteEntries(menu);
 }
 
 public int SpawnVoteMenuHandler(Menu menu, MenuAction action, int client, int item)
@@ -928,14 +933,80 @@ void AddAnneLimitVoteEntries(Menu menu)
 	char folder[16];
 	GetAnneLimitVoteFolder(folder, sizeof(folder));
 
+	AddMenuHeader(menu, "特感数量");
 	for (int limit = ANNE_LIMIT_MIN; limit <= ANNE_LIMIT_MAX; limit++)
 	{
 		char command[SPAWN_VOTE_COMMAND_LENGTH];
 		char text[32];
 		FormatEx(command, sizeof(command), "exec vote/%s/AnneHappy%d.cfg", folder, limit);
-		FormatEx(text, sizeof(text), "%d特", limit);
+		FormatEx(text, sizeof(text), "%d特模式", limit);
 		AddCfgVoteEntry(menu, "avc", command, text);
 	}
+}
+
+void AddAnneIntervalVoteEntries(Menu menu)
+{
+	AddMenuHeader(menu, "复活时间");
+	for (int interval = 0; interval <= 20; interval++)
+	{
+		AddIntegerCvarVoteEntry(menu, "versus_special_respawn_interval", interval, "%d秒");
+	}
+}
+
+void AddAnneAutoModeVoteEntries(Menu menu)
+{
+	AddMenuHeader(menu, "刷特模式");
+	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_EnableAutoSpawnTime 1", "自动时间刷特[23-01版本起有效]");
+	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_EnableAutoSpawnTime 0", "固定时间刷特[23-01版本起有效]");
+}
+
+void AddAnneDistanceVoteEntries(Menu menu)
+{
+	AddMenuHeader(menu, "特感最低生成距离");
+	int start = IsAnneHardcoreVoteMode() ? 200 : 250;
+	for (int distance = start; distance <= 600; distance += 50)
+	{
+		AddFloatCvarVoteEntry(menu, "inf_SpawnDistanceMin", distance, "%d单位");
+	}
+}
+
+void AddAnneTeleportVoteEntries(Menu menu)
+{
+	AddMenuHeader(menu, "特感传送检测秒数");
+	for (int seconds = 1; seconds <= 8; seconds++)
+	{
+		AddIntegerCvarVoteEntry(menu, "inf_TeleportCheckTime", seconds, "%d秒");
+	}
+}
+
+void AddAnneTraitorVoteEntries(Menu menu)
+{
+	AddMenuHeader(menu, "内鬼模式");
+	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 1", "内鬼模式 开");
+	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 0", "内鬼模式 关");
+}
+
+void AddMenuHeader(Menu menu, const char[] message)
+{
+	menu.AddItem("header", message, ITEMDRAW_DISABLED);
+}
+
+void AddIntegerCvarVoteEntry(Menu menu, const char[] cvarName, int value, const char[] textFormat)
+{
+	char command[SPAWN_VOTE_COMMAND_LENGTH];
+	char text[32];
+	FormatEx(command, sizeof(command), "sm_cvar %s %d", cvarName, value);
+	FormatEx(text, sizeof(text), textFormat, value);
+	AddCfgVoteEntry(menu, "avc", command, text);
+}
+
+void AddFloatCvarVoteEntry(Menu menu, const char[] cvarName, int value, const char[] textFormat)
+{
+	char command[SPAWN_VOTE_COMMAND_LENGTH];
+	char text[32];
+	FormatEx(command, sizeof(command), "sm_cvar %s %d.0", cvarName, value);
+	FormatEx(text, sizeof(text), textFormat, value);
+	AddCfgVoteEntry(menu, "avc", command, text);
 }
 
 void AddCfgVoteEntry(Menu menu, const char[] prefix, const char[] command, const char[] message)
@@ -947,16 +1018,22 @@ void AddCfgVoteEntry(Menu menu, const char[] prefix, const char[] command, const
 
 void GetAnneLimitVoteFolder(char[] folder, int maxlen)
 {
-	char voteFile[128];
-	GetCurrentVoteConfigFile(voteFile, sizeof(voteFile));
-
-	if (StrContains(voteFile, "shotgun", false) != -1)
+	if (IsAnneHardcoreVoteMode())
 	{
 		strcopy(folder, maxlen, "hardcore");
 		return;
 	}
 
-	strcopy(folder, maxlen, StrContains(voteFile, "hardcore", false) != -1 ? "hardcore" : "normal");
+	strcopy(folder, maxlen, "normal");
+}
+
+bool IsAnneHardcoreVoteMode()
+{
+	char voteFile[128];
+	GetCurrentVoteConfigFile(voteFile, sizeof(voteFile));
+
+	return StrContains(voteFile, "shotgun", false) != -1
+		|| StrContains(voteFile, "hardcore", false) != -1;
 }
 
 void GetCurrentVoteConfigFile(char[] voteFile, int maxlen)
