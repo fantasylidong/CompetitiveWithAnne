@@ -4,6 +4,63 @@
 	{
 		"MemPatches"
 		{
+			"vomit"
+			{
+				"signature" "CVomit::IsAbilityReadyToFire"
+				
+				"linux"
+				{
+					"offset"	"7Dh"
+					"verify"	"\x74\xB9"
+					"patch"		"\x90\x90"
+				}
+				
+				"windows"
+				{
+					"offset"	"6Ah"
+					"verify"	"\x74\xC9"
+					"patch"		"\x90\x90"
+				}
+			}
+			
+			"tongue_update_attach_state"
+			{
+				"signature" "CTongue::OnUpdateAttachedToTargetState"
+				
+				"linux"
+				{
+					"offset"	"115h"
+					"verify"	"\x0F\x84\x9D\x01\x00\x00"
+					"patch"		"\x90\x90\x90\x90\x90\x90"
+				}
+
+				"windows"
+				{
+					"offset"	"2D5h"
+					"verify"	"\x6A\x04\x8B\xCE\xE8\xD2\xE1\xFF\xFF"
+					"patch"		"\x90\x90\x90\x90\x90\x90\x90\x90\x90"
+				}
+			}
+			
+			"tongue_ability"
+			{
+				"signature" "CTongue::IsAbilityReadyToFire"
+				
+				"linux"
+				{
+					"offset"	"6Fh"
+					"verify"	"\x74\xC7"
+					"patch"		"\x90\x90"
+				}
+
+				"windows"
+				{
+					"offset"	"55h"
+					"verify"	"\x74\x30"
+					"patch"		"\x90\x90"
+				}
+			}
+			
 			"charger"
 			{
 				"signature" "CCharge::ActivateAbility"
@@ -45,6 +102,33 @@
 		
 		"Signatures" 
 		{
+			"CVomit::IsAbilityReadyToFire"
+			{
+				/* 56 57 8B ? 8B 87 ? ? ? ? 83 ? ? 74 ? 8B 15 ? ? ? ? 8B ? 81 E1 ? ? ? ? C1 ? ? 8D ? ? ? C1 ? ? 39 ? ? 75 ? 8B ? 85 ? 75 ? 5F */
+				/* Thanks Crasher */
+				
+				"windows"	"\x56\x57\x8B\x2A\x8B\x87\x2A\x2A\x2A\x2A\x83\x2A\x2A\x74\x2A\x8B\x15\x2A\x2A\x2A\x2A\x8B\x2A\x81\xE1\x2A\x2A\x2A\x2A\xC1\x2A\x2A\x8D\x2A\x2A\x2A\xC1\x2A\x2A\x39\x2A\x2A\x75\x2A\x8B\x2A\x85\x2A\x75\x2A\x5F"
+				"linux"	"@_ZNK6CVomit20IsAbilityReadyToFireEv"
+			}
+			
+			"CTongue::OnUpdateAttachedToTargetState"
+			{
+				/* 56 8B ? 8B 86 ? ? ? ? 83 ? ? 0F 84 ? ? ? ? 8B 15 ? ? ? ? 8B ? 81 E1 ? ? ? ? C1 ? ? 8D ? ? ? C1 ? ? 39 ? ? 0F 85 ? ? ? ? 57 8B ? 85 ? 0F 84 ? ? ? ? A1 */
+				/* Thanks Crasher */
+				
+				"windows"	"\x56\x8B\x2A\x8B\x86\x2A\x2A\x2A\x2A\x83\x2A\x2A\x0F\x84\x2A\x2A\x2A\x2A\x8B\x15\x2A\x2A\x2A\x2A\x8B\x2A\x81\xE1\x2A\x2A\x2A\x2A\xC1\x2A\x2A\x8D\x2A\x2A\x2A\xC1\x2A\x2A\x39\x2A\x2A\x0F\x85\x2A\x2A\x2A\x2A\x57\x8B\x2A\x85\x2A\x0F\x84\x2A\x2A\x2A\x2A\xA1"
+				"linux"	"@_ZN7CTongue29OnUpdateAttachedToTargetStateEv"
+			}
+			
+			"CTongue::IsAbilityReadyToFire"
+			{
+				/* 56 57 8B ? 8B 87 ? ? ? ? 83 ? ? 74 ? 8B 15 ? ? ? ? 8B ? 81 E1 ? ? ? ? C1 ? ? 8D ? ? ? C1 ? ? 39 ? ? 75 ? 8B ? 85 ? 74 ? 83 */
+				/* Thanks Crasher */
+				
+				"windows"	"\x56\x57\x8B\x2A\x8B\x87\x2A\x2A\x2A\x2A\x83\x2A\x2A\x74\x2A\x8B\x15\x2A\x2A\x2A\x2A\x8B\x2A\x81\xE1\x2A\x2A\x2A\x2A\xC1\x2A\x2A\x8D\x2A\x2A\x2A\xC1\x2A\x2A\x39\x2A\x2A\x75\x2A\x8B\x2A\x85\x2A\x74\x2A\x83"
+				"linux"	"@_ZNK7CTongue20IsAbilityReadyToFireEv"
+			}
+			
 			"CCharge::ActivateAbility"
 			{
 				/* 57 8B ? 8B ? 8B 90 ? ? ? ? FF ? 84 ? 0F 84 ? ? ? ? 8B 87 ? ? ? ? 53 */

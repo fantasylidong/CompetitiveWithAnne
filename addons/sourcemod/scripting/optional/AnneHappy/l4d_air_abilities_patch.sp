@@ -6,52 +6,123 @@
 
 #include <sourcescramble>
 
-ArrayStack gStack;
+ArrayList gAlwaysPatches;
+ArrayList gNeriPatches;
+
+ConVar gCvarNeriPatches;
+bool gNeriPatchesEnabled;
 
 public void OnPluginStart()
 {
-	gStack = new ArrayStack();
+	gAlwaysPatches = new ArrayList();
+	gNeriPatches = new ArrayList();
+	gCvarNeriPatches = CreateConVar("l4d_air_abilities_patch_neri", "0", "Enable Anne-Neri smoker/boomer air ability patches.", FCVAR_NONE, true, 0.0, true, 1.0);
+	gCvarNeriPatches.AddChangeHook(OnNeriPatchesChanged);
 	
-	GameData data = new GameData("l4d2_air_data"); Patch(data); delete data;
+	GameData data = new GameData("l4d2_air_data");
+	LoadAlwaysPatches(data);
+	LoadNeriPatches(data);
+	delete data;
+
+	SetNeriPatches(gCvarNeriPatches.BoolValue);
 }
 
 public void OnPluginEnd()
 {
-	MemoryPatch patch;
-	
-	while (!gStack.Empty)
-	{
-		patch = gStack.Pop();
-		patch.Disable();
-	}
+	DisablePatches(gNeriPatches);
+	DisablePatches(gAlwaysPatches);
 }
 
-void Patch (GameData data)
+void OnNeriPatchesChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	static const char name[][] =
+	SetNeriPatches(convar.BoolValue);
+}
+
+void LoadAlwaysPatches(GameData data)
+{
+	static const char names[][] =
 	{
 		"charger",
 		"zoom"
 	};
-	
-	MemoryPatch patch;
-	
-	for (int i; i < sizeof name; i++)
+
+	for (int i; i < sizeof names; i++)
 	{
-		patch = MemoryPatch.CreateFromConf(data, name[i]);
-		
-		if ( !patch )
-		{
-			LogMessage("Failed to create patch for \"%s\". Skiping...", name[i]);
-			continue;
-		}
-		else if ( !patch.Validate() ) 
-		{
-			LogMessage("Failed to verify patch for \"%s\". Skiping...", name[i]);
-			continue;
-		}
-		
-		patch.Enable();
-		gStack.Push(patch);
+		CreatePatch(data, names[i], gAlwaysPatches, true);
 	}
+}
+
+void LoadNeriPatches(GameData data)
+{
+	static const char names[][] =
+	{
+		"vomit",
+		"tongue_update_attach_state",
+		"tongue_ability"
+	};
+
+	for (int i; i < sizeof names; i++)
+	{
+		CreatePatch(data, names[i], gNeriPatches, false);
+	}
+}
+
+void CreatePatch(GameData data, const char[] name, ArrayList patches, bool enable)
+{
+	MemoryPatch patch = MemoryPatch.CreateFromConf(data, name);
+	
+	if ( !patch )
+	{
+		LogMessage("Failed to create patch for \"%s\". Skiping...", name);
+		return;
+	}
+	else if ( !patch.Validate() ) 
+	{
+		LogMessage("Failed to verify patch for \"%s\". Skiping...", name);
+		return;
+	}
+	
+	if ( enable && !patch.Enable() )
+	{
+		LogMessage("Failed to enable patch for \"%s\". Skiping...", name);
+		return;
+	}
+
+	patches.Push(patch);
+}
+
+void SetNeriPatches(bool enable)
+{
+	if (enable == gNeriPatchesEnabled)
+		return;
+
+	for (int i; i < gNeriPatches.Length; i++)
+	{
+		MemoryPatch patch = view_as<MemoryPatch>(gNeriPatches.Get(i));
+		if (enable)
+		{
+			if (!patch.Enable())
+				LogMessage("Failed to enable Anne-Neri air ability patch %d.", i);
+		}
+		else
+		{
+			patch.Disable();
+		}
+	}
+
+	gNeriPatchesEnabled = enable;
+}
+
+void DisablePatches(ArrayList patches)
+{
+	if (patches == null)
+		return;
+
+	for (int i; i < patches.Length; i++)
+	{
+		MemoryPatch patch = view_as<MemoryPatch>(patches.Get(i));
+		patch.Disable();
+	}
+
+	delete patches;
 }
