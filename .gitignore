@@ -80,9 +80,8 @@ scripts/mysql-install-clone-replica.env
 mysql-install-clone-replica.env
 scripts/install-docker-monitoring.sh
 
-# Local L4D2 Docker deploy secrets
-scripts/l4d2-docker.sh
-scripts/l4d2-docker.env.example
+# Local L4D2 Docker deploy secrets. The installer and documented example are
+# tracked; only the operator-specific environment file may contain secrets.
 scripts/l4d2-docker.env
 
 # Local A2S debugging tools, not for GitHub
