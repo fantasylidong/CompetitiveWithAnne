@@ -614,8 +614,16 @@ public CheckSurvivorsWin()
 		return;
 	}
 
-	//StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}CampaignOver值没问题!");
-	StopMapTiming();
+	// 计时记录与积分资格分开处理：先写入地图记录，再按地图类型和实际游玩时间决定是否发团队分。
+	new bool:IsOfficialMap = CheckIsOfficalMap();
+	new Float:MapDuration = -1.0;
+	if (MapTimingStartTime > 0.0)
+		MapDuration = GetEngineTime() - MapTimingStartTime;
+
+	new bool:MapTimingRecorded = StopMapTiming();
+	if (!IsOfficialMap && (!MapTimingRecorded || MapDuration <= STATS_SCORE_MINIMUM_MAP_TIME))
+		return;
+
 	CurrentGamemodeID = GetCurrentGamemodeID();
 	// Return if gamemode is Scavenge or Survival
 	if (CurrentGamemodeID == GAMEMODE_SCAVENGE ||

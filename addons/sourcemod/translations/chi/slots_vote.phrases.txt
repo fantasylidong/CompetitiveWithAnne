@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"chi"		"你不能在这个服务器上将位置设置超过 {olive}%i{default} 人."
+		"#format"	"{1:i},{2:i}"
+		"chi"		"不能将位置设置超过 {olive}{1}{default} 人。上限取 slots_max_slots={blue}{2}{default} 和服务器硬上限 {blue}31{default} 的较小值（32-1，确保总客户端数小于32）。"
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"chi"		"位置数量必须在 1 到 {blue}{1}{default} 之间。"
 	}
 	"LimitedSlotsTo"
 	{

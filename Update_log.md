@@ -603,6 +603,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `hextags_lite.smx` 替换旧 `hextags`，修复称号颜色问题，隐藏管理员命令，配置改为 `hextags_lite.cfg`。
 - `global_chat.smx`、`join.smx` 和相关翻译补齐更多多语言提示，加入全服聊天状态、找队友接收状态等短语。
 - `l4d_stats.smx` 修复季度排名和持久化细节，补充回合状态记录，降低部分数据库和高峰期状态写入问题。
+- `l4d_stats.smx` 调整三方图积分结算：普通三方图实际计时超过 5 分钟才发放安全屋过关分和强势通过分，官方地图维持原有积分；三方救援关不发团队过关分，但地图计时、地图记录和特感统计照常保存。
 - `l4d2_hitsound.smx` 合并原 `killsound`/叮叮叮音效投票能力，删除 `sound_on/off` 旧投票文件，把命中、击杀、爆头音效与图标统一到反馈插件管理。
 - `spechud.sp` 更新旁观 HUD：显示 ping，调整奖励百分比拆分，并修复旁观延迟显示问题。
 - 禁用 `basevotes.smx`，删除无蓄力 Hunter 直投入口，减少和 Anne 动态难度/投票菜单冲突。

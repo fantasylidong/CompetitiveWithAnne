@@ -6,10 +6,12 @@
 #include <sourcemod>
 
 #define L4D2Team_Spectator 1
+#define SLOT_HARD_MAX 31
 
 Handle g_hVote;
 char   g_sSlots[32];
-ConVar hMaxSlots,hNonAdminMinSlots;
+ConVar hMaxSlots, hNonAdminMinSlots;
+ConVar hSvMaxPlayers, hVisibleMaxPlayers;
 int    MaxSlots,NonAdminMinSlots;
 
 public Plugin myinfo =
@@ -25,8 +27,10 @@ public void OnPluginStart()
 {
 	LoadTranslations("slots_vote.phrases");
 	RegConsoleCmd("sm_slots", SlotsRequest);
-	hMaxSlots = CreateConVar("slots_max_slots", "30", "Maximum amount of slots you wish players to be able to vote for? (DON'T GO HIGHER THAN 30)");
-	hNonAdminMinSlots = CreateConVar("slots_nonAdmin_min_slots", "4", "Maximum amount of slots you wish players to be able to vote for? (DON'T GO HIGHER THAN 30)");
+	hMaxSlots = CreateConVar("slots_max_slots", "16", "Maximum amount of slots players can vote for.", _, true, 1.0, true, float(SLOT_HARD_MAX));
+	hNonAdminMinSlots = CreateConVar("slots_nonAdmin_min_slots", "4", "Minimum amount of slots non-admin players can vote for.", _, true, 1.0, true, float(SLOT_HARD_MAX));
+	hSvMaxPlayers = FindConVar("sv_maxplayers");
+	hVisibleMaxPlayers = FindConVar("sv_visiblemaxplayers");
 	MaxSlots  = hMaxSlots.IntValue;
 	NonAdminMinSlots = hNonAdminMinSlots.IntValue;
 	HookConVarChange(hMaxSlots, CVarChanged);
@@ -41,7 +45,18 @@ Action SlotsRequest(int client, int args)
 		char sSlots[64];
 		GetCmdArg(1, sSlots, sizeof(sSlots));
 		int Int = StringToInt(sSlots);
-		if(CheckCommandAccess(client, "", ADMFLAG_GENERIC) || client == 0)
+		bool bAdmin = client == 0 || CheckCommandAccess(client, "", ADMFLAG_GENERIC);
+		int iMaxSlots = GetAllowedMaxSlots();
+
+		if (Int < 1)
+		{
+			CPrintToChat(client, "%t %t", "Tag", "InvalidSlots", iMaxSlots);
+		}
+		else if (Int > iMaxSlots)
+		{
+			CPrintToChat(client, "%t %t", "Tag", "LimitSlotsAbove", iMaxSlots, MaxSlots);
+		}
+		else if (bAdmin)
 		{
 			char sName[MAX_NAME_LENGTH];
 			if(client == 0)
@@ -49,15 +64,10 @@ Action SlotsRequest(int client, int args)
 			else
 				GetClientName(client, sName, sizeof(sName));
 			CPrintToChatAll("%t %t", "Tag", "LimitedSlotsTo", sName, Int);
-			SetConVarInt(FindConVar("sv_maxplayers"), Int);
-			SetConVarInt(FindConVar("sv_visiblemaxplayers"), Int);
+			ApplySlots(Int);
 		}
 		else{
-			if (Int > MaxSlots)
-			{
-				CPrintToChat(client, "%t %t", "Tag", "LimitSlotsAbove", MaxSlots);
-			}
-			else if(Int < NonAdminMinSlots)
+			if(Int < NonAdminMinSlots)
 			{
 				CPrintToChat(client, "%t %t", "Tag", "SlotsVote_AdminOnlyBelowMinimumSlots", NonAdminMinSlots);
 			}
@@ -148,11 +158,16 @@ void SlotVoteResultHandler(Handle vote, int num_votes, int num_clients, const in
 			{
 
 				int Slots = StringToInt(g_sSlots, 10);
+				if (Slots < 1 || Slots > GetAllowedMaxSlots())
+				{
+					DisplayBuiltinVoteFail(vote, BuiltinVoteFail_Loses);
+					return;
+				}
+
 				char Buffer[32];
 				FormatEx(Buffer, sizeof(Buffer), "%T", "LimitingSlots", LANG_SERVER);
 				DisplayBuiltinVotePass(vote, Buffer);
-				SetConVarInt(FindConVar("sv_maxplayers"), Slots);
-				SetConVarInt(FindConVar("sv_visiblemaxplayers"), Slots);
+				ApplySlots(Slots);
 				return;
 			}
 		}
@@ -164,4 +179,18 @@ void CVarChanged(Handle cvar, char[] oldValue, char[] newValue)
 {
 	MaxSlots = GetConVarInt(hMaxSlots);
 	NonAdminMinSlots = GetConVarInt(hNonAdminMinSlots);
+}
+
+int GetAllowedMaxSlots()
+{
+	return MaxSlots < SLOT_HARD_MAX ? MaxSlots : SLOT_HARD_MAX;
+}
+
+void ApplySlots(int slots)
+{
+	if (hSvMaxPlayers != null)
+		hSvMaxPlayers.IntValue = slots;
+
+	if (hVisibleMaxPlayers != null)
+		hVisibleMaxPlayers.IntValue = slots;
 }

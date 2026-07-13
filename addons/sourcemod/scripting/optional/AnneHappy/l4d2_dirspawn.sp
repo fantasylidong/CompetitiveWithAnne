@@ -35,6 +35,8 @@ ConVar gCvarApplyOnRoundStart;   // 回合开始自动应用
 ConVar gCvarApplyDelay;          // 回合开始首次应用延迟（秒）
 ConVar gCvarKvEnable;            // 是否使用KV设置每类上限
 ConVar gCvarKvPath;              // KV路径
+ConVar gCvarLimitStyle;          // 每类上限分配风格（0=KV/均衡 1=Not0721 2=Not0721 community2）
+ConVar gCvarDpsSiLimit;          // Not0721 风格的 DPS 特感数量限制（Spitter+Boomer）
 ConVar gCvarVerbose;             // 服务器日志详细
 ConVar gCvarActiveChallenge;     // 设置 ActiveChallenge/Aggressive/Assault（0/1）
 
@@ -64,6 +66,9 @@ ConVar gCvarAutoBaseCount;       // 4名真人时的基线总特
 ConVar gCvarAutoPerAdd;          // 每多1名真人 +特
 ConVar gCvarAutoMinCount;        // 总特下限
 ConVar gCvarAutoMaxCount;        // 总特上限
+ConVar gCvarAutoBaseInterval;    // 4名真人时的基线刷特间隔
+ConVar gCvarAutoPerIntervalSub;  // 每多1名真人 -间隔
+ConVar gCvarAutoMinInterval;     // 刷特间隔下限
 ConVar gCvarAutoAnnounce;        // 自适应变化时是否公告（0/1）
 
 // interval 联动（Relax/LockTempo/Initial）
@@ -104,6 +109,11 @@ static const char g_SIKeys[SI_Count][] =
 static const SIClass g_DefaultDistributeOrder[SI_Count] =
 {
     SI_Hunter, SI_Charger, SI_Smoker, SI_Jockey, SI_Spitter, SI_Boomer
+};
+
+static const SIClass g_Not0721DistributeOrder[SI_Count] =
+{
+    SI_Hunter, SI_Jockey, SI_Smoker, SI_Charger, SI_Spitter, SI_Boomer
 };
 
 // L4D2 ZombieClass
@@ -234,6 +244,74 @@ stock void ComputeBalancedSplit(int total, int outCaps[SI_Count])
         SIClass cls = g_DefaultDistributeOrder[i % kSIClassCount];
         outCaps[cls]++;
     }
+}
+
+// Not0721 源服 Si_SpawnSetting/.nut 分配：
+// Hunter -> Jockey -> Smoker -> Charger -> Spitter -> Boomer 循环；
+// Spitter+Boomer 达到 dpsLimit 后，只在前四类继续分配。
+stock void ComputeNot0721Split(int total, int dpsLimit, int outCaps[SI_Count])
+{
+    for (int i = 0; i < kSIClassCount; i++)
+        outCaps[i] = 0;
+
+    int fixedTotal = total;
+    if (fixedTotal < kSIClassCount)
+        fixedTotal = kSIClassCount;
+
+    if (dpsLimit < 0)
+        dpsLimit = 0;
+
+    int index = 0;
+    for (int i = 0; i < fixedTotal; i++)
+    {
+        SIClass cls = g_Not0721DistributeOrder[index];
+        outCaps[cls]++;
+
+        index++;
+        if (outCaps[SI_Spitter] + outCaps[SI_Boomer] >= dpsLimit)
+        {
+            if (index > 3)
+                index = 0;
+        }
+        if (index > 5)
+            index = 0;
+    }
+}
+
+// community2.nut 把前四类份额折到 Spitter/Boomer，只保留感染季节味道。
+stock void ComputeNot0721Community2Split(int total, int dpsLimit, int outCaps[SI_Count])
+{
+    int sourceCaps[SI_Count];
+    ComputeNot0721Split(total, dpsLimit, sourceCaps);
+
+    for (int i = 0; i < kSIClassCount; i++)
+        outCaps[i] = 0;
+
+    outCaps[SI_Spitter] = sourceCaps[SI_Spitter] + sourceCaps[SI_Hunter] + sourceCaps[SI_Jockey];
+    outCaps[SI_Boomer] = sourceCaps[SI_Boomer] + sourceCaps[SI_Smoker] + sourceCaps[SI_Charger];
+}
+
+stock bool ComputeStyledSplit(int total, int outCaps[SI_Count], char[] source, int maxlen)
+{
+    int style = gCvarLimitStyle.IntValue;
+    int dpsLimit = gCvarDpsSiLimit.IntValue;
+
+    if (style == 1)
+    {
+        ComputeNot0721Split(total, dpsLimit, outCaps);
+        Format(source, maxlen, "not0721:dps=%d", dpsLimit);
+        return true;
+    }
+
+    if (style == 2)
+    {
+        ComputeNot0721Community2Split(total, dpsLimit, outCaps);
+        Format(source, maxlen, "not0721-community2:dps=%d", dpsLimit);
+        return true;
+    }
+
+    source[0] = '\0';
+    return false;
 }
 
 // 从 KV 载入每类上限
@@ -417,8 +495,20 @@ stock void ApplyByVScript(int total, int interval)
     VS_RawSetInt("cm_SpecialRespawnInterval", interval);
 
     int caps[SI_Count];
-    bool haveKV = (gCvarKvEnable.BoolValue && LoadCapsFromKV(total, caps));
-    if (!haveKV) ComputeBalancedSplit(total, caps);
+    char capSource[64];
+    bool haveStyledCaps = ComputeStyledSplit(total, caps, capSource, sizeof(capSource));
+    bool haveKV = false;
+    if (!haveStyledCaps)
+    {
+        haveKV = (gCvarKvEnable.BoolValue && LoadCapsFromKV(total, caps));
+        if (haveKV)
+            strcopy(capSource, sizeof(capSource), "kv");
+    }
+    if (!haveStyledCaps && !haveKV)
+    {
+        ComputeBalancedSplit(total, caps);
+        strcopy(capSource, sizeof(capSource), "balanced");
+    }
     for (int i = 0; i < kSIClassCount; i++)
         VS_RawSetInt(g_SIKeys[i], caps[i]);
 
@@ -426,8 +516,8 @@ stock void ApplyByVScript(int total, int interval)
     ApplyInitialSpawnDelayByVScript();
     ApplyRelaxDisableByVScript();
 
-    LogMsg("Applied: total=%d, dom=%d, interval=%d, KV=%s | M4: allow=%d relax=[%d..%d] lock=%d | init=[%d..%d]",
-           total, dom, interval, haveKV ? "yes":"no",
+    LogMsg("Applied: total=%d, dom=%d, interval=%d, caps=%s | M4: allow=%d relax=[%d..%d] lock=%d | init=[%d..%d]",
+           total, dom, interval, capSource,
            gCvarAllowSIWithTank.IntValue, gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue, gCvarLockTempo.IntValue,
            gCvarInitialMin.IntValue, gCvarInitialMax.IntValue);
 }
@@ -550,7 +640,7 @@ static void MaybeApplyUnlock()
     PrintToServer("[DirSpawn] 已应用 MaxSpecial 解锁（已补丁 CDirector::GetMaxPlayerZombies）。");
 }
 
-// ---------------------------- Auto scaling（仅改总数） -------------------
+// ---------------------------- Auto scaling ------------------------------
 int CountHumansByMode(int mode)
 {
     int cnt = 0;
@@ -583,12 +673,22 @@ void AutoRecomputeAndApply(bool announce)
     if (newCnt < minCnt) newCnt = minCnt;
     if (newCnt > maxCnt) newCnt = maxCnt;
 
+    int baseInterval = gCvarAutoBaseInterval.IntValue;
+    int perIntervalSub = gCvarAutoPerIntervalSub.IntValue;
+    int minInterval = gCvarAutoMinInterval.IntValue;
+
+    int newInterval = baseInterval - perIntervalSub * over4;
+    if (newInterval < minInterval) newInterval = minInterval;
+
     g_bInternalSet = true;
     gCvarCount.SetInt(newCnt);   // 只改总数
+    gCvarInterval.SetInt(newInterval);
     g_bInternalSet = false;
 
+    AutoTuneTempoFromInterval(newInterval);
+
     ApplyDirectorSettings(announce && gCvarAutoAnnounce.BoolValue);
-    LogMsg("AutoScale: humans=%d mode=%d -> count=%d", humans, mode, newCnt);
+    LogMsg("AutoScale: humans=%d mode=%d -> count=%d interval=%d", humans, mode, newCnt, newInterval);
 }
 
 public Action TMR_AutoOnce(Handle timer, any data)
@@ -887,8 +987,15 @@ public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValu
         AutoTuneTempoFromInterval(gCvarInterval.IntValue);
     }
 
+    if (cvar == gCvarAutoEnable || cvar == gCvarAutoCountMode || cvar == gCvarAutoBaseCount || cvar == gCvarAutoPerAdd
+     || cvar == gCvarAutoMinCount || cvar == gCvarAutoMaxCount || cvar == gCvarAutoBaseInterval
+     || cvar == gCvarAutoPerIntervalSub || cvar == gCvarAutoMinInterval)
+    {
+        ScheduleAuto(0.25);
+    }
+
     if (cvar == gCvarCount || cvar == gCvarInterval || cvar == gCvarDomLimit
-     || cvar == gCvarKvEnable || cvar == gCvarKvPath
+     || cvar == gCvarKvEnable || cvar == gCvarKvPath || cvar == gCvarLimitStyle || cvar == gCvarDpsSiLimit
      || cvar == gCvarAllowSIWithTank || cvar == gCvarRelaxEnable || cvar == gCvarRelaxMin || cvar == gCvarRelaxMax || cvar == gCvarLockTempo
      || cvar == gCvarInitialMin || cvar == gCvarInitialMax
      || cvar == gCvarRelaxOffBattlefieldRespawn || cvar == gCvarRelaxOffInitialDelayMax || cvar == gCvarRelaxOffInitialDelayMaxExtra
@@ -916,6 +1023,8 @@ public void OnPluginStart()
     gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "回合开始首次应用延迟（秒）", FCVAR_NOTIFY, true, 0.1, true, 10.0);
     gCvarKvEnable          = CreateConVar("dirspawn_kv_enable", "1", "是否使用KV设置每类上限（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "每类上限KV文件路径", FCVAR_NOTIFY);
+    gCvarLimitStyle        = CreateConVar("dirspawn_limit_style", "0", "每类上限分配：0=KV/均衡 1=Not0721 2=Not0721 community2", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    gCvarDpsSiLimit        = CreateConVar("dirspawn_dps_si_limit", "10", "Not0721 分配中 Spitter+Boomer 的数量限制", FCVAR_NOTIFY, true, 0.0, true, 30.0);
     gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "服务器日志详细（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "设置 ActiveChallenge/Aggressive/Assault 标志（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
@@ -958,6 +1067,9 @@ public void OnPluginStart()
     gCvarAutoPerAdd        = CreateConVar("dirspawn_auto_per_player_add", "1", "每多1名真人 +特", FCVAR_NOTIFY, true, 0.0, true, 6.0);
     gCvarAutoMinCount      = CreateConVar("dirspawn_auto_min_count", "1",  "总特最小值", FCVAR_NOTIFY, true, 0.0, true, 30.0);
     gCvarAutoMaxCount      = CreateConVar("dirspawn_auto_max_count", "30", "总特最大值", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarAutoBaseInterval  = CreateConVar("dirspawn_auto_base_interval", "35", "4名真人时的基线刷特间隔", FCVAR_NOTIFY, true, 0.0, true, 120.0);
+    gCvarAutoPerIntervalSub = CreateConVar("dirspawn_auto_per_player_interval_sub", "0", "每多1名真人减少的刷特间隔", FCVAR_NOTIFY, true, 0.0, true, 30.0);
+    gCvarAutoMinInterval   = CreateConVar("dirspawn_auto_min_interval", "0", "人数自适应刷特间隔下限", FCVAR_NOTIFY, true, 0.0, true, 120.0);
     gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "0", "人数自适应变更时公告（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     HookConVarChange(gCvarCount,             CvarChanged);
@@ -965,6 +1077,8 @@ public void OnPluginStart()
     HookConVarChange(gCvarDomLimit,          CvarChanged);
     HookConVarChange(gCvarKvEnable,          CvarChanged);
     HookConVarChange(gCvarKvPath,            CvarChanged);
+    HookConVarChange(gCvarLimitStyle,        CvarChanged);
+    HookConVarChange(gCvarDpsSiLimit,        CvarChanged);
     HookConVarChange(gCvarAllowSIWithTank,   CvarChanged);
     HookConVarChange(gCvarRelaxEnable,       CvarChanged);
     HookConVarChange(gCvarRelaxMin,          CvarChanged);
@@ -978,6 +1092,15 @@ public void OnPluginStart()
     HookConVarChange(gCvarRelaxOffInitialDelayMin, CvarChanged);
     HookConVarChange(gCvarRelaxOffFinaleOffer, CvarChanged);
     HookConVarChange(gCvarRelaxOffOriginalOffer, CvarChanged);
+    HookConVarChange(gCvarAutoEnable,        CvarChanged);
+    HookConVarChange(gCvarAutoCountMode,     CvarChanged);
+    HookConVarChange(gCvarAutoBaseCount,     CvarChanged);
+    HookConVarChange(gCvarAutoPerAdd,        CvarChanged);
+    HookConVarChange(gCvarAutoMinCount,      CvarChanged);
+    HookConVarChange(gCvarAutoMaxCount,      CvarChanged);
+    HookConVarChange(gCvarAutoBaseInterval,  CvarChanged);
+    HookConVarChange(gCvarAutoPerIntervalSub, CvarChanged);
+    HookConVarChange(gCvarAutoMinInterval,   CvarChanged);
 
     RegAdminCmd("sm_dirspawn_apply",  Cmd_Apply, ADMFLAG_GENERIC, "sm_dirspawn_apply [总特] [间隔] - 立即应用设置");
     RegAdminCmd("sm_dirspawn_genkv",  Cmd_GenKV, ADMFLAG_ROOT,    "sm_dirspawn_genkv [min] [max] - 生成均衡每类上限KV文件到 dirspawn_kv_path");

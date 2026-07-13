@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"vi"		"Bạn không thể đặt vị trí cho nhiều hơn {olive}%i{default} người trên máy chủ này."
+		"#format"	"{1:i},{2:i}"
+		"vi"		"Bạn không thể đặt quá {olive}{1}{default} slot. Giới hạn là giá trị nhỏ hơn giữa slots_max_slots={blue}{2}{default} và giới hạn cứng của máy chủ {blue}31{default} (32-1, để tổng số client dưới 32)."
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"vi"		"Số slot phải nằm trong khoảng từ 1 đến {blue}{1}{default}."
 	}
 	"LimitedSlotsTo"
 	{

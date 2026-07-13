@@ -68,17 +68,85 @@
 		{
 			"name" "Not0721基础战役"
 		}
+		"not0721_coop_fire"
+		{
+			"name" "Not0721无限火力"
+		}
+		"not0721_coop_fuckmap"
+		{
+			"name" "Not0721坐牢图"
+		}
 		"not0721_coop_hard"
 		{
 			"name" "Not0721进阶战役"
+		}
+		"not0721_coop_himiko"
+		{
+			"name" "Not0721 Himiko战役"
+		}
+		"not0721_coop_wtf"
+		{
+			"name" "Not0721 WTF战役"
 		}
 		"not0721_mutation4"
 		{
 			"name" "Not0721绝境"
 		}
+		"not0721_mutation4_except"
+		{
+			"name" "Not0721绝境Except"
+		}
+		"not0721_mutation4_ez"
+		{
+			"name" "Not0721绝境EZ"
+		}
+		"not0721_mutation4_noobplus"
+		{
+			"name" "Not0721绝境NoobPlus"
+		}
+		"not0721_mutation4_solo"
+		{
+			"name" "Not0721绝境Solo"
+		}
+		"not0721_community2"
+		{
+			"name" "Not0721死亡之门2"
+		}
 		"not0721_community5"
 		{
 			"name" "Not0721写专"
+		}
+		"not0721_community5_610"
+		{
+			"name" "Not0721写专610"
+		}
+		"not0721_community5_ez"
+		{
+			"name" "Not0721写专EZ"
+		}
+		"not0721_community5_himiko"
+		{
+			"name" "Not0721写专Himiko"
+		}
+		"not0721_community5_jimen"
+		{
+			"name" "Not0721写专几门"
+		}
+		"not0721_community5_multi"
+		{
+			"name" "Not0721写专多人"
+		}
+		"not0721_community5_noobplus"
+		{
+			"name" "Not0721写专NoobPlus"
+		}
+		"not0721_realism_miaomei"
+		{
+			"name" "Not0721写实喵妹"
+		}
+		"not0721_realism_solo"
+		{
+			"name" "Not0721写实Solo"
 		}
 	}
 	"ZoneMod Configs"

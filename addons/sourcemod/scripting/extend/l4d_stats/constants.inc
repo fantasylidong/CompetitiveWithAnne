@@ -47,6 +47,9 @@
 
 #define CLEAR_DATABASE_CONFIRMTIME 10.0
 
+// 三方普通章节只有实际计时超过 5 分钟才发放团队过关相关积分。
+#define STATS_SCORE_MINIMUM_MAP_TIME 300.0
+
 #define CM_UNKNOWN -1
 #define CM_RANK 0
 #define CM_TOP10 1

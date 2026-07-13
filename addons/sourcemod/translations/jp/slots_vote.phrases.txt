@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"jp"		"このサーバーでは、{olive}%i{default} 人を超える人の位置を設定することはできません。"
+		"#format"	"{1:i},{2:i}"
+		"jp"		"{olive}{1}{default} 人を超えるスロットは設定できません。上限は slots_max_slots={blue}{2}{default} とサーバーのハード上限 {blue}31{default}（32-1、合計クライアント数を32未満にする）の小さい方です。"
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"jp"		"スロット数は1以上{blue}{1}{default}以下で設定してください。"
 	}
 	"LimitedSlotsTo"
 	{

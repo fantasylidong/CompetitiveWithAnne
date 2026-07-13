@@ -15,6 +15,7 @@
 - Added traitor-mode logic, spawn preset tables, and multilingual phrases to `infected_control` for future gameplay extensions.
 
 #### Player Experience, Votes And Feedback
+- Adjusted `l4d_stats.smx` custom-map scoring: ordinary custom maps award saferoom and strong-clear bonuses only after more than five minutes of actual map time, official maps retain their existing scoring, and custom finales do not receive team completion points while map timing, map records, and Special Infected statistics continue to be saved normally.
 - Replaced the old `hextags` plugin with `hextags_lite.smx`, fixed title colors, hid admin commands, and moved the config to `hextags_lite.cfg`.
 - Added more multilingual phrases for `global_chat.smx`, `join.smx`, and related messages, including global-chat status and LFG receive-state text.
 - Fixed `l4d_stats.smx` quarterly ranking and persistence details, added more round-state tracking, and reduced some database/high-peak status write pressure.

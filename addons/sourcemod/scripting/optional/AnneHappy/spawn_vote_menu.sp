@@ -434,6 +434,20 @@ bool DisplayAnneSpawnVoteMenu(int client)
 	return displayed;
 }
 
+bool DisplayAnneSettingMenu(int client, const char[] setting)
+{
+	Menu menu = new Menu(SpawnVoteMenuHandler);
+	BuildAnneSettingMenu(menu, setting);
+	menu.ExitBackButton = true;
+
+	bool displayed = menu.Display(client, MENU_TIME);
+	if (!displayed)
+	{
+		delete menu;
+	}
+	return displayed;
+}
+
 bool IsPluginRunningByFile(const char[] filename)
 {
 	Handle plugin = FindPluginByFile(filename);
@@ -448,13 +462,47 @@ void BuildCampaignMenu(Menu menu)
 
 void BuildAnneMenu(Menu menu)
 {
-	menu.SetTitle("刷特设置\n选择投票选项:");
-	AddAnneLimitVoteEntries(menu);
-	AddAnneIntervalVoteEntries(menu);
-	AddAnneAutoModeVoteEntries(menu);
-	AddAnneDistanceVoteEntries(menu);
-	AddAnneTeleportVoteEntries(menu);
-	AddAnneTraitorVoteEntries(menu);
+	menu.SetTitle("刷特设置\n选择要修改的项目:");
+	menu.AddItem("avm:limit", "特感数量");
+	menu.AddItem("avm:interval", "复活时间");
+	menu.AddItem("avm:auto", "刷特模式");
+	menu.AddItem("avm:distance", "特感最低生成距离");
+	menu.AddItem("avm:teleport", "特感传送检测秒数");
+	menu.AddItem("avm:traitor", "内鬼模式");
+}
+
+void BuildAnneSettingMenu(Menu menu, const char[] setting)
+{
+	if (StrEqual(setting, "limit"))
+	{
+		menu.SetTitle("刷特设置\n特感数量:");
+		AddAnneLimitVoteEntries(menu);
+	}
+	else if (StrEqual(setting, "interval"))
+	{
+		menu.SetTitle("刷特设置\n复活时间:");
+		AddAnneIntervalVoteEntries(menu);
+	}
+	else if (StrEqual(setting, "auto"))
+	{
+		menu.SetTitle("刷特设置\n刷特模式:");
+		AddAnneAutoModeVoteEntries(menu);
+	}
+	else if (StrEqual(setting, "distance"))
+	{
+		menu.SetTitle("刷特设置\n特感最低生成距离:");
+		AddAnneDistanceVoteEntries(menu);
+	}
+	else if (StrEqual(setting, "teleport"))
+	{
+		menu.SetTitle("刷特设置\n特感传送检测秒数:");
+		AddAnneTeleportVoteEntries(menu);
+	}
+	else if (StrEqual(setting, "traitor"))
+	{
+		menu.SetTitle("刷特设置\n内鬼模式:");
+		AddAnneTraitorVoteEntries(menu);
+	}
 }
 
 public int SpawnVoteMenuHandler(Menu menu, MenuAction action, int client, int item)
@@ -467,7 +515,11 @@ public int SpawnVoteMenuHandler(Menu menu, MenuAction action, int client, int it
 
 	if (action == MenuAction_Cancel)
 	{
-		if (item == MenuCancel_Exit && IsValidPlayer(client))
+		if (item == MenuCancel_ExitBack && IsValidPlayer(client))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+		else if (item == MenuCancel_Exit && IsValidPlayer(client))
 		{
 			CPrintToChat(client, "%t", "SpawnVote_MenuClosed");
 		}
@@ -520,6 +572,15 @@ void HandleCampaignSelect(int client, const char[] info, const char[] display)
 
 void HandleAnneSelect(int client, const char[] info, const char[] display)
 {
+	if (StrContains(info, "avm:", false) == 0)
+	{
+		if (!DisplayAnneSettingMenu(client, info[4]))
+		{
+			DisplayAnneSpawnVoteMenu(client);
+		}
+		return;
+	}
+
 	if (StrContains(info, "avc:", false) == 0)
 	{
 		if (!StartConfigApplyVote(client, SpawnVoteMode_Anne, info[4], display))

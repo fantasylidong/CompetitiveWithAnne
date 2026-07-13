@@ -514,32 +514,21 @@ static bool Traitor_CheckUseLimit(int client, int zc = 0)
     if (g_ITState[client] != Traitor_None)
         return true;
 
-    if (Traitor_IsNoDamageRoundBlocked(client))
+    if (zc != TRAITOR_CLASS_TANK && Traitor_IsNoDamageRoundBlocked(client))
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorRoundBlockedNoDamage");
         return false;
     }
 
-    if (gCV.iTraitorAdminLimit > 0 && g_ITUsesThisRound[client] >= gCV.iTraitorAdminLimit)
+    if (zc != TRAITOR_CLASS_TANK
+        && gCV.iTraitorAdminLimit > 0
+        && g_ITUsesThisRound[client] >= gCV.iTraitorAdminLimit)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorLimitReached", gCV.iTraitorAdminLimit);
         return false;
     }
 
     return TraitorQuota_CanUse(client, Traitor_GetClassCost(zc));
-}
-
-static void Traitor_PrintPenaltyWarnings(int client, int zc)
-{
-    CPrintToChat(client, "%t", "InfectedControl_TraitorPenaltyNoDamageWarning");
-
-    if (zc == TRAITOR_CLASS_TANK)
-    {
-        CPrintToChat(client, "%t",
-            "InfectedControl_TraitorPenaltyTankDamageWarning",
-            TRAITOR_TANK_MIN_DAMAGE,
-            TRAITOR_TANK_BLOCK_DAYS);
-    }
 }
 
 static void Traitor_FinalizeAliveClient(int client)
@@ -614,19 +603,67 @@ static bool Traitor_PrepareGhostClient(int client, int zc)
     if (GetClientTeam(client) != TEAM_INFECTED)
         ChangeClientTeam(client, TEAM_INFECTED);
 
-    if (zc == TRAITOR_CLASS_TANK)
+    if (GetClientTeam(client) != TEAM_INFECTED)
+        return false;
+
+    // A spectator does not have a dead infected body for RoundRespawn to
+    // revive.  Enter the infected ghost state directly first; the respawn
+    // path below remains a fallback for game builds that reject the direct
+    // transition for an already-dead infected player.
+    L4D_State_Transition(client, STATE_GHOST);
+    L4D_SetClass(client, zc);
+
+    if (!IsGhost(client))
+    {
+        if (!IsPlayerAlive(client))
+            L4D_RespawnPlayer(client, false);
+
+        L4D_SetClass(client, zc);
+        L4D_BecomeGhost(client);
+    }
+
+    // Some builds only apply the player state on the next transition after
+    // RoundRespawn.  Retry the direct transition once before reporting a
+    // failed registration.
+    if (!IsGhost(client))
     {
         L4D_State_Transition(client, STATE_GHOST);
         L4D_SetClass(client, zc);
-        return IsGhost(client) && GetEntProp(client, Prop_Send, "m_zombieClass") == TRAITOR_CLASS_TANK;
     }
 
-    L4D_SetClass(client, zc);
-    L4D_RespawnPlayer(client, false);
-    L4D_SetClass(client, zc);
-    L4D_BecomeGhost(client);
+    return IsGhost(client) && GetEntProp(client, Prop_Send, "m_zombieClass") == zc;
+}
 
-    return IsGhost(client);
+static void Traitor_PrintPenaltyWarnings(int client, int zc)
+{
+    if (zc != TRAITOR_CLASS_TANK)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorPenaltyNoDamageWarning");
+        return;
+    }
+
+    CPrintToChat(client, "%t",
+        "InfectedControl_TraitorPenaltyTankDamageWarning",
+        TRAITOR_TANK_MIN_DAMAGE,
+        TRAITOR_TANK_BLOCK_DAYS);
+}
+
+static bool Traitor_ShouldReplaceTankWithAI(int client)
+{
+    return client >= 1
+        && client <= MaxClients
+        && g_ITState[client] == Traitor_Alive
+        && g_ITClass[client] == TRAITOR_CLASS_TANK
+        && Traitor_IsAliveClient(client);
+}
+
+static void Traitor_ReplaceTankWithAI(int client)
+{
+    if (!Traitor_ShouldReplaceTankWithAI(client))
+        return;
+
+    Debug_Print("[TRAITOR] %N disconnected while controlling Tank, handing Tank to AI", client);
+    L4D_ReplaceWithBot(client);
 }
 
 static bool Traitor_QueueClient(int client, int zc)
@@ -675,7 +712,7 @@ static bool Traitor_QueueClient(int client, int zc)
     else if (hasSlot)
         g_ITWaitOrder[client] = 0;
 
-    if (isNewQueue)
+    if (isNewQueue && zc != TRAITOR_CLASS_TANK)
         g_ITUsesThisRound[client]++;
 
     char className[64];
@@ -717,9 +754,6 @@ static void Traitor_ShowClassMenu(int client)
         CPrintToChat(client, "%t", "InfectedControl_TraitorWindowClosed");
         return;
     }
-
-    if (!Traitor_CheckUseLimit(client))
-        return;
 
     if (gCV.iTraitorMaxSlots <= 0)
     {
@@ -809,7 +843,9 @@ static void Traitor_PunishNoDamageClients()
 {
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (g_ITState[client] != Traitor_Alive || g_ITDidDamage[client])
+        if (g_ITState[client] != Traitor_Alive
+            || g_ITClass[client] == TRAITOR_CLASS_TANK
+            || g_ITDidDamage[client])
             continue;
 
         if (!IsValidClient(client)
@@ -1082,6 +1118,9 @@ bool Traitor_OnPlayerDeath(int client)
 void Traitor_OnClientDisconnect(int client)
 {
     bool freedSlot = (client >= 1 && client <= MaxClients && Traitor_IsSlotState(g_ITState[client]));
+    bool wasAlive = (client >= 1 && client <= MaxClients && g_ITState[client] == Traitor_Alive);
+
+    Traitor_ReplaceTankWithAI(client);
     Traitor_FinalizeAliveClient(client);
     Traitor_ClearClient(client);
     if (client >= 1 && client <= MaxClients)
@@ -1089,6 +1128,8 @@ void Traitor_OnClientDisconnect(int client)
         g_ITUsesThisRound[client] = 0;
         g_ITNoDamageBlockedThisRound[client] = false;
     }
+    if (wasAlive)
+        RecalcSiCapFromAlive(false);
     if (freedSlot)
         Traitor_ActivateWaitingClients();
 }

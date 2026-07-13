@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"ko"		"이 서버에서는 {olive}%i{default}명 이상의 위치를 ​​설정할 수 없습니다."
+		"#format"	"{1:i},{2:i}"
+		"ko"		"{olive}{1}{default}개를 초과하는 슬롯은 설정할 수 없습니다. 상한은 slots_max_slots={blue}{2}{default}와 서버 하드 상한 {blue}31{default} 중 작은 값입니다(총 클라이언트 수를 32 미만으로 유지하기 위한 32-1)."
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"ko"		"슬롯 수는 1에서 {blue}{1}{default} 사이여야 합니다."
 	}
 	"LimitedSlotsTo"
 	{

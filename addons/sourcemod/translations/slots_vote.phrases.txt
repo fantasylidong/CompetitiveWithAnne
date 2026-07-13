@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"en"		"You can't limit slots above {olive}%i{default} on this Server."
+		"#format"	"{1:i},{2:i}"
+		"en"		"You can't limit slots above {olive}{1}{default}. The cap is the lower of slots_max_slots={blue}{2}{default} and the server hard cap {blue}31{default} (32 - 1, so total clients stay below 32)."
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"en"		"Slots must be between 1 and {blue}{1}{default}."
 	}
 	"LimitedSlotsTo"
 	{

@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"zho"		"你不能在這個伺服器上將位置設定超過 {olive}%i{default} 人."
+		"#format"	"{1:i},{2:i}"
+		"zho"		"不能將位置設定超過 {olive}{1}{default} 人。上限取 slots_max_slots={blue}{2}{default} 和伺服器硬上限 {blue}31{default} 的較小值（32-1，確保總用戶端數小於32）。"
+	}
+	"InvalidSlots"
+	{
+		"#format"	"{1:i}"
+		"zho"		"位置數量必須在 1 到 {blue}{1}{default} 之間。"
 	}
 	"LimitedSlotsTo"
 	{

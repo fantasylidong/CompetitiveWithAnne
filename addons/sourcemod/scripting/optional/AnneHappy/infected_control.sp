@@ -330,6 +330,7 @@ public void OnPluginStart()
     HookEvent("player_spawn",    Event_PlayerSpawn);
     HookEvent("player_death",    Event_PlayerDeath);
     HookEvent("player_team",     Event_PlayerTeam);
+    HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
     HookEvent("ability_use",     Event_AbilityUse);
     HookEvent("player_hurt",     Event_PlayerHurt);
 }
@@ -630,6 +631,13 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     Traitor_OnClientTeamChanged(client, event.GetInt("oldteam"), event.GetInt("team"));
 }
 
+public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client > 0)
+        Traitor_OnClientDisconnect(client);
+}
+
 public void OnClientDisconnect(int client)
 {
     Traitor_OnClientDisconnect(client);
@@ -663,6 +671,7 @@ public void OnUnpause()
 void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
 {
     gCV.Refresh();
+    gCV.ApplyMaxZombieBound();
 }
 void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
 {
@@ -684,7 +693,7 @@ void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 // =========================
 public void OnGameFrame()
 {
-    if (gCV.iSiLimit > gCV.MaxPlayerZombies.IntValue)
+    if (gCV.GetMaxPlayerZombieBound() > gCV.MaxPlayerZombies.IntValue)
         gCV.ApplyMaxZombieBound();
 
     float now = GetGameTime();

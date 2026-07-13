@@ -853,9 +853,25 @@ enum struct Config
         if (this.fAntiBaitIsolateDist < 0.0) this.fAntiBaitIsolateDist = 0.0;
     }
 
+    int GetMaxPlayerZombieBound()
+    {
+        int maxZombies = this.iSiLimit;
+
+        // z_max_player_zombies also limits human infected slots.  Reserve
+        // one additional slot for the optional traitor Tank; ordinary SI
+        // spawning still uses iSiLimit as its independent cap.
+        bool tankEnabled = this.bTraitorEnable
+            && (this.iTraitorClassMask == 0 || (this.iTraitorClassMask & (1 << SI_COUNT)) != 0);
+        if (tankEnabled)
+            maxZombies++;
+
+        return maxZombies;
+    }
+
     void ApplyMaxZombieBound()
     {
-        SetConVarBounds(this.MaxPlayerZombies, ConVarBound_Upper, true, float(this.iSiLimit));
-        this.MaxPlayerZombies.IntValue = this.iSiLimit;
+        int maxZombies = this.GetMaxPlayerZombieBound();
+        SetConVarBounds(this.MaxPlayerZombies, ConVarBound_Upper, true, float(maxZombies));
+        this.MaxPlayerZombies.IntValue = maxZombies;
     }
 }

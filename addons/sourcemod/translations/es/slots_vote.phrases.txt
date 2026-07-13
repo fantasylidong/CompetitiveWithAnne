@@ -10,7 +10,13 @@
 	}
 	"LimitSlotsAbove"
 	{
-		"es"		"No puede limitar los espacios por encima de {olive}%i{default} en este servidor."
+		"#format"		"{1:i},{2:i}"
+		"es"		"No puede limitar los espacios por encima de {olive}{1}{default}. El límite es el menor entre slots_max_slots={blue}{2}{default} y el límite estricto del servidor {blue}31{default} (32-1, para mantener los clientes totales por debajo de 32)."
+	}
+	"InvalidSlots"
+	{
+		"#format"		"{1:i}"
+		"es"		"Los espacios deben estar entre 1 y {blue}{1}{default}."
 	}
 	"LimitedSlotsTo"
 	{
