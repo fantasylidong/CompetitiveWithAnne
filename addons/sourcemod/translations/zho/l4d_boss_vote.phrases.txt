@@ -36,6 +36,10 @@
 	{
 		"zho"		"百分比是 {olive}無效的{default}."
 	}
+	"DisableBossesRestricted"
+	{
+		"zho"		"只有免疫等級高於 90 的管理員才能停用 Tank 或 Witch。"
+	}
 	"TankStatic"
 	{
 		"zho"		"這張地圖Tank位置是固定的，所以不能進行更改."

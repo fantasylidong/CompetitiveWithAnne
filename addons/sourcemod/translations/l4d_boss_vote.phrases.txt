@@ -36,6 +36,10 @@
 	{
 		"en"		"Percentages are {olive}invalid{default}."
 	}
+	"DisableBossesRestricted"
+	{
+		"en"		"Only administrators with an immunity level above 90 may disable Tank or Witch."
+	}
 	"TankStatic"
 	{
 		"en"		"Tank spawn is static and can not be changed on this map."

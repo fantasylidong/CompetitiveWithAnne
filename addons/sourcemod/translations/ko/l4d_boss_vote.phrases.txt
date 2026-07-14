@@ -36,6 +36,10 @@
 	{
 		"ko"		"백분율은 잘못된 {default}인 {olive}입니다."
 	}
+	"DisableBossesRestricted"
+	{
+		"ko"		"면역 레벨이 90보다 높은 관리자만 Tank 또는 Witch를 비활성화할 수 있습니다."
+	}
 	"TankStatic"
 	{
 		"ko"		"이 지도에서 Tank의 위치는 고정되어 있으며 변경할 수 없습니다."

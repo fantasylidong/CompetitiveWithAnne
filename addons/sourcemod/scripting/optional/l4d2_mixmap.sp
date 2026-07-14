@@ -12,6 +12,8 @@
 #undef REQUIRE_PLUGIN
 #include <sdkhooks>
 
+native bool VersusCoopMode_IsMapTransitioning();
+
 #define SECTION_NAME "CTerrorGameRules::SetCampaignScores"
 #define LEFT4FRAMEWORK_GAMEDATA "left4dhooks.l4d2"
 
@@ -26,6 +28,9 @@ public Plugin myinfo =
 
 #define DIR_CFGS 			"mixmap/"
 #define PATH_KV  			"cfg/mixmap/mapnames.txt"
+#define VERSUS_COOP_MODE_PLUGIN "optional/AnneHappy/versus_coop_mode.smx"
+#define VERSUS_COOP_MODE_LIBRARY "versus_coop_mode"
+#define VERSUS_COOP_MODE_TRANSITION_NATIVE "VersusCoopMode_IsMapTransitioning"
 #define CFG_DEFAULT			"default"
 #define CFG_DODEFAULT		"disorderdefault"
 #define CFG_DODEFAULT_ST	"do"
@@ -78,8 +83,10 @@ int
 
 //bool bLeftStartArea;
 //bool bReadyUpAvailable;
-bool 	g_bCMapTransitioned = false,
-		g_bServerForceStart = false;
+bool
+	g_bCMapTransitioned = false,
+	g_bServerForceStart = false,
+	g_bMapProgressedThisMap = false;
 
 Handle g_hForwardStart;
 Handle g_hForwardNext;
@@ -103,6 +110,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 	MarkNativeAsOptional("PLAYSTATS_BroadcastRoundStats");
 	MarkNativeAsOptional("PLAYSTATS_BroadcastGameStats");
+	MarkNativeAsOptional(VERSUS_COOP_MODE_TRANSITION_NATIVE);
 
 	return APLRes_Success;
 }
@@ -150,6 +158,7 @@ void PluginStartInit()
 
 	g_bMapsetInitialized = false;
 	g_bMaplistFinalized = false;
+	g_bMapProgressedThisMap = false;
 
 	g_hCountDownTimer = null;
 	
@@ -209,6 +218,7 @@ public Action Timer_ShowMaplist(Handle timer, int client)
 }
 
 public void OnMapStart() {
+	g_bMapProgressedThisMap = false;
 	
 	if (g_bCMapTransitioned) {
 		CreateTimer(1.0, Timer_OnMapStartDelay, _, TIMER_FLAG_NO_MAPCHANGE); //Clients have issues connecting if team swap happens exactly on map start, so we delay it
@@ -270,17 +280,14 @@ void SetScores()
 
 public void Event_MapTransition(Event event, const char[] name, bool dontBroadcast)
 {
-	if (IsCoop()) {
-		if (g_bMapsetInitialized) {
-			PerformMapProgression();
-			return;
-		}
+	if (g_bMapsetInitialized && IsCampaignMapTransitionEvent()) {
+		PerformMapProgression();
 	}
 }
 
 public void Event_FinaleVehicleLeaving(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bMapsetInitialized || !g_bMaplistFinalized || !IsCoop()) {
+	if (!g_bMapsetInitialized || !g_bMaplistFinalized || !UsesCampaignMapTransition()) {
 		return;
 	}
 
@@ -297,7 +304,7 @@ public void Event_FinaleVehicleLeaving(Event event, const char[] name, bool dont
 
 public void L4D2_OnEndVersusModeRound_Post() 
 {
-	if (InSecondHalfOfRound() && g_bMapsetInitialized)
+	if (!IsVersusCoopModeActive() && InSecondHalfOfRound() && g_bMapsetInitialized)
 	{
 		PerformMapProgression();
 		return;
@@ -311,6 +318,12 @@ public void L4D2_OnEndVersusModeRound_Post()
 
 stock Action PerformMapProgression() 
 {
+	if (!g_bMapsetInitialized || !g_bMaplistFinalized || g_bMapProgressedThisMap) {
+		return Plugin_Continue;
+	}
+
+	g_bMapProgressedThisMap = true;
+
 	if (++g_iMapsPlayed < g_iMapCount) 
 	{
 		GotoNextMap(false);
@@ -357,7 +370,7 @@ public Action Timed_NextMapInfo(Handle timer)
 		g_iPointsTeam_A = L4D2Direct_GetVSCampaignScore(0);
 		g_iPointsTeam_B = L4D2Direct_GetVSCampaignScore(1);
 		g_bCMapTransitioned = true;
-		if (IsCoop()) {
+		if (UsesCampaignMapTransition()) {
 			CreateTimer(3.0, Timed_Gotomap);
 		}
 		else {
@@ -369,7 +382,7 @@ public Action Timed_NextMapInfo(Handle timer)
 		g_iPointsTeam_A = L4D2Direct_GetVSCampaignScore(0);
 		g_iPointsTeam_B = L4D2Direct_GetVSCampaignScore(1);
 		g_bCMapTransitioned = true;
-		if (IsCoop()) {
+		if (UsesCampaignMapTransition()) {
 			CreateTimer(3.0, Timed_Gotomap);
 		}
 		else {
@@ -1106,4 +1119,42 @@ stock bool IsCoop()
 	char GameMode[32];
 	g_hCvarMpGameMode.GetString(GameMode, sizeof(GameMode));
 	return (StrContains(GameMode, "coop", false) != -1 || StrContains(GameMode, "realism", false) != -1);
+}
+
+stock bool IsVersusCoopModeActive()
+{
+	if (!L4D_IsVersusMode()) {
+		return false;
+	}
+
+	if (LibraryExists(VERSUS_COOP_MODE_LIBRARY)) {
+		return true;
+	}
+
+	Handle plugin = FindPluginByFile(VERSUS_COOP_MODE_PLUGIN);
+	return plugin != INVALID_HANDLE && GetPluginStatus(plugin) == Plugin_Running;
+}
+
+stock bool IsVersusCoopMapTransition()
+{
+	if (!IsVersusCoopModeActive()) {
+		return false;
+	}
+
+	if (GetFeatureStatus(FeatureType_Native, VERSUS_COOP_MODE_TRANSITION_NATIVE) != FeatureStatus_Available) {
+		// Compatibility fallback for upstream builds that do not expose transition state.
+		return true;
+	}
+
+	return VersusCoopMode_IsMapTransitioning();
+}
+
+stock bool IsCampaignMapTransitionEvent()
+{
+	return IsCoop() || IsVersusCoopMapTransition();
+}
+
+stock bool UsesCampaignMapTransition()
+{
+	return IsCoop() || IsVersusCoopModeActive();
 }

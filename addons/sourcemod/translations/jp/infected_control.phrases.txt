@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"jp"		"{green}[IC]{default} You dealt no survivor damage before the next SI countdown. You were slain and cannot play traitor for this round."
+		"jp"		"{green}[IC]{default} 次のSIカウントダウンまで生存者へのダメージまたは有効な攻撃が記録されなかったため、内鬼の役割を解除しAIがこのSIを引き継ぎます。"
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"jp"		"{green}[IC]{default} 次の%dラウンドは内鬼になれません。"
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"jp"		"{green}[IC]{default} 今回の内鬼で生存者に{olive}%d{default}ダメージを与えました。"
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"jp"		"{green}[IC]{default} You cannot play traitor again this round because your last traitor caused no damage."
+		"jp"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"jp"		"{green}[IC]{default} Penalty notice: if your traitor deals no survivor damage before the next SI countdown, you will be slain and cannot play traitor again this round."
+		"jp"		"{green}[IC]{default} ペナルティ警告：次のSIカウントダウンまでに生存者へダメージまたは有効な攻撃を与えてください。"
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"jp"		"{green}[IC]{default} できなければ役割を解除してAIが引き継ぎ、次の%dラウンドは内鬼になれません。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"jp"		"{green}[IC]{default} Tank notice: if your traitor Tank deals less than {olive}%d{default} survivor damage, Tank traitor will be blocked for {olive}%d{default} days."
+		"jp"		"{green}[IC]{default} Tank警告：内鬼Tankは生存者に少なくとも{olive}%d{default}ダメージを与えてください。"
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"jp"		"{green}[IC]{default} できなければTank内鬼は{olive}%d{default}日間無効です。"
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"jp"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} damage. Tank traitor is blocked for {olive}%d{default} days."
+		"jp"		"{green}[IC]{default} 今回の内鬼Tankは生存者に{olive}%d{default}/{olive}%d{default}ダメージを与えました。"
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"jp"		"{green}[IC]{default} Tank内鬼は{olive}%d{default}日間無効です。"
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

@@ -22,12 +22,12 @@ ConVar
 // =========================================================================
 stock void State_OnModuleStart(ConVar& cvPluginName) {
     if (!cvPluginName) {
-        g_cvStateLogLevel = CreateConVar("_ai_charger3_state_log_level", "38", "状态模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
+        g_cvStateLogLevel = CreateConVar("_ai_charger3_state_log_level", "1", "状态模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
     } else {
         char cvName[64], stateLogCvName[64];
         cvPluginName.GetString(cvName, sizeof(cvName));
         FormatEx(stateLogCvName, sizeof(stateLogCvName), "_%s_state_log_level", cvName);
-        g_cvStateLogLevel = CreateConVar(stateLogCvName, "38", "状态模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 33=所有输出", CVAR_FLAGS);
+        g_cvStateLogLevel = CreateConVar(stateLogCvName, "1", "状态模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
     }
 
     stateLog = new Logger(STATE_LOG_PREFIX, g_cvStateLogLevel.IntValue);

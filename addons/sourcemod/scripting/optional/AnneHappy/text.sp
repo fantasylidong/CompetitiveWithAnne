@@ -18,6 +18,8 @@ ConVar
 	g_hCvarWeapon,
 	g_hCvarCoop,
 	g_hAutoSpawnTimeControl,
+	g_hCvarTraitorEnable,
+	g_hCvarTraitorMaxSlots,
 	g_hCvarPluginVersion,
 	g_hCvarAiDynamicEnable,
 	g_hCvarAiCurrentLevel,
@@ -39,6 +41,7 @@ public void OnPluginStart()
 	g_hCvarInfectedLimit = FindConVar("l4d_infected_limit");
 	g_hCvarTankBhop = FindConVar("ai_Tank_Bhop");
 	g_hAutoSpawnTimeControl = FindConVar("inf_EnableAutoSpawnTime");
+	RefreshTraitorCvars();
 	RefreshDynamicAiCvars();
 	g_hCvarWeapon = CreateConVar("ZonemodWeapon", "0", "", 0, false, 0.0, false, 0.0);
 	g_hCvarPluginVersion = CreateConVar("AnnePluginVersion", "Latest", "Anne插件版本");
@@ -65,6 +68,7 @@ public void OnPluginStart()
 
 public void OnAllPluginsLoaded()
 {
+	RefreshTraitorCvars();
 	RefreshDynamicAiCvars();
 }
 
@@ -208,12 +212,40 @@ void printinfo(int client = 0, bool All = true){
 		CPrintToChatAll(buffer);
 		CPrintToChatAll(buffer2);
 		CPrintToChatAll(buffer3);
+		PrintTraitorStatus();
 	}else
 	{
 		CPrintToChat(client, buffer);
 		CPrintToChat(client, buffer2);
 		CPrintToChat(client, buffer3);
+		PrintTraitorStatus(client, false);
 	}
+}
+
+void RefreshTraitorCvars()
+{
+	if(g_hCvarTraitorEnable == null)
+		g_hCvarTraitorEnable = FindConVar("inf_traitor_enable");
+	if(g_hCvarTraitorMaxSlots == null)
+		g_hCvarTraitorMaxSlots = FindConVar("inf_traitor_max_slots");
+}
+
+void PrintTraitorStatus(int client = 0, bool all = true)
+{
+	RefreshTraitorCvars();
+	if(g_hCvarTraitorEnable == null || g_hCvarTraitorMaxSlots == null)
+		return;
+
+	char phrase[64];
+	strcopy(phrase, sizeof(phrase), g_hCvarTraitorEnable.BoolValue
+		? "Text_TraitorStatusEnabled"
+		: "Text_TraitorStatusDisabled");
+
+	int slots = g_hCvarTraitorMaxSlots.IntValue;
+	if(all)
+		CPrintToChatAll("%t", phrase, slots);
+	else if(client >= 1 && client <= MaxClients && IsClientInGame(client))
+		CPrintToChat(client, "%t", phrase, slots);
 }
 
 void RefreshDynamicAiCvars()

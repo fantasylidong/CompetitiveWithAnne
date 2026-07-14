@@ -532,8 +532,8 @@ enum struct Config
         );
         this.TraitorMaxSlots = CreateConVar(
             "inf_traitor_max_slots", "1",
-            "Max pending/alive traitor players that may reserve infected_control slots.",
-            CVAR_FLAG, true, 0.0, true, 4.0
+            "Max pending/alive traitor players; runtime upper bound follows l4d_infected_limit.",
+            CVAR_FLAG, true, 0.0, true, float(MAXPLAYERS)
         );
         this.TraitorAdminLimit = CreateConVar(
             "inf_traitor_admin_limit", "0",
@@ -695,8 +695,14 @@ enum struct Config
         this.iDebugMode         = this.DebugMode.IntValue;
         this.bTraitorEnable     = this.TraitorEnable.BoolValue;
         this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
+        int maxTraitorSlots = this.iSiLimit;
+        if (maxTraitorSlots < 0)
+            maxTraitorSlots = 0;
+        if (maxTraitorSlots > MAXPLAYERS)
+            maxTraitorSlots = MAXPLAYERS;
+        SetConVarBounds(this.TraitorMaxSlots, ConVarBound_Upper, true, float(maxTraitorSlots));
         if (this.iTraitorMaxSlots < 0) this.iTraitorMaxSlots = 0;
-        if (this.iTraitorMaxSlots > 4) this.iTraitorMaxSlots = 4;
+        if (this.iTraitorMaxSlots > maxTraitorSlots) this.iTraitorMaxSlots = maxTraitorSlots;
         this.iTraitorAdminLimit = this.TraitorAdminLimit.IntValue;
         if (this.iTraitorAdminLimit < 0) this.iTraitorAdminLimit = 0;
         if (this.iTraitorAdminLimit > 32) this.iTraitorAdminLimit = 32;

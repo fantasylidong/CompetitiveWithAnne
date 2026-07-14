@@ -927,6 +927,11 @@ stock Action executeAirCorrection(
     vVel_cpy = vVel;
     vVel_cpy[2] = 0.0;
 
+    static float now;
+    now = GetEngineTime();
+    static bool correctionReady;
+    correctionReady = (now - g_AiChargers[client].m_flLastAirVecModifyTime) >= g_cvAirVecModifyInterval.FloatValue;
+
     // ============================================================
     // 1. 当前连跳模式为基于 PATH 的连跳, 进行基于 PATH 的空中速度方向修正
     // ============================================================
@@ -1025,6 +1030,9 @@ stock Action executeAirCorrection(
         static bool isStrafing;
         isStrafing = buildStrafedDesiredVector(client, vDir, d2Goal, vDesired);
 
+        static float desiredAngle;
+        desiredAngle = calcVectorAngle(vVel, vDesired, true);
+
         // ============================================================
         // 正常连跳, 判断是否需要空中速度修正
         // ============================================================
@@ -1033,9 +1041,9 @@ stock Action executeAirCorrection(
         
         static float airCorrLerp;
         airCorrLerp = g_cvAirVecModifyLerp.FloatValue;
-        if (isStrafing && d2Goal > GOAL_POS_TOLERANCE_DIST) {
+        if (isStrafing && desiredAngle <= g_cvAirVecModifyMaxDegree.FloatValue && d2Goal > GOAL_POS_TOLERANCE_DIST) {
             shouldCorrect = true;
-            airCorrLerp = 0.50;
+            airCorrLerp = g_cvAirVecModifyLerp.FloatValue;
         } else {
             if (
                 dot >= g_cvAirVecModifyMinDegree.FloatValue &&
@@ -1050,11 +1058,7 @@ stock Action executeAirCorrection(
             }
         }
 
-        if (shouldCorrect) {
-            // 避免空中速度衰减
-            if (speed < g_AiChargers[client].m_flLastHopSpeed)
-                speed = g_AiChargers[client].m_flLastHopSpeed;
-
+        if (shouldCorrect && correctionReady) {
             /*
                 使用原始速度 vVel 和目标方向的 vDiesired 构建修正后的速度
                 解决原来使用 vVel_cpy 而 vVel_cpy 没有被归一化, 导致 vVel_cpy 和 vDesired 的量纲不匹配导致的速度方向修正效果微乎其微
@@ -1065,7 +1069,7 @@ stock Action executeAirCorrection(
             TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
 
             // 记录空中速度方向修正时间
-            g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+            g_AiChargers[client].m_flLastAirVecModifyTime = now;
             return Plugin_Changed;
         }
     }
@@ -1092,15 +1096,18 @@ stock Action executeAirCorrection(
     static bool isDirectStrafing;
     isDirectStrafing = buildStrafedDesiredVector(client, vDir, dist, vDirectDesired);
 
-    static bool inAngleRange, notPressBack, delayExpired;
-    #pragma unused delayExpired
+    static float directDesiredAngle;
+    directDesiredAngle = calcVectorAngle(vVel, vDirectDesired, true);
+
+    static bool inAngleRange, notPressBack;
 
     inAngleRange = (dot >= g_cvAirVecModifyMinDegree.FloatValue && dot <= g_cvAirVecModifyMaxDegree.FloatValue);
     notPressBack = !(buttons & IN_BACK);
-    delayExpired = (GetEngineTime() - g_AiChargers[client].m_flLastAirVecModifyTime) > g_cvAirVecModifyInterval.FloatValue;
 
     if (visible &&
         notPressBack &&
+        correctionReady &&
+        directDesiredAngle <= g_cvAirVecModifyMaxDegree.FloatValue &&
         (
             isDirectStrafing ||
             (
@@ -1108,23 +1115,18 @@ stock Action executeAirCorrection(
                 dist <= g_cvDirectBhopDist.FloatValue
             )
         )
-        // && delayExpired
     ) {
         stateLog.debugAll("Charger: %N triggered air speed modify, current vector angle: %.2f", client, dot);
-        
-        // 将方向向量缩放成原速度大小, 刚起跳时加速度可能没有应用, 缩放使用的速度为起跳前的速度, 导致连跳无法加速, 因此这里保存加速度并取最大速度缩放
-		if (speed < g_AiChargers[client].m_flLastHopSpeed)
-			speed = g_AiChargers[client].m_flLastHopSpeed;
 
         static float directAirCorrLerp;
-        directAirCorrLerp = isDirectStrafing ? 0.50 : g_cvAirVecModifyLerp.FloatValue;
+        directAirCorrLerp = g_cvAirVecModifyLerp.FloatValue;
         
         buildAirCorrectionVelocity2D(vVel, vDirectDesired, directAirCorrLerp, speed, vFwd);
 
 		vFwd[2] = vVel[2];
 		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
 		// 记录空中速度方向修正时间
-		g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+		g_AiChargers[client].m_flLastAirVecModifyTime = now;
     }
     return Plugin_Changed;
 }
@@ -1236,9 +1238,6 @@ stock int getChargeUnavoidableTarget(int client, int curTarget, float pos[3], fl
     return -1;
 }
 
-#define AIR_CHARGE_LINE_CORR_LERP           0.85
-#define AIR_CHARGE_LINE_CORR_LOCK_LERP      0.95
-#define AIR_CHARGE_LINE_CORR_CHARGE_LERP    0.90
 #define AIR_CHARGE_LINE_MIN_PREDICT_TIME    0.05
 #define AIR_CHARGE_LINE_MAX_PREDICT_TIME    0.25
 
@@ -1247,11 +1246,10 @@ stock int getChargeUnavoidableTarget(int client, int curTarget, float pos[3], fl
 * @param client 客户端索引
 * @param target 目标客户端索引
 * @param visible 是否可见目标
-* @param lerp 方向插值强度, 越接近于 1 转向越强
 * @return bool, 修改速度方向成功返回 true
 * @error 
 **/
-stock bool preserveAirChargeLine(int client, int target, bool visible, float lerp) {
+stock bool preserveAirChargeLine(int client, int target, bool visible) {
     if (!isAiCharger(client)) {
         return false;
     }
@@ -1266,6 +1264,12 @@ stock bool preserveAirChargeLine(int client, int target, bool visible, float ler
         return false;
     }
     if (isChargerCharging(client) || IsPinningSurvivor(client)) {
+        return false;
+    }
+
+    static float now;
+    now = GetEngineTime();
+    if (now - g_AiChargers[client].m_flLastAirVecModifyTime < g_cvAirVecModifyInterval.FloatValue) {
         return false;
     }
 
@@ -1294,19 +1298,14 @@ stock bool preserveAirChargeLine(int client, int target, bool visible, float ler
         return false;
     }
 
-    static float curSpeed, baseSpeed, finalSpeed;
+    static float curSpeed, finalSpeed;
     curSpeed = getVectorLength2D(curVel);
-    baseSpeed = SDKCall(g_hSdkGetRunTopSpeed, client);
-    finalSpeed = curSpeed;
+    if (curSpeed <= 1.0) {
+        return false;
+    }
 
-    // 如果当前的空中最终速度小于上一次连跳的起跳前速度, 那么就使用上一次连跳的起跳速度, 避免空中速度衰减
-    if (finalSpeed < g_AiChargers[client].m_flLastHopSpeed) {
-        finalSpeed = g_AiChargers[client].m_flLastHopSpeed;
-    }
-    // 最小速度至少是基础速度加上一次连跳的加速度
-    if (finalSpeed < baseSpeed + g_cvBhopImpulse.FloatValue) {
-        finalSpeed = baseSpeed + g_cvBhopImpulse.FloatValue;
-    }
+    // 空中修正只改变方向，不补回起跳速度，也不额外增加速度。
+    finalSpeed = curSpeed;
     // 最大速度不能超过设置的连跳速度上限
     if (finalSpeed > g_cvBhopMaxSpeed.FloatValue) {
         finalSpeed = g_cvBhopMaxSpeed.FloatValue;
@@ -1333,7 +1332,13 @@ stock bool preserveAirChargeLine(int client, int target, bool visible, float ler
         return false;
     }
 
-    buildAirCorrectionVelocity2D(curVel, desiredDir, lerp, finalSpeed, outVel);
+    static float turnAngle;
+    turnAngle = calcVectorAngle(curVel, desiredDir, true);
+    if (turnAngle > g_cvAirVecModifyMaxDegree.FloatValue) {
+        return false;
+    }
+
+    buildAirCorrectionVelocity2D(curVel, desiredDir, g_cvAirVecModifyLerp.FloatValue, finalSpeed, outVel);
     outVel[2] = curVel[2];
 
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, outVel);
@@ -1346,7 +1351,7 @@ stock bool preserveAirChargeLine(int client, int target, bool visible, float ler
     ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
     g_AiChargers[client].m_AirStrafe.m_StrafeType = StrafeType_None;
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(outVel);
-    g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+    g_AiChargers[client].m_flLastAirVecModifyTime = now;
 
     return true;
 }

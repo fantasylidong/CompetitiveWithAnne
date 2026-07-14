@@ -133,7 +133,7 @@ GetMapTimingDifficulty()
 		if (currentLevel != null && (enabled == null || enabled.BoolValue))
 		{
 			new level = currentLevel.IntValue;
-			if (level >= 1 && level <= 5)
+			if (level >= 1 && level <= 6)
 				return level;
 		}
 
@@ -141,7 +141,7 @@ GetMapTimingDifficulty()
 		if (fixedLevel != null && (enabled == null || enabled.BoolValue))
 		{
 			new level = fixedLevel.IntValue;
-			if (level >= 1 && level <= 5)
+			if (level >= 1 && level <= 6)
 				return level;
 		}
 	}
@@ -163,6 +163,8 @@ GetMapTimingDifficultyName(Difficulty, String:Name[], MaxLength)
 			strcopy(Name, MaxLength, "专家");
 		case 5:
 			strcopy(Name, MaxLength, "极限");
+		case 6:
+			strcopy(Name, MaxLength, "Neri");
 		default:
 			strcopy(Name, MaxLength, "未知");
 	}

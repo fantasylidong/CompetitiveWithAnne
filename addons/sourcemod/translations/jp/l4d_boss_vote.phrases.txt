@@ -36,6 +36,10 @@
 	{
 		"jp"		"パーセンテージは {olive} ですが、これは無効な {default} です。"
 	}
+	"DisableBossesRestricted"
+	{
+		"jp"		"Immunity レベルが 90 を超える管理者のみ Tank または Witch を無効にできます。"
+	}
 	"TankStatic"
 	{
 		"jp"		"この地図上の Tank の位置は固定されており、変更できません。"

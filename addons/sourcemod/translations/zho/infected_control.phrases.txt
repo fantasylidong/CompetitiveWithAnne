@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"zho"		"{green}[IC]{default} 你在下一波特感倒計時前沒有造成傷害，已被處死並禁用本回合內鬼。"
+		"zho"		"{green}[IC]{default} 下一波特感倒計時前沒有記錄到生還者傷害或有效攻擊，內鬼身份已取消，AI 已接管該特感。"
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"zho"		"{green}[IC]{default} 接下來 %d 回合不能再次扮演內鬼。"
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"zho"		"{green}[IC]{default} 你本次扮演內鬼期間造成了 {olive}%d{default} 點生還者傷害。"
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"zho"		"{green}[IC]{default} 你本回合已被禁止再扮演內鬼（上次內鬼沒有造成傷害）。"
+		"zho"		"{green}[IC]{default} 你還需禁用 %d 回合才能再次扮演內鬼（上次內鬼沒有造成傷害）。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"zho"		"{green}[IC]{default} 懲罰提示：生成內鬼後，如果到下一波特感倒計時前仍未對生還造成傷害，會被處死並禁用本回合內鬼。"
+		"zho"		"{green}[IC]{default} 懲罰提示：內鬼必須在下一波特感倒計時前造成傷害或有效攻擊。"
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"zho"		"{green}[IC]{default} 否則會取消內鬼身份並由 AI 接管，接下來 %d 回合不能再次扮演內鬼。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"zho"		"{green}[IC]{default} Tank 提示：如果內鬼 Tank 對生還傷害低於 {olive}%d{default}，會被禁用 Tank 扮演 {olive}%d{default} 天。"
+		"zho"		"{green}[IC]{default} Tank 提示：內鬼 Tank 至少要造成 {olive}%d{default} 點生還者傷害。"
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"zho"		"{green}[IC]{default} 否則 Tank 內鬼會被禁用 {olive}%d{default} 天。"
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"zho"		"{green}[IC]{default} 你的內鬼 Tank 傷害為 {olive}%d{default}/{olive}%d{default}，已禁用 Tank 扮演 {olive}%d{default} 天。"
+		"zho"		"{green}[IC]{default} 你的內鬼 Tank 傷害：{olive}%d{default}/{olive}%d{default}。"
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"zho"		"{green}[IC]{default} Tank 內鬼已禁用 {olive}%d{default} 天。"
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

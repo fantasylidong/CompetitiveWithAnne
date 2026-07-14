@@ -162,6 +162,12 @@ public Action VoteBossCmd(int client, int args)
 		return Plugin_Handled;
 	}
 
+	if ((StringToInt(bv_sTank) == 0 || StringToInt(bv_sWitch) == 0) && !CanDisableBosses(client))
+	{
+		CReplyToCommand(client, "%t %t", "Tag", "DisableBossesRestricted");
+		return Plugin_Handled;
+	}
+
 	// Make sure witch enable mode can't disable witch
 	if(FindConVar("sm_witch_can_spawn") != null)
 	{
@@ -264,6 +270,17 @@ public Action VoteBossCmd(int client, int args)
 	FakeClientCommand(client, "Vote Yes");
 
 	return Plugin_Handled;
+}
+
+bool CanDisableBosses(int client)
+{
+	if (client == 0)
+	{
+		return true;
+	}
+
+	AdminId admin = GetUserAdmin(client);
+	return admin != INVALID_ADMIN_ID && GetAdminImmunityLevel(admin) > 90;
 }
 
 public void BossVoteActionHandler(Handle vote, BuiltinVoteAction action, int param1, int param2)

@@ -8,4 +8,12 @@
 	{
 		"ko"		"{lightgreen}는 특수무기 10개를 초과하지 않기 때문에 AnneHappyPlus 무기를 사용할 수 없습니다."
 	}
+	"Text_TraitorStatusEnabled"
+	{
+		"ko"		"{lightgreen}트레이터 모드{olive}[{green}켜짐{olive}] {lightgreen}슬롯{olive}[{green}%d{olive}]"
+	}
+	"Text_TraitorStatusDisabled"
+	{
+		"ko"		"{lightgreen}트레이터 모드{olive}[{green}꺼짐{olive}] {lightgreen}슬롯{olive}[{green}%d{olive}]"
+	}
 }

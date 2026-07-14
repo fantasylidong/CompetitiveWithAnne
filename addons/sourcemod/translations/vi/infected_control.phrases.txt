@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"vi"		"{green}[IC]{default} You dealt no survivor damage before the next SI countdown. You were slain and cannot play traitor for this round."
+		"vi"		"{green}[IC]{default} Không ghi nhận sát thương hoặc đòn tấn công hiệu quả lên người sống sót trước lần đếm ngược SI tiếp theo. Vai trò traitor của bạn bị hủy và AI tiếp quản SI này."
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"vi"		"{green}[IC]{default} Bạn không thể làm traitor trong %d vòng tiếp theo."
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"vi"		"{green}[IC]{default} Lần chơi traitor này bạn đã gây {olive}%d{default} sát thương lên người sống sót."
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"vi"		"{green}[IC]{default} You cannot play traitor again this round because your last traitor caused no damage."
+		"vi"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"vi"		"{green}[IC]{default} Penalty notice: if your traitor deals no survivor damage before the next SI countdown, you will be slain and cannot play traitor again this round."
+		"vi"		"{green}[IC]{default} Cảnh báo phạt: traitor phải gây sát thương hoặc thực hiện đòn tấn công hiệu quả lên người sống sót trước lần đếm ngược SI tiếp theo."
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"vi"		"{green}[IC]{default} Nếu không, vai trò sẽ bị hủy, AI tiếp quản và traitor bị vô hiệu hóa trong %d vòng."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"vi"		"{green}[IC]{default} Tank notice: if your traitor Tank deals less than {olive}%d{default} survivor damage, Tank traitor will be blocked for {olive}%d{default} days."
+		"vi"		"{green}[IC]{default} Cảnh báo Tank: traitor Tank phải gây ít nhất {olive}%d{default} sát thương lên người sống sót."
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"vi"		"{green}[IC]{default} Nếu không, traitor Tank sẽ bị vô hiệu hóa trong {olive}%d{default} ngày."
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"vi"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} damage. Tank traitor is blocked for {olive}%d{default} days."
+		"vi"		"{green}[IC]{default} Traitor Tank của bạn đã gây {olive}%d{default}/{olive}%d{default} sát thương lên người sống sót."
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"vi"		"{green}[IC]{default} Traitor Tank bị vô hiệu hóa trong {olive}%d{default} ngày."
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

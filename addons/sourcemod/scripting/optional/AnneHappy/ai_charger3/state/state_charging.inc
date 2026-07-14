@@ -155,7 +155,7 @@ stock Action StateCharging_OnUpdate(int client, int& buttons, float vel[3], floa
         );
 
         if (canPreserveAirLine &&
-            preserveAirChargeLine(client, target, true, AIR_CHARGE_LINE_CORR_CHARGE_LERP)
+            preserveAirChargeLine(client, target, true)
         ) {
             return Plugin_Changed;
         }

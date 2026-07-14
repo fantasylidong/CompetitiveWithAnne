@@ -8,7 +8,7 @@
 #include <SteamWorks>
 
 /* Plugin Info */
-#define PLUGIN_VERSION "1.3.4"
+#define PLUGIN_VERSION "1.3.4-anne.1"
 
 /*
  *	Changelogs:
@@ -34,6 +34,10 @@
  *
  *	Version 1.3.4
  *		> Added Updater_OnLoaded() forward
+ *
+ *	Version 1.3.4-anne.1
+ *		> Persist the last successfully installed manifest version.
+ *		> Use the persisted version instead of requiring a rebuilt caller plugin.
  */
 
 public Plugin myinfo = {
@@ -59,7 +63,7 @@ enum UpdateStatus {
 #define EXTENSION_ERROR			"This plugin requires SteamWorks extensions to function."
 #define TEMP_FILE_EXT			"temp"		// All files are downloaded with this extension first.
 #define MAX_URL_LENGTH			256
-#define UPDATE_URL				"https://raw.githubusercontent.com/Teamkiller324/Updater/main/Updater.txt"
+#define UPDATER_VERSION_LENGTH	64
 
 bool g_bGetDownload, g_bGetSource;
 
@@ -75,6 +79,7 @@ static char _sDataPath[PLATFORM_MAX_PATH];
 
 /* Core Includes */
 #include "updater/plugins.sp"
+#include "updater/versioncache.sp"
 #include "updater/filesys.sp"
 #include "updater/download.sp"
 #include "updater/api.sp"
@@ -116,10 +121,8 @@ public void OnPluginStart()	{
 	// Temp path for checking update files.
 	BuildPath(Path_SM, _sDataPath, sizeof(_sDataPath), "data/updater.txt");
 	
-	#if !defined DEBUG
-	// Add this plugin to the autoupdater.
-	Updater_AddPlugin(GetMyHandle(), UPDATE_URL);
-	#endif
+	// This Anne-maintained fork must not register against the upstream updater
+	// manifest, otherwise a future upstream release would replace this build.
 
 	// Check for updates every 24 hours.
 	_hUpdateTimer = CreateTimer(86400.0, Timer_CheckUpdates, _, TIMER_REPEAT);
@@ -208,17 +211,6 @@ void OnSettingsChanged(ConVar cvar, const char[] oldvalue, const char[] newvalue
 		}
 	}
 }
-
-#if !defined DEBUG
-public void Updater_OnPluginUpdated() {
-	Updater_Log("Reloading Updater plugin... updates will resume automatically.");
-	
-	// Reload this plugin.
-	char filename[64];
-	GetPluginFilename(INVALID_HANDLE, filename, sizeof(filename));
-	ServerCommand("sm plugins reload %s", filename);
-}
-#endif
 
 void Updater_Check(int index) {
 	if (Fwd_OnPluginChecking(IndexToPlugin(index)) == Plugin_Continue)	{

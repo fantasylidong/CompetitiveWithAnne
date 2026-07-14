@@ -38,6 +38,10 @@
     {
         "es"        "Los porcentajes son {olive}inválidos{default}."
     }
+    "DisableBossesRestricted"
+    {
+        "es"        "Solo los administradores con un nivel de inmunidad superior a 90 pueden desactivar Tank o Witch."
+    }
     "TankStatic"
     {
         "es"        "La generación del Tank es estática y no se puede cambiar en este mapa."

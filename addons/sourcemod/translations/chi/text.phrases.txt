@@ -8,4 +8,12 @@
 	{
 		"chi"		"{lightgreen}因为不超过10特，无法使用AnneHappyPlus武器"
 	}
+	"Text_TraitorStatusEnabled"
+	{
+		"chi"		"{lightgreen}内鬼模式{olive}[{green}开启{olive}] {lightgreen}槽位{olive}[{green}%d{olive}]"
+	}
+	"Text_TraitorStatusDisabled"
+	{
+		"chi"		"{lightgreen}内鬼模式{olive}[{green}关闭{olive}] {lightgreen}槽位{olive}[{green}%d{olive}]"
+	}
 }

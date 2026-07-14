@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"en"		"{green}[IC]{default} You dealt no survivor damage before the next SI countdown. You were slain and cannot play traitor for this round."
+		"en"		"{green}[IC]{default} No survivor damage or effective attack was recorded before the next SI countdown. Your traitor role was removed and AI took over this SI."
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"en"		"{green}[IC]{default} You cannot play traitor again for the next %d rounds."
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"en"		"{green}[IC]{default} Your traitor dealt {olive}%d{default} survivor damage this life."
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"en"		"{green}[IC]{default} You cannot play traitor again this round because your last traitor caused no damage."
+		"en"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"en"		"{green}[IC]{default} Penalty notice: if your traitor deals no survivor damage before the next SI countdown, you will be slain and cannot play traitor again this round."
+		"en"		"{green}[IC]{default} Penalty warning: your traitor must damage or effectively attack a survivor before the next SI countdown."
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"en"		"{green}[IC]{default} Otherwise, the role is removed, AI takes over, and traitor is disabled for %d rounds."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"en"		"{green}[IC]{default} Tank notice: if your traitor Tank deals less than {olive}%d{default} survivor damage, Tank traitor will be blocked for {olive}%d{default} days."
+		"en"		"{green}[IC]{default} Tank warning: your traitor Tank must deal at least {olive}%d{default} survivor damage."
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"en"		"{green}[IC]{default} Otherwise, Tank traitor will be disabled for {olive}%d{default} days."
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"en"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} damage. Tank traitor is blocked for {olive}%d{default} days."
+		"en"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} survivor damage."
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"en"		"{green}[IC]{default} Tank traitor is now disabled for {olive}%d{default} days."
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

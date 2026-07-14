@@ -34,7 +34,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.0.0",
+	version 		= "1.0.1.0",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -49,7 +49,7 @@ public void OnPluginStart() {
 	g_cvBhopImpulse = CreateConVar("ai_charger3_bhop_impulse", "100.0", "连跳的加速度", CVAR_FLAGS, true, 0.0);
 	// when charger's speed is greater than 'ai_charger3_bhop_min_speed', it is allowed to bhop, and its max bhop speed will not greater than 'ai_charger3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_charger3_bhop_min_speed", "200", "允许连跳的最小速度", CVAR_FLAGS, true, 0.0);
-	g_cvBhopMaxSpeed = CreateConVar("ai_charger3_bhop_max_speed", "1000", "连跳的最大限制速度", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMaxSpeed = CreateConVar("ai_charger3_bhop_max_speed", "800", "连跳的最大限制速度", CVAR_FLAGS, true, 0.0);
 	// Whether charger is allowed to perform bhop before charging. 0=Disabled, 1=Enabled
 	g_cvBhopBeforeCharge = CreateConVar("ai_charger3_bhop_before_charge", "1", "是否允许在冲锋前进行连跳, 0=禁止, 1=允许", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// when charger has no vision of the target survivor, allow it to bhop?
@@ -75,7 +75,7 @@ public void OnPluginStart() {
 	// when the angle between charger's air velocity direction and the direction from charger to target exceeds this value, perform air velocity modification (air modification: set charger's current velocity direction to the target direction)
 	g_cvAirVecModifyMinDegree = CreateConVar("ai_charger3_airvec_modify_min_deg", "45.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
 	// When the angle between charger's air velocity direction and the direction from charger to target exceeds this value, abandon air velocity modification
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_charger3_airvec_modify_max_deg", "180.0", "在空中速度方向与自身到目标方向角度超过这个值放弃速度修正", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_charger3_airvec_modify_max_deg", "120.0", "在空中速度方向与自身到目标方向角度超过这个值放弃速度修正", CVAR_FLAGS, true, 0.0, true, 180.0);
 	// the interval (in seconds) between consecutive air velocity vector modifications for charger
 	g_cvAirVecModifyInterval = CreateConVar("ai_charger3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.0);
 	// The interpolation factor for charger's air velocity direction modification. Min: 0.0, Max: 1.0. Lower values result in smoother air turning, higher values result in sharper air turning
@@ -120,7 +120,7 @@ public void OnPluginStart() {
 	g_cvPluginName.GetString(cvName, sizeof(cvName));
 	FormatEx(cvName, sizeof(cvName), "%s_log_level", cvName);
 	// log recording level: 1=Disabled, 2=Console output, 4=Log file output, 8=Chat box output, 16=Server console output, 32=Error file output. Values can be added together for multiple outputs
-	g_cvLogLevel = CreateConVar(cvName, "38", "日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
+	g_cvLogLevel = CreateConVar(cvName, "1", "日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
 
 	HookEvent("round_start", evtRoundStart);
 	HookEvent("round_end", evtRoundEnd);
@@ -229,6 +229,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 		g_ChargerStateContext[client].init(client);
 		g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
 	}
+
 
 	// 执行当前状态的每帧行为更新操作
 	return g_ChargerStateContext[client].update(buttons, vel, angles);

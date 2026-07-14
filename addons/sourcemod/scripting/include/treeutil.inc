@@ -610,7 +610,7 @@ stock float GetCurrentSpeed(int client)
 		GetEntPropVector(client, Prop_Data, "m_vecVelocity", vec_speed);
 		return (SquareRoot(Pow(vec_speed[0], 2.0) + Pow(vec_speed[1], 2.0)));
 	}
-	return -1.0
+	return -1.0;
 }
 // 获取当前是否在对抗第二轮
 stock bool InVersusSecondRound()

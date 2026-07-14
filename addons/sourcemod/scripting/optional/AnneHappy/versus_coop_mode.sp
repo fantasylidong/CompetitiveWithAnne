@@ -8,8 +8,11 @@
 #define PLUGIN_NAME						"Versus Coop Mode"
 #define PLUGIN_AUTHOR					"sorallll"
 #define PLUGIN_DESCRIPTION				""
-#define PLUGIN_VERSION					"1.0.3"
+#define PLUGIN_VERSION					"1.0.4-anne1"
 #define PLUGIN_URL						""
+
+#define PLUGIN_LIBRARY					"versus_coop_mode"
+#define NATIVE_IS_MAP_TRANSITIONING		"VersusCoopMode_IsMapTransitioning"
 
 #define GAMEDATA						"versus_coop_mode"
 
@@ -36,6 +39,17 @@ public Plugin myinfo = {
 	version = PLUGIN_VERSION,
 	url = PLUGIN_URL
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
+	RegPluginLibrary(PLUGIN_LIBRARY);
+	// Consumers can distinguish a validated transition from one blocked by this plugin.
+	CreateNative(NATIVE_IS_MAP_TRANSITIONING, Native_IsMapTransitioning);
+	return APLRes_Success;
+}
+
+any Native_IsMapTransitioning(Handle plugin, int numParams) {
+	return g_bTransitionFired;
+}
 
 public void OnPluginStart() {
 	InitGameData();

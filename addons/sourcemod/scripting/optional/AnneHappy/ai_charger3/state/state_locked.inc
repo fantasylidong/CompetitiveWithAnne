@@ -79,7 +79,7 @@ stock Action StateLocked_OnUpdate(int client, int& buttons, float vel[3], float 
     if (visible) {
         g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
     }
-    preserveAirChargeLine(client, target, visible, AIR_CHARGE_LINE_CORR_LOCK_LERP);
+    preserveAirChargeLine(client, target, visible);
 
     // 转换为冲锋状态
     stateLog.debugAll("Charger (%N) locked target (%N), is better target %d, transition to CHARGING STATE",

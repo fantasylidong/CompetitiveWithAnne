@@ -8,4 +8,12 @@
 	{
 		"vi"		"{lightgreen} không thể sử dụng vũ khí AnneHappyPlus vì không vượt quá 10 đặc biệt"
 	}
+	"Text_TraitorStatusEnabled"
+	{
+		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Bật{olive}] {lightgreen}Vị trí{olive}[{green}%d{olive}]"
+	}
+	"Text_TraitorStatusDisabled"
+	{
+		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Tắt{olive}] {lightgreen}Vị trí{olive}[{green}%d{olive}]"
+	}
 }

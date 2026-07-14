@@ -8,4 +8,12 @@
 	{
 		"en"		"{lightgreen} cannot use AnneHappyPlus weapons because it does not exceed 10 special"
 	}
+	"Text_TraitorStatusEnabled"
+	{
+		"en"		"{lightgreen}Traitor mode{olive}[{green}Enabled{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
+	}
+	"Text_TraitorStatusDisabled"
+	{
+		"en"		"{lightgreen}Traitor mode{olive}[{green}Disabled{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
+	}
 }

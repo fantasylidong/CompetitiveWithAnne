@@ -111,15 +111,19 @@ bool ParseUpdateFile(int index, const char[] path)	{
 			Handle hPlugin = IndexToPlugin(index);
 			ArrayList hFiles = view_as<ArrayList>(Updater_GetFiles(index));
 			hFiles.Clear();
+			Updater_ClearPendingVersion(index);
 			
-			// current version.
-			char sCurrentVersion[16];
+			// Prefer the last successfully installed manifest version. Plugin
+			// metadata is only the fallback for a source without cached state.
+			char sCurrentVersion[UPDATER_VERSION_LENGTH];
 			
-			if(!GetPluginInfo(hPlugin, PlInfo_Version, sCurrentVersion, sizeof(sCurrentVersion)))
+			if(!Updater_GetCachedVersion(index, sCurrentVersion, sizeof(sCurrentVersion))
+			&& !GetPluginInfo(hPlugin, PlInfo_Version, sCurrentVersion, sizeof(sCurrentVersion)))
 				strcopy(sCurrentVersion, sizeof(sCurrentVersion), "Null");
 			
 			// latest version.
-			char smcLatestVersion[16];
+			char smcLatestVersion[UPDATER_VERSION_LENGTH];
+			smcLatestVersion[0] = '\0';
 			
 			if(SMC_DataTrie.GetValue("version->latest", hPack))	{
 				hPack.Reset();
@@ -127,7 +131,10 @@ bool ParseUpdateFile(int index, const char[] path)	{
 			}
 			
 			// Check if we have the latest version.
-			if(!StrEqual(sCurrentVersion, smcLatestVersion))	{
+			if(smcLatestVersion[0] == '\0')	{
+				Updater_Log("Update manifest does not contain a latest version.");
+			}
+			else if(!StrEqual(sCurrentVersion, smcLatestVersion))	{
 				char sFilename[64], sName[64];
 				GetPluginFilename(hPlugin, sFilename, sizeof(sFilename));
 				
@@ -149,8 +156,11 @@ bool ParseUpdateFile(int index, const char[] path)	{
 				// Log update notes, save file list, and begin downloading.
 				switch(g_bGetDownload && Fwd_OnPluginDownloading(hPlugin) == Plugin_Continue)	{
 					case true:	 {
+						Updater_SetPendingVersion(index, smcLatestVersion);
+
 						// Get previous version.
-						char smcPrevVersion[16];
+						char smcPrevVersion[UPDATER_VERSION_LENGTH];
+						smcPrevVersion[0] = '\0';
 						if(SMC_DataTrie.GetValue("version->previous", hPack))	{
 							hPack.Reset();
 							hPack.ReadString(smcPrevVersion, sizeof(smcPrevVersion));
@@ -170,7 +180,14 @@ bool ParseUpdateFile(int index, const char[] path)	{
 								ParseSMCFilePack(index, hPack, hFiles);
 						}
 						
-						Updater_SetStatus(index, Status_Downloading);
+						if(hFiles.Length > 0)	{
+							Updater_SetStatus(index, Status_Downloading);
+						}
+						else	{
+							Updater_ClearPendingVersion(index);
+							Updater_SetStatus(index, Status_Error);
+							Updater_Log("Update manifest does not contain downloadable plugin files.");
+						}
 					}
 					
 					// We don't want to spam the logs with the same update notification.

@@ -475,32 +475,50 @@ void BuildAnneSettingMenu(Menu menu, const char[] setting)
 {
 	if (StrEqual(setting, "limit"))
 	{
-		menu.SetTitle("刷特设置\n特感数量:");
+		int currentLimit = GetConVarIntOrDefault(g_cvAnneLimit, ANNE_LIMIT_MIN);
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n特感数量：%d特", currentLimit);
+		menu.SetTitle(title);
 		AddAnneLimitVoteEntries(menu);
 	}
 	else if (StrEqual(setting, "interval"))
 	{
-		menu.SetTitle("刷特设置\n复活时间:");
+		int currentInterval = GetConVarIntOrDefault(g_cvAnneInterval, 0);
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n复活时间：%d秒", currentInterval);
+		menu.SetTitle(title);
 		AddAnneIntervalVoteEntries(menu);
 	}
 	else if (StrEqual(setting, "auto"))
 	{
-		menu.SetTitle("刷特设置\n刷特模式:");
+		int currentAutoMode = GetConVarIntOrDefault(g_cvAnneAutoSpawn, 1);
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n刷特模式：%s", currentAutoMode == 1 ? "自动时间" : "固定时间");
+		menu.SetTitle(title);
 		AddAnneAutoModeVoteEntries(menu);
 	}
 	else if (StrEqual(setting, "distance"))
 	{
-		menu.SetTitle("刷特设置\n特感最低生成距离:");
+		float currentDistance = g_cvAnneDistance != null ? g_cvAnneDistance.FloatValue : 250.0;
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n特感最低生成距离：%.0f单位", currentDistance);
+		menu.SetTitle(title);
 		AddAnneDistanceVoteEntries(menu);
 	}
 	else if (StrEqual(setting, "teleport"))
 	{
-		menu.SetTitle("刷特设置\n特感传送检测秒数:");
+		int currentTeleportCheck = GetConVarIntOrDefault(g_cvAnneTeleportCheck, 5);
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n特感传送检测秒数：%d秒", currentTeleportCheck);
+		menu.SetTitle(title);
 		AddAnneTeleportVoteEntries(menu);
 	}
 	else if (StrEqual(setting, "traitor"))
 	{
-		menu.SetTitle("刷特设置\n内鬼模式:");
+		int currentTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 1);
+		char title[128];
+		FormatEx(title, sizeof(title), "刷特设置\n内鬼模式：%s", currentTraitorEnable != 0 ? "开" : "关");
+		menu.SetTitle(title);
 		AddAnneTraitorVoteEntries(menu);
 	}
 }
@@ -994,20 +1012,18 @@ void AddAnneLimitVoteEntries(Menu menu)
 	char folder[16];
 	GetAnneLimitVoteFolder(folder, sizeof(folder));
 
-	AddMenuHeader(menu, "特感数量");
 	for (int limit = ANNE_LIMIT_MIN; limit <= ANNE_LIMIT_MAX; limit++)
 	{
 		char command[SPAWN_VOTE_COMMAND_LENGTH];
 		char text[32];
 		FormatEx(command, sizeof(command), "exec vote/%s/AnneHappy%d.cfg", folder, limit);
-		FormatEx(text, sizeof(text), "%d特模式", limit);
+		FormatEx(text, sizeof(text), "%d特", limit);
 		AddCfgVoteEntry(menu, "avc", command, text);
 	}
 }
 
 void AddAnneIntervalVoteEntries(Menu menu)
 {
-	AddMenuHeader(menu, "复活时间");
 	for (int interval = 0; interval <= 20; interval++)
 	{
 		AddIntegerCvarVoteEntry(menu, "versus_special_respawn_interval", interval, "%d秒");
@@ -1016,14 +1032,12 @@ void AddAnneIntervalVoteEntries(Menu menu)
 
 void AddAnneAutoModeVoteEntries(Menu menu)
 {
-	AddMenuHeader(menu, "刷特模式");
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_EnableAutoSpawnTime 1", "自动时间刷特[23-01版本起有效]");
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_EnableAutoSpawnTime 0", "固定时间刷特[23-01版本起有效]");
 }
 
 void AddAnneDistanceVoteEntries(Menu menu)
 {
-	AddMenuHeader(menu, "特感最低生成距离");
 	int start = IsAnneHardcoreVoteMode() ? 200 : 250;
 	for (int distance = start; distance <= 600; distance += 50)
 	{
@@ -1033,7 +1047,6 @@ void AddAnneDistanceVoteEntries(Menu menu)
 
 void AddAnneTeleportVoteEntries(Menu menu)
 {
-	AddMenuHeader(menu, "特感传送检测秒数");
 	for (int seconds = 1; seconds <= 8; seconds++)
 	{
 		AddIntegerCvarVoteEntry(menu, "inf_TeleportCheckTime", seconds, "%d秒");
@@ -1042,14 +1055,8 @@ void AddAnneTeleportVoteEntries(Menu menu)
 
 void AddAnneTraitorVoteEntries(Menu menu)
 {
-	AddMenuHeader(menu, "内鬼模式");
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 1", "内鬼模式 开");
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 0", "内鬼模式 关");
-}
-
-void AddMenuHeader(Menu menu, const char[] message)
-{
-	menu.AddItem("header", message, ITEMDRAW_DISABLED);
 }
 
 void AddIntegerCvarVoteEntry(Menu menu, const char[] cvarName, int value, const char[] textFormat)

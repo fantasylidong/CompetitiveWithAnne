@@ -4,6 +4,7 @@
 static DataPackPos PluginPack_Plugin;
 static DataPackPos PluginPack_Files;
 static DataPackPos PluginPack_Status;
+static DataPackPos PluginPack_Metadata;
 static DataPackPos PluginPack_URL;
 
 int GetMaxPlugins()	{
@@ -67,6 +68,7 @@ void Updater_AddPlugin(Handle plugin, const char[] url)	{
 		case false:	{
 			DataPack hPluginPack = new DataPack();
 			ArrayList hFiles = new ArrayList(PLATFORM_MAX_PATH);
+			StringMap hMetadata = new StringMap();
 			
 			PluginPack_Plugin = hPluginPack.Position;
 			hPluginPack.WriteCell(view_as<int>(plugin));
@@ -76,6 +78,9 @@ void Updater_AddPlugin(Handle plugin, const char[] url)	{
 			
 			PluginPack_Status = hPluginPack.Position;
 			hPluginPack.WriteCell(view_as<int>(Status_Idle));
+
+			PluginPack_Metadata = hPluginPack.Position;
+			hPluginPack.WriteCell(view_as<int>(hMetadata));
 			
 			PluginPack_URL = hPluginPack.Position;
 			hPluginPack.WriteString(url);
@@ -100,8 +105,9 @@ void Updater_QueueRemovePlugin(Handle plugin)	{
 
 void Updater_RemovePlugin(int index)	{
 	/* Warning: Removing a plugin will shift indexes. */
-	CloseHandle(Updater_GetFiles(index)); // hFiles
-	CloseHandle(GetArrayCell(g_hPluginPacks, index)); // hPluginPack
+	delete view_as<ArrayList>(Updater_GetFiles(index));
+	delete view_as<StringMap>(Updater_GetMetadata(index));
+	delete view_as<DataPack>(g_hPluginPacks.Get(index));
 	g_hPluginPacks.Erase(index);
 }
 
@@ -109,6 +115,12 @@ Handle Updater_GetFiles(int index)	{
 	DataPack hPluginPack = g_hPluginPacks.Get(index);
 	hPluginPack.Position = PluginPack_Files;
 	return view_as<Handle>(hPluginPack.ReadCell());
+}
+
+StringMap Updater_GetMetadata(int index)	{
+	DataPack hPluginPack = g_hPluginPacks.Get(index);
+	hPluginPack.Position = PluginPack_Metadata;
+	return view_as<StringMap>(hPluginPack.ReadCell());
 }
 
 UpdateStatus Updater_GetStatus(int index)	{

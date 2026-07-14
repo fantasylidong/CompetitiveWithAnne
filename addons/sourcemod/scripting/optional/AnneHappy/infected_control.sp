@@ -43,6 +43,7 @@
 #include <colors>
 #include <dbi>
 #include <sdktools>
+#include <sdkhooks>
 #include <sdktools_tempents>
 #include <left4dhooks>
 #include <sourcescramble>
@@ -330,9 +331,19 @@ public void OnPluginStart()
     HookEvent("player_spawn",    Event_PlayerSpawn);
     HookEvent("player_death",    Event_PlayerDeath);
     HookEvent("player_team",     Event_PlayerTeam);
+    HookEvent("player_bot_replace", Event_PlayerBotReplace, EventHookMode_Post);
     HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
+    HookEvent("player_incapacitated", Event_PlayerIncapacitated, EventHookMode_Post);
+    HookEvent("player_ledge_grab", Event_PlayerLedgeGrab, EventHookMode_Post);
+    HookEvent("revive_success", Event_PlayerReviveSuccess, EventHookMode_Post);
     HookEvent("ability_use",     Event_AbilityUse);
     HookEvent("player_hurt",     Event_PlayerHurt);
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client))
+            Traitor_HookClientDamage(client);
+    }
 }
 
 public void OnPluginEnd()
@@ -541,6 +552,7 @@ static Action Timer_SpawnFirstWave(Handle timer)
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
+    Traitor_OnRoundStart();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
@@ -556,7 +568,12 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 public void Event_PlayerSpawn(Event event, const char[] name, bool dont_broadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
-    if (!client || !IsClientInGame(client) || !IsFakeClient(client)) return;
+    if (!client || !IsClientInGame(client)) return;
+
+    if (IsValidSurvivor(client))
+        Traitor_OnSurvivorRevived(client);
+
+    if (!IsFakeClient(client)) return;
 
     g_LastSpawnTime[client] = GetGameTime();     // 记录出生时间
     gST.teleCount[client]   = 0;                 // 清计数，避免继承旧值
@@ -580,7 +597,6 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast
     int victim   = GetClientOfUserId(GetEventInt(event, "userid"));
     int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
     int dmg      = GetEventInt(event, "dmg_health");
-    Traitor_OnPlayerHurt(attacker, victim, dmg);
 
     if (!gCV.bAddDmgSmoker) return;
 
@@ -596,9 +612,34 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast
         SetEventInt(event, "health", hp);
     }
 }
+
+public void Event_PlayerIncapacitated(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    Traitor_OnSurvivorIncapacitated(client);
+}
+
+public void Event_PlayerLedgeGrab(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    Traitor_OnSurvivorIncapacitated(client);
+}
+
+public void Event_PlayerReviveSuccess(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("subject"));
+    if (client <= 0)
+        client = GetClientOfUserId(event.GetInt("userid"));
+
+    Traitor_OnSurvivorRevived(client);
+}
+
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    if (IsValidSurvivor(client))
+        Traitor_OnSurvivorDeath(client);
+
     if (Traitor_OnPlayerDeath(client))
         return;
 
@@ -631,6 +672,13 @@ public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
     Traitor_OnClientTeamChanged(client, event.GetInt("oldteam"), event.GetInt("team"));
 }
 
+public void Event_PlayerBotReplace(Event event, const char[] name, bool dontBroadcast)
+{
+    int player = GetClientOfUserId(event.GetInt("player"));
+    int bot = GetClientOfUserId(event.GetInt("bot"));
+    Traitor_OnPlayerBotReplace(player, bot);
+}
+
 public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
@@ -640,7 +688,13 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
+    Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
+}
+
+public void OnClientPutInServer(int client)
+{
+    Traitor_HookClientDamage(client);
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)

@@ -21,12 +21,12 @@ ConVar
 
 stock void Stock_OnModuleStart(ConVar& cvPluginName) {
     if (!cvPluginName) {
-        g_cvStockLogLevel = CreateConVar("_ai_charger3_stock_log_level", "38", "工具模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
+        g_cvStockLogLevel = CreateConVar("_ai_charger3_stock_log_level", "1", "工具模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
     } else {
         char cvName[64], stockLogCvName[64];
         cvPluginName.GetString(cvName, sizeof(cvName));
         FormatEx(stockLogCvName, sizeof(stockLogCvName), "_%s_stock_log_level", cvName);
-        g_cvStockLogLevel = CreateConVar(stockLogCvName, "38", "状态模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 33=所有输出", CVAR_FLAGS);
+        g_cvStockLogLevel = CreateConVar(stockLogCvName, "1", "工具模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
     }
 
     stockLog = new Logger(STOCK_LOG_PREFIX, g_cvStockLogLevel.IntValue);

@@ -38,10 +38,11 @@ void OnSteamWorksHTTPComplete(Handle hRequest, bool bFailure, bool bRequestSucce
 
 static DataPackPos QueuePack_URL;
 
-void FinalizeDownload(int index)	{
+bool FinalizeDownload(int index)	{
 	/* Strip the temporary file extension from downloaded files. */
 	char newpath[PLATFORM_MAX_PATH], oldpath[PLATFORM_MAX_PATH];
 	ArrayList hFiles = view_as<ArrayList>(Updater_GetFiles(index));
+	bool successful = true;
 	
 	int maxFiles = hFiles.Length;
 	for(int i = 0; i < maxFiles; i++)	{
@@ -49,13 +50,22 @@ void FinalizeDownload(int index)	{
 		Format(oldpath, sizeof(oldpath), "%s.%s", newpath, TEMP_FILE_EXT);
 		
 		// Rename doesn't overwrite on Windows. Make sure the path is clear.
-		if(FileExists(newpath))
-			DeleteFile(newpath);
+		if(FileExists(newpath) && !DeleteFile(newpath))	{
+			Updater_Log("Unable to replace existing update file: %s", newpath);
+			successful = false;
+			continue;
+		}
 		
-		RenameFile(newpath, oldpath);
+		if(!RenameFile(newpath, oldpath))	{
+			Updater_Log("Unable to install downloaded update file: %s", newpath);
+			successful = false;
+		}
 	}
 	
-	hFiles.Clear();
+	if(successful)
+		hFiles.Clear();
+
+	return successful;
 }
 
 void AbortDownload(int index)	{
@@ -65,7 +75,7 @@ void AbortDownload(int index)	{
 	
 	int maxFiles = hFiles.Length;
 	for(int i = 0; i < maxFiles; i++)	{
-		hFiles.GetString(0, path, sizeof(path));
+		hFiles.GetString(i, path, sizeof(path));
 		Format(path, sizeof(path), "%s.%s", path, TEMP_FILE_EXT);
 		
 		if(FileExists(path))
@@ -164,20 +174,30 @@ void DownloadEnded(bool successful, const char[] error="")	{
 						Handle hPlugin = IndexToPlugin(index);
 						
 						Fwd_OnPluginUpdating(hPlugin);
-						FinalizeDownload(index);
-						
-						char sName[64];
-						if(!GetPluginInfo(hPlugin, PlInfo_Name, sName, sizeof(sName)))
-							strcopy(sName, sizeof(sName), "Null");
-						
-						Updater_Log("Successfully updated and installed \"%s\".", sName);
-						Updater_SetStatus(index, Status_Updated);
-						Fwd_OnPluginUpdated(hPlugin);
+						if(FinalizeDownload(index))	{
+							if(!Updater_CommitPendingVersion(index))
+								Updater_Log("Update installed, but its manifest version could not be persisted.");
+
+							char sName[64];
+							if(!GetPluginInfo(hPlugin, PlInfo_Name, sName, sizeof(sName)))
+								strcopy(sName, sizeof(sName), "Null");
+
+							Updater_Log("Successfully updated and installed \"%s\".", sName);
+							Updater_SetStatus(index, Status_Updated);
+							Fwd_OnPluginUpdated(hPlugin);
+						}
+						else	{
+							AbortDownload(index);
+							Updater_ClearPendingVersion(index);
+							Updater_SetStatus(index, Status_Error);
+							Updater_Log("Update files were downloaded, but installation did not complete.");
+						}
 					}
 				}
 				case false:	{
 					// Failed during an update.
 					AbortDownload(index);
+					Updater_ClearPendingVersion(index);
 					Updater_SetStatus(index, Status_Error);
 					
 					char filename[64];

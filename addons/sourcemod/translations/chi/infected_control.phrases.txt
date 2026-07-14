@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"chi"		"{green}[IC]{default} 你在下一波特感倒计时前没有造成伤害，已被处死并禁用本回合内鬼。"
+		"chi"		"{green}[IC]{default} 下一波特感倒计时前没有记录到生还者伤害或有效攻击，内鬼身份已取消，AI 已接管该特感。"
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"chi"		"{green}[IC]{default} 接下来 %d 回合不能再次扮演内鬼。"
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"chi"		"{green}[IC]{default} 你本次扮演内鬼期间造成了 {olive}%d{default} 点生还者伤害。"
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"chi"		"{green}[IC]{default} 你本回合已被禁止再扮演内鬼（上次内鬼没有造成伤害）。"
+		"chi"		"{green}[IC]{default} 你还需禁用 %d 回合才能再次扮演内鬼（上次内鬼没有造成伤害）。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"chi"		"{green}[IC]{default} 惩罚提示：生成内鬼后，如果到下一波特感倒计时前仍未对生还造成伤害，会被处死并禁用本回合内鬼。"
+		"chi"		"{green}[IC]{default} 惩罚提示：内鬼必须在下一波特感倒计时前造成伤害或有效攻击。"
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"chi"		"{green}[IC]{default} 否则会取消内鬼身份并由 AI 接管，接下来 %d 回合不能再次扮演内鬼。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"chi"		"{green}[IC]{default} Tank 提示：如果内鬼 Tank 对生还伤害低于 {olive}%d{default}，会被禁用 Tank 扮演 {olive}%d{default} 天。"
+		"chi"		"{green}[IC]{default} Tank 提示：内鬼 Tank 至少要造成 {olive}%d{default} 点生还者伤害。"
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"chi"		"{green}[IC]{default} 否则 Tank 内鬼会被禁用 {olive}%d{default} 天。"
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"chi"		"{green}[IC]{default} 你的内鬼 Tank 伤害为 {olive}%d{default}/{olive}%d{default}，已禁用 Tank 扮演 {olive}%d{default} 天。"
+		"chi"		"{green}[IC]{default} 你的内鬼 Tank 伤害：{olive}%d{default}/{olive}%d{default}。"
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"chi"		"{green}[IC]{default} Tank 内鬼已禁用 {olive}%d{default} 天。"
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

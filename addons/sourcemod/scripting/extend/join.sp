@@ -58,14 +58,17 @@ bool
 	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
 	g_bUpdateSystemAvailable = false, 
 	g_bGroupSystemAvailable = false,
-	g_bInfectedControlAvailable = false;
+	g_bInfectedControlAvailable = false,
+	g_bAutoUpdaterRegistered = false,
+	g_bAutoUpdaterInitialCheckRequested = false;
 
 char
 	g_sDonateAmount[MAXPLAYERS + 1][16],
 	g_sDonateMethod[MAXPLAYERS + 1][16],
 	g_sDonateNote[MAXPLAYERS + 1][128],
 	g_sDonateOptionAmount[DONATE_MAX_OPTIONS][16],
-	g_sDonateOptionDisplay[DONATE_MAX_OPTIONS][64];
+	g_sDonateOptionDisplay[DONATE_MAX_OPTIONS][64],
+	g_sAutoUpdaterUrl[AUTOUPDATE_URL_LENGTH];
 
 int
 	g_iDonateOptionCount = 0;
@@ -145,26 +148,46 @@ public void OnPluginStart()
 
 public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	RefreshAutoUpdater();
+	RefreshAutoUpdater(true);
 }
 
-void RefreshAutoUpdater()
+void RefreshAutoUpdater(bool requestInitialCheck = false)
 {
 	if (!g_bUpdateSystemAvailable)
 	{
 		return;
 	}
 
-	Updater_RemovePlugin();
-
 	char updateUrl[AUTOUPDATE_URL_LENGTH];
 	if (!GetAutoUpdateUrl(updateUrl, sizeof(updateUrl)))
 	{
+		if (g_bAutoUpdaterRegistered)
+		{
+			Updater_RemovePlugin();
+			g_bAutoUpdaterRegistered = false;
+		}
+		g_bAutoUpdaterInitialCheckRequested = false;
+		g_sAutoUpdaterUrl[0] = '\0';
 		return;
 	}
 
-	Updater_AddPlugin(updateUrl);
-	Updater_ForceUpdate();
+	if (!g_bAutoUpdaterRegistered || !StrEqual(g_sAutoUpdaterUrl, updateUrl))
+	{
+		if (g_bAutoUpdaterRegistered)
+		{
+			Updater_RemovePlugin();
+		}
+
+		Updater_AddPlugin(updateUrl);
+		strcopy(g_sAutoUpdaterUrl, sizeof(g_sAutoUpdaterUrl), updateUrl);
+		g_bAutoUpdaterRegistered = true;
+		g_bAutoUpdaterInitialCheckRequested = false;
+	}
+
+	if (requestInitialCheck && !g_bAutoUpdaterInitialCheckRequested && Updater_ForceUpdate())
+	{
+		g_bAutoUpdaterInitialCheckRequested = true;
+	}
 }
 
 bool GetAutoUpdateUrl(char[] updateUrl, int maxLength)
@@ -195,25 +218,36 @@ public void OnAllPluginsLoaded(){
 	g_bGroupSystemAvailable = LibraryExists("veterans");
 	g_bUpdateSystemAvailable = LibraryExists("updater");
 	g_bInfectedControlAvailable = LibraryExists("infected_control");
-	RefreshAutoUpdater();
+	RefreshAutoUpdater(true);
 }
 public void OnLibraryAdded(const char[] name)
 {
     if ( StrEqual(name, "veterans") ) { g_bGroupSystemAvailable = true; }
-	else if(StrEqual(name, "updater")) { g_bUpdateSystemAvailable = true; RefreshAutoUpdater(); }
+	else if(StrEqual(name, "updater")) { g_bUpdateSystemAvailable = true; RefreshAutoUpdater(true); }
 	else if(StrEqual(name, "infected_control")) { g_bInfectedControlAvailable = true; }
 }
 public void OnLibraryRemoved(const char[] name)
 {
     if ( StrEqual(name, "veterans") ) { g_bGroupSystemAvailable = false; }
-	else if (StrEqual(name, "updater")){ g_bUpdateSystemAvailable = false; }
+	else if (StrEqual(name, "updater"))
+	{
+		g_bUpdateSystemAvailable = false;
+		g_bAutoUpdaterRegistered = false;
+		g_bAutoUpdaterInitialCheckRequested = false;
+		g_sAutoUpdaterUrl[0] = '\0';
+	}
 	else if (StrEqual(name, "infected_control")){ g_bInfectedControlAvailable = false; }
 }
 
 public void Updater_OnLoaded()
 {
 	g_bUpdateSystemAvailable = true;
-	RefreshAutoUpdater();
+	RefreshAutoUpdater(true);
+}
+
+public void Updater_OnPluginUpdated()
+{
+	Updater_ReloadPlugin();
 }
 
 public void SteamWorks_OnValidateClient(int ownerauthid, int authid)

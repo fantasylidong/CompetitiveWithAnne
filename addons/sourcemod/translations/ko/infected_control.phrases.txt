@@ -54,19 +54,35 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"ko"		"{green}[IC]{default} You dealt no survivor damage before the next SI countdown. You were slain and cannot play traitor for this round."
+		"ko"		"{green}[IC]{default} 다음 특수 감염자 카운트다운 전까지 생존자 피해나 유효한 공격이 기록되지 않아 내귀 역할이 해제되고 AI가 이 특수 감염자를 이어받습니다."
+	}
+	"InfectedControl_TraitorNoDamageBlockApplied"
+	{
+		"ko"		"{green}[IC]{default} 다음 %d라운드 동안 다시 내귀가 될 수 없습니다."
+	}
+	"InfectedControl_TraitorDamageSummary"
+	{
+		"ko"		"{green}[IC]{default} 이번 내귀 플레이에서 생존자에게 {olive}%d{default}의 피해를 입혔습니다."
 	}
 	"InfectedControl_TraitorRoundBlockedNoDamage"
 	{
-		"ko"		"{green}[IC]{default} You cannot play traitor again this round because your last traitor caused no damage."
+		"ko"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"ko"		"{green}[IC]{default} Penalty notice: if your traitor deals no survivor damage before the next SI countdown, you will be slain and cannot play traitor again this round."
+		"ko"		"{green}[IC]{default} 페널티 경고: 다음 특수 감염자 카운트다운 전까지 생존자에게 피해를 주거나 유효한 공격을 해야 합니다."
+	}
+	"InfectedControl_TraitorPenaltyNoDamageBlock"
+	{
+		"ko"		"{green}[IC]{default} 그렇지 않으면 역할이 해제되고 AI가 이어받으며, 다음 %d라운드 동안 내귀가 될 수 없습니다."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"ko"		"{green}[IC]{default} Tank notice: if your traitor Tank deals less than {olive}%d{default} survivor damage, Tank traitor will be blocked for {olive}%d{default} days."
+		"ko"		"{green}[IC]{default} Tank 경고: 내귀 Tank는 생존자에게 최소 {olive}%d{default} 피해를 입혀야 합니다."
+	}
+	"InfectedControl_TraitorPenaltyTankDamageBlock"
+	{
+		"ko"		"{green}[IC]{default} 그렇지 않으면 Tank 내귀가 {olive}%d{default}일 동안 비활성화됩니다."
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
@@ -74,7 +90,11 @@
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"ko"		"{green}[IC]{default} Your traitor Tank dealt {olive}%d{default}/{olive}%d{default} damage. Tank traitor is blocked for {olive}%d{default} days."
+		"ko"		"{green}[IC]{default} 이번 내귀 Tank가 생존자에게 {olive}%d{default}/{olive}%d{default} 피해를 입혔습니다."
+	}
+	"InfectedControl_TraitorTankBlockApplied"
+	{
+		"ko"		"{green}[IC]{default} Tank 내귀가 {olive}%d{default}일 동안 비활성화됩니다."
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{

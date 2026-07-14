@@ -8,4 +8,12 @@
 	{
 		"zho"		"{lightgreen}因為不超過10特，無法使用AnneHappyPlus武器"
 	}
+	"Text_TraitorStatusEnabled"
+	{
+		"zho"		"{lightgreen}內鬼模式{olive}[{green}開啟{olive}] {lightgreen}槽位{olive}[{green}%d{olive}]"
+	}
+	"Text_TraitorStatusDisabled"
+	{
+		"zho"		"{lightgreen}內鬼模式{olive}[{green}關閉{olive}] {lightgreen}槽位{olive}[{green}%d{olive}]"
+	}
 }

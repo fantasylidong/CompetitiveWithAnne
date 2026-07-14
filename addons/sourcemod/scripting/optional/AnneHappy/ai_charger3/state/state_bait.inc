@@ -102,7 +102,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     * 进行空中速度修正, 避免 Charger 飞过目标
     */
     if (threatType != Threat_Melee && !isOnGround && visible) {
-        airLineCorrected = preserveAirChargeLine(client, target, visible, AIR_CHARGE_LINE_CORR_LERP);
+        airLineCorrected = preserveAirChargeLine(client, target, visible);
     }
 
     // ============================================================
