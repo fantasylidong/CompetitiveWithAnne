@@ -1,26 +1,38 @@
 # Anne 历史源码恢复
 
-已直接恢复每个 Anne 发布系列最后一个刷特源码，不包含中间版本。源码位于
-`addons/sourcemod/scripting/archive/AnneHappy/legacy_versions`：
+历史源码位于 `addons/sourcemod/scripting/archive/AnneHappy/legacy_versions`。恢复时不再使用“版本发布前最后一次源码修改”作为依据，因为那往往已经是下个版本的测试代码。
 
-| 最后版本 | Git 源码快照 | 备注 |
+## 选择方法
+
+1. 取得版本化 `infected_control*.smx` 的 Git blob。
+2. 在 `infected_control.smx` 历史中反查同一 blob 实际作为当前插件运行的区间。
+3. 选择该二进制开始运行时一同提交的源码；若同一二进制多次回退使用，优先第一次编译它且连续运行时间最长的稳定提交。
+4. 使用该提交中的 SourcePawn 编译器和 include 重建，对比文件大小、未压缩镜像大小和 SMX 段数。
+
+| 恢复版本 | 正确源码提交 | 判定依据 |
 | --- | --- | --- |
-| `Anne11-28` | `CompetitiveWithAnne-stable-release-2022-12-01` | 2021 系列在 rebase 时整体导入；这是 Git 中最早可恢复的对应快照。 |
-| `Anne22-12` | `CompetitiveWithAnne-stable-release-2022-12-29` | `716711974` 加入该版本二进制。 |
-| `Anne23-1` | `CompetitiveWithAnne-stable-release-2023-01-14` | 使用 2023 年 1 月发布快照。 |
-| `Anne24-5` | `CompetitiveWithAnne-stable-release-2024-05-04` | 24-5 beta 快照。 |
-| `Anne25-11` | `fb2a834ec` | 25-11 二进制在该提交中加入。 |
+| `Anne11-28` | 无法恢复 | 该二进制只在 2022-12-01 整体导入，Git 历史中从未作为当前 `infected_control.smx` 出现，也没有对应版本源码；已删除之前误归档的 2022-12 源码。 |
+| `Anne22-11` | `3c8980595` | 该提交同时生成对应二进制和源码；句柄问题修复后已重新编译覆盖。 |
+| `Anne22-12` | `7792ac49` | 对应二进制从 2022-12-26 运行到 2022-12-29，随后由 `716711974` 冻结为 22-12。 |
+| `Anne23-1` | `5f7646a8` | 对应稳定二进制从 2024-04-17 连续运行到 2024-05-03，之后测试期间还被回退使用。 |
+| `Anne24-5` | `4d048703` | 对应二进制从 2024-06-05 连续运行到 2024-11-06，2025-08 又被回退使用约两周。 |
+| `Anne25-11` | `42f473b3` | 对应二进制从 2026-01-20 连续运行到 2026-06-01，后续重构测试期间多次回退使用。 |
 
-源码会落在 `legacy_versions/<版本>/infected_control.sp`；模块化的 `Anne25-11` 还恢复了同一提交下的 `infected_control/*.inc`。历史 `.smx` 不保证能用今天的 SourceMod 编译器逐字节重建；编译器版本、include 和 gamedata 都会影响二进制。
+历史编译器重建结果如下。少量大小差异来自当时实际编译命令、调试元数据和路径信息；各版本的 SMX 段数一致。
+
+| 版本 | 历史二进制 | 重建二进制 |
+| --- | ---: | ---: |
+| `Anne22-12` | 25,289 字节 | 25,237 字节 |
+| `Anne23-1` | 26,494 字节 | 26,425 字节 |
+| `Anne24-5` | 29,922 字节 | 29,848 字节 |
+| `Anne25-11` | 69,034 字节 | 68,951 字节 |
 
 ## 22-11 句柄异常
 
-虽然 `Anne22-11` 是中间版本、没有导出，但日志对应的历史源码可以由
-`CompetitiveWithAnne-stable-release-2022-12-01` 查看：
+原始 22-11 源码中，`Timer_PositionSi()` 在所有存活生还者都被控或倒地时返回 `Plugin_Stop`。重复定时器因此自动关闭，但全局变量 `g_hTeleHandle` 没有同步清成 `INVALID_HANDLE`。
 
-- `InitStatus()` 第 339 行检查 `g_hTeleHandle != INVALID_HANDLE`，第 342 行执行 `delete g_hTeleHandle`。
-- `SpawnFirstInfected()` 创建 `CreateTimer(1.0, Timer_PositionSi, _, TIMER_REPEAT)` 并保存到该全局变量。
-- `Timer_PositionSi()` 在 `CheckRushManAndAllPinned()` 返回真时返回 `Plugin_Stop`。重复定时器自关闭后，全局变量没有同步清成 `INVALID_HANDLE`。
-- 下一次 `round_start` 再次进入 `InitStatus()`，旧句柄通过检查并被二次 `delete`，所以 `CloseHandle` 报 `Handle ... is invalid (error 1)`。
+下一次回合清理进入 `InitStatus()` 时会再次删除已经关闭的句柄，导致 `CloseHandle` 报 `Handle ... is invalid (error 1)`。异常发生在清理函数开头，还会中断后续定时器、队列和回合状态重置，因此会影响正常刷特，不只是产生一条日志。
 
-后续提交 `b931361d1`（2022-12-08）把该分支改成 `Plugin_Continue`，避免定时器自关闭；继续使用旧 22-11 二进制会保留这个问题，应切换到恢复出的 22-12、25-11 或当前 `infected_control.smx`。
+修复版让 `Timer_PositionSi()` 保持 `Plugin_Continue`，并在 `InitStatus()` 删除前调用 `IsValidHandle()`。编译产物已经覆盖 `addons/sourcemod/plugins/optional/AnneHappy/infected_control22-11.smx`。后续提交 `b931361d1` 也采用了 `Plugin_Continue`。
+
+正确恢复的 `Anne22-12`、`Anne23-1`、`Anne24-5`、`Anne25-11` 以及另行核对的 `Anne25-10` 都不存在这条自关闭路径。

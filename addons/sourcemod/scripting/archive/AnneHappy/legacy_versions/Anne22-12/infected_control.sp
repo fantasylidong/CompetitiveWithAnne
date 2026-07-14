@@ -67,20 +67,18 @@ public Plugin myinfo =
 
 // Cvars
 ConVar 
-	g_hSpawnDistanceMin, 				//特感最低生成距离
-	g_hSpawnDistanceMax, 				//特感最大生成距离
-	g_hTeleportSi,						//是否打开特感传送 
+	g_hSpawnDistanceMin, 
+	g_hSpawnDistanceMax, 
+	g_hTeleportSi, 
 //	g_hTeleportDistance, 
-	g_hSiLimit, 						//一波特感生成数量上限
-	g_hSiInterval, 						//每波特感生成基础间隔
-	g_hMaxPlayerZombies, 				//设置导演系统的特感数量上限
-	g_hTeleportCheckTime, 				//几秒不被看到后可以传送
-	g_hEnableSIoption, 					//设置生成哪几种特感
-	g_hAllChargerMode,					//是否为全牛模式
-	g_hAutoSpawnTimeControl,			//自动设置增加时间，加到基础间隔之上，这项不打开，增加时间默认为g_hSiInterval/2.打开为特感数量小于g_hSiLimit/3 + 1后再过基准时间开始刷特。
-										//但是这个值大于g_hSiInterval/2也会开始强制刷特
-	g_hAddDamageToSmoker,				//被smoker拉的时候是否对smoker是否进行增伤
-	g_hIgnoreIncappedSurvivorSight, 	//是否忽视掉倒地生还者视线
+	g_hSiLimit, 
+	g_hSiInterval, 
+	g_hMaxPlayerZombies, 
+	g_hTeleportCheckTime, 
+	g_hEnableSIoption, 
+	g_hAllChargerMode,
+	g_hAddDamageToSmoker,
+	g_hIgnoreIncappedSurvivorSight, 
 	g_hVsBossFlowBuffer,
 	g_hAllHunterMode;
 
@@ -89,7 +87,6 @@ int
 	g_iSiLimit, 						//特感数量
 	g_iRushManIndex,					//跑男id
 	g_iWaveTime, 						//Debug时输出这是第几波刷特
-	g_iLastSpawnTime,					//离上次刷特过去了多久
 	g_iTotalSINum = 0,					//总共还活着的特感
 	g_iEnableSIoption = 63,				//可生成的特感种类
 	g_iTeleportCheckTime = 5,   		//特感传送要求的不被看到的次数(1s检查一次)
@@ -117,8 +114,6 @@ float
 bool 
 	g_bTeleportSi, 						//是否开启特感传送检测
 	g_bPickRushMan,						//是否针对跑男
-	g_bShouldCheck,						//是否开启时间检测
-	g_bAutoSpawnTimeControl,			//是否开启自动增加时间
 	g_bAddDamageToSmoker,				//是否对smoker增伤（一般alone模式开启）
 	g_bIgnoreIncappedSurvivorSight,		//是否忽略倒地生还者的视线
 	g_bIsLate = false, 					//text插件是否发送开启刷特命令
@@ -126,11 +121,11 @@ bool
 	g_bTargetSystemAvailable = false;	//目标选择插件是否存在
 // Handle
 Handle 
-	g_hCheckShouldSpawnOrNot = INVALID_HANDLE,	//1s检测一次是否开启刷特进程的维护进程
-	g_hTeleHandle = INVALID_HANDLE, 			//传送sdk Handle
-	g_hRushManNotifyForward = INVALID_HANDLE; 	//检测到跑男提醒Target_limit插件放开单人目标限制
+	g_hTeleHandle = INVALID_HANDLE, 	//传送sdk Handle
+	g_hRushManNotifyForward = INVALID_HANDLE; //检测到跑男提醒Target_limit插件放开单人目标限制
 // ArrayList
 ArrayList 
+	aThreadHandle, 						//刷特线程
 	aTeleportQueue,						//传送队列
 	//aSpawnNavList,						//储存特感生成的navid，用来限制特感不能生成在同一块Navid上
 	aSpawnQueue;						//刷特队列
@@ -183,7 +178,6 @@ public void OnPluginStart()
 	g_hEnableSIoption = CreateConVar("inf_EnableSIoption", "63", "启用生成的特感类型，1 smoker 2 boomer 4 hunter 8 spitter 16 jockey 32 charger,把你想要生成的特感值加起来", CVAR_FLAG, true, 0.0, true, 63.0);
 	g_hAllChargerMode = CreateConVar("inf_AllChargerMode", "0", "是否是全牛模式", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hAllHunterMode = CreateConVar("inf_AllHunterMode", "0", "是否是全猎人模式", CVAR_FLAG, true, 0.0, true, 1.0);
-	g_hAutoSpawnTimeControl = CreateConVar("inf_EnableAutoSpawnTime", "1", "是否开启自动设置增加时间", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hIgnoreIncappedSurvivorSight = CreateConVar("inf_IgnoreIncappedSurvivorSight", "1", "特感传送检测是否被看到的时候是否忽略倒地生还者视线", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hAddDamageToSmoker= CreateConVar("inf_AddDamageToSmoker", "0", "单人模式smoker拉人时是否5倍伤害", CVAR_FLAG, true, 0.0, true, 1.0);
 	//传送会根据这个数值画一个以选定生还者为核心，两边各长inf_TeleportDistance单位距离，高inf_TeleportDistance距离的长方形区域内找复活位置,PS传送最好近一点
@@ -213,11 +207,11 @@ public void OnPluginStart()
 	g_hEnableSIoption.AddChangeHook(ConVarChanged_Cvars);
 	g_hAllChargerMode.AddChangeHook(ConVarChanged_Cvars);
 	g_hAllHunterMode.AddChangeHook(ConVarChanged_Cvars);
-	g_hAutoSpawnTimeControl.AddChangeHook(ConVarChanged_Cvars);
 	g_hAddDamageToSmoker.AddChangeHook(ConVarChanged_Cvars);
 	g_hSiLimit.AddChangeHook(MaxPlayerZombiesChanged_Cvars);
 	
 	// ArrayList
+	aThreadHandle = new ArrayList();
 	aSpawnQueue = new ArrayList();
 	aTeleportQueue = new ArrayList();
 	//aSpawnNavList = new ArrayList();
@@ -299,7 +293,6 @@ void GetCvars()
 	g_iTeleportCheckTime = g_hTeleportCheckTime.IntValue;
 	g_iEnableSIoption = g_hEnableSIoption.IntValue;
 	g_bAddDamageToSmoker = g_hAddDamageToSmoker.BoolValue;
-	g_bAutoSpawnTimeControl = g_hAutoSpawnTimeControl.BoolValue;
 	g_bIgnoreIncappedSurvivorSight = g_hIgnoreIncappedSurvivorSight.BoolValue;
 	if(g_hAllChargerMode.BoolValue){
 		TweakSettings();
@@ -373,15 +366,17 @@ public void InitStatus(){
 		delete g_hTeleHandle;
 		g_hTeleHandle = INVALID_HANDLE;
 	}
-	if (g_hCheckShouldSpawnOrNot != INVALID_HANDLE)
-	{
-		delete g_hCheckShouldSpawnOrNot;
-		g_hCheckShouldSpawnOrNot = INVALID_HANDLE;
-	}
 	g_bPickRushMan = false;
 	g_bIsLate = false;
 	g_iSpawnMaxCount = 0;
 	g_fLastSISpawnTime = 0.0;
+	// 从 ArrayList 末端往前判断删除时钟，如果从前往后，因为 ArrayList 会通过前移后面的索引来填补前面擦除的空位，导致有时钟句柄无法擦除
+	for (int hTimerHandle = aThreadHandle.Length - 1; hTimerHandle >= 0; hTimerHandle--)
+	{
+		KillTimer(aThreadHandle.Get(hTimerHandle));
+		aThreadHandle.Erase(hTimerHandle);
+	}
+	aThreadHandle.Clear();
 	aSpawnQueue.Clear();
 	aTeleportQueue.Clear();
 	//aSpawnNavList.Clear();
@@ -556,8 +551,6 @@ public void OnGameFrame()
 						{
 							aSpawnQueue.Erase(0);
 							g_iQueueIndex -= 1;
-							//刷出来之后要求特感激进进攻
-							BypassAndExecuteCommand("nb_assault");
 						}
 						print_type(iZombieClass, g_fSpawnDistance);
 					}
@@ -812,29 +805,31 @@ public Action SpawnFirstInfected(Handle timer)
 	if (!g_bIsLate)
 	{
 		g_bIsLate = true;
-		//首先触发一次刷特，然后每1s检测
-		g_hCheckShouldSpawnOrNot = CreateTimer(1.0, CheckShouldSpawnOrNot, _, TIMER_REPEAT);
-		SpawnInfectedSettings();
+		if (g_hSiInterval.FloatValue > 9.0)
+		{
+			Handle aSpawnTimer = CreateTimer(g_fSiInterval + 8.0, SpawnNewInfected, _, TIMER_REPEAT);
+			aThreadHandle.Push(aSpawnTimer);
+			TriggerTimer(aSpawnTimer, true);
+		}
+		else
+		{
+			Handle aSpawnTimer = CreateTimer(g_fSiInterval + 4.0, SpawnNewInfected, _, TIMER_REPEAT);
+			aThreadHandle.Push(aSpawnTimer);
+			TriggerTimer(aSpawnTimer, true);
+		}
 		if (g_bTeleportSi)
 		{
 			g_hTeleHandle = CreateTimer(1.0, Timer_PositionSi, _, TIMER_REPEAT);
 		}
 	}
-	return Plugin_Stop;
+	return Plugin_Continue;
 }
+
 
 public Action SpawnNewInfected(Handle timer)
 {
-	SpawnInfectedSettings();
-	return Plugin_Stop;
-}
-
-public void SpawnInfectedSettings()
-{
 	g_fLastSISpawnTime = GetGameTime();
 	g_iSurvivorNum = 0;
-	g_iLastSpawnTime = 0;
-	g_bShouldCheck = true;
 	for (int client = 1; client <= MaxClients; client++)
 	{
 		if (IsValidSurvivor(client) && IsPlayerAlive(client))
@@ -845,6 +840,33 @@ public void SpawnInfectedSettings()
 	}
 	if (g_bIsLate)
 	{
+		if (g_iSiLimit > aThreadHandle.Length)
+		{
+			if (g_hSiInterval.FloatValue > 9.0)
+			{
+				Handle aSpawnTimer = CreateTimer(g_fSiInterval + 8.0, SpawnNewInfected, _, TIMER_REPEAT);
+				aThreadHandle.Push(aSpawnTimer);
+				TriggerTimer(aSpawnTimer, true);
+			}
+			else
+			{
+				Handle aSpawnTimer = CreateTimer(g_fSiInterval + 4.0, SpawnNewInfected, _, TIMER_REPEAT);
+				aThreadHandle.Push(aSpawnTimer);
+				TriggerTimer(aSpawnTimer, true);
+			}
+		}
+		// 其实这个删除没什么用，因为当 aThreadHandle.Length = g_iSiLimit 时，多出来的句柄将不会存入数组
+		else if (g_iSiLimit < aThreadHandle.Length)
+		{
+			for (int iTimerIndex = 0; iTimerIndex < aThreadHandle.Length; iTimerIndex++)
+			{
+				if (timer == aThreadHandle.Get(iTimerIndex))
+				{
+					aThreadHandle.Erase(iTimerIndex);
+					return Plugin_Stop;
+				}
+			}
+		}
 		g_fSpawnDistance = g_fSpawnDistanceMin;
 		/*
 		//优化性能，每波刷新前清除aSpawnNavList队列中的值，但是如果刷特时间很短，这个优化估计起的作用不大
@@ -854,47 +876,24 @@ public void SpawnInfectedSettings()
 		}
 		*/
 
-		g_iSpawnMaxCount += g_iSiLimit;
-		g_iWaveTime++;
-		Debug_Print("开始第%d波刷特", g_iWaveTime);
+		g_iSpawnMaxCount += 1;
+		if (g_iSiLimit == g_iSpawnMaxCount){
+			g_iWaveTime++;
+			Debug_Print("开始第%d波刷特", g_iWaveTime);
+			BypassAndExecuteCommand("nb_assault");
+		}
 			
 		// 当一定时间内刷不出特感，触发时钟使 g_iSpawnMaxCount 超过 g_iSiLimit 值时，最多允许刷出 g_iSiLimit + 2 只特感，防止连续刷 2-3 波的情况
 		if (g_iSiLimit < g_iSpawnMaxCount)
 		{
 
 			g_iSpawnMaxCount = g_iSiLimit;
+			BypassAndExecuteCommand("nb_assault");
 			Debug_Print("当前特感数量达到上限");
 		}
 
 	}
-}
-
-public Action CheckShouldSpawnOrNot(Handle timer)
-{
-	g_iLastSpawnTime ++;
-	if(!g_bShouldCheck) return Plugin_Continue;
-	if(!g_bAutoSpawnTimeControl)
-	{
-		g_bShouldCheck = false;
-		Debug_Print("固定增时系统开始新一波刷特");
-		CreateTimer(g_fSiInterval * 1.5, SpawnNewInfected, _, TIMER_FLAG_NO_MAPCHANGE);
-	}
-	else
-	{
-		if((IsAllKillersDown() && g_iSpawnMaxCount == 0) || (g_iTotalSINum <= (RoundToFloor(g_iSiLimit / 4.0) + 1) && g_iSpawnMaxCount == 0) || (g_iLastSpawnTime >= g_fSiInterval * 1.5))
-		{
-			g_bShouldCheck = false;
-			Debug_Print("自动增时系统开始新一波刷特");
-			CreateTimer(g_fSiInterval, SpawnNewInfected, _, TIMER_FLAG_NO_MAPCHANGE);
-		}
-	}
 	return Plugin_Continue;
-}
-
-//是否存在非克、舌头、口水、胖子存活
-bool IsAllKillersDown()
-{
-    return (g_iSINum[view_as<int>(ZC_CHARGER) - 1] + g_iSINum[view_as<int>(ZC_HUNTER) - 1] + g_iSINum[view_as<int>(ZC_JOCKEY)] - 1) == 0;
 }
 
 stock void BypassAndExecuteCommand(char []strCommand)
