@@ -44,6 +44,7 @@ int
 	g_iReserveModifyFlags;
 
 bool
+	g_bDependenciesReady,
 	g_bLobbyReservationObserved;
 
 Address
@@ -77,8 +78,6 @@ public void OnPluginStart()
 	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"3",	"0=Keep reservation, 1=Unreserve when no active reservation or when active reservation is full, 2=Unreserve when lobby full, 3=Default/no mode: clear stale reservation while empty, but keep player-created lobby matchmaking.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	
-	OnConVarChanged(null, "", "");
-	
 	mp_gamemode.AddChangeHook(OnConVarChanged);
 	z_difficulty.AddChangeHook(OnConVarChanged);
 	g_cvUnreserveType.AddChangeHook(OnConVarChanged);
@@ -88,8 +87,18 @@ public void OnPluginStart()
 	RegAdminCmd("sm_lobby_set", Cmd_Set, ADMFLAG_ROOT);
 }
 
+public void OnAllPluginsLoaded()
+{
+	// Nested shared-plugin dependencies are not fully native-bound during OnPluginStart.
+	g_bDependenciesReady = true;
+	OnConVarChanged(null, "", "");
+}
+
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	if (!g_bDependenciesReady)
+		return;
+
 	mp_gamemode.GetString(g_sGameMode, sizeof(g_sGameMode));
 	z_difficulty.GetString(g_sDifficulty, sizeof(g_sDifficulty));
 	g_iUnreserveType = g_cvUnreserveType.IntValue;
@@ -124,7 +133,7 @@ public void OnConfigsExecuted()
 
 MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
 {
-	if (hParams.IsNull(1))
+	if (!g_bDependenciesReady || hParams.IsNull(1))
 		return MRES_Ignored;
 
 	char sBuffer[256];
