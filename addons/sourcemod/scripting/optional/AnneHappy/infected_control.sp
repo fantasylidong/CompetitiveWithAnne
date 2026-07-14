@@ -55,6 +55,7 @@
 // 常量/宏
 // =========================
 #define CVAR_FLAG                 FCVAR_NOTIFY
+#define TEAM_SPECTATOR            1
 #define TEAM_SURVIVOR             2
 #define TEAM_INFECTED             3
 #define NAV_MESH_HEIGHT           20.0
@@ -552,7 +553,6 @@ static Action Timer_SpawnFirstWave(Handle timer)
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     StopAll();
-    Traitor_OnRoundStart();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
@@ -562,6 +562,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+    Traitor_OnRoundEnd();
     StopAll();
     ClearPathCache();
 }

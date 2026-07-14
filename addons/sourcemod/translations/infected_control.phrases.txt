@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"en"		"{green}[IC]{default} You cannot play traitor again for the next %d rounds."
+		"en"		"{green}[IC]{default} You cannot play traitor again for the next %d SI waves."
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"en"		"{green}[IC]{default} Your traitor dealt {olive}%d{default} survivor damage this life."
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"en"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
+		"en"		"{green}[IC]{default} You cannot play traitor again for %d more SI waves because your last traitor caused no damage."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"en"		"{green}[IC]{default} Otherwise, the role is removed, AI takes over, and traitor is disabled for %d rounds."
+		"en"		"{green}[IC]{default} Otherwise, the role is removed, AI takes over, and traitor is disabled for %d SI waves."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"en"		"{green}[IC]{default} Traitor mode is disabled."
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"en"		"{green}[IC]{default} Only spectators may register for traitor mode."
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"en"		"{green}[IC]{default} Unsupported traitor class."
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"en"		"{green}[IC]{default} Traitor registration is closed for this wave."
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"en"		"{green}[IC]{default} You already registered for one traitor role. Cancel it before choosing another."
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"en"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"en"		"{green}[IC]{default} Your Tank registration is active. Stay in spectator until an AI Tank is ready for takeover."
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"en"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"en"		"Spawn now: %d seconds left"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"en"		"{green}[IC]{default} Tank spawn time has arrived. The plugin will try for {olive}%d{default} seconds to create an AI Tank and transfer control to you."
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"en"		"Waiting for Tank: %d seconds left"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"en"		"{green}[IC]{default} Traitor queue cancelled."
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"en"		"{green}[IC]{default} You joined the Survivor team, so your traitor registration was cancelled."
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"en"		"{green}[IC]{default} Tank took a shared traitor slot. AI now controls your {olive}%s{default}, and the spent daily quota was refunded."
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"en"		"{green}[IC]{default} Tank took a shared traitor slot. Your pending {olive}%s{default} registration was cancelled; no daily quota was charged."
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"en"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"en"		"{green}[IC]{default} Failed to prepare traitor ghost state."
+		"en"		"{green}[IC]{default} Failed to spawn the traitor or transfer control."
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

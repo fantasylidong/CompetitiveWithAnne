@@ -191,7 +191,14 @@ Action Spectate_Cmd(int client, int args)
 		{
 			ForcePlayerSuicide(client);
 		}
-		else if (GetZombieClass(client) == ZC_TANK) return Plugin_Handled;
+		else if (GetZombieClass(client) == ZC_TANK)
+		{
+			if (!IsAnneMode())
+				return Plugin_Handled;
+
+			if (IsPlayerAlive(client) && !IsFakeClient(client))
+				L4D_ReplaceWithBot(client);
+		}
 		ChangeClientTeamEx(client, L4D2Team_Spectator, true);
 	}
 	else
@@ -276,6 +283,24 @@ Action SwapTeams_Cmd(int client, int args)
 bool IsGhost(int client)
 {
 	return !!GetEntProp(client, Prop_Send, "m_isGhost", 1);
+}
+
+bool IsAnneMode()
+{
+	ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+	if (readyCfgName == null)
+		return false;
+
+	char cfgName[128];
+	readyCfgName.GetString(cfgName, sizeof(cfgName));
+	return StrContains(cfgName, "AnneHappy", false) != -1
+		|| StrContains(cfgName, "AnneCoop", false) != -1
+		|| StrContains(cfgName, "AnneRealism", false) != -1
+		|| StrContains(cfgName, "AnneMutation4", false) != -1
+		|| StrContains(cfgName, "AllCharger", false) != -1
+		|| StrContains(cfgName, "1vHunters", false) != -1
+		|| StrContains(cfgName, "WitchParty", false) != -1
+		|| StrContains(cfgName, "Alone", false) != -1;
 }
 
 Action Swap_Cmd(int client, int args)

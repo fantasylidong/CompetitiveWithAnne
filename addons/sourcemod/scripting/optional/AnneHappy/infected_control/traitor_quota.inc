@@ -87,6 +87,40 @@ bool TraitorQuota_Consume(int client, int cost = 1)
     return true;
 }
 
+bool TraitorQuota_Refund(int client, int cost = 1)
+{
+    char auth[TRAITOR_QUOTA_AUTH_LENGTH];
+    int total;
+    int used;
+    if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth)))
+        return false;
+
+    if (cost < 1)
+        cost = 1;
+
+    char table[TRAITOR_QUOTA_TABLE_LENGTH];
+    if (!TraitorQuota_GetTableName(table, sizeof(table)))
+        return false;
+
+    char escAuth[TRAITOR_QUOTA_AUTH_LENGTH * 2 + 1];
+    if (!SQL_EscapeString(g_hTraitorQuotaDb, auth, escAuth, sizeof(escAuth)))
+        return false;
+
+    int now = GetTime();
+    char query[512];
+    FormatEx(query, sizeof(query),
+        "UPDATE `%s` SET used_count = CASE WHEN used_count >= %d THEN used_count - %d ELSE 0 END, `updated_at` = %d WHERE `auth_id` = '%s'",
+        table, cost, cost, now, escAuth);
+
+    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    {
+        TraitorQuota_LogSqlError("refund quota");
+        return false;
+    }
+
+    return true;
+}
+
 bool TraitorQuota_CanUseTank(int client)
 {
     int remaining;
@@ -183,7 +217,7 @@ static void TraitorQuota_Connect()
     gCV.TraitorQuotaDb.GetString(configName, sizeof(configName));
     TrimString(configName);
     if (configName[0] == '\0')
-        strcopy(configName, sizeof(configName), "storage-local");
+        strcopy(configName, sizeof(configName), "default");
 
     if (!SQL_CheckConfig(configName))
     {
@@ -202,8 +236,15 @@ static void TraitorQuota_Connect()
     char ident[16];
     SQL_ReadDriver(g_hTraitorQuotaDb, ident, sizeof(ident));
     g_bTraitorQuotaDbIsMySQL = StrEqual(ident, "mysql", false);
-    if (g_bTraitorQuotaDbIsMySQL)
-        SQL_SetCharset(g_hTraitorQuotaDb, "utf8mb4");
+    if (!g_bTraitorQuotaDbIsMySQL)
+    {
+        LogError("[IC][TRAITOR] quota database \"%s\" must use MySQL; got driver \"%s\".", configName, ident);
+        delete g_hTraitorQuotaDb;
+        g_hTraitorQuotaDb = null;
+        return;
+    }
+
+    SQL_SetCharset(g_hTraitorQuotaDb, "utf8mb4");
 
     TraitorQuota_CreateTable();
 }

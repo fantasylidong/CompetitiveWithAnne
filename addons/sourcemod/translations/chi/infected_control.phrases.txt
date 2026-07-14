@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"chi"		"{green}[IC]{default} 接下来 %d 回合不能再次扮演内鬼。"
+		"chi"		"{green}[IC]{default} 接下来 %d 个特感刷新波次不能再次扮演内鬼。"
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"chi"		"{green}[IC]{default} 你本次扮演内鬼期间造成了 {olive}%d{default} 点生还者伤害。"
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"chi"		"{green}[IC]{default} 你还需禁用 %d 回合才能再次扮演内鬼（上次内鬼没有造成伤害）。"
+		"chi"		"{green}[IC]{default} 还需经过 %d 个特感刷新波次才能再次扮演内鬼（上次内鬼没有造成伤害）。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"chi"		"{green}[IC]{default} 否则会取消内鬼身份并由 AI 接管，接下来 %d 回合不能再次扮演内鬼。"
+		"chi"		"{green}[IC]{default} 否则会取消内鬼身份并由 AI 接管，接下来 %d 个特感刷新波次不能再次扮演内鬼。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"chi"		"{green}[IC]{default} 内鬼模式未启用。"
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"chi"		"{green}[IC]{default} 只有旁观者可以登记内鬼。"
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"chi"		"{green}[IC]{default} 不支持这个内鬼特感类型。"
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"chi"		"{green}[IC]{default} 本波内鬼登记窗口已关闭。"
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"chi"		"{green}[IC]{default} 你已经登记了一种内鬼；如需更换，请先取消当前登记。"
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"chi"		"{green}[IC]{default} 你已进入灵魂状态，请等待下一波特感刷新时间。"
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"chi"		"{green}[IC]{default} Tank 登记已生效。请保持旁观，AI Tank 准备好后会自动转交控制权。"
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"chi"		"{green}[IC]{default} AI 特感大约还有 {olive}%d{default} 秒刷新。"
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"chi"		"立即复活：还剩 %d 秒"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"chi"		"{green}[IC]{default} Tank 刷新时间已到，插件将在 {olive}%d{default} 秒内尝试生成 AI Tank 并转交给你控制。"
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"chi"		"等待 Tank 生成：还剩 %d 秒"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"chi"		"{green}[IC]{default} 已取消内鬼登记。"
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"chi"		"{green}[IC]{default} 你已加入生还者，内鬼登记已取消。"
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"chi"		"{green}[IC]{default} Tank 已占用一个共享内鬼槽位，AI 已接管你的 {olive}%s{default}；本次扣除的日配额已退回。"
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"chi"		"{green}[IC]{default} Tank 已占用一个共享内鬼槽位，你尚未生成的 {olive}%s{default} 登记已取消；本次未扣除日配额。"
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"chi"		"{green}[IC]{default} 你已作为内鬼 {olive}%s{default} 复活。"
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"chi"		"{green}[IC]{default} 准备内鬼灵魂状态失败。"
+		"chi"		"{green}[IC]{default} 内鬼生成或控制权转交失败。"
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

@@ -197,13 +197,13 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_reflect 1` 在 `level5` 里对应 `"z_lunge_reflect" "1"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `1`。
 
-插件会把各档配置里出现过的所有 ConVar 作为受控范围，首次接管时记录当前服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限/音理独有参数不会在切回专家、困难、普通或简单后残留。
+插件会把各档配置里出现过的所有 ConVar 作为受控范围，在 `OnConfigsExecuted` 后首次接管时记录当前模式已经应用完成的服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限/音理独有参数不会在切回专家、困难、普通或简单后残留，也不会把 AnneHappy 的基准硬套到 1vHunters、Alone 或 WitchParty。
 
 | 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Hunter | `z_pounce_crouch_delay` | patch 已运行时置 0 | 0 | 0 | 显式锁定无蹲伏等待 |
 | Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 默认 0.1 / 0.1 | 0 / 0 | 未合并 | 极限档不覆盖，保持默认 `0.1` |
-| Hunter | `z_lunge_reflect` / `z_lunge_up` | 未在极限档设置 | 1 / 150 | 1 / 150 | 保留反射与上抬力 |
+| Hunter | `z_lunge_reflect` / `z_lunge_up` | 游戏默认 0 / 200 | 1 / 150 | 1 / 150 | 极限档启用墙面反射并降低上抬力；退出该档后恢复当前模式基线 |
 | Hunter | `z_hunter_lunge_distance` | 基础 5000 | 99999 | 99999 | 极限档允许超远飞扑判定 |
 | Hunter | `hunter_leap_away_give_up_range` | 未在极限档设置 | 99999 | 99999 | 不轻易放弃远距离 leap away 逻辑 |
 | Hunter | `ai_hunter_angle_mean` / `ai_hunter_angle_std` | 默认 10 / 极限 20 | 30 / 10 | 30 / 10 | 侧飞角更偏，随机波动更收束 |

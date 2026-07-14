@@ -155,7 +155,7 @@ stock Action StateCharging_OnUpdate(int client, int& buttons, float vel[3], floa
         );
 
         if (canPreserveAirLine &&
-            preserveAirChargeLine(client, target, true)
+            preserveAirChargeLine(client, target, true, buttons, ang)
         ) {
             return Plugin_Changed;
         }
@@ -253,7 +253,7 @@ stock Action StateCharging_OnUpdate(int client, int& buttons, float vel[3], floa
     if (!forceChargeNow && dist > commitDist) {
         static Action finalBhopRes;
         // performFinalBhopBeforeCharge 成功返回 Plugin_Changed 然后立即结束这一帧的处理, 失败返回 Plugin_Continue
-        finalBhopRes = performFinalBhopBeforeCharge(client, pos, targetPos, targetAbsVel, dist, commitDist, speed, recentlyVisible, buttons);
+        finalBhopRes = performFinalBhopBeforeCharge(client, pos, targetPos, targetAbsVel, dist, commitDist, speed, recentlyVisible, buttons, ang);
         if (finalBhopRes != Plugin_Continue)
             return finalBhopRes;
 
@@ -566,7 +566,7 @@ stock bool calculateChargeAimPosition(const float pos[3], const float targetPos[
 }
 
 stock Action performFinalBhopBeforeCharge(int client, const float pos[3], const float targetPos[3], const float targetVel[3],
-    float dist, float commitDist, float speed, bool visible, int& buttons
+    float dist, float commitDist, float speed, bool visible, int& buttons, float ang[3]
 ) {
     if (!visible || !allowToBhop(client))
         return Plugin_Continue;
@@ -644,13 +644,14 @@ stock Action performFinalBhopBeforeCharge(int client, const float pos[3], const 
         return Plugin_Continue;
 
     // 如果最后一跳的落点安全, 执行连跳
-    buttons |= IN_DUCK;
-    buttons |= IN_JUMP;
-
-    TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, dir);
+    setForwardBhopInput(buttons, true);
+    buttons &= ~(IN_ATTACK | IN_ATTACK2);
+    alignChargerFacingWithMovement(client, dir, ang);
+    TeleportEntity(client, NULL_VECTOR, ang, dir);
     g_AiChargers[client].m_bBhopBeforeCharge = true;
     g_AiChargers[client].m_flFinalBhopStartTime = GetGameTime();
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(dir);
+    g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
 
     stateLog.debugAll(
         "Charger (%N) performed final bunnyhop before charge, dist %.2f, commitDist %.2f, requiredSpeed %.2f, maxHopSpeed %.2f",

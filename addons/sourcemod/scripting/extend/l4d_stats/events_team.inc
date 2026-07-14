@@ -13,6 +13,16 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 		return;
 
 	CampaignOver = true;
+	if (g_brpgAvailable && !L4D_RPG_GetGlobalValue(INDEX_VALID))
+	{
+		StopMapTiming();
+		return;
+	}
+	if (!IsNormalMode() && !IsThisRoundValid())
+	{
+		StopMapTiming();
+		return;
+	}
 
 	StopMapTiming();
 	new Float:TotalTime = GetEngineTime() - MapTimingStartTime;
@@ -65,25 +75,18 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 	}
 
 	if((AnneMultiPlayerMode() || SinglePlayerMode())){
-		if((g_brpgAvailable && !L4D_RPG_GetGlobalValue(INDEX_VALID)) || !IsThisRoundValid())
+		int inf= GetAnneInfectedNumber();
+		if(inf <= 4)
 		{
-			Score = RoundToFloor(view_as<float>(Score) * 0.4);
+			if(AnneMultiPlayerMode())
+				Score = RoundToFloor(Score * (1 - (4 - inf) * 0.2));
 		}
-		else
-		{
-			int inf= GetAnneInfectedNumber();
-			if(inf <= 4)
-			{
-				if(AnneMultiPlayerMode())
-					Score = RoundToFloor(Score * (1 - (4 - inf) * 0.2));
-			}
-			else if(inf > 4 && inf <= 6)
-				Score = RoundToFloor(Score + Score * (inf - 4) * 0.1);
-			else if(inf > 6 && inf <= 8)
-				Score = RoundToFloor(Score + Score * (inf - 4) * 0.2);
-			else if(inf>8)
-				Score = RoundToFloor(Score + Score * (inf-4)*0.3);
-		}	
+		else if(inf > 4 && inf <= 6)
+			Score = RoundToFloor(Score + Score * (inf - 4) * 0.1);
+		else if(inf > 6 && inf <= 8)
+			Score = RoundToFloor(Score + Score * (inf - 4) * 0.2);
+		else if(inf>8)
+			Score = RoundToFloor(Score + Score * (inf-4)*0.3);
 	}
 
 	if(IsAboveFourPeople())

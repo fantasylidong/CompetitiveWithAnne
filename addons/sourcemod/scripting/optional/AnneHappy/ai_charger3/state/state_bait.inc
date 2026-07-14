@@ -102,7 +102,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     * 进行空中速度修正, 避免 Charger 飞过目标
     */
     if (threatType != Threat_Melee && !isOnGround && visible) {
-        airLineCorrected = preserveAirChargeLine(client, target, visible);
+        airLineCorrected = preserveAirChargeLine(client, target, visible, buttons, ang);
     }
 
     // ============================================================
@@ -110,7 +110,10 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     // 距离手持近战目标距离小于 melee_range + g_cvMeleeBaitZoneMaxRange.FloatValue
     // 这时候先阻止冲锋, 并尝试右键挥拳, 若后续满足冲锋条件, 转换到冲锋状态
     // ============================================================
-    buttons |= IN_ATTACK2;
+    if (isOnGround)
+        buttons |= IN_ATTACK2;
+    else
+        buttons &= ~(IN_ATTACK | IN_ATTACK2);
     setChargerAbilityCooldown(client, 1.0);
 
     // ============================================================
@@ -169,7 +172,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     static Action resAction;
     if (threatType == Threat_Melee) {
         // handleMeleeThreat 的返回值为 Plugin_Changed 表示执行了后跳动作, 需要结束这一帧
-        resAction = handleMeleeThreat(client, target, dist, visible, isWatching, watchers, buttons);
+        resAction = handleMeleeThreat(client, target, dist, visible, isWatching, watchers, buttons, ang);
         if (resAction != Plugin_Continue)
             return resAction;
         /*
@@ -178,7 +181,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
         * 若向后移动方向不安全, 且技能就绪, 那么直接冲锋
         */
         static Action distanceControlResult;
-        distanceControlResult = maintainMeleeBaitDistance(client, target, dist, visible, vel, buttons);
+        distanceControlResult = maintainMeleeBaitDistance(client, target, dist, visible, vel, buttons, ang);
         if (distanceControlResult != Plugin_Continue)
             return distanceControlResult;
     } else if (threatType == Threat_Shotgun) {
@@ -210,7 +213,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
 #define BAIT_RETREAT_BACK       1
 #define BAIT_RETREAT_FORWARD    -1
 
-Action maintainMeleeBaitDistance(int client, int target, float dist, bool visible, float cmdVel[3], int& buttons) {
+Action maintainMeleeBaitDistance(int client, int target, float dist, bool visible, float cmdVel[3], int& buttons, float ang[3]) {
     static float pos[3], targetPos[3], currentVel[3], awayDir[3];
     GetClientAbsOrigin(client, pos);
     GetClientAbsOrigin(target, targetPos);
@@ -229,13 +232,14 @@ Action maintainMeleeBaitDistance(int client, int target, float dist, bool visibl
 
     // 后跳起飞后保留远离目标的动量, 不再被下一帧的距离控制清零
     if (!IsClientOnGround(client)) {
-        // 先清除原生的移动输入
-        buttons &= ~(IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT);
+        // 空中只保留朝速度方向的前进姿态，不重复发送跳跃和蹲伏。
+        setForwardBhopInput(buttons, false);
         cmdVel[0] = 0.0;
         cmdVel[1] = 0.0;
 
         // 如果 BhopType 是 BhopType_BaitRetreat, 且当前的 Charger 后跳速度分量有效, 那么说明在空中的这次连跳确实由后跳发起, 保持后跳
         if (g_AiChargers[client].m_BhopType == BhopType_BaitRetreat && currentAwaySpeed > 1.0) {
+            alignChargerFacingWithMovement(client, currentVel, ang);
             return Plugin_Changed;
         }
 
@@ -302,6 +306,7 @@ Action maintainMeleeBaitDistance(int client, int target, float dist, bool visibl
     cmdVel[0] = 0.0;
     cmdVel[1] = 0.0;
     desiredVel[2] = currentVel[2];
+    alignChargerFacingWithMovement(client, desiredVel, ang);
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, desiredVel);
 
     g_AiChargers[client].m_BhopType = BhopType_None;
@@ -371,7 +376,7 @@ bool shouldExitBaitState(int client, int target, float dist, bool visible, Targe
 * @param watchers 正在看着 Charger 的人数
 * @return void
 **/
-Action handleMeleeThreat(int client, int target, float dist, bool visible, bool isWatching, int watchers, int& buttons) {
+Action handleMeleeThreat(int client, int target, float dist, bool visible, bool isWatching, int watchers, int& buttons, float ang[3]) {
     static int health;
     health = GetEntProp(client, Prop_Data, "m_iHealth");
 
@@ -424,7 +429,7 @@ Action handleMeleeThreat(int client, int target, float dist, bool visible, bool 
     // 无法冲锋时, 目标主动进入 baitZoneMin 或已经过近才尝试后跳
     if (targetPressing || emergencyClose) {
         static Action backhopResult;
-        backhopResult = performBackwardBhop(client, target, visible, buttons);
+        backhopResult = performBackwardBhop(client, target, visible, buttons, ang);
         if (backhopResult != Plugin_Continue)
             return backhopResult;
     }
@@ -471,7 +476,7 @@ bool shouldChargeInMeleeBait(int client, int target, int health, bool visible, b
 * @param visible 是否可见目标
 * @return Action
 **/
-Action performBackwardBhop(int client, int target, bool visible, int& buttons) {
+Action performBackwardBhop(int client, int target, bool visible, int& buttons, float ang[3]) {
     if (!IsClientOnGround(client) || !allowToBhop(client))
         return Plugin_Continue;
 
@@ -536,9 +541,11 @@ Action performBackwardBhop(int client, int target, bool visible, int& buttons) {
     g_AiChargers[client].m_flLastHopSpeed = backSpeed;
     ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
     g_AiChargers[client].m_AirStrafe.init();
-    buttons |= IN_DUCK;
-    buttons |= IN_JUMP;
-    TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vBack);
+    setForwardBhopInput(buttons, true);
+    buttons &= ~(IN_ATTACK | IN_ATTACK2);
+    alignChargerFacingWithMovement(client, vBack, ang);
+    TeleportEntity(client, NULL_VECTOR, ang, vBack);
+    g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
     return Plugin_Changed;
 }
 

@@ -33,3 +33,8 @@
 - `cwm1_intro` hittable/clipwall 수정과 여러 모드의 `mapinfo.txt`를 동기화했습니다.
 - Rust 서버 브라우저 도구와 Docker 배포 README를 이 저장소에서 제거했습니다. 관련 워크플로는 외부 도구/웹 경로에서 유지합니다.
 - `basevotes.smx` 위치, SourceMod 설정, 데이터베이스 필드, 여러 문서를 갱신해 플러그인 팩 구조를 더 깔끔하게 정리했습니다.
+
+### 2026년 7월 14일 동적 난이도 긴급 수정
+- 하드코딩된 `level0`가 1vHunters, Alone, WitchParty 등 모드별 값을 덮어쓰던 문제를 수정했습니다. 이제 각 모드 설정 적용이 끝난 뒤 실제 CVar 기준값을 기록하고 난이도 전환, 맵 변경, 플러그인 언로드 시 복원합니다.
+- 낮은 난이도에 잘못 추가된 `z_lunge_up 0`, `z_lunge_interval 0.08`, `z_lunge_cooldown 0` 등을 제거해 기존 `ai_hunter_2`에서 Hunter가 제자리에서 덮치거나 반복해서 웅크리던 문제를 수정했습니다. Jockey, Tank, Boomer 값이 의도치 않게 덮어써지는 문제도 방지합니다.
+- 극한 및 음리 난이도의 명시적 강화값은 유지하며, 해당 난이도를 벗어나면 현재 모드에서 기록한 기준값으로 복원합니다.

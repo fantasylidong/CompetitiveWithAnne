@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"vi"		"{green}[IC]{default} Bạn không thể làm traitor trong %d vòng tiếp theo."
+		"vi"		"{green}[IC]{default} Bạn không thể làm traitor trong %d đợt SI tiếp theo."
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"vi"		"{green}[IC]{default} Lần chơi traitor này bạn đã gây {olive}%d{default} sát thương lên người sống sót."
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"vi"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
+		"vi"		"{green}[IC]{default} Bạn phải chờ thêm %d đợt SI mới có thể làm traitor vì lần trước không gây sát thương."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"vi"		"{green}[IC]{default} Nếu không, vai trò sẽ bị hủy, AI tiếp quản và traitor bị vô hiệu hóa trong %d vòng."
+		"vi"		"{green}[IC]{default} Nếu không, vai trò sẽ bị hủy, AI tiếp quản và traitor bị vô hiệu hóa trong %d đợt SI."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"vi"		"{green}[IC]{default} Traitor mode is disabled."
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"vi"		"{green}[IC]{default} Chỉ khán giả mới có thể đăng ký chế độ nội gián."
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"vi"		"{green}[IC]{default} Unsupported traitor class."
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"vi"		"{green}[IC]{default} Traitor registration is closed for this wave."
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"vi"		"{green}[IC]{default} Bạn đã đăng ký một loại nội gián. Hãy hủy đăng ký hiện tại trước khi chọn loại khác."
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"vi"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"vi"		"{green}[IC]{default} Đăng ký Tank đã có hiệu lực. Hãy tiếp tục quan sát cho đến khi AI Tank sẵn sàng chuyển quyền điều khiển cho bạn."
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"vi"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"vi"		"Spawn now: %d seconds left"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"vi"		"{green}[IC]{default} Đã đến lúc Tank xuất hiện. Plugin sẽ thử tạo AI Tank và chuyển quyền điều khiển cho bạn trong {olive}%d{default} giây."
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"vi"		"Đang chờ Tank: còn %d giây"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"vi"		"{green}[IC]{default} Traitor queue cancelled."
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"vi"		"{green}[IC]{default} Bạn đã tham gia đội Sống sót, vì vậy đăng ký nội gián đã bị hủy."
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"vi"		"{green}[IC]{default} Tank đã chiếm một ô nội gián dùng chung. AI đã tiếp quản {olive}%s{default} của bạn và hạn ngạch ngày đã dùng được hoàn lại."
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"vi"		"{green}[IC]{default} Tank đã chiếm một ô nội gián dùng chung. Đăng ký {olive}%s{default} chưa xuất hiện của bạn đã bị hủy và không trừ hạn ngạch ngày."
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"vi"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"vi"		"{green}[IC]{default} Failed to prepare traitor ghost state."
+		"vi"		"{green}[IC]{default} Không thể tạo nội gián hoặc chuyển quyền điều khiển."
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

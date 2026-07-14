@@ -26,6 +26,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <colors>
+#include <left4dhooks>
 #undef REQUIRE_PLUGIN
 #include <veterans>
 #include <updater>
@@ -38,6 +39,10 @@
 #define DONATE_CONFIG_FILE "configs/anne_donate.cfg"
 #define DONATE_MAX_OPTIONS 16
 #define JOIN_MOTD_DELAY 4.0
+#define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
+#define TEAM_SPECTATOR 1
+#define TEAM_INFECTED 3
+#define ZC_TANK 8
 
 public Plugin myinfo =
 {
@@ -143,6 +148,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_restartmap", RestartMap, ADMFLAG_ROOT, "restarts map");
 	HookEvent("player_disconnect", PlayerDisconnect_Event, EventHookMode_Pre);
 	HookEvent("player_team", Event_PlayerTeam);
+	CreateTimer(ANNE_INFECTED_ENFORCE_INTERVAL, Timer_EnforceAnneInfectedTeam, _, TIMER_REPEAT);
 	LoadDonateConfig();
 }
 
@@ -378,32 +384,44 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 	int target = GetClientOfUserId(client);
 	int team = GetEventInt(event, "team");
 	bool disconnect = GetEventBool(event, "disconnect");
-	if (IsValidPlayer(target) && !disconnect && team == 3 && !hCvarEnableInf.BoolValue)
+	if (IsValidPlayer(target) && !disconnect && team == TEAM_INFECTED && !hCvarEnableInf.BoolValue)
 	{
-		if(!IsFakeClient(target))
-		{
-			CreateTimer(0.5, Timer_CheckDetay2, target, TIMER_FLAG_NO_MAPCHANGE);
-		}else{
+		if(IsFakeClient(target))
 			return Plugin_Handled;
-		}
+
+		if(!IsProtectedInfectedControlTraitor(target))
+			MoveClientToSpectator(target, true);
+
+		// Keep a short fallback in case the engine rejects a team change while
+		// it is still finishing the automatic versus-team assignment.
+		CreateTimer(0.1, Timer_CheckDetay2, GetClientUserId(target), TIMER_FLAG_NO_MAPCHANGE);
 	}
 	//CreateTimer(0.1, Timer_MobChange, 0, TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Continue;
 }
 
-public Action Timer_CheckDetay2(Handle Timer, int client)
+public Action Timer_CheckDetay2(Handle Timer, int userid)
 {
-	if(IsProtectedInfectedControlTraitor(client))
-		return Plugin_Continue;
+	int client = GetClientOfUserId(userid);
+	if(client <= 0)
+		return Plugin_Stop;
 
-	MoveClientToSpectator(client);
-	return Plugin_Continue;
+	if(IsProtectedInfectedControlTraitor(client))
+		return Plugin_Stop;
+
+	if(IsValidPlayerInTeam(client, TEAM_INFECTED))
+		MoveClientToSpectator(client, true);
+	return Plugin_Stop;
 }
 
-public Action Timer_MoveClientToSpectator(Handle Timer, int client)
+public Action Timer_MoveClientToSpectator(Handle Timer, int userid)
 {
+	int client = GetClientOfUserId(userid);
+	if(client <= 0)
+		return Plugin_Stop;
+
 	MoveClientToSpectator(client);
-	return Plugin_Continue;
+	return Plugin_Stop;
 }
 
 
@@ -412,7 +430,7 @@ public void OnClientPutInServer(int client)
 	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && !hCvarEnableInf.BoolValue)
 	{
 		//ServerCommand("sm_addbot2");
-		CreateTimer(3.0, Timer_CheckDetay, client, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(3.0, Timer_CheckDetay, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 		g_bEnableGetbotCommand[client] = true;
 	}
 
@@ -460,15 +478,40 @@ public void OnClientDisconnect(int client)
 	}
 }
 
-public Action Timer_CheckDetay(Handle Timer, int client)
+public Action Timer_CheckDetay(Handle Timer, int userid)
 {
+	int client = GetClientOfUserId(userid);
+	if(client <= 0)
+		return Plugin_Stop;
+
 	if(IsProtectedInfectedControlTraitor(client))
+		return Plugin_Stop;
+
+	if(IsValidPlayerInTeam(client, TEAM_INFECTED))
+	{
+		MoveClientToSpectator(client, true);
+	}
+	return Plugin_Stop;
+}
+
+public Action Timer_EnforceAnneInfectedTeam(Handle timer)
+{
+	if(!IsAnneMode() || hCvarEnableInf.BoolValue)
 		return Plugin_Continue;
 
-	if(IsValidPlayerInTeam(client, 3))
+	for(int client = 1; client <= MaxClients; client++)
 	{
-		MoveClientToSpectator(client);
+		if(!IsValidClient(client)
+			|| IsFakeClient(client)
+			|| GetClientTeam(client) != TEAM_INFECTED
+			|| IsProtectedInfectedControlTraitor(client))
+		{
+			continue;
+		}
+
+		MoveClientToSpectator(client, true, true);
 	}
+
 	return Plugin_Continue;
 }
 
@@ -507,15 +550,53 @@ public Action TurnClientToSurvivors(int client, int args)
 
 public Action AFKTurnClientToSpe(int client, int args) 
 {
+	if(!IsValidClient(client))
+		return Plugin_Handled;
+
 	if(!IsPinned(client))
-		CreateTimer(1.0, Timer_MoveClientToSpectator, client, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(1.0, Timer_MoveClientToSpectator, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Handled;
 }
 
-void MoveClientToSpectator(int client)
+void MoveClientToSpectator(int client, bool forcedTeamCleanup = false, bool preserveControlledInfected = false)
 {
-	if(IsValidClient(client))
-		ChangeClientTeam(client, 1);
+	if(!IsValidClient(client))
+		return;
+
+	if(GetClientTeam(client) == TEAM_INFECTED && IsPlayerAlive(client))
+	{
+		int zombieClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+		bool isTank = zombieClass == ZC_TANK;
+		bool isMaterialized = !GetEntProp(client, Prop_Send, "m_isGhost", 1);
+
+		if(isTank && !forcedTeamCleanup && !IsAnneMode())
+		{
+			return;
+		}
+
+		if(isTank || (preserveControlledInfected && isMaterialized))
+			L4D_ReplaceWithBot(client);
+	}
+
+	ChangeClientTeam(client, TEAM_SPECTATOR);
+}
+
+bool IsAnneMode()
+{
+	ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+	if(readyCfgName == null)
+		return false;
+
+	char cfgName[128];
+	readyCfgName.GetString(cfgName, sizeof(cfgName));
+	return StrContains(cfgName, "AnneHappy", false) != -1
+		|| StrContains(cfgName, "AnneCoop", false) != -1
+		|| StrContains(cfgName, "AnneRealism", false) != -1
+		|| StrContains(cfgName, "AnneMutation4", false) != -1
+		|| StrContains(cfgName, "AllCharger", false) != -1
+		|| StrContains(cfgName, "1vHunters", false) != -1
+		|| StrContains(cfgName, "WitchParty", false) != -1
+		|| StrContains(cfgName, "Alone", false) != -1;
 }
 
 bool IsProtectedInfectedControlTraitor(int client)

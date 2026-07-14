@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"zho"		"{green}[IC]{default} 接下來 %d 回合不能再次扮演內鬼。"
+		"zho"		"{green}[IC]{default} 接下來 %d 個特感刷新波次不能再次扮演內鬼。"
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"zho"		"{green}[IC]{default} 你本次扮演內鬼期間造成了 {olive}%d{default} 點生還者傷害。"
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"zho"		"{green}[IC]{default} 你還需禁用 %d 回合才能再次扮演內鬼（上次內鬼沒有造成傷害）。"
+		"zho"		"{green}[IC]{default} 還需經過 %d 個特感刷新波次才能再次扮演內鬼（上次內鬼沒有造成傷害）。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"zho"		"{green}[IC]{default} 否則會取消內鬼身份並由 AI 接管，接下來 %d 回合不能再次扮演內鬼。"
+		"zho"		"{green}[IC]{default} 否則會取消內鬼身份並由 AI 接管，接下來 %d 個特感刷新波次不能再次扮演內鬼。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"zho"		"{green}[IC]{default} 內鬼模式未啟用。"
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"zho"		"{green}[IC]{default} 只有旁觀者可以登記內鬼。"
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"zho"		"{green}[IC]{default} 不支援這個內鬼特感類型。"
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"zho"		"{green}[IC]{default} 本波內鬼登記視窗已關閉。"
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"zho"		"{green}[IC]{default} 你已經登記了一種內鬼；如需更換，請先取消目前登記。"
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"zho"		"{green}[IC]{default} 你已進入靈魂狀態，請等待下一波特感刷新時間。"
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"zho"		"{green}[IC]{default} Tank 登記已生效。請保持旁觀，AI Tank 準備好後會自動轉交控制權。"
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"zho"		"{green}[IC]{default} AI 特感大約還有 {olive}%d{default} 秒刷新。"
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"zho"		"立即復活：還剩 %d 秒"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"zho"		"{green}[IC]{default} Tank 刷新時間已到，插件將在 {olive}%d{default} 秒內嘗試生成 AI Tank 並轉交給你控制。"
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"zho"		"等待 Tank 生成：還剩 %d 秒"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"zho"		"{green}[IC]{default} 已取消內鬼登記。"
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"zho"		"{green}[IC]{default} 你已加入生還者，內鬼登記已取消。"
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"zho"		"{green}[IC]{default} Tank 已佔用一個共享內鬼槽位，AI 已接管你的 {olive}%s{default}；本次扣除的每日配額已退回。"
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"zho"		"{green}[IC]{default} Tank 已佔用一個共享內鬼槽位，你尚未生成的 {olive}%s{default} 登記已取消；本次未扣除每日配額。"
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"zho"		"{green}[IC]{default} 你已作為內鬼 {olive}%s{default} 復活。"
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"zho"		"{green}[IC]{default} 準備內鬼靈魂狀態失敗。"
+		"zho"		"{green}[IC]{default} 內鬼生成或控制權轉交失敗。"
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

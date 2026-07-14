@@ -532,7 +532,7 @@ enum struct Config
         );
         this.TraitorMaxSlots = CreateConVar(
             "inf_traitor_max_slots", "1",
-            "Max pending/alive traitor players; runtime upper bound follows l4d_infected_limit.",
+            "Shared max active/reserved traitor slots; a waiting Tank starts using one only after takeover.",
             CVAR_FLAG, true, 0.0, true, float(MAXPLAYERS)
         );
         this.TraitorAdminLimit = CreateConVar(
@@ -551,8 +551,8 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 10000.0
         );
         this.TraitorQuotaDb = CreateConVar(
-            "inf_traitor_quota_db", "storage-local",
-            "databases.cfg section for traitor daily quota storage.",
+            "inf_traitor_quota_db", "default",
+            "MySQL databases.cfg section for shared traitor daily quota storage.",
             CVAR_FLAG
         );
         this.TraitorQuotaTable = CreateConVar(

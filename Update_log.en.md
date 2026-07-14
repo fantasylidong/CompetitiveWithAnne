@@ -33,3 +33,8 @@
 - Synced `cwm1_intro` hittable/clipwall fixes and updated `mapinfo.txt` for multiple modes.
 - Removed the Rust server-browser tool and Docker deployment README from this repo; those workflows are now maintained through external tooling/web paths.
 - Updated the `basevotes.smx` location, SourceMod configs, database fields, and several docs to keep the plugin pack structure cleaner.
+
+### July 14, 2026 Dynamic Difficulty Hotfix
+- Fixed the hard-coded `level0` profile overriding mode-specific values in 1vHunters, Alone, WitchParty, and other modes. The plugin now captures each mode's effective CVar baseline after configs execute and restores it before tier changes, map changes, and unloads.
+- Removed invalid low-tier reset values such as `z_lunge_up 0`, `z_lunge_interval 0.08`, and `z_lunge_cooldown 0`, fixing Hunters repeatedly crouching or pouncing in place with the legacy `ai_hunter_2` plugin and preventing unintended Jockey, Tank, and Boomer overrides.
+- Extreme and Neri retain their explicit overrides; leaving those tiers now restores the active mode's captured baseline.

@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"ko"		"{green}[IC]{default} 다음 %d라운드 동안 다시 내귀가 될 수 없습니다."
+		"ko"		"{green}[IC]{default} 다음 %d번의 특수 감염자 웨이브 동안 다시 내귀가 될 수 없습니다."
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"ko"		"{green}[IC]{default} 이번 내귀 플레이에서 생존자에게 {olive}%d{default}의 피해를 입혔습니다."
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"ko"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
+		"ko"		"{green}[IC]{default} 지난 내귀 플레이에서 피해를 주지 않아 특수 감염자 웨이브가 %d번 더 지나야 다시 내귀가 될 수 있습니다."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"ko"		"{green}[IC]{default} 그렇지 않으면 역할이 해제되고 AI가 이어받으며, 다음 %d라운드 동안 내귀가 될 수 없습니다."
+		"ko"		"{green}[IC]{default} 그렇지 않으면 역할이 해제되고 AI가 이어받으며, 다음 %d번의 특수 감염자 웨이브 동안 내귀가 될 수 없습니다."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"ko"		"{green}[IC]{default} Traitor mode is disabled."
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"ko"		"{green}[IC]{default} 관전자만 배신자 모드에 등록할 수 있습니다."
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"ko"		"{green}[IC]{default} Unsupported traitor class."
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"ko"		"{green}[IC]{default} Traitor registration is closed for this wave."
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"ko"		"{green}[IC]{default} 이미 한 종류의 배신자로 등록했습니다. 변경하려면 현재 등록을 먼저 취소하세요."
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"ko"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"ko"		"{green}[IC]{default} Tank 등록이 활성화되었습니다. AI Tank가 준비되어 조종권을 받을 때까지 관전하세요."
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"ko"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"ko"		"Spawn now: %d seconds left"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"ko"		"{green}[IC]{default} Tank 생성 시점입니다. {olive}%d{default}초 동안 AI Tank 생성과 조종권 이전을 시도합니다."
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"ko"		"Tank 생성 대기: %d초 남음"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"ko"		"{green}[IC]{default} Traitor queue cancelled."
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"ko"		"{green}[IC]{default} 생존자 팀에 합류하여 배신자 등록이 취소되었습니다."
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"ko"		"{green}[IC]{default} Tank가 공유 배신자 슬롯을 사용했습니다. AI가 당신의 {olive}%s{default}를 인계받았고 사용된 일일 할당량은 반환되었습니다."
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"ko"		"{green}[IC]{default} Tank가 공유 배신자 슬롯을 사용했습니다. 아직 생성되지 않은 {olive}%s{default} 등록은 취소되었으며 일일 할당량은 차감되지 않았습니다."
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"ko"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"ko"		"{green}[IC]{default} Failed to prepare traitor ghost state."
+		"ko"		"{green}[IC]{default} 배신자 생성 또는 조종권 이전에 실패했습니다."
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

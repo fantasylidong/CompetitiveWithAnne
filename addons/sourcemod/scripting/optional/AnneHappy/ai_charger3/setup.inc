@@ -70,8 +70,9 @@ ConVar
 	g_cvMeleeBaitZoneMaxRange,	// 目标拿着近战时, 近战博弈区的最大范围, melee_range + 这个值
 	g_cvAirVecModifyMinDegree,	// 在空中 charger 到目标方向向量与速度向量夹角超过这个值进行速度修正
 	g_cvAirVecModifyMaxDegree,	// 在空中 charger 到目标方向向量与速度向量夹角超过这个值放弃修正
-	g_cvAirVecModifyInterval,	// 空中速度修正间隔
+	g_cvAirVecModifyInterval,	// 空中平滑转向达到配置插值强度的基准时间
 	g_cvAirVecModifyLerp,		// 空中速度修正转向插值因子
+	g_cvAirTurnSpeedLoss,		// 空中实际转向 90 度时损失的水平速度比例
 	g_cvBaitMaxDuration,		// charger 进入博弈状态的最长时间
 	g_cvProbChargeChkDur,		// 概率冲锋时的检测间隔
 	g_cvProbChargeProb,			// 概率冲锋的概率到达这个数值可冲锋

@@ -6,15 +6,13 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define PLUGIN_VERSION "2026.05.18.1"
+#define PLUGIN_VERSION "2026.07.14.1"
 #define TEAM_SURVIVOR 2
 #define DEFAULT_CONFIG_PATH "configs/AnneHappy/dynamic_ai_difficulty.cfg"
 #define DEFAULT_THRESHOLD_DB_CONFIG "l4dstats"
 #define DEFAULT_THRESHOLD_TABLE "ai_dynamic_ppm_thresholds"
 #define MAX_AUTO_DIFFICULTY_LEVEL 5
 #define MAX_DIFFICULTY_LEVEL 6
-#define BASE_DIFFICULTY_LEVEL 0
-#define BASE_DIFFICULTY_KEY "level0"
 
 ConVar g_cvEnable;
 ConVar g_cvCheckInterval;
@@ -44,6 +42,8 @@ Database g_hThresholdDb = null;
 Handle g_hTimer = null;
 Handle g_hThresholdDbReconnectTimer = null;
 Handle g_hThresholdDbKeepAliveTimer = null;
+ArrayList g_aControlledCvars = null;
+StringMap g_mControlledCvarBaselines = null;
 float g_fNextCheckAt = 0.0;
 float g_fNextEnforceAt = 0.0;
 float g_fDbLevel2PPM = 0.0;
@@ -63,6 +63,7 @@ bool g_bThresholdDbConnecting = false;
 bool g_bThresholdSchemaReady = false;
 bool g_bThresholdQueryInFlight = false;
 bool g_bDbThresholdReady = false;
+bool g_bConfigsExecuted = false;
 char g_sDbThresholdSource[32];
 
 #define THRESHOLD_DB_RECONNECT_DELAY 10.0
@@ -117,6 +118,7 @@ public void OnPluginStart()
 
 public void OnConfigsExecuted()
 {
+    g_bConfigsExecuted = true;
     StartDifficultyTimer();
     EnforceSurvivorLifeCvars();
     RequestThresholdRefresh(true);
@@ -125,7 +127,8 @@ public void OnConfigsExecuted()
 
 public void OnMapEnd()
 {
-    RestoreBaseProfile();
+    RestoreControlledCvars(true);
+    g_bConfigsExecuted = false;
     StopDifficultyTimer();
     StopThresholdDbReconnect();
     CloseThresholdDb();
@@ -133,7 +136,7 @@ public void OnMapEnd()
 
 public void OnPluginEnd()
 {
-    RestoreBaseProfile();
+    RestoreControlledCvars(true);
     StopDifficultyTimer();
     StopThresholdDbReconnect();
     CloseThresholdDb();
@@ -212,7 +215,7 @@ public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontB
 
 public Action Timer_CheckDifficulty(Handle timer)
 {
-    if (!g_cvEnable.BoolValue)
+    if (!g_bConfigsExecuted || !g_cvEnable.BoolValue)
         return Plugin_Continue;
 
     float now = GetGameTime();
@@ -257,7 +260,7 @@ void EnforceLockedDifficulty(float now)
 
 void PrepareRoundDifficulty(bool silent)
 {
-    if (!g_cvEnable.BoolValue || g_bDifficultyLocked)
+    if (!g_bConfigsExecuted || !g_cvEnable.BoolValue || g_bDifficultyLocked)
         return;
 
     if (ApplyFixedDifficultyIfNeeded(silent))
@@ -1139,81 +1142,96 @@ bool ApplyTankBhopOverride()
     return true;
 }
 
-bool BuildProfileKeySet(KeyValues kv, const char[] section, StringMap keys, int &count)
+void EnsureControlledCvarStores()
 {
-    count = 0;
-    kv.Rewind();
-    if (!kv.JumpToKey(section))
-        return false;
+    if (g_aControlledCvars == null)
+        g_aControlledCvars = new ArrayList(ByteCountToCells(64));
 
-    if (!kv.GotoFirstSubKey(false))
-        return true;
+    if (g_mControlledCvarBaselines == null)
+        g_mControlledCvarBaselines = new StringMap();
+}
+
+void CacheControlledCvarBaseline(const char[] name)
+{
+    EnsureControlledCvarStores();
+    if (g_mControlledCvarBaselines.ContainsKey(name))
+        return;
+
+    ConVar cvar = FindConVar(name);
+    if (cvar == null)
+    {
+        if (g_cvDebug.BoolValue)
+            LogMessage("[AnneHappyAI] controlled cvar not found while caching baseline: %s", name);
+        return;
+    }
+
+    char baseline[128];
+    cvar.GetString(baseline, sizeof(baseline));
+    g_mControlledCvarBaselines.SetString(name, baseline);
+    g_aControlledCvars.PushString(name);
+}
+
+void BuildControlledCvarBaselines(KeyValues kv)
+{
+    EnsureControlledCvarStores();
+    kv.Rewind();
+    if (!kv.GotoFirstSubKey())
+        return;
 
     do
     {
-        char cvarName[64];
-        char value[128];
-        kv.GetSectionName(cvarName, sizeof(cvarName));
-        kv.GetString(NULL_STRING, value, sizeof(value), "");
-
-        if (cvarName[0] == '\0' || value[0] == '\0')
+        if (!kv.GotoFirstSubKey(false))
             continue;
 
-        if (keys.ContainsKey(cvarName))
-            return false;
+        do
+        {
+            char cvarName[64];
+            char value[128];
+            kv.GetSectionName(cvarName, sizeof(cvarName));
+            kv.GetString(NULL_STRING, value, sizeof(value), "");
+            if (cvarName[0] != '\0' && value[0] != '\0')
+                CacheControlledCvarBaseline(cvarName);
+        }
+        while (kv.GotoNextKey(false));
 
-        keys.SetValue(cvarName, 1);
-        count++;
+        kv.GoBack();
     }
-    while (kv.GotoNextKey(false));
+    while (kv.GotoNextKey());
 
-    return true;
+    kv.Rewind();
 }
 
-bool ProfileKeysMatch(KeyValues kv, const char[] baselineSection, const char[] targetSection, int &entryCount)
+int RestoreControlledCvars(bool clearStores = false)
 {
-    StringMap baselineKeys = new StringMap();
-    StringMap targetKeys = new StringMap();
-    int baselineCount;
-    int targetCount = 0;
-    bool valid = BuildProfileKeySet(kv, baselineSection, baselineKeys, baselineCount);
-
-    if (valid)
+    int restored = 0;
+    if (g_aControlledCvars != null && g_mControlledCvarBaselines != null)
     {
-        kv.Rewind();
-        if (!kv.JumpToKey(targetSection))
+        for (int i = 0; i < g_aControlledCvars.Length; i++)
         {
-            valid = false;
-        }
-        else if (kv.GotoFirstSubKey(false))
-        {
-            do
-            {
-                char cvarName[64];
-                char value[128];
-                kv.GetSectionName(cvarName, sizeof(cvarName));
-                kv.GetString(NULL_STRING, value, sizeof(value), "");
+            char cvarName[64];
+            char baseline[128];
+            g_aControlledCvars.GetString(i, cvarName, sizeof(cvarName));
+            if (!g_mControlledCvarBaselines.GetString(cvarName, baseline, sizeof(baseline)))
+                continue;
 
-                if (cvarName[0] == '\0' || value[0] == '\0')
-                    continue;
+            ConVar cvar = FindConVar(cvarName);
+            if (cvar == null)
+                continue;
 
-                targetCount++;
-                if (!baselineKeys.ContainsKey(cvarName) || targetKeys.ContainsKey(cvarName))
-                    valid = false;
-                else
-                    targetKeys.SetValue(cvarName, 1);
-            }
-            while (kv.GotoNextKey(false));
+            cvar.SetString(baseline, true, false);
+            restored++;
         }
     }
 
-    if (targetCount != baselineCount)
-        valid = false;
+    if (clearStores)
+    {
+        delete g_aControlledCvars;
+        delete g_mControlledCvarBaselines;
+        g_aControlledCvars = null;
+        g_mControlledCvarBaselines = null;
+    }
 
-    entryCount = baselineCount;
-    delete targetKeys;
-    delete baselineKeys;
-    return valid;
+    return restored;
 }
 
 bool ApplyProfileSection(KeyValues kv, const char[] section, int &applied, int &missing)
@@ -1247,60 +1265,6 @@ bool ApplyProfileSection(KeyValues kv, const char[] section, int &applied, int &
     return true;
 }
 
-void ApplyAuxiliaryPatchState(int level)
-{
-    bool neri = level == MAX_DIFFICULTY_LEVEL;
-    bool hunterExtreme = level >= 5;
-
-    // These cvars toggle memory patches or trigger compatibility hooks. Apply them
-    // explicitly after the profile, then write the dependent crouch delay last.
-    ApplyConfigCvar("l4d_air_abilities_patch_neri", neri ? "1" : "0");
-    ApplyConfigCvar("l4d2_hunter_patch_convert_leap", hunterExtreme ? "1" : "0");
-    ApplyConfigCvar("l4d2_hunter_patch_crouch_pounce", hunterExtreme ? "2" : "0");
-    ApplyConfigCvar("z_pounce_crouch_delay", hunterExtreme ? "0" : "0.8");
-}
-
-bool VerifyNumericCvar(const char[] name, const char[] expected)
-{
-    ConVar cvar = FindConVar(name);
-    if (cvar == null)
-    {
-        LogError("[AnneHappyAI] critical cvar not found while verifying: %s", name);
-        return false;
-    }
-
-    float delta = cvar.FloatValue - StringToFloat(expected);
-    if (delta < 0.0)
-        delta = -delta;
-
-    if (delta > 0.0001)
-    {
-        char actual[128];
-        cvar.GetString(actual, sizeof(actual));
-        LogError("[AnneHappyAI] critical cvar mismatch: %s expected=%s actual=%s", name, expected, actual);
-        return false;
-    }
-
-    return true;
-}
-
-bool VerifyCriticalProfileCvars(int level)
-{
-    bool hunterExtreme = level >= 5;
-    bool valid = true;
-
-    if (!VerifyNumericCvar("l4d_air_abilities_patch_neri", level == MAX_DIFFICULTY_LEVEL ? "1" : "0"))
-        valid = false;
-    if (!VerifyNumericCvar("l4d2_hunter_patch_convert_leap", hunterExtreme ? "1" : "0"))
-        valid = false;
-    if (!VerifyNumericCvar("l4d2_hunter_patch_crouch_pounce", hunterExtreme ? "2" : "0"))
-        valid = false;
-    if (!VerifyNumericCvar("z_pounce_crouch_delay", hunterExtreme ? "0" : "0.8"))
-        valid = false;
-
-    return valid;
-}
-
 void EnforceSurvivorLifeCvars()
 {
     int maxIncaps = g_cvSurvivorMaxIncaps.IntValue;
@@ -1329,81 +1293,33 @@ bool ApplyProfileCvars(int level, int &applied)
         return false;
     }
 
+    BuildControlledCvarBaselines(kv);
+    int restored = RestoreControlledCvars();
+
     char levelKey[16];
-    if (level <= BASE_DIFFICULTY_LEVEL)
-        strcopy(levelKey, sizeof(levelKey), BASE_DIFFICULTY_KEY);
-    else
-        FormatEx(levelKey, sizeof(levelKey), "level%d", ClampLevel(level));
+    FormatEx(levelKey, sizeof(levelKey), "level%d", ClampLevel(level));
 
-    int profileEntries;
-    if (!ProfileKeysMatch(kv, BASE_DIFFICULTY_KEY, levelKey, profileEntries))
+    int missing;
+    if (!ApplyProfileSection(kv, levelKey, applied, missing))
     {
-        LogError("[AnneHappyAI] Profile key mismatch between \"%s\" and \"%s\" in config: %s", BASE_DIFFICULTY_KEY, levelKey, path);
+        LogError("[AnneHappyAI] Missing or invalid section \"%s\" in config: %s", levelKey, path);
         delete kv;
         return false;
-    }
-
-    int baselineApplied;
-    int baselineMissing;
-    if (!ApplyProfileSection(kv, BASE_DIFFICULTY_KEY, baselineApplied, baselineMissing))
-    {
-        LogError("[AnneHappyAI] Failed to apply explicit baseline section \"%s\"", BASE_DIFFICULTY_KEY);
-        delete kv;
-        return false;
-    }
-
-    int targetApplied = baselineApplied;
-    int targetMissing = baselineMissing;
-    if (!StrEqual(levelKey, BASE_DIFFICULTY_KEY))
-    {
-        if (!ApplyProfileSection(kv, levelKey, targetApplied, targetMissing))
-        {
-            LogError("[AnneHappyAI] Failed to apply target section \"%s\"", levelKey);
-            delete kv;
-            return false;
-        }
-
-        if (targetApplied != baselineApplied || targetMissing != baselineMissing)
-        {
-            LogError("[AnneHappyAI] Incomplete profile application for \"%s\": baseline applied/missing=%d/%d target=%d/%d entries=%d",
-                levelKey, baselineApplied, baselineMissing, targetApplied, targetMissing, profileEntries);
-            delete kv;
-            return false;
-        }
     }
 
     delete kv;
-
-    ApplyAuxiliaryPatchState(level <= BASE_DIFFICULTY_LEVEL ? BASE_DIFFICULTY_LEVEL : ClampLevel(level));
-    if (!VerifyCriticalProfileCvars(level <= BASE_DIFFICULTY_LEVEL ? BASE_DIFFICULTY_LEVEL : ClampLevel(level)))
-    {
-        LogError("[AnneHappyAI] Critical cvar verification failed for section \"%s\"", levelKey);
-        return false;
-    }
-
-    applied = targetApplied;
     if (ApplyTankBhopOverride())
         applied++;
 
     EnforceSurvivorLifeCvars();
 
-    if (applied <= 0 || profileEntries <= 0)
+    if (applied <= 0)
     {
         LogError("[AnneHappyAI] No cvars applied from section \"%s\" in config: %s", levelKey, path);
-        applied = 0;
         return false;
     }
     else if (g_cvDebug.BoolValue)
-        LogMessage("[AnneHappyAI] restored explicit baseline \"%s\", applied section \"%s\" cvars=%d/%d", BASE_DIFFICULTY_KEY, levelKey, applied, profileEntries);
+        LogMessage("[AnneHappyAI] restored=%d applied section \"%s\" cvars=%d missing=%d", restored, levelKey, applied, missing);
 
     return true;
-}
-
-void RestoreBaseProfile()
-{
-    int applied;
-    if (!ApplyProfileCvars(BASE_DIFFICULTY_LEVEL, applied))
-    {
-        LogError("[AnneHappyAI] failed to restore explicit baseline profile during lifecycle shutdown");
-    }
 }

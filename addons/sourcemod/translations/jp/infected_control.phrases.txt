@@ -58,15 +58,15 @@
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"jp"		"{green}[IC]{default} 次の%dラウンドは内鬼になれません。"
+		"jp"		"{green}[IC]{default} 次の%d回の特殊感染者ウェーブでは内鬼になれません。"
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
 		"jp"		"{green}[IC]{default} 今回の内鬼で生存者に{olive}%d{default}ダメージを与えました。"
 	}
-	"InfectedControl_TraitorRoundBlockedNoDamage"
+	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"jp"		"{green}[IC]{default} You cannot play traitor again for %d more rounds because your last traitor caused no damage."
+		"jp"		"{green}[IC]{default} 前回の内鬼でダメージを与えなかったため、あと%d回の特殊感染者ウェーブが終わるまで内鬼になれません。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -74,7 +74,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"jp"		"{green}[IC]{default} できなければ役割を解除してAIが引き継ぎ、次の%dラウンドは内鬼になれません。"
+		"jp"		"{green}[IC]{default} できなければ役割を解除してAIが引き継ぎ、次の%d回の特殊感染者ウェーブでは内鬼になれません。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
@@ -112,6 +112,10 @@
 	{
 		"jp"		"{green}[IC]{default} Traitor mode is disabled."
 	}
+	"InfectedControl_TraitorSpectatorsOnly"
+	{
+		"jp"		"{green}[IC]{default} 内鬼モードに登録できるのは観戦者だけです。"
+	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
 		"jp"		"{green}[IC]{default} Unsupported traitor class."
@@ -127,6 +131,10 @@
 	"InfectedControl_TraitorWindowClosed"
 	{
 		"jp"		"{green}[IC]{default} Traitor registration is closed for this wave."
+	}
+	"InfectedControl_TraitorAlreadyRegistered"
+	{
+		"jp"		"{green}[IC]{default} すでに内鬼を1種類登録しています。変更する場合は、先に現在の登録を取り消してください。"
 	}
 	"InfectedControl_TraitorQueued"
 	{
@@ -144,6 +152,10 @@
 	{
 		"jp"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
 	}
+	"InfectedControl_TraitorTankWatching"
+	{
+		"jp"		"{green}[IC]{default} Tank の登録が有効になりました。AI Tank の準備ができて操作権が移るまで観戦してください。"
+	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
 		"jp"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
@@ -155,6 +167,14 @@
 	"InfectedControl_TraitorSpawnCountdown"
 	{
 		"jp"		"Spawn now: %d seconds left"
+	}
+	"InfectedControl_TraitorTankSpawnWindow"
+	{
+		"jp"		"{green}[IC]{default} Tank の出現時間です。{olive}%d{default} 秒間、AI Tank の生成と操作権の移行を試みます。"
+	}
+	"InfectedControl_TraitorTankSpawnCountdown"
+	{
+		"jp"		"Tank の出現待ち：残り %d 秒"
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
@@ -180,13 +200,25 @@
 	{
 		"jp"		"{green}[IC]{default} Traitor queue cancelled."
 	}
+	"InfectedControl_TraitorCancelledJoinedSurvivor"
+	{
+		"jp"		"{green}[IC]{default} 生存者チームに参加したため、内鬼モードの登録をキャンセルしました。"
+	}
+	"InfectedControl_TraitorTankTookSlot"
+	{
+		"jp"		"{green}[IC]{default} Tank が共有内鬼スロットを使用しました。あなたの {olive}%s{default} は AI が引き継ぎ、消費済みの日次枠は返却されました。"
+	}
+	"InfectedControl_TraitorTankCancelledSlot"
+	{
+		"jp"		"{green}[IC]{default} Tank が共有内鬼スロットを使用しました。未出現の {olive}%s{default} 登録は取り消され、日次枠は消費されていません。"
+	}
 	"InfectedControl_TraitorSpawned"
 	{
 		"jp"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"jp"		"{green}[IC]{default} Failed to prepare traitor ghost state."
+		"jp"		"{green}[IC]{default} 内鬼の生成または操作権の移行に失敗しました。"
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{

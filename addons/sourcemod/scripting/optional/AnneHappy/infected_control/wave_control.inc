@@ -26,6 +26,7 @@ void StartWave()
 
     gST.bShouldCheck = true;
     gST.waveIndex++;
+    Traitor_AdvanceNoDamageWaveBlocks();
     Traitor_OnWaveReleased(gST.waveIndex);
     gST.lastWaveAvgFlow = GetSurAvrFlow();
     gST.lastSpawnSecs   = 0;

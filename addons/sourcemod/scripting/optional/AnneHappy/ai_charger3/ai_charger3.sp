@@ -75,11 +75,13 @@ public void OnPluginStart() {
 	// when the angle between charger's air velocity direction and the direction from charger to target exceeds this value, perform air velocity modification (air modification: set charger's current velocity direction to the target direction)
 	g_cvAirVecModifyMinDegree = CreateConVar("ai_charger3_airvec_modify_min_deg", "45.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
 	// When the angle between charger's air velocity direction and the direction from charger to target exceeds this value, abandon air velocity modification
-	g_cvAirVecModifyMaxDegree = CreateConVar("ai_charger3_airvec_modify_max_deg", "120.0", "在空中速度方向与自身到目标方向角度超过这个值放弃速度修正", CVAR_FLAGS, true, 0.0, true, 180.0);
+	g_cvAirVecModifyMaxDegree = CreateConVar("ai_charger3_airvec_modify_max_deg", "89.0", "空中转向允许的最大目标偏角, 最大 89 度以禁止反向修正", CVAR_FLAGS, true, 0.0, true, 89.0);
 	// the interval (in seconds) between consecutive air velocity vector modifications for charger
-	g_cvAirVecModifyInterval = CreateConVar("ai_charger3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.0);
+	g_cvAirVecModifyInterval = CreateConVar("ai_charger3_airvec_modify_interval", "0.3", "空中平滑转向达到配置插值强度的基准时间, 实际以 0.05 秒短步长执行", CVAR_FLAGS, true, 0.0);
 	// The interpolation factor for charger's air velocity direction modification. Min: 0.0, Max: 1.0. Lower values result in smoother air turning, higher values result in sharper air turning
 	g_cvAirVecModifyLerp = CreateConVar("_ai_charger3_airvec_modify_lerp", "0.3", "空中速度方向修正的修正插值因子, 0.1~1.0, 越小转向越平滑, 但是需要更多的帧数, 越大转向越锐利, 需要较少的帧数就可以完成空中转向", CVAR_FLAGS, true, 0.0, true, 1.0);
+	// Horizontal speed loss per 90 degrees of actual in-air turning
+	g_cvAirTurnSpeedLoss = CreateConVar("ai_charger3_air_turn_speed_loss", "0.12", "空中实际转向 90 度时损失的水平速度比例", CVAR_FLAGS, true, 0.0, true, 0.5);
 	// the maximum allowed duration (in seconds) for charger to stay in the bait state
 	g_cvBaitMaxDuration = CreateConVar("ai_charger3_bait_max_duration", "7.0", "Charger 进入博弈状态的最大允许时间", CVAR_FLAGS, true, 0.0);
 	// the detection interval (in seconds) for charger's probabilistic charge when in the bait state

@@ -41,6 +41,30 @@ stock bool isAiCharger(int client) {
             IsFakeClient(client) && IsPlayerAlive(client) && !IsInGhostState(client);
 }
 
+stock bool alignChargerFacingWithMovement(int client, const float movement[3], float commandAngles[3]) {
+    if (!isAiCharger(client))
+        return false;
+
+    static float direction[3];
+    direction = movement;
+    direction[2] = 0.0;
+    if (NormalizeVector(direction, direction) <= 0.0)
+        return false;
+
+    GetVectorAngles(direction, commandAngles);
+    commandAngles[0] = 0.0;
+    commandAngles[2] = 0.0;
+    return true;
+}
+
+stock void setForwardBhopInput(int& buttons, bool startJump) {
+    buttons &= ~(IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_LEFT | IN_RIGHT | IN_JUMP | IN_DUCK);
+    buttons |= IN_FORWARD;
+
+    if (startJump)
+        buttons |= IN_JUMP | IN_DUCK;
+}
+
 stock bool allowToBhop(int client) {
     if (!isAiCharger(client))
         return false;

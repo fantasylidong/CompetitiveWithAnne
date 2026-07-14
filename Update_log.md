@@ -618,3 +618,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 同步 `cwm1_intro` hittable/clipwall 等修复，补齐多个模式的 `mapinfo.txt`。
 - 删除仓库内 Rust 刷服器工具和 Docker 部署 README，相关能力迁移到外部工具/网页链路维护。
 - 更新 `basevotes.smx` 位置、SourceMod 配置、数据库表字段和若干文档，保持插件包结构更清晰。
+
+### 2026年7月14日动态难度热修复
+- 修复动态难度硬编码 `level0` 把 AnneHappy 参数覆盖到 1vHunters、Alone、WitchParty 等模式的问题；插件改为在各模式配置执行完成后记录实际 CVar 基线，并在切档、换图和卸载时恢复。
+- 删除错误补入简单至专家档的 `z_lunge_up 0`、`z_lunge_interval 0.08`、`z_lunge_cooldown 0` 等伪基线，修复旧 `ai_hunter_2` 下 Hunter 原地飞、反复磕头的问题，同时避免 Jockey、Tank、Boomer 参数被错误重置。
+- 极限与音理档仍保留各自明确配置；退出高难档时由运行时基线恢复当前模式原值，避免高难参数残留。

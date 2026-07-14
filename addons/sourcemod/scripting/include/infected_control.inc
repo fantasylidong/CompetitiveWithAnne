@@ -12,8 +12,8 @@
 native float GetNextSpawnTime();
 
 /**
- * @brief Returns whether a client is managed by infected_control traitor mode.
- * @remarks True for waitlisted, queued, locked, spawn-allowed, and alive traitor clients.
+ * @brief Returns whether a client must remain on infected for traitor mode.
+ * @remarks True only for spawn-locked, spawn-allowed, and alive traitor clients.
  *
  * @param client Client index.
  * @return true when join/team-management plugins should not force this player away.
