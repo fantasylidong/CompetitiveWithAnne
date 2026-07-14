@@ -310,13 +310,17 @@ void StartCheckTimer()
 
 void StopCheckTimer()
 {
-    if (g_hCheckTimer == null)
+    Handle timer = g_hCheckTimer;
+    g_hCheckTimer = null;
+
+    // TIMER_FLAG_NO_MAPCHANGE timers may already have been closed by SourceMod
+    // before OnMapEnd/OnPluginEnd reaches this plugin.
+    if (timer == null || !IsValidHandle(timer))
     {
         return;
     }
 
-    KillTimer(g_hCheckTimer);
-    g_hCheckTimer = null;
+    KillTimer(timer);
 }
 
 void SetupClientHooks(int client)
@@ -491,6 +495,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 
 public Action Timer_CheckPlayers(Handle timer)
 {
+    if (g_hCheckTimer != timer)
+    {
+        return Plugin_Stop;
+    }
+
     if (!ShouldRunBoostChecks())
     {
         g_hCheckTimer = null;

@@ -24,6 +24,11 @@
 				"windows"	"8"
 				"linux"		"9"
 			}
+			"Path::Invalidate"
+			{
+				"windows"	"17"
+				"linux"		"18"
+			}
 			"Path::NextSegment"
 			{
 				"windows"	"21"
