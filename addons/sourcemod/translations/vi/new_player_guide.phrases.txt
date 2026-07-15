@@ -1,0 +1,28 @@
+"Phrases"
+{
+	"NPG_MenuTitle" { "vi" "Hướng dẫn chế độ máy chủ Anne Telecom\nTổng L4D2: %s | máy chủ này: %s\nBạn muốn chơi gì?" }
+	"NPG_PlaytimeUnknown" { "vi" "không rõ" }
+	"NPG_CategorySolo" { "vi" "Chế độ chơi đơn" }
+	"NPG_CategoryCoop" { "vi" "Chế độ PvE phối hợp" }
+	"NPG_CategoryVersus" { "vi" "Chế độ đối kháng" }
+	"NPG_PermanentDisable" { "vi" "Tắt vĩnh viễn hướng dẫn khi vào máy chủ" }
+	"NPG_PermanentEnable" { "vi" "Bật lại hướng dẫn khi vào máy chủ" }
+	"NPG_PreferenceDisabled" { "vi" "{green}Đã tắt vĩnh viễn hướng dẫn chế độ Anne. Dùng {olive}!guide{green} để bật lại." }
+	"NPG_PreferenceEnabled" { "vi" "{green}Đã bật lại hướng dẫn chế độ Anne." }
+	"NPG_PreferenceUnavailable" { "vi" "{olive}Hiện không thể lưu thiết lập hướng dẫn chế độ Anne." }
+	"NPG_TitleSolo" { "vi" "Hướng dẫn Anne > Chơi đơn\nChọn mục tiêu luyện tập:" }
+	"NPG_TitleCoopProfile" { "vi" "Hướng dẫn Anne > PvE phối hợp\nKinh nghiệm chung của đội bạn?" }
+	"NPG_TitleEasy" { "vi" "Hướng dẫn Anne > PvE dễ\nKhuyên dùng cho đội có nhiều người mới:" }
+	"NPG_TitleNormal" { "vi" "Hướng dẫn Anne > PvE thường\nKhuyên dùng cho đội đã quen bản đồ và phối hợp cơ bản:" }
+	"NPG_TitleHard" { "vi" "Hướng dẫn Anne > PvE khó\nKhuyên dùng cho đội giàu kinh nghiệm:" }
+	"NPG_TitleFun" { "vi" "Hướng dẫn Anne > PvE giải trí\nƯu tiên niềm vui và tình huống hỗn loạn:" }
+	"NPG_TitleVersusSize" { "vi" "Hướng dẫn Anne > Đối kháng\nChọn số người mỗi đội:" }
+	"NPG_TitleVersus1" { "vi" "Hướng dẫn Anne > Đối kháng > 1v1" }
+	"NPG_TitleVersus2" { "vi" "Hướng dẫn Anne > Đối kháng > 2v2" }
+	"NPG_TitleVersus3" { "vi" "Hướng dẫn Anne > Đối kháng > 3v3" }
+	"NPG_TitleVersus4" { "vi" "Hướng dẫn Anne > Đối kháng > 4v4" }
+	"NPG_ProfileNew" { "vi" "Phần lớn là người mới (7 chế độ)" }
+	"NPG_ProfileExperienced" { "vi" "Phần lớn có kinh nghiệm (9 chế độ)" }
+	"NPG_ProfileHardcore" { "vi" "Cựu binh hardcore (11 chế độ)" }
+	"NPG_ProfileFun" { "vi" "Chỉ muốn vui (4 chế độ)" }
+}

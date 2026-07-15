@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"en"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly."
+		"en"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -54,7 +54,7 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"en"		"{green}[IC]{default} No survivor damage or effective attack was recorded before the next SI countdown. Your traitor role was removed and AI took over this SI."
+		"en"		"{green}[IC]{default} No survivor damage or effective attack was recorded before the next SI wave was released. Your traitor role was removed and AI took over this SI."
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
@@ -70,7 +70,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"en"		"{green}[IC]{default} Penalty warning: your traitor must damage or effectively attack a survivor before the next SI countdown."
+		"en"		"{green}[IC]{default} Penalty warning: your traitor must damage or effectively attack a survivor before the next SI wave is released."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
@@ -114,7 +114,7 @@
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"en"		"{green}[IC]{default} Only spectators may register for traitor mode."
+		"en"		"{green}[IC]{default} Only spectators or infected-team players may register for traitor mode."
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
@@ -140,9 +140,13 @@
 	{
 		"en"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
 	}
+	"InfectedControl_TraitorNextQueued"
+	{
+		"en"		"{green}[IC]{default} Your next traitor is registered as {olive}%s{default}; it will enter the waiting queue after your current SI dies."
+	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"en"		"{green}[IC]{default} Traitor slots are full. You are waiting as {olive}%s{default} (position %d)."
+		"en"		"{green}[IC]{default} You are waiting as traitor {olive}%s{default} (position %d)."
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
@@ -154,7 +158,7 @@
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
-		"en"		"{green}[IC]{default} Your Tank registration is active. Stay in spectator until an AI Tank is ready for takeover."
+		"en"		"{green}[IC]{default} Your Tank registration is active. Control will transfer when a new AI Tank spawns naturally."
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{

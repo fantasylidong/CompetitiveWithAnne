@@ -4,4 +4,52 @@
 	{
 		"ko"		"{green} [ {lightgreen} 순위 {green} ] {default} %s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"ko"		"{green}%s{default} {olive}[맵 기록]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"ko"		"{olive}%s{default} 님이 {green}%d특/%d초/상점 없음/%s 난이도{default} 기록을 갱신했습니다."
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"ko"		"일반 Anne"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"ko"		"하드코어 Anne"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"ko"		"샷건 Anne"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"ko"		"쉬움"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"ko"		"보통"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"ko"		"어려움"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"ko"		"전문가"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"ko"		"극한"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"ko"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"ko"		"알 수 없음"
+	}
 }

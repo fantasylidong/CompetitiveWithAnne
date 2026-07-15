@@ -4,4 +4,52 @@
 	{
 		"zho"		"{green} [ {lightgreen} 排名 {green} ] {default} %s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"zho"		"{green}%s{default} {olive}[地圖記錄]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"zho"		"{olive}%s{default} 刷新了 {green}%d特/%d秒/無商店/%s難度{default}記錄。"
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"zho"		"普通藥役"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"zho"		"硬核藥役"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"zho"		"噴子藥役"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"zho"		"簡單"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"zho"		"普通"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"zho"		"困難"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"zho"		"專家"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"zho"		"極限"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"zho"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"zho"		"未知"
+	}
 }

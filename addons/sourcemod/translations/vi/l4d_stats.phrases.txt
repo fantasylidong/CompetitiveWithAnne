@@ -4,4 +4,52 @@
 	{
 		"vi"		"{green} [ {lightgreen} HẠNG {green} ] {default} %s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"vi"		"{green}%s{default} {olive}[Kỷ lục bản đồ]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"vi"		"{olive}%s{default} đã lập kỷ lục {green}%d SI / %d giây / không shop / độ khó %s{default}."
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"vi"		"Anne thường"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"vi"		"Anne khó"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"vi"		"Anne shotgun"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"vi"		"Dễ"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"vi"		"Thường"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"vi"		"Khó"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"vi"		"Chuyên gia"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"vi"		"Cực hạn"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"vi"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"vi"		"Không rõ"
+	}
 }

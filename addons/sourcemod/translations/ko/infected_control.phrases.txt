@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"ko"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly."
+		"ko"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -54,7 +54,7 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"ko"		"{green}[IC]{default} 다음 특수 감염자 카운트다운 전까지 생존자 피해나 유효한 공격이 기록되지 않아 내귀 역할이 해제되고 AI가 이 특수 감염자를 이어받습니다."
+		"ko"		"{green}[IC]{default} 다음 특수 감염자 웨이브가 시작될 때까지 생존자 피해나 유효한 공격이 기록되지 않아 내귀 역할이 해제되고 AI가 이 특수 감염자를 이어받습니다."
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
@@ -70,7 +70,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"ko"		"{green}[IC]{default} 페널티 경고: 다음 특수 감염자 카운트다운 전까지 생존자에게 피해를 주거나 유효한 공격을 해야 합니다."
+		"ko"		"{green}[IC]{default} 페널티 경고: 다음 특수 감염자 웨이브가 시작될 때까지 생존자에게 피해를 주거나 유효한 공격을 해야 합니다."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
@@ -114,7 +114,7 @@
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"ko"		"{green}[IC]{default} 관전자만 배신자 모드에 등록할 수 있습니다."
+		"ko"		"{green}[IC]{default} 관전자 또는 감염자 팀 플레이어만 내귀 모드에 등록할 수 있습니다."
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
@@ -140,9 +140,13 @@
 	{
 		"ko"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
 	}
+	"InfectedControl_TraitorNextQueued"
+	{
+		"ko"		"{green}[IC]{default} 다음 내귀를 {olive}%s{default}(으)로 등록했습니다. 현재 특수 감염자가 죽으면 대기열에 들어갑니다."
+	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"ko"		"{green}[IC]{default} Traitor slots are full. You are waiting as {olive}%s{default} (position %d)."
+		"ko"		"{green}[IC]{default} 내귀 {olive}%s{default}(으)로 대기 중입니다 (순번 %d)."
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
@@ -154,7 +158,7 @@
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
-		"ko"		"{green}[IC]{default} Tank 등록이 활성화되었습니다. AI Tank가 준비되어 조종권을 받을 때까지 관전하세요."
+		"ko"		"{green}[IC]{default} Tank 등록이 활성화되었습니다. 새 AI Tank가 자연 생성되면 조종권이 자동으로 이전됩니다."
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{

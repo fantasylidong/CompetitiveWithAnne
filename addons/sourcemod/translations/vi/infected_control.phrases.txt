@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"vi"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly."
+		"vi"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -54,7 +54,7 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"vi"		"{green}[IC]{default} Không ghi nhận sát thương hoặc đòn tấn công hiệu quả lên người sống sót trước lần đếm ngược SI tiếp theo. Vai trò traitor của bạn bị hủy và AI tiếp quản SI này."
+		"vi"		"{green}[IC]{default} Không ghi nhận sát thương hoặc đòn tấn công hiệu quả trước khi đợt SI tiếp theo được thả. Vai trò traitor bị hủy và AI tiếp quản SI này."
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
@@ -70,7 +70,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"vi"		"{green}[IC]{default} Cảnh báo phạt: traitor phải gây sát thương hoặc thực hiện đòn tấn công hiệu quả lên người sống sót trước lần đếm ngược SI tiếp theo."
+		"vi"		"{green}[IC]{default} Cảnh báo phạt: traitor phải gây sát thương hoặc tấn công hiệu quả trước khi đợt SI tiếp theo được thả."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
@@ -114,7 +114,7 @@
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"vi"		"{green}[IC]{default} Chỉ khán giả mới có thể đăng ký chế độ nội gián."
+		"vi"		"{green}[IC]{default} Chỉ khán giả hoặc người chơi đội nhiễm mới có thể đăng ký chế độ nội gián."
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
@@ -140,9 +140,13 @@
 	{
 		"vi"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
 	}
+	"InfectedControl_TraitorNextQueued"
+	{
+		"vi"		"{green}[IC]{default} Bạn đã đăng ký traitor tiếp theo là {olive}%s{default}; đăng ký sẽ vào hàng chờ khi SI hiện tại chết."
+	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"vi"		"{green}[IC]{default} Traitor slots are full. You are waiting as {olive}%s{default} (position %d)."
+		"vi"		"{green}[IC]{default} Bạn đang chờ làm traitor {olive}%s{default} (vị trí %d)."
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
@@ -154,7 +158,7 @@
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
-		"vi"		"{green}[IC]{default} Đăng ký Tank đã có hiệu lực. Hãy tiếp tục quan sát cho đến khi AI Tank sẵn sàng chuyển quyền điều khiển cho bạn."
+		"vi"		"{green}[IC]{default} Đăng ký Tank đã có hiệu lực. Quyền điều khiển sẽ tự chuyển khi một AI Tank mới xuất hiện tự nhiên."
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{

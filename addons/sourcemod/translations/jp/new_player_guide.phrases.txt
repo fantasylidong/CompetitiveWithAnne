@@ -1,67 +1,28 @@
 "Phrases"
 {
-	"NPG_Header"
-	{
-		"jp"		"{default}[{green}Anne Guide{default}] L4D2 総時間 {green}%s h{default}、このサーバー {green}%s h{default}。今ならこのあたりがおすすめです："
-	}
-	"NPG_Beginner"
-	{
-		"jp"		"{olive}まずは通常キャンペーンで大丈夫です。モード切替はいりません。少し速い展開を試したくなったら Anne Campaign へ。特殊感染者の戻りが早めです。"
-	}
-	"NPG_Intermediate"
-	{
-		"jp"		"{olive}Anne Campaign と Survival を試してみてください。ルールは分かりやすいまま、テンポは Anne モードに近くなります。"
-	}
-	"NPG_Experienced"
-	{
-		"jp"		"{olive}!match メニューを一通り見て大丈夫です。AnneHappy、Hardcore、Shotgun、1vHT、WitchParty、AllCharger、Anne Campaign/Survival/Realism、Not0721、ZoneMod・NextMod・EQ・AMR・Apex・ZoneHunters があります。"
-	}
-	"NPG_Commands"
-	{
-		"jp"		"{default}よく使うコマンド：{green}!join{default} 生存者参加、{green}!away{default} 観戦、{green}!match{default} モード、{green}!rmatch{default} 解除、{green}!mapvote{default} マップ投票、{green}!xx{default} Anne 状態、{green}!rank{default} ランキング、{green}!web{default}/{green}!ip{default} ページ。"
-	}
-	"NPG_AutoStops"
-	{
-		"jp"		"{default}この自動案内は、このサーバーで {green}%s h{default} 遊ぶと止まります。あとで見るなら {green}!guide{default} または {green}!modes{default}。"
-	}
-	"NPG_PanelTitle"
-	{
-		"jp"		"Anne Guide"
-	}
-	"NPG_PanelPlaytime"
-	{
-		"jp"		"L4D2: %s h | このサーバー: %s h"
-	}
-	"NPG_PanelBeginner"
-	{
-		"jp"		"まずは通常キャンペーン。速い展開なら Anne Campaign。"
-	}
-	"NPG_PanelIntermediate"
-	{
-		"jp"		"Anne Campaign / Survival がおすすめ。慣れたら上の設定へ。"
-	}
-	"NPG_PanelExperienced"
-	{
-		"jp"		"!match で Anne、Not0721、対戦系設定を選べます。"
-	}
-	"NPG_PanelCommands1"
-	{
-		"jp"		"Commands: !join !away !match !rmatch !mapvote"
-	}
-	"NPG_PanelCommands2"
-	{
-		"jp"		"More: !xx !rank !web !ip | !guide / !modes"
-	}
-	"NPG_PanelAutoStops"
-	{
-		"jp"		"このサーバー %s h で自動案内は停止。"
-	}
-	"NPG_PanelClose"
-	{
-		"jp"		"閉じる"
-	}
-	"NPG_MatchLoaded"
-	{
-		"jp"		"{olive}今はすでにモードが入っているので、自動案内は出ない状態です。戻すときは {green}!rmatch{olive} の前にチームへ確認してください。"
-	}
+	"NPG_MenuTitle" { "jp" "Anne電信サーバー モードガイド\nL4D2合計: %s | このサーバー: %s\n何をプレイしますか？" }
+	"NPG_PlaytimeUnknown" { "jp" "不明" }
+	"NPG_CategorySolo" { "jp" "ソロモード" }
+	"NPG_CategoryCoop" { "jp" "協力PvEモード" }
+	"NPG_CategoryVersus" { "jp" "対戦モード" }
+	"NPG_PermanentDisable" { "jp" "入室時のAnneモードガイドを常に表示しない" }
+	"NPG_PermanentEnable" { "jp" "入室時のAnneモードガイドを再び表示する" }
+	"NPG_PreferenceDisabled" { "jp" "{green}Anneモード入室ガイドを無効にしました。{olive}!guide{green} で再度有効にできます。" }
+	"NPG_PreferenceEnabled" { "jp" "{green}Anneモード入室ガイドを再度有効にしました。" }
+	"NPG_PreferenceUnavailable" { "jp" "{olive}現在、Anneモードガイド設定を保存できません。" }
+	"NPG_TitleSolo" { "jp" "Anneモードガイド > ソロ\n練習目的を選んでください：" }
+	"NPG_TitleCoopProfile" { "jp" "Anneモードガイド > 協力PvE\nチーム全体の経験は？" }
+	"NPG_TitleEasy" { "jp" "Anneモードガイド > 初級PvE\n初心者が多いチーム向け：" }
+	"NPG_TitleNormal" { "jp" "Anneモードガイド > 標準PvE\nマップと基本連携に慣れたチーム向け：" }
+	"NPG_TitleHard" { "jp" "Anneモードガイド > 高難度PvE\nルート、資源、集中攻撃が安定したチーム向け：" }
+	"NPG_TitleFun" { "jp" "Anneモードガイド > 娯楽PvE\n派手な遊び方を選択：" }
+	"NPG_TitleVersusSize" { "jp" "Anneモードガイド > 対戦\nチーム人数を選択：" }
+	"NPG_TitleVersus1" { "jp" "Anneモードガイド > 対戦 > 1v1" }
+	"NPG_TitleVersus2" { "jp" "Anneモードガイド > 対戦 > 2v2" }
+	"NPG_TitleVersus3" { "jp" "Anneモードガイド > 対戦 > 3v3" }
+	"NPG_TitleVersus4" { "jp" "Anneモードガイド > 対戦 > 4v4" }
+	"NPG_ProfileNew" { "jp" "初心者が多い（7モード）" }
+	"NPG_ProfileExperienced" { "jp" "経験者が多い（9モード）" }
+	"NPG_ProfileHardcore" { "jp" "ハードコア熟練者（11モード）" }
+	"NPG_ProfileFun" { "jp" "楽しさ優先（4モード）" }
 }

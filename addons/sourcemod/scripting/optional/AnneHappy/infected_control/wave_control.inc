@@ -37,6 +37,7 @@ void StartWave()
 
     AntiBait_OnWaveStart();
     WaveDecider_OnWaveStart();  // 通知波决策器
+    Traitor_ActivateWaitingClients(); // 仅在新的 EarlyCheck 安全窗口晋升普通内鬼
     Debug_Print("Start wave %d", gST.waveIndex);
 }
 

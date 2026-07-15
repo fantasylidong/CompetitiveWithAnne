@@ -530,6 +530,7 @@ CREATE TABLE `RPG` (
   `GLOW` int(10) NOT NULL DEFAULT '0',
   `SKIN` int(10) NOT NULL DEFAULT '0',
   `RECOIL` int(10) NOT NULL DEFAULT '0',
+  `ANNE_GUIDE_PROMPT` tinyint(4) NOT NULL DEFAULT '1',
   `CHATTAG` varchar(128) CHARACTER SET utf8mb4 DEFAULT NULL,
   `hitsound_cfg` tinyint(4) NOT NULL DEFAULT '0',
   `hitsound_overlay` tinyint(4) NOT NULL DEFAULT '0',

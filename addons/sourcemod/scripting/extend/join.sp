@@ -32,6 +32,7 @@
 #include <updater>
 #include <infected_control>
 #include <SteamWorks>
+#include <confogl>
 
 #define IsValidClient(%1)		(1 <= %1 <= MaxClients && IsClientInGame(%1))
 #define IsValidAliveClient(%1)	(1 <= %1 <= MaxClients && IsClientInGame(%1) && IsPlayerAlive(%1))
@@ -253,7 +254,21 @@ public void Updater_OnLoaded()
 
 public void Updater_OnPluginUpdated()
 {
+	bool shouldRelock = LibraryExists("confogl")
+		&& GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") == FeatureStatus_Available
+		&& LGO_IsMatchModeLoaded();
+
+	if (shouldRelock)
+	{
+		ServerCommand("sm plugins load_unlock");
+	}
+
 	Updater_ReloadPlugin();
+
+	if (shouldRelock)
+	{
+		ServerCommand("sm plugins load_lock");
+	}
 }
 
 public void SteamWorks_OnValidateClient(int ownerauthid, int authid)

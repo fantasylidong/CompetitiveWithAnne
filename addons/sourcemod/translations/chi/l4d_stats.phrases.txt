@@ -4,4 +4,52 @@
 	{
 		"chi"		"{green} [ {lightgreen} 排名 {green} ] {default} %s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"chi"		"{green}%s{default} {olive}[地图记录]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"chi"		"{olive}%s{default} 刷新了 {green}%d特/%d秒/无商店/%s难度{default}记录。"
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"chi"		"普通药役"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"chi"		"硬核药役"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"chi"		"喷子药役"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"chi"		"简单"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"chi"		"普通"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"chi"		"困难"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"chi"		"专家"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"chi"		"极限"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"chi"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"chi"		"未知"
+	}
 }

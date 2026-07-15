@@ -7,36 +7,208 @@
 #include <veterans>
 #include <confogl>
 #include <left4dhooks>
+#include <rpg>
 
-#define PLUGIN_VERSION "1.0"
-#define TOTAL_BEGINNER_MINUTES (50 * 60)
-#define TOTAL_INTERMEDIATE_MINUTES (200 * 60)
-#define SERVER_AUTO_STOP_MINUTES (20 * 60)
+#define PLUGIN_VERSION "2.0"
+#define SERVER_AUTO_STOP_MINUTES (30 * 60)
+#define PERMANENT_DISABLE_MINUTES (10 * 60)
 
 #define AUTO_GUIDE_INITIAL_DELAY 10.0
 #define AUTO_GUIDE_RETRY_DELAY 5.0
 #define AUTO_GUIDE_MAX_RETRIES 10
+#define GUIDE_MENU_TIMEOUT 60
 
-enum GuideTier
+enum GuideParent
 {
-	GuideTier_Beginner = 0,
-	GuideTier_Intermediate,
-	GuideTier_Experienced
+	GuideParent_Home = 0,
+	GuideParent_Coop,
+	GuideParent_Versus
 };
 
 public Plugin myinfo =
 {
-	name = "Anne New Player Guide",
+	name = "Anne Telecom Server Mode Guide",
 	author = "morzlee",
-	description = "Recommends Anne server gameplay paths for newer players.",
+	description = "Guides players through Anne server PvE and versus mode choices.",
 	version = PLUGIN_VERSION,
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
+};
+
+static const char g_sSoloConfigs[][] =
+{
+	"hunters",
+	"alone",
+	"not0721_mutation4_solo",
+	"not0721_realism_solo",
+	"not0721_coop_solo"
+};
+
+static const char g_sSoloPhrases[][] =
+{
+	"NPG_Mode_HTTraining",
+	"NPG_Mode_Alone",
+	"NPG_Mode_Not0721MutationSolo",
+	"NPG_Mode_RealismSolo",
+	"NPG_Mode_CampaignSolo"
+};
+
+static const char g_sEasyConfigs[][] =
+{
+	"coop",
+	"purecoop",
+	"not0721_coop_base",
+	"not0721_mutation4_noobplus",
+	"not0721_community5_noobplus",
+	"not0721_community5_multi",
+	"not0721_community5_ez"
+};
+
+static const char g_sEasyPhrases[][] =
+{
+	"NPG_Mode_AnneCoop",
+	"NPG_Mode_PureCoop",
+	"NPG_Mode_Not0721CoopBase",
+	"NPG_Mode_Not0721MutationNoobPlus",
+	"NPG_Mode_Not0721CommunityNoobPlus",
+	"NPG_Mode_Not0721CommunityMulti",
+	"NPG_Mode_Not0721CommunityEZ"
+};
+
+static const char g_sNormalConfigs[][] =
+{
+	"annehappy",
+	"mutation4",
+	"puremutation4",
+	"realism",
+	"purerealism",
+	"not0721_coop_hard",
+	"not0721_mutation4_ez",
+	"not0721_community5_610",
+	"not0721_realism_miaomei"
+};
+
+static const char g_sNormalPhrases[][] =
+{
+	"NPG_Mode_AnneHappy",
+	"NPG_Mode_AnneMutation",
+	"NPG_Mode_PureMutation",
+	"NPG_Mode_AnneRealism",
+	"NPG_Mode_PureRealism",
+	"NPG_Mode_Not0721CoopHard",
+	"NPG_Mode_Not0721MutationEZ",
+	"NPG_Mode_Not0721Community610",
+	"NPG_Mode_Not0721RealismMiaomei"
+};
+
+static const char g_sHardConfigs[][] =
+{
+	"annehappy_hardcore",
+	"annehappy_shotgun",
+	"purecommunity5",
+	"not0721_coop_fuckmap",
+	"not0721_coop_himiko",
+	"not0721_mutation4",
+	"not0721_mutation4_except",
+	"not0721_community2",
+	"not0721_community5",
+	"not0721_community5_himiko",
+	"not0721_community5_jimen"
+};
+
+static const char g_sHardPhrases[][] =
+{
+	"NPG_Mode_AnneHardcore",
+	"NPG_Mode_AnneShotgun",
+	"NPG_Mode_PureCommunity5",
+	"NPG_Mode_Not0721Fuckmap",
+	"NPG_Mode_Not0721CoopHimiko",
+	"NPG_Mode_Not0721Mutation",
+	"NPG_Mode_Not0721MutationExcept",
+	"NPG_Mode_Not0721Community2",
+	"NPG_Mode_Not0721Community5",
+	"NPG_Mode_Not0721CommunityHimiko",
+	"NPG_Mode_Not0721CommunityJimen"
+};
+
+static const char g_sFunConfigs[][] =
+{
+	"allcharger",
+	"not0721_coop_fire",
+	"witchparty",
+	"not0721_coop_wtf"
+};
+
+static const char g_sFunPhrases[][] =
+{
+	"NPG_Mode_AllCharger",
+	"NPG_Mode_InfiniteFire",
+	"NPG_Mode_WitchParty",
+	"NPG_Mode_Not0721WTF"
+};
+
+static const char g_sVersus1Configs[][] =
+{
+	"zm1v1", "nextmod1v1", "amrv1v1", "eq1v1", "zh1v1"
+};
+
+static const char g_sVersus1Names[][] =
+{
+	"1v1 ZoneMod", "1v1 NextMod", "1v1 Acemod RV", "1v1 EQ", "1v1 ZoneHunters"
+};
+
+static const char g_sVersus2Configs[][] =
+{
+	"zm2v2", "nextmod2v2", "amrv2v2", "eq2v2", "zh2v2"
+};
+
+static const char g_sVersus2Names[][] =
+{
+	"2v2 ZoneMod", "2v2 NextMod", "2v2 Acemod RV", "2v2 EQ", "2v2 ZoneHunters"
+};
+
+static const char g_sVersus3Configs[][] =
+{
+	"zm3v3", "nextmod3v3", "amrv3v3", "eq3v3", "zh3v3"
+};
+
+static const char g_sVersus3Names[][] =
+{
+	"3v3 ZoneMod", "3v3 NextMod", "3v3 Acemod RV", "3v3 EQ", "3v3 ZoneHunters"
+};
+
+static const char g_sVersus4Configs[][] =
+{
+	"zonemod",
+	"zoneretro",
+	"neomod",
+	"nextmod",
+	"pmelite",
+	"deadman",
+	"acemodrv",
+	"eq",
+	"apex",
+	"zonehunters"
+};
+
+static const char g_sVersus4Names[][] =
+{
+	"ZoneMod 4v4",
+	"ZoneMod Retro 4v4",
+	"NeoMod 4v4",
+	"NextMod 4v4",
+	"Promod Elite 4v4",
+	"Deadman 4v4",
+	"Acemod RV 4v4",
+	"Equilibrium 4v4",
+	"Apex 4v4",
+	"ZoneHunters 4v4"
 };
 
 bool g_bAutoShown[MAXPLAYERS + 1];
 bool g_bVeteransAvailable = false;
 bool g_bConfoglAvailable = false;
 bool g_bLeft4DHooksAvailable = false;
+bool g_bRpgAvailable = false;
 int g_iRetryCount[MAXPLAYERS + 1];
 
 ConVar g_hEnabled = null;
@@ -44,26 +216,29 @@ ConVar g_hInitialDelay = null;
 ConVar g_hRetryDelay = null;
 ConVar g_hMaxRetries = null;
 ConVar g_hServerAutoStopMinutes = null;
+ConVar g_hPermanentDisableMinutes = null;
 ConVar g_hSuppressWhenModeLoaded = null;
 
 public void OnPluginStart()
 {
 	LoadTranslations("new_player_guide.phrases");
 
-	g_hEnabled = CreateConVar("sm_new_player_guide_enable", "1", "Enable automatic new player guide prompts.", _, true, 0.0, true, 1.0);
-	g_hInitialDelay = CreateConVar("sm_new_player_guide_initial_delay", "10.0", "Delay before the first automatic guide prompt check.", _, true, 1.0, true, 120.0);
-	g_hRetryDelay = CreateConVar("sm_new_player_guide_retry_delay", "5.0", "Delay between playtime API retries.", _, true, 1.0, true, 60.0);
-	g_hMaxRetries = CreateConVar("sm_new_player_guide_max_retries", "10", "How many times to wait for playtime data before showing the beginner guide.", _, true, 0.0, true, 30.0);
-	g_hServerAutoStopMinutes = CreateConVar("sm_new_player_guide_server_stop_minutes", "1200", "This-server playtime in minutes after which automatic guide prompts stop.", _, true, 0.0, true, 100000.0);
-	g_hSuppressWhenModeLoaded = CreateConVar("sm_new_player_guide_suppress_mode_loaded", "1", "Suppress automatic guide prompts when Confogl match mode is loaded.", _, true, 0.0, true, 1.0);
+	g_hEnabled = CreateConVar("sm_anne_mode_guide_enable", "1", "Enable automatic Anne mode guide prompts.", _, true, 0.0, true, 1.0);
+	g_hInitialDelay = CreateConVar("sm_anne_mode_guide_initial_delay", "10.0", "Delay before the first automatic mode guide check.", _, true, 1.0, true, 120.0);
+	g_hRetryDelay = CreateConVar("sm_anne_mode_guide_retry_delay", "5.0", "Delay between playtime and preference retries.", _, true, 1.0, true, 60.0);
+	g_hMaxRetries = CreateConVar("sm_anne_mode_guide_max_retries", "10", "How many times to wait for playtime and preference data.", _, true, 0.0, true, 30.0);
+	g_hServerAutoStopMinutes = CreateConVar("sm_anne_mode_guide_server_stop_minutes", "1800", "This-server playtime in minutes after which automatic prompts stop.", _, true, 0.0, true, 100000.0);
+	g_hPermanentDisableMinutes = CreateConVar("sm_anne_mode_guide_permanent_disable_minutes", "600", "This-server playtime in minutes required before the permanent prompt toggle appears.", _, true, 0.0, true, 100000.0);
+	g_hSuppressWhenModeLoaded = CreateConVar("sm_anne_mode_guide_suppress_mode_loaded", "1", "Suppress automatic prompts when a Confogl match mode is loaded.", _, true, 0.0, true, 1.0);
 
 	RegConsoleCmd("sm_guide", Command_Guide);
 	RegConsoleCmd("sm_modes", Command_Guide);
 	RegConsoleCmd("sm_modeguide", Command_Guide);
+	RegConsoleCmd("sm_anneguide", Command_Guide);
 
 	HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
 
-	AutoExecConfig(true, "new_player_guide");
+	AutoExecConfig(true, "anne_mode_guide");
 	RefreshLibraries();
 }
 
@@ -86,6 +261,10 @@ public void OnLibraryAdded(const char[] name)
 	{
 		g_bLeft4DHooksAvailable = true;
 	}
+	else if (StrEqual(name, "rpg"))
+	{
+		g_bRpgAvailable = true;
+	}
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -101,6 +280,10 @@ public void OnLibraryRemoved(const char[] name)
 	else if (StrEqual(name, "left4dhooks"))
 	{
 		g_bLeft4DHooksAvailable = false;
+	}
+	else if (StrEqual(name, "rpg"))
+	{
+		g_bRpgAvailable = false;
 	}
 }
 
@@ -151,7 +334,7 @@ public Action Command_Guide(int client, int args)
 		return Plugin_Handled;
 	}
 
-	ShowGuide(client, true);
+	ShowMainGuideMenu(client, GUIDE_MENU_TIMEOUT);
 	return Plugin_Handled;
 }
 
@@ -196,13 +379,15 @@ void TryAutoGuide(int client)
 
 	if (!CanReadVeterans())
 	{
-		RetryAutoGuide(client);
+		if (RetryAutoGuide(client))
+		{
+			return;
+		}
 		return;
 	}
 
 	int totalMinutes = GetBestTotalMinutes(client);
 	int serverMinutes = GetServerMinutes(client);
-
 	if (!IsPlaytimeReady(totalMinutes, serverMinutes) && RetryAutoGuide(client))
 	{
 		return;
@@ -213,7 +398,20 @@ void TryAutoGuide(int client)
 		return;
 	}
 
-	ShowAutoGuidePanel(client);
+	bool preferenceReady;
+	bool promptEnabled;
+	GetGuidePromptPreference(client, preferenceReady, promptEnabled);
+	if (!preferenceReady && RetryAutoGuide(client))
+	{
+		return;
+	}
+
+	if (preferenceReady && !promptEnabled)
+	{
+		return;
+	}
+
+	ShowMainGuideMenu(client, GUIDE_MENU_TIMEOUT);
 	g_bAutoShown[client] = true;
 }
 
@@ -229,124 +427,369 @@ bool RetryAutoGuide(int client)
 	return true;
 }
 
-void ShowGuide(int client, bool manual)
+void ShowMainGuideMenu(int client, int timeout)
 {
-	int totalMinutes = GetBestTotalMinutes(client);
-	int serverMinutes = GetServerMinutes(client);
+	char title[256];
+	char totalHours[32];
+	char serverHours[32];
+	FormatPlaytime(client, GetBestTotalMinutes(client), false, totalHours, sizeof(totalHours));
+	FormatPlaytime(client, GetServerMinutes(client), true, serverHours, sizeof(serverHours));
+	FormatEx(title, sizeof(title), "%T", "NPG_MenuTitle", client, totalHours, serverHours);
 
-	char totalHours[16];
-	char serverHours[16];
-	char stopHours[16];
-	FormatHours(totalMinutes, totalHours, sizeof(totalHours));
-	FormatHours(serverMinutes, serverHours, sizeof(serverHours));
-	FormatHours(GetServerAutoStopMinutes(), stopHours, sizeof(stopHours));
+	Menu menu = new Menu(MainGuideMenuHandler);
+	menu.SetTitle(title);
+	AddTranslatedMenuItem(menu, client, "solo", "NPG_CategorySolo");
+	AddTranslatedMenuItem(menu, client, "coop", "NPG_CategoryCoop");
+	AddTranslatedMenuItem(menu, client, "versus", "NPG_CategoryVersus");
 
-	CPrintToChat(client, "%t", "NPG_Header", totalHours, serverHours);
-
-	switch (GetGuideTier(totalMinutes))
+	bool preferenceReady;
+	bool promptEnabled;
+	GetGuidePromptPreference(client, preferenceReady, promptEnabled);
+	if (preferenceReady && CanPersistGuidePreference(client))
 	{
-		case GuideTier_Beginner:
+		AddTranslatedMenuItem(menu, client, "prompt_toggle", promptEnabled ? "NPG_PermanentDisable" : "NPG_PermanentEnable");
+	}
+
+	menu.ExitButton = true;
+	menu.Display(client, timeout);
+}
+
+public int MainGuideMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	if (action == MenuAction_End)
+	{
+		delete menu;
+	}
+	else if (action == MenuAction_Select)
+	{
+		char info[64];
+		menu.GetItem(param2, info, sizeof(info));
+		if (StrEqual(info, "solo"))
 		{
-			CPrintToChat(client, "%t", "NPG_Beginner");
+			ShowSoloMenu(param1);
 		}
-		case GuideTier_Intermediate:
+		else if (StrEqual(info, "coop"))
 		{
-			CPrintToChat(client, "%t", "NPG_Intermediate");
+			ShowCoopProfileMenu(param1);
 		}
-		case GuideTier_Experienced:
+		else if (StrEqual(info, "versus"))
 		{
-			CPrintToChat(client, "%t", "NPG_Experienced");
+			ShowVersusSizeMenu(param1);
+		}
+		else if (StrEqual(info, "prompt_toggle"))
+		{
+			ToggleGuidePreference(param1);
 		}
 	}
 
-	CPrintToChat(client, "%t", "NPG_Commands");
-	CPrintToChat(client, "%t", "NPG_AutoStops", stopHours);
-
-	if (manual && IsServerModeLoaded())
-	{
-		CPrintToChat(client, "%t", "NPG_MatchLoaded");
-	}
-}
-
-void ShowAutoGuidePanel(int client)
-{
-	int totalMinutes = GetBestTotalMinutes(client);
-	int serverMinutes = GetServerMinutes(client);
-
-	char totalHours[16];
-	char serverHours[16];
-	char stopHours[16];
-	FormatHours(totalMinutes, totalHours, sizeof(totalHours));
-	FormatHours(serverMinutes, serverHours, sizeof(serverHours));
-	FormatHours(GetServerAutoStopMinutes(), stopHours, sizeof(stopHours));
-
-	char buffer[192];
-	Panel panel = new Panel();
-
-	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelTitle", client);
-	panel.SetTitle(buffer);
-
-	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelPlaytime", client, totalHours, serverHours);
-	panel.DrawText(buffer);
-	panel.DrawText(" ");
-
-	switch (GetGuideTier(totalMinutes))
-	{
-		case GuideTier_Beginner:
-		{
-			AddGuidePanelText(client, panel, "NPG_PanelBeginner");
-		}
-		case GuideTier_Intermediate:
-		{
-			AddGuidePanelText(client, panel, "NPG_PanelIntermediate");
-		}
-		case GuideTier_Experienced:
-		{
-			AddGuidePanelText(client, panel, "NPG_PanelExperienced");
-		}
-	}
-
-	panel.DrawText(" ");
-	AddGuidePanelText(client, panel, "NPG_PanelCommands1");
-	AddGuidePanelText(client, panel, "NPG_PanelCommands2");
-
-	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelAutoStops", client, stopHours);
-	panel.DrawText(buffer);
-	panel.DrawItem("", ITEMDRAW_SPACER);
-
-	FormatEx(buffer, sizeof(buffer), "%T", "NPG_PanelClose", client);
-	panel.CurrentKey = GetMaxPageItems(panel.Style);
-	panel.DrawItem(buffer, ITEMDRAW_CONTROL);
-
-	panel.Send(client, GuidePanelHandler, 45);
-	delete panel;
-}
-
-void AddGuidePanelText(int client, Panel panel, const char[] phrase)
-{
-	char buffer[192];
-	FormatEx(buffer, sizeof(buffer), "%T", phrase, client);
-	panel.DrawText(buffer);
-}
-
-public int GuidePanelHandler(Menu menu, MenuAction action, int param1, int param2)
-{
 	return 0;
 }
 
-GuideTier GetGuideTier(int totalMinutes)
+void ShowSoloMenu(int client)
 {
-	if (totalMinutes < TOTAL_BEGINNER_MINUTES)
+	Menu menu = CreateTranslatedModeMenu(client, "NPG_TitleSolo", g_sSoloConfigs, g_sSoloPhrases, sizeof(g_sSoloConfigs), SoloMenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowCoopProfileMenu(int client)
+{
+	Menu menu = CreateGuideMenu(client, "NPG_TitleCoopProfile", CoopProfileMenuHandler);
+	AddTranslatedMenuItem(menu, client, "easy", "NPG_ProfileNew");
+	AddTranslatedMenuItem(menu, client, "normal", "NPG_ProfileExperienced");
+	AddTranslatedMenuItem(menu, client, "hard", "NPG_ProfileHardcore");
+	AddTranslatedMenuItem(menu, client, "fun", "NPG_ProfileFun");
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+public int CoopProfileMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	if (action == MenuAction_End)
 	{
-		return GuideTier_Beginner;
+		delete menu;
+	}
+	else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		ShowMainGuideMenu(param1, GUIDE_MENU_TIMEOUT);
+	}
+	else if (action == MenuAction_Select)
+	{
+		char info[32];
+		menu.GetItem(param2, info, sizeof(info));
+		if (StrEqual(info, "easy"))
+		{
+			ShowEasyMenu(param1);
+		}
+		else if (StrEqual(info, "normal"))
+		{
+			ShowNormalMenu(param1);
+		}
+		else if (StrEqual(info, "hard"))
+		{
+			ShowHardMenu(param1);
+		}
+		else if (StrEqual(info, "fun"))
+		{
+			ShowFunMenu(param1);
+		}
 	}
 
-	if (totalMinutes < TOTAL_INTERMEDIATE_MINUTES)
+	return 0;
+}
+
+void ShowEasyMenu(int client)
+{
+	Menu menu = CreateTranslatedModeMenu(client, "NPG_TitleEasy", g_sEasyConfigs, g_sEasyPhrases, sizeof(g_sEasyConfigs), EasyMenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowNormalMenu(int client)
+{
+	Menu menu = CreateTranslatedModeMenu(client, "NPG_TitleNormal", g_sNormalConfigs, g_sNormalPhrases, sizeof(g_sNormalConfigs), NormalMenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowHardMenu(int client)
+{
+	Menu menu = CreateTranslatedModeMenu(client, "NPG_TitleHard", g_sHardConfigs, g_sHardPhrases, sizeof(g_sHardConfigs), HardMenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowFunMenu(int client)
+{
+	Menu menu = CreateTranslatedModeMenu(client, "NPG_TitleFun", g_sFunConfigs, g_sFunPhrases, sizeof(g_sFunConfigs), FunMenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowVersusSizeMenu(int client)
+{
+	Menu menu = CreateGuideMenu(client, "NPG_TitleVersusSize", VersusSizeMenuHandler);
+	menu.AddItem("1v1", "1v1");
+	menu.AddItem("2v2", "2v2");
+	menu.AddItem("3v3", "3v3");
+	menu.AddItem("4v4", "4v4");
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+public int VersusSizeMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	if (action == MenuAction_End)
 	{
-		return GuideTier_Intermediate;
+		delete menu;
+	}
+	else if (action == MenuAction_Cancel && param2 == MenuCancel_ExitBack)
+	{
+		ShowMainGuideMenu(param1, GUIDE_MENU_TIMEOUT);
+	}
+	else if (action == MenuAction_Select)
+	{
+		char info[16];
+		menu.GetItem(param2, info, sizeof(info));
+		if (StrEqual(info, "1v1"))
+		{
+			ShowVersus1Menu(param1);
+		}
+		else if (StrEqual(info, "2v2"))
+		{
+			ShowVersus2Menu(param1);
+		}
+		else if (StrEqual(info, "3v3"))
+		{
+			ShowVersus3Menu(param1);
+		}
+		else if (StrEqual(info, "4v4"))
+		{
+			ShowVersus4Menu(param1);
+		}
 	}
 
-	return GuideTier_Experienced;
+	return 0;
+}
+
+void ShowVersus1Menu(int client)
+{
+	Menu menu = CreateNamedModeMenu(client, "NPG_TitleVersus1", g_sVersus1Configs, g_sVersus1Names, sizeof(g_sVersus1Configs), Versus1MenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowVersus2Menu(int client)
+{
+	Menu menu = CreateNamedModeMenu(client, "NPG_TitleVersus2", g_sVersus2Configs, g_sVersus2Names, sizeof(g_sVersus2Configs), Versus2MenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowVersus3Menu(int client)
+{
+	Menu menu = CreateNamedModeMenu(client, "NPG_TitleVersus3", g_sVersus3Configs, g_sVersus3Names, sizeof(g_sVersus3Configs), Versus3MenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+void ShowVersus4Menu(int client)
+{
+	Menu menu = CreateNamedModeMenu(client, "NPG_TitleVersus4", g_sVersus4Configs, g_sVersus4Names, sizeof(g_sVersus4Configs), Versus4MenuHandler);
+	menu.Display(client, GUIDE_MENU_TIMEOUT);
+}
+
+public int SoloMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Home);
+}
+
+public int EasyMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Coop);
+}
+
+public int NormalMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Coop);
+}
+
+public int HardMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Coop);
+}
+
+public int FunMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Coop);
+}
+
+public int Versus1MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Versus);
+}
+
+public int Versus2MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Versus);
+}
+
+public int Versus3MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Versus);
+}
+
+public int Versus4MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	return HandleModeMenuAction(menu, action, param1, param2, GuideParent_Versus);
+}
+
+int HandleModeMenuAction(Menu menu, MenuAction action, int client, int item, GuideParent parent)
+{
+	if (action == MenuAction_End)
+	{
+		delete menu;
+	}
+	else if (action == MenuAction_Cancel && item == MenuCancel_ExitBack)
+	{
+		ShowParentMenu(client, parent);
+	}
+	else if (action == MenuAction_Select)
+	{
+		char config[64];
+		menu.GetItem(item, config, sizeof(config));
+		FakeClientCommand(client, "sm_match %s", config);
+	}
+
+	return 0;
+}
+
+void ShowParentMenu(int client, GuideParent parent)
+{
+	switch (parent)
+	{
+		case GuideParent_Coop:
+		{
+			ShowCoopProfileMenu(client);
+		}
+		case GuideParent_Versus:
+		{
+			ShowVersusSizeMenu(client);
+		}
+		default:
+		{
+			ShowMainGuideMenu(client, GUIDE_MENU_TIMEOUT);
+		}
+	}
+}
+
+Menu CreateGuideMenu(int client, const char[] titlePhrase, MenuHandler handler)
+{
+	char title[192];
+	FormatEx(title, sizeof(title), "%T", titlePhrase, client);
+	Menu menu = new Menu(handler);
+	menu.SetTitle(title);
+	menu.ExitBackButton = true;
+	return menu;
+}
+
+Menu CreateTranslatedModeMenu(int client, const char[] titlePhrase, const char[][] configs, const char[][] phrases, int count, MenuHandler handler)
+{
+	Menu menu = CreateGuideMenu(client, titlePhrase, handler);
+	for (int i = 0; i < count; i++)
+	{
+		AddTranslatedMenuItem(menu, client, configs[i], phrases[i]);
+	}
+	return menu;
+}
+
+Menu CreateNamedModeMenu(int client, const char[] titlePhrase, const char[][] configs, const char[][] names, int count, MenuHandler handler)
+{
+	Menu menu = CreateGuideMenu(client, titlePhrase, handler);
+	for (int i = 0; i < count; i++)
+	{
+		menu.AddItem(configs[i], names[i]);
+	}
+	return menu;
+}
+
+void AddTranslatedMenuItem(Menu menu, int client, const char[] info, const char[] phrase, int draw = ITEMDRAW_DEFAULT)
+{
+	char buffer[192];
+	FormatEx(buffer, sizeof(buffer), "%T", phrase, client);
+	menu.AddItem(info, buffer, draw);
+}
+
+void ToggleGuidePreference(int client)
+{
+	bool ready;
+	bool enabled;
+	GetGuidePromptPreference(client, ready, enabled);
+	if (!ready || !CanPersistGuidePreference(client)
+		|| !L4D_RPG_SetAnneGuidePrompt(client, !enabled))
+	{
+		CPrintToChat(client, "%t", "NPG_PreferenceUnavailable");
+		return;
+	}
+
+	CPrintToChat(client, "%t", enabled ? "NPG_PreferenceDisabled" : "NPG_PreferenceEnabled");
+}
+
+void GetGuidePromptPreference(int client, bool &ready, bool &enabled)
+{
+	ready = true;
+	enabled = true;
+	if (!g_bRpgAvailable
+		|| GetFeatureStatus(FeatureType_Native, "L4D_RPG_GetAnneGuidePrompt") != FeatureStatus_Available)
+	{
+		return;
+	}
+
+	int value = L4D_RPG_GetAnneGuidePrompt(client);
+	if (value < 0)
+	{
+		ready = false;
+		return;
+	}
+
+	enabled = value != 0;
+}
+
+bool CanPersistGuidePreference(int client)
+{
+	return g_bRpgAvailable
+		&& GetFeatureStatus(FeatureType_Native, "L4D_RPG_SetAnneGuidePrompt") == FeatureStatus_Available
+		&& GetServerMinutes(client) > GetPermanentDisableMinutes();
 }
 
 int GetBestTotalMinutes(int client)
@@ -363,14 +806,14 @@ int GetBestTotalMinutes(int client)
 		return realMinutes;
 	}
 
-	return 0;
+	return -1;
 }
 
 int GetTotalMinutes(int client)
 {
 	if (!CanReadVeterans())
 	{
-		return 0;
+		return -1;
 	}
 
 	return Veterans_Get(client, TIME_TOTAL);
@@ -380,7 +823,7 @@ int GetRealMinutes(int client)
 {
 	if (!CanReadVeterans())
 	{
-		return 0;
+		return -1;
 	}
 
 	return Veterans_Get(client, TIME_REAL);
@@ -390,7 +833,7 @@ int GetServerMinutes(int client)
 {
 	if (!CanReadVeterans())
 	{
-		return 0;
+		return -1;
 	}
 
 	return Veterans_Get(client, TIME_SERVER);
@@ -404,23 +847,24 @@ bool IsPlaytimeReady(int totalMinutes, int serverMinutes)
 int GetServerAutoStopMinutes()
 {
 	int minutes = g_hServerAutoStopMinutes.IntValue;
-	if (minutes <= 0)
-	{
-		return SERVER_AUTO_STOP_MINUTES;
-	}
-
-	return minutes;
+	return minutes > 0 ? minutes : SERVER_AUTO_STOP_MINUTES;
 }
 
-void FormatHours(int minutes, char[] buffer, int maxLength)
+int GetPermanentDisableMinutes()
 {
-	if (minutes <= 0)
+	int minutes = g_hPermanentDisableMinutes.IntValue;
+	return minutes > 0 ? minutes : PERMANENT_DISABLE_MINUTES;
+}
+
+void FormatPlaytime(int client, int minutes, bool zeroIsKnown, char[] buffer, int maxLength)
+{
+	if (minutes < 0 || (!zeroIsKnown && minutes == 0))
 	{
-		strcopy(buffer, maxLength, "0");
+		FormatEx(buffer, maxLength, "%T", "NPG_PlaytimeUnknown", client);
 		return;
 	}
 
-	Format(buffer, maxLength, "%.1f", float(minutes) / 60.0);
+	Format(buffer, maxLength, "%.1f h", float(minutes) / 60.0);
 }
 
 bool CanReadVeterans()
@@ -458,4 +902,5 @@ void RefreshLibraries()
 	g_bVeteransAvailable = LibraryExists("veterans");
 	g_bConfoglAvailable = LibraryExists("confogl");
 	g_bLeft4DHooksAvailable = LibraryExists("left4dhooks");
+	g_bRpgAvailable = LibraryExists("rpg");
 }

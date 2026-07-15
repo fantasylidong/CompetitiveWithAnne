@@ -149,27 +149,6 @@ GetMapTimingDifficulty()
 	return GetCurrentDifficulty();
 }
 
-GetMapTimingDifficultyName(Difficulty, String:Name[], MaxLength)
-{
-	switch (Difficulty)
-	{
-		case 1:
-			strcopy(Name, MaxLength, "简单");
-		case 2:
-			strcopy(Name, MaxLength, "普通");
-		case 3:
-			strcopy(Name, MaxLength, "困难");
-		case 4:
-			strcopy(Name, MaxLength, "专家");
-		case 5:
-			strcopy(Name, MaxLength, "极限");
-		case 6:
-			strcopy(Name, MaxLength, "Neri");
-		default:
-			strcopy(Name, MaxLength, "未知");
-	}
-}
-
 GetMapTimingMode()
 {
 	if (IsWitchParty())
@@ -195,18 +174,37 @@ bool:IsAnneTimingBroadcastMode(Mode)
 	return Mode == 1 || Mode == 6 || Mode == 7;
 }
 
-GetMapTimingModeName(Mode, String:Name[], MaxLength)
+GetMapTimingModePhrase(Mode, String:Phrase[], MaxLength)
 {
 	switch (Mode)
 	{
-		case 1:
-			strcopy(Name, MaxLength, "普通药役");
 		case 6:
-			strcopy(Name, MaxLength, "硬核药役");
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordModeHardcore");
 		case 7:
-			strcopy(Name, MaxLength, "喷子药役");
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordModeShotgun");
 		default:
-			strcopy(Name, MaxLength, "药役");
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordModeNormal");
+	}
+}
+
+GetMapTimingDifficultyPhrase(Difficulty, String:Phrase[], MaxLength)
+{
+	switch (Difficulty)
+	{
+		case 1:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyEasy");
+		case 2:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyNormal");
+		case 3:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyHard");
+		case 4:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyExpert");
+		case 5:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyExtreme");
+		case 6:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyNeri");
+		default:
+			strcopy(Phrase, MaxLength, "L4DStats_MapRecordDifficultyUnknown");
 	}
 }
 
@@ -234,19 +232,36 @@ BuildMapTimingRunPlayerNames(String:Names[], MaxLength)
 
 		GetClientName(i, ClientName, sizeof(ClientName));
 		if (Names[0] == '\0')
-			strcopy(Names, MaxLength, ClientName);
+		{
+			if (strlen(ClientName) < MaxLength)
+			{
+				strcopy(Names, MaxLength, ClientName);
+				shown++;
+			}
+		}
 		else
 		{
 			Format(Buffer, sizeof(Buffer), "%s、%s", Names, ClientName);
-			strcopy(Names, MaxLength, Buffer);
+			if (strlen(Buffer) < MaxLength)
+			{
+				strcopy(Names, MaxLength, Buffer);
+				shown++;
+			}
 		}
-		shown++;
 	}
 
 	if (total > shown)
 	{
-		Format(Buffer, sizeof(Buffer), "%s 等%d人", Names, total);
-		strcopy(Names, MaxLength, Buffer);
+		if (Names[0] != '\0')
+		{
+			Format(Buffer, sizeof(Buffer), "%s 等%d人", Names, total);
+			if (strlen(Buffer) < MaxLength)
+				strcopy(Names, MaxLength, Buffer);
+			else
+				Format(Names, MaxLength, "队伍%d人", total);
+		}
+		else
+			Format(Names, MaxLength, "队伍%d人", total);
 	}
 	else if (Names[0] == '\0')
 	{
@@ -360,7 +375,7 @@ public bool StopMapTiming()
 	decl String:RunID[64];
 	Format(RunID, sizeof(RunID), "%i_%i_%i", GetTime(), RoundToFloor(TotalTime * 1000.0), GetRandomInt(1000, 9999));
 
-	decl String:RunPlayers[MAX_MESSAGE_WIDTH];
+	decl String:RunPlayers[MAP_RECORD_PLAYER_NAMES_MAX];
 	BuildMapTimingRunPlayerNames(RunPlayers, sizeof(RunPlayers));
 	MaybeAnnounceAnneNoBuyFastest(MapName, TotalTime, PlayerCounter, GameDifficulty, mode, RunPlayers);
 
@@ -433,7 +448,8 @@ MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCou
 	if (g_bMapTimingGlobalBroadcastSent || db == INVALID_HANDLE)
 		return;
 
-	if (!IsAnneTimingBroadcastMode(Mode) || GetAnneSISpawnTime() != 16)
+	new SISpawnTime = GetAnneSISpawnTime();
+	if (!IsAnneTimingBroadcastMode(Mode) || SISpawnTime <= 0)
 		return;
 
 	if (g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY))
@@ -441,14 +457,15 @@ MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCou
 
 	new StatsGamemodeID = Stats_GetCurrentStatsGamemodeID();
 	decl String:query[512];
-	Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND sinum = %i AND sitime = 16 AND anneversion = '%s' AND mode = %i AND usebuy = 0 AND auto = %i AND players = %i ORDER BY time LIMIT 1",
-		DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), GetAnneVersion(), Mode, IsAutoSpawnTime(), PlayerCounter);
+	Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = 0 AND auto = %i AND players = %i ORDER BY time LIMIT 1",
+		DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), SISpawnTime, GetAnneVersion(), Mode, IsAutoSpawnTime(), PlayerCounter);
 
 	new Handle:dp = CreateDataPack();
 	WritePackString(dp, MapName);
 	WritePackFloat(dp, TotalTime);
 	WritePackCell(dp, GameDifficulty);
 	WritePackCell(dp, GetAnneInfectedNumber());
+	WritePackCell(dp, SISpawnTime);
 	WritePackCell(dp, Mode);
 	WritePackString(dp, RunPlayers);
 	WritePackString(dp, GetAnneVersion());
@@ -460,11 +477,12 @@ public SQL_OnCheckAnneNoBuyFastest(Handle:owner, Handle:hndl, const String:error
 {
 	ResetPack(dp);
 	decl String:MapName[MAX_LINE_WIDTH], String:AnneVersion[64], String:RunPlayers[MAX_MESSAGE_WIDTH];
-	new Float:TotalTime, GameDifficulty, InfectedNumber, Mode;
+	new Float:TotalTime, GameDifficulty, InfectedNumber, SISpawnTime, Mode;
 	ReadPackString(dp, MapName, sizeof(MapName));
 	TotalTime = ReadPackFloat(dp);
 	GameDifficulty = ReadPackCell(dp);
 	InfectedNumber = ReadPackCell(dp);
+	SISpawnTime = ReadPackCell(dp);
 	Mode = ReadPackCell(dp);
 	ReadPackString(dp, RunPlayers, sizeof(RunPlayers));
 	ReadPackString(dp, AnneVersion, sizeof(AnneVersion));
@@ -494,17 +512,36 @@ public SQL_OnCheckAnneNoBuyFastest(Handle:owner, Handle:hndl, const String:error
 
 	g_bMapTimingGlobalBroadcastSent = true;
 
-	decl String:TimeLabel[32], String:DifficultyName[16], String:ModeName[32], String:Message[256];
-	SetTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel));
-	GetMapTimingDifficultyName(GameDifficulty, DifficultyName, sizeof(DifficultyName));
-	GetMapTimingModeName(Mode, ModeName, sizeof(ModeName));
-	Format(Message, sizeof(Message), "{olive}[%s地图记录刷新通告]{default}: {olive}%s{default} 在 {lightgreen}[%s]{default} 刷新 {green}%d特16秒无商店%s难度记录{default}，新纪录为 {green}%s{default}。",
-		ModeName, RunPlayers, MapName, InfectedNumber, DifficultyName, TimeLabel);
+	decl String:TimeLabel[32];
+	SetMapRecordTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel));
 
-	if (GetFeatureStatus(FeatureType_Native, "GlobalChat_Broadcast") == FeatureStatus_Available && GlobalChat_Broadcast(Message))
+	if (GetFeatureStatus(FeatureType_Native, "GlobalChat_BroadcastMapRecord") == FeatureStatus_Available &&
+			GlobalChat_BroadcastMapRecord(MapName, RunPlayers, Mode, InfectedNumber, SISpawnTime, GameDifficulty, TimeLabel))
 		return;
 
-	StatsPrintToChatAll("%s", Message);
+	BroadcastMapRecordLocally(MapName, RunPlayers, Mode, InfectedNumber, SISpawnTime, GameDifficulty, TimeLabel);
+}
+
+BroadcastMapRecordLocally(const String:MapName[], const String:RunPlayers[], Mode, InfectedNumber, SISpawnTime, GameDifficulty, const String:TimeLabel[])
+{
+	decl String:ModePhrase[64], String:DifficultyPhrase[64];
+	GetMapTimingModePhrase(Mode, ModePhrase, sizeof(ModePhrase));
+	GetMapTimingDifficultyPhrase(GameDifficulty, DifficultyPhrase, sizeof(DifficultyPhrase));
+
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
+
+		decl String:ModeLabel[64], String:DifficultyLabel[64], String:Summary[256], String:Details[256];
+		Format(ModeLabel, sizeof(ModeLabel), "%T", ModePhrase, i);
+		Format(DifficultyLabel, sizeof(DifficultyLabel), "%T", DifficultyPhrase, i);
+		Format(Summary, sizeof(Summary), "%T", "L4DStats_MapRecordSummary", i, TimeLabel, ModeLabel, MapName);
+		Format(Details, sizeof(Details), "%T", "L4DStats_MapRecordDetails", i, RunPlayers, InfectedNumber, SISpawnTime, DifficultyLabel);
+
+		StatsPrintToChatPreFormatted(i, Summary);
+		StatsPrintToChatPreFormatted(i, Details);
+	}
 }
 
 public GetFastTime(Handle:owner, Handle:hndl, const String:error[], any:dp)
@@ -649,6 +686,22 @@ public SetTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize)
 		Format(TimeLabel, maxsize, "%i 分钟 %.1f 秒", Minutes, Seconds);
 	else
 		Format(TimeLabel, maxsize, "%.1f 秒", Seconds);
+}
+
+SetMapRecordTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize)
+{
+	new TotalTenths = RoundToNearest(TheSeconds * 10.0);
+	new TotalSeconds = TotalTenths / 10;
+	new Tenths = TotalTenths % 10;
+	new Minutes = TotalSeconds / 60;
+	new Seconds = TotalSeconds % 60;
+	new Hours = Minutes / 60;
+	Minutes %= 60;
+
+	if (Hours > 0)
+		Format(TimeLabel, maxsize, "%i:%02i:%02i.%i", Hours, Minutes, Seconds, Tenths);
+	else
+		Format(TimeLabel, maxsize, "%02i:%02i.%i", Minutes, Seconds, Tenths);
 }
 
 public DisplayRankVote(client)

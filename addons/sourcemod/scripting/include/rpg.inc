@@ -40,8 +40,9 @@ public void __pl_rpg_SetNTVOptional()
 	MarkNativeAsOptional("L4D_RPG_GetValue");
 	MarkNativeAsOptional("L4D_RPG_GetGlobalValue");
 	MarkNativeAsOptional("L4D_RPG_SetGlobalValue");
-	// 新增：玩家级 Setter
-    MarkNativeAsOptional("L4D_RPG_SetValue");
+	MarkNativeAsOptional("L4D_RPG_SetValue");
+	MarkNativeAsOptional("L4D_RPG_GetAnneGuidePrompt");
+	MarkNativeAsOptional("L4D_RPG_SetAnneGuidePrompt");
 }
 #endif
 
@@ -123,3 +124,22 @@ native any L4D_RPG_SetGlobalValue(TARGET_VALUE_INDEX option, bool vaule);
 * @return 1为成功，-1失败
 */
 native any L4D_RPG_SetValue(int client, TARGET_VALUE_INDEX option, any value);
+
+/**
+* @brief 返回玩家是否启用 Anne 玩法进服提示
+*
+* @param client   目标玩家
+*
+* @return -1 表示数据尚未就绪；0 表示关闭；1 表示开启
+*/
+native int L4D_RPG_GetAnneGuidePrompt(int client);
+
+/**
+* @brief 设置并持久化玩家的 Anne 玩法进服提示开关
+*
+* @param client   目标玩家
+* @param enabled  是否启用进服提示
+*
+* @return true 表示已接受并提交保存；false 表示当前无法持久化
+*/
+native bool L4D_RPG_SetAnneGuidePrompt(int client, bool enabled);

@@ -4,4 +4,52 @@
 	{
 		"en"		"{green}[{lightgreen}RANK{green}] {default}%s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"en"		"{green}%s{default} {olive}[Map record]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"en"		"{olive}%s{default} set a {green}%d SI / %ds / no-shop / %s difficulty{default} record."
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"en"		"Anne"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"en"		"Hardcore Anne"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"en"		"Shotgun Anne"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"en"		"Easy"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"en"		"Normal"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"en"		"Hard"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"en"		"Expert"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"en"		"Extreme"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"en"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"en"		"Unknown"
+	}
 }

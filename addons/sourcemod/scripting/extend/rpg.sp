@@ -21,6 +21,7 @@
 // 进行 MySQL 连接相关变量
 Handle db = INVALID_HANDLE;
 int g_iDbLoadRetryCount[MAXPLAYERS + 1];
+bool g_bGuidePreferenceColumnAvailable = false;
 enum struct PlayerStruct{
 	int ClientPoints;
 	int ClientBlood;
@@ -29,9 +30,11 @@ enum struct PlayerStruct{
 	int ClientRecoil;
 	int GlowType;
 	int SkinType;
+	int AnneGuidePrompt;
 	bool ClientFirstBuy;
 	bool Check;
 	bool CanBuy;
+	bool DataLoaded;
 	CustomTags tags;
 }
 PlayerStruct player[MAXPLAYERS + 1];
@@ -123,6 +126,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("L4D_RPG_GetGlobalValue",  Native_GetGlobalValue);
     CreateNative("L4D_RPG_SetGlobalValue",  Native_SetGlobalValue);
     CreateNative("L4D_RPG_SetValue",        Native_SetValue); // ★ 新增
+	CreateNative("L4D_RPG_GetAnneGuidePrompt", Native_GetAnneGuidePrompt);
+	CreateNative("L4D_RPG_SetAnneGuidePrompt", Native_SetAnneGuidePrompt);
     return APLRes_Success;
 }
 
@@ -177,6 +182,43 @@ public any Native_GetValue(Handle plugin, int numParams)
 		case INDEX_RECOIL:			return player[client].ClientRecoil;
 	}
 	return -1;
+}
+
+public any Native_GetAnneGuidePrompt(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if (client < 1 || client > MaxClients || !IsClientConnected(client))
+	{
+		return -1;
+	}
+
+	if (!player[client].DataLoaded)
+	{
+		return -1;
+	}
+
+	return player[client].AnneGuidePrompt;
+}
+
+public any Native_SetAnneGuidePrompt(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	bool enabled = GetNativeCell(2) != 0;
+	return SetAnneGuidePromptPreference(client, enabled);
+}
+
+bool SetAnneGuidePromptPreference(int client, bool enabled)
+{
+	if (!IsValidClient(client) || IsFakeClient(client)
+		|| !g_bMysqlSystemAvailable || !g_bGuidePreferenceColumnAvailable
+		|| !player[client].DataLoaded)
+	{
+		return false;
+	}
+
+	player[client].AnneGuidePrompt = enabled ? 1 : 0;
+	ClientSaveToFileSave(client);
+	return true;
 }
 
 public any Native_GetGlobalValue(Handle plugin, int numParams)
@@ -602,6 +644,8 @@ public void  OnPluginStart()
 			player[i].ClientPoints=500;
 			player[i].ClientFirstBuy=false;
 			player[i].CanBuy=true;
+			player[i].AnneGuidePrompt=1;
+			player[i].DataLoaded=false;
 	}
 }
 
@@ -679,6 +723,8 @@ public void Event_PlayerDisconnectOrAFK( Event hEvent, const char[] sName, bool 
 		player[client].CanBuy=true;
 		player[client].ClientPoints = 500;
 		player[client].Check = false;
+		player[client].AnneGuidePrompt = 1;
+		player[client].DataLoaded = false;
 		player[client].tags.ChatTag = NULL_STRING;
 	}
 
@@ -850,6 +896,11 @@ public bool ConnectDB()
 			return false;
 		}
 
+		g_bGuidePreferenceColumnAvailable = EnsureAnneGuidePromptColumn();
+		if (!g_bGuidePreferenceColumnAvailable)
+		{
+			LogError("[RPG] ANNE_GUIDE_PROMPT is unavailable; guide prompts remain enabled without persistence.");
+		}
 	}
 	else
 	{
@@ -859,6 +910,40 @@ public bool ConnectDB()
 	}
 
 	g_bMysqlSystemAvailable = true;
+	return true;
+}
+
+bool EnsureAnneGuidePromptColumn()
+{
+	if (db == INVALID_HANDLE)
+	{
+		return false;
+	}
+
+	Handle result = SQL_Query(db, "SHOW COLUMNS FROM `RPG` LIKE 'ANNE_GUIDE_PROMPT'");
+	if (result == INVALID_HANDLE || result == null)
+	{
+		char error[256];
+		SQL_GetError(db, error, sizeof(error));
+		LogError("[RPG] Failed to inspect ANNE_GUIDE_PROMPT: %s", error);
+		return false;
+	}
+
+	bool exists = SQL_GetRowCount(result) > 0;
+	delete result;
+	if (exists)
+	{
+		return true;
+	}
+
+	if (!SQL_FastQuery(db, "ALTER TABLE `RPG` ADD COLUMN `ANNE_GUIDE_PROMPT` TINYINT NOT NULL DEFAULT 1 AFTER `RECOIL`"))
+	{
+		char error[256];
+		SQL_GetError(db, error, sizeof(error));
+		LogError("[RPG] Failed to add ANNE_GUIDE_PROMPT: %s", error);
+		return false;
+	}
+
 	return true;
 }
 
@@ -876,6 +961,7 @@ void CloseDbConnection()
 		CloseHandle(db);
 		db = INVALID_HANDLE;
 	}
+	g_bGuidePreferenceColumnAvailable = false;
 }
 
 public void SendSQLUpdate(char []query)
@@ -908,6 +994,8 @@ public void OnClientPostAdminCheck(int client)
 	player[client].CanBuy=true;
 	player[client].ClientPoints = 500;
 	player[client].Check = false;
+	player[client].AnneGuidePrompt = 1;
+	player[client].DataLoaded = !g_bMysqlSystemAvailable;
 	g_iDbLoadRetryCount[client] = 0;
 	if(g_bMysqlSystemAvailable)
 	{
@@ -916,6 +1004,8 @@ public void OnClientPostAdminCheck(int client)
 		player[client].ClientHat = 0;
 		player[client].GlowType = 0;
 		player[client].SkinType = 0;
+		player[client].AnneGuidePrompt = 1;
+		player[client].DataLoaded = false;
 		player[client].tags.ChatTag = NULL_STRING;
 		ClientSaveToFileLoad(client);
 	}
@@ -928,6 +1018,8 @@ public void OnClientDisconnect(int client)
 	g_iDbLoadRetryCount[client] = 0;
 	g_bPendingCustomTagApply[client] = false;
 	g_bPendingGlowRetry[client] = false;
+	player[client].AnneGuidePrompt = 1;
+	player[client].DataLoaded = false;
 }
 
 public Action RpgGlowDebug(int client, int args)
@@ -1169,7 +1261,14 @@ public void ClientSaveToFileLoad(int Client)
 	char SteamID[64];
 	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
 	if(StrEqual(SteamID,"BOT"))return;
-	SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG FROM RPG WHERE steamid = '%s'", SteamID);
+	if (g_bGuidePreferenceColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG,ANNE_GUIDE_PROMPT FROM RPG WHERE steamid = '%s'", SteamID);
+	}
+	else
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG FROM RPG WHERE steamid = '%s'", SteamID);
+	}
 	SQL_TQuery(db, ShowMelee, query, GetClientUserId(Client));
 	return;
 }
@@ -1185,7 +1284,14 @@ public void ClientSaveToFileCreate(int Client)
 	char SteamID[64];
 	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
 	if(StrEqual(SteamID,"BOT"))return;
-	SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL) VALUES ('%s',%d,%d,%d,%d,%d,%d)", SteamID, 0, 0, 0, 0, 0, 1);
+	if (g_bGuidePreferenceColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,ANNE_GUIDE_PROMPT) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d)", SteamID, 0, 0, 0, 0, 0, 1, 1);
+	}
+	else
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL) VALUES ('%s',%d,%d,%d,%d,%d,%d)", SteamID, 0, 0, 0, 0, 0, 1);
+	}
 	SendSQLUpdate(query);
 	return;
 }
@@ -1223,7 +1329,14 @@ public void ClientSaveToFileSave(int Client)
 	char SteamID[64];
 	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
 	if(StrEqual(SteamID,"BOT"))return;
-	SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, SteamID);
+	if (g_bGuidePreferenceColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d,ANNE_GUIDE_PROMPT=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt, SteamID);
+	}
+	else
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, SteamID);
+	}
 	SendSQLUpdate(query);
 	return;
 }
@@ -1618,7 +1731,11 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 		{
 			g_iDbLoadRetryCount[client]++;
 			CreateTimer(RPG_DB_LOAD_RETRY_DELAY, Timer_RetryClientLoad, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+			return;
 		}
+
+		player[client].AnneGuidePrompt = 1;
+		player[client].DataLoaded = true;
 		return;
 	}
 
@@ -1633,13 +1750,17 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
  		player[client].SkinType = SQL_FetchInt(hndl, 4);
 		player[client].ClientRecoil = SQL_FetchInt(hndl, 5);
 		FakeClientCommand(client, "sm_recoil %d", player[client].ClientRecoil);
- 		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
+		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
+		player[client].AnneGuidePrompt = g_bGuidePreferenceColumnAvailable ? SQL_FetchInt(hndl, 7) : 1;
+		player[client].DataLoaded = true;
 		ApplyCustomTagIfReady(client);
 		ValidateClientGlow(client, true, true);
 	}
 	else
 	{
 		CPrintToChat(client, "%t", "RPG_NewUserCreatingDatabase");
+		player[client].AnneGuidePrompt = 1;
+		player[client].DataLoaded = true;
 		ClientSaveToFileCreate(client);
 	}
 }

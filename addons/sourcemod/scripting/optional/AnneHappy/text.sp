@@ -17,9 +17,6 @@ ConVar
 	g_hCvarTankBhop,
 	g_hCvarWeapon,
 	g_hCvarCoop,
-	g_hAutoSpawnTimeControl,
-	g_hCvarTraitorEnable,
-	g_hCvarTraitorMaxSlots,
 	g_hCvarPluginVersion,
 	g_hCvarAiDynamicEnable,
 	g_hCvarAiCurrentLevel,
@@ -40,20 +37,21 @@ public void OnPluginStart()
 	g_hCvarInfectedTime = FindConVar("versus_special_respawn_interval");
 	g_hCvarInfectedLimit = FindConVar("l4d_infected_limit");
 	g_hCvarTankBhop = FindConVar("ai_Tank_Bhop");
-	g_hAutoSpawnTimeControl = FindConVar("inf_EnableAutoSpawnTime");
-	RefreshTraitorCvars();
 	RefreshDynamicAiCvars();
 	g_hCvarWeapon = CreateConVar("ZonemodWeapon", "0", "", 0, false, 0.0, false, 0.0);
 	g_hCvarPluginVersion = CreateConVar("AnnePluginVersion", "Latest", "Anne插件版本");
-	HookConVarChange(g_hCvarInfectedTime, Cvar_InfectedTime);
+	if(g_hCvarInfectedTime != null)
+		HookConVarChange(g_hCvarInfectedTime, Cvar_InfectedTime);
 	if(g_hCvarInfectedLimit != null)
 		HookConVarChange(g_hCvarInfectedLimit, Cvar_InfectedLimit);
 	if(g_hCvarTankBhop != null)
 		HookConVarChange(g_hCvarTankBhop, CvarTankBhop);
 	HookConVarChange(g_hCvarWeapon, CvarWeapon);
 	HookConVarChange(g_hCvarPluginVersion, CvarPluginVersion);
-	CommonTime = GetConVarInt(g_hCvarInfectedTime);
-	CommonLimit = GetConVarInt(g_hCvarInfectedLimit);
+	if(g_hCvarInfectedTime != null)
+		CommonTime = GetConVarInt(g_hCvarInfectedTime);
+	if(g_hCvarInfectedLimit != null)
+		CommonLimit = GetConVarInt(g_hCvarInfectedLimit);
 	if(g_hCvarTankBhop != null)
 		TankBhop = GetConVarInt(g_hCvarTankBhop);
 	Weapon = GetConVarInt(g_hCvarWeapon);
@@ -68,7 +66,6 @@ public void OnPluginStart()
 
 public void OnAllPluginsLoaded()
 {
-	RefreshTraitorCvars();
 	RefreshDynamicAiCvars();
 }
 
@@ -127,7 +124,10 @@ public void Cvar_InfectedLimit(ConVar convar, const char[] oldValue, const char[
 {
 	CommonLimit = GetConVarInt(g_hCvarInfectedLimit);
 	char tags[64];
-	GetConVarString(FindConVar("l4d_ready_cfg_name"), tags, sizeof(tags));
+	tags[0] = '\0';
+	ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+	if(readyCfgName != null)
+		GetConVarString(readyCfgName, tags, sizeof(tags));
 	if (Weapon == 2 && CommonLimit< 10 && ( StrContains(tags, "WitchParty", false) != -1 || StrContains(tags, "AllCharger", false) != -1 || StrContains(tags, "AnneHappy", false) != -1))
 	{
 		ServerCommand("sm_cvar ZonemodWeapon 0");
@@ -151,7 +151,10 @@ public void CvarWeapon(ConVar convar, const char[] oldValue, const char[] newVal
 {
 	Weapon = GetConVarInt(g_hCvarWeapon);
 	char tags[64];
-	GetConVarString(FindConVar("l4d_ready_cfg_name"), tags, sizeof(tags));
+	tags[0] = '\0';
+	ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+	if(readyCfgName != null)
+		GetConVarString(readyCfgName, tags, sizeof(tags));
 	if (Weapon == 1)
 	{
 		ServerCommand("exec vote/weapon/zonemod.cfg");
@@ -180,6 +183,7 @@ void printinfo(int client = 0, bool All = true){
 	char buffer2[256];
 	char buffer3[256];
 	char aiBuffer[64];
+	buffer3[0] = '\0';
 	if(g_hCvarTankBhop != null){
 		Format(buffer, sizeof(buffer), "{lightgreen}Tank连跳{olive}[{green}%s{olive}]", TankBhop > 0?"开启":"关闭");
 		Format(buffer, sizeof(buffer), "%s {lightgreen}武器{olive}[{green}%s{olive}]", buffer, Weapon > 0?(Weapon > 1?"Anne+":"Zone"):"Anne");
@@ -193,55 +197,61 @@ void printinfo(int client = 0, bool All = true){
 
 	if(PLUGIN_VERSION[0] == '\0')
 	GetConVarString(g_hCvarPluginVersion, PLUGIN_VERSION, sizeof(PLUGIN_VERSION));
-	Format(buffer2, sizeof(buffer2), "{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}电信服{olive}[{green}%s{olive}]", (g_hAutoSpawnTimeControl != null && g_hAutoSpawnTimeControl.BoolValue)?"自动":"固定", CommonLimit, CommonTime, PLUGIN_VERSION);
-	int max_dist = GetConVarInt(FindConVar("inf_SpawnDistanceMin"));
-	Format(buffer3, sizeof(buffer3), "{lightgreen}特感最近生成距离{olive}[{green}%d{olive}]", max_dist);
-	if(FindConVar("inf_TeleportCheckTime")){
-		int Teleport_CheckTime = GetConVarInt(FindConVar("inf_TeleportCheckTime"));
+	ConVar autoSpawnTimeControl = FindConVar("inf_EnableAutoSpawnTime");
+	Format(buffer2, sizeof(buffer2), "{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}电信服{olive}[{green}%s{olive}]", (autoSpawnTimeControl != null && autoSpawnTimeControl.BoolValue)?"自动":"固定", CommonLimit, CommonTime, PLUGIN_VERSION);
+	ConVar spawnDistanceMin = FindConVar("inf_SpawnDistanceMin");
+	if(spawnDistanceMin != null)
+	{
+		int max_dist = GetConVarInt(spawnDistanceMin);
+		Format(buffer3, sizeof(buffer3), "{lightgreen}特感最近生成距离{olive}[{green}%d{olive}]", max_dist);
+	}
+	ConVar teleportCheckTime = FindConVar("inf_TeleportCheckTime");
+	if(teleportCheckTime != null){
+		int Teleport_CheckTime = GetConVarInt(teleportCheckTime);
 		Format(buffer3, sizeof(buffer3), "%s {lightgreen}特感传送条件{olive}[{green}%d秒不可见{olive}]", buffer3, Teleport_CheckTime);
 	}
-	if(FindConVar("ReturnBlood") && GetConVarInt(FindConVar("ReturnBlood")) > 0)
+	ConVar returnBlood = FindConVar("ReturnBlood");
+	if(returnBlood != null && GetConVarInt(returnBlood) > 0)
 		Format(buffer3, sizeof(buffer3), "%s {lightgreen}回血{olive}[{green}开启{olive}]", buffer3);
-	if(FindConVar("ai_TankConsume") && GetConVarInt(FindConVar("ai_TankConsume")) > 0)
+	ConVar tankConsume = FindConVar("ai_TankConsume");
+	ConVar tankSneakTime = FindConVar("ai_TankSneakTime");
+	if(tankConsume != null && GetConVarInt(tankConsume) > 0)
 		Format(buffer3, sizeof(buffer3), "%s {lightgreen}坦克消耗{olive}[{green}开启{olive}]", buffer3);
-	else if(FindConVar("ai_TankSneakTime") && GetConVarFloat(FindConVar("ai_TankSneakTime")) > 0.0)
+	else if(tankSneakTime != null && GetConVarFloat(tankSneakTime) > 0.0)
 	{
 		Format(buffer3, sizeof(buffer3), "%s {lightgreen}狡猾坦克{olive}[{green}开启{olive}]", buffer3);
 	}
 	if(All){
 		CPrintToChatAll(buffer);
 		CPrintToChatAll(buffer2);
-		CPrintToChatAll(buffer3);
+		if(buffer3[0] != '\0')
+			CPrintToChatAll(buffer3);
 		PrintTraitorStatus();
 	}else
 	{
 		CPrintToChat(client, buffer);
 		CPrintToChat(client, buffer2);
-		CPrintToChat(client, buffer3);
+		if(buffer3[0] != '\0')
+			CPrintToChat(client, buffer3);
 		PrintTraitorStatus(client, false);
 	}
 }
 
-void RefreshTraitorCvars()
-{
-	if(g_hCvarTraitorEnable == null)
-		g_hCvarTraitorEnable = FindConVar("inf_traitor_enable");
-	if(g_hCvarTraitorMaxSlots == null)
-		g_hCvarTraitorMaxSlots = FindConVar("inf_traitor_max_slots");
-}
-
 void PrintTraitorStatus(int client = 0, bool all = true)
 {
-	RefreshTraitorCvars();
-	if(g_hCvarTraitorEnable == null || g_hCvarTraitorMaxSlots == null)
+	ConVar traitorEnable = FindConVar("inf_traitor_enable");
+	ConVar traitorMaxSlots = FindConVar("inf_traitor_max_slots");
+	if(traitorEnable == null || traitorMaxSlots == null)
 		return;
 
 	char phrase[64];
-	strcopy(phrase, sizeof(phrase), g_hCvarTraitorEnable.BoolValue
+	strcopy(phrase, sizeof(phrase), traitorEnable.BoolValue
 		? "Text_TraitorStatusEnabled"
 		: "Text_TraitorStatusDisabled");
+	if(!TranslationPhraseExists(phrase))
+		return;
 
-	int slots = g_hCvarTraitorMaxSlots.IntValue;
+	int slots = traitorMaxSlots.IntValue;
 	if(all)
 		CPrintToChatAll("%t", phrase, slots);
 	else if(client >= 1 && client <= MaxClients && IsClientInGame(client))

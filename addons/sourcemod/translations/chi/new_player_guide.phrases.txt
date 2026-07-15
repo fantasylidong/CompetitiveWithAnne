@@ -1,67 +1,247 @@
 "Phrases"
 {
-	"NPG_Header"
+	"NPG_MenuTitle"
 	{
-		"chi"		"{default}[{green}Anne玩法{default}] 你总时长 {green}%s h{default}，本服 {green}%s h{default}。大概给你指个路："
+		"chi"		"Anne电信服模式向导\nL4D2总时长: %s | 本服: %s\n这次准备玩什么？"
 	}
-	"NPG_Beginner"
+	"NPG_PlaytimeUnknown"
 	{
-		"chi"		"{olive}先打默认战役，不用切模式。想节奏快一点再试 Anne 战役，特感刷新会明显更快。"
+		"chi"		"未知"
 	}
-	"NPG_Intermediate"
+	"NPG_CategorySolo"
 	{
-		"chi"		"{olive}可以试 Anne 战役和绝境求生。规则不绕，但节奏已经接近 Anne 模式，路线熟了再往更硬的配置上走。"
+		"chi"		"单人模式"
 	}
-	"NPG_Experienced"
+	"NPG_CategoryCoop"
 	{
-		"chi"		"{olive}可以直接翻完整 !match 菜单了：AnneHappy、硬核、喷子、1vHT、女巫派对、牛牛，Anne 战役/绝境/写实，Not0721，还有 ZoneMod、NextMod、EQ、AMR、Apex、ZoneHunters 这些对抗配置。"
+		"chi"		"多人合作模式"
 	}
-	"NPG_Commands"
+	"NPG_CategoryVersus"
 	{
-		"chi"		"{default}常用：{green}!join{default} 加入生还，{green}!away{default} 旁观，{green}!match{default} 选模式，{green}!rmatch{default} 卸载模式，{green}!mapvote{default} 投图，{green}!xx{default} 看 Anne 状态，{green}!rank{default} 排名，{green}!web{default}/{green}!ip{default} 网页和地址。"
+		"chi"		"对抗模式"
 	}
-	"NPG_AutoStops"
+	"NPG_PermanentDisable"
 	{
-		"chi"		"{default}本服玩到 {green}%s h{default} 后就不再自动提示。以后想看，输入 {green}!guide{default} 或 {green}!modes{default}。"
+		"chi"		"永久关闭Anne玩法进服提示"
 	}
-	"NPG_PanelTitle"
+	"NPG_PermanentEnable"
 	{
-		"chi"		"Anne玩法"
+		"chi"		"重新开启Anne玩法进服提示"
 	}
-	"NPG_PanelPlaytime"
+	"NPG_PreferenceDisabled"
 	{
-		"chi"		"L4D2: %s h | 本服: %s h"
+		"chi"		"{green}已永久关闭Anne玩法进服提示，可用{olive}!guide{green}重新开启。"
 	}
-	"NPG_PanelBeginner"
+	"NPG_PreferenceEnabled"
 	{
-		"chi"		"先打默认战役；想快节奏再试 Anne 战役。"
+		"chi"		"{green}已重新开启Anne玩法进服提示。"
 	}
-	"NPG_PanelIntermediate"
+	"NPG_PreferenceUnavailable"
 	{
-		"chi"		"试 Anne 战役或绝境求生。路线熟了再上更硬配置。"
+		"chi"		"{olive}当前无法保存Anne玩法提示设置。"
 	}
-	"NPG_PanelExperienced"
+	"NPG_TitleSolo"
 	{
-		"chi"		"用 !match 选 Anne、Not0721 或各类对抗配置。"
+		"chi"		"Anne模式向导 > 单人模式\n你想练什么？"
 	}
-	"NPG_PanelCommands1"
+	"NPG_TitleCoopProfile"
 	{
-		"chi"		"常用: !join !away !match !rmatch !mapvote"
+		"chi"		"Anne模式向导 > 多人合作\n你们这队大部分人是什么水平？"
 	}
-	"NPG_PanelCommands2"
+	"NPG_TitleEasy"
 	{
-		"chi"		"更多: !xx !rank !web !ip | 以后: !guide / !modes"
+		"chi"		"Anne模式向导 > 简单多人\n推荐给大部分是新玩家的队伍："
 	}
-	"NPG_PanelAutoStops"
+	"NPG_TitleNormal"
 	{
-		"chi"		"本服 %s h 后不再自动提示。"
+		"chi"		"Anne模式向导 > 一般多人\n推荐给熟悉地图和基本配合的队伍："
 	}
-	"NPG_PanelClose"
+	"NPG_TitleHard"
 	{
-		"chi"		"关闭"
+		"chi"		"Anne模式向导 > 高难度多人\n推荐给路线、资源和集火都稳定的老队："
 	}
-	"NPG_MatchLoaded"
+	"NPG_TitleFun"
 	{
-		"chi"		"{olive}当前已经加载模式，所以自动提示本来会保持安静。要退回默认，用 {green}!rmatch{olive} 前最好先问一下队友。"
+		"chi"		"Anne模式向导 > 娱乐模式\n优先节目效果："
+	}
+	"NPG_TitleVersusSize"
+	{
+		"chi"		"Anne模式向导 > 对抗模式\n准备几打几？"
+	}
+	"NPG_TitleVersus1"
+	{
+		"chi"		"Anne模式向导 > 对抗 > 1v1"
+	}
+	"NPG_TitleVersus2"
+	{
+		"chi"		"Anne模式向导 > 对抗 > 2v2"
+	}
+	"NPG_TitleVersus3"
+	{
+		"chi"		"Anne模式向导 > 对抗 > 3v3"
+	}
+	"NPG_TitleVersus4"
+	{
+		"chi"		"Anne模式向导 > 对抗 > 4v4"
+	}
+	"NPG_ProfileNew"
+	{
+		"chi"		"大部分是新玩家（7个模式）"
+	}
+	"NPG_ProfileExperienced"
+	{
+		"chi"		"大部分人经验比较丰富（9个模式）"
+	}
+	"NPG_ProfileHardcore"
+	{
+		"chi"		"大部分是硬核老鸟（11个模式）"
+	}
+	"NPG_ProfileFun"
+	{
+		"chi"		"我们就是来找乐子的（4个模式）"
+	}
+	"NPG_Mode_HTTraining"
+	{
+		"chi"		"HT训练 | 1人生还、2只Hunter、16秒"
+	}
+	"NPG_Mode_Alone"
+	{
+		"chi"		"单人装逼 | 1人生还、4特、16秒"
+	}
+	"NPG_Mode_Not0721MutationSolo"
+	{
+		"chi"		"Not0721绝境单通 | 1人生还、8特、15秒"
+	}
+	"NPG_Mode_RealismSolo"
+	{
+		"chi"		"写实单通 | 1人生还、14特、15秒"
+	}
+	"NPG_Mode_CampaignSolo"
+	{
+		"chi"		"战役单通 | 1人生还、14特、15秒"
+	}
+	"NPG_Mode_AnneCoop"
+	{
+		"chi"		"Anne战役 | 4人生还、Anne合作规则"
+	}
+	"NPG_Mode_PureCoop"
+	{
+		"chi"		"纯净战役 | 4人生还、原版合作规则"
+	}
+	"NPG_Mode_Not0721CoopBase"
+	{
+		"chi"		"Not0721基础战役 | 3特/35秒、人数联动"
+	}
+	"NPG_Mode_Not0721MutationNoobPlus"
+	{
+		"chi"		"Not0721绝境NoobPlus | 8特/15秒、伤害修正"
+	}
+	"NPG_Mode_Not0721CommunityNoobPlus"
+	{
+		"chi"		"Not0721写专NoobPlus | 5特连续、伤害修正"
+	}
+	"NPG_Mode_Not0721CommunityMulti"
+	{
+		"chi"		"Not0721写专多人 | 6人生还、人数联动"
+	}
+	"NPG_Mode_Not0721CommunityEZ"
+	{
+		"chi"		"Not0721写专EZ | 12特连续、限控2"
+	}
+	"NPG_Mode_AnneHappy"
+	{
+		"chi"		"普通药役 | 4人生还、4特/16秒"
+	}
+	"NPG_Mode_AnneMutation"
+	{
+		"chi"		"Anne绝境 | Anne合作规则"
+	}
+	"NPG_Mode_PureMutation"
+	{
+		"chi"		"纯净绝境 | 原版绝境求生规则"
+	}
+	"NPG_Mode_AnneRealism"
+	{
+		"chi"		"Anne写实 | Anne合作规则"
+	}
+	"NPG_Mode_PureRealism"
+	{
+		"chi"		"纯净写实 | 原版写实规则"
+	}
+	"NPG_Mode_Not0721CoopHard"
+	{
+		"chi"		"Not0721进阶战役 | 8特/15秒、击杀回血"
+	}
+	"NPG_Mode_Not0721MutationEZ"
+	{
+		"chi"		"Not0721绝境EZ | 14特/15秒"
+	}
+	"NPG_Mode_Not0721Community610"
+	{
+		"chi"		"Not0721写专610 | 6特/10秒"
+	}
+	"NPG_Mode_Not0721RealismMiaomei"
+	{
+		"chi"		"Not0721写实喵妹 | 3特/45秒、4000血Witch"
+	}
+	"NPG_Mode_AnneHardcore"
+	{
+		"chi"		"硬核药役 | 4人生还、6特/16秒"
+	}
+	"NPG_Mode_AnneShotgun"
+	{
+		"chi"		"喷子硬核 | 4特/16秒、仅霰弹枪"
+	}
+	"NPG_Mode_PureCommunity5"
+	{
+		"chi"		"纯净死亡之门 | 原版规则"
+	}
+	"NPG_Mode_Not0721Fuckmap"
+	{
+		"chi"		"Not0721坐牢图 | 6特起步/15秒、人数联动"
+	}
+	"NPG_Mode_Not0721CoopHimiko"
+	{
+		"chi"		"Not0721 Himiko战役 | 14特起步/15秒"
+	}
+	"NPG_Mode_Not0721Mutation"
+	{
+		"chi"		"Not0721绝境 | 14特/15秒"
+	}
+	"NPG_Mode_Not0721MutationExcept"
+	{
+		"chi"		"Not0721绝境Except | 28特/15秒、限控4"
+	}
+	"NPG_Mode_Not0721Community2"
+	{
+		"chi"		"Not0721死亡之门2 | 14特/15秒"
+	}
+	"NPG_Mode_Not0721Community5"
+	{
+		"chi"		"Not0721写专 | 10特连续"
+	}
+	"NPG_Mode_Not0721CommunityHimiko"
+	{
+		"chi"		"Not0721写专Himiko | 24特连续、7倍弹药"
+	}
+	"NPG_Mode_Not0721CommunityJimen"
+	{
+		"chi"		"Not0721写专几门 | 6特/15秒、无倒地"
+	}
+	"NPG_Mode_AllCharger"
+	{
+		"chi"		"牛牛冲刺 | Charger主题"
+	}
+	"NPG_Mode_InfiniteFire"
+	{
+		"chi"		"无限火力 | 6人生还、主武器无限弹药"
+	}
+	"NPG_Mode_WitchParty"
+	{
+		"chi"		"女巫派对 | Witch主题"
+	}
+	"NPG_Mode_Not0721WTF"
+	{
+		"chi"		"Not0721 WTF战役 | 6人生还、10特起步、10倍弹药"
 	}
 }

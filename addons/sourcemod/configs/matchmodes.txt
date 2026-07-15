@@ -148,6 +148,10 @@
 		{
 			"name" "Not0721写实Solo"
 		}
+		"not0721_coop_solo"
+		{
+			"name" "Not0721战役Solo"
+		}
 	}
 	"ZoneMod Configs"
 	{

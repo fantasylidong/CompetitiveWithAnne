@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"jp"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly."
+		"jp"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -54,7 +54,7 @@
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"jp"		"{green}[IC]{default} 次のSIカウントダウンまで生存者へのダメージまたは有効な攻撃が記録されなかったため、内鬼の役割を解除しAIがこのSIを引き継ぎます。"
+		"jp"		"{green}[IC]{default} 次の特殊感染者ウェーブが解放されるまでに生存者へのダメージまたは有効な攻撃が記録されなかったため、内鬼の役割を解除しAIがこのSIを引き継ぎます。"
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
@@ -70,7 +70,7 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"jp"		"{green}[IC]{default} ペナルティ警告：次のSIカウントダウンまでに生存者へダメージまたは有効な攻撃を与えてください。"
+		"jp"		"{green}[IC]{default} ペナルティ警告：次の特殊感染者ウェーブが解放されるまでに生存者へダメージまたは有効な攻撃を与えてください。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
@@ -114,7 +114,7 @@
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"jp"		"{green}[IC]{default} 内鬼モードに登録できるのは観戦者だけです。"
+		"jp"		"{green}[IC]{default} 内鬼モードに登録できるのは観戦者または感染者チームのプレイヤーだけです。"
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
@@ -140,9 +140,13 @@
 	{
 		"jp"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
 	}
+	"InfectedControl_TraitorNextQueued"
+	{
+		"jp"		"{green}[IC]{default} 次回の内鬼として {olive}%s{default} を登録しました。現在の特殊感染者が死亡すると待機列に入ります。"
+	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"jp"		"{green}[IC]{default} Traitor slots are full. You are waiting as {olive}%s{default} (position %d)."
+		"jp"		"{green}[IC]{default} 内鬼 {olive}%s{default} として待機中です（%d番目）。"
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
@@ -154,7 +158,7 @@
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
-		"jp"		"{green}[IC]{default} Tank の登録が有効になりました。AI Tank の準備ができて操作権が移るまで観戦してください。"
+		"jp"		"{green}[IC]{default} Tank の登録が有効です。新しい AI Tank が自然出現すると操作権が自動的に移ります。"
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{

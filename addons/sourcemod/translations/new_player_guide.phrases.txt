@@ -1,67 +1,247 @@
 "Phrases"
 {
-	"NPG_Header"
+	"NPG_MenuTitle"
 	{
-		"en"		"{default}[{green}Anne Guide{default}] L4D2: {green}%s h{default}; this server: {green}%s h{default}. Quick route:"
+		"en"		"Anne Telecom Server Mode Guide\nL4D2: %s | this server: %s\nWhat do you want to play?"
 	}
-	"NPG_Beginner"
+	"NPG_PlaytimeUnknown"
 	{
-		"en"		"{olive}Start with the default campaign. No mode switch needed. When you want a faster pace, try Anne Campaign; specials come back quicker there."
+		"en"		"unknown"
 	}
-	"NPG_Intermediate"
+	"NPG_CategorySolo"
 	{
-		"en"		"{olive}Try Anne Campaign and Survival. They keep the rules readable, but the tempo is already closer to Anne mode."
+		"en"		"Solo modes"
 	}
-	"NPG_Experienced"
+	"NPG_CategoryCoop"
 	{
-		"en"		"{olive}You can browse the full !match menu now: AnneHappy, Hardcore, Shotgun, 1vHT, WitchParty, AllCharger, Anne Campaign/Survival/Realism, Not0721, and versus sets like ZoneMod, NextMod, EQ, AMR, Apex, and ZoneHunters."
+		"en"		"Co-op PvE modes"
 	}
-	"NPG_Commands"
+	"NPG_CategoryVersus"
 	{
-		"en"		"{default}Useful: {green}!join{default} survivors, {green}!away{default} spec, {green}!match{default} modes, {green}!rmatch{default} unload, {green}!mapvote{default} maps, {green}!xx{default} Anne status, {green}!rank{default} stats, {green}!web{default}/{green}!ip{default} pages."
+		"en"		"Versus modes"
 	}
-	"NPG_AutoStops"
+	"NPG_PermanentDisable"
 	{
-		"en"		"{default}This reminder stops after {green}%s h{default} on this server. Need it later? Type {green}!guide{default} or {green}!modes{default}."
+		"en"		"Permanently disable the login guide"
 	}
-	"NPG_PanelTitle"
+	"NPG_PermanentEnable"
 	{
-		"en"		"Anne Guide"
+		"en"		"Re-enable the login guide"
 	}
-	"NPG_PanelPlaytime"
+	"NPG_PreferenceDisabled"
 	{
-		"en"		"L4D2: %s h | this server: %s h"
+		"en"		"{green}Anne mode login guide has been permanently disabled. Use {olive}!guide{green} to enable it again."
 	}
-	"NPG_PanelBeginner"
+	"NPG_PreferenceEnabled"
 	{
-		"en"		"Start with default Campaign. Try Anne Campaign when you want faster specials."
+		"en"		"{green}Anne mode login guide has been enabled again."
 	}
-	"NPG_PanelIntermediate"
+	"NPG_PreferenceUnavailable"
 	{
-		"en"		"Try Anne Campaign or Survival. Move up when the routes feel familiar."
+		"en"		"{olive}The Anne mode guide preference cannot be saved right now."
 	}
-	"NPG_PanelExperienced"
+	"NPG_TitleSolo"
 	{
-		"en"		"Use !match for Anne sets, Not0721, and versus configs."
+		"en"		"Anne Mode Guide > Solo\nChoose your training goal:"
 	}
-	"NPG_PanelCommands1"
+	"NPG_TitleCoopProfile"
 	{
-		"en"		"Commands: !join !away !match !rmatch !mapvote"
+		"en"		"Anne Mode Guide > Co-op PvE\nWhat is your team's overall experience?"
 	}
-	"NPG_PanelCommands2"
+	"NPG_TitleEasy"
 	{
-		"en"		"More: !xx !rank !web !ip | later: !guide / !modes"
+		"en"		"Anne Mode Guide > Easy PvE\nRecommended for teams with mostly new players:"
 	}
-	"NPG_PanelAutoStops"
+	"NPG_TitleNormal"
 	{
-		"en"		"Auto guide stops at %s h on this server."
+		"en"		"Anne Mode Guide > Standard PvE\nRecommended for teams familiar with maps and basic coordination:"
 	}
-	"NPG_PanelClose"
+	"NPG_TitleHard"
 	{
-		"en"		"Close"
+		"en"		"Anne Mode Guide > Hard PvE\nRecommended for experienced teams with stable focus fire and routing:"
 	}
-	"NPG_MatchLoaded"
+	"NPG_TitleFun"
 	{
-		"en"		"{olive}A mode is already loaded, so the auto reminder would stay quiet. Use {green}!rmatch{olive} only when everyone agrees to go back."
+		"en"		"Anne Mode Guide > Fun PvE\nChoose a mode built for spectacle:"
+	}
+	"NPG_TitleVersusSize"
+	{
+		"en"		"Anne Mode Guide > Versus\nChoose a team size:"
+	}
+	"NPG_TitleVersus1"
+	{
+		"en"		"Anne Mode Guide > Versus > 1v1"
+	}
+	"NPG_TitleVersus2"
+	{
+		"en"		"Anne Mode Guide > Versus > 2v2"
+	}
+	"NPG_TitleVersus3"
+	{
+		"en"		"Anne Mode Guide > Versus > 3v3"
+	}
+	"NPG_TitleVersus4"
+	{
+		"en"		"Anne Mode Guide > Versus > 4v4"
+	}
+	"NPG_ProfileNew"
+	{
+		"en"		"Mostly new players (7 modes)"
+	}
+	"NPG_ProfileExperienced"
+	{
+		"en"		"Mostly experienced players (9 modes)"
+	}
+	"NPG_ProfileHardcore"
+	{
+		"en"		"Hardcore veterans (11 modes)"
+	}
+	"NPG_ProfileFun"
+	{
+		"en"		"We are here for fun (4 modes)"
+	}
+	"NPG_Mode_HTTraining"
+	{
+		"en"		"HT Training | 1 survivor, 2 Hunters, 16s"
+	}
+	"NPG_Mode_Alone"
+	{
+		"en"		"Alone | 1 survivor, 4 SI, 16s"
+	}
+	"NPG_Mode_Not0721MutationSolo"
+	{
+		"en"		"Not0721 Hard Eight Solo | 1 survivor, 8 SI, 15s"
+	}
+	"NPG_Mode_RealismSolo"
+	{
+		"en"		"Realism Solo | 1 survivor, 14 SI, 15s"
+	}
+	"NPG_Mode_CampaignSolo"
+	{
+		"en"		"Campaign Solo | 1 survivor, 14 SI, 15s"
+	}
+	"NPG_Mode_AnneCoop"
+	{
+		"en"		"Anne Campaign | 4 survivors, Anne co-op rules"
+	}
+	"NPG_Mode_PureCoop"
+	{
+		"en"		"Vanilla Campaign | 4 survivors, vanilla rules"
+	}
+	"NPG_Mode_Not0721CoopBase"
+	{
+		"en"		"Not0721 Base Campaign | 3 SI / 35s, player scaling"
+	}
+	"NPG_Mode_Not0721MutationNoobPlus"
+	{
+		"en"		"Not0721 Hard Eight NoobPlus | 8 SI / 15s, damage assist"
+	}
+	"NPG_Mode_Not0721CommunityNoobPlus"
+	{
+		"en"		"Not0721 Death's Door NoobPlus | 5 SI continuous, damage assist"
+	}
+	"NPG_Mode_Not0721CommunityMulti"
+	{
+		"en"		"Not0721 Death's Door Multi | 6 survivors, player scaling"
+	}
+	"NPG_Mode_Not0721CommunityEZ"
+	{
+		"en"		"Not0721 Death's Door EZ | 12 SI continuous, 2-pin limit"
+	}
+	"NPG_Mode_AnneHappy"
+	{
+		"en"		"Standard Anne | 4 survivors, 4 SI / 16s"
+	}
+	"NPG_Mode_AnneMutation"
+	{
+		"en"		"Anne Hard Eight | Anne co-op rules"
+	}
+	"NPG_Mode_PureMutation"
+	{
+		"en"		"Vanilla Hard Eight | vanilla mutation rules"
+	}
+	"NPG_Mode_AnneRealism"
+	{
+		"en"		"Anne Realism | Anne co-op rules"
+	}
+	"NPG_Mode_PureRealism"
+	{
+		"en"		"Vanilla Realism | vanilla rules"
+	}
+	"NPG_Mode_Not0721CoopHard"
+	{
+		"en"		"Not0721 Advanced Campaign | 8 SI / 15s, kill healing"
+	}
+	"NPG_Mode_Not0721MutationEZ"
+	{
+		"en"		"Not0721 Hard Eight EZ | 14 SI / 15s"
+	}
+	"NPG_Mode_Not0721Community610"
+	{
+		"en"		"Not0721 Death's Door 6/10 | 6 SI / 10s"
+	}
+	"NPG_Mode_Not0721RealismMiaomei"
+	{
+		"en"		"Not0721 Realism Miaomei | 3 SI / 45s, 4000 HP Witch"
+	}
+	"NPG_Mode_AnneHardcore"
+	{
+		"en"		"Anne Hardcore | 4 survivors, 6 SI / 16s"
+	}
+	"NPG_Mode_AnneShotgun"
+	{
+		"en"		"Anne Shotgun Hardcore | 4 SI / 16s, shotguns only"
+	}
+	"NPG_Mode_PureCommunity5"
+	{
+		"en"		"Vanilla Death's Door | vanilla mutation rules"
+	}
+	"NPG_Mode_Not0721Fuckmap"
+	{
+		"en"		"Not0721 Prison Maps | 6+ SI / 15s, player scaling"
+	}
+	"NPG_Mode_Not0721CoopHimiko"
+	{
+		"en"		"Not0721 Himiko Campaign | 14+ SI / 15s"
+	}
+	"NPG_Mode_Not0721Mutation"
+	{
+		"en"		"Not0721 Hard Eight | 14 SI / 15s"
+	}
+	"NPG_Mode_Not0721MutationExcept"
+	{
+		"en"		"Not0721 Hard Eight Except | 28 SI / 15s, 4-pin limit"
+	}
+	"NPG_Mode_Not0721Community2"
+	{
+		"en"		"Not0721 Community2 | 14 SI / 15s"
+	}
+	"NPG_Mode_Not0721Community5"
+	{
+		"en"		"Not0721 Death's Door | 10 SI continuous"
+	}
+	"NPG_Mode_Not0721CommunityHimiko"
+	{
+		"en"		"Not0721 Death's Door Himiko | 24 SI continuous, 7x ammo"
+	}
+	"NPG_Mode_Not0721CommunityJimen"
+	{
+		"en"		"Not0721 Death's Door Jimen | 6 SI / 15s, no incap"
+	}
+	"NPG_Mode_AllCharger"
+	{
+		"en"		"All Charger Rush | Charger theme"
+	}
+	"NPG_Mode_InfiniteFire"
+	{
+		"en"		"Infinite Firepower | 6 survivors, infinite primary ammo"
+	}
+	"NPG_Mode_WitchParty"
+	{
+		"en"		"Witch Party | Witch theme"
+	}
+	"NPG_Mode_Not0721WTF"
+	{
+		"en"		"Not0721 WTF Campaign | 6 survivors, 10+ SI, 10x ammo"
 	}
 }

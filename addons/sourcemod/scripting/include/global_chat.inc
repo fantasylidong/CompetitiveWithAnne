@@ -18,6 +18,7 @@ public SharedPlugin __pl_global_chat =
 public void __pl_global_chat_SetNTVOptional()
 {
 	MarkNativeAsOptional("GlobalChat_Broadcast");
+	MarkNativeAsOptional("GlobalChat_BroadcastMapRecord");
 }
 #endif
 
@@ -28,3 +29,17 @@ public void __pl_global_chat_SetNTVOptional()
  * @return				true if queued to the global chat database.
  */
 native bool GlobalChat_Broadcast(const char[] message);
+
+/**
+ * Broadcast a localized map-record announcement through global_chat.
+ *
+ * @param mapName            Map name.
+ * @param runPlayers        Compact player-name list.
+ * @param mode              Anne timing mode identifier.
+ * @param infectedNumber    Special Infected count.
+ * @param siSpawnTime       Special Infected spawn interval in seconds.
+ * @param difficulty        Difficulty identifier.
+ * @param timeLabel         Formatted completion time.
+ * @return                  true if queued to the global chat database.
+ */
+native bool GlobalChat_BroadcastMapRecord(const char[] mapName, const char[] runPlayers, int mode, int infectedNumber, int siSpawnTime, int difficulty, const char[] timeLabel);

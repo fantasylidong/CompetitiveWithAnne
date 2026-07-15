@@ -8,6 +8,8 @@
 
 #define PLUGIN_VERSION "1.0"
 #define LOCAL_ECHO_CACHE_SIZE 64
+#define MAP_RECORD_BROADCAST_PREFIX "@L4D_STATS_MAP_RECORD"
+#define MAP_RECORD_FIELD_SEPARATOR "\x1f"
 
 Database g_hDatabase = null;
 Database g_hBlacklistDatabase = null;
@@ -75,6 +77,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 {
 	RegPluginLibrary("global_chat");
 	CreateNative("GlobalChat_Broadcast", Native_GlobalChatBroadcast);
+	CreateNative("GlobalChat_BroadcastMapRecord", Native_GlobalChatBroadcastMapRecord);
 	return APLRes_Success;
 }
 
@@ -97,9 +100,59 @@ public int Native_GlobalChatBroadcast(Handle plugin, int numParams)
 	return true;
 }
 
+public int Native_GlobalChatBroadcastMapRecord(Handle plugin, int numParams)
+{
+	if (numParams < 7)
+		return ThrowNativeError(SP_ERROR_NATIVE, "GlobalChat_BroadcastMapRecord requires seven parameters");
+
+	char mapName[64];
+	char runPlayers[80];
+	char timeLabel[32];
+	GetNativeString(1, mapName, sizeof(mapName));
+	GetNativeString(2, runPlayers, sizeof(runPlayers));
+	GetNativeString(7, timeLabel, sizeof(timeLabel));
+
+	if (mapName[0] == '\0' || runPlayers[0] == '\0' || timeLabel[0] == '\0')
+		return false;
+
+	// The payload is parsed after it reaches each server, so keep user-controlled
+	// fields from breaking the separator and leave room for the database column.
+	ReplaceString(mapName, sizeof(mapName), MAP_RECORD_FIELD_SEPARATOR, " ");
+	ReplaceString(runPlayers, sizeof(runPlayers), MAP_RECORD_FIELD_SEPARATOR, " ");
+	ReplaceString(timeLabel, sizeof(timeLabel), MAP_RECORD_FIELD_SEPARATOR, " ");
+
+	char message[256];
+	FormatEx(message, sizeof(message), "%s%s%s%s%s%s%d%s%d%s%d%s%d%s%s",
+		MAP_RECORD_BROADCAST_PREFIX,
+		MAP_RECORD_FIELD_SEPARATOR,
+		mapName,
+		MAP_RECORD_FIELD_SEPARATOR,
+		runPlayers,
+		MAP_RECORD_FIELD_SEPARATOR,
+		GetNativeCell(3),
+		MAP_RECORD_FIELD_SEPARATOR,
+		GetNativeCell(4),
+		MAP_RECORD_FIELD_SEPARATOR,
+		GetNativeCell(5),
+		MAP_RECORD_FIELD_SEPARATOR,
+		GetNativeCell(6),
+		MAP_RECORD_FIELD_SEPARATOR,
+		timeLabel);
+
+	if (strlen(message) >= sizeof(message) - 1)
+		return false;
+
+	if (!g_cvEnabled.BoolValue || !g_bReady || g_hDatabase == null)
+		return false;
+
+	InsertGlobalMessage("@SERVER", "@MAP_RECORD", message, true);
+	return true;
+}
+
 public void OnPluginStart()
 {
 	LoadTranslations("global_chat.phrases");
+	LoadTranslations("l4d_stats.phrases");
 	g_hLFGHudSync = CreateHudSynchronizer();
 	g_cvEnabled = CreateConVar("sm_qf_enabled", "1", "是否启用全服聊天。", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvDatabaseConfig = CreateConVar("sm_qf_database", "globalchat", "databases.cfg 里的数据库配置名称。");
@@ -1426,6 +1479,12 @@ void DispatchGlobalChatMessage(const char[] senderSteam64, const char[] server, 
 		return;
 	}
 
+	if (StrEqual(name, "@MAP_RECORD"))
+	{
+		DispatchMapRecordMessage(message);
+		return;
+	}
+
 	if (StrEqual(name, "@BROADCAST"))
 	{
 		for (int i = 1; i <= MaxClients; i++)
@@ -1442,6 +1501,71 @@ void DispatchGlobalChatMessage(const char[] senderSteam64, const char[] server, 
 	{
 		if (CanReceiveGlobalMessage(i, senderSteam64))
 			CPrintToChat(i, "{green}%s {lightgreen}[%s] {olive}%s{default}: %s", prefix, shortServer, name, message);
+	}
+}
+
+void DispatchMapRecordMessage(const char[] message)
+{
+	char fields[8][96];
+	if (ExplodeString(message, MAP_RECORD_FIELD_SEPARATOR, fields, sizeof(fields), sizeof(fields[])) != 8 ||
+			!StrEqual(fields[0], MAP_RECORD_BROADCAST_PREFIX))
+		return;
+
+	int mode = StringToInt(fields[3]);
+	int infectedNumber = StringToInt(fields[4]);
+	int siSpawnTime = StringToInt(fields[5]);
+	int difficulty = StringToInt(fields[6]);
+
+	char modePhrase[64];
+	char difficultyPhrase[64];
+	GetMapRecordModePhrase(mode, modePhrase, sizeof(modePhrase));
+	GetMapRecordDifficultyPhrase(difficulty, difficultyPhrase, sizeof(difficultyPhrase));
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!CanReceiveGlobalBroadcast(i))
+			continue;
+
+		char modeLabel[64];
+		char difficultyLabel[64];
+		FormatEx(modeLabel, sizeof(modeLabel), "%T", modePhrase, i);
+		FormatEx(difficultyLabel, sizeof(difficultyLabel), "%T", difficultyPhrase, i);
+		CPrintToChat(i, "%t", "L4DStats_MapRecordSummary", fields[7], modeLabel, fields[1]);
+		CPrintToChat(i, "%t", "L4DStats_MapRecordDetails", fields[2], infectedNumber, siSpawnTime, difficultyLabel);
+	}
+}
+
+void GetMapRecordModePhrase(int mode, char[] phrase, int maxlen)
+{
+	switch (mode)
+	{
+		case 6:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordModeHardcore");
+		case 7:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordModeShotgun");
+		default:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordModeNormal");
+	}
+}
+
+void GetMapRecordDifficultyPhrase(int difficulty, char[] phrase, int maxlen)
+{
+	switch (difficulty)
+	{
+		case 1:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyEasy");
+		case 2:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyNormal");
+		case 3:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyHard");
+		case 4:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyExpert");
+		case 5:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyExtreme");
+		case 6:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyNeri");
+		default:
+			strcopy(phrase, maxlen, "L4DStats_MapRecordDifficultyUnknown");
 	}
 }
 

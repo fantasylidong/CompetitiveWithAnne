@@ -4,4 +4,52 @@
 	{
 		"jp"		"{green} [ {lightgreen} ランク {green} ] {default} %s"
 	}
+	"L4DStats_MapRecordSummary"
+	{
+		"jp"		"{green}%s{default} {olive}[マップ記録]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+	}
+	"L4DStats_MapRecordDetails"
+	{
+		"jp"		"{olive}%s{default} が {green}%d特/%d秒/ショップなし/%s難易度{default} の記録を更新しました。"
+	}
+	"L4DStats_MapRecordModeNormal"
+	{
+		"jp"		"通常Anne"
+	}
+	"L4DStats_MapRecordModeHardcore"
+	{
+		"jp"		"ハードAnne"
+	}
+	"L4DStats_MapRecordModeShotgun"
+	{
+		"jp"		"ショットガンAnne"
+	}
+	"L4DStats_MapRecordDifficultyEasy"
+	{
+		"jp"		"イージー"
+	}
+	"L4DStats_MapRecordDifficultyNormal"
+	{
+		"jp"		"ノーマル"
+	}
+	"L4DStats_MapRecordDifficultyHard"
+	{
+		"jp"		"ハード"
+	}
+	"L4DStats_MapRecordDifficultyExpert"
+	{
+		"jp"		"エキスパート"
+	}
+	"L4DStats_MapRecordDifficultyExtreme"
+	{
+		"jp"		"エクストリーム"
+	}
+	"L4DStats_MapRecordDifficultyNeri"
+	{
+		"jp"		"Neri"
+	}
+	"L4DStats_MapRecordDifficultyUnknown"
+	{
+		"jp"		"不明"
+	}
 }
