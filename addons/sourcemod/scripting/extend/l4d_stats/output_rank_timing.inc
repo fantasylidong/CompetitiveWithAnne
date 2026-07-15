@@ -449,7 +449,7 @@ MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCou
 		return;
 
 	new SISpawnTime = GetAnneSISpawnTime();
-	if (!IsAnneTimingBroadcastMode(Mode) || SISpawnTime <= 0)
+	if (!IsAnneTimingBroadcastMode(Mode) || (SISpawnTime != 0 && SISpawnTime != 16))
 		return;
 
 	if (g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY))

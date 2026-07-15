@@ -38,3 +38,11 @@
 - Fixed the hard-coded `level0` profile overriding mode-specific values in 1vHunters, Alone, WitchParty, and other modes. The plugin now captures each mode's effective CVar baseline after configs execute and restores it before tier changes, map changes, and unloads.
 - Removed invalid low-tier reset values such as `z_lunge_up 0`, `z_lunge_interval 0.08`, and `z_lunge_cooldown 0`, fixing Hunters repeatedly crouching or pouncing in place with the legacy `ai_hunter_2` plugin and preventing unintended Jockey, Tank, and Boomer overrides.
 - Extreme and Neri retain their explicit overrides; leaving those tiers now restores the active mode's captured baseline.
+
+### July 15, 2026 Dynamic Difficulty Fix
+- Fixed controlled-CVar baseline discovery potentially missing later difficulty sections. The plugin now scans `level1` through `level6` explicitly, preventing Extreme- or Neri-only values from remaining after switching back to Expert or below.
+- Fixed the legacy `ai_boomer_2` retaining a downward pitch after dynamic tiers enabled aim lift/turning, causing Boomers to vomit toward the ground. Initial aiming and multi-target turns now retain at least five degrees of upward pitch without changing bhop or jump-vomit parameters.
+- Removed four obsolete CVars not registered by the active AI plugins. Three hidden/launcher CVars that SourceMod can resolve and modify remain configured.
+- Fixed switching from a fixed tier back to automatic mode retaining Neri/high-tier CVars while PPM data was temporarily unavailable. The plugin now applies Easy as a safe baseline, then selects the automatic tier once statistics are ready.
+- Fixed server-console/RCON `sm_aidiff` commands being deferred by the saferoom lock, which made operational tier changes appear not to apply. Console and RCON changes now apply immediately, while player-issued admin commands after leaving the saferoom still take effect next round.
+- Added opt-in airborne ability switches for Boomer2 and Smoker3. Both default to off and are enabled only by Neri. Existing bhop behavior continues normally; the switches do not force an extra jump, and only let an AI that is already airborne use vomit or tongue. Ground attacks and activation distances remain unchanged.

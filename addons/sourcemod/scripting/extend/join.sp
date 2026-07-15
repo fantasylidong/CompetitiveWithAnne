@@ -59,6 +59,7 @@ public Plugin myinfo =
 #define AUTOUPDATE_DISABLED 0
 #define AUTOUPDATE_PUBLIC 1
 #define AUTOUPDATE_PRIVATE 2
+#define AUTOUPDATE_RESTORE_FILE "data/join_autoupdate.restore"
 
 bool  
 	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
@@ -77,7 +78,8 @@ char
 	g_sAutoUpdaterUrl[AUTOUPDATE_URL_LENGTH];
 
 int
-	g_iDonateOptionCount = 0;
+	g_iDonateOptionCount = 0,
+	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED;
 
 ConVar
 	hCvarMotdTitle,
@@ -103,7 +105,8 @@ public void OnPluginStart()
 	LoadTranslations("join.phrases");
 	hCvarEnableInf = CreateConVar("join_enable_inf", "1", "是否可以开启加入特感", _, true, 0.0, true, 1.0);
 	hCvarKickFamilyAccount = CreateConVar("join_enable_kickfamilyaccount", "1", "是否开启踢出家庭共享账户", _, true, 0.0, true, 1.0);
-	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "是否开启AnneHappy核心插件自动更新：0关闭，1公开核心清单，2私用清单", _, true, 0.0, true, 2.0);
+	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "是否开启AnneHappy核心插件自动更新：0关闭，1公开核心清单，2私用清单（包含公开更新）", _, true, 0.0, true, 2.0);
+	g_iAutoUpdateModeBeforeConfigs = hCvarEnableAutoupdate.IntValue;
 	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的公开核心更新清单URL");
 	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的私用更新清单URL");
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
@@ -156,6 +159,18 @@ public void OnPluginStart()
 public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	RefreshAutoUpdater(true);
+}
+
+public void OnConfigsExecuted()
+{
+	bool restored = RestorePendingAutoUpdateMode();
+	if (!restored
+		&& g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_PUBLIC
+		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_PRIVATE)
+	{
+		hCvarEnableAutoupdate.SetInt(g_iAutoUpdateModeBeforeConfigs);
+	}
+	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED;
 }
 
 void RefreshAutoUpdater(bool requestInitialCheck = false)
@@ -254,6 +269,13 @@ public void Updater_OnLoaded()
 
 public void Updater_OnPluginUpdated()
 {
+	int autoUpdateMode = hCvarEnableAutoupdate.IntValue;
+	if (!SavePendingAutoUpdateMode(autoUpdateMode))
+	{
+		LogError("Unable to persist join_autoupdate=%d; skipping hot reload.", autoUpdateMode);
+		return;
+	}
+
 	bool shouldRelock = LibraryExists("confogl")
 		&& GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") == FeatureStatus_Available
 		&& LGO_IsMatchModeLoaded();
@@ -269,6 +291,60 @@ public void Updater_OnPluginUpdated()
 	{
 		ServerCommand("sm plugins load_lock");
 	}
+}
+
+bool SavePendingAutoUpdateMode(int mode)
+{
+	if (mode < AUTOUPDATE_PUBLIC || mode > AUTOUPDATE_PRIVATE)
+	{
+		return false;
+	}
+
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), AUTOUPDATE_RESTORE_FILE);
+
+	File file = OpenFile(path, "w");
+	if (file == null)
+	{
+		return false;
+	}
+
+	file.WriteLine("%d", mode);
+	delete file;
+	return true;
+}
+
+bool RestorePendingAutoUpdateMode()
+{
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), AUTOUPDATE_RESTORE_FILE);
+	if (!FileExists(path))
+	{
+		return false;
+	}
+
+	char value[16];
+	File file = OpenFile(path, "r");
+	if (file == null || !file.ReadLine(value, sizeof(value)))
+	{
+		delete file;
+		DeleteFile(path);
+		LogError("Unable to restore join_autoupdate after hot reload.");
+		return false;
+	}
+
+	delete file;
+	DeleteFile(path);
+
+	int mode = StringToInt(value);
+	if (mode < AUTOUPDATE_PUBLIC || mode > AUTOUPDATE_PRIVATE)
+	{
+		LogError("Invalid pending join_autoupdate value: %d", mode);
+		return false;
+	}
+
+	hCvarEnableAutoupdate.SetInt(mode);
+	return true;
 }
 
 public void SteamWorks_OnValidateClient(int ownerauthid, int authid)

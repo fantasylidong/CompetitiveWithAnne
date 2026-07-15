@@ -64,7 +64,7 @@ PPM 从 `l4d_stats` 获取。当前默认对每个真人生还者使用总积分
 | 命令 | 说明 |
 | --- | --- |
 | `sm_aippm` | 查看当前积分、时间、PPM、难度 |
-| `sm_aidiff <0-6>` | 管理员切换模式；`0=自动`，`1-5=固定自动档`，`6=音理固定档` |
+| `sm_aidiff <0-6>` | 管理员切换模式；`0=自动`，`1-5=固定自动档`，`6=音理固定档`。服务器控制台/RCON 立即应用；玩家出门后执行则从下一回合生效 |
 | `sm_aidiff_reload` | 重新读取配置文件，并把当前难度重新应用一次 |
 
 ## 每日分位阈值
@@ -184,27 +184,29 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 从简单到极限逐步增强，但非极限档尽量保持同一套基础行为，不再用大量开关差异制造难度。
 
 - Tank：默认所有档都保留 AITank3 连跳和无视野连跳；Alone 通过 `ah_ai_dynamic_tank_bhop_override 0` 强制关闭 Tank 连跳。无视野连跳角度按各模式 `shared_settings.cfg` 的普通强度基准恢复为 `57.0`，不参与动态难度分档。主要区分停跳距离、连跳加速度、最大速度、空中修正角度和攀爬倍速。`ai_TankSneakTime` 和旧的 `ai_TankAirAngleRestrict` 不属于当前 `ai_tank3.smx`，已经从配置移除。
-- Boomer：所有档都开启连跳和转视角，主要区分连跳速度与转视角帧数；专家保持 15 帧，极限为 10 帧。
+- Boomer：所有档都开启连跳和转视角，主要区分连跳速度与转视角帧数；专家保持 15 帧，极限为 10 帧。`ai_BoomerJumpVomit` 默认关闭，仅音理档开启：原连跳照常执行，不额外强制起跳；只让已经处于空中的 Boomer 也能按原来的距离条件喷吐，地面喷吐保持不变。
 - Charger：所有档都开启连跳，主要区分 `ai_ChagrerBhopSpeed`。
 - Spitter：所有档都开启连跳，主要区分 `ai_SpitterBhopSpeed`。
 - Jockey：所有档都开启连跳，连跳启动距离统一为 `600`，骗推行为概率统一为冻结/后跳/高跳 `40/10/50`。`ai_JockeyAllowInterControl` 全档固定为 `0`，抢控目标由 `target_override` 控制。
 - Hunter：主要区分基础飞扑空速和低飞角度。简单档垂直角度更大，Hunter 更容易飞高，给玩家更多空爆窗口；越难越低飞。极限档额外启用 `l4d2_hunter_patch_convert_leap 1` + `l4d2_hunter_patch_crouch_pounce 2`，等同原 `crouch_on` 强化。
-- Smoker：所有档都开启连跳和无视野连跳，主要区分连跳速度、左右偏角、无视野角度和空中速度修正角度。越难空中修正阈值越小，修正更早介入。
+- Smoker：所有档都开启连跳和无视野连跳，主要区分连跳速度、左右偏角、无视野角度和空中速度修正角度。越难空中修正阈值越小，修正更早介入。`ai_smoker3_jump_pull` 默认关闭，仅音理档开启。原连跳照常执行，不额外强制起跳或延迟地面秒拉；已经处于空中时，技能就绪且进入射程便可正常出舌。
 
 `cfg/vote/hard_on.cfg` 里属于投票/样本或刷点节奏的项目没有加入动态难度：`sm_veterans_*` 不是特感/Tank 行为属性，`inf_TeleportCheckTime` 属于传送检查节奏。
 
 ### 极限档新增属性合并记录
 
-动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_reflect 1` 在 `level5` 里对应 `"z_lunge_reflect" "1"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `1`。
+动态难度配置里不写 `sm_cvar` 命令，而是写成 KeyValues：`"cvar名" "值"`。例如 `sm_cvar z_lunge_up 150` 在 `level5` 里对应 `"z_lunge_up" "150"`，意思是极限档定档时由 `annehappy_dynamic_ai_difficulty.smx` 找到这个 ConVar 并把值设为 `150`。
 
 插件会把各档配置里出现过的所有 ConVar 作为受控范围，在 `OnConfigsExecuted` 后首次接管时记录当前模式已经应用完成的服务器值作为基线；之后每次应用档位前都会先把受控 ConVar 恢复到基线，再写入目标档的值。因此极限/音理独有参数不会在切回专家、困难、普通或简单后残留，也不会把 AnneHappy 的基准硬套到 1vHunters、Alone 或 WitchParty。
+
+2026-07-15 在 Linux 实服逐档 RCON 审计后，已移除只属于停用版 `ai_hunter_new`、`ai_spitter_new`、`ai_boomer_new` 的 4 个旧参数。`z_lunge_reflect`、`z_lunge_cooldown`、`z_hunter_lunge_distance` 属于隐藏/launcher CVar，直接在服务端控制台输入名称会显示 `Unknown command`，但 SourceMod `FindConVar` 与 `sm_cvar` 均能找到并修改，因此继续保留在极限/音理档。
 
 | 特感 | 参数 | 原极限档或基础值 | 新参数 | 合并值 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | Hunter | `z_pounce_crouch_delay` | patch 已运行时置 0 | 0 | 0 | 显式锁定无蹲伏等待 |
-| Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 默认 0.1 / 0.1 | 0 / 0 | 未合并 | 极限档不覆盖，保持默认 `0.1` |
-| Hunter | `z_lunge_reflect` / `z_lunge_up` | 游戏默认 0 / 200 | 1 / 150 | 1 / 150 | 极限档启用墙面反射并降低上抬力；退出该档后恢复当前模式基线 |
-| Hunter | `z_hunter_lunge_distance` | 基础 5000 | 99999 | 99999 | 极限档允许超远飞扑判定 |
+| Hunter | `z_lunge_interval` / `z_lunge_cooldown` | 默认 0.1 / 0.1 | 音理档 0 / 0 | 0 / 0 | 音理档取消飞扑和攻击冷却；退出该档后恢复当前模式基线 |
+| Hunter | `z_lunge_reflect` / `z_lunge_up` | 游戏默认 0 / 200 | 1 / 150 | 1 / 150 | 极限与音理档启用墙面反射并降低飞扑上抬力；退出高难档后恢复当前模式基线 |
+| Hunter | `z_hunter_lunge_distance` | 当前模式基线 5000 | 99999 | 99999 | 极限与音理档放宽 AI Hunter 的远距离飞扑判定 |
 | Hunter | `hunter_leap_away_give_up_range` | 未在极限档设置 | 99999 | 99999 | 不轻易放弃远距离 leap away 逻辑 |
 | Hunter | `ai_hunter_angle_mean` / `ai_hunter_angle_std` | 默认 10 / 极限 20 | 30 / 10 | 30 / 10 | 侧飞角更偏，随机波动更收束 |
 | Hunter | `ai_hunter_angle_diff` | 3 | 6 | 6 | 放宽左右侧飞次数差 |
@@ -220,9 +222,11 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | Spitter | `l4d2_spit_dmg` / `l4d2_spit_alternate_dmg` | 基础 2 / 3 | 3 / 2 | 3 / 2 | 主 tick 更疼，交替 tick 稍低 |
 | Smoker | `smoker_tongue_delay` | 0.0 | 0.1 | 0.0 | 当前基础值更快，极限档显式保留 0.0 |
 | Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1200 | 3 / 800 / 1200 | 舌头失败冷却、距离、飞行速度进入极限档 |
+| Smoker | `ai_smoker3_jump_pull` | 默认 0 | 音理 1 | 1 | 仅解除音理档空中吐舌限制，不主动起跳 |
 | Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 专家疲劳一半 / 专家距离 / 保持极限原值 | 1500 / 300 / 500 | 喷吐距离回专家基线，只降低疲劳到专家值的一半；最大伤害距离不改 |
 | Boomer | `boomer_horde_amount` 基准值 | 12 / 13 / 10 / 10 | 保持专家基准 | 12 / 13 / 10 / 10 | 基准已迁到 Anne 三套 `confogl_plugins.cfg` 的插件加载后，只初始化一次；极限覆盖值按专家值 + `5 * 被喷人数` 计算为 17 / 23 / 25 / 30 |
 | Boomer | `ai_BoomerBhopSpeed` | 250 | 120 | 250 | 当前极限连跳速度更高，保留不降级 |
+| Boomer | `ai_BoomerJumpVomit` | 默认 0 | 音理 1 | 1 | 仅解除音理档空中喷吐限制，不主动起跳、不改变原 0.8 倍触发距离 |
 
 ## 五档对比
 
@@ -268,6 +272,8 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 ### `ai_boomer_2.smx`
 
 `ai_BoomerBhop`, `ai_BoomerBhopSpeed`, `ai_BoomerUpVision`, `ai_BoomerTurnVision`, `ai_BoomerForceBile`, `ai_BoomerBileFindRange`, `ai_BoomerTurnInterval`, `ai_BoomerDegreeForceBile`, `ai_BoomerAutoFrame`
+
+`ai_BoomerUpVision 1` 只接管喷吐瞄准的垂直补偿；首次瞄准和喷中后转向其他目标时均至少保留 5 度仰角，避免优先选择倒地/被控目标时朝地面喷吐。该补偿不改变连跳速度、喷吐距离、喷吐间隔或空中喷吐补丁状态。
 
 ### `boomer_horde_equalizer_refactored.smx`
 

@@ -86,6 +86,12 @@ public void OnPluginStart()
 	fwdOnTankDeath          = CreateGlobalForward("OnTankDeath", ET_Event);
 }
 
+public void OnConfigsExecuted()
+{
+	// The ready-up config name is available after all mode configs are loaded.
+	CalculateTankHealth();
+}
+
 void LoadTranslation(char[] sTranslation)
 {
 	char
@@ -130,6 +136,24 @@ public void Cvar_TankHealth(Handle convar, const char[] oldValue, const char[] n
 	CalculateTankHealth();
 }
 
+bool IsAnneMode()
+{
+	ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+	if (readyCfgName == null)
+		return false;
+
+	char cfgName[128];
+	readyCfgName.GetString(cfgName, sizeof(cfgName));
+	return StrContains(cfgName, "AnneHappy", false) != -1
+		|| StrContains(cfgName, "AnneCoop", false) != -1
+		|| StrContains(cfgName, "AnneRealism", false) != -1
+		|| StrContains(cfgName, "AnneMutation4", false) != -1
+		|| StrContains(cfgName, "AllCharger", false) != -1
+		|| StrContains(cfgName, "1vHunters", false) != -1
+		|| StrContains(cfgName, "WitchParty", false) != -1
+		|| StrContains(cfgName, "Alone", false) != -1;
+}
+
 void CalculateTankHealth()
 {
 	char sGameMode[32];
@@ -137,6 +161,8 @@ void CalculateTankHealth()
 
 	g_fMaxTankHealth = g_cvarTankHealth.FloatValue;
 	if (g_fMaxTankHealth <= 0.0) g_fMaxTankHealth = 1.0;
+	if (IsAnneMode())
+		return;
 
 	// Versus or Realism Versus
 	if (StrEqual(sGameMode, "versus") || StrEqual(sGameMode, "mutation12"))

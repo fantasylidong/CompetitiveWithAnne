@@ -6,7 +6,7 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define PLUGIN_VERSION "2026.07.14.1"
+#define PLUGIN_VERSION "2026.07.15.3"
 #define TEAM_SURVIVOR 2
 #define DEFAULT_CONFIG_PATH "configs/AnneHappy/dynamic_ai_difficulty.cfg"
 #define DEFAULT_THRESHOLD_DB_CONFIG "l4dstats"
@@ -104,7 +104,8 @@ public void OnPluginStart()
     g_cvCurrentMode = CreateConVar("ah_ai_dynamic_current_mode", "0", "当前回合动态难度来源：0=自动，1=固定", FCVAR_DONTRECORD, true, 0.0, true, 1.0);
     g_cvCurrentPPM = CreateConVar("ah_ai_dynamic_current_ppm", "0.0", "当前回合自动定档使用的平均个人 PPM；固定模式为 0", FCVAR_DONTRECORD, true, 0.0);
     g_cvCurrentLocked = CreateConVar("ah_ai_dynamic_current_locked", "0", "当前回合动态难度是否已经锁定", FCVAR_DONTRECORD, true, 0.0, true, 1.0);
-    CreateConVar("ah_ai_dynamic_version", PLUGIN_VERSION, "AnneHappy Dynamic AI Difficulty version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+    ConVar versionCvar = CreateConVar("ah_ai_dynamic_version", PLUGIN_VERSION, "AnneHappy Dynamic AI Difficulty version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+    versionCvar.SetString(PLUGIN_VERSION, false, false);
 
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
     HookEvent("player_left_start_area", Event_PlayerLeftStartArea, EventHookMode_PostNoCopy);
@@ -404,7 +405,8 @@ public Action Cmd_SetDifficulty(int client, int args)
     if (level <= 0)
     {
         g_cvFixedLevel.SetInt(0, true, false);
-        if (g_bSurvivorsLeftStartArea)
+        // Server console/RCON is an operational override and must apply immediately.
+        if (g_bSurvivorsLeftStartArea && client != 0)
         {
             ReplyToCommand(client, "[AnneHappyAI] 已切换为自动难度，将从下一回合开始生效；当前回合难度不变。");
             if (g_cvAnnounce.BoolValue)
@@ -418,7 +420,11 @@ public Action Cmd_SetDifficulty(int client, int args)
         g_bPendingAutoApply = true;
 
         if (!TryApplyAutoDifficulty(false))
+        {
+            // Do not retain a fixed high-tier profile while automatic PPM data is unavailable.
+            ApplyDifficulty(1, true);
             PublishCurrentDifficulty();
+        }
 
         ReplyToCommand(client, "[AnneHappyAI] 已切换为自动难度。");
         if (g_cvAnnounce.BoolValue)
@@ -428,7 +434,7 @@ public Action Cmd_SetDifficulty(int client, int args)
 
     level = ClampLevel(level);
     g_cvFixedLevel.SetInt(level, true, false);
-    if (g_bSurvivorsLeftStartArea)
+    if (g_bSurvivorsLeftStartArea && client != 0)
     {
         char levelName[16];
         GetLevelName(level, levelName, sizeof(levelName), client);
@@ -1154,6 +1160,7 @@ void EnsureControlledCvarStores()
 void CacheControlledCvarBaseline(const char[] name)
 {
     EnsureControlledCvarStores();
+
     if (g_mControlledCvarBaselines.ContainsKey(name))
         return;
 
@@ -1171,16 +1178,16 @@ void CacheControlledCvarBaseline(const char[] name)
     g_aControlledCvars.PushString(name);
 }
 
-void BuildControlledCvarBaselines(KeyValues kv)
+int BuildControlledCvarBaselines(KeyValues kv)
 {
     EnsureControlledCvarStores();
-    kv.Rewind();
-    if (!kv.GotoFirstSubKey())
-        return;
-
-    do
+    for (int level = 1; level <= MAX_DIFFICULTY_LEVEL; level++)
     {
-        if (!kv.GotoFirstSubKey(false))
+        char levelKey[16];
+        FormatEx(levelKey, sizeof(levelKey), "level%d", level);
+
+        kv.Rewind();
+        if (!kv.JumpToKey(levelKey) || !kv.GotoFirstSubKey(false))
             continue;
 
         do
@@ -1193,12 +1200,10 @@ void BuildControlledCvarBaselines(KeyValues kv)
                 CacheControlledCvarBaseline(cvarName);
         }
         while (kv.GotoNextKey(false));
-
-        kv.GoBack();
     }
-    while (kv.GotoNextKey());
 
     kv.Rewind();
+    return g_aControlledCvars.Length;
 }
 
 int RestoreControlledCvars(bool clearStores = false)
@@ -1293,7 +1298,14 @@ bool ApplyProfileCvars(int level, int &applied)
         return false;
     }
 
-    BuildControlledCvarBaselines(kv);
+    int controlled = BuildControlledCvarBaselines(kv);
+    if (controlled <= 0)
+    {
+        LogError("[AnneHappyAI] No controlled cvar baselines were captured from config: %s", path);
+        delete kv;
+        return false;
+    }
+
     int restored = RestoreControlledCvars();
 
     char levelKey[16];
@@ -1319,7 +1331,7 @@ bool ApplyProfileCvars(int level, int &applied)
         return false;
     }
     else if (g_cvDebug.BoolValue)
-        LogMessage("[AnneHappyAI] restored=%d applied section \"%s\" cvars=%d missing=%d", restored, levelKey, applied, missing);
+        LogMessage("[AnneHappyAI] controlled=%d restored=%d applied section \"%s\" cvars=%d missing=%d", controlled, restored, levelKey, applied, missing);
 
     return true;
 }

@@ -28,13 +28,14 @@ public Plugin myinfo =
 	name 			= "Ai Boomer 2.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Boomer 增强 2.0 版本 (integrated tweaks by ChatGPT)",
-	version 		= "2023/1/17+rev2025-09-05",
+	version 		= "2023/1/17+rev2026-07-15.2",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hJumpVomit,
 	g_hUpVision,
 	g_hTurnVision,
 	g_hForceBile,
@@ -67,6 +68,7 @@ public void OnPluginStart()
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳速度", CVAR_FLAG, true, 0.0);
+	g_hJumpVomit = CreateConVar("ai_BoomerJumpVomit", "0", "是否允许 Boomer 已在空中时主动喷吐；不额外强制起跳，原连跳逻辑照常", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hUpVision = CreateConVar("ai_BoomerUpVision", "1", "Boomer 喷吐时是否上抬视角", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hTurnVision = CreateConVar("ai_BoomerTurnVision", "1", "Boomer 喷吐时是否旋转视角", CVAR_FLAG, true, 0.0, true, 1.0);
 
@@ -183,18 +185,9 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		{
 			ComputeAimAngles(client, target, aim_angles, AimEye);
 
-			// [CHANGE] 使用眼睛高度差与“贴脸仰角兜底”，避免“看脚下”
+			// 使用眼睛高度差补偿胆汁抛物线，并避免瞄向目标脚下。
 			if (g_hUpVision.BoolValue)
-			{
-				float eyeDelta = self_eye_pos[2] - target_eye_pos[2]; // 自己眼睛 - 目标眼睛
-				float factor = (eyeDelta > 0.0) ? 1.5 : 0.8;
-				aim_angles[0] -= targetDist / (PLAYER_HEIGHT * factor);
-
-				// 不要明显低头；贴脸时至少给一点仰角
-				if (aim_angles[0] > 4.0) aim_angles[0] = 4.0;
-				if (targetDist <= 85.0 && aim_angles[0] > -5.0)
-					aim_angles[0] = -5.0;
-			}
+				LiftVomitAim(aim_angles[0], targetDist, self_eye_pos[2] - target_eye_pos[2]);
 			TeleportEntity(client, NULL_VECTOR, aim_angles, NULL_VECTOR);
 
 			/* 判断第一个目标是否需要强行被喷，boomer 能力使用后过一个目标帧数延时再做一次检测 */
@@ -239,16 +232,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			/* 视野转向 & 上抬 */
 			ComputeAimAngles(client, turnTarget, aim_angles, AimEye);
 			if (g_hUpVision.BoolValue)
-			{
-				// [CHANGE] 使用眼睛高度差 + 贴脸仰角兜底
-				float eyeDelta2 = self_eye_pos[2] - turnTargetEye[2];
-				float factor2 = (eyeDelta2 > 0.0) ? 1.5 : 0.8;
-				aim_angles[0] -= turnDist / (PLAYER_HEIGHT * factor2);
-
-				if (aim_angles[0] > 4.0) aim_angles[0] = 4.0;
-				if (turnDist <= 85.0 && aim_angles[0] > -5.0)
-					aim_angles[0] = -5.0;
-			}
+				LiftVomitAim(aim_angles[0], turnDist, self_eye_pos[2] - turnTargetEye[2]);
 			TeleportEntity(client, NULL_VECTOR, aim_angles, NULL_VECTOR);
 
 			/* 强制喷吐检测，帧数确认 */
@@ -317,8 +301,12 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		}
 	}
 
-	// === 近距离主动喷吐（原逻辑保留） ============================================
-	if ((flags & FL_ONGROUND) && IsValidSurvivor(target) && has_sight && targetDist <= RoundToNearest(0.8 * g_hVomitRange.FloatValue) && !in_bile_interval[client] && can_bile[client])
+	// 默认只允许落地主动喷吐；音理开关仅解除空中限制，不改变连跳决策和触发距离。
+	bool onGround = view_as<bool>(flags & FL_ONGROUND);
+	bool validVomitTarget = IsValidSurvivor(target) && has_sight;
+	bool canUseVomitHere = onGround || g_hJumpVomit.BoolValue;
+	if (validVomitTarget && canUseVomitHere && targetDist <= 0.8 * g_hVomitRange.FloatValue
+		&& !in_bile_interval[client] && can_bile[client])
 	{
 		buttons |= IN_FORWARD;
 		buttons |= IN_ATTACK;
@@ -646,6 +634,16 @@ void ComputeAimAngles(int client, int target, float angles[3], AimType type = Ai
 	}
 	MakeVectorFromPoints(selfpos, targetpos, lookat);
 	GetVectorAngles(lookat, angles);
+}
+
+void LiftVomitAim(float &pitch, float distance, float eyeHeightDelta)
+{
+	float factor = (eyeHeightDelta > 0.0) ? 1.5 : 0.8;
+	pitch -= distance / (PLAYER_HEIGHT * factor);
+
+	// Source 中正俯角代表向下；喷吐接管视角时始终保留最少 5 度仰角。
+	if (pitch > -5.0)
+		pitch = -5.0;
 }
 
 static bool isInAimOffset(int attacker, int target, float offset)

@@ -45,6 +45,7 @@ ConVar
 	g_cvAirVecModifyMaxDegree,
 	g_cvAirVecModifyInterval,
 	g_cvImmPull,
+	g_cvJumpPull,
 	g_cvPullBackVision,
 	g_cvAntiRetreat,
 	g_cvMove2NewTarInterval,
@@ -110,7 +111,7 @@ public Plugin myinfo =
 	name 			= "Ai-Smoker 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai-Smoker 增强 3.0 版本",
-	version 		= "1.0.0.0",
+	version 		= "1.0.1.1",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -139,6 +140,7 @@ public void OnPluginStart() {
 	g_cvAirVecModifyInterval = CreateConVar("ai_smoker3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
 	// allowed for Smoker to fire his tongue immediately once the target distance is less than tongue_range
 	g_cvImmPull = CreateConVar("ai_smoker3_imm_pull", "1", "是否允许Smoker与目标距离一旦满足TongueRange立刻拉人", CVAR_FLAGS, true, 0.0, true, 1.0);
+	g_cvJumpPull = CreateConVar("ai_smoker3_jump_pull", "0", "是否允许 Smoker 已在空中时主动吐舌；不额外强制起跳，原连跳逻辑照常", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow Smoker to turn it's vision to behind when he is pulling survivor
 	g_cvPullBackVision = CreateConVar("ai_smoker3_pull_back_vision", "0", "是否允许Smoker拉人时视角转向背后", CVAR_FLAGS, true, 0.0, true, 1.0);
 
@@ -297,9 +299,14 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	g_AiSmokers[client].m_bIsVisible2Target = visible;
 
 	// 无法立刻攻击时, 判断是否允许进行连跳操作
-	checkeEnableBhop(client, target, buttons, pos, targetPos, dist, visible);
+	Action bhopResult = checkeEnableBhop(client, target, buttons, pos, targetPos, dist, visible);
+	bool forceAirPull = g_cvJumpPull.BoolValue && !IsClientOnGround(client)
+		&& isSmokerReadyToAttack(client) && isTargetEnterAttackRange(client, target, dist);
+	if (forceAirPull)
+		buttons |= IN_ATTACK;
 	// 是否允许拉人时视角转向背后
 	checkShouldBackVision(client);
+	return forceAirPull ? Plugin_Changed : bhopResult;
 }
 
 /**
