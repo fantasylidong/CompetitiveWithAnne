@@ -19,7 +19,6 @@
 #define SIG_PATH_FOLLOWER_UPDATE   "PathFollower::Update"
 #define SIG_NEXTBOT_GET_COMBAT_CHARACTER "INextBot::GetNextBotCombatCharacter"
 #define SIG_PATH_GET_CUR_GOAL      "Path::GetCurrentGoal"
-#define SIG_PATH_INVALIDATE        "Path::Invalidate"
 #define SIG_PATH_NEXT_SEGMENT      "Path::NextSegment"
 #define SIG_PATH_LAST_SEGMENT      "Path::LastSegment"
 
@@ -28,14 +27,6 @@
 #define DEFAULT_SWING_RANGE        56.0
 #define PATH_LOOKAHEAD_MIN_DIST    150.0
 #define PATH_GOAL_TOLERANCE_DIST   25.0
-#define PATH_CACHE_MAX_AGE         0.25
-#define PATH_INVALIDATE_PENDING_TIME 1.0
-#define TANK_PATH_CACHE_SIZE       32
-#define OBSTACLE_JUMP_TRACE_STEP   0.05
-#define OBSTACLE_JUMP_TRACE_START_Z 2.0
-#define OBSTACLE_JUMP_MAX_DROP     96.0
-#define OBSTACLE_JUMP_LAND_NORMAL  0.65
-#define OBSTACLE_JUMP_MAX_STEPS    128
 
 #define ROCK_FL_GRAVITY            0.4
 
@@ -51,13 +42,6 @@
 
 #define JUMP_SPEED_Z               300.0  // 跳砖时给的Z轴速度
 #define LADDER_NEARBY_CACHE_DEFAULT 0.20  // 梯子附近检测缓存，避免每帧扫实体/nav
-
-#define TANK_SEGMENT_ON_GROUND     0
-#define TANK_SEGMENT_DROP_DOWN     1
-#define TANK_SEGMENT_CLIMB_UP      2
-#define TANK_SEGMENT_JUMP_GAP      3
-#define TANK_SEGMENT_LADDER_UP     4
-#define TANK_SEGMENT_LADDER_DOWN   5
 
 // ===== ConVar =====
 ConVar g_cvPluginName, g_cvLogLevel;
@@ -97,23 +81,7 @@ ConVar
     g_cvHeadBlockForceRockReleaseVert,
     g_cvLadderNearbyDisable,
     g_cvLadderNearbyRadius,
-    g_cvLadderNearbyCacheTime,
-    g_cvPathBhopPrefer,
-    g_cvStuckDetect,
-    g_cvStuckTime,
-    g_cvStuckMinMove,
-    g_cvStuckCheckInterval,
-    g_cvStuckEntityCheck,
-    g_cvStuckEntityInterval,
-    g_cvStuckEntityTime,
-    g_cvStuckObstacleJump,
-    g_cvStuckObstacleJumpSpeed,
-    g_cvStuckObstacleJumpDuration,
-    g_cvStuckObstacleJumpCooldown,
-    g_cvStuckObstacleJumpAttempts,
-    g_cvSpecialMoveTimeout,
-    g_cvPathInvalidateCooldown,
-    g_cvRecoveryTime;
+    g_cvLadderNearbyCacheTime;
 
 ConVar g_cvBhopNoVisionMaxAng;
 ConVar cvTankSwingRange;
@@ -126,7 +94,6 @@ Handle g_hSdkTankClawSweepFist;
 Handle g_hSdkNextBotGetCombatCharacter;
 Handle g_hSdkPathGetCurGoal;
 Handle g_hSdkPathNextSegment;
-Handle g_hSdkPathInvalidate;
 Handle g_hSdkPathLastSegment;
 Handle g_hPathFollowerDetour;
 
@@ -135,17 +102,6 @@ float g_fTankSwingRange;
 float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
 float g_fLastLadderNearbyCheck[MAXPLAYERS + 1];
 bool  g_bLastLadderNearby[MAXPLAYERS + 1];
-bool  g_bAnimHooked[MAXPLAYERS + 1];
-
-enum TankMoveState
-{
-    TankMoveState_Native,
-    TankMoveState_Path,
-    TankMoveState_Direct,
-    TankMoveState_Special,
-    TankMoveState_Recovery,
-    TankMoveState_Commit
-}
 
 // ===== 结构体 =====
 enum struct PathSegment
@@ -192,30 +148,11 @@ enum struct AiTank
     float lastHeadBlockTargetSwitch; // 上次因头顶拉黑强制换目标时间
     float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
     int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
+    Address pathFollower;       // Tank 当前 NextBot PathFollower
     PathSegment pathSegment;    // 当前 PathSegment
     PathSegment lastPathSegment;// 当前路径最后一个 PathSegment
-    bool pathInvalidatePending; // 下一次 PathFollower detour 中安全地失效当前路径
-    float pathInvalidatePendingUntil;
-    float pathUpdateTime;       // 最近一次从有效 PathFollower 复制路径的时间
-    int pathSegmentCount;       // 已复制到本地缓存的 PathSegment 数量
     float airCorrGoal[3];       // 无视野路径连跳的空中修正目标点
     TankBhopType bhopType;      // 当前连跳类型
-    TankMoveState moveState;    // 移动状态机当前状态
-    float moveStateStart;       // 当前移动状态开始时间
-    float progressCheckTime;    // 上次无进展检查时间
-    float progressPos[3];       // 上次记录的位置
-    float stuckSince;            // 疑似卡住开始时间
-    float stuckEntitySince;      // 同一阻挡实体持续时间
-    float lastStuckEntityCheckTime;
-    float ladderNearbyIgnoreUntil; // 路径失效后暂时避免重新进入梯子附近死循环
-    float lastPathInvalidateTime;
-    float recoveryUntil;
-    int stuckEntity;
-    int stuckCount;
-    float obstacleJumpUntil;
-    float obstacleJumpCooldownUntil;
-    int obstacleJumpEntity;
-    int obstacleJumpAttempts;
 
     void initData()
     {
@@ -230,34 +167,14 @@ enum struct AiTank
         this.lastHeadBlockTargetSwitch = 0.0;
         this.forceRockUntil = 0.0;
         this.forceRockTarget = -1;
+        this.pathFollower = Address_Null;
         this.pathSegment.initData();
         this.lastPathSegment.initData();
-        this.pathInvalidatePending = false;
-        this.pathInvalidatePendingUntil = 0.0;
-        this.pathUpdateTime = 0.0;
-        this.pathSegmentCount = 0;
         this.airCorrGoal = NULL_VECTOR;
         this.bhopType = TankBhopType_None;
-        this.moveState = TankMoveState_Native;
-        this.moveStateStart = 0.0;
-        this.progressCheckTime = 0.0;
-        this.progressPos = NULL_VECTOR;
-        this.stuckSince = 0.0;
-        this.stuckEntitySince = 0.0;
-        this.lastStuckEntityCheckTime = 0.0;
-        this.ladderNearbyIgnoreUntil = 0.0;
-        this.lastPathInvalidateTime = 0.0;
-        this.recoveryUntil = 0.0;
-        this.stuckEntity = -1;
-        this.stuckCount = 0;
-        this.obstacleJumpUntil = 0.0;
-        this.obstacleJumpCooldownUntil = 0.0;
-        this.obstacleJumpEntity = -1;
-        this.obstacleJumpAttempts = 0;
     }
 }
 AiTank g_AiTanks[MAXPLAYERS + 1];
-PathSegment g_TankPathCache[MAXPLAYERS + 1][TANK_PATH_CACHE_SIZE];
 
 Logger log;
 
@@ -272,8 +189,8 @@ public Plugin myinfo =
 {
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
-    description = "Ai Tank 增强 3.0 版本（状态机、路径连跳、卡住恢复、障碍跳跃、梯子处理）",
-    version     = "1.1.1.0",
+    description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
+    version     = "1.0.0.1",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -345,24 +262,6 @@ public void OnPluginStart()
     g_cvLadderNearbyRadius = CreateConVar("ai_tank3_ladder_nearby_radius", "180.0", "Tank 距离梯子多近时暂停 ai_tank3 行为处理", CVAR_FLAGS, true, 0.0);
     g_cvLadderNearbyCacheTime = CreateConVar("ai_tank3_ladder_nearby_cache", "0.20", "梯子附近检测缓存时间（秒）", CVAR_FLAGS, true, 0.0);
 
-    // 移动状态机与卡住恢复
-    g_cvPathBhopPrefer = CreateConVar("ai_tank3_path_bhop_prefer", "1", "有有效导航路径时优先沿路径连跳", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvStuckDetect = CreateConVar("ai_tank3_stuck_detect", "1", "是否启用 Tank 无进展检测与路径恢复", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvStuckTime = CreateConVar("ai_tank3_stuck_time", "0.90", "Tank 预计移动但持续无进展多久后判定卡住（秒）", CVAR_FLAGS, true, 0.2);
-    g_cvStuckMinMove = CreateConVar("ai_tank3_stuck_min_move", "24.0", "卡住检测周期内的最小水平位移", CVAR_FLAGS, true, 1.0);
-    g_cvStuckCheckInterval = CreateConVar("ai_tank3_stuck_check_interval", "0.20", "无进展检测间隔（秒）", CVAR_FLAGS, true, 0.05);
-    g_cvStuckEntityCheck = CreateConVar("ai_tank3_stuck_entity_check", "1", "疑似卡住时是否检测脚部阻挡实体", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvStuckEntityInterval = CreateConVar("ai_tank3_stuck_entity_interval", "0.25", "脚部阻挡实体检测间隔（秒）", CVAR_FLAGS, true, 0.05);
-    g_cvStuckEntityTime = CreateConVar("ai_tank3_stuck_entity_time", "0.45", "同一实体持续卡脚多久后触发恢复（秒）", CVAR_FLAGS, true, 0.1);
-    g_cvStuckObstacleJump = CreateConVar("ai_tank3_stuck_obstacle_jump", "1", "检测到可越过的脚部阻挡实体时是否先尝试跳跃", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvStuckObstacleJumpSpeed = CreateConVar("ai_tank3_stuck_obstacle_jump_speed", "300.0", "脚部阻挡跳跃的垂直速度", CVAR_FLAGS, true, 150.0, true, 600.0);
-    g_cvStuckObstacleJumpDuration = CreateConVar("ai_tank3_stuck_obstacle_jump_duration", "0.80", "脚部阻挡跳跃期间暂停其他移动覆盖的时间（秒）", CVAR_FLAGS, true, 0.2, true, 2.0);
-    g_cvStuckObstacleJumpCooldown = CreateConVar("ai_tank3_stuck_obstacle_jump_cooldown", "1.25", "同一 Tank 两次脚部阻挡跳跃的最小间隔（秒）", CVAR_FLAGS, true, 0.2, true, 5.0);
-    g_cvStuckObstacleJumpAttempts = CreateConVar("ai_tank3_stuck_obstacle_jump_attempts", "1", "同一阻挡实体允许尝试跳跃的次数，失败后改为重新寻路", CVAR_FLAGS, true, 0.0, true, 3.0);
-    g_cvSpecialMoveTimeout = CreateConVar("ai_tank3_special_move_timeout", "1.50", "梯子/攀爬等特殊移动最长等待时间（秒）", CVAR_FLAGS, true, 0.2);
-    g_cvPathInvalidateCooldown = CreateConVar("ai_tank3_path_invalidate_cooldown", "0.75", "两次主动路径失效之间的最小间隔（秒）", CVAR_FLAGS, true, 0.1);
-    g_cvRecoveryTime = CreateConVar("ai_tank3_recovery_time", "0.35", "路径恢复期间暂停移动覆盖的时间（秒）", CVAR_FLAGS, true, 0.1);
-
     // 日志
     g_cvPluginName = CreateConVar("ai_tank3_plugin_name", "ai_tank3");
     char cvName[64];
@@ -373,11 +272,6 @@ public void OnPluginStart()
     // 事件
     HookEvent("round_start", evtRoundStart);
     HookEvent("round_end",   evtRoundEnd);
-    HookEvent("player_spawn", evtPlayerSpawn, EventHookMode_Post);
-    HookEvent("player_death", evtPlayerDeath, EventHookMode_Post);
-    HookEvent("tank_spawn", evtTankSpawn, EventHookMode_Post);
-    HookEvent("player_bot_replace", evtPlayerBotReplace, EventHookMode_Post);
-    HookEvent("bot_player_replace", evtBotPlayerReplace, EventHookMode_Post);
     HookEvent("player_hurt", evtPlayerHurt, EventHookMode_Post); // 命中刷新通背拳窗口
 
     // 日志对象
@@ -443,13 +337,6 @@ public void OnAllPluginsLoaded()
         SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_GET_CUR_GOAL);
 
     StartPrepSDKCall(SDKCall_Raw);
-    if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_PATH_INVALIDATE))
-        SetFailState("Failed to load offset for %s.", SIG_PATH_INVALIDATE);
-    g_hSdkPathInvalidate = EndPrepSDKCall();
-    if (!g_hSdkPathInvalidate)
-        SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_INVALIDATE);
-
-    StartPrepSDKCall(SDKCall_Raw);
     if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_PATH_NEXT_SEGMENT))
         SetFailState("Failed to load offset for %s.", SIG_PATH_NEXT_SEGMENT);
     PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
@@ -467,12 +354,6 @@ public void OnAllPluginsLoaded()
         SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_LAST_SEGMENT);
 
     delete hGamedata;
-
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (IsClientInGame(i))
-            ensureTankAnimHook(i);
-    }
 }
 
 public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
@@ -488,49 +369,18 @@ public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
     if (!isAiTank(client))
         return MRES_Ignored;
 
-    if (g_AiTanks[client].pathInvalidatePending)
-    {
-        bool shouldInvalidate = GetEngineTime() <= g_AiTanks[client].pathInvalidatePendingUntil;
-        g_AiTanks[client].pathInvalidatePending = false;
-        g_AiTanks[client].pathInvalidatePendingUntil = 0.0;
-        if (shouldInvalidate)
-        {
-            SDKCall(g_hSdkPathInvalidate, pThis);
-            clearTankPathSnapshot(client);
-            return MRES_Ignored;
-        }
-    }
+    g_AiTanks[client].pathFollower = pThis;
 
     Address pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
     if (!pPathSeg)
     {
-        clearTankPathSnapshot(client);
+        g_AiTanks[client].pathSegment.initData();
         return MRES_Ignored;
     }
 
     PathSegment curSegment;
     constructPathSegment(pPathSeg, curSegment);
     g_AiTanks[client].pathSegment = curSegment;
-
-    int cacheLimit = g_cvPathLookAheadMaxDepth.IntValue + 1;
-    if (cacheLimit < 1)
-        cacheLimit = 1;
-    else if (cacheLimit > TANK_PATH_CACHE_SIZE)
-        cacheLimit = TANK_PATH_CACHE_SIZE;
-
-    int cacheCount = 0;
-    Address pIterSeg = pPathSeg;
-    while (pIterSeg != Address_Null && cacheCount < cacheLimit)
-    {
-        PathSegment cachedSegment;
-        constructPathSegment(pIterSeg, cachedSegment);
-        g_TankPathCache[client][cacheCount] = cachedSegment;
-        cacheCount++;
-
-        pIterSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pThis, pIterSeg));
-    }
-    g_AiTanks[client].pathSegmentCount = cacheCount;
-    g_AiTanks[client].pathUpdateTime = GetEngineTime();
 
     Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pThis));
     if (!pLastSeg)
@@ -567,15 +417,6 @@ void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[]
 // ===== 结束回收 =====
 public void OnPluginEnd()
 {
-    if (GetFeatureStatus(FeatureType_Native, "AnimHookDisable") == FeatureStatus_Available)
-    {
-        for (int i = 1; i <= MaxClients; i++)
-        {
-            if (g_bAnimHooked[i] && IsClientInGame(i))
-                AnimHookDisable(i, INVALID_FUNCTION, tankAnimHookPostCb);
-        }
-    }
-
     delete log;
     delete g_hThrowAnimMap;
     delete g_hNearbyLadderList;
@@ -583,124 +424,50 @@ public void OnPluginEnd()
     delete g_hSdkNextBotGetCombatCharacter;
     delete g_hSdkPathGetCurGoal;
     delete g_hSdkPathNextSegment;
-    delete g_hSdkPathInvalidate;
     delete g_hSdkPathLastSegment;
 }
 
 // ===== 事件 =====
-void clearTankPathSnapshot(int client)
-{
-    g_AiTanks[client].pathSegment.initData();
-    g_AiTanks[client].lastPathSegment.initData();
-    g_AiTanks[client].pathUpdateTime = 0.0;
-    g_AiTanks[client].pathSegmentCount = 0;
-    g_AiTanks[client].airCorrGoal = NULL_VECTOR;
-    g_AiTanks[client].bhopType = TankBhopType_None;
-    g_AiTanks[client].lastHopSpeed = 0.0;
-    g_AiTanks[client].lastLookAheadTime = 0.0;
-    g_AiTanks[client].lastAirVecModifyTime = 0.0;
-}
-
-void resetTankClientState(int client, bool resetIgnore)
-{
-    if (client < 1 || client > MaxClients)
-        return;
-
-    g_AiTanks[client].initData();
-    g_fLastLadderNearbyCheck[client] = 0.0;
-    g_bLastLadderNearby[client] = false;
-    if (resetIgnore)
-        g_fHeadBlockIgnoreUntil[client] = 0.0;
-}
-
-void ensureTankAnimHook(int client)
-{
-    if (client < 1 || client > MaxClients || !IsClientInGame(client) || g_bAnimHooked[client])
-        return;
-    if (GetFeatureStatus(FeatureType_Native, "AnimHookEnable") != FeatureStatus_Available)
-        return;
-
-    g_bAnimHooked[client] = AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
-}
-
-public void OnMapStart()
-{
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        g_bAnimHooked[i] = false;
-        if (IsClientInGame(i))
-            ensureTankAnimHook(i);
-    }
-}
-
-public void OnMapEnd()
-{
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        resetTankClientState(i, true);
-        g_bAnimHooked[i] = false;
-    }
-}
-
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     for (int i = 1; i <= MaxClients; i++)
-        resetTankClientState(i, true);
+    {
+        g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_AiTanks[i].lastLookAheadTime = 0.0;
+        g_AiTanks[i].pathFollower = Address_Null;
+        g_AiTanks[i].pathSegment.initData();
+        g_AiTanks[i].lastPathSegment.initData();
+        g_AiTanks[i].airCorrGoal = NULL_VECTOR;
+        g_AiTanks[i].bhopType = TankBhopType_None;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
+        g_fLastLadderNearbyCheck[i] = 0.0;
+        g_bLastLadderNearby[i] = false;
+    }
 }
 
 void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
     for (int i = 1; i <= MaxClients; i++)
-        resetTankClientState(i, true);
-}
-
-void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
-{
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    resetTankClientState(client, true);
-    ensureTankAnimHook(client);
-}
-
-void evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
-{
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    if (client > 0 && IsClientInGame(client) && GetClientTeam(client) == TEAM_INFECTED)
-        resetTankClientState(client, false);
-}
-
-void evtTankSpawn(Event event, const char[] name, bool dontBroadcast)
-{
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    resetTankClientState(client, true);
-    ensureTankAnimHook(client);
-}
-
-void resetTankReplacementClients(Event event)
-{
-    int player = GetClientOfUserId(event.GetInt("player"));
-    int bot = GetClientOfUserId(event.GetInt("bot"));
-    resetTankClientState(player, true);
-    resetTankClientState(bot, true);
-    ensureTankAnimHook(player);
-    ensureTankAnimHook(bot);
-}
-
-void evtPlayerBotReplace(Event event, const char[] name, bool dontBroadcast)
-{
-    resetTankReplacementClients(event);
-}
-
-void evtBotPlayerReplace(Event event, const char[] name, bool dontBroadcast)
-{
-    resetTankReplacementClients(event);
-}
-
-public void L4D_OnReplaceTank(int oldTank, int newTank)
-{
-    resetTankClientState(oldTank, true);
-    resetTankClientState(newTank, true);
-    ensureTankAnimHook(oldTank);
-    ensureTankAnimHook(newTank);
+    {
+        g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_AiTanks[i].lastLookAheadTime = 0.0;
+        g_AiTanks[i].pathFollower = Address_Null;
+        g_AiTanks[i].pathSegment.initData();
+        g_AiTanks[i].lastPathSegment.initData();
+        g_AiTanks[i].airCorrGoal = NULL_VECTOR;
+        g_AiTanks[i].bhopType = TankBhopType_None;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
+        g_fLastLadderNearbyCheck[i] = 0.0;
+        g_bLastLadderNearby[i] = false;
+    }
 }
 
 // ===== 动画活动映射 =====
@@ -720,19 +487,10 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     if (!g_cvEnable.BoolValue || !isAiTank(client))
         return Plugin_Continue;
 
-
     float pos[3];
     GetClientAbsOrigin(client, pos);
 
-    if (handleTankObstacleJumpState(client, buttons, vel))
-    {
-        resetTankMovementOverrides(client);
-        return Plugin_Changed;
-    }
-
-    bool actualLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
-    bool nearLadder = actualLadder || isTankNearLadder(client, pos);
-    if (handleTankSpecialMoveState(client, pos, nearLadder, actualLadder))
+    if (isTankNearLadder(client, pos))
     {
         resetTankMovementOverrides(client);
         return Plugin_Continue;
@@ -747,13 +505,6 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     float targetPos[3];
     GetClientAbsOrigin(target, targetPos);
     float dist = GetVectorDistance(pos, targetPos);
-
-    updateTankMoveState(client, target, dist);
-    if (updateTankProgress(client, pos, targetPos, dist, buttons, vel))
-    {
-        resetTankMovementOverrides(client);
-        return Plugin_Changed;
-    }
 
     bool targetIgnored = isSurvivorIgnored(target);
     if (!targetIgnored)
@@ -883,531 +634,8 @@ void resetTankMovementOverrides(int client)
 {
     g_AiTanks[client].airCorrGoal = NULL_VECTOR;
     g_AiTanks[client].bhopType = TankBhopType_None;
-    g_AiTanks[client].lastHopSpeed = 0.0;
     g_AiTanks[client].lastLookAheadTime = 0.0;
     g_AiTanks[client].lastAirVecModifyTime = 0.0;
-}
-
-void setTankMoveState(int client, TankMoveState state)
-{
-    if (g_AiTanks[client].moveState == state)
-        return;
-
-    g_AiTanks[client].moveState = state;
-    g_AiTanks[client].moveStateStart = GetEngineTime();
-    if (state == TankMoveState_Recovery || state == TankMoveState_Special)
-        resetTankMovementOverrides(client);
-}
-
-bool handleTankObstacleJumpState(int client, int& buttons, float vel[3])
-{
-    float now = GetEngineTime();
-    if (g_AiTanks[client].obstacleJumpUntil <= 0.0)
-        return false;
-
-    bool landed = IsClientOnGround(client) && now - g_AiTanks[client].moveStateStart >= 0.15;
-    if (now >= g_AiTanks[client].obstacleJumpUntil || landed)
-    {
-        g_AiTanks[client].obstacleJumpUntil = 0.0;
-        return false;
-    }
-
-    // 起跳速度由 TeleportEntity 完全接管，避免原生跳跃和空中加速改变预测轨迹。
-    buttons &= ~(IN_ATTACK | IN_ATTACK2 | IN_JUMP | IN_DUCK | IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_LEFT | IN_RIGHT);
-    vel[0] = 0.0;
-    vel[1] = 0.0;
-    vel[2] = 0.0;
-    return true;
-}
-
-bool getTankObstacleDirection(int client, const float pos[3], const float targetPos[3], float direction[3])
-{
-    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", direction);
-    direction[2] = 0.0;
-    if (getVectorLength2D(direction) < 10.0 && hasTankPathSegment(client))
-        direction = g_AiTanks[client].pathSegment.m_vecForward;
-    if (getVectorLength2D(direction) < 10.0)
-        MakeVectorFromPoints(pos, targetPos, direction);
-    direction[2] = 0.0;
-    return NormalizeVector(direction, direction) > 0.0;
-}
-
-bool isTankObstacleJumpEntity(int entity)
-{
-    if (entity <= MaxClients || !IsValidEntity(entity))
-        return false;
-
-    char className[64];
-    GetEntityClassname(entity, className, sizeof(className));
-    if (strcmp(className, "func_ladder", false) == 0 ||
-        strcmp(className, "func_simpleladder", false) == 0 ||
-        strcmp(className, "func_nav_blocker", false) == 0 ||
-        strcmp(className, "func_playerclip", false) == 0 ||
-        strcmp(className, "player_infected_clip", false) == 0 ||
-        strcmp(className, "func_playerinfected_clip", false) == 0 ||
-        StrContains(className, "trigger_", false) == 0)
-    {
-        return false;
-    }
-    return true;
-}
-
-float getTankGravity(int client)
-{
-    ConVar cvGravity = FindConVar("sv_gravity");
-    float gravity = cvGravity ? cvGravity.FloatValue : DEFAULT_SV_GRAVITY;
-    if (gravity <= 1.0)
-        gravity = DEFAULT_SV_GRAVITY;
-
-    if (HasEntProp(client, Prop_Data, "m_flGravity"))
-    {
-        float gravityScale = GetEntPropFloat(client, Prop_Data, "m_flGravity");
-        if (gravityScale > 0.0)
-            gravity *= gravityScale;
-    }
-    return gravity;
-}
-
-bool tankJumpChordTouchesEntityClass(const float start[3], const float end[3], const float vMins[3], const float vMaxs[3], const char[] className)
-{
-    int entity = INVALID_ENT_REFERENCE;
-    while ((entity = FindEntityByClassname(entity, className)) != INVALID_ENT_REFERENCE)
-    {
-        Handle trace = TR_ClipRayHullToEntityEx(start, end, vMins, vMaxs, MASK_ALL, entity);
-        bool touched = TR_DidHit(trace) || TR_StartSolid(trace);
-        delete trace;
-        if (touched)
-            return true;
-    }
-    return false;
-}
-
-bool tankJumpChordTouchesHazard(const float start[3], const float end[3], const float vMins[3], const float vMaxs[3])
-{
-    return tankJumpChordTouchesEntityClass(start, end, vMins, vMaxs, "trigger_hurt") ||
-        tankJumpChordTouchesEntityClass(start, end, vMins, vMaxs, "trigger_fall") ||
-        tankJumpChordTouchesEntityClass(start, end, vMins, vMaxs, "trigger_teleport") ||
-        tankJumpChordTouchesEntityClass(start, end, vMins, vMaxs, "trigger_push") ||
-        tankJumpChordTouchesEntityClass(start, end, vMins, vMaxs, "trigger_gravity");
-}
-
-bool canTankJumpOverObstacle(int client, const float pos[3], const float jumpVelocity[3], float& landingTime)
-{
-    float gravity = getTankGravity(client);
-    float jumpHeight = jumpVelocity[2] * jumpVelocity[2] / (2.0 * gravity);
-    if (jumpVelocity[2] <= 0.0 || jumpHeight < 24.0)
-        return false;
-
-    float traceDrop = OBSTACLE_JUMP_MAX_DROP + OBSTACLE_JUMP_TRACE_START_Z;
-    float maxTime = (jumpVelocity[2] + SquareRoot(jumpVelocity[2] * jumpVelocity[2] + 2.0 * gravity * traceDrop)) / gravity;
-    int steps = RoundToCeil(maxTime / OBSTACLE_JUMP_TRACE_STEP);
-    int distanceSteps = RoundToCeil(getVectorLength2D(jumpVelocity) * maxTime / 32.0);
-    if (distanceSteps > steps)
-        steps = distanceSteps;
-    if (steps < 8)
-        steps = 8;
-    else if (steps > OBSTACLE_JUMP_MAX_STEPS)
-        steps = OBSTACLE_JUMP_MAX_STEPS;
-
-    float vMins[3], vMaxs[3];
-    GetClientMins(client, vMins);
-    GetClientMaxs(client, vMaxs);
-
-    float previousPos[3];
-    previousPos = pos;
-    previousPos[2] += OBSTACLE_JUMP_TRACE_START_Z;
-    float previousTime = 0.0;
-    for (int i = 1; i <= steps; i++)
-    {
-        float currentTime = maxTime * float(i) / float(steps);
-        float currentPos[3];
-        currentPos[0] = pos[0] + jumpVelocity[0] * currentTime;
-        currentPos[1] = pos[1] + jumpVelocity[1] * currentTime;
-        currentPos[2] = pos[2] + OBSTACLE_JUMP_TRACE_START_Z + jumpVelocity[2] * currentTime - 0.5 * gravity * currentTime * currentTime;
-
-        if (TR_PointOutsideWorld(currentPos) || tankJumpChordTouchesHazard(previousPos, currentPos, vMins, vMaxs))
-            return false;
-
-        Handle trace = TR_TraceHullFilterEx(previousPos, currentPos, vMins, vMaxs, MASK_PLAYERSOLID, _TraceWallFilter, client);
-        bool startedSolid = TR_StartSolid(trace);
-        if (!TR_DidHit(trace))
-        {
-            delete trace;
-            previousPos = currentPos;
-            previousTime = currentTime;
-            continue;
-        }
-
-        float fraction = TR_GetFraction(trace);
-        float hitTime = previousTime + (currentTime - previousTime) * fraction;
-        float hitPos[3], hitNormal[3];
-        TR_GetEndPosition(hitPos, trace);
-        TR_GetPlaneNormal(trace, hitNormal);
-        delete trace;
-
-        float verticalSpeed = jumpVelocity[2] - gravity * hitTime;
-        if (startedSolid || verticalSpeed >= 0.0 || hitNormal[2] < OBSTACLE_JUMP_LAND_NORMAL ||
-            hitPos[2] < pos[2] - OBSTACLE_JUMP_MAX_DROP)
-        {
-            return false;
-        }
-
-        landingTime = hitTime;
-        return true;
-    }
-    return false;
-}
-
-bool tryTankObstacleJump(int client, int blocker, const float pos[3], const float targetPos[3], int& buttons, float cmdVel[3])
-{
-    if (!g_cvStuckObstacleJump.BoolValue || !isTankObstacleJumpEntity(blocker))
-        return false;
-    if (!IsClientOnGround(client) || L4D_IsPlayerStaggering(client) ||
-        GetEntityMoveType(client) == MOVETYPE_LADDER ||
-        GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
-    {
-        return false;
-    }
-
-    float now = GetEngineTime();
-    if (now < g_AiTanks[client].obstacleJumpCooldownUntil)
-        return false;
-    if (g_AiTanks[client].obstacleJumpEntity != blocker)
-    {
-        g_AiTanks[client].obstacleJumpEntity = blocker;
-        g_AiTanks[client].obstacleJumpAttempts = 0;
-    }
-    if (g_AiTanks[client].obstacleJumpAttempts >= g_cvStuckObstacleJumpAttempts.IntValue)
-        return false;
-
-    float direction[3];
-    if (!getTankObstacleDirection(client, pos, targetPos, direction))
-        return false;
-
-    float velocity[3];
-    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velocity);
-    float forwardSpeed = getVectorLength2D(velocity);
-    if (forwardSpeed < 220.0)
-        forwardSpeed = 220.0;
-    if (g_cvBhopMaxSpeed.FloatValue >= 220.0 && forwardSpeed > g_cvBhopMaxSpeed.FloatValue)
-        forwardSpeed = g_cvBhopMaxSpeed.FloatValue;
-
-    float jumpVelocity[3];
-    jumpVelocity[0] = direction[0] * forwardSpeed;
-    jumpVelocity[1] = direction[1] * forwardSpeed;
-    jumpVelocity[2] = g_cvStuckObstacleJumpSpeed.FloatValue;
-
-    float landingTime;
-    if (!canTankJumpOverObstacle(client, pos, jumpVelocity, landingTime))
-        return false;
-
-    g_AiTanks[client].obstacleJumpAttempts++;
-    float jumpControlTime = landingTime + 0.05;
-    if (jumpControlTime < g_cvStuckObstacleJumpDuration.FloatValue)
-        jumpControlTime = g_cvStuckObstacleJumpDuration.FloatValue;
-    g_AiTanks[client].obstacleJumpUntil = now + jumpControlTime;
-    g_AiTanks[client].obstacleJumpCooldownUntil = now + g_cvStuckObstacleJumpCooldown.FloatValue;
-    g_AiTanks[client].stuckSince = now;
-    g_AiTanks[client].stuckEntitySince = now;
-    g_AiTanks[client].lastStuckEntityCheckTime = now;
-    g_AiTanks[client].progressPos = pos;
-    g_AiTanks[client].progressCheckTime = now;
-    setTankMoveState(client, TankMoveState_Special);
-
-    buttons &= ~(IN_ATTACK | IN_ATTACK2 | IN_JUMP | IN_DUCK | IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_LEFT | IN_RIGHT);
-    cmdVel[0] = 0.0;
-    cmdVel[1] = 0.0;
-    cmdVel[2] = 0.0;
-    if (HasEntProp(client, Prop_Send, "m_hGroundEntity"))
-        SetEntPropEnt(client, Prop_Send, "m_hGroundEntity", -1);
-    SetEntityFlags(client, GetEntityFlags(client) & ~FL_ONGROUND);
-    float jumpStart[3];
-    jumpStart = pos;
-    jumpStart[2] += OBSTACLE_JUMP_TRACE_START_Z;
-    TeleportEntity(client, jumpStart, NULL_VECTOR, jumpVelocity);
-
-    if (log != null)
-        log.debugAll("Tank %N jumps over foot blocking entity %d", client, blocker);
-    return true;
-}
-
-bool isTankPathSpecialMove(int client)
-{
-    if (!hasTankPathSegment(client))
-        return false;
-
-    return g_AiTanks[client].pathSegment.m_SegmentType != TANK_SEGMENT_ON_GROUND;
-}
-
-bool handleTankSpecialMoveState(int client, const float pos[3], bool nearLadder, bool actualLadder)
-{
-    float now = GetEngineTime();
-    if (g_AiTanks[client].moveState == TankMoveState_Recovery)
-    {
-        if (now < g_AiTanks[client].recoveryUntil)
-            return true;
-        setTankMoveState(client, TankMoveState_Native);
-    }
-
-    bool nearbyAllowed = nearLadder && (actualLadder || now >= g_AiTanks[client].ladderNearbyIgnoreUntil);
-    bool specialPath = isTankPathSpecialMove(client);
-    if (!nearbyAllowed && !specialPath)
-    {
-        if (g_AiTanks[client].moveState == TankMoveState_Special)
-            setTankMoveState(client, TankMoveState_Native);
-        return false;
-    }
-
-    if (g_AiTanks[client].moveState != TankMoveState_Special)
-    {
-        setTankMoveState(client, TankMoveState_Special);
-        g_AiTanks[client].progressPos = pos;
-        g_AiTanks[client].progressCheckTime = now;
-    }
-
-    // 仅仅靠近梯子时继续让权给原生 AI，但不把正常停顿当成梯子卡住。
-    if (!actualLadder && !specialPath)
-    {
-        g_AiTanks[client].progressPos = pos;
-        g_AiTanks[client].progressCheckTime = now;
-        g_AiTanks[client].moveStateStart = now;
-        return true;
-    }
-
-    if (!g_cvStuckDetect.BoolValue)
-    {
-        g_AiTanks[client].progressPos = pos;
-        g_AiTanks[client].progressCheckTime = now;
-        g_AiTanks[client].moveStateStart = now;
-        return true;
-    }
-
-    float moved = GetVectorDistance(pos, g_AiTanks[client].progressPos);
-    if (moved >= g_cvStuckMinMove.FloatValue)
-    {
-        g_AiTanks[client].progressPos = pos;
-        g_AiTanks[client].progressCheckTime = now;
-        g_AiTanks[client].moveStateStart = now;
-        return true;
-    }
-
-    if (now - g_AiTanks[client].moveStateStart >= g_cvSpecialMoveTimeout.FloatValue)
-    {
-        invalidateTankPath(client, actualLadder ? "ladder made no progress" : "special path made no progress", true);
-    }
-    return true;
-}
-
-void updateTankMoveState(int client, int target, float dist)
-{
-    if (!isAiTank(client) || !IsValidSurvivor(target))
-        return;
-
-    float now = GetEngineTime();
-    if (g_AiTanks[client].moveState == TankMoveState_Recovery)
-    {
-        if (now < g_AiTanks[client].recoveryUntil)
-            return;
-        setTankMoveState(client, TankMoveState_Native);
-    }
-
-    if (dist <= g_cvBhopMinDist.FloatValue)
-    {
-        setTankMoveState(client, TankMoveState_Commit);
-        return;
-    }
-
-    if (g_cvPathBhopPrefer.BoolValue && hasValidTankPath(client) && !isTankPathSpecialMove(client))
-    {
-        setTankMoveState(client, TankMoveState_Path);
-        return;
-    }
-
-    if (dist <= g_cvBhopPathFallbackDist.FloatValue)
-    {
-        setTankMoveState(client, TankMoveState_Direct);
-        return;
-    }
-
-    setTankMoveState(client, TankMoveState_Native);
-}
-
-void invalidateTankPath(int client, const char[] reason, bool forceRequest = false)
-{
-    if (!isAiTank(client))
-        return;
-
-    float now = GetEngineTime();
-    if (now - g_AiTanks[client].lastPathInvalidateTime < g_cvPathInvalidateCooldown.FloatValue)
-        return;
-
-    g_AiTanks[client].pathInvalidatePending = forceRequest || hasTankPathSegment(client);
-    g_AiTanks[client].pathInvalidatePendingUntil = now + PATH_INVALIDATE_PENDING_TIME;
-
-    g_AiTanks[client].lastPathInvalidateTime = now;
-    g_AiTanks[client].ladderNearbyIgnoreUntil = now + 2.0;
-    g_AiTanks[client].recoveryUntil = now + g_cvRecoveryTime.FloatValue;
-    g_AiTanks[client].stuckCount++;
-    g_AiTanks[client].stuckSince = 0.0;
-    g_AiTanks[client].stuckEntity = -1;
-    g_AiTanks[client].stuckEntitySince = 0.0;
-    g_AiTanks[client].lastStuckEntityCheckTime = 0.0;
-    g_AiTanks[client].obstacleJumpUntil = 0.0;
-    g_AiTanks[client].obstacleJumpEntity = -1;
-    g_AiTanks[client].obstacleJumpAttempts = 0;
-    clearTankPathSnapshot(client);
-    setTankMoveState(client, TankMoveState_Recovery);
-    resetTankMovementOverrides(client);
-
-    if (log != null)
-        log.debugAll("Tank %N invalidated path: %s (attempt %d)", client, reason, g_AiTanks[client].stuckCount);
-}
-
-int detectTankFootBlockingEntity(int client, const float pos[3], const float targetPos[3])
-{
-    float direction[3];
-    GetEntPropVector(client, Prop_Data, "m_vecVelocity", direction);
-    direction[2] = 0.0;
-    if (getVectorLength2D(direction) < 10.0 && hasTankPathSegment(client))
-        direction = g_AiTanks[client].pathSegment.m_vecForward;
-    if (getVectorLength2D(direction) < 10.0)
-        MakeVectorFromPoints(pos, targetPos, direction);
-    direction[2] = 0.0;
-    if (NormalizeVector(direction, direction) <= 0.0)
-        return -1;
-
-    float start[3], end[3];
-    start = pos;
-    start[2] += 4.0;
-    end = start;
-    ScaleVector(direction, 42.0);
-    AddVectors(end, direction, end);
-
-    Handle trace = TR_TraceHullFilterEx(start, end, {-32.0, -32.0, 0.0}, {32.0, 32.0, 34.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
-    if (!TR_DidHit(trace))
-    {
-        delete trace;
-        return -1;
-    }
-
-    int entity = TR_GetEntityIndex(trace);
-    delete trace;
-    if (entity > MaxClients && IsValidEntity(entity))
-        return entity;
-    return -1;
-}
-
-void resetTankProgressTracking(int client, const float pos[3], float now)
-{
-    g_AiTanks[client].progressPos = pos;
-    g_AiTanks[client].progressCheckTime = now;
-    g_AiTanks[client].stuckSince = 0.0;
-    g_AiTanks[client].stuckEntity = -1;
-    g_AiTanks[client].stuckEntitySince = 0.0;
-    g_AiTanks[client].lastStuckEntityCheckTime = 0.0;
-    g_AiTanks[client].obstacleJumpEntity = -1;
-    g_AiTanks[client].obstacleJumpAttempts = 0;
-}
-
-bool updateTankProgress(int client, const float pos[3], const float targetPos[3], float dist, int& buttons, float cmdVel[3])
-{
-    if (!isAiTank(client))
-        return false;
-
-    float now = GetEngineTime();
-    if (!g_cvStuckDetect.BoolValue)
-    {
-        resetTankProgressTracking(client, pos, now);
-        return false;
-    }
-
-    TankMoveState state = g_AiTanks[client].moveState;
-    if (state != TankMoveState_Path && state != TankMoveState_Direct)
-    {
-        resetTankProgressTracking(client, pos, now);
-        return false;
-    }
-
-    if (L4D_IsPlayerStaggering(client) || GetEntityMoveType(client) == MOVETYPE_LADDER ||
-        GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
-    {
-        resetTankProgressTracking(client, pos, now);
-        return false;
-    }
-
-    if (g_AiTanks[client].progressCheckTime <= 0.0)
-    {
-        g_AiTanks[client].progressPos = pos;
-        g_AiTanks[client].progressCheckTime = now;
-        return false;
-    }
-    if (now - g_AiTanks[client].progressCheckTime < g_cvStuckCheckInterval.FloatValue)
-        return false;
-
-    float moved = getVectorDistance2D(pos, g_AiTanks[client].progressPos);
-    g_AiTanks[client].progressCheckTime = now;
-    if (moved >= g_cvStuckMinMove.FloatValue)
-    {
-        resetTankProgressTracking(client, pos, now);
-        return false;
-    }
-
-    bool committedToAttack = g_AiTanks[client].wasThrowing || (buttons & (IN_ATTACK | IN_ATTACK2)) != 0;
-    bool expectedToMove = !committedToAttack && ((buttons & (IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT)) != 0 ||
-        FloatAbs(cmdVel[0]) > 1.0 || FloatAbs(cmdVel[1]) > 1.0);
-    if (!expectedToMove || dist < g_cvBhopMinDist.FloatValue)
-    {
-        resetTankProgressTracking(client, pos, now);
-        return false;
-    }
-
-    if (g_AiTanks[client].stuckSince <= 0.0)
-        g_AiTanks[client].stuckSince = now;
-    if (now - g_AiTanks[client].stuckSince < g_cvStuckTime.FloatValue)
-        return false;
-
-    if (g_cvStuckEntityCheck.BoolValue && now - g_AiTanks[client].lastStuckEntityCheckTime >= g_cvStuckEntityInterval.FloatValue)
-    {
-        g_AiTanks[client].lastStuckEntityCheckTime = now;
-        int blockedEntity = detectTankFootBlockingEntity(client, pos, targetPos);
-        if (blockedEntity > 0)
-        {
-            if (g_AiTanks[client].stuckEntity != blockedEntity)
-            {
-                g_AiTanks[client].stuckEntity = blockedEntity;
-                g_AiTanks[client].stuckEntitySince = now;
-            }
-            else if (now - g_AiTanks[client].stuckEntitySince >= g_cvStuckEntityTime.FloatValue)
-            {
-                if (tryTankObstacleJump(client, blockedEntity, pos, targetPos, buttons, cmdVel))
-                    return true;
-                invalidateTankPath(client, "foot blocking entity");
-                return false;
-            }
-        }
-        else
-        {
-            g_AiTanks[client].stuckEntity = -1;
-            g_AiTanks[client].stuckEntitySince = 0.0;
-            g_AiTanks[client].obstacleJumpEntity = -1;
-            g_AiTanks[client].obstacleJumpAttempts = 0;
-        }
-    }
-
-    // 实体检测有自己的持续时间阈值；在确认实体消失或跳跃/寻路处理完成前，
-    // 不要被下面的通用“无进展”分支提前失效路径。
-    if (g_cvStuckEntityCheck.BoolValue && g_AiTanks[client].stuckEntity > 0)
-        return false;
-
-    if (hasTankPathSegment(client))
-        invalidateTankPath(client, "no movement on path");
-    else
-    {
-        g_AiTanks[client].recoveryUntil = now + g_cvRecoveryTime.FloatValue;
-        setTankMoveState(client, TankMoveState_Recovery);
-        resetTankMovementOverrides(client);
-    }
-    return false;
 }
 
 static bool isClientDownState(int client)
@@ -1805,8 +1033,7 @@ Action punchLockVision(int client, int target, const float pos[3], const float t
         return Plugin_Continue;
 
     float nextAtk = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
-    float now = GetGameTime();
-    if (g_AiTanks[client].nextAttackTime <= now && nextAtk > now)
+    if (g_AiTanks[client].nextAttackTime < GetEngineTime() && nextAtk > GetGameTime())
     {
         float vLookAt[3], vDir[3];
         MakeVectorFromPoints(pos, targetPos, vLookAt);
@@ -1821,11 +1048,6 @@ Action punchLockVision(int client, int target, const float pos[3], const float t
 Action checkEnableBhop(int client, int target, int& buttons, const float pos[3], const float targetPos[3], float dist)
 {
     if (!g_cvTankBhop.BoolValue || !isAiTank(client) || !IsValidSurvivor(target))
-        return Plugin_Continue;
-
-    if (g_AiTanks[client].moveState == TankMoveState_Special ||
-        g_AiTanks[client].moveState == TankMoveState_Recovery ||
-        g_AiTanks[client].moveState == TankMoveState_Commit)
         return Plugin_Continue;
 
     if (L4D_IsPlayerStaggering(client))
@@ -1852,15 +1074,14 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
     float l_targetPos[3]; l_targetPos = targetPos;
     bool visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, 0, l_targetPos);
 
-    bool pathPreferred = g_cvPathBhopPrefer.BoolValue &&
-        hasValidTankPath(client) && !isTankPathSpecialMove(client);
+    bool useCurrentBhop = visible || dist <= g_cvBhopPathFallbackDist.FloatValue;
 
     if (IsClientOnGround(client))
     {
         if (!g_cvBhopNoVision.BoolValue && !visible)
             return Plugin_Continue;
 
-        if (pathPreferred)
+        if (!useCurrentBhop)
         {
             bool pathHandled = false;
             Action pathBhop = tryPathGroundBhop(client, buttons, pos, vel, visible, pathHandled);
@@ -1950,7 +1171,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
         SetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
     }
 
-    if (g_AiTanks[client].bhopType == TankBhopType_Path)
+    if (!useCurrentBhop && g_AiTanks[client].bhopType == TankBhopType_Path)
     {
         Action pathAir = tryPathAirCorrection(client, pos, vAbsVelVec, vel);
         if (pathAir != Plugin_Continue)
@@ -1967,8 +1188,6 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 
     float dx = SquareRoot(Pow(targetPos[0] - pos[0], 2.0) + Pow(targetPos[1] - pos[1], 2.0));
     float dz = targetPos[2] - pos[2];
-    if (dx <= 1.0)
-        return Plugin_Continue;
     float pitch = RadToDeg(ArcTangent(dz / dx));
     if (dz > (JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange) && pitch > 45.0)
         return Plugin_Continue;
@@ -2116,8 +1335,6 @@ stock bool nextTickVelocityCheck(int client, const float velocity[3], bool visib
     GetClientAbsOrigin(client, pos);
     velVec = velocity;
     float vel = GetVectorLength(velVec);
-    if (vel <= 1.0)
-        return false;
     NormalizeVector(velVec, velVec);
 
     ScaleVector(velVec, vel + FloatAbs(vMaxs[0] - vMins[0]) + 3.0);
@@ -2175,26 +1392,21 @@ stock bool nextTickVelocityCheck(int client, const float velocity[3], bool visib
     return true;
 }
 
-bool hasTankPathSegment(int client)
+bool hasValidTankPath(int client)
 {
     if (!isAiTank(client))
         return false;
 
+    PathSegment curSegment;
+    PathSegment lastSegment;
+    curSegment = g_AiTanks[client].pathSegment;
+    lastSegment = g_AiTanks[client].lastPathSegment;
     return (
-        g_AiTanks[client].pathSegmentCount > 0 &&
-        g_AiTanks[client].pathUpdateTime > 0.0 &&
-        GetEngineTime() - g_AiTanks[client].pathUpdateTime <= PATH_CACHE_MAX_AGE &&
-        g_AiTanks[client].pathSegment.m_pPathSegment != Address_Null
+        g_AiTanks[client].pathFollower != Address_Null &&
+        curSegment.m_pPathSegment != Address_Null &&
+        lastSegment.m_pPathSegment != Address_Null &&
+        curSegment.m_pPathSegment != lastSegment.m_pPathSegment
     );
-}
-
-bool hasValidTankPath(int client)
-{
-    if (!hasTankPathSegment(client))
-        return false;
-
-    return g_AiTanks[client].lastPathSegment.m_pPathSegment != Address_Null &&
-        g_AiTanks[client].pathSegment.m_pPathSegment != g_AiTanks[client].lastPathSegment.m_pPathSegment;
 }
 
 void constructPathSegment(Address pPathSegment, PathSegment segment)
@@ -2219,32 +1431,34 @@ void constructPathSegment(Address pPathSegment, PathSegment segment)
     segment.m_flDistFromStart = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(44), NumberType_Int32));
 }
 
+bool getNextTankPathSegment(Address pPath, Address pCurSeg, PathSegment segment)
+{
+    if (!pPath || !pCurSeg || !g_hSdkPathNextSegment)
+        return false;
+
+    Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPath, pCurSeg));
+    if (!pNextSeg)
+        return false;
+
+    constructPathSegment(pNextSeg, segment);
+    return true;
+}
+
 bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, float outPos[3], int maxDepth = 10)
 {
-    if (!hasValidTankPath(client))
-        return false;
-
-    int cacheCount = g_AiTanks[client].pathSegmentCount;
-    if (cacheCount < 1)
-        return false;
-
-    int iterIndex = 0;
     PathSegment iterSeg;
-    iterSeg = g_TankPathCache[client][iterIndex];
+    iterSeg = g_AiTanks[client].pathSegment;
     if (iterSeg.m_pPathSegment == Address_Null)
-        return false;
-    if (iterSeg.m_SegmentType != TANK_SEGMENT_ON_GROUND)
         return false;
 
     float pos2D[3];
     pos2D = pos;
     pos2D[2] = 0.0;
 
-    for (int i = 0; i < maxDepth && iterIndex + 1 < cacheCount; i++)
+    for (int i = 0; i < maxDepth; i++)
     {
         PathSegment nextSeg;
-        nextSeg = g_TankPathCache[client][iterIndex + 1];
-        if (nextSeg.m_SegmentType != TANK_SEGMENT_ON_GROUND)
+        if (!getNextTankPathSegment(g_AiTanks[client].pathFollower, iterSeg.m_pPathSegment, nextSeg))
             break;
 
         float curGoal2D[3], nextGoal2D[3];
@@ -2260,9 +1474,6 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         float lenSqr = GetVectorDotProduct(curToNext, curToNext);
         if (lenSqr <= 0.0)
         {
-            if (nextSeg.m_pPathSegment == g_AiTanks[client].lastPathSegment.m_pPathSegment)
-                return false;
-            iterIndex++;
             iterSeg = nextSeg;
             continue;
         }
@@ -2270,17 +1481,11 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         float proj = GetVectorDotProduct(curToNext, curToTank) / lenSqr;
         if (proj >= 1.0)
         {
-            if (nextSeg.m_pPathSegment == g_AiTanks[client].lastPathSegment.m_pPathSegment)
-                return false;
-            iterIndex++;
             iterSeg = nextSeg;
             continue;
         }
         if (proj >= 0.5)
-        {
-            iterIndex++;
             iterSeg = nextSeg;
-        }
 
         break;
     }
@@ -2293,14 +1498,14 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
     start[2] += 36.0;
 
     int fwdCount = 0;
-    for (int i = 0; i < maxDepth && iterIndex < cacheCount; i++)
+    for (int i = 0; i < maxDepth; i++)
     {
-        float goal[3], endPos[3];
+        float goal[3], end[3];
         goal = iterSeg.m_vecGoalPos;
-        endPos = goal;
-        endPos[2] += 36.0;
+        end = goal;
+        end[2] += 36.0;
 
-        Handle hTrace = TR_TraceHullFilterEx(start, endPos, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
+        Handle hTrace = TR_TraceHullFilterEx(start, end, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
         bool isHit = TR_DidHit(hTrace);
         delete hTrace;
 
@@ -2317,11 +1522,7 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         if (goal[2] - pos[2] > JUMP_HEIGHT)
             break;
 
-        iterIndex++;
-        if (iterIndex >= cacheCount)
-            break;
-        iterSeg = g_TankPathCache[client][iterIndex];
-        if (iterSeg.m_SegmentType != TANK_SEGMENT_ON_GROUND)
+        if (!getNextTankPathSegment(g_AiTanks[client].pathFollower, iterSeg.m_pPathSegment, iterSeg))
             break;
     }
 
@@ -2374,8 +1575,10 @@ bool isNullVector(const float vec[3])
 // ===== 玩家进服：启用动画钩子 & 梯子常驻维护 =====
 public void OnClientPutInServer(int client)
 {
-    resetTankClientState(client, true);
-    ensureTankAnimHook(client);
+    g_AiTanks[client].initData();
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    // 后置动画钩子：识别投石/翻越等序列变化
+    AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
 }
 
 public void OnClientDisconnect(int client)
@@ -2383,23 +1586,36 @@ public void OnClientDisconnect(int client)
     if (client < 1 || client > MaxClients)
         return;
 
-    resetTankClientState(client, true);
-    g_bAnimHooked[client] = false;
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    g_AiTanks[client].headBlockStart = 0.0;
+    g_AiTanks[client].lastHeadBlockTargetSwitch = 0.0;
+    g_AiTanks[client].forceRockUntil = 0.0;
+    g_AiTanks[client].forceRockTarget = -1;
+    g_AiTanks[client].lastLookAheadTime = 0.0;
+    g_AiTanks[client].pathFollower = Address_Null;
+    g_AiTanks[client].pathSegment.initData();
+    g_AiTanks[client].lastPathSegment.initData();
+    g_AiTanks[client].airCorrGoal = NULL_VECTOR;
+    g_AiTanks[client].bhopType = TankBhopType_None;
+    g_fLastLadderNearbyCheck[client] = 0.0;
+    g_bLastLadderNearby[client] = false;
 }
 
 // ===== 动画后置钩子：识别投石序列并触发相应逻辑 =====
 Action tankAnimHookPostCb(int tank, int &sequence)
 {
     if (!isAiTank(tank))
+    {
+        AnimHookDisable(tank, tankAnimHookPostCb);
         return Plugin_Continue;
+    }
 
     if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Throw)))
     {
-        if (!g_AiTanks[tank].wasThrowing)
+        if (g_cvJumpRock.BoolValue && !g_AiTanks[tank].wasThrowing)
         {
+            makeTankJumpRock(tank);
             g_AiTanks[tank].wasThrowing = true;
-            if (g_cvJumpRock.BoolValue)
-                makeTankJumpRock(tank);
             CreateTimer(0.5, timerResetThrowingFlagHandler, GetClientUserId(tank), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
         }
     }
@@ -2427,7 +1643,6 @@ bool isMatchedSequence(int sequence, TankSequenceType seqType)
 void makeTankJumpRock(int tank)
 {
     if (!isAiTank(tank)) return;
-    if (g_AiTanks[tank].obstacleJumpUntil > GetEngineTime()) return;
 
     float vAbsVelVec[3];
     GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
@@ -2439,11 +1654,7 @@ Action timerResetThrowingFlagHandler(Handle timer, int userId)
 {
     int tank = GetClientOfUserId(userId);
     if (!isAiTank(tank))
-    {
-        if (tank > 0)
-            g_AiTanks[tank].wasThrowing = false;
         return Plugin_Stop;
-    }
 
     int animSeq = GetEntProp(tank, Prop_Data, "m_nSequence");
     if (!isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Throw)))
