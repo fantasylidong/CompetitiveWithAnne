@@ -1,0 +1,79 @@
+"Phrases"
+{
+	"Advertisement_MapTime"
+	{
+		"jp"		"{lightgreen}[現在のチャプター]: {green}{CURRENTMAP}\n{lightgreen}[サーバー時刻]: {green}{TIME24} - {DATE}"
+	}
+	"Advertisement_LoadMode"
+	{
+		"jp"		"{green}!match{lightgreen} を入力してモードを読み込みます。\n{lightgreen}モードを変更するには、先に {green}!rmatch{lightgreen} で現在の設定を解除し、もう一度 {green}!match{lightgreen} を使用してください。"
+	}
+	"Advertisement_DefaultCommands"
+	{
+		"jp"		"{green}!away{lightgreen} 観戦  {green}!slots{lightgreen} スロット追加  {green}!rpg{lightgreen} 娯楽ショップ"
+	}
+	"Advertisement_AnneCommands"
+	{
+		"jp"		"{green}!away{lightgreen} 観戦  {green}!join{lightgreen} 生存者に参加  {green}!slots{lightgreen} スロット追加  {green}!xx{lightgreen} モード情報\n{green}!mapvote{lightgreen} カスタムマップ  {green}!spechudon{lightgreen} 観戦 HUD を有効化"
+	}
+	"Advertisement_CoopCommands"
+	{
+		"jp"		"{green}!vote{lightgreen} 投票設定  {green}!away{lightgreen} 観戦  {green}!slots{lightgreen} スロット追加  {green}!rpg{lightgreen} 娯楽ショップ"
+	}
+	"Advertisement_ServerGroup"
+	{
+		"jp"		"{lightgreen}サーバー管理者: {green}東{lightgreen}。一緒に遊ぶ仲間を探すには QQ グループ {green}883237206{lightgreen} に参加してください。"
+	}
+	"Advertisement_LowHealth"
+	{
+		"jp"		"{lightgreen}体力が {green}40{lightgreen} 未満になったら、チームの進行を遅らせないように飛び降りることも検討してください。"
+	}
+	"Advertisement_DefaultBossCommands"
+	{
+		"jp"		"{green}!tank !witch !boss{lightgreen} ボス情報  {green}!cur{lightgreen} 現在の進行度"
+	}
+	"Advertisement_AnneInfoCommands"
+	{
+		"jp"		"{green}!tank{lightgreen} ボス情報  {green}!zs{lightgreen} 自殺  {green}!rpg{lightgreen} ショップ  {green}!xx{lightgreen} モード情報\n{green}!ip{lightgreen} 電信サーバー IP  {green}!web{lightgreen} 電信サーバーの Web ページ"
+	}
+	"Advertisement_Cosmetics"
+	{
+		"jp"		"{lightgreen}称号、帽子、生存者アウトラインがショップで利用できるようになりました。\n{green}50 万ポイント{lightgreen}でカスタム称号を入手し、{green}!setch{lightgreen} で設定または変更できます。"
+	}
+	"Advertisement_VoteBoss"
+	{
+		"jp"		"{lightgreen}生存者は {green}!voteboss{lightgreen} を使用して Tank と Witch の出現位置を変更できます。"
+	}
+	"Advertisement_Donate"
+	{
+		"jp"		"{lightgreen}サーバー管理者の活動を支援するには、{green}!donate{lightgreen} と入力してください。"
+	}
+	"Advertisement_ModToggle"
+	{
+		"jp"		"{green}サーバー Mod の切り替え{lightgreen}は{green}投票メニュー{lightgreen}から利用できます。"
+	}
+	"Advertisement_PlayerVotes"
+	{
+		"jp"		"{green}!votekick{lightgreen} 放置プレイヤーのキック投票 {green}[プレイヤーのみ投票]{lightgreen}\n{green}!voteban{lightgreen} チート・迷惑プレイヤーの BAN 投票 {green}[全員が投票]{lightgreen}"
+	}
+	"Advertisement_CoopSpawnTiming"
+	{
+		"jp"		"{lightgreen}特殊感染者の出現タイマーは{green}最短時間のみ{lightgreen}を示し、実際の出現時刻は Director が決定します。"
+	}
+	"Advertisement_CoopProgress"
+	{
+		"jp"		"{green}!cur{lightgreen} 現在の進行度を表示します。Z キーを押して、マークされたアイテムの表示を選択できます。"
+	}
+	"Advertisement_CoopHealthReset"
+	{
+		"jp"		"{green}チャプター終了時、体力が 50 未満の生存者は体力 50 まで回復し、状態もリセットされるため自殺は不要です。"
+	}
+	"Advertisement_CoopMedkit"
+	{
+		"jp"		"{green}セーフルーム内に救急キットはありません。{lightgreen}次のチャプター開始時にセーフルームを出ると 1 個支給されます。"
+	}
+	"Advertisement_PendingVote"
+	{
+		"jp"		"投票待ち"
+	}
+}

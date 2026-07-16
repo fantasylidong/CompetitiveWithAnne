@@ -3,51 +3,61 @@
 	"1"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_MapTime"
 		"text"		"{LIGHTGREEN}[本章节地图]: {GREEN}{CURRENTMAP} \n{LIGHTGREEN}[服务器时间]: {GREEN}{TIME24} - {DATE}"
 	}
 	"2"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_LoadMode"
 		"text"		"{LIGHTGREEN}输入{GREEN}!match加载模式 \n{LIGHTGREEN}如果需要更换模式，先使用{GREEN}!rmatch{LIGHTGREEN}卸载配置再重新{GREEN}!match{LIGHTGREEN}选择模式"
 	}
 	"3"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_CoopCommands"
 		"text"		"{GREEN}!vote{LIGHTGREEN} 投票设置{GREEN}!away{LIGHTGREEN} 旁观 {GREEN}!slots{LIGHTGREEN} 开位 {GREEN}!rpg{LIGHTGREEN} 娱乐商店"
 	}
 	"4"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_ServerGroup"
 		"text"		"{LIGHTGREEN}本服OP {GREEN}东{LIGHTGREEN}，欢迎加入组服务器qq群：{GREEN}883237206{LIGHTGREEN} 寻找小伙伴一起开黑"
 	}
 	"5"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_CoopSpawnTiming"
 		"text"		"{LIGHTGREEN}特感刷新时间{GREEN}只代表特感最低刷新时间，具体刷特时间由导演决定。"
 	}
 	"6"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_CoopProgress"
 		"text"		" {GREEN}!cur {LIGHTGREEN}查看当前进度 按Z选择看来标记物品"
 	}
 	"7"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_CoopHealthReset"
 		"text"		"{GREEN}过关低于50血的都会恢复50血且重置状态，不用自杀"
 	}
 	"9"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_Donate"
 		"text"		"{LIGHTGREEN}如果欣赏腐竹的工作，输入 {GREEN}!donate{LIGHTGREEN}赞助服务器"
 	}
 	"10"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_ModToggle"
 		"text"		"{GREEN}服务器Mod开关{LIGHTGREEN}可以在{GREEN}投票菜单{LIGHTGREEN}中开启"
 	}
 	"11"
 	{
 		"type"		"S"
+		"phrase"	"Advertisement_CoopMedkit"
 		"text"		"{GREEN}安全门内{LIGHTGREEN}没有理疗包，过关后出门会发一个医疗包{GREEN}"
 	}
 }

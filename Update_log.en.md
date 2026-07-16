@@ -46,3 +46,10 @@
 - Fixed switching from a fixed tier back to automatic mode retaining Neri/high-tier CVars while PPM data was temporarily unavailable. The plugin now applies Easy as a safe baseline, then selects the automatic tier once statistics are ready.
 - Fixed server-console/RCON `sm_aidiff` commands being deferred by the saferoom lock, which made operational tier changes appear not to apply. Console and RCON changes now apply immediately, while player-issued admin commands after leaving the saferoom still take effect next round.
 - Added opt-in airborne ability switches for Boomer2 and Smoker3. Both default to off and are enabled only by Neri. Existing bhop behavior continues normally; the switches do not force an extra jump, and only let an AI that is already airborne use vomit or tongue. Ground attacks and activation distances remain unchanged.
+
+### July 16, 2026 New-Player Download Optimization
+- Reworked FastDL scheduling in `l4d2_blackscreen_fix.smx`. New players now download hit-feedback icons and non-built-in feedback sounds first, while dance assets are filled in during real map transitions.
+- `restrict_strings.cfg` is now the first-connect priority list, containing 44 feedback material files and 17 deduplicated feedback sound files. Dance models are no longer downloaded on the initial connection.
+- Added `deferred_strings.cfg` for the 60 dance songs, split into eight groups by default. Each actual `changelevel` offers one shuffled group; no group repeats until all eight have been offered, after which the order is shuffled again. `sm_fixscreen_deferred_group_count` controls the number of groups, and files already present in the client cache are skipped automatically.
+- The three interdependent dance model files are downloaded together on the player's first map transition to prevent partial-model errors. The same transition also offers one random song group, and later transitions continue in shuffled, non-repeating order.
+- All 124 feedback, model, and dance resources are now stored as path-preserving `.bz2` files in the NewAnneWeb file manager. FastDL now uses `http://anne.trygek.com/fastdl/left4dead2` with Cloudflare edge caching.

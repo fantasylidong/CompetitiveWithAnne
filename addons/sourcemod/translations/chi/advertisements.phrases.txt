@@ -1,0 +1,79 @@
+"Phrases"
+{
+	"Advertisement_MapTime"
+	{
+		"chi"		"{lightgreen}[本章节地图]：{green}{CURRENTMAP}\n{lightgreen}[服务器时间]：{green}{TIME24} - {DATE}"
+	}
+	"Advertisement_LoadMode"
+	{
+		"chi"		"{lightgreen}输入 {green}!match{lightgreen} 加载模式。\n{lightgreen}如需更换模式，先用 {green}!rmatch{lightgreen} 卸载当前配置，再用 {green}!match{lightgreen} 重新选择。"
+	}
+	"Advertisement_DefaultCommands"
+	{
+		"chi"		"{green}!away{lightgreen} 旁观  {green}!slots{lightgreen} 开位  {green}!rpg{lightgreen} 娱乐商店"
+	}
+	"Advertisement_AnneCommands"
+	{
+		"chi"		"{green}!away{lightgreen} 旁观  {green}!join{lightgreen} 加入生还者  {green}!slots{lightgreen} 开位  {green}!xx{lightgreen} 模式查询\n{green}!mapvote{lightgreen} 三方图  {green}!spechudon{lightgreen} 打开旁观 HUD"
+	}
+	"Advertisement_CoopCommands"
+	{
+		"chi"		"{green}!vote{lightgreen} 投票设置  {green}!away{lightgreen} 旁观  {green}!slots{lightgreen} 开位  {green}!rpg{lightgreen} 娱乐商店"
+	}
+	"Advertisement_ServerGroup"
+	{
+		"chi"		"{lightgreen}本服 OP：{green}东{lightgreen}。欢迎加入服务器 QQ 群 {green}883237206{lightgreen}，寻找小伙伴一起开黑。"
+	}
+	"Advertisement_LowHealth"
+	{
+		"chi"		"{lightgreen}血量低于 {green}40{lightgreen} 时要考虑跳楼表演了，否则会拖慢队伍推进速度。"
+	}
+	"Advertisement_DefaultBossCommands"
+	{
+		"chi"		"{green}!tank !witch !boss{lightgreen} 查看 Boss  {green}!cur{lightgreen} 查看当前进度"
+	}
+	"Advertisement_AnneInfoCommands"
+	{
+		"chi"		"{green}!tank{lightgreen} 查看 Boss  {green}!zs{lightgreen} 自杀  {green}!rpg{lightgreen} 购物商店  {green}!xx{lightgreen} 模式查询\n{green}!ip{lightgreen} 查看电信服 IP  {green}!web{lightgreen} 电信服网页"
+	}
+	"Advertisement_Cosmetics"
+	{
+		"chi"		"{lightgreen}称号、帽子和生还者轮廓系统已在商店上线。\n{green}50 万积分{lightgreen}可自定义称号，使用 {green}!setch{lightgreen} 设置或修改。"
+	}
+	"Advertisement_VoteBoss"
+	{
+		"chi"		"{lightgreen}如果不想打某个进度的克，生还者可以使用 {green}!voteboss{lightgreen} 修改 Tank 和 Witch 进度。"
+	}
+	"Advertisement_Donate"
+	{
+		"chi"		"{lightgreen}如果欣赏腐竹的工作，输入 {green}!donate{lightgreen} 赞助服务器。"
+	}
+	"Advertisement_ModToggle"
+	{
+		"chi"		"{green}服务器 Mod 开关{lightgreen}可以在{green}投票菜单{lightgreen}中开启。"
+	}
+	"Advertisement_PlayerVotes"
+	{
+		"chi"		"{green}!votekick{lightgreen} 投票踢出闲置玩家 {green}[仅玩家参与投票]{lightgreen}\n{green}!voteban{lightgreen} 投票封禁开挂或嘴臭玩家 {green}[所有人参与投票]{lightgreen}"
+	}
+	"Advertisement_CoopSpawnTiming"
+	{
+		"chi"		"{lightgreen}特感刷新时间{green}只代表最低刷新时间{lightgreen}，具体刷新时间由导演决定。"
+	}
+	"Advertisement_CoopProgress"
+	{
+		"chi"		"{green}!cur{lightgreen} 查看当前进度。按 Z 选择查看标记物品。"
+	}
+	"Advertisement_CoopHealthReset"
+	{
+		"chi"		"{green}过关时低于 50 血的生还者会恢复至 50 血并重置状态，不用自杀。"
+	}
+	"Advertisement_CoopMedkit"
+	{
+		"chi"		"{green}安全门内没有医疗包。{lightgreen}过关后离开安全门时会发放一个医疗包。"
+	}
+	"Advertisement_PendingVote"
+	{
+		"chi"		"等待投票"
+	}
+}

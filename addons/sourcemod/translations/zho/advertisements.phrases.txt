@@ -1,0 +1,79 @@
+"Phrases"
+{
+	"Advertisement_MapTime"
+	{
+		"zho"		"{lightgreen}[本章節地圖]：{green}{CURRENTMAP}\n{lightgreen}[伺服器時間]：{green}{TIME24} - {DATE}"
+	}
+	"Advertisement_LoadMode"
+	{
+		"zho"		"{lightgreen}輸入 {green}!match{lightgreen} 載入模式。\n{lightgreen}如需更換模式，先用 {green}!rmatch{lightgreen} 卸載目前設定，再用 {green}!match{lightgreen} 重新選擇。"
+	}
+	"Advertisement_DefaultCommands"
+	{
+		"zho"		"{green}!away{lightgreen} 旁觀  {green}!slots{lightgreen} 開位  {green}!rpg{lightgreen} 娛樂商店"
+	}
+	"Advertisement_AnneCommands"
+	{
+		"zho"		"{green}!away{lightgreen} 旁觀  {green}!join{lightgreen} 加入倖存者  {green}!slots{lightgreen} 開位  {green}!xx{lightgreen} 模式查詢\n{green}!mapvote{lightgreen} 第三方地圖  {green}!spechudon{lightgreen} 開啟旁觀 HUD"
+	}
+	"Advertisement_CoopCommands"
+	{
+		"zho"		"{green}!vote{lightgreen} 投票設定  {green}!away{lightgreen} 旁觀  {green}!slots{lightgreen} 開位  {green}!rpg{lightgreen} 娛樂商店"
+	}
+	"Advertisement_ServerGroup"
+	{
+		"zho"		"{lightgreen}本服 OP：{green}東{lightgreen}。歡迎加入伺服器 QQ 群 {green}883237206{lightgreen}，尋找夥伴一起遊玩。"
+	}
+	"Advertisement_LowHealth"
+	{
+		"zho"		"{lightgreen}血量低於 {green}40{lightgreen} 時要考慮跳樓表演了，否則會拖慢隊伍推進速度。"
+	}
+	"Advertisement_DefaultBossCommands"
+	{
+		"zho"		"{green}!tank !witch !boss{lightgreen} 查看 Boss  {green}!cur{lightgreen} 查看目前進度"
+	}
+	"Advertisement_AnneInfoCommands"
+	{
+		"zho"		"{green}!tank{lightgreen} 查看 Boss  {green}!zs{lightgreen} 自殺  {green}!rpg{lightgreen} 購物商店  {green}!xx{lightgreen} 模式查詢\n{green}!ip{lightgreen} 查看電信服 IP  {green}!web{lightgreen} 電信服網頁"
+	}
+	"Advertisement_Cosmetics"
+	{
+		"zho"		"{lightgreen}稱號、帽子和倖存者輪廓系統已在商店上線。\n{green}50 萬積分{lightgreen}可自訂稱號，使用 {green}!setch{lightgreen} 設定或修改。"
+	}
+	"Advertisement_VoteBoss"
+	{
+		"zho"		"{lightgreen}如果不想打某個進度的克，倖存者可以使用 {green}!voteboss{lightgreen} 修改 Tank 和 Witch 進度。"
+	}
+	"Advertisement_Donate"
+	{
+		"zho"		"{lightgreen}如果欣賞服主的工作，輸入 {green}!donate{lightgreen} 贊助伺服器。"
+	}
+	"Advertisement_ModToggle"
+	{
+		"zho"		"{green}伺服器 Mod 開關{lightgreen}可以在{green}投票選單{lightgreen}中開啟。"
+	}
+	"Advertisement_PlayerVotes"
+	{
+		"zho"		"{green}!votekick{lightgreen} 投票踢出閒置玩家 {green}[僅玩家參與投票]{lightgreen}\n{green}!voteban{lightgreen} 投票封禁作弊或惡意玩家 {green}[所有人參與投票]{lightgreen}"
+	}
+	"Advertisement_CoopSpawnTiming"
+	{
+		"zho"		"{lightgreen}特殊感染者刷新時間{green}只代表最低刷新時間{lightgreen}，實際刷新時間由 Director 決定。"
+	}
+	"Advertisement_CoopProgress"
+	{
+		"zho"		"{green}!cur{lightgreen} 查看目前進度。按 Z 選擇查看標記物品。"
+	}
+	"Advertisement_CoopHealthReset"
+	{
+		"zho"		"{green}過關時低於 50 血的倖存者會恢復至 50 血並重設狀態，不用自殺。"
+	}
+	"Advertisement_CoopMedkit"
+	{
+		"zho"		"{green}安全室內沒有醫療包。{lightgreen}過關後離開安全室時會發放一個醫療包。"
+	}
+	"Advertisement_PendingVote"
+	{
+		"zho"		"等待投票"
+	}
+}

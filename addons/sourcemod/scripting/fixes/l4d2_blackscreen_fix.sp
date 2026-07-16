@@ -1,36 +1,65 @@
 #pragma semicolon 1
 #pragma newdecls required
- 
+
 #include <sourcemod>
 #include <sdktools>
 #include <stringtables_data>
 
-#define Config		"data/restrict_strings.cfg"
-#define MaxString	128
+#define PRIORITY_CONFIG "data/restrict_strings.cfg"
+#define DEFERRED_CONFIG "data/deferred_strings.cfg"
+#define MAX_DEFERRED_GROUPS 128
 
-char g_sItems[8192][PLATFORM_MAX_PATH], g_sRestricted[MaxString][PLATFORM_MAX_PATH];
-int g_iItemsTotal;
-bool g_bEmpty;
+ArrayList g_aDownloadables;
+ArrayList g_aPriority;
+ArrayList g_aDeferred;
+
+ConVar g_cvDeferredGroupCount;
+
+int g_iDeferredGroupOrder[MAX_DEFERRED_GROUPS];
+int g_iDeferredGroupOrderCount;
+int g_iDeferredGroupOrderCursor;
+int g_iPlannedDeferredCount = -1;
+int g_iPlannedGroupCount = -1;
+int g_iLastDeferredGroup = -1;
+bool g_bDownloadablesSaved;
+bool g_bRestoredThisMap;
 
 public Plugin myinfo =
 {
-	name = "[L4D & L4D2] Black Screen Fix",
-	author = "BHaType & Dragokas",
-	description = "Fixes blacksreen while file downloading"
+	name = "[L4D & L4D2] Staged FastDL / Black Screen Fix",
+	author = "BHaType, Dragokas, AnneHappy",
+	description = "Keeps priority downloads on connect and downloads optional assets in batches during map transitions",
+	version = "1.2.0"
 };
 
 public void OnPluginStart()
 {
-	RegAdminCmd("sm_get_restricted_strings",	CMD_GetStringRestricted, 	ADMFLAG_ROOT, 	"Get strings from restrict_strings");
-	RegAdminCmd("sm_restore_st",	CMD_RestoreDownloadables, 	ADMFLAG_ROOT, 	"Restore downloadables stringtable items");
-	
-	HookEvent("player_disconnect", eDiconnect, EventHookMode_Pre);
-	HookEvent("map_transition", eStart, EventHookMode_Pre);
+	g_aDownloadables = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+	g_aPriority = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+	g_aDeferred = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+
+	g_cvDeferredGroupCount = CreateConVar(
+		"sm_fixscreen_deferred_group_count",
+		"8",
+		"Number of groups used to split deferred files; one shuffled group is restored per real map change (0 disables deferred downloads).",
+		FCVAR_NONE,
+		true,
+		0.0,
+		true,
+		float(MAX_DEFERRED_GROUPS)
+	);
+
+	RegAdminCmd("sm_get_restricted_strings", CMD_GetPriorityFiles, ADMFLAG_ROOT, "List files downloaded when a player first connects");
+	RegAdminCmd("sm_restore_st", CMD_RestoreDownloadables, ADMFLAG_ROOT, "Restore every saved downloadables string-table item");
+
+	AddCommandListener(ServerCmd_ChangeLevel, "changelevel");
 }
 
 public void OnMapStart()
 {
-	CreateTimer(1.0, Timer_SaveDownloadables, .flags = TIMER_FLAG_NO_MAPCHANGE);
+	g_bDownloadablesSaved = false;
+	g_bRestoredThisMap = false;
+	CreateTimer(0.1, Timer_SaveDownloadables, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action Timer_SaveDownloadables(Handle timer)
@@ -41,140 +70,228 @@ public Action Timer_SaveDownloadables(Handle timer)
 
 void SaveDownloadables()
 {
-	int iTable = FindStringTable("downloadables");
-	if(iTable == INVALID_STRING_TABLE) 
+	if (!LoadFileList(PRIORITY_CONFIG, g_aPriority, true))
 	{
-		LogError("Cannot find 'downloadables' string table!");
+		LogError("[FixScreen] Priority config '%s' is missing; leaving the downloadables table unchanged.", PRIORITY_CONFIG);
 		return;
 	}
-	
-	g_iItemsTotal = 0;
-	int iNum = GetStringTableNumStrings(iTable);
- 
-	for (int i; i < iNum; i++)
-	{
-		ReadStringTable(iTable, i, g_sItems[g_iItemsTotal], sizeof(g_sItems[]));
-		g_iItemsTotal++;
-	}
-	
-	PrintToServer("[FixScreen] All strings has been saved and deleted from stringtable");
-	
-	DeleteStringTableData(iTable);
-	
-	int index = ReadRestrictedFiles();
-		
-	if ( index != -1 )
-		for (int i; i <= index; i++)
-			if ( strlen(g_sRestricted[i]) )
-				AddFileToDownloadsTable(g_sRestricted[i]);
-}
 
-public void eStart(Event event, const char[] name, bool dontBroadcast)
-{
-	if (g_iItemsTotal == 0 || g_bEmpty)
+	LoadFileList(DEFERRED_CONFIG, g_aDeferred, false);
+
+	int table = FindStringTable("downloadables");
+	if (table == INVALID_STRING_TABLE)
+	{
+		LogError("[FixScreen] Cannot find the 'downloadables' string table.");
 		return;
-	
-	for (int i = 0; i < g_iItemsTotal; i++)
-		if ( strlen(g_sItems[i]) )
-			AddFileToDownloadsTable(g_sItems[i]);
-	
-	PrintToServer("[FixScreen] All strings has been restored to downloadables");
-}
+	}
 
-public void eDiconnect (Event event, const char[] name, bool dontBroadcast)
-{
-	int client = GetClientOfUserId(event.GetInt("userid"));
-	
-	if ( (client == 0 || !IsFakeClient(client)) && !RealPlayerExist(client) ) 
-		CreateTimer(6.3, tPlayers);
-}
+	g_aDownloadables.Clear();
 
-public Action tPlayers(Handle timer)
-{
-	if ( !RealPlayerExist() )
+	int count = GetStringTableNumStrings(table);
+	char path[PLATFORM_MAX_PATH];
+	for (int i = 0; i < count; i++)
 	{
-		g_bEmpty = true;
-		
-		DeleteStringTableData(FindStringTable("downloadables"));
-		
-			ReadRestrictedFiles();
+		ReadStringTable(table, i, path, sizeof(path));
+		if (path[0] != '\0' && g_aDownloadables.FindString(path) == -1)
+			g_aDownloadables.PushString(path);
+	}
+
+	INetworkStringTable downloadables = INetworkStringTable(table);
+	downloadables.DeleteStrings();
+	AddFileListToDownloadsTable(g_aPriority);
+
+	g_bDownloadablesSaved = true;
+	PrintToServer(
+		"[FixScreen] Saved %d downloadables; keeping %d priority files on first connect and staging %d deferred files.",
+		g_aDownloadables.Length,
+		g_aPriority.Length,
+		g_aDeferred.Length
+	);
+}
+
+public Action ServerCmd_ChangeLevel(int client, const char[] command, int argc)
+{
+	if (!g_bDownloadablesSaved || g_bRestoredThisMap)
+		return Plugin_Continue;
+
+	RestoreTransitionDownloadables();
+	g_bRestoredThisMap = true;
+	return Plugin_Continue;
+}
+
+void RestoreTransitionDownloadables()
+{
+	char path[PLATFORM_MAX_PATH];
+	int regularCount;
+
+	for (int i = 0; i < g_aDownloadables.Length; i++)
+	{
+		g_aDownloadables.GetString(i, path, sizeof(path));
+		if (g_aDeferred.FindString(path) != -1)
+			continue;
+
+		AddFileToDownloadsTable(path);
+		regularCount++;
+	}
+
+	int selectedGroup;
+	int groupCount;
+	int deferredCount = AddRandomDeferredGroup(selectedGroup, groupCount);
+	PrintToServer(
+		"[FixScreen] Restored %d regular files and deferred group %d/%d (%d files) for this map change.",
+		regularCount,
+		selectedGroup + 1,
+		groupCount,
+		deferredCount
+	);
+}
+
+int AddRandomDeferredGroup(int &selectedGroup, int &groupCount)
+{
+	int total = g_aDeferred.Length;
+	groupCount = g_cvDeferredGroupCount.IntValue;
+	selectedGroup = -1;
+
+	if (total == 0 || groupCount <= 0)
+	{
+		groupCount = 0;
+		return 0;
+	}
+
+	if (groupCount > total)
+		groupCount = total;
+
+	EnsureDeferredGroupOrder(total, groupCount);
+	selectedGroup = g_iDeferredGroupOrder[g_iDeferredGroupOrderCursor++];
+	g_iLastDeferredGroup = selectedGroup;
+
+	int baseSize = total / groupCount;
+	int largerGroups = total % groupCount;
+	int groupSize = baseSize + (selectedGroup < largerGroups ? 1 : 0);
+	int start = selectedGroup * baseSize;
+	start += (selectedGroup < largerGroups) ? selectedGroup : largerGroups;
+
+	char path[PLATFORM_MAX_PATH];
+	int added;
+	for (int i = 0; i < groupSize; i++)
+	{
+		int index = start + i;
+		g_aDeferred.GetString(index, path, sizeof(path));
+		if (g_aDownloadables.FindString(path) != -1)
+		{
+			AddFileToDownloadsTable(path);
+			added++;
 		}
-	return Plugin_Stop;
+	}
+
+	return added;
+}
+
+void EnsureDeferredGroupOrder(int deferredCount, int groupCount)
+{
+	bool planChanged = (deferredCount != g_iPlannedDeferredCount || groupCount != g_iPlannedGroupCount);
+	if (!planChanged && g_iDeferredGroupOrderCursor < g_iDeferredGroupOrderCount)
+		return;
+
+	if (planChanged)
+		g_iLastDeferredGroup = -1;
+
+	for (int i = 0; i < groupCount; i++)
+		g_iDeferredGroupOrder[i] = i;
+
+	for (int i = groupCount - 1; i > 0; i--)
+	{
+		int other = GetRandomInt(0, i);
+		int swap = g_iDeferredGroupOrder[i];
+		g_iDeferredGroupOrder[i] = g_iDeferredGroupOrder[other];
+		g_iDeferredGroupOrder[other] = swap;
+	}
+
+	if (groupCount > 1 && g_iLastDeferredGroup >= 0 && g_iDeferredGroupOrder[0] == g_iLastDeferredGroup)
+	{
+		int other = GetRandomInt(1, groupCount - 1);
+		g_iDeferredGroupOrder[0] = g_iDeferredGroupOrder[other];
+		g_iDeferredGroupOrder[other] = g_iLastDeferredGroup;
+	}
+
+	g_iDeferredGroupOrderCount = groupCount;
+	g_iDeferredGroupOrderCursor = 0;
+	g_iPlannedDeferredCount = deferredCount;
+	g_iPlannedGroupCount = groupCount;
 }
 
 public Action CMD_RestoreDownloadables(int client, int args)
 {
-	if ( g_iItemsTotal == 0 ) 
+	if (!g_bDownloadablesSaved)
 	{
-		ReplyToCommand(client, "Cannot restore. Downloadables string table is not saved");
+		ReplyToCommand(client, "Cannot restore: the downloadables string table has not been saved.");
 		return Plugin_Handled;
 	}
-	
-	for (int i; i < g_iItemsTotal; i++)
-		if ( strlen(g_sItems[i]) )
-			AddFileToDownloadsTable(g_sItems[i]);
-			
+
+	AddFileListToDownloadsTable(g_aDownloadables);
+	ReplyToCommand(client, "Restored %d downloadables string-table items.", g_aDownloadables.Length);
 	return Plugin_Handled;
 }
 
-public Action CMD_GetStringRestricted (int client, int args)
+public Action CMD_GetPriorityFiles(int client, int args)
 {
-	int index = ReadRestrictedFiles();
-	
-	if ( index == -1 )
+	if (!LoadFileList(PRIORITY_CONFIG, g_aPriority, true))
 	{
-		ReplyToCommand(client, "No config \"%s\" has been found", Config);
+		ReplyToCommand(client, "No config '%s' was found.", PRIORITY_CONFIG);
 		return Plugin_Handled;
 	}
-	
-	for (int i; i <= index; i++)
-		if ( strlen(g_sRestricted[i]) )
-			ReplyToCommand(client, "%i. %s", i, g_sRestricted[i]);
-			
+
+	char path[PLATFORM_MAX_PATH];
+	for (int i = 0; i < g_aPriority.Length; i++)
+	{
+		g_aPriority.GetString(i, path, sizeof(path));
+		ReplyToCommand(client, "%d. %s", i + 1, path);
+	}
+
 	return Plugin_Handled;
 }
 
-int ReadRestrictedFiles ()
+bool LoadFileList(const char[] relativePath, ArrayList list, bool reportMissing)
 {
-	char sPath[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, sPath, sizeof(sPath), Config);
-	
-	if ( FileExists(sPath) )
+	list.Clear();
+
+	char fullPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, fullPath, sizeof(fullPath), relativePath);
+	if (!FileExists(fullPath))
 	{
-		int index;
-		
-		char szBuffer[MaxString];
-		File hFile = OpenFile(sPath, "r");
-		
-		while ( ReadFileLine(hFile, szBuffer, MaxString) )
-		{
-			if ( szBuffer[0] != '/' && szBuffer[1] != '/' )
-			{
-				TrimString(szBuffer);
-				
-				Format(g_sRestricted[index], MaxString, "%s", szBuffer);
-				index++;
-			}
-		}
-		
-		delete hFile;
-		return index;
+		if (reportMissing)
+			LogError("[FixScreen] Missing file list: %s", relativePath);
+		return false;
 	}
-	
-	return -1;
+
+	File file = OpenFile(fullPath, "r");
+	if (file == null)
+	{
+		LogError("[FixScreen] Cannot open file list: %s", relativePath);
+		return false;
+	}
+
+	char line[PLATFORM_MAX_PATH];
+	while (file.ReadLine(line, sizeof(line)))
+	{
+		TrimString(line);
+		if (line[0] == '\0' || strncmp(line, "//", 2, false) == 0)
+			continue;
+
+		if (list.FindString(line) == -1)
+			list.PushString(line);
+	}
+
+	delete file;
+	return true;
 }
 
-bool RealPlayerExist (int iExclude = 0)
+void AddFileListToDownloadsTable(ArrayList list)
 {
-	for (int client = 1; client < MaxClients; client++)
+	char path[PLATFORM_MAX_PATH];
+	for (int i = 0; i < list.Length; i++)
 	{
-		if ( client != iExclude && IsClientConnected(client) )
-		{
-			if ( !IsFakeClient(client) ) 
-			{
-				return true;
-			}
-		}
+		list.GetString(i, path, sizeof(path));
+		AddFileToDownloadsTable(path);
 	}
-	return false;
 }

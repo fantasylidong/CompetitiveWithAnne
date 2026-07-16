@@ -210,6 +210,9 @@ void ParseTopColor(const char[] sText, int &iStart, int aColor[4])
     if (sColor[0] == '#') {
         ParseColor(sColor[1], aColor);
     } else {
+        for (int i; sColor[i]; i++) {
+            sColor[i] = CharToLower(sColor[i]);
+        }
         g_hTopColors.GetArray(sColor, aColor, sizeof(aColor));
     }
     iStart = iEnd + 1;

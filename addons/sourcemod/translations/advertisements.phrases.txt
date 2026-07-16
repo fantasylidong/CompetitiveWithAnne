@@ -1,0 +1,79 @@
+"Phrases"
+{
+	"Advertisement_MapTime"
+	{
+		"en"		"{lightgreen}[Current chapter]: {green}{CURRENTMAP}\n{lightgreen}[Server time]: {green}{TIME24} - {DATE}"
+	}
+	"Advertisement_LoadMode"
+	{
+		"en"		"{lightgreen}Type {green}!match{lightgreen} to load a mode.\n{lightgreen}To switch modes, use {green}!rmatch{lightgreen} to unload the current config, then use {green}!match{lightgreen} again."
+	}
+	"Advertisement_DefaultCommands"
+	{
+		"en"		"{green}!away{lightgreen} Spectate  {green}!slots{lightgreen} Open a slot  {green}!rpg{lightgreen} Fun shop"
+	}
+	"Advertisement_AnneCommands"
+	{
+		"en"		"{green}!away{lightgreen} Spectate  {green}!join{lightgreen} Join survivors  {green}!slots{lightgreen} Open a slot  {green}!xx{lightgreen} Mode info\n{green}!mapvote{lightgreen} Custom maps  {green}!spechudon{lightgreen} Enable spectator HUD"
+	}
+	"Advertisement_CoopCommands"
+	{
+		"en"		"{green}!vote{lightgreen} Vote settings  {green}!away{lightgreen} Spectate  {green}!slots{lightgreen} Open a slot  {green}!rpg{lightgreen} Fun shop"
+	}
+	"Advertisement_ServerGroup"
+	{
+		"en"		"{lightgreen}Server operator: {green}Dong{lightgreen}. Join our QQ group {green}883237206{lightgreen} to find teammates."
+	}
+	"Advertisement_LowHealth"
+	{
+		"en"		"{lightgreen}When your health falls below {green}40{lightgreen}, consider jumping off the map so you do not slow the team down."
+	}
+	"Advertisement_DefaultBossCommands"
+	{
+		"en"		"{green}!tank !witch !boss{lightgreen} View boss info  {green}!cur{lightgreen} View current progress"
+	}
+	"Advertisement_AnneInfoCommands"
+	{
+		"en"		"{green}!tank{lightgreen} Boss info  {green}!zs{lightgreen} Suicide  {green}!rpg{lightgreen} Shop  {green}!xx{lightgreen} Mode info\n{green}!ip{lightgreen} Telecom server IP  {green}!web{lightgreen} Telecom server website"
+	}
+	"Advertisement_Cosmetics"
+	{
+		"en"		"{lightgreen}Titles, hats, and survivor outlines are now available in the shop.\n{green}500,000 points{lightgreen} unlocks a custom title; use {green}!setch{lightgreen} to set or change it."
+	}
+	"Advertisement_VoteBoss"
+	{
+		"en"		"{lightgreen}Survivors can use {green}!voteboss{lightgreen} to change the Tank and Witch spawn progress."
+	}
+	"Advertisement_Donate"
+	{
+		"en"		"{lightgreen}If you appreciate the server owner's work, type {green}!donate{lightgreen} to support the server."
+	}
+	"Advertisement_ModToggle"
+	{
+		"en"		"{green}Server mod toggles{lightgreen} are available in the {green}vote menu{lightgreen}."
+	}
+	"Advertisement_PlayerVotes"
+	{
+		"en"		"{green}!votekick{lightgreen} Vote to kick an idle player {green}[players vote]{lightgreen}\n{green}!voteban{lightgreen} Vote to ban cheating or abusive players {green}[everyone votes]{lightgreen}"
+	}
+	"Advertisement_CoopSpawnTiming"
+	{
+		"en"		"{lightgreen}The special infected spawn timer {green}only shows the minimum delay{lightgreen}; the Director decides the actual spawn time."
+	}
+	"Advertisement_CoopProgress"
+	{
+		"en"		"{green}!cur{lightgreen} View current progress. Press Z and select the option to view marked items."
+	}
+	"Advertisement_CoopHealthReset"
+	{
+		"en"		"{green}After completing a chapter, survivors below 50 health are restored to 50 and their status is reset; there is no need to suicide."
+	}
+	"Advertisement_CoopMedkit"
+	{
+		"en"		"{green}There are no first aid kits in the saferoom.{lightgreen} You will receive one after leaving the saferoom at the start of the next chapter."
+	}
+	"Advertisement_PendingVote"
+	{
+		"en"		"Pending vote"
+	}
+}

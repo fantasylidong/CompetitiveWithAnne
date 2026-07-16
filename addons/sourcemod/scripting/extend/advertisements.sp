@@ -9,8 +9,9 @@
 #include "advertisements/chatcolors.sp"
 #include "advertisements/topcolors.sp"
 
-#define PL_VERSION	"2.1.1"
+#define PL_VERSION	"2.2.0"
 #define UPDATE_URL	"http://ErikMinekus.github.io/sm-advertisements/update.txt"
+#define MAX_PHRASE_LENGTH 128
 
 public Plugin myinfo =
 {
@@ -25,10 +26,15 @@ public Plugin myinfo =
 enum struct Advertisement
 {
     char center[1024];
+    char centerPhrase[MAX_PHRASE_LENGTH];
     char chat[2048];
+    char chatPhrase[MAX_PHRASE_LENGTH];
     char hint[1024];
+    char hintPhrase[MAX_PHRASE_LENGTH];
     char menu[1024];
+    char menuPhrase[MAX_PHRASE_LENGTH];
     char top[1024];
+    char topPhrase[MAX_PHRASE_LENGTH];
     bool adminsOnly;
     bool hasFlags;
     int flags;
@@ -54,6 +60,8 @@ Handle g_hTimer;
  */
 public void OnPluginStart()
 {
+    LoadTranslations("advertisements.phrases");
+
     CreateConVar("sm_advertisements_version", PL_VERSION, "Display advertisements", FCVAR_NOTIFY);
     g_hEnabled  = CreateConVar("sm_advertisements_enabled",  "1",                  "Enable/disable displaying advertisements.");
     g_hFile     = CreateConVar("sm_advertisements_file",     "advertisements.txt", "File to read the advertisements from.");
@@ -139,19 +147,23 @@ public int MenuHandler_DoNothing(Menu menu, MenuAction action, int param1, int p
  */
 public Action Timer_DisplayAd(Handle timer)
 {
-    if (!g_hEnabled.BoolValue) {
+    if (!g_hEnabled.BoolValue || g_hAdvertisements.Length == 0) {
         return Plugin_Continue;
+    }
+
+    if (g_iCurrentAd >= g_hAdvertisements.Length) {
+        g_iCurrentAd = 0;
     }
 
     Advertisement ad;
     g_hAdvertisements.GetArray(g_iCurrentAd, ad);
-    char message[1024];
+    char localized[2048], message[2048];
 
-    if (ad.center[0]) {
-        ProcessVariables(ad.center, message, sizeof(message));
-
+    if (ad.center[0] || ad.centerPhrase[0]) {
         for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i, ad)) {
+                GetLocalizedMessage(ad.center, ad.centerPhrase, i, localized, sizeof(localized));
+                ProcessVariables(localized, message, sizeof(message), i);
                 PrintCenterText(i, "%s", message);
 
                 DataPack hCenterAd;
@@ -161,24 +173,24 @@ public Action Timer_DisplayAd(Handle timer)
             }
         }
     }
-    if (ad.chat[0]) {
-        bool teamColor[10];
-        char messages[10][1024];
-        int messageCount = ExplodeString(ad.chat, "\n", messages, sizeof(messages), sizeof(messages[]));
-
-        for (int idx; idx < messageCount; idx++) {
-            teamColor[idx] = StrContains(messages[idx], "{teamcolor}", false) != -1;
-            if (teamColor[idx] && !g_bSayText2) {
-                SetFailState("This game does not support {teamcolor}");
-            }
-
-            ProcessChatColors(messages[idx], message, sizeof(message));
-            ProcessVariables(message, messages[idx], sizeof(messages[]));
-        }
-
+    if (ad.chat[0] || ad.chatPhrase[0]) {
         for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i, ad)) {
+                bool teamColor[10];
+                char messages[10][1024];
+
+                GetLocalizedMessage(ad.chat, ad.chatPhrase, i, localized, sizeof(localized));
+                int messageCount = ExplodeString(localized, "\n", messages, sizeof(messages), sizeof(messages[]));
+
                 for (int idx; idx < messageCount; idx++) {
+                    teamColor[idx] = StrContains(messages[idx], "{teamcolor}", false) != -1;
+                    if (teamColor[idx] && !g_bSayText2) {
+                        SetFailState("This game does not support {teamcolor}");
+                    }
+
+                    ProcessChatColors(messages[idx], message, sizeof(message));
+                    ProcessVariables(message, messages[idx], sizeof(messages[]), i);
+
                     if (teamColor[idx]) {
                         SayText2(i, messages[idx]);
                     } else {
@@ -188,49 +200,47 @@ public Action Timer_DisplayAd(Handle timer)
             }
         }
     }
-    if (ad.hint[0]) {
-        ProcessVariables(ad.hint, message, sizeof(message));
-
+    if (ad.hint[0] || ad.hintPhrase[0]) {
         for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i, ad)) {
+                GetLocalizedMessage(ad.hint, ad.hintPhrase, i, localized, sizeof(localized));
+                ProcessVariables(localized, message, sizeof(message), i);
                 PrintHintText(i, "%s", message);
             }
         }
     }
-    if (ad.menu[0]) {
-        ProcessVariables(ad.menu, message, sizeof(message));
-
-        Panel hPl = new Panel();
-        hPl.DrawText(message);
-        hPl.CurrentKey = 10;
-
+    if (ad.menu[0] || ad.menuPhrase[0]) {
         for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i, ad)) {
+                GetLocalizedMessage(ad.menu, ad.menuPhrase, i, localized, sizeof(localized));
+                ProcessVariables(localized, message, sizeof(message), i);
+
+                Panel hPl = new Panel();
+                hPl.DrawText(message);
+                hPl.CurrentKey = 10;
                 hPl.Send(i, MenuHandler_DoNothing, 10);
+                delete hPl;
             }
         }
-
-        delete hPl;
     }
-    if (ad.top[0]) {
-        int iStart    = 0,
-            aColor[4] = {255, 255, 255, 255};
-
-        ParseTopColor(ad.top, iStart, aColor);
-        ProcessVariables(ad.top[iStart], message, sizeof(message));
-
-        KeyValues hKv = new KeyValues("Stuff", "title", message);
-        hKv.SetColor4("color", aColor);
-        hKv.SetNum("level",    1);
-        hKv.SetNum("time",     10);
-
+    if (ad.top[0] || ad.topPhrase[0]) {
         for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i, ad)) {
+                int iStart    = 0,
+                    aColor[4] = {255, 255, 255, 255};
+
+                GetLocalizedMessage(ad.top, ad.topPhrase, i, localized, sizeof(localized));
+                ParseTopColor(localized, iStart, aColor);
+                ProcessVariables(localized[iStart], message, sizeof(message), i);
+
+                KeyValues hKv = new KeyValues("Stuff", "title", message);
+                hKv.SetColor4("color", aColor);
+                hKv.SetNum("level",    1);
+                hKv.SetNum("time",     10);
                 CreateDialog(i, hKv, DialogType_Msg);
+                delete hKv;
             }
         }
-
-        delete hKv;
     }
 
     if (++g_iCurrentAd >= g_hAdvertisements.Length) {
@@ -283,17 +293,35 @@ void ParseAds()
 
     KeyValues hConfig = new KeyValues("Advertisements");
     hConfig.SetEscapeSequences(true);
-    hConfig.ImportFromFile(sPath);
-    hConfig.GotoFirstSubKey();
+    if (!hConfig.ImportFromFile(sPath) || !hConfig.GotoFirstSubKey()) {
+        delete hConfig;
+        SetFailState("Unable to parse advertisements file: %s", sPath);
+    }
 
     Advertisement ad;
-    char flags[22];
+    char flags[22], legacyType[16], legacyText[2048], legacyPhrase[MAX_PHRASE_LENGTH];
     do {
         hConfig.GetString("center", ad.center, sizeof(Advertisement::center));
+        hConfig.GetString("center_phrase", ad.centerPhrase, sizeof(Advertisement::centerPhrase));
         hConfig.GetString("chat",   ad.chat,   sizeof(Advertisement::chat));
+        hConfig.GetString("chat_phrase", ad.chatPhrase, sizeof(Advertisement::chatPhrase));
         hConfig.GetString("hint",   ad.hint,   sizeof(Advertisement::hint));
+        hConfig.GetString("hint_phrase", ad.hintPhrase, sizeof(Advertisement::hintPhrase));
         hConfig.GetString("menu",   ad.menu,   sizeof(Advertisement::menu));
+        hConfig.GetString("menu_phrase", ad.menuPhrase, sizeof(Advertisement::menuPhrase));
         hConfig.GetString("top",    ad.top,    sizeof(Advertisement::top));
+        hConfig.GetString("top_phrase", ad.topPhrase, sizeof(Advertisement::topPhrase));
+
+        // Advertisements 0.5.x used a shared text/phrase selected by one or more type letters.
+        hConfig.GetString("type", legacyType, sizeof(legacyType), "S");
+        hConfig.GetString("text", legacyText, sizeof(legacyText));
+        hConfig.GetString("phrase", legacyPhrase, sizeof(legacyPhrase));
+        ApplyLegacyField(legacyType, "C", legacyText, legacyPhrase, ad.center, sizeof(Advertisement::center), ad.centerPhrase, sizeof(Advertisement::centerPhrase));
+        ApplyLegacyField(legacyType, "S", legacyText, legacyPhrase, ad.chat, sizeof(Advertisement::chat), ad.chatPhrase, sizeof(Advertisement::chatPhrase));
+        ApplyLegacyField(legacyType, "H", legacyText, legacyPhrase, ad.hint, sizeof(Advertisement::hint), ad.hintPhrase, sizeof(Advertisement::hintPhrase));
+        ApplyLegacyField(legacyType, "M", legacyText, legacyPhrase, ad.menu, sizeof(Advertisement::menu), ad.menuPhrase, sizeof(Advertisement::menuPhrase));
+        ApplyLegacyField(legacyType, "T", legacyText, legacyPhrase, ad.top, sizeof(Advertisement::top), ad.topPhrase, sizeof(Advertisement::topPhrase));
+
         hConfig.GetString("flags",  flags,     sizeof(flags), "none");
         ad.adminsOnly = StrEqual(flags, "");
         ad.hasFlags   = !StrEqual(flags, "none");
@@ -309,7 +337,31 @@ void ParseAds()
     delete hConfig;
 }
 
-void ProcessVariables(const char[] message, char[] buffer, int maxlength)
+void ApplyLegacyField(const char[] types, const char[] type, const char[] text, const char[] phrase,
+    char[] output, int outputLength, char[] outputPhrase, int phraseLength)
+{
+    if (StrContains(types, type, false) == -1) {
+        return;
+    }
+
+    if (!output[0]) {
+        strcopy(output, outputLength, text);
+    }
+    if (!outputPhrase[0]) {
+        strcopy(outputPhrase, phraseLength, phrase);
+    }
+}
+
+void GetLocalizedMessage(const char[] fallback, const char[] phrase, int client, char[] buffer, int maxlength)
+{
+    if (phrase[0] && TranslationPhraseExists(phrase)) {
+        FormatEx(buffer, maxlength, "%T", phrase, client);
+    } else {
+        strcopy(buffer, maxlength, fallback);
+    }
+}
+
+void ProcessVariables(const char[] message, char[] buffer, int maxlength, int client)
 {
     char name[64], value[256];
     int buf_idx, i, name_len;
@@ -330,7 +382,8 @@ void ProcessVariables(const char[] message, char[] buffer, int maxlength)
         }
         else if (StrEqual(name, "nextmap", false)) {
             if (g_bMapChooser && EndOfMapVoteEnabled() && !HasEndOfMapVoteFinished()) {
-                buf_idx += strcopy(buffer[buf_idx], maxlength - buf_idx, "Pending Vote");
+                FormatEx(value, sizeof(value), "%T", "Advertisement_PendingVote", client);
+                buf_idx += strcopy(buffer[buf_idx], maxlength - buf_idx, value);
             } else {
                 GetNextMap(value, sizeof(value));
                 GetMapDisplayName(value, value, sizeof(value));

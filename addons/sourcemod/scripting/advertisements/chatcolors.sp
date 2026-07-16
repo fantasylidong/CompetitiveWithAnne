@@ -248,7 +248,7 @@ static int PreFormat(char[] buffer, int maxlength)
 
 void ProcessChatColors(const char[] message, char[] buffer, int maxlength)
 {
-    char name[32], color[10];
+    char name[32], lookup[32], color[10];
     int buf_idx = PreFormat(buffer, maxlength);
     int i, name_len;
 
@@ -262,10 +262,17 @@ void ProcessChatColors(const char[] message, char[] buffer, int maxlength)
 
         if (name[0] == '#') {
             buf_idx += FormatEx(buffer[buf_idx], maxlength - buf_idx, "%c%s", (name_len == 9) ? 8 : 7, name[1]);
-        } else if (g_hChatColors.GetString(name, color, sizeof(color))) {
-            buf_idx += strcopy(buffer[buf_idx], maxlength - buf_idx, color);
         } else {
-            buf_idx += FormatEx(buffer[buf_idx], maxlength - buf_idx, "{%s}", name);
+            strcopy(lookup, sizeof(lookup), name);
+            for (int idx; lookup[idx]; idx++) {
+                lookup[idx] = CharToLower(lookup[idx]);
+            }
+
+            if (g_hChatColors.GetString(lookup, color, sizeof(color))) {
+                buf_idx += strcopy(buffer[buf_idx], maxlength - buf_idx, color);
+            } else {
+                buf_idx += FormatEx(buffer[buf_idx], maxlength - buf_idx, "{%s}", name);
+            }
         }
 
         i += name_len + 2;
