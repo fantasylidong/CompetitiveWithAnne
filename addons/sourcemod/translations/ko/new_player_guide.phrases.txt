@@ -1,28 +1,104 @@
 "Phrases"
 {
-	"NPG_MenuTitle" { "ko" "Anne 통신 서버 모드 안내\nL4D2 총 플레이: %s | 이 서버: %s\n무엇을 플레이할까요?" }
-	"NPG_PlaytimeUnknown" { "ko" "알 수 없음" }
-	"NPG_CategorySolo" { "ko" "솔로 모드" }
-	"NPG_CategoryCoop" { "ko" "협동 PvE 모드" }
-	"NPG_CategoryVersus" { "ko" "대전 모드" }
-	"NPG_PermanentDisable" { "ko" "접속 시 Anne 모드 안내 영구 끄기" }
-	"NPG_PermanentEnable" { "ko" "접속 시 Anne 모드 안내 다시 켜기" }
-	"NPG_PreferenceDisabled" { "ko" "{green}Anne 모드 접속 안내를 영구적으로 껐습니다. {olive}!guide{green}에서 다시 켤 수 있습니다." }
-	"NPG_PreferenceEnabled" { "ko" "{green}Anne 모드 접속 안내를 다시 켰습니다." }
-	"NPG_PreferenceUnavailable" { "ko" "{olive}현재 Anne 모드 안내 설정을 저장할 수 없습니다." }
-	"NPG_TitleSolo" { "ko" "Anne 모드 안내 > 솔로\n연습 목표를 선택하세요:" }
-	"NPG_TitleCoopProfile" { "ko" "Anne 모드 안내 > 협동 PvE\n팀의 전반적인 숙련도는 어느 정도인가요?" }
-	"NPG_TitleEasy" { "ko" "Anne 모드 안내 > 쉬운 PvE\n초보자가 많은 팀에 추천:" }
-	"NPG_TitleNormal" { "ko" "Anne 모드 안내 > 일반 PvE\n맵과 기본 협동에 익숙한 팀에 추천:" }
-	"NPG_TitleHard" { "ko" "Anne 모드 안내 > 고난도 PvE\n경로, 자원, 집중 공격이 안정적인 팀에 추천:" }
-	"NPG_TitleFun" { "ko" "Anne 모드 안내 > 예능 PvE\n재미와 장면 연출을 우선:" }
-	"NPG_TitleVersusSize" { "ko" "Anne 모드 안내 > 대전\n팀 인원을 선택하세요:" }
-	"NPG_TitleVersus1" { "ko" "Anne 모드 안내 > 대전 > 1v1" }
-	"NPG_TitleVersus2" { "ko" "Anne 모드 안내 > 대전 > 2v2" }
-	"NPG_TitleVersus3" { "ko" "Anne 모드 안내 > 대전 > 3v3" }
-	"NPG_TitleVersus4" { "ko" "Anne 모드 안내 > 대전 > 4v4" }
-	"NPG_ProfileNew" { "ko" "초보자가 많음 (7개 모드)" }
-	"NPG_ProfileExperienced" { "ko" "경험자가 많음 (9개 모드)" }
-	"NPG_ProfileHardcore" { "ko" "하드코어 숙련자 (11개 모드)" }
-	"NPG_ProfileFun" { "ko" "재미가 목적 (4개 모드)" }
+	"NPG_MenuTitle"
+	{
+		"#format"	"{1:s},{2:s}"
+		"ko"		"Anne 통신 서버 모드 안내\nL4D2 총 플레이: {1} | 이 서버: {2}\n무엇을 플레이할까요?"
+	}
+	"NPG_PlaytimeUnknown"
+	{
+		"ko"		"알 수 없음"
+	}
+	"NPG_CategorySolo"
+	{
+		"ko"		"솔로 모드"
+	}
+	"NPG_CategoryCoop"
+	{
+		"ko"		"협동 PvE 모드"
+	}
+	"NPG_CategoryVersus"
+	{
+		"ko"		"대전 모드"
+	}
+	"NPG_PermanentDisable"
+	{
+		"ko"		"접속 시 Anne 모드 안내 영구 끄기"
+	}
+	"NPG_PermanentEnable"
+	{
+		"ko"		"접속 시 Anne 모드 안내 다시 켜기"
+	}
+	"NPG_PreferenceDisabled"
+	{
+		"ko"		"{green}Anne 모드 접속 안내를 영구적으로 껐습니다. {olive}!guide{green}에서 다시 켤 수 있습니다."
+	}
+	"NPG_PreferenceEnabled"
+	{
+		"ko"		"{green}Anne 모드 접속 안내를 다시 켰습니다."
+	}
+	"NPG_PreferenceUnavailable"
+	{
+		"ko"		"{olive}현재 Anne 모드 안내 설정을 저장할 수 없습니다."
+	}
+	"NPG_TitleSolo"
+	{
+		"ko"		"Anne 모드 안내 > 솔로\n연습 목표를 선택하세요:"
+	}
+	"NPG_TitleCoopProfile"
+	{
+		"ko"		"Anne 모드 안내 > 협동 PvE\n팀의 전반적인 숙련도는 어느 정도인가요?"
+	}
+	"NPG_TitleEasy"
+	{
+		"ko"		"Anne 모드 안내 > 쉬운 PvE\n초보자가 많은 팀에 추천:"
+	}
+	"NPG_TitleNormal"
+	{
+		"ko"		"Anne 모드 안내 > 일반 PvE\n맵과 기본 협동에 익숙한 팀에 추천:"
+	}
+	"NPG_TitleHard"
+	{
+		"ko"		"Anne 모드 안내 > 고난도 PvE\n경로, 자원, 집중 공격이 안정적인 팀에 추천:"
+	}
+	"NPG_TitleFun"
+	{
+		"ko"		"Anne 모드 안내 > 예능 PvE\n재미와 장면 연출을 우선:"
+	}
+	"NPG_TitleVersusSize"
+	{
+		"ko"		"Anne 모드 안내 > 대전\n팀 인원을 선택하세요:"
+	}
+	"NPG_TitleVersus1"
+	{
+		"ko"		"Anne 모드 안내 > 대전 > 1v1"
+	}
+	"NPG_TitleVersus2"
+	{
+		"ko"		"Anne 모드 안내 > 대전 > 2v2"
+	}
+	"NPG_TitleVersus3"
+	{
+		"ko"		"Anne 모드 안내 > 대전 > 3v3"
+	}
+	"NPG_TitleVersus4"
+	{
+		"ko"		"Anne 모드 안내 > 대전 > 4v4"
+	}
+	"NPG_ProfileNew"
+	{
+		"ko"		"초보자가 많음 (7개 모드)"
+	}
+	"NPG_ProfileExperienced"
+	{
+		"ko"		"경험자가 많음 (9개 모드)"
+	}
+	"NPG_ProfileHardcore"
+	{
+		"ko"		"하드코어 숙련자 (11개 모드)"
+	}
+	"NPG_ProfileFun"
+	{
+		"ko"		"재미가 목적 (4개 모드)"
+	}
 }

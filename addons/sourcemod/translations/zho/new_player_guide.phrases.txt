@@ -1,28 +1,104 @@
 "Phrases"
 {
-	"NPG_MenuTitle" { "zho" "Anne電信服模式嚮導\nL4D2總時長: %s | 本服: %s\n這次準備玩什麼？" }
-	"NPG_PlaytimeUnknown" { "zho" "未知" }
-	"NPG_CategorySolo" { "zho" "單人模式" }
-	"NPG_CategoryCoop" { "zho" "多人合作模式" }
-	"NPG_CategoryVersus" { "zho" "對抗模式" }
-	"NPG_PermanentDisable" { "zho" "永久關閉Anne玩法進服提示" }
-	"NPG_PermanentEnable" { "zho" "重新開啟Anne玩法進服提示" }
-	"NPG_PreferenceDisabled" { "zho" "{green}已永久關閉Anne玩法進服提示，可用{olive}!guide{green}重新開啟。" }
-	"NPG_PreferenceEnabled" { "zho" "{green}已重新開啟Anne玩法進服提示。" }
-	"NPG_PreferenceUnavailable" { "zho" "{olive}目前無法儲存Anne玩法提示設定。" }
-	"NPG_TitleSolo" { "zho" "Anne模式嚮導 > 單人模式\n你想練什麼？" }
-	"NPG_TitleCoopProfile" { "zho" "Anne模式嚮導 > 多人合作\n你們這隊大部分人是什麼水準？" }
-	"NPG_TitleEasy" { "zho" "Anne模式嚮導 > 簡單多人\n推薦給大部分是新玩家的隊伍：" }
-	"NPG_TitleNormal" { "zho" "Anne模式嚮導 > 一般多人\n推薦給熟悉地圖和基本配合的隊伍：" }
-	"NPG_TitleHard" { "zho" "Anne模式嚮導 > 高難度多人\n推薦給路線、資源和集火都穩定的老隊：" }
-	"NPG_TitleFun" { "zho" "Anne模式嚮導 > 娛樂模式\n優先節目效果：" }
-	"NPG_TitleVersusSize" { "zho" "Anne模式嚮導 > 對抗模式\n準備幾打幾？" }
-	"NPG_TitleVersus1" { "zho" "Anne模式嚮導 > 對抗 > 1v1" }
-	"NPG_TitleVersus2" { "zho" "Anne模式嚮導 > 對抗 > 2v2" }
-	"NPG_TitleVersus3" { "zho" "Anne模式嚮導 > 對抗 > 3v3" }
-	"NPG_TitleVersus4" { "zho" "Anne模式嚮導 > 對抗 > 4v4" }
-	"NPG_ProfileNew" { "zho" "大部分是新玩家（7個模式）" }
-	"NPG_ProfileExperienced" { "zho" "大部分人經驗比較豐富（9個模式）" }
-	"NPG_ProfileHardcore" { "zho" "大部分是硬核老鳥（11個模式）" }
-	"NPG_ProfileFun" { "zho" "我們就是來找樂子的（4個模式）" }
+	"NPG_MenuTitle"
+	{
+		"#format"	"{1:s},{2:s}"
+		"zho"		"Anne電信服模式嚮導\nL4D2總時長: {1} | 本服: {2}\n這次準備玩什麼？"
+	}
+	"NPG_PlaytimeUnknown"
+	{
+		"zho"		"未知"
+	}
+	"NPG_CategorySolo"
+	{
+		"zho"		"單人模式"
+	}
+	"NPG_CategoryCoop"
+	{
+		"zho"		"多人合作模式"
+	}
+	"NPG_CategoryVersus"
+	{
+		"zho"		"對抗模式"
+	}
+	"NPG_PermanentDisable"
+	{
+		"zho"		"永久關閉Anne玩法進服提示"
+	}
+	"NPG_PermanentEnable"
+	{
+		"zho"		"重新開啟Anne玩法進服提示"
+	}
+	"NPG_PreferenceDisabled"
+	{
+		"zho"		"{green}已永久關閉Anne玩法進服提示，可用{olive}!guide{green}重新開啟。"
+	}
+	"NPG_PreferenceEnabled"
+	{
+		"zho"		"{green}已重新開啟Anne玩法進服提示。"
+	}
+	"NPG_PreferenceUnavailable"
+	{
+		"zho"		"{olive}目前無法儲存Anne玩法提示設定。"
+	}
+	"NPG_TitleSolo"
+	{
+		"zho"		"Anne模式嚮導 > 單人模式\n你想練什麼？"
+	}
+	"NPG_TitleCoopProfile"
+	{
+		"zho"		"Anne模式嚮導 > 多人合作\n你們這隊大部分人是什麼水準？"
+	}
+	"NPG_TitleEasy"
+	{
+		"zho"		"Anne模式嚮導 > 簡單多人\n推薦給大部分是新玩家的隊伍："
+	}
+	"NPG_TitleNormal"
+	{
+		"zho"		"Anne模式嚮導 > 一般多人\n推薦給熟悉地圖和基本配合的隊伍："
+	}
+	"NPG_TitleHard"
+	{
+		"zho"		"Anne模式嚮導 > 高難度多人\n推薦給路線、資源和集火都穩定的老隊："
+	}
+	"NPG_TitleFun"
+	{
+		"zho"		"Anne模式嚮導 > 娛樂模式\n優先節目效果："
+	}
+	"NPG_TitleVersusSize"
+	{
+		"zho"		"Anne模式嚮導 > 對抗模式\n準備幾打幾？"
+	}
+	"NPG_TitleVersus1"
+	{
+		"zho"		"Anne模式嚮導 > 對抗 > 1v1"
+	}
+	"NPG_TitleVersus2"
+	{
+		"zho"		"Anne模式嚮導 > 對抗 > 2v2"
+	}
+	"NPG_TitleVersus3"
+	{
+		"zho"		"Anne模式嚮導 > 對抗 > 3v3"
+	}
+	"NPG_TitleVersus4"
+	{
+		"zho"		"Anne模式嚮導 > 對抗 > 4v4"
+	}
+	"NPG_ProfileNew"
+	{
+		"zho"		"大部分是新玩家（7個模式）"
+	}
+	"NPG_ProfileExperienced"
+	{
+		"zho"		"大部分人經驗比較豐富（9個模式）"
+	}
+	"NPG_ProfileHardcore"
+	{
+		"zho"		"大部分是硬核老鳥（11個模式）"
+	}
+	"NPG_ProfileFun"
+	{
+		"zho"		"我們就是來找樂子的（4個模式）"
+	}
 }

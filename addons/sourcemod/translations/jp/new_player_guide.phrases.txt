@@ -1,28 +1,104 @@
 "Phrases"
 {
-	"NPG_MenuTitle" { "jp" "Anne電信サーバー モードガイド\nL4D2合計: %s | このサーバー: %s\n何をプレイしますか？" }
-	"NPG_PlaytimeUnknown" { "jp" "不明" }
-	"NPG_CategorySolo" { "jp" "ソロモード" }
-	"NPG_CategoryCoop" { "jp" "協力PvEモード" }
-	"NPG_CategoryVersus" { "jp" "対戦モード" }
-	"NPG_PermanentDisable" { "jp" "入室時のAnneモードガイドを常に表示しない" }
-	"NPG_PermanentEnable" { "jp" "入室時のAnneモードガイドを再び表示する" }
-	"NPG_PreferenceDisabled" { "jp" "{green}Anneモード入室ガイドを無効にしました。{olive}!guide{green} で再度有効にできます。" }
-	"NPG_PreferenceEnabled" { "jp" "{green}Anneモード入室ガイドを再度有効にしました。" }
-	"NPG_PreferenceUnavailable" { "jp" "{olive}現在、Anneモードガイド設定を保存できません。" }
-	"NPG_TitleSolo" { "jp" "Anneモードガイド > ソロ\n練習目的を選んでください：" }
-	"NPG_TitleCoopProfile" { "jp" "Anneモードガイド > 協力PvE\nチーム全体の経験は？" }
-	"NPG_TitleEasy" { "jp" "Anneモードガイド > 初級PvE\n初心者が多いチーム向け：" }
-	"NPG_TitleNormal" { "jp" "Anneモードガイド > 標準PvE\nマップと基本連携に慣れたチーム向け：" }
-	"NPG_TitleHard" { "jp" "Anneモードガイド > 高難度PvE\nルート、資源、集中攻撃が安定したチーム向け：" }
-	"NPG_TitleFun" { "jp" "Anneモードガイド > 娯楽PvE\n派手な遊び方を選択：" }
-	"NPG_TitleVersusSize" { "jp" "Anneモードガイド > 対戦\nチーム人数を選択：" }
-	"NPG_TitleVersus1" { "jp" "Anneモードガイド > 対戦 > 1v1" }
-	"NPG_TitleVersus2" { "jp" "Anneモードガイド > 対戦 > 2v2" }
-	"NPG_TitleVersus3" { "jp" "Anneモードガイド > 対戦 > 3v3" }
-	"NPG_TitleVersus4" { "jp" "Anneモードガイド > 対戦 > 4v4" }
-	"NPG_ProfileNew" { "jp" "初心者が多い（7モード）" }
-	"NPG_ProfileExperienced" { "jp" "経験者が多い（9モード）" }
-	"NPG_ProfileHardcore" { "jp" "ハードコア熟練者（11モード）" }
-	"NPG_ProfileFun" { "jp" "楽しさ優先（4モード）" }
+	"NPG_MenuTitle"
+	{
+		"#format"	"{1:s},{2:s}"
+		"jp"		"Anne電信サーバー モードガイド\nL4D2合計: {1} | このサーバー: {2}\n何をプレイしますか？"
+	}
+	"NPG_PlaytimeUnknown"
+	{
+		"jp"		"不明"
+	}
+	"NPG_CategorySolo"
+	{
+		"jp"		"ソロモード"
+	}
+	"NPG_CategoryCoop"
+	{
+		"jp"		"協力PvEモード"
+	}
+	"NPG_CategoryVersus"
+	{
+		"jp"		"対戦モード"
+	}
+	"NPG_PermanentDisable"
+	{
+		"jp"		"入室時のAnneモードガイドを常に表示しない"
+	}
+	"NPG_PermanentEnable"
+	{
+		"jp"		"入室時のAnneモードガイドを再び表示する"
+	}
+	"NPG_PreferenceDisabled"
+	{
+		"jp"		"{green}Anneモード入室ガイドを無効にしました。{olive}!guide{green} で再度有効にできます。"
+	}
+	"NPG_PreferenceEnabled"
+	{
+		"jp"		"{green}Anneモード入室ガイドを再度有効にしました。"
+	}
+	"NPG_PreferenceUnavailable"
+	{
+		"jp"		"{olive}現在、Anneモードガイド設定を保存できません。"
+	}
+	"NPG_TitleSolo"
+	{
+		"jp"		"Anneモードガイド > ソロ\n練習目的を選んでください："
+	}
+	"NPG_TitleCoopProfile"
+	{
+		"jp"		"Anneモードガイド > 協力PvE\nチーム全体の経験は？"
+	}
+	"NPG_TitleEasy"
+	{
+		"jp"		"Anneモードガイド > 初級PvE\n初心者が多いチーム向け："
+	}
+	"NPG_TitleNormal"
+	{
+		"jp"		"Anneモードガイド > 標準PvE\nマップと基本連携に慣れたチーム向け："
+	}
+	"NPG_TitleHard"
+	{
+		"jp"		"Anneモードガイド > 高難度PvE\nルート、資源、集中攻撃が安定したチーム向け："
+	}
+	"NPG_TitleFun"
+	{
+		"jp"		"Anneモードガイド > 娯楽PvE\n派手な遊び方を選択："
+	}
+	"NPG_TitleVersusSize"
+	{
+		"jp"		"Anneモードガイド > 対戦\nチーム人数を選択："
+	}
+	"NPG_TitleVersus1"
+	{
+		"jp"		"Anneモードガイド > 対戦 > 1v1"
+	}
+	"NPG_TitleVersus2"
+	{
+		"jp"		"Anneモードガイド > 対戦 > 2v2"
+	}
+	"NPG_TitleVersus3"
+	{
+		"jp"		"Anneモードガイド > 対戦 > 3v3"
+	}
+	"NPG_TitleVersus4"
+	{
+		"jp"		"Anneモードガイド > 対戦 > 4v4"
+	}
+	"NPG_ProfileNew"
+	{
+		"jp"		"初心者が多い（7モード）"
+	}
+	"NPG_ProfileExperienced"
+	{
+		"jp"		"経験者が多い（9モード）"
+	}
+	"NPG_ProfileHardcore"
+	{
+		"jp"		"ハードコア熟練者（11モード）"
+	}
+	"NPG_ProfileFun"
+	{
+		"jp"		"楽しさ優先（4モード）"
+	}
 }
