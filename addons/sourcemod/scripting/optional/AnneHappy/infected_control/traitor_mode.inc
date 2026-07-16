@@ -1434,6 +1434,10 @@ static bool Traitor_TryTakeOverTank(int client, int tank)
         return false;
     }
 
+    // A direct bot takeover bypasses the normal Tank offering path. Mark it
+    // as the first pass so Tank Control can grant exactly one second control.
+    L4D2Direct_SetTankPassedCount(1);
+
     g_ITState[client] = Traitor_Alive;
     g_ITClass[client] = TRAITOR_CLASS_TANK;
     g_ITDamageLedgerActive[client] = true;
