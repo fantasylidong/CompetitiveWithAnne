@@ -9,6 +9,10 @@
 	{
 		"jp"		"不明"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"jp"		"{olive}Anneモードを選び、投票が通るまでセーフルームから退出できません。"
+	}
 	"NPG_CategorySolo"
 	{
 		"jp"		"ソロモード"

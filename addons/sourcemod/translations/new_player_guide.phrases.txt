@@ -9,6 +9,10 @@
 	{
 		"en"		"unknown"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"en"		"{olive}Select an Anne mode and wait for the vote to pass before leaving the saferoom."
+	}
 	"NPG_CategorySolo"
 	{
 		"en"		"Solo modes"

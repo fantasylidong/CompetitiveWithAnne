@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <sdktools>
 #include <colors>
 #undef REQUIRE_PLUGIN
 #include <veterans>
@@ -17,6 +18,7 @@
 #define AUTO_GUIDE_RETRY_DELAY 5.0
 #define AUTO_GUIDE_MAX_RETRIES 10
 #define GUIDE_MENU_TIMEOUT 60
+#define MODE_BLOCK_NOTICE_INTERVAL 3
 
 enum GuideParent
 {
@@ -210,6 +212,11 @@ bool g_bConfoglAvailable = false;
 bool g_bLeft4DHooksAvailable = false;
 bool g_bRpgAvailable = false;
 int g_iRetryCount[MAXPLAYERS + 1];
+bool g_bSafeReturnPositionSet[MAXPLAYERS + 1];
+float g_vSafeReturnPosition[MAXPLAYERS + 1][3];
+bool g_bFallbackSafeReturnPositionSet = false;
+float g_vFallbackSafeReturnPosition[3];
+int g_iLastModeBlockNotice[MAXPLAYERS + 1];
 
 ConVar g_hEnabled = null;
 ConVar g_hInitialDelay = null;
@@ -237,9 +244,19 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_anneguide", Command_Guide);
 
 	HookEvent("player_team", Event_PlayerTeam, EventHookMode_Post);
+	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
+	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 
 	AutoExecConfig(true, "anne_mode_guide");
 	RefreshLibraries();
+	ResetSafeReturnPositions();
+	CreateTimer(0.5, Timer_CaptureSafeReturnPositions, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public void OnMapStart()
+{
+	ResetSafeReturnPositions();
+	CreateTimer(1.0, Timer_CaptureSafeReturnPositions, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnAllPluginsLoaded()
@@ -291,6 +308,8 @@ public void OnClientPutInServer(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
+	g_bSafeReturnPositionSet[client] = false;
+	g_iLastModeBlockNotice[client] = 0;
 
 	if (IsValidHumanClient(client))
 	{
@@ -302,6 +321,8 @@ public void OnClientDisconnect(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
+	g_bSafeReturnPositionSet[client] = false;
+	g_iLastModeBlockNotice[client] = 0;
 }
 
 public void l4dstats_SuccessGetPlayerTime(int client)
@@ -316,8 +337,18 @@ public void l4dstats_AnnounceGameTime(int client)
 
 public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("userid"));
+	int userid = event.GetInt("userid");
+	int client = GetClientOfUserId(userid);
 	int team = event.GetInt("team");
+
+	if (team == 2)
+	{
+		CreateTimer(0.2, Timer_CaptureClientSafeReturnPosition, userid, TIMER_FLAG_NO_MAPCHANGE);
+	}
+	else if (1 <= client <= MaxClients)
+	{
+		g_bSafeReturnPositionSet[client] = false;
+	}
 
 	if (team == 2 || team == 3)
 	{
@@ -325,6 +356,40 @@ public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcas
 	}
 
 	return Plugin_Continue;
+}
+
+public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+	CreateTimer(0.2, Timer_CaptureClientSafeReturnPosition, event.GetInt("userid"), TIMER_FLAG_NO_MAPCHANGE);
+	return Plugin_Continue;
+}
+
+public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+	ResetSafeReturnPositions();
+	CreateTimer(0.5, Timer_CaptureSafeReturnPositions, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+{
+	if (!ShouldBlockUntilModeSelected())
+	{
+		return Plugin_Continue;
+	}
+
+	TeleportSurvivorToSafeReturnPosition(client);
+	if (IsValidHumanClient(client))
+	{
+		int now = GetTime();
+		if (g_iLastModeBlockNotice[client] == 0 || now - g_iLastModeBlockNotice[client] >= MODE_BLOCK_NOTICE_INTERVAL)
+		{
+			g_iLastModeBlockNotice[client] = now;
+			CPrintToChat(client, "%t", "NPG_ModeSelectionRequired");
+			ShowMainGuideMenu(client, GUIDE_MENU_TIMEOUT);
+		}
+	}
+
+	return Plugin_Handled;
 }
 
 public Action Command_Guide(int client, int args)
@@ -425,6 +490,97 @@ bool RetryAutoGuide(int client)
 	g_iRetryCount[client]++;
 	QueueAutoGuide(client, g_hRetryDelay.FloatValue);
 	return true;
+}
+
+void ResetSafeReturnPositions()
+{
+	g_bFallbackSafeReturnPositionSet = false;
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		g_bSafeReturnPositionSet[client] = false;
+		g_iLastModeBlockNotice[client] = 0;
+	}
+}
+
+public Action Timer_CaptureSafeReturnPositions(Handle timer, any data)
+{
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		CaptureSafeReturnPosition(client);
+	}
+
+	return Plugin_Stop;
+}
+
+public Action Timer_CaptureClientSafeReturnPosition(Handle timer, any userid)
+{
+	CaptureSafeReturnPosition(GetClientOfUserId(userid));
+	return Plugin_Stop;
+}
+
+void CaptureSafeReturnPosition(int client)
+{
+	if (!IsValidAliveSurvivor(client))
+	{
+		return;
+	}
+
+	GetClientAbsOrigin(client, g_vSafeReturnPosition[client]);
+	g_bSafeReturnPositionSet[client] = true;
+	if (!g_bFallbackSafeReturnPositionSet)
+	{
+		g_vFallbackSafeReturnPosition[0] = g_vSafeReturnPosition[client][0];
+		g_vFallbackSafeReturnPosition[1] = g_vSafeReturnPosition[client][1];
+		g_vFallbackSafeReturnPosition[2] = g_vSafeReturnPosition[client][2];
+		g_bFallbackSafeReturnPositionSet = true;
+	}
+}
+
+void TeleportSurvivorToSafeReturnPosition(int client)
+{
+	if (!IsValidAliveSurvivor(client))
+	{
+		return;
+	}
+
+	float position[3];
+	if (g_bSafeReturnPositionSet[client])
+	{
+		position[0] = g_vSafeReturnPosition[client][0];
+		position[1] = g_vSafeReturnPosition[client][1];
+		position[2] = g_vSafeReturnPosition[client][2];
+	}
+	else if (g_bFallbackSafeReturnPositionSet)
+	{
+		position[0] = g_vFallbackSafeReturnPosition[0];
+		position[1] = g_vFallbackSafeReturnPosition[1];
+		position[2] = g_vFallbackSafeReturnPosition[2];
+	}
+	else
+	{
+		return;
+	}
+
+	position[2] += 5.0;
+	float velocity[3] = {0.0, 0.0, 0.0};
+	TeleportEntity(client, position, NULL_VECTOR, velocity);
+}
+
+bool ShouldBlockUntilModeSelected()
+{
+	return g_hEnabled != null
+		&& g_hEnabled.BoolValue
+		&& g_bConfoglAvailable
+		&& GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") == FeatureStatus_Available
+		&& !LGO_IsMatchModeLoaded();
+}
+
+bool IsValidAliveSurvivor(int client)
+{
+	return 1 <= client <= MaxClients
+		&& IsClientInGame(client)
+		&& IsPlayerAlive(client)
+		&& GetClientTeam(client) == 2;
 }
 
 void ShowMainGuideMenu(int client, int timeout)

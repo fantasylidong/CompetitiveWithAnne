@@ -9,6 +9,10 @@
 	{
 		"vi"		"không rõ"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"vi"		"{olive}Hãy chọn một chế độ Anne và chờ biểu quyết thông qua trước khi rời phòng an toàn."
+	}
 	"NPG_CategorySolo"
 	{
 		"vi"		"Chế độ chơi đơn"

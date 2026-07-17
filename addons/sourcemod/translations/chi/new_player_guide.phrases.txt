@@ -9,6 +9,10 @@
 	{
 		"chi"		"未知"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"chi"		"{olive}请先选择一个Anne模式并等待投票通过，当前不能离开安全区。"
+	}
 	"NPG_CategorySolo"
 	{
 		"chi"		"单人模式"

@@ -9,6 +9,10 @@
 	{
 		"ko"		"알 수 없음"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"ko"		"{olive}Anne 모드를 선택하고 투표가 통과될 때까지 안전 구역을 나갈 수 없습니다."
+	}
 	"NPG_CategorySolo"
 	{
 		"ko"		"솔로 모드"

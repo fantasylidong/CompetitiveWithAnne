@@ -3,6 +3,8 @@
 #endif
 #define _infected_control_config_included
 
+#define DEFAULT_TRAITOR_QUOTA_DB_CONFIG "l4dstats"
+
 static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0, 6.0 };
 static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10, 1.10 };
 static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50, 0.50 };
@@ -551,8 +553,8 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 10000.0
         );
         this.TraitorQuotaDb = CreateConVar(
-            "inf_traitor_quota_db", "default",
-            "MySQL databases.cfg section for shared traitor daily quota storage.",
+            "inf_traitor_quota_db", DEFAULT_TRAITOR_QUOTA_DB_CONFIG,
+            "MySQL databases.cfg section for shared traitor daily quota storage; defaults to the l4d_stats database.",
             CVAR_FLAG
         );
         this.TraitorQuotaTable = CreateConVar(

@@ -9,6 +9,10 @@
 	{
 		"zho"		"未知"
 	}
+	"NPG_ModeSelectionRequired"
+	{
+		"zho"		"{olive}請先選擇一個Anne模式並等待投票通過，目前不能離開安全區。"
+	}
 	"NPG_CategorySolo"
 	{
 		"zho"		"單人模式"

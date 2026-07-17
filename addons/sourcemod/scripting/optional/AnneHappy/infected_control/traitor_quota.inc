@@ -217,7 +217,7 @@ static void TraitorQuota_Connect()
     gCV.TraitorQuotaDb.GetString(configName, sizeof(configName));
     TrimString(configName);
     if (configName[0] == '\0')
-        strcopy(configName, sizeof(configName), "default");
+        strcopy(configName, sizeof(configName), DEFAULT_TRAITOR_QUOTA_DB_CONFIG);
 
     if (!SQL_CheckConfig(configName))
     {
