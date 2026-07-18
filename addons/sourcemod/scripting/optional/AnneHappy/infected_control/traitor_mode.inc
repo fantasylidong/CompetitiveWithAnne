@@ -253,8 +253,22 @@ static void Traitor_QueueDamageSummary(int client, float delay)
     CreateTimer(delay + 0.1, Timer_TraitorDamageSummary, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
+static bool Traitor_ShouldBlockTankFriendlyFire(int victim, int attacker)
+{
+    return victim != attacker
+        && IsValidClient(victim)
+        && GetClientTeam(victim) == TEAM_INFECTED
+        && Traitor_IsActiveTankClient(attacker);
+}
+
 public Action Traitor_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
+    if (Traitor_ShouldBlockTankFriendlyFire(victim, attacker))
+    {
+        damage = 0.0;
+        return Plugin_Handled;
+    }
+
     if (!IsValidSurvivor(victim))
         return Plugin_Continue;
 
