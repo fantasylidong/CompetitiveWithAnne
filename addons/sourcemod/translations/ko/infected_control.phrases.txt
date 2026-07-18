@@ -44,6 +44,14 @@
 	{
 		"ko"		"{green}[IC]{default} Traitor quota database is unavailable."
 	}
+	"InfectedControl_TraitorPublicStatsUnavailable"
+	{
+		"ko"		"{green}[IC]{default} l4d_stats 점수가 아직 준비되지 않았습니다. 일반 플레이어는 잠시 후 다시 시도해 주세요."
+	}
+	"InfectedControl_TraitorPublicScoreRequired"
+	{
+		"ko"		"{green}[IC]{default} 일반 플레이어가 내귀로 등록하려면 최소 {olive}%d{default}점이 필요합니다. 현재 점수는 {olive}%d{default}점입니다."
+	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
 		"ko"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."

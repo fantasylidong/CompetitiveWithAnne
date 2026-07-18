@@ -11,6 +11,12 @@ static Database g_hTraitorQuotaDb = null;
 static bool g_bTraitorQuotaSchemaReady = false;
 static bool g_bTraitorQuotaDbIsMySQL = false;
 
+bool Traitor_IsAdminClient(int client)
+{
+    return IsValidClient(client)
+        && CheckCommandAccess(client, "infected_control_traitor_admin", ADMFLAG_GENERIC);
+}
+
 void TraitorQuota_Init()
 {
     TraitorQuota_Connect();
@@ -406,11 +412,16 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
         if (total < 0)
             total = 0;
 
+        if (!Traitor_IsAdminClient(client))
+            total = gCV.iTraitorPublicDailyQuota;
+
         return true;
     }
 
     delete results;
-    total = gCV.iTraitorDailyQuota;
+    total = Traitor_IsAdminClient(client)
+        ? gCV.iTraitorDailyQuota
+        : gCV.iTraitorPublicDailyQuota;
     used = 0;
     return TraitorQuota_InsertClientRow(client, table, escAuth, today, total);
 }

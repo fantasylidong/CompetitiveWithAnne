@@ -44,6 +44,14 @@
 	{
 		"en"		"{green}[IC]{default} Traitor quota database is unavailable."
 	}
+	"InfectedControl_TraitorPublicStatsUnavailable"
+	{
+		"en"		"{green}[IC]{default} Your l4d_stats score is not ready. Non-admin traitor registration is temporarily unavailable; try again shortly."
+	}
+	"InfectedControl_TraitorPublicScoreRequired"
+	{
+		"en"		"{green}[IC]{default} Non-admin players need at least {olive}%d{default} points to register as traitor; you currently have {olive}%d{default}."
+	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
 		"en"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."

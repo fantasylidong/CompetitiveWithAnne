@@ -44,6 +44,14 @@
 	{
 		"jp"		"{green}[IC]{default} Traitor quota database is unavailable."
 	}
+	"InfectedControl_TraitorPublicStatsUnavailable"
+	{
+		"jp"		"{green}[IC]{default} l4d_stats のスコアがまだ読み込まれていません。一般プレイヤーはしばらくしてから再試行してください。"
+	}
+	"InfectedControl_TraitorPublicScoreRequired"
+	{
+		"jp"		"{green}[IC]{default} 一般プレイヤーが内鬼に登録するには {olive}%d{default} ポイント以上必要です。現在は {olive}%d{default} ポイントです。"
+	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
 		"jp"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."

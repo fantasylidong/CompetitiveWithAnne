@@ -24,6 +24,7 @@
 #tryinclude <materialadmin>
 #tryinclude <sourcebanspp>
 #tryinclude <updater>
+#tryinclude <infected_control>
 #include <tf2>
 #include <tf2_stocks>
 #define REQUIRE_PLUGIN

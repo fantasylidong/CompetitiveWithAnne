@@ -44,6 +44,14 @@
 	{
 		"zho"		"{green}[IC]{default} 內鬼次數資料庫不可用。"
 	}
+	"InfectedControl_TraitorPublicStatsUnavailable"
+	{
+		"zho"		"{green}[IC]{default} 積分資料尚未就緒，普通玩家暫時無法登記內鬼，請稍後重試。"
+	}
+	"InfectedControl_TraitorPublicScoreRequired"
+	{
+		"zho"		"{green}[IC]{default} 普通玩家至少需要 {olive}%d{default} 積分才能登記內鬼；你目前有 {olive}%d{default} 積分。"
+	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
 		"zho"		"{green}[IC]{default} 你今天的內鬼次數已用完（{olive}%d{default}/{olive}%d{default}），明天恢復。"

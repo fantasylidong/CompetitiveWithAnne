@@ -153,6 +153,8 @@ enum struct Config
     ConVar TraitorAdminLimit;
     ConVar TraitorClassMask;
     ConVar TraitorDailyQuota;
+    ConVar TraitorPublicMinScore;
+    ConVar TraitorPublicDailyQuota;
     ConVar TraitorQuotaDb;
     ConVar TraitorQuotaTable;
     bool   bAntiBaitEnable;
@@ -178,6 +180,8 @@ enum struct Config
     int    iTraitorAdminLimit;
     int    iTraitorClassMask;
     int    iTraitorDailyQuota;
+    int    iTraitorPublicMinScore;
+    int    iTraitorPublicDailyQuota;
 
     // 缓存值
     float fFlowBadPenalty;
@@ -529,7 +533,7 @@ enum struct Config
         );
         this.TraitorEnable = CreateConVar(
             "inf_traitor_enable", "1",
-            "Enable admin traitor SI mode (0/1).",
+            "Enable traitor SI mode (0/1).",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.TraitorMaxSlots = CreateConVar(
@@ -550,6 +554,16 @@ enum struct Config
         this.TraitorDailyQuota = CreateConVar(
             "inf_traitor_daily_quota", "100",
             "Default daily traitor SI total_count for new admins.",
+            CVAR_FLAG, true, 0.0, true, 10000.0
+        );
+        this.TraitorPublicMinScore = CreateConVar(
+            "inf_traitor_public_min_score", "100000",
+            "Minimum l4d_stats total score required for a non-admin to register as traitor.",
+            CVAR_FLAG, true, 0.0, true, 100000000.0
+        );
+        this.TraitorPublicDailyQuota = CreateConVar(
+            "inf_traitor_public_daily_quota", "20",
+            "Daily traitor quota available to eligible non-admin players.",
             CVAR_FLAG, true, 0.0, true, 10000.0
         );
         this.TraitorQuotaDb = CreateConVar(
@@ -603,6 +617,8 @@ enum struct Config
         this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
         this.TraitorClassMask.AddChangeHook(OnCfgChanged);
         this.TraitorDailyQuota.AddChangeHook(OnCfgChanged);
+        this.TraitorPublicMinScore.AddChangeHook(OnCfgChanged);
+        this.TraitorPublicDailyQuota.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -714,6 +730,12 @@ enum struct Config
         this.iTraitorDailyQuota = this.TraitorDailyQuota.IntValue;
         if (this.iTraitorDailyQuota < 0) this.iTraitorDailyQuota = 0;
         if (this.iTraitorDailyQuota > 10000) this.iTraitorDailyQuota = 10000;
+        this.iTraitorPublicMinScore = this.TraitorPublicMinScore.IntValue;
+        if (this.iTraitorPublicMinScore < 0) this.iTraitorPublicMinScore = 0;
+        if (this.iTraitorPublicMinScore > 100000000) this.iTraitorPublicMinScore = 100000000;
+        this.iTraitorPublicDailyQuota = this.TraitorPublicDailyQuota.IntValue;
+        if (this.iTraitorPublicDailyQuota < 0) this.iTraitorPublicDailyQuota = 0;
+        if (this.iTraitorPublicDailyQuota > 10000) this.iTraitorPublicDailyQuota = 10000;
 
         this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
         this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);

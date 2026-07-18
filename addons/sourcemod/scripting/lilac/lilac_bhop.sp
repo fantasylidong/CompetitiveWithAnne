@@ -40,6 +40,16 @@ void lilac_bhop_check(int client, const int buttons, int last_buttons)
 	if (playerinfo_banned_flags[client][CHEAT_BHOP])
 		return;
 
+#if defined _infected_control_included
+	// Traitor mode supplies its own auto-bhop, so its movement is not evidence of cheating.
+	if (ggame == GAME_L4D2
+		&& NATIVE_EXISTS("InfectedControl_IsTraitorClient")
+		&& InfectedControl_IsTraitorClient(client)) {
+		bhop_reset(client);
+		return;
+	}
+#endif
+
 	if ((buttons & IN_JUMP))
 		jump_ticks[client]++;
 

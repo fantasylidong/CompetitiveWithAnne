@@ -44,6 +44,14 @@
 	{
 		"vi"		"{green}[IC]{default} Traitor quota database is unavailable."
 	}
+	"InfectedControl_TraitorPublicStatsUnavailable"
+	{
+		"vi"		"{green}[IC]{default} Điểm l4d_stats chưa sẵn sàng. Người chơi thường vui lòng thử đăng ký traitor lại sau."
+	}
+	"InfectedControl_TraitorPublicScoreRequired"
+	{
+		"vi"		"{green}[IC]{default} Người chơi thường cần ít nhất {olive}%d{default} điểm để đăng ký traitor; hiện bạn có {olive}%d{default} điểm."
+	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
 		"vi"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."

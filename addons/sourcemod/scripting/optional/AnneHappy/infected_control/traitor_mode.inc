@@ -728,6 +728,7 @@ static int Traitor_GetWaitingPosition(int client)
 
     int pos = 1;
     int order = g_ITWaitOrder[client];
+    bool isAdmin = Traitor_IsAdminClient(client);
     for (int other = 1; other <= MaxClients; other++)
     {
         if (other == client || g_ITState[other] != Traitor_Waiting || g_ITWaitOrder[other] <= 0)
@@ -736,8 +737,12 @@ static int Traitor_GetWaitingPosition(int client)
         if (Traitor_IsTankClient(other) != Traitor_IsTankClient(client))
             continue;
 
-        if (g_ITWaitOrder[other] < order)
+        bool otherIsAdmin = Traitor_IsAdminClient(other);
+        if ((otherIsAdmin && !isAdmin)
+            || (otherIsAdmin == isAdmin && g_ITWaitOrder[other] < order))
+        {
             pos++;
+        }
     }
     return pos;
 }
@@ -746,6 +751,7 @@ static int Traitor_FindNextWaitingClient()
 {
     int bestClient = 0;
     int bestOrder = 0;
+    bool bestIsAdmin = false;
 
     for (int client = 1; client <= MaxClients; client++)
     {
@@ -779,10 +785,14 @@ static int Traitor_FindNextWaitingClient()
         if (order <= 0)
             order = 999999;
 
-        if (bestClient == 0 || order < bestOrder)
+        bool isAdmin = Traitor_IsAdminClient(client);
+        if (bestClient == 0
+            || (isAdmin && !bestIsAdmin)
+            || (isAdmin == bestIsAdmin && order < bestOrder))
         {
             bestClient = client;
             bestOrder = order;
+            bestIsAdmin = isAdmin;
         }
     }
 
@@ -1028,6 +1038,7 @@ static bool Traitor_CheckUseLimit(int client, int zc = 0)
     }
 
     if (zc != TRAITOR_CLASS_TANK
+        && Traitor_IsAdminClient(client)
         && gCV.iTraitorAdminLimit > 0
         && g_ITUsesThisRound[client] >= gCV.iTraitorAdminLimit)
     {
@@ -1040,6 +1051,9 @@ static bool Traitor_CheckUseLimit(int client, int zc = 0)
 
 static bool Traitor_CheckQueuedEligibility(int client, int zc)
 {
+    if (!Traitor_CheckRegistrationAccess(client))
+        return false;
+
     if (!Traitor_IsClassSelectable(zc))
         return false;
 
@@ -1639,6 +1653,32 @@ static bool Traitor_RequireRegistrationTeam(int client)
     return false;
 }
 
+static bool Traitor_CheckRegistrationAccess(int client)
+{
+    if (Traitor_IsAdminClient(client))
+        return true;
+
+    bool statsAvailable = GetFeatureStatus(FeatureType_Native, "l4dstats_GetClientScore") == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") == FeatureStatus_Available;
+    if (!statsAvailable || l4dstats_IsClientScoreReady(client) == 0)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorPublicStatsUnavailable");
+        return false;
+    }
+
+    int score = l4dstats_GetClientScore(client);
+    if (score < gCV.iTraitorPublicMinScore)
+    {
+        CPrintToChat(client, "%t",
+            "InfectedControl_TraitorPublicScoreRequired",
+            gCV.iTraitorPublicMinScore,
+            score);
+        return false;
+    }
+
+    return true;
+}
+
 static bool Traitor_QueueNextLife(int client, int zc)
 {
     if (g_ITDeferredClass[client] != 0)
@@ -1677,6 +1717,9 @@ static bool Traitor_QueueClient(int client, int zc)
         CPrintToChat(client, "%t", "InfectedControl_TraitorDisabled");
         return false;
     }
+
+    if (!Traitor_CheckRegistrationAccess(client))
+        return false;
 
     if (gCV.iTraitorMaxSlots <= 0)
     {
@@ -1757,6 +1800,9 @@ static void Traitor_ShowClassMenu(int client)
     }
 
     if (!Traitor_RequireRegistrationTeam(client))
+        return;
+
+    if (!Traitor_CheckRegistrationAccess(client))
         return;
 
     if (gCV.iTraitorMaxSlots <= 0)
