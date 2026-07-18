@@ -407,7 +407,7 @@ static bool Traitor_IsManagedClient(int client)
 
 static bool Traitor_IsJoinProtectedClient(int client)
 {
-    if (!IsValidClient(client))
+    if (!gCV.bTraitorEnable || !IsValidClient(client))
         return false;
 
     return (g_ITState[client] == Traitor_Armed && g_ITClass[client] == TRAITOR_CLASS_TANK)

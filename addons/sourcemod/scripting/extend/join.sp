@@ -60,6 +60,7 @@ public Plugin myinfo =
 #define AUTOUPDATE_PUBLIC 1
 #define AUTOUPDATE_PRIVATE 2
 #define AUTOUPDATE_RESTORE_FILE "data/join_autoupdate.restore"
+#define AUTOUPDATE_RESTORE_DELAY 1.0
 
 bool  
 	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
@@ -124,6 +125,11 @@ public void OnPluginStart()
 	hCvarAutoupdatePublicUrl.AddChangeHook(UpdateStatuChange);
 	hCvarAutoupdatePrivateUrl.AddChangeHook(UpdateStatuChange);
 	AutoExecConfig(true, "join");
+	if (g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_PUBLIC
+		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_PRIVATE)
+	{
+		CreateTimer(AUTOUPDATE_RESTORE_DELAY, Timer_RestoreAutoUpdateMode, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
 	RegConsoleCmd("sm_away", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_afk", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_spec", AFKTurnClientToSpe);
@@ -162,6 +168,17 @@ public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[]
 }
 
 public void OnConfigsExecuted()
+{
+	TryRestoreAutoUpdateMode();
+}
+
+public Action Timer_RestoreAutoUpdateMode(Handle timer)
+{
+	TryRestoreAutoUpdateMode();
+	return Plugin_Stop;
+}
+
+void TryRestoreAutoUpdateMode()
 {
 	bool restored = RestorePendingAutoUpdateMode();
 	if (!restored
@@ -692,6 +709,10 @@ bool IsAnneMode()
 
 bool IsProtectedInfectedControlTraitor(int client)
 {
+	ConVar traitorEnabled = FindConVar("inf_traitor_enable");
+	if(traitorEnabled == null || !traitorEnabled.BoolValue)
+		return false;
+
 	return g_bInfectedControlAvailable
 		&& GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorClient") == FeatureStatus_Available
 		&& IsValidClient(client)

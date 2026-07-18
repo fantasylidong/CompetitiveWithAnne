@@ -726,8 +726,12 @@ public void OnUnpause()
 // =========================
 void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
 {
+    bool traitorDisabled = convar == gCV.TraitorEnable && StringToInt(ov) != 0 && StringToInt(nv) == 0;
     gCV.Refresh();
     gCV.ApplyMaxZombieBound();
+
+    if (traitorDisabled)
+        Traitor_ResetAll(false);
 }
 void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
 {
