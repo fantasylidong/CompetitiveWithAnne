@@ -1812,6 +1812,8 @@ void SwitchPlayerTeam(int client, int target) {
 	for (int i; i < sizeof g_iTargetTeam; i++) {
 		if (team == i || (team != 2 && i == 0))
 			continue;
+		if (g_iTargetTeam[i] == 3 && IsRygiveInfectedTeamMoveRestricted(client))
+			continue;
 
 		IntToString(g_iTargetTeam[i], str[1], sizeof str[]);
 		ImplodeStrings(str, sizeof str, "|", info, sizeof info);
@@ -1862,7 +1864,9 @@ int SwitchPlayerTeam_MenuHandler(Menu menu, MenuAction action, int client, int p
 
 						case 3:
 							{
-								if(IsInfectTeamFull())
+								if(IsRygiveInfectedTeamMoveRestricted(client))
+									CPrintToChat(client, "%t", "RYGive_TraitorModeInfectedTeamRestricted");
+								else if(IsInfectTeamFull())
 									CPrintToChat(client, "%t", "RYGive_NumberInfectedPeopleFull");
 								else
 									ChangeClientTeam(target, targetTeam);
@@ -1888,6 +1892,15 @@ int SwitchPlayerTeam_MenuHandler(Menu menu, MenuAction action, int client, int p
 	}
 
 	return 0;
+}
+
+bool IsRygiveInfectedTeamMoveRestricted(int client)
+{
+	if (!LibraryExists("infected_control") || GetClientImmunityLevel(client) > RYGIVE_LIMIT_IMMUNITY)
+		return false;
+
+	ConVar traitorEnable = FindConVar("inf_traitor_enable");
+	return traitorEnable != null && traitorEnable.BoolValue;
 }
 
 //判断生还是否已经满人

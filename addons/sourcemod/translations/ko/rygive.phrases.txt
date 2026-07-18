@@ -48,6 +48,10 @@
 	{
 		"ko"		"감염된 사람이 가득 찼습니다."
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"ko"		"배신자 모드에서는 면역 레벨 90 이하의 관리자가 플레이어를 감염자 팀으로 이동할 수 없습니다."
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"ko"		"플레이어가 이미 대상 팀에 있습니다"

@@ -48,6 +48,10 @@
 	{
 		"en"		"The number of infected people is full"
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"en"		"In traitor mode, administrators with immunity level 90 or lower cannot move players to the infected team."
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"en"		"The player is already in the target team"

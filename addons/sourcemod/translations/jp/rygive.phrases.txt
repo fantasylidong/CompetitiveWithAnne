@@ -48,6 +48,10 @@
 	{
 		"jp"		"感染者がいっぱいだ"
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"jp"		"裏切り者モードでは、免疫レベル90以下の管理者はプレイヤーを感染者チームへ移動できません。"
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"jp"		"プレーヤーはすでに対象チームに所属しています"

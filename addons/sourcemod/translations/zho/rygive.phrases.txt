@@ -48,6 +48,10 @@
 	{
 		"zho"		"感染者已滿"
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"zho"		"內鬼模式啟用時，免疫等級小於等於 90 的管理員不能將玩家切換到感染者隊伍。"
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"zho"		"玩家已在目標隊伍中"

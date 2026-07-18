@@ -48,6 +48,10 @@
 	{
 		"vi"		"Người nhiễm bệnh đầy rẫy"
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"vi"		"Trong chế độ nội gián, quản trị viên có mức miễn nhiễm từ 90 trở xuống không thể chuyển người chơi sang đội nhiễm bệnh."
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"vi"		"Người chơi đã ở trong đội mục tiêu"

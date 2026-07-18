@@ -48,6 +48,10 @@
 	{
 		"chi"		"感染者已满"
 	}
+	"RYGive_TraitorModeInfectedTeamRestricted"
+	{
+		"chi"		"内鬼模式开启时，免疫等级小于等于 90 的管理员不能将玩家切换到感染者队伍。"
+	}
 	"RYGive_PlayerAlreadyTargetTeam"
 	{
 		"chi"		"玩家已在目标队伍中"
