@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"en"		"Anne Telecom Server Mode Guide\nL4D2: {1} | this server: {2}\nWhat do you want to play?"
+		"#format"	"{1:s}"
+		"en"		"Anne Telecom Server Mode Guide\nTime on this server: {1}\nWhat do you want to play?"
 	}
 	"NPG_PlaytimeUnknown"
 	{

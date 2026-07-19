@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"chi"		"Anne电信服模式向导\nL4D2总时长: {1} | 本服: {2}\n这次准备玩什么？"
+		"#format"	"{1:s}"
+		"chi"		"Anne电信服模式向导\n本服游玩时长: {1}\n这次准备玩什么？"
 	}
 	"NPG_PlaytimeUnknown"
 	{

@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <colors>
 #undef REQUIRE_PLUGIN
-#include <veterans>
+#include <l4dstats>
 #include <confogl>
 #include <left4dhooks>
 #include <rpg>
@@ -14,9 +14,11 @@
 #define SERVER_AUTO_STOP_MINUTES (30 * 60)
 #define PERMANENT_DISABLE_MINUTES (10 * 60)
 
-#define AUTO_GUIDE_INITIAL_DELAY 10.0
+#define AUTO_GUIDE_INITIAL_DELAY 1.0
 #define AUTO_GUIDE_RETRY_DELAY 5.0
 #define AUTO_GUIDE_MAX_RETRIES 10
+#define SERVER_TIME_RETRY_DELAY 1.0
+#define SERVER_TIME_MAX_RETRIES 1
 #define GUIDE_MENU_TIMEOUT 60
 #define MODE_BLOCK_NOTICE_INTERVAL 3
 
@@ -207,11 +209,12 @@ static const char g_sVersus4Names[][] =
 };
 
 bool g_bAutoShown[MAXPLAYERS + 1];
-bool g_bVeteransAvailable = false;
+bool g_bL4DStatsAvailable = false;
 bool g_bConfoglAvailable = false;
 bool g_bLeft4DHooksAvailable = false;
 bool g_bRpgAvailable = false;
 int g_iRetryCount[MAXPLAYERS + 1];
+int g_iServerTimeRetryCount[MAXPLAYERS + 1];
 bool g_bSafeReturnPositionSet[MAXPLAYERS + 1];
 float g_vSafeReturnPosition[MAXPLAYERS + 1][3];
 bool g_bFallbackSafeReturnPositionSet = false;
@@ -231,7 +234,7 @@ public void OnPluginStart()
 	LoadTranslations("new_player_guide.phrases");
 
 	g_hEnabled = CreateConVar("sm_anne_mode_guide_enable", "1", "Enable automatic Anne mode guide prompts.", _, true, 0.0, true, 1.0);
-	g_hInitialDelay = CreateConVar("sm_anne_mode_guide_initial_delay", "10.0", "Delay before the first automatic mode guide check.", _, true, 1.0, true, 120.0);
+	g_hInitialDelay = CreateConVar("sm_anne_mode_guide_initial_delay", "1.0", "Delay before the first automatic mode guide check.", _, true, 1.0, true, 120.0);
 	g_hRetryDelay = CreateConVar("sm_anne_mode_guide_retry_delay", "5.0", "Delay between playtime and preference retries.", _, true, 1.0, true, 60.0);
 	g_hMaxRetries = CreateConVar("sm_anne_mode_guide_max_retries", "10", "How many times to wait for playtime and preference data.", _, true, 0.0, true, 30.0);
 	g_hServerAutoStopMinutes = CreateConVar("sm_anne_mode_guide_server_stop_minutes", "1800", "This-server playtime in minutes after which automatic prompts stop.", _, true, 0.0, true, 100000.0);
@@ -266,9 +269,9 @@ public void OnAllPluginsLoaded()
 
 public void OnLibraryAdded(const char[] name)
 {
-	if (StrEqual(name, "veterans"))
+	if (StrEqual(name, "l4d_stats"))
 	{
-		g_bVeteransAvailable = true;
+		g_bL4DStatsAvailable = true;
 	}
 	else if (StrEqual(name, "confogl"))
 	{
@@ -286,9 +289,9 @@ public void OnLibraryAdded(const char[] name)
 
 public void OnLibraryRemoved(const char[] name)
 {
-	if (StrEqual(name, "veterans"))
+	if (StrEqual(name, "l4d_stats"))
 	{
-		g_bVeteransAvailable = false;
+		g_bL4DStatsAvailable = false;
 	}
 	else if (StrEqual(name, "confogl"))
 	{
@@ -308,6 +311,7 @@ public void OnClientPutInServer(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
+	g_iServerTimeRetryCount[client] = 0;
 	g_bSafeReturnPositionSet[client] = false;
 	g_iLastModeBlockNotice[client] = 0;
 
@@ -321,18 +325,15 @@ public void OnClientDisconnect(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
+	g_iServerTimeRetryCount[client] = 0;
 	g_bSafeReturnPositionSet[client] = false;
 	g_iLastModeBlockNotice[client] = 0;
 }
 
 public void l4dstats_SuccessGetPlayerTime(int client)
 {
-	QueueAutoGuide(client, 1.0);
-}
-
-public void l4dstats_AnnounceGameTime(int client)
-{
-	QueueAutoGuide(client, 1.0);
+	g_iServerTimeRetryCount[client] = SERVER_TIME_MAX_RETRIES;
+	QueueAutoGuide(client, 0.1);
 }
 
 public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
@@ -352,7 +353,7 @@ public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcas
 
 	if (team == 2 || team == 3)
 	{
-		QueueAutoGuide(client, 3.0);
+		QueueAutoGuide(client, 1.0);
 	}
 
 	return Plugin_Continue;
@@ -442,22 +443,12 @@ void TryAutoGuide(int client)
 		return;
 	}
 
-	if (!CanReadVeterans())
+	if (!IsServerPlaytimeReady(client) && RetryServerPlaytime(client))
 	{
-		if (RetryAutoGuide(client))
-		{
-			return;
-		}
 		return;
 	}
 
-	int totalMinutes = GetBestTotalMinutes(client);
 	int serverMinutes = GetServerMinutes(client);
-	if (!IsPlaytimeReady(totalMinutes, serverMinutes) && RetryAutoGuide(client))
-	{
-		return;
-	}
-
 	if (serverMinutes >= GetServerAutoStopMinutes())
 	{
 		return;
@@ -489,6 +480,18 @@ bool RetryAutoGuide(int client)
 
 	g_iRetryCount[client]++;
 	QueueAutoGuide(client, g_hRetryDelay.FloatValue);
+	return true;
+}
+
+bool RetryServerPlaytime(int client)
+{
+	if (g_iServerTimeRetryCount[client] >= SERVER_TIME_MAX_RETRIES)
+	{
+		return false;
+	}
+
+	g_iServerTimeRetryCount[client]++;
+	QueueAutoGuide(client, SERVER_TIME_RETRY_DELAY);
 	return true;
 }
 
@@ -586,11 +589,9 @@ bool IsValidAliveSurvivor(int client)
 void ShowMainGuideMenu(int client, int timeout)
 {
 	char title[256];
-	char totalHours[32];
 	char serverHours[32];
-	FormatPlaytime(client, GetBestTotalMinutes(client), false, totalHours, sizeof(totalHours));
-	FormatPlaytime(client, GetServerMinutes(client), true, serverHours, sizeof(serverHours));
-	FormatEx(title, sizeof(title), "%T", "NPG_MenuTitle", client, totalHours, serverHours);
+	FormatServerPlaytime(client, GetServerMinutes(client), serverHours, sizeof(serverHours));
+	FormatEx(title, sizeof(title), "%T", "NPG_MenuTitle", client, serverHours);
 
 	Menu menu = new Menu(MainGuideMenuHandler);
 	menu.SetTitle(title);
@@ -948,56 +949,14 @@ bool CanPersistGuidePreference(int client)
 		&& GetServerMinutes(client) > GetPermanentDisableMinutes();
 }
 
-int GetBestTotalMinutes(int client)
-{
-	int totalMinutes = GetTotalMinutes(client);
-	if (totalMinutes > 0)
-	{
-		return totalMinutes;
-	}
-
-	int realMinutes = GetRealMinutes(client);
-	if (realMinutes > 0)
-	{
-		return realMinutes;
-	}
-
-	return -1;
-}
-
-int GetTotalMinutes(int client)
-{
-	if (!CanReadVeterans())
-	{
-		return -1;
-	}
-
-	return Veterans_Get(client, TIME_TOTAL);
-}
-
-int GetRealMinutes(int client)
-{
-	if (!CanReadVeterans())
-	{
-		return -1;
-	}
-
-	return Veterans_Get(client, TIME_REAL);
-}
-
 int GetServerMinutes(int client)
 {
-	if (!CanReadVeterans())
+	if (!CanReadServerPlaytime())
 	{
 		return -1;
 	}
 
-	return Veterans_Get(client, TIME_SERVER);
-}
-
-bool IsPlaytimeReady(int totalMinutes, int serverMinutes)
-{
-	return totalMinutes > 0 || serverMinutes > 0;
+	return l4dstats_GetClientPlayTime(client);
 }
 
 int GetServerAutoStopMinutes()
@@ -1012,9 +971,9 @@ int GetPermanentDisableMinutes()
 	return minutes > 0 ? minutes : PERMANENT_DISABLE_MINUTES;
 }
 
-void FormatPlaytime(int client, int minutes, bool zeroIsKnown, char[] buffer, int maxLength)
+void FormatServerPlaytime(int client, int minutes, char[] buffer, int maxLength)
 {
-	if (minutes < 0 || (!zeroIsKnown && minutes == 0))
+	if (minutes < 0)
 	{
 		FormatEx(buffer, maxLength, "%T", "NPG_PlaytimeUnknown", client);
 		return;
@@ -1023,9 +982,17 @@ void FormatPlaytime(int client, int minutes, bool zeroIsKnown, char[] buffer, in
 	Format(buffer, maxLength, "%.1f h", float(minutes) / 60.0);
 }
 
-bool CanReadVeterans()
+bool CanReadServerPlaytime()
 {
-	return g_bVeteransAvailable && GetFeatureStatus(FeatureType_Native, "Veterans_Get") == FeatureStatus_Available;
+	return g_bL4DStatsAvailable
+		&& GetFeatureStatus(FeatureType_Native, "l4dstats_GetClientPlayTime") == FeatureStatus_Available;
+}
+
+bool IsServerPlaytimeReady(int client)
+{
+	return g_bL4DStatsAvailable
+		&& GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") == FeatureStatus_Available
+		&& l4dstats_IsClientScoreReady(client) != 0;
 }
 
 bool IsServerModeLoaded()
@@ -1055,7 +1022,7 @@ bool IsValidHumanClient(int client)
 
 void RefreshLibraries()
 {
-	g_bVeteransAvailable = LibraryExists("veterans");
+	g_bL4DStatsAvailable = LibraryExists("l4d_stats");
 	g_bConfoglAvailable = LibraryExists("confogl");
 	g_bLeft4DHooksAvailable = LibraryExists("left4dhooks");
 	g_bRpgAvailable = LibraryExists("rpg");

@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"jp"		"Anne電信サーバー モードガイド\nL4D2合計: {1} | このサーバー: {2}\n何をプレイしますか？"
+		"#format"	"{1:s}"
+		"jp"		"Anne電信サーバー モードガイド\nこのサーバーでのプレイ時間: {1}\n何をプレイしますか？"
 	}
 	"NPG_PlaytimeUnknown"
 	{

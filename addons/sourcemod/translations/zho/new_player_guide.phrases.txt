@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"zho"		"Anne電信服模式嚮導\nL4D2總時長: {1} | 本服: {2}\n這次準備玩什麼？"
+		"#format"	"{1:s}"
+		"zho"		"Anne電信服模式嚮導\n本服遊玩時長: {1}\n這次準備玩什麼？"
 	}
 	"NPG_PlaytimeUnknown"
 	{

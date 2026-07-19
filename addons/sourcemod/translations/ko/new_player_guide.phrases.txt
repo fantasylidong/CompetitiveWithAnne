@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"ko"		"Anne 통신 서버 모드 안내\nL4D2 총 플레이: {1} | 이 서버: {2}\n무엇을 플레이할까요?"
+		"#format"	"{1:s}"
+		"ko"		"Anne 통신 서버 모드 안내\n이 서버의 플레이 시간: {1}\n무엇을 플레이할까요?"
 	}
 	"NPG_PlaytimeUnknown"
 	{

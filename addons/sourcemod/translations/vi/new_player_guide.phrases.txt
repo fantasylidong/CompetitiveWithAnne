@@ -2,8 +2,8 @@
 {
 	"NPG_MenuTitle"
 	{
-		"#format"	"{1:s},{2:s}"
-		"vi"		"Hướng dẫn chế độ máy chủ Anne Telecom\nTổng L4D2: {1} | máy chủ này: {2}\nBạn muốn chơi gì?"
+		"#format"	"{1:s}"
+		"vi"		"Hướng dẫn chế độ máy chủ Anne Telecom\nThời gian trên máy chủ này: {1}\nBạn muốn chơi gì?"
 	}
 	"NPG_PlaytimeUnknown"
 	{
