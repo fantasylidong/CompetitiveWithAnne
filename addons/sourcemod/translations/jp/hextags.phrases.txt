@@ -4,4 +4,12 @@
 	{
 		"jp"		"[SM] タイトル %s が正常に設定されました"
 	}
+	"HexTags_ChatSpectator"
+	{
+		"jp"		"*観戦者* "
+	}
+	"HexTags_ChatDead"
+	{
+		"jp"		"*死亡* "
+	}
 }

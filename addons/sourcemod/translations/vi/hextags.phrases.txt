@@ -4,4 +4,12 @@
 	{
 		"vi"		"[SM] Tiêu đề %s được đặt thành công"
 	}
+	"HexTags_ChatSpectator"
+	{
+		"vi"		"*KHÁN GIẢ* "
+	}
+	"HexTags_ChatDead"
+	{
+		"vi"		"*ĐÃ CHẾT* "
+	}
 }

@@ -11,7 +11,7 @@
 #include <rpg>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 
 // ===== 全局变量 =====
 CustomTags g_PlayerTags[MAXPLAYERS + 1];
@@ -49,6 +49,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 // ===== 插件加载 =====
 public void OnPluginStart() {
     LoadTranslations("common.phrases");
+    LoadTranslations("hextags.phrases");
 
     // Cookie
     // g_hTagCookie = RegClientCookie("HexTags_Lite_SelectedTag", "Selected Tag ID", CookieAccess_Private);
@@ -214,7 +215,17 @@ void PrintTaggedChatMessage(int client, const char[] command, const char[] messa
         if (!IsClientInGame(i)) continue;
         if (teamChat && GetClientTeam(i) != team) continue;
 
-        CPrintToChat(i, "{default}%s{default} : %s", sFullName, sFullMessage);
+        char sStatus[32];
+        sStatus[0] = '\0';
+        if (!teamChat) {
+            if (team == 1) {
+                FormatEx(sStatus, sizeof(sStatus), "%T", "HexTags_ChatSpectator", i);
+            } else if (!IsPlayerAlive(client)) {
+                FormatEx(sStatus, sizeof(sStatus), "%T", "HexTags_ChatDead", i);
+            }
+        }
+
+        CPrintToChat(i, "{default}%s%s{default} : %s", sStatus, sFullName, sFullMessage);
     }
 }
 

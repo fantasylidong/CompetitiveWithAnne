@@ -4,4 +4,12 @@
 	{
 		"zho"		"[SM] 頭銜 %s 設定成功"
 	}
+	"HexTags_ChatSpectator"
+	{
+		"zho"		"*旁觀者* "
+	}
+	"HexTags_ChatDead"
+	{
+		"zho"		"*死亡* "
+	}
 }

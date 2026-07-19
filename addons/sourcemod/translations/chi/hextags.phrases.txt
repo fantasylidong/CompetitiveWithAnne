@@ -4,4 +4,12 @@
 	{
 		"chi"		"[SM] 称号 %s 设置成功"
 	}
+	"HexTags_ChatSpectator"
+	{
+		"chi"		"*旁观者* "
+	}
+	"HexTags_ChatDead"
+	{
+		"chi"		"*死亡* "
+	}
 }

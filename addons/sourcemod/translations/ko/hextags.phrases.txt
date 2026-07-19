@@ -4,4 +4,12 @@
 	{
 		"ko"		"[SM] 타이틀 %s가 설정되었습니다."
 	}
+	"HexTags_ChatSpectator"
+	{
+		"ko"		"*관전자* "
+	}
+	"HexTags_ChatDead"
+	{
+		"ko"		"*사망* "
+	}
 }

@@ -42,6 +42,7 @@
 #define JOIN_MOTD_DELAY 4.0
 #define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
 #define TEAM_SPECTATOR 1
+#define TEAM_SURVIVOR 2
 #define TEAM_INFECTED 3
 #define ZC_TANK 8
 
@@ -50,7 +51,7 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.2",
+	version = "1.3",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 #define AUTOUPDATE_URL_LENGTH 256
@@ -671,7 +672,15 @@ void MoveClientToSpectator(int client, bool forcedTeamCleanup = false, bool pres
 	if(!IsValidClient(client))
 		return;
 
-	if(GetClientTeam(client) == TEAM_INFECTED && IsPlayerAlive(client))
+	int team = GetClientTeam(client);
+	if(team == TEAM_SURVIVOR && IsPlayerAlive(client))
+	{
+		if(!L4D_GoAwayFromKeyboard(client))
+			LogError("Unable to move survivor %N to spectator through GoAwayFromKeyboard.", client);
+		return;
+	}
+
+	if(team == TEAM_INFECTED && IsPlayerAlive(client))
 	{
 		int zombieClass = GetEntProp(client, Prop_Send, "m_zombieClass");
 		bool isTank = zombieClass == ZC_TANK;

@@ -4,4 +4,12 @@
 	{
 		"en"		"[SM] Title %s set successfully"
 	}
+	"HexTags_ChatSpectator"
+	{
+		"en"		"*SPECTATOR* "
+	}
+	"HexTags_ChatDead"
+	{
+		"en"		"*DEAD* "
+	}
 }
