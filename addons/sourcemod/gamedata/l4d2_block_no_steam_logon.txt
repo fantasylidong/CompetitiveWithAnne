@@ -1,0 +1,89 @@
+"Games"
+{
+	"#default"
+	{
+		"Offsets"
+		{
+			"OS"
+			{
+				"linux"  "1"
+				"windows" "0"
+			}
+		}
+	}
+
+	"left4dead2"
+	{
+		"Functions"
+		{
+			"CSteam3Server::OnValidateAuthTicketResponseHelper"
+			{
+				"signature" "CSteam3Server::OnValidateAuthTicketResponseHelper"
+				"callconv"  "thiscall"
+				"return"    "void"
+				"this"      "ignore"
+				"arguments"
+				{
+					"a1"
+					{
+						"type" "int"
+					}
+
+					"CBaseClient"
+					{
+						"type" "int"
+					}
+
+					"EAuthSessionResponse"
+					{
+						"type" "int"
+					}
+				}
+			}
+		}
+
+		"Offsets"
+		{
+			"CNetChan::IsTimingOut"
+			{
+				"linux"   "7"
+				"windows" "7"
+			}
+
+			"CBaseClient::GetNetChannel"
+			{
+				"linux"   "8"
+				"windows" "9"
+			}
+
+			"CBaseClient->m_Name"
+			{
+				"linux"   "60"
+				"windows" "60"
+			}
+		}
+
+		"Signatures"
+		{
+			"CSteam3Server::OnValidateAuthTicketResponseHelper"
+			{
+				"library" "engine"
+				"linux"   "@_ZN13CSteam3Server34OnValidateAuthTicketResponseHelperEP11CBaseClient20EAuthSessionResponse"
+				"windows" "\x55\x8B\xEC\x53\x56\x8B\x75\x2A\x8B\x46\x2A\x8B\x50\x2A\x57\x8B\x7D\x2A\x83\xC6\x2A\x8B\xD9\x57\x8B\xCE\xFF\xD2\x50\x68\x2A\x2A\x2A\x2A\xFF\x15\x2A\x2A\x2A\x2A\x8B\x06\x8B\x50\x2A\x83\xC4\x2A\x57\x8B\xCE\xFF\xD2"
+			}
+
+			"CBaseClient::Disconnect"
+			{
+				"library" "engine"
+				"linux"   "@_ZN11CBaseClient10DisconnectEPKcz"
+				"windows" "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\xC5\x89\x45\x2A\x57\x8B\x7D\x2A\x83\xBF"
+			}
+
+			"CBaseClient::GetClientName"
+			{
+				"library" "engine"
+				"linux" "@_ZNK11CBaseClient13GetClientNameEv"
+			}
+		}
+	}
+}

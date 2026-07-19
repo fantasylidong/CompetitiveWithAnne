@@ -20,6 +20,24 @@ native float GetNextSpawnTime();
  */
 native bool InfectedControl_IsTraitorClient(int client);
 
+enum InfectedControlTankOfferResult
+{
+	InfectedControlTankOffer_NotTraitor = 0,
+	InfectedControlTankOffer_KeepCurrentControl,
+	InfectedControlTankOffer_GrantSecondControl,
+	InfectedControlTankOffer_ReleaseToAI
+};
+
+/**
+ * @brief Resolves a Tank offer for an active traitor Tank.
+ * @remarks Tank Control should block the engine offer for KeepCurrentControl and
+ *          GrantSecondControl, and continue normally for ReleaseToAI.
+ *
+ * @param client Active Tank client index.
+ * @return How the Tank offer should be handled.
+ */
+native InfectedControlTankOfferResult InfectedControl_HandleTraitorTankOffer(int client);
+
 /**
  * @brief When a RushMan be detected
  * @remarks you must send alive Player client index.
@@ -42,7 +60,8 @@ public SharedPlugin __pl_infected_control =
 #if !defined REQUIRE_PLUGIN
 public void __pl_infected_control_SetNTVOptional()
 {
-    MarkNativeAsOptional("GetNextSpawnTime");
-    MarkNativeAsOptional("InfectedControl_IsTraitorClient");
+	MarkNativeAsOptional("GetNextSpawnTime");
+	MarkNativeAsOptional("InfectedControl_IsTraitorClient");
+	MarkNativeAsOptional("InfectedControl_HandleTraitorTankOffer");
 }
 #endif

@@ -232,6 +232,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
                                                   ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
+    CreateNative("InfectedControl_HandleTraitorTankOffer", Native_InfectedControlHandleTraitorTankOffer);
     return APLRes_Success;
 }
 public void OnAllPluginsLoaded()
@@ -334,7 +335,9 @@ public void OnPluginStart()
     HookEvent("player_death",    Event_PlayerDeath);
     HookEvent("player_team",     Event_PlayerTeam);
     HookEvent("player_bot_replace", Event_PlayerBotReplace, EventHookMode_Post);
+    HookEvent("bot_player_replace", Event_BotPlayerReplace, EventHookMode_Post);
     HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
+    HookEvent("player_no_longer_it", Event_PlayerNoLongerIt, EventHookMode_Post);
     HookEvent("player_incapacitated", Event_PlayerIncapacitated, EventHookMode_Post);
     HookEvent("player_ledge_grab", Event_PlayerLedgeGrab, EventHookMode_Post);
     HookEvent("revive_success", Event_PlayerReviveSuccess, EventHookMode_Post);
@@ -678,7 +681,20 @@ public void Event_PlayerBotReplace(Event event, const char[] name, bool dontBroa
 {
     int player = GetClientOfUserId(event.GetInt("player"));
     int bot = GetClientOfUserId(event.GetInt("bot"));
+    Traitor_OnBileVictimReplaced(player, bot);
     Traitor_OnPlayerBotReplace(player, bot);
+}
+
+public void Event_BotPlayerReplace(Event event, const char[] name, bool dontBroadcast)
+{
+    int bot = GetClientOfUserId(event.GetInt("bot"));
+    int player = GetClientOfUserId(event.GetInt("player"));
+    Traitor_OnBileVictimReplaced(bot, player);
+}
+
+public void Event_PlayerNoLongerIt(Event event, const char[] name, bool dontBroadcast)
+{
+    Traitor_OnBileEffectEnded(GetClientOfUserId(event.GetInt("userid")));
 }
 
 public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
@@ -697,6 +713,16 @@ public void OnClientDisconnect(int client)
 public void OnClientPutInServer(int client)
 {
     Traitor_HookClientDamage(client);
+}
+
+public void OnEntityCreated(int entity, const char[] classname)
+{
+    Traitor_OnEntityCreated(entity, classname);
+}
+
+public void OnEntityDestroyed(int entity)
+{
+    Traitor_OnEntityDestroyed(entity);
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)

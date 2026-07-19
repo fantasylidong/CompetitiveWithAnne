@@ -5,6 +5,8 @@
 #include <readyup>
 #include <sourcemod>
 #include <left4dhooks>
+#undef REQUIRE_PLUGIN
+#include <infected_control>
 
 #define TEAM_SPECTATOR          1
 #define TEAM_INFECTED           3
@@ -118,22 +120,28 @@ public void L4D2_OnTankPassControl(int iOldTank, int iNewTank, int iPassCount)
  * Make sure we give the tank to our queued player.
  */
 public Action L4D_OnTryOfferingTankBot(int tank_index, bool &enterStatis)
-{    
+{
+    if (tank_index < 1 || tank_index > MaxClients || !IsClientInGame(tank_index))
+        return Plugin_Continue;
+
     // Reset the tank's frustration if need be
     if (!IsFakeClient(tank_index)) 
     {
-        PrintHintText(tank_index, "Rage Meter Refilled");
-        for (int i = 1; i <= MaxClients; i++) 
-        {
-            if (!IS_VALID_INFECTED(i) && !IS_VALID_SPECTATOR(i))
-                continue;
+        InfectedControlTankOfferResult traitorResult = InfectedControlTankOffer_NotTraitor;
+        if (GetFeatureStatus(FeatureType_Native, "InfectedControl_HandleTraitorTankOffer") == FeatureStatus_Available)
+            traitorResult = InfectedControl_HandleTraitorTankOffer(tank_index);
 
-            if (tank_index == i) 
-                CPrintToChat(i, "%t", "L4DTankControlEq_TankRageMeterRefilled");
-            else 
-                CPrintToChat(i, "%t", "L4DTankControlEq_TankRageMeterRefilled_2", tank_index);
+        if (traitorResult == InfectedControlTankOffer_ReleaseToAI)
+            return Plugin_Continue;
+
+        if (traitorResult != InfectedControlTankOffer_NotTraitor)
+        {
+            if (traitorResult == InfectedControlTankOffer_GrantSecondControl)
+                AnnounceTankRageRefilled(tank_index);
+            return Plugin_Handled;
         }
-        
+
+        AnnounceTankRageRefilled(tank_index);
         SetTankFrustration(tank_index, 100);
         L4D2Direct_SetTankPassedCount(L4D2Direct_GetTankPassedCount() + 1);
 
@@ -162,6 +170,23 @@ public Action L4D_OnTryOfferingTankBot(int tank_index, bool &enterStatis)
     }
     
     return Plugin_Continue;
+}
+
+void AnnounceTankRageRefilled(int tank_index)
+{
+    SetGlobalTransTarget(tank_index);
+    PrintHintText(tank_index, "%t", "HintText");
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IS_VALID_INFECTED(i) && !IS_VALID_SPECTATOR(i))
+            continue;
+
+        if (tank_index == i)
+            CPrintToChat(i, "%t", "L4DTankControlEq_TankRageMeterRefilled");
+        else
+            CPrintToChat(i, "%t", "L4DTankControlEq_TankRageMeterRefilled_2", tank_index);
+    }
 }
 
 

@@ -12,7 +12,10 @@
 #define TRAITOR_TANK_BLOCK_SECONDS (3 * 24 * 60 * 60)
 #define TRAITOR_TANK_BLOCK_DAYS 3
 #define TRAITOR_NO_DAMAGE_BLOCK_WAVES 3
-#define TRAITOR_POST_DEATH_DAMAGE_WINDOW 8.0 // covers the default Spitter acid lifetime plus event delay
+#define TRAITOR_DAMAGE_TAIL_SECONDS 0.5
+#define TRAITOR_DAMAGE_POLL_INTERVAL 0.1
+#define TRAITOR_BILE_FALLBACK_SECONDS 15.0
+#define TRAITOR_ENTITY_SLOTS 2048
 
 enum TraitorState
 {
@@ -22,6 +25,14 @@ enum TraitorState
     Traitor_SpawnLocked,
     Traitor_SpawnAllowed,
     Traitor_Alive
+}
+
+enum TraitorTankOfferResult
+{
+    TraitorTankOffer_NotTraitor = 0,
+    TraitorTankOffer_KeepCurrentControl,
+    TraitorTankOffer_GrantSecondControl,
+    TraitorTankOffer_ReleaseToAI
 }
 
 static TraitorState g_ITState[MAXPLAYERS + 1];
@@ -40,10 +51,14 @@ static bool g_ITSkipNextDamagePost[MAXPLAYERS + 1];
 static int g_ITPendingIncapAttacker[MAXPLAYERS + 1];
 static bool g_ITSurvivorIncapped[MAXPLAYERS + 1];
 static bool g_ITDamageLedgerActive[MAXPLAYERS + 1];
-static float g_ITDamageLedgerExpire[MAXPLAYERS + 1];
 static int g_ITDamageLedgerClass[MAXPLAYERS + 1];
 static bool g_ITDamageSummaryPending[MAXPLAYERS + 1];
+static bool g_ITDamagePenaltyPending[MAXPLAYERS + 1];
+static float g_ITDamageFinalizeAfter[MAXPLAYERS + 1];
 static ConVar g_ITSurvivorIncapHealth = null;
+static ConVar g_ITTankFrustrationSpawnDelay = null;
+static ConVar g_ITVomitFadeStart = null;
+static ConVar g_ITVomitFadeDuration = null;
 static int g_ITNoDamageBlockedWaves[MAXPLAYERS + 1];
 static float g_ITSpawnDeadline[MAXPLAYERS + 1];
 static Handle g_ITSpawnTimer[MAXPLAYERS + 1];
@@ -54,6 +69,12 @@ static StringMap g_ITNoDamageBlockedAuths = null;
 static int g_ITDeferredClass[MAXPLAYERS + 1];
 static int g_ITDeferredRegistrationOrder[MAXPLAYERS + 1];
 static int g_ITDeferredWaitOrder[MAXPLAYERS + 1];
+static int g_ITTankBotDamageOwner[MAXPLAYERS + 1];
+static float g_ITTankBotDamageExpire[MAXPLAYERS + 1];
+static int g_ITBileOwner[MAXPLAYERS + 1];
+static float g_ITBileFallbackExpire[MAXPLAYERS + 1];
+static int g_ITSpitEntityOwner[TRAITOR_ENTITY_SLOTS];
+static int g_ITSpitEntityRef[TRAITOR_ENTITY_SLOTS];
 
 static bool Traitor_IsSurvivorIncapacitated(int client)
 {
@@ -86,25 +107,257 @@ static bool Traitor_IsSurvivorTeamWiped()
 
 static bool Traitor_IsDamageLedgerActive(int client)
 {
-    if (client < 1 || client > MaxClients || !g_ITDamageLedgerActive[client])
-        return false;
-
-    if (g_ITDamageLedgerExpire[client] > 0.0 && GetGameTime() > g_ITDamageLedgerExpire[client])
-    {
-        g_ITDamageLedgerActive[client] = false;
-        g_ITDamageLedgerExpire[client] = 0.0;
-        g_ITDamageLedgerClass[client] = 0;
-        g_ITDidDamage[client] = false;
-        g_ITDamageTotal[client] = 0;
-        return false;
-    }
-
-    return true;
+    return client >= 1 && client <= MaxClients && g_ITDamageLedgerActive[client];
 }
 
 static bool Traitor_IsDamageAttributor(int client)
 {
     return Traitor_IsAliveClient(client) || Traitor_IsDamageLedgerActive(client);
+}
+
+static bool Traitor_IsTrackedEntityIndex(int entity)
+{
+    return entity > MaxClients && entity < TRAITOR_ENTITY_SLOTS;
+}
+
+static bool Traitor_IsEntityClass(int entity, const char[] expectedClass)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity) || !IsValidEntity(entity))
+        return false;
+
+    char classname[32];
+    GetEntityClassname(entity, classname, sizeof(classname));
+    return StrEqual(classname, expectedClass, false);
+}
+
+static bool Traitor_IsCommonInfectedEntity(int entity)
+{
+    return Traitor_IsEntityClass(entity, "infected");
+}
+
+static float Traitor_GetBileFallbackDuration()
+{
+    if (g_ITVomitFadeStart == null)
+        g_ITVomitFadeStart = FindConVar("z_vomit_fade_start");
+    if (g_ITVomitFadeDuration == null)
+        g_ITVomitFadeDuration = FindConVar("z_vomit_fade_duration");
+
+    float duration = 0.0;
+    if (g_ITVomitFadeStart != null && g_ITVomitFadeStart.FloatValue > 0.0)
+        duration += g_ITVomitFadeStart.FloatValue;
+    if (g_ITVomitFadeDuration != null && g_ITVomitFadeDuration.FloatValue > 0.0)
+        duration += g_ITVomitFadeDuration.FloatValue;
+
+    return (duration > 0.0) ? duration + 1.0 : TRAITOR_BILE_FALLBACK_SECONDS;
+}
+
+static void Traitor_TouchDamageTail(int owner)
+{
+    if (owner < 1 || owner > MaxClients || !g_ITDamageSummaryPending[owner])
+        return;
+
+    float finalizeAfter = GetGameTime() + TRAITOR_DAMAGE_TAIL_SECONDS;
+    if (finalizeAfter > g_ITDamageFinalizeAfter[owner])
+        g_ITDamageFinalizeAfter[owner] = finalizeAfter;
+}
+
+static void Traitor_ClearBileVictim(int victim, bool touchOwner = true)
+{
+    if (victim < 1 || victim > MaxClients)
+        return;
+
+    int owner = g_ITBileOwner[victim];
+    g_ITBileOwner[victim] = 0;
+    g_ITBileFallbackExpire[victim] = 0.0;
+
+    if (touchOwner)
+        Traitor_TouchDamageTail(owner);
+}
+
+static void Traitor_SetBileOwner(int victim, int owner)
+{
+    if (victim < 1 || victim > MaxClients || owner < 1 || owner > MaxClients)
+        return;
+
+    int previousOwner = g_ITBileOwner[victim];
+    if (previousOwner > 0 && previousOwner != owner)
+        Traitor_TouchDamageTail(previousOwner);
+
+    g_ITBileOwner[victim] = owner;
+    g_ITBileFallbackExpire[victim] = GetGameTime() + Traitor_GetBileFallbackDuration();
+    Traitor_TouchDamageTail(owner);
+}
+
+static bool Traitor_HasActiveBileVictim(int owner)
+{
+    float now = GetGameTime();
+
+    for (int victim = 1; victim <= MaxClients; victim++)
+    {
+        if (g_ITBileOwner[victim] != owner)
+            continue;
+
+        if (!IsValidSurvivor(victim)
+            || !IsPlayerAlive(victim)
+            || (g_ITBileFallbackExpire[victim] > 0.0 && now > g_ITBileFallbackExpire[victim]))
+        {
+            Traitor_ClearBileVictim(victim, false);
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+static int Traitor_GetTrackedSpitOwner(int entity)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity))
+        return 0;
+
+    if (g_ITSpitEntityOwner[entity] <= 0
+        || g_ITSpitEntityRef[entity] == 0
+        || EntRefToEntIndex(g_ITSpitEntityRef[entity]) != entity)
+    {
+        g_ITSpitEntityOwner[entity] = 0;
+        g_ITSpitEntityRef[entity] = 0;
+        return 0;
+    }
+
+    return g_ITSpitEntityOwner[entity];
+}
+
+static void Traitor_RegisterSpitEntity(int entity, int owner)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity)
+        || !IsValidEntity(entity)
+        || !Traitor_IsClassAttributor(owner, view_as<int>(SI_Spitter)))
+    {
+        return;
+    }
+
+    g_ITSpitEntityOwner[entity] = owner;
+    g_ITSpitEntityRef[entity] = EntIndexToEntRef(entity);
+    Traitor_TouchDamageTail(owner);
+}
+
+static void Traitor_ClearSpitEntity(int entity, bool touchOwner = true)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity))
+        return;
+
+    int owner = g_ITSpitEntityOwner[entity];
+    g_ITSpitEntityOwner[entity] = 0;
+    g_ITSpitEntityRef[entity] = 0;
+
+    if (touchOwner)
+        Traitor_TouchDamageTail(owner);
+}
+
+static bool Traitor_HasActiveSpitEntity(int owner)
+{
+    for (int entity = MaxClients + 1; entity < TRAITOR_ENTITY_SLOTS; entity++)
+    {
+        if (g_ITSpitEntityOwner[entity] != owner)
+            continue;
+
+        if (g_ITSpitEntityRef[entity] == 0 || EntRefToEntIndex(g_ITSpitEntityRef[entity]) != entity)
+        {
+            Traitor_ClearSpitEntity(entity, false);
+            continue;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+static bool Traitor_HasOutstandingDamageSource(int owner)
+{
+    if (owner < 1 || owner > MaxClients)
+        return false;
+
+    if (g_ITDamageLedgerClass[owner] == view_as<int>(SI_Boomer))
+        return Traitor_HasActiveBileVictim(owner);
+
+    if (g_ITDamageLedgerClass[owner] == view_as<int>(SI_Spitter))
+        return Traitor_HasActiveSpitEntity(owner);
+
+    return false;
+}
+
+static void Traitor_ClearDamageSourcesForOwner(int owner)
+{
+    if (owner < 1 || owner > MaxClients)
+        return;
+
+    for (int victim = 1; victim <= MaxClients; victim++)
+    {
+        if (g_ITBileOwner[victim] == owner)
+            Traitor_ClearBileVictim(victim, false);
+    }
+
+    for (int entity = MaxClients + 1; entity < TRAITOR_ENTITY_SLOTS; entity++)
+    {
+        if (g_ITSpitEntityOwner[entity] == owner)
+            Traitor_ClearSpitEntity(entity, false);
+    }
+}
+
+static bool Traitor_IsTankRockEntity(int entity)
+{
+    if (entity <= MaxClients || !IsValidEntity(entity))
+        return false;
+
+    char classname[32];
+    GetEntityClassname(entity, classname, sizeof(classname));
+    return StrEqual(classname, "tank_rock", false);
+}
+
+static int Traitor_ResolveDamageAttacker(int victim, int attacker, int inflictor)
+{
+    if (Traitor_IsDamageAttributor(attacker))
+        return attacker;
+
+    int spitOwner = Traitor_GetTrackedSpitOwner(inflictor);
+    if (spitOwner <= 0)
+        spitOwner = Traitor_GetTrackedSpitOwner(attacker);
+    if (Traitor_IsClassAttributor(spitOwner, view_as<int>(SI_Spitter)))
+        return spitOwner;
+
+    if ((Traitor_IsCommonInfectedEntity(attacker) || Traitor_IsCommonInfectedEntity(inflictor))
+        && victim >= 1
+        && victim <= MaxClients)
+    {
+        int bileOwner = g_ITBileOwner[victim];
+        if (Traitor_IsClassAttributor(bileOwner, view_as<int>(SI_Boomer)))
+            return bileOwner;
+    }
+
+    if (attacker < 1
+        || attacker > MaxClients
+        || !IsClientInGame(attacker)
+        || !IsFakeClient(attacker)
+        || !Traitor_IsTankRockEntity(inflictor))
+    {
+        return 0;
+    }
+
+    int owner = g_ITTankBotDamageOwner[attacker];
+    if (owner < 1
+        || owner > MaxClients
+        || GetGameTime() > g_ITTankBotDamageExpire[attacker]
+        || !Traitor_IsDamageLedgerActive(owner)
+        || g_ITDamageLedgerClass[owner] != TRAITOR_CLASS_TANK)
+    {
+        g_ITTankBotDamageOwner[attacker] = 0;
+        g_ITTankBotDamageExpire[attacker] = 0.0;
+        return 0;
+    }
+
+    return owner;
 }
 
 static bool Traitor_IsClassAttributor(int client, int zc)
@@ -116,17 +369,6 @@ static bool Traitor_IsClassAttributor(int client, int zc)
         return g_ITClass[client] == zc;
 
     return Traitor_IsDamageLedgerActive(client) && g_ITDamageLedgerClass[client] == zc;
-}
-
-static float Traitor_GetPostDeathDamageWindow(int zc)
-{
-    if (zc == view_as<int>(SI_Spitter))
-        return TRAITOR_POST_DEATH_DAMAGE_WINDOW;
-
-    if (zc == view_as<int>(SI_Boomer))
-        return 1.0;
-
-    return 0.5;
 }
 
 static int Traitor_GetMinimumIncapHealth()
@@ -163,7 +405,19 @@ static bool Traitor_OpenDamageLedger(int client)
 
     g_ITDamageLedgerActive[client] = true;
     g_ITDamageLedgerClass[client] = g_ITClass[client];
-    g_ITDamageLedgerExpire[client] = GetGameTime() + Traitor_GetPostDeathDamageWindow(g_ITClass[client]);
+    return true;
+}
+
+static bool Traitor_BeginDelayedFinalization(int client, float &delay)
+{
+    if (client < 1 || client > MaxClients || g_ITState[client] != Traitor_Alive)
+        return false;
+
+    delay = TRAITOR_DAMAGE_TAIL_SECONDS;
+    if (!Traitor_OpenDamageLedger(client))
+        return false;
+
+    g_ITDamagePenaltyPending[client] = true;
     return true;
 }
 
@@ -175,11 +429,13 @@ void Traitor_HookClientDamage(int client)
     if (g_ITState[client] == Traitor_None)
     {
         g_ITDamageLedgerActive[client] = false;
-        g_ITDamageLedgerExpire[client] = 0.0;
         g_ITDamageLedgerClass[client] = 0;
         g_ITDidDamage[client] = false;
         g_ITDamageTotal[client] = 0;
         g_ITDamageSummaryPending[client] = false;
+        g_ITDamagePenaltyPending[client] = false;
+        g_ITDamageFinalizeAfter[client] = 0.0;
+        Traitor_ClearDamageSourcesForOwner(client);
     }
 
     SDKHook(client, SDKHook_OnTakeDamage, Traitor_OnTakeDamage);
@@ -221,14 +477,28 @@ static void Traitor_FlushDamageSummary(int client)
     if (client < 1 || client > MaxClients || !g_ITDamageSummaryPending[client])
         return;
 
+    if (g_ITDamagePenaltyPending[client])
+        Traitor_ApplyDamagePenalty(client, g_ITDamageLedgerClass[client]);
+
     g_ITDamageSummaryPending[client] = false;
+    g_ITDamagePenaltyPending[client] = false;
     Traitor_AnnounceDamageSummary(client);
 
     g_ITDamageLedgerActive[client] = false;
-    g_ITDamageLedgerExpire[client] = 0.0;
     g_ITDamageLedgerClass[client] = 0;
+    g_ITDamageFinalizeAfter[client] = 0.0;
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
+    Traitor_ClearDamageSourcesForOwner(client);
+
+    for (int bot = 1; bot <= MaxClients; bot++)
+    {
+        if (g_ITTankBotDamageOwner[bot] != client)
+            continue;
+
+        g_ITTankBotDamageOwner[bot] = 0;
+        g_ITTankBotDamageExpire[bot] = 0.0;
+    }
 }
 
 static Action Timer_TraitorDamageSummary(Handle timer, int userid)
@@ -237,8 +507,12 @@ static Action Timer_TraitorDamageSummary(Handle timer, int userid)
     if (client < 1 || client > MaxClients || !g_ITDamageSummaryPending[client])
         return Plugin_Stop;
 
-    // The post-death attribution window is complete.  Do not let the next
-    // player who receives this client index inherit the old damage ledger.
+    if (Traitor_HasOutstandingDamageSource(client)
+        || GetGameTime() < g_ITDamageFinalizeAfter[client])
+    {
+        return Plugin_Continue;
+    }
+
     Traitor_FlushDamageSummary(client);
     Traitor_ActivateWaitingClients();
     return Plugin_Stop;
@@ -250,7 +524,12 @@ static void Traitor_QueueDamageSummary(int client, float delay)
         return;
 
     g_ITDamageSummaryPending[client] = true;
-    CreateTimer(delay + 0.1, Timer_TraitorDamageSummary, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+    g_ITDamageFinalizeAfter[client] = GetGameTime() + delay;
+    CreateTimer(
+        TRAITOR_DAMAGE_POLL_INTERVAL,
+        Timer_TraitorDamageSummary,
+        GetClientUserId(client),
+        TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 static bool Traitor_ShouldBlockTankFriendlyFire(int victim, int attacker)
@@ -275,15 +554,16 @@ public Action Traitor_OnTakeDamage(int victim, int &attacker, int &inflictor, fl
     g_ITPendingDamageAttacker[victim] = 0;
     g_ITSkipNextDamagePost[victim] = false;
 
-    if (damage <= 0.0 || attacker < 1 || attacker > MaxClients || !Traitor_IsDamageAttributor(attacker))
+    int recordedAttacker = Traitor_ResolveDamageAttacker(victim, attacker, inflictor);
+    if (damage <= 0.0 || recordedAttacker <= 0)
         return Plugin_Continue;
 
     if (Traitor_IsSurvivorIncapacitated(victim))
     {
         // A Tank traitor may beat down only the upper half of incap HP.  Hits
         // that stay above the line are applied, but are intentionally omitted
-        // from the Tank's 100-damage qualification total.
-        if (Traitor_IsAliveClient(attacker) && g_ITClass[attacker] == TRAITOR_CLASS_TANK)
+        // from the Tank's minimum-damage qualification total.
+        if (Traitor_IsAliveClient(recordedAttacker) && g_ITClass[recordedAttacker] == TRAITOR_CLASS_TANK)
         {
             if (Traitor_ShouldCancelTankIncapHit(victim, damage))
             {
@@ -297,7 +577,7 @@ public Action Traitor_OnTakeDamage(int victim, int &attacker, int &inflictor, fl
 
     // Keep the attacker from the pre-damage state.  The post hook then uses
     // the final damage value after every other damage modifier has run.
-    g_ITPendingDamageAttacker[victim] = attacker;
+    g_ITPendingDamageAttacker[victim] = recordedAttacker;
     return Plugin_Continue;
 }
 
@@ -329,9 +609,10 @@ public Action L4D_OnIncapacitated(int client, int &inflictor, int &attacker, flo
     g_ITPendingIncapAttacker[client] = 0;
     g_ITSkipNextDamagePost[client] = false;
 
-    if (damage > 0.0 && Traitor_IsDamageAttributor(attacker))
+    int recordedAttacker = Traitor_ResolveDamageAttacker(client, attacker, inflictor);
+    if (damage > 0.0 && recordedAttacker > 0)
     {
-        g_ITPendingIncapAttacker[client] = attacker;
+        g_ITPendingIncapAttacker[client] = recordedAttacker;
         g_ITSkipNextDamagePost[client] = true;
     }
 
@@ -368,23 +649,100 @@ public void L4D_OnVomitedUpon_Post(int victim, int attacker, bool boomerExplosio
         return;
     }
 
-    // Boomer bile has no player_hurt health event, but it is a successful
-    // versus attack and must prevent the no-damage traitor penalty.
+    // Common infected attacks against this survivor remain attributable to
+    // the Boomer until player_no_longer_it ends the bile effect.
+    Traitor_SetBileOwner(victim, attacker);
     g_ITDidDamage[attacker] = true;
 }
 
 public void L4D2_CInsectSwarm_CanHarm_Post(int acid, int spitter, int entity)
 {
-    if (!IsValidSurvivor(entity)
-        || !Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
+    int owner = Traitor_GetTrackedSpitOwner(acid);
+    if (owner <= 0 && Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
     {
-        return;
+        Traitor_RegisterSpitEntity(acid, spitter);
+        owner = spitter;
     }
+
+    if (!IsValidSurvivor(entity)
+        || !Traitor_IsClassAttributor(owner, view_as<int>(SI_Spitter)))
+        return;
 
     // The acid entity can continue ticking after its Spitter has died.  The
     // CanHarm forward preserves the original creator even when the later
     // SDK damage event no longer reports a live player as the attacker.
-    g_ITDidDamage[spitter] = true;
+    g_ITDidDamage[owner] = true;
+}
+
+public Action L4D2_OnSpitSpread(int spitter, int projectile, float &x, float &y, float &z)
+{
+    if (Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
+        Traitor_RegisterSpitEntity(projectile, spitter);
+
+    return Plugin_Continue;
+}
+
+static int Traitor_ReadSpitEntityOwner(int entity)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity) || !IsValidEntity(entity))
+        return 0;
+
+    int owner = 0;
+    if (HasEntProp(entity, Prop_Data, "m_hOwnerEntity"))
+        owner = GetEntPropEnt(entity, Prop_Data, "m_hOwnerEntity");
+    if ((owner < 1 || owner > MaxClients) && HasEntProp(entity, Prop_Send, "m_hThrower"))
+        owner = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
+    if ((owner < 1 || owner > MaxClients) && HasEntProp(entity, Prop_Data, "m_hThrower"))
+        owner = GetEntPropEnt(entity, Prop_Data, "m_hThrower");
+
+    return owner;
+}
+
+public void Traitor_OnSpitEntitySpawnPost(int entity)
+{
+    int owner = Traitor_ReadSpitEntityOwner(entity);
+    if (Traitor_IsClassAttributor(owner, view_as<int>(SI_Spitter)))
+        Traitor_RegisterSpitEntity(entity, owner);
+}
+
+void Traitor_OnEntityCreated(int entity, const char[] classname)
+{
+    if (!Traitor_IsTrackedEntityIndex(entity))
+        return;
+
+    if (StrEqual(classname, "spitter_projectile", false)
+        || StrEqual(classname, "insect_swarm", false))
+    {
+        SDKHook(entity, SDKHook_SpawnPost, Traitor_OnSpitEntitySpawnPost);
+    }
+}
+
+void Traitor_OnEntityDestroyed(int entity)
+{
+    Traitor_ClearSpitEntity(entity);
+}
+
+void Traitor_OnBileEffectEnded(int victim)
+{
+    Traitor_ClearBileVictim(victim);
+}
+
+void Traitor_OnBileVictimReplaced(int oldClient, int newClient)
+{
+    if (oldClient < 1 || oldClient > MaxClients || newClient < 1 || newClient > MaxClients)
+        return;
+
+    int owner = g_ITBileOwner[oldClient];
+    float fallbackExpire = g_ITBileFallbackExpire[oldClient];
+    Traitor_ClearBileVictim(oldClient, false);
+
+    if (owner <= 0)
+        return;
+
+    Traitor_ClearBileVictim(newClient, false);
+    g_ITBileOwner[newClient] = owner;
+    g_ITBileFallbackExpire[newClient] = fallbackExpire;
+    Traitor_TouchDamageTail(owner);
 }
 
 void Traitor_OnSurvivorIncapacitated(int client)
@@ -402,7 +760,10 @@ void Traitor_OnSurvivorRevived(int client)
 void Traitor_OnSurvivorDeath(int client)
 {
     if (client >= 1 && client <= MaxClients)
+    {
         g_ITSurvivorIncapped[client] = false;
+        Traitor_ClearBileVictim(client);
+    }
 }
 
 static void Traitor_ResetSurvivorDamageState()
@@ -411,6 +772,7 @@ static void Traitor_ResetSurvivorDamageState()
     {
         g_ITPendingDamageAttacker[client] = 0;
         g_ITSurvivorIncapped[client] = false;
+        Traitor_ClearBileVictim(client, false);
     }
 }
 
@@ -469,7 +831,8 @@ bool Traitor_IsAliveClient(int client)
         && g_ITState[client] == Traitor_Alive
         && IsPlayerAlive(client)
         && !IsGhost(client)
-        && Traitor_IsSupportedClass(g_ITClass[client]);
+        && Traitor_IsSupportedClass(g_ITClass[client])
+        && GetEntProp(client, Prop_Send, "m_zombieClass") == g_ITClass[client];
 }
 
 bool IsCountedSpecial(int client)
@@ -1087,15 +1450,15 @@ static bool Traitor_CheckQueuedEligibility(int client, int zc)
     return TraitorQuota_CanUse(client, Traitor_GetClassCost(zc));
 }
 
-static void Traitor_FinalizeAliveClient(int client)
+static void Traitor_ApplyDamagePenalty(int client, int zc)
 {
-    if (client < 1 || client > MaxClients || g_ITState[client] != Traitor_Alive)
+    if (client < 1 || client > MaxClients || !Traitor_IsSupportedClass(zc))
         return;
 
     if (Traitor_IsSurvivorTeamWiped())
         return;
 
-    if (g_ITClass[client] != TRAITOR_CLASS_TANK)
+    if (zc != TRAITOR_CLASS_TANK)
     {
         if (!g_ITDidDamage[client])
         {
@@ -1121,22 +1484,37 @@ static void Traitor_FinalizeAliveClient(int client)
     }
 }
 
+static void Traitor_FinalizeAliveClient(int client)
+{
+    if (client < 1 || client > MaxClients || g_ITState[client] != Traitor_Alive)
+        return;
+
+    Traitor_ApplyDamagePenalty(client, g_ITClass[client]);
+}
+
 void Traitor_OnRoundEnd()
 {
     if (Traitor_IsSurvivorTeamWiped())
     {
         Traitor_ClearNoDamageWaveBlocks();
+        for (int client = 1; client <= MaxClients; client++)
+            Traitor_FlushDamageSummary(client);
         return;
     }
 
     for (int client = 1; client <= MaxClients; client++)
+    {
         Traitor_FinalizeAliveClient(client);
+        Traitor_FlushDamageSummary(client);
+    }
 }
 
 static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
 {
     if (client < 1 || client > MaxClients)
         return;
+
+    preserveDamageLedger = preserveDamageLedger || g_ITDamageSummaryPending[client];
 
     g_ITState[client] = Traitor_None;
     g_ITClass[client] = 0;
@@ -1149,8 +1527,10 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
         g_ITDidDamage[client] = false;
         g_ITDamageTotal[client] = 0;
         g_ITDamageLedgerActive[client] = false;
-        g_ITDamageLedgerExpire[client] = 0.0;
         g_ITDamageLedgerClass[client] = 0;
+        g_ITDamagePenaltyPending[client] = false;
+        g_ITDamageFinalizeAfter[client] = 0.0;
+        Traitor_ClearDamageSourcesForOwner(client);
     }
     g_ITRefreshPending[client] = false;
     g_ITRefreshClass[client] = 0;
@@ -1217,9 +1597,17 @@ void Traitor_ResetAll(bool moveClientsToSpec)
         if (!preserveDamageSummary)
         {
             g_ITDamageLedgerActive[client] = false;
-            g_ITDamageLedgerExpire[client] = 0.0;
             g_ITDamageLedgerClass[client] = 0;
         }
+        g_ITTankBotDamageOwner[client] = 0;
+        g_ITTankBotDamageExpire[client] = 0.0;
+        g_ITBileOwner[client] = 0;
+        g_ITBileFallbackExpire[client] = 0.0;
+    }
+    for (int entity = 0; entity < TRAITOR_ENTITY_SLOTS; entity++)
+    {
+        g_ITSpitEntityOwner[entity] = 0;
+        g_ITSpitEntityRef[entity] = 0;
     }
     g_ITNextWaitOrder = 1;
     g_ITNextRegistrationOrder = 1;
@@ -1274,6 +1662,93 @@ static bool Traitor_PrepareGhostClient(int client, int zc)
     }
 
     return IsGhost(client) && GetEntProp(client, Prop_Send, "m_zombieClass") == zc;
+}
+
+static float Traitor_GetTankFrustrationSpawnDelay()
+{
+    if (g_ITTankFrustrationSpawnDelay == null)
+        g_ITTankFrustrationSpawnDelay = FindConVar("z_frustration_spawn_delay");
+
+    float delay = (g_ITTankFrustrationSpawnDelay != null)
+        ? g_ITTankFrustrationSpawnDelay.FloatValue
+        : 30.0;
+    return (delay > 0.0) ? delay : 0.0;
+}
+
+static CountdownTimer Traitor_GetTankFrustrationTimer(int client)
+{
+    static int offset = -1;
+    if (offset == -1)
+        offset = FindSendPropInfo("CTerrorPlayer", "m_frustration") + 4;
+
+    if (offset < 4 || !IsValidClient(client))
+        return CTimer_Null;
+
+    Address address = GetEntityAddress(client);
+    if (address == Address_Null)
+        return CTimer_Null;
+
+    return view_as<CountdownTimer>(address + view_as<Address>(offset));
+}
+
+static void Traitor_SetTankFrustrationFull(int client)
+{
+    if (IsValidClient(client))
+        SetEntProp(client, Prop_Send, "m_frustration", 0);
+}
+
+static void Traitor_InitializeTankControl(int client)
+{
+    Traitor_SetTankFrustrationFull(client);
+
+    CountdownTimer timer = Traitor_GetTankFrustrationTimer(client);
+    if (timer != CTimer_Null)
+        CTimer_Start(timer, Traitor_GetTankFrustrationSpawnDelay());
+
+    L4D2Direct_SetTankPassedCount(1);
+    Debug_Print("[TRAITOR] initialized Tank control for %N pass=1 rage=100 grace=%.1f",
+        client,
+        Traitor_GetTankFrustrationSpawnDelay());
+}
+
+static TraitorTankOfferResult Traitor_HandleTankOffer(int client)
+{
+    if (!Traitor_IsActiveTankClient(client))
+        return TraitorTankOffer_NotTraitor;
+
+    int passCount = L4D2Direct_GetTankPassedCount();
+    int frustration = GetEntProp(client, Prop_Send, "m_frustration");
+
+    // TryOfferingTankBot is also called by the initial Director lottery.  An
+    // offer with rage remaining is not a real control exhaustion and must not
+    // consume either pass.
+    if (frustration < 100)
+    {
+        if (passCount <= 1)
+            L4D2Direct_SetTankPassedCount(1);
+
+        Debug_Print("[TRAITOR] ignored Tank offer with rage remaining for %N pass=%d rage=%d",
+            client,
+            passCount,
+            100 - frustration);
+        return TraitorTankOffer_KeepCurrentControl;
+    }
+
+    if (passCount <= 1)
+    {
+        Traitor_SetTankFrustrationFull(client);
+        L4D2Direct_SetTankPassedCount(2);
+        Debug_Print("[TRAITOR] granted second Tank control to %N", client);
+        return TraitorTankOffer_GrantSecondControl;
+    }
+
+    Debug_Print("[TRAITOR] Tank %N exhausted second control; allowing AI takeover", client);
+    return TraitorTankOffer_ReleaseToAI;
+}
+
+public any Native_InfectedControlHandleTraitorTankOffer(Handle plugin, int numParams)
+{
+    return view_as<any>(Traitor_HandleTankOffer(GetNativeCell(1)));
 }
 
 static bool Traitor_PrepareTankController(int client)
@@ -1462,18 +1937,14 @@ static bool Traitor_TryTakeOverTank(int client, int tank)
         return false;
     }
 
-    // A direct bot takeover bypasses the normal Tank offering path. Mark it
-    // as the first pass so Tank Control can grant exactly one second control.
-    L4D2Direct_SetTankPassedCount(1);
-
     g_ITState[client] = Traitor_Alive;
     g_ITClass[client] = TRAITOR_CLASS_TANK;
     g_ITDamageLedgerActive[client] = true;
-    g_ITDamageLedgerExpire[client] = 0.0;
     g_ITDamageLedgerClass[client] = TRAITOR_CLASS_TANK;
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
     Traitor_CancelSpawnTimer(client);
+    Traitor_InitializeTankControl(client);
 
     char className[64];
     Traitor_FormatClassName(TRAITOR_CLASS_TANK, client, className, sizeof(className));
@@ -1570,15 +2041,6 @@ static bool Traitor_ShouldReplaceTankWithAI(int client)
         && Traitor_IsAliveClient(client);
 }
 
-static void Traitor_ReplaceTankWithAI(int client)
-{
-    if (!Traitor_ShouldReplaceTankWithAI(client))
-        return;
-
-    Debug_Print("[TRAITOR] %N disconnected while controlling Tank, handing Tank to AI", client);
-    L4D_ReplaceWithBot(client);
-}
-
 static bool Traitor_QueueRefreshBot(int bot, int zc)
 {
     if (!IsInfectedBot(bot) || !IsPlayerAlive(bot) || GetInfectedClass(bot) != zc)
@@ -1602,15 +2064,67 @@ static bool Traitor_QueueRefreshBot(int bot, int zc)
 
 void Traitor_OnPlayerBotReplace(int player, int bot)
 {
-    if (player < 1 || player > MaxClients || !g_ITRefreshPending[player])
+    if (player < 1 || player > MaxClients)
         return;
 
-    int zc = g_ITRefreshClass[player];
-    if (Traitor_QueueRefreshBot(bot, zc))
+    if (g_ITRefreshPending[player])
     {
-        g_ITRefreshPending[player] = false;
-        g_ITRefreshClass[player] = 0;
+        int zc = g_ITRefreshClass[player];
+        if (Traitor_QueueRefreshBot(bot, zc))
+        {
+            g_ITRefreshPending[player] = false;
+            g_ITRefreshClass[player] = 0;
+        }
+        return;
     }
+
+    bool isTankBot = IsValidClient(bot)
+        && IsFakeClient(bot)
+        && GetClientTeam(bot) == TEAM_INFECTED
+        && GetEntProp(bot, Prop_Send, "m_zombieClass") == TRAITOR_CLASS_TANK;
+
+    if (g_ITDamageSummaryPending[player] && g_ITDamageLedgerClass[player] == TRAITOR_CLASS_TANK)
+    {
+        if (isTankBot)
+        {
+            Traitor_TouchDamageTail(player);
+            g_ITTankBotDamageOwner[bot] = player;
+            g_ITTankBotDamageExpire[bot] = g_ITDamageFinalizeAfter[player];
+        }
+        return;
+    }
+
+    if (g_ITState[player] != Traitor_Alive || g_ITClass[player] != TRAITOR_CLASS_TANK)
+    {
+        return;
+    }
+
+    int deferredClass = g_ITDeferredClass[player];
+    int deferredRegistrationOrder = g_ITDeferredRegistrationOrder[player];
+    int deferredWaitOrder = g_ITDeferredWaitOrder[player];
+    float summaryDelay = 0.0;
+    bool preserveDamageLedger = Traitor_BeginDelayedFinalization(player, summaryDelay);
+    if (!preserveDamageLedger)
+        Traitor_FinalizeAliveClient(player);
+    else if (isTankBot)
+    {
+        g_ITTankBotDamageOwner[bot] = player;
+        g_ITTankBotDamageExpire[bot] = GetGameTime() + summaryDelay;
+    }
+
+    Traitor_ClearClient(player, preserveDamageLedger);
+    if (preserveDamageLedger)
+        Traitor_QueueDamageSummary(player, summaryDelay);
+    if (deferredClass > 0)
+        Traitor_RestoreNextRegistration(player, deferredClass, deferredRegistrationOrder, deferredWaitOrder);
+
+    if (IsValidClient(player) && GetClientTeam(player) == TEAM_INFECTED)
+        ChangeClientTeam(player, TEAM_SPECTATOR);
+
+    Debug_Print("[TRAITOR] Tank control passed from %N to AI bot %d; finalization delayed %.1fs", player, bot, summaryDelay);
+    InvalidateBucketShareCache();
+    RecalcSiCapFromAlive(false);
+    Traitor_ActivateWaitingClients();
 }
 
 static Action Timer_TraitorRefreshFallback(Handle timer, int userid)
@@ -1723,9 +2237,6 @@ static bool Traitor_QueueClient(int client, int zc)
     if (!Traitor_RequireRegistrationTeam(client))
         return false;
 
-    if (g_ITState[client] == Traitor_None && g_ITDamageSummaryPending[client])
-        Traitor_FlushDamageSummary(client);
-
     if (!gCV.bTraitorEnable)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorDisabled");
@@ -1759,11 +2270,12 @@ static bool Traitor_QueueClient(int client, int zc)
     if (!Traitor_CheckUseLimit(client, zc))
         return false;
 
-    bool hasSlot = (zc == TRAITOR_CLASS_TANK)
-        ? Traitor_CanPromoteClass(client, zc)
-        : (Traitor_IsArmingWindowOpen()
-            && Traitor_IsNormalClientReadyForSlot(client)
-            && Traitor_CanPromoteClass(client, zc));
+    bool hasSlot = !g_ITDamageSummaryPending[client]
+        && ((zc == TRAITOR_CLASS_TANK)
+            ? Traitor_CanPromoteClass(client, zc)
+            : (Traitor_IsArmingWindowOpen()
+                && Traitor_IsNormalClientReadyForSlot(client)
+                && Traitor_CanPromoteClass(client, zc)));
 
     g_ITState[client] = hasSlot ? Traitor_Armed : Traitor_Waiting;
     g_ITClass[client] = zc;
@@ -2267,7 +2779,6 @@ public void L4D_OnMaterializeFromGhost(int client)
     g_ITState[client] = Traitor_Alive;
     g_ITClass[client] = zc;
     g_ITDamageLedgerActive[client] = true;
-    g_ITDamageLedgerExpire[client] = 0.0;
     g_ITDamageLedgerClass[client] = zc;
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
@@ -2300,14 +2811,15 @@ bool Traitor_OnPlayerDeath(int client)
     }
 
     bool wasAlive = (g_ITState[client] == Traitor_Alive);
-    float summaryDelay = wasAlive ? Traitor_GetPostDeathDamageWindow(g_ITClass[client]) : 0.0;
+    float summaryDelay = 0.0;
     int deferredClass = g_ITDeferredClass[client];
     int deferredRegistrationOrder = g_ITDeferredRegistrationOrder[client];
     int deferredWaitOrder = g_ITDeferredWaitOrder[client];
-    Traitor_FinalizeAliveClient(client);
-    bool preserveDamageLedger = Traitor_OpenDamageLedger(client);
+    bool preserveDamageLedger = wasAlive && Traitor_BeginDelayedFinalization(client, summaryDelay);
+    if (wasAlive && !preserveDamageLedger)
+        Traitor_FinalizeAliveClient(client);
     Traitor_ClearClient(client, preserveDamageLedger);
-    if (wasAlive)
+    if (preserveDamageLedger)
         Traitor_QueueDamageSummary(client, summaryDelay);
     if (deferredClass > 0)
         Traitor_RestoreNextRegistration(client, deferredClass, deferredRegistrationOrder, deferredWaitOrder);
@@ -2324,15 +2836,23 @@ void Traitor_OnClientDisconnect(int client)
     if (client < 1 || client > MaxClients)
         return;
 
+    Traitor_ClearBileVictim(client);
+    Traitor_ClearDamageSourcesForOwner(client);
+    Traitor_FlushDamageSummary(client);
+
     if (g_ITState[client] == Traitor_None)
         return;
 
     bool wasAlive = (client >= 1 && client <= MaxClients && g_ITState[client] == Traitor_Alive);
+    bool replaceTank = Traitor_ShouldReplaceTankWithAI(client);
 
-    Traitor_ReplaceTankWithAI(client);
     Traitor_FinalizeAliveClient(client);
-    bool preserveDamageLedger = Traitor_OpenDamageLedger(client);
-    Traitor_ClearClient(client, preserveDamageLedger);
+    Traitor_ClearClient(client);
+    if (replaceTank)
+    {
+        Debug_Print("[TRAITOR] %N disconnected while controlling Tank, handing Tank to AI", client);
+        L4D_ReplaceWithBot(client);
+    }
     if (client >= 1 && client <= MaxClients)
     {
         g_ITUsesThisRound[client] = 0;
@@ -2345,6 +2865,9 @@ void Traitor_OnClientDisconnect(int client)
 
 void Traitor_OnClientTeamChanged(int client, int oldTeam, int newTeam)
 {
+    if (oldTeam == TEAM_SURVIVOR && newTeam != TEAM_SURVIVOR)
+        Traitor_ClearBileVictim(client);
+
     if (!Traitor_IsManagedClient(client))
         return;
 
@@ -2373,17 +2896,18 @@ void Traitor_OnClientTeamChanged(int client, int oldTeam, int newTeam)
         return;
 
     bool wasAlive = (g_ITState[client] == Traitor_Alive);
-    float summaryDelay = wasAlive ? Traitor_GetPostDeathDamageWindow(g_ITClass[client]) : 0.0;
+    float summaryDelay = 0.0;
     int deferredClass = g_ITDeferredClass[client];
     int deferredRegistrationOrder = g_ITDeferredRegistrationOrder[client];
     int deferredWaitOrder = g_ITDeferredWaitOrder[client];
     bool returnAiSlot = g_ITState[client] == Traitor_SpawnAllowed && g_ITClass[client] != TRAITOR_CLASS_TANK;
-    Traitor_FinalizeAliveClient(client);
-    bool preserveDamageLedger = Traitor_OpenDamageLedger(client);
+    bool preserveDamageLedger = wasAlive && Traitor_BeginDelayedFinalization(client, summaryDelay);
+    if (wasAlive && !preserveDamageLedger)
+        Traitor_FinalizeAliveClient(client);
     if (returnAiSlot)
         Traitor_ReplaceExpiredSlotWithAI(client);
     Traitor_ClearClient(client, preserveDamageLedger);
-    if (wasAlive)
+    if (preserveDamageLedger)
         Traitor_QueueDamageSummary(client, summaryDelay);
     if (newTeam == TEAM_SPECTATOR && deferredClass > 0)
         Traitor_RestoreNextRegistration(client, deferredClass, deferredRegistrationOrder, deferredWaitOrder);
