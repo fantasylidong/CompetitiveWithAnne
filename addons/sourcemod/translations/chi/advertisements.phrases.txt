@@ -72,6 +72,10 @@
 	{
 		"chi"		"{green}安全门内没有医疗包。{lightgreen}过关后离开安全门时会发放一个医疗包。"
 	}
+	"Advertisement_LobbyUnreserve"
+	{
+		"chi"		"{lightgreen}如果有超过 {green}4 名玩家{lightgreen}想加入游戏，那么请在 {green}!vote{lightgreen} 菜单中投票删除大厅。"
+	}
 	"Advertisement_PendingVote"
 	{
 		"chi"		"等待投票"

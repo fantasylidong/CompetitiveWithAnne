@@ -66,4 +66,10 @@
 		"phrase"	"Advertisement_PlayerVotes"
 		"text"		"{GREEN}!votekick{LIGHTGREEN} 投票踢出不m闲置玩家{GREEN}[仅玩家参与投票]{LIGHTGREEN} \n{GREEN}!voteban{LIGHTGREEN} 投票封禁开挂/嘴臭玩家{GREEN}[所有人参与投票]{LIGHTGREEN}"
 	}
+	"12"
+	{
+		"type"		"S"
+		"phrase"	"Advertisement_LobbyUnreserve"
+		"text"		"{LIGHTGREEN}如果有超过 {GREEN}4 名玩家{LIGHTGREEN}想加入游戏，那么请在 {GREEN}!vote{LIGHTGREEN} 菜单中投票删除大厅。"
+	}
 }

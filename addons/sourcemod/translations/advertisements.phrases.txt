@@ -72,6 +72,10 @@
 	{
 		"en"		"{green}There are no first aid kits in the saferoom.{lightgreen} You will receive one after leaving the saferoom at the start of the next chapter."
 	}
+	"Advertisement_LobbyUnreserve"
+	{
+		"en"		"{lightgreen}If more than {green}4 players{lightgreen} want to join the game, use the {green}!vote{lightgreen} menu to vote to remove the lobby reservation."
+	}
 	"Advertisement_PendingVote"
 	{
 		"en"		"Pending vote"

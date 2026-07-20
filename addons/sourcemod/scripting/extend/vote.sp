@@ -12,6 +12,9 @@
 
 #define VOTE_DEFAULT_CONFIG "configs/cfgs.txt"
 #define VOTE_MENU_NAME_LENGTH 128
+#define VOTE_LOBBY_UNRESERVE_COMMAND "sm_lobby_unreserve"
+#define VOTE_LOBBY_UNRESERVE_MESSAGE "删除大厅，允许更多玩家进入"
+#define LOBBY_UNRESERVE_TYPE_AUTOMATIC 1
 
 bool g_bSourceBansSystemAvailable = false, g_bl4dstatsSystemAvailable = false;
 public void OnAllPluginsLoaded(){
@@ -36,7 +39,7 @@ public Plugin myinfo =
 	name = "Vote for run command or cfg file",
 	description = "使用!vote投票执行命令或cfg文件",
 	author = "东",
-	version = "1.4",
+	version = "1.5",
 	url = "https://github.com/fantasylidong/"
 };
 /*
@@ -214,6 +217,10 @@ void DisplayBuiltinVoteMenu(int client)
 			AddMenuItem(hMenu, sBuffer, sBuffer, ITEMDRAW_DEFAULT);
 		} while (KvGotoNextKey(g_hCfgsKV, true));
 	}
+	if (ShouldOfferLobbyUnreserveVote())
+	{
+		AddMenuItem(hMenu, VOTE_LOBBY_UNRESERVE_COMMAND, VOTE_LOBBY_UNRESERVE_MESSAGE, ITEMDRAW_DEFAULT);
+	}
 	DisplayMenu(hMenu, client, 20);
 }
 
@@ -282,11 +289,23 @@ public int ConfigsMenuHandler(Handle menu, MenuAction action, int param1, int pa
 
 void HandleVoteCategorySelected(int client, const char[] category)
 {
+	if (StrEqual(category, VOTE_LOBBY_UNRESERVE_COMMAND, false))
+	{
+		HandleVoteCommandSelected(client, VOTE_LOBBY_UNRESERVE_COMMAND, VOTE_LOBBY_UNRESERVE_MESSAGE);
+		return;
+	}
+
 	if (!DisplayBuiltinVoteCommandMenu(client, category))
 	{
 		CPrintToChat(client, "%t", "Vote_NoRelatedFilesExist");
 		ShowVoteMenu(client);
 	}
+}
+
+bool ShouldOfferLobbyUnreserveVote()
+{
+	ConVar unreserveType = FindConVar("l4d2_lmm_unreserve_type");
+	return unreserveType != null && unreserveType.IntValue != LOBBY_UNRESERVE_TYPE_AUTOMATIC;
 }
 
 void HandleVoteCommandSelected(int client, const char[] command, const char[] message)

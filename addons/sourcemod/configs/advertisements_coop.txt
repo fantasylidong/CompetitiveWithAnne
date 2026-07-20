@@ -60,4 +60,10 @@
 		"phrase"	"Advertisement_CoopMedkit"
 		"text"		"{GREEN}安全门内{LIGHTGREEN}没有理疗包，过关后出门会发一个医疗包{GREEN}"
 	}
+	"12"
+	{
+		"type"		"S"
+		"phrase"	"Advertisement_LobbyUnreserve"
+		"text"		"{LIGHTGREEN}如果有超过 {GREEN}4 名玩家{LIGHTGREEN}想加入游戏，那么请在 {GREEN}!vote{LIGHTGREEN} 菜单中投票删除大厅。"
+	}
 }

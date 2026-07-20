@@ -72,6 +72,10 @@
 	{
 		"ko"		"{green}안전실 안에는 구급상자가 없습니다.{lightgreen} 다음 챕터 시작 시 안전실을 나가면 하나가 지급됩니다."
 	}
+	"Advertisement_LobbyUnreserve"
+	{
+		"ko"		"{lightgreen}4명이 넘는 플레이어가 게임에 참가하려면 {green}!vote{lightgreen} 메뉴에서 로비 예약 삭제 투표를 진행하세요."
+	}
 	"Advertisement_PendingVote"
 	{
 		"ko"		"투표 대기 중"

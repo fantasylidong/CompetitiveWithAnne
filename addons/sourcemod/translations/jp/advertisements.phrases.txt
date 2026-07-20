@@ -72,6 +72,10 @@
 	{
 		"jp"		"{green}セーフルーム内に救急キットはありません。{lightgreen}次のチャプター開始時にセーフルームを出ると 1 個支給されます。"
 	}
+	"Advertisement_LobbyUnreserve"
+	{
+		"jp"		"{lightgreen}4 人を超えるプレイヤーがゲームに参加する場合は、{green}!vote{lightgreen} メニューからロビー予約の解除に投票してください。"
+	}
 	"Advertisement_PendingVote"
 	{
 		"jp"		"投票待ち"

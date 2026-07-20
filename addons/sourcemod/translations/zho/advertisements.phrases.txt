@@ -72,6 +72,10 @@
 	{
 		"zho"		"{green}安全室內沒有醫療包。{lightgreen}過關後離開安全室時會發放一個醫療包。"
 	}
+	"Advertisement_LobbyUnreserve"
+	{
+		"zho"		"{lightgreen}如果有超過 {green}4 名玩家{lightgreen}想加入遊戲，請在 {green}!vote{lightgreen} 選單中投票移除大廳預約。"
+	}
 	"Advertisement_PendingVote"
 	{
 		"zho"		"等待投票"

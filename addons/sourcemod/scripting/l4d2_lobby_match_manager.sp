@@ -14,7 +14,7 @@
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
 #include <l4d2_lobby_match_manager_policy>
 
-#define VERSION "0.8"
+#define VERSION "0.9"
 
 #define RMFLAG_NO_MODE_CHANGE			1
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
@@ -75,7 +75,7 @@ public void OnPluginStart()
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
 
 	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"3",	"0=Keep reservation, 1=Unreserve when no active reservation or when active reservation is full, 2=Unreserve when lobby full, 3=Default/no mode: clear stale reservation while empty, but keep player-created lobby matchmaking.");
+	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"0=Keep reservation, 1=Unreserve when no active reservation or when active reservation is full, 2=Unreserve when lobby full, 3=Clear stale reservation while empty, but keep player-created lobby matchmaking.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	
 	mp_gamemode.AddChangeHook(OnConVarChanged);
@@ -85,6 +85,7 @@ public void OnPluginStart()
 
 	RegAdminCmd("sm_lobby_status", Cmd_Status, ADMFLAG_ROOT);
 	RegAdminCmd("sm_lobby_set", Cmd_Set, ADMFLAG_ROOT);
+	RegServerCmd("sm_lobby_unreserve", Cmd_Unreserve, "Remove the lobby reservation so more players can join.");
 }
 
 public void OnAllPluginsLoaded()
@@ -283,6 +284,17 @@ Action Cmd_Status(int client, int args)
 		FormatEx(sCookie, sizeof(sCookie), "%x", iCookie[0]);
 
 	ReplyToCommand(client, "g_iUnreserveType = %i, iPlayers = %i, iMaxLobbySlots = %i, sv_allow_lobby_connect_only = %i, sCookie = %s", g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), sv_allow_lobby_connect_only.IntValue, sCookie);
+	return Plugin_Handled;
+}
+
+Action Cmd_Unreserve(int args)
+{
+	if (!g_bDependenciesReady)
+		return Plugin_Handled;
+
+	SetReservationCookie(false);
+	sv_allow_lobby_connect_only.BoolValue = false;
+	RefreshReserveBlockPatch();
 	return Plugin_Handled;
 }
 
