@@ -39,10 +39,41 @@ bool:ConnectDB()
 		return false;
 	}
 
+	g_bPlayerServerNameColumnReady = EnsurePlayerServerNameColumn();
 	g_bQuarterRankTableReady = false;
 	QuarterRank_EnsureCurrentQuarter();
 
 	// 大部分表结构由外部 SQL 管理；季度表保留一次兼容迁移，避免旧主键继续覆盖历史季度。
+	return true;
+}
+
+bool:EnsurePlayerServerNameColumn()
+{
+	decl String:query[512], String:Error[256];
+	Format(query, sizeof(query), "SHOW COLUMNS FROM `%splayers` LIKE 'lastservername'", DbPrefix);
+
+	new Handle:hndl = SQL_Query(db, query);
+	if (hndl == INVALID_HANDLE)
+	{
+		SQL_GetError(db, Error, sizeof(Error));
+		LogError("EnsurePlayerServerNameColumn failed to inspect players table: %s", Error);
+		return false;
+	}
+
+	new bool:Exists = SQL_GetRowCount(hndl) > 0;
+	CloseHandle(hndl);
+	if (Exists)
+		return true;
+
+	Format(query, sizeof(query), "ALTER TABLE `%splayers` ADD COLUMN `lastservername` VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' AFTER `ip`", DbPrefix);
+	if (!SQL_FastQuery(db, query))
+	{
+		SQL_GetError(db, Error, sizeof(Error));
+		LogError("EnsurePlayerServerNameColumn failed to add lastservername: %s", Error);
+		return false;
+	}
+
+	LogMessage("[l4d_stats] players.lastservername column created.");
 	return true;
 }
 
@@ -1148,7 +1179,20 @@ public UpdatePlayerFull(Client, const String:SteamID[], const String:Name[])
 	decl String:IP[16];
 	GetClientIP(Client, IP, sizeof(IP));
 
-	decl String:query[512];	
+	decl String:Hostname[128];
+	decl String:EscHostname[257];
+	if (cvar_Hostname != INVALID_HANDLE)
+		GetConVarString(cvar_Hostname, Hostname, sizeof(Hostname));
+	else
+		Hostname[0] = '\0';
+	SQL_EscapeString(db, Hostname, EscHostname, sizeof(EscHostname));
+	decl String:ServerNameSet[320];
+	if (g_bPlayerServerNameColumnReady)
+		Format(ServerNameSet, sizeof(ServerNameSet), ", lastservername = '%s'", EscHostname);
+	else
+		ServerNameSet[0] = '\0';
+
+	decl String:query[1024];
 	//方便网页显示具体游玩模式
 	int mode = 0;
 	if(IsAnne() == 1)
@@ -1177,9 +1221,9 @@ public UpdatePlayerFull(Client, const String:SteamID[], const String:Name[])
 	new bool:CountPlaytime = Stats_ShouldCountClientPlaytime(Client);
 	//旁观者更新时间戳，但是不增加游戏时间，这样来方便统计在线人数
 	if(!CountPlaytime || !ModeStats_IsRankedMode())
-		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s' WHERE steamid = '%s'", DbPrefix, mode, CurrentGamemodeID, Name, IP, SteamID);
+		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s'%s WHERE steamid = '%s'", DbPrefix, mode, CurrentGamemodeID, Name, IP, ServerNameSet, SteamID);
 	else
-		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), %s = %s + 1, lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s' WHERE steamid = '%s'", DbPrefix, Playtime, Playtime, mode, CurrentGamemodeID, Name, IP, SteamID);
+		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), %s = %s + 1, lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s'%s WHERE steamid = '%s'", DbPrefix, Playtime, Playtime, mode, CurrentGamemodeID, Name, IP, ServerNameSet, SteamID);
 
 	SQL_TQuery(db, UpdatePlayerCallback, query, Client);
 	if (CountPlaytime)

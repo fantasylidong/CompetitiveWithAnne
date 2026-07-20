@@ -49,6 +49,7 @@ public OnPluginStart()
 	cvar_Difficulty = FindConVar("z_difficulty");
 	cvar_Gamemode = FindConVar("mp_gamemode");
 	cvar_Cheats = FindConVar("sv_cheats");
+	cvar_Hostname = FindConVar("hostname");
 	if(FindConVar("l4d_ready_cfg_name"))
 		cvar_mode = FindConVar("l4d_ready_cfg_name");
 	cvar_Lan = FindConVar("sv_lan");

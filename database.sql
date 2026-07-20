@@ -402,6 +402,7 @@ CREATE TABLE `players` (
   `lastgamemode` int(1) NOT NULL DEFAULT '0',
   `lastannemode` int(1) NOT NULL DEFAULT '0',
   `ip` varchar(16) CHARACTER SET utf8mb4 NOT NULL DEFAULT '0.0.0.0',
+  `lastservername` varchar(128) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
   `playtime` int(11) NOT NULL DEFAULT '0' COMMENT 'Playtime in Coop',
   `playtime_versus` int(11) NOT NULL DEFAULT '0' COMMENT 'Playtime in Versus',
   `playtime_realism` int(11) NOT NULL DEFAULT '0' COMMENT 'Playtime in Realism',

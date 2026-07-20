@@ -44,6 +44,7 @@ EngineVersion EngineVersion1 =  Engine_Left4Dead;
 // Database handle
 new Handle:db = INVALID_HANDLE;
 new String:DbPrefix[MAX_LINE_WIDTH] = "";
+new bool:g_bPlayerServerNameColumnReady = false;
 
 // Update Timer handle
 new Handle:UpdateTimer = INVALID_HANDLE;
@@ -59,6 +60,7 @@ ConVar cvar_mode;
 new Handle:cvar_Difficulty = INVALID_HANDLE;
 new Handle:cvar_Gamemode = INVALID_HANDLE;
 new Handle:cvar_Cheats = INVALID_HANDLE;
+new Handle:cvar_Hostname = INVALID_HANDLE;
 
 new Handle:cvar_SurvivorLimit = INVALID_HANDLE;
 new Handle:cvar_InfectedLimit = INVALID_HANDLE;
