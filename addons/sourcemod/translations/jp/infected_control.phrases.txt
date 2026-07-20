@@ -40,6 +40,14 @@
 	{
 		"jp"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"jp"		"{green}[IC]{default} このラウンドで {olive}%s{default} を使用できる上限（%d 回）に達しました。"
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"jp"		"{green}[IC]{default} 管理者は {olive}%s{default} を連続してプレイできません。別の特殊感染者を選んでください。"
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"jp"		"{green}[IC]{default} Traitor quota database is unavailable."

@@ -40,6 +40,14 @@
 	{
 		"en"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"en"		"{green}[IC]{default} You have reached this round's limit for {olive}%s{default} (%d)."
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"en"		"{green}[IC]{default} Admins cannot play {olive}%s{default} in consecutive traitor lives. Choose another class."
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"en"		"{green}[IC]{default} Traitor quota database is unavailable."

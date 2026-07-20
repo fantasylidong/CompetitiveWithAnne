@@ -148,6 +148,16 @@ public Action L4D_OnTryOfferingTankBot(int tank_index, bool &enterStatis)
         return Plugin_Handled;
     }
 
+    if (HasPendingTraitorTank())
+    {
+        queuedTankSteamId = "";
+        tankInitiallyChosen = "";
+        setTankTickets("", 0);
+        if (hTankDebug.BoolValue)
+            PrintToConsoleAll("[TC] pending traitor Tank takeover; keeping spawned Tank under AI control");
+        return Plugin_Handled;
+    }
+
     // Allow third party plugins to override tank selection
     char sOverrideTank[64];
     sOverrideTank[0] = '\0';
@@ -157,10 +167,17 @@ public Action L4D_OnTryOfferingTankBot(int tank_index, bool &enterStatis)
 
     if (!StrEqual(sOverrideTank, ""))
         strcopy(queuedTankSteamId, sizeof(queuedTankSteamId), sOverrideTank);
-    
-    // If we don't have a queued tank, choose one
-    if (strcmp(queuedTankSteamId, "") == 0)
-        chooseTank(0);
+
+    // The player may have registered for traitor mode after the saferoom
+    // lottery. Revalidate at the actual Tank offer so stale tickets cannot
+    // turn a queued traitor into the engine-selected Tank.
+    if (!EnsureEligibleTankSelection())
+    {
+        setTankTickets("", 0);
+        if (hTankDebug.BoolValue)
+            PrintToConsoleAll("[TC] no eligible non-traitor Tank candidate; keeping Tank under AI control");
+        return Plugin_Handled;
+    }
     
     // Mark the player as having had tank
     if (strcmp(queuedTankSteamId, "") != 0)
@@ -463,12 +480,60 @@ Action GiveTank_Cmd(int client, int args)
 =========================================================================*/
 
 
+bool IsTraitorTankLotteryBlocked(int client)
+{
+    return client >= 1
+        && client <= MaxClients
+        && GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorRegistered") == FeatureStatus_Available
+        && InfectedControl_IsTraitorRegistered(client);
+}
+
+bool HasPendingTraitorTank()
+{
+    return GetFeatureStatus(FeatureType_Native, "InfectedControl_HasPendingTraitorTank") == FeatureStatus_Available
+        && InfectedControl_HasPendingTraitorTank();
+}
+
+bool IsEligibleAutomaticTankCandidate(int client)
+{
+    return client >= 1
+        && client <= MaxClients
+        && IS_VALID_INFECTED(client)
+        && !IsFakeClient(client)
+        && !IsTraitorTankLotteryBlocked(client);
+}
+
+bool EnsureEligibleTankSelection()
+{
+    int selectedClient = getInfectedPlayerBySteamId(queuedTankSteamId);
+    if (IsEligibleAutomaticTankCandidate(selectedClient))
+        return true;
+
+    if (!StrEqual(queuedTankSteamId, "") && hTankDebug.BoolValue)
+        PrintToConsoleAll("[TC] discarded ineligible or traitor Tank selection: %s", queuedTankSteamId);
+
+    queuedTankSteamId = "";
+    tankInitiallyChosen = "";
+    chooseTank(0);
+
+    selectedClient = getInfectedPlayerBySteamId(queuedTankSteamId);
+    return IsEligibleAutomaticTankCandidate(selectedClient);
+}
+
+
 /**
  * Selects a player on the infected team from random who hasn't been
  * tank and gives it to them.
  */
 void chooseTank(any data)
 {
+    if (HasPendingTraitorTank())
+    {
+        queuedTankSteamId = "";
+        tankInitiallyChosen = "";
+        return;
+    }
+
     // Allow other plugins to override tank selection.
     char sOverrideTank[64];
     sOverrideTank[0] = '\0';
@@ -529,11 +594,16 @@ void chooseTank(any data)
 void setTankTickets(const char[] steamId, int tickets)
 {
     int tankClientId = getInfectedPlayerBySteamId(steamId);
+    if (!IsEligibleAutomaticTankCandidate(tankClientId))
+        tankClientId = -1;
     
     for (int i = 1; i <= MaxClients; i++)
     {
         if (IS_VALID_INFECTED(i) && !IsFakeClient(i))
-            L4D2Direct_SetTankTickets(i, (i == tankClientId) ? tickets : 0);
+        {
+            int clientTickets = (i == tankClientId && !IsTraitorTankLotteryBlocked(i)) ? tickets : 0;
+            L4D2Direct_SetTankTickets(i, clientTickets);
+        }
     }
 }
 
@@ -595,11 +665,16 @@ void addTeamSteamIdsToArray(ArrayList steamIds, int team)
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsClientInGame(i) || IsFakeClient(i) || GetClientTeam(i) != team)
+        if (!IsClientInGame(i)
+            || IsFakeClient(i)
+            || GetClientTeam(i) != team
+            || (team == TEAM_INFECTED && IsTraitorTankLotteryBlocked(i)))
+        {
             continue;
+        }
         
-        GetClientAuthId(i, AuthId_Steam2, steamId, sizeof(steamId));
-        steamIds.PushString(steamId);
+        if (GetClientAuthId(i, AuthId_Steam2, steamId, sizeof(steamId)))
+            steamIds.PushString(steamId);
     }
 }
 
@@ -638,6 +713,9 @@ void removeTanksFromPool(ArrayList steamIdTankPool, ArrayList tanks)
  */
 int getInfectedPlayerBySteamId(const char[] steamId) 
 {
+    if (steamId[0] == '\0')
+        return -1;
+
     char tmpSteamId[64];
    
     for (int i = 1; i <= MaxClients; i++) 

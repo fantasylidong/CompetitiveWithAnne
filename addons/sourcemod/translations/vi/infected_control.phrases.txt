@@ -40,6 +40,14 @@
 	{
 		"vi"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"vi"		"{green}[IC]{default} Bạn đã đạt giới hạn chơi {olive}%s{default} trong vòng này (%d lần)."
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"vi"		"{green}[IC]{default} Quản trị viên không thể chơi {olive}%s{default} liên tiếp. Hãy chọn loại đặc cảm khác."
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"vi"		"{green}[IC]{default} Traitor quota database is unavailable."

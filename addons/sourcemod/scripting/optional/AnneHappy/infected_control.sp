@@ -234,6 +234,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
     CreateNative("InfectedControl_IsTraitorRegistered", Native_InfectedControlIsTraitorRegistered);
     CreateNative("InfectedControl_IsTraitorModeEnabled", Native_InfectedControlIsTraitorModeEnabled);
+    CreateNative("InfectedControl_HasPendingTraitorTank", Native_InfectedControlHasPendingTraitorTank);
     CreateNative("InfectedControl_HandleTraitorTankOffer", Native_InfectedControlHandleTraitorTankOffer);
     return APLRes_Success;
 }
@@ -559,6 +560,7 @@ static Action Timer_SpawnFirstWave(Handle timer)
 // =========================
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+    Traitor_ResetRoundUseLimits();
     StopAll();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
@@ -758,6 +760,8 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
     bool traitorDisabled = convar == gCV.TraitorEnable && StringToInt(ov) != 0 && StringToInt(nv) == 0;
     gCV.Refresh();
     gCV.ApplyMaxZombieBound();
+    if (convar == gCV.TraitorDailyQuota)
+        TraitorQuota_InvalidateAdminQuotaCache();
 
     if (traitorDisabled)
     {

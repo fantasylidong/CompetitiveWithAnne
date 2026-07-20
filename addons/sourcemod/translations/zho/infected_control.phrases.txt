@@ -40,6 +40,14 @@
 	{
 		"zho"		"{green}[IC]{default} 你本回合的內鬼登記次數已用完（%d）。"
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"zho"		"{green}[IC]{default} 你本回合扮演 {olive}%s{default} 已達到上限（%d 次）。"
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"zho"		"{green}[IC]{default} 管理員不能連續兩次扮演 {olive}%s{default}，請選擇其他特感。"
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"zho"		"{green}[IC]{default} 內鬼次數資料庫不可用。"

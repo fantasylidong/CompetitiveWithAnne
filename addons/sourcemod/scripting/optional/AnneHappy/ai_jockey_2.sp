@@ -389,7 +389,11 @@ void StumbleByStanders(int pinnedSurvivor, int pinner)
 // ***** 方法 *****
 bool IsAiJockey(int client)
 {
-	return GetInfectedClass(client) == ZC_JOCKEY /* && IsFakeClient(client) */;
+	return client > 0 && client <= MaxClients
+		&& IsClientInGame(client)
+		&& GetClientTeam(client) == TEAM_INFECTED
+		&& IsFakeClient(client)
+		&& GetInfectedClass(client) == ZC_JOCKEY;
 }
 
 float NearestSurvivorDistance(int client)

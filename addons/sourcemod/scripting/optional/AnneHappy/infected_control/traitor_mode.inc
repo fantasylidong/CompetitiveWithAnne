@@ -5,6 +5,7 @@
 
 #define TRAITOR_SPAWN_WINDOW_SECONDS 5
 #define TRAITOR_ROUND_AUTH_LENGTH 64
+#define TRAITOR_ROUND_USE_KEY_LENGTH 80
 #define TRAITOR_CLASS_TANK ZC_TANK
 #define TRAITOR_CLASS_MASK_TANK (1 << SI_COUNT)
 #define TRAITOR_CLASS_MASK_ALL ((1 << (SI_COUNT + 1)) - 1)
@@ -38,7 +39,8 @@ enum TraitorTankOfferResult
 static TraitorState g_ITState[MAXPLAYERS + 1];
 static int g_ITClass[MAXPLAYERS + 1];
 static int g_ITReleaseWave[MAXPLAYERS + 1];
-static int g_ITUsesThisRound[MAXPLAYERS + 1];
+static int g_ITClassUsesThisRound[MAXPLAYERS + 1][SI_COUNT + 1];
+static int g_ITLastPlayedClass[MAXPLAYERS + 1];
 static int g_ITRegistrationOrder[MAXPLAYERS + 1];
 static int g_ITNextRegistrationOrder = 1;
 static int g_ITWaitOrder[MAXPLAYERS + 1];
@@ -66,6 +68,8 @@ static bool g_ITRefreshPending[MAXPLAYERS + 1];
 static int g_ITRefreshClass[MAXPLAYERS + 1];
 static float g_ITRefreshOrigin[MAXPLAYERS + 1][3];
 static StringMap g_ITNoDamageBlockedAuths = null;
+static StringMap g_ITRoundClassUsesByAuth = null;
+static StringMap g_ITRoundLastClassByAuth = null;
 static int g_ITDeferredClass[MAXPLAYERS + 1];
 static int g_ITDeferredRegistrationOrder[MAXPLAYERS + 1];
 static int g_ITDeferredWaitOrder[MAXPLAYERS + 1];
@@ -428,6 +432,7 @@ void Traitor_HookClientDamage(int client)
 
     if (g_ITState[client] == Traitor_None)
     {
+        Traitor_ResetClientRoundUseCache(client);
         g_ITDamageLedgerActive[client] = false;
         g_ITDamageLedgerClass[client] = 0;
         g_ITDidDamage[client] = false;
@@ -811,6 +816,11 @@ public any Native_InfectedControlIsTraitorModeEnabled(Handle plugin, int numPara
     return view_as<any>(gCV.bTraitorEnable);
 }
 
+public any Native_InfectedControlHasPendingTraitorTank(Handle plugin, int numParams)
+{
+    return view_as<any>(gCV.bTraitorEnable && Traitor_FindArmedTankClient() > 0);
+}
+
 bool Traitor_IsActiveClient(int client)
 {
     return Traitor_IsAliveClient(client) && g_ITClass[client] >= 1 && g_ITClass[client] <= SI_COUNT;
@@ -897,6 +907,104 @@ static bool Traitor_GetClientAuth(int client, char[] auth, int maxlen)
         && !StrEqual(auth, "BOT", false)
         && !StrEqual(auth, "STEAM_ID_PENDING", false)
         && !StrEqual(auth, "STEAM_ID_STOP_IGNORING_RETVALS", false);
+}
+
+static void Traitor_EnsureRoundUseMaps()
+{
+    if (g_ITRoundClassUsesByAuth == null)
+        g_ITRoundClassUsesByAuth = new StringMap();
+    if (g_ITRoundLastClassByAuth == null)
+        g_ITRoundLastClassByAuth = new StringMap();
+}
+
+static bool Traitor_GetRoundClassUseKey(int client, int zc, char[] key, int maxlen)
+{
+    if (zc < 1 || zc > SI_COUNT)
+        return false;
+
+    char auth[TRAITOR_ROUND_AUTH_LENGTH];
+    if (!Traitor_GetClientAuth(client, auth, sizeof(auth)))
+        return false;
+
+    FormatEx(key, maxlen, "%s:%d", auth, zc);
+    return true;
+}
+
+static int Traitor_GetRoundClassUses(int client, int zc)
+{
+    if (client < 1 || client > MaxClients || zc < 1 || zc > SI_COUNT)
+        return 0;
+
+    Traitor_EnsureRoundUseMaps();
+
+    char key[TRAITOR_ROUND_USE_KEY_LENGTH];
+    int uses;
+    if (Traitor_GetRoundClassUseKey(client, zc, key, sizeof(key))
+        && g_ITRoundClassUsesByAuth.GetValue(key, uses))
+    {
+        g_ITClassUsesThisRound[client][zc] = uses;
+        return uses;
+    }
+
+    return g_ITClassUsesThisRound[client][zc];
+}
+
+static int Traitor_GetRoundLastPlayedClass(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return 0;
+
+    Traitor_EnsureRoundUseMaps();
+
+    char auth[TRAITOR_ROUND_AUTH_LENGTH];
+    int zc;
+    if (Traitor_GetClientAuth(client, auth, sizeof(auth))
+        && g_ITRoundLastClassByAuth.GetValue(auth, zc))
+    {
+        g_ITLastPlayedClass[client] = zc;
+        return zc;
+    }
+
+    return g_ITLastPlayedClass[client];
+}
+
+static void Traitor_RecordRoundClassUse(int client, int zc)
+{
+    if (client < 1 || client > MaxClients || zc < 1 || zc > SI_COUNT)
+        return;
+
+    int uses = Traitor_GetRoundClassUses(client, zc) + 1;
+    g_ITClassUsesThisRound[client][zc] = uses;
+    g_ITLastPlayedClass[client] = zc;
+
+    char key[TRAITOR_ROUND_USE_KEY_LENGTH];
+    if (Traitor_GetRoundClassUseKey(client, zc, key, sizeof(key)))
+        g_ITRoundClassUsesByAuth.SetValue(key, uses);
+
+    char auth[TRAITOR_ROUND_AUTH_LENGTH];
+    if (Traitor_GetClientAuth(client, auth, sizeof(auth)))
+        g_ITRoundLastClassByAuth.SetValue(auth, zc);
+}
+
+static void Traitor_ResetClientRoundUseCache(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    for (int zc = 1; zc <= SI_COUNT; zc++)
+        g_ITClassUsesThisRound[client][zc] = 0;
+    g_ITLastPlayedClass[client] = 0;
+}
+
+void Traitor_ResetRoundUseLimits()
+{
+    if (g_ITRoundClassUsesByAuth != null)
+        g_ITRoundClassUsesByAuth.Clear();
+    if (g_ITRoundLastClassByAuth != null)
+        g_ITRoundLastClassByAuth.Clear();
+
+    for (int client = 1; client <= MaxClients; client++)
+        Traitor_ResetClientRoundUseCache(client);
 }
 
 static void Traitor_SetNoDamageWaveBlock(int client)
@@ -1282,13 +1390,16 @@ static bool Traitor_IsClassSelectable(int zc)
     return (Traitor_GetAllowedClassMask() & bit) != 0;
 }
 
-static int Traitor_CountSelectableClasses()
+static int Traitor_CountSelectableClasses(int client = 0)
 {
     int count = 0;
     for (int zc = 1; zc <= SI_COUNT; zc++)
     {
-        if (Traitor_IsClassSelectable(zc))
+        if (Traitor_IsClassSelectable(zc)
+            && (client <= 0 || Traitor_CanSelectClassThisRound(client, zc, false)))
+        {
             count++;
+        }
     }
 
     if (Traitor_IsClassSelectable(TRAITOR_CLASS_TANK))
@@ -1297,15 +1408,18 @@ static int Traitor_CountSelectableClasses()
     return count;
 }
 
-int Traitor_PickRandomEnabledClass()
+int Traitor_PickRandomEnabledClass(int client = 0)
 {
     int classes[SI_COUNT + 1];
     int count = 0;
 
     for (int zc = 1; zc <= SI_COUNT; zc++)
     {
-        if (!Traitor_IsClassSelectable(zc))
+        if (!Traitor_IsClassSelectable(zc)
+            || (client > 0 && !Traitor_CanSelectClassThisRound(client, zc, false)))
+        {
             continue;
+        }
 
         classes[count++] = zc;
     }
@@ -1426,6 +1540,46 @@ static void Traitor_FormatClassName(int zc, int client, char[] buffer, int maxle
         strcopy(buffer, maxlen, "unknown");
 }
 
+static int Traitor_GetRoundClassLimit(int client)
+{
+    return Traitor_IsAdminClient(client)
+        ? gCV.iTraitorAdminLimit
+        : gCV.iTraitorPlayerLimit;
+}
+
+static bool Traitor_CanSelectClassThisRound(int client, int zc, bool notify)
+{
+    // Tank is naturally limited to one spawn per round and keeps its existing
+    // database eligibility and damage-penalty rules.
+    if (zc < 1 || zc > SI_COUNT)
+        return true;
+
+    char className[64];
+    if (Traitor_IsAdminClient(client) && Traitor_GetRoundLastPlayedClass(client) == zc)
+    {
+        if (notify)
+        {
+            Traitor_FormatClassName(zc, client, className, sizeof(className));
+            CPrintToChat(client, "%t", "InfectedControl_TraitorSameClassConsecutive", className);
+        }
+        return false;
+    }
+
+    int limit = Traitor_GetRoundClassLimit(client);
+    int uses = Traitor_GetRoundClassUses(client, zc);
+    if (limit > 0 && uses >= limit)
+    {
+        if (notify)
+        {
+            Traitor_FormatClassName(zc, client, className, sizeof(className));
+            CPrintToChat(client, "%t", "InfectedControl_TraitorClassLimitReached", className, limit);
+        }
+        return false;
+    }
+
+    return true;
+}
+
 static bool Traitor_CheckUseLimit(int client, int zc = 0)
 {
     if (zc == TRAITOR_CLASS_TANK && !TraitorQuota_CanUseTank(client))
@@ -1438,14 +1592,8 @@ static bool Traitor_CheckUseLimit(int client, int zc = 0)
         return false;
     }
 
-    if (zc != TRAITOR_CLASS_TANK
-        && Traitor_IsAdminClient(client)
-        && gCV.iTraitorAdminLimit > 0
-        && g_ITUsesThisRound[client] >= gCV.iTraitorAdminLimit)
-    {
-        CPrintToChat(client, "%t", "InfectedControl_TraitorLimitReached", gCV.iTraitorAdminLimit);
+    if (!Traitor_CanSelectClassThisRound(client, zc, true))
         return false;
-    }
 
     return TraitorQuota_CanUse(client, Traitor_GetClassCost(zc));
 }
@@ -1458,20 +1606,7 @@ static bool Traitor_CheckQueuedEligibility(int client, int zc)
     if (!Traitor_IsClassSelectable(zc))
         return false;
 
-    if (zc == TRAITOR_CLASS_TANK && !TraitorQuota_CanUseTank(client))
-        return false;
-
-    if (zc != TRAITOR_CLASS_TANK)
-    {
-        int blockedWaves = Traitor_GetNoDamageBlockWaves(client);
-        if (blockedWaves > 0)
-        {
-            CPrintToChat(client, "%t", "InfectedControl_TraitorWaveBlockedNoDamage", blockedWaves);
-            return false;
-        }
-    }
-
-    return TraitorQuota_CanUse(client, Traitor_GetClassCost(zc));
+    return Traitor_CheckUseLimit(client, zc);
 }
 
 static void Traitor_ApplyDamagePenalty(int client, int zc)
@@ -1523,6 +1658,7 @@ void Traitor_OnRoundEnd()
         Traitor_ClearNoDamageWaveBlocks();
         for (int client = 1; client <= MaxClients; client++)
             Traitor_FlushDamageSummary(client);
+        Traitor_ResetRoundUseLimits();
         return;
     }
 
@@ -1531,6 +1667,7 @@ void Traitor_OnRoundEnd()
         Traitor_FinalizeAliveClient(client);
         Traitor_FlushDamageSummary(client);
     }
+    Traitor_ResetRoundUseLimits();
 }
 
 static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
@@ -1633,7 +1770,6 @@ void Traitor_ResetAll(bool moveClientsToSpec)
         Traitor_ClearClient(client, preserveDamageSummary);
         if (moveToSpec)
             Traitor_ReturnClientToSpectator(client, true);
-        g_ITUsesThisRound[client] = 0;
         if (!preserveDamageSummary)
         {
             g_ITDamageLedgerActive[client] = false;
@@ -2261,14 +2397,12 @@ static bool Traitor_QueueNextLife(int client, int zc)
     g_ITDeferredClass[client] = zc;
     g_ITDeferredRegistrationOrder[client] = g_ITNextRegistrationOrder++;
     g_ITDeferredWaitOrder[client] = g_ITNextWaitOrder++;
-    if (zc != TRAITOR_CLASS_TANK)
-        g_ITUsesThisRound[client]++;
 
     char className[64];
     Traitor_FormatClassName(zc, client, className, sizeof(className));
     CPrintToChat(client, "%t", "InfectedControl_TraitorNextQueued", className);
     Traitor_PrintPenaltyWarnings(client, zc);
-    Debug_Print("[TRAITOR] %N queued next life as %s use=%d/%d", client, g_sInfectedClassNames[zc], g_ITUsesThisRound[client], gCV.iTraitorAdminLimit);
+    Debug_Print("[TRAITOR] %N queued next life as %s", client, g_sInfectedClassNames[zc]);
     return true;
 }
 
@@ -2326,9 +2460,6 @@ static bool Traitor_QueueClient(int client, int zc)
     else if (hasSlot)
         g_ITWaitOrder[client] = 0;
 
-    if (zc != TRAITOR_CLASS_TANK)
-        g_ITUsesThisRound[client]++;
-
     char className[64];
     Traitor_FormatClassName(zc, client, className, sizeof(className));
     if (hasSlot)
@@ -2336,12 +2467,12 @@ static bool Traitor_QueueClient(int client, int zc)
         CPrintToChat(client, "%t", "InfectedControl_TraitorQueued", className);
         if (zc == TRAITOR_CLASS_TANK)
             CPrintToChat(client, "%t", "InfectedControl_TraitorTankWatching");
-        Debug_Print("[TRAITOR] %N queued as %s use=%d/%d", client, g_sInfectedClassNames[zc], g_ITUsesThisRound[client], gCV.iTraitorAdminLimit);
+        Debug_Print("[TRAITOR] %N queued as %s", client, g_sInfectedClassNames[zc]);
     }
     else
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorWaiting", className, Traitor_GetWaitingPosition(client));
-        Debug_Print("[TRAITOR] %N waitlisted as %s pos=%d use=%d/%d", client, g_sInfectedClassNames[zc], Traitor_GetWaitingPosition(client), g_ITUsesThisRound[client], gCV.iTraitorAdminLimit);
+        Debug_Print("[TRAITOR] %N waitlisted as %s pos=%d", client, g_sInfectedClassNames[zc], Traitor_GetWaitingPosition(client));
     }
     Traitor_PrintPenaltyWarnings(client, zc);
     return true;
@@ -2354,7 +2485,10 @@ static void Traitor_AddClassMenuItem(Menu menu, int zc, int client)
 
     char display[64];
     Traitor_FormatClassName(zc, client, display, sizeof(display));
-    menu.AddItem(info, display);
+    int drawStyle = Traitor_CanSelectClassThisRound(client, zc, false)
+        ? ITEMDRAW_DEFAULT
+        : ITEMDRAW_DISABLED;
+    menu.AddItem(info, display, drawStyle);
 }
 
 static void Traitor_ShowClassMenu(int client)
@@ -2377,7 +2511,8 @@ static void Traitor_ShowClassMenu(int client)
         return;
     }
 
-    if (Traitor_CountSelectableClasses() <= 0)
+    int selectableClasses = Traitor_CountSelectableClasses(client);
+    if (selectableClasses <= 0)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorNoEnabledClass");
         return;
@@ -2389,7 +2524,7 @@ static void Traitor_ShowClassMenu(int client)
 
     char randomText[64];
     Format(randomText, sizeof(randomText), "%T", "InfectedControl_TraitorMenuRandom", client);
-    menu.AddItem("random", randomText);
+    menu.AddItem("random", randomText, selectableClasses > 0 ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
     for (int zc = 1; zc <= SI_COUNT; zc++)
     {
@@ -2426,7 +2561,7 @@ public int Traitor_MenuHandler(Menu menu, MenuAction action, int client, int ite
 
     int zc = 0;
     if (StrEqual(info, "random", false))
-        zc = Traitor_PickRandomEnabledClass();
+        zc = Traitor_PickRandomEnabledClass(client);
     else
         zc = StringToInt(info);
 
@@ -2703,7 +2838,7 @@ public Action Cmd_Traitor(int client, int args)
 
     int zc = 0;
     if (Traitor_IsRandomClassArg(arg))
-        zc = Traitor_PickRandomEnabledClass();
+        zc = Traitor_PickRandomEnabledClass(client);
     else
         zc = Traitor_ParseClass(arg);
 
@@ -2823,6 +2958,7 @@ public void L4D_OnMaterializeFromGhost(int client)
     g_ITDamageLedgerClass[client] = zc;
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
+    Traitor_RecordRoundClassUse(client, zc);
     Traitor_CancelSpawnTimer(client);
     if (zc >= 1 && zc <= SI_COUNT)
     {
@@ -2877,6 +3013,8 @@ void Traitor_OnClientDisconnect(int client)
     if (client < 1 || client > MaxClients)
         return;
 
+    // Keep the SteamID-backed round record so reconnecting cannot reset it.
+    Traitor_ResetClientRoundUseCache(client);
     Traitor_ClearBileVictim(client);
     Traitor_ClearDamageSourcesForOwner(client);
     Traitor_FlushDamageSummary(client);
@@ -2896,7 +3034,6 @@ void Traitor_OnClientDisconnect(int client)
     }
     if (client >= 1 && client <= MaxClients)
     {
-        g_ITUsesThisRound[client] = 0;
         g_ITNoDamageBlockedWaves[client] = 0;
     }
     if (wasAlive)

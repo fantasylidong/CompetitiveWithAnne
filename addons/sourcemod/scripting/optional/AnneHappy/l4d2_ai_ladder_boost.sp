@@ -6,7 +6,7 @@
 #include <sdkhooks>
 #include <left4dhooks>
 
-#define PLUGIN_VERSION "1.1.0"
+#define PLUGIN_VERSION "1.1.1"
 
 #define TEAM_SURVIVOR 2
 #define TEAM_INFECTED 3
@@ -26,12 +26,10 @@ ConVar g_cvEnabled;
 ConVar g_cvSpeedMultiplier;
 ConVar g_cvDetectionMethod;
 ConVar g_cvCooldownTime;
-ConVar g_cvUseSDKHook;
 ConVar g_cvDebugMode;
 
 // Compatibility cvars from l4d2_si_ladder_booster.sp.
 ConVar g_cvAiLadderBoost;
-ConVar g_cvPzLadderBoost;
 ConVar g_cvLegacyBoostMultiplier;
 ConVar g_cvTankLadderBoost;
 ConVar g_cvClimbAnimBoost;
@@ -64,7 +62,7 @@ public Plugin myinfo =
 {
     name = "[L4D2] Infected Ladder Speed Boost",
     author = "YourName, AiMee, AnneHappy",
-    description = "Merged infected ladder booster with visibility-gated boost and climb animation controls",
+    description = "AI infected ladder booster with visibility-gated boost and climb animation controls",
     version = PLUGIN_VERSION,
     url = ""
 };
@@ -73,15 +71,15 @@ public void OnPluginStart()
 {
     LoadTranslations("l4d2_ai_ladder_boost.phrases");
 
-    g_cvEnabled = CreateConVar("l4d2_ladder_boost_enabled", "1", "启用未被生还者看见时的特感爬梯加速 (0=禁用, 1=启用)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_cvEnabled = CreateConVar("l4d2_ladder_boost_enabled", "1", "启用未被生还者看见时的AI特感爬梯加速 (0=禁用, 1=启用)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvSpeedMultiplier = CreateConVar("l4d2_ladder_boost_multiplier", "10.0", "未被看见时的爬梯速度倍数", FCVAR_NOTIFY, true, 1.0, true, 20.0);
     g_cvDetectionMethod = CreateConVar("l4d2_ladder_boost_detection", "0", "检测方法 (0=威胁感知+射线, 1=传统FOV+射线)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvCooldownTime = CreateConVar("l4d2_ladder_boost_cooldown", "3.0", "被看见后禁用未视野加速的冷却时间(秒)", FCVAR_NOTIFY, true, 1.0, true, 10.0);
-    g_cvUseSDKHook = CreateConVar("l4d2_ladder_boost_use_sdkhook", "1", "真人特感使用SDKHook即时检测 (0=只使用Timer, 1=使用SDKHook)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    CreateConVar("l4d2_ladder_boost_use_sdkhook", "1", "兼容旧配置：已停用，AI特感固定使用Timer检测", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvDebugMode = CreateConVar("l4d2_ladder_boost_debug", "0", "调试模式 (0=关闭, 1=基本调试, 2=详细调试)", FCVAR_NOTIFY, true, 0.0, true, 2.0);
 
     g_cvAiLadderBoost = CreateConVar("l4d2_ai_ladder_boost", "1", "兼容旧l4d2_si_ladder_booster：AI特感在梯子上固定加速", FCVAR_SPONLY, true, 0.0, true, 1.0);
-    g_cvPzLadderBoost = CreateConVar("l4d2_pz_ladder_boost", "0", "兼容旧l4d2_si_ladder_booster：真人特感在梯子上固定加速", FCVAR_SPONLY, true, 0.0, true, 1.0);
+    CreateConVar("l4d2_pz_ladder_boost", "0", "兼容旧l4d2_si_ladder_booster：已停用，真人特感不会获得加速", FCVAR_SPONLY, true, 0.0, true, 1.0);
     g_cvLegacyBoostMultiplier = CreateConVar("l4d2_boost_multiplier", "3.2", "兼容旧l4d2_si_ladder_booster：固定爬梯加速倍数", FCVAR_SPONLY, true, 1.0, true, 10.0);
     g_cvTankLadderBoost = CreateConVar("l4d2_ladder_boost_tank", "1", "是否允许该通用插件加速Tank爬梯", FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_cvClimbAnimBoost = CreateConVar("l4d2_climb_anim_boost", "1", "是否由该插件处理特感翻越/爬小障碍动画加速", FCVAR_NOTIFY, true, 0.0, true, 1.0);
@@ -111,9 +109,7 @@ void HookBoostCvars()
 {
     g_cvEnabled.AddChangeHook(OnConVarChanged);
     g_cvSpeedMultiplier.AddChangeHook(OnConVarChanged);
-    g_cvUseSDKHook.AddChangeHook(OnConVarChanged);
     g_cvAiLadderBoost.AddChangeHook(OnConVarChanged);
-    g_cvPzLadderBoost.AddChangeHook(OnConVarChanged);
     g_cvLegacyBoostMultiplier.AddChangeHook(OnConVarChanged);
     g_cvTankLadderBoost.AddChangeHook(OnConVarChanged);
     g_cvClimbAnimBoost.AddChangeHook(OnConVarChanged);
@@ -136,7 +132,6 @@ public void OnPluginEnd()
         }
         RestorePlaybackRate(i);
         RemoveAnimationHook(i);
-        RemoveClientHooks(i);
     }
 
     delete g_hTankClimbAnimMap;
@@ -161,17 +156,11 @@ public void OnMapEnd()
 
 public void OnClientPostAdminCheck(int client)
 {
-    if (ShouldRunBoostChecks() && g_cvUseSDKHook.BoolValue)
-    {
-        SetupClientHooks(client);
-    }
-
     SetupAnimationHook(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-    RemoveClientHooks(client);
     RemoveAnimationHook(client);
     ResetClientData(client);
 }
@@ -228,11 +217,6 @@ void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 
     ResetClientData(client);
 
-    if (ShouldRunBoostChecks() && g_cvUseSDKHook.BoolValue)
-    {
-        SetupClientHooks(client);
-    }
-
     SetupAnimationHook(client);
 }
 
@@ -258,7 +242,6 @@ void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroadcast)
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (client > 0)
     {
-        RemoveClientHooks(client);
         RemoveAnimationHook(client);
         ResetClientData(client);
     }
@@ -278,13 +261,6 @@ void RefreshRuntimeHooks()
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        RemoveClientHooks(i);
-
-        if (shouldRun && g_cvUseSDKHook.BoolValue && IsValidClient(i))
-        {
-            SetupClientHooks(i);
-        }
-
         if (IsValidClient(i))
         {
             SetupAnimationHook(i);
@@ -294,7 +270,7 @@ void RefreshRuntimeHooks()
 
 bool ShouldRunBoostChecks()
 {
-    return g_cvEnabled.BoolValue || g_cvAiLadderBoost.BoolValue || g_cvPzLadderBoost.BoolValue || g_cvTankLadderBoost.BoolValue;
+    return g_cvEnabled.BoolValue || g_cvAiLadderBoost.BoolValue || g_cvTankLadderBoost.BoolValue;
 }
 
 void StartCheckTimer()
@@ -323,31 +299,9 @@ void StopCheckTimer()
     KillTimer(timer);
 }
 
-void SetupClientHooks(int client)
-{
-    if (!IsValidClient(client) || IsFakeClient(client))
-    {
-        return;
-    }
-
-    SDKHook(client, SDKHook_PreThink, Hook_PreThink);
-    SDKHook(client, SDKHook_PostThinkPost, Hook_PostThinkPost);
-}
-
-void RemoveClientHooks(int client)
-{
-    if (client < 1 || client > MaxClients)
-    {
-        return;
-    }
-
-    SDKUnhook(client, SDKHook_PreThink, Hook_PreThink);
-    SDKUnhook(client, SDKHook_PostThinkPost, Hook_PostThinkPost);
-}
-
 void SetupAnimationHook(int client)
 {
-    if (!IsValidClient(client) || GetClientTeam(client) != TEAM_INFECTED || g_bAnimHooked[client])
+    if (!IsAiInfected(client) || g_bAnimHooked[client])
     {
         return;
     }
@@ -377,7 +331,7 @@ void RemoveAnimationHook(int client)
 
 Action Hook_AnimationPost(int client, int &sequence)
 {
-    if (!g_cvClimbAnimBoost.BoolValue || !IsValidInfected(client))
+    if (!g_cvClimbAnimBoost.BoolValue || !IsAiInfected(client))
     {
         return Plugin_Continue;
     }
@@ -395,7 +349,7 @@ Action Hook_AnimationPost(int client, int &sequence)
 
 public void Hook_ClimbAnimThink(int client)
 {
-    if (!g_cvClimbAnimBoost.BoolValue || !IsValidInfected(client))
+    if (!g_cvClimbAnimBoost.BoolValue || !IsAiInfected(client))
     {
         RestorePlaybackRate(client);
         return;
@@ -424,49 +378,19 @@ public void Hook_ClimbAnimThink(int client)
     RestorePlaybackRate(client);
 }
 
-public void Hook_PreThink(int client)
-{
-    if (!ShouldRunBoostChecks() || !IsValidInfected(client))
-    {
-        return;
-    }
-
-    bool isOnLadder = IsPlayerOnLadder(client);
-    bool wasOnLadder = g_bIsOnLadder[client];
-    g_bIsOnLadder[client] = isOnLadder;
-
-    if (g_cvDebugMode.IntValue >= 2 && isOnLadder != wasOnLadder)
-    {
-        char name[64];
-        GetClientName(client, name, sizeof(name));
-        LogMessage("[LadderBoost] %s(%d) ladder state: %s -> %s",
-            name, client, wasOnLadder ? "on" : "off", isOnLadder ? "on" : "off");
-    }
-
-    if (isOnLadder != wasOnLadder)
-    {
-        CheckAndUpdatePlayerSpeed(client);
-    }
-}
-
-public void Hook_PostThinkPost(int client)
-{
-    if (!ShouldRunBoostChecks() || !g_bIsOnLadder[client] || !IsValidInfected(client))
-    {
-        return;
-    }
-
-    CheckAndUpdatePlayerSpeed(client);
-}
-
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3])
 {
+    if (!IsAiInfected(client))
+    {
+        return Plugin_Continue;
+    }
+
     if (!g_bSpeedBoosted[client] && !g_bWasOnLadder[client])
     {
         return Plugin_Continue;
     }
 
-    if (!IsValidInfected(client))
+    if (!IsAiInfected(client))
     {
         RestorePlayerSpeed(client);
         g_bIsOnLadder[client] = false;
@@ -508,7 +432,7 @@ public Action Timer_CheckPlayers(Handle timer)
 
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (!IsValidClient(client))
+        if (!IsAiInfected(client))
         {
             continue;
         }
@@ -526,7 +450,7 @@ void CheckAndUpdatePlayerSpeed(int client)
         return;
     }
 
-    if (!IsValidInfected(client))
+    if (!IsAiInfected(client))
     {
         if (g_bSpeedBoosted[client])
         {
@@ -572,8 +496,12 @@ void CheckAndUpdatePlayerSpeed(int client)
 
 float GetDesiredBoostMultiplier(int client)
 {
+    if (!IsAiInfected(client))
+    {
+        return NORMAL_SPEED;
+    }
+
     float multiplier = NORMAL_SPEED;
-    bool fakeClient = IsFakeClient(client);
     bool tank = IsTank(client);
 
     if (tank && g_cvTankLadderBoost.BoolValue)
@@ -581,12 +509,7 @@ float GetDesiredBoostMultiplier(int client)
         multiplier = MaxFloat(multiplier, g_cvLegacyBoostMultiplier.FloatValue);
     }
 
-    if (!tank && fakeClient && g_cvAiLadderBoost.BoolValue)
-    {
-        multiplier = MaxFloat(multiplier, g_cvLegacyBoostMultiplier.FloatValue);
-    }
-
-    if (!tank && !fakeClient && g_cvPzLadderBoost.BoolValue && !IsInfectedGhost(client))
+    if (!tank && g_cvAiLadderBoost.BoolValue)
     {
         multiplier = MaxFloat(multiplier, g_cvLegacyBoostMultiplier.FloatValue);
     }
@@ -730,7 +653,7 @@ void InitClimbAnimMaps()
 
 float GetClimbPlaybackRate(int client, int sequence)
 {
-    if (!IsValidInfected(client))
+    if (!IsAiInfected(client))
     {
         return NORMAL_SPEED;
     }
@@ -905,6 +828,11 @@ bool IsValidInfected(int client)
     return IsValidClient(client) && GetClientTeam(client) == TEAM_INFECTED && IsPlayerAlive(client);
 }
 
+bool IsAiInfected(int client)
+{
+    return IsValidInfected(client) && IsFakeClient(client);
+}
+
 bool IsValidClient(int client)
 {
     return client > 0 && client <= MaxClients && IsClientInGame(client) && !IsClientInKickQueue(client);
@@ -949,11 +877,6 @@ int GetZombieClass(int client)
     return GetEntProp(client, Prop_Send, "m_zombieClass");
 }
 
-bool IsInfectedGhost(int client)
-{
-    return HasEntProp(client, Prop_Send, "m_isGhost") && view_as<bool>(GetEntProp(client, Prop_Send, "m_isGhost"));
-}
-
 void SetClientSpeed(int client, float value)
 {
     SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", value);
@@ -981,7 +904,7 @@ bool IsInfectedVisibleToSurvivors(int infected)
 
 bool UseNewRaycastDetection(int infected)
 {
-    if (!IsValidInfected(infected))
+    if (!IsAiInfected(infected))
     {
         return false;
     }
@@ -1034,7 +957,7 @@ bool UseNewRaycastDetection(int infected)
 
 bool UseTraditionalDetection(int infected)
 {
-    if (!IsValidInfected(infected))
+    if (!IsAiInfected(infected))
     {
         return false;
     }
@@ -1106,12 +1029,12 @@ public Action Command_LadderDebug(int client, int args)
     PrintToConsole(client, "Sight boost: %s", g_cvEnabled.BoolValue ? "on" : "off");
     PrintToConsole(client, "Sight multiplier: %.1fx", g_cvSpeedMultiplier.FloatValue);
     PrintToConsole(client, "Legacy AI boost: %s", g_cvAiLadderBoost.BoolValue ? "on" : "off");
-    PrintToConsole(client, "Legacy PZ boost: %s", g_cvPzLadderBoost.BoolValue ? "on" : "off");
+    PrintToConsole(client, "Legacy PZ boost: ignored (AI only)");
     PrintToConsole(client, "Legacy multiplier: %.1fx", g_cvLegacyBoostMultiplier.FloatValue);
     PrintToConsole(client, "Tank boost: %s", g_cvTankLadderBoost.BoolValue ? "on" : "off");
     PrintToConsole(client, "Detection: %s", g_cvDetectionMethod.IntValue == 0 ? "threat+ray" : "fov+ray");
     PrintToConsole(client, "Cooldown: %.1fs", g_cvCooldownTime.FloatValue);
-    PrintToConsole(client, "SDKHook: %s", g_cvUseSDKHook.BoolValue ? "on" : "off");
+    PrintToConsole(client, "Realtime speed hook: ignored (AI uses timer)");
     PrintToConsole(client, "Debug mode: %d", g_cvDebugMode.IntValue);
 
     float currentTime = GetGameTime();
@@ -1173,7 +1096,7 @@ public Action Command_LadderStatus(int client, int args)
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidInfected(i) || !g_bSpeedBoosted[i])
+        if (!IsAiInfected(i) || !g_bSpeedBoosted[i])
         {
             continue;
         }
@@ -1187,7 +1110,7 @@ public Action Command_LadderStatus(int client, int args)
     float currentTime = GetGameTime();
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsValidInfected(i) && currentTime < g_fCooldownEndTime[i])
+        if (IsAiInfected(i) && currentTime < g_fCooldownEndTime[i])
         {
             coolingDownCount++;
         }

@@ -40,6 +40,14 @@
 	{
 		"ko"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"ko"		"{green}[IC]{default} 이번 라운드의 {olive}%s{default} 플레이 제한(%d회)에 도달했습니다."
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"ko"		"{green}[IC]{default} 관리자는 {olive}%s{default}을(를) 연속으로 플레이할 수 없습니다. 다른 특수 감염자를 선택하세요."
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"ko"		"{green}[IC]{default} Traitor quota database is unavailable."

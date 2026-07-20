@@ -150,6 +150,7 @@ enum struct Config
     ConVar AntiBaitDebug;
     ConVar TraitorEnable;
     ConVar TraitorMaxSlots;
+    ConVar TraitorPlayerLimit;
     ConVar TraitorAdminLimit;
     ConVar TraitorClassMask;
     ConVar TraitorDailyQuota;
@@ -177,6 +178,7 @@ enum struct Config
     bool   bAntiBaitDebug;
     bool   bTraitorEnable;
     int    iTraitorMaxSlots;
+    int    iTraitorPlayerLimit;
     int    iTraitorAdminLimit;
     int    iTraitorClassMask;
     int    iTraitorDailyQuota;
@@ -541,9 +543,14 @@ enum struct Config
             "Shared max active/reserved traitor slots; a waiting Tank starts using one only after takeover.",
             CVAR_FLAG, true, 0.0, true, float(MAXPLAYERS)
         );
+        this.TraitorPlayerLimit = CreateConVar(
+            "inf_traitor_player_limit", "1",
+            "Per-round successful spawns allowed for each normal traitor SI class for non-admin players. Tank is excluded; 0 disables.",
+            CVAR_FLAG, true, 0.0, true, 32.0
+        );
         this.TraitorAdminLimit = CreateConVar(
-            "inf_traitor_admin_limit", "0",
-            "Legacy per-admin traitor queue uses per round. 0 = disabled; daily DB quota is the normal limit.",
+            "inf_traitor_admin_limit", "3",
+            "Per-round successful spawns allowed for each normal traitor SI class for admins. Tank is excluded; 0 disables.",
             CVAR_FLAG, true, 0.0, true, 32.0
         );
         this.TraitorClassMask = CreateConVar(
@@ -553,7 +560,7 @@ enum struct Config
         );
         this.TraitorDailyQuota = CreateConVar(
             "inf_traitor_daily_quota", "100",
-            "Default daily traitor SI total_count for new admins.",
+            "Base daily traitor quota for admins; each full year remaining before sb_admins.expires adds 50.",
             CVAR_FLAG, true, 0.0, true, 10000.0
         );
         this.TraitorPublicMinScore = CreateConVar(
@@ -614,6 +621,7 @@ enum struct Config
         this.AntiBaitDebug.AddChangeHook(OnCfgChanged);
         this.TraitorEnable.AddChangeHook(OnCfgChanged);
         this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
+        this.TraitorPlayerLimit.AddChangeHook(OnCfgChanged);
         this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
         this.TraitorClassMask.AddChangeHook(OnCfgChanged);
         this.TraitorDailyQuota.AddChangeHook(OnCfgChanged);
@@ -721,6 +729,9 @@ enum struct Config
         SetConVarBounds(this.TraitorMaxSlots, ConVarBound_Upper, true, float(maxTraitorSlots));
         if (this.iTraitorMaxSlots < 0) this.iTraitorMaxSlots = 0;
         if (this.iTraitorMaxSlots > maxTraitorSlots) this.iTraitorMaxSlots = maxTraitorSlots;
+        this.iTraitorPlayerLimit = this.TraitorPlayerLimit.IntValue;
+        if (this.iTraitorPlayerLimit < 0) this.iTraitorPlayerLimit = 0;
+        if (this.iTraitorPlayerLimit > 32) this.iTraitorPlayerLimit = 32;
         this.iTraitorAdminLimit = this.TraitorAdminLimit.IntValue;
         if (this.iTraitorAdminLimit < 0) this.iTraitorAdminLimit = 0;
         if (this.iTraitorAdminLimit > 32) this.iTraitorAdminLimit = 32;

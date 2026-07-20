@@ -36,6 +36,13 @@ native bool InfectedControl_IsTraitorRegistered(int client);
  */
 native bool InfectedControl_IsTraitorModeEnabled();
 
+/**
+ * @brief Returns whether an armed traitor Tank is waiting for a natural AI Tank.
+ *
+ * @return true when automatic Tank lotteries should leave the spawned Tank as AI for traitor takeover.
+ */
+native bool InfectedControl_HasPendingTraitorTank();
+
 enum InfectedControlTankOfferResult
 {
 	InfectedControlTankOffer_NotTraitor = 0,
@@ -80,6 +87,7 @@ public void __pl_infected_control_SetNTVOptional()
 	MarkNativeAsOptional("InfectedControl_IsTraitorClient");
 	MarkNativeAsOptional("InfectedControl_IsTraitorRegistered");
 	MarkNativeAsOptional("InfectedControl_IsTraitorModeEnabled");
+	MarkNativeAsOptional("InfectedControl_HasPendingTraitorTank");
 	MarkNativeAsOptional("InfectedControl_HandleTraitorTankOffer");
 }
 #endif

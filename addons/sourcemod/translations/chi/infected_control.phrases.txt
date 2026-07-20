@@ -40,6 +40,14 @@
 	{
 		"chi"		"{green}[IC]{default} 你本回合的内鬼登记次数已用完（%d）。"
 	}
+	"InfectedControl_TraitorClassLimitReached"
+	{
+		"chi"		"{green}[IC]{default} 你本回合扮演 {olive}%s{default} 已达到上限（%d 次）。"
+	}
+	"InfectedControl_TraitorSameClassConsecutive"
+	{
+		"chi"		"{green}[IC]{default} 管理员不能连续两次扮演 {olive}%s{default}，请选择其他特感。"
+	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
 		"chi"		"{green}[IC]{default} 内鬼次数数据库不可用。"

@@ -6,10 +6,21 @@
 #define TRAITOR_QUOTA_AUTH_LENGTH   64
 #define TRAITOR_QUOTA_NAME_LENGTH   64
 #define TRAITOR_QUOTA_TABLE_LENGTH  64
+#define TRAITOR_ADMIN_DB_CONFIG     "sourcebans"
+#define TRAITOR_ADMIN_TABLE         "sb_admins"
+#define TRAITOR_ADMIN_YEAR_SECONDS  (365 * 24 * 60 * 60)
+#define TRAITOR_ADMIN_YEAR_BONUS    50
+#define TRAITOR_ADMIN_QUOTA_MAX     10000
+#define TRAITOR_ADMIN_CACHE_SECONDS 300
 
 static Database g_hTraitorQuotaDb = null;
+static Database g_hTraitorAdminDb = null;
 static bool g_bTraitorQuotaSchemaReady = false;
 static bool g_bTraitorQuotaDbIsMySQL = false;
+static int g_iTraitorAdminDbRetryAfter = 0;
+static int g_iTraitorAdminQuotaCache[MAXPLAYERS + 1];
+static int g_iTraitorAdminQuotaCacheUntil[MAXPLAYERS + 1];
+static char g_sTraitorAdminQuotaAuth[MAXPLAYERS + 1][TRAITOR_QUOTA_AUTH_LENGTH];
 
 bool Traitor_IsAdminClient(int client)
 {
@@ -30,8 +41,26 @@ void TraitorQuota_Close()
         g_hTraitorQuotaDb = null;
     }
 
+    if (g_hTraitorAdminDb != null)
+    {
+        delete g_hTraitorAdminDb;
+        g_hTraitorAdminDb = null;
+    }
+
     g_bTraitorQuotaSchemaReady = false;
     g_bTraitorQuotaDbIsMySQL = false;
+    g_iTraitorAdminDbRetryAfter = 0;
+    TraitorQuota_InvalidateAdminQuotaCache();
+}
+
+void TraitorQuota_InvalidateAdminQuotaCache()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        g_iTraitorAdminQuotaCache[client] = 0;
+        g_iTraitorAdminQuotaCacheUntil[client] = 0;
+        g_sTraitorAdminQuotaAuth[client][0] = '\0';
+    }
 }
 
 bool TraitorQuota_CanUse(int client, int cost = 1)
@@ -394,10 +423,13 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
         return false;
     }
 
+    int desiredTotal = Traitor_IsAdminClient(client)
+        ? TraitorQuota_GetAdminDailyTotal(client, auth)
+        : gCV.iTraitorPublicDailyQuota;
     int today = TraitorQuota_GetToday();
     if (results.FetchRow())
     {
-        total = results.FetchInt(0);
+        int storedTotal = results.FetchInt(0);
         used = results.FetchInt(1);
         int quotaDay = results.FetchInt(2);
         delete results;
@@ -409,21 +441,121 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
                 return false;
         }
 
-        if (total < 0)
-            total = 0;
-
-        if (!Traitor_IsAdminClient(client))
-            total = gCV.iTraitorPublicDailyQuota;
+        total = desiredTotal;
+        if (storedTotal != desiredTotal
+            && !TraitorQuota_UpdateClientTotal(table, escAuth, desiredTotal))
+        {
+            return false;
+        }
 
         return true;
     }
 
     delete results;
-    total = Traitor_IsAdminClient(client)
-        ? gCV.iTraitorDailyQuota
-        : gCV.iTraitorPublicDailyQuota;
+    total = desiredTotal;
     used = 0;
     return TraitorQuota_InsertClientRow(client, table, escAuth, today, total);
+}
+
+static int TraitorQuota_GetAdminDailyTotal(int client, const char[] auth)
+{
+    int baseQuota = gCV.iTraitorDailyQuota;
+    int now = GetTime();
+    if (client >= 1 && client <= MaxClients
+        && g_iTraitorAdminQuotaCacheUntil[client] > now
+        && StrEqual(g_sTraitorAdminQuotaAuth[client], auth, false))
+    {
+        return g_iTraitorAdminQuotaCache[client];
+    }
+
+    int total = baseQuota;
+    if (TraitorQuota_EnsureAdminDatabase())
+    {
+        char escAuth[TRAITOR_QUOTA_AUTH_LENGTH * 2 + 1];
+        char authSuffix[TRAITOR_QUOTA_AUTH_LENGTH];
+        char escAuthSuffix[TRAITOR_QUOTA_AUTH_LENGTH * 2 + 1];
+        if (SQL_EscapeString(g_hTraitorAdminDb, auth, escAuth, sizeof(escAuth))
+            && strlen(auth) > 8)
+        {
+            strcopy(authSuffix, sizeof(authSuffix), auth[8]);
+            if (SQL_EscapeString(g_hTraitorAdminDb, authSuffix, escAuthSuffix, sizeof(escAuthSuffix)))
+            {
+                char query[512];
+                FormatEx(query, sizeof(query),
+                    "SELECT `expires` FROM `%s` "
+                    ... "WHERE `authid` = '%s' OR `authid` REGEXP '^STEAM_[0-9]:%s$' "
+                    ... "ORDER BY (`authid` = '%s') DESC LIMIT 1",
+                    TRAITOR_ADMIN_TABLE, escAuth, escAuthSuffix, escAuth);
+
+                DBResultSet results = SQL_Query(g_hTraitorAdminDb, query);
+                if (results == null)
+                {
+                    TraitorQuota_LogAdminSqlError("read admin expiry");
+                }
+                else
+                {
+                    if (results.FetchRow())
+                    {
+                        int expires = results.FetchInt(0);
+                        if (expires > now)
+                        {
+                            int fullYears = (expires - now) / TRAITOR_ADMIN_YEAR_SECONDS;
+                            total += fullYears * TRAITOR_ADMIN_YEAR_BONUS;
+                            if (total > TRAITOR_ADMIN_QUOTA_MAX)
+                                total = TRAITOR_ADMIN_QUOTA_MAX;
+                        }
+                    }
+                    delete results;
+                }
+            }
+        }
+    }
+
+    if (client >= 1 && client <= MaxClients)
+    {
+        g_iTraitorAdminQuotaCache[client] = total;
+        g_iTraitorAdminQuotaCacheUntil[client] = now + TRAITOR_ADMIN_CACHE_SECONDS;
+        strcopy(g_sTraitorAdminQuotaAuth[client], sizeof(g_sTraitorAdminQuotaAuth[]), auth);
+    }
+    return total;
+}
+
+static bool TraitorQuota_EnsureAdminDatabase()
+{
+    if (g_hTraitorAdminDb != null)
+        return true;
+
+    int now = GetTime();
+    if (g_iTraitorAdminDbRetryAfter > now)
+        return false;
+
+    g_iTraitorAdminDbRetryAfter = now + TRAITOR_ADMIN_CACHE_SECONDS;
+    if (!SQL_CheckConfig(TRAITOR_ADMIN_DB_CONFIG))
+    {
+        LogError("[IC][TRAITOR] admin expiry database config \"%s\" is missing.", TRAITOR_ADMIN_DB_CONFIG);
+        return false;
+    }
+
+    char error[256];
+    g_hTraitorAdminDb = SQL_Connect(TRAITOR_ADMIN_DB_CONFIG, false, error, sizeof(error));
+    if (g_hTraitorAdminDb == null)
+    {
+        LogError("[IC][TRAITOR] failed to connect admin expiry database \"%s\": %s", TRAITOR_ADMIN_DB_CONFIG, error);
+        return false;
+    }
+
+    char ident[16];
+    SQL_ReadDriver(g_hTraitorAdminDb, ident, sizeof(ident));
+    if (!StrEqual(ident, "mysql", false))
+    {
+        LogError("[IC][TRAITOR] admin expiry database \"%s\" must use MySQL; got driver \"%s\".", TRAITOR_ADMIN_DB_CONFIG, ident);
+        delete g_hTraitorAdminDb;
+        g_hTraitorAdminDb = null;
+        return false;
+    }
+
+    SQL_SetCharset(g_hTraitorAdminDb, "utf8mb4");
+    return true;
 }
 
 static bool TraitorQuota_GetTankBlockRemaining(int client, int &remaining)
@@ -510,6 +642,23 @@ static bool TraitorQuota_ResetClientDay(const char[] table, const char[] escAuth
     return true;
 }
 
+static bool TraitorQuota_UpdateClientTotal(const char[] table, const char[] escAuth, int total)
+{
+    int now = GetTime();
+    char query[512];
+    FormatEx(query, sizeof(query),
+        "UPDATE `%s` SET total_count = %d, `updated_at` = %d WHERE `auth_id` = '%s'",
+        table, total, now, escAuth);
+
+    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    {
+        TraitorQuota_LogSqlError("update quota total");
+        return false;
+    }
+
+    return true;
+}
+
 static int TraitorQuota_GetToday()
 {
     char day[16];
@@ -572,5 +721,12 @@ static void TraitorQuota_LogSqlError(const char[] action)
 {
     char error[256];
     SQL_GetError(g_hTraitorQuotaDb, error, sizeof(error));
+    LogError("[IC][TRAITOR] failed to %s: %s", action, error);
+}
+
+static void TraitorQuota_LogAdminSqlError(const char[] action)
+{
+    char error[256];
+    SQL_GetError(g_hTraitorAdminDb, error, sizeof(error));
     LogError("[IC][TRAITOR] failed to %s: %s", action, error);
 }
