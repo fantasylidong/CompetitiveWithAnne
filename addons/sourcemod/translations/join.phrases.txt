@@ -92,4 +92,16 @@
 	{
 		"en"		"{lightgreen} The survivor team is full and there are no other survivor bots available to take over."
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"en"		"{green}[Join]{default} Register with {olive}!it{default} first. Unregistered players cannot join the infected team in traitor mode."
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"en"		"{green}[Join]{default} Your traitor registration is active. Wait for the system to move you to the infected team when your turn begins."
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"en"		"{green}[Join]{default} Traitor mode is updating. Please wait until the next round before registering or changing teams."
+	}
 }

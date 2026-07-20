@@ -92,4 +92,16 @@
 	{
 		"ko"		"{lightgreen} 생존자 팀이 꽉 찼으며 인계받을 수 있는 다른 생존자 봇이 없습니다."
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"ko"		"{green}[Join]{default} 먼저 {olive}!it{default} 명령으로 배신자 등록을 하세요. 등록하지 않은 플레이어는 감염자 팀에 참가할 수 없습니다."
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"ko"		"{green}[Join]{default} 배신자 등록이 완료되었습니다. 차례가 되면 시스템이 자동으로 감염자 팀으로 이동시킵니다."
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"ko"		"{green}[Join]{default} 배신자 모드를 업데이트하는 중입니다. 다음 라운드까지 등록이나 팀 변경을 기다려 주세요."
+	}
 }

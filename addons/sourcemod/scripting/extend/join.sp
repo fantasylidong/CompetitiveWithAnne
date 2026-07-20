@@ -42,7 +42,6 @@
 #define JOIN_MOTD_DELAY 4.0
 #define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
 #define TEAM_SPECTATOR 1
-#define TEAM_SURVIVOR 2
 #define TEAM_INFECTED 3
 #define ZC_TANK 8
 
@@ -51,7 +50,7 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.3",
+	version = "1.6",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 #define AUTOUPDATE_URL_LENGTH 256
@@ -61,10 +60,12 @@ public Plugin myinfo =
 #define AUTOUPDATE_PUBLIC 1
 #define AUTOUPDATE_PRIVATE 2
 #define AUTOUPDATE_RESTORE_FILE "data/join_autoupdate.restore"
+#define CORE_RELOAD_PENDING_FILE "data/join_core_reload.pending"
+#define INFECTED_CONTROL_PLUGIN "optional/AnneHappy/infected_control.smx"
 #define AUTOUPDATE_RESTORE_DELAY 1.0
 
 bool  
-	g_bEnableGetbotCommand[MAXPLAYERS] = { false },
+	g_bEnableGetbotCommand[MAXPLAYERS + 1] = { false },
 	g_bUpdateSystemAvailable = false, 
 	g_bGroupSystemAvailable = false,
 	g_bInfectedControlAvailable = false,
@@ -97,6 +98,7 @@ ConVar
 	hCvarAutoupdatePublicUrl,
 	hCvarAutoupdatePrivateUrl,
 	hCvarEnableInf,
+	hCvarTraitorEnable,
 	hCvarKickFamilyAccount,
 	hCvarIPUrl,
 	hCvarDonateUrl;
@@ -159,6 +161,10 @@ public void OnPluginStart()
 	RegAdminCmd("sm_restartmap", RestartMap, ADMFLAG_ROOT, "restarts map");
 	HookEvent("player_disconnect", PlayerDisconnect_Event, EventHookMode_Pre);
 	HookEvent("player_team", Event_PlayerTeam);
+	HookEvent("finale_win", Event_RoundEndReloadUpdatedPlugins, EventHookMode_PostNoCopy);
+	HookEvent("mission_lost", Event_RoundEndReloadUpdatedPlugins, EventHookMode_PostNoCopy);
+	HookEvent("map_transition", Event_RoundEndReloadUpdatedPlugins, EventHookMode_PostNoCopy);
+	HookEvent("round_end", Event_RoundEndReloadUpdatedPlugins, EventHookMode_PostNoCopy);
 	CreateTimer(ANNE_INFECTED_ENFORCE_INTERVAL, Timer_EnforceAnneInfectedTeam, _, TIMER_REPEAT);
 	LoadDonateConfig();
 }
@@ -258,13 +264,18 @@ public void OnAllPluginsLoaded(){
 	g_bGroupSystemAvailable = LibraryExists("veterans");
 	g_bUpdateSystemAvailable = LibraryExists("updater");
 	g_bInfectedControlAvailable = LibraryExists("infected_control");
+	RefreshTraitorEnableConVar();
 	RefreshAutoUpdater(true);
 }
 public void OnLibraryAdded(const char[] name)
 {
     if ( StrEqual(name, "veterans") ) { g_bGroupSystemAvailable = true; }
 	else if(StrEqual(name, "updater")) { g_bUpdateSystemAvailable = true; RefreshAutoUpdater(true); }
-	else if(StrEqual(name, "infected_control")) { g_bInfectedControlAvailable = true; }
+	else if(StrEqual(name, "infected_control"))
+	{
+		g_bInfectedControlAvailable = true;
+		RefreshTraitorEnableConVar();
+	}
 }
 public void OnLibraryRemoved(const char[] name)
 {
@@ -276,7 +287,12 @@ public void OnLibraryRemoved(const char[] name)
 		g_bAutoUpdaterInitialCheckRequested = false;
 		g_sAutoUpdaterUrl[0] = '\0';
 	}
-	else if (StrEqual(name, "infected_control")){ g_bInfectedControlAvailable = false; }
+	else if (StrEqual(name, "infected_control"))
+	{
+		g_bInfectedControlAvailable = false;
+		delete hCvarTraitorEnable;
+		hCvarTraitorEnable = null;
+	}
 }
 
 public void Updater_OnLoaded()
@@ -293,6 +309,8 @@ public void Updater_OnPluginUpdated()
 		LogError("Unable to persist join_autoupdate=%d; skipping hot reload.", autoUpdateMode);
 		return;
 	}
+	if (!SavePendingCoreReload())
+		LogError("Unable to schedule infected_control reload for the next round.");
 
 	bool shouldRelock = LibraryExists("confogl")
 		&& GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") == FeatureStatus_Available
@@ -309,6 +327,53 @@ public void Updater_OnPluginUpdated()
 	{
 		ServerCommand("sm plugins load_lock");
 	}
+}
+
+bool SavePendingCoreReload()
+{
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), CORE_RELOAD_PENDING_FILE);
+
+	File file = OpenFile(path, "w");
+	if (file == null)
+		return false;
+
+	file.WriteLine("1");
+	delete file;
+	return true;
+}
+
+bool ConsumePendingCoreReload()
+{
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), CORE_RELOAD_PENDING_FILE);
+	if (!FileExists(path))
+		return false;
+
+	DeleteFile(path);
+	return true;
+}
+
+public void Event_RoundEndReloadUpdatedPlugins(Event event, const char[] name, bool dontBroadcast)
+{
+	if (!ConsumePendingCoreReload() || !IsCurrentInfectedControlRunning())
+		return;
+
+	bool shouldRelock = LibraryExists("confogl")
+		&& GetFeatureStatus(FeatureType_Native, "LGO_IsMatchModeLoaded") == FeatureStatus_Available
+		&& LGO_IsMatchModeLoaded();
+
+	if (shouldRelock)
+		ServerCommand("sm plugins load_unlock");
+	ServerCommand("sm plugins reload %s", INFECTED_CONTROL_PLUGIN);
+	if (shouldRelock)
+		ServerCommand("sm plugins load_lock");
+}
+
+bool IsCurrentInfectedControlRunning()
+{
+	Handle plugin = FindPluginByFile(INFECTED_CONTROL_PLUGIN);
+	return plugin != INVALID_HANDLE && GetPluginStatus(plugin) == Plugin_Running;
 }
 
 bool SavePendingAutoUpdateMode(int mode)
@@ -493,13 +558,13 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 	int target = GetClientOfUserId(client);
 	int team = GetEventInt(event, "team");
 	bool disconnect = GetEventBool(event, "disconnect");
-	if (IsValidPlayer(target) && !disconnect && team == TEAM_INFECTED && !hCvarEnableInf.BoolValue)
+	if (IsValidPlayer(target) && !disconnect && team == TEAM_INFECTED && ShouldRestrictInfectedTeam())
 	{
 		if(IsFakeClient(target))
 			return Plugin_Handled;
 
 		if(!IsProtectedInfectedControlTraitor(target))
-			MoveClientToSpectator(target, true);
+			MoveClientToSpectator(target, true, true);
 
 		// Keep a short fallback in case the engine rejects a team change while
 		// it is still finishing the automatic versus-team assignment.
@@ -519,7 +584,7 @@ public Action Timer_CheckDetay2(Handle Timer, int userid)
 		return Plugin_Stop;
 
 	if(IsValidPlayerInTeam(client, TEAM_INFECTED))
-		MoveClientToSpectator(client, true);
+		MoveClientToSpectator(client, true, true);
 	return Plugin_Stop;
 }
 
@@ -529,14 +594,14 @@ public Action Timer_MoveClientToSpectator(Handle Timer, int userid)
 	if(client <= 0)
 		return Plugin_Stop;
 
-	MoveClientToSpectator(client);
+	MoveClientToSpectator(client, false, IsAnneManagedMode());
 	return Plugin_Stop;
 }
 
 
 public void OnClientPutInServer(int client)
 {
-	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && !hCvarEnableInf.BoolValue)
+	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && ShouldRestrictInfectedTeam())
 	{
 		//ServerCommand("sm_addbot2");
 		CreateTimer(3.0, Timer_CheckDetay, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -598,14 +663,14 @@ public Action Timer_CheckDetay(Handle Timer, int userid)
 
 	if(IsValidPlayerInTeam(client, TEAM_INFECTED))
 	{
-		MoveClientToSpectator(client, true);
+		MoveClientToSpectator(client, true, true);
 	}
 	return Plugin_Stop;
 }
 
 public Action Timer_EnforceAnneInfectedTeam(Handle timer)
 {
-	if(!IsAnneMode() || hCvarEnableInf.BoolValue)
+	if(!IsAnneManagedMode() || !ShouldRestrictInfectedTeam())
 		return Plugin_Continue;
 
 	for(int client = 1; client <= MaxClients; client++)
@@ -626,6 +691,15 @@ public Action Timer_EnforceAnneInfectedTeam(Handle timer)
 
 public Action TurnClientToInfected(int client, int args) 
 {
+	if(!IsValidClient(client))
+		return Plugin_Handled;
+
+	if(IsTraitorModeEnabled())
+	{
+		PrintTraitorTeamJoinBlocked(client);
+		return Plugin_Handled;
+	}
+
 	if(!IsInfectTeamFull() && hCvarEnableInf.BoolValue)
 	{
 		ClientCommand(client, "jointeam infected");
@@ -649,9 +723,13 @@ void checkbot(){
 
 public Action TurnClientToSurvivors(int client, int args)
 { 
+	if(!IsValidClient(client))
+		return Plugin_Handled;
+
 	checkbot();
 	if(!IsSuivivorTeamFull())
 	{
+		ReturnControlledInfectedToBot(client);
 		ClientCommand(client, "jointeam survivor");
 	}
 	return Plugin_Handled;
@@ -672,21 +750,16 @@ void MoveClientToSpectator(int client, bool forcedTeamCleanup = false, bool pres
 	if(!IsValidClient(client))
 		return;
 
-	int team = GetClientTeam(client);
-	if(team == TEAM_SURVIVOR && IsPlayerAlive(client))
-	{
-		if(!L4D_GoAwayFromKeyboard(client))
-			LogError("Unable to move survivor %N to spectator through GoAwayFromKeyboard.", client);
-		return;
-	}
+	int userid = GetClientUserId(client);
+	ReleaseSurvivorBotOwnership(client);
 
-	if(team == TEAM_INFECTED && IsPlayerAlive(client))
+	if(GetClientTeam(client) == TEAM_INFECTED && IsPlayerAlive(client))
 	{
 		int zombieClass = GetEntProp(client, Prop_Send, "m_zombieClass");
 		bool isTank = zombieClass == ZC_TANK;
 		bool isMaterialized = !GetEntProp(client, Prop_Send, "m_isGhost", 1);
 
-		if(isTank && !forcedTeamCleanup && !IsAnneMode())
+		if(isTank && !forcedTeamCleanup && !IsAnneManagedMode())
 		{
 			return;
 		}
@@ -696,6 +769,47 @@ void MoveClientToSpectator(int client, bool forcedTeamCleanup = false, bool pres
 	}
 
 	ChangeClientTeam(client, TEAM_SPECTATOR);
+	ReleaseSurvivorBotOwnership(client);
+	CreateTimer(0.1, Timer_ReleaseSurvivorBotOwnership, userid, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+void ReturnControlledInfectedToBot(int client)
+{
+	if(!IsAnneManagedMode()
+		|| !IsValidClient(client)
+		|| GetClientTeam(client) != TEAM_INFECTED
+		|| !IsPlayerAlive(client)
+		|| GetEntProp(client, Prop_Send, "m_isGhost", 1))
+	{
+		return;
+	}
+
+	L4D_ReplaceWithBot(client);
+}
+
+public Action Timer_ReleaseSurvivorBotOwnership(Handle timer, int userid)
+{
+	int client = GetClientOfUserId(userid);
+	if(IsValidClient(client))
+		ReleaseSurvivorBotOwnership(client);
+	return Plugin_Stop;
+}
+
+void ReleaseSurvivorBotOwnership(int client)
+{
+	int userid = GetClientUserId(client);
+	for(int bot = 1; bot <= MaxClients; bot++)
+	{
+		if(!IsClientInGame(bot)
+			|| !IsFakeClient(bot)
+			|| !HasEntProp(bot, Prop_Send, "m_humanSpectatorUserID")
+			|| GetEntProp(bot, Prop_Send, "m_humanSpectatorUserID") != userid)
+		{
+			continue;
+		}
+
+		SetEntProp(bot, Prop_Send, "m_humanSpectatorUserID", 0);
+	}
 }
 
 bool IsAnneMode()
@@ -718,8 +832,7 @@ bool IsAnneMode()
 
 bool IsProtectedInfectedControlTraitor(int client)
 {
-	ConVar traitorEnabled = FindConVar("inf_traitor_enable");
-	if(traitorEnabled == null || !traitorEnabled.BoolValue)
+	if(!IsTraitorModeEnabled())
 		return false;
 
 	return g_bInfectedControlAvailable
@@ -728,10 +841,71 @@ bool IsProtectedInfectedControlTraitor(int client)
 		&& InfectedControl_IsTraitorClient(client);
 }
 
+bool IsTraitorModeEnabled()
+{
+	if(!g_bInfectedControlAvailable)
+		return false;
+
+	if(GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorModeEnabled") == FeatureStatus_Available)
+		return InfectedControl_IsTraitorModeEnabled();
+
+	return hCvarTraitorEnable != null && hCvarTraitorEnable.BoolValue;
+}
+
+void RefreshTraitorEnableConVar()
+{
+	delete hCvarTraitorEnable;
+	hCvarTraitorEnable = g_bInfectedControlAvailable ? FindConVar("inf_traitor_enable") : null;
+}
+
+bool IsRegisteredInfectedControlTraitor(int client)
+{
+	return g_bInfectedControlAvailable
+		&& GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorRegistered") == FeatureStatus_Available
+		&& IsValidClient(client)
+		&& InfectedControl_IsTraitorRegistered(client);
+}
+
+bool ShouldRestrictInfectedTeam()
+{
+	return !hCvarEnableInf.BoolValue || IsTraitorModeEnabled();
+}
+
+bool IsAnneManagedMode()
+{
+	return g_bInfectedControlAvailable || IsAnneMode();
+}
+
+void PrintTraitorTeamJoinBlocked(int client)
+{
+	if(GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorRegistered") != FeatureStatus_Available)
+	{
+		CPrintToChat(client, "%t", "Join_TraitorStateSynchronizing");
+		return;
+	}
+
+	if(IsRegisteredInfectedControlTraitor(client))
+		CPrintToChat(client, "%t", "Join_TraitorTeamManagedAutomatically");
+	else
+		CPrintToChat(client, "%t", "Join_TraitorRegistrationRequired");
+}
+
+bool IsInfectedJoinArgument(const char[] arg)
+{
+	return StrEqual(arg, "infected", false) || StrEqual(arg, "3");
+}
+
 public Action Command_Setinfo(int client, const char[] command, int args)
 {
 	char arg[32];
 	GetCmdArg(1, arg, sizeof(arg));
+	if(IsTraitorModeEnabled() && IsInfectedJoinArgument(arg))
+	{
+		if(IsValidClient(client))
+			PrintTraitorTeamJoinBlocked(client);
+		return Plugin_Handled;
+	}
+
 	if (!hCvarEnableInf.BoolValue && (!StrEqual(arg, "survivor") || IsSuivivorTeamFull()))
 	{
 		return Plugin_Handled;

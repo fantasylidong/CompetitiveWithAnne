@@ -92,4 +92,16 @@
 	{
 		"jp"		"{lightgreen} サバイバー チームは満員で、他に引き継ぐことができるサバイバー ボットはありません。"
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"jp"		"{green}[Join]{default} 先に {olive}!it{default} で裏切り者登録してください。未登録のプレイヤーは感染者チームに参加できません。"
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"jp"		"{green}[Join]{default} 裏切り者登録済みです。順番になるとシステムが自動で感染者チームへ移動します。"
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"jp"		"{green}[Join]{default} 裏切り者モードを更新中です。次のラウンドまで登録やチーム変更をお待ちください。"
+	}
 }

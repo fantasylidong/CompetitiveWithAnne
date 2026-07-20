@@ -92,4 +92,16 @@
 	{
 		"vi"		"{lightgreen} Đội sống sót đã đầy đủ và không có bot sống sót nào khác để tiếp quản."
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"vi"		"{green}[Join]{default} Hãy đăng ký nội gián bằng {olive}!it{default} trước. Người chưa đăng ký không thể vào đội infected."
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"vi"		"{green}[Join]{default} Bạn đã đăng ký nội gián. Hệ thống sẽ tự chuyển bạn sang đội infected khi đến lượt."
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"vi"		"{green}[Join]{default} Chế độ nội gián đang được cập nhật. Hãy chờ đến vòng tiếp theo trước khi đăng ký hoặc đổi đội."
+	}
 }

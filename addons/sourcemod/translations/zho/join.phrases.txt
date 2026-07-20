@@ -92,4 +92,16 @@
 	{
 		"zho"		"{lightgreen} 生還者團隊已滿，無其他生還者bot可供接管"
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"zho"		"{green}[Join]{default} 請先使用 {olive}!it{default} 登記內鬼；內鬼模式下未登記玩家不能加入特感方。"
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"zho"		"{green}[Join]{default} 你已登記內鬼，請等待系統在輪到你時自動切入特感方。"
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"zho"		"{green}[Join]{default} 內鬼模式正在更新，請等待下一回合後再登記或切換隊伍。"
+	}
 }

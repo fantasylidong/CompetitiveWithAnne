@@ -92,4 +92,16 @@
 	{
 		"chi"		"{lightgreen} 生还者团队已满，无其他生还者bot可供接管"
 	}
+	"Join_TraitorRegistrationRequired"
+	{
+		"chi"		"{green}[Join]{default} 请先使用 {olive}!it{default} 登记内鬼；内鬼模式下未登记玩家不能加入特感方。"
+	}
+	"Join_TraitorTeamManagedAutomatically"
+	{
+		"chi"		"{green}[Join]{default} 你已登记内鬼，请等待系统在轮到你时自动切入特感方。"
+	}
+	"Join_TraitorStateSynchronizing"
+	{
+		"chi"		"{green}[Join]{default} 内鬼模式正在更新，请等待下一回合后再登记或切换队伍。"
+	}
 }

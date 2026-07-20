@@ -172,7 +172,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2026-07",
+    version     = "2026-07-20",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -232,6 +232,8 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
                                                   ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
+    CreateNative("InfectedControl_IsTraitorRegistered", Native_InfectedControlIsTraitorRegistered);
+    CreateNative("InfectedControl_IsTraitorModeEnabled", Native_InfectedControlIsTraitorModeEnabled);
     CreateNative("InfectedControl_HandleTraitorTankOffer", Native_InfectedControlHandleTraitorTankOffer);
     return APLRes_Success;
 }
@@ -353,6 +355,7 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
+    Traitor_ResetAll(true);
     // 插件结束时清理 Path 缓存
     ClearPathCache();
     TraitorQuota_Close();
@@ -757,7 +760,10 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
     gCV.ApplyMaxZombieBound();
 
     if (traitorDisabled)
-        Traitor_ResetAll(false);
+    {
+        Traitor_ReturnAllReservedSlotsToAI();
+        Traitor_ResetAll(true);
+    }
 }
 void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
 {

@@ -14,7 +14,7 @@
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
 #include <l4d2_lobby_match_manager_policy>
 
-#define VERSION "0.9"
+#define VERSION "0.11"
 
 #define RMFLAG_NO_MODE_CHANGE			1
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
@@ -45,7 +45,8 @@ int
 
 bool
 	g_bDependenciesReady,
-	g_bLobbyReservationObserved;
+	g_bLobbyReservationObserved,
+	g_bAnneLobbyReleased;
 
 Address
 	g_pMatchExtL4D,
@@ -75,7 +76,7 @@ public void OnPluginStart()
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
 
 	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"0=Keep reservation, 1=Unreserve when no active reservation or when active reservation is full, 2=Unreserve when lobby full, 3=Clear stale reservation while empty, but keep player-created lobby matchmaking.");
+	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"0=Keep reservation, 1=Anne mode: unreserve when the third player joins and reject new reservations, 2=Unreserve when lobby full, 3=Clear stale reservation while empty, but keep player-created lobby matchmaking.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	
 	mp_gamemode.AddChangeHook(OnConVarChanged);
@@ -104,10 +105,12 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 	z_difficulty.GetString(g_sDifficulty, sizeof(g_sDifficulty));
 	g_iUnreserveType = g_cvUnreserveType.IntValue;
 	g_iReserveModifyFlags = g_cvReserveModifyFlags.IntValue;
+	if (g_iUnreserveType != UNRESERVE_ANNE)
+		g_bAnneLobbyReleased = false;
 
-	if (g_iUnreserveType == UNRESERVE_ALWAYS)
+	if (g_iUnreserveType == UNRESERVE_ANNE)
 	{
-		ClearAlwaysLobbyReservationIfAllowed();
+		ClearAnneLobbyReservationIfAllowed();
 	}
 	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
 	{
@@ -121,9 +124,9 @@ public void OnConfigsExecuted()
 {
 	sv_reservation_timeout.IntValue = 30;
 	
-	if (g_iUnreserveType == UNRESERVE_ALWAYS)
+	if (g_iUnreserveType == UNRESERVE_ANNE)
 	{
-		ClearAlwaysLobbyReservationIfAllowed();
+		ClearAnneLobbyReservationIfAllowed();
 		RefreshReserveBlockPatch();
 	}
 	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
@@ -146,7 +149,7 @@ MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
 
 	g_bLobbyReservationObserved = true;
 
-	if (g_iUnreserveType == UNRESERVE_ALWAYS)
+	if (g_iUnreserveType == UNRESERVE_ANNE)
 	{
 		RefreshReserveBlockPatch();
 		return MRES_Ignored;
@@ -204,8 +207,8 @@ public void OnClientPutInServer(int client)
 	if (HasReservationCookie())
 		g_bLobbyReservationObserved = true;
 
-	if (g_iUnreserveType == UNRESERVE_ALWAYS || g_iUnreserveType == UNRESERVE_WHEN_FULL)
-		CreateTimer(1.0, Timer_ClearLobbyIfFull, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	if (g_iUnreserveType == UNRESERVE_ANNE || g_iUnreserveType == UNRESERVE_WHEN_FULL)
+		CreateTimer(1.0, Timer_ClearLobbyOnJoin, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnClientDisconnect(int client)
@@ -223,16 +226,18 @@ Action Timer_ClearDefaultLobbyIfEmpty(Handle timer)
 	return Plugin_Stop;
 }
 
-Action Timer_ClearLobbyIfFull(Handle timer, any userid)
+Action Timer_ClearLobbyOnJoin(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
 		return Plugin_Stop;
 
-	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
+	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bAnneLobbyReleased))
 	{
 		SetReservationCookie(false);
 		sv_allow_lobby_connect_only.BoolValue = false;
+		if (g_iUnreserveType == UNRESERVE_ANNE)
+			g_bAnneLobbyReleased = true;
 	}
 
 	RefreshReserveBlockPatch();
@@ -249,23 +254,24 @@ void ClearDefaultLobbyIfIdle(bool forceClearObserved)
 	sv_allow_lobby_connect_only.BoolValue = false;
 }
 
-void ClearAlwaysLobbyReservationIfAllowed()
+void ClearAnneLobbyReservationIfAllowed()
 {
-	if (g_iUnreserveType != UNRESERVE_ALWAYS)
+	if (g_iUnreserveType != UNRESERVE_ANNE)
 		return;
 
-	if (!LobbyPolicy_ShouldClearAlwaysReservation(HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
+	if (g_bAnneLobbyReleased || !LobbyPolicy_ShouldClearAnneReservation(GetPlayerCount()))
 		return;
 
 	SetReservationCookie(false);
 	sv_allow_lobby_connect_only.BoolValue = false;
+	g_bAnneLobbyReleased = true;
 }
 
 void RefreshReserveBlockPatch()
 {
 	g_mBlockReserve.Disable();
 
-	if (!LobbyPolicy_ShouldBlockReservePatch(g_iUnreserveType, HasReservationCookie(), GetPlayerCount(), GetMaxLobbySlots(g_sGameMode)))
+	if (!LobbyPolicy_ShouldBlockReservePatch(g_iUnreserveType, g_bAnneLobbyReleased))
 		return;
 
 	if (!g_mBlockReserve.Enable())
@@ -283,7 +289,7 @@ Action Cmd_Status(int client, int args)
 	else 
 		FormatEx(sCookie, sizeof(sCookie), "%x", iCookie[0]);
 
-	ReplyToCommand(client, "g_iUnreserveType = %i, iPlayers = %i, iMaxLobbySlots = %i, sv_allow_lobby_connect_only = %i, sCookie = %s", g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), sv_allow_lobby_connect_only.IntValue, sCookie);
+	ReplyToCommand(client, "g_iUnreserveType = %i, iPlayers = %i, iMaxLobbySlots = %i, bAnneLobbyReleased = %i, sv_allow_lobby_connect_only = %i, sCookie = %s", g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bAnneLobbyReleased, sv_allow_lobby_connect_only.IntValue, sCookie);
 	return Plugin_Handled;
 }
 
@@ -294,6 +300,8 @@ Action Cmd_Unreserve(int args)
 
 	SetReservationCookie(false);
 	sv_allow_lobby_connect_only.BoolValue = false;
+	if (g_iUnreserveType == UNRESERVE_ANNE)
+		g_bAnneLobbyReleased = true;
 	RefreshReserveBlockPatch();
 	return Plugin_Handled;
 }

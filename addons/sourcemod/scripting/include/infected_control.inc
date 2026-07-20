@@ -20,6 +20,22 @@ native float GetNextSpawnTime();
  */
 native bool InfectedControl_IsTraitorClient(int client);
 
+/**
+ * @brief Returns whether a client has a traitor registration.
+ * @remarks False while traitor mode is disabled. Waiting and armed clients are included.
+ *
+ * @param client Client index.
+ * @return true when the player is registered for traitor mode.
+ */
+native bool InfectedControl_IsTraitorRegistered(int client);
+
+/**
+ * @brief Returns whether infected_control currently enables traitor mode.
+ *
+ * @return true when traitor mode is enabled by the active plugin instance.
+ */
+native bool InfectedControl_IsTraitorModeEnabled();
+
 enum InfectedControlTankOfferResult
 {
 	InfectedControlTankOffer_NotTraitor = 0,
@@ -62,6 +78,8 @@ public void __pl_infected_control_SetNTVOptional()
 {
 	MarkNativeAsOptional("GetNextSpawnTime");
 	MarkNativeAsOptional("InfectedControl_IsTraitorClient");
+	MarkNativeAsOptional("InfectedControl_IsTraitorRegistered");
+	MarkNativeAsOptional("InfectedControl_IsTraitorModeEnabled");
 	MarkNativeAsOptional("InfectedControl_HandleTraitorTankOffer");
 }
 #endif
