@@ -813,7 +813,16 @@ stock int GetAnneSISpawnTime()
 stock char[] GetAnneVersion()
 {
 	char version[255];
-	GetConVarString(FindConVar("AnnePluginVersion"), version, sizeof(version));
+	ConVar anneVersion = FindConVar("AnnePluginVersion");
+	if (anneVersion == null) {
+		strcopy(version, sizeof(version), "NonAnne");
+		return version;
+	}
+	anneVersion.GetString(version, sizeof(version));
+	TrimString(version);
+	if (version[0] == '\0') {
+		strcopy(version, sizeof(version), "NonAnne");
+	}
 	return version;
 }
 

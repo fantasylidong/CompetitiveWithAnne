@@ -214,7 +214,7 @@ public void playerDeathHandler(Event event, const char[] name, bool dontBroadcas
 	if ((!IsValidClient(attacker) || attacker == victim) && !g_hAllowForceKillAnnounce.BoolValue) { return; }
 	/* 如果已经显示过了 Tank 伤害，则不再显示 */
 	if (hasPrintDamage[victim]) { return; }
-	CreateTimer(DAMAGE_DISPLAY_DELAY, printTankDamageHandler, victim);
+	CreateTimer(DAMAGE_DISPLAY_DELAY, printTankDamageHandler, GetClientUserId(victim), TIMER_FLAG_NO_MAPCHANGE);
 	hasPrintDamage[victim] = true;
 }
 
@@ -239,14 +239,16 @@ public void roundEndHandler(Event event, const char[] name, bool dontBroadcast)
 			CPrintToChatAll("%t", "L4DTankDamageAnnounce_RemainingBloodVolume", i, GetClientHealth(i), RoundToNearest(float(GetClientHealth(i)) / float(tankHealth[i]) * 100.0));
 			/* 如果已经显示过了 Tank 伤害，则不再显示 */
 			if (hasPrintDamage[i]) { continue; }
-			CreateTimer(DAMAGE_DISPLAY_DELAY, printTankDamageHandler, i);
+			CreateTimer(DAMAGE_DISPLAY_DELAY, printTankDamageHandler, GetClientUserId(i), TIMER_FLAG_NO_MAPCHANGE);
 			hasPrintDamage[i] = true;
 		}
 	}
 }
 
-public Action printTankDamageHandler(Handle timer, int client)
+public Action printTankDamageHandler(Handle timer, int userid)
 {
+	int client = GetClientOfUserId(userid);
+	if (client <= 0 || !IsClientInGame(client)) { return Plugin_Stop; }
 	printTankDamage(client);
 	return Plugin_Stop;
 }

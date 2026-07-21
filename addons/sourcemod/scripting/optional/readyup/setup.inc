@@ -17,6 +17,7 @@ void LoadTranslation()
 		SetFailState("Missing translation file \"" ... TRANSLATION_READYUP ... ".txt\"");
 	}
 	LoadTranslations(TRANSLATION_READYUP);
+	LoadTranslations("pause.phrases");
 }
 
 void SetupNatives()

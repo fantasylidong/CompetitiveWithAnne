@@ -368,19 +368,20 @@ public OnClientAuthorized(Client, const String:SteamID[]){
 	}
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT %s, %s FROM %splayers WHERE steamid = '%s'", DB_PLAYERS_TOTALPLAYTIME, DB_PLAYERS_TOTALPOINTS, DbPrefix, SteamID);
-	SQL_TQuery(db, GetBasicInf, query, Client);
+	SQL_TQuery(db, GetBasicInf, query, GetClientUserId(Client));
 }
 // Send the RANK panel to the client's display.
-public GetBasicInf(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetBasicInf(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
-		return;
-
 	if (hndl == INVALID_HANDLE)
 	{
 		LogError("GetBasicInf Query failed: %s", error);
 		return;
 	}
+
+	new client = GetClientOfUserId(userid);
+	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
+		return;
 
 	new Playtime;
 	new String:Name[32];

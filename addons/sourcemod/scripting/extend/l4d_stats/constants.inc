@@ -6,7 +6,7 @@
 // 插件常量、数据库表达式和固定资源名。
 
 #define PLUGIN_NAME "玩家排名系统"
-#define PLUGIN_VERSION "1.5.1"
+#define PLUGIN_VERSION "1.5.2"
 #define PLUGIN_DESCRIPTION "求生之路2状态和排名系统."
 
 #define MAX_LINE_WIDTH 64

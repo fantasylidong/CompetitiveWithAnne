@@ -22,7 +22,7 @@
 #tryinclude <sourcescramble> // 未装也能编译，仅无法打补丁
 
 #define PLUGIN_NAME        "L4D2 DirSpawn + MaxSpecial Unlock"
-#define PLUGIN_VERSION     "1.6.0"
+#define PLUGIN_VERSION     "1.6.1"
 #define PLUGIN_AUTHOR      "morzlee"
 #define PLUGIN_URL         "https://github.com/fantasylidong/CompetitiveWithAnne"
 
@@ -693,7 +693,10 @@ void AutoRecomputeAndApply(bool announce)
 
 public Action TMR_AutoOnce(Handle timer, any data)
 {
-    g_hAutoTimer = null;
+    if (g_hAutoTimer == timer)
+    {
+        g_hAutoTimer = null;
+    }
     AutoRecomputeAndApply(true);
     return Plugin_Stop;
 }
@@ -1108,7 +1111,18 @@ public void OnPluginStart()
     LogMsg("%s v%s loaded.", PLUGIN_NAME, PLUGIN_VERSION);
 }
 
+public void OnMapEnd()
+{
+    // TIMER_FLAG_NO_MAPCHANGE closes the timer without running its callback.
+    g_hAutoTimer = null;
+}
+
 public void OnPluginEnd()
 {
+    if (g_hAutoTimer != null)
+    {
+        delete g_hAutoTimer;
+        g_hAutoTimer = null;
+    }
     ShutdownVScript();
 }
