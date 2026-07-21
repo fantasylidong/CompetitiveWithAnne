@@ -489,19 +489,19 @@
 
 ## Anne 私有武器属性实验插件命令
 
-这些插件目前是私有实验层，通常放在 `plugins/optional/AnneHappy/` 下按需加载。网页后台“玩家武器属性”写入数据库后，由 `l4d2_player_attr_db` 读取并调用 PWA/PMA/PMA-Trace/PMA-AttackSeg native；调试时也可以直接用下表命令手动设置。
+这些插件目前是私有实验层，通常放在 `plugins/optional/AnneHappy/` 下按需加载。网页后台“玩家武器属性”写入数据库后，由 `l4d2_player_attr_db` 启动时读取并调用 PWA/PMA native；调试时也可以直接用下表命令手动设置。
 
-所有武器属性插件现在强依赖 `l4d2_private_license.smx`。如果没有 `addons/sourcemod/configs/l4d2_private_license.cfg`、数据库授权表没有匹配行，或服务器不在授权绑定范围内，PWA/PMA/Trace/AttackSeg/DB/Dump 会在启动阶段拒绝加载。
+所有武器属性插件现在强依赖 `l4d2_private_license.smx`。服务器不在 SourceBans 白名单时，PWA/PMA/DB/Dump 会在启动阶段拒绝加载。
 
 ### 生效和默认值链路
 
-- 原生默认：由 `l4d2_weaponinfo_dump` 执行 `sm_widump_all_defaults` 生成 JSON，Web 后台读取 `addons/sourcemod/data/l4d2_weaponinfo_defaults.json`；近战轨迹会额外 dump `scripts/melee/*.txt` 的主/副攻击段，若服务器不能通过 Valve 文件系统读取 VPK 内脚本，可把脚本镜像放到 `addons/sourcemod/data/l4d2_melee_scripts/*.txt`。
+- 原生默认：由 `l4d2_weaponinfo_dump` 执行 `sm_widump_all_defaults` 生成 JSON，Web 后台读取 `addons/sourcemod/data/l4d2_weaponinfo_defaults.json`。
 - vote 默认：来自 `cfg/vote/weapon` 下当前模式 cfg 的 `sm_weapon <weapon> <attr> <value>` 行，只是全局默认，不是玩家覆盖。
-- 玩家覆盖：存入 `l4d2_player_attr_profiles`，游戏服 `l4d2_player_attr_db` 在进服、切枪、定时刷新或手动 reload/apply 时下发。
-- 手动测试：如果直接用 `sm_pwa_set`、`sm_pma_set`、`sm_pma_trace_attr_set`、`sm_pma_attackseg_set` 调试，建议先临时执行 `sm_cvar l4d2_player_attr_db_enable 0`。否则 DB 协调器会在切枪、定时刷新或 `sm_pattrdb_reload/apply` 时清掉当前类型手动 profile 并按数据库重放。
-- 私有授权：`l4d2_private_license` 读取 `l4d2_private_plugin_licenses` 和本服 license key，只允许授权服务器使用私有武器属性插件；`.smx` 外流但没有授权时不能直接加载。
-- 日志默认关闭，测试时按需打开：PWA `l4d2_pwa_log`/`l4d2_pwa_firebullets_log`/`l4d2_pwa_damage_fallback_log`，PMA `l4d2_pma_log`，Trace `l4d2_pma_trace_attrs_log`，AttackSeg `l4d2_pma_attackseg_attrs_log`，DB `l4d2_player_attr_db_log`，授权 `l4d2_private_license_log`。完整测试时可执行：
-  `sm_cvar l4d2_pwa_log 1; sm_cvar l4d2_pwa_log_level 3; sm_cvar l4d2_pwa_firebullets_log 1; sm_cvar l4d2_pwa_damage_fallback_log 1; sm_cvar l4d2_pma_log 1; sm_cvar l4d2_pma_trace_attrs_log 1; sm_cvar l4d2_pma_attackseg_attrs_log 1; sm_cvar l4d2_player_attr_db_log 1; sm_cvar l4d2_private_license_log 1`。测完把这些 cvar 改回 `0` 即可。
+- 玩家覆盖：存入 `l4d2_player_attr_profiles`，游戏服 `l4d2_player_attr_db` 在插件启动、玩家进服、切枪或手动 reload/apply 时从内存缓存下发。
+- 手动测试：如果直接用 `sm_pwa_set` 或 `sm_pma_set` 调试，建议先临时执行 `sm_cvar l4d2_player_attr_db_enable 0`。否则 DB 协调器会在切枪或 `sm_pattrdb_reload/apply` 时清掉当前类型手动 profile 并按数据库缓存重放。
+- 私有授权：`l4d2_private_license` 只允许 SourceBans 白名单内的服务器使用私有武器属性插件。
+- 日志默认关闭，测试时按需打开：PWA `l4d2_pwa_log`/`l4d2_pwa_firebullets_log`/`l4d2_pwa_damage_fallback_log`，PMA `l4d2_pma_log`，DB `l4d2_player_attr_db_log`，授权 `l4d2_private_license_log`。完整测试时可执行：
+  `sm_cvar l4d2_pwa_log 1; sm_cvar l4d2_pwa_log_level 3; sm_cvar l4d2_pwa_firebullets_log 1; sm_cvar l4d2_pwa_damage_fallback_log 1; sm_cvar l4d2_pma_log 1; sm_cvar l4d2_player_attr_db_log 1; sm_cvar l4d2_private_license_log 1`。测完把这些 cvar 改回 `0` 即可。
 
 ### 私有授权守卫
 
@@ -515,7 +515,7 @@
 | 插件 | 命令 | 类型 | 权限 | 说明 |
 | --- | --- | --- | --- | --- |
 | `optional/AnneHappy/l4d2_player_attr_db.smx` | `sm_pattrdb_reload` | 管理员 | ADMFLAG_ROOT | 重新连接/读取数据库里的玩家属性行，并对在线玩家尝试应用。 |
-| `optional/AnneHappy/l4d2_player_attr_db.smx` | `sm_pattrdb_status` | 管理员 | ADMFLAG_ROOT | 显示 DB 插件启用状态、连接状态、缓存行数、最后加载时间和 PWA/PMA/Trace/AttackSeg native 是否可用。 |
+| `optional/AnneHappy/l4d2_player_attr_db.smx` | `sm_pattrdb_status` | 管理员 | ADMFLAG_ROOT | 显示 DB 插件启用状态、连接状态、缓存行数、最后加载时间和 PWA/PMA native 是否可用。 |
 | `optional/AnneHappy/l4d2_player_attr_db.smx` | `sm_pattrdb_apply <target>` | 管理员 | ADMFLAG_ROOT | 对目标玩家立即按当前持有武器/近战应用已缓存 DB 行。 |
 
 常用流程：
@@ -525,8 +525,6 @@ sm plugins load optional/AnneHappy/l4d2_private_license
 sm_private_license_status
 sm plugins load optional/AnneHappy/l4d2_pwa_native_attrs
 sm plugins load optional/AnneHappy/l4d2_pma_native_attrs
-sm plugins load optional/AnneHappy/l4d2_pma_trace_attrs
-sm plugins load optional/AnneHappy/l4d2_pma_attackseg_attrs
 sm plugins load optional/AnneHappy/l4d2_player_attr_db
 sm_pattrdb_status
 sm_pattrdb_reload
@@ -567,6 +565,8 @@ sm_pwa_clear "#userid"
 
 ### PMA 近战原生属性
 
+当前只支持可由服务器权威处理的 `damage`、`damageflags`、`rumbleeffect`、`decapitates`。挥砍间隔、待机时间、轨迹和攻击段已移除，以免与客户端预测不同步。
+
 | 插件 | 命令 | 类型 | 权限 | 说明 |
 | --- | --- | --- | --- | --- |
 | `optional/AnneHappy/l4d2_pma_native_attrs.smx` | `sm_pma_set <target> <melee\|@active> <attr> <value> [attr value]...` | 管理员 | ADMFLAG_ROOT | 手动给目标设置近战原生 profile。 |
@@ -581,68 +581,6 @@ sm_pwa_clear "#userid"
 | `optional/AnneHappy/l4d2_pma_native_attrs.smx` | `sm_pma_matrix_audit <target_a> <target_b> <melee\|@active>` | 管理员 | ADMFLAG_ROOT | 设置两名玩家不同近战 profile 并跑审计。 |
 | `optional/AnneHappy/l4d2_pma_native_attrs.smx` | `sm_pma_live_swing_audit <target_a> <target_b> <melee\|@active>` | 管理员 | ADMFLAG_ROOT | 强制同 tick 挥砍并审计 apply/restore。 |
 | `optional/AnneHappy/l4d2_pma_native_attrs.smx` | `sm_pma_bot_live_smoke <bot_a> <bot_b> <melee>` | 管理员 | ADMFLAG_ROOT | bot 近战 live smoke。 |
-
-### PMA-Trace 近战轨迹属性
-
-| 插件 | 命令 | 类型 | 权限 | 说明 |
-| --- | --- | --- | --- | --- |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_set <target> [melee\|@active\|*] <range\|dirscale\|yawbias> <value> [attr value]...` | 管理员 | ADMFLAG_ROOT | 手动设置近战轨迹 profile。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_clear <target>` | 管理员 | ADMFLAG_ROOT | 清除目标 Trace profile。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_list` | 管理员 | ADMFLAG_ROOT | 列出 Trace profile。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_status` | 管理员 | ADMFLAG_ROOT | 查看 Trace counters 和状态。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_reload_config` | 管理员 | ADMFLAG_ROOT | 重新读取旧 cfg profile。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_apply_config <target> <melee\|@active>` | 管理员 | ADMFLAG_ROOT | 手动应用旧 cfg Trace profile。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_live_audit <target_a> <target_b>` | 管理员 | ADMFLAG_ROOT | 强制同 tick 近战轨迹审计。 |
-| `optional/AnneHappy/l4d2_pma_trace_attrs.smx` | `sm_pma_trace_attr_bot_live_smoke <bot_a> <bot_b> <melee>` | 管理员 | ADMFLAG_ROOT | bot 轨迹 live smoke。 |
-
-启用方向向量修改：
-
-```text
-sm_cvar l4d2_pma_trace_attrs_vector_change 1
-sm_pma_trace_attr_set "#userid" @active range 160 dirscale 1.0 yawbias 20
-sm_pma_trace_attr_live_audit "#userid_a" "#userid_b"
-```
-
-### PMA-AttackSeg 近战攻击段属性
-
-这一层专门覆盖 `CMeleeWeaponInfo` 里的 `primaryattacks` / `secondaryattacks` 挥砍段，用来还原或按玩家修改 VPK 脚本里的原生挥砍方向、命中时间窗、挥砍持续时间和推力方向。它和 PMA-Trace 不同：PMA-Trace 是在 trace 结果附近改范围/方向；PMA-AttackSeg 是在 `CTerrorMeleeWeapon::GetPrimaryAttackActivity` / `GetSecondaryAttackActivity`、`StartMeleeSwing`、`DoMeleeSwing` 前后短窗口覆盖 `melee_anim_t`，随后恢复全局数据。
-
-支持字段：
-
-- `startdir`、`enddir`：方向，支持 `N/NE/E/SE/S/SW/W/NW` 或 `0-7`。
-- `starttime`、`endtime`：命中窗口开始/结束时间。
-- `duration`：本段挥砍持续时间。
-- `forcedir`：三维推力方向，例如 `8 -4 0`。
-- `activity`、`playeractivity`、`playeractivityidle`：活动编号，只接受数字；后台目前展示默认脚本字符串，但插件端还没有做 ACT 字符串到数字的映射。
-
-网页数据库里的 `target_type` 是 `attackseg`，`attr_name` 格式是 `primary0.starttime`、`primary0.forcedir`、`secondary0.endtime` 这类复合字段。
-
-| 插件 | 命令 | 类型 | 权限 | 说明 |
-| --- | --- | --- | --- | --- |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_set <target> [melee\|@active\|*] <primary\|secondary> <segment> <attr> <value...> [attr value]...` | 管理员 | ADMFLAG_ROOT | 手动给目标设置近战攻击段 profile。`segment` 是 0-7；`forcedir` 后面跟三个数字。 |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_clear <target>` | 管理员 | ADMFLAG_ROOT | 清除目标 AttackSeg profile。 |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_status` | 管理员 | ADMFLAG_ROOT | 查看 detour 计数、apply/restore 计数、未恢复事务数量和在线 profile。 |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_dump_current <target>` | 管理员 | ADMFLAG_ROOT | dump 目标当前 `weapon+0x1824` 指向的挥砍段内容。通常需要目标刚挥砍过或正在挥砍。 |
-| `optional/AnneHappy/l4d2_pma_attackseg_attrs.smx` | `sm_pma_attackseg_apply_original_knife <target>` | 管理员 | ADMFLAG_ROOT | 给目标写入 VPK 原版小刀攻击段 preset，覆盖方向、窗口、duration、forcedir 和 AXE 动画 activity 编号。 |
-
-原版小刀攻击段手动测试：
-
-```text
-sm_cvar l4d2_pma_attackseg_attrs_log 1
-sm_pma_attackseg_set "#userid" knife primary 0 activity 197 playeractivity 1125 playeractivityidle 1126 startdir W enddir E duration 1.1 starttime 0.05 endtime 0.35 forcedir 8 -4 0
-sm_pma_attackseg_set "#userid" knife secondary 0 activity 192 playeractivity 1133 playeractivityidle 1133 startdir W enddir E duration 0.7 starttime 0.08 endtime 0.4
-sm_pma_attackseg_status
-```
-
-随后左键/右键各挥几次小刀，再执行 `sm_pma_attackseg_status`。如果 `get_primary` / `get_secondary` 计数增加，且 `logs/l4d2_pma_attackseg_attrs.log` 中出现 `hook=GetPrimaryAttackActivity` / `hook=GetSecondaryAttackActivity` 的 `apply`、`return_override` 和 `start_post restore`，说明攻击段覆盖进入了正确时机。
-
-如果走网页后台，对管理员写原版小刀 preset 后，游戏服执行：
-
-```text
-sm_pattrdb_reload
-sm_pattrdb_apply "#userid"
-sm_pma_attackseg_status
-```
 
 ### WeaponInfo dump/probe
 

@@ -6,7 +6,7 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define PLUGIN_VERSION "2026.07.15.3"
+#define PLUGIN_VERSION "2026.07.22.1"
 #define TEAM_SURVIVOR 2
 #define DEFAULT_CONFIG_PATH "configs/AnneHappy/dynamic_ai_difficulty.cfg"
 #define DEFAULT_THRESHOLD_DB_CONFIG "l4dstats"
@@ -59,6 +59,7 @@ int g_iNextThresholdRefreshAt = 0;
 bool g_bDifficultyLocked = false;
 bool g_bPendingAutoApply = false;
 bool g_bSurvivorsLeftStartArea = false;
+bool g_bRoundStartSeen = false;
 bool g_bThresholdDbConnecting = false;
 bool g_bThresholdSchemaReady = false;
 bool g_bThresholdQueryInFlight = false;
@@ -108,6 +109,7 @@ public void OnPluginStart()
     versionCvar.SetString(PLUGIN_VERSION, false, false);
 
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+    HookEvent("player_team", Event_PlayerTeam);
     HookEvent("player_left_start_area", Event_PlayerLeftStartArea, EventHookMode_PostNoCopy);
 
     RegConsoleCmd("sm_aippm", Cmd_ShowPPM, "显示当前 AnneHappy 动态难度和 PPM");
@@ -130,6 +132,7 @@ public void OnMapEnd()
 {
     RestoreControlledCvars(true);
     g_bConfigsExecuted = false;
+    g_bRoundStartSeen = false;
     StopDifficultyTimer();
     StopThresholdDbReconnect();
     CloseThresholdDb();
@@ -162,6 +165,7 @@ void StopDifficultyTimer()
 
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+    g_bRoundStartSeen = true;
     g_fNextCheckAt = 0.0;
     g_fNextEnforceAt = 0.0;
     g_fCurrentPPM = 0.0;
@@ -181,11 +185,14 @@ public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontB
 {
     g_bSurvivorsLeftStartArea = true;
 
-    if (!g_cvEnable.BoolValue || g_bDifficultyLocked)
+    if (!g_cvEnable.BoolValue)
         return;
 
     if (g_cvFixedLevel.IntValue > 0)
     {
+        if (g_bDifficultyLocked)
+            return;
+
         ApplyFixedDifficultyIfNeeded(true);
         if (!g_bDifficultyLocked)
         {
@@ -198,10 +205,18 @@ public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontB
         return;
     }
 
-    if (g_iCurrentLevel <= 0 && !ApplyDifficulty(1, true))
+    // The round-start result is provisional because team changes can finish after
+    // round_start. Recalculate from the exact survivor roster before locking.
+    if (!TryApplyAutoDifficulty(true, true))
     {
-        g_bPendingAutoApply = true;
-        return;
+        if (!ApplyDifficulty(1, true))
+        {
+            g_bPendingAutoApply = true;
+            return;
+        }
+
+        g_iCurrentMode = 0;
+        g_fCurrentPPM = 0.0;
     }
 
     g_bDifficultyLocked = true;
@@ -212,6 +227,29 @@ public void Event_PlayerLeftStartArea(Event event, const char[] name, bool dontB
     {
         CPrintLevelPhraseToChatAll("DynamicAIDifficulty_DynamicDifficultyRoundLocked", g_iCurrentLevel);
     }
+}
+
+public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+{
+    if (!g_cvEnable.BoolValue || g_cvFixedLevel.IntValue > 0 || g_bSurvivorsLeftStartArea)
+        return;
+
+    int oldTeam = event.GetInt("oldteam");
+    int newTeam = event.GetInt("team");
+    if (oldTeam != TEAM_SURVIVOR && newTeam != TEAM_SURVIVOR)
+        return;
+
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client > 0 && IsFakeClient(client))
+        return;
+
+    // A survivor joining, leaving, or switching to spectator invalidates the
+    // provisional PPM snapshot. The repeating timer will refresh it in saferoom.
+    g_bDifficultyLocked = false;
+    g_bPendingAutoApply = true;
+    g_fNextCheckAt = 0.0;
+    g_fCurrentPPM = 0.0;
+    PublishCurrentDifficulty();
 }
 
 public Action Timer_CheckDifficulty(Handle timer)
@@ -237,7 +275,7 @@ public Action Timer_CheckDifficulty(Handle timer)
     if (ApplyFixedDifficultyIfNeeded(false))
         return Plugin_Continue;
 
-    TryApplyAutoDifficulty(false);
+    TryApplyAutoDifficulty(false, ShouldLockAutoDifficulty());
     return Plugin_Continue;
 }
 
@@ -281,7 +319,14 @@ void PrepareRoundDifficulty(bool silent)
     }
 
     g_bPendingAutoApply = true;
-    TryApplyAutoDifficulty(silent);
+    TryApplyAutoDifficulty(silent, ShouldLockAutoDifficulty());
+}
+
+bool ShouldLockAutoDifficulty()
+{
+    // If the plugin was loaded mid-round, round_start was not observable and
+    // there may be no later saferoom event available to finalize the result.
+    return !g_bRoundStartSeen || g_bSurvivorsLeftStartArea;
 }
 
 bool ApplyFixedDifficultyIfNeeded(bool silent)
@@ -310,7 +355,7 @@ bool ApplyFixedDifficultyIfNeeded(bool silent)
     return true;
 }
 
-bool TryApplyAutoDifficulty(bool silent)
+bool TryApplyAutoDifficulty(bool silent, bool lockDifficulty = false)
 {
     if (ShouldWaitForThresholdRefresh())
     {
@@ -343,7 +388,7 @@ bool TryApplyAutoDifficulty(bool silent)
         return false;
     }
 
-    g_bDifficultyLocked = true;
+    g_bDifficultyLocked = lockDifficulty;
     g_bPendingAutoApply = false;
     g_iCurrentMode = 0;
     g_fCurrentPPM = ppm;
@@ -419,7 +464,7 @@ public Action Cmd_SetDifficulty(int client, int args)
         g_bDifficultyLocked = false;
         g_bPendingAutoApply = true;
 
-        if (!TryApplyAutoDifficulty(false))
+        if (!TryApplyAutoDifficulty(false, ShouldLockAutoDifficulty()))
         {
             // Do not retain a fixed high-tier profile while automatic PPM data is unavailable.
             ApplyDifficulty(1, true);

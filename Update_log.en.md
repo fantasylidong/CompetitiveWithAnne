@@ -53,3 +53,7 @@
 - Added `deferred_strings.cfg` for the 60 dance songs, split into eight groups by default. Each actual `changelevel` offers one shuffled group; no group repeats until all eight have been offered, after which the order is shuffled again. `sm_fixscreen_deferred_group_count` controls the number of groups, and files already present in the client cache are skipped automatically.
 - The three interdependent dance model files are downloaded together on the player's first map transition to prevent partial-model errors. The same transition also offers one random song group, and later transitions continue in shuffled, non-repeating order.
 - All 124 feedback, model, and dance resources are now stored as path-preserving `.bz2` files in the NewAnneWeb file manager. FastDL now uses `http://anne.trygek.com/fastdl/left4dead2` with Cloudflare edge caching.
+
+### July 22, 2026 Dynamic Difficulty PPM Fix
+- Fixed automatic difficulty locking its team PPM snapshot too early at `round_start`, which could leave players who subsequently switched to spectator in the round's tier calculation.
+- The round-start tier is now provisional. Survivor-roster changes inside the saferoom invalidate that PPM, and the plugin recalculates and locks from the real players still on the Survivor team when the first Survivor leaves. Spectators and bots are excluded.
