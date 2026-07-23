@@ -624,6 +624,7 @@ int DummyHandler(Menu menu, MenuAction action, int param1, int param2) { return 
 void UpdatePanel()
 {
     Panel menuPanel = new Panel();
+	bool anneMode = IsAnneMode();
 	
     char info[512];
     serverNamerCvar.GetString(info, sizeof(info));
@@ -648,18 +649,27 @@ void UpdatePanel()
         FormatEx(buffer, sizeof(buffer), "%T", "RequireAdmin", LANG_SERVER);
         menuPanel.DrawText(buffer);
         menuPanel.DrawText(teamReady[L4D2Team_Survivor] ? SurvivorUnPaused() : SurvivorPaused() );
-        menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        if (!anneMode)
+        {
+            menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        }
     }
     else if (initiatorReadyCvar.BoolValue)
     {
         menuPanel.DrawText(initiatorReady ? InitiatorUnPaused() : InitiatorPaused() );
         menuPanel.DrawText(teamReady[L4D2Team_Survivor] ?  SurvivorUnPaused() : SurvivorPaused() );
-        menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        if (!anneMode)
+        {
+            menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        }
     } 
     else
     {
         menuPanel.DrawText(teamReady[L4D2Team_Survivor] ? SurvivorUnPaused() : SurvivorPaused());
-        menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        if (!anneMode)
+        {
+            menuPanel.DrawText(teamReady[L4D2Team_Infected] ? InfectedUnPaused() : InfectedPaused() );
+        }
     }
 
     menuPanel.DrawText(" ");
@@ -737,7 +747,7 @@ bool CheckFullReady()
     int InitiatorClient = GetClientOfUserId(initiatorId);
 
     return (teamReady[L4D2Team_Survivor] || GetTeamHumanCount(L4D2Team_Survivor) == 0)
-        && (teamReady[L4D2Team_Infected] || GetTeamHumanCount(L4D2Team_Infected) == 0)
+        && (IsAnneMode() || teamReady[L4D2Team_Infected] || GetTeamHumanCount(L4D2Team_Infected) == 0)
         && (!initiatorReadyCvar.BoolValue || initiatorReady || !IsPlayer(InitiatorClient));
 }
 
@@ -951,6 +961,26 @@ stock int GetTeamHumanCount(int team)
     }
 	
     return humans;
+}
+
+stock bool IsAnneMode()
+{
+    ConVar readyCfgName = FindConVar("l4d_ready_cfg_name");
+    if (readyCfgName == null)
+    {
+        return false;
+    }
+
+    char cfgName[128];
+    readyCfgName.GetString(cfgName, sizeof(cfgName));
+    return StrContains(cfgName, "AnneHappy", false) != -1
+        || StrContains(cfgName, "AnneCoop", false) != -1
+        || StrContains(cfgName, "AnneRealism", false) != -1
+        || StrContains(cfgName, "AnneMutation4", false) != -1
+        || StrContains(cfgName, "AllCharger", false) != -1
+        || StrContains(cfgName, "1vHunters", false) != -1
+        || StrContains(cfgName, "WitchParty", false) != -1
+        || StrContains(cfgName, "Alone", false) != -1;
 }
 
 stock bool IsSurvivorReviving()

@@ -1199,7 +1199,7 @@ stock bool IsNormalMode()
 stock int IsAutoSpawnTime()
 {
 	ConVar cvar = FindConVar("inf_EnableAutoSpawnTime");
-	if(cvar_mode == null) return false;
+	if(cvar == null) return false;
 	return cvar.IntValue;
 }
 
