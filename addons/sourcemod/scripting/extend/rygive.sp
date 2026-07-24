@@ -11,7 +11,7 @@
 #define PLUGIN_NAME				"Give Item Menu"
 #define PLUGIN_AUTHOR			"sorallll"
 #define PLUGIN_DESCRIPTION		"多功能插件"
-#define PLUGIN_VERSION			"1.2.3"
+#define PLUGIN_VERSION			"1.2.4"
 #define PLUGIN_URL				""
 
 #define GAMEDATA				"rygive"
@@ -2256,20 +2256,13 @@ void UpdateRpgRoundForRygiveItems() {
 	if (!g_bRPG)
 		return;
 
-	switch (GetAnneModeForRygive()) {
-		case 1: {
-			L4D_RPG_SetGlobalValue(INDEX_USEBUY, true);
-		}
-		case 2: {
-			InvalidateRpgRoundForRygiveItems();
-		}
-		case 3: {
-			InvalidateRpgRoundForRygiveItems();
-		}
-		default: {
-			L4D_RPG_SetGlobalValue(INDEX_USEBUY, true);
-		}
+	int anneMode = GetAnneModeForRygive();
+	if (anneMode == 2 || anneMode == 3) {
+		InvalidateRpgRoundForRygiveItems();
+		return;
 	}
+
+	L4D_RPG_SetGlobalValue(INDEX_USEBUY, true);
 }
 
 void InvalidateRpgRoundForRygiveItems() {

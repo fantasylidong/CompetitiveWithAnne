@@ -363,9 +363,21 @@ public Action:timer_ShowPlayerJoined(Handle:timer, any:client)
 public OnClientAuthorized(Client, const String:SteamID[]){
 	if (!Client)
 		return;
+
+	NewPlayerBonus_ResetClientData(Client);
+
 	if (StrEqual(SteamID, "BOT", false)) {
 		return;
 	}
+
+	// 数据库连接和客户端入服状态在 PostAdminCheck 阶段统一确认后再查询。
+}
+
+stock QueryClientNewPlayerBonusData(Client, const String:SteamID[])
+{
+	if (db == INVALID_HANDLE || !Stats_IsValidHumanClient(Client))
+		return;
+
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT %s, %s FROM %splayers WHERE steamid = '%s'", DB_PLAYERS_TOTALPLAYTIME, DB_PLAYERS_TOTALPOINTS, DbPrefix, SteamID);
 	SQL_TQuery(db, GetBasicInf, query, GetClientUserId(Client));
@@ -383,24 +395,26 @@ public GetBasicInf(Handle:owner, Handle:hndl, const String:error[], any:userid)
 	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
 		return;
 
-	new Playtime;
-	new String:Name[32];
-
 	if (SQL_FetchRow(hndl))
 	{
-		Playtime = SQL_FetchInt(hndl, 0);
-		ClientPlayTime[client] = Playtime;
+		ClientPlayTime[client] = SQL_FetchInt(hndl, 0);
 		ClientPoints[client] = SQL_FetchInt(hndl, 1);
-		ClientScoreReady[client] = true;
-		Call_StartForward(SuccessGetPlayerTime);//转发触发
-		Call_PushCell(client);//按顺序将参数push进forward传参列表里
-		Call_Finish();//转发结束
 	}
 	else
 	{
-		GetClientName(client, Name, sizeof(Name));
-		Playtime = 0;
+		// 查询成功且没有记录，才确认这是分数和时长均为 0 的新玩家。
+		ClientPlayTime[client] = 0;
+		ClientPoints[client] = 0;
 	}
+
+	g_bNewPlayerBonusClientDataReady[client] = true;
+	ClientScoreReady[client] = true;
+	Call_StartForward(SuccessGetPlayerTime);//转发触发
+	Call_PushCell(client);//按顺序将参数push进forward传参列表里
+	Call_Finish();//转发结束
+
+	if (g_bStatsPlaytimeStarted || Isstart || SurvivalStarted)
+		NewPlayerBonus_AnnounceRoundStart();
 }
 public DoShowPlayerJoined(client)
 {

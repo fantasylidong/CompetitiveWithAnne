@@ -59,6 +59,7 @@ public Action:ClientPostAdminCheck(Handle:timer, any:client)
 	decl String:SteamID[MAX_LINE_WIDTH];
 	GetClientRankAuthString(client, SteamID, sizeof(SteamID));
 
+	QueryClientNewPlayerBonusData(client, SteamID);
 	CheckPlayerDB(client);
 	QuarterRank_QueryClient(client);
 
@@ -201,8 +202,7 @@ public OnClientDisconnect(client)
 {
 	Stats_ClearRoundParticipant(client);
 	InitializeClientInf(client);
-	ClientScoreReady[client] = false;
-	ClientPoints[client] = 0;
+	NewPlayerBonus_ResetClientData(client);
 	ClientRank[client] = 0;
 	PlayerRankVote[client] = RANKVOTE_NOVOTE;
 	ClientRankMute[client] = false;

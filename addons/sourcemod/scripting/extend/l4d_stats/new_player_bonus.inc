@@ -10,6 +10,7 @@ new Handle:cvar_NewPlayerBonusFirstMultiplier = INVALID_HANDLE;
 new Handle:cvar_NewPlayerBonusExtraMultiplier = INVALID_HANDLE;
 new Handle:cvar_NewPlayerBonusMaxMultiplier = INVALID_HANDLE;
 new bool:g_bNewPlayerBonusRoundAnnounced = false;
+new bool:g_bNewPlayerBonusClientDataReady[MAXPLAYERS + 1];
 
 // 带新人奖励配置：
 // - 同时以累计游玩时间和总分判断新人。
@@ -30,18 +31,43 @@ stock NewPlayerBonus_ResetRound()
 	g_bNewPlayerBonusRoundAnnounced = false;
 }
 
+stock NewPlayerBonus_ResetClientData(client)
+{
+	if (client < 1 || client > MaxClients)
+		return;
+
+	g_bNewPlayerBonusClientDataReady[client] = false;
+	ClientScoreReady[client] = false;
+	ClientPlayTime[client] = 0;
+	ClientPoints[client] = 0;
+}
+
+stock bool:NewPlayerBonus_AreSurvivorStatsReady()
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (Stats_IsSurvivorHuman(i) && !g_bNewPlayerBonusClientDataReady[i])
+			return false;
+	}
+
+	return true;
+}
+
 stock bool:NewPlayerBonus_IsNewPlayer(client)
 {
-	if (!Stats_IsSurvivorHuman(client))
+	if (!Stats_IsSurvivorHuman(client) || !g_bNewPlayerBonusClientDataReady[client])
 		return false;
 
-	// ClientPlayTime / ClientPoints 在玩家授权后从 DB 异步读取；新入库或尚未有记录时为 0，按新人处理。
+	// 只有 DB 查询确认后的分数和时长才能用于新人判断；加载中的玩家保持未知状态。
 	return ClientPlayTime[client] < GetConVarInt(cvar_NewPlayerBonusPlaytime) &&
 		ClientPoints[client] < GetConVarInt(cvar_NewPlayerBonusMaxPoints);
 }
 
 stock NewPlayerBonus_CountNewSurvivors()
 {
+	if (!NewPlayerBonus_AreSurvivorStatsReady())
+		return 0;
+
 	new Count = 0;
 
 	for (new i = 1; i <= MaxClients; i++)
@@ -81,7 +107,7 @@ stock bool:NewPlayerBonus_ShouldApplyToClient(client)
 	if (!GetConVarBool(cvar_NewPlayerBonusEnable))
 		return false;
 
-	if (!Stats_IsSurvivorHuman(client) || NewPlayerBonus_IsNewPlayer(client))
+	if (!NewPlayerBonus_AreSurvivorStatsReady() || !Stats_IsSurvivorHuman(client) || NewPlayerBonus_IsNewPlayer(client))
 		return false;
 
 	return NewPlayerBonus_CountNewSurvivors() > 0;
