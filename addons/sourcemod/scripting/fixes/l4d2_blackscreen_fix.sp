@@ -3,13 +3,18 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <stringtables_data>
 
 #define PRIORITY_CONFIG "data/restrict_strings.cfg"
 #define DEFERRED_CONFIG "data/deferred_strings.cfg"
 #define MAX_DEFERRED_GROUPS 128
 
-ArrayList g_aDownloadables;
+static const char g_sDanceModels[][] =
+{
+	"models/player/custom_player/foxhound/fortnite_dances_emotes_ok.mdl",
+	"models/player/custom_player/foxhound/fortnite_dances_emotes_ok.vvd",
+	"models/player/custom_player/foxhound/fortnite_dances_emotes_ok.dx90.vtx"
+};
+
 ArrayList g_aPriority;
 ArrayList g_aDeferred;
 
@@ -21,27 +26,33 @@ int g_iDeferredGroupOrderCursor;
 int g_iPlannedDeferredCount = -1;
 int g_iPlannedGroupCount = -1;
 int g_iLastDeferredGroup = -1;
-bool g_bDownloadablesSaved;
-bool g_bRestoredThisMap;
+bool g_bTransitionBatchAdded;
+bool g_bPriorityAddedThisMap;
+bool g_bLateLoad;
 
 public Plugin myinfo =
 {
-	name = "[L4D & L4D2] Staged FastDL / Black Screen Fix",
+	name = "[L4D & L4D2] Additive Staged FastDL",
 	author = "BHaType, Dragokas, AnneHappy",
-	description = "Keeps priority downloads on connect and downloads optional assets in batches during map transitions",
-	version = "1.2.0"
+	description = "Adds priority downloads on map start and optional assets in batches during map transitions",
+	version = "1.3.0"
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
+{
+	g_bLateLoad = late;
+	return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
-	g_aDownloadables = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
 	g_aPriority = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
 	g_aDeferred = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
 
 	g_cvDeferredGroupCount = CreateConVar(
 		"sm_fixscreen_deferred_group_count",
 		"8",
-		"Number of groups used to split deferred files; one shuffled group is restored per real map change (0 disables deferred downloads).",
+		"Number of groups used to split deferred files; one shuffled group is added per real map change (0 disables deferred downloads).",
 		FCVAR_NONE,
 		true,
 		0.0,
@@ -49,97 +60,72 @@ public void OnPluginStart()
 		float(MAX_DEFERRED_GROUPS)
 	);
 
-	RegAdminCmd("sm_get_restricted_strings", CMD_GetPriorityFiles, ADMFLAG_ROOT, "List files downloaded when a player first connects");
-	RegAdminCmd("sm_restore_st", CMD_RestoreDownloadables, ADMFLAG_ROOT, "Restore every saved downloadables string-table item");
+	RegAdminCmd("sm_get_restricted_strings", CMD_GetPriorityFiles, ADMFLAG_ROOT, "List files added when a player first connects");
 
+	HookEvent("map_transition", Event_MapTransition, EventHookMode_Pre);
 	AddCommandListener(ServerCmd_ChangeLevel, "changelevel");
+
+	if (g_bLateLoad)
+		CreateTimer(0.1, Timer_AddPriorityFiles, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnMapStart()
 {
-	g_bDownloadablesSaved = false;
-	g_bRestoredThisMap = false;
-	CreateTimer(0.1, Timer_SaveDownloadables, _, TIMER_FLAG_NO_MAPCHANGE);
+	g_bTransitionBatchAdded = false;
+	g_bPriorityAddedThisMap = false;
+	CreateTimer(0.1, Timer_AddPriorityFiles, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action Timer_SaveDownloadables(Handle timer)
+public Action Timer_AddPriorityFiles(Handle timer)
 {
-	SaveDownloadables();
-	return Plugin_Stop;
-}
+	if (g_bPriorityAddedThisMap)
+		return Plugin_Stop;
 
-void SaveDownloadables()
-{
 	if (!LoadFileList(PRIORITY_CONFIG, g_aPriority, true))
-	{
-		LogError("[FixScreen] Priority config '%s' is missing; leaving the downloadables table unchanged.", PRIORITY_CONFIG);
-		return;
-	}
+		return Plugin_Stop;
 
 	LoadFileList(DEFERRED_CONFIG, g_aDeferred, false);
-
-	int table = FindStringTable("downloadables");
-	if (table == INVALID_STRING_TABLE)
-	{
-		LogError("[FixScreen] Cannot find the 'downloadables' string table.");
-		return;
-	}
-
-	g_aDownloadables.Clear();
-
-	int count = GetStringTableNumStrings(table);
-	char path[PLATFORM_MAX_PATH];
-	for (int i = 0; i < count; i++)
-	{
-		ReadStringTable(table, i, path, sizeof(path));
-		if (path[0] != '\0' && g_aDownloadables.FindString(path) == -1)
-			g_aDownloadables.PushString(path);
-	}
-
-	INetworkStringTable downloadables = INetworkStringTable(table);
-	downloadables.DeleteStrings();
 	AddFileListToDownloadsTable(g_aPriority);
+	g_bPriorityAddedThisMap = true;
 
-	g_bDownloadablesSaved = true;
 	PrintToServer(
-		"[FixScreen] Saved %d downloadables; keeping %d priority files on first connect and staging %d deferred files.",
-		g_aDownloadables.Length,
+		"[FixScreen] Added %d priority files; %d deferred files are available for additive transition batches.",
 		g_aPriority.Length,
 		g_aDeferred.Length
 	);
+	return Plugin_Stop;
+}
+
+public void Event_MapTransition(Event event, const char[] name, bool dontBroadcast)
+{
+	AddTransitionDownloadables();
 }
 
 public Action ServerCmd_ChangeLevel(int client, const char[] command, int argc)
 {
-	if (!g_bDownloadablesSaved || g_bRestoredThisMap)
-		return Plugin_Continue;
-
-	RestoreTransitionDownloadables();
-	g_bRestoredThisMap = true;
+	AddTransitionDownloadables();
 	return Plugin_Continue;
 }
 
-void RestoreTransitionDownloadables()
+void AddTransitionDownloadables()
 {
-	char path[PLATFORM_MAX_PATH];
-	int regularCount;
+	if (g_bTransitionBatchAdded)
+		return;
 
-	for (int i = 0; i < g_aDownloadables.Length; i++)
-	{
-		g_aDownloadables.GetString(i, path, sizeof(path));
-		if (g_aDeferred.FindString(path) != -1)
-			continue;
+	if (g_aDeferred.Length == 0)
+		LoadFileList(DEFERRED_CONFIG, g_aDeferred, false);
 
-		AddFileToDownloadsTable(path);
-		regularCount++;
-	}
+	for (int i = 0; i < sizeof(g_sDanceModels); i++)
+		AddFileToDownloadsTable(g_sDanceModels[i]);
 
 	int selectedGroup;
 	int groupCount;
 	int deferredCount = AddRandomDeferredGroup(selectedGroup, groupCount);
+	g_bTransitionBatchAdded = true;
+
 	PrintToServer(
-		"[FixScreen] Restored %d regular files and deferred group %d/%d (%d files) for this map change.",
-		regularCount,
+		"[FixScreen] Added %d dance model files and deferred group %d/%d (%d files) for this map change.",
+		sizeof(g_sDanceModels),
 		selectedGroup + 1,
 		groupCount,
 		deferredCount
@@ -172,19 +158,13 @@ int AddRandomDeferredGroup(int &selectedGroup, int &groupCount)
 	start += (selectedGroup < largerGroups) ? selectedGroup : largerGroups;
 
 	char path[PLATFORM_MAX_PATH];
-	int added;
 	for (int i = 0; i < groupSize; i++)
 	{
-		int index = start + i;
-		g_aDeferred.GetString(index, path, sizeof(path));
-		if (g_aDownloadables.FindString(path) != -1)
-		{
-			AddFileToDownloadsTable(path);
-			added++;
-		}
+		g_aDeferred.GetString(start + i, path, sizeof(path));
+		AddFileToDownloadsTable(path);
 	}
 
-	return added;
+	return groupSize;
 }
 
 void EnsureDeferredGroupOrder(int deferredCount, int groupCount)
@@ -218,19 +198,6 @@ void EnsureDeferredGroupOrder(int deferredCount, int groupCount)
 	g_iDeferredGroupOrderCursor = 0;
 	g_iPlannedDeferredCount = deferredCount;
 	g_iPlannedGroupCount = groupCount;
-}
-
-public Action CMD_RestoreDownloadables(int client, int args)
-{
-	if (!g_bDownloadablesSaved)
-	{
-		ReplyToCommand(client, "Cannot restore: the downloadables string table has not been saved.");
-		return Plugin_Handled;
-	}
-
-	AddFileListToDownloadsTable(g_aDownloadables);
-	ReplyToCommand(client, "Restored %d downloadables string-table items.", g_aDownloadables.Length);
-	return Plugin_Handled;
 }
 
 public Action CMD_GetPriorityFiles(int client, int args)

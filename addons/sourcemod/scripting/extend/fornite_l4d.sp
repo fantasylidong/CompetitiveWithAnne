@@ -48,6 +48,7 @@ ConVar g_cvEmotesSounds;
 ConVar g_cvHideWeapons;
 ConVar g_cvTeleportBack;
 ConVar g_cvSpeed;
+ConVar g_cvAddDownloads;
 
 int g_iEmoteEnt[MAXPLAYERS+1];
 int g_iEmoteSoundEnt[MAXPLAYERS+1];
@@ -116,6 +117,7 @@ public void OnPluginStart() {
 	g_cvHidePlayers = CreateConVar("sm_emotes_hide_enemies", "0", "跳舞时隐藏敌方玩家(1=是0=否)", CVAR_FLAGS);
 	g_cvTeleportBack = CreateConVar("sm_emotes_teleportonend", "0", "当他开始跳舞时,传送回确切的位置.(某些地图需要此作为传送触发器)", CVAR_FLAGS);
 	g_cvSpeed = CreateConVar("sm_emotes_speed", "0.80", "设置动画的播放速度.默认值(1.0)", CVAR_FLAGS);
+	g_cvAddDownloads = CreateConVar("sm_emotes_add_downloads", "0", "是否由舞蹈插件一次性加入全部模型和音乐下载(1=是0=否).", CVAR_FLAGS, true, 0.0, true, 1.0);
 
 	AutoExecConfig(true, "fortnite_emotes_extended_l4d");
 
@@ -154,24 +156,18 @@ int Native_IsClientEmoting(Handle plugin, int numParams)
 	return g_bClientDancing[GetNativeCell(1)];
 }
 
-public void OnMapStart()
+void AddDanceFilesToDownloadsTable()
 {
-	
 	AddFileToDownloadsTable("models/player/custom_player/foxhound/fortnite_dances_emotes_ok.mdl");
 	AddFileToDownloadsTable("models/player/custom_player/foxhound/fortnite_dances_emotes_ok.vvd");
 	AddFileToDownloadsTable("models/player/custom_player/foxhound/fortnite_dances_emotes_ok.dx90.vtx");
-
-
-
-	// edit
-	// add the sound file routes here
 
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/ninja_dance_01.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/dance_soldier_03.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/hip_hop_good_vibes_mix_01_loop.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/emote_zippy_a.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_electroshuffle_music.mp3");
-	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/emote_aerobics_01.mp3"); 
+	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/emote_aerobics_01.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_music_emotes_bendy.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_bandofthefort_music.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/emote_boogiedown.mp3");
@@ -186,7 +182,7 @@ public void OnMapStart()
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_music_emotes_takethel.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_breakdance_music.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/Emote_Dance_Pump.mp3");
-	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_ridethepony_music_01.mp3"); 
+	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_ridethepony_music_01.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_facepalm_foley_01.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/Athena_Emotes_OnTheHook_02.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_floss_music.mp3");
@@ -226,7 +222,12 @@ public void OnMapStart()
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/eastern_bloc_musc_setup_d.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/athena_emote_hot_music.mp3");
 	AddFileToDownloadsTable("sound/kodua/fortnite_emotes/emote_capoeira.mp3");
-    
+}
+
+public void OnMapStart()
+{
+	if (g_cvAddDownloads.BoolValue)
+		AddDanceFilesToDownloadsTable();
 
 	// this dont touch
 	PrecacheModel("models/player/custom_player/foxhound/fortnite_dances_emotes_ok.mdl", true);

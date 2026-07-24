@@ -57,3 +57,8 @@
 ### July 22, 2026 Dynamic Difficulty PPM Fix
 - Fixed automatic difficulty locking its team PPM snapshot too early at `round_start`, which could leave players who subsequently switched to spectator in the round's tier calculation.
 - The round-start tier is now provisional. Survivor-roster changes inside the saferoom invalidate that PPM, and the plugin recalculates and locks from the real players still on the Survivor team when the first Survivor leaves. Spectators and bots are excluded.
+
+### July 23, 2026 FastDL Map-Transition Stability Fix
+- Removed the `l4d2_blackscreen_fix.smx` call to the private engine function `CNetworkStringTable::DeleteAllStrings()`, preventing the `downloadables` table from being cleared during map loading and potentially crashing or watchdog-restarting the server.
+- Download scheduling is now append-only: each map adds the priority feedback files, while a real transition uses SourceMod's public `AddFileToDownloadsTable()` API to add the three dance model files and one shuffled song group. No string-table entries are deleted, overwritten, or restored.
+- `fornite_l4d.smx` retains its original full dance-asset download registration behind the new default-off `sm_emotes_add_downloads` switch. This server uses the globally loaded `l4d2_blackscreen_fix.smx` for staged downloads, while other servers can enable the switch to restore one-shot downloads.

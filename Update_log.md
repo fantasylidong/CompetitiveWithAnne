@@ -642,3 +642,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 ### 2026年7月22日动态难度 PPM 修复
 - 修复自动难度在 `round_start` 过早锁定队伍 PPM，导致随后切到旁观的玩家仍留在本回合定档快照中的问题。
 - 回合开始时的自动档位现在仅作临时结果；安全区内生还者名单变化会使临时 PPM 失效，第一名生还者出门时再按当时仍在生还者队伍的真人重新计算并锁档。旁观者和 Bot 均不参与队伍 PPM。
+
+### 2026年7月23日 FastDL 过图稳定性修复
+- 移除 `l4d2_blackscreen_fix.smx` 对引擎私有 `CNetworkStringTable::DeleteAllStrings()` 的调用，避免在过图加载期间清空 `downloadables` 字符串表导致服务器崩溃或被守护程序重启。
+- 下载调度改为纯追加：每张图只加入反馈优先资源，实际过关时通过 SourceMod 官方 `AddFileToDownloadsTable()` 追加 3 个跳舞模型和一组随机舞曲，不再删除、覆盖或恢复任何字符串表项目。
+- `fornite_l4d.smx` 保留原有的全部跳舞资源下载登记，并新增默认关闭的 `sm_emotes_add_downloads` 开关；当前服务器由全局加载的 `l4d2_blackscreen_fix.smx` 管理分组下载，其他服务器可开启该开关恢复一次性下载。
