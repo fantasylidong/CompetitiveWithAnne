@@ -17,15 +17,10 @@
 #define GAMEDATA "l4d2_ai_smoker3"
 #define SIG_SMOKER_MOVE_2_ATTACK_POSITION			"SmokerMoveToAttackPosition::SmokerMoveToAttackPosition"
 #define SIG_GET_RUN_TOP_SPEED						"CTerrorPlayer::GetRunTopSpeed"
-#define SIG_SMOKER_MOVE_2_ATTACK_POSITION_UPDATE	"SmokerMoveToAttackPosition::Update"
-#define SIG_SMOKER_TONGUE_VICTIM					"SmokerTongueVictim::SmokerTongueVictim"
 
-#define ACT_NAME_MOVE_TO_ATTACK_POSITION			"SmokerMoveToAttackPosition"
 #define ACT_NAME_TONGUE_VICTIM						"SmokerTongueVictim"
 #define ACT_NAME_RETREAT							"SmokerRetreatToCover"
 #define ACT_NAME_MOVETO								"BehaviorMoveTo"
-
-#define ACT_SIZE_TONGUE_VICTIM						72	// 0x48u
 
 #define DEFAULT_TONGUE_RANGE						750.0
 
@@ -44,7 +39,6 @@ ConVar
 	g_cvBhopNoVisionMaxAng,
 	g_cvAirVecModifyMaxDegree,
 	g_cvAirVecModifyInterval,
-	g_cvImmPull,
 	g_cvJumpPull,
 	g_cvPullBackVision,
 	g_cvAntiRetreat,
@@ -67,8 +61,7 @@ ActionConstructor
 	g_hSmokerMove2AtkPosConstructor;
 
 Handle
-	g_hSdkGetRunTopSpeed,
-	g_hSdkSmokerTongueVictim;
+	g_hSdkGetRunTopSpeed;
 
 enum struct AiSmoker {
 	int		m_iTarget;					// 当前目标的 userId
@@ -111,7 +104,7 @@ public Plugin myinfo =
 	name 			= "Ai-Smoker 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai-Smoker 增强 3.0 版本",
-	version 		= "1.0.1.1",
+	version 		= "1.0.1.2",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -138,8 +131,6 @@ public void OnPluginStart() {
 	g_cvAirVecModifyDegree = CreateConVar("ai_smoker3_airvec_modify_degree", "50.0", "在空中速度方向与自身到目标方向角度超过这个值进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyMaxDegree = CreateConVar("ai_smoker3_airvec_modify_degree_max", "105.0", "在空中速度方向与自身到目标方向角度超过这个值不进行速度修正", CVAR_FLAGS, true, 0.0);
 	g_cvAirVecModifyInterval = CreateConVar("ai_smoker3_airvec_modify_interval", "0.3", "空中速度修正间隔", CVAR_FLAGS, true, 0.1);
-	// allowed for Smoker to fire his tongue immediately once the target distance is less than tongue_range
-	g_cvImmPull = CreateConVar("ai_smoker3_imm_pull", "1", "是否允许Smoker与目标距离一旦满足TongueRange立刻拉人", CVAR_FLAGS, true, 0.0, true, 1.0);
 	g_cvJumpPull = CreateConVar("ai_smoker3_jump_pull", "0", "是否允许 Smoker 已在空中时主动吐舌；不额外强制起跳，原连跳逻辑照常", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// allow Smoker to turn it's vision to behind when he is pulling survivor
 	g_cvPullBackVision = CreateConVar("ai_smoker3_pull_back_vision", "0", "是否允许Smoker拉人时视角转向背后", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -204,38 +195,6 @@ public void OnAllPluginsLoaded() {
 	if (!g_hSdkGetRunTopSpeed)
 		SetFailState("Failed to find signature: %s in gamedata file: %s.", SIG_GET_RUN_TOP_SPEED, GAMEDATA);
 
-	// ============================================================
-	// Search for action constructor of 'SmokerTongueVictim'
-	// ============================================================
-	OS_Type osType = GetOSType();
-	if (osType == OS_windows) {
-		// 获取父函数入口地址
-		Address pSmokerMove2AtkPosUpdate = hGamedata.GetMemSig(SIG_SMOKER_MOVE_2_ATTACK_POSITION_UPDATE);
-		if (pSmokerMove2AtkPosUpdate == Address_Null)
-			SetFailState("Failed to find signature address: %s in gamedata file: %s.", SIG_SMOKER_MOVE_2_ATTACK_POSITION_UPDATE, GAMEDATA);
-		// 读取 call SmokerTongueVictim 语句距离父函数起始位置的偏移量
-		int offset = hGamedata.GetOffset(SIG_SMOKER_TONGUE_VICTIM);
-		if (offset < 0)
-			SetFailState("Failed to get offset of signature: %s in gamedata file: %s.", SIG_SMOKER_TONGUE_VICTIM, GAMEDATA);
-		// E8 imm32, 从 call 指令首地址 +1 字节位置读入 SmokerTongueVictim 函数入口地址的偏移量
-		Address pCall = pSmokerMove2AtkPosUpdate + view_as<Address>(offset);
-		int rel = LoadFromAddress(pCall + view_as<Address>(1), NumberType_Int32);
-		// 计算入口地址
-		Address pFunc = pCall + view_as<Address>(5) + view_as<Address>(rel);
-		StartPrepSDKCall(SDKCall_Raw);
-		PrepSDKCall_SetAddress(pFunc);
-		PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-		g_hSdkSmokerTongueVictim = EndPrepSDKCall();
-	} else {
-		// Linux and Mac
-		StartPrepSDKCall(SDKCall_Raw);
-		PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, SIG_SMOKER_TONGUE_VICTIM);
-		PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-		g_hSdkSmokerTongueVictim = EndPrepSDKCall();
-	}
-	if (!g_hSdkSmokerTongueVictim)
-		SetFailState("Failed to find signature address: %s in gamedata file: %s.", SIG_SMOKER_TONGUE_VICTIM, GAMEDATA);
-
 	delete hGamedata;
 }
 
@@ -250,7 +209,6 @@ public void OnConfigsExecuted() {
 public void OnPluginEnd() {
 	delete log;
 	delete g_hSdkGetRunTopSpeed;
-	delete g_hSdkSmokerTongueVictim;
 }
 
 void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
@@ -411,10 +369,6 @@ Action checkeEnableBhop(int client, int target, int& buttons, const float pos[3]
 	// 无生还视野不允许连跳
 	if (!g_cvBhopNoVision.BoolValue && !visible)
 		return Plugin_Continue;
-	// 开启进入范围内秒拉, 则技能准备就绪后自身与目标范围满足 tongue_range 之后不允许连跳
-	if (g_cvImmPull.BoolValue && isSmokerReadyToAttack(client) && isTargetEnterAttackRange(client, target, dist))
-		return Plugin_Continue;
-
 	if (L4D_IsPlayerStaggering(client))
 		return Plugin_Continue;
 
@@ -670,13 +624,6 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 		action.OnUpdate = onSmokerTongueVictimOnUpdate;
 	}
 
-	if (g_cvImmPull.BoolValue) {
-		// Smoker 进入 tongue_range 范围内立刻将 MoveToAttackPosition 行为替换为 TongueVictim 行为, 令其吐舌头
-		if (strcmp(name, ACT_NAME_MOVE_TO_ATTACK_POSITION, false) == 0) {
-			action.OnUpdate = onSmokerMoveToAtkPosOnUpdate;
-		}
-	}
-
 	if (g_cvAntiRetreat.BoolValue) {
 		// Smoker 正在逃跑的时候, hook OnUpdate 每帧更新函数
 		// 需要检测能力 timestamp 因为 Smoker 拉人的时候也是 RetreatToCover 状态, 去除 tongueVictim 检测, 因为 tongueVictim 不会在舌头一断立即无效
@@ -692,42 +639,7 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 }
 
 /**
-* Smoker 技能已经准备就绪, 进入 SmokerMoveToAttackPosition 行为, 进行攻击找位, Hook OnUpdate 每帧更新函数
-* 检测若与目标距离在 tongue_range 范围内, 则将 MoveToAttackPosition 行为更改为 TongueVictim 行为, 令其吐舌头
-* @param action 当前动作
-* @param actor 动作父实体
-* @param interval 上一次调用到这次调用的间隔时间
-* @param result 上一次执行子行为的返回结果
-* @return Action
-**/
-Action onSmokerMoveToAtkPosOnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
-	if (!g_cvImmPull.BoolValue || !isAiSmoker(actor))
-    	return Plugin_Continue;
-	
-	static int target;
-	target = GetClientOfUserId(g_AiSmokers[actor].m_iTarget);
-	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
-		return Plugin_Continue;
-	static float pos[3], targetPos[3], dist;
-	GetClientAbsOrigin(actor, pos);
-	GetClientEyePosition(target, targetPos);
-	dist = GetVectorDistance(pos, targetPos);
-	// 目标没有进入到攻击范围, 不处理
-	if (!isTargetEnterAttackRange(actor, target, dist))
-		return Plugin_Continue;
-	
-	static BehaviorAction newAction;
-	newAction = createSmokerTongueVictim(target);
-	if (!newAction)
-		return Plugin_Continue;
-	
-	action.ChangeTo(newAction);
-	return Plugin_Changed;
-}
-
-/**
-* 由于 checkShouldAttack 函数存在, Smoker 一旦生成在距离目标 tongue_range 范围内, 则会立刻攻击, 若此时舌头被砍断, 则会卡在 SmokerTongueVictim 行为中, 无法转换到逃跑行为
-* 因此 Hook 这个行为的 OnUpdate 函数, 检测若 Smoker 技能未冷却完毕且不是在拉人状态中卡在这个行为, 则将这个行为结束
+* 检测 Smoker 技能未冷却完毕且没有拉人时是否卡在 TongueVictim 行为中，若卡住则结束该行为
 * SmokerTongueVictim 行为每帧的更新函数
 * @param action 当前动作
 * @param actor 动作父实体
@@ -870,24 +782,6 @@ stock BehaviorAction createSmokerMoveToPosition(int target) {
 	
 	// 调用构造函数初始化申请的内存块
 	return g_hSmokerMove2AtkPosConstructor.Execute(target);
-}
-
-/**
-* 创建 SmokerTongueVictim 行为
-* @param target 目标生还者索引
-* @return BehaviorAction
-**/
-stock BehaviorAction createSmokerTongueVictim(int target) {
-	if (!IsValidSurvivor(target))
-		return INVALID_ACTION;
-
-	static BehaviorAction action;
-	action = ActionsManager.Allocate(ACT_SIZE_TONGUE_VICTIM);
-	if (action == INVALID_ACTION)
-		return INVALID_ACTION;
-	
-	SDKCall(g_hSdkSmokerTongueVictim, action, target);
-	return action;
 }
 
 stock int getClosestSurvivorAndValid(int smoker, int excludeTar = -1) {
