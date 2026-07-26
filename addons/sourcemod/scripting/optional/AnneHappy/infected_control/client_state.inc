@@ -76,6 +76,14 @@ bool IsPinned(int client)
         || GetEntPropEnt(client, Prop_Send, "m_pummelAttacker") > 0;
 }
 
+bool IsEligibleSpawnTarget(int client)
+{
+    return IsValidSurvivor(client)
+        && IsPlayerAlive(client)
+        && !IsPinned(client)
+        && !L4D_IsPlayerIncapacitated(client);
+}
+
 bool IsPinningSomeone(int client)
 {
     if (!IsInfectedBot(client)) return false;

@@ -185,14 +185,14 @@ int ChooseTargetSurvivor()
     if (antiBaitTarget > 0)
         return antiBaitTarget;
 
-    if (gST.bPickRushMan && IsValidSurvivor(gST.rushManIndex) && IsPlayerAlive(gST.rushManIndex) && !IsPinned(gST.rushManIndex))
+    if (gST.bPickRushMan && IsEligibleSpawnTarget(gST.rushManIndex))
         return gST.rushManIndex;
 
     int cand[MAX_SURVIVOR_SLOTS];
     int n = 0;
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsValidSurvivor(i) && IsPlayerAlive(i) && !L4D_IsPlayerIncapacitated(i))
+        if (IsEligibleSpawnTarget(i))
         {
             if (g_bTargetLimitLib && IsClientReachLimit(i))
             {

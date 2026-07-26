@@ -619,7 +619,6 @@ public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast
         int hp = evHealth - bonus;
         if (hp < 0) hp = 0;
         SetEntityHealth(victim, hp);
-        SetEventInt(event, "health", hp);
     }
 }
 

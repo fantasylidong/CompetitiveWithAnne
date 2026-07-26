@@ -616,7 +616,7 @@ int AntiBait_GetPreferredTarget()
 {
     if (!gCV.bAntiBaitEnable)
         return -1;
-    if (gAB.runner > 0 && IsValidSurvivor(gAB.runner) && IsPlayerAlive(gAB.runner) && !IsPinned(gAB.runner))
+    if (gAB.runner > 0 && IsEligibleSpawnTarget(gAB.runner))
         return gAB.runner;
 
     return -1;
