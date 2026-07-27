@@ -227,6 +227,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
 	if (g_ChargerStateContext[client].userId != GetClientUserId(client)) {
 		g_AiChargers[client].init();
+		clearPathSnapshot(client);
 		// 目标变化, 重置状态
 		g_ChargerStateContext[client].init(client);
 		g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
@@ -253,6 +254,7 @@ void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 	
 	// 新的 charger, 重置状态
 	g_AiChargers[client].init();
+	clearPathSnapshot(client);
 	g_ChargerStateContext[client].init(client);
 	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
 }
@@ -375,43 +377,37 @@ MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams) {
 	if (!isAiCharger(client))
 		return MRES_Ignored;
 
-	// 保存 IPathFollower 指针, 用于路径前瞻与失效化处理
-	g_AiChargers[client].m_pPathFollower = pThis;
+	// 只在当前回调期间使用 PathFollower。跨帧缓存该原生对象会形成悬空指针。
+	if (g_AiChargers[client].m_bPathInvalidatePending) {
+		g_AiChargers[client].m_bPathInvalidatePending = false;
+		SDKCall(g_hSdkPathInvalidate, pThis);
+		clearCachedPath(client);
+		return MRES_Ignored;
+	}
 
 	// v37 = *((_DWORD *)this + 4566); 因为 this 被转成了 DWORD 类型, 因此后面的偏移量 4566 也是基于 4 字节的
-	static Address pPathSeg, pNextSeg, pLastSeg;
-	static PathSegment curSegment, nextSegment, lastSegment;
+	static Address pPathSeg;
+	static PathSegment curSegment;
 	// Current Segment struct
 	pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
 	if (!pPathSeg) {
-		g_AiChargers[client].m_PathSegment.init();
+		clearCachedPath(client);
 		return MRES_Ignored;
-	} else {
-		constructPathSegment(pPathSeg, curSegment);
-		g_AiChargers[client].m_PathSegment = curSegment;
 	}
 
-	// Next Segment struct
-	pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pThis, pPathSeg));
-	if (!pNextSeg) {
-		g_AiChargers[client].m_NextPathSegment.init();
-	} else {
-		constructPathSegment(pNextSeg, nextSegment);
-		g_AiChargers[client].m_NextPathSegment = nextSegment;
-	}
-
-	// Last Segment struct
-	// class PathFollower : public Path; PathFollower 继承自 Path, 可以使用 Path 类中的虚函数 Path::LastSegment
-	pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pThis));
-	if (!pLastSeg) {
-		g_AiChargers[client].m_LastPathSegment.init();
-	} else {
-		constructPathSegment(pLastSeg, lastSegment);
-		g_AiChargers[client].m_LastPathSegment = lastSegment;
-	}
+	constructPathSegment(pPathSeg, curSegment);
+	g_AiChargers[client].m_PathSegment = curSegment;
 
 	// 检查落后的 m_goal；无法在剩余路径中重新定位时，无效化旧路径并等待原生 Action 重新寻路。
 	checkGoalIsBehind(client, pThis, pPathSeg);
+
+	// 路径前瞻只消费值快照，不把 PathFollower 或 PathSegment 原生对象带出本次回调。
+	pPathSeg = g_AiChargers[client].m_PathSegment.m_pPathSegment;
+	if (pPathSeg)
+		capturePathSnapshot(client, pThis, pPathSeg);
+	else
+		clearCachedPath(client);
+
 	return MRES_Ignored;
 }
 
@@ -523,9 +519,7 @@ void checkGoalIsBehind(int client, Address pPathFollower, Address pCurrentSeg) {
 	*/
 	SDKCall(g_hSdkPathInvalidate, pPathFollower);
 
-	g_AiChargers[client].m_PathSegment.init();
-	g_AiChargers[client].m_NextPathSegment.init();
-	g_AiChargers[client].m_LastPathSegment.init();
+	clearCachedPath(client);
 	ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
 	g_AiChargers[client].m_AirStrafe.init();
 	g_AiChargers[client].m_BhopType = BhopType_None;

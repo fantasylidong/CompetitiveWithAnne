@@ -62,3 +62,8 @@
 - `l4d2_blackscreen_fix.smx`에서 비공개 엔진 함수 `CNetworkStringTable::DeleteAllStrings()` 호출을 제거해 맵 로딩 중 `downloadables` 테이블이 비워지면서 서버가 충돌하거나 watchdog에 의해 재시작될 가능성을 없앴습니다.
 - 다운로드 처리를 추가 전용 방식으로 변경했습니다. 각 맵에서는 우선 피드백 리소스만 추가하고, 실제 맵 전환 때 SourceMod 공개 API `AddFileToDownloadsTable()`로 춤 모델 3개와 무작위 음악 그룹 1개를 추가합니다. 문자열 테이블 항목을 삭제하거나 덮어쓰거나 복원하지 않습니다.
 - `fornite_l4d.smx`는 기존 전체 춤 리소스 다운로드 등록을 새 기본 비활성화 스위치 `sm_emotes_add_downloads` 안에 유지합니다. 현재 서버는 전역으로 로드되는 `l4d2_blackscreen_fix.smx`가 단계별 다운로드를 관리하며, 다른 서버는 이 스위치를 켜 기존 일괄 다운로드 방식으로 되돌릴 수 있습니다.
+
+### 2026년 7월 26일 맵 기록 v2
+- `l4d_stats.smx`에 공통 `ruleset_key`, 규칙 버전, 기록 정책, 시간/난이도 프로필을 추가했습니다. Anne 계열은 최고 기록 랭킹을 유지하고, 협동/생존은 규칙별로 분리하며, 대전·리얼리즘 대전·스캐빈지는 최단 시간 비교 대신 라운드 기록으로 저장합니다.
+- `map_runs`, `map_run_players`, `legacy_map_bests`와 반복 실행 가능한 마이그레이션/롤백 스크립트를 추가했습니다. 기존 `timedmaps`/`timedmap_runs`는 유지하며, 이전 플레이어별 최고 기록과 실제 경기를 분리합니다.
+- NewAnneWeb의 플레이어 페이지, 맵 목록, 상세 페이지를 v2에 맞게 갱신했으며 규칙, 버전, 난이도/AI 단계, 팀 인원, Anne 리스폰 설정으로 필터링할 수 있습니다. 배포 순서는 `docs/map_records_v2_migration.md`를 참고하세요.

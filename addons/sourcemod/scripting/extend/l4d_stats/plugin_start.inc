@@ -90,6 +90,11 @@ public OnPluginStart()
 	cvar_FriendlyFireMultiplier = CreateConVar("l4d_stats_ffire_multiplier", "1.5", "Friendly fire damage multiplier (Formula: Score = Damage * Multiplier)", 0, true, 0.0);
 	cvar_FriendlyFireCooldown = CreateConVar("l4d_stats_ffire_cooldown", "10.0", "Time in seconds for friendly fire cooldown", 0, true, 1.0);
 	cvar_FriendlyFireCooldownMode = CreateConVar("l4d_stats_ffire_cooldownmode", "1", "Friendly fire cooldown mode. 0 = Disable, 1 = Player specific, 2 = General", 0, true, 0.0, true, 2.0);
+	cvar_MapRecordPolicy = CreateConVar("l4d_stats_map_record_policy", "-1", "Map record policy. -1 = Auto, 0 = Off, 1 = History only, 2 = Leaderboard and history");
+	cvar_MapRecordRuleset = CreateConVar("l4d_stats_map_ruleset", "", "Stable ruleset key written to map_runs. Empty = automatic fallback");
+	cvar_MapRecordRulesetVersion = CreateConVar("l4d_stats_map_ruleset_version", "", "Ruleset version written to map_runs. Empty = ready config name or plugin version");
+	cvar_MapRecordTimingProfile = CreateConVar("l4d_stats_map_timing_profile", "", "Map timing profile: completion, survival, round_history. Empty = automatic");
+	cvar_MapRecordDifficultyProfile = CreateConVar("l4d_stats_map_difficulty_profile", "", "Difficulty profile: anne_ai, game, none. Empty = automatic");
 
 	// Game mode Cvars
 	cvar_Enable = CreateConVar("l4d_stats_enable", "1", "Enable/Disable all stat tracking", 0, true, 0.0, true, 1.0);

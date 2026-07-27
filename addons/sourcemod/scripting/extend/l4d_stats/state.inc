@@ -105,6 +105,11 @@ new Handle:cvar_FriendlyFireMode = INVALID_HANDLE;
 new Handle:cvar_FriendlyFireMultiplier = INVALID_HANDLE;
 new Handle:cvar_FriendlyFireCooldown = INVALID_HANDLE;
 new Handle:cvar_FriendlyFireCooldownMode = INVALID_HANDLE;
+new Handle:cvar_MapRecordPolicy = INVALID_HANDLE;
+new Handle:cvar_MapRecordRuleset = INVALID_HANDLE;
+new Handle:cvar_MapRecordRulesetVersion = INVALID_HANDLE;
+new Handle:cvar_MapRecordTimingProfile = INVALID_HANDLE;
+new Handle:cvar_MapRecordDifficultyProfile = INVALID_HANDLE;
 new Handle:FriendlyFireTimer[MAXPLAYERS + 1][MAXPLAYERS + 1];
 new bool:FriendlyFireCooldown[MAXPLAYERS + 1][MAXPLAYERS + 1];
 new FriendlyFirePrm[MAXPLAYERS][2];
@@ -302,6 +307,7 @@ new String:MapTimingMenuInfo[MAXPLAYERS + 1][MAX_LINE_WIDTH];
 float FastestTime = -1.0;
 new bool:g_bMapTimingGlobalBroadcastSent = false;
 new bool:g_bMapTimingNoFastestPromptSent = false;
+new bool:g_bMapRecordsTablesReady = false;
 
 // When an admin calls for clear database, the client id is stored here for a period of time.
 // The admin must then call the clear command again to confirm the call. After the second call

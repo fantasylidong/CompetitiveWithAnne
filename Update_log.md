@@ -647,3 +647,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 移除 `l4d2_blackscreen_fix.smx` 对引擎私有 `CNetworkStringTable::DeleteAllStrings()` 的调用，避免在过图加载期间清空 `downloadables` 字符串表导致服务器崩溃或被守护程序重启。
 - 下载调度改为纯追加：每张图只加入反馈优先资源，实际过关时通过 SourceMod 官方 `AddFileToDownloadsTable()` 追加 3 个跳舞模型和一组随机舞曲，不再删除、覆盖或恢复任何字符串表项目。
 - `fornite_l4d.smx` 保留原有的全部跳舞资源下载登记，并新增默认关闭的 `sm_emotes_add_downloads` 开关；当前服务器由全局加载的 `l4d2_blackscreen_fix.smx` 管理分组下载，其他服务器可开启该开关恢复一次性下载。
+
+### 2026年7月26日地图记录 v2
+- `l4d_stats.smx` 新增通用 `ruleset_key`、规则版本、记录策略和计时/难度档案；Anne 系模式保持最佳成绩榜，合作/生存等模式也可独立记录，对抗、写实对抗和清道夫改为不比最快的回合历史。
+- 新增 `map_runs`、`map_run_players`、`legacy_map_bests` 表和可重复执行的迁移/回滚脚本；旧 `timedmaps`/`timedmap_runs` 保留，并区分“旧玩家最佳”与“真实局”。
+- NewAnneWeb 已按玩法、版本、难度/档位、队伍人数和 Anne 刷特参数读取 v2 记录，个人页、地图列表和详情页已同步；部署步骤见 `docs/map_records_v2_migration.md`。

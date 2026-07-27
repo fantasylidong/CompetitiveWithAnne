@@ -19,6 +19,7 @@
 #include "l4d_stats/score_log.inc"
 #include "l4d_stats/quarter_rank.inc"
 #include "l4d_stats/mode_stats.inc"
+#include "l4d_stats/map_records.inc"
 
 // Plugin Info
 public Plugin:myinfo =

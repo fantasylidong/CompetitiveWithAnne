@@ -748,3 +748,77 @@ CREATE TABLE `timedmap_runs` (
   KEY `idx_timedmap_runs_filter_time` (`map`,`mode`,`difficulty`,`sinum`,`sitime`,`usebuy`,`anneversion`,`time`),
   KEY `idx_timedmap_runs_steamid` (`steamid`,`modified`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+DROP TABLE IF EXISTS `map_runs`;
+CREATE TABLE `map_runs` (
+  `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
+  `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
+  `gamemode` tinyint unsigned NOT NULL,
+  `mutation` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `ruleset_version` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `record_policy` tinyint unsigned NOT NULL DEFAULT '2',
+  `timing_profile` varchar(24) CHARACTER SET ascii NOT NULL DEFAULT 'completion',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'game',
+  `difficulty` tinyint unsigned NOT NULL DEFAULT '0',
+  `duration_ms` bigint unsigned NOT NULL,
+  `survivor_count` smallint unsigned NOT NULL DEFAULT '0',
+  `infected_count` smallint unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint unsigned NOT NULL DEFAULT '0',
+  `usebuy` tinyint unsigned NOT NULL DEFAULT '0',
+  `auto` tinyint unsigned NOT NULL DEFAULT '0',
+  `legacy_mode` tinyint unsigned NOT NULL DEFAULT '0',
+  `completed` tinyint unsigned NOT NULL DEFAULT '1',
+  `valid` tinyint unsigned NOT NULL DEFAULT '1',
+  `server_name` varchar(128) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `source` varchar(32) CHARACTER SET ascii NOT NULL DEFAULT 'native',
+  `created` datetime NOT NULL,
+  `modified` datetime NOT NULL,
+  PRIMARY KEY (`run_id`),
+  KEY `idx_map_runs_leaderboard` (`record_policy`,`completed`,`valid`,`ruleset_key`,`map`,`difficulty`,`duration_ms`),
+  KEY `idx_map_runs_recent` (`ruleset_key`,`created`),
+  KEY `idx_map_runs_map_recent` (`map`,`created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `map_run_players`;
+CREATE TABLE `map_run_players` (
+  `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
+  `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
+  `team` tinyint unsigned NOT NULL DEFAULT '2',
+  `completed` tinyint unsigned NOT NULL DEFAULT '1',
+  `created` datetime NOT NULL,
+  PRIMARY KEY (`run_id`,`steamid`),
+  KEY `idx_map_run_players_steamid` (`steamid`,`created`),
+  KEY `idx_map_run_players_run_team` (`run_id`,`team`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `legacy_map_bests`;
+CREATE TABLE `legacy_map_bests` (
+  `source_hash` char(64) CHARACTER SET ascii NOT NULL,
+  `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
+  `gamemode` tinyint unsigned NOT NULL,
+  `mutation` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `ruleset_version` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `timing_profile` varchar(24) CHARACTER SET ascii NOT NULL DEFAULT 'completion',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'game',
+  `difficulty` tinyint unsigned NOT NULL DEFAULT '0',
+  `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
+  `plays` int unsigned NOT NULL DEFAULT '0',
+  `best_duration_ms` bigint unsigned NOT NULL,
+  `player_count` smallint unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint unsigned NOT NULL DEFAULT '0',
+  `usebuy` tinyint unsigned NOT NULL DEFAULT '0',
+  `auto` tinyint unsigned NOT NULL DEFAULT '0',
+  `legacy_mode` tinyint unsigned NOT NULL DEFAULT '0',
+  `created` date NOT NULL,
+  `modified` datetime NOT NULL,
+  PRIMARY KEY (`source_hash`),
+  KEY `idx_legacy_map_bests_filter` (`ruleset_key`,`map`,`difficulty`,`best_duration_ms`),
+  KEY `idx_legacy_map_bests_steamid` (`steamid`,`modified`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

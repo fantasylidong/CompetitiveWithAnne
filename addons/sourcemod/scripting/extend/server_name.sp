@@ -9,7 +9,8 @@
  *  Anne 系列：服务器名动态更新
  *  规则：
  *  - 服务器名（房间名）：{hostname}{gamemode}
- *      => hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]
+ *      => hostname设置的名字[<模式>][AI:<难度>][缺人][无mod][<几特><几秒>]
+ *      * [AI:<难度>]：ah_ai_dynamic_current_level 已定档时显示
  *      * [缺人]：未满员显示（Anne 系列只看幸存者位）
  *      * [无mod]：l4d2_addons_eclipse == 0 时显示
  *  - A2S_INFO GameDescription 由 a2s-proxy-go 按服务器名标签重写
@@ -21,7 +22,7 @@ public Plugin myinfo =
     name        = "Anne ServerName",
     author      = "东",
     description = "动态服务器名",
-    version     = "1.4.6",
+    version     = "1.4.7",
     url         = ""
 };
 
@@ -29,7 +30,7 @@ public Plugin myinfo =
 // ConVars
 // -----------------------------
 ConVar
-    cvarServerNameFormatCase1,   // 用于生成服务器名后缀（{Confogl}{Full}{MOD}{AnneHappy}）
+    cvarServerNameFormatCase1,   // 用于生成服务器名后缀（{Confogl}{AIDifficulty}{Full}{MOD}{AnneHappy}）
     cvarMpGameMode,              // 实际是 l4d_ready_cfg_name
     cvarSI,                      // l4d_infected_limit
     cvarMpGameMin,               // versus_special_respawn_interval
@@ -38,7 +39,8 @@ ConVar
     cvarMod,                     // l4d2_addons_eclipse
     cvarHostPort,                // hostport
     cvarDirCount,                // dirspawn_count
-    cvarDirInterval;             // dirspawn_interval
+    cvarDirInterval,             // dirspawn_interval
+    cvarAIDifficulty;            // ah_ai_dynamic_current_level（旧版 Anne 可能不存在）
 
 // -----------------------------
 // 其它全局
@@ -72,7 +74,7 @@ public void OnPluginStart()
     g_hHostNameFormat = CreateConVar("sn_hostname_format", "{hostname}{gamemode}");
 
     // 用于生成服务器名后缀的模板
-    cvarServerNameFormatCase1 = CreateConVar("sn_hostname_format1", "{Confogl}{Full}{MOD}{AnneHappy}");
+    cvarServerNameFormatCase1 = CreateConVar("sn_hostname_format1", "{Confogl}{AIDifficulty}{Full}{MOD}{AnneHappy}");
 
     cvarMod = FindConVar("l4d2_addons_eclipse");
 
@@ -91,6 +93,7 @@ public void OnAllPluginsLoaded()
 
     cvarDirCount    = FindConVar("dirspawn_count");
     cvarDirInterval = FindConVar("dirspawn_interval");
+    RefreshAIDifficultyCvar();
 }
 
 public void OnConfigsExecuted()
@@ -101,6 +104,7 @@ public void OnConfigsExecuted()
     if (cvarMod == null)               cvarMod = FindConVar("l4d2_addons_eclipse");
     if (cvarDirCount == null)          cvarDirCount = FindConVar("dirspawn_count");
     if (cvarDirInterval == null)       cvarDirInterval = FindConVar("dirspawn_interval");
+    RefreshAIDifficultyCvar();
 
     // 关心的 ConVar 用于“服务器名”即时刷新
     if (cvarSI != null)                cvarSI.AddChangeHook(OnCvarChanged);
@@ -142,6 +146,7 @@ public void OnPluginEnd()
     cvarMod          = null;
     cvarDirCount     = null;
     cvarDirInterval  = null;
+    cvarAIDifficulty = null;
 }
 
 public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
@@ -169,13 +174,14 @@ public void Update()
 }
 
 // -----------------------------
-// 服务器名构建（hostname设置的名字[<模式>][缺人][无mod][<几特><几秒>]）
+// 服务器名构建（hostname设置的名字[<模式>][AI:<难度>][缺人][无mod][<几特><几秒>]）
 // -----------------------------
 public void UpdateServerName()
 {
     char sReadyUpCfgName[128], FinalHostname[128], buffer[128];
     bool IsAnne = false;
 
+    RefreshAIDifficultyCvar();
     GetConVarString(cvarServerNameFormatCase1, FinalHostname, sizeof(FinalHostname));
 
     if (cvarMpGameMode != null)
@@ -278,8 +284,51 @@ public void UpdateServerName()
         ReplaceString(FinalHostname, sizeof(FinalHostname), "{AnneHappy}", "");
     }
 
+    AddAIDifficultyTag(FinalHostname, sizeof(FinalHostname));
+
     // 注入为 {gamemode}，与 {hostname} 拼合
     ChangeServerName(FinalHostname);
+}
+
+void RefreshAIDifficultyCvar()
+{
+    if (cvarAIDifficulty != null)
+        return;
+
+    cvarAIDifficulty = FindConVar("ah_ai_dynamic_current_level");
+    if (cvarAIDifficulty != null)
+        cvarAIDifficulty.AddChangeHook(OnCvarChanged);
+}
+
+void AddAIDifficultyTag(char[] hostname, int maxlen)
+{
+    char tag[32];
+    tag[0] = '\0';
+
+    if (cvarAIDifficulty != null && cvarAIDifficulty.IntValue >= 1 && cvarAIDifficulty.IntValue <= 6)
+    {
+        char difficulty[16];
+        GetAIDifficultyName(cvarAIDifficulty.IntValue, difficulty, sizeof(difficulty));
+        FormatEx(tag, sizeof(tag), "[AI:%s]", difficulty);
+    }
+
+    // 旧的自定义模板没有该占位符时，仍自动把 AI 难度追加到末尾。
+    if (ReplaceString(hostname, maxlen, "{AIDifficulty}", tag) == 0 && tag[0] != '\0')
+        StrCat(hostname, maxlen, tag);
+}
+
+void GetAIDifficultyName(int level, char[] buffer, int maxlen)
+{
+    switch (level)
+    {
+        case 1: strcopy(buffer, maxlen, "简单");
+        case 2: strcopy(buffer, maxlen, "普通");
+        case 3: strcopy(buffer, maxlen, "困难");
+        case 4: strcopy(buffer, maxlen, "专家");
+        case 5: strcopy(buffer, maxlen, "极限");
+        case 6: strcopy(buffer, maxlen, "音理");
+        default: buffer[0] = '\0';
+    }
 }
 
 // 是否满员（Anne：只看幸存者；其他：幸存者+特感玩家）

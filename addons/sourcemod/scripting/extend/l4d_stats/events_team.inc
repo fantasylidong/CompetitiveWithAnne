@@ -2225,6 +2225,9 @@ public Action:event_ScavengeHalftime(Handle:event, const String:name[], bool:don
 	if (StatsDisabled() || CampaignOver)
 		return;
 
+	if (MapRecords_GetPolicy() == MAP_RECORD_POLICY_HISTORY && MapTimingStartTime > 0.0)
+		StopMapTimingWithOptions(false, true);
+
 	CampaignOver = true;
 
 	new maxplayers = MaxClients;

@@ -214,32 +214,21 @@ stock Action checkShouldBhop(
 * @error 
 **/
 stock bool isRemainingPathSupportsTarget(int client, Address targetNavArea, bool& hasSpecialMove) {
+    hasSpecialMove = false;
+
     if (!isAiCharger(client))
         return false;
     if (!targetNavArea)
         return false;
-    
-    hasSpecialMove = false;
 
-    static Address pPathFollower;
-    pPathFollower = g_AiChargers[client].m_pPathFollower;
-
-    static Address pCurrentSeg, pLastSegment;
-    pCurrentSeg = g_AiChargers[client].m_PathSegment.m_pPathSegment;
-    pLastSegment = g_AiChargers[client].m_LastPathSegment.m_pPathSegment;
-
-    if (!pPathFollower || !pCurrentSeg || !pLastSegment)
+    ArrayList snapshot = g_ChargerPathSnapshots[client];
+    if (snapshot == null || snapshot.Length < 1)
         return false;
-    
-    static bool scannedAny;
-    scannedAny = false;
 
     static PathSegment curSeg, lastScannedSeg;
-    while (pCurrentSeg != Address_Null) {
-        constructPathSegment(pCurrentSeg, curSeg);
-
+    for (int i = 0; i < snapshot.Length; i++) {
+        snapshot.GetArray(i, curSeg, sizeof(curSeg));
         lastScannedSeg = curSeg;
-        scannedAny = true;
 
         // 查看当前遍历的 PathSegment 的 SegmentType 查看是否需要特殊移动
         if (curSeg.m_SegmentType != SegType_OnGround)
@@ -248,17 +237,9 @@ stock bool isRemainingPathSupportsTarget(int client, Address targetNavArea, bool
         // 如果当前 Path 的某一个 Segment 对应的 NavArea 等于目标所在的 NavArea, 则返回 true
         if (curSeg.m_pNavArea == targetNavArea)
             return true;
-        
-        if (pCurrentSeg == pLastSegment)
-            break;
-
-        pCurrentSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pCurrentSeg));
-
-        if (!pCurrentSeg)
-            break;
     }
 
-    if (!scannedAny || !lastScannedSeg.m_pNavArea)
+    if (!g_AiChargers[client].m_bPathSnapshotComplete || !lastScannedSeg.m_pNavArea)
         return false;
     
     // 目标移动到 Path 终点相邻的 NavArea 也视为当前 Path 可以通向目标
@@ -433,13 +414,10 @@ stock void enterPathWait(int client, bool invalidateOldPath) {
     if (now - g_AiChargers[client].m_flLastPathInvalidateTime < PATH_REPATH_COOLDOWN)
         return;
 
-    // 如果需要销毁旧的 Path, 那么就销毁, 然后等待 Repath
-    SDKCall(g_hSdkPathInvalidate, g_AiChargers[client].m_pPathFollower);
+    // PathFollower 只能在其 Update 回调期间安全使用，下一次回调中再执行 Invalidate。
+    g_AiChargers[client].m_bPathInvalidatePending = true;
     g_AiChargers[client].m_flLastPathInvalidateTime = now;
-
-    g_AiChargers[client].m_PathSegment.init();
-    g_AiChargers[client].m_NextPathSegment.init();
-    g_AiChargers[client].m_LastPathSegment.init();
+    clearCachedPath(client);
 }
 
 stock void setupGroundAirStrafe(int client, float targetDist, float airCorrDist) {
@@ -677,10 +655,11 @@ stock Action executeGroundBhop(
     currentSeg = g_AiChargers[client].m_PathSegment;
     lastSeg = g_AiChargers[client].m_LastPathSegment;
 
-    // 当前 PathSegment 和当前 Path 最后一个 Segment 均有效, 则为路径有效
-    hasPath = g_AiChargers[client].m_pPathFollower && (currentSeg.m_pPathSegment && lastSeg.m_pPathSegment);
+    // 当前路径快照至少包含一个有效节点, 则可以继续使用快照进行寻路判断
+    hasPath = hasPathSnapshot(client) && currentSeg.m_pPathSegment;
     // 是否到达当前 Path 的最后一个 Segment
-    atLastSegment = hasPath && (currentSeg.m_pPathSegment == lastSeg.m_pPathSegment);
+    atLastSegment = hasPath && g_AiChargers[client].m_bPathSnapshotComplete &&
+        lastSeg.m_pPathSegment && (currentSeg.m_pPathSegment == lastSeg.m_pPathSegment);
     // 是否已经走完最后一个 PathSegment
     lastGoalReached = (atLastSegment && isFinalGoalReached(pos, vVel, currentSeg.m_vecGoalPos));
 

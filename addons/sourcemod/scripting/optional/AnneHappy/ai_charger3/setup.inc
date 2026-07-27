@@ -44,6 +44,7 @@
 #define EVADE_MOVETO_REFRESH_MIN_DIST		50.0		// 目标至少移动该距离才重建 BehaviorMoveTo, 避免微小位置抖动反复寻路
 #define STATE_TOLERANCE_DIST                50.0		// 状态转换容差距离
 #define CHARGE_Z_THRESHOLD                  57.0    	// charger 冲锋时, 如果与目标的高度差超过该值, 则取消冲锋
+#define MAX_PATH_SNAPSHOT_SEGMENTS          512			// 单次 PathFollower::Update 最多复制的路径节点数
 #define PI									3.14159265
 
 // =========================================================================
@@ -181,7 +182,8 @@ enum struct AiCharger {
 	float m_flLastVisibleTime;			// 当前状态中上次看到目标的时间
 	float m_flLastEvadeMoveToCheckTime;	// 上次检查 BehaviorMoveTo 目标坐标是否过期的时间
 	float m_vecEvadeMoveToPos[3];		// 当前 BehaviorMoveTo 创建时使用的目标坐标
-	Address m_pPathFollower;			// Path Follower 的指针, 用于前瞻 Goal Pos
+	bool m_bPathSnapshotComplete;		// 路径快照是否完整复制到了 LastSegment
+	bool m_bPathInvalidatePending;		// 是否需要在下次 PathFollower::Update 中使路径失效
 	PathSegment m_PathSegment;			// Charger 当前 NextBot 寻路的 PathSegment
 	PathSegment m_NextPathSegment;		// 当前 PathSegment 的下一个 PathSegment
 	PathSegment m_LastPathSegment;		// Charger 当前 NextBot 寻路的当前路径最后一个 PathSegment
@@ -206,7 +208,8 @@ enum struct AiCharger {
 		ZeroVector(this.m_vecEvadeMoveToPos);
 		this.m_flPathWaitStart = -1.0;
 		this.m_flLastPathInvalidateTime = -1.0;
-		this.m_pPathFollower = Address_Null;
+		this.m_bPathSnapshotComplete = false;
+		this.m_bPathInvalidatePending = false;
 		this.m_PathSegment.init();
 		this.m_NextPathSegment.init();
 		this.m_LastPathSegment.init();
@@ -215,6 +218,7 @@ enum struct AiCharger {
 	}
 }
 AiCharger g_AiChargers[MAXPLAYERS + 1];
+ArrayList g_ChargerPathSnapshots[MAXPLAYERS + 1];
 
 // 定义状态函数原型 Funcion Properties
 typedef StateFunc_Enter = function void(int client);
@@ -369,6 +373,8 @@ int
 stock void SetUp_OnModuleStart() {
 	// 初始化状态描述列表
 	g_ChargerStates = new ArrayList(sizeof(ChargerState));
+	for (int client = 1; client <= MaxClients; client++)
+		g_ChargerPathSnapshots[client] = new ArrayList(sizeof(PathSegment));
 }
 
 stock void SetUp_OnConfigsExecuted() {
@@ -557,5 +563,7 @@ stock void SetUp_OnAllPluginsLoaded() {
 }
 
 stock void SetUp_OnModuleEnd() {
+	for (int client = 1; client <= MaxClients; client++)
+		delete g_ChargerPathSnapshots[client];
 	delete g_ChargerStates;
 }

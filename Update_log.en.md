@@ -62,3 +62,8 @@
 - Removed the `l4d2_blackscreen_fix.smx` call to the private engine function `CNetworkStringTable::DeleteAllStrings()`, preventing the `downloadables` table from being cleared during map loading and potentially crashing or watchdog-restarting the server.
 - Download scheduling is now append-only: each map adds the priority feedback files, while a real transition uses SourceMod's public `AddFileToDownloadsTable()` API to add the three dance model files and one shuffled song group. No string-table entries are deleted, overwritten, or restored.
 - `fornite_l4d.smx` retains its original full dance-asset download registration behind the new default-off `sm_emotes_add_downloads` switch. This server uses the globally loaded `l4d2_blackscreen_fix.smx` for staged downloads, while other servers can enable the switch to restore one-shot downloads.
+
+### July 26, 2026 Map Records v2
+- `l4d_stats.smx` now records a general `ruleset_key`, ruleset version, record policy, and timing/difficulty profiles. Anne modes retain fastest-time leaderboards; co-op and survival rulesets are isolated; versus, realism versus, and scavenge use round history instead of misleading fastest-time comparisons.
+- Added `map_runs`, `map_run_players`, and `legacy_map_bests`, plus repeatable migration and rollback scripts. Existing `timedmaps` and `timedmap_runs` stay intact, with legacy per-player bests kept distinct from real runs.
+- NewAnneWeb now reads v2 records across the player profile, map list, and detail pages, with filters for ruleset, version, difficulty/AI level, team size, and Anne spawn settings. Deployment steps are documented in `docs/map_records_v2_migration.md`.

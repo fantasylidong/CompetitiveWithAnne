@@ -55,6 +55,10 @@ public SetCurrentGamemodeName()
 
 public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadcast)
 {
+	// Competitive modes keep round history in map_runs but do not enter cooperative fastest-time tables.
+	if (MapRecords_GetPolicy() == MAP_RECORD_POLICY_HISTORY && MapTimingStartTime > 0.0)
+		StopMapTimingWithOptions(false, true);
+
 	if(!g_broundend && (AnneMultiPlayerMode() || SinglePlayerMode())){
 		g_broundend = true;
 	}else{

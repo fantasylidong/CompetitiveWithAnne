@@ -40,6 +40,7 @@ bool:ConnectDB()
 	}
 
 	g_bPlayerServerNameColumnReady = EnsurePlayerServerNameColumn();
+	g_bMapRecordsTablesReady = MapRecords_CheckSchema();
 	g_bQuarterRankTableReady = false;
 	QuarterRank_EnsureCurrentQuarter();
 

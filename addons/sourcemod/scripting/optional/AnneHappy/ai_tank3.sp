@@ -27,6 +27,7 @@
 #define DEFAULT_SWING_RANGE        56.0
 #define PATH_LOOKAHEAD_MIN_DIST    150.0
 #define PATH_GOAL_TOLERANCE_DIST   25.0
+#define MAX_TANK_PATH_SNAPSHOT_SEGMENTS 256
 
 #define ROCK_FL_GRAVITY            0.4
 
@@ -148,7 +149,6 @@ enum struct AiTank
     float lastHeadBlockTargetSwitch; // 上次因头顶拉黑强制换目标时间
     float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
     int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
-    Address pathFollower;       // Tank 当前 NextBot PathFollower
     PathSegment pathSegment;    // 当前 PathSegment
     PathSegment lastPathSegment;// 当前路径最后一个 PathSegment
     float airCorrGoal[3];       // 无视野路径连跳的空中修正目标点
@@ -167,7 +167,6 @@ enum struct AiTank
         this.lastHeadBlockTargetSwitch = 0.0;
         this.forceRockUntil = 0.0;
         this.forceRockTarget = -1;
-        this.pathFollower = Address_Null;
         this.pathSegment.initData();
         this.lastPathSegment.initData();
         this.airCorrGoal = NULL_VECTOR;
@@ -175,6 +174,7 @@ enum struct AiTank
     }
 }
 AiTank g_AiTanks[MAXPLAYERS + 1];
+ArrayList g_TankPathSnapshots[MAXPLAYERS + 1];
 
 Logger log;
 
@@ -280,6 +280,8 @@ public void OnPluginStart()
     // 初始化动画活动映射
     initAnimMap();
     g_hNearbyLadderList = new ArrayList();
+    for (int client = 1; client <= MaxClients; client++)
+        g_TankPathSnapshots[client] = new ArrayList(sizeof(PathSegment));
 
     // 迟加载：给已在服玩家挂钩
     if (g_bLateLoad)
@@ -369,30 +371,15 @@ public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
     if (!isAiTank(client))
         return MRES_Ignored;
 
-    g_AiTanks[client].pathFollower = pThis;
-
     Address pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
     if (!pPathSeg)
     {
-        g_AiTanks[client].pathSegment.initData();
+        clearCachedTankPath(client);
         return MRES_Ignored;
     }
 
-    PathSegment curSegment;
-    constructPathSegment(pPathSeg, curSegment);
-    g_AiTanks[client].pathSegment = curSegment;
-
-    Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pThis));
-    if (!pLastSeg)
-    {
-        g_AiTanks[client].lastPathSegment.initData();
-    }
-    else
-    {
-        PathSegment lastSegment;
-        constructPathSegment(pLastSeg, lastSegment);
-        g_AiTanks[client].lastPathSegment = lastSegment;
-    }
+    // PathFollower 和 PathSegment 原生对象只在本次 detour 内使用，跨帧逻辑只读取值快照。
+    captureTankPathSnapshot(client, pThis, pPathSeg);
 
     return MRES_Ignored;
 }
@@ -417,6 +404,8 @@ void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[]
 // ===== 结束回收 =====
 public void OnPluginEnd()
 {
+    for (int client = 1; client <= MaxClients; client++)
+        delete g_TankPathSnapshots[client];
     delete log;
     delete g_hThrowAnimMap;
     delete g_hNearbyLadderList;
@@ -438,10 +427,7 @@ void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
-        g_AiTanks[i].pathFollower = Address_Null;
-        g_AiTanks[i].pathSegment.initData();
-        g_AiTanks[i].lastPathSegment.initData();
-        g_AiTanks[i].airCorrGoal = NULL_VECTOR;
+        clearCachedTankPath(i);
         g_AiTanks[i].bhopType = TankBhopType_None;
         g_fHeadBlockIgnoreUntil[i] = 0.0;
         g_fLastLadderNearbyCheck[i] = 0.0;
@@ -459,10 +445,7 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
-        g_AiTanks[i].pathFollower = Address_Null;
-        g_AiTanks[i].pathSegment.initData();
-        g_AiTanks[i].lastPathSegment.initData();
-        g_AiTanks[i].airCorrGoal = NULL_VECTOR;
+        clearCachedTankPath(i);
         g_AiTanks[i].bhopType = TankBhopType_None;
         g_fHeadBlockIgnoreUntil[i] = 0.0;
         g_fLastLadderNearbyCheck[i] = 0.0;
@@ -1392,9 +1375,33 @@ stock bool nextTickVelocityCheck(int client, const float velocity[3], bool visib
     return true;
 }
 
+void clearTankPathSnapshot(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    if (g_TankPathSnapshots[client] != null)
+        g_TankPathSnapshots[client].Clear();
+}
+
+void clearCachedTankPath(int client)
+{
+    clearTankPathSnapshot(client);
+    g_AiTanks[client].pathSegment.initData();
+    g_AiTanks[client].lastPathSegment.initData();
+    g_AiTanks[client].airCorrGoal = NULL_VECTOR;
+
+    if (g_AiTanks[client].bhopType == TankBhopType_Path)
+        g_AiTanks[client].bhopType = TankBhopType_None;
+}
+
 bool hasValidTankPath(int client)
 {
     if (!isAiTank(client))
+        return false;
+
+    ArrayList snapshot = g_TankPathSnapshots[client];
+    if (snapshot == null || snapshot.Length < 2)
         return false;
 
     PathSegment curSegment;
@@ -1402,7 +1409,6 @@ bool hasValidTankPath(int client)
     curSegment = g_AiTanks[client].pathSegment;
     lastSegment = g_AiTanks[client].lastPathSegment;
     return (
-        g_AiTanks[client].pathFollower != Address_Null &&
         curSegment.m_pPathSegment != Address_Null &&
         lastSegment.m_pPathSegment != Address_Null &&
         curSegment.m_pPathSegment != lastSegment.m_pPathSegment
@@ -1431,25 +1437,73 @@ void constructPathSegment(Address pPathSegment, PathSegment segment)
     segment.m_flDistFromStart = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(44), NumberType_Int32));
 }
 
-bool getNextTankPathSegment(Address pPath, Address pCurSeg, PathSegment segment)
+bool captureTankPathSnapshot(int client, Address pPathFollower, Address pCurrentSeg)
 {
-    if (!pPath || !pCurSeg || !g_hSdkPathNextSegment)
-        return false;
+    clearTankPathSnapshot(client);
 
-    Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPath, pCurSeg));
-    if (!pNextSeg)
+    ArrayList snapshot = g_TankPathSnapshots[client];
+    if (snapshot == null || !pPathFollower || !pCurrentSeg)
+    {
+        clearCachedTankPath(client);
         return false;
+    }
 
-    constructPathSegment(pNextSeg, segment);
+    Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pPathFollower));
+    Address pIterSeg = pCurrentSeg;
+    Address pPreviousSeg = Address_Null;
+    PathSegment segment;
+
+    int maxDepth = g_cvPathLookAheadMaxDepth.IntValue;
+    if (maxDepth < 1)
+        maxDepth = 1;
+
+    // 前两段前瞻循环各自最多推进 maxDepth，因此默认只需复制 2 * maxDepth + 1 个节点。
+    int snapshotLimit = (maxDepth >= (MAX_TANK_PATH_SNAPSHOT_SEGMENTS - 1) / 2)
+        ? MAX_TANK_PATH_SNAPSHOT_SEGMENTS
+        : maxDepth * 2 + 1;
+
+    for (int i = 0; i < snapshotLimit && pIterSeg; i++)
+    {
+        constructPathSegment(pIterSeg, segment);
+        snapshot.PushArray(segment, sizeof(segment));
+
+        if (pIterSeg == pLastSeg)
+            break;
+
+        Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pIterSeg));
+        if (!pNextSeg || pNextSeg == pIterSeg || pNextSeg == pPreviousSeg)
+            break;
+
+        pPreviousSeg = pIterSeg;
+        pIterSeg = pNextSeg;
+    }
+
+    if (snapshot.Length < 1)
+    {
+        clearCachedTankPath(client);
+        return false;
+    }
+
+    snapshot.GetArray(0, g_AiTanks[client].pathSegment, sizeof(PathSegment));
+
+    if (pLastSeg)
+        constructPathSegment(pLastSeg, g_AiTanks[client].lastPathSegment);
+    else
+        g_AiTanks[client].lastPathSegment.initData();
+
     return true;
 }
 
 bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, float outPos[3], int maxDepth = 10)
 {
-    PathSegment iterSeg;
-    iterSeg = g_AiTanks[client].pathSegment;
-    if (iterSeg.m_pPathSegment == Address_Null)
+    ArrayList snapshot = g_TankPathSnapshots[client];
+    if (snapshot == null || snapshot.Length < 1)
         return false;
+
+    int segmentIndex = 0;
+    int segmentCount = snapshot.Length;
+    PathSegment iterSeg;
+    snapshot.GetArray(segmentIndex, iterSeg, sizeof(iterSeg));
 
     float pos2D[3];
     pos2D = pos;
@@ -1457,9 +1511,11 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
 
     for (int i = 0; i < maxDepth; i++)
     {
-        PathSegment nextSeg;
-        if (!getNextTankPathSegment(g_AiTanks[client].pathFollower, iterSeg.m_pPathSegment, nextSeg))
+        if (segmentIndex + 1 >= segmentCount)
             break;
+
+        PathSegment nextSeg;
+        snapshot.GetArray(segmentIndex + 1, nextSeg, sizeof(nextSeg));
 
         float curGoal2D[3], nextGoal2D[3];
         curGoal2D = iterSeg.m_vecGoalPos;
@@ -1475,6 +1531,7 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         if (lenSqr <= 0.0)
         {
             iterSeg = nextSeg;
+            segmentIndex++;
             continue;
         }
 
@@ -1482,10 +1539,14 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         if (proj >= 1.0)
         {
             iterSeg = nextSeg;
+            segmentIndex++;
             continue;
         }
         if (proj >= 0.5)
+        {
             iterSeg = nextSeg;
+            segmentIndex++;
+        }
 
         break;
     }
@@ -1522,8 +1583,11 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
         if (goal[2] - pos[2] > JUMP_HEIGHT)
             break;
 
-        if (!getNextTankPathSegment(g_AiTanks[client].pathFollower, iterSeg.m_pPathSegment, iterSeg))
+        if (segmentIndex + 1 >= segmentCount)
             break;
+
+        segmentIndex++;
+        snapshot.GetArray(segmentIndex, iterSeg, sizeof(iterSeg));
     }
 
     if (fwdCount < 1)
@@ -1576,6 +1640,7 @@ bool isNullVector(const float vec[3])
 public void OnClientPutInServer(int client)
 {
     g_AiTanks[client].initData();
+    clearTankPathSnapshot(client);
     g_fHeadBlockIgnoreUntil[client] = 0.0;
     // 后置动画钩子：识别投石/翻越等序列变化
     AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
@@ -1592,10 +1657,7 @@ public void OnClientDisconnect(int client)
     g_AiTanks[client].forceRockUntil = 0.0;
     g_AiTanks[client].forceRockTarget = -1;
     g_AiTanks[client].lastLookAheadTime = 0.0;
-    g_AiTanks[client].pathFollower = Address_Null;
-    g_AiTanks[client].pathSegment.initData();
-    g_AiTanks[client].lastPathSegment.initData();
-    g_AiTanks[client].airCorrGoal = NULL_VECTOR;
+    clearCachedTankPath(client);
     g_AiTanks[client].bhopType = TankBhopType_None;
     g_fLastLadderNearbyCheck[client] = 0.0;
     g_bLastLadderNearby[client] = false;

@@ -55,8 +55,7 @@ public PrintToConsoleAll(const String:Message[], any:...)
 
 MapTimingEnabled()
 {
-	new StatsGamemodeID = Stats_GetCurrentStatsGamemodeID();
-	return MapTimingBlocked || StatsGamemodeID == GAMEMODE_COOP || StatsGamemodeID == GAMEMODE_SURVIVAL || StatsGamemodeID == GAMEMODE_REALISM || StatsGamemodeID == GAMEMODE_OTHERMUTATIONS;
+	return MapTimingBlocked || MapRecords_GetPolicy() != MAP_RECORD_POLICY_OFF;
 }
 
 MapTimingRuns_RecordParticipant(const String:RunID[], const String:MapName[], GamemodeID, const String:ClientID[], Float:TotalTime, PlayerCounter, GameDifficulty, const String:Mutation[], Mode)
@@ -271,11 +270,17 @@ BuildMapTimingRunPlayerNames(String:Names[], MaxLength)
 
 public bool StopMapTiming()
 {
+	return StopMapTimingWithOptions(true, true);
+}
+
+bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
+{
 	if (!MapTimingEnabled() || MapTimingStartTime <= 0.0 || StatsDisabled())
 	{
 		return false;
 	}
-	if(g_brpgAvailable && !L4D_RPG_GetGlobalValue(INDEX_VALID))
+	new bool:HistoryOnly = MapRecords_GetPolicy() == MAP_RECORD_POLICY_HISTORY && !WriteLegacy;
+	if(!HistoryOnly && g_brpgAvailable && !L4D_RPG_GetGlobalValue(INDEX_VALID))
 	{
 		if (GetConVarInt(cvar_AnnounceMode))
 		{
@@ -285,7 +290,7 @@ public bool StopMapTiming()
 		MapTimingBlocked = true;
 		return false;
 	}
-	if(!IsNormalMode() && !IsThisRoundValid())
+	if(!HistoryOnly && !IsNormalMode() && !IsThisRoundValid())
 	{
 		if (GetConVarInt(cvar_AnnounceMode))
 		{
@@ -297,7 +302,7 @@ public bool StopMapTiming()
 	}
 	int mode = GetMapTimingMode();
 	ConVar multiplayer = FindConVar("l4d_multislots_survivors_manager_enable");
-	if(mode > 0 && (multiplayer == null || multiplayer.IntValue == 1 || GetConVarInt(cvar_SurvivorLimit) > 4))
+	if(!HistoryOnly && mode > 0 && (multiplayer == null || multiplayer.IntValue == 1 || GetConVarInt(cvar_SurvivorLimit) > 4))
 	{
 		StatsPrintToChatAll("启用了多人运动模式，不记录这张地图游戏时间!");
 		MapTimingStartTime = -1.0;
@@ -306,7 +311,7 @@ public bool StopMapTiming()
 	}
 
 	new Float:TotalTime = GetEngineTime() - MapTimingStartTime;
-	if(TotalTime < 30.0)
+	if(!HistoryOnly && TotalTime < 30.0)
 	{
 		StatsPrintToChatAll("记录时间小于30s，数据应该不对，没有分数奖励!(PS: 30s能完成的图算啥图)");
 		return false;
@@ -321,7 +326,7 @@ public bool StopMapTiming()
 
 	GetCurrentMap(MapName, sizeof(MapName));
 
-	new i, PlayerCounter = 0, InfectedCounter = (CurrentGamemodeID == GAMEMODE_VERSUS || CurrentGamemodeID == GAMEMODE_SCAVENGE ? 0 : 1);
+	new i, PlayerCounter = 0, SurvivorCounter = 0, InfectedCounter = 0;
 
 	// 结算时以实际过关队伍为准，补登记中途加入/重连后加入的真人幸存者。
 	for (i = 1; i <= maxplayers; i++)
@@ -334,6 +339,12 @@ public bool StopMapTiming()
 				SetTrieValue(MapTimingSurvivors, ClientID, 1, true);
 			}
 		}
+		else if (HistoryOnly && IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i) && GetClientTeam(i) == TEAM_INFECTED)
+		{
+			GetClientRankAuthString(i, ClientID, sizeof(ClientID));
+			if (!GetTrieValue(MapTimingInfected, ClientID, enabled))
+				SetTrieValue(MapTimingInfected, ClientID, 1, true);
+		}
 	}
 
 	for (i = 1; i <= maxplayers; i++)
@@ -343,19 +354,25 @@ public bool StopMapTiming()
 			ClientTeam = GetClientTeam(i);
 			GetClientRankAuthString(i, ClientID, sizeof(ClientID));
 
-			if (ClientTeam == TEAM_SURVIVORS && GetTrieValue(MapTimingSurvivors, ClientID, enabled))
-			{
-				if (enabled)
-					PlayerCounter++;
-			}
-			else if (IsNormalMode() && ClientTeam == TEAM_INFECTED)
-			{
-				InfectedCounter++;
-				if (GetTrieValue(MapTimingInfected, ClientID, enabled))
+				if (ClientTeam == TEAM_SURVIVORS && GetTrieValue(MapTimingSurvivors, ClientID, enabled))
 				{
 					if (enabled)
+					{
 						PlayerCounter++;
+						SurvivorCounter++;
+					}
 				}
+				else if (ClientTeam == TEAM_INFECTED)
+				{
+					if (GetTrieValue(MapTimingInfected, ClientID, enabled))
+					{
+						if (enabled)
+						{
+							InfectedCounter++;
+							if (MapRecords_GetPolicy() == MAP_RECORD_POLICY_HISTORY)
+								PlayerCounter++;
+						}
+					}
 			}
 		}
 	}
@@ -370,6 +387,7 @@ public bool StopMapTiming()
 	{
 		GetThisModeBestTime(g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY));	
 		PlayerCounter = GetConVarInt(cvar_SurvivorLimit);
+		SurvivorCounter = PlayerCounter;
 	}
 
 	decl String:RunID[64];
@@ -377,6 +395,15 @@ public bool StopMapTiming()
 
 	decl String:RunPlayers[MAP_RECORD_PLAYER_NAMES_MAX];
 	BuildMapTimingRunPlayerNames(RunPlayers, sizeof(RunPlayers));
+	MapRecords_RecordRun(RunID, MapName, CurrentGamemodeID, TotalTime, SurvivorCounter, InfectedCounter, GameDifficulty, mode, Completed);
+
+	if (!WriteLegacy || MapRecords_GetPolicy() != MAP_RECORD_POLICY_LEADERBOARD)
+	{
+		ClearTrie(MapTimingSurvivors);
+		ClearTrie(MapTimingInfected);
+		return true;
+	}
+
 	MaybeAnnounceAnneNoBuyFastest(MapName, TotalTime, PlayerCounter, GameDifficulty, mode, RunPlayers);
 
 	for (i = 1; i <= maxplayers; i++)
@@ -1206,6 +1233,8 @@ stock int IsAutoSpawnTime()
 stock bool IsThisRoundValid()
 {
 	ConVar tank_bhop = FindConVar("ai_Tank_Bhop");
+	if(tank_bhop == null)
+		return true;
 	if(AnneMultiPlayerMode())
 	{
 		return tank_bhop.BoolValue;

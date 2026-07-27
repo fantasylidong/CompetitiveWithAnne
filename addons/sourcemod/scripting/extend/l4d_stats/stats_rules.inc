@@ -802,12 +802,14 @@ public CheckSurvivorsWin()
 }
 
 stock int GetAnneInfectedNumber(){
-	return GetConVarInt(FindConVar("l4d_infected_limit"));
+	ConVar infectedLimit = FindConVar("l4d_infected_limit");
+	return infectedLimit == null ? 0 : infectedLimit.IntValue;
 }
 
 stock int GetAnneSISpawnTime()
 {
-	return GetConVarInt(FindConVar("versus_special_respawn_interval"));
+	ConVar spawnTime = FindConVar("versus_special_respawn_interval");
+	return spawnTime == null ? 0 : spawnTime.IntValue;
 }
 
 stock char[] GetAnneVersion()
@@ -1046,7 +1048,7 @@ GetGamemodeID(const String:Gamemode[])
 	{
 		return GAMEMODE_REALISM;
 	}
-	else if (StrEqual(Gamemode, "mutation4", false) && IsMutationCoop())
+	else if (StrEqual(Gamemode, "mutation4", false))
 	{
 		return GAMEMODE_COOP;
 	}

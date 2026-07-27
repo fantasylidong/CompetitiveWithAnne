@@ -828,6 +828,31 @@ stock bool isSurvivorPinned(int client) {
     Vector m_portalCenter;							// position of center of 'portal' between previous area and this area
     float m_portalHalfWidth;						// half width of 'portal'
 }; */
+stock void clearPathSnapshot(int client) {
+    if (client < 1 || client > MaxClients)
+        return;
+
+    if (g_ChargerPathSnapshots[client] != null)
+        g_ChargerPathSnapshots[client].Clear();
+
+    g_AiChargers[client].m_bPathSnapshotComplete = false;
+}
+
+stock void clearCachedPath(int client) {
+    clearPathSnapshot(client);
+    g_AiChargers[client].m_PathSegment.init();
+    g_AiChargers[client].m_NextPathSegment.init();
+    g_AiChargers[client].m_LastPathSegment.init();
+}
+
+stock bool hasPathSnapshot(int client) {
+    return (
+        client >= 1 && client <= MaxClients &&
+        g_ChargerPathSnapshots[client] != null &&
+        g_ChargerPathSnapshots[client].Length > 0
+    );
+}
+
 void constructPathSegment(Address pPathSegment, PathSegment segment) {
     if (!pPathSegment) {
         LogError("Stocks.sp::ConstructPathSegment: pPathSegment pointer is null");
@@ -869,30 +894,72 @@ void constructPathSegment(Address pPathSegment, PathSegment segment) {
     static float length, dist;
 	length = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(40), NumberType_Int32));
 	dist = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(44), NumberType_Int32));
-	segment.m_flLength = length;
+    segment.m_flLength = length;
     segment.m_flDistFromStart = dist;
 }
 
-stock bool getNextPathSegment(Address pPath, Address pCurSeg, PathSegment segemnt) {
-    if (!pPath || !pCurSeg)
+stock bool capturePathSnapshot(int client, Address pPathFollower, Address pCurrentSeg) {
+    clearPathSnapshot(client);
+
+    ArrayList snapshot = g_ChargerPathSnapshots[client];
+    if (snapshot == null || !pPathFollower || !pCurrentSeg) {
+        clearCachedPath(client);
         return false;
-    
-    Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPath, pCurSeg));
-    if (!pNextSeg)
+    }
+
+    Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pPathFollower));
+    Address pIterSeg = pCurrentSeg;
+    Address pPreviousSeg = Address_Null;
+    PathSegment segment;
+
+    for (int i = 0; i < MAX_PATH_SNAPSHOT_SEGMENTS && pIterSeg; i++) {
+        constructPathSegment(pIterSeg, segment);
+        snapshot.PushArray(segment, sizeof(segment));
+
+        if (pIterSeg == pLastSeg) {
+            g_AiChargers[client].m_bPathSnapshotComplete = true;
+            break;
+        }
+
+        Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pIterSeg));
+        if (!pNextSeg || pNextSeg == pIterSeg || pNextSeg == pPreviousSeg)
+            break;
+
+        pPreviousSeg = pIterSeg;
+        pIterSeg = pNextSeg;
+    }
+
+    if (snapshot.Length < 1) {
+        clearCachedPath(client);
         return false;
-    constructPathSegment(pNextSeg, segemnt);
+    }
+
+    snapshot.GetArray(0, g_AiChargers[client].m_PathSegment, sizeof(PathSegment));
+
+    if (snapshot.Length > 1)
+        snapshot.GetArray(1, g_AiChargers[client].m_NextPathSegment, sizeof(PathSegment));
+    else
+        g_AiChargers[client].m_NextPathSegment.init();
+
+    if (g_AiChargers[client].m_bPathSnapshotComplete)
+        snapshot.GetArray(snapshot.Length - 1, g_AiChargers[client].m_LastPathSegment, sizeof(PathSegment));
+    else
+        g_AiChargers[client].m_LastPathSegment.init();
+
     return true;
 }
 
-stock int getLookAheadGoalPos(int client, const float pos[3], float maxDist, float outPos[3], int maxDepth = 10) {
+stock bool getLookAheadGoalPos(int client, const float pos[3], float maxDist, float outPos[3], int maxDepth = 10) {
 	// A: iterSeg, B: nextSeg
     static PathSegment A, B;
-    A = g_AiChargers[client].m_PathSegment;
-    
-    // 如果 current path segment 无效, 返回 false
-    if (!A.m_pPathSegment) {
+	ArrayList snapshot = g_ChargerPathSnapshots[client];
+	if (snapshot == null || snapshot.Length < 1)
 		return false;
-	}
+
+	static int segmentIndex, segmentCount;
+	segmentIndex = 0;
+	segmentCount = snapshot.Length;
+	snapshot.GetArray(segmentIndex, A, sizeof(A));
 
 	static float vPos2D[3];
 	vPos2D = pos;
@@ -903,9 +970,9 @@ stock int getLookAheadGoalPos(int client, const float pos[3], float maxDist, flo
 	// ============================================================
 	for (int i = 0; i < maxDepth; i++) {
 		// 先尝试获取下一个节点, 如果没有下一个节点, 说明 iterSeg 为当前路径的终点, 跳出循环
-		if (!getNextPathSegment(g_AiChargers[client].m_pPathFollower, A.m_pPathSegment, B)) {
+		if (segmentIndex + 1 >= segmentCount)
 			break;
-		}
+		snapshot.GetArray(segmentIndex + 1, B, sizeof(B));
 
 		// 获取 2D 节点坐标, 用于计算投影
 		static float curGoal2D[3], nextGoal2D[3];
@@ -923,6 +990,7 @@ stock int getLookAheadGoalPos(int client, const float pos[3], float maxDist, flo
 		
 		if (lenSqrAB <= 0.0) {
 			A = B;
+			segmentIndex += 1;
 			continue;
 		}
 
@@ -933,10 +1001,12 @@ stock int getLookAheadGoalPos(int client, const float pos[3], float maxDist, flo
 		// 如果 y 向量在 x 向量上的投影长过 x 向量, 说明当前 path segment 完全在 client 身后, 继续推进检测下一段 path segment
 		if (proj >= 1.0) {
 			A = B;
+			segmentIndex += 1;
 			continue;
 		} else if (proj >= 0.5) {
 			// 若 y 向量在 x 向量上的投影超过 x 向量长度一半, 说明 client 已经走了当前 path segment 的一半, 找一个以当前 client 速度一次可达的最远节点
 			A = B;
+			segmentIndex += 1;
 			break;
 		} else {
 			// 若投影小于等于 0, 说明当前节点依旧是有效的起步点, 找一个以当前 client 速度一次可达的最远节点
@@ -993,9 +1063,11 @@ stock int getLookAheadGoalPos(int client, const float pos[3], float maxDist, flo
 
 		// 如果这个节点以当前速度可达, 继续遍历下一个节点
 		// 如果下一个节点没有了, 说明当前节点就是路径的最后一个节点, 跳出循环
-		if (!getNextPathSegment(g_AiChargers[client].m_pPathFollower, A.m_pPathSegment, A)) {
+		if (segmentIndex + 1 >= segmentCount)
 			break;
-		}
+
+		segmentIndex += 1;
+		snapshot.GetArray(segmentIndex, A, sizeof(A));
 	}
 
 	// 如果前向检查节点没有任何一个以当前速度一次跳跃可达的节点, 说明 client 当前位置到下一个节点中间存在障碍物, 不允许连跳

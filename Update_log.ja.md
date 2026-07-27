@@ -62,3 +62,8 @@
 - `l4d2_blackscreen_fix.smx` から非公開エンジン関数 `CNetworkStringTable::DeleteAllStrings()` の呼び出しを削除し、マップ読み込み中に `downloadables` テーブルを消去してサーバーがクラッシュまたは watchdog により再起動される可能性をなくしました。
 - ダウンロード配信を追加専用に変更しました。各マップでは優先フィードバック素材のみを追加し、実際のマップ切り替え時に SourceMod 公開 API `AddFileToDownloadsTable()` で 3 個のダンスモデルとランダムな曲グループ 1 組を追加します。文字列テーブルの削除、上書き、復元は行いません。
 - `fornite_l4d.smx` は従来の全ダンス素材ダウンロード登録を、新しい既定無効の `sm_emotes_add_downloads` スイッチの内側に保持します。このサーバーではグローバルに読み込まれる `l4d2_blackscreen_fix.smx` が段階的ダウンロードを管理し、他のサーバーではスイッチを有効にすると従来の一括ダウンロードへ戻せます。
+
+### 2026年7月26日 マップ記録 v2
+- `l4d_stats.smx` に汎用 `ruleset_key`、ルールセットバージョン、記録ポリシー、計時/難易度プロファイルを追加しました。Anne 系はベストタイムランキングを維持し、Co-op/Survival はルールごとに分離し、Versus、Realism Versus、Scavenge は最速比較ではなくラウンド履歴として保存します。
+- `map_runs`、`map_run_players`、`legacy_map_bests` と、再実行可能な移行/ロールバックスクリプトを追加しました。旧 `timedmaps`/`timedmap_runs` は保持し、旧版のプレイヤー別ベストと実際のランを分けて扱います。
+- NewAnneWeb のプレイヤーページ、マップ一覧、詳細ページを v2 に対応し、ルール、バージョン、難易度/AI レベル、チーム人数、Anne スポーン設定で絞り込めます。導入手順は `docs/map_records_v2_migration.md` を参照してください。
