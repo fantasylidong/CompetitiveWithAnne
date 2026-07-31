@@ -447,16 +447,36 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
             if (g_NavGraphGeneration.load() != generation)
                 return;
 
+            std::string temporaryPath;
+            std::string saveError;
+            bool staged = AnneStageNavGraphCache(
+                *graph, metadata->cachePath, temporaryPath, saveError);
+            if (g_NavGraphGeneration.load() != generation)
+            {
+                AnneDiscardNavGraphCache(temporaryPath);
+                return;
+            }
+
+            bool stale = false;
             {
                 std::lock_guard<std::mutex> lock(g_GraphMutex);
-                if (g_NavGraphGeneration.load() != generation)
-                    return;
-                std::string saveError;
-                AnneSaveNavGraph(*graph, metadata->cachePath, saveError);
-                g_PendingNavGraph = std::move(graph);
-                g_NavGraphError = saveError;
-                g_NavGraphState.store(kNavGraphReadyPending);
+                stale = g_NavGraphGeneration.load() != generation;
+                if (!stale)
+                {
+                    if (staged)
+                        AnnePublishNavGraphCache(
+                            temporaryPath, metadata->cachePath, saveError);
+                    temporaryPath.clear();
+                }
+                if (!stale)
+                {
+                    g_PendingNavGraph = std::move(graph);
+                    g_NavGraphError = saveError;
+                    g_NavGraphState.store(kNavGraphReadyPending);
+                }
             }
+            if (stale)
+                AnneDiscardNavGraphCache(temporaryPath);
         });
     if (!queued)
     {

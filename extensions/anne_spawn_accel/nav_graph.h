@@ -71,5 +71,10 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
     std::string &error);
 
 bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::string &error);
+bool AnneStageNavGraphCache(const AnneNavGraph &graph, const std::string &path,
+                            std::string &temporaryPath, std::string &error);
+bool AnnePublishNavGraphCache(const std::string &temporaryPath, const std::string &path,
+                              std::string &error);
+void AnneDiscardNavGraphCache(const std::string &temporaryPath);
 
 #endif

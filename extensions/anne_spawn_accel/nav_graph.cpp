@@ -353,7 +353,8 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
     return graph;
 }
 
-bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::string &error)
+bool AnneStageNavGraphCache(const AnneNavGraph &graph, const std::string &path,
+                            std::string &temporaryPath, std::string &error)
 {
     DiskHeader header{};
     std::memcpy(header.magic, kDiskMagic, sizeof(kDiskMagic));
@@ -368,7 +369,7 @@ bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::s
                                    graph.navIds, graph.offsets, graph.edges);
 
     static std::atomic<std::uint64_t> temporarySerial{0};
-    std::string temporaryPath = path + ".tmp." +
+    temporaryPath = path + ".tmp." +
         std::to_string(temporarySerial.fetch_add(1) + 1);
     std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
     if (!file || !file.write(reinterpret_cast<const char *>(&header), sizeof(header)) ||
@@ -387,8 +388,15 @@ bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::s
         std::remove(temporaryPath.c_str());
         return false;
     }
+    return true;
+}
 
+bool AnnePublishNavGraphCache(const std::string &temporaryPath, const std::string &path,
+                              std::string &error)
+{
+#if defined(_WIN32)
     std::remove(path.c_str());
+#endif
     if (std::rename(temporaryPath.c_str(), path.c_str()) != 0)
     {
         error = "could not publish Nav graph cache";
@@ -396,4 +404,18 @@ bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::s
         return false;
     }
     return true;
+}
+
+void AnneDiscardNavGraphCache(const std::string &temporaryPath)
+{
+    if (!temporaryPath.empty())
+        std::remove(temporaryPath.c_str());
+}
+
+bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::string &error)
+{
+    std::string temporaryPath;
+    if (!AnneStageNavGraphCache(graph, path, temporaryPath, error))
+        return false;
+    return AnnePublishNavGraphCache(temporaryPath, path, error);
 }
