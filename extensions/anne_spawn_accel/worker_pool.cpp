@@ -48,6 +48,12 @@ bool AnneWorkerPool::Enqueue(std::function<void()> job)
     return true;
 }
 
+void AnneWorkerPool::ClearPending()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    jobs_.clear();
+}
+
 void AnneWorkerPool::Stop()
 {
     {

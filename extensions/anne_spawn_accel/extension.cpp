@@ -13,6 +13,7 @@
 #include <mutex>
 #include <numeric>
 #include <string>
+#include <sys/stat.h>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -89,13 +90,17 @@ struct PathCacheKey
     std::uint32_t goalId;
     std::uint32_t startId;
     std::int32_t quantizedLength;
+    std::int32_t exactLengthBits;
+    std::int32_t blockedEpoch;
     std::int16_t team;
     bool ignoreNavBlockers;
 
     bool operator==(const PathCacheKey &other) const
     {
         return goalId == other.goalId && startId == other.startId &&
-               quantizedLength == other.quantizedLength && team == other.team &&
+               quantizedLength == other.quantizedLength &&
+               exactLengthBits == other.exactLengthBits &&
+               blockedEpoch == other.blockedEpoch && team == other.team &&
                ignoreNavBlockers == other.ignoreNavBlockers;
     }
 };
@@ -107,6 +112,8 @@ struct PathCacheKeyHash
         std::size_t value = static_cast<std::size_t>(key.goalId);
         value = value * 16777619u ^ static_cast<std::size_t>(key.startId);
         value = value * 16777619u ^ static_cast<std::uint32_t>(key.quantizedLength);
+        value = value * 16777619u ^ static_cast<std::uint32_t>(key.exactLengthBits);
+        value = value * 16777619u ^ static_cast<std::uint32_t>(key.blockedEpoch);
         value = value * 16777619u ^ static_cast<std::uint16_t>(key.team);
         return value * 16777619u ^ static_cast<std::size_t>(key.ignoreNavBlockers);
     }
@@ -124,6 +131,7 @@ NavAreaBuildPathFn g_NavAreaBuildPath = nullptr;
 void *g_TheNavAreas = nullptr;
 std::vector<SurvivorSnapshot> g_Survivors;
 std::unordered_map<PathCacheKey, bool, PathCacheKeyHash> g_PathCache;
+int g_PathCacheEpoch = -1;
 int g_BlockTypeOffset = -1;
 int g_NavAreaIdOffset = -1;
 int g_NavAreaCenterOffset = -1;
@@ -193,6 +201,28 @@ void HashBytes(std::uint64_t &hash, const void *data, std::size_t size)
     }
 }
 
+void HashLooseMapFile(std::uint64_t &hash, const char *gameDirectory,
+                      const char *mapName, const char *extension)
+{
+    char path[1024];
+    std::snprintf(path, sizeof(path), "%s/maps/%s.%s",
+                  gameDirectory, mapName, extension);
+#if defined(_WIN32)
+    struct _stat64 info{};
+    if (_stat64(path, &info) != 0)
+        return;
+#else
+    struct stat info{};
+    if (stat(path, &info) != 0)
+        return;
+#endif
+    std::uint64_t fileSize = static_cast<std::uint64_t>(info.st_size);
+    std::int64_t modified = static_cast<std::int64_t>(info.st_mtime);
+    HashBytes(hash, extension, std::strlen(extension));
+    HashBytes(hash, &fileSize, sizeof(fileSize));
+    HashBytes(hash, &modified, sizeof(modified));
+}
+
 std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
     const char *mapName, const char *cachePath, std::string &error)
 {
@@ -220,6 +250,10 @@ std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
     std::uint64_t fingerprint = 1469598103934665603ull;
     HashBytes(fingerprint, mapName, std::strlen(mapName));
     HashBytes(fingerprint, &areaCount, sizeof(areaCount));
+    char gameDirectory[1024] = "";
+    engine->GetGameDir(gameDirectory, sizeof(gameDirectory));
+    HashLooseMapFile(fingerprint, gameDirectory, mapName, "bsp");
+    HashLooseMapFile(fingerprint, gameDirectory, mapName, "nav");
     for (int i = 0; i < areaCount; ++i)
     {
         void *area = ReadField<void *>(areaList, i * static_cast<int>(sizeof(void *)));
@@ -413,14 +447,12 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
             if (g_NavGraphGeneration.load() != generation)
                 return;
 
-            std::string saveError;
-            AnneSaveNavGraph(*graph, metadata->cachePath, saveError);
-            if (g_NavGraphGeneration.load() != generation)
-                return;
             {
                 std::lock_guard<std::mutex> lock(g_GraphMutex);
                 if (g_NavGraphGeneration.load() != generation)
                     return;
+                std::string saveError;
+                AnneSaveNavGraph(*graph, metadata->cachePath, saveError);
                 g_PendingNavGraph = std::move(graph);
                 g_NavGraphError = saveError;
                 g_NavGraphState.store(kNavGraphReadyPending);
@@ -796,6 +828,22 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         context->LocalToString(params[2], &cachePath) != SP_ERROR_NONE || !cachePath)
         return context->ThrowNativeError("Invalid Nav graph map or cache path");
 
+    std::uint64_t generation;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        generation = g_NavGraphGeneration.fetch_add(1) + 1;
+        g_NavMetadata.reset();
+        g_NavGraph.reset();
+        g_PendingNavGraph.reset();
+        g_NavCapture.reset();
+        ClearReachabilityState();
+        g_NavGraphError.clear();
+    }
+    g_Workers.ClearPending();
+    g_PathCache.clear();
+    g_PathCacheEpoch = -1;
+    g_NavGraphState.store(kNavGraphLoading);
+
     std::string error;
     std::shared_ptr<AnneNavGraphMetadata> metadata =
         CaptureNavMetadata(mapName, cachePath, error);
@@ -805,18 +853,12 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         g_NavGraphState.store(kNavGraphFailed);
         return 0;
     }
-
-    std::uint64_t generation = g_NavGraphGeneration.fetch_add(1) + 1;
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
+        if (g_NavGraphGeneration.load() != generation)
+            return 0;
         g_NavMetadata = metadata;
-        g_NavGraph.reset();
-        g_PendingNavGraph.reset();
-        g_NavCapture.reset();
-        ClearReachabilityState();
-        g_NavGraphError.clear();
     }
-    g_PathCache.clear();
 
     if (params[3] != 0)
     {
@@ -824,7 +866,6 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         return 1;
     }
 
-    g_NavGraphState.store(kNavGraphLoading);
     bool queued = g_Workers.Enqueue([metadata = std::move(metadata), generation]() {
         if (g_NavGraphGeneration.load() != generation)
             return;
@@ -868,9 +909,9 @@ cell_t Native_NavGraphPump(IPluginContext *, const cell_t *)
 
 cell_t Native_NavGraphStop(IPluginContext *, const cell_t *)
 {
-    g_NavGraphGeneration.fetch_add(1);
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavGraphGeneration.fetch_add(1);
         g_NavMetadata.reset();
         g_NavGraph.reset();
         g_PendingNavGraph.reset();
@@ -878,7 +919,9 @@ cell_t Native_NavGraphStop(IPluginContext *, const cell_t *)
         ClearReachabilityState();
         g_NavGraphError.clear();
     }
+    g_Workers.ClearPending();
     g_PathCache.clear();
+    g_PathCacheEpoch = -1;
     g_NavGraphState.store(kNavGraphIdle);
     return 0;
 }
@@ -1239,14 +1282,23 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
         }
     }
 
+    bool useCache = params[9] != 0;
+    int blockedEpoch = CurrentBlockedEpoch();
+    if (useCache && g_PathCacheEpoch != blockedEpoch)
+    {
+        g_PathCache.clear();
+        g_PathCacheEpoch = blockedEpoch;
+    }
+
     PathCacheKey key{
         goalId,
         startId,
         params[6],
+        params[5],
+        blockedEpoch,
         static_cast<std::int16_t>(params[7]),
         params[8] != 0,
     };
-    bool useCache = params[9] != 0;
     if (useCache)
     {
         auto found = g_PathCache.find(key);
@@ -1268,6 +1320,7 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
 cell_t Native_ClearPathCache(IPluginContext *, const cell_t *)
 {
     g_PathCache.clear();
+    g_PathCacheEpoch = -1;
     return 0;
 }
 
@@ -1386,7 +1439,10 @@ bool AnneSpawnAccelExtension::SDK_OnLoad(char *error, size_t maxlength, bool)
 
 void AnneSpawnAccelExtension::SDK_OnUnload()
 {
-    g_NavGraphGeneration.fetch_add(1);
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavGraphGeneration.fetch_add(1);
+    }
     g_Workers.Stop();
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
@@ -1400,6 +1456,7 @@ void AnneSpawnAccelExtension::SDK_OnUnload()
     g_NavGraphState.store(kNavGraphIdle);
     g_Survivors.clear();
     g_PathCache.clear();
+    g_PathCacheEpoch = -1;
     g_IsVisibleToPlayer = nullptr;
     g_NavAreaBuildPath = nullptr;
     g_TheNavAreas = nullptr;

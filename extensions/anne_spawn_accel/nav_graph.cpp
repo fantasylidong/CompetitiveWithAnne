@@ -1,6 +1,7 @@
 #include "nav_graph.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -11,8 +12,8 @@
 
 namespace
 {
-constexpr char kDiskMagic[8] = {'A', 'N', 'N', 'E', 'N', 'A', 'V', '2'};
-constexpr std::uint32_t kDiskVersion = 2;
+constexpr char kDiskMagic[8] = {'A', 'N', 'N', 'E', 'N', 'A', 'V', '3'};
+constexpr std::uint32_t kDiskVersion = 3;
 constexpr std::uint32_t kMaxDiskAreas = 100000;
 constexpr std::uint32_t kMaxDiskEdges = 2000000;
 constexpr std::uint32_t kDiskFlagComplete = 1u << 0;
@@ -44,11 +45,17 @@ std::uint32_t Crc32UpdateState(std::uint32_t crc, const void *data, std::size_t 
     return crc;
 }
 
-std::uint32_t PayloadCrc(const std::vector<std::uint32_t> &ids,
-                         const std::vector<std::uint32_t> &offsets,
-                         const std::vector<std::uint32_t> &edges)
+std::uint32_t CacheCrc(std::uint64_t fingerprint, std::uint32_t areaCount,
+                       std::uint32_t edgeCount, std::uint32_t flags,
+                       const std::vector<std::uint32_t> &ids,
+                       const std::vector<std::uint32_t> &offsets,
+                       const std::vector<std::uint32_t> &edges)
 {
     std::uint32_t crc = 0xffffffffu;
+    crc = Crc32UpdateState(crc, &fingerprint, sizeof(fingerprint));
+    crc = Crc32UpdateState(crc, &areaCount, sizeof(areaCount));
+    crc = Crc32UpdateState(crc, &edgeCount, sizeof(edgeCount));
+    crc = Crc32UpdateState(crc, &flags, sizeof(flags));
     if (!ids.empty())
         crc = Crc32UpdateState(crc, ids.data(), ids.size() * sizeof(ids[0]));
     if (!offsets.empty())
@@ -112,6 +119,19 @@ bool AnneNavGraph::Finalize(std::string &error)
     {
         error = "invalid Nav graph dimensions";
         return false;
+    }
+    if (offsets.front() != 0)
+    {
+        error = "invalid Nav graph CSR offsets";
+        return false;
+    }
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (offsets[i] > offsets[i + 1] || offsets[i + 1] > edges.size())
+        {
+            error = "invalid Nav graph CSR offsets";
+            return false;
+        }
     }
 
     idToIndex.clear();
@@ -322,7 +342,8 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
         return nullptr;
     }
     if (graph->navIds != metadata.navIds ||
-        PayloadCrc(graph->navIds, graph->offsets, graph->edges) != header.payloadCrc32)
+        CacheCrc(header.fingerprint, header.areaCount, header.edgeCount, header.flags,
+                 graph->navIds, graph->offsets, graph->edges) != header.payloadCrc32)
     {
         error = "Nav graph cache checksum mismatch";
         return nullptr;
@@ -342,9 +363,13 @@ bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::s
     header.areaCount = static_cast<std::uint32_t>(graph.navIds.size());
     header.edgeCount = static_cast<std::uint32_t>(graph.edges.size());
     header.flags = graph.complete ? kDiskFlagComplete : 0;
-    header.payloadCrc32 = PayloadCrc(graph.navIds, graph.offsets, graph.edges);
+    header.payloadCrc32 = CacheCrc(header.fingerprint, header.areaCount,
+                                   header.edgeCount, header.flags,
+                                   graph.navIds, graph.offsets, graph.edges);
 
-    std::string temporaryPath = path + ".tmp";
+    static std::atomic<std::uint64_t> temporarySerial{0};
+    std::string temporaryPath = path + ".tmp." +
+        std::to_string(temporarySerial.fetch_add(1) + 1);
     std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
     if (!file || !file.write(reinterpret_cast<const char *>(&header), sizeof(header)) ||
         !WriteVector(file, graph.navIds) || !WriteVector(file, graph.offsets) ||

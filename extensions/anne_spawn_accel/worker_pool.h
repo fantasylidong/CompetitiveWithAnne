@@ -17,6 +17,7 @@ public:
 
     bool Start(std::size_t threadCount, std::size_t maxQueuedJobs);
     bool Enqueue(std::function<void()> job);
+    void ClearPending();
     void Stop();
     std::size_t ThreadCount() const;
 
