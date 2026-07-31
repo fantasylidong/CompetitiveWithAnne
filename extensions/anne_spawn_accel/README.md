@@ -10,12 +10,14 @@ This SourceMod extension accelerates the expensive, stable primitives used by `i
 - asynchronous reachable-range candidate queries and integer-keyed path fallback caching.
 
 The main thread only snapshots engine-owned Nav pointers in bounded batches. Workers never dereference
-engine objects: they consume copied IDs, centers, edges, and blocker bytes. Ordinary floor paths use a
+engine objects: they consume copied IDs, centers, flow distances, edges, and blocker bytes. Invalid
+flow values inherit the nearest valid progress over the Nav graph on a worker. Ordinary floor paths use a
 reverse distance field shared by every candidate for the same survivor NavArea. `NavAreaBuildPath`
 remains the conservative fallback while the cache is unavailable and for ladder/elevator paths or
 queries close to the maximum-distance boundary.
 
-The binary payload stores one ID per area plus forward CSR offsets and packed edges. A synthetic graph
+The binary payload stores one ID per area plus forward CSR offsets and packed edges. Flow is read fresh
+from the engine on each graph start, so it does not enlarge or invalidate the topology cache. A synthetic graph
 with 10,000 areas and 60,000 directed edges occupies 320,060 bytes (about 312.6 KiB). The standalone
 round-trip test is `tests/nav_graph_test.cpp`.
 

@@ -135,6 +135,7 @@ int g_PathCacheEpoch = -1;
 int g_BlockTypeOffset = -1;
 int g_NavAreaIdOffset = -1;
 int g_NavAreaCenterOffset = -1;
+int g_NavAreaFlowOffset = -1;
 int g_NavAreaBlockedOffset = -1;
 int g_NavAreaAttributesOffset = -1;
 int g_NavAreaConnectionsOffset = -1;
@@ -224,7 +225,8 @@ void HashLooseMapFile(std::uint64_t &hash, const char *gameDirectory,
 }
 
 std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
-    const char *mapName, const char *cachePath, std::string &error)
+    const char *mapName, const char *cachePath, float maxFlowDistance,
+    std::string &error)
 {
     if (!g_TheNavAreas || !mapName || !cachePath)
     {
@@ -245,6 +247,8 @@ std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
     metadata->cachePath = cachePath;
     metadata->navIds.reserve(areaCount);
     metadata->centers.reserve(static_cast<std::size_t>(areaCount) * 3);
+    metadata->flowDistances.reserve(areaCount);
+    metadata->maxFlowDistance = maxFlowDistance;
     metadata->areaPointers.reserve(areaCount);
 
     std::uint64_t fingerprint = 1469598103934665603ull;
@@ -273,6 +277,7 @@ std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
         metadata->centers.push_back(center.x);
         metadata->centers.push_back(center.y);
         metadata->centers.push_back(center.z);
+        metadata->flowDistances.push_back(ReadField<float>(area, g_NavAreaFlowOffset));
         metadata->areaPointers.push_back(reinterpret_cast<std::uintptr_t>(area));
         HashBytes(fingerprint, &id, sizeof(id));
         HashBytes(fingerprint, &center, sizeof(center));
@@ -839,14 +844,17 @@ cell_t Native_IsActive(IPluginContext *, const cell_t *)
 
 cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
 {
-    if (params[0] != 3)
-        return context->ThrowNativeError("AnneSpawn_NavGraphStart expects 3 parameters");
+    if (params[0] != 4)
+        return context->ThrowNativeError("AnneSpawn_NavGraphStart expects 4 parameters");
 
     char *mapName = nullptr;
     char *cachePath = nullptr;
     if (context->LocalToString(params[1], &mapName) != SP_ERROR_NONE || !mapName ||
         context->LocalToString(params[2], &cachePath) != SP_ERROR_NONE || !cachePath)
         return context->ThrowNativeError("Invalid Nav graph map or cache path");
+    float maxFlowDistance = sp_ctof(params[3]);
+    if (!std::isfinite(maxFlowDistance) || maxFlowDistance <= 0.0f)
+        return context->ThrowNativeError("Invalid Nav graph max flow distance");
 
     std::uint64_t generation;
     {
@@ -866,7 +874,7 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
 
     std::string error;
     std::shared_ptr<AnneNavGraphMetadata> metadata =
-        CaptureNavMetadata(mapName, cachePath, error);
+        CaptureNavMetadata(mapName, cachePath, maxFlowDistance, error);
     if (!metadata)
     {
         SetGraphError(error);
@@ -887,7 +895,7 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         return 0;
     }
 
-    if (params[3] != 0)
+    if (params[4] != 0)
     {
         g_NavGraphState.store(kNavGraphNeedBuild);
         return 1;
@@ -1014,6 +1022,47 @@ cell_t Native_NavGraphGetEdgeCount(IPluginContext *, const cell_t *)
 {
     std::lock_guard<std::mutex> lock(g_GraphMutex);
     return g_NavGraph ? static_cast<cell_t>(g_NavGraph->edges.size()) : 0;
+}
+
+cell_t Native_NavGraphCollectProgress(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 4)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavGraphCollectProgress expects 4 parameters");
+
+    int maxResults = params[2];
+    bool mapInvalid = params[3] != 0;
+    float maxResolveDistance = sp_ctof(params[4]);
+    if (maxResults < 0 || maxResults > kMaxSpatialPoints ||
+        !std::isfinite(maxResolveDistance) || maxResolveDistance < 0.0f)
+        return context->ThrowNativeError("Invalid Nav graph progress request");
+
+    cell_t *output = nullptr;
+    if (maxResults > 0 && !GetCells(context, params[1], output))
+        return context->ThrowNativeError("Invalid Nav graph progress output array");
+
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    if (!g_NavGraph || g_NavGraphState.load() != kNavGraphReady)
+        return -1;
+
+    int count = std::min(maxResults, static_cast<int>(g_NavGraph->navIds.size()));
+    for (int i = 0; i < count; ++i)
+    {
+        float flow = g_NavGraph->flowDistances[i];
+        bool valid = std::isfinite(flow) && flow >= 0.0f &&
+                     flow <= g_NavGraph->maxFlowDistance;
+        if (!valid && mapInvalid &&
+            std::isfinite(g_NavGraph->flowResolveDistances[i]) &&
+            (maxResolveDistance <= 0.0f ||
+             g_NavGraph->flowResolveDistances[i] <= maxResolveDistance))
+        {
+            flow = g_NavGraph->resolvedFlowDistances[i];
+            valid = std::isfinite(flow) && flow >= 0.0f &&
+                    flow <= g_NavGraph->maxFlowDistance;
+        }
+        output[i] = sp_ftoc(valid ? flow : -1.0f);
+    }
+    return count;
 }
 
 cell_t Native_GetWorkerCount(IPluginContext *, const cell_t *)
@@ -1360,6 +1409,7 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavGraphCollectRange", Native_NavGraphCollectRange},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},
     {"AnneSpawn_NavGraphGetEdgeCount", Native_NavGraphGetEdgeCount},
+    {"AnneSpawn_NavGraphCollectProgress", Native_NavGraphCollectProgress},
     {"AnneSpawn_GetWorkerCount", Native_GetWorkerCount},
     {"AnneSpawn_SetSurvivorSnapshot", Native_SetSurvivorSnapshot},
     {"AnneSpawn_ClearSurvivorSnapshot", Native_ClearSurvivorSnapshot},
@@ -1427,6 +1477,7 @@ bool AnneSpawnAccelExtension::SDK_OnLoad(char *error, size_t maxlength, bool)
     RequiredOffset requiredOffsets[] = {
         {"CNavArea::ID", &g_NavAreaIdOffset},
         {"CNavArea::Center", &g_NavAreaCenterOffset},
+        {"TerrorNavArea::FlowDistance", &g_NavAreaFlowOffset},
         {"CNavArea::Blocked", &g_NavAreaBlockedOffset},
         {"CNavArea::Attributes", &g_NavAreaAttributesOffset},
         {"CNavArea::Connections", &g_NavAreaConnectionsOffset},

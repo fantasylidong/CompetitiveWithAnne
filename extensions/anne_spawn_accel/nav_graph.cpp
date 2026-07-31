@@ -114,6 +114,8 @@ bool AnneNavGraph::Finalize(std::string &error)
 {
     std::size_t count = navIds.size();
     if (count == 0 || count > kMaxDiskAreas || centers.size() != count * 3 ||
+        flowDistances.size() != count || !std::isfinite(maxFlowDistance) ||
+        maxFlowDistance <= 0.0f ||
         offsets.size() != count + 1 || offsets.back() != edges.size() ||
         edges.size() > kMaxDiskEdges)
     {
@@ -174,6 +176,67 @@ bool AnneNavGraph::Finalize(std::string &error)
             std::uint32_t target = EdgeTarget(edge);
             reverseEdges[cursor[target]++] = PackEdge(from, EdgeType(edge));
         }
+    }
+
+    struct FlowQueueEntry
+    {
+        float distance;
+        std::uint32_t index;
+        std::uint32_t source;
+    };
+    struct FurtherFlowFirst
+    {
+        bool operator()(const FlowQueueEntry &left, const FlowQueueEntry &right) const
+        {
+            if (left.distance != right.distance)
+                return left.distance > right.distance;
+            if (left.source != right.source)
+                return left.source > right.source;
+            return left.index > right.index;
+        }
+    };
+
+    const float infinity = std::numeric_limits<float>::infinity();
+    resolvedFlowDistances = flowDistances;
+    flowResolveDistances.assign(count, infinity);
+    std::vector<std::uint32_t> flowSources(count, kTargetMask);
+    std::priority_queue<FlowQueueEntry, std::vector<FlowQueueEntry>, FurtherFlowFirst> open;
+    for (std::uint32_t i = 0; i < count; ++i)
+    {
+        float flow = flowDistances[i];
+        if (!std::isfinite(flow) || flow < 0.0f || flow > maxFlowDistance)
+            continue;
+        flowResolveDistances[i] = 0.0f;
+        flowSources[i] = i;
+        open.push({0.0f, i, i});
+    }
+
+    auto relaxFlow = [&](const FlowQueueEntry &current, std::uint32_t next) {
+        float nextDistance = current.distance + CenterDistance(centers, current.index, next);
+        bool betterDistance = nextDistance + 0.01f < flowResolveDistances[next];
+        bool betterSource = std::fabs(nextDistance - flowResolveDistances[next]) <= 0.01f &&
+                            current.source < flowSources[next];
+        if (!betterDistance && !betterSource)
+            return;
+        flowResolveDistances[next] = nextDistance;
+        flowSources[next] = current.source;
+        resolvedFlowDistances[next] = flowDistances[current.source];
+        open.push({nextDistance, next, current.source});
+    };
+
+    while (!open.empty())
+    {
+        FlowQueueEntry current = open.top();
+        open.pop();
+        if (current.distance > flowResolveDistances[current.index] + 0.01f ||
+            current.source != flowSources[current.index])
+            continue;
+
+        for (std::uint32_t row = offsets[current.index]; row < offsets[current.index + 1]; ++row)
+            relaxFlow(current, EdgeTarget(edges[row]));
+        for (std::uint32_t row = reverseOffsets[current.index];
+             row < reverseOffsets[current.index + 1]; ++row)
+            relaxFlow(current, EdgeTarget(reverseEdges[row]));
     }
     return true;
 }
@@ -268,6 +331,8 @@ std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(
     graph->complete = complete;
     graph->navIds = metadata.navIds;
     graph->centers = metadata.centers;
+    graph->flowDistances = metadata.flowDistances;
+    graph->maxFlowDistance = metadata.maxFlowDistance;
 
     std::sort(inputEdges.begin(), inputEdges.end(), [](const auto &left, const auto &right) {
         if (left.from != right.from)
@@ -334,6 +399,8 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
     graph->fingerprint = header.fingerprint;
     graph->complete = (header.flags & kDiskFlagComplete) != 0;
     graph->centers = metadata.centers;
+    graph->flowDistances = metadata.flowDistances;
+    graph->maxFlowDistance = metadata.maxFlowDistance;
     if (!ReadVector(file, graph->navIds, header.areaCount) ||
         !ReadVector(file, graph->offsets, static_cast<std::size_t>(header.areaCount) + 1) ||
         !ReadVector(file, graph->edges, header.edgeCount))

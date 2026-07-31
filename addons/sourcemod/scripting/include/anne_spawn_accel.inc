@@ -26,6 +26,7 @@ native bool AnneSpawn_IsActive();
 native bool AnneSpawn_NavGraphStart(
     const char[] mapName,
     const char[] cachePath,
+    float maxFlowDistance,
     bool forceRebuild
 );
 
@@ -50,6 +51,13 @@ native int AnneSpawn_NavGraphCollectRange(
 
 native int AnneSpawn_NavGraphGetAreaCount();
 native int AnneSpawn_NavGraphGetEdgeCount();
+// 一次性导出与图 area index 对齐的原始进度距离；坏 flow 可在扩展后台按 Nav 邻接补齐。
+native int AnneSpawn_NavGraphCollectProgress(
+    float[] outputFlowDistances,
+    int maxResults,
+    bool mapInvalid,
+    float maxResolveDistance
+);
 native int AnneSpawn_GetWorkerCount();
 
 native bool AnneSpawn_SetSurvivorSnapshot(

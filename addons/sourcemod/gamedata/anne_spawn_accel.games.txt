@@ -23,6 +23,7 @@
         {
             "CNavArea::ID"              { "linux" "140" "windows" "140" }
             "CNavArea::Center"          { "linux" "44"  "windows" "44"  }
+            "TerrorNavArea::FlowDistance" { "linux" "340" "windows" "332" }
             "CNavArea::Blocked"         { "linux" "58"  "windows" "58"  }
             "CNavArea::Attributes"      { "linux" "84"  "windows" "84"  }
             "CNavArea::Connections"     { "linux" "88"  "windows" "88"  }

@@ -21,6 +21,8 @@ struct AnneNavGraphMetadata
     std::uint64_t fingerprint = 0;
     std::vector<std::uint32_t> navIds;
     std::vector<float> centers;
+    std::vector<float> flowDistances;
+    float maxFlowDistance = 0.0f;
     std::vector<std::uintptr_t> areaPointers;
 };
 
@@ -42,6 +44,10 @@ public:
     bool hasElevatorEdges = false;
     std::vector<std::uint32_t> navIds;
     std::vector<float> centers;
+    std::vector<float> flowDistances;
+    std::vector<float> resolvedFlowDistances;
+    std::vector<float> flowResolveDistances;
+    float maxFlowDistance = 0.0f;
     std::vector<std::uint32_t> offsets;
     std::vector<std::uint32_t> edges;
     std::vector<std::uint32_t> reverseOffsets;

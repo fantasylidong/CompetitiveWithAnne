@@ -20,13 +20,17 @@ int main()
     metadata.fingerprint = 0x123456789abcdef0ull;
     metadata.navIds.reserve(areaCount);
     metadata.centers.reserve(areaCount * 3);
+    metadata.flowDistances.reserve(areaCount);
+    metadata.maxFlowDistance = static_cast<float>(areaCount) * 10.0f;
     for (std::uint32_t i = 0; i < areaCount; ++i)
     {
         metadata.navIds.push_back(i + 1);
         metadata.centers.push_back(static_cast<float>(i % 100) * 32.0f);
         metadata.centers.push_back(static_cast<float>(i / 100) * 32.0f);
         metadata.centers.push_back(0.0f);
+        metadata.flowDistances.push_back(static_cast<float>(i) * 10.0f);
     }
+    metadata.flowDistances[5000] = -1.0f;
 
     std::vector<AnneNavGraphInputEdge> inputEdges;
     inputEdges.reserve(areaCount * edgesPerArea);
@@ -45,6 +49,8 @@ int main()
     assert(graph && error.empty());
     assert(graph->navIds.size() == areaCount);
     assert(graph->edges.size() == areaCount * edgesPerArea);
+    assert(graph->resolvedFlowDistances.size() == areaCount);
+    assert(graph->resolvedFlowDistances[5000] >= 0.0f);
     assert(AnneSaveNavGraph(*graph, cachePath, error));
 
     std::ifstream cache(cachePath, std::ios::binary | std::ios::ate);
@@ -57,6 +63,7 @@ int main()
     auto loadMicros = std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now() - loadStart).count();
     assert(loaded && loaded->edges.size() == graph->edges.size());
+    assert(loaded->resolvedFlowDistances[5000] == graph->resolvedFlowDistances[5000]);
 
     std::vector<std::uint8_t> blocked(areaCount, 0);
     std::vector<float> distances;
