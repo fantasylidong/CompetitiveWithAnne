@@ -879,6 +879,13 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
             return 0;
         g_NavMetadata = metadata;
     }
+    if (g_Workers.ThreadCount() == 0 &&
+        !g_Workers.Start(kGraphWorkerCount, kGraphWorkerQueueLimit))
+    {
+        SetGraphError("Could not start Nav graph worker pool");
+        g_NavGraphState.store(kNavGraphFailed);
+        return 0;
+    }
 
     if (params[3] != 0)
     {
@@ -939,7 +946,7 @@ cell_t Native_NavGraphStop(IPluginContext *, const cell_t *)
         ClearReachabilityState();
         g_NavGraphError.clear();
     }
-    g_Workers.ClearPending();
+    g_Workers.Stop();
     g_PathCache.clear();
     g_PathCacheEpoch = -1;
     g_NavGraphState.store(kNavGraphIdle);
@@ -1445,12 +1452,6 @@ bool AnneSpawnAccelExtension::SDK_OnLoad(char *error, size_t maxlength, bool)
     g_NavAreaBuildPath = reinterpret_cast<NavAreaBuildPathFn>(pathAddress);
     g_TheNavAreas = navAreasAddress;
     g_PathCache.reserve(4096);
-    if (!g_Workers.Start(kGraphWorkerCount, kGraphWorkerQueueLimit))
-    {
-        std::snprintf(error, maxlength, "Could not start anne_spawn_accel worker pool");
-        SDK_OnUnload();
-        return false;
-    }
 
     sharesys->AddNatives(myself, g_Natives);
     sharesys->RegisterLibrary(myself, "anne_spawn_accel");

@@ -26,3 +26,5 @@ available.
 Install the platform binary with `anne_spawn_accel.autoload`, `anne_spawn_accel.games.txt`, and
 `anne_spawn_accel.inc`. Autoloading at server startup is recommended, but late loading is supported;
 `infected_control` detects the library dynamically and switches back to SourcePawn when it unloads.
+The worker pool is created lazily by `AnneSpawn_NavGraphStart` and destroyed by
+`AnneSpawn_NavGraphStop`, so merely autoloading the extension does not create background threads.
