@@ -40,6 +40,7 @@ constexpr std::size_t kGraphWorkerQueueLimit = 32;
 constexpr int kNavSnapshotBatchAreas = 512;
 constexpr int kMaxFloorConnections = 4096;
 constexpr int kMaxLadderConnections = 256;
+constexpr float kBlockerSnapshotSeconds = 0.5f;
 
 struct NavGraphCapture
 {
@@ -392,6 +393,9 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
 {
     bool queued = g_Workers.Enqueue(
         [metadata = std::move(metadata), edges = std::move(edges), complete, generation]() mutable {
+            if (g_NavGraphGeneration.load() != generation)
+                return;
+
             std::string error;
             std::shared_ptr<AnneNavGraph> graph =
                 AnneBuildNavGraph(*metadata, std::move(edges), complete, error);
@@ -406,6 +410,8 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
                 }
                 return;
             }
+            if (g_NavGraphGeneration.load() != generation)
+                return;
 
             std::string saveError;
             AnneSaveNavGraph(*graph, metadata->cachePath, saveError);
@@ -490,7 +496,9 @@ int PublicNavGraphState()
 
 int CurrentBlockedEpoch()
 {
-    return gpGlobals ? gpGlobals->tickcount / 15 : 0;
+    return gpGlobals
+        ? static_cast<int>(std::floor(gpGlobals->curtime / kBlockerSnapshotSeconds))
+        : 0;
 }
 
 bool ReachabilityMatches(const ReachabilityResult &result, std::uint32_t targetId,
@@ -522,7 +530,7 @@ bool PrepareReachability(std::uint32_t targetId, float maxDistance,
 {
     PumpNavGraph();
     if (g_NavGraphState.load() != kNavGraphReady || maxDistance <= 0.0f ||
-        (team != kTeamSurvivor && team != kTeamInfected))
+        team != kTeamInfected)
         return false;
 
     std::shared_ptr<AnneNavGraph> graph;
@@ -584,6 +592,9 @@ bool PrepareReachability(std::uint32_t targetId, float maxDistance,
     bool queued = g_Workers.Enqueue(
         [graph = std::move(graph), blocked = std::move(blocked), targetIndex,
          targetId, maxDistance, team, ignoreNavBlockers, epoch, generation, serial]() mutable {
+            if (g_NavGraphGeneration.load() != generation)
+                return;
+
             auto result = std::make_shared<ReachabilityResult>();
             result->generation = generation;
             result->serial = serial;
@@ -815,6 +826,9 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
 
     g_NavGraphState.store(kNavGraphLoading);
     bool queued = g_Workers.Enqueue([metadata = std::move(metadata), generation]() {
+        if (g_NavGraphGeneration.load() != generation)
+            return;
+
         std::string loadError;
         std::shared_ptr<AnneNavGraph> graph = AnneLoadNavGraph(*metadata, loadError);
         if (g_NavGraphGeneration.load() != generation)
@@ -1218,7 +1232,8 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
                 bool special = reachability->usesSpecialEdge[goalIndex] != 0;
                 if (!special && distance <= maxPathLength - AnneNavGraph::kBoundarySlack)
                     return 1;
-                if (!special && distance > maxPathLength + AnneNavGraph::kBoundarySlack)
+                if (!special && graph->complete && !graph->hasElevatorEdges &&
+                    distance > maxPathLength + AnneNavGraph::kBoundarySlack)
                     return 0;
             }
         }
