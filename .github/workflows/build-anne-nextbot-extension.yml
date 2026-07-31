@@ -27,6 +27,8 @@ on:
 
 jobs:
   build:
+    env:
+      SOURCEMOD_COMMIT: e5de0a0cdef3eb2bc484b17ce63a4e14fcf3f221
     strategy:
       fail-fast: false
       matrix:
@@ -52,7 +54,13 @@ jobs:
       - name: Fetch SourceMod and SDK dependencies
         shell: bash
         run: |
-          git clone --depth 1 --recurse-submodules https://github.com/alliedmodders/sourcemod "$RUNNER_TEMP/sourcemod"
+          git init "$RUNNER_TEMP/sourcemod"
+          git -C "$RUNNER_TEMP/sourcemod" remote add origin https://github.com/alliedmodders/sourcemod
+          git -C "$RUNNER_TEMP/sourcemod" fetch --depth 1 origin "$SOURCEMOD_COMMIT"
+          git -C "$RUNNER_TEMP/sourcemod" checkout --detach FETCH_HEAD
+          git -C "$RUNNER_TEMP/sourcemod" submodule update --init --recursive --depth 1
+          grep -Eq '^[[:space:]]*#define[[:space:]]+SMINTERFACE_EXTENSIONAPI_VERSION[[:space:]]+8[[:space:]]*$' \
+            "$RUNNER_TEMP/sourcemod/public/IExtensionSys.h"
           mkdir -p "$RUNNER_TEMP/dependencies/sourcemod"
           cd "$RUNNER_TEMP/dependencies"
           "$RUNNER_TEMP/sourcemod/tools/checkout-deps.sh" -m -s l4d2

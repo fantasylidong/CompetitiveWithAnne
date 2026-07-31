@@ -143,8 +143,9 @@ Damage Show、CVar shield、Charger、Nav variant 和 Global Chat 本轮也已�
 `HEAD` 原版本。私有属性的 106 项结构测试
 全部通过，两个仓库的 `git diff --check` 通过；PWA/PMA/player_attr_db 的插件目录、
 `build`、发布归档和 NewAnneWeb 手动更新镜像哈希一致，更新清单同步状态为 `complete`。
-`anne_spawn_accel` 的 10,000 Nav / 60,000 边缓存往返测试通过；Linux L4D2 32 位 `.so`
-已由 Clang 22 / AMBuild 成功构建。Windows `.dll` 本机没有对应交叉编译工具链，本轮未重建。
+`anne_spawn_accel` 的 10,000 Nav / 60,000 边缓存往返测试通过；`anne_nextbot` 与
+`anne_spawn_accel` 的 Linux L4D2 32 位 `.so` 已固定使用 SourceMod 1.12 / Extension API 8
+并由 Clang 22 / AMBuild 成功构建。Windows `.dll` 也已通过 GitHub Actions 的 `windows-latest` / MSVC，使用同一 SourceMod 1.12 / Extension API 8 基线成功构建。
 
 仓库内没有可用的本地 `srcds`，因此热加载/卸载、实际 CPU 时间、数据库断线恢复仍需
 在预发布或生产服务器验证。静态回调数量不能替代运行时测量。
