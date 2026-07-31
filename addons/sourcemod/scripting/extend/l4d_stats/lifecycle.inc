@@ -117,7 +117,10 @@ public Action:Timer_ResetConnectAnnounceMapChange(Handle:timer)
 public OnPluginEnd()
 {
 	if (db == INVALID_HANDLE)
+	{
+		ScoreLog_FlushNow();
 		return;
+	}
 
 	new maxplayers = MaxClients;
 
@@ -134,6 +137,8 @@ public OnPluginEnd()
 			}
 		}
 	}
+
+	ScoreLog_FlushNow();
 
 	CloseHandle(db);
 	db = INVALID_HANDLE;
@@ -192,7 +197,7 @@ public Action:AnnounceConnect(Handle:timer, any:client)
 	Call_Finish();//转发结束
 
 	ShowMOTD(client);
-	StatsPrintToChat2(client, true, "输入 {olive}rankmenu {default}来操作 {green}%s{default}!", PLUGIN_NAME);
+	StatsPrintToChat2(client, true, "L4DStats_RankMenuHint");
 }
 
 // Update the player's interstitial stats, since they may have
@@ -276,7 +281,10 @@ public action_DbPrefixChanged(Handle:convar, const String:oldValue[], const Stri
 	if (convar == cvar_DbPrefix)
 	{
 		if (!StrEqual(DbPrefix, newValue))
+		{
+			ScoreLog_FlushNow();
 			strcopy(DbPrefix, sizeof(DbPrefix), newValue);
+		}
 	}
 }
 

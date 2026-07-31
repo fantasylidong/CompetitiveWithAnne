@@ -3,40 +3,39 @@
 #endif
 #define _infected_control_spawn_memory_included
 
-bool IsNavOnCooldownID(int areaID, float now)
+void EnsureNavCooldownSlots()
 {
-    if (areaID < 0 || g_NavCooldown == null) return false;
+    EnsureNavAreasCache();
+    if (g_NavCooldownUntil != null && g_NavCooldownUntil.Length == g_NavAreasCacheCount)
+        return;
 
-    char key[16];
-    IntToString(areaID, key, sizeof key);
-
-    any stored;
-    if (g_NavCooldown.GetValue(key, stored))
-    {
-        float until = view_as<float>(stored);
-        return (now < until);
-    }
-    return false;
-}
-
-void TouchNavCooldownID(int areaID, float now, float cooldown = 8.0)
-{
-    if (areaID < 0) return;
-    if (g_NavCooldown == null) g_NavCooldown = new StringMap();
-
-    char key[16];
-    IntToString(areaID, key, sizeof key);
-    g_NavCooldown.SetValue(key, view_as<any>(now + cooldown));
+    if (g_NavCooldownUntil != null)
+        delete g_NavCooldownUntil;
+    g_NavCooldownUntil = new ArrayList();
+    for (int i = 0; i < g_NavAreasCacheCount; i++)
+        g_NavCooldownUntil.Push(0.0);
 }
 
 stock bool IsNavOnCooldown(int areaIdx, float now)
 {
-    return IsNavOnCooldownID(GetNavIDByIndex(areaIdx), now);
+    EnsureNavCooldownSlots();
+    if (areaIdx < 0 || areaIdx >= g_NavCooldownUntil.Length)
+        return false;
+    return now < view_as<float>(g_NavCooldownUntil.Get(areaIdx));
 }
 
 stock void TouchNavCooldown(int areaIdx, float now, float cooldown = 8.0)
 {
-    TouchNavCooldownID(GetNavIDByIndex(areaIdx), now, cooldown);
+    EnsureNavCooldownSlots();
+    if (areaIdx < 0 || areaIdx >= g_NavCooldownUntil.Length)
+        return;
+    g_NavCooldownUntil.Set(areaIdx, now + cooldown);
+}
+
+void ClearNavWeightMemory()
+{
+    // 历史权重不参与当前评分。保留入口供生命周期和调试代码调用，
+    // 但不再为每张地图分配三份 per-Nav ArrayList。
 }
 
 stock void CleanupLastSpawns(float now)
@@ -93,6 +92,26 @@ stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si = 0)
     return PassRealBucketPositionCheck(candPercent, candPos[2], targetSur, si);
 }
 
+stock bool PassRealBucketPositionCheckCached(int candPercent, float candZ, int surPercent,
+                                             bool hasLowestFootZ, float lowestFootZ, int si = 0)
+{
+    if (candPercent < 0 || surPercent < 0)
+        return true;
+
+    if (candPercent < surPercent - 6)
+        return false;
+
+    if (hasLowestFootZ
+        && candPercent < surPercent
+        && (candZ <= (lowestFootZ - 180.0)
+            || (si != view_as<int>(SI_Smoker) && candZ >= (lowestFootZ + 200.0))))
+    {
+        return false;
+    }
+
+    return true;
+}
+
 stock bool PassRealBucketPositionCheck(int candPercent, float candZ, int targetSur, int si = 0)
 {
     if (candPercent < 0)
@@ -122,19 +141,9 @@ stock bool PassRealBucketPositionCheck(int candPercent, float candZ, int targetS
     if (surPercent < 0)
         return true;
 
-    if (candPercent < surPercent - 6)
-        return false;
-
     float minFootZ;
-    if (TryGetLowestSurvivorFootZ(minFootZ))
-    {
-        if (candPercent < surPercent
-            && (candZ <= (minFootZ - 180.0)
-                || (si != view_as<int>(SI_Smoker) && candZ >= (minFootZ + 200.0))))
-            return false;
-    }
-
-    return true;
+    bool hasMinFootZ = TryGetLowestSurvivorFootZ(minFootZ);
+    return PassRealBucketPositionCheckCached(candPercent, candZ, surPercent, hasMinFootZ, minFootZ, si);
 }
 
 stock bool TryGetLowestSurvivorFootZ(float &outMinZ)
@@ -166,6 +175,9 @@ stock int GetNavIDByIndex(int idx)
 
     if (idx < 0 || idx >= g_NavAreasCacheCount)
         return -1;
+
+    if (g_AreaNavIds != null && idx < g_AreaNavIds.Length)
+        return g_AreaNavIds.Get(idx);
 
     Address area = g_AllNavAreasCache.Get(idx);
     return L4D_GetNavAreaID(area);
@@ -229,38 +241,6 @@ stock void RememberSpawn(const float pos[3], const float center[3])
     recentSectors[2] = recentSectors[1];
     recentSectors[1] = recentSectors[0];
     recentSectors[0] = s;
-}
-
-stock int ArgMinFloat(const float[] a, int n, float eps = 0.0001)
-{
-    if (n <= 0) return -1;
-
-    float best = a[0];
-    for (int i = 1; i < n; i++)
-        if (a[i] < best) best = a[i];
-
-    int ties = 0;
-    for (int i = 0; i < n; i++)
-        if (a[i] <= best + eps) ties++;
-
-    int pick = GetRandomInt(1, ties);
-    for (int i = 0; i < n; i++)
-        if (a[i] <= best + eps && --pick == 0) return i;
-
-    return 0;
-}
-
-int PickSector(int sectors)
-{
-    float score[SECTORS_MAX];
-    for (int s = 0; s < sectors; s++)
-        score[s] = GetRandomFloat(0.0, 1.0);
-
-    if (recentSectors[0] >= 0 && recentSectors[0] < sectors) score[recentSectors[0]] += 1.5;
-    if (recentSectors[1] >= 0 && recentSectors[1] < sectors) score[recentSectors[1]] += 1.0;
-    if (recentSectors[2] >= 0 && recentSectors[2] < sectors) score[recentSectors[2]] += 0.5;
-
-    return ArgMinFloat(score, sectors);
 }
 
 int GetCurrentSectors()

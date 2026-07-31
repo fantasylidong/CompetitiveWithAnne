@@ -273,5 +273,9 @@
 	{
 		"zho"		"{green}[IC]{default} 內鬼預留槽位: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"zho"		"[IC] 正在重建 Nav 圖和逐區域進度快取。"
+	}
 
 }

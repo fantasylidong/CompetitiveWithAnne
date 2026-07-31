@@ -12,7 +12,6 @@
 ConVar g_cvSpawnPerfMode;
 ConVar g_cvSpawnPerfProgressiveSampling;
 ConVar g_cvSpawnPerfAdaptiveBucketWindow;
-ConVar g_cvSpawnPerfEarlyDistanceFilter;
 ConVar g_cvSpawnPerfStats;
 
 enum SpawnPerfMode
@@ -27,7 +26,6 @@ enum SpawnPerfMode
 SpawnPerfMode g_CurrentPerfMode = PerfMode_Balanced;
 bool g_bProgressiveSampling = false;
 bool g_bAdaptiveBucketWindow = false;
-bool g_bEarlyDistanceFilter = false;
 bool g_bShowPerfStats = false;
 
 // ==================== 初始化 ====================
@@ -52,12 +50,6 @@ void SpawnPerfConfig_Create()
         CVAR_FLAG, true, 0.0, true, 1.0
     );
 
-    g_cvSpawnPerfEarlyDistanceFilter = CreateConVar(
-        "inf_spawn_perf_early_dist_filter", "0",
-        "启用早期距离过滤：使用包围盒快速淘汰明显不合格的候选点",
-        CVAR_FLAG, true, 0.0, true, 1.0
-    );
-
     g_cvSpawnPerfStats = CreateConVar(
         "inf_spawn_perf_stats", "0",
         "显示刷点性能统计：0=关闭，1=回合结束时输出",
@@ -67,7 +59,6 @@ void SpawnPerfConfig_Create()
     g_cvSpawnPerfMode.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfProgressiveSampling.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfAdaptiveBucketWindow.AddChangeHook(OnSpawnPerfConfigChanged);
-    g_cvSpawnPerfEarlyDistanceFilter.AddChangeHook(OnSpawnPerfConfigChanged);
     g_cvSpawnPerfStats.AddChangeHook(OnSpawnPerfConfigChanged);
 }
 
@@ -79,7 +70,6 @@ void SpawnPerfConfig_Refresh()
     g_CurrentPerfMode = view_as<SpawnPerfMode>(g_cvSpawnPerfMode.IntValue);
     g_bProgressiveSampling = g_cvSpawnPerfProgressiveSampling.BoolValue;
     g_bAdaptiveBucketWindow = g_cvSpawnPerfAdaptiveBucketWindow.BoolValue;
-    g_bEarlyDistanceFilter = g_cvSpawnPerfEarlyDistanceFilter.BoolValue;
     g_bShowPerfStats = g_cvSpawnPerfStats.BoolValue;
 
     // 根据性能模式应用预设
@@ -100,14 +90,12 @@ void ApplyPerfModePreset(SpawnPerfMode mode)
             // 快速模式：激进优化，可能牺牲刷点质量
             g_bProgressiveSampling = true;
             g_bAdaptiveBucketWindow = true;
-            g_bEarlyDistanceFilter = true;
         }
         case PerfMode_Quality:
         {
             // 质量模式：关闭所有优化，全面扫描
             g_bProgressiveSampling = false;
             g_bAdaptiveBucketWindow = false;
-            g_bEarlyDistanceFilter = false;
         }
         case PerfMode_Balanced:
         {
@@ -127,11 +115,6 @@ stock bool SpawnPerfConfig_UseProgressiveSampling()
 stock bool SpawnPerfConfig_UseAdaptiveBucketWindow()
 {
     return g_bAdaptiveBucketWindow;
-}
-
-stock bool SpawnPerfConfig_UseEarlyDistanceFilter()
-{
-    return g_bEarlyDistanceFilter;
 }
 
 stock bool SpawnPerfConfig_ShowStats()
@@ -169,7 +152,6 @@ public Action Cmd_SpawnPerfMode(int client, int args)
         ReplyToCommand(client, "[IC] 当前刷点性能模式: %s (%d)", modeName, g_CurrentPerfMode);
         ReplyToCommand(client, "  渐进式采样: %s", g_bProgressiveSampling ? "开启" : "关闭");
         ReplyToCommand(client, "  自适应桶窗口: %s", g_bAdaptiveBucketWindow ? "开启" : "关闭");
-        ReplyToCommand(client, "  早期距离过滤: %s", g_bEarlyDistanceFilter ? "开启" : "关闭");
         return Plugin_Handled;
     }
 

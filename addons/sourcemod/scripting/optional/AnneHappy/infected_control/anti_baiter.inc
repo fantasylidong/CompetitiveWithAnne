@@ -9,7 +9,8 @@ enum AntiBaitState
     AB_Grace,
     AB_Observe,
     AB_Pressure,
-    AB_Recover
+    AB_Recover,
+    AB_Paused
 }
 
 enum struct AntiBaitRuntime
@@ -17,42 +18,50 @@ enum struct AntiBaitRuntime
     AntiBaitState state;
     int baselineAvgPct;
     int baselineMaxPct;
+    int baselineMedianPct;
     int lastAvgPct;
     int lastMaxPct;
     int lastMedianPct;
     int runner;
+    int holdingTarget;
     int isolatedCount;
     int groupCount;
     float stateSince;
     float lastProgressTime;
     float pressureSince;
+    float blockedSince;
     float lastSpreadDist;
     float lastAvgNearestDist;
     bool teamHolding;
     bool attackableSpread;
     bool allPinned;
     bool spreadStallPressure;
+    AntiBaitState resumeState;
 
     void Reset()
     {
         this.state = AB_Off;
         this.baselineAvgPct = -1;
         this.baselineMaxPct = -1;
+        this.baselineMedianPct = -1;
         this.lastAvgPct = -1;
         this.lastMaxPct = -1;
         this.lastMedianPct = -1;
         this.runner = -1;
+        this.holdingTarget = -1;
         this.isolatedCount = 0;
         this.groupCount = 0;
         this.stateSince = 0.0;
         this.lastProgressTime = 0.0;
         this.pressureSince = 0.0;
+        this.blockedSince = 0.0;
         this.lastSpreadDist = 0.0;
         this.lastAvgNearestDist = 0.0;
         this.teamHolding = false;
         this.attackableSpread = false;
         this.allPinned = false;
         this.spreadStallPressure = false;
+        this.resumeState = AB_Grace;
     }
 }
 
@@ -64,7 +73,8 @@ static const char g_sAntiBaitStateName[][] =
     "Grace",
     "Observe",
     "Pressure",
-    "Recover"
+    "Recover",
+    "Paused"
 };
 
 static void AntiBait_Debug(const char[] fmt, any ...)
@@ -150,7 +160,7 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
 
     SortIntegers(pcts, n, Sort_Ascending);
     avgPct = RoundToNearest(float(sum) / float(n));
-    medianPct = pcts[n / 2];
+    medianPct = pcts[(n - 1) / 2];
 
     for (int i = 0; i < n; i++)
     {
@@ -237,64 +247,10 @@ static bool AntiBait_IsEventBlocked()
         return true;
     if (g_bPauseLib && IsInPause())
         return true;
-    if (IsAnyTankOrAboveHalfSurvivorDownOrDied(1))
+    if (IsAnyTankOrAboveHalfSurvivorDownOrDied())
         return true;
     if (gAB.allPinned)
         return true;
-    return false;
-}
-
-static float AntiBait_GetSpawnLatestScale()
-{
-    int level = DifficultyStrategy_GetLevel();
-
-    // 档位越高，允许拖延的“最晚开波”越接近基础刷新时间；绝不低于基础刷新间隔。
-    float scale = gCV.fAntiBaitLatestBaseScale - (float(level - 1) * gCV.fAntiBaitLatestScaleStep);
-    if (scale < 1.0)
-        scale = 1.0;
-    if (scale > 3.0)
-        scale = 3.0;
-    return scale;
-}
-
-static float AntiBait_GetLatestWaveDelay()
-{
-    return gCV.fSiInterval * AntiBait_GetSpawnLatestScale();
-}
-
-static bool AntiBait_HasReachedConfiguredSpawnTime()
-{
-    return DifficultyStrategy_CanStartConfiguredWave();
-}
-
-static float AntiBait_GetPressureAge()
-{
-    if (gAB.state != AB_Pressure || gAB.pressureSince <= 0.0)
-        return 0.0;
-
-    return GetGameTime() - gAB.pressureSince;
-}
-
-static bool AntiBait_HasEnoughSiPressure()
-{
-    if (gCV.iSiLimit <= 0)
-        return false;
-
-    float ratio = float(gST.totalSI) / float(gCV.iSiLimit);
-    return ratio >= gCV.fAntiBaitMinSiRatio;
-}
-
-static bool AntiBait_IsSpawnWindowPressure()
-{
-    if (!DifficultyStrategy_CanEvaluateWave())
-        return false;
-
-    if (AntiBait_HasEnoughSiPressure())
-        return true;
-
-    if (gST.siQueueCount > 0 || SpawnQueue_Length() > 0 || TeleportQueue_Length() > 0)
-        return true;
-
     return false;
 }
 
@@ -347,6 +303,10 @@ stock bool AntiBait_IsAttackableSpread()
 
 stock bool AntiBait_ShouldReleaseFromIntensive()
 {
+    // 兼容旧状态：基础刷新时间一到必须放行，禁止无限 Intensive。
+    if (DifficultyStrategy_CanStartConfiguredWave())
+        return true;
+
     if (gAB.attackableSpread)
         return true;
 
@@ -357,6 +317,87 @@ stock bool AntiBait_ShouldReleaseFromIntensive()
         return true;
 
     return false;
+}
+
+static bool AntiBait_IsPreferredTargetEligible(int client)
+{
+    return IsEligibleSpawnTarget(client)
+        && (!g_bTargetLimitLib || !IsClientReachLimit(client));
+}
+
+static int AntiBait_SelectHoldingTarget()
+{
+    float center[3];
+    float pos[MAX_SURVIVOR_SLOTS][3];
+    int clients[MAX_SURVIVOR_SLOTS];
+    int count = 0;
+
+    for (int client = 1; client <= MaxClients && count < sizeof(clients); client++)
+    {
+        if (!IsValidSurvivor(client) || !IsPlayerAlive(client) || L4D_IsPlayerIncapacitated(client))
+            continue;
+
+        clients[count] = client;
+        GetClientAbsOrigin(client, pos[count]);
+        center[0] += pos[count][0];
+        center[1] += pos[count][1];
+        center[2] += pos[count][2];
+        count++;
+    }
+
+    if (count <= 0)
+        return -1;
+
+    center[0] /= float(count);
+    center[1] /= float(count);
+    center[2] /= float(count);
+
+    int target = -1;
+    float bestDistSq = -1.0;
+    for (int i = 0; i < count; i++)
+    {
+        int client = clients[i];
+        if (IsPinned(client) || !AntiBait_IsPreferredTargetEligible(client))
+            continue;
+
+        float distSq = GetVectorDistance(pos[i], center, true);
+        if (target < 0 || distSq > bestDistSq)
+        {
+            target = client;
+            bestDistSq = distSq;
+        }
+    }
+
+    return target;
+}
+
+static void AntiBait_Pause(float now)
+{
+    if (gAB.state == AB_Paused)
+        return;
+
+    gAB.resumeState = gAB.state;
+    if (gAB.resumeState == AB_Off || gAB.resumeState == AB_Paused)
+        gAB.resumeState = AB_Grace;
+    gAB.blockedSince = now;
+    AntiBait_SetState(AB_Paused, now, "event blocked");
+}
+
+static void AntiBait_Resume(float now)
+{
+    float pausedFor = (gAB.blockedSince > 0.0) ? (now - gAB.blockedSince) : 0.0;
+    if (pausedFor > 0.0)
+    {
+        gAB.lastProgressTime += pausedFor;
+        if (gAB.pressureSince > 0.0)
+            gAB.pressureSince += pausedFor;
+    }
+
+    AntiBaitState resume = gAB.resumeState;
+    if (resume == AB_Off || resume == AB_Paused)
+        resume = AB_Grace;
+    gAB.blockedSince = 0.0;
+    AntiBait_SetState(resume, now, "event block cleared");
 }
 
 static bool AntiBait_IsRunnerCandidate(int client, int maxPct, int medianPct)
@@ -444,6 +485,7 @@ void AntiBait_OnWaveStart()
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
+        gAB.baselineMedianPct = medianPct;
         gAB.lastAvgPct = avgPct;
         gAB.lastMaxPct = maxPct;
         gAB.lastMedianPct = medianPct;
@@ -471,11 +513,14 @@ void AntiBait_Update()
     if (AntiBait_IsEventBlocked())
     {
         AntiBait_ClearRunner();
-        if (gAB.state != AB_Off)
+        if (gAB.state != AB_Paused)
             AntiBait_Debug("blocked state=%s allPinned=%d", g_sAntiBaitStateName[view_as<int>(gAB.state)], gAB.allPinned);
-        AntiBait_SetState(AB_Off, now, "blocked");
+        AntiBait_Pause(now);
         return;
     }
+
+    if (gAB.state == AB_Paused)
+        AntiBait_Resume(now);
 
     int avgPct, maxPct, medianPct, highest, isolatedCount, groupCount;
     float spreadDist, avgNearestDist;
@@ -491,23 +536,26 @@ void AntiBait_Update()
     gAB.groupCount = groupCount;
     gAB.teamHolding = AntiBait_TeamHoldingFormation(spreadDist, avgNearestDist, isolatedCount, groupCount);
     gAB.attackableSpread = AntiBait_TeamAttackableSpread(spreadDist, isolatedCount, groupCount);
+    gAB.holdingTarget = gAB.teamHolding ? AntiBait_SelectHoldingTarget() : -1;
     AntiBait_UpdateRunner(highest, maxPct, medianPct);
 
-    if (gAB.baselineAvgPct < 0 || gAB.baselineMaxPct < 0)
+    if (gAB.baselineAvgPct < 0 || gAB.baselineMaxPct < 0 || gAB.baselineMedianPct < 0)
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
+        gAB.baselineMedianPct = medianPct;
         gAB.lastProgressTime = now;
     }
 
-    bool progressed = ((avgPct - gAB.baselineAvgPct) >= gCV.iAntiBaitProgressPct)
-                   || ((maxPct - gAB.baselineMaxPct) >= gCV.iAntiBaitProgressPct);
+    // 使用下中位数要求过半核心成员推进；单人探路不再替全队重置停滞计时。
+    bool progressed = (medianPct - gAB.baselineMedianPct) >= gCV.iAntiBaitProgressPct;
     bool releasedBySpread = gAB.attackableSpread;
 
     if (progressed)
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
+        gAB.baselineMedianPct = medianPct;
         gAB.lastProgressTime = now;
         gAB.spreadStallPressure = false;
 
@@ -557,45 +605,19 @@ void AntiBait_Update()
         }
 
         // 原有：密集且停滞
-        if (stalled && AntiBait_IsSpawnWindowPressure() && gAB.teamHolding)
+        if (stalled && gAB.teamHolding)
         {
             gAB.spreadStallPressure = false;
-            AntiBait_SetState(AB_Pressure, now, "team holding near spawn window");
+            AntiBait_SetState(AB_Pressure, now, "team holding without progress");
         }
     }
 }
 
-bool AntiBait_ShouldStartWaveByLatest()
-{
-    if (!gCV.bAntiBaitEnable || gST.hSpawn != INVALID_HANDLE || !gST.bShouldCheck)
-        return false;
-    if (!AntiBait_HasReachedConfiguredSpawnTime())
-        return false;
-
-    return float(gST.lastSpawnSecs) >= AntiBait_GetLatestWaveDelay();
-}
-
-bool AntiBait_ShouldReleaseHeldWave()
+bool AntiBait_ShouldPrepareBreachWave()
 {
     if (!gCV.bAntiBaitEnable || gCV.iAntiBaitAction < 1)
         return false;
-    if (gAB.state != AB_Pressure)
-        return false;
-    if (!AntiBait_HasReachedConfiguredSpawnTime())
-        return false;
-
-    return AntiBait_ShouldStartWaveByLatest()
-        || AntiBait_GetPressureAge() >= gCV.fAntiBaitForceAfter;
-}
-
-bool AntiBait_ShouldHoldWave()
-{
-    if (!gCV.bAntiBaitEnable || gCV.iAntiBaitAction < 1)
-        return false;
-    if (gAB.state != AB_Pressure)
-        return false;
-
-    return !AntiBait_ShouldReleaseHeldWave();
+    return gAB.state == AB_Pressure;
 }
 
 bool AntiBait_ShouldFastTeleport(int client)
@@ -604,7 +626,7 @@ bool AntiBait_ShouldFastTeleport(int client)
         return false;
     if (gAB.state != AB_Pressure)
         return false;
-    if (!AntiBait_HasReachedConfiguredSpawnTime())
+    if (!DifficultyStrategy_CanStartConfiguredWave())
         return false;
     if (!CanBeTeleport(client))
         return false;
@@ -616,8 +638,10 @@ int AntiBait_GetPreferredTarget()
 {
     if (!gCV.bAntiBaitEnable)
         return -1;
-    if (gAB.runner > 0 && IsEligibleSpawnTarget(gAB.runner))
+    if (gAB.runner > 0 && AntiBait_IsPreferredTargetEligible(gAB.runner))
         return gAB.runner;
+    if (gAB.state == AB_Pressure && gAB.holdingTarget > 0 && AntiBait_IsPreferredTargetEligible(gAB.holdingTarget))
+        return gAB.holdingTarget;
 
     return -1;
 }

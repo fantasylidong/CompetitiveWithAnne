@@ -12,6 +12,7 @@
 #define TRAITOR_ADMIN_YEAR_BONUS    50
 #define TRAITOR_ADMIN_QUOTA_MAX     10000
 #define TRAITOR_ADMIN_CACHE_SECONDS 300
+#define TRAITOR_QUOTA_CACHE_SECONDS 30
 
 static Database g_hTraitorQuotaDb = null;
 static Database g_hTraitorAdminDb = null;
@@ -21,6 +22,13 @@ static int g_iTraitorAdminDbRetryAfter = 0;
 static int g_iTraitorAdminQuotaCache[MAXPLAYERS + 1];
 static int g_iTraitorAdminQuotaCacheUntil[MAXPLAYERS + 1];
 static char g_sTraitorAdminQuotaAuth[MAXPLAYERS + 1][TRAITOR_QUOTA_AUTH_LENGTH];
+static bool g_bTraitorQuotaCacheReady[MAXPLAYERS + 1];
+static int g_iTraitorQuotaCacheUntil[MAXPLAYERS + 1];
+static int g_iTraitorQuotaCacheDay[MAXPLAYERS + 1];
+static int g_iTraitorQuotaCacheTotal[MAXPLAYERS + 1];
+static int g_iTraitorQuotaCacheUsed[MAXPLAYERS + 1];
+static int g_iTraitorQuotaCacheTankBlockUntil[MAXPLAYERS + 1];
+static char g_sTraitorQuotaCacheAuth[MAXPLAYERS + 1][TRAITOR_QUOTA_AUTH_LENGTH];
 
 bool Traitor_IsAdminClient(int client)
 {
@@ -53,6 +61,34 @@ void TraitorQuota_Close()
     TraitorQuota_InvalidateAdminQuotaCache();
 }
 
+void TraitorQuota_InvalidateClientCache(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_bTraitorQuotaCacheReady[client] = false;
+    g_iTraitorQuotaCacheUntil[client] = 0;
+    g_iTraitorQuotaCacheDay[client] = 0;
+    g_iTraitorQuotaCacheTotal[client] = 0;
+    g_iTraitorQuotaCacheUsed[client] = 0;
+    g_iTraitorQuotaCacheTankBlockUntil[client] = 0;
+    g_sTraitorQuotaCacheAuth[client][0] = '\0';
+}
+
+static void TraitorQuota_StoreClientCache(int client, const char[] auth, int total, int used, int quotaDay, int tankBlockUntil)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_bTraitorQuotaCacheReady[client] = true;
+    g_iTraitorQuotaCacheUntil[client] = GetTime() + TRAITOR_QUOTA_CACHE_SECONDS;
+    g_iTraitorQuotaCacheDay[client] = quotaDay;
+    g_iTraitorQuotaCacheTotal[client] = total;
+    g_iTraitorQuotaCacheUsed[client] = used;
+    g_iTraitorQuotaCacheTankBlockUntil[client] = tankBlockUntil;
+    strcopy(g_sTraitorQuotaCacheAuth[client], sizeof(g_sTraitorQuotaCacheAuth[]), auth);
+}
+
 void TraitorQuota_InvalidateAdminQuotaCache()
 {
     for (int client = 1; client <= MaxClients; client++)
@@ -60,6 +96,7 @@ void TraitorQuota_InvalidateAdminQuotaCache()
         g_iTraitorAdminQuotaCache[client] = 0;
         g_iTraitorAdminQuotaCacheUntil[client] = 0;
         g_sTraitorAdminQuotaAuth[client][0] = '\0';
+        TraitorQuota_InvalidateClientCache(client);
     }
 }
 
@@ -75,8 +112,15 @@ bool TraitorQuota_CanUse(int client, int cost = 1)
 
     if (used + cost > total)
     {
-        CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaExhausted", used, total);
-        return false;
+        TraitorQuota_InvalidateClientCache(client);
+        if (!TraitorQuota_ReadClientQuota(client, total, used))
+            return false;
+
+        if (used + cost > total)
+        {
+            CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaExhausted", used, total);
+            return false;
+        }
     }
 
     return true;
@@ -95,8 +139,15 @@ bool TraitorQuota_Consume(int client, int cost = 1)
 
     if (used + cost > total)
     {
-        CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaExhausted", used, total);
-        return false;
+        TraitorQuota_InvalidateClientCache(client);
+        if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth)))
+            return false;
+
+        if (used + cost > total)
+        {
+            CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaExhausted", used, total);
+            return false;
+        }
     }
 
     char table[TRAITOR_QUOTA_TABLE_LENGTH];
@@ -108,10 +159,22 @@ bool TraitorQuota_Consume(int client, int cost = 1)
         return false;
 
     int now = GetTime();
-    char query[512];
+    int today = TraitorQuota_GetToday();
+    char query[1024];
     FormatEx(query, sizeof(query),
-        "UPDATE `%s` SET used_count = used_count + %d, `updated_at` = %d WHERE `auth_id` = '%s'",
-        table, cost, now, escAuth);
+        "UPDATE `%s` SET "
+        ... "total_count = %d, "
+        ... "used_count = CASE WHEN quota_day <> %d THEN %d ELSE used_count + %d END, "
+        ... "quota_day = %d, `updated_at` = %d "
+        ... "WHERE `auth_id` = '%s' AND "
+        ... "((quota_day <> %d AND %d <= %d) OR (quota_day = %d AND used_count + %d <= %d))",
+        table,
+        total,
+        today, cost, cost,
+        today, now,
+        escAuth,
+        today, cost, total,
+        today, cost, total);
 
     if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
     {
@@ -119,16 +182,35 @@ bool TraitorQuota_Consume(int client, int cost = 1)
         return false;
     }
 
+    if (SQL_GetAffectedRows(g_hTraitorQuotaDb) <= 0)
+    {
+        TraitorQuota_InvalidateClientCache(client);
+
+        int freshTotal;
+        int freshUsed;
+        if (TraitorQuota_ReadClientQuota(client, freshTotal, freshUsed)
+            && freshUsed + cost > freshTotal)
+        {
+            CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaExhausted", freshUsed, freshTotal);
+        }
+        return false;
+    }
+
+    TraitorQuota_StoreClientCache(client, auth, total, used + cost, today, g_iTraitorQuotaCacheTankBlockUntil[client]);
+
     return true;
 }
 
 bool TraitorQuota_Refund(int client, int cost = 1)
 {
     char auth[TRAITOR_QUOTA_AUTH_LENGTH];
-    int total;
-    int used;
-    if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth)))
+    if (!TraitorQuota_EnsureDatabase()
+        || !TraitorQuota_GetClientAuth(client, auth, sizeof(auth)))
+    {
+        if (IsValidClient(client))
+            CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaDbUnavailable");
         return false;
+    }
 
     if (cost < 1)
         cost = 1;
@@ -151,6 +233,19 @@ bool TraitorQuota_Refund(int client, int cost = 1)
     {
         TraitorQuota_LogSqlError("refund quota");
         return false;
+    }
+
+    if (g_bTraitorQuotaCacheReady[client]
+        && StrEqual(g_sTraitorQuotaCacheAuth[client], auth, false))
+    {
+        g_iTraitorQuotaCacheUsed[client] -= cost;
+        if (g_iTraitorQuotaCacheUsed[client] < 0)
+            g_iTraitorQuotaCacheUsed[client] = 0;
+        g_iTraitorQuotaCacheUntil[client] = now + TRAITOR_QUOTA_CACHE_SECONDS;
+    }
+    else
+    {
+        TraitorQuota_InvalidateClientCache(client);
     }
 
     return true;
@@ -176,10 +271,13 @@ bool TraitorQuota_BlockTank(int client, int seconds)
         return false;
 
     char auth[TRAITOR_QUOTA_AUTH_LENGTH];
-    int total;
-    int used;
-    if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth)))
+    if (!TraitorQuota_EnsureDatabase()
+        || !TraitorQuota_GetClientAuth(client, auth, sizeof(auth)))
+    {
+        if (IsValidClient(client))
+            CPrintToChat(client, "%t", "InfectedControl_TraitorQuotaDbUnavailable");
         return false;
+    }
 
     char table[TRAITOR_QUOTA_TABLE_LENGTH];
     if (!TraitorQuota_GetTableName(table, sizeof(table)))
@@ -202,13 +300,26 @@ bool TraitorQuota_BlockTank(int client, int seconds)
         return false;
     }
 
+    if (g_bTraitorQuotaCacheReady[client]
+        && StrEqual(g_sTraitorQuotaCacheAuth[client], auth, false))
+    {
+        if (blockUntil > g_iTraitorQuotaCacheTankBlockUntil[client])
+            g_iTraitorQuotaCacheTankBlockUntil[client] = blockUntil;
+        g_iTraitorQuotaCacheUntil[client] = now + TRAITOR_QUOTA_CACHE_SECONDS;
+    }
+    else
+    {
+        TraitorQuota_InvalidateClientCache(client);
+    }
+
     return true;
 }
 
-static bool TraitorQuota_ReadClientQuota(int client, int &total, int &used, char[] auth = "", int authMaxLen = 0)
+static bool TraitorQuota_ReadClientQuota(int client, int &total, int &used, char[] auth = "", int authMaxLen = 0, int &tankBlockUntil = 0)
 {
     total = 0;
     used = 0;
+    tankBlockUntil = 0;
 
     if (!TraitorQuota_EnsureDatabase())
     {
@@ -226,7 +337,24 @@ static bool TraitorQuota_ReadClientQuota(int client, int &total, int &used, char
     if (authMaxLen > 0)
         strcopy(auth, authMaxLen, localAuth);
 
-    return TraitorQuota_EnsureClientRow(client, localAuth, total, used);
+    int today = TraitorQuota_GetToday();
+    int now = GetTime();
+    if (g_bTraitorQuotaCacheReady[client]
+        && g_iTraitorQuotaCacheUntil[client] > now
+        && g_iTraitorQuotaCacheDay[client] == today
+        && StrEqual(g_sTraitorQuotaCacheAuth[client], localAuth, false))
+    {
+        total = g_iTraitorQuotaCacheTotal[client];
+        used = g_iTraitorQuotaCacheUsed[client];
+        tankBlockUntil = g_iTraitorQuotaCacheTankBlockUntil[client];
+        return true;
+    }
+
+    if (!TraitorQuota_EnsureClientRow(client, localAuth, total, used, tankBlockUntil))
+        return false;
+
+    TraitorQuota_StoreClientCache(client, localAuth, total, used, today, tankBlockUntil);
+    return true;
 }
 
 static bool TraitorQuota_EnsureDatabase()
@@ -401,7 +529,7 @@ static bool TraitorQuota_TableHasColumn(const char[] table, const char[] column)
     return false;
 }
 
-static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &total, int &used)
+static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &total, int &used, int &tankBlockUntil, bool allowInsert = true)
 {
     char table[TRAITOR_QUOTA_TABLE_LENGTH];
     if (!TraitorQuota_GetTableName(table, sizeof(table)))
@@ -413,7 +541,7 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
 
     char query[512];
     FormatEx(query, sizeof(query),
-        "SELECT `total_count`, `used_count`, `quota_day` FROM `%s` WHERE `auth_id` = '%s'",
+        "SELECT `total_count`, `used_count`, `quota_day`, `tank_block_until` FROM `%s` WHERE `auth_id` = '%s'",
         table, escAuth);
 
     DBResultSet results = SQL_Query(g_hTraitorQuotaDb, query);
@@ -432,6 +560,7 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
         int storedTotal = results.FetchInt(0);
         used = results.FetchInt(1);
         int quotaDay = results.FetchInt(2);
+        tankBlockUntil = results.FetchInt(3);
         delete results;
 
         if (quotaDay != today)
@@ -452,9 +581,19 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
     }
 
     delete results;
+    if (!allowInsert)
+        return false;
+
     total = desiredTotal;
     used = 0;
-    return TraitorQuota_InsertClientRow(client, table, escAuth, today, total);
+    tankBlockUntil = 0;
+    if (!TraitorQuota_InsertClientRow(client, table, escAuth, today, total))
+        return false;
+
+    if (SQL_GetAffectedRows(g_hTraitorQuotaDb) == 0)
+        return TraitorQuota_EnsureClientRow(client, auth, total, used, tankBlockUntil, false);
+
+    return true;
 }
 
 static int TraitorQuota_GetAdminDailyTotal(int client, const char[] auth)
@@ -565,34 +704,9 @@ static bool TraitorQuota_GetTankBlockRemaining(int client, int &remaining)
     char auth[TRAITOR_QUOTA_AUTH_LENGTH];
     int total;
     int used;
-    if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth)))
+    int blockUntil;
+    if (!TraitorQuota_ReadClientQuota(client, total, used, auth, sizeof(auth), blockUntil))
         return false;
-
-    char table[TRAITOR_QUOTA_TABLE_LENGTH];
-    if (!TraitorQuota_GetTableName(table, sizeof(table)))
-        return false;
-
-    char escAuth[TRAITOR_QUOTA_AUTH_LENGTH * 2 + 1];
-    if (!SQL_EscapeString(g_hTraitorQuotaDb, auth, escAuth, sizeof(escAuth)))
-        return false;
-
-    char query[512];
-    FormatEx(query, sizeof(query),
-        "SELECT `tank_block_until` FROM `%s` WHERE `auth_id` = '%s'",
-        table, escAuth);
-
-    DBResultSet results = SQL_Query(g_hTraitorQuotaDb, query);
-    if (results == null)
-    {
-        TraitorQuota_LogSqlError("read tank block");
-        return false;
-    }
-
-    int blockUntil = 0;
-    if (results.FetchRow())
-        blockUntil = results.FetchInt(0);
-
-    delete results;
 
     int now = GetTime();
     if (blockUntil > now)
@@ -612,7 +726,7 @@ static bool TraitorQuota_InsertClientRow(int client, const char[] table, const c
     int now = GetTime();
     char query[512];
     FormatEx(query, sizeof(query),
-        "INSERT INTO `%s` (`auth_id`, `total_count`, `used_count`, `quota_day`, `tank_block_until`, `last_name`, `updated_at`) "
+        "INSERT IGNORE INTO `%s` (`auth_id`, `total_count`, `used_count`, `quota_day`, `tank_block_until`, `last_name`, `updated_at`) "
         ... "VALUES ('%s', %d, 0, %d, 0, '%s', %d)",
         table, escAuth, total, today, escName, now);
 

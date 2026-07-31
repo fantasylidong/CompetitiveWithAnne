@@ -1,0 +1,1245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>infected_control 完整流程架构</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f5;
+      --surface: #ffffff;
+      --surface-2: #eef1ef;
+      --ink: #171b1e;
+      --muted: #66706c;
+      --line: #d5dbd7;
+      --line-strong: #aeb8b2;
+      --teal: #117f83;
+      --teal-soft: #d9eeee;
+      --green: #2d8a57;
+      --green-soft: #dcf0e4;
+      --amber: #a86416;
+      --amber-soft: #f7e8d0;
+      --red: #b8473e;
+      --red-soft: #f5dedb;
+      --blue: #3567a6;
+      --blue-soft: #dce7f4;
+      --purple: #76518f;
+      --purple-soft: #ece2f1;
+      --shadow: 0 8px 22px rgba(23, 27, 30, 0.08);
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: 0;
+    }
+
+    button, select, input { font: inherit; letter-spacing: 0; }
+    button, select {
+      min-height: 36px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--ink);
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--ink); }
+    button:focus-visible, select:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(17, 127, 131, 0.24);
+      outline-offset: 2px;
+    }
+    a { color: var(--teal); text-underline-offset: 3px; }
+    code {
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--surface-2);
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    h1, h2, h3, h4, p { margin: 0; }
+    h1 { font-size: 28px; line-height: 1.2; font-weight: 680; }
+    h2 { font-size: 20px; line-height: 1.3; font-weight: 680; }
+    h3 { font-size: 16px; line-height: 1.35; font-weight: 670; }
+    h4 { font-size: 13px; line-height: 1.4; font-weight: 700; }
+
+    .page-shell {
+      width: min(1480px, 100%);
+      margin: 0 auto;
+      padding: 22px clamp(16px, 3vw, 40px) 42px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .subtitle { margin-top: 7px; max-width: 820px; color: var(--muted); }
+    .top-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 30px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .status-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
+    .status-chip.frame::before { background: var(--green); }
+    .status-chip.event::before { background: var(--amber); }
+
+    .tab-shell {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      margin: 0 calc(-1 * clamp(16px, 3vw, 40px));
+      padding: 0 clamp(16px, 3vw, 40px);
+      background: rgba(246, 247, 245, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    .tabs {
+      display: flex;
+      gap: 22px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .tab {
+      flex: 0 0 auto;
+      min-height: 48px;
+      padding: 0;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--teal); }
+
+    .view { padding-top: 20px; }
+    .view[hidden] { display: none; }
+    .section-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .section-head p { margin-top: 5px; max-width: 860px; color: var(--muted); }
+    .eyebrow { color: var(--teal); font-size: 11px; font-weight: 760; text-transform: uppercase; }
+
+    .transport { display: flex; align-items: center; gap: 6px; }
+    .icon-button {
+      width: 38px;
+      min-width: 38px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+    }
+    .icon-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .play-button { width: auto; padding: 0 12px; display: inline-flex; gap: 7px; align-items: center; }
+    .counter { min-width: 62px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+
+    .overview-workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+      min-height: 620px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .lane-canvas { min-width: 0; padding: 20px; }
+    .system-head {
+      display: grid;
+      grid-template-columns: 165px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--line);
+    }
+    .system-head strong { font-size: 13px; }
+    .shared-state {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .shared-state span {
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 142px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .lane:last-child { border-bottom: 0; }
+    .lane-label { padding-top: 8px; }
+    .lane-label span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .lane-label .lane-frequency { margin-top: 9px; font-variant-numeric: tabular-nums; }
+    .lane-nodes { display: flex; align-items: stretch; min-width: 0; }
+    .flow-node {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 98px;
+      padding: 11px 10px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--surface);
+      text-align: left;
+      transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+    }
+    .flow-node + .flow-node { margin-left: 27px; }
+    .flow-node + .flow-node::before {
+      content: "";
+      position: absolute;
+      right: 100%;
+      top: 50%;
+      width: 27px;
+      height: 1px;
+      background: var(--line-strong);
+    }
+    .flow-node + .flow-node::after {
+      content: "";
+      position: absolute;
+      right: calc(100% + 1px);
+      top: calc(50% - 3px);
+      width: 6px;
+      height: 6px;
+      border-top: 1px solid var(--line-strong);
+      border-right: 1px solid var(--line-strong);
+      transform: rotate(45deg);
+    }
+    .flow-node strong { display: block; font-size: 12px; }
+    .flow-node small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+    .flow-node[data-tone="timer"] { border-top: 3px solid var(--teal); }
+    .flow-node[data-tone="frame"] { border-top: 3px solid var(--green); }
+    .flow-node[data-tone="event"] { border-top: 3px solid var(--amber); }
+    .flow-node[aria-current="step"] {
+      border-color: var(--ink);
+      background: var(--teal-soft);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(23, 27, 30, 0.09);
+    }
+    .flow-node[aria-current="step"]::before { background: var(--teal); }
+    .node-pulse {
+      position: absolute;
+      right: 7px;
+      top: 7px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+      opacity: 0;
+    }
+    .flow-node[aria-current="step"] .node-pulse { opacity: 1; animation: pulse 1.15s ease-out infinite; }
+
+    .inspector {
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .inspector-head { padding: 22px 20px 18px; border-bottom: 1px solid var(--line); }
+    .inspector-index { color: var(--teal); font-size: 11px; font-weight: 760; }
+    .inspector-title { margin-top: 5px; font-size: 20px; font-weight: 680; }
+    .inspector-copy { margin-top: 9px; color: var(--muted); }
+    .inspector-list { margin: 0; padding: 8px 20px; }
+    .inspector-list div {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .inspector-list div:last-child { border-bottom: 0; }
+    .inspector-list dt { color: var(--muted); }
+    .inspector-list dd {
+      min-width: 0;
+      margin: 0;
+      font-weight: 620;
+      overflow-wrap: anywhere;
+    }
+    .inspector-list div { min-width: 0; }
+    .inspector-note { margin-top: auto; padding: 16px 20px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+    .handoff-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .handoff-item { padding: 14px 16px; border-right: 1px solid var(--line); }
+    .handoff-item:last-child { border-right: 0; }
+    .handoff-item span { color: var(--muted); font-size: 11px; }
+    .handoff-item strong { display: block; margin-top: 4px; font-size: 13px; }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .state-panel {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .state-panel > p { margin-top: 5px; color: var(--muted); }
+    .state-track { display: flex; align-items: stretch; margin-top: 18px; overflow-x: auto; padding-bottom: 4px; }
+    .state-node {
+      position: relative;
+      flex: 1 0 105px;
+      min-width: 105px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      text-align: left;
+      font-size: 12px;
+    }
+    .state-node + .state-node { margin-left: 24px; }
+    .state-node + .state-node::before { content: "→"; position: absolute; right: 100%; width: 24px; text-align: center; color: var(--muted); }
+    .state-node[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); color: var(--ink); }
+    .state-detail {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 16px;
+      margin-top: 15px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    .state-detail strong { color: var(--teal); }
+    .state-detail p { color: var(--muted); }
+
+    .rule-band {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      margin-top: 18px;
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+    .rule-band section { padding: 16px 18px; }
+    .rule-band section + section { border-left: 1px solid var(--line); }
+    .rule-band p { margin-top: 6px; color: var(--muted); }
+    .rule-band .red { color: var(--red); }
+
+    .queue-workspace {
+      display: grid;
+      grid-template-columns: minmax(250px, 0.65fr) minmax(0, 1.35fr);
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+    .class-selector { padding: 18px 22px 18px 0; border-right: 1px solid var(--line); }
+    .class-selector > p { margin-top: 5px; color: var(--muted); }
+    .class-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 16px; }
+    .class-button { padding: 8px 10px; text-align: left; }
+    .class-button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+    .class-button small { display: block; margin-top: 2px; opacity: 0.72; }
+    .class-detail { padding: 18px 0 18px 22px; }
+    .class-title-row { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+    .class-role { color: var(--muted); font-size: 12px; }
+    .band-chart { position: relative; height: 118px; margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .band-axis { position: absolute; inset: 48px 0 auto; height: 2px; background: var(--line-strong); }
+    .band-block { position: absolute; top: 24px; height: 50px; border-radius: 4px; transition: left 220ms ease, width 220ms ease; }
+    .band-block.stage-2 { background: var(--amber-soft); border: 1px solid var(--amber); }
+    .band-block.stage-1 { background: var(--blue-soft); border: 1px solid var(--blue); }
+    .band-block.stage-0 { background: var(--teal-soft); border: 1px solid var(--teal); }
+    .band-block span { display: block; padding: 4px 6px; color: var(--ink); font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .axis-labels { position: absolute; inset: 81px 0 auto; display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .class-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .class-fact { padding-top: 10px; border-top: 2px solid var(--line); }
+    .class-fact span { color: var(--muted); font-size: 11px; }
+    .class-fact strong { display: block; margin-top: 3px; }
+
+    .queue-pipeline { display: flex; align-items: stretch; margin-top: 18px; overflow-x: auto; padding-bottom: 6px; }
+    .queue-step {
+      position: relative;
+      flex: 1 0 146px;
+      min-width: 146px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .queue-step + .queue-step { margin-left: 28px; }
+    .queue-step + .queue-step::before { content: "→"; position: absolute; right: 100%; width: 28px; text-align: center; color: var(--muted); }
+    .queue-step span { color: var(--teal); font-size: 10px; font-weight: 740; }
+    .queue-step p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+    .nav-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(270px, 330px);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .funnel { padding: 20px; }
+    .funnel-stage {
+      position: relative;
+      display: grid;
+      width: 100%;
+      grid-template-columns: 48px minmax(180px, 0.65fr) minmax(0, 1.35fr) 82px;
+      gap: 14px;
+      align-items: center;
+      min-height: 66px;
+      padding: 10px 12px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      text-align: left;
+      transition: background 180ms ease;
+      cursor: pointer;
+    }
+    .funnel-stage:last-child { border-bottom: 0; }
+    .funnel-stage[aria-current="step"] { background: var(--teal-soft); }
+    .stage-number { color: var(--teal); font-size: 11px; font-weight: 760; }
+    .stage-copy strong { display: block; font-size: 13px; }
+    .stage-copy span { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .stage-bar { height: 22px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+    .stage-fill { height: 100%; background: var(--teal); transition: width 280ms ease; }
+    .funnel-stage[data-cost="expensive"] .stage-fill { background: var(--amber); }
+    .funnel-stage[data-cost="final"] .stage-fill { background: var(--green); }
+    .stage-count { color: var(--muted); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    .nav-inspector { padding: 20px; border-left: 1px solid var(--line); background: var(--surface-2); }
+    .nav-inspector p { margin-top: 7px; color: var(--muted); }
+    .nav-metrics { margin-top: 16px; border-top: 1px solid var(--line); }
+    .nav-metrics div { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .nav-metrics span { color: var(--muted); }
+    .nav-metrics strong { text-align: right; }
+    .deep-link { display: inline-flex; margin-top: 16px; }
+
+    .fallback-ladder { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: stretch; }
+    .fallback-step {
+      position: relative;
+      min-width: 0;
+      padding: 14px 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .fallback-step + .fallback-step { margin-left: 24px; }
+    .fallback-step + .fallback-step::before { content: "→"; position: absolute; right: 100%; width: 24px; text-align: center; color: var(--muted); }
+    .fallback-step strong { display: block; font-size: 12px; }
+    .fallback-step span { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+    .fallback-step.constrained { border-top: 3px solid var(--amber); }
+    .fallback-step.api { border-top: 3px solid var(--red); background: var(--red-soft); }
+    .fallback-controls { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; }
+    .fallback-controls button { padding: 6px 10px; }
+    .fallback-controls button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+    .fallback-step.active { border-color: var(--ink); box-shadow: 0 6px 16px rgba(23, 27, 30, 0.1); transform: translateY(-2px); }
+    .fallback-note {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 18px;
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+    .fallback-note section { padding: 15px 18px; }
+    .fallback-note section + section { border-left: 1px solid var(--line); }
+    .fallback-note p { margin-top: 5px; color: var(--muted); }
+
+    .teleport-flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin-top: 22px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .teleport-flow section { padding: 15px 14px; }
+    .teleport-flow section + section { border-left: 1px solid var(--line); }
+    .teleport-flow span { color: var(--blue); font-size: 10px; font-weight: 760; }
+    .teleport-flow p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+    .traitor-map {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(265px, 320px);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .traitor-stages { padding: 18px; }
+    .traitor-row { display: flex; align-items: stretch; overflow-x: auto; padding: 4px 0 10px; }
+    .traitor-node {
+      position: relative;
+      flex: 1 0 122px;
+      min-width: 122px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      text-align: left;
+    }
+    .traitor-node + .traitor-node { margin-left: 25px; }
+    .traitor-node + .traitor-node::before { content: "→"; position: absolute; right: 100%; width: 25px; text-align: center; color: var(--muted); }
+    .traitor-node[aria-pressed="true"] { border-color: var(--purple); background: var(--purple-soft); }
+    .traitor-node strong { display: block; font-size: 12px; }
+    .traitor-node span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .traitor-branches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+    .branch { padding: 15px; border-top: 3px solid var(--teal); background: var(--surface-2); }
+    .branch.tank { border-color: var(--amber); }
+    .branch p { margin-top: 6px; color: var(--muted); }
+    .traitor-inspector { padding: 20px; border-left: 1px solid var(--line); background: var(--surface-2); }
+    .traitor-inspector p { margin-top: 7px; color: var(--muted); }
+    .traitor-inspector dl { margin: 16px 0 0; }
+    .traitor-inspector div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .traitor-inspector dt { color: var(--muted); }
+    .traitor-inspector dd { margin: 0; }
+
+    .lifecycle {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+    .life-step { padding: 16px; }
+    .life-step + .life-step { border-left: 1px solid var(--line); }
+    .life-step span { color: var(--teal); font-size: 10px; font-weight: 760; }
+    .life-step p { margin-top: 6px; color: var(--muted); font-size: 12px; }
+
+    .perf-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr); gap: 22px; margin-top: 22px; }
+    .budget-table, .ownership-table, .command-table { width: 100%; border-collapse: collapse; background: var(--surface); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+    .budget-table th, .budget-table td, .ownership-table th, .ownership-table td, .command-table th, .command-table td { padding: 11px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    .budget-table tr:last-child td, .ownership-table tr:last-child td, .command-table tr:last-child td { border-bottom: 0; }
+    .budget-table th, .ownership-table th, .command-table th { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .budget-table td:last-child { color: var(--muted); }
+    .cost-stack { border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background: var(--surface); }
+    .cost-item { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .cost-item:last-child { border-bottom: 0; }
+    .cost-rank { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 750; }
+    .cost-item p { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .subsection { margin-top: 26px; }
+    .subsection-head { margin-bottom: 12px; }
+    .subsection-head p { margin-top: 4px; color: var(--muted); }
+    .module-name { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
+    footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @keyframes pulse {
+      from { box-shadow: 0 0 0 0 rgba(17, 127, 131, 0.55); }
+      to { box-shadow: 0 0 0 10px rgba(17, 127, 131, 0); }
+    }
+
+    @media (max-width: 1100px) {
+      .lane { grid-template-columns: 115px minmax(0, 1fr); gap: 12px; }
+      .lane-nodes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .flow-node + .flow-node { margin-left: 0; }
+      .flow-node + .flow-node::before, .flow-node + .flow-node::after { display: none; }
+      .fallback-ladder { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .fallback-step + .fallback-step { margin-left: 0; }
+      .fallback-step + .fallback-step::before { display: none; }
+      .teleport-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .teleport-flow section:nth-child(4) { border-left: 0; border-top: 1px solid var(--line); }
+      .teleport-flow section:nth-child(5), .teleport-flow section:nth-child(6) { border-top: 1px solid var(--line); }
+      .lifecycle { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .life-step:nth-child(4) { border-left: 0; border-top: 1px solid var(--line); }
+      .life-step:nth-child(5) { border-top: 1px solid var(--line); }
+    }
+
+    @media (max-width: 820px) {
+      .topbar, .section-head { align-items: flex-start; flex-direction: column; gap: 13px; }
+      .top-meta { justify-content: flex-start; }
+      .overview-workspace, .nav-layout, .traitor-map { grid-template-columns: 1fr; }
+      .inspector, .nav-inspector, .traitor-inspector { border-left: 0; border-top: 1px solid var(--line); }
+      .state-grid { grid-template-columns: 1fr; }
+      .queue-workspace { grid-template-columns: 1fr; }
+      .class-selector { padding-right: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .class-detail { padding-left: 0; }
+      .rule-band, .fallback-note { grid-template-columns: 1fr; }
+      .rule-band section + section, .fallback-note section + section { border-left: 0; border-top: 1px solid var(--line); }
+      .perf-grid { grid-template-columns: 1fr; }
+      .handoff-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .handoff-item:nth-child(2) { border-right: 0; }
+      .handoff-item:nth-child(3), .handoff-item:nth-child(4) { border-top: 1px solid var(--line); }
+    }
+
+    @media (max-width: 620px) {
+      .page-shell { padding: 16px 12px 30px; }
+      .tab-shell { margin: 0 -12px; padding: 0 12px; }
+      h1 { font-size: 23px; }
+      .lane-canvas { padding: 12px; }
+      .system-head { grid-template-columns: 1fr; }
+      .lane { grid-template-columns: 1fr; }
+      .lane-label { padding-top: 0; }
+      .lane-nodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow-node { min-width: 0; }
+      .state-detail { grid-template-columns: 1fr; gap: 4px; }
+      .class-buttons { grid-template-columns: 1fr; }
+      .class-facts { grid-template-columns: 1fr; }
+      .funnel { padding: 10px; }
+      .funnel-stage { grid-template-columns: 72px minmax(0, 1fr); gap: 8px; }
+      .stage-number { grid-column: 1; grid-row: 1; }
+      .stage-copy { grid-column: 2; grid-row: 1; }
+      .stage-count { grid-column: 1; grid-row: 2; text-align: left; white-space: nowrap; }
+      .stage-bar { grid-column: 2; grid-row: 2; width: 100%; }
+      .fallback-ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .teleport-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .teleport-flow section:nth-child(3), .teleport-flow section:nth-child(5) { border-left: 0; }
+      .teleport-flow section:nth-child(n+3) { border-top: 1px solid var(--line); }
+      .traitor-branches { grid-template-columns: 1fr; }
+      .lifecycle { grid-template-columns: 1fr; }
+      .life-step + .life-step { border-left: 0; border-top: 1px solid var(--line); }
+      .handoff-strip { grid-template-columns: 1fr; }
+      .handoff-item { border-right: 0; }
+      .handoff-item + .handoff-item { border-top: 1px solid var(--line); }
+      .budget-table, .ownership-table, .command-table { display: block; overflow-x: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <div>
+        <h1>infected_control 完整流程架构</h1>
+        <p class="subtitle">从回合初始化、波次决策和 Anti-Bait，到职业队列、Nav 候选、传送兜底与内鬼接管。页面按实际执行频率拆开，避免把 1 秒计时器、OnGameFrame 热路径和事件回调混在一起理解。</p>
+      </div>
+      <div class="top-meta" aria-label="执行通道图例">
+        <span class="status-chip">1 秒决策通道</span>
+        <span class="status-chip frame">OnGameFrame 执行通道</span>
+        <span class="status-chip event">事件回写通道</span>
+      </div>
+    </header>
+
+    <nav class="tab-shell" aria-label="功能视图">
+      <div class="tabs" role="tablist">
+        <button class="tab" type="button" role="tab" aria-selected="true" data-view="overview">全局总览</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="wave">波次与 Anti-Bait</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="queue">职业队列</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="nav">Nav 找位</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="fallback">传送与兜底</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="traitor">内鬼模式</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-view="lifecycle">生命周期与性能</button>
+      </div>
+    </nav>
+
+    <section class="view" id="overview-view" data-view-panel="overview">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">End-to-end runtime</div>
+          <h2>三条执行通道，共享一套状态</h2>
+          <p>点击任意节点查看职责；播放会沿真实主流程从开波走到生成，再由事件把存活数、冷却和 Nav 权重写回。</p>
+        </div>
+        <div class="transport" aria-label="总流程播放控制">
+          <button class="icon-button" id="overview-prev" type="button" title="上一步" aria-label="上一步">
+            <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button class="icon-button play-button" id="overview-play" type="button" aria-label="播放总流程">
+            <svg class="play-icon" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"/></svg>
+            <span>播放</span>
+          </button>
+          <button class="icon-button" id="overview-next" type="button" title="下一步" aria-label="下一步">
+            <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <span class="counter" id="overview-counter">01 / 14</span>
+        </div>
+      </div>
+
+      <div class="overview-workspace">
+        <div class="lane-canvas">
+          <div class="system-head">
+            <strong>共享运行态 <code>gST</code></strong>
+            <div class="shared-state">
+              <span>waveIndex / waveState</span><span>siAlive / totalSI</span><span>normalQueue / teleportQueue</span><span>targetSurvivor</span><span>AntiBait / breach</span><span>bandStage / fallbackCycles</span>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-label"><strong>波次决策</strong><span>决定何时释放下一波</span><span class="lane-frequency">固定 1 秒 tick</span></div>
+            <div class="lane-nodes">
+              <button class="flow-node" data-step="0" data-tone="timer"><span class="node-pulse"></span><strong>离开安全区</strong><small>RequestStartSpawn</small></button>
+              <button class="flow-node" data-step="1" data-tone="timer"><span class="node-pulse"></span><strong>StartWave</strong><small>预算、目标、队列快照</small></button>
+              <button class="flow-node" data-step="2" data-tone="timer"><span class="node-pulse"></span><strong>Anti-Bait</strong><small>停滞、跑男、暂停恢复</small></button>
+              <button class="flow-node" data-step="3" data-tone="timer"><span class="node-pulse"></span><strong>WaveDecider</strong><small>EarlyCheck / TimerRunning</small></button>
+              <button class="flow-node" data-step="4" data-tone="timer"><span class="node-pulse"></span><strong>释放新波</strong><small>正常波或破点波</small></button>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-label"><strong>实际生成</strong><span>预算内寻找并刷出</span><span class="lane-frequency">OnGameFrame 节流</span></div>
+            <div class="lane-nodes">
+              <button class="flow-node" data-step="5" data-tone="frame"><span class="node-pulse"></span><strong>维护队列</strong><small>0.25 秒缺口节流</small></button>
+              <button class="flow-node" data-step="6" data-tone="frame"><span class="node-pulse"></span><strong>传送优先</strong><small>teleportQueue first</small></button>
+              <button class="flow-node" data-step="7" data-tone="frame"><span class="node-pulse"></span><strong>职业距离带</strong><small>直接进入对应主区间</small></button>
+              <button class="flow-node" data-step="8" data-tone="frame"><span class="node-pulse"></span><strong>Nav 候选会话</strong><small>懒游标、权重、职业几何</small></button>
+              <button class="flow-node" data-step="9" data-tone="frame"><span class="node-pulse"></span><strong>时间片筛选</strong><small>便宜过滤 → 昂贵检查</small></button>
+              <button class="flow-node" data-step="10" data-tone="frame"><span class="node-pulse"></span><strong>DoSpawnAt</strong><small>生成或进入兜底</small></button>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-label"><strong>事件回写</strong><span>让下一次决策看到新状态</span><span class="lane-frequency">游戏事件 / hooks</span></div>
+            <div class="lane-nodes">
+              <button class="flow-node" data-step="11" data-tone="event"><span class="node-pulse"></span><strong>spawn / death</strong><small>存活数、职业 CD</small></button>
+              <button class="flow-node" data-step="12" data-tone="event"><span class="node-pulse"></span><strong>能力与伤害</strong><small>交战、内鬼伤害账本</small></button>
+              <button class="flow-node" data-step="13" data-tone="event"><span class="node-pulse"></span><strong>权重与缓存</strong><small>成功、失败、过滤降权</small></button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="inspector" aria-live="polite">
+          <div class="inspector-head">
+            <div class="inspector-index" id="overview-index">步骤 01 · 决策通道</div>
+            <div class="inspector-title" id="overview-title">离开安全区</div>
+            <p class="inspector-copy" id="overview-copy"></p>
+          </div>
+          <dl class="inspector-list">
+            <div><dt>入口</dt><dd id="overview-entry"></dd></div>
+            <div><dt>读取</dt><dd id="overview-read"></dd></div>
+            <div><dt>写入</dt><dd id="overview-write"></dd></div>
+            <div><dt>所属模块</dt><dd id="overview-module"></dd></div>
+          </dl>
+          <div class="inspector-note">核心边界：1 秒 timer 只做波次判断；真正的找位和生成仍由 <code>OnGameFrame</code> 时间片消费，不改成低频刷特 timer。</div>
+        </aside>
+      </div>
+
+      <div class="handoff-strip">
+        <div class="handoff-item"><span>波次计时器输出</span><strong>本波何时释放、是否为破点波</strong></div>
+        <div class="handoff-item"><span>职业队列输出</span><strong>当前应生成的具体职业</strong></div>
+        <div class="handoff-item"><span>Nav 搜索输出</span><strong>可生成的最高分落地点</strong></div>
+        <div class="handoff-item"><span>事件通道输出</span><strong>下一轮使用的存活数、冷却与历史权重</strong></div>
+      </div>
+    </section>
+
+    <section class="view" id="wave-view" data-view-panel="wave" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Wave scheduling</div>
+          <h2>基础波次时钟与 Anti-Bait 是并行关系</h2>
+          <p>Anti-Bait 负责给本波增加“破点”战术语义，不延迟基础倒计时。Tank、暂停或半数倒地只暂停 Anti-Bait 状态机，解除后从原进度恢复。</p>
+        </div>
+      </div>
+
+      <div class="state-grid">
+        <section class="state-panel">
+          <h3>WaveDecider 状态机</h3>
+          <p>每秒由 <code>Timer_CheckSpawnWindow</code> 更新；倒计时到点后调用 <code>StartWave</code>。</p>
+          <div class="state-track" data-state-group="wave">
+            <button class="state-node" type="button" data-state="Idle">Idle</button>
+            <button class="state-node" type="button" data-state="EarlyCheck">EarlyCheck</button>
+            <button class="state-node" type="button" data-state="TimerRunning">TimerRunning</button>
+            <button class="state-node" type="button" data-state="Release">Release</button>
+          </div>
+          <div class="state-detail"><strong id="wave-state-title"></strong><p id="wave-state-copy"></p></div>
+        </section>
+
+        <section class="state-panel">
+          <h3>Anti-Bait 状态机</h3>
+          <p>下中位数 Flow 判断全队是否推进，四人队需要至少三人移动；单人前探不会重置停滞计时。</p>
+          <div class="state-track" data-state-group="anti">
+            <button class="state-node" type="button" data-state="Off">Off</button>
+            <button class="state-node" type="button" data-state="Grace">Grace</button>
+            <button class="state-node" type="button" data-state="Observe">Observe</button>
+            <button class="state-node" type="button" data-state="Pressure">Pressure</button>
+            <button class="state-node" type="button" data-state="Recover">Recover</button>
+            <button class="state-node" type="button" data-state="Paused">Paused</button>
+          </div>
+          <div class="state-detail"><strong id="anti-state-title"></strong><p id="anti-state-copy"></p></div>
+        </section>
+      </div>
+
+      <div class="rule-band">
+        <section><h3>Pressure 门槛</h3><p>零特感、普通队列为空也能进入 Pressure；不再要求场上达到固定特感比例，优势点抱团空窗仍会被识别。</p></section>
+        <section><h3>破点波动作</h3><p>控制型特感前置并选择抱团队伍边缘目标；连续几何分区分侧翼、后方、外拉和推离方向，不再重复放大单一扇区。</p></section>
+        <section><h3 class="red">不会做的事</h3><p>Anti-Bait 不无限扣住计时，不绕过距离/视线/卡位/路径硬过滤，也不增加单帧 Nav 和昂贵检查预算。</p></section>
+      </div>
+    </section>
+
+    <section class="view" id="queue-view" data-view-panel="queue" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Class planning</div>
+          <h2>先决定“刷什么”，再进入该职业的距离带</h2>
+          <p>队列以职业上限、当前存活数、已排队数、死亡冷却和本波职业次数为硬边界；稀缺度决定普通优先级，破点波再叠加战术优先级。</p>
+        </div>
+      </div>
+
+      <div class="queue-workspace">
+        <section class="class-selector">
+          <h3>查看职业策略</h3>
+          <p>主区间失败只放宽两次，不再从 250 开始盲目扩圈。</p>
+          <div class="class-buttons" id="class-buttons">
+            <button class="class-button" type="button" data-class="smoker">Smoker<small>控制 / 远距离</small></button>
+            <button class="class-button" type="button" data-class="boomer">Boomer<small>支援 / 后手</small></button>
+            <button class="class-button" type="button" data-class="hunter">Hunter<small>控制 / 中远距离</small></button>
+            <button class="class-button" type="button" data-class="spitter">Spitter<small>支援 / 后手</small></button>
+            <button class="class-button" type="button" data-class="jockey">Jockey<small>控制 / 中近距离</small></button>
+            <button class="class-button" type="button" data-class="charger">Charger<small>控制 / 中近距离</small></button>
+          </div>
+        </section>
+
+        <section class="class-detail">
+          <div class="class-title-row"><h2 id="class-title">Smoker</h2><span class="class-role" id="class-role"></span></div>
+          <p class="subtitle" id="class-copy"></p>
+          <div class="band-chart" aria-label="职业距离带图">
+            <div class="band-axis"></div>
+            <div class="band-block stage-2" id="band-stage-2"><span></span></div>
+            <div class="band-block stage-1" id="band-stage-1"><span></span></div>
+            <div class="band-block stage-0" id="band-stage-0"><span></span></div>
+            <div class="axis-labels"><span>250</span><span>500</span><span>750</span><span>1000</span><span>1250</span><span>1500</span></div>
+          </div>
+          <div class="class-facts">
+            <div class="class-fact"><span>主区间</span><strong id="class-main-band"></strong></div>
+            <div class="class-fact"><span>队列角色</span><strong id="class-gate"></strong></div>
+            <div class="class-fact"><span>破点波处理</span><strong id="class-breach"></strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="queue-pipeline" aria-label="队列构建流程">
+        <div class="queue-step"><span>01</span><h3>重算容量</h3><p>扫描场上活着、非 ghost 的特感，扣除内鬼预留槽。</p></div>
+        <div class="queue-step"><span>02</span><h3>计算缺口</h3><p><code>siLimit - alive - queued - reserved</code> 得出本波 AI 预算。</p></div>
+        <div class="queue-step"><span>03</span><h3>职业硬过滤</h3><p>EnableMask、职业总上限、本波上限、死亡 CD。</p></div>
+        <div class="queue-step"><span>04</span><h3>稀缺度排序</h3><p>按 alive / classCap 选择最稀缺职业，破点波增加控制型优先级。</p></div>
+        <div class="queue-step"><span>05</span><h3>支援门控</h3><p>Boomer / Spitter 在控制特感落位、交战或宽限到期后放行。</p></div>
+        <div class="queue-step"><span>06</span><h3>稳定入队</h3><p>破点波只调整顺序，不丢职业；正常和传送队列分别维护。</p></div>
+      </div>
+    </section>
+
+    <section class="view" id="nav-view" data-view-panel="nav" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Spawn position search</div>
+          <h2>候选会话跨帧恢复，过滤从便宜到昂贵</h2>
+          <p>单次会话固定职业、目标、距离带和传送模式；候选生产游标跨帧恢复，当前刷特帧只抓取一次全队眼位与朝向。</p>
+        </div>
+        <div class="transport">
+          <button class="icon-button" id="nav-prev" type="button" title="上一步" aria-label="Nav 上一步"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button class="icon-button" id="nav-next" type="button" title="下一步" aria-label="Nav 下一步"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          <span class="counter" id="nav-counter">01 / 10</span>
+        </div>
+      </div>
+
+      <div class="nav-layout">
+        <div class="funnel" id="nav-funnel">
+          <button type="button" class="funnel-stage" data-nav-step="0"><span class="stage-number">01</span><span class="stage-copy"><strong>Flow 桶窗口</strong><span>按目标生还者 Flow 直接定位附近桶</span></span><span class="stage-bar"><span class="stage-fill" style="width:100%"></span></span><span class="stage-count">全量入口</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="1"><span class="stage-number">02</span><span class="stage-copy"><strong>目标中心粗排</strong><span>Nav 中心只计算到当前目标的平方距离</span></span><span class="stage-bar"><span class="stage-fill" style="width:82%"></span></span><span class="stage-count">≤ 48 / 会话</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="2"><span class="stage-number">03</span><span class="stage-copy"><strong>历史权重游标</strong><span>高 / 中 / 低权重按 3:1:1 在线消费</span></span><span class="stage-bar"><span class="stage-fill" style="width:66%"></span></span><span class="stage-count">跨帧恢复</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="3"><span class="stage-number">04</span><span class="stage-copy"><strong>全队眼位快照</strong><span>同 Tick 复用眼位、左右视点和朝向</span></span><span class="stage-bar"><span class="stage-fill" style="width:57%"></span></span><span class="stage-count">每帧一次</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="4"><span class="stage-number">05</span><span class="stage-copy"><strong>Flags / 冷却 / 桶占用</strong><span>在取随机点前做最便宜硬过滤</span></span><span class="stage-bar"><span class="stage-fill" style="width:43%"></span></span><span class="stage-count">轻量</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="5"><span class="stage-number">06</span><span class="stage-copy"><strong>区域内随机点</strong><span>同一 NavArea 最多抽取 3 个点</span></span><span class="stage-bar"><span class="stage-fill" style="width:32%"></span></span><span class="stage-count">随机采样</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="6"><span class="stage-number">07</span><span class="stage-copy"><strong>分散 / 精确距离 / Flow</strong><span>平方距离硬边界与真实位置检查</span></span><span class="stage-bar"><span class="stage-fill" style="width:23%"></span></span><span class="stage-count">轻量</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="7" data-cost="expensive"><span class="stage-number">08</span><span class="stage-copy"><strong>Hull + 可见性</strong><span>避免卡住和当面刷新</span></span><span class="stage-bar"><span class="stage-fill" style="width:13%"></span></span><span class="stage-count">昂贵预算</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="8" data-cost="expensive"><span class="stage-number">09</span><span class="stage-copy"><strong>Nav path</strong><span>最后才检查目标是否可达并复用缓存</span></span><span class="stage-bar"><span class="stage-fill" style="width:8%"></span></span><span class="stage-count">昂贵预算</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="9" data-cost="final"><span class="stage-number">10</span><span class="stage-copy"><strong>统一职业评分</strong><span>0–100 基础质量 + 连续战术几何</span></span><span class="stage-bar"><span class="stage-fill" style="width:4%"></span></span><span class="stage-count">取最高分</span></button>
+        </div>
+        <aside class="nav-inspector" aria-live="polite">
+          <div class="eyebrow" id="nav-step-label">阶段 01</div>
+          <h2 id="nav-step-title"></h2>
+          <p id="nav-step-copy"></p>
+          <div class="nav-metrics">
+            <div><span>每帧 Nav 检查</span><strong>默认 16</strong></div>
+            <div><span>每帧昂贵检查</span><strong>默认 3</strong></div>
+            <div><span>会话检查上限</span><strong>48</strong></div>
+            <div><span>有命中时间片</span><strong>最多 2</strong></div>
+            <div><span>无命中时间片</span><strong>每距离带最多 3</strong></div>
+          </div>
+          <a class="deep-link" href="nav_spawn_pipeline.html">打开 Nav 专题动画与权重实验室</a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="view" id="fallback-view" data-view-panel="fallback" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Failure handling</div>
+          <h2>插件先完整自救，再使用无限制导演 API</h2>
+          <p>选择场景查看失败游标。一个距离带处于 <code>Pending</code> 时不会误判失败、不会扩圈；只有该带跨帧预算耗尽才进入下一带。</p>
+        </div>
+      </div>
+
+      <div class="fallback-controls" id="fallback-controls">
+        <button type="button" data-fallback="main">主区间命中</button>
+        <button type="button" data-fallback="constrained">三带失败后命中</button>
+        <button type="button" data-fallback="api">两轮完整失败</button>
+      </div>
+      <div class="fallback-ladder" id="fallback-ladder">
+        <div class="fallback-step" data-fallback-step="0"><strong>职业主区间</strong><span>每个职业直接进入自己的最佳距离带</span></div>
+        <div class="fallback-step" data-fallback-step="1"><strong>第一次放宽</strong><span>距离边界扩大，其他硬限制保持</span></div>
+        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>仍受 SpawnMin / SpawnMax 约束</span></div>
+        <div class="fallback-step constrained" data-fallback-step="3"><strong>导演候选 × 8</strong><span>仍检查最终距离、视线和卡位</span></div>
+        <div class="fallback-step" data-fallback-step="4"><strong>完整轮次 +1</strong><span>轮转队首，保留职业并重置会话</span></div>
+        <div class="fallback-step" data-fallback-step="5"><strong>重复完整流程</strong><span>插件再自救一轮</span></div>
+        <div class="fallback-step api" data-fallback-step="6"><strong>无限制 API</strong><span>RandomPZSpawnPosition 后直接 DoSpawnAt</span></div>
+      </div>
+
+      <div class="fallback-note">
+        <section><h3>受限导演兜底</h3><p>只是换候选来源，不放弃插件的最终距离、视线和卡位约束；同一职业最多尝试 8 个导演点。</p></section>
+        <section><h3>无限制 API 兜底</h3><p>只有连续两轮“主区间 → 两次放宽 → 受限导演”全部失败后启用；成功返回后不再叠加插件限制，避免永远刷不出。</p></section>
+        <section><h3>失败反馈</h3><p>Nav 成功、实际生成失败、候选过滤失败分别按 0.55 / 0.25 / 0.85 降权，并在 8 / 18 / 4 秒内恢复；权重只改扫描顺序。</p></section>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>传送队列</h2><p>1 秒 monitor 只判断“谁该被回收”，实际重新生成仍由 OnGameFrame 优先消费。</p></div>
+        <div class="teleport-flow">
+          <section><span>01</span><h3>状态过滤</h3><p>跳过 Tank、控人中、刚生成、喷吐时机等不适合回收的特感。</p></section>
+          <section><span>02</span><h3>位置与 Flow</h3><p>检查距离、是否跑到生还者前方，以及 Smoker 技能准备。</p></section>
+          <section><span>03</span><h3>可见性计数</h3><p>被看见就归零；持续不可见才累加，跑男与 Anti-Bait 可缩短阈值。</p></section>
+          <section><span>04</span><h3>进入传送队列</h3><p>记录职业后踢掉旧 Bot，不占用普通 pending 预算。</p></section>
+          <section><span>05</span><h3>OnGameFrame 优先</h3><p><code>TryTeleportSpawnOnce</code> 先于普通队列执行，并应用 TeleportMin。</p></section>
+          <section><span>06</span><h3>重新选目标</h3><p>每次 tick 结束更新目标生还者，避免长期绑定过期目标。</p></section>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="traitor-view" data-view-panel="traitor" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Human infected reservation</div>
+          <h2>内鬼不是额外加人，而是预留并接管一份刷特预算</h2>
+          <p>普通特感在波次 arming window 预留槽；Tank 不占普通 SI 波次槽，等待 ZombieManager 自然生成 AI Tank 后接管。所有玩家提示通过翻译短语输出。</p>
+        </div>
+      </div>
+
+      <div class="traitor-map">
+        <div class="traitor-stages">
+          <div class="traitor-row" id="traitor-row">
+            <button class="traitor-node" type="button" data-traitor-step="0"><strong>注册</strong><span>sm_neigui / 菜单</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="1"><strong>资格与额度</strong><span>队伍、分数、日配额</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="2"><strong>Waiting / Armed</strong><span>管理员优先、FIFO</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="3"><strong>SpawnLocked</strong><span>最终刷新锁定下一波</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="4"><strong>SpawnAllowed</strong><span>释放后 5 秒窗口</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="5"><strong>Alive</strong><span>实体化后才扣额度</span></button>
+            <button class="traitor-node" type="button" data-traitor-step="6"><strong>结算</strong><span>伤害、惩罚、归还槽</span></button>
+          </div>
+          <div class="traitor-branches">
+            <section class="branch"><h3>普通特感分支</h3><p><code>Traitor_AdjustWaveSpawnBudget</code> 从 AI 本波预算扣除预留数；5 秒内未实体化，槽位归还 AI 队列并提升候补。</p></section>
+            <section class="branch tank"><h3>Tank 分支</h3><p>注册后保持 Armed，监听自然 Tank。接管时处理共享槽、Bot 伤害归属和控制权；低伤 Tank 会触发单独封禁。</p></section>
+          </div>
+        </div>
+        <aside class="traitor-inspector" aria-live="polite">
+          <div class="eyebrow" id="traitor-index">步骤 01</div>
+          <h2 id="traitor-title"></h2>
+          <p id="traitor-copy"></p>
+          <dl>
+            <div><dt>状态</dt><dd id="traitor-state"></dd></div>
+            <div><dt>预算关系</dt><dd id="traitor-budget"></dd></div>
+            <div><dt>失败处理</dt><dd id="traitor-fail"></dd></div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section class="view" id="lifecycle-view" data-view-panel="lifecycle" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Lifecycle & operations</div>
+          <h2>地图生命周期、性能边界与维护入口</h2>
+          <p>缓存主要在插件启动和回合开始建立；热路径只消费已准备的数据。SourcePawn include 是文本拼接，模块顺序也是依赖顺序。</p>
+        </div>
+      </div>
+
+      <div class="lifecycle">
+        <section class="life-step"><span>01 · PluginStart</span><h3>注册与依赖</h3><p>翻译、CVar、gamedata patch、命令、事件、数据库、队列与缓存容器。</p></section>
+        <section class="life-step"><span>02 · RoundStart</span><h3>清理上一局</h3><p>StopAll、重置权重/波次/内鬼状态，构建或读取 Nav Flow 桶缓存。</p></section>
+        <section class="life-step"><span>03 · SafeAreaExit</span><h3>启动刷特</h3><p>首波 timer → StartWave → 1 秒波次 timer；启用时再创建传送 monitor。</p></section>
+        <section class="life-step"><span>04 · Runtime</span><h3>三通道协作</h3><p>timer 决策、OnGameFrame 找位、事件回写，暂停时分别保存和恢复。</p></section>
+        <section class="life-step"><span>05 · End / MapEnd</span><h3>关闭句柄</h3><p>停止 timers、搜索会话、路径缓存与数据库，避免跨图残留。</p></section>
+      </div>
+
+      <div class="perf-grid">
+        <section>
+          <div class="subsection-head"><h2>热路径预算</h2><p>高特上限时主要靠固定单帧预算稳定峰值，而不是靠降低刷特频率。</p></div>
+          <table class="budget-table">
+            <thead><tr><th>边界</th><th>当前策略</th><th>作用</th></tr></thead>
+            <tbody>
+              <tr><td>OnGameFrame 节流</td><td>活跃 / 空闲使用不同 think step</td><td>没有刷特工作时近似零成本。</td></tr>
+              <tr><td>普通队列补位</td><td>缺口存在时最短 0.25 秒重试</td><td>避免每帧重新扫描职业容量。</td></tr>
+              <tr><td>Nav 检查</td><td>默认每帧最多 16 个</td><td>限制候选枚举与随机点采样。</td></tr>
+              <tr><td>昂贵检查</td><td>默认每帧最多 3 个</td><td>控制 hull、可见性和 path 峰值。</td></tr>
+              <tr><td>候选比较</td><td>普通波 4 / 3；破点波 5 / 4</td><td>至少比较 2 个，84 分可提前结束。</td></tr>
+              <tr><td>会话寿命</td><td>有命中最多 2 帧；空搜每带最多 3 帧</td><td>避免单个职业长期垄断热路径。</td></tr>
+              <tr><td>眼位与朝向</td><td>每个实际刷特帧快照一次</td><td>距离、视线和战术评分同 Tick 复用。</td></tr>
+              <tr><td>性能观测</td><td>6/8/10/12/14+ 分组分位数</td><td>区分候选构建、最大切片和最终 API。</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <div class="subsection-head"><h2>昂贵操作排序</h2><p>修改候选顺序时重点保护这四层。</p></div>
+          <div class="cost-stack">
+            <div class="cost-item"><span class="cost-rank">1</span><div><strong>可见性精判</strong><p>多生还者 trace + Left4DHooks 可见性；PVS 只能粗筛，不能替代。</p></div></div>
+            <div class="cost-item"><span class="cost-rank">2</span><div><strong>NavAreaBuildPath</strong><p>首次构建最贵，放在可见性之后并复用路径起点和 path cache。</p></div></div>
+            <div class="cost-item"><span class="cost-rank">3</span><div><strong>Hull stuck 检查</strong><p>只对通过距离、Flow 和分散过滤的点执行。</p></div></div>
+            <div class="cost-item"><span class="cost-rank">4</span><div><strong>点位反查 Nav</strong><p>优先携带 area 索引和已知 bucket，避免重复 nearest-nav native。</p></div></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>模块所有权</h2><p>大的功能修改先从责任模块进入，避免在入口文件重复状态。</p></div>
+        <table class="ownership-table">
+          <thead><tr><th>功能</th><th>主要模块</th><th>维护边界</th></tr></thead>
+          <tbody>
+            <tr><td>入口 / 事件 / 帧驱动</td><td class="module-name">infected_control.sp</td><td>生命周期、hook、include 顺序；不承载候选评分细节。</td></tr>
+            <tr><td>波次与 Anti-Bait</td><td class="module-name">wave_control.inc / wave_decider.inc / anti_baiter.inc</td><td>决定何时开波和是否破点，不直接找位。</td></tr>
+            <tr><td>职业计划</td><td class="module-name">class_queue.inc / spawn_tactics.inc / si_cap.inc</td><td>职业、队列顺序、容量、距离带、支援门控。</td></tr>
+            <tr><td>Nav 候选与评分</td><td class="module-name">spawn_core.inc / spawn_score.inc / nav_*.inc</td><td>候选会话、过滤顺序、缓存、分桶、评分。</td></tr>
+            <tr><td>生成与兜底</td><td class="module-name">spawn_attempts.inc / teleport_monitor.inc</td><td>普通/传送一次尝试、导演兜底和成功回写。</td></tr>
+            <tr><td>内鬼模式</td><td class="module-name">traitor_mode.inc / traitor_quota.inc</td><td>注册、预留、接管、配额、伤害账本与惩罚。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>调试与运维命令</h2><p>先用状态与性能命令定位，再修改 CVar 或代码。</p></div>
+        <table class="command-table">
+          <thead><tr><th>命令</th><th>用途</th><th>推荐场景</th></tr></thead>
+          <tbody>
+            <tr><td><code>sm_wavestatus</code></td><td>查看波决策器、倒计时与 Anti-Bait 状态</td><td>波次过慢、破点波未触发。</td></tr>
+            <tr><td><code>sm_spawnperf</code></td><td>查看 11 类过滤、构建/切片/API 的 P50/P95/P99/max</td><td>6/8/10/12/14+ 特性能对比。</td></tr>
+            <tr><td><code>sm_navpeek</code> / <code>sm_navtest</code></td><td>检查准星 Nav 的 bucket、属性和候选评分</td><td>具体地图点位为何失败。</td></tr>
+            <tr><td><code>sm_rebuildnavcache</code></td><td>重建当前地图 Flow 分桶缓存</td><td>地图 Nav 或缓存版本变化。</td></tr>
+            <tr><td><code>sm_startspawn</code> / <code>sm_stopspawn</code></td><td>管理员重置或停止刷特时钟</td><td>受控测试波次。</td></tr>
+            <tr><td><code>sm_neigui</code> / <code>sm_neiguicancel</code></td><td>注册或取消内鬼队列</td><td>测试预留槽和 5 秒实体化窗口。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>实现依据：<code>optional/AnneHappy/infected_control.sp</code> 及其 <code>infected_control/*.inc</code> 模块</span>
+      <span>专题页：<a href="nav_spawn_pipeline.html">Nav 刷特管线、权重反馈与优化方案</a></span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const overviewSteps = [
+        { channel: '决策通道', title: '离开安全区', copy: '首名生还者离开安全区或管理员执行 startspawn 后，插件只安排一次首波启动，不在事件回调里直接做找位。', entry: 'L4D_OnFirstSurvivorLeftSafeArea / sm_startspawn', read: '插件启用状态、当前 timers', write: 'Timer_SpawnFirstWave', module: 'infected_control.sp' },
+        { channel: '决策通道', title: 'StartWave', copy: '建立一波的完整快照：重算存活容量、清空路径上下文、计算 AI 预算、批量填队列、解析目标，并把 pending 的破点标记提升为 active。', entry: 'Timer_SpawnFirstWave / Timer_StartNewWave', read: 'siAlive、内鬼预留、难度、上一波状态', write: 'waveIndex、pendingBudget、职业队列、waveTarget', module: 'wave_control.inc' },
+        { channel: '决策通道', title: 'Anti-Bait', copy: '每秒读取团队 Flow 和几何关系。停滞使用下中位数 Flow，抱团看连通组与边缘目标；Pressure 只给本波增加破点策略。', entry: 'Timer_CheckSpawnWindow', read: 'Flow 快照、队形、Tank/暂停/倒地事件', write: 'AntiBaitState、breachPending、runner 标记', module: 'anti_baiter.inc' },
+        { channel: '决策通道', title: 'WaveDecider', copy: '低特、团队健康且没有事件阻断时可以提前进入倒计时；否则在检查窗口底线启动。最终时刻严格受配置的波间隔约束。', entry: 'WaveDecider_Update', read: '总 SI、健康状态、配置间隔、Anti-Bait Pressure', write: 'Idle / EarlyCheck / TimerRunning 与 release 决策', module: 'wave_decider.inc' },
+        { channel: '决策通道', title: '释放新波', copy: '倒计时到点后通知内鬼 5 秒窗口，并启动下一波。Pressure 会把这次波次标记为破点波，但不会推迟基础释放时间。', entry: 'Timer_CheckSpawnWindow', read: 'WaveReleaseDecision、breachPending', write: 'StartWave、Traitor_OnWaveReleased', module: 'wave_control.inc / traitor_mode.inc' },
+        { channel: '帧执行通道', title: '维护普通队列', copy: 'OnGameFrame 先做活跃/空闲节流。只有普通队列存在缺口时才按最短 0.25 秒重试，批量补齐 pending 预算。', entry: 'OnGameFrame', read: '队列数、pendingBudget、职业容量', write: 'normalQueue', module: 'infected_control.sp / class_queue.inc' },
+        { channel: '帧执行通道', title: '传送队列优先', copy: '需要回收的旧特感先进入独立传送队列。OnGameFrame 每次优先尝试传送，避免普通新生占满上限后让旧 Bot 永远回不来。', entry: 'OnGameFrame', read: 'teleportQueue、总 SI 上限', write: 'TryTeleportSpawnOnce', module: 'spawn_attempts.inc' },
+        { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用它的主区间。Boomer 和 Spitter 受后手门控；主区间失败才进入两级放宽。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minRange / maxRange', module: 'spawn_tactics.inc' },
+        { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话只初始化目标、Flow、路径起点和 Flow 桶游标，不在首帧物化候选；同一会话最多检查 48 个 Nav。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、距离带、Nav 缓存', write: 'SpawnSearch session、懒生产游标', module: 'spawn_core.inc / nav_buckets.inc' },
+        { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位与朝向，再生产和消费默认最多 16 个 Nav，最多 3 个候选进入昂贵阶段。Pending 留到下一帧。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'flags、bucket、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
+        { channel: '帧执行通道', title: '生成与兜底', copy: '合格点交给 DoSpawnAt。三段 Nav 全失败后先尝试受限导演点；连续两轮完整失败后才使用不附加限制的最终导演 API。', entry: 'TryNormalSpawnOnce', read: 'bestPos、fallbackCycles', write: '特感实体或下一兜底阶段', module: 'spawn_attempts.inc' },
+        { channel: '事件回写通道', title: '生成与死亡事件', copy: '生成记录最后出生时间；死亡减少存活数并触发对应职业死亡 CD。所有计数再用于下一帧容量和队列维护。', entry: 'player_spawn / player_death', read: '实体职业、是否 ghost、是否内鬼', write: 'siAlive、totalSI、lastDeathTime', module: 'infected_control.sp / si_cap.inc' },
+        { channel: '事件回写通道', title: '能力、控制与伤害', copy: 'Charge、Pounce、Ride、Tongue 等事件标记战术交战，让后手支援职业放行；内鬼模式同时维护延迟伤害归属和伤害账本。', entry: 'ability_use / player_hurt / 控制事件', read: '攻击者、受害者、实体归属', write: 'pressureEngaged、traitor damage ledger', module: 'infected_control.sp / traitor_mode.inc' },
+        { channel: '事件回写通道', title: 'Nav 权重与缓存', copy: '生成成功、实际生成失败、点位过滤失败使用不同降权和恢复时间。权重只改变候选被扫描的顺序，不改变硬资格或最终评分。', entry: '候选结果 / DoSpawnAt 结果', read: 'areaIdx、结果类型、当前时间', write: 'history weight、spawn memory、path cache', module: 'spawn_memory.inc / path_cache.inc' }
+      ];
+
+      const classData = {
+        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[650,1100],[450,1400],[300,1500]], copy: '主区间远于其他职业，利用高度、Flow、外拉方向和侧后方质量寻找拉扯角度。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
+        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,450],[250,600],[250,800]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
+        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[450,850],[300,1100],[250,1300]], copy: '中远距离给扑击留出展开空间，连续几何分偏好多数枪线未覆盖的侧后方。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
+        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[400,750],[300,900],[250,1000]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
+        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[300,600],[250,800],[250,1000]], copy: '偏近距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
+        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[300,600],[250,800],[250,1000]], copy: '近中距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
+      };
+
+      const stateData = {
+        wave: {
+          Idle: '本波刚开始，等待低特提前检查或正常检查窗口。',
+          EarlyCheck: '低 SI、团队健康、无 Tank/半数倒地等阻断时，允许更早建立最终倒计时。',
+          TimerRunning: '倒计时已经确定，持续观察 Anti-Bait Pressure，但不会被它无限延长。',
+          Release: '达到配置的波间隔，释放普通波或携带 breach 标记的破点波。'
+        },
+        anti: {
+          Off: '功能关闭或当前没有有效生还者快照。重新启用后会进入 Grace，而不是永久失效。',
+          Grace: '开波后的宽限期，先允许生还者自然处理当前场面。',
+          Observe: '持续采样下中位数 Flow、队伍扩散和跑男差距，确认是否真的停滞。',
+          Pressure: '停滞达到门槛，标记下一次释放为破点波，并可加速不可见特感传送。',
+          Recover: '团队重新推进后的稳定观察期，避免单次 Flow 抖动频繁切换。',
+          Paused: 'Tank、游戏暂停或至少半数生还者倒地时冻结。解除后扣除暂停时长并恢复先前状态。'
+        }
+      };
+
+      const navData = [
+        ['Flow 桶窗口', '目标 Flow 映射到 0..100 的桶，动态窗口随当前距离带变化；磁盘缓存按地图和 Nav 元数据复用。'],
+        ['目标中心粗排', '每帧从 Flow 桶游标恢复，Nav 中心只计算到当前目标的平方距离；整个会话最多检查 48 个。'],
+        ['历史权重游标', '高、中、低权重按 3:1:1 在线消费。失败区域会后移，但仍保留探索机会。'],
+        ['全队眼位快照', '每个实际刷特帧只读取一次眼位、左右视点和朝向；同 Tick 距离、视线与战术评分复用。'],
+        ['Flags / 冷却 / 桶占用', '安全屋、救援等无效 flags、最近使用 Nav 和已拥挤 Flow 桶在随机采样前退出。'],
+        ['区域内随机点', '调用 Nav 随机点 API，同一区域最多采样 3 次；这里开始才产生真实世界坐标。'],
+        ['分散 / 精确距离 / Flow', '使用平方距离检查职业硬边界，并检查最近出生点分散度和候选真实 Flow/楼层关系。'],
+        ['Hull + 可见性', '候选先通过卡位检查，再用 PVS/完全可见粗筛配合精确视线判断，防止当面生成。'],
+        ['Nav path', '只对前面全部通过的点构建路径；会话缓存目标起点，path cache 复用量化后的结果。'],
+        ['统一职业评分', '距离、高度、Flow、分散度统一为 0..100，再混合连续的外拉、侧后方、推离或范围覆盖质量；默认不因低分拒绝安全点。']
+      ];
+
+      const traitorData = [
+        { title: '注册', copy: '玩家通过命令或职业菜单选择普通特感、Tank 或随机职业。可在本次生命结束前预约下一次。', state: 'None → Waiting / Armed', budget: '尚不占 AI 波次预算', fail: '无可选职业或访问被拒绝则保持旁观' },
+        { title: '资格与额度', copy: '检查功能开关、队伍、最大玩家槽、职业 mask、回合职业次数、公开玩家最低分和数据库日配额。', state: '注册前校验', budget: '只验证可用额度，实体化前不扣费', fail: '数据库不可用、分数或额度不足则拒绝' },
+        { title: 'Waiting / Armed', copy: '槽位不足进入 Waiting；管理员优先，同级按等待顺序。普通特感只在波次 arming window 晋升，Tank 可长期 Armed。', state: 'Waiting ↔ Armed', budget: 'Armed 普通 SI 成为可预留对象', fail: '资格变化时清理并提升下一候补' },
+        { title: 'SpawnLocked', copy: '最终刷新开始时把准备就绪的普通内鬼切到感染者 ghost，锁定到下一波的 releaseWave。', state: 'Armed → SpawnLocked', budget: '从下一波 AI budget 扣除预留槽', fail: '准备 ghost 失败则清理并返回旁观' },
+        { title: 'SpawnAllowed', copy: '波次释放后开放 5 秒实体化窗口。Materialize pre 再检查总 SI、共享槽和职业资格。', state: 'SpawnLocked → SpawnAllowed', budget: '预留槽仍由该玩家持有', fail: '窗口过期则把槽归还 AI 队列' },
+        { title: 'Alive', copy: '成功实体化后才消费职业对应额度，纳入 siAlive / totalSI；自动连跳和伤害归属开始生效。', state: 'SpawnAllowed → Alive', budget: '成为真实存活特感', fail: '扣额度失败则清理、返旁观并重算容量' },
+        { title: '伤害结算与离场', copy: '死亡后等待喷吐、口水和延迟伤害尾部结算，再输出伤害摘要。零伤会阻断后续波次，Tank 低伤有独立封禁。', state: 'Alive → None / deferred next life', budget: '死亡释放槽，必要时恢复预约', fail: '断线或换队时交回 AI 控制并清理归属' }
+      ];
+
+      let overviewIndex = 0;
+      let overviewPlaying = false;
+      let overviewTimer = 0;
+      let navIndex = 0;
+      let traitorIndex = 0;
+
+      function selectView(name) {
+        document.querySelectorAll('.tab').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.view === name ? 'true' : 'false'));
+        document.querySelectorAll('[data-view-panel]').forEach(panel => { panel.hidden = panel.dataset.viewPanel !== name; });
+      }
+
+      function renderOverview() {
+        const item = overviewSteps[overviewIndex];
+        document.querySelectorAll('.flow-node').forEach(node => node.setAttribute('aria-current', Number(node.dataset.step) === overviewIndex ? 'step' : 'false'));
+        document.getElementById('overview-index').textContent = `步骤 ${String(overviewIndex + 1).padStart(2, '0')} · ${item.channel}`;
+        document.getElementById('overview-title').textContent = item.title;
+        document.getElementById('overview-copy').textContent = item.copy;
+        document.getElementById('overview-entry').textContent = item.entry;
+        document.getElementById('overview-read').textContent = item.read;
+        document.getElementById('overview-write').textContent = item.write;
+        document.getElementById('overview-module').textContent = item.module;
+        document.getElementById('overview-counter').textContent = `${String(overviewIndex + 1).padStart(2, '0')} / ${overviewSteps.length}`;
+      }
+
+      function setOverview(index) {
+        overviewIndex = (index + overviewSteps.length) % overviewSteps.length;
+        renderOverview();
+      }
+
+      function setOverviewPlayback(playing) {
+        overviewPlaying = playing;
+        const button = document.getElementById('overview-play');
+        button.querySelector('span').textContent = playing ? '暂停' : '播放';
+        button.querySelector('svg').innerHTML = playing ? '<path d="M9 5v14M15 5v14"/>' : '<path d="m8 5 11 7-11 7Z"/>';
+        window.clearInterval(overviewTimer);
+        if (playing && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          overviewTimer = window.setInterval(() => setOverview(overviewIndex + 1), 1900);
+        }
+      }
+
+      function renderState(group, state) {
+        const root = document.querySelector(`[data-state-group="${group}"]`);
+        root.querySelectorAll('.state-node').forEach(node => node.setAttribute('aria-pressed', node.dataset.state === state ? 'true' : 'false'));
+        document.getElementById(`${group}-state-title`).textContent = state;
+        document.getElementById(`${group}-state-copy`).textContent = stateData[group][state];
+      }
+
+      function renderClass(key) {
+        const item = classData[key];
+        document.querySelectorAll('.class-button').forEach(button => button.setAttribute('aria-pressed', button.dataset.class === key ? 'true' : 'false'));
+        document.getElementById('class-title').textContent = item.name;
+        document.getElementById('class-role').textContent = item.role;
+        document.getElementById('class-copy').textContent = item.copy;
+        document.getElementById('class-main-band').textContent = `${item.bands[0][0]}–${item.bands[0][1]}`;
+        document.getElementById('class-gate').textContent = item.gate;
+        document.getElementById('class-breach').textContent = item.breach;
+        item.bands.forEach((band, index) => {
+          const el = document.getElementById(`band-stage-${index}`);
+          const left = ((band[0] - 250) / 1250) * 100;
+          const width = ((band[1] - band[0]) / 1250) * 100;
+          el.style.left = `${left}%`;
+          el.style.width = `${Math.max(width, 8)}%`;
+          el.querySelector('span').textContent = `${index === 0 ? '主' : index === 1 ? '放宽 1' : '最终'} ${band[0]}–${band[1]}`;
+        });
+      }
+
+      function renderNav() {
+        const item = navData[navIndex];
+        document.querySelectorAll('.funnel-stage').forEach(stage => stage.setAttribute('aria-current', Number(stage.dataset.navStep) === navIndex ? 'step' : 'false'));
+        document.getElementById('nav-step-label').textContent = `阶段 ${String(navIndex + 1).padStart(2, '0')}`;
+        document.getElementById('nav-step-title').textContent = item[0];
+        document.getElementById('nav-step-copy').textContent = item[1];
+        document.getElementById('nav-counter').textContent = `${String(navIndex + 1).padStart(2, '0')} / ${navData.length}`;
+      }
+
+      function renderFallback(scenario) {
+        const last = scenario === 'main' ? 0 : scenario === 'constrained' ? 3 : 6;
+        document.querySelectorAll('#fallback-controls button').forEach(button => button.setAttribute('aria-pressed', button.dataset.fallback === scenario ? 'true' : 'false'));
+        document.querySelectorAll('.fallback-step').forEach(step => {
+          const index = Number(step.dataset.fallbackStep);
+          step.classList.toggle('active', index === last);
+          step.style.opacity = index <= last ? '1' : '0.32';
+        });
+      }
+
+      function renderTraitor(index) {
+        traitorIndex = (index + traitorData.length) % traitorData.length;
+        const item = traitorData[traitorIndex];
+        document.querySelectorAll('.traitor-node').forEach(node => node.setAttribute('aria-pressed', Number(node.dataset.traitorStep) === traitorIndex ? 'true' : 'false'));
+        document.getElementById('traitor-index').textContent = `步骤 ${String(traitorIndex + 1).padStart(2, '0')}`;
+        document.getElementById('traitor-title').textContent = item.title;
+        document.getElementById('traitor-copy').textContent = item.copy;
+        document.getElementById('traitor-state').textContent = item.state;
+        document.getElementById('traitor-budget').textContent = item.budget;
+        document.getElementById('traitor-fail').textContent = item.fail;
+      }
+
+      document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => selectView(tab.dataset.view)));
+      document.querySelectorAll('.flow-node').forEach(node => node.addEventListener('click', () => { setOverviewPlayback(false); setOverview(Number(node.dataset.step)); }));
+      document.getElementById('overview-prev').addEventListener('click', () => { setOverviewPlayback(false); setOverview(overviewIndex - 1); });
+      document.getElementById('overview-next').addEventListener('click', () => { setOverviewPlayback(false); setOverview(overviewIndex + 1); });
+      document.getElementById('overview-play').addEventListener('click', () => setOverviewPlayback(!overviewPlaying));
+      document.querySelectorAll('[data-state-group]').forEach(group => group.querySelectorAll('.state-node').forEach(node => node.addEventListener('click', () => renderState(group.dataset.stateGroup, node.dataset.state))));
+      document.querySelectorAll('.class-button').forEach(button => button.addEventListener('click', () => renderClass(button.dataset.class)));
+      document.querySelectorAll('.funnel-stage').forEach(stage => stage.addEventListener('click', () => { navIndex = Number(stage.dataset.navStep); renderNav(); }));
+      document.getElementById('nav-prev').addEventListener('click', () => { navIndex = (navIndex - 1 + navData.length) % navData.length; renderNav(); });
+      document.getElementById('nav-next').addEventListener('click', () => { navIndex = (navIndex + 1) % navData.length; renderNav(); });
+      document.querySelectorAll('#fallback-controls button').forEach(button => button.addEventListener('click', () => renderFallback(button.dataset.fallback)));
+      document.querySelectorAll('.traitor-node').forEach(node => node.addEventListener('click', () => renderTraitor(Number(node.dataset.traitorStep))));
+
+      renderOverview();
+      renderState('wave', 'Idle');
+      renderState('anti', 'Grace');
+      renderClass('smoker');
+      renderNav();
+      renderFallback('main');
+      renderTraitor(0);
+    })();
+  </script>
+</body>
+</html>

@@ -79,7 +79,7 @@ HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, String:SaveFro
 		return;
 
 	if (Mode)
-		StatsPrintToChat(Savior, "你因把 {olive}%s{default} 从 {green}%s{default} 里救了出来获得 {green}%i {default}分!", VictimName, SaveFrom, Score);
+		StatsPrintToChat(Savior, "L4DStats_SpecialSaveSelf", VictimName, SaveFrom, Score);
 
 	UpdateMapStat("points", Score);
 	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
@@ -516,6 +516,19 @@ public AddScore(Client, Score)
 	return Score;
 }
 
+public AddInfectedKillScore(Client, Score, const String:InfectedType[], Kills, Headshots)
+{
+	// Keep the score audit as a separate append-only write, but merge same-table counters.
+	CurrentPoints[Client] += Score;
+	ClientPoints[Client] += Score;
+	ClientScoreReady[Client] = true;
+	ScoreLog_Record(Client, Score);
+	QuarterRank_RecordInfectedKillAndScore(Client, Score, InfectedType, Kills, Headshots);
+	ModeStats_RecordKillAndScore(Client, Score, Kills, Headshots);
+
+	return Score;
+}
+
 public UpdateSmokerDamage(Client, Damage)
 {
 	if (Client <= 0 || Damage <= 0 || IsClientBot(Client))
@@ -680,19 +693,23 @@ public CheckSurvivorsWin()
 		}
 
 		if (Mode)
-			StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}没有惊扰Witch {default}获得{green}%i {default}额外过关分!", Score);
+			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_NoWitchDisturbanceReward", Score);
 	}
 	//StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}过关分数为%d",Score);
 	Score = 0;
 	new Deaths = 0;
 	new BaseScore = ModifyScoreDifficulty(GetConVarInt(cvar_SafeHouse), 2, 2, TEAM_SURVIVORS);
+	new AliveCount = 0;
 
 	for (new i = 1; i <= maxplayers; i++)
 	{
 		if (IsClientConnected(i) && IsClientInGame(i)  && GetClientTeam(i) == TEAM_SURVIVORS)
 		{
 			if (IsPlayerAlive(i))
+			{
 				Score = Score + BaseScore;
+				AliveCount++;
+			}
 			else
 				Deaths++;
 		}
@@ -700,23 +717,26 @@ public CheckSurvivorsWin()
 	if(Score>400)
 		Score=400;
 	
-	if (SinglePlayerMode())
+	new FormulaSinglePlayer = SinglePlayerMode() ? 1 : 0;
+	if (FormulaSinglePlayer)
 	{
 		int addScore = 0;
 		if( GetAnneInfectedNumber() > 3 && ((g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_VALID)) && IsThisRoundValid())){
 			addScore = (GetAnneInfectedNumber() - 3) * 100;
 		}
-		char buffer[256];
-		Format(buffer, sizeof(buffer), "{lightgreen}单人模式 {default}没有{green}特感击杀奖励，所以过关奖励分数{olive}3倍");
-		if(addScore > 0){
-			Format(buffer, sizeof(buffer), "%s, 获得难度分数补贴 %d 分", buffer, addScore);
-		}
-		StatsPrintToChatTeam(TEAM_SURVIVORS, buffer);
+		if (addScore > 0)
+			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SinglePlayerTripleBonusWithDifficulty", addScore);
+		else
+			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SinglePlayerTripleBonus");
 		Score *=3;
 	}
 
-	if((AnneMultiPlayerMode() || SinglePlayerMode()) && ((g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_VALID)) && IsThisRoundValid())){
+	new FormulaInfectedAdjustment = 0;
+	new FormulaInfected = 0;
+	if((AnneMultiPlayerMode() || FormulaSinglePlayer) && ((g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_VALID)) && IsThisRoundValid())){
 		int inf = GetAnneInfectedNumber();
+		FormulaInfectedAdjustment = 1;
+		FormulaInfected = inf;
 		if(inf>4)
 			Score=RoundToFloor(Score+Score*(inf-4)*0.2);
 		else if(inf>6)
@@ -725,23 +745,28 @@ public CheckSurvivorsWin()
 			Score=RoundToFloor(Score+Score*(inf-4)*0.4);
 	}
 
+	new FormulaAbovePlayers = 0;
 	if(IsAboveFourPeople())
 	{
-		Score = RoundToFloor(Score * (4.0 / getSurvivorNum()));
+		FormulaAbovePlayers = getSurvivorNum();
+		Score = RoundToFloor(Score * (4.0 / FormulaAbovePlayers));
 	}
 
-	if(IsGaoJiRenJiEnabled())
+	new FormulaHighAi = IsGaoJiRenJiEnabled() ? 1 : 0;
+	if(FormulaHighAi)
 	{
 		Score = RoundToFloor(Score * 0.5);
 	}
 
 	// HardCore 奖励增加50%
-	if(IsAnne() == 2)
+	new FormulaHardcore = IsAnne() == 2 ? 1 : 0;
+	if(FormulaHardcore)
 	{
 		Score = RoundToFloor(1.5 * Score);
 	}
 
-	if(IsFunGame() > 1)
+	new FormulaFun = IsFunGame() > 1 ? 1 : 0;
+	if(FormulaFun)
 	{
 		if(Score > 200){
 			Score = 200;
@@ -762,13 +787,16 @@ public CheckSurvivorsWin()
 			if (ClientTeam == TEAM_SURVIVORS)
 			{
 				InterstitialPlayerUpdate(i);
+				new FormulaNewbie = NewPlayerBonus_ShouldApplyToClient(i) ? view_as<int>(NewPlayerBonus_GetMultiplier()) : 0;
 				new ClientScore = NewPlayerBonus_ApplyScoreMultiplier(i, Score);
 
 				GetClientRankAuthString(i, iID, sizeof(iID));
 				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i%s WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, ClientScore, All4Safe, iID);
 				SendSQLUpdate(query);
 				UpdateMapStat("points", ClientScore);
-				ScoreLog_SetContext("safehouse", "base=l4d_stats_safehouse*alive_survivors,difficulty,anne,player_count,hardcore,fun,newbie_multiplier");
+				decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+				Format(ScoreFormula, sizeof(ScoreFormula), "v3s:%i:%i:%i:%i:%i:%i:%i:%i:%i:%i", BaseScore, AliveCount, FormulaSinglePlayer, FormulaInfectedAdjustment, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
+				ScoreLog_SetContext("safehouse", ScoreFormula);
 				AddScore(i, ClientScore);
 			}
 			else if (ClientTeam == TEAM_INFECTED && NegativeScore)
@@ -788,11 +816,11 @@ public CheckSurvivorsWin()
 
 	if (Mode && Score > 0)
 	{
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}%i 死亡到达安全门 {default}获得 {green}%i {default}分!", Deaths, Score);
-		NewPlayerBonus_AnnounceMultiplier("安全屋", Score);
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SafeRoomWithDeathsReward", Deaths, Score);
+		NewPlayerBonus_AnnounceMultiplier(false, Score);
 
 		if (NegativeScore)
-			StatsPrintToChatTeam(TEAM_INFECTED, "{lightgreen}所有感染者因 {olive}让幸存者进了安全门 {default}失去了 {green}%i {default}分!", Score);
+			StatsPrintToChatTeam(TEAM_INFECTED, "L4DStats_SafeRoomInfectedPenalty", Score);
 	}
 
 	NoBuyBonus_TryAwardSurvivors();
@@ -952,7 +980,7 @@ CheckSurvivorsAllDown()
 	}
 
 	if (Score > 0 && Mode)
-		StatsPrintToChatTeam(TEAM_INFECTED, "{lightgreen}所有感染者 {olive}因杀死了所有幸存者 {default}获得 {green}%i {default}分!", Score);
+		StatsPrintToChatTeam(TEAM_INFECTED, "L4DStats_WipeSurvivorsReward", Score);
 
 	if (!GetConVarBool(cvar_EnableNegativeScore))
 		return;
@@ -986,7 +1014,7 @@ CheckSurvivorsAllDown()
 	}
 
 	if (Mode && Score > 0)
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者 {default} {lightgreen}失去了 {green}%i {default}分 by {lightgreen}全部坐牢{default}!", Score);
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SurvivorWipePenalty", Score);
 }
 
 bool:IsClientIncapacitated(client)
@@ -1237,12 +1265,12 @@ TankDamage(Client, Damage)
 				new Mode = GetConVarInt(cvar_AnnounceMode);
 
 				if (Mode == 1 || Mode == 2)
-					StatsPrintToChat(Client, "你给幸存者造成了价值 {green}%i{default} 分的伤害获得 {green}%i {default}分!", TankDamageTotal, Score);
+					StatsPrintToChat(Client, "L4DStats_TankDamageRewardSelf", TankDamageTotal, Score);
 				else if (Mode == 3)
 				{
 					decl String:Name[MAX_LINE_WIDTH];
 					GetClientName(Client, Name, sizeof(Name));
-					StatsPrintToChatAll("{olive}%s {default}给幸存者造成了价值 {green}%i{default} 分的伤害获得 {green}%i {default}分!", Name, TankDamageTotal, Score);
+					StatsPrintToChatAll("L4DStats_TankDamageRewardAll", Name, TankDamageTotal, Score);
 				}
 
 				if (EnableSounds_Tank_Bulldozer && GetConVarBool(cvar_SoundsEnabled))
@@ -1336,9 +1364,9 @@ UpdateFriendlyFire(Attacker, Victim)
 		Mode = GetConVarInt(cvar_AnnounceMode);
 
 	if (Mode == 1 || Mode == 2)
-		StatsPrintToChat(Attacker, "你已经 {lightgreen}失去了 {green}%i {default}分 by {lightgreen}黑枪了 {olive}%s{default}!", Score, VictimName);
+		StatsPrintToChat(Attacker, "L4DStats_FriendlyFireVictimPenaltySelf", Score, VictimName);
 	else if (Mode == 3)
-		StatsPrintToChatAll("{olive}%s {default}已经 {lightgreen}失去了 {green}%i {default}分 by {lightgreen}黑枪了 {olive}%s{default}!", AttackerName, Score, VictimName);
+		StatsPrintToChatAll("L4DStats_FriendlyFireVictimPenaltyAll", AttackerName, Score, VictimName);
 }
 
 UpdateHunterDamage(Client, Damage)
@@ -1564,10 +1592,10 @@ SurvivorDiedNamed(Attacker, Victim, const String:VictimName[], const String:Atta
 		{
 			decl String:AttackerName[MAX_LINE_WIDTH];
 			GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-			StatsPrintToChatAll("{olive}%s 杀了 {olive}%s {default}获得了 {green}%i {default}分!", AttackerName, VictimName, Score);
+			StatsPrintToChatAll("L4DStats_WitchKillAll", AttackerName, VictimName, Score);
 		}
 		else
-			StatsPrintToChat(Attacker, "你杀了 {olive}%s {default}获得了 {green}%i {default}分!", VictimName, Score);
+			StatsPrintToChat(Attacker, "L4DStats_WitchKillSelf", VictimName, Score);
 	}
 
 	UpdateMapStat("survivor_kills", 1);
@@ -1641,12 +1669,12 @@ SurvivorHurt(Attacker, Victim, Damage, AttackerInfType = -1, Handle:event = INVA
 			new Mode = GetConVarInt(cvar_AnnounceMode);
 
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Attacker, "你因为丢石头到 {olive}%s{default}头上获得 {green}%i {default}分!", VictimName, RockHit);
+				StatsPrintToChat(Attacker, "L4DStats_TankRockHitSelf", VictimName, RockHit);
 			else if (Mode == 3)
 			{
 				decl String:AttackerName[MAX_LINE_WIDTH];
 				GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-				StatsPrintToChatAll("{olive}%s {default}丢石头到{olive}%s{default}头上获得 {green}%i {default}分!", AttackerName, VictimName, RockHit);
+				StatsPrintToChatAll("L4DStats_TankRockHitAll", AttackerName, VictimName, RockHit);
 			}
 		}
 	}
@@ -1858,9 +1886,9 @@ SurvivorIncappedByInfected(Attacker, Victim, Mode = -1)
 		Mode = GetConVarInt(cvar_AnnounceMode);
 
 	if (Mode == 1 || Mode == 2)
-		StatsPrintToChat(Attacker, "你制伏 {olive}%s {default}获得 {green}%i {default}分!", VictimName, Score);
+		StatsPrintToChat(Attacker, "L4DStats_IncapSurvivorSelf", VictimName, Score);
 	else if (Mode == 3)
-		StatsPrintToChatAll("{olive}%s 制伏 {olive}%s {default}获得 {green}%i {default}分!", AttackerName, VictimName, Score);
+		StatsPrintToChatAll("L4DStats_IncapSurvivorAll", AttackerName, VictimName, Score);
 }
 
 Float:GetMedkitPointReductionFactor()
@@ -1921,7 +1949,7 @@ AnnounceMedkitPenalty(Mode = -1)
 		Mode = GetConVarInt(cvar_AnnounceMode);
 
 	if (Mode)
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者 {default}现在只能获得正常分数的百分之 {green}%i {default}，因为用了他们的第 {olive}%i 个医疗包%s{default}!", RoundToNearest(ReductionFactor * 100), MedkitsUsedCounter,  (EngineVersion1 == Engine_Left4Dead ? "" : "或电击器"));
+		StatsPrintToChatTeam(TEAM_SURVIVORS, EngineVersion1 == Engine_Left4Dead ? "L4DStats_MedkitReductionL4D1" : "L4DStats_MedkitReductionL4D2", RoundToNearest(ReductionFactor * 100), MedkitsUsedCounter);
 }
 
 GetClientInfectedType(Client)

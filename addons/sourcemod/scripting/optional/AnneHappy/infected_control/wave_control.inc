@@ -5,11 +5,13 @@
 
 // 波控制：负责开波、自动刷特窗口以及暂停恢复。
 // 重构后使用 WaveDecider 进行决策，本模块只负责执行。
+
 void StartWave()
 {
     ClearPathCache();
     RecalcSiCapFromAlive(true);
     ResetWaveClassSpawnCounts();
+    Tactical_OnWaveStart();
 
     gST.survCount = 0;
     for (int i = 1; i <= MaxClients; i++)
@@ -18,8 +20,6 @@ void StartWave()
             gST.survIdx[gST.survCount++] = i;
     }
 
-    gST.teleportDistCur = gCV.fTeleportSpawnMin;
-    gST.spawnDistCur    = gCV.fSpawnMin;
     int waveNumber = gST.waveIndex + 1;
     int aiBudget = Traitor_AdjustWaveSpawnBudget(gCV.iSiLimit, waveNumber);
     gST.siQueueCount   += aiBudget;
@@ -35,7 +35,11 @@ void StartWave()
     if (gST.siQueueCount > gCV.iSiLimit)
         gST.siQueueCount = gCV.iSiLimit;
 
+    FillSpawnQueueToPendingBudget(false);
+    Tactical_PrioritizeBreachQueue();
+
     AntiBait_OnWaveStart();
+    gST.targetSurvivor = Tactical_ResolveWaveTarget();
     WaveDecider_OnWaveStart();  // 通知波决策器
     Traitor_ActivateWaitingClients(); // 仅在新的 EarlyCheck 安全窗口晋升普通内鬼
     Debug_Print("Start wave %d", gST.waveIndex);
@@ -88,16 +92,15 @@ Action Timer_CheckSpawnWindow(Handle timer)
             return Plugin_Continue;
 
         bool reachedConfiguredSpawnTime = DifficultyStrategy_CanStartConfiguredWave();
-        bool shouldHoldByAntiBait = AntiBait_ShouldHoldWave();
-
         if (reachedConfiguredSpawnTime)
         {
             if (gST.siQueueCount == gCV.iSiLimit)
             {
                 gST.lastSpawnSecs = 0;
             }
-            else if (!shouldHoldByAntiBait)
+            else
             {
+                Tactical_PrepareBreachWave();
                 ScheduleNextWave();
             }
         }

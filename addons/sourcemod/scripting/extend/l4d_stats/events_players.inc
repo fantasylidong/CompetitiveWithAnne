@@ -178,9 +178,9 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 			QuarterRank_RecordScore(Attacker, Score * (-1));
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Attacker, "你因为队内误杀 {olive}%s{default} {lightgreen}失去了 {green}%i {default}分!", VictimName, Score);
+			StatsPrintToChat(Attacker, "L4DStats_TeamKillPenaltySelf", VictimName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}因为队内误杀 {olive}%s{default} {lightgreen}失去了 {green}%i {default}分!!", AttackerName, VictimName, Score);
+			StatsPrintToChatAll("L4DStats_TeamKillPenaltyAll", AttackerName, VictimName, Score);
 	}
 
 	// Attacker is a Survivor
@@ -278,8 +278,6 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 		len += Format(query[len], sizeof(query)-len, "kills = kills + 1, kill_%s = kill_%s + 1", InfectedType, InfectedType);
 			len += Format(query[len], sizeof(query)-len, "%s WHERE steamid = '%s'", Headshot, AttackerID);
 			SendSQLUpdate(query);
-			ModeStats_RecordKills(Attacker, 1, GetEventBool(event, "headshot") ? 1 : 0);
-			QuarterRank_RecordInfectedKill(Attacker, InfectedType, 1, GetEventBool(event, "headshot") ? 1 : 0);
 
 		if (Mode && Score > 0)
 		{
@@ -288,26 +286,26 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 				if (Mode > 1)
 				{
 					GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-					StatsPrintToChatAll("{olive}%s {green}爆头杀死 {olive}%s {default}获得 {green}%i {default}分 !", AttackerName, VictimName, Score);
+					StatsPrintToChatAll("L4DStats_HeadshotSpecialKillAll", AttackerName, VictimName, Score);
 				}
 				else
-					StatsPrintToChat(Attacker, "你 {green}爆头杀死 {olive}%s {default} 获得 {green}%i {default}分!", VictimName, Score);
+					StatsPrintToChat(Attacker, "L4DStats_HeadshotSpecialKillSelf", VictimName, Score);
 			}
 			else
 			{
 				if (Mode > 1)
 				{
 					GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-					StatsPrintToChatAll("{olive}%s {green}杀死 {olive}%s {default}获得 {green}%i {default}分 !", AttackerName, VictimName, Score);
+					StatsPrintToChatAll("L4DStats_SpecialKillAll", AttackerName, VictimName, Score);
 				}
 				else
-					StatsPrintToChat(Attacker, "你 {green}杀死 {olive}%s {default} 获得 {green}%i {default}分!", VictimName, Score);
+					StatsPrintToChat(Attacker, "L4DStats_SpecialKillSelf", VictimName, Score);
 			}
 		}
 
 		UpdateMapStat("kills", 1);
 		UpdateMapStat("points", Score);
-		AddScore(Attacker, Score);
+		AddInfectedKillScore(Attacker, Score, InfectedType, 1, GetEventBool(event, "headshot") ? 1 : 0);
 	}
 
 	// Attacker is an Infected
@@ -684,7 +682,7 @@ public Action:event_TankKilled(Handle:event, const String:name[], bool:dontBroad
 
 	if (Mode && Score > 0)
 	{
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}%i 死亡击杀一个Tank {default}获得 {green}%i {default}分 !", Deaths, Score);
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_TankKillWithDeaths", Deaths, Score);
 	}
 
 	UpdateMapStat("kills", 1);
@@ -1228,9 +1226,9 @@ GiveAdrenaline(Giver, Recipient, AdrenalineID = -1)
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Giver, "你赠送肾上腺素给 {olive}%s {default}获得了 {green}%i {default}分!", RecipientName, Score);
+			StatsPrintToChat(Giver, "L4DStats_AdrenalineGivenSelf", RecipientName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s 赠送肾上腺素给 {olive}%s {default}获得了 {green}%i {default}分!", GiverName, RecipientName, Score);
+			StatsPrintToChatAll("L4DStats_AdrenalineGivenAll", GiverName, RecipientName, Score);
 	}
 }
 
@@ -1345,9 +1343,9 @@ GivePills(Giver, Recipient, PillsID = -1)
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Giver, "你赠送药丸给 {olive}%s {default}获得了 {green}%i {default}分!", RecipientName, Score);
+			StatsPrintToChat(Giver, "L4DStats_PillsGivenSelf", RecipientName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}赠送药丸给 {olive}%s {default}获得了 {green}%i {default}分!", GiverName, RecipientName, Score);
+			StatsPrintToChatAll("L4DStats_PillsGivenAll", GiverName, RecipientName, Score);
 	}
 }
 
@@ -1450,9 +1448,9 @@ public Action:event_DefibPlayer(Handle:event, const String:name[], bool:dontBroa
 	{
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Giver, "你用电击器复活了 {olive}%s{default} 获得了 {green}%i {default}分!", RecipientName, Score);
+			StatsPrintToChat(Giver, "L4DStats_DefibReviveSelf", RecipientName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}用电击器复活了 {olive}%s{default} 获得了 {green}%i {default}分!", GiverName, RecipientName, Score);
+			StatsPrintToChatAll("L4DStats_DefibReviveAll", GiverName, RecipientName, Score);
 	}
 }
 
@@ -1564,9 +1562,9 @@ public Action:event_HealPlayer(Handle:event, const String:name[], bool:dontBroad
 	{
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 		if (Mode == 1 || Mode == 2) 
-			StatsPrintToChat(Giver, "你用医疗包治疗了 {olive}%s{default} 获得了 {green}%i {default}分!", RecipientName, Score);
+			StatsPrintToChat(Giver, "L4DStats_HealTeammateSelf", RecipientName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}用医疗包治疗了 {olive}%s{default} 获得了 {green}%i {default}分!", GiverName, RecipientName, Score);
+			StatsPrintToChatAll("L4DStats_HealTeammateAll", GiverName, RecipientName, Score);
 	}
 }
 

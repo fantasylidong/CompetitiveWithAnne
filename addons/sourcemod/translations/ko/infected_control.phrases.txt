@@ -273,5 +273,9 @@
 	{
 		"ko"		"{green}[IC]{default} Traitor reserved slots: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"ko"		"[IC] Nav 그래프와 영역별 진행도 캐시를 다시 빌드하고 있습니다."
+	}
 
 }

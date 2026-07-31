@@ -3,6 +3,7 @@
 
 #include <sourcemod>
 #include <dhooks>
+#include <anne_nextbot>
 
 #define GAMEDATA         "l4d2_npc_manager"
 #define GAMEDATA_VERSION 27
@@ -74,7 +75,9 @@ EntityIDData
 
 bool
     g_bPlugins,
-    g_bLinuxOS;
+    g_bLinuxOS,
+    g_bGameDataInitialized,
+    g_bUsingNativeExtension;
 
 int
     updatetick;
@@ -93,6 +96,13 @@ public Plugin myinfo =
     version     = "1.0",
     url         = "https://steamcommunity.com/profiles/76561198812009299/"
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
+{
+    MarkNativeAsOptional("AnneNextBot_IsActive");
+    MarkNativeAsOptional("AnneNextBot_Configure");
+    return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
@@ -117,7 +127,35 @@ public void OnPluginStart()
     g_hCvar_Plugins.AddChangeHook(OnCvarChnaged);
     g_hCvar_Origin_UpdateFrequency.AddChangeHook(OnCvarChnaged);
     HookEvent("round_start_pre_entity", Event_RoundStart, EventHookMode_PostNoCopy);
+    g_bUsingNativeExtension = IsAnneNextBotAvailable();
+    if (!g_bUsingNativeExtension)
+        InItGameData();
+}
+
+public void OnPluginEnd()
+{
+    if (g_bUsingNativeExtension && IsAnneNextBotAvailable())
+        AnneNextBot_Configure(false, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+    if (!StrEqual(name, ANNE_NEXTBOT_LIBRARY))
+        return;
+
+    g_bUsingNativeExtension = IsAnneNextBotAvailable();
+    if (g_bUsingNativeExtension && g_hCvar_Plugins != null)
+        UpdateCvars();
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+    if (!StrEqual(name, ANNE_NEXTBOT_LIBRARY))
+        return;
+
+    g_bUsingNativeExtension = false;
     InItGameData();
+    UpdateCvars();
 }
 
 public void OnConfigsExecuted()
@@ -132,15 +170,6 @@ void OnCvarChnaged(ConVar convar, const char[] oldValue, const char[] newValue)
 
 void UpdateCvars()
 {
-    bool g_bTemp = g_hCvar_Plugins.BoolValue;
-    if (g_bTemp != g_bPlugins)
-    {
-        if (g_bTemp)
-            g_hShouldUpdate.Enable(Hook_Pre, DTR_NextBotManager_ShouldUpdate_Pre);
-        else
-            g_hShouldUpdate.Disable(Hook_Pre, DTR_NextBotManager_ShouldUpdate_Pre);
-        g_bPlugins = g_bTemp;
-    }
     float tickinterval = GetTickInterval();
     for (int i = 0; i < NPC_COUNT; i++)
     {
@@ -152,6 +181,50 @@ void UpdateCvars()
     }
     updatetick = RoundToNearest(g_hCvar_Origin_UpdateFrequency.FloatValue / tickinterval);
     updatetick = updatetick < 1 ? 1 : updatetick;
+
+    g_bUsingNativeExtension = IsAnneNextBotAvailable();
+    if (g_bUsingNativeExtension)
+    {
+        if (g_bPlugins && g_hShouldUpdate)
+        {
+            g_hShouldUpdate.Disable(Hook_Pre, DTR_NextBotManager_ShouldUpdate_Pre);
+            g_bPlugins = false;
+        }
+
+        AnneNextBot_Configure(
+            g_hCvar_Plugins.BoolValue,
+            updatetick,
+            g_iUpdateTick[NPC_COMMON],
+            g_iUpdateTick[NPC_SMOKER],
+            g_iUpdateTick[NPC_BOOMER],
+            g_iUpdateTick[NPC_HUNTER],
+            g_iUpdateTick[NPC_SPITTER],
+            g_iUpdateTick[NPC_JOCKEY],
+            g_iUpdateTick[NPC_CHARGER],
+            g_iUpdateTick[NPC_WITCH],
+            g_iUpdateTick[NPC_TANK],
+            g_iUpdateTick[NPC_SURVIVOR_BOT]
+        );
+        return;
+    }
+
+    bool g_bTemp = g_hCvar_Plugins.BoolValue;
+    if (g_bTemp != g_bPlugins && g_hShouldUpdate)
+    {
+        if (g_bTemp)
+            g_hShouldUpdate.Enable(Hook_Pre, DTR_NextBotManager_ShouldUpdate_Pre);
+        else
+            g_hShouldUpdate.Disable(Hook_Pre, DTR_NextBotManager_ShouldUpdate_Pre);
+        g_bPlugins = g_bTemp;
+    }
+}
+
+bool IsAnneNextBotAvailable()
+{
+    return LibraryExists(ANNE_NEXTBOT_LIBRARY)
+        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_Configure") == FeatureStatus_Available
+        && AnneNextBot_IsActive();
 }
 
 void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -265,11 +338,14 @@ MRESReturn DTR_NextBotManager_ShouldUpdate_Pre(Address pManager, DHookReturn hRe
 
 void InItGameData()
 {
+    if (g_bGameDataInitialized)
+        return;
+
     CheckGameDataFile();
 
     GameDataWrapper gd = new GameDataWrapper(GAMEDATA);
     g_bLinuxOS         = gd.GetOffset("OS") == 1;
-    g_hShouldUpdate    = gd.CreateDetourOrFail("NextBotManager::ShouldUpdate", true, DTR_NextBotManager_ShouldUpdate_Pre);
+    g_hShouldUpdate    = gd.CreateDetourOrFail("NextBotManager::ShouldUpdate", false, DTR_NextBotManager_ShouldUpdate_Pre);
 
     delete gd.CreateDetourOrFail("NextBotManager::Register", true, _, DTR_NextBotManager_Register_Post);
     delete gd.CreateDetourOrFail("NextBotManager::UnRegister", true, _, DTR_NextBotManager_UnRegister_Post);
@@ -287,6 +363,7 @@ void InItGameData()
     PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
     g_hSDK_CallGetEntity = EndPrepSDKCall();
     delete gd;
+    g_bGameDataInitialized = true;
 }
 
 void CheckGameDataFile()

@@ -2,7 +2,7 @@
 #pragma newdecls required
 
 /**
- * Infected Control (fdxx-style NavArea spot picking + max-distance fallback + 动态FLOW分桶)
+ * Infected Control (fdxx-style NavArea spot picking + persisted Nav graph + legacy fallback)
  *
  * ── 模块地图（Modules）
  *  1. 头文件 & 常量/宏
@@ -15,16 +15,16 @@
  *     - Spawn 波控制：StartWave/Timer_CheckSpawnWindow/Timer_StartNewWave
  *  6. 选类与队列：稀缺度优先、死亡CD与双保险、上限闸门
  *  7. 刷点核心（NavArea主路）：距离/可视/卡壳/路径/分散度/Flow 评分与 First-Fit
- *  8. Nav 分桶与缓存：BuildNavBuckets / KV 读写 / 桶窗口序列（含本文件补完的 BuildBucketOrder）
+ *  8. Nav 图与进度缓存：图模式直接按路径范围取候选，旧 Flow 桶仅用于扩展失败兜底
  *  9. Flow 与 Survivor 进度：安全获取、回退 TTL、每秒刷新“最后一次有效团队进度”
  * 10. 跑男检测与目标生还者选择
  * 11. 工具函数：可视/线段/碰撞/冷却/扇区/日志
  *
  * ── 行为要点（Behavior）
- *  - 预建 Nav Flow 分桶（0..100%），刷点时仅在“目标生还者附近 ±N 桶”内扫描
+ *  - 图模式后台预建 Nav 邻接表，并一次性缓存每个 Nav 的 0..100% 进度
  *  - 扩圈 SpawnMin→SpawnMax；到达上限走导演兜底
  *  - 评分四因子：距离 / 高度偏好 / Flow / 分散度（可调权重）
- *  - badflow 仅作轻度扣分（不强制禁用），支持空间映射就近归桶
+ *  - badflow 仅作轻度扣分（不强制禁用），图模式按 Nav 邻接继承最近有效进度
  *  - 传送监督：出生宽限、跑男快通道（但≥0.8s）、Smoker 技能未就绪不传
  *  - 生还者进度“本地回退”：所有人统计失败时，短期采用“最后一次有效平均进度”
  *
@@ -47,6 +47,7 @@
 #include <sdktools_tempents>
 #include <left4dhooks>
 #include <sourcescramble>
+#include <anne_spawn_accel>
 #undef REQUIRE_PLUGIN
 #include <si_target_limit>  // 可选
 #include <pause>            // 可选
@@ -63,11 +64,19 @@
 #define PLAYER_CHEST              45.0
 
 #define BAIT_DISTANCE             200.0
-#define RING_SLACK                350.0
-#define SUPPORT_EXPAND_MAX        1200.0
 
-// 扩圈节奏
-#define LOW_SCORE_EXPAND          100.0
+// Nav 找点按帧分片；候选数与昂贵精判数都有限制。
+#define NAV_RANDOM_POINT_TRIES    3
+#define NAV_SCAN_CANDIDATES_PER_SLICE 48
+#define NAV_SCAN_EXPENSIVE_PER_SLICE  6
+#define NAV_SCAN_TIME_BUDGET_MS       0.80
+#define TACTICAL_BAND_STAGES      3
+#define SUPPORT_RELEASE_GRACE     0.55
+#define SUPPORT_RELEASE_FORCE     0.90
+#define DIRECTOR_FALLBACK_SAMPLES 4
+#define UNRESTRICTED_FALLBACK_CYCLES 2
+#define UNRESTRICTED_DIRECTOR_TRIES  12
+#define NAV_WEIGHT_MIN            0.10
 
 #define ENABLE_SMOKER             (1 << 0)
 #define ENABLE_BOOMER             (1 << 1)
@@ -111,8 +120,8 @@
 #define FLOW_BUCKETS              101     // 0..100
 #define BUCKET_CACHE_VER "2026-07"  // 和插件版号保持同步
 
-// 记录最近使用过的 navArea -> 过期时间
-StringMap g_NavCooldown;
+// areaIdx -> 冷却过期时间；候选热循环直接 O(1) 读取。
+ArrayList g_NavCooldownUntil = null;
 
 char g_sInfectedClassNames[10][] =
 {
@@ -130,6 +139,7 @@ float g_BucketMaxZ[FLOW_BUCKETS];
 float g_LastSpawnTime[MAXPLAYERS+1];
 
 StringMap g_NavIdToIndex = null;  // navid -> areaIdx
+ArrayList g_AreaNavIds = null;     // areaIdx -> navid
 char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
 
 #include "infected_control/nav_types.inc"
@@ -141,6 +151,7 @@ char g_sBucketCachePath[PLATFORM_MAX_PATH] = "";
 bool g_bPauseLib       = false;
 bool g_bSmokerLib      = false;
 bool g_bTargetLimitLib = false;
+bool g_bInfectedControlStarted = false;
 
 // —— 分散度：最近扇区 & 最近刷点 —— //
 int recentSectors[3] = { -1, -1, -1 };   // 最近 3 次使用的扇区
@@ -172,9 +183,11 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2026-07-20",
+    version     = "2026-07-30",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
+
+#include "infected_control/runtime_state.inc"
 
 Config gCV;
 State  gST;
@@ -191,10 +204,10 @@ bool CheckClassEnabled(int zc)
     return (gCV.iEnableMask & bit) != 0;
 }
 
-#include "infected_control/runtime_state.inc"
 #include "infected_control/queue.inc"
 #include "infected_control/class_queue.inc"
 #include "infected_control/client_state.inc"
+#include "infected_control/spawn_accel_bridge.inc"
 
 // 刷特管线的依赖顺序很重要：
 // 1) 先加载基础状态、队列、玩家状态和可见性工具；
@@ -209,6 +222,7 @@ bool CheckClassEnabled(int zc)
 #include "infected_control/path_cache.inc"
 #include "infected_control/survivor_flow.inc"
 #include "infected_control/spawn_memory.inc"
+#include "infected_control/spawn_tactics.inc"
 #include "infected_control/nav_cache.inc"
 #include "infected_control/nav_persist.inc"
 #include "infected_control/nav_buckets.inc"
@@ -227,6 +241,25 @@ bool CheckClassEnabled(int zc)
 // =========================
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max)
 {
+    MarkNativeAsOptional("AnneSpawn_IsActive");
+    MarkNativeAsOptional("AnneSpawn_NavGraphStart");
+    MarkNativeAsOptional("AnneSpawn_NavGraphPump");
+    MarkNativeAsOptional("AnneSpawn_NavGraphStop");
+    MarkNativeAsOptional("AnneSpawn_NavGraphPrepareRange");
+    MarkNativeAsOptional("AnneSpawn_NavGraphCollectRange");
+    MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");
+    MarkNativeAsOptional("AnneSpawn_NavGraphGetEdgeCount");
+    MarkNativeAsOptional("AnneSpawn_NavGraphCollectProgress");
+    MarkNativeAsOptional("AnneSpawn_GetWorkerCount");
+    MarkNativeAsOptional("AnneSpawn_SetSurvivorSnapshot");
+    MarkNativeAsOptional("AnneSpawn_ClearSurvivorSnapshot");
+    MarkNativeAsOptional("AnneSpawn_TestPointSafety");
+    MarkNativeAsOptional("AnneSpawn_ComputePointGeometry");
+    MarkNativeAsOptional("AnneSpawn_ComputeGeometryBatch");
+    MarkNativeAsOptional("AnneSpawn_SelectTopK");
+    MarkNativeAsOptional("AnneSpawn_MapNearest2D");
+    MarkNativeAsOptional("AnneSpawn_PathExists");
+    MarkNativeAsOptional("AnneSpawn_ClearPathCache");
     RegPluginLibrary("infected_control");                           // 供其他插件依赖
     g_hRushManNotifyForward = CreateGlobalForward("OnDetectRushman", // 跑男 forward：传入幸存者 index
                                                   ET_Ignore, Param_Cell);
@@ -243,15 +276,36 @@ public void OnAllPluginsLoaded()
     g_bTargetLimitLib = LibraryExists("si_target_limit");
     g_bSmokerLib      = LibraryExists("ai_smoker_new");
     g_bPauseLib       = LibraryExists("pause");
+    SpawnAccel_UpdateAvailability();
 }
 public void OnLibraryAdded(const char[] name)
 {
+    if (StrEqual(name, ANNE_SPAWN_ACCEL_LIBRARY))
+    {
+        SpawnAttempts_ResetSearchProgress();
+        SpawnAccel_UpdateAvailability();
+        Visibility_ClearEyeSnapshot();
+        ClearPathCache();
+        if (g_bInfectedControlStarted)
+            SpawnAccel_StartNavGraph(false);
+    }
+
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = true;
     else if (StrEqual(name, "ai_smoker_new")) g_bSmokerLib   = true;
     else if (StrEqual(name, "pause"))         g_bPauseLib    = true;
 }
 public void OnLibraryRemoved(const char[] name)
 {
+    if (StrEqual(name, ANNE_SPAWN_ACCEL_LIBRARY))
+    {
+        SpawnAttempts_ResetSearchProgress();
+        SpawnAccel_ClearGraphState(false);
+        g_bSpawnAccel = false;
+        Visibility_ClearEyeSnapshot();
+        ClearPathCache();
+        SpawnAccel_EnsureLegacyBuckets();
+    }
+
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = false;
     else if (StrEqual(name, "ai_smoker_new")) g_bSmokerLib   = false;
     else if (StrEqual(name, "pause"))         g_bPauseLib    = false;
@@ -292,19 +346,22 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 public void OnPluginStart()
 {
 	LoadTranslations("infected_control.phrases");
+    SpawnAccel_UpdateAvailability();
     SpawnPerfConfig_Create();
     gCV.Create();
+    ClearPathCache();
+    Visibility_ClearEyeSnapshot();
     TraitorQuota_Init();
     ClassCapMirrors_Create();
     gQ.Create();
     gST.Reset();
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
     BuildNavIdIndexMap();
-    BuildNavBuckets();        // ← 预建 FLOW 分桶
+    g_bInfectedControlStarted = true;
+    SpawnAccel_StartNavGraph(false);
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
-    g_NavCooldown = new StringMap();
     lastSpawns = new ArrayList(4);
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
     // 初始化 Path 缓存
@@ -345,25 +402,37 @@ public void OnPluginStart()
     HookEvent("player_ledge_grab", Event_PlayerLedgeGrab, EventHookMode_Post);
     HookEvent("revive_success", Event_PlayerReviveSuccess, EventHookMode_Post);
     HookEvent("ability_use",     Event_AbilityUse);
+    HookEvent("charger_charge_start", Event_PressureEngaged, EventHookMode_Post);
+    HookEvent("lunge_pounce", Event_PressureEngaged, EventHookMode_Post);
+    HookEvent("jockey_ride", Event_PressureEngaged, EventHookMode_Post);
+    HookEvent("tongue_grab", Event_PressureEngaged, EventHookMode_Post);
     HookEvent("player_hurt",     Event_PlayerHurt);
 
     for (int client = 1; client <= MaxClients; client++)
     {
         if (IsClientInGame(client))
-            Traitor_HookClientDamage(client);
+            Traitor_InitializeClientDamage(client);
     }
 }
 
 public void OnPluginEnd()
 {
+    g_bInfectedControlStarted = false;
+    SpawnAccel_ClearGraphState(true);
+    AssaultBurst_Reset();
+    SpawnAttempts_ResetSearchProgress();
     Traitor_ResetAll(true);
+    Traitor_ShutdownDamageHooks();
     // 插件结束时清理 Path 缓存
     ClearPathCache();
     TraitorQuota_Close();
 }
 public void OnMapEnd()
 {
-    if (g_NavCooldown != null) g_NavCooldown.Clear();
+    SpawnAccel_ClearGraphState(true);
+    AssaultBurst_Reset();
+    SpawnAttempts_ResetSearchProgress();
+    if (g_NavCooldownUntil != null) g_NavCooldownUntil.Clear();
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
@@ -371,6 +440,7 @@ public void OnMapEnd()
     g_SupportShortageStart = 0.0;
     for (int i = 0; i < SI_COUNT; i++) g_LastDeathTime[i] = 0.0;
     Traitor_ResetAll(true);
+    Traitor_ShutdownDamageHooks();
 
     ClearNavBuckets();
     g_BucketsReady = false;
@@ -383,6 +453,19 @@ public void OnMapEnd()
     {
         SpawnPerf_OnMapEnd();
     }
+}
+
+public void OnMapStart()
+{
+    if (g_bInfectedControlStarted)
+        CreateTimer(1.0, Timer_StartSpawnAccelGraph, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_StartSpawnAccelGraph(Handle timer)
+{
+    SpawnAccel_UpdateAvailability();
+    SpawnAccel_StartNavGraph(false);
+    return Plugin_Stop;
 }
 
 // =========================
@@ -467,9 +550,10 @@ public Action Cmd_WaveStatus(int client, int args)
     return Plugin_Handled;
 }
 
-// 重建 NavArea 缓存和分桶缓存
+// 重建 NavArea、图拓扑和进度缓存
 public Action Cmd_RebuildNavCache(int client, int args)
 {
+    SpawnAttempts_ResetSearchProgress();
     // 强制重建 NavAreas 缓存
     RebuildNavAreasCache();
     
@@ -481,9 +565,12 @@ public Action Cmd_RebuildNavCache(int client, int args)
     if (g_sBucketCachePath[0] != '\0' && FileExists(g_sBucketCachePath))
         DeleteFile(g_sBucketCachePath);
 
-    BuildNavBuckets();
+    if (g_bSpawnAccel)
+        SpawnAccel_StartNavGraph(true);
+    else
+        BuildNavBuckets();
     
-    ReplyToCommand(client, "[IC] Rebuilt Nav bucket cache (forced, old cache deleted).");
+    ReplyToCommand(client, "%t", "InfectedControl_NavCacheRebuildStarted");
     return Plugin_Handled;
 }
 
@@ -498,6 +585,8 @@ void ResetDeathState()
 
 static void StopAll()
 {
+    AssaultBurst_Reset();
+    SpawnAttempts_ResetSearchProgress();
     if (g_hFirstWaveTimer != INVALID_HANDLE)
     {
         KillTimer(g_hFirstWaveTimer);
@@ -508,6 +597,7 @@ static void StopAll()
     Queue_SyncSizes();
     gST.Reset();
     Traitor_ResetAll(true);
+    Traitor_ShutdownDamageHooks();
     AntiBait_OnRoundStart();
     WaveDecider_OnRoundStart();
     if (lastSpawns != null) lastSpawns.Clear();
@@ -562,11 +652,12 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     Traitor_ResetRoundUseLimits();
     StopAll();
+    // 权重只在当前回合学习，避免对抗上下半场继承不同的 Nav 历史。
+    ClearNavWeightMemory();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
     CreateTimer(0.1, Timer_ApplyMaxSpecials);
     CreateTimer(1.0,  Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(2.0, Timer_RebuildBuckets, _, TIMER_FLAG_NO_MAPCHANGE); // 地图开局重建分桶
     ClearPathCache();
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -601,6 +692,19 @@ public void Event_AbilityUse(Event event, const char[] name, bool dont_broadcast
     event.GetString("ability", ability, sizeof ability);
     if (strcmp(ability, "ability_spit") == 0)
         gST.spitterSpitTime[client] = GetGameTime();
+
+    if (strcmp(ability, "ability_charge") == 0
+        || strcmp(ability, "ability_lunge") == 0
+        || strcmp(ability, "ability_leap") == 0
+        || strcmp(ability, "ability_tongue") == 0)
+    {
+        Tactical_OnPressureEngaged();
+    }
+}
+
+public void Event_PressureEngaged(Event event, const char[] name, bool dont_broadcast)
+{
+    Tactical_OnPressureEngaged();
 }
 public void Event_PlayerHurt(Event event, const char[] name, bool dont_broadcast)
 {
@@ -710,13 +814,15 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
+    TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
 }
 
 public void OnClientPutInServer(int client)
 {
-    Traitor_HookClientDamage(client);
+    TraitorQuota_InvalidateClientCache(client);
+    Traitor_InitializeClientDamage(client);
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
@@ -727,11 +833,6 @@ public void OnEntityCreated(int entity, const char[] classname)
 public void OnEntityDestroyed(int entity)
 {
     Traitor_OnEntityDestroyed(entity);
-}
-
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
-{
-    return Traitor_OnPlayerRunCmd(client, buttons);
 }
 
 static Action Timer_KickBot(Handle timer, int userid)
@@ -756,10 +857,11 @@ public void OnUnpause()
 // =========================
 void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
 {
+    SpawnAttempts_ResetSearchProgress();
     bool traitorDisabled = convar == gCV.TraitorEnable && StringToInt(ov) != 0 && StringToInt(nv) == 0;
     gCV.Refresh();
     gCV.ApplyMaxZombieBound();
-    if (convar == gCV.TraitorDailyQuota)
+    if (convar == gCV.TraitorDailyQuota || convar == gCV.TraitorPublicDailyQuota)
         TraitorQuota_InvalidateAdminQuotaCache();
 
     if (traitorDisabled)
@@ -770,8 +872,10 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
 }
 void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
 {
-    // Flow 百分比变化会影响分桶 → 重建
-    RebuildNavBuckets();
+    SpawnAttempts_ResetSearchProgress();
+    // 图模式只需按缓存的原始 Nav flow 重算 areaIdx -> 百分比。
+    if (!SpawnAccel_RebuildAreaProgress())
+        RebuildNavBuckets();
 }
 void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 {
@@ -788,10 +892,16 @@ void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 // =========================
 public void OnGameFrame()
 {
-    if (gCV.GetMaxPlayerZombieBound() > gCV.MaxPlayerZombies.IntValue)
-        gCV.ApplyMaxZombieBound();
-
     float now = GetGameTime();
+
+    // 外部插件可能改写 z_max_player_zombies，但没有必要为此每帧读取 ConVar。
+    if (now >= gST.nextMaxZombieCheck)
+    {
+        if (gCV.GetMaxPlayerZombieBound() > gCV.MaxPlayerZombies.IntValue)
+            gCV.ApplyMaxZombieBound();
+        gST.nextMaxZombieCheck = now + 1.0;
+    }
+
     if (now < gST.nextFrameThink)
         return;
 
@@ -803,9 +913,13 @@ public void OnGameFrame()
     if (gST.totalSI >= gCV.iSiLimit)
         return;
 
-    // 每个 think slice 先维护普通刷特队列：按上限、稀缺度、死亡 CD 和支援特感规则补队列。
-    // 真正刷出时优先处理传送队列，因为传送一般意味着已有特感失去作用或跑男压力更高。
-    MaintainSpawnQueueOnce();
+    // 开波时已经批量补齐队列。只有丢弃队首或死亡 CD 暂时无可用职业时才需要重试，
+    // 并限制到每 0.25 秒一次，避免搜索期间反复遍历 MaxClients 重算职业上限。
+    if (SpawnQueue_Length() < gST.siQueueCount && now >= gST.nextQueueMaintain)
+    {
+        FillSpawnQueueToPendingBudget();
+        gST.nextQueueMaintain = now + 0.25;
+    }
 
     if (!gST.bLate)
         return;

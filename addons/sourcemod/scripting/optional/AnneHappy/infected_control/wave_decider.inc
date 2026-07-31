@@ -9,8 +9,8 @@
  * 负责管理整个刷特时序决策流程：
  * 1. 提前检查窗口（0-checkWindow秒）
  * 2. 正常等待窗口（checkWindow-interval秒）
- * 3. 密集检测模式（卡位时1秒检测）
- * 4. 卡位密集检测无强制兜底：持续卡位时保持等待，直到推进/分散
+ * 3. Anti-Bait 只标记下一波为破点波，不延长基础刷新时间
+ * 4. 旧密集检测状态保留兼容，但到达基础时间立即放行
  */
 
 enum WaveDecisionState
@@ -18,7 +18,7 @@ enum WaveDecisionState
     WD_Idle = 0,           // 空闲：没有活跃波
     WD_EarlyCheck,         // 提前检查：0-checkWindow 秒，评估是否提前触发
     WD_TimerRunning,       // 定时器运行中：16秒倒计时，监控玩家行为
-    WD_IntensiveCheck      // 密集检测：卡位时改为1秒检测，推进/分散时放行
+    WD_IntensiveCheck      // 兼容旧状态：基础时间到达后立即放行
 }
 
 enum struct WaveDecider
@@ -28,7 +28,7 @@ enum struct WaveDecider
     float stateStartTime;      // 当前状态开始时间
     float timerStartTime;      // 16秒定时器开始时间
     bool earlyTriggered;       // 是否已触发提前机制
-    bool needIntensiveCheck;   // 定时器到达后是否需要进入密集检测
+    bool pressureObserved;     // 定时器运行期间是否观察到破点压力
     int earlyCheckCount;       // 提前检查次数（用于调试）
     int intensiveCheckCount;   // 密集检测次数（用于调试）
 
@@ -40,7 +40,7 @@ enum struct WaveDecider
         this.stateStartTime = now;
         this.timerStartTime = 0.0;
         this.earlyTriggered = false;
-        this.needIntensiveCheck = false;
+        this.pressureObserved = false;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
 
@@ -54,7 +54,7 @@ enum struct WaveDecider
         this.stateStartTime = 0.0;
         this.timerStartTime = 0.0;
         this.earlyTriggered = false;
-        this.needIntensiveCheck = false;
+        this.pressureObserved = false;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
     }
@@ -128,25 +128,22 @@ enum struct WaveDecider
         float timerElapsed = now - this.timerStartTime;
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
 
-        // 在定时器运行期间，持续监控玩家行为，标记是否需要密集检测
-        // 但不取消定时器（16秒是刚性时间）
+        // 在刚性倒计时期间记录 Pressure，只改变下一波战术，不改变截止时间。
 
         // 检查是否进入卡位状态
-        if (AntiBait_ShouldHoldWave())
+        if (AntiBait_ShouldPrepareBreachWave())
         {
-            // 标记需要密集检测，但继续等待定时器
-            if (!this.needIntensiveCheck)
+            if (!this.pressureObserved)
             {
-                this.needIntensiveCheck = true;
-                WaveDecider_Debug("Detected baiting at timer %.1fs, will enter intensive check after timer", timerElapsed);
+                this.pressureObserved = true;
+                WaveDecider_Debug("Detected baiting at timer %.1fs, prepare breach wave at deadline", timerElapsed);
             }
         }
         else
         {
-            // 如果之前标记了密集检测，但现在又恢复正常了，清除标记
-            if (this.needIntensiveCheck)
+            if (this.pressureObserved)
             {
-                this.needIntensiveCheck = false;
+                this.pressureObserved = false;
                 WaveDecider_Debug("Baiting cleared at timer %.1fs, will spawn normally", timerElapsed);
             }
         }
@@ -155,11 +152,10 @@ enum struct WaveDecider
         if (timerElapsed >= interval)
         {
             // 根据标记决定走向
-            if (this.needIntensiveCheck)
+            if (this.pressureObserved)
             {
-                // 定时器期间检测到卡位，进入密集检测
-                this.TransitionTo(WD_IntensiveCheck, "timer reached with baiting");
-                WaveDecider_Debug("Timer reached, enter intensive check due to baiting");
+                // 卡位不会延后刷新；ReleaseWave 会把本波标记为专用破点波。
+                this.ReleaseWave("timer reached with breach pressure");
             }
             else
             {
@@ -171,8 +167,6 @@ enum struct WaveDecider
 
     void UpdateIntensiveCheck()
     {
-        // 密集检测：只等玩家推进或主动分散，不按超时兜底放波。
-
         if (AntiBait_ShouldReleaseFromIntensive())
         {
             if (AntiBait_IsAttackableSpread())
@@ -182,7 +176,7 @@ enum struct WaveDecider
             return;
         }
 
-        // 继续卡位时等待下一次检测。
+        // 理论上不会再进入此状态；热重载遗留状态最多等待到基础截止时间。
         this.intensiveCheckCount++;
     }
 
@@ -208,7 +202,7 @@ enum struct WaveDecider
             return false;
 
         // 条件3：不在坦克/团灭状态
-        if (IsAnyTankOrAboveHalfSurvivorDownOrDied(1))
+        if (IsAnyTankOrAboveHalfSurvivorDownOrDied())
             return false;
 
         return true;
@@ -222,6 +216,7 @@ enum struct WaveDecider
             this.earlyCheckCount,
             this.intensiveCheckCount);
 
+        Tactical_PrepareBreachWave();
         this.Reset();
         StartWave();
     }

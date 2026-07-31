@@ -77,13 +77,13 @@ stock NoBuyBonus_TryAwardSurvivors()
 
 	if (IsGaoJiRenJiEnabled())
 	{
-		StatsPrintToChatAll("{default}[{green}RANK{default}]{green}由于开启了高级人机，不能获得额外过关积分");
+		StatsPrintToChatAll("L4DStats_NoBuyBonusAdvancedBotsDisabled");
 		return;
 	}
 
 	if (!IsThisRoundValid())
 	{
-		StatsPrintToChatAll("{default}[{green}RANK{default}]{green}由于关闭了tank连跳，不能获得额外过关积分");
+		StatsPrintToChatAll("L4DStats_NoBuyBonusBunnyHopDisabled");
 		return;
 	}
 
@@ -92,8 +92,11 @@ stock NoBuyBonus_TryAwardSurvivors()
 		return;
 
 	new Awarded = 0;
+	new BaseScore = NoBuyBonus_GetBaseScore();
+	new HardcoreMultiplier = IsAnne() == 2 ? view_as<int>(GetConVarFloat(cvar_NoBuyBonusHardcoreMultiplier)) : view_as<int>(1.0);
+	new AbovePlayers = IsAboveFourPeople() ? getSurvivorNum() : 0;
 	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-	Format(ScoreFormula, sizeof(ScoreFormula), "infected_limit=%i,hardcore_multiplier=%.2f,above_four_adjustment,no_buy=1", GetAnneInfectedNumber(), GetConVarFloat(cvar_NoBuyBonusHardcoreMultiplier));
+	Format(ScoreFormula, sizeof(ScoreFormula), "v3n:%i:%i:%i", BaseScore, HardcoreMultiplier, AbovePlayers);
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		if (!Stats_IsSurvivorHuman(i))
@@ -106,5 +109,5 @@ stock NoBuyBonus_TryAwardSurvivors()
 	ScoreLog_ClearContext();
 
 	if (Awarded > 0)
-		StatsPrintToChatAll("{default}[{green}RANK{default}]{green}幸存者强势通过当前关卡，没花费任何B数，获得额外%d过关积分", Score);
+		StatsPrintToChatAll("L4DStats_NoBuyBonusAwarded", Score);
 }

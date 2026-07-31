@@ -5,6 +5,21 @@
 * norank版本是用电信服的rpg插件，只删除了排名，作弊检测和sourcebans插件，缺点就是每次进服务器需要自己设置出门近战，不想自己写了，有需求的写完可以pull request到我的项目里
 * nomysql版本是删除了所有和数据库相关的插件
 
+## **Accelerator 崩溃报告上传**
+
+> [!IMPORTANT]
+> 仓库内的 `addons/sourcemod/configs/core.cfg` 默认供 Anne 私有服务器使用，崩溃报告上传到 AnneWeb，并且只接收 Anne 私用 SourceBans 服务器白名单中的公网 IP。
+>
+> 如果你在自己的服务器部署本项目，请不要使用 Anne 的私有上传地址，应使用 Accelerator 官方的崩溃、符号和二进制上传接口：
+>
+> ```text
+> "MinidumpUrl" "http://crash.limetech.org/submit"
+> "MinidumpSymbolUrl" "http://crash.limetech.org/symbols/submit"
+> "MinidumpBinaryUrl" "http://crash.limetech.org/binary/submit"
+> ```
+>
+> `MinidumpAccount` 也应改为你自己的报告账号。Anne 专用配置填写维护者 SteamID64，是为了让 AnneWeb 将报告归属到对应的 Steam 登录账号。
+
 
 ## **AnneHappy 会自动更新的核心插件**
 - Path_SM/plugins/optional/AnneHappy/ai_boomer_2.smx"
@@ -95,7 +110,7 @@
 * fdxx 使用了一部分fdxx的插件
 
 > **Competitive Mapping Rework:**
-* Derpduck, morzlee 地图修改
+* Derpduck, morzlee, Easy 地图修改
 
 > **Testing/Issue Reporting:**
 * Too many to list, keep up the great work in reporting issues!

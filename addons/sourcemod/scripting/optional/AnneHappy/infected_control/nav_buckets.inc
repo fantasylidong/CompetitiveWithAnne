@@ -220,7 +220,17 @@ void BuildNavBuckets()
         const float timeBudgetS = 0.60; // 总时间预算：>0.6s 就中止映射
 
         float t1 = GetEngineTime();
-        if (estCostM > hardCostM)
+        float radius = gCV.fNavBucketAssignRadius; // 0=不限
+        if (radius < 0.0) radius = 0.0;
+
+        int nativeMapped, nativeDropped;
+        if (SpawnAccel_MapInvalidNavAreas(validIdxs, badIdxs, radius,
+                                          nativeMapped, nativeDropped))
+        {
+            Debug_Print("[BUCKET] pass2 native: B=%d V=%d mapped=%d dropped=%d took=%.3fs",
+                B, V, nativeMapped, nativeDropped, GetEngineTime() - t1);
+        }
+        else if (estCostM > hardCostM)
         {
             Debug_Print("[BUCKET] pass2 SKIP(cost): B=%d V=%d est≈%.1fM", B, V, estCostM);
         }
@@ -228,8 +238,6 @@ void BuildNavBuckets()
         {
             // 5.2 构建“有效区”二维栅格
             const float cell = 2000.0; // 栅格边长（可按地图尺度调整）
-            float radius = gCV.fNavBucketAssignRadius; // 0=不限
-            if (radius < 0.0) radius = 0.0;
 
             StringMap cellMap = new StringMap();
             ArrayList ownedLists = new ArrayList(); // 收尾 delete
@@ -390,22 +398,6 @@ void BuildNavBuckets()
     Debug_Print("[BUCKET] build done: took=%.3fs", GetEngineTime() - t0);
 
     SaveBucketsToCache(); // 若启用缓存将写入 .kv（你已有实现）
-}
-
-// 重建 Buckets 时确保缓存新鲜。
-Action Timer_RebuildBuckets(Handle timer)
-{
-    // 如果本局本图已经有可用缓存，就别动了
-    if (g_BucketsReady && g_AllNavAreasCache != null && g_NavAreasCacheCount > 0)
-    {
-        // Debug_Print("[NAV CACHE] Skip rebuild (already warm)");
-        return Plugin_Stop;
-    }
-
-    // 只在“没有缓存”时，补齐一次（不会触发 Cleared 日志）
-    EnsureNavAreasCache();   // 仅确保存在，不清空
-    BuildNavBuckets();       // 内部会 TryLoadBucketsFromCache()
-    return Plugin_Stop;
 }
 
 void RebuildNavBuckets()

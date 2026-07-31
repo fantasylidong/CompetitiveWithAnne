@@ -33,9 +33,10 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "2.1.0"
+#define PLUGIN_VERSION "2.2.0"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
+#define OVERLAY_CLEAN_INTERVAL 0.1
 
 // --------------------- Library expose ---------------------
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -85,7 +86,13 @@ int  g_PrefsRevision[MAXPLAYERS + 1] = { 0, ... };
 Handle g_hDB = INVALID_HANDLE;
 bool   g_DBConnecting = false;
 
-Handle g_taskClean[MAXPLAYERS + 1] = { INVALID_HANDLE, ... };
+Handle g_hOverlayCleanTimer = INVALID_HANDLE;
+float  g_OverlayExpiresAt[MAXPLAYERS + 1] = { 0.0, ... };
+bool   g_OverlayActive[MAXPLAYERS + 1] = { false, ... };
+int    g_OverlaySetId[MAXPLAYERS + 1] = { 0, ... };
+int    g_OverlayType[MAXPLAYERS + 1] = { -1, ... };
+int    g_ActiveOverlayCount = 0;
+float  g_OverlayShowTime = 0.3;
 bool   g_IsVictimDeadPlayer[MAXPLAYERS + 1] = { false, ... };
 
 // Fallback KV
@@ -277,27 +284,77 @@ static bool GetOverlayBase_BySet(int setId, int which, char[] out, int maxlen)
 
 static void ShowOverlayBySet(int client, int setId, int which)
 {
-    if (GetConVarInt(cv_pic_enable) == 0) return;
-    if (setId <= 0) return;
+    if (setId <= 0 || setId > g_OvCount) return;
+
+    float expiresAt = GetEngineTime() + g_OverlayShowTime;
+
+    if (g_OverlayActive[client] && g_OverlaySetId[client] == setId && g_OverlayType[client] == which)
+    {
+        g_OverlayExpiresAt[client] = expiresAt;
+        return;
+    }
 
     char base[PLATFORM_MAX_PATH];
     if (!GetOverlayBase_BySet(setId, which, base, sizeof(base))) return;
 
-    char vmt[PLATFORM_MAX_PATH], vtf[PLATFORM_MAX_PATH];
-    Format(vmt, sizeof(vmt), "%s.vmt", base);
-    Format(vtf, sizeof(vtf), "%s.vtf", base);
-    PrecacheDecal(vmt, true);
-    PrecacheDecal(vtf, true);
-
-    int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
-    SetCommandFlags("r_screenoverlay", iFlags);
     ClientCommand(client, "r_screenoverlay \"%s\"", base);
+    g_OverlayExpiresAt[client] = expiresAt;
 
-    if (g_taskClean[client] != INVALID_HANDLE) {
-        KillTimer(g_taskClean[client]);
-        g_taskClean[client] = INVALID_HANDLE;
+    if (!g_OverlayActive[client])
+    {
+        g_OverlayActive[client] = true;
+        g_ActiveOverlayCount++;
     }
-    g_taskClean[client] = CreateTimer(GetConVarFloat(cv_showtime), Timer_CleanOverlay, client);
+    g_OverlaySetId[client] = setId;
+    g_OverlayType[client] = which;
+
+    if (g_hOverlayCleanTimer == INVALID_HANDLE)
+    {
+        g_hOverlayCleanTimer = CreateTimer(
+            OVERLAY_CLEAN_INTERVAL,
+            Timer_CleanOverlays,
+            _,
+            TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE
+        );
+    }
+}
+
+static void ResetClientOverlayState(int client, bool clearOverlay)
+{
+    bool wasActive = g_OverlayActive[client];
+    if (wasActive)
+    {
+        g_OverlayActive[client] = false;
+        if (g_ActiveOverlayCount > 0)
+            g_ActiveOverlayCount--;
+    }
+    g_OverlayExpiresAt[client] = 0.0;
+    g_OverlaySetId[client] = 0;
+    g_OverlayType[client] = -1;
+
+    if (clearOverlay && wasActive && IsValidClient(client) && !IsFakeClient(client))
+        ClientCommand(client, "r_screenoverlay \"\"");
+}
+
+static void StopOverlayCleanTimer()
+{
+    if (g_hOverlayCleanTimer != INVALID_HANDLE)
+    {
+        Handle timer = g_hOverlayCleanTimer;
+        g_hOverlayCleanTimer = INVALID_HANDLE;
+        if (IsValidHandle(timer))
+            KillTimer(timer);
+    }
+}
+
+static void ResetAllOverlayState(bool clearOverlays)
+{
+    StopOverlayCleanTimer();
+
+    for (int client = 1; client <= MaxClients; client++)
+        ResetClientOverlayState(client, clearOverlays);
+
+    g_ActiveOverlayCount = 0;
 }
 
 // ========================================================
@@ -327,6 +384,15 @@ public void OnPluginStart()
     cv_db_table               = CreateConVar("sm_hitsound_db_table", "RPG", "存储表名", CVAR_FLAGS);
     cv_debug                  = CreateConVar("sm_hitsound_debug", "0", "调试输出(0关,1开)", CVAR_FLAGS);
 
+    g_OverlayShowTime = GetConVarFloat(cv_showtime);
+    if (g_OverlayShowTime < 0.0)
+        g_OverlayShowTime = 0.0;
+    HookConVarChange(cv_showtime, ConVarChanged_OverlayShowTime);
+
+    int overlayFlags = GetCommandFlags("r_screenoverlay");
+    if (overlayFlags != INVALID_FCVAR_FLAGS && (overlayFlags & FCVAR_CHEAT) != 0)
+        SetCommandFlags("r_screenoverlay", overlayFlags & ~FCVAR_CHEAT);
+
     // Fallback KV
     g_SoundStore = CreateKeyValues("SoundSelect6");
     BuildPath(Path_SM, g_SavePath, sizeof(g_SavePath), "data/SoundSelect.txt");
@@ -347,6 +413,8 @@ public void OnPluginStart()
     // Load configs
     LoadHitSoundSets();
     LoadHitIconSets();
+    if (IsServerProcessing())
+        PrecacheAllAssets();
 
     RegConsoleCmd("sm_snd",   Cmd_MenuMain, "主菜单：音效/图标套装（玩家）+ 特定开关 + 管理员单独设置");
     RegConsoleCmd("sm_hitui", Cmd_ToggleUI,  "快速在禁用与套装1间切换覆盖图三项");
@@ -367,8 +435,16 @@ public void OnPluginStart()
     }
 }
 
+public void ConVarChanged_OverlayShowTime(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    g_OverlayShowTime = GetConVarFloat(convar);
+    if (g_OverlayShowTime < 0.0)
+        g_OverlayShowTime = 0.0;
+}
+
 public void OnMapEnd()
 {
+    ResetAllOverlayState(false);
     // 数据库连接保持跨地图运行。
     g_DBConnecting = false;
 }
@@ -386,6 +462,8 @@ public void OnConfigsExecuted()
 
 public void OnPluginEnd()
 {
+    ResetAllOverlayState(true);
+
     if (g_hDB != INVALID_HANDLE)
     {
         CloseHandle(g_hDB);
@@ -568,6 +646,7 @@ public void OnClientPutInServer(int client)
 {
     if (IsFakeClient(client)) return;
 
+    ResetClientOverlayState(client, false);
     g_PrefsRevision[client]++;
 
     // 最近套装（仅内存）
@@ -635,11 +714,10 @@ public void OnClientDisconnect(int client)
         }
     }
 
-    if (g_taskClean[client] != INVALID_HANDLE)
-    {
-        KillTimer(g_taskClean[client]);
-        g_taskClean[client] = INVALID_HANDLE;
-    }
+    ResetClientOverlayState(client, false);
+    if (g_ActiveOverlayCount == 0)
+        StopOverlayCleanTimer();
+
     g_PrefsLoaded[client] = false;
     g_PrefsDirty [client] = false;
     g_DBLoadInFlight[client] = false;
@@ -1024,7 +1102,6 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
             int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
             if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
             {
-                PrecacheSound(s, true);
                 EmitSoundToClient(attacker, s, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
             }
         }
@@ -1041,9 +1118,6 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
     int health     = GetEventInt(event, "health");
     int damagetype = GetEventInt(event, "type");
     bool headshot  = (GetEventInt(event, "hitgroup") == 1);
-
-    char weapon[64]; GetEventString(event, "weapon", weapon, sizeof(weapon));
-    bool inferno = (StrEqual(weapon, "entityflame", false) || StrEqual(weapon, "inferno", false));
 
     if (damagetype & DMG_DIRECT) return Plugin_Changed;
     if (GetConVarInt(cv_blast) == 0 && (damagetype & DMG_BLAST)) return Plugin_Changed;
@@ -1065,14 +1139,16 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
             }
 
             // 音效：爆头/命中
-            if (GetConVarInt(cv_sound_enable) == 1 && !inferno && ShouldPlaySoundFeedback(attacker, specialTarget))
+            if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
             {
-                char s2[PLATFORM_MAX_PATH];
-                int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
-                if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
+                char weapon[64];
+                GetEventString(event, "weapon", weapon, sizeof(weapon));
+                if (!StrEqual(weapon, "entityflame", false) && !StrEqual(weapon, "inferno", false))
                 {
-                    PrecacheSound(s2, true);
-                    EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                    char s2[PLATFORM_MAX_PATH];
+                    int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
+                    if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
+                        EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
                 }
             }
         }
@@ -1108,7 +1184,6 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
             int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
             if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
             {
-                PrecacheSound(s, true);
                 EmitSoundToClient(attacker, s, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
             }
         }
@@ -1149,7 +1224,6 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
                 int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                 if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
                 {
-                    PrecacheSound(s2, true);
                     EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
                 }
             }
@@ -1160,29 +1234,33 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
 
 public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
-    // 清理残留计时器
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (g_taskClean[i] != INVALID_HANDLE)
-        {
-            KillTimer(g_taskClean[i]);
-            g_taskClean[i] = INVALID_HANDLE;
-        }
-    }
+    ResetAllOverlayState(true);
 }
 
 // ========================================================
-// Overlay clean timer
+// Shared overlay clean timer
 // ========================================================
-public Action Timer_CleanOverlay(Handle timer, int client)
+public Action Timer_CleanOverlays(Handle timer)
 {
-    g_taskClean[client] = INVALID_HANDLE;
+    if (timer != g_hOverlayCleanTimer)
+        return Plugin_Stop;
 
-    int iFlags = GetCommandFlags("r_screenoverlay") & (~FCVAR_CHEAT);
-    SetCommandFlags("r_screenoverlay", iFlags);
-    ClientCommand(client, "r_screenoverlay \"\" ");
+    float now = GetEngineTime();
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!g_OverlayActive[client] || now < g_OverlayExpiresAt[client])
+            continue;
 
-    return Plugin_Stop;
+        ResetClientOverlayState(client, true);
+    }
+
+    if (g_ActiveOverlayCount == 0)
+    {
+        g_hOverlayCleanTimer = INVALID_HANDLE;
+        return Plugin_Stop;
+    }
+
+    return Plugin_Continue;
 }
 
 // ========================================================

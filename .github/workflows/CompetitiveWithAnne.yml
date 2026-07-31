@@ -11,12 +11,10 @@ on:
         required: false
   push:
     paths:
-      - 'addons/**'
-      - 'cfg/**'
-      - 'cfgs/**'
-      - 'scripts/**'
       - 'README.md'
       - 'README-*.md'
+      - 'Update_log.md'
+      - 'Update_log.*.md'
     branches:
       - master
 

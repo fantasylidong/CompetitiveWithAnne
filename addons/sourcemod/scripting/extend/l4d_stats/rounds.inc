@@ -11,35 +11,35 @@ public SetCurrentGamemodeName()
 	{
 		case GAMEMODE_COOP:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "战役");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeCoop");
 		}
 		case GAMEMODE_VERSUS:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "对抗");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeVersus");
 		}
 		case GAMEMODE_REALISM:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "写实");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeRealism");
 		}
 		case GAMEMODE_SURVIVAL:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "生存");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeSurvival");
 		}
 		case GAMEMODE_SCAVENGE:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "清道夫");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeScavenge");
 		}
 		case GAMEMODE_REALISMVERSUS:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "写实对抗");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeRealismVersus");
 		}
 		case GAMEMODE_OTHERMUTATIONS:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "突变模式");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeMutations");
 		}
 		default:
 		{
-			Format(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "未知模式");
+			strcopy(CurrentGamemodeLabel, sizeof(CurrentGamemodeLabel), "L4DStats_GamemodeUnknown");
 		}
 	}
 
@@ -92,7 +92,7 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 	
 	for(int i = 1; i <= MaxClients; i++){
 		if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == TEAM_SURVIVORS || Stats_IsRoundParticipant(i)) && !IsFakeClient(i) && Score > 0){
-			StatsPrintToChat(i, "{lightgreen}所有参与玩家 {default}都 {lightgreen}掉了 {green}%i {default}分 by {lightgreen}大家又坐牢了!", Score);
+			StatsPrintToChat(i, "L4DStats_AllPlayersLostRoundPenalty", Score);
 			decl String:UpdatePoints[32];
 			decl String:UserID[MAX_LINE_WIDTH];
 			GetClientRankAuthString(i, UserID, sizeof(UserID));

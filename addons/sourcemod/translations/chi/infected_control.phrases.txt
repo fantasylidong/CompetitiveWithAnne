@@ -273,5 +273,9 @@
 	{
 		"chi"		"{green}[IC]{default} 内鬼预留槽位: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"chi"		"[IC] 正在重建 Nav 图和逐区域进度缓存。"
+	}
 
 }

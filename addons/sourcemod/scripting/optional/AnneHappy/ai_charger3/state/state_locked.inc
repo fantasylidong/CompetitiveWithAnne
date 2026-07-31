@@ -75,7 +75,7 @@ stock Action StateLocked_OnUpdate(int client, int& buttons, float vel[3], float 
     GetClientEyePosition(target, targetEyePos);
 
     static bool visible;
-    visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    visible = isSurvivorVisibleToCharger(client, target, targetEyePos);
     if (visible) {
         g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
     }

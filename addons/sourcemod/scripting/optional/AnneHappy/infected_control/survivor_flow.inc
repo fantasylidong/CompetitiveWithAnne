@@ -350,8 +350,10 @@ static void TouchLastGoodSurPctFromAverage(int avgPct)
 // =========================
 bool GetSurPosData()
 {
-    if (g_aSurPosData != null) { delete g_aSurPosData; g_aSurPosData = null; }
-    g_aSurPosData = new ArrayList(sizeof(SurPosData));
+    if (g_aSurPosData == null)
+        g_aSurPosData = new ArrayList(sizeof(SurPosData));
+    else
+        g_aSurPosData.Clear();
     g_iSurPosDataLen = 0; g_iSurCount = 0;
 
     SurPosData data;

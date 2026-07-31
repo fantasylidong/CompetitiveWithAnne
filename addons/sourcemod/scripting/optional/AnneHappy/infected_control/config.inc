@@ -355,7 +355,7 @@ enum struct Config
         this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
             "跑男时的快速传送阈值（秒），仍需达到该不可见时长才可传送", CVAR_FLAG, true, 0.0, true, 10.0);
         this.SupportUnlockKillers = CreateConVar("inf_support_unlock_killers", "-1",
-            "支援特感(Smoker/Spitter/Boomer)解锁所需的优先特感(Jockey/Hunter/Charger)数量；<0 表示按 inf_support_unlock_ratio 自动计算，0 关闭限制。",
+            "支援特感(Spitter/Boomer)解锁所需的控场特感(Smoker/Hunter/Jockey/Charger)数量；<0 表示按 inf_support_unlock_ratio 自动计算，0 关闭限制。",
             CVAR_FLAG, true, -1.0, true, 12.0);
         this.SupportUnlockRatio = CreateConVar("inf_support_unlock_ratio", "0.4",
             "当 inf_support_unlock_killers < 0 时，所需优先特感 = RoundToFloor(limit * ratio)。0 关闭比例限制。",
@@ -366,7 +366,8 @@ enum struct Config
         this.NavBucketMapInvalid   = CreateConVar("inf_NavBucketMapInvalid", "1",
             "Map invalid-flow NavAreas to nearest valid-flow bucket (0=off,1=on)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.NavBucketAssignRadius = CreateConVar("inf_NavBucketAssignRadius", "2000.0",
-            "Optional XY max distance when reassigning invalid-flow areas; 0 = unlimited", CVAR_FLAG, true, 0.0);
+            "Max Nav graph distance for invalid-flow progress mapping (legacy fallback uses XY); 0 = unlimited",
+            CVAR_FLAG, true, 0.0);
         this.gCvarNavCacheEnable = CreateConVar(
             "inf_NavCacheEnable", "1",
             "Enable on-disk cache for Nav flow buckets (0=off,1=on)",
@@ -383,12 +384,12 @@ enum struct Config
             CVAR_FLAG, true, 1.0, true, 500.0);
         this.FrameThinkStep = CreateConVar(
             "inf_FrameThinkStep", "0.05",
-            "Idle seconds between spawn queue think slices; active work uses inf_FrameThinkStepActive",
+            "Idle seconds between spawn queue attempts; active work uses inf_FrameThinkStepActive",
             CVAR_FLAG, true, 0.01, true, 0.25
         );
         this.FrameThinkStepActive = CreateConVar(
             "inf_FrameThinkStepActive", "0.02",
-            "Seconds between spawn queue think slices while spawn/teleport work is queued",
+            "Seconds between spawn/teleport attempts while work is queued",
             CVAR_FLAG, true, 0.01, true, 0.25
         );
         this.SpawnCandidateBudget = CreateConVar(
@@ -416,9 +417,9 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 2.0
         );
         this.SpawnScoreFloor = CreateConVar(
-            "inf_spawn_score_floor", "50.0",
-            "最小总评分阈值，低于该值的刷点直接丢弃；0=关闭限制。",
-            CVAR_FLAG, true, -1000.0, true, 5000.0
+            "inf_spawn_score_floor", "0.0",
+            "0..100 最小总评分阈值；0=只排序安全候选，不因评分拒绝刷点。",
+            CVAR_FLAG, true, 0.0, true, 100.0
         );
         this.FlowBucketShare = CreateConVar(
             "inf_spawn_bucket_ratio", "0.50",
@@ -460,17 +461,17 @@ enum struct Config
         );
         this.AntiBaitProgressPct = CreateConVar(
             "inf_antibait_progress_pct", "2",
-            "Average or max survivor flow percent needed to reset anti-bait baseline",
+            "Lower-median survivor flow percent needed to reset anti-bait baseline",
             CVAR_FLAG, true, 1.0, true, 20.0
         );
         this.AntiBaitMinSiRatio = CreateConVar(
             "inf_antibait_min_si_ratio", "0.50",
-            "Minimum alive SI ratio before anti-bait can enter pressure",
+            "Legacy compatibility value; breach pressure no longer requires alive SI",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.AntiBaitForceAfter = CreateConVar(
             "inf_antibait_force_after", "25.0",
-            "Seconds in pressure before anti-bait may release a held wave after base respawn interval",
+            "Legacy compatibility value; anti-bait no longer holds waves",
             CVAR_FLAG, true, 0.0, true, 180.0
         );
         this.AntiBaitRecover = CreateConVar(
@@ -480,7 +481,7 @@ enum struct Config
         );
         this.AntiBaitAction = CreateConVar(
             "inf_antibait_action", "2",
-            "0=debug only, 1=cap latest wave delay, 2=also fast-teleport invisible SI",
+            "0=debug only, 1=prepare breach waves, 2=also fast-teleport invisible SI",
             CVAR_FLAG, true, 0.0, true, 2.0
         );
         this.AntiBaitRunnerGapPct = CreateConVar(
@@ -500,12 +501,12 @@ enum struct Config
         );
         this.AntiBaitLatestBaseScale = CreateConVar(
             "inf_antibait_latest_scale", "1.50",
-            "Latest held-wave release multiplier at AI difficulty 1; base respawn interval remains the lower bound",
+            "Legacy compatibility value; anti-bait no longer delays wave release",
             CVAR_FLAG, true, 1.0, true, 3.0
         );
         this.AntiBaitLatestScaleStep = CreateConVar(
             "inf_antibait_latest_scale_step", "0.10",
-            "How much higher AI difficulty reduces latest wave delay multiplier per level",
+            "Legacy compatibility value; anti-bait no longer delays wave release",
             CVAR_FLAG, true, 0.0, true, 0.5
         );
         this.AntiBaitClusterDist = CreateConVar(
@@ -695,7 +696,7 @@ enum struct Config
         this.NavBucketFirstFit.AddChangeHook(OnCfgChanged);
         this.NavBucketIncludeCtr.AddChangeHook(OnCfgChanged);
 
-        this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 变更时重建桶
+        this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 仅重算进度数组
 
         this.Refresh();
         this.ApplyMaxZombieBound();

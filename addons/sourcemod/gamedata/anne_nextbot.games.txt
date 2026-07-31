@@ -1,0 +1,41 @@
+"Games"
+{
+    "left4dead2"
+    {
+        "Signatures"
+        {
+            "NextBotManager::ShouldUpdate"
+            {
+                "library"   "server"
+                "linux"     "@_ZN14NextBotManager12ShouldUpdateEP8INextBot"
+                "windows"   "\x55\x8B\xEC\x83\xEC\x08\x57\x8B\xF9\x83\x7F\x24\x01"
+            }
+            "NextBotManager::Register"
+            {
+                "library"   "server"
+                "linux"     "@_ZN14NextBotManager8RegisterEP8INextBot"
+                "windows"   "\x2A\x2A\x2A\x2A\x2A\x2A\x79\x08\x6A\x00"
+            }
+            "NextBotManager::UnRegister"
+            {
+                "library"   "server"
+                "linux"     "@_ZN14NextBotManager10UnRegisterEP8INextBot"
+                "windows"   "\x2A\x2A\x2A\x2A\x2A\x2A\x53\x56\x57\x8B\x78\x08"
+            }
+            "PathFollower::Update"
+            {
+                "library"   "server"
+                "linux"     "@_ZN12PathFollower6UpdateEP8INextBot"
+                "windows"   "\x55\x8B\xEC\x83\xEC\x70\xA1\x2A\x2A\x2A\x2A\x53\x56\x33\xF6\x89\x75\xE8\x89\x75\xEC\x57\x8B\xF9\x39\x70\x08\x74\x37\x8B\x40\x08\x68\x2A\x2A\x2A\x2A"
+            }
+        }
+        "Offsets"
+        {
+            "INextBot::GetEntity"
+            {
+                "linux"     "45"
+                "windows"   "44"
+            }
+        }
+    }
+}

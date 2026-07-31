@@ -50,7 +50,7 @@
 #include <multicolors>      // https://github.com/fbef0102/L4D1_2-Plugins/releases
 #include <SteamWorks>
 
-#define PLUGIN_VERSION			"1.1.2-2026/06/13"
+#define PLUGIN_VERSION			"1.1.3-2026/07/30"
 #define PLUGIN_NAME			    "l4d_player_count_unload_mode"
 #define DEBUG 0
 
@@ -125,7 +125,8 @@ bool
 
 Handle
     g_hDetectTimer,
-    g_hStatusTimer;
+    g_hStatusTimer,
+    g_hStatusDebounceTimer;
 
 Database g_hDB;
 bool g_bDBReady, g_bPeakQueryPending, g_bLastPeakActive, g_bLastGoodServer, g_bIsMySQL;
@@ -302,12 +303,14 @@ public void OnMapEnd()
 {
     ClearDefault();
     ResetTimer();
+    delete g_hStatusDebounceTimer;
 
     g_bPluginStart = false;
 }
 
 public void OnPluginEnd()
 {
+    delete g_hStatusDebounceTimer;
     delete g_hStatusTimer;
     delete g_hDB;
 }
@@ -342,7 +345,7 @@ void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast) 
 {
     if (g_iCvarPeakMode == 1)
-        CreateTimer(1.0, Timer_UpdateServerStatus, _, TIMER_FLAG_NO_MAPCHANGE);
+        QueueServerStatusUpdate();
 
     if(!g_bCvarEnable || !g_bPluginStart || g_hDetectTimer != null) return;
 
@@ -862,12 +865,28 @@ void CleanupLegacyStatusRows()
 
 void RestartStatusTimer()
 {
+    delete g_hStatusDebounceTimer;
     delete g_hStatusTimer;
 
     if (g_iCvarPeakMode != 1)
         return;
 
     g_hStatusTimer = CreateTimer(g_fCvarStatusInterval, Timer_UpdateServerStatus, _, TIMER_REPEAT);
+}
+
+void QueueServerStatusUpdate()
+{
+    delete g_hStatusDebounceTimer;
+    g_hStatusDebounceTimer = CreateTimer(1.0, Timer_DebouncedServerStatus, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+Action Timer_DebouncedServerStatus(Handle timer)
+{
+    if (timer == g_hStatusDebounceTimer)
+        g_hStatusDebounceTimer = null;
+
+    UpdateServerStatus();
+    return Plugin_Stop;
 }
 
 Action Timer_UpdateServerStatus(Handle timer)

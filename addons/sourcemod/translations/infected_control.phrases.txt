@@ -273,5 +273,9 @@
 	{
 		"en"		"{green}[IC]{default} Traitor reserved slots: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"en"		"[IC] Rebuilding the Nav graph and per-area progress cache."
+	}
 
 }

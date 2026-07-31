@@ -193,10 +193,87 @@ stock bool:MapRecords_CheckSchema()
 	new bool:HasPlayers = SQL_GetRowCount(Players) > 0;
 	CloseHandle(Players);
 
-	if (!HasRuns || !HasPlayers)
+	Format(Table, sizeof(Table), "%slegacy_map_bests", DbPrefix);
+	SQL_EscapeString(db, Table, EscTable, sizeof(EscTable));
+	Format(Query, sizeof(Query), "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' LIMIT 1", EscTable);
+	new Handle:Legacy = SQL_Query(db, Query);
+	if (Legacy == INVALID_HANDLE)
+	{
+		SQL_GetError(db, Error, sizeof(Error));
+		LogError("MapRecords schema check failed for legacy_map_bests: %s", Error);
+		return false;
+	}
+	new bool:HasLegacy = SQL_GetRowCount(Legacy) > 0;
+	CloseHandle(Legacy);
+
+	if (!HasRuns || !HasPlayers || !HasLegacy)
 		LogError("Map record v2 tables are missing. Run the 20260726 map record migration; legacy timing remains available.");
 
-	return HasRuns && HasPlayers;
+	return HasRuns && HasPlayers && HasLegacy;
+}
+
+stock bool:MapRecords_BuildBestTimeQuery(String:Query[], MaxLength, const String:MapName[], Difficulty, PlayerCount, const String:SteamID[], const String:ExcludeRunID[])
+{
+	if (!g_bMapRecordsTablesReady || MapRecords_GetPolicy() != MAP_RECORD_POLICY_LEADERBOARD)
+		return false;
+
+	decl String:Ruleset[MAX_LINE_WIDTH], String:Version[MAX_LINE_WIDTH], String:TimingProfile[24], String:DifficultyProfile[16];
+	MapRecords_GetRuleset(Ruleset, sizeof(Ruleset));
+	MapRecords_GetRulesetVersion(Version, sizeof(Version));
+	MapRecords_GetTimingProfile(TimingProfile, sizeof(TimingProfile));
+	MapRecords_GetDifficultyProfile(DifficultyProfile, sizeof(DifficultyProfile));
+
+	decl String:EscMap[512], String:EscRuleset[128], String:EscVersion[128], String:EscTiming[64], String:EscDifficulty[64];
+	decl String:EscSteamID[128], String:EscRunID[128], String:LegacyPlayerWhere[192], String:RunPlayerJoin[320], String:RunExclude[192];
+	SQL_EscapeString(db, MapName, EscMap, sizeof(EscMap));
+	SQL_EscapeString(db, Ruleset, EscRuleset, sizeof(EscRuleset));
+	SQL_EscapeString(db, Version, EscVersion, sizeof(EscVersion));
+	SQL_EscapeString(db, TimingProfile, EscTiming, sizeof(EscTiming));
+	SQL_EscapeString(db, DifficultyProfile, EscDifficulty, sizeof(EscDifficulty));
+
+	LegacyPlayerWhere[0] = '\0';
+	RunPlayerJoin[0] = '\0';
+	if (SteamID[0] != '\0')
+	{
+		SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
+		Format(LegacyPlayerWhere, sizeof(LegacyPlayerWhere), " AND l.`steamid` = '%s'", EscSteamID);
+		Format(RunPlayerJoin, sizeof(RunPlayerJoin),
+			" INNER JOIN `%smap_run_players` rp ON rp.`run_id` = r.`run_id` AND rp.`steamid` = '%s'", DbPrefix, EscSteamID);
+	}
+
+	RunExclude[0] = '\0';
+	if (ExcludeRunID[0] != '\0')
+	{
+		SQL_EscapeString(db, ExcludeRunID, EscRunID, sizeof(EscRunID));
+		Format(RunExclude, sizeof(RunExclude), " AND r.`run_id` <> '%s'", EscRunID);
+	}
+
+	new SICount = GetAnneInfectedNumber();
+	new SISpawnTime = GetAnneSISpawnTime();
+	new UseBuy = g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY);
+	new Auto = IsAutoSpawnTime();
+	decl String:LegacyWhere[1536], String:RunWhere[1792], String:Direction[5];
+	Format(LegacyWhere, sizeof(LegacyWhere),
+		"l.`map` = '%s' AND l.`ruleset_key` = '%s' AND l.`ruleset_version` = '%s' AND l.`timing_profile` = '%s' "
+		... "AND l.`difficulty_type` = '%s' AND l.`difficulty` = %i AND l.`player_count` = %i AND l.`si_count` = %i "
+		... "AND l.`si_spawn_time` = %i AND l.`usebuy` = %i AND l.`auto` = %i%s",
+		EscMap, EscRuleset, EscVersion, EscTiming, EscDifficulty, Difficulty, PlayerCount, SICount, SISpawnTime, UseBuy, Auto, LegacyPlayerWhere);
+	Format(RunWhere, sizeof(RunWhere),
+		"r.`map` = '%s' AND r.`ruleset_key` = '%s' AND r.`ruleset_version` = '%s' AND r.`timing_profile` = '%s' "
+		... "AND r.`difficulty_type` = '%s' AND r.`difficulty` = %i AND r.`survivor_count` = %i AND r.`si_count` = %i "
+		... "AND r.`si_spawn_time` = %i AND r.`usebuy` = %i AND r.`auto` = %i AND r.`record_policy` = %i "
+		... "AND r.`completed` = 1 AND r.`valid` = 1 AND r.`source` <> 'legacy_timedmap_runs'%s",
+		EscMap, EscRuleset, EscVersion, EscTiming, EscDifficulty, Difficulty, PlayerCount, SICount, SISpawnTime, UseBuy, Auto,
+		MAP_RECORD_POLICY_LEADERBOARD, RunExclude);
+
+	strcopy(Direction, sizeof(Direction), StrEqual(TimingProfile, "survival", false) ? "DESC" : "ASC");
+	Format(Query, MaxLength,
+		"SELECT record_bests.`best_duration_ms` / 1000.0 AS `time` FROM ("
+		... "SELECT l.`best_duration_ms` FROM `%slegacy_map_bests` l WHERE %s UNION ALL "
+		... "SELECT r.`duration_ms` AS `best_duration_ms` FROM `%smap_runs` r%s WHERE %s"
+		... ") record_bests ORDER BY record_bests.`best_duration_ms` %s LIMIT 1",
+		DbPrefix, LegacyWhere, DbPrefix, RunPlayerJoin, RunWhere, Direction);
+	return true;
 }
 
 stock MapRecords_RecordRun(const String:RunID[], const String:MapName[], GamemodeID, Float:TotalTime, SurvivorCount, InfectedCount, Difficulty, LegacyMode, bool:Completed)

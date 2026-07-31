@@ -10,7 +10,7 @@
 #include <sourcemod>
 
 #define PLUGIN_NAME                   "Anne CVar Shield"
-#define PLUGIN_VERSION                "2.2.0"
+#define PLUGIN_VERSION                "2.3.0"
 
 #define PROTECTED_COUNT               20
 #define INDEX_SI_LIMIT                0
@@ -23,6 +23,20 @@
 #define AUTHORIZE_WINDOW              0.35
 #define CAPTURE_DELAY                 1.0
 #define ENFORCE_DELAY                 0.05
+
+#define GUARD_BURST_STAGE_ENFORCE     0
+#define GUARD_BURST_STAGE_FAST        1
+#define GUARD_BURST_STAGE_NORMAL      2
+#define GUARD_BURST_STAGE_FINAL       3
+#define GUARD_BURST_STAGE_COUNT       4
+
+static const float g_fGuardBurstDelays[GUARD_BURST_STAGE_COUNT] =
+{
+    ENFORCE_DELAY,
+    0.2,
+    1.0,
+    3.0
+};
 
 static const char g_sProtectedCvars[PROTECTED_COUNT][] =
 {
@@ -66,7 +80,12 @@ int g_iAuthorizedValue[PROTECTED_COUNT];
 float g_fAuthorizedUntil[PROTECTED_COUNT];
 
 Handle g_hCaptureTimer;
-Handle g_hEnforceTimer;
+Handle g_hGuardBurstTimer;
+
+int g_iGuardBurstGeneration;
+int g_iGuardBurstNextStage = GUARD_BURST_STAGE_COUNT;
+
+float g_fGuardBurstStartedAt;
 
 public Plugin myinfo =
 {
@@ -135,11 +154,18 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    CancelGuardBurst();
     ClearAuthorizationWindows();
     BindConVars();
     BindGameModeCvar();
     StartGuardBurst();
     ScheduleCapture(3.0);
+}
+
+public void OnMapEnd()
+{
+    ClearTimer(g_hCaptureTimer);
+    CancelGuardBurst();
 }
 
 public void OnConfigsExecuted()
@@ -151,7 +177,7 @@ public void OnConfigsExecuted()
 public void OnPluginEnd()
 {
     ClearTimer(g_hCaptureTimer);
-    ClearTimer(g_hEnforceTimer);
+    CancelGuardBurst();
 }
 
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -258,7 +284,10 @@ public void OnProtectedCvarChanged(ConVar convar, const char[] oldValue, const c
 public void OnControlCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     if (!IsShieldEnabled())
+    {
+        CancelGuardBurst();
         return;
+    }
 
     NormalizeAllClassLimitTargets();
     StartGuardBurst();
@@ -283,12 +312,17 @@ public Action Timer_CaptureMissing(Handle timer, any data)
     return Plugin_Stop;
 }
 
-public Action Timer_Enforce(Handle timer, any data)
+public Action Timer_GuardBurst(Handle timer, any generation)
 {
-    if (timer == g_hEnforceTimer)
-        g_hEnforceTimer = null;
+    if (timer != g_hGuardBurstTimer || generation != g_iGuardBurstGeneration)
+        return Plugin_Stop;
+
+    g_hGuardBurstTimer = null;
 
     EnforceTargets();
+
+    g_iGuardBurstNextStage++;
+    ScheduleNextGuardBurstCheck(generation);
     return Plugin_Stop;
 }
 
@@ -445,9 +479,7 @@ static void SetTarget(int index, int value, const char[] reason)
 static void StartGuardBurst()
 {
     EnforceTargets();
-    CreateTimer(0.2, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(1.0, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(3.0, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
+    BeginGuardBurst(GUARD_BURST_STAGE_FAST);
 }
 
 static void EnforceTargets()
@@ -588,18 +620,48 @@ static void ScheduleCapture(float delay)
     g_hCaptureTimer = CreateTimer(delay, Timer_CaptureMissing, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-static void ScheduleEnforce(float delay)
+static void BeginGuardBurst(int firstStage)
 {
-    ClearTimer(g_hEnforceTimer);
-    g_hEnforceTimer = CreateTimer(delay, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
+    CancelGuardBurst();
+
+    g_fGuardBurstStartedAt = GetEngineTime();
+    g_iGuardBurstNextStage = firstStage;
+    ScheduleNextGuardBurstCheck(g_iGuardBurstGeneration);
+}
+
+static void ScheduleNextGuardBurstCheck(int generation)
+{
+    if (generation != g_iGuardBurstGeneration
+        || g_iGuardBurstNextStage >= GUARD_BURST_STAGE_COUNT)
+    {
+        g_iGuardBurstNextStage = GUARD_BURST_STAGE_COUNT;
+        return;
+    }
+
+    float elapsed = GetEngineTime() - g_fGuardBurstStartedAt;
+    float delay = g_fGuardBurstDelays[g_iGuardBurstNextStage] - elapsed;
+    if (delay < 0.01)
+        delay = 0.01;
+
+    g_hGuardBurstTimer = CreateTimer(
+        delay,
+        Timer_GuardBurst,
+        generation,
+        TIMER_FLAG_NO_MAPCHANGE
+    );
+}
+
+static void CancelGuardBurst()
+{
+    g_iGuardBurstGeneration++;
+    ClearTimer(g_hGuardBurstTimer);
+    g_iGuardBurstNextStage = GUARD_BURST_STAGE_COUNT;
+    g_fGuardBurstStartedAt = 0.0;
 }
 
 static void ScheduleEnforceBurst()
 {
-    ScheduleEnforce(ENFORCE_DELAY);
-    CreateTimer(0.2, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(1.0, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(3.0, Timer_Enforce, _, TIMER_FLAG_NO_MAPCHANGE);
+    BeginGuardBurst(GUARD_BURST_STAGE_ENFORCE);
 }
 
 static int FindProtectedIndex(ConVar convar)
@@ -653,8 +715,11 @@ static void ClearTimer(Handle &timer)
     if (timer == null)
         return;
 
-    KillTimer(timer);
+    Handle oldTimer = timer;
     timer = null;
+
+    if (IsValidHandle(oldTimer))
+        KillTimer(oldTimer);
 }
 
 static void ShieldLog(const char[] format, any ...)

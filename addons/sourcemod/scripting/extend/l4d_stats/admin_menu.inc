@@ -59,21 +59,21 @@ public void OnLibraryAdded(const char[] name)
 public ClearRankCategoryHandler(Handle:topmenu, TopMenuAction:action, TopMenuObject:object_id, client, String:buffer[], maxlength)
 {
 	if (action == TopMenuAction_DisplayOption)
-		Format(buffer, maxlength, "玩家排名系统");
+		StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminCategory");
 	else if (action == TopMenuAction_DisplayTitle)
-		Format(buffer, maxlength, "玩家排名系统");
+		StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminCategory");
 }
 
 public Action:Menu_CreateClearMenu(client, args)
 {
 	new Handle:menu = CreateMenu(Menu_CreateClearMenuHandler);
 
-	SetMenuTitle(menu, "清除:");
+	StatsSetMenuTitle(menu, client, "L4DStats_AdminClearTitle");
 	SetMenuExitBackButton(menu, true);
 	SetMenuExitButton(menu, true);
 
-	AddMenuItem(menu, "cps", "清除正在游玩玩家的记录");
-	AddMenuItem(menu, "ctm", "清除已记录的地图时间数据");
+	StatsAddMenuItem(menu, "cps", client, "L4DStats_AdminClearCurrentPlayers");
+	StatsAddMenuItem(menu, "ctm", client, "L4DStats_AdminClearMapTimes");
 
 	DisplayMenu(menu, client, 30);
 
@@ -114,15 +114,15 @@ public Action:Menu_CreateClearTMMenu(client, args)
 {
 	new Handle:menu = CreateMenu(Menu_CreateClearTMMenuHandler);
 
-	SetMenuTitle(menu, "清除已记录的地图:");
+	StatsSetMenuTitle(menu, client, "L4DStats_AdminClearRecordedMapsTitle");
 	SetMenuExitBackButton(menu, true);
 	SetMenuExitButton(menu, true);
 
-	AddMenuItem(menu, "ctma",  "所有");
-	AddMenuItem(menu, "ctmc",  "战役");
-	AddMenuItem(menu, "ctmsu", "生存");
-	AddMenuItem(menu, "ctmr",  "写实");
-	AddMenuItem(menu, "ctmm",  "突变");
+	StatsAddMenuItem(menu, "ctma", client, "L4DStats_All");
+	StatsAddMenuItem(menu, "ctmc", client, "L4DStats_GamemodeCoop");
+	StatsAddMenuItem(menu, "ctmsu", client, "L4DStats_GamemodeSurvival");
+	StatsAddMenuItem(menu, "ctmr", client, "L4DStats_GamemodeRealism");
+	StatsAddMenuItem(menu, "ctmm", client, "L4DStats_GamemodeMutations");
 
 	DisplayMenu(menu, client, 30);
 
@@ -139,23 +139,23 @@ public Menu_CreateClearTMMenuHandler(Handle:menu, MenuAction:action, param1, par
 			{
 				case 0:
 				{
-					DisplayYesNoPanel(param1, "你想清除地图记录数据统计吗?", ClearTMAllPanelHandler);
+					DisplayYesNoPanel(param1, "L4DStats_ConfirmClearAllMapTimes", ClearTMAllPanelHandler);
 				}
 				case 1:
 				{
-					DisplayYesNoPanel(param1, "你想清除所有战役游戏模式的地图记录统计吗?", ClearTMCoopPanelHandler);
+					DisplayYesNoPanel(param1, "L4DStats_ConfirmClearCoopMapTimes", ClearTMCoopPanelHandler);
 				}
 				case 2:
 				{
-					DisplayYesNoPanel(param1, "你想清除所有生存的地图记录统计吗?", ClearTMSurvivalPanelHandler);
+					DisplayYesNoPanel(param1, "L4DStats_ConfirmClearSurvivalMapTimes", ClearTMSurvivalPanelHandler);
 				}
 				case 3:
 				{
-					DisplayYesNoPanel(param1, "你想清除所有写实游戏模式的地图记录统计吗?", ClearTMRealismPanelHandler);
+					DisplayYesNoPanel(param1, "L4DStats_ConfirmClearRealismMapTimes", ClearTMRealismPanelHandler);
 				}
 				case 4:
 				{
-					DisplayYesNoPanel(param1, "你想清除所有突变游戏模式的地图记录统计吗?", ClearTMMutationsPanelHandler);
+					DisplayYesNoPanel(param1, "L4DStats_ConfirmClearMutationMapTimes", ClearTMMutationsPanelHandler);
 				}
 			}
 		}
@@ -181,31 +181,31 @@ public ClearRankTopItemHandler(Handle:topmenu, TopMenuAction:action, TopMenuObje
 	{
 		if (object_id == MenuClearPlayers)
 		{
-			Format(buffer, maxlength, "清除玩家");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminClearPlayers");
 		}
 		else if (object_id == MenuClearMaps)
 		{
-			Format(buffer, maxlength, "清除地图");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminClearMaps");
 		}
 		else if (object_id == MenuClearAll)
 		{
-			Format(buffer, maxlength, "清除所有");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminClearAll");
 		}
 		else if (object_id == MenuClearTimedMaps)
 		{
-			Format(buffer, maxlength, "清除已经记录的时间");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminClearRecordedTimes");
 		}
 		else if (object_id == MenuRemoveCustomMaps)
 		{
-			Format(buffer, maxlength, "移除三方地图统计");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminRemoveCustomMaps");
 		}
 		else if (object_id == MenuCleanPlayers)
 		{
-			Format(buffer, maxlength, "清除玩家");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_AdminClearPlayers");
 		}
 		else if (object_id == MenuClear)
 		{
-			Format(buffer, maxlength, "更多");
+			StatsFormatPhrase(client, buffer, maxlength, "L4DStats_More");
 		}
 	}
 
@@ -214,27 +214,27 @@ public ClearRankTopItemHandler(Handle:topmenu, TopMenuAction:action, TopMenuObje
 	{
 		if (object_id == MenuClearPlayers)
 		{
-			DisplayYesNoPanel(client, "你真的想清除这个玩家的玩家记录吗?", ClearPlayersPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmClearPlayerStats", ClearPlayersPanelHandler);
 		}
 		else if (object_id == MenuClearMaps)
 		{
-			DisplayYesNoPanel(client, "你真的想清除这个玩家的所有地图的统计记录吗?", ClearMapsPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmClearPlayerMapStats", ClearMapsPanelHandler);
 		}
 		else if (object_id == MenuClearAll)
 		{
-			DisplayYesNoPanel(client, "你真的想清除所有玩家的统计记录吗?", ClearAllPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmClearAllStats", ClearAllPanelHandler);
 		}
 		else if (object_id == MenuClearTimedMaps)
 		{
-			DisplayYesNoPanel(client, "你真的想清除所有玩家的地图纪律吗?", ClearTMAllPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmClearAllMapTimes", ClearTMAllPanelHandler);
 		}
 		else if (object_id == MenuRemoveCustomMaps)
 		{
-			DisplayYesNoPanel(client, "你真的想去除这张三方地图的统计吗?", RemoveCustomMapsPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmRemoveCustomMaps", RemoveCustomMapsPanelHandler);
 		}
 		else if (object_id == MenuCleanPlayers)
 		{
-			DisplayYesNoPanel(client, "你真的想清除这名玩家的游玩记录吗?", CleanPlayersPanelHandler);
+			DisplayYesNoPanel(client, "L4DStats_ConfirmCleanInactivePlayers", CleanPlayersPanelHandler);
 		}
 		else if (object_id == MenuClear)
 		{

@@ -18,14 +18,14 @@ static bool IsSupportClassInt(int zc)
 
 bool IsSupportGateClassInt(int zc)
 {
-    return zc == view_as<int>(SI_Smoker)
-        || zc == view_as<int>(SI_Boomer)
+    return zc == view_as<int>(SI_Boomer)
         || zc == view_as<int>(SI_Spitter);
 }
 
 static bool IsPriorityUnlockClassInt(int zc)
 {
-    return zc == view_as<int>(SI_Hunter)
+    return zc == view_as<int>(SI_Smoker)
+        || zc == view_as<int>(SI_Hunter)
         || zc == view_as<int>(SI_Jockey)
         || zc == view_as<int>(SI_Charger);
 }
@@ -51,7 +51,8 @@ static int CountKillersQueued()
 
 static int CountPriorityUnlockersAlive()
 {
-    return gST.siAlive[view_as<int>(SI_Hunter)-1]
+    return gST.siAlive[view_as<int>(SI_Smoker)-1]
+         + gST.siAlive[view_as<int>(SI_Hunter)-1]
          + gST.siAlive[view_as<int>(SI_Jockey)-1]
          + gST.siAlive[view_as<int>(SI_Charger)-1];
 }
@@ -68,7 +69,7 @@ static int CountPriorityUnlockersQueued()
     return total;
 }
 
-static int GetSupportUnlockNeed()
+int GetSupportUnlockNeed()
 {
     int req = gCV.iSupportUnlockKillers;
     if (req == 0)
@@ -265,6 +266,7 @@ static int PickScarceClassImpl(bool relaxCD)
 
         // 稀缺度：alive / (alive + remain)，越小越稀缺
         float ratio = float(alive) / float(capTotal);
+        ratio = Tactical_AdjustQueueScarcity(zc, ratio);
 
         // 刷新开头给杀手类一点优先（小幅）
         if (gST.lastSpawnSecs < SUPPORT_SPAWN_DELAY_SECS && IsKillerClassInt(zc))
@@ -282,9 +284,10 @@ static int PickScarceClassImpl(bool relaxCD)
 // -------------------------
 // 队列维护 & 选类规则（修复版）
 // -------------------------
-void MaintainSpawnQueueOnce()
+void MaintainSpawnQueueOnce(bool refreshCaps = true)
 {
-    RecalcSiCapFromAlive(false);  // 入队前刷新“剩余额度”
+    if (refreshCaps)
+        RecalcSiCapFromAlive(false);
     if (SpawnQueue_Length() >= gCV.iSiLimit) return;
 
     int zc = 0;
@@ -384,6 +387,25 @@ void MaintainSpawnQueueOnce()
     }
 }
 
+void FillSpawnQueueToPendingBudget(bool refreshCaps = true)
+{
+    if (gST.siQueueCount <= 0 || SpawnQueue_Length() >= gST.siQueueCount)
+        return;
+
+    // 一批补队列只扫描一次玩家状态；后续选类直接使用这份活体/职业上限快照。
+    if (refreshCaps)
+        RecalcSiCapFromAlive(false);
+
+    int guard = gCV.iSiLimit + SI_COUNT;
+    while (SpawnQueue_Length() < gST.siQueueCount && guard-- > 0)
+    {
+        int before = SpawnQueue_Length();
+        MaintainSpawnQueueOnce(false);
+        if (SpawnQueue_Length() == before)
+            break;
+    }
+}
+
 // =========================
 // SI 选择 / 限制
 // =========================
@@ -460,6 +482,7 @@ static bool CanQueueClass(int zc)
     if (capTotal <= 0)
         return false;
 
-    return (gST.siAlive[idx] + reserved + CountQueuedOfClass(zc)) < capTotal
-        && (gST.siSpawnedThisWave[idx] + CountQueuedOfClass(zc)) < capTotal;
+    int queued = CountQueuedOfClass(zc);
+    return (gST.siAlive[idx] + reserved + queued) < capTotal
+        && (gST.siSpawnedThisWave[idx] + queued) < capTotal;
 }

@@ -9,30 +9,22 @@
 
 public StatsPrintToChatTeam(Team, const String:Message[], any:...)
 {
-	new String:FormattedMessage[MAX_MESSAGE_WIDTH];
-	VFormat(FormattedMessage, sizeof(FormattedMessage), Message, 3);
-
 	new AnnounceToTeam = GetConVarInt(cvar_AnnounceToTeam);
-
-	if (Team > 0 && AnnounceToTeam)
+	new maxplayers = MaxClients;
+	for (new i = 1; i <= maxplayers; i++)
 	{
-		new maxplayers = MaxClients;
-		new ClientTeam;
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
 
-		for (new i = 1; i <= maxplayers; i++)
-		{
-			if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
-			{
-				ClientTeam = GetClientTeam(i);
-				if (ClientTeam == Team || (ClientTeam == TEAM_SPECTATORS && AnnounceToTeam == 2))
-				{
-					StatsPrintToChatPreFormatted(i, FormattedMessage);
-				}
-			}
-		}
+		new ClientTeam = GetClientTeam(i);
+		if (Team > 0 && AnnounceToTeam && ClientTeam != Team && (ClientTeam != TEAM_SPECTATORS || AnnounceToTeam != 2))
+			continue;
+
+		new String:FormattedMessage[MAX_MESSAGE_WIDTH];
+		SetGlobalTransTarget(i);
+		VFormat(FormattedMessage, sizeof(FormattedMessage), "%t", 2);
+		StatsPrintToChatRaw(i, FormattedMessage);
 	}
-	else
-		StatsPrintToChatAllPreFormatted(FormattedMessage);
 }
 
 // Debugging...
@@ -240,7 +232,7 @@ BuildMapTimingRunPlayerNames(String:Names[], MaxLength)
 		}
 		else
 		{
-			Format(Buffer, sizeof(Buffer), "%s、%s", Names, ClientName);
+			Format(Buffer, sizeof(Buffer), "%s, %s", Names, ClientName);
 			if (strlen(Buffer) < MaxLength)
 			{
 				strcopy(Names, MaxLength, Buffer);
@@ -253,18 +245,18 @@ BuildMapTimingRunPlayerNames(String:Names[], MaxLength)
 	{
 		if (Names[0] != '\0')
 		{
-			Format(Buffer, sizeof(Buffer), "%s 等%d人", Names, total);
+			Format(Buffer, sizeof(Buffer), "%s ... (%d)", Names, total);
 			if (strlen(Buffer) < MaxLength)
 				strcopy(Names, MaxLength, Buffer);
 			else
-				Format(Names, MaxLength, "队伍%d人", total);
+				Format(Names, MaxLength, "Team (%d)", total);
 		}
 		else
-			Format(Names, MaxLength, "队伍%d人", total);
+			Format(Names, MaxLength, "Team (%d)", total);
 	}
 	else if (Names[0] == '\0')
 	{
-		strcopy(Names, MaxLength, "本次队伍");
+		strcopy(Names, MaxLength, "Team");
 	}
 }
 
@@ -284,7 +276,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	{
 		if (GetConVarInt(cvar_AnnounceMode))
 		{
-			StatsPrintToChatAll("此次结果因修改难度或开启高级人机或使用管理员功能导致 {green}无效 {default}，不记录这张地图游戏时间!");
+			StatsPrintToChatAll("L4DStats_MapTimeInvalidSettings");
 		}
 		MapTimingStartTime = -1.0;
 		MapTimingBlocked = true;
@@ -294,7 +286,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	{
 		if (GetConVarInt(cvar_AnnounceMode))
 		{
-			StatsPrintToChatAll("此次结果因关闭tank连跳导致 {green}无效 {default}，不记录这张地图游戏时间!");
+			StatsPrintToChatAll("L4DStats_MapTimeInvalidBunnyHop");
 		}
 		MapTimingStartTime = -1.0;
 		MapTimingBlocked = true;
@@ -304,7 +296,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	ConVar multiplayer = FindConVar("l4d_multislots_survivors_manager_enable");
 	if(!HistoryOnly && mode > 0 && (multiplayer == null || multiplayer.IntValue == 1 || GetConVarInt(cvar_SurvivorLimit) > 4))
 	{
-		StatsPrintToChatAll("启用了多人运动模式，不记录这张地图游戏时间!");
+		StatsPrintToChatAll("L4DStats_MapTimeInvalidMultiplayerMode");
 		MapTimingStartTime = -1.0;
 		MapTimingBlocked = true;
 		return false;
@@ -313,7 +305,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	new Float:TotalTime = GetEngineTime() - MapTimingStartTime;
 	if(!HistoryOnly && TotalTime < 30.0)
 	{
-		StatsPrintToChatAll("记录时间小于30s，数据应该不对，没有分数奖励!(PS: 30s能完成的图算啥图)");
+		StatsPrintToChatAll("L4DStats_MapTimeTooShortNoReward");
 		return false;
 	}
 
@@ -322,7 +314,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 
 	new Handle:dp = INVALID_HANDLE;
 	new ClientTeam, enabled, maxplayers = MaxClients;
-	decl String:ClientID[MAX_LINE_WIDTH], String:MapName[MAX_LINE_WIDTH], String:query[512];
+	decl String:ClientID[MAX_LINE_WIDTH], String:MapName[MAX_LINE_WIDTH], String:query[4096];
 
 	GetCurrentMap(MapName, sizeof(MapName));
 
@@ -385,7 +377,6 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	new StatsGamemodeID = Stats_GetCurrentStatsGamemodeID();
 	if(mode > 0)
 	{
-		GetThisModeBestTime(g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY));	
 		PlayerCounter = GetConVarInt(cvar_SurvivorLimit);
 		SurvivorCounter = PlayerCounter;
 	}
@@ -396,6 +387,8 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	decl String:RunPlayers[MAP_RECORD_PLAYER_NAMES_MAX];
 	BuildMapTimingRunPlayerNames(RunPlayers, sizeof(RunPlayers));
 	MapRecords_RecordRun(RunID, MapName, CurrentGamemodeID, TotalTime, SurvivorCounter, InfectedCounter, GameDifficulty, mode, Completed);
+	if (mode > 0)
+		GetThisModeBestTime(g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY), RunID);
 
 	if (!WriteLegacy || MapRecords_GetPolicy() != MAP_RECORD_POLICY_LEADERBOARD)
 	{
@@ -404,7 +397,14 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 		return true;
 	}
 
-	MaybeAnnounceAnneNoBuyFastest(MapName, TotalTime, PlayerCounter, GameDifficulty, mode, RunPlayers);
+	MaybeAnnounceAnneNoBuyFastest(MapName, TotalTime, PlayerCounter, GameDifficulty, mode, RunPlayers, RunID);
+
+	new SICount = GetAnneInfectedNumber();
+	new SISpawnTime = GetAnneSISpawnTime();
+	new UseBuy = g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY);
+	new Auto = IsAutoSpawnTime();
+	decl String:AnneVersion[64];
+	strcopy(AnneVersion, sizeof(AnneVersion), GetAnneVersion());
 
 	for (i = 1; i <= maxplayers; i++)
 	{
@@ -420,26 +420,37 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 				{
 					if (enabled)
 						{
-							dp = CreateDataPack();
 							MapTimingRuns_RecordParticipant(RunID, MapName, StatsGamemodeID, ClientID, TotalTime, PlayerCounter, GameDifficulty, CurrentMutation, mode);
 
+							new bool:UsingV2 = MapRecords_BuildBestTimeQuery(query, sizeof(query), MapName, GameDifficulty, PlayerCounter, ClientID, RunID);
+							if (!UsingV2)
+							{
+								if(mode > 0)
+								{
+									Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i AND players = %i ORDER BY time %s LIMIT 1", DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, ClientID, SICount, SISpawnTime, AnneVersion, mode, UseBuy, Auto, PlayerCounter, CurrentGamemodeID == GAMEMODE_SURVIVAL ? "DESC" : "ASC");
+								}
+								else
+								{
+									Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND mode = %i AND players = %i ORDER BY time %s LIMIT 1", DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, ClientID, mode, PlayerCounter, CurrentGamemodeID == GAMEMODE_SURVIVAL ? "DESC" : "ASC");
+								}
+							}
+
+							dp = CreateDataPack();
 							WritePackString(dp, MapName);
 							WritePackCell(dp, StatsGamemodeID);
 							WritePackString(dp, ClientID);
 							WritePackFloat(dp, TotalTime);
 							WritePackCell(dp, i);
 							WritePackCell(dp, PlayerCounter);
-						WritePackCell(dp, GameDifficulty);
-						WritePackString(dp, CurrentMutation);
-
-						if(mode > 0)
-						{
-							Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i AND players = %i", DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, ClientID, GetAnneInfectedNumber(), GetAnneSISpawnTime(), GetAnneVersion(), mode, g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY), IsAutoSpawnTime(), PlayerCounter);
-						}
-						else
-						{
-							Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND mode = %i", DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, ClientID, mode);
-						}
+							WritePackCell(dp, GameDifficulty);
+							WritePackString(dp, CurrentMutation);
+							WritePackCell(dp, mode);
+							WritePackCell(dp, SICount);
+							WritePackCell(dp, SISpawnTime);
+							WritePackString(dp, AnneVersion);
+							WritePackCell(dp, UseBuy);
+							WritePackCell(dp, Auto);
+							WritePackCell(dp, UsingV2 ? 1 : 0);
 						SQL_TQuery(db, UpdateMapTimingStat, query, dp);
 					}
 				}
@@ -451,10 +462,10 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 	return true;
 }
 
-GetThisModeBestTime(int UseBuy=0)
+GetThisModeBestTime(int UseBuy=0, const String:ExcludeRunID[]="")
 {
 
-	decl String:MapName[MAX_LINE_WIDTH], String:query[512];
+	decl String:MapName[MAX_LINE_WIDTH], String:query[4096];
 
 	GetCurrentMap(MapName, sizeof(MapName));
 
@@ -463,14 +474,17 @@ GetThisModeBestTime(int UseBuy=0)
 	int mode = GetMapTimingMode();
 	if (mode <= 0)
 		mode = 1;
-	Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s'  AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i AND players = %i ORDER BY time LIMIT 1", \
-			DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), GetAnneSISpawnTime(), \
-			GetAnneVersion(), mode, UseBuy, IsAutoSpawnTime(), GetConVarInt(cvar_SurvivorLimit));
+	if (!MapRecords_BuildBestTimeQuery(query, sizeof(query), MapName, GameDifficulty, GetConVarInt(cvar_SurvivorLimit), "", ExcludeRunID))
+	{
+		Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i AND players = %i ORDER BY time %s LIMIT 1",
+			DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), GetAnneSISpawnTime(),
+			GetAnneVersion(), mode, UseBuy, IsAutoSpawnTime(), GetConVarInt(cvar_SurvivorLimit), CurrentGamemodeID == GAMEMODE_SURVIVAL ? "DESC" : "ASC");
+	}
 	LogMessage("GetFastTimequery: %s", query);
 	SQL_TQuery(db, GetFastTime, query);
 }
 
-MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCounter, GameDifficulty, Mode, const String:RunPlayers[])
+MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCounter, GameDifficulty, Mode, const String:RunPlayers[], const String:RunID[])
 {
 	if (g_bMapTimingGlobalBroadcastSent || db == INVALID_HANDLE)
 		return;
@@ -483,9 +497,12 @@ MaybeAnnounceAnneNoBuyFastest(const String:MapName[], Float:TotalTime, PlayerCou
 		return;
 
 	new StatsGamemodeID = Stats_GetCurrentStatsGamemodeID();
-	decl String:query[512];
-	Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = 0 AND auto = %i AND players = %i ORDER BY time LIMIT 1",
-		DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), SISpawnTime, GetAnneVersion(), Mode, IsAutoSpawnTime(), PlayerCounter);
+	decl String:query[4096];
+	if (!MapRecords_BuildBestTimeQuery(query, sizeof(query), MapName, GameDifficulty, PlayerCounter, "", RunID))
+	{
+		Format(query, sizeof(query), "SELECT time FROM %stimedmaps WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = 0 AND auto = %i AND players = %i ORDER BY time ASC LIMIT 1",
+			DbPrefix, MapName, StatsGamemodeID, GameDifficulty, CurrentMutation, GetAnneInfectedNumber(), SISpawnTime, GetAnneVersion(), Mode, IsAutoSpawnTime(), PlayerCounter);
+	}
 
 	new Handle:dp = CreateDataPack();
 	WritePackString(dp, MapName);
@@ -566,30 +583,43 @@ BroadcastMapRecordLocally(const String:MapName[], const String:RunPlayers[], Mod
 		Format(Summary, sizeof(Summary), "%T", "L4DStats_MapRecordSummary", i, TimeLabel, ModeLabel, MapName);
 		Format(Details, sizeof(Details), "%T", "L4DStats_MapRecordDetails", i, RunPlayers, InfectedNumber, SISpawnTime, DifficultyLabel);
 
-		StatsPrintToChatPreFormatted(i, Summary);
-		StatsPrintToChatPreFormatted(i, Details);
+		StatsPrintToChatRaw(i, Summary);
+		StatsPrintToChatRaw(i, Details);
 	}
 }
 
 public GetFastTime(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
+	if (hndl == INVALID_HANDLE)
+	{
+		LogError("[l4d_stats] fastest map record query failed: %s", error);
+		return;
+	}
+
 	new Mode = GetConVarInt(cvar_AnnounceMode);
 	if (SQL_GetRowCount(hndl) > 0)
 	{
 		SQL_FetchRow(hndl);
 		FastestTime = SQL_FetchFloat(hndl, 0);
-		char TimeLabel[32];
-		SetTimeLabel(FastestTime, TimeLabel, sizeof(TimeLabel));
 		if (Mode)
 		{
-			StatsPrintToChatAll("当前模式该难度{green} [%s使用B数] {default}最快通关速度为{green} %s {default}." , (g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY))?"":"不", TimeLabel);
+			new bool:UsedBuy = g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY);
+			for (new i = 1; i <= MaxClients; i++)
+			{
+				if (!Stats_IsValidHumanClient(i))
+					continue;
+
+				decl String:TimeLabel[32];
+				SetTimeLabel(FastestTime, TimeLabel, sizeof(TimeLabel), i);
+				StatsPrintToChat(i, UsedBuy ? "L4DStats_FastestTimeWithBuy" : "L4DStats_FastestTimeWithoutBuy", TimeLabel);
+			}
 		}
 	}
 		else{
 			if (Mode && !g_bMapTimingNoFastestPromptSent)
 			{
 				g_bMapTimingNoFastestPromptSent = true;
-				StatsPrintToChatAll("你来到无人的荒野，当前模式该难度没有最快纪录，快来挑战一下吧");
+				StatsPrintToChatAll("L4DStats_NoFastestTimeYet");
 			}
 		}
 }
@@ -597,10 +627,9 @@ public GetFastTime(Handle:owner, Handle:hndl, const String:error[], any:dp)
 
 public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	int mode = GetMapTimingMode();
 	ResetPack(dp);
 
-	decl String:MapName[MAX_LINE_WIDTH], String:ClientID[MAX_LINE_WIDTH], String:query[512], String:TimeLabel[32], String:Mutation[MAX_LINE_WIDTH];
+	decl String:MapName[MAX_LINE_WIDTH], String:ClientID[MAX_LINE_WIDTH], String:TimeLabel[32], String:Mutation[MAX_LINE_WIDTH], String:AnneVersion[64];
 	new GamemodeID, Float:TotalTime, Float:OldTime, Client, PlayerCounter, GameDifficulty;
 	ReadPackString(dp, MapName, sizeof(MapName));
 	GamemodeID = ReadPackCell(dp);
@@ -610,6 +639,13 @@ public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:
 	PlayerCounter = ReadPackCell(dp);
 	GameDifficulty = ReadPackCell(dp);
 	ReadPackString(dp, Mutation, sizeof(Mutation));
+	new mode = ReadPackCell(dp);
+	new SICount = ReadPackCell(dp);
+	new SISpawnTime = ReadPackCell(dp);
+	ReadPackString(dp, AnneVersion, sizeof(AnneVersion));
+	new UseBuy = ReadPackCell(dp);
+	new Auto = ReadPackCell(dp);
+	new bool:UsingV2 = ReadPackCell(dp) != 0;
 
 	CloseHandle(dp);
 
@@ -618,56 +654,54 @@ public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:
 		return;
 
 	new Mode = GetConVarInt(cvar_AnnounceMode);
-
-	if (SQL_GetRowCount(hndl) > 0)
+	new bool:HasOldTime = false;
+	new bool:Improved = false;
+	if (hndl == INVALID_HANDLE)
+	{
+		LogError("[l4d_stats] %s map record comparison failed: %s", UsingV2 ? "v2" : "legacy", error);
+	}
+	else if (SQL_GetRowCount(hndl) > 0)
 	{
 		SQL_FetchRow(hndl);
 		OldTime = SQL_FetchFloat(hndl, 0);
+		HasOldTime = true;
+		Improved = GamemodeID == GAMEMODE_SURVIVAL ? TotalTime > OldTime : TotalTime < OldTime;
+	}
+	else
+	{
+		Improved = true;
+	}
+
+	if (HasOldTime)
+	{
 		if(TotalTime < 30.0)
 		{
-			StatsPrintToChat(Client, "记录时间小于30s，数据应该不对，此次记录不进行记录!");
+			StatsPrintToChat(Client, "L4DStats_MapTimeTooShortNotRecorded");
 			return;
 		}
 
-		if ((CurrentGamemodeID != GAMEMODE_SURVIVAL && OldTime <= TotalTime) || (CurrentGamemodeID == GAMEMODE_SURVIVAL && OldTime >= TotalTime))
+		if (!Improved)
 		{
 			if (Mode)
 			{
-				SetTimeLabel(OldTime, TimeLabel, sizeof(TimeLabel));
+					SetTimeLabel(OldTime, TimeLabel, sizeof(TimeLabel), Client);
 				if(mode > 0)
 				{
-					StatsPrintToChat(Client, "下次继续努力哦，这张图 {green}Anne%s {default}版本该难度的最快完成时间 {green}%s {default} 并没有提升!", GetAnneVersion(), TimeLabel);
+					StatsPrintToChat(Client, "L4DStats_MapRecordNotImprovedAnne", AnneVersion, TimeLabel);
 				}
 				else
 				{
-					StatsPrintToChat(Client, "下次继续努力哦，这张图最快完成时间 {green}%s {default} 并没有提升!", TimeLabel);
+					StatsPrintToChat(Client, "L4DStats_MapRecordNotImproved", TimeLabel);
 				}
-			}
-			if(mode > 0)
-			{
-				Format(query, sizeof(query), "UPDATE %stimedmaps SET plays = plays + 1, modified = NOW() WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i", DbPrefix, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, GetAnneInfectedNumber(), GetAnneSISpawnTime(), GetAnneVersion(), mode, g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY), IsAutoSpawnTime());
-			}
-			else
-			{
-				Format(query, sizeof(query), "UPDATE %stimedmaps SET plays = plays + 1, modified = NOW() WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND mode = %i", DbPrefix, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, mode);
 			}
 		}
 		else
 		{
 			if (Mode)
 			{
-				SetTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel));
-				StatsPrintToChat(Client, "牛逼，你刷新了%s这张图 {green}Anne%s {default}版本该难度的最快完成时间，目前是 {green}%s{default}!", FastestTime < TotalTime?"目前":"你", GetAnneVersion(), TimeLabel);
+					SetTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel), Client);
+					StatsPrintToChat(Client, FastestTime < TotalTime ? "L4DStats_MapRecordImprovedCurrent" : "L4DStats_MapRecordImprovedPlayer", AnneVersion, TimeLabel);
 
-			}
-
-			if(mode > 0)
-			{
-				Format(query, sizeof(query), "UPDATE %stimedmaps SET plays = plays + 1, time = %f, players = %i, modified = NOW() WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i", DbPrefix, TotalTime, PlayerCounter, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, GetAnneInfectedNumber(), GetAnneSISpawnTime(), GetAnneVersion(), mode, g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY), IsAutoSpawnTime());
-			}
-			else
-			{
-				Format(query, sizeof(query), "UPDATE %stimedmaps SET plays = plays + 1, time = %f, players = %i, modified = NOW() WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND mode = %i", DbPrefix, TotalTime, PlayerCounter, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, mode);
 			}
 			
 			if (EnableSounds_Maptime_Improve && GetConVarBool(cvar_SoundsEnabled))
@@ -678,26 +712,71 @@ public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:
 	{
 		if (Mode)
 		{
-			SetTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel));
-			StatsPrintToChat(Client, "你花费了 {green}%s {default}来完成这张地图!", TimeLabel);
+				SetTimeLabel(TotalTime, TimeLabel, sizeof(TimeLabel), Client);
+			StatsPrintToChat(Client, "L4DStats_MapCompletionTime", TimeLabel);
 		}
 
-		if(mode > 0)
-		{
-			Format(query, sizeof(query), "INSERT INTO %stimedmaps (map, gamemode, difficulty, mutation, steamid, plays, time, players, sinum, sitime, anneversion, mode, usebuy, auto, modified, created) VALUES ('%s', %i, %i, '%s', '%s', 1, %f, %i, %i, %i, '%s', %i, %i, %i, NOW(), NOW())", DbPrefix, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, TotalTime, PlayerCounter, GetAnneInfectedNumber(), GetAnneSISpawnTime(), GetAnneVersion(), mode, g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_USEBUY), IsAutoSpawnTime());
-		}
-		else
-		{
-			Format(query, sizeof(query), "INSERT INTO %stimedmaps (map, gamemode, difficulty, mutation, steamid, plays, time, players, mode, modified, created) VALUES ('%s', %i, %i, '%s', '%s', 1, %f, %i, %i, NOW(), NOW())", DbPrefix, MapName, GamemodeID, GameDifficulty, Mutation, ClientID, TotalTime, PlayerCounter, mode);
-		}
 	}
 
 	FastestTime = -1.0;
-
-	SendSQLUpdate(query);
+	MapTiming_UpdateLegacyRecord(MapName, GamemodeID, ClientID, TotalTime, PlayerCounter, GameDifficulty, Mutation, mode, SICount, SISpawnTime, AnneVersion, UseBuy, Auto, Improved);
 }
 
-public SetTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize)
+MapTiming_UpdateLegacyRecord(const String:MapName[], GamemodeID, const String:ClientID[], Float:TotalTime, PlayerCounter, GameDifficulty, const String:Mutation[], mode, SICount, SISpawnTime, const String:AnneVersion[], UseBuy, Auto, bool:Improved)
+{
+	decl String:EscMap[512], String:EscClientID[128], String:EscMutation[128], String:EscVersion[128];
+	SQL_EscapeString(db, MapName, EscMap, sizeof(EscMap));
+	SQL_EscapeString(db, ClientID, EscClientID, sizeof(EscClientID));
+	SQL_EscapeString(db, Mutation, EscMutation, sizeof(EscMutation));
+	SQL_EscapeString(db, AnneVersion, EscVersion, sizeof(EscVersion));
+
+	decl String:SetValues[128], String:query[2048], String:insertQuery[2048];
+	if (Improved)
+		Format(SetValues, sizeof(SetValues), "plays = plays + 1, time = %f, players = %i, modified = NOW()", TotalTime, PlayerCounter);
+	else
+		strcopy(SetValues, sizeof(SetValues), "plays = plays + 1, modified = NOW()");
+
+	if (mode > 0)
+	{
+		Format(query, sizeof(query),
+			"UPDATE `%stimedmaps` SET %s WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND sinum = %i AND sitime = %i AND anneversion = '%s' AND mode = %i AND usebuy = %i AND auto = %i AND players = %i",
+			DbPrefix, SetValues, EscMap, GamemodeID, GameDifficulty, EscMutation, EscClientID, SICount, SISpawnTime, EscVersion, mode, UseBuy, Auto, PlayerCounter);
+		Format(insertQuery, sizeof(insertQuery),
+			"INSERT IGNORE INTO `%stimedmaps` (map, gamemode, difficulty, mutation, steamid, plays, time, players, sinum, sitime, anneversion, mode, usebuy, auto, modified, created) VALUES ('%s', %i, %i, '%s', '%s', 1, %f, %i, %i, %i, '%s', %i, %i, %i, NOW(), NOW())",
+			DbPrefix, EscMap, GamemodeID, GameDifficulty, EscMutation, EscClientID, TotalTime, PlayerCounter, SICount, SISpawnTime, EscVersion, mode, UseBuy, Auto);
+	}
+	else
+	{
+		Format(query, sizeof(query),
+			"UPDATE `%stimedmaps` SET %s WHERE map = '%s' AND gamemode = %i AND difficulty = %i AND mutation = '%s' AND steamid = '%s' AND mode = %i AND players = %i",
+			DbPrefix, SetValues, EscMap, GamemodeID, GameDifficulty, EscMutation, EscClientID, mode, PlayerCounter);
+		Format(insertQuery, sizeof(insertQuery),
+			"INSERT IGNORE INTO `%stimedmaps` (map, gamemode, difficulty, mutation, steamid, plays, time, players, mode, modified, created) VALUES ('%s', %i, %i, '%s', '%s', 1, %f, %i, %i, NOW(), NOW())",
+			DbPrefix, EscMap, GamemodeID, GameDifficulty, EscMutation, EscClientID, TotalTime, PlayerCounter, mode);
+	}
+
+	new Handle:writePack = CreateDataPack();
+	WritePackString(writePack, insertQuery);
+	SQL_TQuery(db, SQL_OnLegacyMapTimingUpdated, query, writePack);
+}
+
+public SQL_OnLegacyMapTimingUpdated(Handle:owner, Handle:hndl, const String:error[], any:dp)
+{
+	ResetPack(dp);
+	decl String:insertQuery[2048];
+	ReadPackString(dp, insertQuery, sizeof(insertQuery));
+	CloseHandle(dp);
+
+	if (hndl == INVALID_HANDLE)
+	{
+		LogError("[l4d_stats] legacy timedmaps update failed: %s", error);
+		return;
+	}
+	if (SQL_GetAffectedRows(hndl) == 0)
+		SendSQLUpdate(insertQuery);
+}
+
+public SetTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize, Client)
 {
 	new FlooredSeconds = RoundToFloor(TheSeconds);
 	new FlooredSecondsMod = FlooredSeconds % 60;
@@ -708,11 +787,11 @@ public SetTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize)
 	Minutes = MinutesMod;
 
 	if (Hours > 0)
-		Format(TimeLabel, maxsize, "%i小时 %i分钟 %.1f秒", Hours, Minutes, Seconds);
+		StatsFormatPhrase(Client, TimeLabel, maxsize, "L4DStats_TimeHoursMinutesSeconds", Hours, Minutes, Seconds);
 	else if (Minutes > 0)
-		Format(TimeLabel, maxsize, "%i 分钟 %.1f 秒", Minutes, Seconds);
+		StatsFormatPhrase(Client, TimeLabel, maxsize, "L4DStats_TimeMinutesSeconds", Minutes, Seconds);
 	else
-		Format(TimeLabel, maxsize, "%.1f 秒", Seconds);
+		StatsFormatPhrase(Client, TimeLabel, maxsize, "L4DStats_TimeSeconds", Seconds);
 }
 
 SetMapRecordTimeLabel(Float:TheSeconds, String:TimeLabel[], maxsize)
@@ -743,11 +822,11 @@ public InitializeRankVote(client)
 	{
 		if (client == 0)
 		{
-			PrintToConsole(0, "[RANK] Cannot initiate vote when the plugin is disabled!");
+				StatsPrintToConsolePhrase(0, "L4DStats_RankVotePluginDisabledConsole");
 		}
 		else
 		{
-			StatsPrintToChatPreFormatted2(client, true, "Cannot initiate vote when the plugin is disabled!");
+			StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVotePluginDisabledChat");
 		}
 
 		return;
@@ -758,17 +837,17 @@ public InitializeRankVote(client)
 	{
 		if (client == 0)
 		{
-			PrintToConsole(0, "[RANK] The Rank Vote is not enabled in this gamemode!");
+				StatsPrintToConsolePhrase(0, "L4DStats_RankVoteGamemodeDisabledConsole");
 		}
 		else
 		{
 			if (EngineVersion1 == Engine_Left4Dead)
 			{
-				StatsPrintToChatPreFormatted2(client, true, "The {green}Rank Vote {default}is enabled in {lightgreen}Versus {default}gamemode!");
+				StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVoteVersusOnly");
 			}
 			else
 			{
-				StatsPrintToChatPreFormatted2(client, true, "The {green}Rank Vote {default}is enabled in {lightgreen}Versus{default}, {lightgreen}Realism Versus {default}and {lightgreen}Scavenge {default}gamemodes!");
+				StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVoteCompetitiveModes");
 			}
 		}
 
@@ -783,7 +862,7 @@ public InitializeRankVote(client)
 		}
 		else
 		{
-			PrintToConsole(client, "[RANK] The Rank Vote is already initiated!");
+				StatsPrintToConsolePhrase(client, "L4DStats_RankVoteAlreadyStartedConsole");
 		}
 
 		return;
@@ -796,7 +875,7 @@ public InitializeRankVote(client)
 
 	if (!IsAdmin && client > 0 && GetTrieValue(PlayerRankVoteTrie, ClientID, team))
 	{
-		StatsPrintToChatPreFormatted2(client, true, "You can initiate a {green}Rank Vote {default}only once per map!");
+		StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVoteOncePerMap");
 		return;
 	}
 
@@ -835,11 +914,11 @@ public InitializeRankVote(client)
 		decl String:UserName[MAX_LINE_WIDTH];
 		GetClientName(client, UserName, sizeof(UserName));
 
-		StatsPrintToChatAll2(true, "The {green}Rank Vote {default}was initiated by {olive}%s{default}!", UserName);
+		StatsPrintToChatAll2(true, "L4DStats_RankVoteInitiated", UserName);
 	}
 	else
 	{
-		StatsPrintToChatAllPreFormatted2(true, "The {green}Rank Vote {default}was initiated from Server Console!");
+		StatsPrintToChatAllPreFormatted2(true, "L4DStats_RankVoteInitiatedConsole");
 	}
 }
 
@@ -985,43 +1064,51 @@ bool:GetClientRankAuthString(client, String:auth[], maxlength)
 
 public StatsPrintToChatAll(const String:Message[], any:...)
 {
-	new String:FormattedMessage[MAX_MESSAGE_WIDTH];
-	VFormat(FormattedMessage, sizeof(FormattedMessage), Message, 2);
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
 
-	StatsPrintToChatAllPreFormatted(FormattedMessage);
+		new String:FormattedMessage[MAX_MESSAGE_WIDTH];
+		SetGlobalTransTarget(i);
+		VFormat(FormattedMessage, sizeof(FormattedMessage), "%t", 1);
+		StatsPrintToChatRaw(i, FormattedMessage);
+	}
 }
 
 public StatsPrintToChatAll2(bool:Forced, const String:Message[], any:...)
 {
-	new String:FormattedMessage[MAX_MESSAGE_WIDTH];
-	VFormat(FormattedMessage, sizeof(FormattedMessage), Message, 2);
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
 
-	StatsPrintToChatAllPreFormatted2(Forced, FormattedMessage);
+		new String:FormattedMessage[MAX_MESSAGE_WIDTH];
+		SetGlobalTransTarget(i);
+		VFormat(FormattedMessage, sizeof(FormattedMessage), "%t", 2);
+		StatsPrintToChatRaw2(i, Forced, FormattedMessage);
+	}
 }
 
 public StatsPrintToChatAllPreFormatted(const String:Message[])
 {
-	new maxplayers = MaxClients;
-
-	for (new i = 1; i <= maxplayers; i++)
+	for (new i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
-		{
-			StatsPrintToChatPreFormatted(i, Message);
-		}
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
+
+		StatsPrintToChatPreFormatted(i, Message);
 	}
 }
 
 public StatsPrintToChatAllPreFormatted2(bool:Forced, const String:Message[])
 {
-	new maxplayers = MaxClients;
-
-	for (new i = 1; i <= maxplayers; i++)
+	for (new i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
-		{
-			StatsPrintToChatPreFormatted2(i, Forced, Message);
-		}
+		if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+			continue;
+
+		StatsPrintToChatPreFormatted2(i, Forced, Message);
 	}
 }
 
@@ -1034,9 +1121,10 @@ public StatsPrintToChat(Client, const String:Message[], any:...)
 	}
 
 	new String:FormattedMessage[MAX_MESSAGE_WIDTH];
-	VFormat(FormattedMessage, sizeof(FormattedMessage), Message, 3);
+	SetGlobalTransTarget(Client);
+	VFormat(FormattedMessage, sizeof(FormattedMessage), "%t", 2);
 
-	StatsPrintToChatPreFormatted(Client, FormattedMessage);
+	StatsPrintToChatRaw(Client, FormattedMessage);
 }
 
 public StatsPrintToChat2(Client, bool:Forced, const String:Message[], any:...)
@@ -1048,9 +1136,10 @@ public StatsPrintToChat2(Client, bool:Forced, const String:Message[], any:...)
 	}
 
 	new String:FormattedMessage[MAX_MESSAGE_WIDTH];
-	VFormat(FormattedMessage, sizeof(FormattedMessage), Message, 4);
+	SetGlobalTransTarget(Client);
+	VFormat(FormattedMessage, sizeof(FormattedMessage), "%t", 3);
 
-	StatsPrintToChatPreFormatted2(Client, Forced, FormattedMessage);
+	StatsPrintToChatRaw2(Client, Forced, FormattedMessage);
 }
 
 public StatsPrintToChatPreFormatted(Client, const String:Message[])
@@ -1066,7 +1155,81 @@ public StatsPrintToChatPreFormatted2(Client, bool:Forced, const String:Message[]
 		return;
 	}
 
-	CPrintToChat(Client, "%t", "L4DStats_RankMessage", Message);
+	decl String:FormattedMessage[MAX_MESSAGE_WIDTH];
+	Format(FormattedMessage, sizeof(FormattedMessage), "%T", Message, Client);
+	StatsPrintToChatRaw2(Client, Forced, FormattedMessage);
+}
+
+public StatsPrintToChatRaw(Client, const String:Message[])
+{
+	StatsPrintToChatRaw2(Client, false, Message);
+}
+
+public StatsPrintToChatRaw2(Client, bool:Forced, const String:Message[])
+{
+	if (!Forced && ClientRankMute[Client])
+		return;
+
+	CPrintToChat(Client, "%T", "L4DStats_RankMessage", Client, Message);
+}
+
+stock StatsFormatPhrase(Client, String:Buffer[], MaxLength, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	SetGlobalTransTarget(Client);
+	VFormat(Buffer, MaxLength, "%t", 4);
+}
+
+stock StatsPrintToConsolePhrase(Client, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	decl String:Message[1024];
+	SetGlobalTransTarget(Client > 0 ? Client : LANG_SERVER);
+	VFormat(Message, sizeof(Message), "%t", 2);
+	PrintToConsole(Client, "[RANK] %s", Message);
+}
+
+stock StatsSetMenuTitle(Handle:MenuHandle, Client, const String:Phrase[])
+{
+	decl String:Text[MAX_LINE_WIDTH];
+	StatsFormatPhrase(Client, Text, sizeof(Text), Phrase);
+	SetMenuTitle(MenuHandle, Text);
+}
+
+stock StatsAddMenuItem(Handle:MenuHandle, const String:Info[], Client, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	decl String:Text[MAX_LINE_WIDTH];
+	SetGlobalTransTarget(Client);
+	VFormat(Text, sizeof(Text), "%t", 4);
+	AddMenuItem(MenuHandle, Info, Text);
+}
+
+stock StatsSetPanelTitle(Handle:PanelHandle, Client, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	decl String:Text[MAX_LINE_WIDTH];
+	SetGlobalTransTarget(Client);
+	VFormat(Text, sizeof(Text), "%t", 3);
+	SetPanelTitle(PanelHandle, Text);
+}
+
+stock StatsDrawPanelText(Handle:PanelHandle, Client, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	decl String:Text[MAX_LINE_WIDTH];
+	SetGlobalTransTarget(Client);
+	VFormat(Text, sizeof(Text), "%t", 3);
+	DrawPanelText(PanelHandle, Text);
+}
+
+stock StatsDrawPanelItem(Handle:PanelHandle, Client, const String:Phrase[], any:...)
+{
+	#pragma unused Phrase
+	decl String:Text[MAX_LINE_WIDTH];
+	SetGlobalTransTarget(Client);
+	VFormat(Text, sizeof(Text), "%t", 3);
+	DrawPanelItem(PanelHandle, Text);
 }
 
 stock StatsGetClientTeam(client)
@@ -1084,7 +1247,7 @@ stock StatsGetClientTeam(client)
 	return TEAM_UNDEFINED;
 }
 
-bool:UpdateServerSettings(Client, const String:Key[], const String:Value[], const String:Desc[])
+bool:UpdateServerSettings(Client, const String:Key[], const String:Value[])
 {
 	new Handle:statement = INVALID_HANDLE;
 	decl String:error[1024], String:query[2048];
@@ -1092,7 +1255,7 @@ bool:UpdateServerSettings(Client, const String:Key[], const String:Value[], cons
 	// Add a row if it does not previously exist
 	if (!DoFastQuery(Client, "INSERT IGNORE INTO %sserver_settings SET sname = '%s', svalue = ''", DbPrefix, Key))
 	{
-		PrintToConsole(Client, "[RANK] %s: Setting a new MOTD value failure!", Desc);
+		StatsPrintToConsolePhrase(Client, "L4DStats_MotdCreateFailed");
 		return false;
 	}
 
@@ -1102,7 +1265,7 @@ bool:UpdateServerSettings(Client, const String:Key[], const String:Value[], cons
 
 	if (statement == INVALID_HANDLE)
 	{
-		PrintToConsole(Client, "[RANK] %s: Update failed! (Reason: Cannot create SQL statement)");
+		StatsPrintToConsolePhrase(Client, "L4DStats_MotdPrepareFailed");
 		return false;
 	}
 
@@ -1113,20 +1276,20 @@ bool:UpdateServerSettings(Client, const String:Key[], const String:Value[], cons
 	{
 		if (SQL_GetError(db, error, sizeof(error)))
 		{
-			PrintToConsole(Client, "[RANK] %s: Update failed! (Error = \"%s\")", Desc, error);
-			LogError("%s: Update failed! (Error = \"%s\")", Desc, error);
+			StatsPrintToConsolePhrase(Client, "L4DStats_MotdUpdateError", error);
+			LogError("MOTD update failed! (Error = \"%s\")", error);
 		}
 		else
 		{
-			PrintToConsole(Client, "[RANK] %s: Update failed!", Desc);
-			LogError("%s: Update failed!", Desc);
+			StatsPrintToConsolePhrase(Client, "L4DStats_MotdUpdateFailed");
+			LogError("MOTD update failed!");
 		}
 		
 		retval = false;
 	}
 	else
 	{
-		PrintToConsole(Client, "[RANK] %s: Update successful!", Desc);
+		StatsPrintToConsolePhrase(Client, "L4DStats_MotdUpdateSuccess");
 
 		if (StrEqual(Key, "motdmessage", false))
 		{
@@ -1160,7 +1323,7 @@ ShowMOTD(client, bool:forced=false)
 		return;
 	}
 
-	StatsPrintToChat2(client, forced, "{olive}%s: {default}%s", MOTD_TITLE, MessageOfTheDay);
+	StatsPrintToChat2(client, forced, "L4DStats_MotdMessage", MessageOfTheDay);
 }
 
 AnnouncePlayerConnect(client)

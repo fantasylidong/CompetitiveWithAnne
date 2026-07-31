@@ -34,8 +34,16 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.0",
+	version 		= "1.0.1.2",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
+}
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax) {
+	MarkNativeAsOptional("AIPathFollowerBroker_IsActive");
+	MarkNativeAsOptional("AnneNextBot_IsActive");
+	MarkNativeAsOptional("AnneNextBot_IsPathBrokerActive");
+	MarkNativeAsOptional("AnneNextBot_SetPathConsumer");
+	return APLRes_Success;
 }
 
 public void OnPluginStart() {
@@ -147,6 +155,33 @@ public void OnAllPluginsLoaded() {
 	SetUp_OnAllPluginsLoaded();
 }
 
+public Action AIPathFollowerBroker_OnPrepare() {
+	return SetUp_PreparePathFollowerBroker() ? Plugin_Continue : Plugin_Stop;
+}
+
+public void AIPathFollowerBroker_OnReady() {
+	SetUp_UseActivePathFollowerBroker();
+}
+
+public void AIPathFollowerBroker_OnAbort() {
+	SetUp_UseLocalPathFollowerDetour();
+}
+
+public void AIPathFollowerBroker_OnStopping() {
+	SetUp_UseLocalPathFollowerDetour();
+}
+
+public void OnLibraryRemoved(const char[] name) {
+	if (StrEqual(name, ANNE_NEXTBOT_LIBRARY)) {
+		if (SetUp_IsPathFollowerBrokerActive())
+			SetUp_UseActivePathFollowerBroker();
+		else
+			SetUp_UseLocalPathFollowerDetour();
+	} else if (StrEqual(name, PATH_FOLLOWER_BROKER_LIBRARY)) {
+		SetUp_UseLocalPathFollowerDetour();
+	}
+}
+
 public void OnConfigsExecuted() {
 	SetUp_OnConfigsExecuted();
 	syncLegacyChargerConfig();
@@ -202,6 +237,8 @@ void legacyChargerConfigChanged(ConVar convar, const char[] oldValue, const char
 public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3], float angles[3], int& weapon) {
 	if (!isAiCharger(client))
 		return Plugin_Continue;
+
+	beginChargerVisibilityMemo(client);
 
 	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
 	maintainEvadeMoveCommand(client);
@@ -377,12 +414,25 @@ MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams) {
 	if (!isAiCharger(client))
 		return MRES_Ignored;
 
+	ProcessChargerPathFollowerUpdate(client, pThis);
+	return MRES_Ignored;
+}
+
+public void AICharger3_OnPathFollowerUpdate(int client, int pathFollower) {
+	if (!g_bUsingSharedPathFollowerDetour || !pathFollower || !isAiCharger(client))
+		return;
+
+	ProcessChargerPathFollowerUpdate(client, view_as<Address>(pathFollower));
+}
+
+void ProcessChargerPathFollowerUpdate(int client, Address pThis) {
+
 	// 只在当前回调期间使用 PathFollower。跨帧缓存该原生对象会形成悬空指针。
 	if (g_AiChargers[client].m_bPathInvalidatePending) {
 		g_AiChargers[client].m_bPathInvalidatePending = false;
 		SDKCall(g_hSdkPathInvalidate, pThis);
 		clearCachedPath(client);
-		return MRES_Ignored;
+		return;
 	}
 
 	// v37 = *((_DWORD *)this + 4566); 因为 this 被转成了 DWORD 类型, 因此后面的偏移量 4566 也是基于 4 字节的
@@ -392,7 +442,7 @@ MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams) {
 	pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
 	if (!pPathSeg) {
 		clearCachedPath(client);
-		return MRES_Ignored;
+		return;
 	}
 
 	constructPathSegment(pPathSeg, curSegment);
@@ -408,7 +458,6 @@ MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams) {
 	else
 		clearCachedPath(client);
 
-	return MRES_Ignored;
 }
 
 void checkGoalIsBehind(int client, Address pPathFollower, Address pCurrentSeg) {

@@ -177,11 +177,11 @@ public Action:cmd_ShowTimedMapsTimer(client, args)
 	{
 		if (client == 0)
 		{
-			PrintToConsole(0, "[RANK] Map timer has not started");
+				StatsPrintToConsolePhrase(0, "L4DStats_MapTimerNotStarted");
 		}
 		else
 		{
-			StatsPrintToChatPreFormatted(client, "地图计时器还没开始计时");
+			StatsPrintToChatPreFormatted(client, "L4DStats_MapTimerNotStarted");
 		}
 
 		return Plugin_Handled;
@@ -190,12 +190,12 @@ public Action:cmd_ShowTimedMapsTimer(client, args)
 	new Float:CurrentMapTimer = GetEngineTime() - MapTimingStartTime;
 	decl String:TimeLabel[32];
 
-	SetTimeLabel(CurrentMapTimer, TimeLabel, sizeof(TimeLabel));
+	SetTimeLabel(CurrentMapTimer, TimeLabel, sizeof(TimeLabel), client > 0 ? client : LANG_SERVER);
 
 	if (client == 0)
-		PrintToConsole(0, "[RANK] 当前地图时间: %s", TimeLabel);
+		StatsPrintToConsolePhrase(0, "L4DStats_CurrentMapTimeConsole", TimeLabel);
 	else
-		StatsPrintToChat(client, "当前地图时间: {green}%s", TimeLabel);
+		StatsPrintToChat(client, "L4DStats_CurrentMapTime", TimeLabel);
 
 	return Plugin_Handled;
 }
@@ -245,10 +245,10 @@ DisplayYesNoPanel(client, const String:title[], MenuHandler:handler, delay=30)
 
 	new Handle:panel = CreatePanel();
 
-	SetPanelTitle(panel, title);
+	StatsSetPanelTitle(panel, client, title);
 
-	DrawPanelItem(panel, "是");
-	DrawPanelItem(panel, "否");
+	StatsDrawPanelItem(panel, client, "L4DStats_Yes");
+	StatsDrawPanelItem(panel, client, "L4DStats_No");
 
 	SendPanelToClient(panel, client, handler, delay);
 	CloseHandle(panel);
@@ -274,7 +274,7 @@ public Action:cmd_ShuffleTeams(client, args)
 {
 	if (!IsTeamGamemode())
 	{
-		PrintToConsole(client, "[RANK] Team shuffle 在这个模式不启用!");
+		StatsPrintToConsolePhrase(client, "L4DStats_TeamShuffleUnavailable");
 		return Plugin_Handled;
 	}
 
@@ -283,10 +283,10 @@ public Action:cmd_ShuffleTeams(client, args)
 		CloseHandle(RankVoteTimer);
 		RankVoteTimer = INVALID_HANDLE;
 
-		StatsPrintToChatAllPreFormatted("Team shuffle 被管理员执行.");
+		StatsPrintToChatAllPreFormatted("L4DStats_TeamShuffleAdminExecuted");
 	}
 
-	PrintToConsole(client, "[RANK] Executing team shuffle...");
+	StatsPrintToConsolePhrase(client, "L4DStats_TeamShuffleExecuting");
 	CreateTimer(1.0, timer_ShuffleTeams);
 
 	return Plugin_Handled;
@@ -299,7 +299,7 @@ public Action:cmd_SetMotd(client, args)
 
 	GetCmdArgString(arg, sizeof(arg));
 
-	UpdateServerSettings(client, "motdmessage", arg, MOTD_TITLE);
+	UpdateServerSettings(client, "motdmessage", arg);
 
 	return Plugin_Handled;
 }
@@ -309,7 +309,7 @@ public Action:cmd_ClearRank(client, args)
 {
 	if (client == 0)
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Database clearing from server console currently disabled because of a bug in it! Run the command from in-game console or from Admin Panel.");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseServerDisabled");
 		
 		return Plugin_Handled;
 	}
@@ -323,7 +323,7 @@ public Action:cmd_ClearRank(client, args)
 
 	if (ClearDatabaseCaller == client)
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Started clearing the database!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseStarted");
 		ClearDatabaseCaller = -1;
 
 		ClearStatsAll(client);
@@ -331,7 +331,7 @@ public Action:cmd_ClearRank(client, args)
 		return Plugin_Handled;
 	}
 
-	PrintToConsole(client, "[RANK] Clear Stats: To clear the database, execute this command again in %.2f seconds!", CLEAR_DATABASE_CONFIRMTIME);
+	StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseConfirm", CLEAR_DATABASE_CONFIRMTIME);
 	ClearDatabaseCaller = client;
 
 	ClearDatabaseTimer = CreateTimer(CLEAR_DATABASE_CONFIRMTIME, timer_ClearDatabase);
@@ -361,9 +361,9 @@ public ClearStatsAll(client)
 
 	if (!DoFastQuery(client, "DELETE FROM %stimedmaps", DbPrefix))
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Clearing timedmaps table failed. Executing rollback...");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearTimedMapsRollback");
 		DoFastQuery(client, "ROLLBACK");
-		PrintToConsole(client, "[RANK] Clear Stats: Failure!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 
 		return;
 	}
@@ -371,9 +371,9 @@ public ClearStatsAll(client)
 
 	if (!DoFastQuery(client, "DELETE FROM %splayers", DbPrefix))
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Clearing players table failed. Executing rollback...");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearPlayersRollback");
 		DoFastQuery(client, "ROLLBACK");
-		PrintToConsole(client, "[RANK] Clear Stats: Failure!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 
 		return;
 	}
@@ -393,14 +393,14 @@ public ClearStatsPlayers(client)
 
 	if (!DoFastQuery(client, "DELETE FROM %splayers", DbPrefix))
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Clearing players table failed. Executing rollback...");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearPlayersRollback");
 		DoFastQuery(client, "ROLLBACK");
-		PrintToConsole(client, "[RANK] Clear Stats: Failure!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 	}
 	else
 	{
 		DoFastQuery(client, "COMMIT");
-		PrintToConsole(client, "[RANK] Clear Stats: Ranks succesfully cleared!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearRanksSuccess");
 	}
 }
 
@@ -408,9 +408,9 @@ public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], an
 {
 	if (hndl == INVALID_HANDLE)
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Query failed! (%s)", error);
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearQueryFailed", error);
 		DoFastQuery(client, "ROLLBACK");
-		PrintToConsole(client, "[RANK] Clear Stats: Failure!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 		return;
 	}
 
@@ -444,14 +444,14 @@ public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], an
 
 	if (!DoFastQuery(client, query))
 	{
-		PrintToConsole(client, "[RANK] Clear Stats: Clearing maps table failed. Executing rollback...");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearMapsRollback");
 		DoFastQuery(client, "ROLLBACK");
-		PrintToConsole(client, "[RANK] Clear Stats: Failure!");
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 	}
 	else
 	{
 		DoFastQuery(client, "COMMIT");
-		PrintToConsole(client, "[RANK] Clear Stats: Stats succesfully cleared!", query);
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsSuccess");
 	}
 }
 
@@ -469,12 +469,12 @@ bool:DoFastQuery(Client, const String:Query[], any:...)
 	{
 		if (SQL_GetError(db, Error, sizeof(Error)))
 		{
-			PrintToConsole(Client, "[RANK] Fast query failed! (Error = \"%s\") Query = \"%s\"", Error, FormattedQuery);
+			StatsPrintToConsolePhrase(Client, "L4DStats_FastQueryError", Error, FormattedQuery);
 			LogError("Fast query failed! (Error = \"%s\") Query = \"%s\"", Error, FormattedQuery);
 		}
 		else
 		{
-			PrintToConsole(Client, "[RANK] Fast query failed! Query = \"%s\"", FormattedQuery);
+			StatsPrintToConsolePhrase(Client, "L4DStats_FastQueryFailed", FormattedQuery);
 			LogError("Fast query failed! Query = \"%s\"", FormattedQuery);
 		}
 
@@ -496,7 +496,7 @@ public Action:cmd_ShowRankMenu(client, args)
 	if (client <= 0)
 	{
 		if (client == 0)
-			PrintToConsole(0, "[RANK] 你必须在游戏中才能操作排名榜单");
+			StatsPrintToConsolePhrase(0, "L4DStats_CommandInGameOnly");
 
 		return Plugin_Handled;
 	}
@@ -514,42 +514,37 @@ public Action:cmd_ShowRankMenu(client, args)
 
 public DisplayRankMenu(client)
 {
-	decl String:Title[MAX_LINE_WIDTH];
-
-	Format(Title, sizeof(Title), "%s:", PLUGIN_NAME);
-
 	new Handle:menu = CreateMenu(Menu_CreateRankMenuHandler);
 
-	SetMenuTitle(menu, Title);
+	StatsSetMenuTitle(menu, client, "L4DStats_RankMenuTitle");
 	SetMenuExitBackButton(menu, false);
 	SetMenuExitButton(menu, true);
 
 
-	AddMenuItem(menu, "rank", "显示当前排名");
-	AddMenuItem(menu, "top10", "显示TOP10玩家");
-	AddMenuItem(menu, "top10q", "显示季度TOP10玩家");
-	AddMenuItem(menu, "top10ppm", "显示TOP10 PPM玩家");
-	AddMenuItem(menu, "nextrank", "下一名达标要求");
-	AddMenuItem(menu, "showtimer", "显示当前地图游玩时间");
-	AddMenuItem(menu, "showrank", "展示他人排名");
-	AddMenuItem(menu, "showppm", "展示他人PPM排名");
+	StatsAddMenuItem(menu, "rank", client, "L4DStats_MenuCurrentRank");
+	StatsAddMenuItem(menu, "top10", client, "L4DStats_MenuTop10");
+	StatsAddMenuItem(menu, "top10q", client, "L4DStats_MenuQuarterTop10");
+	StatsAddMenuItem(menu, "top10ppm", client, "L4DStats_MenuTop10PPM");
+	StatsAddMenuItem(menu, "nextrank", client, "L4DStats_MenuNextRank");
+	StatsAddMenuItem(menu, "showtimer", client, "L4DStats_MenuCurrentMapTime");
+	StatsAddMenuItem(menu, "showrank", client, "L4DStats_MenuOtherPlayerRank");
+	StatsAddMenuItem(menu, "showppm", client, "L4DStats_MenuOtherPlayerPPM");
 	if (GetConVarBool(cvar_EnableRankVote) && IsTeamGamemode())
 	{
-		AddMenuItem(menu, "rankvote", "Vote for team shuffle by PPM");
+		StatsAddMenuItem(menu, "rankvote", client, "L4DStats_MenuRankVote");
 	}
-	AddMenuItem(menu, "timedmaps", "显示所有地图游玩时间记录");
+	StatsAddMenuItem(menu, "timedmaps", client, "L4DStats_MenuAllMapTimes");
 	if (IsSingleTeamGamemode())
 	{
-		AddMenuItem(menu, "maptimes", "显示当前地图游玩时间记录");
+		StatsAddMenuItem(menu, "maptimes", client, "L4DStats_MenuThisMapTimes");
 	}
 	if (GetConVarInt(cvar_AnnounceMode))
 	{
-		AddMenuItem(menu, "showsettings", "修改Rank插件提醒设置");
+		StatsAddMenuItem(menu, "showsettings", client, "L4DStats_MenuSettings");
 	}
 	//AddMenuItem(menu, "showmaptimes", "显示他人地图的游玩时间记录");
 
-	Format(Title, sizeof(Title), "关于 %s，它由Mikko Andersson编写，由东汉化并对数值进行调整", PLUGIN_NAME);
-	AddMenuItem(menu, "Rank插件说明", Title);
+	StatsAddMenuItem(menu, "rankabout", client, "L4DStats_MenuAbout");
 
 	DisplayMenu(menu, client, 30);
 
@@ -559,7 +554,7 @@ public DisplayRankMenu(client)
 
 NotServerConsoleCommand()
 {
-	PrintToConsole(0, "[RANK] Error: Most of the rank commands including this one are not available from server console.");
+	StatsPrintToConsolePhrase(0, "L4DStats_CommandUnavailableFromServer");
 }
 
 // Begin generating the RANK display panel.
@@ -749,17 +744,17 @@ public GetClientRankRankChange(Handle:owner, Handle:hndl, const String:error[], 
 		if (!GetConVarInt(cvar_AnnounceMode) || !GetConVarBool(cvar_AnnounceRankChange))
 			return;
 
-		decl String:Label[16];
 		if (RankChange > 0)
-			Format(Label, sizeof(Label), "上升");
+		{
+			if (!IsClientBot(client) && IsClientConnected(client) && IsClientInGame(client))
+				StatsPrintToChat(client, "L4DStats_RankRose", RankChange, RankChangeLastRank[client]);
+		}
 		else
 		{
 			RankChange *= -1;
-			Format(Label, sizeof(Label), "下降");
+			if (!IsClientBot(client) && IsClientConnected(client) && IsClientInGame(client))
+				StatsPrintToChat(client, "L4DStats_RankFell", RankChange, RankChangeLastRank[client]);
 		}
-
-		if (!IsClientBot(client) && IsClientConnected(client) && IsClientInGame(client))
-			StatsPrintToChat(client, "你的排名%s了 {green}%i 名{default}! {olive}(Rank: %i)", Label, RankChange,  RankChangeLastRank[client]);
 	}
 }
 
@@ -807,33 +802,30 @@ public GetClientQuarterRankRankChange(Handle:owner, Handle:hndl, const String:er
 	}
 
 	decl String:QuarterLabel[32];
-	QuarterRank_FormatCurrentQuarter(QuarterLabel, sizeof(QuarterLabel));
+	QuarterRank_FormatCurrentQuarter(client, QuarterLabel, sizeof(QuarterLabel));
 
 	if (CurrentRank <= 0)
 	{
-		StatsPrintToChat(client, "你已离开 {olive}%s{default} 排行榜。", QuarterLabel);
+		StatsPrintToChat(client, "L4DStats_QuarterRankingLeft", QuarterLabel);
 		return;
 	}
 
 	if (LastRank <= 0)
 	{
-		StatsPrintToChat(client, "你进入了 {olive}%s{default} 排行榜! 当前季度排名 {green}%i{default}, 季度分数 {green}%i{default}。", QuarterLabel, CurrentRank, ClientQuarterPoints[client]);
+		StatsPrintToChat(client, "L4DStats_QuarterRankingEntered", QuarterLabel, CurrentRank, ClientQuarterPoints[client]);
 		return;
 	}
 
 	new RankChange = LastRank - CurrentRank;
-	decl String:Label[16];
 	if (RankChange > 0)
 	{
-		Format(Label, sizeof(Label), "上升");
+		StatsPrintToChat(client, "L4DStats_QuarterRankRose", QuarterLabel, RankChange, CurrentRank, ClientQuarterPoints[client]);
 	}
 	else
 	{
 		RankChange *= -1;
-		Format(Label, sizeof(Label), "下降");
+		StatsPrintToChat(client, "L4DStats_QuarterRankFell", QuarterLabel, RankChange, CurrentRank, ClientQuarterPoints[client]);
 	}
-
-	StatsPrintToChat(client, "你的 {olive}%s{default} 排名%s了 {green}%i 名{default}! {olive}(季度排名: %i / 季度分数: %i)", QuarterLabel, Label, RankChange, CurrentRank, ClientQuarterPoints[client]);
 }
 
 QueryClientStatsDP_PlayerJoined(Client, const String:SteamID[])
@@ -848,16 +840,13 @@ QueryClientStatsDP_PlayerJoined(Client, const String:SteamID[])
 	decl String:userName[MAX_LINE_WIDTH];
 	GetClientName(Client, userName, sizeof(userName));
 
-	decl String:QuarterLabel[32];
-	QuarterRank_FormatCurrentQuarter(QuarterLabel, sizeof(QuarterLabel));
-
 	if (ClientRank[Client] > 0)
 	{
-		StatsPrintToChatAll("玩家 {olive}%s {default}进入游戏! (总榜: {lightgreen}%i/%i{default}, 总分: {lightgreen}%i{default})", userName, ClientRank[Client], RankTotal, ClientPoints[Client]);
+		StatsPrintToChatAll("L4DStats_PlayerJoinedOverallRanked", userName, ClientRank[Client], RankTotal, ClientPoints[Client]);
 	}
 	else
 	{
-		StatsPrintToChatAll("玩家 {olive}%s {default}进入游戏! (总榜未上榜)", userName);
+		StatsPrintToChatAll("L4DStats_PlayerJoinedOverallUnranked", userName);
 	}
 
 	if (!QuarterRank_Enabled())
@@ -867,11 +856,27 @@ QueryClientStatsDP_PlayerJoined(Client, const String:SteamID[])
 
 	if (ClientQuarterRank[Client] > 0)
 	{
-		StatsPrintToChatAll("当前 {olive}%s{default}: 季度排名 {lightgreen}%i/%i{default}, 季度分 {lightgreen}%i{default}", QuarterLabel, ClientQuarterRank[Client], QuarterRankTotal, ClientQuarterPoints[Client]);
+		for (new i = 1; i <= MaxClients; i++)
+		{
+			if (!Stats_IsValidHumanClient(i))
+				continue;
+
+			decl String:QuarterLabel[32];
+			QuarterRank_FormatCurrentQuarter(i, QuarterLabel, sizeof(QuarterLabel));
+			StatsPrintToChat(i, "L4DStats_CurrentQuarterRanked", QuarterLabel, ClientQuarterRank[Client], QuarterRankTotal, ClientQuarterPoints[Client]);
+		}
 	}
 	else
 	{
-		StatsPrintToChatAll("当前 {olive}%s{default}: 季度未上榜", QuarterLabel);
+		for (new i = 1; i <= MaxClients; i++)
+		{
+			if (!Stats_IsValidHumanClient(i))
+				continue;
+
+			decl String:QuarterLabel[32];
+			QuarterRank_FormatCurrentQuarter(i, QuarterLabel, sizeof(QuarterLabel));
+			StatsPrintToChat(i, "L4DStats_CurrentQuarterUnranked", QuarterLabel);
+		}
 	}
 }
 
@@ -896,11 +901,11 @@ public GetClientRankPlayerJoined(Handle:owner, Handle:hndl, const String:error[]
 
 	if (ClientRank[client] > 0)
 	{
-		StatsPrintToChatAll("玩家 {olive}%s {default}进入游戏! (排名: {lightgreen}%i {default}/ 分数: {lightgreen}%i{default})", userName, ClientRank[client], ClientPoints[client]);
+		StatsPrintToChatAll("L4DStats_PlayerJoinedModeRanked", userName, ClientRank[client], ClientPoints[client]);
 	}
 	else
 	{
-		StatsPrintToChatAll("玩家 {olive}%s {default}进入游戏! (未进入排行榜)", userName);
+		StatsPrintToChatAll("L4DStats_PlayerJoinedModeUnranked", userName);
 	}
 }
 
@@ -971,21 +976,21 @@ public DisplayNextRank(client)
 	new Handle:NextRankPanel = CreatePanel();
 	new String:Value[MAX_LINE_WIDTH];
 
-	SetPanelTitle(NextRankPanel, "下一名达标要求:");
+	StatsSetPanelTitle(NextRankPanel, client, "L4DStats_NextRankTitle");
 
 	if (ClientNextRank[client])
 	{
-		Format(Value, sizeof(Value), "还需要分数: %i", ClientNextRank[client]);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_NextRankPointsNeeded", ClientNextRank[client]);
 		DrawPanelText(NextRankPanel, Value);
 
-		Format(Value, sizeof(Value), "当前排名: %i", ClientRank[client]);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CurrentRank", ClientRank[client]);
 		DrawPanelText(NextRankPanel, Value);
 	}
 	else
-		DrawPanelText(NextRankPanel, "你目前位于于第一名");
+		StatsDrawPanelText(NextRankPanel, client, "L4DStats_AlreadyFirst");
 
-	DrawPanelItem(NextRankPanel, "更多...");
-	DrawPanelItem(NextRankPanel, "关闭");
+	StatsDrawPanelItem(NextRankPanel, client, "L4DStats_MoreEllipsis");
+	StatsDrawPanelItem(NextRankPanel, client, "L4DStats_Close");
 	SendPanelToClient(NextRankPanel, client, NextRankPanelHandler, 30);
 	CloseHandle(NextRankPanel);
 }
@@ -1011,29 +1016,29 @@ public DisplayNextRankFull(Handle:owner, Handle:hndl, const String:error[], any:
 	new Handle:NextRankPanel = CreatePanel();
 	new String:Value[MAX_LINE_WIDTH];
 
-	SetPanelTitle(NextRankPanel, "下一名达标要求:");
+	StatsSetPanelTitle(NextRankPanel, client, "L4DStats_NextRankTitle");
 
 	if (ClientNextRank[client])
 	{
-		Format(Value, sizeof(Value), "还需要分数: %i", ClientNextRank[client]);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_NextRankPointsNeeded", ClientNextRank[client]);
 		DrawPanelText(NextRankPanel, Value);
 
-		Format(Value, sizeof(Value), "当前排名: %i", ClientRank[client]);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CurrentRank", ClientRank[client]);
 		DrawPanelText(NextRankPanel, Value);
 	}
 	else
-		DrawPanelText(NextRankPanel, "你目前位于于第一名");
+		StatsDrawPanelText(NextRankPanel, client, "L4DStats_AlreadyFirst");
 
 	while (SQL_FetchRow(hndl))
 	{
 		SQL_FetchString(hndl, 0, Name, sizeof(Name));
 		Points = SQL_FetchInt(hndl, 1);
 
-		Format(Value, sizeof(Value), "%i 分数: %s", Points, Name);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PointsAndPlayer", Points, Name);
 		DrawPanelText(NextRankPanel, Value);
 	}
 
-	DrawPanelItem(NextRankPanel, "关闭");
+	StatsDrawPanelItem(NextRankPanel, client, "L4DStats_Close");
 	SendPanelToClient(NextRankPanel, client, NextRankFullPanelHandler, 30);
 	CloseHandle(NextRankPanel);
 }
@@ -1079,67 +1084,68 @@ public DisplayRank(Handle:owner, Handle:hndl, const String:error[], any:client)
 	new Handle:RankPanel = CreatePanel();
 	new String:Value[MAX_LINE_WIDTH];
 	new String:URL[MAX_LINE_WIDTH];
-	new String:QuarterLabel[32];
+	new String:QuarterLabel[32], String:GamemodeLabel[64];
 
 	GetConVarString(cvar_SiteURL, URL, sizeof(URL));
-	QuarterRank_FormatCurrentQuarter(QuarterLabel, sizeof(QuarterLabel));
+	QuarterRank_FormatCurrentQuarter(client, QuarterLabel, sizeof(QuarterLabel));
+	StatsFormatPhrase(client, GamemodeLabel, sizeof(GamemodeLabel), CurrentGamemodeLabel);
 	new Float:HeadshotRatio = Headshots == 0 ? 0.00 : float(Headshots)/float(InfectedKilled)*100;
 
-	Format(Value, sizeof(Value), "%s的排名" , Name);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlayerRankTitle", Name);
 	SetPanelTitle(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "排名: %i  (共%i)" , ClientRank[client], RankTotal);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_OverallRank", ClientRank[client], RankTotal);
 	DrawPanelText(RankPanel, Value);
 
 	if (!InvalidGameMode())
 	{
-		Format(Value, sizeof(Value), "%s 排名: %i (共%i)" ,CurrentGamemodeLabel , ClientGameModeRank[client], GameModeRankTotal);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_ModeRank", GamemodeLabel, ClientGameModeRank[client], GameModeRankTotal);
 		DrawPanelText(RankPanel, Value);
 	}
 
 	if (Playtime > 60)
 	{
-		Format(Value, sizeof(Value), "游玩时间: %.2f 小时" , float(Playtime)/ 60.0);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlaytimeHours", float(Playtime)/ 60.0);
 		DrawPanelText(RankPanel, Value);
 	}
 	else
 	{
-		Format(Value, sizeof(Value), "游玩时间: %i 分钟" , Playtime);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlaytimeMinutes", Playtime);
 		DrawPanelText(RankPanel, Value);
 	}
 
-	Format(Value, sizeof(Value), "目前分数: %i" , Points);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CurrentPoints", Points);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "%s分数: %i" , QuarterLabel, ClientQuarterPoints[client]);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_QuarterPoints", QuarterLabel, ClientQuarterPoints[client]);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "%s排名: %i (共%i)" , QuarterLabel, ClientQuarterRank[client], QuarterRankTotal);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_QuarterRank", QuarterLabel, ClientQuarterRank[client], QuarterRankTotal);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "每分钟获取分数: %.2f" , PPM);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PointsPerMinute", PPM);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "消灭的小僵尸: %i" , InfectedKilled);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CommonKilled", InfectedKilled);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "杀死的生还者: %i" , SurvivorsKilled);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_SurvivorsKilled", SurvivorsKilled);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "爆头数量: %i" , Headshots);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_Headshots", Headshots);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "爆头比率: %.2f \%" , HeadshotRatio);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_HeadshotRatio", HeadshotRatio);
 	DrawPanelText(RankPanel, Value);
 
 	if (!StrEqual(URL, "", false))
 	{
-		Format(Value, sizeof(Value), "完整数据可以在 %s 查看", URL);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_FullStatsUrl", URL);
 		DrawPanelText(RankPanel, Value);
 	}
 
 	//DrawPanelItem(RankPanel, "Next Rank");
-	DrawPanelItem(RankPanel, "关闭");
+	StatsDrawPanelItem(RankPanel, client, "L4DStats_Close");
 	SendPanelToClient(RankPanel, client, RankPanelHandler, 30);
 	CloseHandle(RankPanel);
 }
@@ -1182,7 +1188,7 @@ public DisplayRankSnapshot(Handle:owner, Handle:hndl, const String:error[], any:
 	}
 	else
 	{
-		Format(Name, sizeof(Name), "Unknown");
+		StatsFormatPhrase(client, Name, sizeof(Name), "L4DStats_UnknownPlayer");
 		Playtime = 0;
 		Points = 0;
 		InfectedKilled = 0;
@@ -1210,66 +1216,67 @@ public DisplayRankSnapshot(Handle:owner, Handle:hndl, const String:error[], any:
 	new Handle:RankPanel = CreatePanel();
 	new String:Value[MAX_LINE_WIDTH];
 	new String:URL[MAX_LINE_WIDTH];
-	new String:QuarterLabel[32];
+	new String:QuarterLabel[32], String:GamemodeLabel[64];
 
 	GetConVarString(cvar_SiteURL, URL, sizeof(URL));
-	QuarterRank_FormatCurrentQuarter(QuarterLabel, sizeof(QuarterLabel));
+	QuarterRank_FormatCurrentQuarter(client, QuarterLabel, sizeof(QuarterLabel));
+	StatsFormatPhrase(client, GamemodeLabel, sizeof(GamemodeLabel), CurrentGamemodeLabel);
 	new Float:HeadshotRatio = InfectedKilled == 0 ? 0.00 : float(Headshots)/float(InfectedKilled)*100;
 
-	Format(Value, sizeof(Value), "%s的排名" , Name);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlayerRankTitle", Name);
 	SetPanelTitle(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "排名: %i  (共%i)" , Rank, TotalRank);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_OverallRank", Rank, TotalRank);
 	DrawPanelText(RankPanel, Value);
 
 	if (!InvalidGameMode())
 	{
-		Format(Value, sizeof(Value), "%s 排名: %i (共%i)" , CurrentGamemodeLabel, GameModeRank, GameModeTotal);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_ModeRank", GamemodeLabel, GameModeRank, GameModeTotal);
 		DrawPanelText(RankPanel, Value);
 	}
 
 	if (Playtime > 60)
 	{
-		Format(Value, sizeof(Value), "游玩时间: %.2f 小时" , float(Playtime)/ 60.0);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlaytimeHours", float(Playtime)/ 60.0);
 		DrawPanelText(RankPanel, Value);
 	}
 	else
 	{
-		Format(Value, sizeof(Value), "游玩时间: %i 分钟" , Playtime);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PlaytimeMinutes", Playtime);
 		DrawPanelText(RankPanel, Value);
 	}
 
-	Format(Value, sizeof(Value), "目前分数: %i" , Points);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CurrentPoints", Points);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "%s分数: %i" , QuarterLabel, QuarterPoints);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_QuarterPoints", QuarterLabel, QuarterPoints);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "%s排名: %i (共%i)" , QuarterLabel, QuarterRank, QuarterTotal);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_QuarterRank", QuarterLabel, QuarterRank, QuarterTotal);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "每分钟获取分数: %.2f" , PPM);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_PointsPerMinute", PPM);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "消灭的小僵尸: %i" , InfectedKilled);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_CommonKilled", InfectedKilled);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "杀死的生还者: %i" , SurvivorsKilled);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_SurvivorsKilled", SurvivorsKilled);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "爆头数量: %i" , Headshots);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_Headshots", Headshots);
 	DrawPanelText(RankPanel, Value);
 
-	Format(Value, sizeof(Value), "爆头比率: %.2f \%" , HeadshotRatio);
+	StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_HeadshotRatio", HeadshotRatio);
 	DrawPanelText(RankPanel, Value);
 
 	if (!StrEqual(URL, "", false))
 	{
-		Format(Value, sizeof(Value), "完整数据可以在 %s 查看", URL);
+		StatsFormatPhrase(client, Value, sizeof(Value), "L4DStats_FullStatsUrl", URL);
 		DrawPanelText(RankPanel, Value);
 	}
 
-	DrawPanelItem(RankPanel, "关闭");
+	StatsDrawPanelItem(RankPanel, client, "L4DStats_Close");
 	SendPanelToClient(RankPanel, client, RankPanelHandler, 30);
 	CloseHandle(RankPanel);
 }
@@ -1280,11 +1287,11 @@ public StartRankVote(client)
 	{
 		if (client > 0)
 		{
-			StatsPrintToChatPreFormatted(client, "{green}Rank投票{default}是 {lightgreen}关闭的{default}. {olive}插件设置失败.");
+			StatsPrintToChatPreFormatted(client, "L4DStats_RankVoteSettingsFailed");
 		}
 		else
 		{
-			PrintToConsole(0, "[RANK] The Rank Vote is DISABLED! Could not load gamedata/l4d_stats.txt.");
+			StatsPrintToConsolePhrase(0, "L4DStats_RankVoteGamedataMissingConsole");
 		}
 	}
 
@@ -1292,11 +1299,11 @@ public StartRankVote(client)
 	{
 		if (client > 0)
 		{
-			StatsPrintToChatPreFormatted(client, "The {green}Rank Vote {default}is {lightgreen}DISABLED{default}.");
+			StatsPrintToChatPreFormatted(client, "L4DStats_RankVoteDisabledChat");
 		}
 		else
 		{
-			PrintToConsole(0, "[RANK] The Rank Vote is DISABLED.");
+			StatsPrintToConsolePhrase(0, "L4DStats_RankVoteDisabledConsole");
 		}
 	}
 
@@ -1331,7 +1338,7 @@ public Action:cmd_ToggleClientRankMute(client, args)
 
 ShowRankMuteUsage(client)
 {
-	PrintToConsole(client, "[RANK] Command usage: sm_rankmute <0|1>");
+	StatsPrintToConsolePhrase(client, "L4DStats_RankMuteUsage");
 }
 
 // Show current message of the day.
@@ -1380,7 +1387,7 @@ public Action:cmd_ClientRankMute(client, args)
 
 AnnounceClientRankMute(client)
 {
-	StatsPrintToChat2(client, true, "你 %s {default}the {olive}%s{default}.", (ClientRankMute[client] ? "{green}已经禁用" : "{lightgreen}解除禁用"), PLUGIN_NAME);
+	StatsPrintToChat2(client, true, ClientRankMute[client] ? "L4DStats_RankMessagesMuted" : "L4DStats_RankMessagesUnmuted");
 }
 
 // Start RANKVOTE.
@@ -1404,7 +1411,7 @@ public Action:cmd_RankVote(client, args)
 
 	if (!IsAdmin && ClientTeam != TEAM_SURVIVORS && ClientTeam != TEAM_INFECTED)
 	{
-		StatsPrintToChatPreFormatted2(client, true, "The spectators cannot initiate the {green}Rank Vote{default}.");
+		StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVoteSpectatorDenied");
 		return Plugin_Handled;
 	}
 
@@ -1448,7 +1455,7 @@ public Action:cmd_ShowMapTimes(client, args)
 	if (client == 0 || !IsClientConnected(client) && !IsClientInGame(client) && IsClientBot(client))
 		return Plugin_Handled;
 
-	StatsPrintToChatPreFormatted2(client, true, "{olive}NOT IMPLEMENTED YET");
+	StatsPrintToChatPreFormatted2(client, true, "L4DStats_NotImplemented");
 
 	return Plugin_Handled;
 }
@@ -1592,7 +1599,7 @@ public Action:cmd_ShowQuarterTop10(client, args)
 
 	if (!QuarterRank_Enabled() && !QuarterRank_RecoverIfNeeded())
 	{
-		StatsPrintToChat(client, "季度榜单当前不可用，请稍后再试。");
+		StatsPrintToChat(client, "L4DStats_QuarterRankingUnavailable");
 		return Plugin_Handled;
 	}
 
@@ -1672,7 +1679,7 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 			if (!SetTrieValue(PlayersTrie, SteamID, i, false))
 			{
 				LogError("ExecuteTeamShuffle failed! Reason: Duplicate SteamID while generating shuffled teams.");
-				StatsPrintToChatAllPreFormatted2(true, "Team shuffle failed in an error.");
+				StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleFailed");
 
 				SetConVarBool(cvar_EnableRankVote, false);
 
@@ -1758,7 +1765,7 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 		if (NewSurvivorCounter > SurvivorsLimit || NewInfectedCounter > InfectedLimit)
 		{
 			LogError("ExecuteTeamShuffle failed! Reason: Team size limits block Rank Vote functionality. (Survivors Limit = %i [%i] / Infected Limit = %i [%i])", SurvivorsLimit, NewSurvivorCounter, InfectedLimit, NewInfectedCounter);
-			StatsPrintToChatAllPreFormatted2(true, "Team shuffle failed in an error.");
+			StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleFailed");
 
 			SetConVarBool(cvar_EnableRankVote, false);
 		}
@@ -1782,7 +1789,7 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 
 				ChangeRankPlayerTeam(client, TEAM_SURVIVORS);
 
-				StatsPrintToChatAll2(true, "{olive}%s {default}加入到了 {lightgreen}Survivors{default}阵营!", Name);
+				StatsPrintToChatAll2(true, "L4DStats_PlayerJoinedSurvivors", Name);
 			}
 
 			// Change Spectators (TEMPORARILY) team to Infected
@@ -1793,10 +1800,10 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 
 				ChangeRankPlayerTeam(client, TEAM_INFECTED);
 
-				StatsPrintToChatAll2(true, "{olive}%s {default}加入到了 {lightgreen}Infected{default}阵营!", Name);
+				StatsPrintToChatAll2(true, "L4DStats_PlayerJoinedInfected", Name);
 			}
 
-			StatsPrintToChatAllPreFormatted2(true, "Team shuffle by player PPM {lightgreen}DONE{default}.");
+			StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleDone");
 
 			if (EnableSounds_Rankvote && GetConVarBool(cvar_SoundsEnabled))
 				EmitSoundToAll(SOUND_RANKVOTE);
@@ -1804,7 +1811,7 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 	}
 	else
 	{
-		StatsPrintToChatAllPreFormatted2(true, "Teams are already even by player PPM.");
+		StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamsAlreadyEven");
 	}
 
 	ClearArray(SurvivorArray);
@@ -1831,7 +1838,7 @@ public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:clie
 
 	decl String:Name[32], String:DisplayName[MAX_LINE_WIDTH];
 
-	SetMenuTitle(menu, "Player Ranks:");
+	StatsSetMenuTitle(menu, client, "L4DStats_PlayerRanksTitle");
 	SetMenuExitBackButton(menu, false);
 	SetMenuExitButton(menu, true);
 
@@ -1846,7 +1853,7 @@ public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:clie
 		ReplaceString(Name, sizeof(Name), "&#61;", "=");
 		ReplaceString(Name, sizeof(Name), "&#42;", "*");
 
-		Format(DisplayName, sizeof(DisplayName), "%s (%i points)", Name, SQL_FetchInt(hndl, 2));
+		StatsFormatPhrase(client, DisplayName, sizeof(DisplayName), "L4DStats_PlayerPointsMenuItem", Name, SQL_FetchInt(hndl, 2));
 
 		AddMenuItem(menu, SteamID, DisplayName);
 	}
@@ -1865,10 +1872,10 @@ public CreateTimedMapsMenu(Handle:owner, Handle:hndl, const String:error[], any:
 	if (SQL_GetRowCount(hndl) <= 0)
 	{
 		new Handle:TimedMapsPanel = CreatePanel();
-		SetPanelTitle(TimedMapsPanel, "地图玩过的时间:");
+		StatsSetPanelTitle(TimedMapsPanel, client, "L4DStats_TimedMapsTitle");
 
-		DrawPanelText(TimedMapsPanel, "这地图还没被玩过!");
-		DrawPanelItem(TimedMapsPanel, "Close");
+		StatsDrawPanelText(TimedMapsPanel, client, "L4DStats_MapNeverPlayed");
+		StatsDrawPanelItem(TimedMapsPanel, client, "L4DStats_Close");
 
 		SendPanelToClient(TimedMapsPanel, client, TimedMapsPanelHandler, 30);
 		CloseHandle(TimedMapsPanel);
@@ -1880,7 +1887,7 @@ public CreateTimedMapsMenu(Handle:owner, Handle:hndl, const String:error[], any:
 	new Handle:menu = CreateMenu(Menu_CreateTimedMapsMenuHandler);
 	decl String:GamemodeTitle[32], String:GamemodeInfo[2]; //, MutationInfo[MAX_LINE_WIDTH];
 
-	SetMenuTitle(menu, "Timed Maps:");
+	StatsSetMenuTitle(menu, client, "L4DStats_TimedMapsTitle");
 	SetMenuExitBackButton(menu, false);
 	SetMenuExitButton(menu, true);
 
@@ -1891,15 +1898,15 @@ public CreateTimedMapsMenu(Handle:owner, Handle:hndl, const String:error[], any:
 
 		switch (Gamemode)
 		{
-			case GAMEMODE_COOP:
-				strcopy(GamemodeTitle, sizeof(GamemodeTitle), "Co-op");
+		case GAMEMODE_COOP:
+				StatsFormatPhrase(client, GamemodeTitle, sizeof(GamemodeTitle), "L4DStats_GamemodeCoop");
 			case GAMEMODE_SURVIVAL:
-				strcopy(GamemodeTitle, sizeof(GamemodeTitle), "Survival");
+				StatsFormatPhrase(client, GamemodeTitle, sizeof(GamemodeTitle), "L4DStats_GamemodeSurvival");
 			case GAMEMODE_REALISM:
-				strcopy(GamemodeTitle, sizeof(GamemodeTitle), "Realism");
+				StatsFormatPhrase(client, GamemodeTitle, sizeof(GamemodeTitle), "L4DStats_GamemodeRealism");
 			case GAMEMODE_OTHERMUTATIONS:
 			{
-				strcopy(GamemodeTitle, sizeof(GamemodeTitle), "Mutations");
+				StatsFormatPhrase(client, GamemodeTitle, sizeof(GamemodeTitle), "L4DStats_GamemodeMutations");
 				//SQL_FetchString(hndl, 1, MutationInfo, sizeof(MutationInfo));
 				//Format(GamemodeTitle, sizeof(GamemodeTitle), "Mutations (%s)", MutationInfo);
 			}
@@ -2002,10 +2009,10 @@ public CreateTimedMapsMenu2(Handle:owner, Handle:hndl, const String:error[], any
 	if (SQL_GetRowCount(hndl) <= 0)
 	{
 		new Handle:TimedMapsPanel = CreatePanel();
-		SetPanelTitle(TimedMapsPanel, "模式时间:");
+		StatsSetPanelTitle(TimedMapsPanel, client, "L4DStats_ModeTimesTitle");
 
-		DrawPanelText(TimedMapsPanel, "这模式还没被玩过!");
-		DrawPanelItem(TimedMapsPanel, "Close");
+		StatsDrawPanelText(TimedMapsPanel, client, "L4DStats_ModeNeverPlayed");
+		StatsDrawPanelItem(TimedMapsPanel, client, "L4DStats_Close");
 
 		SendPanelToClient(TimedMapsPanel, client, TimedMapsPanelHandler, 30);
 		CloseHandle(TimedMapsPanel);
@@ -2018,7 +2025,7 @@ public CreateTimedMapsMenu2(Handle:owner, Handle:hndl, const String:error[], any
 
 	GetCurrentMap(CurrentMapName, sizeof(CurrentMapName));
 
-	SetMenuTitle(menu, "Timed Maps:");
+	StatsSetMenuTitle(menu, client, "L4DStats_TimedMapsTitle");
 	SetMenuExitBackButton(menu, true);
 	SetMenuExitButton(menu, true);
 
@@ -2143,10 +2150,10 @@ public CreateTimedMapsMenu3(Handle:owner, Handle:hndl, const String:error[], any
 	if (SQL_GetRowCount(hndl) <= 0)
 	{
 		new Handle:TimedMapsPanel = CreatePanel();
-		SetPanelTitle(TimedMapsPanel, "Timed Maps:");
+		StatsSetPanelTitle(TimedMapsPanel, client, "L4DStats_TimedMapsTitle");
 
-		DrawPanelText(TimedMapsPanel, "这地图还没被玩过!");
-		DrawPanelItem(TimedMapsPanel, "Close");
+		StatsDrawPanelText(TimedMapsPanel, client, "L4DStats_MapNeverPlayed");
+		StatsDrawPanelItem(TimedMapsPanel, client, "L4DStats_Close");
 
 		SendPanelToClient(TimedMapsPanel, client, TimedMapsPanelHandler, 30);
 		CloseHandle(TimedMapsPanel);
@@ -2157,7 +2164,7 @@ public CreateTimedMapsMenu3(Handle:owner, Handle:hndl, const String:error[], any
 	new Handle:menu = CreateMenu(Menu_CreateTimedMapsMenu3Hndl), Float:MapTime;
 	decl String:Map[MAX_LINE_WIDTH], String:Info[MAX_LINE_WIDTH], String:Value[MAX_LINE_WIDTH];
 
-	SetMenuTitle(menu, "Timed Maps:");
+	StatsSetMenuTitle(menu, client, "L4DStats_TimedMapsTitle");
 	SetMenuExitBackButton(menu, true);
 	SetMenuExitButton(menu, true);
 
@@ -2166,7 +2173,7 @@ public CreateTimedMapsMenu3(Handle:owner, Handle:hndl, const String:error[], any
 		SQL_FetchString(hndl, 1, Map, sizeof(Map));
 		MapTime = SQL_FetchFloat(hndl, 2);
 
-		SetTimeLabel(MapTime, Value, sizeof(Value));
+		SetTimeLabel(MapTime, Value, sizeof(Value), client);
 
 		Format(Info, sizeof(Info), "%i\\%s\\%f", SQL_FetchInt(hndl, 0), Map, MapTime);
 
@@ -2260,7 +2267,7 @@ public CreateTimedMapsMenu4(Handle:owner, Handle:hndl, const String:error[], any
 
 	decl String:Name[32], String:SteamID[MAX_LINE_WIDTH];
 
-	SetMenuTitle(menu, "Timed Maps:");
+	StatsSetMenuTitle(menu, client, "L4DStats_TimedMapsTitle");
 	SetMenuExitBackButton(menu, true);
 	SetMenuExitButton(menu, true);
 
@@ -2322,7 +2329,7 @@ public CreatePPMMenu(Handle:owner, Handle:hndl, const String:error[], any:client
 
 	decl String:Name[32], String:DisplayName[MAX_LINE_WIDTH];
 
-	SetMenuTitle(menu, "Player PPM:");
+	StatsSetMenuTitle(menu, client, "L4DStats_PlayerPPMTitle");
 	SetMenuExitBackButton(menu, false);
 	SetMenuExitButton(menu, true);
 
@@ -2337,7 +2344,7 @@ public CreatePPMMenu(Handle:owner, Handle:hndl, const String:error[], any:client
 		ReplaceString(Name, sizeof(Name), "&#61;", "=");
 		ReplaceString(Name, sizeof(Name), "&#42;", "*");
 
-		Format(DisplayName, sizeof(DisplayName), "%s (PPM: %.2f)", Name, SQL_FetchFloat(hndl, 2));
+		StatsFormatPhrase(client, DisplayName, sizeof(DisplayName), "L4DStats_PlayerPPMMenuItem", Name, SQL_FetchFloat(hndl, 2));
 
 		AddMenuItem(menu, SteamID, DisplayName);
 	}
@@ -2400,24 +2407,14 @@ public Menu_CreateRankMenuHandler(Handle:menu, MenuAction:action, param1, param2
 // Send the RANKABOUT panel to the client's display.
 public DisplayAboutPanel(client)
 {
-	decl String:Value[MAX_LINE_WIDTH];
-
 	new Handle:panel = CreatePanel();
 
-	Format(Value, sizeof(Value), "关于 %s:", PLUGIN_NAME);
-	SetPanelTitle(panel, Value);
-
-	Format(Value, sizeof(Value), "版本: %s", PLUGIN_VERSION);
-	DrawPanelText(panel, Value);
-
-	Format(Value, sizeof(Value), "作者: %s", "Mikko Andersson (muukis) translator:东");
-	DrawPanelText(panel, Value);
-
-	Format(Value, sizeof(Value), "描述: %s", "记录玩家的游戏记录.");
-	DrawPanelText(panel, Value);
-
-	DrawPanelItem(panel, "后退");
-	DrawPanelItem(panel, "关闭");
+	StatsSetPanelTitle(panel, client, "L4DStats_AboutTitle");
+	StatsDrawPanelText(panel, client, "L4DStats_AboutVersion", PLUGIN_VERSION);
+	StatsDrawPanelText(panel, client, "L4DStats_AboutAuthor");
+	StatsDrawPanelText(panel, client, "L4DStats_AboutDescription");
+	StatsDrawPanelItem(panel, client, "L4DStats_Back");
+	StatsDrawPanelItem(panel, client, "L4DStats_Close");
 
 	SendPanelToClient(panel, client, AboutPanelHandler, 30);
 	CloseHandle(panel);
@@ -2426,17 +2423,12 @@ public DisplayAboutPanel(client)
 // Send the RANKABOUT panel to the client's display.
 public DisplaySettingsPanel(client)
 {
-	decl String:Value[MAX_LINE_WIDTH];
-
 	new Handle:panel = CreatePanel();
 
-	Format(Value, sizeof(Value), "%s 设置:", PLUGIN_NAME);
-	SetPanelTitle(panel, Value);
-
-	DrawPanelItem(panel, (ClientRankMute[client] ? "解除rank提示禁用 (当前状态: 已禁用)" : "禁用rank提示 (当前状态: 未禁用)"));
-
-	DrawPanelItem(panel, "后退");
-	DrawPanelItem(panel, "关闭");
+	StatsSetPanelTitle(panel, client, "L4DStats_SettingsTitle");
+	StatsDrawPanelItem(panel, client, ClientRankMute[client] ? "L4DStats_SettingsUnmute" : "L4DStats_SettingsMute");
+	StatsDrawPanelItem(panel, client, "L4DStats_Back");
+	StatsDrawPanelItem(panel, client, "L4DStats_Close");
 
 	SendPanelToClient(panel, client, SettingsPanelHandler, 30);
 	CloseHandle(panel);
@@ -2456,7 +2448,7 @@ public DisplayTop10(Handle:owner, Handle:hndl, const String:error[], any:client)
 	new String:Name[32];
 
 	new Handle:Top10Panel = CreatePanel();
-	SetPanelTitle(Top10Panel, "Top 10 玩家");
+	StatsSetPanelTitle(Top10Panel, client, "L4DStats_Top10Title");
 
 	while (SQL_FetchRow(hndl))
 	{
@@ -2482,15 +2474,15 @@ public DisplayQuarterTop10(Handle:owner, Handle:hndl, const String:error[], any:
 	{
 		LogError("DisplayQuarterTop10 failed! Reason: %s", error);
 		if (Stats_IsValidHumanClient(client))
-			StatsPrintToChat(client, "季度榜单查询失败，请稍后再试。");
+			StatsPrintToChat(client, "L4DStats_QuarterRankingQueryFailed");
 		return;
 	}
 
 	decl String:Name[32], String:Disp[MAX_LINE_WIDTH], String:QuarterLabel[32];
-	QuarterRank_FormatCurrentQuarter(QuarterLabel, sizeof(QuarterLabel));
+	QuarterRank_FormatCurrentQuarter(client, QuarterLabel, sizeof(QuarterLabel));
 
 	new Handle:Top10Panel = CreatePanel();
-	Format(Disp, sizeof(Disp), "%s Top 10 玩家", QuarterLabel);
+	StatsFormatPhrase(client, Disp, sizeof(Disp), "L4DStats_QuarterTop10Title", QuarterLabel);
 	SetPanelTitle(Top10Panel, Disp);
 
 	while (SQL_FetchRow(hndl))
@@ -2503,7 +2495,7 @@ public DisplayQuarterTop10(Handle:owner, Handle:hndl, const String:error[], any:
 		ReplaceString(Name, sizeof(Name), "&#61;", "=");
 		ReplaceString(Name, sizeof(Name), "&#42;", "*");
 
-		Format(Disp, sizeof(Disp), "%s (%i)", Name, SQL_FetchInt(hndl, 1));
+		StatsFormatPhrase(client, Disp, sizeof(Disp), "L4DStats_PlayerScoreMenuItem", Name, SQL_FetchInt(hndl, 1));
 		DrawPanelItem(Top10Panel, Disp);
 	}
 
@@ -2523,7 +2515,7 @@ public DisplayTop10PPM(Handle:owner, Handle:hndl, const String:error[], any:clie
 	decl String:Name[32], String:Disp[MAX_LINE_WIDTH];
 
 	new Handle:TopPPMPanel = CreatePanel();
-	SetPanelTitle(TopPPMPanel, "Top 10 PPM 玩家");
+	StatsSetPanelTitle(TopPPMPanel, client, "L4DStats_Top10PPMTitle");
 
 	while (SQL_FetchRow(hndl))
 	{
@@ -2535,7 +2527,7 @@ public DisplayTop10PPM(Handle:owner, Handle:hndl, const String:error[], any:clie
 		ReplaceString(Name, sizeof(Name), "&#61;", "=");
 		ReplaceString(Name, sizeof(Name), "&#42;", "*");
 
-		Format(Disp, sizeof(Disp), "%s (PPM: %.2f)", Name, SQL_FetchFloat(hndl, 1));
+		StatsFormatPhrase(client, Disp, sizeof(Disp), "L4DStats_PlayerPPMMenuItem", Name, SQL_FetchFloat(hndl, 1));
 
 		DrawPanelItem(TopPPMPanel, Disp);
 	}
@@ -2591,7 +2583,7 @@ public ClearPlayersPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 	if (param2 == 1)
 	{
 		ClearStatsPlayers(param1);
-		StatsPrintToChatPreFormatted(param1, "All player stats cleared!");
+		StatsPrintToChatPreFormatted(param1, "L4DStats_AllPlayerStatsCleared");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2606,7 +2598,7 @@ public ClearMapsPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 	if (param2 == 1)
 	{
 		ClearStatsMaps(param1);
-		StatsPrintToChatPreFormatted(param1, "All map stats cleared!");
+		StatsPrintToChatPreFormatted(param1, "L4DStats_AllMapStatsCleared");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2621,7 +2613,7 @@ public ClearAllPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 	if (param2 == 1)
 	{
 		ClearStatsAll(param1);
-		StatsPrintToChatPreFormatted(param1, "All stats cleared!");
+		StatsPrintToChatPreFormatted(param1, "L4DStats_AllStatsCleared");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2649,12 +2641,12 @@ public CleanPlayersPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 				Success &= DoFastQuery(param1, "DELETE FROM %splayers WHERE %s < %i AND lastontime < UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 HOUR))", DbPrefix, DB_PLAYERS_TOTALPLAYTIME, PlaytimeMinutes);
 
 			if (Success)
-				StatsPrintToChatPreFormatted(param1, "Player cleaning successful!");
+				StatsPrintToChatPreFormatted(param1, "L4DStats_PlayerCleaningSuccess");
 			else
-				StatsPrintToChatPreFormatted(param1, "Player cleaning failed!");
+				StatsPrintToChatPreFormatted(param1, "L4DStats_PlayerCleaningFailed");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Player cleaning is disabled by configurations!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_PlayerCleaningDisabled");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2669,9 +2661,9 @@ public RemoveCustomMapsPanelHandler(Handle:menu, MenuAction:action, param1, para
 	if (param2 == 1)
 	{
 		if (DoFastQuery(param1, "DELETE FROM %smaps WHERE custom = 1", DbPrefix))
-			StatsPrintToChatPreFormatted(param1, "All custom maps removed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_CustomMapsRemoved");
 		else
-			StatsPrintToChatPreFormatted(param1, "Removing custom maps failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_CustomMapsRemoveFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2688,10 +2680,10 @@ public ClearTMAllPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 		if (DoFastQuery(param1, "DELETE FROM %stimedmaps", DbPrefix))
 		{
 			DoFastQuery(param1, "DELETE FROM `%stimedmap_runs`", DbPrefix);
-			StatsPrintToChatPreFormatted(param1, "All map timings removed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_AllMapTimesRemoved");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Removing map timings failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_MapTimesRemoveFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2708,10 +2700,10 @@ public ClearTMCoopPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 		if (DoFastQuery(param1, "DELETE FROM %stimedmaps WHERE gamemode = %i", DbPrefix, GAMEMODE_COOP))
 		{
 			DoFastQuery(param1, "DELETE FROM `%stimedmap_runs` WHERE gamemode = %i", DbPrefix, GAMEMODE_COOP);
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Coop successful!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_CoopMapTimesClearSuccess");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Coop failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_CoopMapTimesClearFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2728,10 +2720,10 @@ public ClearTMSurvivalPanelHandler(Handle:menu, MenuAction:action, param1, param
 		if (DoFastQuery(param1, "DELETE FROM %stimedmaps WHERE gamemode = %i", DbPrefix, GAMEMODE_SURVIVAL))
 		{
 			DoFastQuery(param1, "DELETE FROM `%stimedmap_runs` WHERE gamemode = %i", DbPrefix, GAMEMODE_SURVIVAL);
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Survival successful!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_SurvivalMapTimesClearSuccess");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Survival failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_SurvivalMapTimesClearFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2748,10 +2740,10 @@ public ClearTMRealismPanelHandler(Handle:menu, MenuAction:action, param1, param2
 		if (DoFastQuery(param1, "DELETE FROM %stimedmaps WHERE gamemode = %i", DbPrefix, GAMEMODE_REALISM))
 		{
 			DoFastQuery(param1, "DELETE FROM `%stimedmap_runs` WHERE gamemode = %i", DbPrefix, GAMEMODE_REALISM);
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Realism successful!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_RealismMapTimesClearSuccess");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Realism failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_RealismMapTimesClearFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2768,10 +2760,10 @@ public ClearTMMutationsPanelHandler(Handle:menu, MenuAction:action, param1, para
 		if (DoFastQuery(param1, "DELETE FROM %stimedmaps WHERE gamemode = %i", DbPrefix, GAMEMODE_OTHERMUTATIONS))
 		{
 			DoFastQuery(param1, "DELETE FROM `%stimedmap_runs` WHERE gamemode = %i", DbPrefix, GAMEMODE_OTHERMUTATIONS);
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Mutations successful!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_MutationMapTimesClearSuccess");
 		}
 		else
-			StatsPrintToChatPreFormatted(param1, "Clearing map timings for Mutations failed!");
+			StatsPrintToChatPreFormatted(param1, "L4DStats_MutationMapTimesClearFailed");
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
@@ -2809,7 +2801,7 @@ public RankVotePanelHandler(Handle:menu, MenuAction:action, param1, param2)
 				RankVoteTimer = INVALID_HANDLE;
 			}
 
-			StatsPrintToChatAll("Vote to shuffle teams by player PPM {lightgreen}%s {default}with {green}%i (yes) against %i (no){default}.", (yesvotes >= WinningVoteCount ? "PASSED" : "DID NOT PASS"), yesvotes, novotes);
+			StatsPrintToChatAll(yesvotes >= WinningVoteCount ? "L4DStats_RankVotePassed" : "L4DStats_RankVoteFailed", yesvotes, novotes);
 
 			if (yesvotes >= WinningVoteCount)
 				CreateTimer(2.0, timer_ShuffleTeams);
@@ -2821,7 +2813,7 @@ public RankVotePanelHandler(Handle:menu, MenuAction:action, param1, param2)
 		decl String:Name[32];
 		GetClientName(param1, Name, sizeof(Name));
 
-		StatsPrintToChatAll("{olive}%s {default}voted. {green}%i/%i {default}players have voted.", Name, votes, humans);
+		StatsPrintToChatAll("L4DStats_RankVoteProgress", Name, votes, humans);
 	}
 }
 
@@ -2887,7 +2879,7 @@ DisplayClearPanel(client, delay=30)
 		AddMenuItem(ClearPlayerMenu, id, Name);
 	}
 
-	SetMenuTitle(ClearPlayerMenu, "Clear player stats:");
+	StatsSetMenuTitle(ClearPlayerMenu, client, "L4DStats_ClearPlayerStatsTitle");
 	DisplayMenu(ClearPlayerMenu, client, delay);
 }
 
@@ -2926,12 +2918,12 @@ public DisplayClearPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 		decl String:Name[32];
 		GetClientName(client, Name, sizeof(Name));
 
-		StatsPrintToChatPreFormatted(client, "你的游玩记录已被清除!");
+		StatsPrintToChatPreFormatted(client, "L4DStats_OwnStatsCleared");
 		if (client != param1)
-			StatsPrintToChat(param1, "玩家 {olive}%s {default}游玩记录清除!", Name);
+			StatsPrintToChat(param1, "L4DStats_PlayerStatsCleared", Name);
 	}
 	else
-		StatsPrintToChatPreFormatted(param1, "清除玩家游玩记录失败!");
+		StatsPrintToChatPreFormatted(param1, "L4DStats_PlayerStatsClearFailed");
 }
 
 // Handler for RANKABOUT panel.

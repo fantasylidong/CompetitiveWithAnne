@@ -38,9 +38,6 @@ Action Timer_TeleportTick(Handle timer)
 
         if (!vis)
         {
-            if (TeleportQueue_Length() == 0)
-                gST.teleportDistCur = gCV.fSpawnMin;
-
             int zc = GetInfectedClass(c);
             if (zc == view_as<int>(SI_Smoker) && g_bSmokerLib)
             {

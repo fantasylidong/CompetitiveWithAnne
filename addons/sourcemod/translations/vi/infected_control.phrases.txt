@@ -273,5 +273,9 @@
 	{
 		"vi"		"{green}[IC]{default} Traitor reserved slots: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"vi"		"[IC] Dang xay dung lai do thi Nav va bo nho dem tien do tung khu vuc."
+	}
 
 }

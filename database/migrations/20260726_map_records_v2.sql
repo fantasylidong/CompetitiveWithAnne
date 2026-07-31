@@ -115,33 +115,42 @@ INSERT INTO `legacy_map_bests` (
   `si_count`,`si_spawn_time`,`usebuy`,`auto`,`legacy_mode`,`created`,`modified`
 )
 SELECT
-  SHA2(CONCAT_WS('|',tm.`map`,tm.`gamemode`,
-    CASE WHEN tm.`mode` > 0 AND tm.`difficulty` = 3 AND tm.`modified` < '2026-05-19 00:00:00' THEN 4 ELSE tm.`difficulty` END,
-    tm.`steamid`,tm.`mutation`,tm.`mode`,tm.`sinum`,tm.`sitime`,tm.`usebuy`,tm.`anneversion`,tm.`auto`,tm.`players`), 256),
-  tm.`map`, tm.`gamemode`, tm.`mutation`,
-  CASE tm.`mode`
+  SHA2(CONCAT_WS('|',src.`map`,src.`gamemode`,src.`difficulty`,src.`steamid`,src.`mutation`,src.`mode`,src.`sinum`,src.`sitime`,src.`usebuy`,src.`anneversion`,src.`auto`,src.`player_count`), 256),
+  src.`map`, src.`gamemode`, src.`mutation`,
+  CASE src.`mode`
     WHEN 1 THEN 'annehappy' WHEN 2 THEN 'witchparty' WHEN 3 THEN 'allcharger'
     WHEN 4 THEN 'alone' WHEN 5 THEN 'hunters' WHEN 6 THEN 'anne_hardcore'
     WHEN 7 THEN 'anne_shotgun'
-    ELSE CASE tm.`gamemode`
+    ELSE CASE src.`gamemode`
       WHEN 0 THEN 'legacy_coop' WHEN 1 THEN 'legacy_versus'
       WHEN 2 THEN 'legacy_realism' WHEN 3 THEN 'legacy_survival'
       WHEN 4 THEN 'legacy_scavenge' WHEN 5 THEN 'legacy_realism_versus'
-      WHEN 6 THEN CONCAT('legacy_mutation_', COALESCE(NULLIF(tm.`mutation`, ''), 'unknown'))
+      WHEN 6 THEN CONCAT('legacy_mutation_', COALESCE(NULLIF(src.`mutation`, ''), 'unknown'))
       ELSE 'legacy_unknown'
     END
   END,
-  tm.`anneversion`,
-  CASE WHEN tm.`gamemode` = 3 THEN 'survival'
-       WHEN tm.`gamemode` IN (1,4,5) AND tm.`mode` = 0 THEN 'round_history'
+  src.`anneversion`,
+  CASE WHEN src.`gamemode` = 3 THEN 'survival'
+       WHEN src.`gamemode` IN (1,4,5) AND src.`mode` = 0 THEN 'round_history'
        ELSE 'completion' END,
-  CASE WHEN tm.`mode` > 0 THEN 'anne_ai' ELSE 'game' END,
-  CASE WHEN tm.`mode` > 0 AND tm.`difficulty` = 3 AND tm.`modified` < '2026-05-19 00:00:00'
-       THEN 4 ELSE tm.`difficulty` END,
-  tm.`steamid`,tm.`plays`,ROUND(tm.`time` * 1000),tm.`players`,tm.`sinum`,tm.`sitime`,
-  tm.`usebuy`,tm.`auto`,tm.`mode`,tm.`created`,tm.`modified`
-FROM `timedmaps` tm
+  CASE WHEN src.`mode` > 0 THEN 'anne_ai' ELSE 'game' END,
+  src.`difficulty`,src.`steamid`,src.`plays`,ROUND(src.`best_time` * 1000),src.`player_count`,src.`sinum`,src.`sitime`,
+  src.`usebuy`,src.`auto`,src.`mode`,src.`created`,src.`modified`
+FROM (
+  SELECT
+    tm.`map`,tm.`gamemode`,tm.`mutation`,tm.`mode`,tm.`sinum`,tm.`sitime`,tm.`usebuy`,tm.`anneversion`,tm.`auto`,
+    tm.`players` AS `player_count`,
+    CASE WHEN tm.`mode` > 0 AND tm.`difficulty` = 3 AND tm.`modified` < '2026-05-19 00:00:00' THEN 4 ELSE tm.`difficulty` END AS `difficulty`,
+    tm.`steamid`,SUM(tm.`plays`) AS `plays`,
+    CASE WHEN tm.`gamemode` = 3 THEN MAX(tm.`time`) ELSE MIN(tm.`time`) END AS `best_time`,
+    MIN(tm.`created`) AS `created`,MAX(tm.`modified`) AS `modified`
+  FROM `timedmaps` tm
+  GROUP BY tm.`map`,tm.`gamemode`,tm.`mutation`,tm.`mode`,tm.`sinum`,tm.`sitime`,tm.`usebuy`,tm.`anneversion`,tm.`auto`,tm.`players`,
+    CASE WHEN tm.`mode` > 0 AND tm.`difficulty` = 3 AND tm.`modified` < '2026-05-19 00:00:00' THEN 4 ELSE tm.`difficulty` END,
+    tm.`steamid`
+) src
 ON DUPLICATE KEY UPDATE
   `plays` = VALUES(`plays`),
   `best_duration_ms` = VALUES(`best_duration_ms`),
+  `created` = VALUES(`created`),
   `modified` = VALUES(`modified`);

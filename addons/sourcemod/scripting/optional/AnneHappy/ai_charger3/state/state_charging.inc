@@ -116,7 +116,7 @@ stock Action StateCharging_OnUpdate(int client, int& buttons, float vel[3], floa
     dist = getVectorDistance2D(pos, targetPos);
     // 是否可视目标
     static bool visible;
-    visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    visible = isSurvivorVisibleToCharger(client, target, targetEyePos);
     if (visible) {
         g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
     }
@@ -308,27 +308,9 @@ bool shouldExitChargingState(int client, int target, float dist, bool visible, T
         return true;
     }
 
-    static float pos[3], targetPos[3];
-    GetClientAbsOrigin(client, pos);
-    GetClientAbsOrigin(target, targetPos);
-
-    // 冲锋路径上面存在障碍物和高度差过大的 Gap 属于独立的硬退出理由, 不受距离、视野或最后一跳宽限窗口影响
-    if (isChargePathBlocked(client, target)) {
-        stateLog.debugAll("Charger (%N), charge path to target (%N) is blocked, transition to APPROACH STATE", client, target);
-        return true;
-    }
-
     /*
-    * 沿实际地面逐段采样。连续上坡/下坡即使累计高度差超过 JUMP_HEIGHT 也不会退出
-    * 只有相邻地面不连续、两个采样点之间高度差大于 JUMP_HEIGHT 说明存在 Gap 才退出
-    */
-    if (hasPotentialGap2(client, pos, targetPos, JUMP_HEIGHT)) {
-        stateLog.debugAll("Charger (%N), route to target (%N) has a gap, transition to APPROACH STATE", client, target);
-        return true;
-    }
-
-    /*
-    * 最后一跳待决期间只忽略软退出条件, 上面的目标状态、阻挡和 Gap 仍然立即生效
+    * 最后一跳待决期间只忽略软退出条件, 目标状态、阻挡和 Gap 仍然立即生效。
+    * 非最后一跳先判定无 Trace 的软退出，避免已确定退出时继续扫描整段地面。
     */
     static bool finalHopPending;
     finalHopPending = (
@@ -337,34 +319,39 @@ bool shouldExitChargingState(int client, int target, float dist, bool visible, T
         GetGameTime() - g_AiChargers[client].m_flFinalBhopStartTime <= getJumpAirTime() + CHARGE_FINAL_HOP_GRACE_TIME
     );
 
-    if (finalHopPending)
-        return false;
+    if (!finalHopPending) {
+        static float minDist;
+        minDist = g_cvBhopMinDist.FloatValue + STATE_TOLERANCE_DIST;
 
-    static float minDist;
-    minDist = g_cvBhopMinDist.FloatValue + STATE_TOLERANCE_DIST;
+        if (!visible && GetGameTime() - g_AiChargers[client].m_flLastVisibleTime >= CHARGING_LOST_SIGHT_GRACE) {
+            stateLog.debugAll("Charger (%N) lost sight of target (%N) for %.1f seconds, transition to APPROACH STATE", client, target, CHARGING_LOST_SIGHT_GRACE);
+            return true;
+        }
+        if (threatType != Threat_Melee && dist > minDist) {
+            stateLog.debugAll("Charger (%N), target (%N), distance %.2f > min dist %.2f, transition to APPROACH STATE", client, target, dist, minDist);
+            return true;
+        }
 
-    // 连续丢失目标视野超过宽限期才转换为 APPROACH STATE
-    if (!visible && GetGameTime() - g_AiChargers[client].m_flLastVisibleTime >= CHARGING_LOST_SIGHT_GRACE) {
-        stateLog.debugAll("Charger (%N) lost sight of target (%N) for %.1f seconds, transition to APPROACH STATE", client, target, CHARGING_LOST_SIGHT_GRACE);
+        static float meleeRange;
+        meleeRange = !cvMeleeRange ? DEFAULT_MELEE_RANGE : cvMeleeRange.FloatValue;
+        minDist = meleeRange + g_cvMeleeBaitZoneMaxRange.FloatValue + STATE_TOLERANCE_DIST;
+        if (threatType == Threat_Melee && dist > minDist) {
+            stateLog.debugAll("Charger (%N), target (%N) holding melee, dist %.2f > baitZoneMax %.2f, transition to APPROACH STATE", client, target, dist, minDist);
+            return true;
+        }
+    }
+
+    static float pos[3], targetPos[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+
+    if (isChargePathBlocked(client, target)) {
+        stateLog.debugAll("Charger (%N), charge path to target (%N) is blocked, transition to APPROACH STATE", client, target);
         return true;
     }
-    // 目标非手持近战, 且到目标距离大于 g_cvBhopMinDist.FloatValue + 容差距离, 转换为 APPROACH STATE
-    if (
-        threatType != Threat_Melee &&
-        dist > minDist
-    ) {
-        stateLog.debugAll("Charger (%N), target (%N), distance %.2f > min dist %.2f, transition to APPROACH STATE", client, target, dist, minDist);
-        return true;
-    }
-    // 目标手持近战, 且到目标距离大于 meleeRange + g_cvMeleeBaitZoneMaxRange.FloatValue, 转换为 APPROACH STATE
-    static float meleeRange;
-    meleeRange = !cvMeleeRange ? DEFAULT_MELEE_RANGE : cvMeleeRange.FloatValue;
-    minDist = meleeRange + g_cvMeleeBaitZoneMaxRange.FloatValue + STATE_TOLERANCE_DIST;
-    if (
-        threatType == Threat_Melee &&
-        dist > minDist
-    ) {
-        stateLog.debugAll("Charger (%N), target (%N) holding melee, dist %.2f > baitZoneMax %.2f, transition to APPROACH STATE", client, target, dist, minDist);
+
+    if (hasPotentialGap2(client, pos, targetPos, JUMP_HEIGHT)) {
+        stateLog.debugAll("Charger (%N), route to target (%N) has a gap, transition to APPROACH STATE", client, target);
         return true;
     }
     return false;

@@ -459,6 +459,7 @@ public OnPluginStart()
 
 public OnMapEnd()
 {
+	ScoreLog_FlushNow();
 	MapChangingForConnectAnnounce = true;
 	// 数据库连接保持跨地图运行。
 }

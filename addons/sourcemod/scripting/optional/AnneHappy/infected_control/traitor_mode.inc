@@ -57,6 +57,11 @@ static int g_ITDamageLedgerClass[MAXPLAYERS + 1];
 static bool g_ITDamageSummaryPending[MAXPLAYERS + 1];
 static bool g_ITDamagePenaltyPending[MAXPLAYERS + 1];
 static float g_ITDamageFinalizeAfter[MAXPLAYERS + 1];
+static bool g_ITDamageHooked[MAXPLAYERS + 1];
+static bool g_ITAutoBhopHooked[MAXPLAYERS + 1];
+static bool g_ITDamageTrackingNeeded;
+static bool g_ITDamageUnhookPending;
+static int g_ITDamageUnhookGeneration;
 static ConVar g_ITSurvivorIncapHealth = null;
 static ConVar g_ITTankFrustrationSpawnDelay = null;
 static ConVar g_ITVomitFadeStart = null;
@@ -116,7 +121,13 @@ static bool Traitor_IsDamageLedgerActive(int client)
 
 static bool Traitor_IsDamageAttributor(int client)
 {
-    return Traitor_IsAliveClient(client) || Traitor_IsDamageLedgerActive(client);
+    if (client < 1 || client > MaxClients)
+        return false;
+
+    if (g_ITDamageLedgerActive[client])
+        return true;
+
+    return g_ITState[client] == Traitor_Alive && Traitor_IsAliveClient(client);
 }
 
 static bool Traitor_IsTrackedEntityIndex(int entity)
@@ -369,6 +380,9 @@ static bool Traitor_IsClassAttributor(int client, int zc)
     if (client < 1 || client > MaxClients)
         return false;
 
+    if (g_ITState[client] != Traitor_Alive)
+        return Traitor_IsDamageLedgerActive(client) && g_ITDamageLedgerClass[client] == zc;
+
     if (Traitor_IsAliveClient(client))
         return g_ITClass[client] == zc;
 
@@ -421,16 +435,33 @@ static bool Traitor_BeginDelayedFinalization(int client, float &delay)
     if (!Traitor_OpenDamageLedger(client))
         return false;
 
+    Traitor_RefreshDamageHookDemand();
     g_ITDamagePenaltyPending[client] = true;
     return true;
 }
 
 void Traitor_HookClientDamage(int client)
 {
+    if (client < 1
+        || client > MaxClients
+        || !IsClientInGame(client)
+        || !g_ITDamageTrackingNeeded
+        || g_ITDamageHooked[client])
+        return;
+
+    SDKHook(client, SDKHook_OnTakeDamage, Traitor_OnTakeDamage);
+    SDKHook(client, SDKHook_OnTakeDamagePost, Traitor_OnTakeDamagePost);
+    g_ITDamageHooked[client] = true;
+}
+
+void Traitor_InitializeClientDamage(int client)
+{
     if (client < 1 || client > MaxClients || !IsClientInGame(client))
         return;
 
-    if (g_ITState[client] == Traitor_None)
+    if (g_ITState[client] == Traitor_None
+        && !g_ITDamageLedgerActive[client]
+        && !g_ITDamageSummaryPending[client])
     {
         Traitor_ResetClientRoundUseCache(client);
         g_ITDamageLedgerActive[client] = false;
@@ -443,8 +474,7 @@ void Traitor_HookClientDamage(int client)
         Traitor_ClearDamageSourcesForOwner(client);
     }
 
-    SDKHook(client, SDKHook_OnTakeDamage, Traitor_OnTakeDamage);
-    SDKHook(client, SDKHook_OnTakeDamagePost, Traitor_OnTakeDamagePost);
+    Traitor_HookClientDamage(client);
 }
 
 void Traitor_UnhookClientDamage(int client)
@@ -452,17 +482,103 @@ void Traitor_UnhookClientDamage(int client)
     if (client < 1 || client > MaxClients)
         return;
 
-    SDKUnhook(client, SDKHook_OnTakeDamage, Traitor_OnTakeDamage);
-    SDKUnhook(client, SDKHook_OnTakeDamagePost, Traitor_OnTakeDamagePost);
+    if (g_ITDamageHooked[client])
+    {
+        SDKUnhook(client, SDKHook_OnTakeDamage, Traitor_OnTakeDamage);
+        SDKUnhook(client, SDKHook_OnTakeDamagePost, Traitor_OnTakeDamagePost);
+        g_ITDamageHooked[client] = false;
+    }
     g_ITPendingDamageAttacker[client] = 0;
     g_ITSkipNextDamagePost[client] = false;
     g_ITPendingIncapAttacker[client] = 0;
     g_ITSurvivorIncapped[client] = false;
 }
 
+static bool Traitor_HasDamageHookDemand()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (g_ITDamageLedgerActive[client] || g_ITDamageSummaryPending[client])
+            return true;
+    }
+
+    return false;
+}
+
+static void Traitor_EnableDamageHooksNow()
+{
+    if (g_ITDamageTrackingNeeded)
+        return;
+
+    g_ITDamageTrackingNeeded = true;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client))
+            Traitor_HookClientDamage(client);
+    }
+}
+
+static void Frame_TraitorDisableDamageHooks(any data)
+{
+    if (!g_ITDamageUnhookPending || data != g_ITDamageUnhookGeneration)
+        return;
+
+    g_ITDamageUnhookPending = false;
+
+    // A new traitor may have materialized after the unhook was queued.
+    if (Traitor_HasDamageHookDemand())
+    {
+        Traitor_EnableDamageHooksNow();
+        return;
+    }
+
+    g_ITDamageTrackingNeeded = false;
+    for (int client = 1; client <= MaxClients; client++)
+        Traitor_UnhookClientDamage(client);
+}
+
+static void Traitor_RefreshDamageHookDemand()
+{
+    if (Traitor_HasDamageHookDemand())
+    {
+        Traitor_EnableDamageHooksNow();
+        return;
+    }
+
+    if (!g_ITDamageTrackingNeeded || g_ITDamageUnhookPending)
+        return;
+
+    // Keep damage pre/post paired when the last ledger closes from a damage
+    // related callback. The frame callback rechecks demand before unhooking.
+    g_ITDamageUnhookPending = true;
+    g_ITDamageUnhookGeneration++;
+    RequestFrame(Frame_TraitorDisableDamageHooks, g_ITDamageUnhookGeneration);
+}
+
+void Traitor_ShutdownDamageHooks()
+{
+    g_ITDamageTrackingNeeded = false;
+    g_ITDamageUnhookPending = false;
+    g_ITDamageUnhookGeneration++;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        // A round/map shutdown is a hard boundary. Pending summaries must not
+        // carry damage or penalties into the next round.
+        g_ITDamageLedgerActive[client] = false;
+        g_ITDamageLedgerClass[client] = 0;
+        g_ITDamageSummaryPending[client] = false;
+        g_ITDamagePenaltyPending[client] = false;
+        g_ITDamageFinalizeAfter[client] = 0.0;
+        g_ITDidDamage[client] = false;
+        g_ITDamageTotal[client] = 0;
+        Traitor_UnhookClientDamage(client);
+    }
+}
+
 static void Traitor_RecordDamage(int attacker, int damage)
 {
-    if (damage <= 0 || (!Traitor_IsAliveClient(attacker) && !Traitor_IsDamageLedgerActive(attacker)))
+    if (damage <= 0
+        || (!Traitor_IsDamageLedgerActive(attacker) && !Traitor_IsAliveClient(attacker)))
         return;
 
     g_ITDidDamage[attacker] = true;
@@ -504,6 +620,8 @@ static void Traitor_FlushDamageSummary(int client)
         g_ITTankBotDamageOwner[bot] = 0;
         g_ITTankBotDamageExpire[bot] = 0.0;
     }
+
+    Traitor_RefreshDamageHookDemand();
 }
 
 static Action Timer_TraitorDamageSummary(Handle timer, int userid)
@@ -540,6 +658,10 @@ static void Traitor_QueueDamageSummary(int client, float delay)
 static bool Traitor_ShouldBlockTankFriendlyFire(int victim, int attacker)
 {
     return victim != attacker
+        && attacker >= 1
+        && attacker <= MaxClients
+        && g_ITState[attacker] == Traitor_Alive
+        && g_ITClass[attacker] == TRAITOR_CLASS_TANK
         && IsValidClient(victim)
         && GetClientTeam(victim) == TEAM_INFECTED
         && Traitor_IsActiveTankClient(attacker);
@@ -608,7 +730,10 @@ public void Traitor_OnTakeDamagePost(int victim, int attacker, int inflictor, fl
 
 public Action L4D_OnIncapacitated(int client, int &inflictor, int &attacker, float &damage, int &damagetype, int &weapon)
 {
-    if (client < 1 || client > MaxClients || !IsValidSurvivor(client))
+    if (!g_ITDamageTrackingNeeded
+        || client < 1
+        || client > MaxClients
+        || !IsValidSurvivor(client))
         return Plugin_Continue;
 
     g_ITPendingIncapAttacker[client] = 0;
@@ -626,7 +751,7 @@ public Action L4D_OnIncapacitated(int client, int &inflictor, int &attacker, flo
 
 public void L4D_OnIncapacitated_Post(int client, int inflictor, int attacker, float damage, int damagetype, int weapon)
 {
-    if (client < 1 || client > MaxClients)
+    if (!g_ITDamageTrackingNeeded || client < 1 || client > MaxClients)
         return;
 
     int recordedAttacker = g_ITPendingIncapAttacker[client];
@@ -637,7 +762,7 @@ public void L4D_OnIncapacitated_Post(int client, int inflictor, int attacker, fl
 
 public void L4D_OnIncapacitated_PostHandled(int client, int inflictor, int attacker, float damage, int damagetype, int weapon)
 {
-    if (client < 1 || client > MaxClients)
+    if (!g_ITDamageTrackingNeeded || client < 1 || client > MaxClients)
         return;
 
     g_ITPendingIncapAttacker[client] = 0;
@@ -646,7 +771,8 @@ public void L4D_OnIncapacitated_PostHandled(int client, int inflictor, int attac
 
 public void L4D_OnVomitedUpon_Post(int victim, int attacker, bool boomerExplosion)
 {
-    if (!IsValidSurvivor(victim)
+    if (!g_ITDamageTrackingNeeded
+        || !IsValidSurvivor(victim)
         || attacker < 1
         || attacker > MaxClients
         || !Traitor_IsClassAttributor(attacker, view_as<int>(SI_Boomer)))
@@ -662,6 +788,9 @@ public void L4D_OnVomitedUpon_Post(int victim, int attacker, bool boomerExplosio
 
 public void L4D2_CInsectSwarm_CanHarm_Post(int acid, int spitter, int entity)
 {
+    if (!g_ITDamageTrackingNeeded)
+        return;
+
     int owner = Traitor_GetTrackedSpitOwner(acid);
     if (owner <= 0 && Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
     {
@@ -681,7 +810,8 @@ public void L4D2_CInsectSwarm_CanHarm_Post(int acid, int spitter, int entity)
 
 public Action L4D2_OnSpitSpread(int spitter, int projectile, float &x, float &y, float &z)
 {
-    if (Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
+    if (g_ITDamageTrackingNeeded
+        && Traitor_IsClassAttributor(spitter, view_as<int>(SI_Spitter)))
         Traitor_RegisterSpitEntity(projectile, spitter);
 
     return Plugin_Continue;
@@ -705,6 +835,9 @@ static int Traitor_ReadSpitEntityOwner(int entity)
 
 public void Traitor_OnSpitEntitySpawnPost(int entity)
 {
+    if (!g_ITDamageTrackingNeeded)
+        return;
+
     int owner = Traitor_ReadSpitEntityOwner(entity);
     if (Traitor_IsClassAttributor(owner, view_as<int>(SI_Spitter)))
         Traitor_RegisterSpitEntity(entity, owner);
@@ -712,7 +845,7 @@ public void Traitor_OnSpitEntitySpawnPost(int entity)
 
 void Traitor_OnEntityCreated(int entity, const char[] classname)
 {
-    if (!Traitor_IsTrackedEntityIndex(entity))
+    if (!g_ITDamageTrackingNeeded || !Traitor_IsTrackedEntityIndex(entity))
         return;
 
     if (StrEqual(classname, "spitter_projectile", false)
@@ -724,6 +857,9 @@ void Traitor_OnEntityCreated(int entity, const char[] classname)
 
 void Traitor_OnEntityDestroyed(int entity)
 {
+    if (!g_ITDamageTrackingNeeded)
+        return;
+
     Traitor_ClearSpitEntity(entity);
 }
 
@@ -866,6 +1002,30 @@ bool IsCountedSpecial(int client)
 static bool Traitor_IsReservedState(TraitorState state)
 {
     return state == Traitor_SpawnLocked || state == Traitor_SpawnAllowed;
+}
+
+static void Traitor_RefreshAutoBhopHook(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    bool shouldHook = IsClientInGame(client) && !IsFakeClient(client)
+        && (g_ITState[client] == Traitor_Alive
+            || Traitor_IsReservedState(g_ITState[client]));
+    if (shouldHook == g_ITAutoBhopHooked[client])
+        return;
+
+    if (shouldHook)
+        SDKHook(client, SDKHook_PreThink, Traitor_OnAutoBhopPreThink);
+    else
+        SDKUnhook(client, SDKHook_PreThink, Traitor_OnAutoBhopPreThink);
+    g_ITAutoBhopHooked[client] = shouldHook;
+}
+
+static void Traitor_SetState(int client, TraitorState state)
+{
+    g_ITState[client] = state;
+    Traitor_RefreshAutoBhopHook(client);
 }
 
 static bool Traitor_IsSlotState(TraitorState state)
@@ -1311,7 +1471,7 @@ void Traitor_ActivateWaitingClients()
             return;
 
         int zc = g_ITClass[client];
-        g_ITState[client] = Traitor_Armed;
+        Traitor_SetState(client, Traitor_Armed);
         g_ITReleaseWave[client] = 0;
         g_ITWaitOrder[client] = 0;
 
@@ -1677,7 +1837,7 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
 
     preserveDamageLedger = preserveDamageLedger || g_ITDamageSummaryPending[client];
 
-    g_ITState[client] = Traitor_None;
+    Traitor_SetState(client, Traitor_None);
     g_ITClass[client] = 0;
     g_ITReleaseWave[client] = 0;
     g_ITRegistrationOrder[client] = 0;
@@ -1699,6 +1859,7 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
     g_ITDeferredRegistrationOrder[client] = 0;
     g_ITDeferredWaitOrder[client] = 0;
     Traitor_CancelSpawnTimer(client);
+    Traitor_RefreshDamageHookDemand();
 }
 
 static void Traitor_ClearNextRegistration(int client)
@@ -1728,7 +1889,7 @@ static void Traitor_RestoreNextRegistration(int client, int zc, int registration
     if (!IsValidClient(client) || !Traitor_IsSupportedClass(zc))
         return;
 
-    g_ITState[client] = Traitor_Waiting;
+    Traitor_SetState(client, Traitor_Waiting);
     g_ITClass[client] = zc;
     g_ITReleaseWave[client] = 0;
     g_ITRegistrationOrder[client] = registrationOrder;
@@ -1788,6 +1949,7 @@ void Traitor_ResetAll(bool moveClientsToSpec)
     g_ITNextWaitOrder = 1;
     g_ITNextRegistrationOrder = 1;
     Traitor_ResetSurvivorDamageState();
+    Traitor_RefreshDamageHookDemand();
 }
 
 bool Traitor_IsArmingWindowOpen()
@@ -2113,10 +2275,10 @@ static bool Traitor_TryTakeOverTank(int client, int tank)
         return false;
     }
 
-    g_ITState[client] = Traitor_Alive;
+    Traitor_SetState(client, Traitor_Alive);
     g_ITClass[client] = TRAITOR_CLASS_TANK;
-    g_ITDamageLedgerActive[client] = true;
-    g_ITDamageLedgerClass[client] = TRAITOR_CLASS_TANK;
+    Traitor_OpenDamageLedger(client);
+    Traitor_RefreshDamageHookDemand();
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
     Traitor_CancelSpawnTimer(client);
@@ -2451,7 +2613,7 @@ static bool Traitor_QueueClient(int client, int zc)
                 && Traitor_IsNormalClientReadyForSlot(client)
                 && Traitor_CanPromoteClass(client, zc)));
 
-    g_ITState[client] = hasSlot ? Traitor_Armed : Traitor_Waiting;
+    Traitor_SetState(client, hasSlot ? Traitor_Armed : Traitor_Waiting);
     g_ITClass[client] = zc;
     g_ITReleaseWave[client] = 0;
     g_ITRegistrationOrder[client] = g_ITNextRegistrationOrder++;
@@ -2660,9 +2822,18 @@ static void Traitor_BroadcastNextWaveStatus(int releaseWave)
     }
 }
 
-Action Traitor_OnPlayerRunCmd(int client, int &buttons)
+public void Traitor_OnAutoBhopPreThink(int client)
 {
-    return Traitor_TryAutoBhop(client, buttons);
+    int buttons = GetClientButtons(client);
+    if (!(buttons & IN_JUMP) || client < 1 || client > MaxClients)
+        return;
+
+    TraitorState state = g_ITState[client];
+    if (state != Traitor_Alive && !Traitor_IsReservedState(state))
+        return;
+
+    if (Traitor_TryAutoBhop(client, buttons) == Plugin_Changed)
+        SetEntProp(client, Prop_Data, "m_nButtons", buttons);
 }
 
 static bool Traitor_CanAutoBhop(int client)
@@ -2719,7 +2890,7 @@ void Traitor_OnFinalRefreshStarted()
 
         if (!Traitor_IsNormalClientReadyForSlot(client))
         {
-            g_ITState[client] = Traitor_Waiting;
+            Traitor_SetState(client, Traitor_Waiting);
             g_ITReleaseWave[client] = 0;
             if (g_ITWaitOrder[client] <= 0)
                 g_ITWaitOrder[client] = g_ITNextWaitOrder++;
@@ -2735,7 +2906,7 @@ void Traitor_OnFinalRefreshStarted()
         if (canUse)
         {
             // Protect the internal team switch from join's player_team guard.
-            g_ITState[client] = Traitor_SpawnLocked;
+            Traitor_SetState(client, Traitor_SpawnLocked);
             g_ITReleaseWave[client] = releaseWave;
         }
 
@@ -2780,7 +2951,7 @@ static void Traitor_StartSpawnWindow(int client)
     if (!IsValidClient(client) || g_ITState[client] != Traitor_SpawnLocked)
         return;
 
-    g_ITState[client] = Traitor_SpawnAllowed;
+    Traitor_SetState(client, Traitor_SpawnAllowed);
     Traitor_CancelSpawnTimer(client);
     g_ITSpawnDeadline[client] = GetGameTime() + float(TRAITOR_SPAWN_WINDOW_SECONDS);
     g_ITSpawnTimer[client] = CreateTimer(1.0, Timer_TraitorSpawnCountdown, GetClientUserId(client), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -2952,10 +3123,10 @@ public void L4D_OnMaterializeFromGhost(int client)
     }
     g_ITQuotaConsumed[client] = true;
 
-    g_ITState[client] = Traitor_Alive;
+    Traitor_SetState(client, Traitor_Alive);
     g_ITClass[client] = zc;
-    g_ITDamageLedgerActive[client] = true;
-    g_ITDamageLedgerClass[client] = zc;
+    Traitor_OpenDamageLedger(client);
+    Traitor_RefreshDamageHookDemand();
     g_ITDidDamage[client] = false;
     g_ITDamageTotal[client] = 0;
     Traitor_RecordRoundClassUse(client, zc);

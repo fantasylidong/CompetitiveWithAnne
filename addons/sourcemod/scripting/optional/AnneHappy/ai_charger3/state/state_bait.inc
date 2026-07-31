@@ -65,17 +65,12 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     dist = getVectorDistance2D(pos, targetPos);
     // 是否可视目标
     static bool visible;
-    visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    visible = isSurvivorVisibleToCharger(client, target, targetEyePos);
     if (visible) {
         g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
     }
-    // 目标是否正在看着 charger
-    // 除了目标之外还有多少生还者正在看着 charger
-    static bool isWatching, isOnGround;
-    static int watchers;
+    static bool isOnGround;
     isOnGround = IsClientOnGround(client);
-    isWatching = isTargetWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue);
-    watchers = isAnySurvivorWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue);
     // 目标威胁类型
     static TargetThreatType threatType;
     threatType = getTargetThreatType(client, target);
@@ -171,6 +166,12 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     // ============================================================
     static Action resAction;
     if (threatType == Threat_Melee) {
+        // 只有近战博弈会使用 watcher 数据，避免枪械目标每 tick 扫描所有生还者。
+        static bool isWatching;
+        static int watchers;
+        isWatching = isTargetWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue);
+        watchers = isAnySurvivorWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue);
+
         // handleMeleeThreat 的返回值为 Plugin_Changed 表示执行了后跳动作, 需要结束这一帧
         resAction = handleMeleeThreat(client, target, dist, visible, isWatching, watchers, buttons, ang);
         if (resAction != Plugin_Continue)

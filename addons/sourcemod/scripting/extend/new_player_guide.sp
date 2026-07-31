@@ -10,7 +10,7 @@
 #include <left4dhooks>
 #include <rpg>
 
-#define PLUGIN_VERSION "2.0"
+#define PLUGIN_VERSION "2.1"
 #define SERVER_AUTO_STOP_MINUTES (30 * 60)
 #define PERMANENT_DISABLE_MINUTES (10 * 60)
 
@@ -361,7 +361,12 @@ public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcas
 
 public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
-	CreateTimer(0.2, Timer_CaptureClientSafeReturnPosition, event.GetInt("userid"), TIMER_FLAG_NO_MAPCHANGE);
+	int userid = event.GetInt("userid");
+	int client = GetClientOfUserId(userid);
+	if (1 <= client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == 2)
+	{
+		CreateTimer(0.2, Timer_CaptureClientSafeReturnPosition, userid, TIMER_FLAG_NO_MAPCHANGE);
+	}
 	return Plugin_Continue;
 }
 

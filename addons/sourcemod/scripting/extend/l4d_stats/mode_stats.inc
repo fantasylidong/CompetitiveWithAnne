@@ -122,3 +122,37 @@ stock ModeStats_RecordKills(Client, Kills, Headshots = 0)
 		Headshots);
 	SendSQLUpdate(query);
 }
+
+stock ModeStats_RecordKillAndScore(Client, Score, Kills, Headshots = 0)
+{
+	if ((Score == 0 && Kills <= 0) || !ModeStats_ShouldTrackClient(Client))
+		return;
+
+	if (Kills <= 0)
+	{
+		Kills = 0;
+		Headshots = 0;
+	}
+	else if (Headshots < 0)
+	{
+		Headshots = 0;
+	}
+
+	decl String:ClientID[MAX_LINE_WIDTH];
+	GetClientRankAuthString(Client, ClientID, sizeof(ClientID));
+
+	decl String:query[768];
+	Format(query, sizeof(query),
+		"INSERT INTO `%splayer_mode_stats` (steamid, mode_id, anne_mode, points, kills, headshots, updated) VALUES ('%s', %i, %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = points + %i, kills = kills + %i, headshots = headshots + %i, updated = UNIX_TIMESTAMP()",
+		DbPrefix,
+		ClientID,
+		Stats_GetCurrentStatsGamemodeID(),
+		ModeStats_GetAnneMode(),
+		Score,
+		Kills,
+		Headshots,
+		Score,
+		Kills,
+		Headshots);
+	SendSQLUpdate(query);
+}

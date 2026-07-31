@@ -1,0 +1,1334 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>infected_control Nav 刷特管线</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f5;
+      --surface: #ffffff;
+      --surface-2: #eef1ef;
+      --ink: #171b1e;
+      --muted: #66706c;
+      --line: #d5dbd7;
+      --line-strong: #aeb8b2;
+      --teal: #117f83;
+      --teal-soft: #d9eeee;
+      --green: #2d8a57;
+      --green-soft: #dcf0e4;
+      --amber: #b66c17;
+      --amber-soft: #f7e8d0;
+      --red: #b8473e;
+      --red-soft: #f5dedb;
+      --blue: #3567a6;
+      --blue-soft: #dce7f4;
+      --nav: #dfe4e1;
+      --nav-stroke: #c4cbc7;
+      --shadow: 0 8px 22px rgba(23, 27, 30, 0.08);
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: 0;
+    }
+
+    button, select, input { font: inherit; letter-spacing: 0; }
+
+    button, select {
+      min-height: 36px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    button { cursor: pointer; }
+    button:hover { border-color: var(--ink); }
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 3px solid rgba(17, 127, 131, 0.24);
+      outline-offset: 2px;
+    }
+
+    .page-shell {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 24px clamp(16px, 3vw, 40px) 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 28px; line-height: 1.2; font-weight: 650; }
+    h2 { font-size: 20px; line-height: 1.3; font-weight: 650; }
+    h3 { font-size: 15px; line-height: 1.4; font-weight: 650; }
+
+    .subtitle { margin-top: 6px; color: var(--muted); max-width: 760px; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--nav); border: 1px solid var(--line-strong); }
+    .legend-dot.candidate { background: var(--teal); border-color: var(--teal); }
+    .legend-dot.selected { background: var(--green); border-color: var(--green); }
+    .legend-dot.rejected { background: var(--red); border-color: var(--red); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(145px, 0.8fr) minmax(190px, 1fr) minmax(165px, 0.85fr) auto minmax(150px, 0.8fr);
+      gap: 14px;
+      align-items: end;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field { min-width: 0; }
+    .field label, .field-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .field select { width: 100%; padding: 6px 30px 6px 10px; }
+
+    .segmented {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      gap: 4px;
+    }
+
+    .segmented button { padding: 6px 10px; white-space: nowrap; }
+    .segmented button[aria-pressed="true"] {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--surface);
+    }
+
+    .transport { display: flex; gap: 6px; }
+    .icon-button {
+      width: 38px;
+      min-width: 38px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+    }
+    .icon-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .play-button { width: auto; padding: 0 12px; display: inline-flex; gap: 7px; align-items: center; }
+
+    .speed-row { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+    .speed-value { min-width: 34px; font-variant-numeric: tabular-nums; color: var(--muted); }
+    input[type="range"] { width: 100%; accent-color: var(--teal); }
+
+    .tabs {
+      display: flex;
+      gap: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab {
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--teal); }
+
+    .view { padding-top: 18px; }
+    .view[hidden] { display: none; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(265px, 320px);
+      min-height: 570px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .map-panel { min-width: 0; padding: 12px 12px 10px; }
+    #nav-map { width: 100%; aspect-ratio: 900 / 520; display: block; background: #f9faf9; border-radius: 4px; }
+
+    .map-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 9px 4px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .map-footer strong { color: var(--ink); font-weight: 650; }
+
+    .inspector {
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .inspector-head { padding: 22px 20px 18px; border-bottom: 1px solid var(--line); }
+    .step-index { color: var(--teal); font-size: 12px; font-weight: 700; }
+    .step-title { margin-top: 5px; font-size: 20px; font-weight: 650; }
+    .step-description { margin-top: 8px; color: var(--muted); }
+
+    .metrics { margin: 0; padding: 8px 20px; }
+    .metric-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .metric-row:last-child { border-bottom: 0; }
+    .metric-row dt { color: var(--muted); }
+    .metric-row dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
+
+    .event-log { margin-top: auto; padding: 16px 20px 18px; border-top: 1px solid var(--line); }
+    .event-log h3 { margin-bottom: 8px; }
+    .event-line { display: flex; gap: 9px; align-items: flex-start; color: var(--muted); font-size: 13px; }
+    .event-pulse { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--amber); flex: 0 0 auto; }
+
+    .timeline {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 0;
+      margin: 16px 0 0;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .timeline li { min-width: 0; border-right: 1px solid var(--line); }
+    .timeline li:last-child { border-right: 0; }
+    .timeline button {
+      width: 100%; min-height: 70px; border: 0; border-radius: 0; padding: 10px 8px;
+      background: transparent; text-align: left; color: var(--muted);
+    }
+    .timeline button:hover { background: var(--surface-2); }
+    .timeline button[aria-current="step"] { background: var(--teal-soft); color: var(--ink); }
+    .timeline-number { display: block; font-size: 11px; color: var(--teal); font-weight: 700; }
+    .timeline-label { display: block; margin-top: 4px; font-size: 12px; line-height: 1.3; }
+
+    .band-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .band-item { padding: 14px 16px; border-right: 1px solid var(--line); }
+    .band-item:last-child { border-right: 0; }
+    .band-name { color: var(--muted); font-size: 12px; }
+    .band-value { margin-top: 3px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+    .perf-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 18px;
+    }
+    .perf-head p { margin-top: 5px; color: var(--muted); max-width: 760px; }
+    .status-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .status-label::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
+
+    .cost-lanes {
+      display: grid;
+      gap: 13px;
+      padding: 18px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .cost-row { display: grid; grid-template-columns: 180px minmax(0, 1fr) 105px; gap: 16px; align-items: center; }
+    .cost-label { color: var(--muted); }
+    .cost-track { height: 22px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+    .cost-bar { height: 100%; border-radius: 3px; transition: width 360ms ease; }
+    .cost-bar.current { background: var(--amber); }
+    .cost-bar.proposed { background: var(--green); }
+    .cost-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+
+    .comparison {
+      width: 100%; border-collapse: collapse; margin-top: 24px; background: var(--surface);
+      border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong);
+    }
+    .comparison th, .comparison td { padding: 13px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    .comparison tr:last-child td { border-bottom: 0; }
+    .comparison th { color: var(--muted); font-size: 12px; font-weight: 650; }
+    .comparison td:nth-child(2), .comparison td:nth-child(3) { font-variant-numeric: tabular-nums; }
+    .proposal { color: var(--green); font-weight: 650; }
+
+    .perf-note {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 22px;
+    }
+    .perf-note section { padding-top: 12px; border-top: 3px solid var(--line); }
+    .perf-note section:nth-child(1) { border-color: var(--teal); }
+    .perf-note section:nth-child(2) { border-color: var(--green); }
+    .perf-note section:nth-child(3) { border-color: var(--red); }
+    .perf-note p { margin-top: 6px; color: var(--muted); }
+
+    .scope-key {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .scope-key span { display: inline-flex; align-items: center; gap: 7px; }
+    .scope-key span::before { content: ""; width: 9px; height: 9px; border-radius: 50%; }
+    .scope-key .implemented::before { background: var(--teal); }
+    .scope-key .proposed-key::before { background: var(--green); }
+    .scope-key .measure::before { background: var(--amber); }
+
+    .weight-lab {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--surface);
+    }
+    .weight-copy { padding: 20px 24px 22px 0; border-right: 1px solid var(--line); }
+    .weight-copy > p { margin-top: 7px; color: var(--muted); }
+    .weight-event-control { margin-top: 18px; }
+    .weight-event-control .field-label { margin-bottom: 7px; }
+    .weight-event-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .weight-event-buttons button { padding: 7px 9px; text-align: left; }
+    .weight-event-buttons button[aria-pressed="true"] {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--surface);
+    }
+    .weight-time { margin-top: 18px; }
+    .weight-time-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+    .weight-time strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .weight-time input { margin-top: 8px; }
+    .weight-readout {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    .weight-readout dt { color: var(--muted); font-size: 12px; }
+    .weight-readout dd { margin: 3px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .weight-note { margin-top: 15px; padding-left: 12px; border-left: 3px solid var(--teal); color: var(--muted); font-size: 13px; }
+    .weight-chart-wrap { min-width: 0; padding: 16px 0 10px 24px; }
+    .weight-chart-title { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+    .weight-chart-title span { color: var(--muted); font-size: 12px; }
+    #weight-chart { width: 100%; aspect-ratio: 720 / 310; display: block; }
+    .chart-grid { stroke: var(--line); stroke-width: 1; }
+    .chart-threshold { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 5 6; }
+    .chart-axis-label { fill: var(--muted); font-size: 11px; }
+    .chart-band-label { fill: var(--muted); font-size: 11px; font-weight: 650; }
+    .chart-curve { fill: none; stroke: var(--teal); stroke-width: 4; stroke-linejoin: round; }
+    .chart-marker { fill: var(--surface); stroke: var(--ink); stroke-width: 3; }
+    .chart-marker-line { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 4; }
+
+    .weight-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .weight-fact { padding: 13px 16px 15px 0; }
+    .weight-fact + .weight-fact { padding-left: 16px; border-left: 1px solid var(--line); }
+    .weight-fact dt { color: var(--muted); font-size: 12px; }
+    .weight-fact dd { margin: 4px 0 0; font-weight: 650; }
+
+    .roadmap { margin-top: 30px; }
+    .roadmap-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+    .roadmap-head p { margin-top: 5px; max-width: 800px; color: var(--muted); }
+    .frame-loop {
+      margin-top: 17px;
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .loop-row { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 16px; align-items: center; }
+    .loop-row + .loop-row { margin-top: 12px; }
+    .loop-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .loop-label.proposed { color: var(--green); }
+    .loop-nodes { display: flex; align-items: stretch; min-width: 0; }
+    .loop-node {
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: 13px;
+    }
+    .loop-row.proposed-row .loop-node { border-color: rgba(45, 138, 87, 0.45); background: var(--green-soft); }
+    .loop-arrow { display: grid; place-items: center; width: 28px; flex: 0 0 28px; color: var(--muted); }
+
+    .optimization-table { margin-top: 18px; }
+    .optimization-table td:first-child { width: 52px; color: var(--green); font-weight: 750; }
+    .optimization-table td:nth-child(2) { width: 185px; font-weight: 650; }
+    .optimization-table td:nth-child(4) { width: 240px; color: var(--muted); }
+    .implementation-order {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 22px;
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .order-step { padding: 15px 16px 17px 0; }
+    .order-step + .order-step { padding-left: 16px; border-left: 1px solid var(--line); }
+    .order-index { color: var(--green); font-size: 11px; font-weight: 750; }
+    .order-step h3 { margin-top: 4px; }
+    .order-step p { margin-top: 5px; color: var(--muted); font-size: 13px; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    footer code { color: var(--ink); }
+
+    .nav-area { fill: var(--nav); stroke: var(--nav-stroke); stroke-width: 1; transition: fill 240ms ease, opacity 240ms ease, stroke 240ms ease; }
+    .nav-area.flow-match { fill: var(--blue-soft); stroke: var(--blue); }
+    .nav-area.candidate { fill: var(--teal-soft); stroke: var(--teal); }
+    .nav-area.rejected { fill: var(--red-soft); stroke: var(--red); opacity: 0.68; }
+    .nav-area.expensive { fill: var(--amber-soft); stroke: var(--amber); }
+    .nav-area.chosen { fill: var(--green-soft); stroke: var(--green); stroke-width: 2.5; }
+    .nav-area.dim { opacity: 0.34; }
+
+    .flow-window { fill: var(--blue-soft); opacity: 0; transition: opacity 260ms ease; }
+    .flow-window.visible { opacity: 0.62; }
+    .flow-axis { stroke: var(--line-strong); stroke-width: 1; }
+    .flow-tick { fill: var(--muted); font-size: 11px; }
+    .flow-target { stroke: var(--blue); stroke-width: 2; }
+    .flow-target-label { fill: var(--blue); font-size: 12px; font-weight: 650; }
+
+    .survivor-dot { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+    .survivor-dot.target { fill: var(--blue); stroke: var(--blue); }
+    .survivor-label { fill: var(--ink); font-size: 12px; font-weight: 650; }
+    .target-label { fill: var(--blue); }
+    .distance-ring { fill: none; stroke: var(--teal); opacity: 0; transition: opacity 240ms ease, stroke-width 240ms ease, r 240ms ease; }
+    .distance-ring.visible { opacity: 0.15; }
+    .distance-ring.target.visible { opacity: 0.31; }
+
+    .candidate-mark { opacity: 0; transition: opacity 200ms ease; }
+    .candidate-mark.visible { opacity: 1; }
+    .candidate-mark circle { fill: var(--teal); stroke: var(--surface); stroke-width: 2; }
+    .candidate-mark.rejected circle { fill: var(--red); }
+    .candidate-mark.expensive circle { fill: var(--amber); }
+    .candidate-mark.chosen circle { fill: var(--green); }
+    .candidate-mark.chosen .pulse { fill: none; stroke: var(--green); stroke-width: 2; animation: pulse 1.2s ease-out infinite; }
+
+    .path-line { fill: none; stroke: var(--green); stroke-width: 3; stroke-dasharray: 8 7; opacity: 0; transition: opacity 220ms ease; }
+    .path-line.visible { opacity: 0.9; animation: dash 1.2s linear infinite; }
+    .fallback-label { fill: var(--amber); font-size: 13px; font-weight: 650; opacity: 0; }
+    .fallback-label.visible { opacity: 1; }
+    .api-label { fill: var(--red); font-size: 13px; font-weight: 650; opacity: 0; }
+    .api-label.visible { opacity: 1; }
+
+    @keyframes pulse { from { r: 7; opacity: 0.8; } to { r: 22; opacity: 0; } }
+    @keyframes dash { to { stroke-dashoffset: -30; } }
+
+    @media (max-width: 980px) {
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .transport { grid-column: span 1; }
+      .workspace { grid-template-columns: 1fr; }
+      .inspector { border-left: 0; border-top: 1px solid var(--line); }
+      .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+      .timeline { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .timeline li:nth-child(4) { border-right: 0; }
+      .timeline li:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
+      .cost-row { grid-template-columns: 150px minmax(0, 1fr) 90px; }
+    }
+
+    @media (max-width: 640px) {
+      .page-shell { padding: 16px 12px 28px; }
+      .topbar { align-items: flex-start; flex-direction: column; gap: 14px; }
+      h1 { font-size: 23px; }
+      .legend { justify-content: flex-start; }
+      .controls { grid-template-columns: 1fr; }
+      .transport { grid-column: auto; }
+      .workspace { min-height: 0; }
+      .map-panel { padding: 6px; }
+      .map-footer { align-items: flex-start; flex-direction: column; gap: 3px; padding: 8px 6px 4px; }
+      .metrics { grid-template-columns: 1fr; }
+      .timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .timeline li { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .timeline li:nth-child(even) { border-right: 0; }
+      .timeline li:nth-last-child(-n+2) { border-bottom: 0; }
+      .band-strip { grid-template-columns: 1fr; }
+      .band-item { border-right: 0; border-bottom: 1px solid var(--line); }
+      .band-item:last-child { border-bottom: 0; }
+      .perf-head { align-items: flex-start; flex-direction: column; }
+      .cost-row { grid-template-columns: 1fr auto; gap: 5px 12px; }
+      .cost-track { grid-column: 1 / -1; grid-row: 2; }
+      .comparison-wrap { overflow-x: auto; }
+      .comparison { min-width: 650px; }
+      .perf-note { grid-template-columns: 1fr; }
+      .scope-key { justify-content: flex-start; }
+      .weight-lab { grid-template-columns: 1fr; }
+      .weight-copy { padding: 18px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .weight-chart-wrap { padding: 16px 0 8px; }
+      .weight-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .weight-fact:nth-child(3) { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+      .weight-fact:nth-child(4) { border-top: 1px solid var(--line); }
+      .roadmap-head { align-items: flex-start; flex-direction: column; }
+      .loop-row { grid-template-columns: 1fr; gap: 7px; }
+      .loop-nodes { display: grid; grid-template-columns: 1fr; gap: 5px; }
+      .loop-arrow { width: auto; height: 17px; transform: rotate(90deg); }
+      .optimization-table { min-width: 760px; }
+      .implementation-order { grid-template-columns: 1fr; }
+      .order-step { padding: 14px 0; }
+      .order-step + .order-step { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div>
+        <h1>infected_control Nav 刷特管线</h1>
+        <p class="subtitle">当前实现：目标生还者确定 Flow 与路径参考，职业距离带按全队最近距离完成硬判定。</p>
+      </div>
+      <div class="legend" aria-label="图例">
+        <span class="legend-item"><span class="legend-dot"></span>NavArea</span>
+        <span class="legend-item"><span class="legend-dot candidate"></span>候选</span>
+        <span class="legend-item"><span class="legend-dot selected"></span>选中</span>
+        <span class="legend-item"><span class="legend-dot rejected"></span>淘汰</span>
+      </div>
+    </header>
+
+    <section class="controls" aria-label="动画参数">
+      <div class="field">
+        <label for="class-select">特感职业</label>
+        <select id="class-select">
+          <option value="smoker">Smoker</option>
+          <option value="boomer">Boomer</option>
+          <option value="hunter" selected>Hunter</option>
+          <option value="spitter">Spitter</option>
+          <option value="jockey">Jockey</option>
+          <option value="charger">Charger</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <span class="field-label">距离阶段</span>
+        <div class="segmented" id="band-control">
+          <button type="button" data-band="0" aria-pressed="true">主区间</button>
+          <button type="button" data-band="1" aria-pressed="false">放宽 1</button>
+          <button type="button" data-band="2" aria-pressed="false">最终区间</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="scenario-select">演示场景</label>
+        <select id="scenario-select">
+          <option value="normal">Nav 评分命中</option>
+          <option value="restricted">受限导演兜底</option>
+          <option value="api">两轮失败后 API</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <span class="field-label">播放</span>
+        <div class="transport">
+          <button class="icon-button" id="previous-step" type="button" aria-label="上一步">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button class="play-button" id="play-toggle" type="button" aria-pressed="true">
+            <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+            <span id="play-label">暂停</span>
+          </button>
+          <button class="icon-button" id="next-step" type="button" aria-label="下一步">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="speed-range">速度</label>
+        <div class="speed-row">
+          <span class="speed-value" id="speed-value">1.0×</span>
+          <input id="speed-range" type="range" min="0.5" max="2" value="1" step="0.25">
+        </div>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="视图">
+      <button class="tab" type="button" data-view="pipeline" aria-selected="true">执行流程</button>
+      <button class="tab" type="button" data-view="performance" aria-selected="false">性能剖面</button>
+      <button class="tab" type="button" data-view="optimization" aria-selected="false">优化方案</button>
+    </nav>
+
+    <main>
+      <section class="view" id="pipeline-view" aria-labelledby="pipeline-heading">
+        <h2 id="pipeline-heading" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Nav 刷特执行流程</h2>
+        <div class="workspace">
+          <div class="map-panel">
+            <svg id="nav-map" viewBox="0 0 900 520" role="img" aria-labelledby="map-title map-desc">
+              <title id="map-title">Nav 刷特候选动画</title>
+              <desc id="map-desc">展示目标生还者 Flow 桶窗口、各职业距离带、NavArea 候选筛选、评分与兜底过程。</desc>
+              <defs>
+                <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#2d8a57"></path>
+                </marker>
+              </defs>
+              <rect x="0" y="0" width="900" height="520" fill="#f9faf9"></rect>
+              <rect id="flow-window" class="flow-window" x="0" y="38" width="0" height="395"></rect>
+              <g id="nav-layer"></g>
+              <g id="ring-layer"></g>
+              <g id="path-layer"><path id="path-line" class="path-line" marker-end="url(#arrow-green)"></path></g>
+              <g id="candidate-layer"></g>
+              <g id="survivor-layer"></g>
+              <g id="flow-axis-layer"></g>
+              <text id="fallback-label" class="fallback-label" x="28" y="30">受限导演候选：仍检查最终距离、视线与卡位</text>
+              <text id="api-label" class="api-label" x="28" y="30">连续两轮失败：导演 API 直接生成，不叠加插件限制</text>
+            </svg>
+            <div class="map-footer">
+              <span>距离口径：<strong id="distance-model">全队最近眼距</strong></span>
+              <span>目标：<strong id="target-name">Survivor 2 · 47% Flow</strong></span>
+            </div>
+          </div>
+
+          <aside class="inspector" aria-live="polite">
+            <div class="inspector-head">
+              <div class="step-index" id="step-index">阶段 01 / 08</div>
+              <div class="step-title" id="step-title">选择目标</div>
+              <p class="step-description" id="step-description">Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。</p>
+            </div>
+            <dl class="metrics">
+              <div class="metric-row"><dt>职业距离带</dt><dd id="metric-range">450–850</dd></div>
+              <div class="metric-row"><dt>Flow 桶窗口</dt><dd id="metric-window">47% ± 8</dd></div>
+              <div class="metric-row"><dt>候选检查</dt><dd id="metric-pool">0 / 48</dd></div>
+              <div class="metric-row"><dt>本帧 Nav 检查</dt><dd id="metric-nav">0 / 16</dd></div>
+              <div class="metric-row"><dt>本帧昂贵检查</dt><dd id="metric-expensive">0 / 3</dd></div>
+              <div class="metric-row"><dt>完整失败轮次</dt><dd id="metric-cycle">0 / 2</dd></div>
+            </dl>
+            <div class="event-log">
+              <h3>当前事件</h3>
+              <div class="event-line"><span class="event-pulse"></span><span id="event-text">冻结本次会话目标，后续每秒目标更新不会重置扫描进度。</span></div>
+            </div>
+          </aside>
+        </div>
+
+        <ol class="timeline" id="timeline" aria-label="执行阶段"></ol>
+
+        <div class="band-strip" aria-label="职业距离带">
+          <div class="band-item"><div class="band-name">主区间</div><div class="band-value" id="band-primary">450–850</div></div>
+          <div class="band-item"><div class="band-name">第一次放宽</div><div class="band-value" id="band-secondary">300–1100</div></div>
+          <div class="band-item"><div class="band-name">最终区间</div><div class="band-value" id="band-final">250–1300</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="performance-view" hidden aria-labelledby="performance-heading">
+        <div class="perf-head">
+          <div>
+            <h2 id="performance-heading">单次搜索的成本边界</h2>
+            <p>候选生产、精判和性能观测都已进入逐帧状态机；页面对照重构前后的固定成本边界。</p>
+          </div>
+          <span class="status-label">当前实现</span>
+        </div>
+
+        <div class="cost-lanes" aria-label="当前与建议成本对比">
+          <div class="cost-row">
+            <span class="cost-label">重构前中心距离计算</span>
+            <div class="cost-track"><div class="cost-bar current" style="width:100%"></div></div>
+            <span class="cost-value">≤ 1536</span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">当前目标定向预筛</span>
+            <div class="cost-track"><div class="cost-bar proposed" style="width:4%"></div></div>
+            <span class="cost-value">≤ 48</span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">重构前候选物化</span>
+            <div class="cost-track"><div class="cost-bar current" style="width:50%"></div></div>
+            <span class="cost-value">96 个</span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">当前逐帧检查上限</span>
+            <div class="cost-track"><div class="cost-bar proposed" style="width:25%"></div></div>
+            <span class="cost-value">48 个</span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">每帧昂贵检查</span>
+            <div class="cost-track"><div class="cost-bar current" style="width:18%"></div></div>
+            <span class="cost-value">≤ 3 次</span>
+          </div>
+        </div>
+
+        <div class="comparison-wrap">
+          <table class="comparison">
+            <thead><tr><th>环节</th><th>重构前</th><th>当前实现</th><th>收益与边界</th></tr></thead>
+            <tbody>
+              <tr><td>空间预筛口径</td><td>最多 384 个 Nav 中心 × 全体生还者</td><td class="proposal">最多 48 个中心且只对目标；随机点硬判仍看全队</td><td>4 人局中心距离计算上界约减 97%</td></tr>
+              <tr><td>候选上限</td><td>固定最多 96</td><td class="proposal">整个会话最多检查 48</td><td>默认对应无点 3 帧 × 16</td></tr>
+              <tr><td>候选生产</td><td>会话开始时同步物化</td><td class="proposal">Flow 桶与权重游标跨帧恢复</td><td>移除会话首帧尖峰</td></tr>
+              <tr><td>生还者眼位</td><td>每个随机点调用 native</td><td class="proposal">每个实际刷特帧快照一次</td><td>同 Tick 距离、视线、战术评分复用</td></tr>
+              <tr><td>评分</td><td>混合量纲 + 离散扇区重复放大</td><td class="proposal">0–100 基础质量 + 连续职业战术几何</td><td>只排序安全候选，默认不硬拒绝</td></tr>
+              <tr><td>最终 API</td><td>50 次导演内部尝试，无独立数据</td><td class="proposal">保持无限制并记录 fallbackApiMs</td><td>量化罕见尖峰，不新增限制</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="perf-note">
+          <section><h3>已经受控</h3><p>每帧最多 16 个 NavArea、3 个昂贵检查；找到点最多 2 帧，无点最多 3 帧。</p></section>
+          <section><h3>已经落地</h3><p>目标定向距离、48 上限、眼位快照和懒游标同时降低总成本与单帧峰值。</p></section>
+          <section><h3>现在可测</h3><p><code>sm_spawnperf</code> 按 6/8/10/12/14+ 输出候选构建、最大切片和最终 API 分位数。</p></section>
+        </div>
+      </section>
+
+      <section class="view" id="optimization-view" hidden aria-labelledby="optimization-heading">
+        <div class="perf-head">
+          <div>
+            <h2 id="optimization-heading">优化方案与实现边界</h2>
+            <p>Nav 权重反馈与逐帧候选生产都已落地；下方展示它们如何共同工作。</p>
+          </div>
+          <div class="scope-key" aria-label="实现状态图例">
+            <span class="implemented">已经实现</span>
+            <span class="proposed-key">本次重构</span>
+            <span class="measure">运行观测</span>
+          </div>
+        </div>
+
+        <section class="weight-lab" aria-labelledby="weight-heading">
+          <div class="weight-copy">
+            <h3 id="weight-heading">已经实现：Nav 权重反馈</h3>
+            <p>每个 NavArea 初始权重为 1.00。生成成功、实际生成失败或候选过滤失败都会降低权重，然后按各自恢复时间线性回到 1.00。</p>
+
+            <div class="weight-event-control">
+              <span class="field-label">模拟事件</span>
+              <div class="weight-event-buttons" id="weight-event-control">
+                <button type="button" data-weight-event="success" aria-pressed="true">生成成功</button>
+                <button type="button" data-weight-event="spawnFailure" aria-pressed="false">实际生成失败</button>
+                <button type="button" data-weight-event="filterFailure" aria-pressed="false">点位过滤失败</button>
+                <button type="button" data-weight-event="reset" aria-pressed="false">无事件 / 已恢复</button>
+              </div>
+            </div>
+
+            <div class="weight-time">
+              <div class="weight-time-head"><label for="weight-time-range">事件后时间</label><strong id="weight-time-value">0.0 秒</strong></div>
+              <input id="weight-time-range" type="range" min="0" max="18" value="0" step="0.25">
+            </div>
+
+            <dl class="weight-readout">
+              <div><dt>当前权重</dt><dd id="weight-current">0.55</dd></div>
+              <div><dt>扫描权重档</dt><dd id="weight-band">中</dd></div>
+              <div><dt>恢复时间</dt><dd id="weight-recover">8 秒</dd></div>
+            </dl>
+            <p class="weight-note" id="weight-event-note">成功点立即进入冷却；降低权重让下一只优先探索其他区域。</p>
+          </div>
+
+          <div class="weight-chart-wrap">
+            <div class="weight-chart-title">
+              <h3>权重恢复曲线</h3>
+              <span>最低权重始终钳制在 0.10</span>
+            </div>
+            <svg id="weight-chart" viewBox="0 0 720 310" role="img" aria-labelledby="weight-chart-title weight-chart-desc">
+              <title id="weight-chart-title">NavArea 权重随时间恢复曲线</title>
+              <desc id="weight-chart-desc">当前事件发生后权重下降，并在规定秒数内线性恢复到一。</desc>
+              <line x1="70" y1="44" x2="680" y2="44" class="chart-grid"></line>
+              <line x1="70" y1="116" x2="680" y2="116" class="chart-threshold"></line>
+              <line x1="70" y1="192" x2="680" y2="192" class="chart-threshold"></line>
+              <line x1="70" y1="246" x2="680" y2="246" class="chart-grid"></line>
+              <line x1="70" y1="44" x2="70" y2="246" class="chart-grid"></line>
+              <line x1="70" y1="246" x2="680" y2="246" class="chart-grid"></line>
+              <text x="56" y="48" text-anchor="end" class="chart-axis-label">1.00</text>
+              <text x="56" y="120" text-anchor="end" class="chart-axis-label">0.80</text>
+              <text x="56" y="196" text-anchor="end" class="chart-axis-label">0.45</text>
+              <text x="56" y="250" text-anchor="end" class="chart-axis-label">0.10</text>
+              <text x="688" y="82" class="chart-band-label">高权重</text>
+              <text x="688" y="159" class="chart-band-label">中权重</text>
+              <text x="688" y="226" class="chart-band-label">低权重</text>
+              <g class="chart-axis-label" text-anchor="middle">
+                <text x="70" y="271">0</text><text x="206" y="271">4</text><text x="341" y="271">8</text>
+                <text x="477" y="271">12</text><text x="680" y="271">18 秒</text>
+              </g>
+              <path id="weight-curve" class="chart-curve" d="M 70 145 L 341 44 L 680 44"></path>
+              <line id="weight-marker-line" x1="70" y1="44" x2="70" y2="246" class="chart-marker-line"></line>
+              <circle id="weight-marker" cx="70" cy="145" r="7" class="chart-marker"></circle>
+            </svg>
+          </div>
+        </section>
+
+        <dl class="weight-facts">
+          <div class="weight-fact"><dt>三种降权</dt><dd>成功 ×0.55 · 失败 ×0.25 · 过滤 ×0.85</dd></div>
+          <div class="weight-fact"><dt>线性恢复</dt><dd>8 秒 · 18 秒 · 4 秒</dd></div>
+          <div class="weight-fact"><dt>扫描混合</dt><dd>高 / 中 / 低按 3:1:1 取样</dd></div>
+          <div class="weight-fact"><dt>评分语义</dt><dd>只改变扫描顺序，不重复扣最终分数</dd></div>
+        </dl>
+
+        <section class="roadmap" aria-labelledby="roadmap-heading">
+          <div class="roadmap-head">
+            <div>
+              <h2 id="roadmap-heading">当前实现：保留 OnGameFrame</h2>
+              <p>没有改成低频 timer。会话首帧只初始化游标，后续帧边生产边消费，同时保持 16 个 Nav 和 3 个昂贵检查的默认预算。</p>
+            </div>
+            <span class="status-label">已写入插件</span>
+          </div>
+
+          <div class="frame-loop" aria-label="当前与建议执行管线">
+            <div class="loop-row">
+              <div class="loop-label">重构前</div>
+              <div class="loop-nodes">
+                <div class="loop-node">会话创建</div><span class="loop-arrow">→</span>
+                <div class="loop-node">同步检查 ≤384 Nav × 生还者数</div><span class="loop-arrow">→</span>
+                <div class="loop-node">物化 ≤96 候选</div><span class="loop-arrow">→</span>
+                <div class="loop-node">OnGameFrame 消费 16 / 3</div>
+              </div>
+            </div>
+            <div class="loop-row proposed-row">
+              <div class="loop-label proposed">当前</div>
+              <div class="loop-nodes">
+                <div class="loop-node">OnGameFrame 恢复 Flow 游标</div><span class="loop-arrow">→</span>
+                <div class="loop-node">按需生产小批候选</div><span class="loop-arrow">→</span>
+                <div class="loop-node">最多保留 48 候选</div><span class="loop-arrow">→</span>
+                <div class="loop-node">同帧继续消费 16 / 3</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="comparison-wrap">
+            <table class="comparison optimization-table">
+              <thead><tr><th>优先级</th><th>优化项</th><th>具体改法</th><th>预期收益与边界</th></tr></thead>
+              <tbody>
+                <tr><td>P0 · 已完成</td><td>分段耗时统计</td><td>新增 candidateBuildMs、maxSliceMs、fallbackApiMs 和每类过滤命中数。</td><td>按 6/8/10/12/14+ 输出真实分位数；不改变生成行为。</td></tr>
+                <tr><td>P1 · 已完成</td><td>Flow 桶懒游标</td><td>候选不在会话开始时一次性物化；每帧从交错桶和权重档恢复游标，边生产边消费。</td><td>移除会话首帧构建尖峰；仍然使用 OnGameFrame。</td></tr>
+                <tr><td>P1 · 已完成</td><td>目标定向粗排</td><td>Nav 中心的职业距离只对当前目标计算；随机点最终硬判继续使用全队最近眼距。</td><td>叠加 48 上限后，4 人局中心距离计算从 ≤1536 降到 ≤48；不会放宽最终安全规则。</td></tr>
+                <tr><td>P1 · 已完成</td><td>候选上限 48</td><td>按无点最多 3 帧 × 每帧 16 Nav 设会话上限，不再物化 96。</td><td>低密度地图命中率由 P0 数据继续验证。</td></tr>
+                <tr><td>P2 · 已完成</td><td>生还者眼位快照</td><td>每个实际刷特的 OnGameFrame 读取一次眼位和朝向，当前切片复用。</td><td>玩家移动最多产生一个 Tick 的快照误差。</td></tr>
+                <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>保持 50 次导演内部尝试和无插件限制，只独立记录耗时、命中率和职业。</td><td>确认罕见兜底是否造成尖峰，不新增任何刷不出的限制。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="implementation-order" aria-label="建议实施顺序">
+            <section class="order-step"><div class="order-index">01</div><h3>采集基线</h3><p>用 <code>sm_spawnperf</code> 建立 P50、P95、P99 和最大切片基线。</p></section>
+            <section class="order-step"><div class="order-index">02</div><h3>观察覆盖</h3><p>确认 48 次检查在低密度地图的三帧内覆盖率。</p></section>
+            <section class="order-step"><div class="order-index">03</div><h3>检查评分</h3><p>用 SCORE-CHOSEN 日志比较六职业的战术质量和最终分。</p></section>
+            <section class="order-step"><div class="order-index">04</div><h3>对照压测</h3><p>按 6/8/10/12/14 特比较刷出延迟、失败轮次和帧峰值。</p></section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <span>数据来源：<code>spawn_core.inc</code>、<code>spawn_tactics.inc</code>、<code>spawn_attempts.inc</code>、<code>spawn_memory.inc</code></span>
+      <span>当前常量：48 Nav/会话 · 16 Nav/帧 · 3 昂贵检查/帧 · 2/3 时间片</span>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const classBands = {
+        smoker:  { label: 'Smoker',  bands: [[650, 1100], [450, 1400], [300, 1500]] },
+        boomer:  { label: 'Boomer',  bands: [[250, 450],  [250, 600],  [250, 800]] },
+        hunter:  { label: 'Hunter',  bands: [[450, 850],  [300, 1100], [250, 1300]] },
+        spitter: { label: 'Spitter', bands: [[400, 750],  [300, 900],  [250, 1000]] },
+        jockey:  { label: 'Jockey',  bands: [[300, 600],  [250, 800],  [250, 1000]] },
+        charger: { label: 'Charger', bands: [[300, 600],  [250, 800],  [250, 1000]] }
+      };
+
+      const steps = [
+        { title: '选择目标', short: '目标', description: 'Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。', event: '冻结本次会话目标，后续每秒目标更新不会重置扫描进度。' },
+        { title: '定位 Flow 窗口', short: 'Flow 桶', description: '目标 Flow 百分比成为中心桶，职业当前最大距离换算成 ±6 至 ±12 的桶窗口。', event: '只读取预建的 101 个 Flow 桶，不在每次刷特时遍历全图 NavArea。' },
+        { title: '逐帧生产候选', short: '候选游标', description: '各 Flow 桶跨帧轮流贡献 NavArea，历史高/中/低权重按 3:1:1 在线消费。', event: '整个会话最多检查 48 个中心；中心粗排只对当前目标计算。' },
+        { title: '轻量硬过滤', short: '距离预筛', description: '每个 NavArea 最多随机 3 个点，先检查分散度、全队最近眼距和真实 Flow 位置。', event: '职业距离带是硬边界；高度不再偷偷扩大最大距离。' },
+        { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '单帧最多 3 个候选进入昂贵检查，避免 trace 与寻路集中爆发。' },
+        { title: '评分并生成', short: '评分生成', description: '通过硬过滤的候选统一按 0–100 基础质量和职业战术几何评分，选择最高分。', event: '至少比较两个候选；普通波比较 3–4 个，破点波比较 4–5 个，84 分可早停。' },
+        { title: '受限导演兜底', short: '受限兜底', description: '三个职业距离带都失败后，导演候选仍需满足最终距离、视线和卡位规则。', event: '完整流程第一次失败只轮转职业，继续让插件自己处理。' },
+        { title: '无条件 API 兜底', short: '最终 API', description: '同一职业连续两轮完整失败后，导演执行 50 次内部找位，返回坐标后直接生成。', event: '最终 API 不再叠加插件距离、视线、卡位、路径或评分限制。' }
+      ];
+
+      const weightEvents = {
+        success: {
+          factor: 0.55,
+          duration: 8,
+          note: '成功点立即进入冷却；降低权重让下一只优先探索其他区域。',
+          color: '#117f83'
+        },
+        spawnFailure: {
+          factor: 0.25,
+          duration: 18,
+          note: '导演返回坐标但实际生成失败时降权最重，避免连续撞同一个坏 NavArea。',
+          color: '#b8473e'
+        },
+        filterFailure: {
+          factor: 0.85,
+          duration: 4,
+          note: '距离、卡位、可见性或路径过滤失败只做轻度短时降权，仍保留再次探索机会。',
+          color: '#b66c17'
+        },
+        reset: {
+          factor: 1,
+          duration: 0,
+          note: '没有事件或恢复结束时权重为 1.00，回到高权重扫描档。',
+          color: '#2d8a57'
+        }
+      };
+
+      const survivors = [
+        { x: 332, y: 282, flow: 41, label: 'S1' },
+        { x: 405, y: 252, flow: 47, label: 'S2', target: true },
+        { x: 465, y: 304, flow: 50, label: 'S3' },
+        { x: 380, y: 346, flow: 44, label: 'S4' }
+      ];
+
+      const state = {
+        phase: 0,
+        band: 0,
+        classKey: 'hunter',
+        scenario: 'normal',
+        playing: true,
+        speed: 1,
+        lastTick: performance.now(),
+        elapsed: 0,
+        weightEvent: 'success',
+        weightTime: 0
+      };
+      const phaseDuration = 1600;
+
+      const navLayer = document.getElementById('nav-layer');
+      const ringLayer = document.getElementById('ring-layer');
+      const candidateLayer = document.getElementById('candidate-layer');
+      const survivorLayer = document.getElementById('survivor-layer');
+      const flowAxisLayer = document.getElementById('flow-axis-layer');
+      const flowWindow = document.getElementById('flow-window');
+      const pathLine = document.getElementById('path-line');
+      const fallbackLabel = document.getElementById('fallback-label');
+      const apiLabel = document.getElementById('api-label');
+      const timeline = document.getElementById('timeline');
+      const navAreas = [];
+      const candidateMarks = [];
+
+      function svgEl(name, attrs = {}) {
+        const el = document.createElementNS(SVG_NS, name);
+        Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+        return el;
+      }
+
+      function seeded(index) {
+        const x = Math.sin(index * 927.13 + 17.7) * 43758.5453;
+        return x - Math.floor(x);
+      }
+
+      function buildMap() {
+        let index = 0;
+        for (let row = 0; row < 6; row++) {
+          for (let col = 0; col < 13; col++) {
+            const jitterX = seeded(index + 1) * 11 - 5.5;
+            const jitterY = seeded(index + 2) * 10 - 5;
+            const width = 50 + seeded(index + 3) * 16;
+            const height = 44 + seeded(index + 4) * 13;
+            const x = 25 + col * 65 + jitterX;
+            const y = 54 + row * 61 + jitterY;
+            const flow = Math.round((col / 12) * 100);
+            const weightBand = index % 9 < 5 ? 0 : (index % 9 < 7 ? 1 : 2);
+            const rect = svgEl('rect', { x, y, width, height, rx: 3, class: 'nav-area', 'data-index': index });
+            navLayer.appendChild(rect);
+            navAreas.push({ index, x, y, width, height, cx: x + width / 2, cy: y + height / 2, flow, weightBand, el: rect });
+            index++;
+          }
+        }
+
+        survivors.forEach((survivor, i) => {
+          const ring = svgEl('circle', { cx: survivor.x, cy: survivor.y, r: 1, class: `distance-ring${survivor.target ? ' target' : ''}` });
+          ringLayer.appendChild(ring);
+          survivor.ring = ring;
+
+          const group = svgEl('g');
+          const dot = svgEl('circle', { cx: survivor.x, cy: survivor.y, r: 9, class: `survivor-dot${survivor.target ? ' target' : ''}` });
+          const label = svgEl('text', { x: survivor.x + 13, y: survivor.y + 4, class: `survivor-label${survivor.target ? ' target-label' : ''}` });
+          label.textContent = survivor.target ? `${survivor.label} 目标` : survivor.label;
+          group.append(dot, label);
+          survivorLayer.appendChild(group);
+        });
+
+        const axisY = 468;
+        flowAxisLayer.appendChild(svgEl('line', { x1: 28, y1: axisY, x2: 870, y2: axisY, class: 'flow-axis' }));
+        [0, 20, 40, 60, 80, 100].forEach(value => {
+          const x = 28 + value / 100 * 842;
+          flowAxisLayer.appendChild(svgEl('line', { x1: x, y1: axisY - 5, x2: x, y2: axisY + 5, class: 'flow-axis' }));
+          const text = svgEl('text', { x, y: axisY + 22, class: 'flow-tick', 'text-anchor': 'middle' });
+          text.textContent = `${value}%`;
+          flowAxisLayer.appendChild(text);
+        });
+        const targetX = 28 + 47 / 100 * 842;
+        flowAxisLayer.appendChild(svgEl('line', { x1: targetX, y1: axisY - 11, x2: targetX, y2: axisY + 11, class: 'flow-target' }));
+        const targetText = svgEl('text', { x: targetX, y: axisY - 16, class: 'flow-target-label', 'text-anchor': 'middle' });
+        targetText.textContent = '目标 47%';
+        flowAxisLayer.appendChild(targetText);
+
+        navAreas.forEach(area => {
+          const group = svgEl('g', { class: 'candidate-mark' });
+          const pulse = svgEl('circle', { cx: area.cx, cy: area.cy, r: 7, class: 'pulse' });
+          const dot = svgEl('circle', { cx: area.cx, cy: area.cy, r: 5 });
+          group.append(pulse, dot);
+          candidateLayer.appendChild(group);
+          candidateMarks.push(group);
+        });
+      }
+
+      function dynamicWindow(maxRange) {
+        if (maxRange <= 500) return 6;
+        if (maxRange >= 1500) return 12;
+        return Math.round(6 + (maxRange - 500) / 1000 * 6);
+      }
+
+      function nearestSurvivorDistance(area) {
+        let best = Infinity;
+        survivors.forEach(s => {
+          const dx = area.cx - s.x;
+          const dy = area.cy - s.y;
+          best = Math.min(best, Math.sqrt(dx * dx + dy * dy) / 0.19);
+        });
+        return best;
+      }
+
+      function candidateSet() {
+        const config = classBands[state.classKey];
+        const bandIndex = state.phase >= 6 ? 2 : state.band;
+        const [minRange, maxRange] = config.bands[bandIndex];
+        const win = dynamicWindow(maxRange);
+        return navAreas
+          .filter(area => Math.abs(area.flow - 47) <= win)
+          .map(area => ({ ...area, dist: nearestSurvivorDistance(area) }))
+          .sort((a, b) => {
+            const weightOrder = a.weightBand - b.weightBand;
+            if (weightOrder !== 0) return weightOrder;
+            return Math.abs(a.flow - 52) - Math.abs(b.flow - 52);
+          })
+          .slice(0, 28)
+          .map((area, idx) => ({ ...area, passDistance: area.dist >= minRange && area.dist <= maxRange, rank: idx }));
+      }
+
+      function maxPhaseForScenario() {
+        return state.scenario === 'normal' ? 5 : (state.scenario === 'restricted' ? 6 : 7);
+      }
+
+      function setPhase(next, pause = false) {
+        const max = maxPhaseForScenario();
+        state.phase = Math.max(0, Math.min(next, max));
+        state.elapsed = 0;
+        if (pause) state.playing = false;
+        render();
+      }
+
+      function renderMap(candidates, minRange, maxRange, win) {
+        const flowMinX = 25 + Math.max(0, 47 - win) / 100 * 845;
+        const flowMaxX = 25 + Math.min(100, 47 + win) / 100 * 845;
+        flowWindow.setAttribute('x', flowMinX);
+        flowWindow.setAttribute('width', Math.max(0, flowMaxX - flowMinX));
+        flowWindow.classList.toggle('visible', state.phase >= 1 && state.phase <= 6);
+
+        const ringRadius = ((minRange + maxRange) / 2) * 0.19;
+        const ringWidth = Math.max(2, (maxRange - minRange) * 0.19);
+        survivors.forEach(s => {
+          s.ring.setAttribute('r', ringRadius);
+          s.ring.setAttribute('stroke-width', ringWidth);
+          s.ring.classList.toggle('visible', state.phase >= 2 && state.phase <= 5);
+        });
+
+        const candidateByIndex = new Map(candidates.map(c => [c.index, c]));
+        let chosen = candidates.find(c => c.passDistance && c.rank % 5 === 1);
+        if (!chosen) chosen = candidates.find(c => c.passDistance);
+
+        navAreas.forEach((area, index) => {
+          const candidate = candidateByIndex.get(index);
+          const el = area.el;
+          el.setAttribute('class', 'nav-area');
+          candidateMarks[index].setAttribute('class', 'candidate-mark');
+
+          if (state.phase === 0) {
+            el.classList.add('dim');
+          } else if (state.phase === 1) {
+            if (Math.abs(area.flow - 47) <= win) el.classList.add('flow-match'); else el.classList.add('dim');
+          } else if (state.phase >= 2 && state.phase <= 5) {
+            if (!candidate) {
+              el.classList.add('dim');
+            } else {
+              el.classList.add('candidate');
+              candidateMarks[index].classList.add('visible');
+              if (state.phase >= 3 && !candidate.passDistance) {
+                el.classList.remove('candidate');
+                el.classList.add('rejected');
+                candidateMarks[index].classList.add('rejected');
+              } else if (state.phase >= 4 && candidate.passDistance && candidate.rank % 4 === 0) {
+                el.classList.remove('candidate');
+                el.classList.add('expensive');
+                candidateMarks[index].classList.add('expensive');
+              }
+              if (state.phase >= 5 && chosen && candidate.index === chosen.index) {
+                el.setAttribute('class', 'nav-area chosen');
+                candidateMarks[index].setAttribute('class', 'candidate-mark visible chosen');
+              }
+            }
+          } else {
+            el.classList.add('dim');
+          }
+        });
+
+        pathLine.setAttribute('class', 'path-line');
+        if (state.phase === 5 && chosen) {
+          const target = survivors.find(s => s.target);
+          pathLine.setAttribute('d', `M ${target.x} ${target.y} C ${target.x + 80} ${target.y - 95}, ${chosen.cx - 70} ${chosen.cy + 70}, ${chosen.cx} ${chosen.cy}`);
+          pathLine.classList.add('visible');
+        }
+
+        fallbackLabel.setAttribute('class', `fallback-label${state.phase === 6 ? ' visible' : ''}`);
+        apiLabel.setAttribute('class', `api-label${state.phase === 7 ? ' visible' : ''}`);
+
+        if (state.phase === 6 || state.phase === 7) {
+          const fallbackArea = navAreas[state.phase === 6 ? 11 : 69];
+          fallbackArea.el.setAttribute('class', `nav-area ${state.phase === 6 ? 'expensive' : 'chosen'}`);
+          candidateMarks[fallbackArea.index].setAttribute('class', `candidate-mark visible ${state.phase === 6 ? 'expensive' : 'chosen'}`);
+        }
+      }
+
+      function renderInspector(candidates, minRange, maxRange, win) {
+        const step = steps[state.phase];
+        document.getElementById('step-index').textContent = `阶段 ${String(state.phase + 1).padStart(2, '0')} / 08`;
+        document.getElementById('step-title').textContent = step.title;
+        document.getElementById('step-description').textContent = step.description;
+        document.getElementById('event-text').textContent = step.event;
+        document.getElementById('metric-range').textContent = `${minRange}–${maxRange}`;
+        document.getElementById('metric-window').textContent = `47% ± ${win}`;
+
+        const poolCount = state.phase < 2 ? 0 : Math.min(48, Math.round(candidates.length * Math.min(1, (state.phase - 1) / 2)));
+        document.getElementById('metric-pool').textContent = `${poolCount} / 48`;
+        document.getElementById('metric-nav').textContent = `${state.phase >= 3 && state.phase <= 5 ? Math.min(16, candidates.length) : 0} / 16`;
+        document.getElementById('metric-expensive').textContent = `${state.phase === 4 || state.phase === 5 ? Math.min(3, candidates.filter(c => c.passDistance).length) : 0} / 3`;
+        document.getElementById('metric-cycle').textContent = `${state.phase === 7 ? 2 : (state.phase === 6 ? 1 : 0)} / 2`;
+
+        timeline.querySelectorAll('button').forEach((button, index) => {
+          button.setAttribute('aria-current', index === state.phase ? 'step' : 'false');
+          button.disabled = index > maxPhaseForScenario();
+        });
+      }
+
+      function renderBands() {
+        const config = classBands[state.classKey];
+        document.getElementById('band-primary').textContent = config.bands[0].join('–');
+        document.getElementById('band-secondary').textContent = config.bands[1].join('–');
+        document.getElementById('band-final').textContent = config.bands[2].join('–');
+        document.querySelectorAll('#band-control button').forEach(button => {
+          button.setAttribute('aria-pressed', Number(button.dataset.band) === state.band ? 'true' : 'false');
+        });
+      }
+
+      function renderPlayback() {
+        const icon = document.getElementById('play-icon');
+        const label = document.getElementById('play-label');
+        document.getElementById('play-toggle').setAttribute('aria-pressed', state.playing ? 'true' : 'false');
+        if (state.playing) {
+          icon.innerHTML = '<path d="M8 5v14M16 5v14"/>';
+          label.textContent = '暂停';
+        } else {
+          icon.innerHTML = '<path d="m8 5 11 7-11 7Z"/>';
+          label.textContent = '播放';
+        }
+      }
+
+      function weightY(weight) {
+        const clamped = Math.max(0.1, Math.min(1, weight));
+        return 246 - ((clamped - 0.1) / 0.9) * 202;
+      }
+
+      function renderWeightLab() {
+        const config = weightEvents[state.weightEvent];
+        const progress = config.duration > 0 ? Math.min(1, state.weightTime / config.duration) : 1;
+        const current = config.factor + (1 - config.factor) * progress;
+        const band = current >= 0.8 ? '高' : (current >= 0.45 ? '中' : '低');
+        const curve = document.getElementById('weight-curve');
+        const marker = document.getElementById('weight-marker');
+        const markerLine = document.getElementById('weight-marker-line');
+        const timeRange = document.getElementById('weight-time-range');
+        const startY = weightY(config.factor);
+        const endX = 70 + (config.duration / 18) * 610;
+        const markerX = 70 + (state.weightTime / 18) * 610;
+        const markerY = weightY(current);
+
+        curve.setAttribute('d', config.duration > 0
+          ? `M 70 ${startY} L ${endX} 44 L 680 44`
+          : 'M 70 44 L 680 44');
+        curve.style.stroke = config.color;
+        marker.setAttribute('cx', markerX);
+        marker.setAttribute('cy', markerY);
+        marker.style.stroke = config.color;
+        markerLine.setAttribute('x1', markerX);
+        markerLine.setAttribute('x2', markerX);
+        markerLine.style.stroke = config.color;
+
+        document.getElementById('weight-time-value').textContent = `${state.weightTime.toFixed(2).replace(/0$/, '').replace(/\.0$/, '')} 秒`;
+        document.getElementById('weight-current').textContent = current.toFixed(2);
+        document.getElementById('weight-band').textContent = band;
+        document.getElementById('weight-recover').textContent = config.duration > 0 ? `${config.duration} 秒` : '已恢复';
+        document.getElementById('weight-event-note').textContent = config.note;
+        timeRange.value = String(state.weightTime);
+        timeRange.disabled = config.duration === 0;
+
+        document.querySelectorAll('#weight-event-control button').forEach(button => {
+          button.setAttribute('aria-pressed', button.dataset.weightEvent === state.weightEvent ? 'true' : 'false');
+        });
+      }
+
+      function render() {
+        const config = classBands[state.classKey];
+        const bandIndex = state.phase >= 6 ? 2 : state.band;
+        const [minRange, maxRange] = config.bands[bandIndex];
+        const win = dynamicWindow(maxRange);
+        const candidates = candidateSet();
+        renderMap(candidates, minRange, maxRange, win);
+        renderInspector(candidates, minRange, maxRange, win);
+        renderBands();
+        renderPlayback();
+      }
+
+      function buildTimeline() {
+        steps.forEach((step, index) => {
+          const item = document.createElement('li');
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.innerHTML = `<span class="timeline-number">${String(index + 1).padStart(2, '0')}</span><span class="timeline-label">${step.short}</span>`;
+          button.addEventListener('click', () => setPhase(index, true));
+          item.appendChild(button);
+          timeline.appendChild(item);
+        });
+      }
+
+      function bindControls() {
+        document.getElementById('class-select').addEventListener('change', event => {
+          state.classKey = event.target.value;
+          state.phase = 0;
+          state.elapsed = 0;
+          render();
+        });
+        document.getElementById('scenario-select').addEventListener('change', event => {
+          state.scenario = event.target.value;
+          if (state.phase > maxPhaseForScenario()) state.phase = maxPhaseForScenario();
+          state.elapsed = 0;
+          render();
+        });
+        document.querySelectorAll('#band-control button').forEach(button => {
+          button.addEventListener('click', () => {
+            state.band = Number(button.dataset.band);
+            state.elapsed = 0;
+            render();
+          });
+        });
+        document.getElementById('play-toggle').addEventListener('click', () => {
+          state.playing = !state.playing;
+          state.lastTick = performance.now();
+          renderPlayback();
+        });
+        document.getElementById('previous-step').addEventListener('click', () => setPhase(state.phase - 1, true));
+        document.getElementById('next-step').addEventListener('click', () => setPhase(state.phase + 1, true));
+        document.getElementById('speed-range').addEventListener('input', event => {
+          state.speed = Number(event.target.value);
+          document.getElementById('speed-value').textContent = `${state.speed.toFixed(2).replace(/0$/, '')}×`;
+        });
+        document.querySelectorAll('.tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            const view = tab.dataset.view;
+            document.querySelectorAll('.tab').forEach(other => other.setAttribute('aria-selected', other === tab ? 'true' : 'false'));
+            document.getElementById('pipeline-view').hidden = view !== 'pipeline';
+            document.getElementById('performance-view').hidden = view !== 'performance';
+            document.getElementById('optimization-view').hidden = view !== 'optimization';
+          });
+        });
+        document.querySelectorAll('#weight-event-control button').forEach(button => {
+          button.addEventListener('click', () => {
+            state.weightEvent = button.dataset.weightEvent;
+            state.weightTime = 0;
+            renderWeightLab();
+          });
+        });
+        document.getElementById('weight-time-range').addEventListener('input', event => {
+          state.weightTime = Number(event.target.value);
+          renderWeightLab();
+        });
+      }
+
+      function animate(now) {
+        const delta = Math.min(100, now - state.lastTick);
+        state.lastTick = now;
+        if (state.playing && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          state.elapsed += delta * state.speed;
+          if (state.elapsed >= phaseDuration) {
+            state.elapsed = 0;
+            state.phase = state.phase >= maxPhaseForScenario() ? 0 : state.phase + 1;
+            render();
+          }
+        }
+        requestAnimationFrame(animate);
+      }
+
+      buildMap();
+      buildTimeline();
+      bindControls();
+      render();
+      renderWeightLab();
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>

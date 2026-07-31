@@ -24,6 +24,7 @@
 #define AIR_CORRECTION_STEP_INTERVAL    0.05             // 用短步长平滑空中转向，避免离散硬拐
 #define AIR_CORRECTION_MIN_TARGET_DEG   1.0              // 小于该角度不写回速度，避免无效 Teleport 引起抖动
 #define AIR_CORRECTION_MAX_TURN_DEG     89.0             // 空中不允许把速度修正到当前运动方向后方
+#define BETTER_TARGET_CHECK_INTERVAL    0.08             // 更优目标扫描最多约 12.5 Hz
 
 // =========================================================================
 // State Approach 接近目标状态 (连跳等)
@@ -76,7 +77,7 @@ stock Action StateApproach_OnUpdate(int client, int& buttons, float vel[3], floa
     dist = getVectorDistance2D(pos, targetPos);
     // 是否可视目标
     static bool visible;
-    visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    visible = isSurvivorVisibleToCharger(client, target, targetEyePos);
     if (visible) {
         g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
     }
@@ -92,7 +93,9 @@ stock Action StateApproach_OnUpdate(int client, int& buttons, float vel[3], floa
     // ============================================================
 
     // 1. 优先行动检查, 检测是否有更好的可以直接冲锋的目标, 如果有, 直接转换为冲锋状态
-    if (isOnGround) {
+    float now = GetGameTime();
+    if (isOnGround && now >= g_AiChargers[client].m_flNextBetterTargetCheck) {
+        g_AiChargers[client].m_flNextBetterTargetCheck = now + BETTER_TARGET_CHECK_INTERVAL;
         static int betterTarget;
         betterTarget = getChargeUnavoidableTarget(client, target, pos, dist, g_cvBhopMinDist.FloatValue);
         if (IsValidSurvivor(betterTarget) && IsPlayerAlive(betterTarget) &&
@@ -1161,18 +1164,18 @@ stock int getChargeUnavoidableTarget(int client, int curTarget, float pos[3], fl
             continue;
 
         GetClientAbsOrigin(i, targetPos);
-        GetClientEyePosition(i, targetEyePos);
         // 高度差过大的目标不作为直接冲锋目标
         if (!isChargeHeightReachable(pos, targetPos))
-            continue;
-
-        // 跳过不可直视的玩家
-        if (!L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos))
             continue;
         
         dist = getVectorDistance2D(pos, targetPos);
         // 跳过距离比当前目标还远的玩家
         if (dist > unavoidableDist || dist > curTarDist)
+            continue;
+
+        GetClientEyePosition(i, targetEyePos);
+        // 先排除距离和高度不合格者，避免为必然淘汰的候选执行 LOS 查询。
+        if (!isSurvivorVisibleToCharger(client, i, targetEyePos))
             continue;
         
         // 计算冲锋无法躲避的条件

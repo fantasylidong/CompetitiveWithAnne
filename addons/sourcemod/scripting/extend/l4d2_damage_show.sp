@@ -10,7 +10,7 @@
 // =========================
 // Plugin constants / config
 // =========================
-#define PLUGIN_VERSION  "2.4-mysql-cookie(db-first)+persistent+keepalive"
+#define PLUGIN_VERSION  "2.5-mysql-cookie(db-first)+ondemand"
 #define SPRITE_MATERIAL "materials/sprites/laserbeam.vmt"
 #define DMG_HEADSHOT    (1 << 30)
 #define L4D2_MAXPLAYERS 32
@@ -105,6 +105,22 @@ ShotgunDamageData  g_SGbuf[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1]; // [attack
 SumShowMode        g_Sum[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 DamageTrans        g_AttackCache[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 
+#define SUM_PAIR_CAPACITY 1024
+#define SUM_PAIR_STRIDE (L4D2_MAXPLAYERS + 1)
+
+Handle g_hSumUpdateTimer = INVALID_HANDLE;
+int    g_iActiveSumPairs[SUM_PAIR_CAPACITY];
+int    g_iActiveSumPairCount = 0;
+bool   g_bSumPairActive[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
+bool   g_bSumFirstFramePending = false;
+
+bool g_bDamageHooked[L4D2_MAXPLAYERS + 1];
+bool g_bClientLeaving[L4D2_MAXPLAYERS + 1];
+bool g_bDamageHooksActive = false;
+bool g_bLateLoad = false;
+bool g_bMapActive = false;
+bool g_bGateReconcilePending = false;
+
 ConVar g_hMaxTE;
 // ★ 新增：按管理员 Flag 白名单控制
 ConVar g_hAllowedFlags;
@@ -112,7 +128,6 @@ char   g_sAllowedFlags[64];
 int    g_iAllowedBits = 0;
 bool   g_bGateActive  = false; // true=必须有这些flag之一才允许用
 
-bool  g_bNeverFire[L4D2_MAXPLAYERS + 1];
 int   g_sprite;
 int   g_iVitcimHealth[L4D2_MAXPLAYERS + 1][L4D2_MAXPLAYERS + 1];
 float g_fTankIncap[L4D2_MAXPLAYERS + 1];
@@ -150,6 +165,8 @@ int           g_SaveRevision[MAXPLAYERS + 1];
 
 static void ResetClientState(int client)
 {
+    // 槽位复用期间始终保持关闭，直到 Cookie/DB 明确加载完偏好。
+    g_Plr[client].enable = false;
     g_LoadState[client] = LS_None;
     g_HaveCookie[client] = false;
     g_CookieRaw[client][0] = '\0';
@@ -238,6 +255,235 @@ static void ClampStyle(int client)
     }
 }
 
+static void Sum_ClearPairState(int attacker, int victim)
+{
+    g_bSumPairActive[attacker][victim] = false;
+    g_Sum[attacker][victim].needShow = false;
+    g_Sum[attacker][victim].totalDamage = 0;
+    g_Sum[attacker][victim].isHeadshot = false;
+    g_Sum[attacker][victim].lastShowTime = 0.0;
+    g_Sum[attacker][victim].lastHitTime = 0.0;
+}
+
+static void Sum_RemoveActiveAt(int index)
+{
+    int pair = g_iActiveSumPairs[index];
+    int attacker = pair / SUM_PAIR_STRIDE;
+    int victim = pair % SUM_PAIR_STRIDE;
+    Sum_ClearPairState(attacker, victim);
+
+    g_iActiveSumPairCount--;
+    if (index < g_iActiveSumPairCount)
+        g_iActiveSumPairs[index] = g_iActiveSumPairs[g_iActiveSumPairCount];
+}
+
+static void Sum_StopTimerIfIdle()
+{
+    if (g_iActiveSumPairCount != 0 || g_hSumUpdateTimer == INVALID_HANDLE)
+        return;
+
+    KillTimer(g_hSumUpdateTimer);
+    g_hSumUpdateTimer = INVALID_HANDLE;
+}
+
+static void Sum_ClearAllActive()
+{
+    while (g_iActiveSumPairCount > 0)
+        Sum_RemoveActiveAt(g_iActiveSumPairCount - 1);
+
+    if (g_hSumUpdateTimer != INVALID_HANDLE)
+    {
+        KillTimer(g_hSumUpdateTimer);
+        g_hSumUpdateTimer = INVALID_HANDLE;
+    }
+    g_bSumFirstFramePending = false;
+}
+
+static void Sum_ClearClient(int client)
+{
+    int index = 0;
+    while (index < g_iActiveSumPairCount)
+    {
+        int pair = g_iActiveSumPairs[index];
+        int attacker = pair / SUM_PAIR_STRIDE;
+        int victim = pair % SUM_PAIR_STRIDE;
+        if (attacker == client || victim == client)
+        {
+            Sum_RemoveActiveAt(index);
+            continue;
+        }
+        index++;
+    }
+
+    Sum_StopTimerIfIdle();
+}
+
+static void Sum_ProcessActivePairs()
+{
+    float now = GetGameTime();
+    int index = 0;
+    while (index < g_iActiveSumPairCount)
+    {
+        int pair = g_iActiveSumPairs[index];
+        int attacker = pair / SUM_PAIR_STRIDE;
+        int victim = pair % SUM_PAIR_STRIDE;
+
+        if (!g_bSumPairActive[attacker][victim]
+            || !g_Sum[attacker][victim].needShow
+            || !IsValidClient(attacker)
+            || !IsPlayerAlive(attacker)
+            || !IsValidClient(victim)
+            || !g_Plr[attacker].enable
+            || !Gate_ClientAllowed(attacker)
+            || g_Sum[attacker][victim].lastHitTime + 0.5 < now)
+        {
+            Sum_RemoveActiveAt(index);
+            continue;
+        }
+
+        if (g_Sum[attacker][victim].lastShowTime + UPDATE_INTERVAL <= now)
+        {
+            DisplayDamage(
+                victim, attacker,
+                g_Sum[attacker][victim].weapon,
+                g_Sum[attacker][victim].totalDamage,
+                g_Sum[attacker][victim].damageType,
+                g_Sum[attacker][victim].damagePosition,
+                g_Sum[attacker][victim].isHeadshot,
+                true
+            );
+            g_Sum[attacker][victim].lastShowTime = now;
+        }
+        index++;
+    }
+}
+
+public void Frame_SumFirstUpdate(any data)
+{
+    g_bSumFirstFramePending = false;
+    Sum_ProcessActivePairs();
+    Sum_StopTimerIfIdle();
+}
+
+public Action Timer_SumUpdate(Handle timer)
+{
+    if (timer != g_hSumUpdateTimer)
+        return Plugin_Stop;
+
+    Sum_ProcessActivePairs();
+    if (g_iActiveSumPairCount == 0)
+    {
+        g_hSumUpdateTimer = INVALID_HANDLE;
+        return Plugin_Stop;
+    }
+    return Plugin_Continue;
+}
+
+static void Sum_ActivatePair(int attacker, int victim)
+{
+    if (!g_bSumPairActive[attacker][victim])
+    {
+        if (g_iActiveSumPairCount >= SUM_PAIR_CAPACITY)
+            return;
+
+        g_bSumPairActive[attacker][victim] = true;
+        g_iActiveSumPairs[g_iActiveSumPairCount++] = attacker * SUM_PAIR_STRIDE + victim;
+    }
+
+    if (g_hSumUpdateTimer == INVALID_HANDLE)
+        g_hSumUpdateTimer = CreateTimer(UPDATE_INTERVAL, Timer_SumUpdate, _, TIMER_REPEAT);
+
+    if (!g_bSumFirstFramePending)
+    {
+        g_bSumFirstFramePending = true;
+        RequestFrame(Frame_SumFirstUpdate);
+    }
+}
+
+static bool DamageHooks_IsEligibleAttacker(int client)
+{
+    return IsValidClient(client)
+        && !IsFakeClient(client)
+        && GetClientTeam(client) == 2
+        && g_Plr[client].enable
+        && Gate_ClientAllowed(client);
+}
+
+static void DamageHooks_SetClient(int client, bool shouldHook)
+{
+    if (shouldHook)
+    {
+        if (!g_bDamageHooked[client] && !g_bClientLeaving[client] && IsClientInGame(client))
+        {
+            SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+            g_bDamageHooked[client] = true;
+        }
+        return;
+    }
+
+    if (!g_bDamageHooked[client])
+        return;
+
+    if (IsClientInGame(client))
+        SDKUnhook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+    g_bDamageHooked[client] = false;
+}
+
+static void DamageHooks_DisableAll()
+{
+    for (int i = 1; i <= MaxClients; i++)
+        DamageHooks_SetClient(i, false);
+    g_bDamageHooksActive = false;
+}
+
+static void DamageHooks_Reconcile()
+{
+    if (!g_bMapActive)
+    {
+        DamageHooks_DisableAll();
+        Sum_ClearAllActive();
+        return;
+    }
+
+    bool shouldBeActive = false;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (DamageHooks_IsEligibleAttacker(i))
+        {
+            shouldBeActive = true;
+            break;
+        }
+    }
+
+    if (!shouldBeActive)
+    {
+        DamageHooks_DisableAll();
+        Sum_ClearAllActive();
+        return;
+    }
+
+    g_bDamageHooksActive = true;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsClientInGame(i))
+            DamageHooks_SetClient(i, true);
+    }
+
+    // 仍有其他攻击者启用时，只清理已经失去资格的攻击者条目。
+    int index = 0;
+    while (index < g_iActiveSumPairCount)
+    {
+        int attacker = g_iActiveSumPairs[index] / SUM_PAIR_STRIDE;
+        if (!DamageHooks_IsEligibleAttacker(attacker))
+        {
+            Sum_RemoveActiveAt(index);
+            continue;
+        }
+        index++;
+    }
+    Sum_StopTimerIfIdle();
+}
+
 // ===============================
 // SQL 拼接工具（避免相邻 ""）
 // ===============================
@@ -303,6 +549,7 @@ static bool ApplyCookieRawString(int client, const char[] raw)
     ClampStyle(client);
     // ★ 新增：Cookie 应用后也要过门禁
     Gate_EnforceFor(client, "cookie-apply");
+    DamageHooks_Reconcile();
     return true;
 }
 
@@ -449,6 +696,7 @@ static void DB_Load(int client)
 
         g_LoadState[client] = LS_Ready;
         Settings_MarkClean(client);
+        DamageHooks_Reconcile();
         LogInfo("[Load] DB not ready, used %s for client %d.",
                 ok ? "cookie" : "defaults", client);
         return;
@@ -465,6 +713,7 @@ static void DB_Load(int client)
         if (!ok) Settings_Default(client);
         g_LoadState[client] = LS_Ready;
         Settings_MarkClean(client);
+        DamageHooks_Reconcile();
         LogInfo("[Load] No Steam2 (or BOT), used %s for client %d.",
                 ok ? "cookie" : "defaults", client);
         return;
@@ -492,6 +741,7 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
 
         g_LoadState[client] = LS_Ready;
         Settings_MarkClean(client);
+        DamageHooks_Reconcile();
         LogErr("[Load] SQL error: %s. Used %s for client %d.",
                error, ok ? "cookie" : "defaults", client);
         return;
@@ -519,6 +769,7 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         Settings_MarkClean(client);
         // ★ 新增：DB 数据落地后，执行门禁并保存
         Gate_EnforceFor(client, "db-load");
+        DamageHooks_Reconcile();
         LogInfo("[Load] Loaded settings from DB for client %d.", client);
     }
     else
@@ -564,6 +815,7 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
         Settings_MarkClean(client);
         // ★ 新增：DB 数据落地后，执行门禁并保存
         Gate_EnforceFor(client, "db-load");
+        DamageHooks_Reconcile();
     }
 
     // 若期间用户点过“保存”，立即把当时的快照写库（避免丢变更）
@@ -747,6 +999,7 @@ public Plugin myinfo =
 // ============ 生命周期 ============
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
+    g_bLateLoad = late;
     RegPluginLibrary("damage_show");
     if (GetEngineVersion() != Engine_Left4Dead2)
     {
@@ -756,8 +1009,40 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     return APLRes_Success;
 }
 
+static void InitializeLateLoadClients()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i))
+            continue;
+
+        g_bDamageHooked[i] = false;
+        g_bClientLeaving[i] = false;
+        g_bAdminObsViewAll[i] = false;
+        ResetClientState(i);
+
+        if (IsFakeClient(i))
+        {
+            g_LoadState[i] = LS_Ready;
+            continue;
+        }
+
+        Settings_Default(i);
+        if (g_ck != null && AreClientCookiesCached(i))
+        {
+            g_ck.Get(i, g_CookieRaw[i], sizeof(g_CookieRaw[]));
+            g_HaveCookie[i] = (g_CookieRaw[i][0] != '\0');
+        }
+        DB_Load(i);
+        Gate_EnforceFor(i, "late-load");
+    }
+
+    DamageHooks_Reconcile();
+}
+
 public void OnPluginStart()
 {
+	g_bMapActive = true;
 	LoadTranslations("l4d2_damage_show.phrases");
     g_hMaxTE = FindConVar("sv_multiplayer_maxtempentities");
     if (g_hMaxTE != null) g_hMaxTE.SetInt(512);
@@ -789,12 +1074,20 @@ public void OnPluginStart()
     // 事件/钩子
     HookEvent("player_left_safe_area", E_LeftSafe, EventHookMode_PostNoCopy);
     HookEvent("player_hurt", E_PlayerHurt);
-    for (int i=1;i<=MaxClients;i++)
-        if (IsClientInGame(i)) SDKHook(i, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+    HookEvent("player_team", E_PlayerTeam, EventHookMode_Post);
+
+    if (g_bLateLoad)
+        InitializeLateLoadClients();
+    else
+        DamageHooks_Reconcile();
 }
 
 public void OnPluginEnd()
 {
+    g_bMapActive = false;
+    Sum_ClearAllActive();
+    DamageHooks_DisableAll();
+
     if (g_DB != INVALID_HANDLE)
     {
         CloseHandle(g_DB);
@@ -804,14 +1097,19 @@ public void OnPluginEnd()
 
 public void OnClientConnected(int client)
 {
+    g_bClientLeaving[client] = false;
+    g_bDamageHooked[client] = false;
     ResetClientState(client);
 }
 
 public void OnClientPutInServer(int client)
 {
+    g_bClientLeaving[client] = false;
+    g_bDamageHooked[client] = false;
     g_bAdminObsViewAll[client] = false;
 
-    SDKHook(client, SDKHook_OnTakeDamagePost, SDK_OnTakeDamagePost);
+    if (g_bDamageHooksActive)
+        DamageHooks_SetClient(client, true);
 
     if (IsFakeClient(client))
     {
@@ -837,6 +1135,27 @@ public void OnCvarChanged_AllowedFlags(ConVar convar, const char[] oldValue, con
         if (IsClientInGame(i) && !IsFakeClient(i))
             Gate_EnforceFor(i, "cvar-change");
     }
+    DamageHooks_Reconcile();
+}
+
+public void OnRebuildAdminCache(AdminCachePart part)
+{
+    if (!g_bGateActive || g_bGateReconcilePending)
+        return;
+
+    g_bGateReconcilePending = true;
+    RequestFrame(Frame_ReconcileAdminGate);
+}
+
+public void Frame_ReconcileAdminGate(any data)
+{
+    g_bGateReconcilePending = false;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsClientInGame(i) && !IsFakeClient(i))
+            Gate_EnforceFor(i, "admin-cache-rebuild");
+    }
+    DamageHooks_Reconcile();
 }
 
 // 在玩家通过 Steam 认证/权限检查后，立即触发 DB 加载（不依赖 Cookie 回调）
@@ -848,6 +1167,17 @@ public void OnClientPostAdminCheck(int client)
     DB_Load(client);          // DB 优先加载
     // ★ 新增：即时门禁（先把占位/加载中的状态压回禁用）
     Gate_EnforceFor(client, "postadmincheck");
+    DamageHooks_Reconcile();
+}
+
+public void E_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+{
+    RequestFrame(Frame_ReconcileDamageHooks);
+}
+
+public void Frame_ReconcileDamageHooks(any data)
+{
+    DamageHooks_Reconcile();
 }
 
 // 仅缓存 Cookie（不在这里触发 DB_Load，避免某些时序下缺失）
@@ -882,6 +1212,7 @@ public Action Timer_DBEnsureLoad(Handle timer, any userid)
     {
         Settings_Default(client);
         DB_Load(client);
+        DamageHooks_Reconcile();
         LogInfo("[LoadWatchdog] reissue DB_Load for client %d", client);
     }
     return Plugin_Stop;
@@ -891,10 +1222,14 @@ public void OnMapEnd()
 {
     // 数据库连接保持跨地图运行。
     g_DbConnecting = false;
+    g_bMapActive = false;
+    Sum_ClearAllActive();
+    DamageHooks_DisableAll();
 }
 
 public void OnMapStart()
 {
+    g_bMapActive = true;
     g_sprite = PrecacheModel(SPRITE_MATERIAL, true);
 
     // 仅清理运行期缓存（不要重置 g_Plr 的持久化字段）
@@ -904,7 +1239,6 @@ public void OnMapStart()
         g_Plr[i].wpn_type       = -1;
         g_Plr[i].last_set_time  = 0.0;
 
-        g_bNeverFire[i] = true;
         g_fTankIncap[i] = 0.0;
 
         for (int j = 1; j <= L4D2_MAXPLAYERS; j++)
@@ -923,10 +1257,13 @@ public void OnMapStart()
             g_iVitcimHealth[i][j] = 0;
         }
     }
+    DamageHooks_Reconcile();
 }
 
 public void OnClientDisconnect(int client)
 {
+    g_bClientLeaving[client] = true;
+
     if (IsClientConnected(client) && !IsFakeClient(client))
     {
         if (g_LoadState[client] == LS_Ready)
@@ -940,8 +1277,11 @@ public void OnClientDisconnect(int client)
         }
     }
 
+    Sum_ClearClient(client);
+    DamageHooks_SetClient(client, false);
     ResetClientState(client);
     g_bAdminObsViewAll[client] = false;
+    DamageHooks_Reconcile();
 }
 
 // ============ 调试命令 ============
@@ -1179,6 +1519,7 @@ public int Menu_Style(Menu menu, MenuAction action, int client, int param2)
 
     ClampStyle(client);
     Settings_MarkDirty(client);
+    DamageHooks_Reconcile();
     OpenStyleMenu(client);
     return 0;
 }
@@ -1280,6 +1621,8 @@ void E_LeftSafe(Event event, const char[] name, bool dontBroadcast)
 // ============ 事件/绘制 ============
 public void E_PlayerHurt(Event hEvent, const char[] name, bool dontBroadcast)
 {
+    if (!g_bDamageHooksActive) return;
+
     int attacker = GetClientOfUserId(hEvent.GetInt("attacker"));
     int victim   = GetClientOfUserId(hEvent.GetInt("userid"));
 
@@ -1489,43 +1832,6 @@ static void DrawNumber(const float StartPos[3], const float EndPos[3], int numbe
     }
 }
 
-public void OnGameFrame()
-{
-    // 累加模式帧驱动
-    for (int i=1;i<=L4D2_MAXPLAYERS;i++)
-    {
-        if (g_bNeverFire[i]) continue;
-        if (!IsValidClient(i) || !IsPlayerAlive(i) || g_Sum[i][0].lastHitTime + 0.5 < GetGameTime())
-        {
-            g_bNeverFire[i] = true;
-            g_Sum[i][0].needShow = false;
-            continue;
-        }
-        for (int j=1;j<=L4D2_MAXPLAYERS;j++)
-        {
-            if (!g_Sum[i][j].needShow) continue;
-            if (g_Sum[i][j].lastShowTime + UPDATE_INTERVAL >= GetGameTime()) continue;
-
-            if (g_Sum[i][j].lastHitTime + 0.5 < GetGameTime())
-            {
-                g_Sum[i][j].needShow = false;
-                g_Sum[i][j].totalDamage = 0;
-                continue;
-            }
-            DisplayDamage(
-                j, i,
-                g_Sum[i][j].weapon,
-                g_Sum[i][j].totalDamage,
-                g_Sum[i][j].damageType,
-                g_Sum[i][j].damagePosition,
-                g_Sum[i][j].isHeadshot,
-                true
-            );
-            g_Sum[i][j].lastShowTime = GetGameTime();
-        }
-    }
-}
-
 // —— 可见性/分享规则要点 ——
 // 1) 自己永远能看见自己的数字（只要 enable=true）。
 // 2) “看他人”仅决定我是否接收他人分享（默认 true 便于看管理员分享）。
@@ -1623,13 +1929,11 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
     // ★ 累加模式： lethal 一枪也进入合并，最后一帧统一显示
     if (g_Plr[attacker].summode && !UpdateFrame)
     {
-        if (!g_Sum[attacker][victim].needShow || !g_Sum[attacker][0].needShow)
+        if (!g_Sum[attacker][victim].needShow)
         {
             g_Sum[attacker][victim].needShow = true;
-            g_Sum[attacker][0].needShow = true;
             g_Sum[attacker][victim].lastShowTime = 0.0;
             g_Sum[attacker][victim].totalDamage = val;
-            g_bNeverFire[attacker] = false;
         }
         else g_Sum[attacker][victim].totalDamage += val;
 
@@ -1646,7 +1950,7 @@ static void DisplayDamage(int victim, int attacker, int weapon, int damage, int 
             else if (g_Plr[attacker].wpn_type == 3) now += 0.5;
         }
         g_Sum[attacker][victim].lastHitTime = now;
-        g_Sum[attacker][0].lastHitTime = now;
+        Sum_ActivatePair(attacker, victim);
         return;
     }
 
@@ -1799,5 +2103,6 @@ static void Gate_EnforceFor(int client, const char[] reason = "")
             CPrintToChat(client, "%t", "L4D2DamageShow_HUDFunctionDisabledAdministratorFlag", g_sAllowedFlags[0] ? g_sAllowedFlags : "无");
         }
         LogInfo("[Gate] client=%d blocked (%s), settings saved.", client, reason);
+        DamageHooks_Reconcile();
     }
 }

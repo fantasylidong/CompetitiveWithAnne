@@ -39,12 +39,12 @@ stock QuarterRank_GetCurrentQuarter()
 	return QuarterRank_GetCurrentKey();
 }
 
-stock QuarterRank_FormatCurrentQuarter(String:buffer[], maxlength)
+stock QuarterRank_FormatCurrentQuarter(Client, String:buffer[], maxlength)
 {
 	new QuarterKey = QuarterRank_GetCurrentQuarter();
 	new Year = QuarterKey / 10;
 	new Quarter = QuarterKey % 10;
-	Format(buffer, maxlength, "%i年第%i季度", Year, Quarter);
+	StatsFormatPhrase(Client, buffer, maxlength, "L4DStats_QuarterLabel", Year, Quarter);
 }
 
 stock QuarterRank_ResetLocalCache()
@@ -261,6 +261,54 @@ stock QuarterRank_RecordInfectedKill(Client, const String:InfectedType[], Kills,
 	decl String:query[1024];
 	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE kills = kills + VALUES(kills), headshots = headshots + VALUES(headshots), `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
 		DbPrefix, KillColumn, EscSteamID, g_iQuarterRankKey, Kills, Headshots, Kills, KillColumn, KillColumn, KillColumn);
+	SendSQLUpdate(query);
+}
+
+stock QuarterRank_RecordInfectedKillAndScore(Client, Score, const String:InfectedType[], Kills, Headshots = 0)
+{
+	if (Score == 0 && Kills <= 0)
+		return;
+
+	QuarterRank_EnsureCurrentQuarter();
+	new bool:RecordKills = Kills > 0 && !StatsDisabled();
+	if (Score == 0 && !RecordKills)
+		return;
+
+	if (!QuarterRank_Enabled() || !Stats_IsValidHumanClient(Client))
+		return;
+
+	if (!RecordKills)
+	{
+		Kills = 0;
+		Headshots = 0;
+	}
+	else if (Headshots < 0)
+	{
+		Headshots = 0;
+	}
+
+	ClientQuarterPoints[Client] += Score;
+	if (ClientQuarterPoints[Client] < 0)
+		ClientQuarterPoints[Client] = 0;
+
+	decl String:SteamID[MAX_LINE_WIDTH];
+	decl String:EscSteamID[MAX_LINE_WIDTH * 2 + 1];
+	GetClientRankAuthString(Client, SteamID, sizeof(SteamID));
+	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
+
+	new InsertScore = Score;
+	if (InsertScore < 0)
+		InsertScore = 0;
+
+	decl String:ModePointsColumn[32];
+	QuarterRank_GetModePointsColumn(Client, ModePointsColumn, sizeof(ModePointsColumn));
+
+	decl String:KillColumn[32];
+	Format(KillColumn, sizeof(KillColumn), "kill_%s", InfectedType);
+
+	decl String:query[1536];
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = GREATEST(points + %i, 0), `%s` = GREATEST(`%s` + %i, 0), kills = kills + VALUES(kills), headshots = headshots + VALUES(headshots), `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
+		DbPrefix, ModePointsColumn, KillColumn, EscSteamID, g_iQuarterRankKey, InsertScore, InsertScore, Kills, Headshots, Kills, Score, ModePointsColumn, ModePointsColumn, Score, KillColumn, KillColumn, KillColumn);
 	SendSQLUpdate(query);
 }
 

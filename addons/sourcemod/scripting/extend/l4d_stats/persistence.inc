@@ -144,9 +144,9 @@ public Action:timer_ProtectedFriendly(Handle:timer, any:data)
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(client, "你{olive} 保护队友 {default}获得了 {green}%i {default}分！!", Score);
+			StatsPrintToChat(client, "L4DStats_ProtectedTeammateSelf", Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s{olive} 保护队友 {default}获得了 {green}%i {default}分！{default}!", UserName, Score);
+			StatsPrintToChatAll("L4DStats_ProtectedTeammateAll", UserName, Score);
 	}
 }
 // Team infected damage score
@@ -208,14 +208,14 @@ public Action:timer_InfectedDamageCheck(Handle:timer, any:data)
 		if (Mode == 1 || Mode == 2)
 		{
 			if (InfectedDamage > 1)
-				StatsPrintToChat(data, "你因给生还者造成了 {green}%i {default}分的伤害获得了 {green}%i {default}分！", DamageCounter, Score);
+				StatsPrintToChat(data, "L4DStats_InfectedDamageRewardSelf", DamageCounter, Score);
 		}
 		else if (Mode == 3)
 		{
 			decl String:Name[MAX_LINE_WIDTH];
 			GetClientName(data, Name, sizeof(Name));
 			if (InfectedDamage > 1)
-				StatsPrintToChatAll("{olive}%s 因给生还者造成了 {green}%i {default}分的伤害获得了 {green}%i {default}分!", Name, DamageCounter, Score);
+				StatsPrintToChatAll("L4DStats_InfectedDamageRewardAll", Name, DamageCounter, Score);
 		}
 	}
 }
@@ -287,18 +287,18 @@ public Action:timer_BoomerBlindnessCheck(Handle:timer, any:data)
 			if (Mode == 1 || Mode == 2)
 			{
 				if (AwardCounter > 0)
-					StatsPrintToChat(data, "你完美的糊生还者的眼，获得 {green}%i {default} 分!", Score);
+					StatsPrintToChat(data, "L4DStats_PerfectBoomSelf", Score);
 				else
-					StatsPrintToChat(data, "你获得了 {green}%i {default}分!", Score);
+					StatsPrintToChat(data, "L4DStats_GenericPointsSelf", Score);
 			}
 			else if (Mode == 3)
 			{
 				decl String:Name[MAX_LINE_WIDTH];
 				GetClientName(data, Name, sizeof(Name));
 				if (AwardCounter > 0)
-					StatsPrintToChatAll("{olive}%s {default}完美的糊生还者的眼，获得 {green}%i {default} 分!", Name, Score);
+					StatsPrintToChatAll("L4DStats_PerfectBoomAll", Name, Score);
 				else
-					StatsPrintToChatAll("{olive}%s {default}获得了 {green}%i {default}分!", Name, Score);
+					StatsPrintToChatAll("L4DStats_GenericPointsAll", Name, Score);
 			}
 		}
 

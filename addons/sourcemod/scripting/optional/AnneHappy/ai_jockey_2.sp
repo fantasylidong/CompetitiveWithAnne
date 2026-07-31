@@ -90,28 +90,38 @@ void GetInterControl_Cvars(ConVar convar, const char[] oldValue, const char[] ne
 public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
 	if (!IsAiJockey(jockey) || !IsPlayerAlive(jockey)) { return Plugin_Continue; }
-	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey) || GetEntityMoveType(jockey) == MOVETYPE_NONE)
+	MoveType moveType = GetEntityMoveType(jockey);
+	if (moveType == MOVETYPE_NONE)
 		return Plugin_Continue;
-	float fSpeed[3] = {0.0}, fCurrentSpeed = 0.0, fJockeyPos[3] = {0.0};
-	GetEntPropVector(jockey, Prop_Data, "m_vecVelocity", fSpeed);
-	fCurrentSpeed = SquareRoot(Pow(fSpeed[0], 2.0) + Pow(fSpeed[1], 2.0));
-	GetClientAbsOrigin(jockey, fJockeyPos);
-	// 获取jockey状态
-	int iTarget = g_bCanAttackPinned[jockey] ? GetClientAimTarget(jockey, true) : GetClosetMobileSurvivor(jockey);
-	bool bHasSight = view_as<bool>(GetEntProp(jockey, Prop_Send, "m_hasVisibleThreats"));
 	// 在梯子上，禁止跳与蹲
-	if (GetEntityMoveType(jockey) & MOVETYPE_LADDER)
+	if (moveType & MOVETYPE_LADDER)
 	{
 		buttons &= ~IN_JUMP;
 		buttons &= ~IN_DUCK;
 		return Plugin_Changed;
 	}
-	if (!bHasSight || !IsValidSurvivor(iTarget) || !IsPlayerAlive(iTarget) || g_bHasBeenShoved[jockey]) { return Plugin_Continue; }
+	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey)
+		|| g_bHasBeenShoved[jockey]
+		|| !view_as<bool>(GetEntProp(jockey, Prop_Send, "m_hasVisibleThreats")))
+	{
+		return Plugin_Continue;
+	}
+
+	float fSpeed[3] = {0.0};
+	GetEntPropVector(jockey, Prop_Data, "m_vecVelocity", fSpeed);
+	float fCurrentSpeed = SquareRoot(fSpeed[0] * fSpeed[0] + fSpeed[1] * fSpeed[1]);
+	if (fCurrentSpeed <= 130.0) { return Plugin_Continue; }
+
+	int iTarget = g_bCanAttackPinned[jockey] ? GetClientAimTarget(jockey, true) : GetClosetMobileSurvivor(jockey);
+	if (!IsValidSurvivor(iTarget) || !IsPlayerAlive(iTarget)) { return Plugin_Continue; }
+
 	// 当前 Jockey 有效，目标有效，进行其他操作
-	float fTargetPos[3] = {0.0}, fDistance = NearestSurvivorDistance(jockey);
+	float fJockeyPos[3] = {0.0}, fTargetPos[3] = {0.0};
+	GetClientAbsOrigin(jockey, fJockeyPos);
 	GetClientAbsOrigin(iTarget, fTargetPos);
-	// 当前速度不大于 130.0 或距离大于 StartHopDistance，不进行操作
-	if (fCurrentSpeed <= 130.0 || fDistance > g_hStartHopDistance.FloatValue || fDistance < 40.0) { return Plugin_Continue; }
+	float fDistance = GetVectorDistance(fJockeyPos, fTargetPos);
+	// 距离不在连跳处理区间时不进行操作
+	if (fDistance > g_hStartHopDistance.FloatValue || fDistance < 40.0) { return Plugin_Continue; }
 	if (IsGrounded(jockey))
 	{
 		if (g_bCanBackVision[jockey]) { g_bCanBackVision[jockey] = false; }
@@ -394,19 +404,6 @@ bool IsAiJockey(int client)
 		&& GetClientTeam(client) == TEAM_INFECTED
 		&& IsFakeClient(client)
 		&& GetInfectedClass(client) == ZC_JOCKEY;
-}
-
-float NearestSurvivorDistance(int client)
-{
-	int closestSurvivor = GetClosetMobileSurvivor(client);
-	if (IsValidSurvivor(closestSurvivor))
-	{
-		float selfPos[3] = {0.0}, targetPos[3] = {0.0};
-		GetClientAbsOrigin(client, selfPos);
-		GetClientAbsOrigin(closestSurvivor, targetPos);
-		return GetVectorDistance(selfPos, targetPos);
-	}
-	return -1.0;
 }
 
 bool IsTargetWatchingAttacker(int attacker, int target, int offset)

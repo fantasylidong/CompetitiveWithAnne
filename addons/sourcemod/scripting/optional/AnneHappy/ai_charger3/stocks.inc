@@ -19,6 +19,13 @@ Logger
 ConVar
     g_cvStockLogLevel;
 
+int g_iVisibilityMemoSerial[MAXPLAYERS + 1];
+int g_iVisibilityMemoEntrySerial[MAXPLAYERS + 1][MAXPLAYERS + 1];
+bool g_bVisibilityMemoResult[MAXPLAYERS + 1][MAXPLAYERS + 1];
+float g_flVisibilityMemoExpiry[MAXPLAYERS + 1][MAXPLAYERS + 1];
+int g_iVisibilityMemoClientUserid[MAXPLAYERS + 1];
+int g_iVisibilityMemoTargetUserid[MAXPLAYERS + 1][MAXPLAYERS + 1];
+
 stock void Stock_OnModuleStart(ConVar& cvPluginName) {
     if (!cvPluginName) {
         g_cvStockLogLevel = CreateConVar("_ai_charger3_stock_log_level", "1", "工具模块的日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
@@ -650,6 +657,54 @@ stock float angleNormalize(float angle) {
     return angle;
 }
 
+stock void beginChargerVisibilityMemo(int client) {
+    int userid = GetClientUserId(client);
+    if (g_iVisibilityMemoClientUserid[client] != userid) {
+        g_iVisibilityMemoClientUserid[client] = userid;
+        for (int target = 1; target <= MaxClients; target++) {
+            g_flVisibilityMemoExpiry[client][target] = 0.0;
+            g_iVisibilityMemoTargetUserid[client][target] = 0;
+        }
+    }
+
+    g_iVisibilityMemoSerial[client]++;
+    if (g_iVisibilityMemoSerial[client] > 0)
+        return;
+
+    g_iVisibilityMemoSerial[client] = 1;
+    for (int target = 1; target <= MaxClients; target++)
+        g_iVisibilityMemoEntrySerial[client][target] = 0;
+}
+
+stock bool isSurvivorVisibleToCharger(int client, int target, float targetEyePos[3]) {
+    int serial = g_iVisibilityMemoSerial[client];
+    if (serial > 0 && g_iVisibilityMemoEntrySerial[client][target] == serial)
+        return g_bVisibilityMemoResult[client][target];
+
+    float now = GetGameTime();
+    int targetUserid = GetClientUserId(target);
+    if (targetUserid != 0
+        && g_iVisibilityMemoTargetUserid[client][target] == targetUserid
+        && now < g_flVisibilityMemoExpiry[client][target])
+    {
+        bool cached = g_bVisibilityMemoResult[client][target];
+        if (serial > 0) {
+            g_iVisibilityMemoEntrySerial[client][target] = serial;
+        }
+        return cached;
+    }
+
+    bool visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    g_iVisibilityMemoTargetUserid[client][target] = targetUserid;
+    g_flVisibilityMemoExpiry[client][target] = now + 0.04;
+    g_bVisibilityMemoResult[client][target] = visible;
+    if (serial > 0)
+    {
+        g_iVisibilityMemoEntrySerial[client][target] = serial;
+    }
+    return visible;
+}
+
 /**
 * 判断目标是否正在看着 charger
 * @param client 客户端索引
@@ -693,7 +748,7 @@ stock bool isTargetWatchingCharger(int client, int target, float fovDeg = 60.0) 
     return visible;
     **/
 
-    return L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    return isSurvivorVisibleToCharger(client, target, targetEyePos);
 }
 
 /**
@@ -712,6 +767,9 @@ stock int isAnySurvivorWatchingCharger(int client, int target, float fovDeg = 60
     static int weapon;
     static char clsName[32];
 
+    GetClientAbsOrigin(client, pos);
+    pos[2] = 0.0;
+
     for (int i = 1; i <= MaxClients; i++) {
         if (i == client || i == target)
             continue;
@@ -719,16 +777,13 @@ stock int isAnySurvivorWatchingCharger(int client, int target, float fovDeg = 60
             continue;
         if (IsClientIncapped(i) || IsClientHanging(i) || IsClientPinned(i))
             continue;
-        if (!isTargetWatchingCharger(client, i, fovDeg))
-            continue;
         // =========================================================================
         // 对不同的武器类型进行判断
         // 1. 如果生还者拿着近战武器但是距离 charger 的距离大于 melee_range + _ai_charger3_melee_bait_maxrange.FloatValue, 那么没有威胁
         // 2. 如果生还者拿着枪械, 如果距离大于射程范围, 没有威胁
         // =========================================================================
-        GetClientAbsOrigin(client, pos);
         GetClientAbsOrigin(i, targetPos);
-        pos[2] = targetPos[2] = 0.0;
+        targetPos[2] = 0.0;
         dist = GetVectorDistance(pos, targetPos);
 
         weapon = GetEntPropEnt(i, Prop_Send, "m_hActiveWeapon");
@@ -745,6 +800,9 @@ stock int isAnySurvivorWatchingCharger(int client, int target, float fovDeg = 60
         weaponRange = L4D2_GetFloatWeaponAttribute(clsName, L4D2FWA_Range);
         rangeModifier = L4D2_GetFloatWeaponAttribute(clsName, L4D2FWA_RangeModifier);
         if (dist > (weaponRange * rangeModifier))
+            continue;
+
+        if (!isTargetWatchingCharger(client, i, fovDeg))
             continue;
         
         count += 1;
@@ -912,7 +970,16 @@ stock bool capturePathSnapshot(int client, Address pPathFollower, Address pCurre
     Address pPreviousSeg = Address_Null;
     PathSegment segment;
 
-    for (int i = 0; i < MAX_PATH_SNAPSHOT_SEGMENTS && pIterSeg; i++) {
+    int maxDepth = g_cvPathLookAheadMaxDepth.IntValue;
+    if (maxDepth < 1)
+        maxDepth = 1;
+
+    // 前瞻逻辑最多先跳过 maxDepth 段，再向前检查 maxDepth 段。
+    int snapshotLimit = (maxDepth >= (MAX_PATH_SNAPSHOT_SEGMENTS - 1) / 2)
+        ? MAX_PATH_SNAPSHOT_SEGMENTS
+        : maxDepth * 2 + 1;
+
+    for (int i = 0; i < snapshotLimit && pIterSeg; i++) {
         constructPathSegment(pIterSeg, segment);
         snapshot.PushArray(segment, sizeof(segment));
 

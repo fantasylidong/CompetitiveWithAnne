@@ -31,6 +31,9 @@ enum struct State
     bool   bPickRushMan;
     bool   bShouldCheck;
     bool   bPausedSpawnTimer;
+    bool   waveEngaged;
+    bool   breachWavePending;
+    bool   breachWaveActive;
 
     int    totalSI;
     int    siQueueCount;
@@ -44,6 +47,9 @@ enum struct State
     int    lastSpawnSecs;
     int    rushManIndex;
     int    targetSurvivor;
+    int    breachTarget;
+    int    normalFallbackCycles[SI_COUNT];
+    int    teleportFallbackCycles[SI_COUNT];
 
     int    survCount;
     int    survIdx[MAX_SURVIVOR_SLOTS];
@@ -51,11 +57,12 @@ enum struct State
     float  lastWaveStartTime;
     float  unpauseDelay;
     float  lastWaveAvgFlow;
-    float  spawnDistCur;
-    float  teleportDistCur;
     float  spitterSpitTime[MAXPLAYERS+1];
+    float  firstPressureSpawnTime;
 
     float  nextFrameThink;
+    float  nextQueueMaintain;
+    float  nextMaxZombieCheck;
 
     void Reset()
     {
@@ -66,6 +73,9 @@ enum struct State
         this.bPickRushMan = false;
         this.bShouldCheck = false;
         this.bPausedSpawnTimer = false;
+        this.waveEngaged  = false;
+        this.breachWavePending = false;
+        this.breachWaveActive = false;
         this.bLate        = false;
 
         this.siQueueCount = 0;
@@ -78,9 +88,11 @@ enum struct State
         this.waveIndex         = 0;
         this.rushManIndex      = -1;
         this.targetSurvivor    = -1;
-        this.spawnDistCur      = 0.0;
-        this.teleportDistCur   = 0.0;
+        this.breachTarget      = -1;
         this.nextFrameThink    = 0.0;
+        this.nextQueueMaintain = 0.0;
+        this.nextMaxZombieCheck = 0.0;
+        this.firstPressureSpawnTime = 0.0;
 
         for (int i = 0; i <= MAXPLAYERS; i++)
         {
@@ -91,6 +103,8 @@ enum struct State
         {
             this.siAlive[i] = 0;
             this.siSpawnedThisWave[i] = 0;
+            this.normalFallbackCycles[i] = 0;
+            this.teleportFallbackCycles[i] = 0;
         }
         for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
     }

@@ -10,10 +10,9 @@ new String:TM_MENU_CURRENT[4] = " <<";
 new String:DB_PLAYERS_TOTALPOINTS[1024] = "totalpoints";
 new String:DB_PLAYERS_TOTALPLAYTIME[1024] = "totalplaytime";
 
-new String:RANKVOTE_QUESTION[128] = "Do you want to shuffle teams by player PPM?";
+new String:RANKVOTE_QUESTION[128] = "L4DStats_RankVoteQuestion";
 
 // Message of the day
-new String:MOTD_TITLE[32] = "今日消息";
 new String:MessageOfTheDay[1024];
 
 // Set to false when stats seem to work properly

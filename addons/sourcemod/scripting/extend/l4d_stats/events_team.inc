@@ -28,7 +28,7 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 	new Float:TotalTime = GetEngineTime() - MapTimingStartTime;
 	if(TotalTime < 30.0)
 	{
-		StatsPrintToChatAll("记录时间小于30s，数据应该不对，没有分数奖励!(PS: 30s能完成的图算啥图)");
+		StatsPrintToChatAll("L4DStats_MapTimeTooShortNoReward");
 		return;
 	}
 
@@ -37,12 +37,15 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 		return;
 
 	new Score = ModifyScoreDifficulty(GetConVarInt(cvar_VictorySurvivors), 4, 12, TEAM_SURVIVORS);
+	new FormulaBaseScore = Score;
 	new Mode = GetConVarInt(cvar_AnnounceMode);
 	new SurvivorCount = GetEventInt(event, "survivorcount");
 	new ClientTeam, bool:NegativeScore = GetConVarBool(cvar_EnableNegativeScore);
 	if(SurvivorCount>4)
 		SurvivorCount=4;
 	Score *= SurvivorCount;
+	new FormulaAnneMode = 0;
+	new FormulaInfected = 0;
 
 	decl String:query[1024];
 	decl String:iID[MAX_LINE_WIDTH];
@@ -76,6 +79,8 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 
 	if((AnneMultiPlayerMode() || SinglePlayerMode())){
 		int inf= GetAnneInfectedNumber();
+		FormulaAnneMode = SinglePlayerMode() ? 2 : 1;
+		FormulaInfected = inf;
 		if(inf <= 4)
 		{
 			if(AnneMultiPlayerMode())
@@ -89,23 +94,28 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 			Score = RoundToFloor(Score + Score * (inf-4)*0.3);
 	}
 
+	new FormulaAbovePlayers = 0;
 	if(IsAboveFourPeople())
 	{
-		Score = RoundToFloor(Score * (4.0 / getSurvivorNum()));
+		FormulaAbovePlayers = getSurvivorNum();
+		Score = RoundToFloor(Score * (4.0 / FormulaAbovePlayers));
 	}
 
-	if(IsGaoJiRenJiEnabled())
+	new FormulaHighAi = IsGaoJiRenJiEnabled() ? 1 : 0;
+	if(FormulaHighAi)
 	{
 		Score = RoundToFloor(Score * 0.5);
 	}
 
 	// HardCore 奖励增加50%
-	if(IsAnne() == 2)
+	new FormulaHardcore = IsAnne() == 2 ? 1 : 0;
+	if(FormulaHardcore)
 	{
 		Score = RoundToFloor(1.5 * Score);
 	}
 
-	if(IsFunGame() > 1)
+	new FormulaFun = IsFunGame() > 1 ? 1 : 0;
+	if(FormulaFun)
 	{
 		//娱乐模式完成关卡统一只给100分
 		if(Score > 400)
@@ -125,6 +135,7 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 			if (ClientTeam == TEAM_SURVIVORS)
 			{
 				GetClientRankAuthString(i, iID, sizeof(iID));
+				new FormulaNewbie = NewPlayerBonus_ShouldApplyToClient(i) ? view_as<int>(NewPlayerBonus_GetMultiplier()) : 0;
 				new ClientScore = NewPlayerBonus_ApplyScoreMultiplier(i, Score);
 
 				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_campaigns = award_campaigns + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, ClientScore, iID);
@@ -133,7 +144,9 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 				if (ClientScore > 0)
 				{
 					UpdateMapStat("points", ClientScore);
-					ScoreLog_SetContext("campaign_win", "base=l4d_stats_campaign*survivor_count,difficulty,anne,player_count,hardcore,fun,newbie_multiplier");
+					decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+					Format(ScoreFormula, sizeof(ScoreFormula), "v3c:%i:%i:%i:%i:%i:%i:%i:%i:%i", FormulaBaseScore, SurvivorCount, FormulaAnneMode, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
+					ScoreLog_SetContext("campaign_win", ScoreFormula);
 					AddScore(i, ClientScore);
 				}
 			}
@@ -155,11 +168,11 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 
 	if (Mode && Score > 0)
 	{
-		StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}%i 幸存者{green}完成了救援关 {default}获得了 {green}%i {default}分!", SurvivorCount, Score);
-		NewPlayerBonus_AnnounceMultiplier("救援关", Score);
+		StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_FinaleSurvivorReward", SurvivorCount, Score);
+		NewPlayerBonus_AnnounceMultiplier(true, Score);
 
 		if (NegativeScore)
-			StatsPrintToChatTeam(TEAM_INFECTED, "{lightgreen}所有感染者因 {green}没能阻拦幸存者完成救援关{default}! {lightgreen}失去了 {green}%i {default}分", Score);
+			StatsPrintToChatTeam(TEAM_INFECTED, "L4DStats_FinaleInfectedPenalty", Score);
 	}
 }
 
@@ -267,7 +280,7 @@ public Action:timer_PanicEventEnd(Handle:timer, Handle:hndl)
 			}
 
 			if (Mode)
-				StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}尸潮事件过后没有倒地或者死亡 {default}获得了 {green}%i {default}分!", Score);
+				StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_HordeNoIncapReward", Score);
 		}
 	}
 
@@ -390,7 +403,7 @@ public Action:event_PlayerBlindEnd(Handle:event, const String:name[], bool:dontB
 				}
 			}
 			if (Mode)
-				StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}所有幸存者因 {olive}boomer爆炸后无人死亡 {default}获得了 {green}%i {default}分!", Score);
+				StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_BoomerNoDeathReward", Score);
 		}
 	}
 
@@ -512,9 +525,9 @@ PlayerIncap(Attacker, Victim)
 			QuarterRank_RecordScore(Attacker, Score * (-1));
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Attacker, "你 {lightgreen}失去了 {green}%i {default}分 by {lightgreen}黑倒了 {olive}%s{default}!", Score, VictimName);
+			StatsPrintToChat(Attacker, "L4DStats_TeamIncapPenaltySelf", Score, VictimName);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default} {lightgreen}失去了{green}%i {default}分 by {lightgreen}黒倒了 {olive}%s{default}!", AttackerName, Score, VictimName);
+			StatsPrintToChatAll("L4DStats_TeamIncapPenaltyAll", AttackerName, Score, VictimName);
 	}
 
 	// Attacker is an Infected
@@ -670,12 +683,12 @@ public Action:event_PlayerLedge(Handle:event, const String:name[], bool:dontBroa
 		UpdateMapStat(MapPoints, Score);
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Attacker, "你造成玩家 {olive}%s{default} 挂边获得 {green}%i {default}分!", VictimName, Score);
+			StatsPrintToChat(Attacker, "L4DStats_LedgeHangSelf", VictimName, Score);
 		else if (Mode == 3)
 		{
 			decl String:AttackerName[MAX_LINE_WIDTH];
 			GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-			StatsPrintToChatAll("{olive}%s {default}造成玩家 {olive}%s{default} 挂边获得 {green}%i {default}分!", AttackerName, VictimName, Score);
+			StatsPrintToChatAll("L4DStats_LedgeHangAll", AttackerName, VictimName, Score);
 		}
 	}
 }
@@ -989,11 +1002,11 @@ public Action:event_JockeyRelease(Handle:event, const String:name[], bool:dontBr
 		if (Score > 0)
 		{
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Rescuer, "你将 {olive}%s {default}从 {green}%s{default} 手里救下获得{green}%i {default}分!", VictimName, JockeyName, Score);
+				StatsPrintToChat(Rescuer, "L4DStats_JockeySaveSelf", VictimName, JockeyName, Score);
 			else if (Mode == 3)
 			{
 				GetClientName(Rescuer, RescuerName, sizeof(RescuerName));
-				StatsPrintToChatAll("{olive}%s {default}将 {olive}%s {default}从 {green}%s{default} 手里救下获得{green}%i {default}分!", RescuerName, VictimName, JockeyName, Score);
+				StatsPrintToChatAll("L4DStats_JockeySaveAll", RescuerName, VictimName, JockeyName, Score);
 			}
 		}
 	}
@@ -1117,9 +1130,9 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 			if(IsFunGame() == 2)
 				return Plugin_Continue;
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Killer, "你 {green}秒了个牛{default} 获得 {green}%i {default}分!", Score);
+				StatsPrintToChat(Killer, "L4DStats_QuickChargerKillSelf", Score);
 			else if (Mode == 3)
-				StatsPrintToChatAll("{olive}%s {default} {green}秒了个牛{default} 获得 {green}%i {default}分!", KillerName, Score);
+				StatsPrintToChatAll("L4DStats_QuickChargerKillAll", KillerName, Score);
 		}
 		else
 		{
@@ -1138,9 +1151,9 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 				return Plugin_Continue;
 
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Killer, "你将 {olive}%s{default} 从 {green}%s{default} 手里救下获得 {green}%i {default}分!", VictimName, ChargerName, Score);
+				StatsPrintToChat(Killer, "L4DStats_ChargerSaveSelf", VictimName, ChargerName, Score);
 			else if (Mode == 3)
-				StatsPrintToChatAll("{olive}%s {default}将 {olive}%s{default} 从 {green}%s{default} 手里救下获得 {green}%i {default}分!", KillerName, VictimName, ChargerName, Score);
+				StatsPrintToChatAll("L4DStats_ChargerSaveAll", KillerName, VictimName, ChargerName, Score);
 		}
 	}
 }
@@ -1347,21 +1360,20 @@ public Action:event_UpgradePackAdded(Handle:event, const String:name[], bool:don
 		new EntityID = GetEventInt(event, "upgradeid");
 		decl String:ModelName[128];
 		GetEntPropString(EntityID, Prop_Data, "m_ModelName", ModelName, sizeof(ModelName));
+		new UpgradeType = 0;
 
 		if (StrContains(ModelName, "incendiary_ammo", false) >= 0)
-			strcopy(ModelName, sizeof(ModelName), "Incendiary Ammo");
+			UpgradeType = 1;
 		else if (StrContains(ModelName, "exploding_ammo", false) >= 0)
-			strcopy(ModelName, sizeof(ModelName), "Exploding Ammo");
-		else
-			strcopy(ModelName, sizeof(ModelName), "UNKNOWN");
+			UpgradeType = 2;
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Player, "你部署一个 {olive}%s{default}获得 {green}%i {default}分!", ModelName, Score);
+			StatsPrintToChat(Player, UpgradeType == 1 ? "L4DStats_DeployIncendiarySelf" : (UpgradeType == 2 ? "L4DStats_DeployExplosiveSelf" : "L4DStats_DeployUnknownSelf"), Score);
 		else if (Mode == 3)
 		{
 			decl String:PlayerName[MAX_LINE_WIDTH];
 			GetClientName(Player, PlayerName, sizeof(PlayerName));
-			StatsPrintToChatAll("{olive}%s {default}部署一个 {olive}%s{default}获得 {green}%i {default}分!", PlayerName, ModelName, Score);
+			StatsPrintToChatAll(UpgradeType == 1 ? "L4DStats_DeployIncendiaryAll" : (UpgradeType == 2 ? "L4DStats_DeployExplosiveAll" : "L4DStats_DeployUnknownAll"), PlayerName, Score);
 		}
 	}
 }
@@ -1434,12 +1446,12 @@ public Action:event_GascanPoured(Handle:event, const String:name[], bool:dontBro
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Player, "你成功 {green}灌了桶油{default} 获得了 {green}%i {default}分!", Score);
+			StatsPrintToChat(Player, "L4DStats_GasCanPouredSelf", Score);
 		else if (Mode == 3)
 		{
 			decl String:PlayerName[MAX_LINE_WIDTH];
 			GetClientName(Player, PlayerName, sizeof(PlayerName));
-			StatsPrintToChatAll("{olive}%s {default}成功 {green}灌了桶油{default} 获得了 {green}%i {default}分!", PlayerName, Score);
+			StatsPrintToChatAll("L4DStats_GasCanPouredAll", PlayerName, Score);
 		}
 	}
 }
@@ -1682,16 +1694,16 @@ public Action:event_PlayerPounced(Handle:event, const String:name[], bool:dontBr
 	GetClientName(Victim, VictimName, sizeof(VictimName));
 
 	new Score = 0;
-	decl String:Label[32];
+	new bool:IsPerfectPounce = false;
 	decl String:query[1024];
 
 	if (Dmg >= PerfectDmgLimit)
 	{
+		IsPerfectPounce = true;
 		Score = GetConVarInt(cvar_HunterPerfectPounceSuccess);
 		decl String:UpdatePoints[32];
 		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
 		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_pounce_perfect = award_pounce_perfect + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-		Format(Label, sizeof(Label), "Death From Above");
 
 		if (EnableSounds_Hunter_Perfect && GetConVarBool(cvar_SoundsEnabled))
 			EmitSoundToAll(StatsSound_Hunter_Perfect);
@@ -1702,7 +1714,6 @@ public Action:event_PlayerPounced(Handle:event, const String:name[], bool:dontBr
 		decl String:UpdatePoints[32];
 		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
 		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_pounce_nice = award_pounce_nice + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-		Format(Label, sizeof(Label), "Pain From Above");
 	}
 
 	SendSQLUpdate(query);
@@ -1711,9 +1722,9 @@ public Action:event_PlayerPounced(Handle:event, const String:name[], bool:dontBr
 	UpdateMapStat(MapPoints, Score);
 
 	if (Mode == 1 || Mode == 2)
-		StatsPrintToChat(Attacker, "你在{olive}%s{default}身上完成了一个 {olive}%s {default}扑倒，获得 {green}%i {default}分!", VictimName, Label, Score);
+		StatsPrintToChat(Attacker, IsPerfectPounce ? "L4DStats_PerfectPounceSelf" : "L4DStats_NicePounceSelf", VictimName, Score);
 	else if (Mode == 3)
-		StatsPrintToChatAll("{olive}%s 在{olive}%s{default}身上完成了一个 {olive}%s {default}扑倒，获得 {green}%i {default}分!", AttackerName, VictimName, Label, Score);
+		StatsPrintToChatAll(IsPerfectPounce ? "L4DStats_PerfectPounceAll" : "L4DStats_NicePounceAll", AttackerName, VictimName, Score);
 }
 
 // Revive friendly code.
@@ -1803,9 +1814,9 @@ public Action:event_RevivePlayer(Handle:event, const String:name[], bool:dontBro
 	if (Score > 0)
 	{
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(Savior, "你因拉起 {olive}%s{default} 获得 {green}%i {default}分!", VictimName, Score);
+			StatsPrintToChat(Savior, "L4DStats_ReviveTeammateSelf", VictimName, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}因拉起 {olive}%s{default} 获得 {green}%i {default}分!", SaviorName, VictimName, Score);
+			StatsPrintToChatAll("L4DStats_ReviveTeammateAll", SaviorName, VictimName, Score);
 	}
 }
 
@@ -2060,11 +2071,11 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 		{
 			if (Mode == 1 || Mode == 2)
 			{
-				StatsPrintToChat(User, "你解救  {olive}%s{default}获得 {green}%i {default}分!", RecipientName, Score);
+				StatsPrintToChat(User, "L4DStats_RescueClosetSelf", RecipientName, Score);
 			}
 			else if (Mode == 3)
 			{
-				StatsPrintToChatAll("{olive}%s 解救  {olive}%s{default}获得 {green}%i {default}分!", UserName, RecipientName, Score);
+				StatsPrintToChatAll("L4DStats_RescueClosetAll", UserName, RecipientName, Score);
 			}
 		}
 	}
@@ -2106,9 +2117,9 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 			Mode = 0;
 
 		if (Mode == 1 || Mode == 2)
-			StatsPrintToChat(User, "你 {lightgreen}失去了 {green}%i {default}分 by 让{lightgreen}感染者进入安全门!", Score);
+			StatsPrintToChat(User, "L4DStats_InfectedEnteredSafeRoomPenaltySelf", Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}has {lightgreen}失去了 {green}%i {default}分 by 让{lightgreen}感染者进入安全门!", UserName, Score);
+			StatsPrintToChatAll("L4DStats_InfectedEnteredSafeRoomPenaltyAll", UserName, Score);
 
 		Score = Score * -1;
 	}
@@ -2136,7 +2147,7 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 			Score = RoundToFloor(view_as<float>(Score) * 0.4);			
 		}
 		if (Mode && Score > 0)
-			StatsPrintToChat(User, "{lightgreen}所有幸存者 {default}都 {lightgreen}掉了 {green}%i {default}分 by {lightgreen}大家又坐牢了!", Score);
+			StatsPrintToChat(User, "L4DStats_AllSurvivorsLostRoundPenalty", Score);
 		Mode=0;
 		Score = Score * -1;
 		Isstart=false;
@@ -2329,7 +2340,7 @@ public Action:event_CarAlarm(Handle:event, const String:name[], bool:dontBroadca
 		SendSQLUpdate(query);
 
 		if (Mode)
-			StatsPrintToChatAll("{green}%N {lightgreen}失去了 {green}%i {default}分 by {lightgreen}又特么打警报车是吧.jpg{default}!", attacker, Score);
+			StatsPrintToChatAll("L4DStats_AlarmCarPenalty", attacker, Score);
 	}
 }
 
@@ -2414,7 +2425,7 @@ public Action:event_WitchCrowned(Handle:event, const String:name[], bool:dontBro
 			decl String:Name[MAX_LINE_WIDTH];
 			GetClientName(Killer, Name, sizeof(Name));
 
-			StatsPrintToChatTeam(TEAM_SURVIVORS, "{olive}%s {green}对Witch洒洒水 {default}获得{green}%i {default}分!", Name, Score);
+			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_WitchCrownReward", Name, Score);
 		}
 	}
 }

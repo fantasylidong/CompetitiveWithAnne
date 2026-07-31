@@ -125,7 +125,7 @@ stock NewPlayerBonus_ApplyScoreMultiplier(client, Score)
 	return RoundToCeil(float(Score) * Multiplier);
 }
 
-stock NewPlayerBonus_AnnounceMultiplier(const String:Reason[], BaseScore)
+stock NewPlayerBonus_AnnounceMultiplier(bool:IsFinaleRescue, BaseScore)
 {
 	if (BaseScore <= 0 || !GetConVarBool(cvar_NewPlayerBonusEnable))
 		return;
@@ -135,7 +135,7 @@ stock NewPlayerBonus_AnnounceMultiplier(const String:Reason[], BaseScore)
 	if (NewPlayerCount <= 0 || Multiplier <= 1.0)
 		return;
 
-	StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}带新玩家%s倍率: {olive}%i {default}名新人, 非新人幸存者获得 {green}%.1fx {default}分数倍率!", Reason, NewPlayerCount, Multiplier);
+	StatsPrintToChatTeam(TEAM_SURVIVORS, IsFinaleRescue ? "L4DStats_NewPlayerFinaleMultiplier" : "L4DStats_NewPlayerSafeRoomMultiplier", NewPlayerCount, Multiplier);
 }
 
 stock NewPlayerBonus_AnnounceRoundStart()
@@ -155,8 +155,8 @@ stock NewPlayerBonus_AnnounceRoundStart()
 		if (!NewPlayerBonus_IsNewPlayer(i))
 			continue;
 
-		StatsPrintToChat(i, "{lightgreen}你当前被判定为新人，本局非新人幸存者会获得 {green}%.1fx {default}带新分数倍率。", Multiplier);
+		StatsPrintToChat(i, "L4DStats_NewPlayerStatus", Multiplier);
 	}
 
-	StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}本局检测到 {olive}%i {default}名新人，带新系数为 {green}%.1fx{default}；新人本身不吃倍率，非新人幸存者获得加成。", NewPlayerCount, Multiplier);
+	StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_NewPlayerRoundSummary", NewPlayerCount, Multiplier);
 }

@@ -86,12 +86,12 @@ public Action:timer_EndCharge(Handle:timer, any:data)
 		Mode = GetConVarInt(cvar_AnnounceMode);
 
 	if ((Mode == 1 || Mode == 2) && IsClientConnected(data) && IsClientInGame(data))
-		StatsPrintToChat(data, "你用牛撞了{lightgreen}%i {default}幸存者获得了 {green}%i {default}分!", Counter, Score);
+		StatsPrintToChat(data, "L4DStats_ChargerMultiHitSelf", Counter, Score);
 	else if (Mode == 3)
 	{
 		decl String:AttackerName[MAX_LINE_WIDTH];
 		GetClientName(data, AttackerName, sizeof(AttackerName));
-		StatsPrintToChatAll("{olive}%s {default}用牛撞了{lightgreen}%i {default}幸存者获得了 {green}%i {default}分s!", AttackerName, Counter, Score);
+		StatsPrintToChatAll("L4DStats_ChargerMultiHitAll", AttackerName, Counter, Score);
 	}
 }
 
@@ -201,9 +201,9 @@ public Action:timer_FriendlyFireDamageEnd(Handle:timer, any:dp)
 			Mode = GetConVarInt(cvar_AnnounceMode);
 
 		if ((Mode == 1 || Mode == 2) && IsClientConnected(Attacker) && IsClientInGame(Attacker))
-			StatsPrintToChat(Attacker, "你因为造成了{olive}(%i 血)的友伤{default}  {lightgreen}失去了 {green}%i {default}分!", HumanDamage + BotDamage, Score);
+			StatsPrintToChat(Attacker, "L4DStats_FriendlyFirePenaltySelf", HumanDamage + BotDamage, Score);
 		else if (Mode == 3)
-			StatsPrintToChatAll("{olive}%s {default}因为造成了{olive}(%i 血)的友伤{default}  {lightgreen}失去了 {green}%i {default}分!", AttackerName,HumanDamage + BotDamage, Score );
+			StatsPrintToChatAll("L4DStats_FriendlyFirePenaltyAll", AttackerName, HumanDamage + BotDamage, Score);
 
 }
 
@@ -241,7 +241,7 @@ public Action:timer_ShuffleTeams(Handle:timer, any:data)
 
 	if (counter <= 1)
 	{
-		StatsPrintToChatAllPreFormatted2(true, "Team shuffle by player PPM failed because there was {lightgreen}not enough players{default}!");
+		StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleNotEnoughPlayers");
 		return;
 	}
 
@@ -263,7 +263,7 @@ public Action:timer_RankVote(Handle:timer, any:data)
 
 		CheckRankVotes(humans, votes, yesvotes, novotes, WinningVoteCount);
 
-		StatsPrintToChatAll2(true, "Vote to shuffle teams by player PPM {lightgreen}%s {default}with {green}%i (yes) against %i (no){default}.", (yesvotes > novotes ? "PASSED" : "DID NOT PASS"), yesvotes, novotes);
+		StatsPrintToChatAll2(true, yesvotes > novotes ? "L4DStats_RankVotePassed" : "L4DStats_RankVoteFailed", yesvotes, novotes);
 
 		if (yesvotes > novotes)
 		{
@@ -307,7 +307,7 @@ public Action:timer_UpdatePlayers(Handle:timer, Handle:hndl)
 	{
 		if (GetConVarBool(cvar_DisabledMessages))
 		{
-			StatsPrintToChatAllPreFormatted("求生之路排名系统现在处于 {green}关闭{default} 状态, 没有足够玩家!");
+			StatsPrintToChatAllPreFormatted("L4DStats_RankDisabledNotEnoughPlayers");
 		}
 
 		return;
@@ -454,12 +454,12 @@ public Action:timer_ShowTimerScore(Handle:timer, Handle:hndl)
 			{
 				if (Mode == 1 || Mode == 2)
 				{
-					StatsPrintToChat(i, "你击杀了 {olive}%i {default} 个感染者获得{green}%i {default}分!", TimerKills[i], TimerPoints[i]);
+					StatsPrintToChat(i, "L4DStats_CommonKillsRewardSelf", TimerKills[i], TimerPoints[i]);
 				}
 				else if (Mode == 3)
 				{
 					GetClientName(i, Name, sizeof(Name));
-					StatsPrintToChatAll("{olive}%s {default}击杀了 {olive}%i {default} 个感染者获得{green}%i {default}分!", Name, TimerKills[i], TimerPoints[i]);
+					StatsPrintToChatAll("L4DStats_CommonKillsRewardAll", Name, TimerKills[i], TimerPoints[i]);
 				}
 			}
 
@@ -530,12 +530,10 @@ InterstitialPlayerUpdateEx(client, bool:ApplyNewPlayerMultiplier)
 	len += Format(query[len], sizeof(query)-len, "headshots = headshots + %i ", TimerHeadshots[client]);
 	len += Format(query[len], sizeof(query)-len, "WHERE steamid = '%s'", ClientID);
 	SendSQLUpdate(query);
-	ModeStats_RecordKills(client, TimerKills[client], TimerHeadshots[client]);
-	QuarterRank_RecordInfectedKill(client, "infected", TimerKills[client], TimerHeadshots[client]);
 
 	UpdateMapStat("kills", TimerKills[client]);
 	UpdateMapStat("points", AwardPoints);
 
 	ScoreLog_SetContext("common_infected_timer", "timer_points=sum_common_infected_kills,difficulty,newbie_multiplier");
-	AddScore(client, AwardPoints);
+	AddInfectedKillScore(client, AwardPoints, "infected", TimerKills[client], TimerHeadshots[client]);
 }

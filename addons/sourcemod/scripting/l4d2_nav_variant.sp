@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <dhooks>
 
-#define PLUGIN_VERSION "0.1"
+#define PLUGIN_VERSION "0.2"
 #define GAMEDATA_FILE "l4d2_nav_variant"
 #define DEFAULT_CONFIG "configs/nav_variants.cfg"
 #define DEFAULT_VARIANT "anne"
@@ -46,6 +46,7 @@ bool g_bHookedStripperCfgPath;
 bool g_bPendingNavRead;
 bool g_bLastReadWasRedirect;
 bool g_bLastReadSucceeded;
+bool g_bVariantActiveCached;
 int g_iRedirectCount;
 int g_iMissingFileCount;
 char g_sLastMap[64];
@@ -57,6 +58,7 @@ char g_sLastStatus[192];
 char g_sPendingOriginal[PLATFORM_MAX_PATH];
 char g_sPendingReplacement[PLATFORM_MAX_PATH];
 char g_sClearReason[128];
+char g_sVariantNameCached[64];
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 {
@@ -93,12 +95,14 @@ public void OnPluginStart()
 	LoadNavConfig();
 	EnsureReadyCfgNameHook();
 	EnsureStripperCfgPathHook();
+	RefreshVariantActivation();
 }
 
 public void OnConfigsExecuted()
 {
 	EnsureReadyCfgNameHook();
 	EnsureStripperCfgPathHook();
+	RefreshVariantActivation();
 }
 
 public void OnPluginEnd()
@@ -121,6 +125,7 @@ public void OnPluginEnd()
 Action Cmd_ReloadConfig(int client, int args)
 {
 	LoadNavConfig();
+	RefreshVariantActivation();
 	QueueClearNavCache("config reloaded");
 	ResetLastStatus("config reloaded; not attempted for current map");
 	ReplyToCommand(client, "[NavVariant] Reloaded %s.", g_bConfigLoaded ? "successfully" : "with no valid config");
@@ -171,6 +176,7 @@ Action Cmd_Status(int client, int args)
 
 void OnNavCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	RefreshVariantActivation();
 	QueueClearNavCache("nav cvar changed");
 	ResetLastStatus("nav cvar changed; not attempted for current map");
 }
@@ -178,18 +184,21 @@ void OnNavCvarChanged(ConVar convar, const char[] oldValue, const char[] newValu
 void OnConfigCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	LoadNavConfig();
+	RefreshVariantActivation();
 	QueueClearNavCache("config cvar changed");
 	ResetLastStatus("config cvar changed; not attempted for current map");
 }
 
 void OnReadyCfgNameChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	RefreshVariantActivation();
 	QueueClearNavCache("ready cfg changed");
 	ResetLastStatus("ready cfg changed; not attempted for current map");
 }
 
 void OnStripperCfgPathChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+	RefreshVariantActivation();
 	QueueClearNavCache("stripper cfg changed");
 	ResetLastStatus("stripper cfg changed; not attempted for current map");
 }
@@ -331,20 +340,26 @@ void LoadNavConfig()
 
 MRESReturn DTR_ReadFile(Address pThis, DHookReturn hReturn, DHookParam hParams)
 {
-	char variantName[64];
-	if (!ShouldUseVariant(variantName, sizeof(variantName)))
-	{
-		return MRES_Ignored;
-	}
+    if (!g_bVariantActiveCached)
+    {
+        return MRES_Ignored;
+    }
 
 	if (hParams.IsNull(1) || hParams.IsNull(2))
 	{
 		return MRES_Ignored;
 	}
 
-	char path[PLATFORM_MAX_PATH];
-	hParams.GetString(1, path, sizeof(path));
-	NormalizeSlashes(path);
+    char path[PLATFORM_MAX_PATH];
+    hParams.GetString(1, path, sizeof(path));
+
+    int pathLen = strlen(path);
+    if (pathLen <= 4 || !StrEqual(path[pathLen - 4], ".nav", false))
+    {
+        return MRES_Ignored;
+    }
+
+    NormalizeSlashes(path);
 
 	char pathID[32];
 	hParams.GetString(2, pathID, sizeof(pathID));
@@ -359,32 +374,32 @@ MRESReturn DTR_ReadFile(Address pThis, DHookReturn hReturn, DHookParam hParams)
 		return MRES_Ignored;
 	}
 
-	char replacement[PLATFORM_MAX_PATH];
-	if (!FindReplacementNav(mapName, variantName, replacement, sizeof(replacement)))
-	{
-		SaveLastStatus(mapName, variantName, path, "", "no configured variant for this map");
-		DebugLog("No nav variant for map \"%s\" variant \"%s\".", mapName, variantName);
+    char replacement[PLATFORM_MAX_PATH];
+    if (!FindReplacementNav(mapName, g_sVariantNameCached, replacement, sizeof(replacement)))
+    {
+        SaveLastStatus(mapName, g_sVariantNameCached, path, "", "no configured variant for this map");
+        DebugLog("No nav variant for map \"%s\" variant \"%s\".", mapName, g_sVariantNameCached);
 		return MRES_Ignored;
 	}
 
 	if (!IsSafeNavPath(replacement))
 	{
-		LogError("Rejected unsafe nav variant path for %s/%s: %s", mapName, variantName, replacement);
+        LogError("Rejected unsafe nav variant path for %s/%s: %s", mapName, g_sVariantNameCached, replacement);
 		return MRES_Ignored;
 	}
 
 	if (!FileExists(replacement, true, "GAME"))
 	{
 		g_iMissingFileCount++;
-		SaveLastStatus(mapName, variantName, path, replacement, "configured variant file is missing");
-		LogError("Configured nav variant does not exist in GAME path for %s/%s: %s", mapName, variantName, replacement);
+        SaveLastStatus(mapName, g_sVariantNameCached, path, replacement, "configured variant file is missing");
+        LogError("Configured nav variant does not exist in GAME path for %s/%s: %s", mapName, g_sVariantNameCached, replacement);
 		return MRES_Ignored;
 	}
 
 	g_bPendingNavRead = true;
 	strcopy(g_sPendingOriginal, sizeof(g_sPendingOriginal), path);
 	strcopy(g_sPendingReplacement, sizeof(g_sPendingReplacement), replacement);
-	SaveLastStatus(mapName, variantName, path, replacement, "redirect pending");
+    SaveLastStatus(mapName, g_sVariantNameCached, path, replacement, "redirect pending");
 	hParams.SetString(1, replacement);
 	DebugLog("Redirect nav: %s -> %s", path, replacement);
 	return MRES_ChangedHandled;
@@ -422,6 +437,16 @@ MRESReturn DTR_ReadFile_Post(Address pThis, DHookReturn hReturn, DHookParam hPar
 	}
 
 	return MRES_Ignored;
+}
+
+void RefreshVariantActivation()
+{
+    char variantName[64];
+    g_bVariantActiveCached = ShouldUseVariant(variantName, sizeof(variantName));
+    if (g_bVariantActiveCached)
+        strcopy(g_sVariantNameCached, sizeof(g_sVariantNameCached), variantName);
+    else
+        g_sVariantNameCached[0] = '\0';
 }
 
 bool ShouldUseVariant(char[] variantName, int variantSize)

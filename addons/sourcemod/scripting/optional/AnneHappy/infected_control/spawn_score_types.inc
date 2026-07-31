@@ -18,6 +18,7 @@ enum SIClass
 enum struct SpawnScoreDbg
 {
     float total;
+    float baseTotal;
     float dist;
     float hght;
     float flow;
@@ -27,8 +28,11 @@ enum struct SpawnScoreDbg
     float dispScaled;
     float penK;
     float extraPen;
+    float navWeight;
+    float navPenalty;
+    float tacticalQuality;
 
-    float dminEye;
+    float dTargetEye;
     float ringEff;
     float slack;
     float sweet;

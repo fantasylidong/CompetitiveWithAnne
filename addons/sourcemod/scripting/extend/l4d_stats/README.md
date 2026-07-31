@@ -106,7 +106,7 @@ native int l4dstats_IsQuarterTopPlayer(int client, int ranklimit);
 l4d_stats_scorelog_enable 1
 ```
 
-插件连接数据库后会自动创建 `%sscore_log` 表；`database.sql` 里也有默认 `score_log` 结构。每次 `AddScore` 都会写入一条流水，字段包含玩家、地图、模式、难度、队伍、分数变化、变化后的本图分、原因、公式上下文、RPG 局有效状态、是否使用B数、当前新人数量和带新倍率。
+插件连接数据库后会自动创建 `%sscore_log` 表；`database.sql` 里也有默认 `score_log` 结构。每次 `AddScore` 都会保留一条独立流水，字段包含玩家、地图、模式、难度、队伍、分数变化、变化后的本图分、原因、公式上下文、RPG 局有效状态、是否使用B数、当前新人数量和带新倍率。写入会在最多 0.25 秒内按 16 行一批合并为 multi-row INSERT，并在换图或插件卸载前强制送入 SQL 队列，以减少击杀尖峰中的数据库任务数。公式字段从版本 2 开始自动以前缀 `formula_version=2,calculated_score=<最终分数>` 保存 l4d_stats 实际计算结果，供网站审查任务独立比对流水中的 `score`；后面的原始公式上下文继续保留。
 
 常用排查 SQL：
 

@@ -3,9 +3,19 @@
 #endif
 #define _infected_control_spawn_score_included
 
+#define SPAWN_SCORE_FIRST_FIT       80.0
+#define SPAWN_SCORE_TACTICAL_BLEND_NORMAL  0.10
+#define SPAWN_SCORE_TACTICAL_BLEND_BREACH  0.18
+
 static float SpawnScore_ExpF(float x)
 {
     return Pow(FLOAT_EULER, x);
+}
+
+static float SpawnScore_SmoothStep(float value)
+{
+    float t = ClampFloat(value, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
 }
 
 float GetMinDistToAnySurvivor(const float p[3])
@@ -34,15 +44,11 @@ static bool FindDropLanding(const float from[3], float outLand[3], float maxDrop
     end[1] = from[1];
     end[2] = from[2] - maxDrop;
 
-    Handle tr = TR_TraceRayFilterEx(start, end, MASK_SOLID, RayType_EndPoint, TraceFilter);
-    if (!TR_DidHit(tr))
-    {
-        delete tr;
+    TR_TraceRayFilter(start, end, MASK_SOLID, RayType_EndPoint, TraceFilter);
+    if (!TR_DidHit())
         return false;
-    }
 
-    TR_GetEndPosition(outLand, tr);
-    delete tr;
+    TR_GetEndPosition(outLand);
 
     Address nav = L4D_GetNearestNavArea(outLand, 120.0, false, false, false, TEAM_INFECTED);
     return nav != Address_Null;
@@ -55,52 +61,6 @@ stock int GetSepMax()
     if (cap > 20) cap = 20;
     return cap;
 }
-
-// raw badflow 时使用：返回“应扣的分值”，而不是改后的分。
-float ComputeBadFlowHeightPenalty(float candZ, float refBestEyeZ)
-{
-    const float CAP = 200.0;
-    float delta = refBestEyeZ - candZ;
-
-    if (delta < -120.0)
-        return 0.0;
-
-    float pen;
-    if (delta <= 0.0)
-    {
-        pen = 0.5 * (delta + 120.0);
-    }
-    else if (delta <= 60.0)
-    {
-        pen = 60.0 + 2.0 * delta;
-    }
-    else
-    {
-        pen = CAP;
-    }
-
-    if (pen < 0.0) pen = 0.0;
-    if (pen > CAP) pen = CAP;
-    return pen;
-}
-
-// 高度感知的 ring 弹性（加入近距离屋顶衰减因子）
-float HeightRingSlack(const float p[3], float bucketMinZ, float bucketMaxZ, float allMaxEyeZ)
-{
-    float zRange = bucketMaxZ - bucketMinZ;
-    if (zRange < 1.0) zRange = 1.0;
-
-    float zNorm = (p[2] - bucketMinZ) / zRange;
-    if (zNorm < 0.0) zNorm = 0.0;
-    if (zNorm > 1.0) zNorm = 1.0;
-
-    float base = FloatMin(zRange + 50.0, RING_SLACK * 2.0) * zNorm;
-    float over = FloatMax(0.0, p[2] - (allMaxEyeZ + 200.0));
-    float taperZ = 1.0 / (1.0 + over / 150.0);
-
-    return base * taperZ;
-}
-
 
 static float HeightScore_NearPlane(float zRel, float planeWindow, float peakScore, float windowDrop, float falloff, float floorScore)
 {
@@ -143,35 +103,52 @@ static float HeightScore_ModerateAbove(float zRel, float baseScore, float peakSc
     return ClampFloat(score, floorScore, peakScore);
 }
 
+static void GetClassHeightScoreRange(int zc, float &scoreMin, float &scoreMax)
+{
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker):  { scoreMin = 20.0;  scoreMax = 100.0; }
+        case view_as<int>(SI_Boomer):  { scoreMin = 18.0;  scoreMax = 82.0; }
+        case view_as<int>(SI_Hunter):  { scoreMin = 22.0;  scoreMax = 108.0; }
+        case view_as<int>(SI_Spitter): { scoreMin = 28.0;  scoreMax = 72.0; }
+        case view_as<int>(SI_Jockey),
+             view_as<int>(SI_Charger): { scoreMin = -60.0; scoreMax = 90.0; }
+        default:                       { scoreMin = 24.0;  scoreMax = 76.0; }
+    }
+}
+
 stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
 {
     float zRel = p[2] - refEyeZ;
-
-    if (zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Jockey))
-        return HeightScore_NearPlane(zRel, 150.0, 90.0, 20.0, 0.20, -60.0);
-
     float score;
-    switch (zc)
+    if (zc == view_as<int>(SI_Charger) || zc == view_as<int>(SI_Jockey))
     {
-        case view_as<int>(SI_Boomer):
+        score = HeightScore_NearPlane(zRel, 150.0, 90.0, 20.0, 0.20, -60.0);
+    }
+    else
+    {
+        switch (zc)
         {
-            score = HeightScore_NearPlane(zRel, 80.0, 82.0, 12.0, 0.16, 18.0);
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            score = HeightScore_ModerateAbove(zRel, 42.0, 90.0, 260.0, 0.13, 22.0);
-        }
-        case view_as<int>(SI_Smoker):
-        {
-            score = HeightScore_ModerateAbove(zRel, 46.0, 82.0, 220.0, 0.16, 20.0);
-        }
-        case view_as<int>(SI_Spitter):
-        {
-            score = HeightScore_ModerateAbove(zRel, 58.0, 72.0, 140.0, 0.12, 28.0);
-        }
-        default:
-        {
-            score = HeightScore_ModerateAbove(zRel, 50.0, 76.0, 180.0, 0.14, 24.0);
+            case view_as<int>(SI_Boomer):
+            {
+                score = HeightScore_NearPlane(zRel, 80.0, 82.0, 12.0, 0.16, 18.0);
+            }
+            case view_as<int>(SI_Hunter):
+            {
+                score = HeightScore_ModerateAbove(zRel, 42.0, 90.0, 260.0, 0.13, 22.0);
+            }
+            case view_as<int>(SI_Smoker):
+            {
+                score = HeightScore_ModerateAbove(zRel, 46.0, 82.0, 220.0, 0.16, 20.0);
+            }
+            case view_as<int>(SI_Spitter):
+            {
+                score = HeightScore_ModerateAbove(zRel, 58.0, 72.0, 140.0, 0.12, 28.0);
+            }
+            default:
+            {
+                score = HeightScore_ModerateAbove(zRel, 50.0, 76.0, 180.0, 0.14, 24.0);
+            }
         }
     }
 
@@ -186,18 +163,24 @@ stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
         }
     }
 
-    return ClampFloat(score, -60.0, 110.0);
+    float scoreMin, scoreMax;
+    GetClassHeightScoreRange(zc, scoreMin, scoreMax);
+    float span = FloatMax(1.0, scoreMax - scoreMin);
+    return ClampFloat((score - scoreMin) * 100.0 / span, 0.0, 100.0);
 }
 
 
-stock float CalculateScore_Dispersion(int sidx, int preferredSector, const int a_recentSectors[3])
+static float CalculateScore_DispersionWithScale(int sidx,
+                                                const int a_recentSectors[3], float penaltyScale)
 {
-    float k = PenLimitScale();
-    if (sidx == preferredSector)    return 100.0;
-    if (sidx == a_recentSectors[0]) return -50.0 * k;
-    if (sidx == a_recentSectors[1]) return -25.0 * k;
-    if (sidx == a_recentSectors[2]) return 0.0;
-    return 50.0;
+    float recentPenalty = 0.0;
+    if (sidx == a_recentSectors[0])      recentPenalty = 70.0;
+    else if (sidx == a_recentSectors[1]) recentPenalty = 45.0;
+    else if (sidx == a_recentSectors[2]) recentPenalty = 25.0;
+
+    // 方向偏好由连续战术几何分表达；这里仅负责避免连续从同一扇区刷出。
+    float score = 70.0 - ClampFloat(penaltyScale, 0.0, 1.0) * recentPenalty;
+    return ClampFloat(score, 0.0, 100.0);
 }
 
 static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
@@ -278,25 +261,19 @@ static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket
     return penalty;
 }
 
-stock float ComputeFFThresholdForClass(int zc)
+stock float ComputeFFThreshold()
 {
-    float maxDist = 100.0, maxFlow = 100.0, maxDisp = 100.0, maxHght = 140.0;
-    float theoMax = gCV.w_dist[zc] * maxDist
-                  + gCV.w_hght[zc] * maxHght
-                  + gCV.w_flow[zc] * maxFlow
-                  + gCV.w_disp[zc] * maxDisp;
-    return 0.85 * theoMax;
+    return SPAWN_SCORE_FIRST_FIT;
 }
 
-stock float ScoreDistSmooth(float dminEye, float sweet, float width)
+stock float ScoreDistSmooth(float dTargetEye, float sweet, float width)
 {
     if (width < 1.0) width = 1.0;
 
-    float t = FloatAbs(dminEye - sweet) / width;
-    float k = 1.5;
-    float s = 100.0 / (1.0 + SpawnScore_ExpF(k * t));
+    float t = FloatAbs(dTargetEye - sweet) / width;
+    float s = 100.0 * SpawnScore_ExpF(-0.5 * t * t);
 
-    return ClampFloat(s, 10.0, 100.0);
+    return ClampFloat(s, 0.0, 100.0);
 }
 
 stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, float &width)
@@ -319,28 +296,41 @@ stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, f
     width = ClampFloat(width, span * 0.12, span * 0.80);
 }
 
-stock float ScoreFlowSmooth(int deltaFlow)
+static void GetClassFlowProfile(int zc, int &backAnchor, int &peakAnchor, int &frontAnchor)
 {
-    if (deltaFlow <= -12) return 0.0;
-
-    if (deltaFlow < 0)
+    switch (zc)
     {
-        float t = float(deltaFlow + 11) / 10.0;
-        return 5.0 + t * 25.0;
+        case view_as<int>(SI_Smoker),
+             view_as<int>(SI_Spitter): { backAnchor = -12; peakAnchor = 4; frontAnchor = 20; }
+        case view_as<int>(SI_Boomer):  { backAnchor = -8;  peakAnchor = 1; frontAnchor = 14; }
+        case view_as<int>(SI_Hunter):  { backAnchor = -10; peakAnchor = 3; frontAnchor = 18; }
+        case view_as<int>(SI_Jockey),
+             view_as<int>(SI_Charger): { backAnchor = -9;  peakAnchor = 2; frontAnchor = 16; }
+        default:                       { backAnchor = -10; peakAnchor = 3; frontAnchor = 18; }
+    }
+}
+
+stock float ScoreFlowSmooth(int zc, int deltaFlow)
+{
+    int backAnchor, peakAnchor, frontAnchor;
+    GetClassFlowProfile(zc, backAnchor, peakAnchor, frontAnchor);
+
+    if (deltaFlow <= backAnchor)
+        return 5.0;
+
+    if (deltaFlow < peakAnchor)
+    {
+        float t = float(deltaFlow - backAnchor) / float(peakAnchor - backAnchor);
+        return 5.0 + 95.0 * SpawnScore_SmoothStep(t);
     }
 
-    if (deltaFlow == 0) return 50.0;
-    if (deltaFlow <= 5) return 100.0;
-
-    if (deltaFlow <= 12)
+    if (deltaFlow < frontAnchor)
     {
-        float t = float(deltaFlow - 6) / 6.0;
-        return 85.0 - t * 40.0;
+        float t = float(deltaFlow - peakAnchor) / float(frontAnchor - peakAnchor);
+        return 100.0 - 70.0 * SpawnScore_SmoothStep(t);
     }
 
-    float over = float(deltaFlow - 12);
-    float s = 40.0 / (1.0 + (over / 8.0));
-    return 30.0 + ClampFloat(s, 0.0, 40.0);
+    return 30.0;
 }
 
 stock float PenLimitScale()
@@ -364,6 +354,24 @@ stock float ScaleNegativeOnly(float v, float k)
     return (v < 0.0) ? (v * k) : v;
 }
 
+static float SpawnScore_WeightedAverage(int zc, float scoreDist, float scoreHeight,
+                                        float scoreFlow, float scoreDisp)
+{
+    float weightDist = FloatMax(0.0, gCV.w_dist[zc]);
+    float weightHeight = FloatMax(0.0, gCV.w_hght[zc]);
+    float weightFlow = FloatMax(0.0, gCV.w_flow[zc]);
+    float weightDisp = FloatMax(0.0, gCV.w_disp[zc]);
+    float weightTotal = weightDist + weightHeight + weightFlow + weightDisp;
+
+    if (weightTotal <= 0.0001)
+        return 0.25 * (scoreDist + scoreHeight + scoreFlow + scoreDisp);
+
+    return (weightDist * scoreDist
+          + weightHeight * scoreHeight
+          + weightFlow * scoreFlow
+          + weightDisp * scoreDisp) / weightTotal;
+}
+
 static void SpawnScore_CopyPos(float dest[3], const float src[3])
 {
     dest[0] = src[0];
@@ -375,6 +383,7 @@ static void SpawnScore_CopyPos(float dest[3], const float src[3])
 void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
 {
     dest.total = src.total;
+    dest.baseTotal = src.baseTotal;
     dest.dist = src.dist;
     dest.hght = src.hght;
     dest.flow = src.flow;
@@ -384,7 +393,10 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.dispScaled = src.dispScaled;
     dest.penK = src.penK;
     dest.extraPen = src.extraPen;
-    dest.dminEye = src.dminEye;
+    dest.navWeight = src.navWeight;
+    dest.navPenalty = src.navPenalty;
+    dest.tacticalQuality = src.tacticalQuality;
+    dest.dTargetEye = src.dTargetEye;
     dest.ringEff = src.ringEff;
     dest.slack = src.slack;
     dest.sweet = src.sweet;
@@ -400,7 +412,8 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
 
 bool SpawnScore_BuildCandidate(int zc,
                                       const float pos[3],
-                                      float dminEye,
+                                      float dTargetEye,
+                                      float minRange,
                                       float ringEff,
                                       float slack,
                                       int candBucket,
@@ -410,38 +423,48 @@ bool SpawnScore_BuildCandidate(int zc,
                                       float bestSurvivorEyeZ,
                                       float lowestFootZ,
                                       int sector,
-                                      int preferredSector,
                                       int areaIdx,
+                                      float navWeight,
+                                      float tacticalQuality,
                                       SpawnScoreDbg dbg)
 {
     // 评分只排序“已经通过硬过滤”的候选点，不负责可见性、卡壳、路径等安全判定。
     // 想让某类点完全不能刷，应放在 SpawnCore_EvaluateNavCandidate 的过滤阶段；
     // 想调整偏好强弱，才改这里的四因子或 config.inc 里的权重。
     float sweet, width;
-    GetClassDistanceProfile(zc, gCV.fSpawnMin, ringEff, sweet, width);
+    GetClassDistanceProfile(zc, minRange, ringEff, sweet, width);
 
-    float scoreDist = ScoreDistSmooth(dminEye, sweet, width);
+    float scoreDist = ScoreDistSmooth(dTargetEye, sweet, width);
     float scoreHeight = CalculateScore_Height(zc, pos, refEyeZ);
 
     int deltaFlow = candBucket - centerBucket;
-    float flowBase = ScoreFlowSmooth(deltaFlow);
-    float flowPenalty = rawBadFlow ? ComputeBadFlowHeightPenalty(pos[2], bestSurvivorEyeZ) : 0.0;
-    float scoreFlow = flowBase - flowPenalty;
-    if (scoreFlow > 100.0) scoreFlow = 100.0;
-    if (scoreFlow < -200.0) scoreFlow = -200.0;
+    float flowBase = ScoreFlowSmooth(zc, deltaFlow);
+    float flowPenalty = rawBadFlow ? ClampFloat(gCV.fFlowBadPenalty, 0.0, 100.0) : 0.0;
+    float scoreFlow = ClampFloat(flowBase - flowPenalty, 0.0, 100.0);
 
-    float scoreDisp = CalculateScore_Dispersion(sector, preferredSector, recentSectors);
     float penK = ComputePenScaleByLimit(gCV.iSiLimit);
-    float dispScaled = ScaleNegativeOnly(scoreDisp, penK);
-    float behindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
-                                                     pos[2], refEyeZ, bestSurvivorEyeZ,
-                                                     lowestFootZ);
+    float scoreDisp = CalculateScore_DispersionWithScale(
+        sector, recentSectors, 1.0);
+    float dispScaled = CalculateScore_DispersionWithScale(
+        sector, recentSectors, penK);
+    float rawBehindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
+                                                        pos[2], refEyeZ, bestSurvivorEyeZ,
+                                                        lowestFootZ);
+    float behindPenalty = 10.0 * ClampFloat(rawBehindPenalty / 150.0, 0.0, 1.0);
 
-    dbg.total = gCV.w_dist[zc] * scoreDist
-              + gCV.w_hght[zc] * scoreHeight
-              + gCV.w_flow[zc] * scoreFlow
-              + gCV.w_disp[zc] * dispScaled;
-    dbg.total -= behindPenalty;
+    float weightedQuality = SpawnScore_WeightedAverage(
+        zc, scoreDist, scoreHeight, scoreFlow, dispScaled);
+    dbg.baseTotal = ClampFloat(weightedQuality - behindPenalty, 0.0, 100.0);
+    dbg.navWeight = ClampFloat(navWeight, NAV_WEIGHT_MIN, 1.0);
+    dbg.navPenalty = 0.0;
+    dbg.tacticalQuality = ClampFloat(tacticalQuality, 0.0, 100.0);
+    float tacticalBlend = Tactical_IsBreachWave()
+        ? SPAWN_SCORE_TACTICAL_BLEND_BREACH
+        : SPAWN_SCORE_TACTICAL_BLEND_NORMAL;
+    dbg.total = ClampFloat(
+        dbg.baseTotal * (1.0 - tacticalBlend)
+        + dbg.tacticalQuality * tacticalBlend,
+        0.0, 100.0);
     dbg.dist = scoreDist;
     dbg.hght = scoreHeight;
     dbg.flow = scoreFlow;
@@ -451,7 +474,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.dispScaled = dispScaled;
     dbg.penK = penK;
     dbg.extraPen = behindPenalty;
-    dbg.dminEye = dminEye;
+    dbg.dTargetEye = dTargetEye;
     dbg.ringEff = ringEff;
     dbg.slack = slack;
     dbg.sweet = sweet;
@@ -463,7 +486,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.areaIdx = areaIdx;
     dbg.rawBadFlow = rawBadFlow;
     SpawnScore_CopyPos(dbg.pos, pos);
-    return !(rawBadFlow && scoreFlow < 0.0);
+    return true;
 }
 
 void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
@@ -476,10 +499,11 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
-        dbg.dminEye, dbg.ringEff, dbg.slack,
+        dbg.total, dbg.baseTotal, dbg.tacticalQuality, dbg.navWeight, dbg.navPenalty,
+        dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
+        dbg.dTargetEye, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         candReal, surReal, candReal - surReal);
 }

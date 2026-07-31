@@ -42,16 +42,19 @@ public Action Cmd_NavPeek(int client, int args)
     float aZCore = 0.0, aZMin = 0.0, aZMax = 0.0;
     float bZMin  = 0.0, bZMax  = 0.0;
 
-    if (g_BucketsReady && index >= 0 && g_AreaPct != null)
+    if (index >= 0 && g_AreaPct != null && index < g_AreaPct.Length)
     {
         bucketA = view_as<int>(g_AreaPct.Get(index));
-        aZCore  = view_as<float>(g_AreaZCore.Get(index));
-        aZMin   = view_as<float>(g_AreaZMin.Get(index));
-        aZMax   = view_as<float>(g_AreaZMax.Get(index));
-        if (0 <= bucketA && bucketA <= 100)
+        if (g_BucketsReady && g_AreaZCore != null && g_AreaZMin != null && g_AreaZMax != null)
         {
-            bZMin = g_BucketMinZ[bucketA];
-            bZMax = g_BucketMaxZ[bucketA];
+            aZCore = view_as<float>(g_AreaZCore.Get(index));
+            aZMin = view_as<float>(g_AreaZMin.Get(index));
+            aZMax = view_as<float>(g_AreaZMax.Get(index));
+            if (0 <= bucketA && bucketA <= 100)
+            {
+                bZMin = g_BucketMinZ[bucketA];
+                bZMax = g_BucketMaxZ[bucketA];
+            }
         }
     }
 
@@ -69,9 +72,10 @@ public Action Cmd_NavPeek(int client, int args)
     else
         PrintToConsole(client, "flow = (invalid) -> bucket(computed) = N/A");
 
+    if (bucketA >= 0)
+        PrintToConsole(client, "progress(assigned) = %d", bucketA);
     if (g_BucketsReady)
     {
-        PrintToConsole(client, "bucket(assigned) = %d", bucketA);
         PrintToConsole(client, "areaZ(core/min/max) = %.1f / %.1f / %.1f", aZCore, aZMin, aZMax);
         if (0 <= bucketA && bucketA <= 100)
             PrintToConsole(client, "bucketZ[min..max] = [%.1f .. %.1f]", bZMin, bZMax);
@@ -171,7 +175,7 @@ public Action Cmd_NavTest(int client, int args)
     bool  passFlowRaw = (flowDist >= 0.0 && flowDist <= maxFlow);
 
     int mappedPct = -1;
-    if (gCV.bNavBucketEnable && g_BucketsReady && g_AreaPct != null && index >= 0 && index < g_AreaPct.Length) {
+    if (g_AreaPct != null && index >= 0 && index < g_AreaPct.Length) {
         mappedPct = view_as<int>(g_AreaPct.Get(index));  // 0..100 或 -1
     }
     bool passFlow = passFlowRaw || (mappedPct >= 0 && mappedPct <= 100);
@@ -225,15 +229,15 @@ public Action Cmd_NavTest(int client, int args)
     int zc = view_as<int>(SI_Smoker);
     float center[3]; GetSectorCenter(center, targetSur);
     int sectors = GetCurrentSectors();
-    int preferredSector = PickSector(sectors);
     int sidx = ComputeSectorIndex(center, testPos, sectors);
 
     // 高度“偏好”分（独立正向项，不是扣分器）
     float refEyeZ = 0.0;
+    float targetEye[3];
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
     {
-        float e[3]; GetClientEyePosition(targetSur, e);
-        refEyeZ = e[2];
+        GetClientEyePosition(targetSur, targetEye);
+        refEyeZ = targetEye[2];
     }
 
     // 计算全队最高眼睛高度，用于 badflow 惩罚参考面
@@ -252,17 +256,23 @@ public Action Cmd_NavTest(int client, int args)
     bool  rawBadFlow = (!passFlowRaw && passFlow);
     float lowestFootZ = 1.0e9;
     TryGetLowestSurvivorFootZ(lowestFootZ);
+    Visibility_RefreshEyeSnapshot();
+    float dTargetEye = GetVectorDistance(testPos, targetEye);
+    float tacticalQuality = Tactical_GetCandidateQuality(zc, testPos, targetSur, targetEye);
     SpawnScoreDbg scoreDbg;
-    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dminEye, gCV.fSpawnMax, 0.0,
+    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye, gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
                                                    candPercent, centerBucket, rawBadFlow,
-                                                   refEyeZ, bestEyeZ, lowestFootZ, sidx, preferredSector,
-                                                   index, scoreDbg);
+                                                   refEyeZ, bestEyeZ, lowestFootZ, sidx, index,
+                                                   GetNavHistoryWeight(index, GetGameTime()),
+                                                   tacticalQuality, scoreDbg);
 
     PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)",
         scoreDbg.dist, scoreDbg.sweet, scoreDbg.width);
     PrintToConsole(client, "  Height Score: %.1f (refZ: %.1f, candZ: %.1f, delta: %.1f)",
         scoreDbg.hght, refEyeZ, testPos[2], testPos[2] - refEyeZ);
     PrintToConsole(client, "  Extra Penalty: %.1f", scoreDbg.extraPen);
+    PrintToConsole(client, "  Nav History: weight=%.2f penalty=%.1f total=%.1f base=%.1f",
+        scoreDbg.navWeight, scoreDbg.navPenalty, scoreDbg.total, scoreDbg.baseTotal);
 
     if (rawBadFlow)
     {
@@ -274,8 +284,8 @@ public Action Cmd_NavTest(int client, int args)
         PrintToConsole(client, "  Flow Score: %.1f (delta: %d)", scoreDbg.flow, scoreDbg.deltaFlow);
     }
 
-    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, sector: %d/%d, pref: %d)",
-        scoreDbg.dispRaw, scoreDbg.dispScaled, scoreDbg.penK, sidx, sectors, preferredSector);
+    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, sector: %d/%d)",
+        scoreDbg.dispRaw, scoreDbg.dispScaled, scoreDbg.penK, sidx, sectors);
 
     float totalScore = scoreDbg.total;
     PrintToConsole(client, "");

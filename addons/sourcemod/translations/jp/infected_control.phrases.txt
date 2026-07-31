@@ -273,5 +273,9 @@
 	{
 		"jp"		"{green}[IC]{default} Traitor reserved slots: %d"
 	}
+	"InfectedControl_NavCacheRebuildStarted"
+	{
+		"jp"		"[IC] Nav グラフとエリア別進行度キャッシュを再構築しています。"
+	}
 
 }

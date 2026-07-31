@@ -1,0 +1,61 @@
+"Games"
+{
+    "left4dead2"
+    {
+        "Addresses"
+        {
+            "TheNavAreas"
+            {
+                "linux"
+                {
+                    "signature" "nav_update_lighting"
+                    "read"      "33"
+                }
+                "windows"
+                {
+                    "signature" "nav_update_lighting"
+                    "read"      "82"
+                }
+            }
+        }
+
+        "Offsets"
+        {
+            "CNavArea::ID"              { "linux" "140" "windows" "140" }
+            "CNavArea::Center"          { "linux" "44"  "windows" "44"  }
+            "TerrorNavArea::FlowDistance" { "linux" "340" "windows" "332" }
+            "CNavArea::Blocked"         { "linux" "58"  "windows" "58"  }
+            "CNavArea::Attributes"      { "linux" "84"  "windows" "84"  }
+            "CNavArea::Connections"     { "linux" "88"  "windows" "88"  }
+            "CNavArea::Ladders"         { "linux" "104" "windows" "104" }
+            "CNavArea::Elevator"        { "linux" "132" "windows" "132" }
+            "TheNavAreas::Count"        { "linux" "12"  "windows" "12"  }
+            "CNavLadder::TopForward"    { "linux" "32"  "windows" "32"  }
+            "CNavLadder::TopLeft"       { "linux" "36"  "windows" "36"  }
+            "CNavLadder::TopRight"      { "linux" "40"  "windows" "40"  }
+            "CNavLadder::Bottom"        { "linux" "48"  "windows" "48"  }
+        }
+
+        "Signatures"
+        {
+            "nav_update_lighting"
+            {
+                "library"   "server"
+                "linux"     "@_ZL19nav_update_lightingRK8CCommand"
+                "windows"   "\x55\x8B\x2A\x8B\x2A\x2A\x57\x33\x2A\x83\x2A\x2A\x75"
+            }
+            "IsVisibleToPlayer"
+            {
+                "library"   "server"
+                "linux"     "@_Z17IsVisibleToPlayerRK6VectorP11CBasePlayeriifPK11CBaseEntityPP13TerrorNavAreaPb"
+                "windows"   "\x55\x8B\x2A\x81\xEC\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x89\x2A\x2A\x8B\x2A\x2A\x8B\x2A\x2A\x53\x8B\x2A\x2A\x56\x8B\x2A\x2A\xC6"
+            }
+            "NavAreaBuildPath"
+            {
+                "library"   "server"
+                "linux"     "@_Z16NavAreaBuildPathI16ShortestPathCostEbP8CNavAreaS2_PK6VectorS5_RT_PS2_fib"
+                "windows"   "\x53\x8B\x2A\x83\x2A\x2A\x83\x2A\x2A\x83\x2A\x2A\x55\x8B\x2A\x2A\x89\x2A\x2A\x2A\x8B\x2A\x83\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x33\x2A\x56\x89"
+            }
+        }
+    }
+}

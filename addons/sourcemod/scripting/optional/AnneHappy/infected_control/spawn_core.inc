@@ -16,6 +16,21 @@ enum struct SpawnFilterStats
     int position;
     int score;
     int bucket;
+
+    void Reset()
+    {
+        this.cooldown = 0;
+        this.flags = 0;
+        this.flow = 0;
+        this.distance = 0;
+        this.separation = 0;
+        this.stuck = 0;
+        this.visibility = 0;
+        this.path = 0;
+        this.position = 0;
+        this.score = 0;
+        this.bucket = 0;
+    }
 }
 
 // 刷点核心分两层：
@@ -72,6 +87,8 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
 
 static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            int targetSurvivor,
+                                           const float targetPoint[3],
+                                           float minRange,
                                            float searchRange,
                                            bool teleportMode,
                                            int areaIdx,
@@ -81,20 +98,26 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            bool finaleArea,
                                            const float center[3],
                                            int sectors,
-                                           int preferredSector,
-                                           float allMinZ,
                                            float allMaxZ,
                                            int centerBucket,
+                                           int positionCheckBucket,
                                            float refEyeZ,
                                            float lowestFootZ,
+                                           bool hasLowestFootZ,
+                                           Address navStart,
+                                           int visibilityRayMode,
                                            float minScore,
+                                           float now,
                                            SpawnScoreDbg candDbg,
-                                           SpawnFilterStats stats)
+                                           SpawnFilterStats stats,
+                                           bool &usedExpensive)
 {
+    usedExpensive = false;
     // 0) 防御性检查：areaIdx 必须先验证，避免无效 index 进入 NavArea native。
     if (areaIdx < 0 || areaIdx >= g_NavAreasCacheCount)
     {
         stats.position++;
+        SpawnPerf_RecordFilterByPosition();
         return false;
     }
 
@@ -104,6 +127,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!area)
     {
         stats.position++;
+        SpawnPerf_RecordFilterByPosition();
         return false;
     }
 
@@ -131,6 +155,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         if (rejectBadFlow && rawBadFlow)
         {
             stats.flow++;
+            SpawnPerf_RecordFilterByFlow();
             return false;
         }
 
@@ -140,9 +165,10 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     candidateBucket = ClampInt(candidateBucket, 0, 100);
 
     // 3) 冷却和同桶上限都是区域/桶级判断，放在 GetRandomPoint 之前节省点位级成本。
-    if (IsNavOnCooldown(areaIdx, GetGameTime()))
+    if (IsNavOnCooldown(areaIdx, now))
     {
         stats.cooldown++;
+        SpawnPerf_RecordFilterByCooldown();
         return false;
     }
 
@@ -153,73 +179,101 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
     }
 
-    // 4) 从这里开始才进入点位级成本。GetRandomPoint 会调用 leftdhooks 随机 Nav 点。
+    // 4) 从这里开始才进入点位级成本。一个 NavArea 内可能同时跨过距离带边界；
+    //    若随机点只在廉价检查阶段失败，少量重采样比丢掉整个区域后继续扫图更划算。
     float pos[3];
-    area.GetRandomPoint(pos);
-
-    // 5) 最近刷点分散是纯内存距离检查，比距离/trace/path 都便宜。
-    if (!PassMinSeparation(pos))
-    {
-        stats.separation++;
-        return false;
-    }
-
-    // 6) 高度 slack 只给真正吃高点收益的职业，避免普通候选被屋顶高度大面积放宽。
-    float bucketMinZ = g_BucketMinZ[candidateBucket];
-    float bucketMaxZ = g_BucketMaxZ[candidateBucket];
-    if (bucketMaxZ <= bucketMinZ)
-    {
-        bucketMinZ = allMinZ - 50.0;
-        bucketMaxZ = allMaxZ + 50.0;
-    }
-
     float slack = 0.0;
-    if (zc == view_as<int>(SI_Smoker) || zc == view_as<int>(SI_Hunter))
-        slack = HeightRingSlack(pos, bucketMinZ, bucketMaxZ, allMaxZ);
+    float ringEff = searchRange;
+    float dminEyeSq = 0.0;
+    float minDistSq = minRange * minRange;
+    bool haveCheapCandidate = false;
+    bool geometryReady = false;
+    float dTargetEye = 0.0;
+    int sector = 0;
+    float targetEye[3];
+    if (!Visibility_GetClientEyeSnapshot(targetSurvivor, targetEye))
+        SpawnCore_CopyPos(targetEye, targetPoint);
 
-    float ringEff = FloatMin(searchRange + slack, gCV.fSpawnMax);
-
-    // 7) 距离检查分两层：可选快速包围盒预筛，然后精确 eye distance。
-    if (!SpawnCore_QuickDistancePrecheckAnySurvivor(pos, ringEff))
+    for (int sample = 0; sample < NAV_RANDOM_POINT_TRIES; sample++)
     {
-        stats.distance++;
-        SpawnPerf_RecordFilterByDist();
-        return false;
+        area.GetRandomPoint(pos);
+
+        // 5) 最近刷点分散是纯内存距离检查，比距离/trace/path 都便宜。
+        if (!PassMinSeparation(pos))
+        {
+            stats.separation++;
+            SpawnPerf_RecordFilterBySeparation();
+            continue;
+        }
+
+        // 6) 当前职业范围是硬边界；高度只参与评分，不再隐式扩大搜索范围。
+        geometryReady = g_bSpawnAccel
+            && AnneSpawn_ComputePointGeometry(pos, center, sectors, targetEye,
+                                               dminEyeSq, dTargetEye, sector);
+        if (!geometryReady)
+            dminEyeSq = GetMinEyeDistSquaredToAnySurvivor(pos);
+        float maxDistSq = ringEff * ringEff;
+        if (dminEyeSq < minDistSq || dminEyeSq > maxDistSq)
+        {
+            stats.distance++;
+            SpawnPerf_RecordFilterByDist();
+            continue;
+        }
+
+        // 7) 使用已知 candidateBucket 做真实位置检查，避免 GetPositionBucketPercent(pos) 再查 Nav。
+        if (!PassRealBucketPositionCheckCached(candidateBucket, pos[2], positionCheckBucket,
+                                               hasLowestFootZ, lowestFootZ, zc))
+        {
+            stats.position++;
+            SpawnPerf_RecordFilterByPosition();
+            continue;
+        }
+
+        haveCheapCandidate = true;
+        break;
     }
 
-    float dminEye = GetMinEyeDistToAnySurvivor(pos);
+    if (!haveCheapCandidate)
+        return false;
 
-    if (!(dminEye >= gCV.fSpawnMin && dminEye <= ringEff))
+    // 8) 卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
+    usedExpensive = true;
+    bool pointStuck;
+    bool pointVisible;
+    if (g_bSpawnAccel)
     {
-        stats.distance++;
-        SpawnPerf_RecordFilterByDist();
-        return false;
+        AnneSpawnSafetyResult safety = AnneSpawn_TestPointSafety(
+            pos, teleportMode, gCV.bIgnoreIncapSight, visibilityRayMode);
+        pointStuck = (safety == AnneSpawnSafety_Stuck);
+        pointVisible = (safety == AnneSpawnSafety_Visible);
     }
-    // 8) 使用已知 candidateBucket 做真实位置检查，避免 GetPositionBucketPercent(pos) 再查 Nav。
-    if (!PassRealBucketPositionCheck(candidateBucket, pos[2], targetSurvivor, zc))
+    else
     {
-        stats.position++;
-        return false;
+        pointStuck = WillStuck(pos);
+        pointVisible = !pointStuck
+            && IsPosVisibleSDKWithMode(pos, teleportMode, visibilityRayMode);
     }
-    // 9) 卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
-    if (WillStuck(pos))
+
+    if (pointStuck)
     {
         stats.stuck++;
+        SpawnPerf_RecordFilterByStuck();
         return false;
     }
-    if (IsPosVisibleSDK(pos, teleportMode))
+    if (pointVisible)
     {
         stats.visibility++;
         SpawnPerf_RecordFilterByVisibility();
         return false;
     }
-    if (PathPenalty_NoBuild(pos, targetSurvivor, searchRange, gCV.fSpawnMax) != 0.0)
+    if (PathPenalty_NoBuildFromStart(pos, navStart, searchRange, gCV.fSpawnMax) != 0.0)
     {
         stats.path++;
+        SpawnPerf_RecordFilterByPath();
         return false;
     }
 
-    // 10) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
+    // 9) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
     //     这能让桶模式下大量失败候选完全不读 area.GetFlow()。
     if (!flowLoaded)
     {
@@ -228,239 +282,416 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         rawBadFlow = IsFlowAbnormal(flow, mapMaxFlowDist);
     }
 
-    int sector = ComputeSectorIndex(center, pos, sectors);
+    if (!geometryReady)
+    {
+        sector = ComputeSectorIndex(center, pos, sectors);
+        dTargetEye = GetVectorDistance(pos, targetEye);
+    }
+    float tacticalQuality = Tactical_GetCandidateQuality(
+        zc, pos, targetSurvivor, targetPoint);
     SpawnPerf_RecordFullEvaluation();
-    if (!SpawnScore_BuildCandidate(zc, pos, dminEye, ringEff, slack,
+    float navWeight = 1.0;
+    if (!SpawnScore_BuildCandidate(zc, pos, dTargetEye, minRange, ringEff, slack,
                                    candidateBucket, centerBucket, rawBadFlow,
-                                   refEyeZ, allMaxZ, lowestFootZ, sector, preferredSector,
-                                   areaIdx, candDbg))
+                                   refEyeZ, allMaxZ, lowestFootZ, sector, areaIdx,
+                                   navWeight, tacticalQuality, candDbg))
     {
         stats.flow++;
+        SpawnPerf_RecordFilterByFlow();
         return false;
     }
 
-    if (candDbg.total < minScore)
+    // 历史权重仅保留在调试信息中，不改变原扫描顺序或候选资格。
+    if (minScore > 0.0 && candDbg.total < minScore)
     {
         stats.score++;
+        SpawnPerf_RecordFilterByScore();
         return false;
     }
 
     return true;
 }
 
-static bool SpawnCore_QuickDistancePrecheckAnySurvivor(const float pos[3], float maxDist)
+enum SpawnSearchResult
 {
-    if (!SpawnPerfConfig_UseEarlyDistanceFilter())
-        return true;
-
-    float surPos[3];
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
-            continue;
-
-        GetClientAbsOrigin(i, surPos);
-        if (QuickDistancePrecheck(pos, surPos, 0.0, maxDist))
-            return true;
-    }
-    return false;
+    SpawnSearch_Pending = 0,
+    SpawnSearch_Found,
+    SpawnSearch_Exhausted
 }
 
-bool FindSpawnPosViaNavArea(int zc, int targetSurvivor, float searchRange, bool teleportMode,
-                            float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
+enum SpawnCandidateSource
 {
-    float perfStart = GetEngineTime();
+    SpawnCandidate_None = 0,
+    SpawnCandidate_Buckets,
+    SpawnCandidate_All
+}
 
-    // 生还者 Flow/位置缓存是整个刷点决策的基准。拿不到数据时不猜点，避免刷到离谱位置。
+enum struct SpawnSearchState
+{
+    bool active;
+    int zc;
+    int targetSurvivor;
+    int targetUserid;
+    float minRange;
+    float maxRange;
+    bool teleportMode;
+
+    SpawnCandidateSource source;
+    int allRow;
+    int bucketOrder[FLOW_BUCKETS];
+    int bucketOrderLen;
+    int bucketOrderIdx;
+    int bucketRow;
+
+    int candidateBudget;
+    int acceptedHits;
+    int inspected;
+    bool firstFit;
+    bool found;
+    float bestScore;
+    float elapsedMs;
+    SpawnScoreDbg bestDbg;
+    SpawnFilterStats stats;
+
+    float mapMaxFlowDist;
+    bool finaleArea;
+    float center[3];
+    int sectors;
+    float allMaxZ;
+    int centerBucket;
+    int positionCheckBucket;
+    float targetPoint[3];
+    float refEyeZ;
+    float lowestFootZ;
+    bool hasLowestFootZ;
+    Address navStart;
+    int visibilityRayMode;
+    float minScore;
+    float firstFitScore;
+}
+
+static SpawnSearchState g_SpawnSearch;
+
+void SpawnSearch_Reset()
+{
+    g_SpawnSearch.active = false;
+    g_SpawnSearch.source = SpawnCandidate_None;
+    g_SpawnSearch.allRow = 0;
+    g_SpawnSearch.bucketOrderLen = 0;
+    g_SpawnSearch.bucketOrderIdx = 0;
+    g_SpawnSearch.bucketRow = 0;
+    g_SpawnSearch.navStart = Address_Null;
+    g_SpawnSearch.acceptedHits = 0;
+    g_SpawnSearch.inspected = 0;
+    g_SpawnSearch.found = false;
+    g_SpawnSearch.bestScore = -1.0e9;
+    g_SpawnSearch.elapsedMs = 0.0;
+    g_SpawnSearch.stats.Reset();
+}
+
+static bool SpawnSearch_Matches(int zc, int targetSurvivor, float minRange,
+                                float maxRange, bool teleportMode)
+{
+    if (!g_SpawnSearch.active || g_SpawnSearch.zc != zc
+        || g_SpawnSearch.targetSurvivor != targetSurvivor
+        || g_SpawnSearch.minRange != minRange || g_SpawnSearch.maxRange != maxRange
+        || g_SpawnSearch.teleportMode != teleportMode)
+    {
+        return false;
+    }
+
+    int userid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
+        && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
+    return userid == g_SpawnSearch.targetUserid;
+}
+
+static bool SpawnSearch_Begin(int zc, int targetSurvivor, float minRange,
+                              float maxRange, bool teleportMode)
+{
+    SpawnSearch_Reset();
+    if (!Visibility_HasCurrentEyeSnapshot())
+        Visibility_RefreshEyeSnapshot();
+
+    float buildStart = GetEngineTime();
     if (!GetSurPosData())
     {
+        SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
         Debug_Print("[FIND FAIL] no survivor data");
-        SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, false);
         return false;
     }
 
     EnsureNavAreasCache();
-    int areaCount = g_NavAreasCacheCount;
+    if (g_AllNavAreasCache == null || g_NavAreasCacheCount <= 0)
+    {
+        SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
+        return false;
+    }
+    EnsureNavCooldownSlots();
 
-    float mapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
-    bool finaleArea = L4D_IsMissionFinalMap() && L4D2_GetCurrentFinaleStage() < FINALE_STAGE_ESCAPE;
+    g_SpawnSearch.zc = zc;
+    g_SpawnSearch.targetSurvivor = targetSurvivor;
+    g_SpawnSearch.targetUserid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
+        && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
+    g_SpawnSearch.minRange = minRange;
+    g_SpawnSearch.maxRange = maxRange;
+    g_SpawnSearch.teleportMode = teleportMode;
+    g_SpawnSearch.mapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
+    g_SpawnSearch.finaleArea = L4D_IsMissionFinalMap()
+        && L4D2_GetCurrentFinaleStage() < FINALE_STAGE_ESCAPE;
+    GetSectorCenter(g_SpawnSearch.center, targetSurvivor);
+    g_SpawnSearch.sectors = GetCurrentSectors();
 
-    // 扇区中心用于“分散度”评分：同一波/最近几次不要总从同一个方向刷。
-    float center[3];
-    GetSectorCenter(center, targetSurvivor);
-    int sectors = GetCurrentSectors();
-    int preferredSector = PickSector(sectors);
-
-    float allMinZ = 1.0e9;
-    float allMaxZ = -1.0e9;
+    g_SpawnSearch.allMaxZ = -1.0e9;
     SurPosData data;
     for (int i = 0; i < g_iSurPosDataLen; i++)
     {
         g_aSurPosData.GetArray(i, data);
-        if (data.fPos[2] < allMinZ) allMinZ = data.fPos[2];
-        if (data.fPos[2] > allMaxZ) allMaxZ = data.fPos[2];
+        if (data.fPos[2] > g_SpawnSearch.allMaxZ)
+            g_SpawnSearch.allMaxZ = data.fPos[2];
     }
 
-    // centerBucket 是本轮扫描窗口中心。优先用目标生还者，目标无效时退到最高 Flow 生还者。
-    int centerBucket = 50;
-    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor) && !L4D_IsPlayerIncapacitated(targetSurvivor))
+    g_SpawnSearch.positionCheckBucket = -1;
+    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
+        && !L4D_IsPlayerIncapacitated(targetSurvivor))
     {
-        int pct;
-        if (TryGetClientFlowPercentSafe(targetSurvivor, pct))
-            centerBucket = pct;
+        TryGetClientFlowPercentSafe(targetSurvivor, g_SpawnSearch.positionCheckBucket);
     }
-    else
+    if (g_SpawnSearch.positionCheckBucket < 0)
     {
         float bestFlow = -1.0;
-        SurPosData fallbackData;
         for (int i = 0; i < g_iSurPosDataLen; i++)
         {
-            g_aSurPosData.GetArray(i, fallbackData);
-            if (fallbackData.fFlow > bestFlow) bestFlow = fallbackData.fFlow;
+            g_aSurPosData.GetArray(i, data);
+            if (data.fFlow > bestFlow)
+                bestFlow = data.fFlow;
         }
         if (bestFlow >= 0.0)
-            centerBucket = FlowDistanceToPercent(bestFlow);
+            g_SpawnSearch.positionCheckBucket = FlowDistanceToPercent(bestFlow);
     }
+    g_SpawnSearch.centerBucket = (g_SpawnSearch.positionCheckBucket >= 0)
+        ? g_SpawnSearch.positionCheckBucket : 50;
 
-    float refEyeZ = allMaxZ;
-    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor) && !L4D_IsPlayerIncapacitated(targetSurvivor))
+    SpawnCore_CopyPos(g_SpawnSearch.targetPoint, g_SpawnSearch.center);
+    g_SpawnSearch.refEyeZ = g_SpawnSearch.allMaxZ;
+    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
+        && !L4D_IsPlayerIncapacitated(targetSurvivor))
     {
-        float eye[3];
-        GetClientEyePosition(targetSurvivor, eye);
-        refEyeZ = eye[2];
+        GetClientEyePosition(targetSurvivor, g_SpawnSearch.targetPoint);
+        g_SpawnSearch.refEyeZ = g_SpawnSearch.targetPoint[2];
     }
-    float lowestFootZ = 1.0e9;
-    TryGetLowestSurvivorFootZ(lowestFootZ);
+    g_SpawnSearch.hasLowestFootZ = TryGetLowestSurvivorFootZ(g_SpawnSearch.lowestFootZ);
 
-    bool found = false;
-    float bestScore = -1.0e9;
-    int acceptedHits = 0;
-
-    bool useBuckets = (gCV.bNavBucketEnable && g_BucketsReady);
-    bool firstFit = gCV.bNavBucketFirstFit;
-    float minScore = gCV.fSpawnScoreFloor;
-    float firstFitScore = FloatMax(ComputeFFThresholdForClass(zc), minScore);
-    // 候选预算表示“通过硬过滤并进入评分的候选数量”，不是扫描的 NavArea 数量。
-    // 默认基础 12，再由 AI 难度 bonus 调成 9/10/11/12/12。
-    int candidateBudget = DifficultyStrategy_GetCandidateBudget();
-
-    SpawnScoreDbg bestDbg;
-    SpawnFilterStats stats;
-
-    if (useBuckets)
+    int pathTarget = targetSurvivor;
+    if (!IsValidSurvivor(pathTarget) || !IsPlayerAlive(pathTarget)
+        || L4D_IsPlayerIncapacitated(pathTarget))
     {
-        // 桶模式是主路径：只扫描 centerBucket 附近的 Flow 桶，极大减少 NavArea 数量。
-        int win = ClampInt(ComputeDynamicBucketWindow(searchRange), 0, 100);
-        if (SpawnPerfConfig_UseAdaptiveBucketWindow())
-            win = ClampInt(ComputeAdaptiveBucketWindow(searchRange, win), 0, 100);
-
-        int order[FLOW_BUCKETS];
-        int orderLen = SpawnPerfConfig_UseProgressiveSampling()
-            ? BuildOptimizedBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order)
-            : BuildBucketOrder(centerBucket, win, gCV.bNavBucketIncludeCtr, order);
-
-        for (int orderIdx = 0; orderIdx < orderLen; orderIdx++)
+        pathTarget = (g_iSurCount > 0) ? g_iSurvivors[0] : -1;
+    }
+    if (IsValidSurvivor(pathTarget) && IsPlayerAlive(pathTarget))
+    {
+        float survivorPos[3];
+        GetClientAbsOrigin(pathTarget, survivorPos);
+        g_SpawnSearch.navStart = L4D2Direct_GetTerrorNavArea(survivorPos);
+        if (g_SpawnSearch.navStart == Address_Null)
         {
-            int bucketIdx = order[orderIdx];
-            if (bucketIdx < 0 || bucketIdx > 100 || g_FlowBuckets[bucketIdx] == null)
-                continue;
-
-            int bucketLen = g_FlowBuckets[bucketIdx].Length;
-            if (bucketLen <= 0)
-                continue;
-
-            for (int row = 0; row < bucketLen && acceptedHits < candidateBudget; row++)
-            {
-                int areaIdx = g_FlowBuckets[bucketIdx].Get(row);
-                SpawnScoreDbg candDbg;
-                if (!SpawnCore_EvaluateNavCandidate(zc, targetSurvivor, searchRange, teleportMode,
-                                                     areaIdx, bucketIdx, false,
-                                                     mapMaxFlowDist, finaleArea, center,
-                                                     sectors, preferredSector, allMinZ, allMaxZ,
-                                                     centerBucket, refEyeZ, lowestFootZ, minScore,
-                                                     candDbg, stats))
-                {
-                    continue;
-                }
-
-                acceptedHits++;
-
-                if (firstFit && candDbg.total >= firstFitScore)
-                {
-                    SpawnScore_CopyDbg(dbgOut, candDbg);
-                    SpawnCore_CopyPos(outPos, candDbg.pos);
-                    outAreaIdx = areaIdx;
-                    SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
-                    return true;
-                }
-
-                if (!found || candDbg.total > bestScore)
-                {
-                    found = true;
-                    bestScore = candDbg.total;
-                    SpawnScore_CopyDbg(bestDbg, candDbg);
-                }
-            }
-            if (acceptedHits >= candidateBudget)
-                break;
+            g_SpawnSearch.navStart = L4D_GetNearestNavArea(
+                survivorPos, 120.0, false, false, false, TEAM_INFECTED);
         }
     }
-    else
+    if (g_SpawnSearch.navStart == Address_Null)
     {
-        // 全图模式是 fallback/debug 路径：更保守，会拒绝 badflow，成本也更高。
-        for (int areaIdx = 0; areaIdx < areaCount && acceptedHits < candidateBudget; areaIdx++)
-        {
-            SpawnScoreDbg candDbg;
-            if (!SpawnCore_EvaluateNavCandidate(zc, targetSurvivor, searchRange, teleportMode,
-                                                 areaIdx, -1, true,
-                                                 mapMaxFlowDist, finaleArea, center,
-                                                 sectors, preferredSector, allMinZ, allMaxZ,
-                                                 centerBucket, refEyeZ, lowestFootZ, minScore,
-                                                 candDbg, stats))
-            {
-                continue;
-            }
-
-            acceptedHits++;
-
-            if (firstFit && candDbg.total >= firstFitScore)
-            {
-                SpawnScore_CopyDbg(dbgOut, candDbg);
-                SpawnCore_CopyPos(outPos, candDbg.pos);
-                outAreaIdx = areaIdx;
-                SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
-                return true;
-            }
-
-            if (!found || candDbg.total > bestScore)
-            {
-                found = true;
-                bestScore = candDbg.total;
-                SpawnScore_CopyDbg(bestDbg, candDbg);
-            }
-        }
-    }
-
-    if (!found)
-    {
-        Debug_Print("[FIND FAIL] ring=%.1f. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
-                    searchRange, stats.cooldown, stats.flags, stats.flow, stats.distance, stats.separation,
-                    stats.stuck, stats.visibility, stats.path, stats.position, stats.score, stats.bucket);
-        SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, false);
+        SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
         return false;
     }
 
-    SpawnScore_CopyDbg(dbgOut, bestDbg);
-    SpawnCore_CopyPos(outPos, bestDbg.pos);
-    outAreaIdx = bestDbg.areaIdx;
-    SpawnPerf_RecordAttempt((GetEngineTime() - perfStart) * 1000.0, true);
+    if (gCV.bNavBucketEnable && g_BucketsReady)
+    {
+        g_SpawnSearch.source = SpawnCandidate_Buckets;
+        int win = ClampInt(ComputeDynamicBucketWindow(maxRange), 0, 100);
+        if (SpawnPerfConfig_UseAdaptiveBucketWindow())
+            win = ClampInt(ComputeAdaptiveBucketWindow(maxRange, win), 0, 100);
+        g_SpawnSearch.bucketOrderLen = SpawnPerfConfig_UseProgressiveSampling()
+            ? BuildOptimizedBucketOrder(g_SpawnSearch.centerBucket, win,
+                gCV.bNavBucketIncludeCtr, g_SpawnSearch.bucketOrder)
+            : BuildBucketOrder(g_SpawnSearch.centerBucket, win,
+                gCV.bNavBucketIncludeCtr, g_SpawnSearch.bucketOrder);
+    }
+    else
+    {
+        g_SpawnSearch.source = SpawnCandidate_All;
+    }
+
+    g_SpawnSearch.candidateBudget = DifficultyStrategy_GetCandidateBudget();
+    g_SpawnSearch.visibilityRayMode = GetEffectiveVisibilityRayMode();
+    g_SpawnSearch.firstFit = gCV.bNavBucketFirstFit;
+    g_SpawnSearch.minScore = gCV.fSpawnScoreFloor;
+    g_SpawnSearch.firstFitScore = FloatMax(
+        ComputeFFThreshold(), g_SpawnSearch.minScore);
+    g_SpawnSearch.active = true;
+    SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
     return true;
 }
 
-// 计算到任意幸存者“眼睛”的最小距离，用于刷出硬下限判定。
-float GetMinEyeDistToAnySurvivor(const float pos[3])
+static bool SpawnSearch_NextCandidate(int &areaIdx, int &candidateBucket,
+                                      bool &rejectBadFlow)
 {
-    float best = 999999.0;
+    candidateBucket = -1;
+    rejectBadFlow = false;
+    if (g_SpawnSearch.source == SpawnCandidate_Buckets)
+    {
+        while (g_SpawnSearch.bucketOrderIdx < g_SpawnSearch.bucketOrderLen)
+        {
+            int bucketIdx = g_SpawnSearch.bucketOrder[g_SpawnSearch.bucketOrderIdx];
+            if (bucketIdx < 0 || bucketIdx >= FLOW_BUCKETS
+                || g_FlowBuckets[bucketIdx] == null
+                || g_SpawnSearch.bucketRow >= g_FlowBuckets[bucketIdx].Length)
+            {
+                g_SpawnSearch.bucketOrderIdx++;
+                g_SpawnSearch.bucketRow = 0;
+                continue;
+            }
+            areaIdx = g_FlowBuckets[bucketIdx].Get(g_SpawnSearch.bucketRow++);
+            candidateBucket = bucketIdx;
+            return true;
+        }
+        return false;
+    }
+
+    if (g_SpawnSearch.source == SpawnCandidate_All
+        && g_SpawnSearch.allRow < g_NavAreasCacheCount)
+    {
+        areaIdx = g_SpawnSearch.allRow++;
+        rejectBadFlow = true;
+        return true;
+    }
+    return false;
+}
+
+static SpawnSearchResult SpawnSearch_Finish(bool exhausted, float outPos[3],
+                                            int &outAreaIdx, SpawnScoreDbg dbgOut)
+{
+    if (!exhausted)
+        return SpawnSearch_Pending;
+
+    if (g_SpawnSearch.found)
+    {
+        SpawnScore_CopyDbg(dbgOut, g_SpawnSearch.bestDbg);
+        SpawnCore_CopyPos(outPos, g_SpawnSearch.bestDbg.pos);
+        outAreaIdx = g_SpawnSearch.bestDbg.areaIdx;
+        SpawnPerf_RecordAttempt(g_SpawnSearch.elapsedMs, true);
+        SpawnSearch_Reset();
+        return SpawnSearch_Found;
+    }
+    Debug_Print("[FIND FAIL] range=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+                g_SpawnSearch.minRange, g_SpawnSearch.maxRange, g_SpawnSearch.inspected,
+                g_SpawnSearch.stats.cooldown, g_SpawnSearch.stats.flags,
+                g_SpawnSearch.stats.flow, g_SpawnSearch.stats.distance,
+                g_SpawnSearch.stats.separation, g_SpawnSearch.stats.stuck,
+                g_SpawnSearch.stats.visibility, g_SpawnSearch.stats.path,
+                g_SpawnSearch.stats.position, g_SpawnSearch.stats.score,
+                g_SpawnSearch.stats.bucket);
+    SpawnPerf_RecordAttempt(g_SpawnSearch.elapsedMs, false);
+    SpawnSearch_Reset();
+    return SpawnSearch_Exhausted;
+}
+
+SpawnSearchResult FindSpawnPosViaNavAreaStep(
+    int zc, int targetSurvivor, float minRange, float maxRange, bool teleportMode,
+    float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
+{
+    outAreaIdx = -1;
+    if (!SpawnSearch_Matches(zc, targetSurvivor, minRange, maxRange, teleportMode))
+    {
+        if (!SpawnSearch_Begin(zc, targetSurvivor, minRange, maxRange, teleportMode))
+        {
+            SpawnPerf_RecordAttempt(0.0, false);
+            return SpawnSearch_Exhausted;
+        }
+    }
+    if (!Visibility_HasCurrentEyeSnapshot())
+        Visibility_RefreshEyeSnapshot();
+
+    float sliceStart = GetEngineTime();
+    int sliceInspected = 0;
+    int sliceExpensive = 0;
+    bool exhausted = false;
+    while (sliceInspected < NAV_SCAN_CANDIDATES_PER_SLICE
+        && sliceExpensive < NAV_SCAN_EXPENSIVE_PER_SLICE
+        && g_SpawnSearch.acceptedHits < g_SpawnSearch.candidateBudget
+        && (GetEngineTime() - sliceStart) * 1000.0 < NAV_SCAN_TIME_BUDGET_MS)
+    {
+        int areaIdx;
+        int candidateBucket;
+        bool rejectBadFlow;
+        if (!SpawnSearch_NextCandidate(areaIdx, candidateBucket, rejectBadFlow))
+        {
+            exhausted = true;
+            break;
+        }
+
+        sliceInspected++;
+        g_SpawnSearch.inspected++;
+        bool usedExpensive;
+        SpawnScoreDbg candDbg;
+        bool accepted = SpawnCore_EvaluateNavCandidate(
+            g_SpawnSearch.zc, g_SpawnSearch.targetSurvivor,
+            g_SpawnSearch.targetPoint, g_SpawnSearch.minRange,
+            g_SpawnSearch.maxRange, g_SpawnSearch.teleportMode,
+            areaIdx, candidateBucket, rejectBadFlow,
+            g_SpawnSearch.mapMaxFlowDist, g_SpawnSearch.finaleArea,
+            g_SpawnSearch.center, g_SpawnSearch.sectors,
+            g_SpawnSearch.allMaxZ, g_SpawnSearch.centerBucket,
+            g_SpawnSearch.positionCheckBucket, g_SpawnSearch.refEyeZ,
+            g_SpawnSearch.lowestFootZ, g_SpawnSearch.hasLowestFootZ,
+            g_SpawnSearch.navStart, g_SpawnSearch.visibilityRayMode,
+            g_SpawnSearch.minScore, GetGameTime(), candDbg,
+            g_SpawnSearch.stats, usedExpensive);
+        if (usedExpensive)
+            sliceExpensive++;
+        if (!accepted)
+            continue;
+
+        g_SpawnSearch.acceptedHits++;
+        if (!g_SpawnSearch.found || candDbg.total > g_SpawnSearch.bestScore)
+        {
+            g_SpawnSearch.found = true;
+            g_SpawnSearch.bestScore = candDbg.total;
+            SpawnScore_CopyDbg(g_SpawnSearch.bestDbg, candDbg);
+        }
+        if (g_SpawnSearch.firstFit && candDbg.total >= g_SpawnSearch.firstFitScore)
+            break;
+    }
+
+    float sliceMs = (GetEngineTime() - sliceStart) * 1000.0;
+    g_SpawnSearch.elapsedMs += sliceMs;
+    SpawnPerf_RecordSlice(sliceMs);
+    bool complete = exhausted
+        || g_SpawnSearch.acceptedHits >= g_SpawnSearch.candidateBudget
+        || (g_SpawnSearch.firstFit && g_SpawnSearch.found
+            && g_SpawnSearch.bestScore >= g_SpawnSearch.firstFitScore);
+    return SpawnSearch_Finish(complete, outPos, outAreaIdx, dbgOut);
+}
+
+// 计算到任意幸存者“眼睛”的最小距离，用于刷出硬下限判定。
+float GetMinEyeDistSquaredToAnySurvivor(const float pos[3])
+{
+    float best = 1.0e20;
+    int snapshotCount = Visibility_GetEyeSnapshotCount();
+    if (snapshotCount > 0)
+    {
+        for (int slot = 0; slot < snapshotCount; slot++)
+        {
+            int client;
+            float eyes[3], viewDir[2];
+            if (!Visibility_GetEyeSnapshot(slot, client, eyes, viewDir))
+                continue;
+            float distanceSq = GetVectorDistance(pos, eyes, true);
+            if (distanceSq < best)
+                best = distanceSq;
+        }
+        return best;
+    }
+
     float eyes[3];
     for (int i = 1; i <= MaxClients; i++)
     {
@@ -468,9 +699,14 @@ float GetMinEyeDistToAnySurvivor(const float pos[3])
             continue;
 
         GetClientEyePosition(i, eyes);
-        float distance = GetVectorDistance(pos, eyes);
-        if (distance < best)
-            best = distance;
+        float distanceSq = GetVectorDistance(pos, eyes, true);
+        if (distanceSq < best)
+            best = distanceSq;
     }
     return best;
+}
+
+stock float GetMinEyeDistToAnySurvivor(const float pos[3])
+{
+    return SquareRoot(GetMinEyeDistSquaredToAnySurvivor(pos));
 }

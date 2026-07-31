@@ -1,0 +1,16 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+
+if 'l4d2' in SM.sdks:
+  sdk = SM.sdks['l4d2']
+
+  for cxx in builder.targets:
+    if not cxx.target.arch in sdk['platforms'][cxx.target.platform]:
+      continue
+
+    binary = SM.HL2Library(builder, cxx, 'anne_nextbot.ext.' + sdk['extension'], sdk)
+    SM.AddCDetour(binary)
+    binary.sources += [
+      'extension.cpp',
+      '../../public/smsdk_ext.cpp',
+    ]
+    SM.extensions += [builder.Add(binary)]

@@ -9,6 +9,7 @@
 #include <colors>
 #include <treeutil>
 #include <logger2>
+#include <anne_nextbot>
 // 你自己的公共方法、工具函数（判定AI Tank / 可见性 / 贴图等）都在这里
 #include "../../archive/AnneHappy/stocks.sp"
 
@@ -21,6 +22,13 @@
 #define SIG_PATH_GET_CUR_GOAL      "Path::GetCurrentGoal"
 #define SIG_PATH_NEXT_SEGMENT      "Path::NextSegment"
 #define SIG_PATH_LAST_SEGMENT      "Path::LastSegment"
+#define PATH_FOLLOWER_BROKER_LIBRARY "ai_tank3_pathfollower"
+#define PATH_FOLLOWER_BROKER_NATIVE "AIPathFollowerBroker_IsActive"
+#define PATH_FOLLOWER_BROKER_PREPARE_FORWARD "AIPathFollowerBroker_OnPrepare"
+#define PATH_FOLLOWER_BROKER_READY_FORWARD "AIPathFollowerBroker_OnReady"
+#define PATH_FOLLOWER_BROKER_ABORT_FORWARD "AIPathFollowerBroker_OnAbort"
+#define PATH_FOLLOWER_BROKER_STOPPING_FORWARD "AIPathFollowerBroker_OnStopping"
+#define CHARGER_PATH_FOLLOWER_FORWARD "AICharger3_OnPathFollowerUpdate"
 
 #define DEFAULT_THROW_FORCE        800.0
 #define DEFAULT_SV_GRAVITY         800.0
@@ -97,8 +105,15 @@ Handle g_hSdkPathGetCurGoal;
 Handle g_hSdkPathNextSegment;
 Handle g_hSdkPathLastSegment;
 Handle g_hPathFollowerDetour;
+Handle g_hChargerPathFollowerForward;
+Handle g_hPathFollowerPrepareForward;
+Handle g_hPathFollowerReadyForward;
+Handle g_hPathFollowerAbortForward;
+Handle g_hPathFollowerStoppingForward;
 
 bool  g_bLateLoad;
+bool  g_bPathFollowerDetourEnabled;
+bool  g_bPathFollowerBrokerActive;
 float g_fTankSwingRange;
 float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
 float g_fLastLadderNearbyCheck[MAXPLAYERS + 1];
@@ -190,7 +205,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
-    version     = "1.0.0.1",
+    version     = "1.0.0.2",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -205,13 +220,32 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     MarkNativeAsOptional("L4D_FindEntityByClassnameNearest");
     MarkNativeAsOptional("L4D_FindEntityByClassnameWithin");
     MarkNativeAsOptional("L4D_NavArea_GetLadder");
+    MarkNativeAsOptional("AnneNextBot_IsActive");
+    MarkNativeAsOptional("AnneNextBot_IsPathBrokerActive");
+    MarkNativeAsOptional("AnneNextBot_SetPathConsumer");
+    RegPluginLibrary(PATH_FOLLOWER_BROKER_LIBRARY);
+    CreateNative(PATH_FOLLOWER_BROKER_NATIVE, Native_PathFollowerBrokerIsActive);
     g_bLateLoad = late;
     return APLRes_Success;
+}
+
+public any Native_PathFollowerBrokerIsActive(Handle plugin, int numParams)
+{
+    return g_bPathFollowerBrokerActive;
 }
 
 // ===== 启动 =====
 public void OnPluginStart()
 {
+    g_hChargerPathFollowerForward = CreateGlobalForward(CHARGER_PATH_FOLLOWER_FORWARD, ET_Ignore, Param_Cell, Param_Cell);
+    g_hPathFollowerPrepareForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_PREPARE_FORWARD, ET_Event);
+    g_hPathFollowerReadyForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_READY_FORWARD, ET_Ignore);
+    g_hPathFollowerAbortForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_ABORT_FORWARD, ET_Ignore);
+    g_hPathFollowerStoppingForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_STOPPING_FORWARD, ET_Ignore);
+    if (!g_hChargerPathFollowerForward || !g_hPathFollowerPrepareForward || !g_hPathFollowerReadyForward
+        || !g_hPathFollowerAbortForward || !g_hPathFollowerStoppingForward)
+        SetFailState("Failed to create PathFollower broker forwards.");
+
     // 总开关
     g_cvEnable = CreateConVar("ai_tank3_enable", "1", "是否启用插件, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 
@@ -319,9 +353,6 @@ public void OnAllPluginsLoaded()
     g_hPathFollowerDetour = DHookCreateFromConf(hGamedata, SIG_PATH_FOLLOWER_UPDATE);
     if (!g_hPathFollowerDetour)
         SetFailState("Failed to create detour for %s.", SIG_PATH_FOLLOWER_UPDATE);
-    if (!DHookEnableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
-        SetFailState("Failed to enable detour for %s.", SIG_PATH_FOLLOWER_UPDATE);
-
     StartPrepSDKCall(SDKCall_Raw);
     if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_NEXTBOT_GET_COMBAT_CHARACTER))
         SetFailState("Failed to load offset for %s.", SIG_NEXTBOT_GET_COMBAT_CHARACTER);
@@ -356,6 +387,62 @@ public void OnAllPluginsLoaded()
         SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_LAST_SEGMENT);
 
     delete hGamedata;
+    SetAnneNextBotPathConsumer(true);
+    if (!IsAnneNextBotPathBrokerActive())
+        StartPathFollowerBroker();
+}
+
+bool SetAnneNextBotPathConsumer(bool enabled)
+{
+    if (!LibraryExists(ANNE_NEXTBOT_LIBRARY)
+        || GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "AnneNextBot_SetPathConsumer") != FeatureStatus_Available
+        || !AnneNextBot_IsActive())
+        return false;
+
+    return AnneNextBot_SetPathConsumer(AnneNextBotPathConsumer_Tank, enabled);
+}
+
+bool IsAnneNextBotPathBrokerActive()
+{
+    return LibraryExists(ANNE_NEXTBOT_LIBRARY)
+        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsPathBrokerActive") == FeatureStatus_Available
+        && AnneNextBot_IsActive()
+        && AnneNextBot_IsPathBrokerActive();
+}
+
+void NotifyPathFollowerBroker(Handle forwardHandle)
+{
+    if (!forwardHandle)
+        return;
+
+    Call_StartForward(forwardHandle);
+    Call_Finish();
+}
+
+void StartPathFollowerBroker()
+{
+    Action prepareResult = Plugin_Continue;
+    Call_StartForward(g_hPathFollowerPrepareForward);
+    Call_Finish(prepareResult);
+    if (prepareResult >= Plugin_Handled)
+    {
+        NotifyPathFollowerBroker(g_hPathFollowerAbortForward);
+        SetFailState("A PathFollower broker consumer could not release its local detour.");
+        return;
+    }
+
+    if (!DHookEnableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
+    {
+        NotifyPathFollowerBroker(g_hPathFollowerAbortForward);
+        SetFailState("Failed to enable detour for %s.", SIG_PATH_FOLLOWER_UPDATE);
+        return;
+    }
+
+    g_bPathFollowerDetourEnabled = true;
+    g_bPathFollowerBrokerActive = true;
+    NotifyPathFollowerBroker(g_hPathFollowerReadyForward);
 }
 
 public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
@@ -368,20 +455,49 @@ public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
         return MRES_Ignored;
 
     int client = SDKCall(g_hSdkNextBotGetCombatCharacter, pNextBot);
-    if (!isAiTank(client))
+    if (!IsValidInfected(client) || !IsFakeClient(client) || !IsPlayerAlive(client) || IsInGhostState(client))
         return MRES_Ignored;
 
-    Address pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
-    if (!pPathSeg)
+    int infectedClass = GetInfectedClass(client);
+    if (infectedClass == ZC_CHARGER)
     {
-        clearCachedTankPath(client);
+        if (g_hChargerPathFollowerForward && GetForwardFunctionCount(g_hChargerPathFollowerForward) > 0)
+        {
+            Call_StartForward(g_hChargerPathFollowerForward);
+            Call_PushCell(client);
+            Call_PushCell(view_as<int>(pThis));
+            Call_Finish();
+        }
         return MRES_Ignored;
     }
 
-    // PathFollower 和 PathSegment 原生对象只在本次 detour 内使用，跨帧逻辑只读取值快照。
-    captureTankPathSnapshot(client, pThis, pPathSeg);
-
+    HandleTankPathFollowerUpdate(client, pThis);
     return MRES_Ignored;
+}
+
+public void AnneNextBot_OnTankPathFollowerUpdate(int client, int pathFollower)
+{
+    HandleTankPathFollowerUpdate(client, view_as<Address>(pathFollower));
+}
+
+void HandleTankPathFollowerUpdate(int client, Address pPathFollower)
+{
+    if (!pPathFollower || !g_hSdkPathGetCurGoal)
+        return;
+    if (!IsValidInfected(client) || !IsFakeClient(client) || !IsPlayerAlive(client) || IsInGhostState(client))
+        return;
+    if (GetInfectedClass(client) != ZC_TANK || IsClientIncapped(client))
+        return;
+
+    Address pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pPathFollower));
+    if (!pPathSeg)
+    {
+        clearCachedTankPath(client);
+        return;
+    }
+
+    // PathFollower 和 PathSegment 原生对象只在本次回调内使用，跨帧逻辑只读取值快照。
+    captureTankPathSnapshot(client, pPathFollower, pPathSeg);
 }
 
 // ===== 读取/监听 CVar =====
@@ -404,16 +520,42 @@ void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[]
 // ===== 结束回收 =====
 public void OnPluginEnd()
 {
+    SetAnneNextBotPathConsumer(false);
+    if (g_bPathFollowerBrokerActive)
+    {
+        g_bPathFollowerBrokerActive = false;
+        NotifyPathFollowerBroker(g_hPathFollowerStoppingForward);
+    }
+    if (g_bPathFollowerDetourEnabled && g_hPathFollowerDetour)
+    {
+        if (!DHookDisableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
+            LogError("Failed to disable detour for %s during unload.", SIG_PATH_FOLLOWER_UPDATE);
+        g_bPathFollowerDetourEnabled = false;
+    }
+
     for (int client = 1; client <= MaxClients; client++)
         delete g_TankPathSnapshots[client];
     delete log;
     delete g_hThrowAnimMap;
     delete g_hNearbyLadderList;
     delete g_hPathFollowerDetour;
+    delete g_hChargerPathFollowerForward;
+    delete g_hPathFollowerPrepareForward;
+    delete g_hPathFollowerReadyForward;
+    delete g_hPathFollowerAbortForward;
+    delete g_hPathFollowerStoppingForward;
     delete g_hSdkNextBotGetCombatCharacter;
     delete g_hSdkPathGetCurGoal;
     delete g_hSdkPathNextSegment;
     delete g_hSdkPathLastSegment;
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+    if (!StrEqual(name, ANNE_NEXTBOT_LIBRARY) || g_bPathFollowerBrokerActive || !g_hPathFollowerDetour)
+        return;
+
+    StartPathFollowerBroker();
 }
 
 // ===== 事件 =====

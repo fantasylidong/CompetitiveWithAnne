@@ -52,4 +52,2605 @@
 	{
 		"en"		"Unknown"
 	}
+	"L4DStats_Yes"
+	{
+		"en"		"Yes"
+		"chi"		"是"
+		"zho"		"是"
+		"jp"		"はい"
+		"ko"		"예"
+		"vi"		"Có"
+	}
+	"L4DStats_No"
+	{
+		"en"		"No"
+		"chi"		"否"
+		"zho"		"否"
+		"jp"		"いいえ"
+		"ko"		"아니오"
+		"vi"		"Không"
+	}
+	"L4DStats_Close"
+	{
+		"en"		"Close"
+		"chi"		"关闭"
+		"zho"		"關閉"
+		"jp"		"閉じる"
+		"ko"		"닫기"
+		"vi"		"Đóng"
+	}
+	"L4DStats_Back"
+	{
+		"en"		"Back"
+		"chi"		"返回"
+		"zho"		"返回"
+		"jp"		"戻る"
+		"ko"		"뒤로"
+		"vi"		"Quay lại"
+	}
+	"L4DStats_More"
+	{
+		"en"		"More"
+		"chi"		"更多"
+		"zho"		"更多"
+		"jp"		"その他"
+		"ko"		"더 보기"
+		"vi"		"Thêm"
+	}
+	"L4DStats_MoreEllipsis"
+	{
+		"en"		"More..."
+		"chi"		"更多..."
+		"zho"		"更多..."
+		"jp"		"その他..."
+		"ko"		"더 보기..."
+		"vi"		"Thêm..."
+	}
+	"L4DStats_All"
+	{
+		"en"		"All"
+		"chi"		"全部"
+		"zho"		"全部"
+		"jp"		"すべて"
+		"ko"		"전체"
+		"vi"		"Tất cả"
+	}
+	"L4DStats_GamemodeCoop"
+	{
+		"en"		"Co-op"
+		"chi"		"战役"
+		"zho"		"戰役"
+		"jp"		"キャンペーン"
+		"ko"		"캠페인"
+		"vi"		"Chiến dịch"
+	}
+	"L4DStats_GamemodeVersus"
+	{
+		"en"		"Versus"
+		"chi"		"对抗"
+		"zho"		"對抗"
+		"jp"		"対抗"
+		"ko"		"대전"
+		"vi"		"Đối kháng"
+	}
+	"L4DStats_GamemodeRealism"
+	{
+		"en"		"Realism"
+		"chi"		"写实"
+		"zho"		"寫實"
+		"jp"		"リアリズム"
+		"ko"		"리얼리즘"
+		"vi"		"Hiện thực"
+	}
+	"L4DStats_GamemodeSurvival"
+	{
+		"en"		"Survival"
+		"chi"		"生存"
+		"zho"		"生存"
+		"jp"		"サバイバル"
+		"ko"		"생존"
+		"vi"		"Sinh tồn"
+	}
+	"L4DStats_GamemodeScavenge"
+	{
+		"en"		"Scavenge"
+		"chi"		"清道夫"
+		"zho"		"清道夫"
+		"jp"		"スカベンジ"
+		"ko"		"수집"
+		"vi"		"Thu gom"
+	}
+	"L4DStats_GamemodeRealismVersus"
+	{
+		"en"		"Realism Versus"
+		"chi"		"写实对抗"
+		"zho"		"寫實對抗"
+		"jp"		"リアリズム対抗"
+		"ko"		"리얼리즘 대전"
+		"vi"		"Đối kháng hiện thực"
+	}
+	"L4DStats_GamemodeMutations"
+	{
+		"en"		"Mutations"
+		"chi"		"突变"
+		"zho"		"突變"
+		"jp"		"ミューテーション"
+		"ko"		"변이"
+		"vi"		"Đột biến"
+	}
+	"L4DStats_GamemodeUnknown"
+	{
+		"en"		"Unknown mode"
+		"chi"		"未知模式"
+		"zho"		"未知模式"
+		"jp"		"不明なモード"
+		"ko"		"알 수 없는 모드"
+		"vi"		"Chế độ không xác định"
+	}
+	"L4DStats_RankMenuTitle"
+	{
+		"en"		"Player ranking system:"
+		"chi"		"玩家排名系统:"
+		"zho"		"玩家排名系統:"
+		"jp"		"プレイヤーランキング:"
+		"ko"		"플레이어 랭킹 시스템:"
+		"vi"		"Hệ thống xếp hạng:"
+	}
+	"L4DStats_MenuCurrentRank"
+	{
+		"en"		"Show my rank"
+		"chi"		"显示当前排名"
+		"zho"		"顯示目前排名"
+		"jp"		"自分のランクを表示"
+		"ko"		"내 순위 보기"
+		"vi"		"Xem hạng của tôi"
+	}
+	"L4DStats_MenuTop10"
+	{
+		"en"		"Show top 10 players"
+		"chi"		"显示前10名玩家"
+		"zho"		"顯示前10名玩家"
+		"jp"		"上位10人を表示"
+		"ko"		"상위 10명 보기"
+		"vi"		"Xem 10 người dẫn đầu"
+	}
+	"L4DStats_MenuQuarterTop10"
+	{
+		"en"		"Show quarterly top 10"
+		"chi"		"显示季度前10名"
+		"zho"		"顯示季度前10名"
+		"jp"		"四半期トップ10を表示"
+		"ko"		"분기 상위 10명 보기"
+		"vi"		"Xem top 10 theo quý"
+	}
+	"L4DStats_MenuTop10PPM"
+	{
+		"en"		"Show top 10 PPM players"
+		"chi"		"显示前10名 PPM 玩家"
+		"zho"		"顯示前10名 PPM 玩家"
+		"jp"		"PPM上位10人を表示"
+		"ko"		"PPM 상위 10명 보기"
+		"vi"		"Xem top 10 PPM"
+	}
+	"L4DStats_MenuNextRank"
+	{
+		"en"		"Points needed for the next rank"
+		"chi"		"下一名达标要求"
+		"zho"		"下一名達標要求"
+		"jp"		"次のランクまで"
+		"ko"		"다음 순위 필요 점수"
+		"vi"		"Điểm cần cho hạng tiếp theo"
+	}
+	"L4DStats_MenuCurrentMapTime"
+	{
+		"en"		"Show current map time"
+		"chi"		"显示当前地图时间"
+		"zho"		"顯示目前地圖時間"
+		"jp"		"現在のマップ時間を表示"
+		"ko"		"현재 맵 시간 보기"
+		"vi"		"Xem thời gian bản đồ hiện tại"
+	}
+	"L4DStats_MenuOtherPlayerRank"
+	{
+		"en"		"Show another player's rank"
+		"chi"		"显示其他玩家排名"
+		"zho"		"顯示其他玩家排名"
+		"jp"		"他のプレイヤーのランク"
+		"ko"		"다른 플레이어 순위"
+		"vi"		"Xem hạng người chơi khác"
+	}
+	"L4DStats_MenuOtherPlayerPPM"
+	{
+		"en"		"Show another player's PPM"
+		"chi"		"显示其他玩家 PPM"
+		"zho"		"顯示其他玩家 PPM"
+		"jp"		"他のプレイヤーのPPM"
+		"ko"		"다른 플레이어 PPM"
+		"vi"		"Xem PPM người chơi khác"
+	}
+	"L4DStats_MenuRankVote"
+	{
+		"en"		"Vote to shuffle teams by PPM"
+		"chi"		"投票按 PPM 重新分队"
+		"zho"		"投票按 PPM 重新分隊"
+		"jp"		"PPMでチーム分けを投票"
+		"ko"		"PPM 기준 팀 재편성 투표"
+		"vi"		"Bỏ phiếu chia lại đội theo PPM"
+	}
+	"L4DStats_MenuAllMapTimes"
+	{
+		"en"		"Show all map records"
+		"chi"		"显示所有地图时间记录"
+		"zho"		"顯示所有地圖時間記錄"
+		"jp"		"すべてのマップ記録"
+		"ko"		"모든 맵 기록 보기"
+		"vi"		"Xem mọi kỷ lục bản đồ"
+	}
+	"L4DStats_MenuThisMapTimes"
+	{
+		"en"		"Show records for this map"
+		"chi"		"显示当前地图时间记录"
+		"zho"		"顯示目前地圖時間記錄"
+		"jp"		"このマップの記録"
+		"ko"		"현재 맵 기록 보기"
+		"vi"		"Xem kỷ lục bản đồ này"
+	}
+	"L4DStats_MenuSettings"
+	{
+		"en"		"Rank notification settings"
+		"chi"		"Rank 提醒设置"
+		"zho"		"Rank 提醒設定"
+		"jp"		"ランク通知設定"
+		"ko"		"랭킹 알림 설정"
+		"vi"		"Cài đặt thông báo xếp hạng"
+	}
+	"L4DStats_MenuAbout"
+	{
+		"en"		"About the ranking plugin"
+		"chi"		"关于排名插件"
+		"zho"		"關於排名插件"
+		"jp"		"ランクプラグインについて"
+		"ko"		"랭킹 플러그인 정보"
+		"vi"		"Giới thiệu plugin xếp hạng"
+	}
+	"L4DStats_NextRankTitle"
+	{
+		"en"		"Next rank requirements:"
+		"chi"		"下一名达标要求:"
+		"zho"		"下一名達標要求:"
+		"jp"		"次のランクの条件:"
+		"ko"		"다음 순위 요구 조건:"
+		"vi"		"Yêu cầu cho hạng tiếp theo:"
+	}
+	"L4DStats_NextRankPointsNeeded"
+	{
+		"en"		"Points needed: %i"
+		"chi"		"还需分数: %i"
+		"zho"		"還需分數: %i"
+		"jp"		"必要ポイント: %i"
+		"ko"		"필요 점수: %i"
+		"vi"		"Điểm cần thêm: %i"
+	}
+	"L4DStats_CurrentRank"
+	{
+		"en"		"Current rank: %i"
+		"chi"		"当前排名: %i"
+		"zho"		"目前排名: %i"
+		"jp"		"現在のランク: %i"
+		"ko"		"현재 순위: %i"
+		"vi"		"Hạng hiện tại: %i"
+	}
+	"L4DStats_AlreadyFirst"
+	{
+		"en"		"You are already ranked first"
+		"chi"		"你已位居第一"
+		"zho"		"你已位居第一"
+		"jp"		"すでに1位です"
+		"ko"		"이미 1위입니다"
+		"vi"		"Bạn đã đứng hạng nhất"
+	}
+	"L4DStats_PointsAndPlayer"
+	{
+		"en"		"%i points: %s"
+		"chi"		"%i 分: %s"
+		"zho"		"%i 分: %s"
+		"jp"		"%i ポイント: %s"
+		"ko"		"%i점: %s"
+		"vi"		"%i điểm: %s"
+	}
+	"L4DStats_PlayerRankTitle"
+	{
+		"en"		"%s's rank"
+		"chi"		"%s 的排名"
+		"zho"		"%s 的排名"
+		"jp"		"%s のランク"
+		"ko"		"%s의 순위"
+		"vi"		"Hạng của %s"
+	}
+	"L4DStats_OverallRank"
+	{
+		"en"		"Overall rank: %i (of %i)"
+		"chi"		"总排名: %i (共 %i)"
+		"zho"		"總排名: %i (共 %i)"
+		"jp"		"総合ランク: %i / %i"
+		"ko"		"종합 순위: %i / %i"
+		"vi"		"Hạng tổng: %i / %i"
+	}
+	"L4DStats_ModeRank"
+	{
+		"en"		"%s rank: %i (of %i)"
+		"chi"		"%s 排名: %i (共 %i)"
+		"zho"		"%s 排名: %i (共 %i)"
+		"jp"		"%s ランク: %i / %i"
+		"ko"		"%s 순위: %i / %i"
+		"vi"		"Hạng %s: %i / %i"
+	}
+	"L4DStats_PlaytimeHours"
+	{
+		"en"		"Play time: %.2f hours"
+		"chi"		"游玩时间: %.2f 小时"
+		"zho"		"遊玩時間: %.2f 小時"
+		"jp"		"プレイ時間: %.2f 時間"
+		"ko"		"플레이 시간: %.2f시간"
+		"vi"		"Thời gian chơi: %.2f giờ"
+	}
+	"L4DStats_PlaytimeMinutes"
+	{
+		"en"		"Play time: %i minutes"
+		"chi"		"游玩时间: %i 分钟"
+		"zho"		"遊玩時間: %i 分鐘"
+		"jp"		"プレイ時間: %i 分"
+		"ko"		"플레이 시간: %i분"
+		"vi"		"Thời gian chơi: %i phút"
+	}
+	"L4DStats_CurrentPoints"
+	{
+		"en"		"Current points: %i"
+		"chi"		"当前分数: %i"
+		"zho"		"目前分數: %i"
+		"jp"		"現在のポイント: %i"
+		"ko"		"현재 점수: %i"
+		"vi"		"Điểm hiện tại: %i"
+	}
+	"L4DStats_QuarterLabel"
+	{
+		"en"		"%i Q%i"
+		"chi"		"%i 年第 %i 季度"
+		"zho"		"%i 年第 %i 季度"
+		"jp"		"%i年第%i四半期"
+		"ko"		"%i년 %i분기"
+		"vi"		"Năm %i, quý %i"
+	}
+	"L4DStats_QuarterPoints"
+	{
+		"en"		"%s points: %i"
+		"chi"		"%s 分数: %i"
+		"zho"		"%s 分數: %i"
+		"jp"		"%s ポイント: %i"
+		"ko"		"%s 점수: %i"
+		"vi"		"Điểm %s: %i"
+	}
+	"L4DStats_QuarterRank"
+	{
+		"en"		"%s rank: %i (of %i)"
+		"chi"		"%s 排名: %i (共 %i)"
+		"zho"		"%s 排名: %i (共 %i)"
+		"jp"		"%s ランク: %i / %i"
+		"ko"		"%s 순위: %i / %i"
+		"vi"		"Hạng %s: %i / %i"
+	}
+	"L4DStats_PointsPerMinute"
+	{
+		"en"		"Points per minute: %.2f"
+		"chi"		"每分钟分数: %.2f"
+		"zho"		"每分鐘分數: %.2f"
+		"jp"		"1分あたりのポイント: %.2f"
+		"ko"		"분당 점수: %.2f"
+		"vi"		"Điểm mỗi phút: %.2f"
+	}
+	"L4DStats_CommonKilled"
+	{
+		"en"		"Common infected killed: %i"
+		"chi"		"击杀普通感染者: %i"
+		"zho"		"擊殺普通感染者: %i"
+		"jp"		"コモン感染者キル: %i"
+		"ko"		"일반 감염자 처치: %i"
+		"vi"		"Kẻ nhiễm thường đã diệt: %i"
+	}
+	"L4DStats_SurvivorsKilled"
+	{
+		"en"		"Survivors killed: %i"
+		"chi"		"击杀幸存者: %i"
+		"zho"		"擊殺幸存者: %i"
+		"jp"		"サバイバーキル: %i"
+		"ko"		"생존자 처치: %i"
+		"vi"		"Người sống sót đã diệt: %i"
+	}
+	"L4DStats_Headshots"
+	{
+		"en"		"Headshots: %i"
+		"chi"		"爆头数: %i"
+		"zho"		"爆頭數: %i"
+		"jp"		"ヘッドショット: %i"
+		"ko"		"헤드샷: %i"
+		"vi"		"Bắn đầu: %i"
+	}
+	"L4DStats_HeadshotRatio"
+	{
+		"en"		"Headshot ratio: %.2f%%"
+		"chi"		"爆头率: %.2f%%"
+		"zho"		"爆頭率: %.2f%%"
+		"jp"		"ヘッドショット率: %.2f%%"
+		"ko"		"헤드샷 비율: %.2f%%"
+		"vi"		"Tỷ lệ bắn đầu: %.2f%%"
+	}
+	"L4DStats_FullStatsUrl"
+	{
+		"en"		"Full statistics: %s"
+		"chi"		"完整数据: %s"
+		"zho"		"完整數據: %s"
+		"jp"		"詳細統計: %s"
+		"ko"		"전체 통계: %s"
+		"vi"		"Thống kê đầy đủ: %s"
+	}
+	"L4DStats_UnknownPlayer"
+	{
+		"en"		"Unknown"
+		"chi"		"未知"
+		"zho"		"未知"
+		"jp"		"不明"
+		"ko"		"알 수 없음"
+		"vi"		"Không xác định"
+	}
+	"L4DStats_PlayerRanksTitle"
+	{
+		"en"		"Player ranks:"
+		"chi"		"玩家排名:"
+		"zho"		"玩家排名:"
+		"jp"		"プレイヤーランク:"
+		"ko"		"플레이어 순위:"
+		"vi"		"Xếp hạng người chơi:"
+	}
+	"L4DStats_PlayerPointsMenuItem"
+	{
+		"en"		"%s (%i points)"
+		"chi"		"%s (%i 分)"
+		"zho"		"%s (%i 分)"
+		"jp"		"%s (%i ポイント)"
+		"ko"		"%s (%i점)"
+		"vi"		"%s (%i điểm)"
+	}
+	"L4DStats_PlayerScoreMenuItem"
+	{
+		"en"		"%s (%i)"
+		"chi"		"%s (%i)"
+		"zho"		"%s (%i)"
+		"jp"		"%s (%i)"
+		"ko"		"%s (%i)"
+		"vi"		"%s (%i)"
+	}
+	"L4DStats_PlayerPPMTitle"
+	{
+		"en"		"Player PPM:"
+		"chi"		"玩家 PPM:"
+		"zho"		"玩家 PPM:"
+		"jp"		"プレイヤー PPM:"
+		"ko"		"플레이어 PPM:"
+		"vi"		"PPM người chơi:"
+	}
+	"L4DStats_PlayerPPMMenuItem"
+	{
+		"en"		"%s (PPM: %.2f)"
+		"chi"		"%s (PPM: %.2f)"
+		"zho"		"%s (PPM: %.2f)"
+		"jp"		"%s (PPM: %.2f)"
+		"ko"		"%s (PPM: %.2f)"
+		"vi"		"%s (PPM: %.2f)"
+	}
+	"L4DStats_TimedMapsTitle"
+	{
+		"en"		"Timed maps:"
+		"chi"		"地图时间记录:"
+		"zho"		"地圖時間記錄:"
+		"jp"		"マップタイム:"
+		"ko"		"맵 시간 기록:"
+		"vi"		"Thời gian bản đồ:"
+	}
+	"L4DStats_ModeTimesTitle"
+	{
+		"en"		"Mode times:"
+		"chi"		"模式时间:"
+		"zho"		"模式時間:"
+		"jp"		"モードタイム:"
+		"ko"		"모드 시간:"
+		"vi"		"Thời gian chế độ:"
+	}
+	"L4DStats_MapNeverPlayed"
+	{
+		"en"		"This map has not been played yet."
+		"chi"		"这张地图还没有记录。"
+		"zho"		"這張地圖還沒有記錄。"
+		"jp"		"このマップはまだプレイされていません。"
+		"ko"		"이 맵은 아직 플레이되지 않았습니다."
+		"vi"		"Bản đồ này chưa được chơi."
+	}
+	"L4DStats_ModeNeverPlayed"
+	{
+		"en"		"This mode has not been played yet."
+		"chi"		"这个模式还没有记录。"
+		"zho"		"這個模式還沒有記錄。"
+		"jp"		"このモードはまだプレイされていません。"
+		"ko"		"이 모드는 아직 플레이되지 않았습니다."
+		"vi"		"Chế độ này chưa được chơi."
+	}
+	"L4DStats_Top10Title"
+	{
+		"en"		"Top 10 players"
+		"chi"		"前 10 名玩家"
+		"zho"		"前 10 名玩家"
+		"jp"		"上位10人"
+		"ko"		"상위 10명"
+		"vi"		"10 người dẫn đầu"
+	}
+	"L4DStats_QuarterTop10Title"
+	{
+		"en"		"%s top 10 players"
+		"chi"		"%s 前 10 名玩家"
+		"zho"		"%s 前 10 名玩家"
+		"jp"		"%s 上位10人"
+		"ko"		"%s 상위 10명"
+		"vi"		"Top 10 người chơi %s"
+	}
+	"L4DStats_Top10PPMTitle"
+	{
+		"en"		"Top 10 PPM players"
+		"chi"		"PPM 前 10 名玩家"
+		"zho"		"PPM 前 10 名玩家"
+		"jp"		"PPM上位10人"
+		"ko"		"PPM 상위 10명"
+		"vi"		"10 người có PPM cao nhất"
+	}
+	"L4DStats_ClearPlayerStatsTitle"
+	{
+		"en"		"Clear player statistics:"
+		"chi"		"清除玩家统计:"
+		"zho"		"清除玩家統計:"
+		"jp"		"プレイヤー統計を消去:"
+		"ko"		"플레이어 통계 삭제:"
+		"vi"		"Xóa thống kê người chơi:"
+	}
+	"L4DStats_AboutTitle"
+	{
+		"en"		"About the player ranking system:"
+		"chi"		"关于玩家排名系统:"
+		"zho"		"關於玩家排名系統:"
+		"jp"		"プレイヤーランキングについて:"
+		"ko"		"플레이어 랭킹 시스템 정보:"
+		"vi"		"Giới thiệu hệ thống xếp hạng:"
+	}
+	"L4DStats_AboutVersion"
+	{
+		"en"		"Version: %s"
+		"chi"		"版本: %s"
+		"zho"		"版本: %s"
+		"jp"		"バージョン: %s"
+		"ko"		"버전: %s"
+		"vi"		"Phiên bản: %s"
+	}
+	"L4DStats_AboutAuthor"
+	{
+		"en"		"Author: Mikko Andersson (muukis); Anne adaptation: Dong"
+		"chi"		"作者: Mikko Andersson (muukis); Anne 适配: 东"
+		"zho"		"作者: Mikko Andersson (muukis); Anne 適配: 東"
+		"jp"		"作者: Mikko Andersson (muukis); Anne対応: Dong"
+		"ko"		"제작: Mikko Andersson (muukis); Anne 적용: Dong"
+		"vi"		"Tác giả: Mikko Andersson (muukis); bản Anne: Dong"
+	}
+	"L4DStats_AboutDescription"
+	{
+		"en"		"Tracks player statistics and rankings."
+		"chi"		"记录玩家统计和排名。"
+		"zho"		"記錄玩家統計和排名。"
+		"jp"		"プレイヤーの統計とランクを記録します。"
+		"ko"		"플레이어 통계와 순위를 기록합니다."
+		"vi"		"Theo dõi thống kê và xếp hạng người chơi."
+	}
+	"L4DStats_SettingsTitle"
+	{
+		"en"		"Ranking notification settings:"
+		"chi"		"排名提醒设置:"
+		"zho"		"排名提醒設定:"
+		"jp"		"ランク通知設定:"
+		"ko"		"랭킹 알림 설정:"
+		"vi"		"Cài đặt thông báo xếp hạng:"
+	}
+	"L4DStats_SettingsMute"
+	{
+		"en"		"Mute rank messages (currently enabled)"
+		"chi"		"禁用 Rank 提醒 (当前已启用)"
+		"zho"		"停用 Rank 提醒 (目前已啟用)"
+		"jp"		"ランク通知をミュート (現在有効)"
+		"ko"		"랭킹 알림 음소거 (현재 활성)"
+		"vi"		"Tắt thông báo hạng (hiện đang bật)"
+	}
+	"L4DStats_SettingsUnmute"
+	{
+		"en"		"Unmute rank messages (currently muted)"
+		"chi"		"恢复 Rank 提醒 (当前已禁用)"
+		"zho"		"恢復 Rank 提醒 (目前已停用)"
+		"jp"		"ランク通知のミュートを解除"
+		"ko"		"랭킹 알림 음소거 해제"
+		"vi"		"Bật lại thông báo hạng"
+	}
+	"L4DStats_TimeHoursMinutesSeconds"
+	{
+		"en"		"%i h %i min %.1f sec"
+		"chi"		"%i 小时 %i 分 %.1f 秒"
+		"zho"		"%i 小時 %i 分 %.1f 秒"
+		"jp"		"%i時間 %i分 %.1f秒"
+		"ko"		"%i시간 %i분 %.1f초"
+		"vi"		"%i giờ %i phút %.1f giây"
+	}
+	"L4DStats_TimeMinutesSeconds"
+	{
+		"en"		"%i min %.1f sec"
+		"chi"		"%i 分 %.1f 秒"
+		"zho"		"%i 分 %.1f 秒"
+		"jp"		"%i分 %.1f秒"
+		"ko"		"%i분 %.1f초"
+		"vi"		"%i phút %.1f giây"
+	}
+	"L4DStats_TimeSeconds"
+	{
+		"en"		"%.1f sec"
+		"chi"		"%.1f 秒"
+		"zho"		"%.1f 秒"
+		"jp"		"%.1f秒"
+		"ko"		"%.1f초"
+		"vi"		"%.1f giây"
+	}
+	"L4DStats_AdminCategory"
+	{
+		"en"		"Player rankings"
+		"chi"		"玩家排名"
+		"zho"		"玩家排名"
+		"jp"		"プレイヤーランキング"
+		"ko"		"플레이어 랭킹"
+		"vi"		"Xếp hạng người chơi"
+	}
+	"L4DStats_AdminClearTitle"
+	{
+		"en"		"Clear ranking data:"
+		"chi"		"清除排名数据:"
+		"zho"		"清除排名資料:"
+		"jp"		"ランキングデータを消去:"
+		"ko"		"랭킹 데이터 삭제:"
+		"vi"		"Xóa dữ liệu xếp hạng:"
+	}
+	"L4DStats_AdminClearCurrentPlayers"
+	{
+		"en"		"Clear current players' statistics"
+		"chi"		"清除当前玩家统计"
+		"zho"		"清除目前玩家統計"
+		"jp"		"現在のプレイヤー統計を消去"
+		"ko"		"현재 플레이어 통계 삭제"
+		"vi"		"Xóa thống kê người chơi hiện tại"
+	}
+	"L4DStats_AdminClearMapTimes"
+	{
+		"en"		"Clear map completion times"
+		"chi"		"清除地图通关时间"
+		"zho"		"清除地圖通關時間"
+		"jp"		"マップクリアタイムを消去"
+		"ko"		"맵 클리어 시간 삭제"
+		"vi"		"Xóa thời gian hoàn thành bản đồ"
+	}
+	"L4DStats_AdminClearRecordedMapsTitle"
+	{
+		"en"		"Clear recorded map times:"
+		"chi"		"清除已记录的地图时间:"
+		"zho"		"清除已記錄的地圖時間:"
+		"jp"		"記録済みのマップタイムを消去:"
+		"ko"		"기록된 맵 시간 삭제:"
+		"vi"		"Xóa thời gian bản đồ đã ghi:"
+	}
+	"L4DStats_AdminClearPlayers"
+	{
+		"en"		"Clear player statistics"
+		"chi"		"清除玩家统计"
+		"zho"		"清除玩家統計"
+		"jp"		"プレイヤー統計を消去"
+		"ko"		"플레이어 통계 삭제"
+		"vi"		"Xóa thống kê người chơi"
+	}
+	"L4DStats_AdminClearMaps"
+	{
+		"en"		"Clear player map statistics"
+		"chi"		"清除玩家地图统计"
+		"zho"		"清除玩家地圖統計"
+		"jp"		"プレイヤーのマップ統計を消去"
+		"ko"		"플레이어 맵 통계 삭제"
+		"vi"		"Xóa thống kê bản đồ của người chơi"
+	}
+	"L4DStats_AdminClearAll"
+	{
+		"en"		"Clear all statistics"
+		"chi"		"清除全部统计"
+		"zho"		"清除全部統計"
+		"jp"		"すべての統計を消去"
+		"ko"		"모든 통계 삭제"
+		"vi"		"Xóa toàn bộ thống kê"
+	}
+	"L4DStats_AdminClearRecordedTimes"
+	{
+		"en"		"Clear all recorded map times"
+		"chi"		"清除全部地图记录"
+		"zho"		"清除全部地圖紀錄"
+		"jp"		"すべてのマップタイムを消去"
+		"ko"		"모든 맵 기록 삭제"
+		"vi"		"Xóa mọi thời gian bản đồ đã ghi"
+	}
+	"L4DStats_AdminRemoveCustomMaps"
+	{
+		"en"		"Remove custom maps"
+		"chi"		"移除自定义地图"
+		"zho"		"移除自訂地圖"
+		"jp"		"カスタムマップを削除"
+		"ko"		"커스텀 맵 제거"
+		"vi"		"Xóa bản đồ tùy chỉnh"
+	}
+	"L4DStats_ConfirmClearPlayerStats"
+	{
+		"en"		"Clear all player statistics?"
+		"chi"		"确定清除所有玩家统计吗?"
+		"zho"		"確定清除所有玩家統計嗎?"
+		"jp"		"すべてのプレイヤー統計を消去しますか?"
+		"ko"		"모든 플레이어 통계를 삭제할까요?"
+		"vi"		"Xóa toàn bộ thống kê người chơi?"
+	}
+	"L4DStats_ConfirmClearPlayerMapStats"
+	{
+		"en"		"Clear all player map statistics?"
+		"chi"		"确定清除所有玩家地图统计吗?"
+		"zho"		"確定清除所有玩家地圖統計嗎?"
+		"jp"		"すべてのプレイヤーのマップ統計を消去しますか?"
+		"ko"		"모든 플레이어 맵 통계를 삭제할까요?"
+		"vi"		"Xóa toàn bộ thống kê bản đồ của người chơi?"
+	}
+	"L4DStats_ConfirmClearAllStats"
+	{
+		"en"		"Clear all ranking statistics?"
+		"chi"		"确定清除全部排名统计吗?"
+		"zho"		"確定清除全部排名統計嗎?"
+		"jp"		"すべてのランキング統計を消去しますか?"
+		"ko"		"모든 랭킹 통계를 삭제할까요?"
+		"vi"		"Xóa toàn bộ thống kê xếp hạng?"
+	}
+	"L4DStats_ConfirmClearAllMapTimes"
+	{
+		"en"		"Clear all recorded map times?"
+		"chi"		"确定清除全部地图时间记录吗?"
+		"zho"		"確定清除全部地圖時間紀錄嗎?"
+		"jp"		"すべてのマップタイムを消去しますか?"
+		"ko"		"모든 맵 시간 기록을 삭제할까요?"
+		"vi"		"Xóa toàn bộ thời gian bản đồ đã ghi?"
+	}
+	"L4DStats_ConfirmClearCoopMapTimes"
+	{
+		"en"		"Clear Coop map times?"
+		"chi"		"确定清除合作模式地图时间吗?"
+		"zho"		"確定清除合作模式地圖時間嗎?"
+		"jp"		"協力モードのマップタイムを消去しますか?"
+		"ko"		"협동 모드 맵 시간을 삭제할까요?"
+		"vi"		"Xóa thời gian bản đồ Coop?"
+	}
+	"L4DStats_ConfirmClearSurvivalMapTimes"
+	{
+		"en"		"Clear Survival map times?"
+		"chi"		"确定清除生存模式地图时间吗?"
+		"zho"		"確定清除生存模式地圖時間嗎?"
+		"jp"		"サバイバルのマップタイムを消去しますか?"
+		"ko"		"생존 모드 맵 시간을 삭제할까요?"
+		"vi"		"Xóa thời gian bản đồ Survival?"
+	}
+	"L4DStats_ConfirmClearRealismMapTimes"
+	{
+		"en"		"Clear Realism map times?"
+		"chi"		"确定清除写实模式地图时间吗?"
+		"zho"		"確定清除寫實模式地圖時間嗎?"
+		"jp"		"リアリズムのマップタイムを消去しますか?"
+		"ko"		"리얼리즘 모드 맵 시간을 삭제할까요?"
+		"vi"		"Xóa thời gian bản đồ Realism?"
+	}
+	"L4DStats_ConfirmClearMutationMapTimes"
+	{
+		"en"		"Clear Mutation map times?"
+		"chi"		"确定清除过往之役模式地图时间吗?"
+		"zho"		"確定清除過往之役模式地圖時間嗎?"
+		"jp"		"ミューテーションのマップタイムを消去しますか?"
+		"ko"		"변이 모드 맵 시간을 삭제할까요?"
+		"vi"		"Xóa thời gian bản đồ Mutation?"
+	}
+	"L4DStats_ConfirmRemoveCustomMaps"
+	{
+		"en"		"Remove all custom maps?"
+		"chi"		"确定移除所有自定义地图吗?"
+		"zho"		"確定移除所有自訂地圖嗎?"
+		"jp"		"すべてのカスタムマップを削除しますか?"
+		"ko"		"모든 커스텀 맵을 제거할까요?"
+		"vi"		"Xóa tất cả bản đồ tùy chỉnh?"
+	}
+	"L4DStats_ConfirmCleanInactivePlayers"
+	{
+		"en"		"Remove inactive players?"
+		"chi"		"确定清理不活跃玩家吗?"
+		"zho"		"確定清理不活躍玩家嗎?"
+		"jp"		"非アクティブなプレイヤーを削除しますか?"
+		"ko"		"비활성 플레이어를 제거할까요?"
+		"vi"		"Xóa người chơi không hoạt động?"
+	}
+	"L4DStats_CommandInGameOnly"
+	{
+		"en"		"This command can only be used in game."
+		"chi"		"此命令只能在游戏内使用。"
+		"zho"		"此指令只能在遊戲內使用。"
+		"jp"		"このコマンドはゲーム内でのみ使用できます。"
+		"ko"		"이 명령어는 게임 내에서만 사용할 수 있습니다."
+		"vi"		"Lệnh này chỉ có thể dùng trong trò chơi."
+	}
+	"L4DStats_CommandUnavailableFromServer"
+	{
+		"en"		"This command cannot be used from the server console."
+		"chi"		"服务器控制台无法使用此命令。"
+		"zho"		"伺服器控制台無法使用此指令。"
+		"jp"		"このコマンドはサーバーコンソールから使用できません。"
+		"ko"		"서버 콘솔에서는 이 명령어를 사용할 수 없습니다."
+		"vi"		"Không thể dùng lệnh này từ bảng điều khiển máy chủ."
+	}
+	"L4DStats_MapTimerNotStarted"
+	{
+		"en"		"The map timer has not started."
+		"chi"		"地图计时器尚未开始。"
+		"zho"		"地圖計時器尚未開始。"
+		"jp"		"マップタイマーはまだ開始していません。"
+		"ko"		"맵 타이머가 아직 시작되지 않았습니다."
+		"vi"		"Bộ đếm giờ bản đồ chưa bắt đầu."
+	}
+	"L4DStats_CurrentMapTimeConsole"
+	{
+		"en"		"Current map time: %s"
+		"chi"		"当前地图时间: %s"
+		"zho"		"目前地圖時間: %s"
+		"jp"		"現在のマップタイム: %s"
+		"ko"		"현재 맵 시간: %s"
+		"vi"		"Thời gian bản đồ hiện tại: %s"
+	}
+	"L4DStats_TeamShuffleUnavailable"
+	{
+		"en"		"Team shuffle is currently unavailable."
+		"chi"		"当前无法随机重组队伍。"
+		"zho"		"目前無法隨機重組隊伍。"
+		"jp"		"現在チームシャッフルは使用できません。"
+		"ko"		"현재 팀 섞기를 사용할 수 없습니다."
+		"vi"		"Hiện không thể xáo trộn đội."
+	}
+	"L4DStats_TeamShuffleExecuting"
+	{
+		"en"		"Shuffling teams..."
+		"chi"		"正在随机重组队伍..."
+		"zho"		"正在隨機重組隊伍..."
+		"jp"		"チームをシャッフルしています..."
+		"ko"		"팀을 섞는 중..."
+		"vi"		"Đang xáo trộn đội..."
+	}
+	"L4DStats_ClearDatabaseServerDisabled"
+	{
+		"en"		"Database clearing from the server console is disabled."
+		"chi"		"已禁用从服务器控制台清除数据库。"
+		"zho"		"已停用從伺服器控制台清除資料庫。"
+		"jp"		"サーバーコンソールからのデータベース消去は無効です。"
+		"ko"		"서버 콘솔에서의 데이터베이스 삭제가 비활성화되었습니다."
+		"vi"		"Tính năng xóa cơ sở dữ liệu từ bảng điều khiển máy chủ đã bị tắt."
+	}
+	"L4DStats_ClearDatabaseStarted"
+	{
+		"en"		"Database clearing started."
+		"chi"		"已开始清除数据库。"
+		"zho"		"已開始清除資料庫。"
+		"jp"		"データベースの消去を開始しました。"
+		"ko"		"데이터베이스 삭제를 시작했습니다."
+		"vi"		"Đã bắt đầu xóa cơ sở dữ liệu."
+	}
+	"L4DStats_ClearDatabaseConfirm"
+	{
+		"en"		"Run the command again within %i seconds to confirm database clearing."
+		"chi"		"请在 %i 秒内再次执行命令以确认清除数据库。"
+		"zho"		"請在 %i 秒內再次執行指令以確認清除資料庫。"
+		"jp"		"%i秒以内にもう一度コマンドを実行するとデータベースを消去します。"
+		"ko"		"%i초 안에 명령어를 다시 실행하여 데이터베이스 삭제를 확인하세요."
+		"vi"		"Chạy lại lệnh trong %i giây để xác nhận xóa cơ sở dữ liệu."
+	}
+	"L4DStats_ClearTimedMapsRollback"
+	{
+		"en"		"Clearing map times failed; rolling back."
+		"chi"		"清除地图时间失败，正在回滚。"
+		"zho"		"清除地圖時間失敗，正在回滾。"
+		"jp"		"マップタイムの消去に失敗したため、ロールバックします。"
+		"ko"		"맵 시간 삭제에 실패하여 롤백합니다."
+		"vi"		"Xóa thời gian bản đồ thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearPlayersRollback"
+	{
+		"en"		"Clearing player statistics failed; rolling back."
+		"chi"		"清除玩家统计失败，正在回滚。"
+		"zho"		"清除玩家統計失敗，正在回滾。"
+		"jp"		"プレイヤー統計の消去に失敗したため、ロールバックします。"
+		"ko"		"플레이어 통계 삭제에 실패하여 롤백합니다."
+		"vi"		"Xóa thống kê người chơi thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearMapsRollback"
+	{
+		"en"		"Clearing map statistics failed; rolling back."
+		"chi"		"清除地图统计失败，正在回滚。"
+		"zho"		"清除地圖統計失敗，正在回滾。"
+		"jp"		"マップ統計の消去に失敗したため、ロールバックします。"
+		"ko"		"맵 통계 삭제에 실패하여 롤백합니다."
+		"vi"		"Xóa thống kê bản đồ thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearStatsFailure"
+	{
+		"en"		"Statistics were not cleared."
+		"chi"		"统计数据未清除。"
+		"zho"		"統計資料未清除。"
+		"jp"		"統計は消去されませんでした。"
+		"ko"		"통계가 삭제되지 않았습니다."
+		"vi"		"Thống kê chưa được xóa."
+	}
+	"L4DStats_ClearRanksSuccess"
+	{
+		"en"		"Player rankings cleared successfully."
+		"chi"		"玩家排名已成功清除。"
+		"zho"		"玩家排名已成功清除。"
+		"jp"		"プレイヤーランキングを消去しました。"
+		"ko"		"플레이어 랭킹을 삭제했습니다."
+		"vi"		"Đã xóa xếp hạng người chơi."
+	}
+	"L4DStats_ClearStatsSuccess"
+	{
+		"en"		"Statistics cleared successfully."
+		"chi"		"统计数据已成功清除。"
+		"zho"		"統計資料已成功清除。"
+		"jp"		"統計を消去しました。"
+		"ko"		"통계를 삭제했습니다."
+		"vi"		"Đã xóa thống kê."
+	}
+	"L4DStats_ClearQueryFailed"
+	{
+		"en"		"Database query failed: %s"
+		"chi"		"数据库查询失败: %s"
+		"zho"		"資料庫查詢失敗: %s"
+		"jp"		"データベースクエリに失敗: %s"
+		"ko"		"데이터베이스 쿼리 실패: %s"
+		"vi"		"Truy vấn cơ sở dữ liệu thất bại: %s"
+	}
+	"L4DStats_FastQueryError"
+	{
+		"en"		"Fast query failed: %s | Query: %s"
+		"chi"		"快速查询失败: %s | 查询: %s"
+		"zho"		"快速查詢失敗: %s | 查詢: %s"
+		"jp"		"高速クエリに失敗: %s | クエリ: %s"
+		"ko"		"빠른 쿼리 실패: %s | 쿼리: %s"
+		"vi"		"Truy vấn nhanh thất bại: %s | Truy vấn: %s"
+	}
+	"L4DStats_FastQueryFailed"
+	{
+		"en"		"Fast query failed: %s"
+		"chi"		"快速查询失败: %s"
+		"zho"		"快速查詢失敗: %s"
+		"jp"		"高速クエリに失敗: %s"
+		"ko"		"빠른 쿼리 실패: %s"
+		"vi"		"Truy vấn nhanh thất bại: %s"
+	}
+	"L4DStats_FastestTimeWithBuy"
+	{
+		"en"		"Fastest completion time with purchases: {green}%s{default}."
+		"chi"		"当前带购买的最快通关时间: {green}%s{default}。"
+		"zho"		"目前含購買的最快通關時間: {green}%s{default}。"
+		"jp"		"購入ありの最速クリアタイム: {green}%s{default}。"
+		"ko"		"구매를 포함한 최단 클리어 시간: {green}%s{default}."
+		"vi"		"Thời gian hoàn thành nhanh nhất có mua vật phẩm: {green}%s{default}."
+	}
+	"L4DStats_FastestTimeWithoutBuy"
+	{
+		"en"		"Fastest completion time: {green}%s{default}."
+		"chi"		"当前最快通关时间: {green}%s{default}。"
+		"zho"		"目前最快通關時間: {green}%s{default}。"
+		"jp"		"最速クリアタイム: {green}%s{default}。"
+		"ko"		"최단 클리어 시간: {green}%s{default}."
+		"vi"		"Thời gian hoàn thành nhanh nhất: {green}%s{default}."
+	}
+	"L4DStats_MapRecordImprovedCurrent"
+	{
+		"en"		"New Anne%s difficulty record: {green}%s{default}!"
+		"chi"		"刷新了 Anne%s 版本该难度的最快记录: {green}%s{default}!"
+		"zho"		"刷新了 Anne%s 版本該難度的最快紀錄: {green}%s{default}!"
+		"jp"		"Anne%sのこの難易度で新記録: {green}%s{default}!"
+		"ko"		"Anne%s 해당 난이도 신기록: {green}%s{default}!"
+		"vi"		"Kỷ lục mới cho độ khó Anne%s: {green}%s{default}!"
+	}
+	"L4DStats_MapRecordImprovedPlayer"
+	{
+		"en"		"Your Anne%s difficulty record improved to {green}%s{default}!"
+		"chi"		"你在 Anne%s 版本该难度的最快记录提升至 {green}%s{default}!"
+		"zho"		"你在 Anne%s 版本該難度的最快紀錄提升至 {green}%s{default}!"
+		"jp"		"Anne%sのこの難易度で自己の記録を {green}%s{default} に更新!"
+		"ko"		"Anne%s 해당 난이도 개인 기록을 {green}%s{default}(으)로 갱신!"
+		"vi"		"Kỷ lục cá nhân ở độ khó Anne%s đã tăng lên {green}%s{default}!"
+	}
+	"L4DStats_RankMenuHint"
+	{
+		"en"		"Type {green}!rank{default} to open the ranking menu."
+		"chi"		"输入 {green}!rank{default} 打开排名菜单。"
+		"zho"		"輸入 {green}!rank{default} 開啟排名選單。"
+		"jp"		"{green}!rank{default} でランキングメニューを開きます。"
+		"ko"		"{green}!rank{default}를 입력하여 랭킹 메뉴를 여세요."
+		"vi"		"Nhập {green}!rank{default} để mở menu xếp hạng."
+	}
+	"L4DStats_RankRose"
+	{
+		"en"		"Your overall rank rose {green}%i{default} places to {green}%i{default}."
+		"chi"		"你的总榜排名上升 {green}%i{default} 名，当前第 {green}%i{default} 名。"
+		"zho"		"你的總榜排名上升 {green}%i{default} 名，目前第 {green}%i{default} 名。"
+		"jp"		"総合ランクが {green}%i{default} 上がり、{green}%i{default} 位になりました。"
+		"ko"		"전체 순위가 {green}%i{default}등 올라 {green}%i{default}등이 되었습니다."
+		"vi"		"Xếp hạng tổng của bạn tăng {green}%i{default} bậc lên hạng {green}%i{default}."
+	}
+	"L4DStats_RankFell"
+	{
+		"en"		"Your overall rank fell {green}%i{default} places to {green}%i{default}."
+		"chi"		"你的总榜排名下降 {green}%i{default} 名，当前第 {green}%i{default} 名。"
+		"zho"		"你的總榜排名下降 {green}%i{default} 名，目前第 {green}%i{default} 名。"
+		"jp"		"総合ランクが {green}%i{default} 下がり、{green}%i{default} 位になりました。"
+		"ko"		"전체 순위가 {green}%i{default}등 내려가 {green}%i{default}등이 되었습니다."
+		"vi"		"Xếp hạng tổng của bạn giảm {green}%i{default} bậc xuống hạng {green}%i{default}."
+	}
+	"L4DStats_QuarterRankRose"
+	{
+		"en"		"Your %s rank rose {green}%i{default} places to {green}%i{default} ({green}%i{default} points)."
+		"chi"		"你在 %s 的排名上升 {green}%i{default} 名，当前第 {green}%i{default} 名（{green}%i{default} 分）。"
+		"zho"		"你在 %s 的排名上升 {green}%i{default} 名，目前第 {green}%i{default} 名（{green}%i{default} 分）。"
+		"jp"		"%sのランクが {green}%i{default} 上がり、{green}%i{default} 位（{green}%i{default} ポイント）になりました。"
+		"ko"		"%s 순위가 {green}%i{default}등 올라 {green}%i{default}등({green}%i{default}점)이 되었습니다."
+		"vi"		"Hạng %s của bạn tăng {green}%i{default} bậc lên hạng {green}%i{default} ({green}%i{default} điểm)."
+	}
+	"L4DStats_QuarterRankFell"
+	{
+		"en"		"Your %s rank fell {green}%i{default} places to {green}%i{default} ({green}%i{default} points)."
+		"chi"		"你在 %s 的排名下降 {green}%i{default} 名，当前第 {green}%i{default} 名（{green}%i{default} 分）。"
+		"zho"		"你在 %s 的排名下降 {green}%i{default} 名，目前第 {green}%i{default} 名（{green}%i{default} 分）。"
+		"jp"		"%sのランクが {green}%i{default} 下がり、{green}%i{default} 位（{green}%i{default} ポイント）になりました。"
+		"ko"		"%s 순위가 {green}%i{default}등 내려가 {green}%i{default}등({green}%i{default}점)이 되었습니다."
+		"vi"		"Hạng %s của bạn giảm {green}%i{default} bậc xuống hạng {green}%i{default} ({green}%i{default} điểm)."
+	}
+	"L4DStats_RankMessagesMuted"
+	{
+		"en"		"Rank messages are now muted."
+		"chi"		"已禁用 Rank 提醒。"
+		"zho"		"已停用 Rank 提醒。"
+		"jp"		"ランク通知をミュートしました。"
+		"ko"		"랭킹 알림을 음소거했습니다."
+		"vi"		"Đã tắt thông báo xếp hạng."
+	}
+	"L4DStats_RankMessagesUnmuted"
+	{
+		"en"		"Rank messages are now enabled."
+		"chi"		"已恢复 Rank 提醒。"
+		"zho"		"已恢復 Rank 提醒。"
+		"jp"		"ランク通知を有効にしました。"
+		"ko"		"랭킹 알림을 활성화했습니다."
+		"vi"		"Đã bật thông báo xếp hạng."
+	}
+	"L4DStats_RankMuteUsage"
+	{
+		"en"		"Usage: sm_rankmute [0/1]"
+		"chi"		"用法: sm_rankmute [0/1]"
+		"zho"		"用法: sm_rankmute [0/1]"
+		"jp"		"使い方: sm_rankmute [0/1]"
+		"ko"		"사용법: sm_rankmute [0/1]"
+		"vi"		"Cách dùng: sm_rankmute [0/1]"
+	}
+	"L4DStats_RankVoteQuestion"
+	{
+		"en"		"Enable player ranking?"
+		"chi"		"是否启用玩家排名?"
+		"zho"		"是否啟用玩家排名?"
+		"jp"		"プレイヤーランキングを有効にしますか?"
+		"ko"		"플레이어 랭킹을 활성화할까요?"
+		"vi"		"Bật xếp hạng người chơi?"
+	}
+	"L4DStats_RankVotePassed"
+	{
+		"en"		"Rank vote passed ({green}%i{default} yes, {green}%i{default} no)."
+		"chi"		"Rank 投票已通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
+		"zho"		"Rank 投票已通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
+		"jp"		"ランク投票が可決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
+		"ko"		"랭킹 투표가 가결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
+		"vi"		"Bỏ phiếu xếp hạng đã thông qua ({green}%i{default} có, {green}%i{default} không)."
+	}
+	"L4DStats_RankVoteFailed"
+	{
+		"en"		"Rank vote failed ({green}%i{default} yes, {green}%i{default} no)."
+		"chi"		"Rank 投票未通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
+		"zho"		"Rank 投票未通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
+		"jp"		"ランク投票は否決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
+		"ko"		"랭킹 투표가 부결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
+		"vi"		"Bỏ phiếu xếp hạng không thông qua ({green}%i{default} có, {green}%i{default} không)."
+	}
+	"L4DStats_RankVotePluginDisabledConsole"
+	{
+		"en"		"Cannot start a rank vote while the plugin is disabled."
+		"chi"		"插件已禁用，无法发起 Rank 投票。"
+		"zho"		"插件已停用，無法發起 Rank 投票。"
+		"jp"		"プラグインが無効のためランク投票を開始できません。"
+		"ko"		"플러그인이 비활성화된 동안 랭킹 투표를 시작할 수 없습니다."
+		"vi"		"Không thể bắt đầu bỏ phiếu xếp hạng khi plugin đang tắt."
+	}
+	"L4DStats_RankVoteGamemodeDisabledConsole"
+	{
+		"en"		"Rank voting is disabled in this game mode."
+		"chi"		"当前游戏模式已禁用 Rank 投票。"
+		"zho"		"目前遊戲模式已停用 Rank 投票。"
+		"jp"		"このゲームモードではランク投票が無効です。"
+		"ko"		"이 게임 모드에서는 랭킹 투표가 비활성화됩니다."
+		"vi"		"Bỏ phiếu xếp hạng bị tắt trong chế độ này."
+	}
+	"L4DStats_RankVoteAlreadyStartedConsole"
+	{
+		"en"		"A rank vote is already in progress."
+		"chi"		"已有 Rank 投票正在进行。"
+		"zho"		"已有 Rank 投票正在進行。"
+		"jp"		"ランク投票はすでに進行中です。"
+		"ko"		"랭킹 투표가 이미 진행 중입니다."
+		"vi"		"Cuộc bỏ phiếu xếp hạng đang diễn ra."
+	}
+	"L4DStats_RankVoteGamedataMissingConsole"
+	{
+		"en"		"Rank vote setup failed: required gamedata is missing."
+		"chi"		"Rank 投票设置失败：缺少所需的 gamedata。"
+		"zho"		"Rank 投票設定失敗：缺少所需的 gamedata。"
+		"jp"		"ランク投票の設定に失敗: 必要なgamedataがありません。"
+		"ko"		"랭킹 투표 설정 실패: 필요한 gamedata가 없습니다."
+		"vi"		"Thiết lập bỏ phiếu xếp hạng thất bại: thiếu gamedata cần thiết."
+	}
+	"L4DStats_RankVoteDisabledConsole"
+	{
+		"en"		"Rank voting is disabled."
+		"chi"		"Rank 投票已禁用。"
+		"zho"		"Rank 投票已停用。"
+		"jp"		"ランク投票は無効です。"
+		"ko"		"랭킹 투표가 비활성화되었습니다."
+		"vi"		"Bỏ phiếu xếp hạng đang tắt."
+	}
+	"L4DStats_MotdCreateFailed"
+	{
+		"en"		"Unable to create the MOTD file."
+		"chi"		"无法创建 MOTD 文件。"
+		"zho"		"無法建立 MOTD 檔案。"
+		"jp"		"MOTDファイルを作成できません。"
+		"ko"		"MOTD 파일을 생성할 수 없습니다."
+		"vi"		"Không thể tạo tệp MOTD."
+	}
+	"L4DStats_MotdPrepareFailed"
+	{
+		"en"		"Unable to prepare the MOTD request."
+		"chi"		"无法准备 MOTD 请求。"
+		"zho"		"無法準備 MOTD 請求。"
+		"jp"		"MOTDリクエストを準備できません。"
+		"ko"		"MOTD 요청을 준비할 수 없습니다."
+		"vi"		"Không thể chuẩn bị yêu cầu MOTD."
+	}
+	"L4DStats_MotdUpdateError"
+	{
+		"en"		"MOTD update failed: %s"
+		"chi"		"MOTD 更新失败: %s"
+		"zho"		"MOTD 更新失敗: %s"
+		"jp"		"MOTDの更新に失敗: %s"
+		"ko"		"MOTD 업데이트 실패: %s"
+		"vi"		"Cập nhật MOTD thất bại: %s"
+	}
+	"L4DStats_MotdUpdateFailed"
+	{
+		"en"		"MOTD update failed."
+		"chi"		"MOTD 更新失败。"
+		"zho"		"MOTD 更新失敗。"
+		"jp"		"MOTDの更新に失敗しました。"
+		"ko"		"MOTD 업데이트에 실패했습니다."
+		"vi"		"Cập nhật MOTD thất bại."
+	}
+	"L4DStats_MotdUpdateSuccess"
+	{
+		"en"		"MOTD updated successfully."
+		"chi"		"MOTD 更新成功。"
+		"zho"		"MOTD 更新成功。"
+		"jp"		"MOTDを更新しました。"
+		"ko"		"MOTD를 업데이트했습니다."
+		"vi"		"Đã cập nhật MOTD."
+	}
+	"L4DStats_MotdMessage"
+	{
+		"en"		"Message of the day: {green}%s{default}"
+		"chi"		"今日消息: {green}%s{default}"
+		"zho"		"今日消息: {green}%s{default}"
+		"jp"		"本日のメッセージ: {green}%s{default}"
+		"ko"		"오늘의 메시지: {green}%s{default}"
+		"vi"		"Thông điệp hôm nay: {green}%s{default}"
+	}
+	"L4DStats_NewPlayerSafeRoomMultiplier"
+	{
+		"en"		"{lightgreen}%i new player(s) detected. Experienced survivors earn a {green}%.1fx{default} safe-room bonus; new players do not receive the multiplier."
+		"chi"		"{lightgreen}检测到 %i 名新人，带新系数为 {green}%.1fx{default}；新人不享受倍率，非新人幸存者获得安全屋加成。"
+		"zho"		"{lightgreen}偵測到 %i 名新人，帶新係數為 {green}%.1fx{default}；新人不享受倍率，非新人生還者獲得安全室加成。"
+		"jp"		"{lightgreen}初心者を%i人検出。経験者の生存者はセーフルームで {green}%.1fx{default} ボーナスを得ますが、初心者には倍率が適用されません。"
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 기존 생존자는 세이프룸에서 {green}%.1fx{default} 보너스를 받지만 신규 플레이어에게는 배율이 적용되지 않습니다."
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới. Người sống sót có kinh nghiệm nhận thưởng phòng an toàn {green}%.1fx{default}; người mới không nhận hệ số."
+	}
+	"L4DStats_NewPlayerFinaleMultiplier"
+	{
+		"en"		"{lightgreen}%i new player(s) detected. Experienced survivors earn a {green}%.1fx{default} finale bonus; new players do not receive the multiplier."
+		"chi"		"{lightgreen}检测到 %i 名新人，带新系数为 {green}%.1fx{default}；新人不享受倍率，非新人幸存者获得救援关加成。"
+		"zho"		"{lightgreen}偵測到 %i 名新人，帶新係數為 {green}%.1fx{default}；新人不享受倍率，非新人生還者獲得救援關加成。"
+		"jp"		"{lightgreen}初心者を%i人検出。経験者の生存者はフィナーレで {green}%.1fx{default} ボーナスを得ますが、初心者には倍率が適用されません。"
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 기존 생존자는 피날레에서 {green}%.1fx{default} 보너스를 받지만 신규 플레이어에게는 배율이 적용되지 않습니다."
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới. Người sống sót có kinh nghiệm nhận thưởng màn cuối {green}%.1fx{default}; người mới không nhận hệ số."
+	}
+	"L4DStats_SinglePlayerTripleBonus"
+	{
+		"en"		"Only one survivor remains; their score is tripled."
+		"chi"		"仅剩一名幸存者，其得分将乘三。"
+		"zho"		"僅剩一名生還者，其得分將乘三。"
+		"jp"		"生存者が1人のため、スコアが3倍になります。"
+		"ko"		"생존자가 한 명만 남아 점수가 3배로 적용됩니다."
+		"vi"		"Chỉ còn một người sống sót; điểm được nhân ba."
+	}
+	"L4DStats_SinglePlayerTripleBonusWithDifficulty"
+	{
+		"en"		"Only one survivor remains; their score is tripled with a {green}%i{default}-point difficulty bonus."
+		"chi"		"仅剩一名幸存者，其得分将乘三，并获得 {green}%i{default} 点难度加成。"
+		"zho"		"僅剩一名生還者，其得分將乘三，並獲得 {green}%i{default} 點難度加成。"
+		"jp"		"生存者が1人のためスコアが3倍になり、難易度ボーナス {green}%i{default} ポイントを得ます。"
+		"ko"		"생존자가 한 명만 남아 점수가 3배로 적용되고 난이도 보너스 {green}%i{default}점을 받습니다."
+		"vi"		"Chỉ còn một người sống sót; điểm được nhân ba và thêm {green}%i{default} điểm độ khó."
+	}
+	"L4DStats_MedkitReductionL4D1"
+	{
+		"en"		"Medkit use reduces the completion reward by {green}%i%%{default} per kit ({green}%i{default} used)."
+		"chi"		"每使用一个医疗包，过关奖励减少 {green}%i%%{default}（已使用 {green}%i{default} 个）。"
+		"zho"		"每使用一個醫療包，過關獎勵減少 {green}%i%%{default}（已使用 {green}%i{default} 個）。"
+		"jp"		"救急キット1個ごとにクリアボーナスが {green}%i%%{default} 減少（{green}%i{default}個使用）。"
+		"ko"		"구급키트를 사용할 때마다 클리어 보상이 {green}%i%%{default} 감소합니다({green}%i{default}개 사용)."
+		"vi"		"Mỗi túi cứu thương làm giảm {green}%i%%{default} thưởng hoàn thành (đã dùng {green}%i{default})."
+	}
+	"L4DStats_MedkitReductionL4D2"
+	{
+		"en"		"Medkit use reduces the completion reward by {green}%i%%{default} per kit after the first four ({green}%i{default} used)."
+		"chi"		"前四个医疗包后，每额外使用一个，过关奖励减少 {green}%i%%{default}（已使用 {green}%i{default} 个）。"
+		"zho"		"前四個醫療包後，每額外使用一個，過關獎勵減少 {green}%i%%{default}（已使用 {green}%i{default} 個）。"
+		"jp"		"最初の4個以降、救急キット1個ごとにクリアボーナスが {green}%i%%{default} 減少（{green}%i{default}個使用）。"
+		"ko"		"첫 4개 이후 구급키트를 사용할 때마다 클리어 보상이 {green}%i%%{default} 감소합니다({green}%i{default}개 사용)."
+		"vi"		"Sau bốn túi đầu, mỗi túi cứu thương làm giảm {green}%i%%{default} thưởng hoàn thành (đã dùng {green}%i{default})."
+	}
+	"L4DStats_DeployIncendiarySelf"
+	{
+		"en"		"You deployed incendiary ammo and earned {green}%i{default} points!"
+		"chi"		"你部署了燃烧弹药，获得 {green}%i{default} 分!"
+		"zho"		"你部署了燃燒彈藥，獲得 {green}%i{default} 分!"
+		"jp"		"焼夷弾パックを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"소소탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đã triển khai đạn lửa và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployExplosiveSelf"
+	{
+		"en"		"You deployed explosive ammo and earned {green}%i{default} points!"
+		"chi"		"你部署了高爆弹药，获得 {green}%i{default} 分!"
+		"zho"		"你部署了高爆彈藥，獲得 {green}%i{default} 分!"
+		"jp"		"爆発弾パックを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"폭발탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đã triển khai đạn nổ và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployUnknownSelf"
+	{
+		"en"		"You deployed an ammo upgrade and earned {green}%i{default} points!"
+		"chi"		"你部署了弹药升级，获得 {green}%i{default} 分!"
+		"zho"		"你部署了彈藥升級，獲得 {green}%i{default} 分!"
+		"jp"		"弾薬アップグレードを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"탄약 업그레이드를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đã triển khai nâng cấp đạn và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployIncendiaryAll"
+	{
+		"en"		"{olive}%s{default} deployed incendiary ammo and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 部署了燃烧弹药，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 部署了燃燒彈藥，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が焼夷弾パックを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 소소탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đã triển khai đạn lửa và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployExplosiveAll"
+	{
+		"en"		"{olive}%s{default} deployed explosive ammo and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 部署了高爆弹药，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 部署了高爆彈藥，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が爆発弾パックを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 폭발탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đã triển khai đạn nổ và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployUnknownAll"
+	{
+		"en"		"{olive}%s{default} deployed an ammo upgrade and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 部署了弹药升级，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 部署了彈藥升級，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が弾薬アップグレードを設置し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 탄약 업그레이드를 배치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đã triển khai nâng cấp đạn và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectPounceSelf"
+	{
+		"en"		"Perfect pounce on {olive}%s{default}! You earned {green}%i{default} points."
+		"chi"		"完美飞扑 {olive}%s{default}!你获得 {green}%i{default} 分。"
+		"zho"		"完美飛撲 {olive}%s{default}!你獲得 {green}%i{default} 分。"
+		"jp"		"{olive}%s{default} へ完璧な飛びかかり! {green}%i{default} ポイント獲得。"
+		"ko"		"{olive}%s{default}에게 완벽한 폰스! {green}%i{default}점을 획득했습니다."
+		"vi"		"Cú vồ hoàn hảo vào {olive}%s{default}! Bạn nhận {green}%i{default} điểm."
+	}
+	"L4DStats_PerfectPounceAll"
+	{
+		"en"		"{olive}%s{default} landed a perfect pounce on {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 对 {olive}%s{default} 完成完美飞扑，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 對 {olive}%s{default} 完成完美飛撲，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} へ完璧な飛びかかりを決め、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}에게 완벽한 폰스를 성공하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} vồ hoàn hảo vào {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_NicePounceSelf"
+	{
+		"en"		"Nice pounce on {olive}%s{default}! You earned {green}%i{default} points."
+		"chi"		"漂亮的飞扑 {olive}%s{default}!你获得 {green}%i{default} 分。"
+		"zho"		"漂亮的飛撲 {olive}%s{default}!你獲得 {green}%i{default} 分。"
+		"jp"		"{olive}%s{default} へ見事な飛びかかり! {green}%i{default} ポイント獲得。"
+		"ko"		"{olive}%s{default}에게 멋진 폰스! {green}%i{default}점을 획득했습니다."
+		"vi"		"Cú vồ đẹp mắt vào {olive}%s{default}! Bạn nhận {green}%i{default} điểm."
+	}
+	"L4DStats_NicePounceAll"
+	{
+		"en"		"{olive}%s{default} landed a nice pounce on {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 对 {olive}%s{default} 完成了漂亮的飞扑，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 對 {olive}%s{default} 完成了漂亮的飛撲，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} へ見事な飛びかかりを決め、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}에게 멋진 폰스를 성공하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} vồ đẹp mắt vào {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CurrentMapTime"
+	{
+		"en"		"Current map time: {green}%s"
+		"chi"		"当前地图时间: {green}%s"
+		"zho"		"目前地圖時間: {green}%s"
+		"jp"		"現在のマップタイム: {green}%s"
+		"ko"		"현재 맵 시간: {green}%s"
+		"vi"		"Thời gian bản đồ hiện tại: {green}%s"
+	}
+	"L4DStats_QuarterRankingLeft"
+	{
+		"en"		"You have left the {olive}%s{default} ranking."
+		"chi"		"你已离开 {olive}%s{default} 排行榜。"
+		"zho"		"你已離開 {olive}%s{default} 排行榜。"
+		"jp"		"{olive}%s{default} ランキングから外れました。"
+		"ko"		"{olive}%s{default} 랭킹에서 벗어났습니다."
+		"vi"		"Bạn đã rời khỏi bảng xếp hạng {olive}%s{default}."
+	}
+	"L4DStats_QuarterRankingEntered"
+	{
+		"en"		"You entered the {olive}%s{default} ranking at {green}%i{default} with {green}%i{default} points."
+		"chi"		"你进入了 {olive}%s{default} 排行榜!当前季度排名 {green}%i{default}，季度分数 {green}%i{default}。"
+		"zho"		"你進入了 {olive}%s{default} 排行榜!目前季度排名 {green}%i{default}，季度分數 {green}%i{default}。"
+		"jp"		"{olive}%s{default} ランキングに入りました: {green}%i{default}位、{green}%i{default}ポイント。"
+		"ko"		"{olive}%s{default} 랭킹에 진입했습니다: {green}%i{default}등, {green}%i{default}점."
+		"vi"		"Bạn đã vào bảng {olive}%s{default} ở hạng {green}%i{default} với {green}%i{default} điểm."
+	}
+	"L4DStats_PlayerJoinedOverallRanked"
+	{
+		"en"		"Player {olive}%s{default} joined! (Overall: {lightgreen}%i/%i{default}, points: {lightgreen}%i{default})"
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（总榜: {lightgreen}%i/%i{default}，总分: {lightgreen}%i{default}）"
+		"zho"		"玩家 {olive}%s{default} 進入遊戲!（總榜: {lightgreen}%i/%i{default}，總分: {lightgreen}%i{default}）"
+		"jp"		"プレイヤー {olive}%s{default} が参加!（総合: {lightgreen}%i/%i{default}、ポイント: {lightgreen}%i{default}）"
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (전체: {lightgreen}%i/%i{default}, 점수: {lightgreen}%i{default})"
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Tổng: {lightgreen}%i/%i{default}, điểm: {lightgreen}%i{default})"
+	}
+	"L4DStats_PlayerJoinedOverallUnranked"
+	{
+		"en"		"Player {olive}%s{default} joined! (Not on the overall ranking)"
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（总榜未上榜）"
+		"zho"		"玩家 {olive}%s{default} 進入遊戲!（總榜未上榜）"
+		"jp"		"プレイヤー {olive}%s{default} が参加!（総合ランク外）"
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (전체 랭킹 외)"
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Chưa có trong bảng tổng)"
+	}
+	"L4DStats_CurrentQuarterRanked"
+	{
+		"en"		"Current {olive}%s{default}: rank {lightgreen}%i/%i{default}, points {lightgreen}%i{default}"
+		"chi"		"当前 {olive}%s{default}: 季度排名 {lightgreen}%i/%i{default}，季度分 {lightgreen}%i{default}"
+		"zho"		"目前 {olive}%s{default}: 季度排名 {lightgreen}%i/%i{default}，季度分 {lightgreen}%i{default}"
+		"jp"		"現在の {olive}%s{default}: {lightgreen}%i/%i{default}位、{lightgreen}%i{default}ポイント"
+		"ko"		"현재 {olive}%s{default}: {lightgreen}%i/%i{default}등, {lightgreen}%i{default}점"
+		"vi"		"{olive}%s{default} hiện tại: hạng {lightgreen}%i/%i{default}, {lightgreen}%i{default} điểm"
+	}
+	"L4DStats_CurrentQuarterUnranked"
+	{
+		"en"		"Current {olive}%s{default}: not ranked"
+		"chi"		"当前 {olive}%s{default}: 季度未上榜"
+		"zho"		"目前 {olive}%s{default}: 季度未上榜"
+		"jp"		"現在の {olive}%s{default}: ランク外"
+		"ko"		"현재 {olive}%s{default}: 순위 없음"
+		"vi"		"{olive}%s{default} hiện tại: chưa xếp hạng"
+	}
+	"L4DStats_PlayerJoinedModeRanked"
+	{
+		"en"		"Player {olive}%s{default} joined! (Rank: {lightgreen}%i{default}, points: {lightgreen}%i{default})"
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（排名: {lightgreen}%i{default} / 分数: {lightgreen}%i{default}）"
+		"zho"		"玩家 {olive}%s{default} 進入遊戲!（排名: {lightgreen}%i{default} / 分數: {lightgreen}%i{default}）"
+		"jp"		"プレイヤー {olive}%s{default} が参加!（{lightgreen}%i{default}位 / {lightgreen}%i{default}ポイント）"
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! ({lightgreen}%i{default}등 / {lightgreen}%i{default}점)"
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Hạng: {lightgreen}%i{default} / điểm: {lightgreen}%i{default})"
+	}
+	"L4DStats_PlayerJoinedModeUnranked"
+	{
+		"en"		"Player {olive}%s{default} joined! (Not ranked)"
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（未进入排行榜）"
+		"zho"		"玩家 {olive}%s{default} 進入遊戲!（未進入排行榜）"
+		"jp"		"プレイヤー {olive}%s{default} が参加!（ランク外）"
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (순위 없음)"
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Chưa xếp hạng)"
+	}
+	"L4DStats_QuarterRankingUnavailable"
+	{
+		"en"		"Quarterly rankings are currently unavailable. Please try again later."
+		"chi"		"季度榜单当前不可用，请稍后再试。"
+		"zho"		"季度榜單目前不可用，請稍後再試。"
+		"jp"		"四半期ランキングは現在利用できません。後で再試行してください。"
+		"ko"		"분기 랭킹을 현재 사용할 수 없습니다. 나중에 다시 시도하세요."
+		"vi"		"Bảng xếp hạng quý hiện không khả dụng. Vui lòng thử lại sau."
+	}
+	"L4DStats_QuarterRankingQueryFailed"
+	{
+		"en"		"Quarterly ranking query failed. Please try again later."
+		"chi"		"季度榜单查询失败，请稍后再试。"
+		"zho"		"季度榜單查詢失敗，請稍後再試。"
+		"jp"		"四半期ランキングの取得に失敗しました。後で再試行してください。"
+		"ko"		"분기 랭킹 조회에 실패했습니다. 나중에 다시 시도하세요."
+		"vi"		"Truy vấn bảng xếp hạng quý thất bại. Vui lòng thử lại sau."
+	}
+	"L4DStats_PlayerJoinedSurvivors"
+	{
+		"en"		"{olive}%s{default} joined the {lightgreen}Survivors{default}!"
+		"chi"		"{olive}%s{default} 加入了 {lightgreen}幸存者{default} 阵营!"
+		"zho"		"{olive}%s{default} 加入了 {lightgreen}生還者{default} 陣營!"
+		"jp"		"{olive}%s{default} が {lightgreen}生存者{default} チームに参加!"
+		"ko"		"{olive}%s{default}님이 {lightgreen}생존자{default} 팀에 합류했습니다!"
+		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Người sống sót{default}!"
+	}
+	"L4DStats_PlayerJoinedInfected"
+	{
+		"en"		"{olive}%s{default} joined the {lightgreen}Infected{default}!"
+		"chi"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 阵营!"
+		"zho"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 陣營!"
+		"jp"		"{olive}%s{default} が {lightgreen}感染者{default} チームに参加!"
+		"ko"		"{olive}%s{default}님이 {lightgreen}감염자{default} 팀에 합류했습니다!"
+		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Nhiễm bệnh{default}!"
+	}
+	"L4DStats_AllPlayerStatsCleared"
+	{
+		"en"		"All player statistics cleared!"
+		"chi"		"已清除所有玩家统计!"
+		"zho"		"已清除所有玩家統計!"
+		"jp"		"すべてのプレイヤー統計を消去しました!"
+		"ko"		"모든 플레이어 통계를 삭제했습니다!"
+		"vi"		"Đã xóa toàn bộ thống kê người chơi!"
+	}
+	"L4DStats_AllMapStatsCleared"
+	{
+		"en"		"All map statistics cleared!"
+		"chi"		"已清除所有地图统计!"
+		"zho"		"已清除所有地圖統計!"
+		"jp"		"すべてのマップ統計を消去しました!"
+		"ko"		"모든 맵 통계를 삭제했습니다!"
+		"vi"		"Đã xóa toàn bộ thống kê bản đồ!"
+	}
+	"L4DStats_AllStatsCleared"
+	{
+		"en"		"All statistics cleared!"
+		"chi"		"已清除所有统计!"
+		"zho"		"已清除所有統計!"
+		"jp"		"すべての統計を消去しました!"
+		"ko"		"모든 통계를 삭제했습니다!"
+		"vi"		"Đã xóa toàn bộ thống kê!"
+	}
+	"L4DStats_PlayerCleaningSuccess"
+	{
+		"en"		"Inactive players cleaned successfully!"
+		"chi"		"不活跃玩家清理成功!"
+		"zho"		"不活躍玩家清理成功!"
+		"jp"		"非アクティブなプレイヤーを削除しました!"
+		"ko"		"비활성 플레이어를 정리했습니다!"
+		"vi"		"Đã dọn người chơi không hoạt động!"
+	}
+	"L4DStats_PlayerCleaningFailed"
+	{
+		"en"		"Player cleaning failed!"
+		"chi"		"玩家清理失败!"
+		"zho"		"玩家清理失敗!"
+		"jp"		"プレイヤーの削除に失敗しました!"
+		"ko"		"플레이어 정리에 실패했습니다!"
+		"vi"		"Dọn người chơi thất bại!"
+	}
+	"L4DStats_PlayerCleaningDisabled"
+	{
+		"en"		"Player cleaning is disabled by configuration!"
+		"chi"		"配置已禁用玩家清理!"
+		"zho"		"設定已停用玩家清理!"
+		"jp"		"設定によりプレイヤーの削除が無効です!"
+		"ko"		"설정에서 플레이어 정리가 비활성화되었습니다!"
+		"vi"		"Tính năng dọn người chơi bị tắt trong cấu hình!"
+	}
+	"L4DStats_CustomMapsRemoved"
+	{
+		"en"		"All custom maps removed!"
+		"chi"		"已移除所有自定义地图!"
+		"zho"		"已移除所有自訂地圖!"
+		"jp"		"すべてのカスタムマップを削除しました!"
+		"ko"		"모든 커스텀 맵을 제거했습니다!"
+		"vi"		"Đã xóa tất cả bản đồ tùy chỉnh!"
+	}
+	"L4DStats_CustomMapsRemoveFailed"
+	{
+		"en"		"Removing custom maps failed!"
+		"chi"		"移除自定义地图失败!"
+		"zho"		"移除自訂地圖失敗!"
+		"jp"		"カスタムマップの削除に失敗しました!"
+		"ko"		"커스텀 맵 제거에 실패했습니다!"
+		"vi"		"Xóa bản đồ tùy chỉnh thất bại!"
+	}
+	"L4DStats_AllMapTimesRemoved"
+	{
+		"en"		"All map times removed!"
+		"chi"		"已移除所有地图时间记录!"
+		"zho"		"已移除所有地圖時間紀錄!"
+		"jp"		"すべてのマップタイムを削除しました!"
+		"ko"		"모든 맵 시간을 제거했습니다!"
+		"vi"		"Đã xóa toàn bộ thời gian bản đồ!"
+	}
+	"L4DStats_MapTimesRemoveFailed"
+	{
+		"en"		"Removing map times failed!"
+		"chi"		"移除地图时间记录失败!"
+		"zho"		"移除地圖時間紀錄失敗!"
+		"jp"		"マップタイムの削除に失敗しました!"
+		"ko"		"맵 시간 제거에 실패했습니다!"
+		"vi"		"Xóa thời gian bản đồ thất bại!"
+	}
+	"L4DStats_CoopMapTimesClearSuccess"
+	{
+		"en"		"Coop map times cleared!"
+		"chi"		"合作模式地图时间已清除!"
+		"zho"		"合作模式地圖時間已清除!"
+		"jp"		"協力モードのマップタイムを消去しました!"
+		"ko"		"협동 모드 맵 시간을 삭제했습니다!"
+		"vi"		"Đã xóa thời gian bản đồ Coop!"
+	}
+	"L4DStats_CoopMapTimesClearFailed"
+	{
+		"en"		"Clearing Coop map times failed!"
+		"chi"		"清除合作模式地图时间失败!"
+		"zho"		"清除合作模式地圖時間失敗!"
+		"jp"		"協力モードのマップタイム消去に失敗!"
+		"ko"		"협동 모드 맵 시간 삭제 실패!"
+		"vi"		"Xóa thời gian bản đồ Coop thất bại!"
+	}
+	"L4DStats_SurvivalMapTimesClearSuccess"
+	{
+		"en"		"Survival map times cleared!"
+		"chi"		"生存模式地图时间已清除!"
+		"zho"		"生存模式地圖時間已清除!"
+		"jp"		"サバイバルのマップタイムを消去しました!"
+		"ko"		"생존 모드 맵 시간을 삭제했습니다!"
+		"vi"		"Đã xóa thời gian bản đồ Survival!"
+	}
+	"L4DStats_SurvivalMapTimesClearFailed"
+	{
+		"en"		"Clearing Survival map times failed!"
+		"chi"		"清除生存模式地图时间失败!"
+		"zho"		"清除生存模式地圖時間失敗!"
+		"jp"		"サバイバルのマップタイム消去に失敗!"
+		"ko"		"생존 모드 맵 시간 삭제 실패!"
+		"vi"		"Xóa thời gian bản đồ Survival thất bại!"
+	}
+	"L4DStats_RealismMapTimesClearSuccess"
+	{
+		"en"		"Realism map times cleared!"
+		"chi"		"写实模式地图时间已清除!"
+		"zho"		"寫實模式地圖時間已清除!"
+		"jp"		"リアリズムのマップタイムを消去しました!"
+		"ko"		"리얼리즘 모드 맵 시간을 삭제했습니다!"
+		"vi"		"Đã xóa thời gian bản đồ Realism!"
+	}
+	"L4DStats_RealismMapTimesClearFailed"
+	{
+		"en"		"Clearing Realism map times failed!"
+		"chi"		"清除写实模式地图时间失败!"
+		"zho"		"清除寫實模式地圖時間失敗!"
+		"jp"		"リアリズムのマップタイム消去に失敗!"
+		"ko"		"리얼리즘 모드 맵 시간 삭제 실패!"
+		"vi"		"Xóa thời gian bản đồ Realism thất bại!"
+	}
+	"L4DStats_MutationMapTimesClearSuccess"
+	{
+		"en"		"Mutation map times cleared!"
+		"chi"		"过往之役模式地图时间已清除!"
+		"zho"		"過往之役模式地圖時間已清除!"
+		"jp"		"ミューテーションのマップタイムを消去しました!"
+		"ko"		"변이 모드 맵 시간을 삭제했습니다!"
+		"vi"		"Đã xóa thời gian bản đồ Mutation!"
+	}
+	"L4DStats_MutationMapTimesClearFailed"
+	{
+		"en"		"Clearing Mutation map times failed!"
+		"chi"		"清除过往之役模式地图时间失败!"
+		"zho"		"清除過往之役模式地圖時間失敗!"
+		"jp"		"ミューテーションのマップタイム消去に失敗!"
+		"ko"		"변이 모드 맵 시간 삭제 실패!"
+		"vi"		"Xóa thời gian bản đồ Mutation thất bại!"
+	}
+	"L4DStats_OwnStatsCleared"
+	{
+		"en"		"Your play statistics have been cleared!"
+		"chi"		"你的游玩记录已被清除!"
+		"zho"		"你的遊玩紀錄已被清除!"
+		"jp"		"あなたのプレイ統計が消去されました!"
+		"ko"		"플레이 통계가 삭제되었습니다!"
+		"vi"		"Thống kê chơi của bạn đã bị xóa!"
+	}
+	"L4DStats_PlayerStatsCleared"
+	{
+		"en"		"Cleared play statistics for {olive}%s{default}!"
+		"chi"		"玩家 {olive}%s{default} 的游玩记录已清除!"
+		"zho"		"玩家 {olive}%s{default} 的遊玩紀錄已清除!"
+		"jp"		"{olive}%s{default} のプレイ統計を消去しました!"
+		"ko"		"{olive}%s{default}님의 플레이 통계를 삭제했습니다!"
+		"vi"		"Đã xóa thống kê chơi của {olive}%s{default}!"
+	}
+	"L4DStats_PlayerStatsClearFailed"
+	{
+		"en"		"Clearing player play statistics failed!"
+		"chi"		"清除玩家游玩记录失败!"
+		"zho"		"清除玩家遊玩紀錄失敗!"
+		"jp"		"プレイヤーのプレイ統計消去に失敗!"
+		"ko"		"플레이어 플레이 통계 삭제 실패!"
+		"vi"		"Xóa thống kê chơi thất bại!"
+	}
+	"L4DStats_RankVoteSettingsFailed"
+	{
+		"en"		"{green}Rank voting{default} is {lightgreen}disabled{default}: plugin setup failed."
+		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}: 插件设置失败。"
+		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}: 插件設定失敗。"
+		"jp"		"プラグイン設定に失敗したため、{green}ランク投票{default}は{lightgreen}無効{default}です。"
+		"ko"		"플러그인 설정 실패로 {green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã {lightgreen}tắt{default}: thiết lập plugin thất bại."
+	}
+	"L4DStats_RankVoteDisabledChat"
+	{
+		"en"		"{green}Rank voting{default} is {lightgreen}disabled{default}."
+		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}。"
+		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}。"
+		"jp"		"{green}ランク投票{default}は{lightgreen}無効{default}です。"
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đang {lightgreen}tắt{default}."
+	}
+	"L4DStats_RankVoteSpectatorDenied"
+	{
+		"en"		"Spectators cannot start a {green}rank vote{default}."
+		"chi"		"观众无法发起 {green}Rank 投票{default}。"
+		"zho"		"觀眾無法發起 {green}Rank 投票{default}。"
+		"jp"		"観戦者は {green}ランク投票{default} を開始できません。"
+		"ko"		"관전자는 {green}랭킹 투표{default}를 시작할 수 없습니다."
+		"vi"		"Khán giả không thể bắt đầu {green}bỏ phiếu xếp hạng{default}."
+	}
+	"L4DStats_NotImplemented"
+	{
+		"en"		"{olive}Not implemented yet."
+		"chi"		"{olive}此功能尚未实现。"
+		"zho"		"{olive}此功能尚未實作。"
+		"jp"		"{olive}まだ実装されていません。"
+		"ko"		"{olive}아직 구현되지 않았습니다."
+		"vi"		"{olive}Chưa được triển khai."
+	}
+	"L4DStats_RankVoteProgress"
+	{
+		"en"		"{olive}%s{default} voted. {green}%i/%i{default} players have voted."
+		"chi"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
+		"zho"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
+		"jp"		"{olive}%s{default} が投票しました。{green}%i/%i{default}人が投票済みです。"
+		"ko"		"{olive}%s{default}님이 투표했습니다. {green}%i/%i{default}명이 투표했습니다."
+		"vi"		"{olive}%s{default} đã bỏ phiếu. {green}%i/%i{default} người đã bỏ phiếu."
+	}
+	"L4DStats_RankVotePluginDisabledChat"
+	{
+		"en"		"Cannot start a rank vote while the plugin is disabled!"
+		"chi"		"插件已关闭，无法发起 Rank 投票!"
+		"zho"		"插件已關閉，無法發起 Rank 投票!"
+		"jp"		"プラグインが無効のためランク投票を開始できません!"
+		"ko"		"플러그인이 비활성화되어 랭킹 투표를 시작할 수 없습니다!"
+		"vi"		"Không thể bắt đầu bỏ phiếu khi plugin đang tắt!"
+	}
+	"L4DStats_RankVoteVersusOnly"
+	{
+		"en"		"{green}Rank voting{default} is enabled in {lightgreen}Versus{default} mode!"
+		"chi"		"{green}Rank 投票{default}已在 {lightgreen}对抗{default} 模式中启用!"
+		"zho"		"{green}Rank 投票{default}已在 {lightgreen}對抗{default} 模式中啟用!"
+		"jp"		"{green}ランク投票{default}は {lightgreen}対戦{default} モードで有効です!"
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default} 모드에서 활성화됩니다!"
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong chế độ {lightgreen}Versus{default}!"
+	}
+	"L4DStats_RankVoteCompetitiveModes"
+	{
+		"en"		"{green}Rank voting{default} is enabled in {lightgreen}Versus{default}, {lightgreen}Realism Versus{default}, and {lightgreen}Scavenge{default}!"
+		"chi"		"{green}Rank 投票{default}已在{lightgreen}对抗{default}、{lightgreen}写实对抗{default}和{lightgreen}清道夫{default}模式中启用!"
+		"zho"		"{green}Rank 投票{default}已在{lightgreen}對抗{default}、{lightgreen}寫實對抗{default}和{lightgreen}清道夫{default}模式中啟用!"
+		"jp"		"{green}ランク投票{default}は{lightgreen}対戦{default}、{lightgreen}リアリズム対戦{default}、{lightgreen}スカベンジ{default}で有効です!"
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default}, {lightgreen}리얼리즘 대전{default}, {lightgreen}스캐빈지{default} 모드에서 활성화됩니다!"
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong {lightgreen}Versus{default}, {lightgreen}Realism Versus{default} và {lightgreen}Scavenge{default}!"
+	}
+	"L4DStats_RankVoteOncePerMap"
+	{
+		"en"		"You can start a {green}rank vote{default} only once per map!"
+		"chi"		"每张地图只能发起一次 {green}Rank 投票{default}!"
+		"zho"		"每張地圖只能發起一次 {green}Rank 投票{default}!"
+		"jp"		"{green}ランク投票{default}は各マップ1回だけ開始できます!"
+		"ko"		"{green}랭킹 투표{default}는 맵당 한 번만 시작할 수 있습니다!"
+		"vi"		"Bạn chỉ có thể bắt đầu {green}bỏ phiếu xếp hạng{default} một lần mỗi bản đồ!"
+	}
+	"L4DStats_RankVoteInitiated"
+	{
+		"en"		"{green}Rank voting{default} was started by {olive}%s{default}!"
+		"chi"		"{olive}%s{default} 发起了 {green}Rank 投票{default}!"
+		"zho"		"{olive}%s{default} 發起了 {green}Rank 投票{default}!"
+		"jp"		"{olive}%s{default} が {green}ランク投票{default} を開始しました!"
+		"ko"		"{olive}%s{default}님이 {green}랭킹 투표{default}를 시작했습니다!"
+		"vi"		"{olive}%s{default} đã bắt đầu {green}bỏ phiếu xếp hạng{default}!"
+	}
+	"L4DStats_RankVoteInitiatedConsole"
+	{
+		"en"		"{green}Rank voting{default} was started from the server console!"
+		"chi"		"服务器控制台发起了 {green}Rank 投票{default}!"
+		"zho"		"伺服器控制台發起了 {green}Rank 投票{default}!"
+		"jp"		"サーバーコンソールから {green}ランク投票{default} が開始されました!"
+		"ko"		"서버 콘솔에서 {green}랭킹 투표{default}를 시작했습니다!"
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã được bắt đầu từ bảng điều khiển máy chủ!"
+	}
+	"L4DStats_TeamShuffleAdminExecuted"
+	{
+		"en"		"Team shuffle was started by an administrator."
+		"chi"		"管理员已执行队伍随机重组。"
+		"zho"		"管理員已執行隊伍隨機重組。"
+		"jp"		"管理者がチームシャッフルを実行しました。"
+		"ko"		"관리자가 팀 섞기를 실행했습니다."
+		"vi"		"Quản trị viên đã xáo trộn đội."
+	}
+	"L4DStats_TeamShuffleFailed"
+	{
+		"en"		"Team shuffle failed due to an error."
+		"chi"		"队伍随机重组因错误失败。"
+		"zho"		"隊伍隨機重組因錯誤失敗。"
+		"jp"		"エラーによりチームシャッフルに失敗しました。"
+		"ko"		"오류로 팀 섞기에 실패했습니다."
+		"vi"		"Xáo trộn đội thất bại do lỗi."
+	}
+	"L4DStats_TeamShuffleDone"
+	{
+		"en"		"Team shuffle by player PPM {lightgreen}complete{default}."
+		"chi"		"按玩家 PPM 随机重组队伍{lightgreen}完成{default}。"
+		"zho"		"按玩家 PPM 隨機重組隊伍{lightgreen}完成{default}。"
+		"jp"		"プレイヤーPPMによるチームシャッフルが{lightgreen}完了{default}しました。"
+		"ko"		"플레이어 PPM 기준 팀 섞기가 {lightgreen}완료{default}되었습니다."
+		"vi"		"Xáo trộn đội theo PPM người chơi đã {lightgreen}hoàn tất{default}."
+	}
+	"L4DStats_TeamsAlreadyEven"
+	{
+		"en"		"Teams are already balanced by player PPM."
+		"chi"		"队伍已按玩家 PPM 达到平衡。"
+		"zho"		"隊伍已按玩家 PPM 達到平衡。"
+		"jp"		"チームはすでにプレイヤーPPMで均等です。"
+		"ko"		"팀이 이미 플레이어 PPM 기준으로 균형 잡혀 있습니다."
+		"vi"		"Các đội đã cân bằng theo PPM người chơi."
+	}
+	"L4DStats_TeamShuffleNotEnoughPlayers"
+	{
+		"en"		"Team shuffle failed: {lightgreen}not enough players{default}!"
+		"chi"		"队伍随机重组失败: {lightgreen}玩家不足{default}!"
+		"zho"		"隊伍隨機重組失敗: {lightgreen}玩家不足{default}!"
+		"jp"		"チームシャッフルに失敗: {lightgreen}プレイヤーが足りません{default}!"
+		"ko"		"팀 섞기 실패: {lightgreen}플레이어 부족{default}!"
+		"vi"		"Xáo trộn đội thất bại: {lightgreen}không đủ người chơi{default}!"
+	}
+	"L4DStats_RankDisabledNotEnoughPlayers"
+	{
+		"en"		"The ranking system is now {green}disabled{default}: not enough players!"
+		"chi"		"没有足够玩家，排名系统现已{green}关闭{default}!"
+		"zho"		"沒有足夠玩家，排名系統現已{green}關閉{default}!"
+		"jp"		"プレイヤー不足のためランキングシステムが{green}無効{default}になりました!"
+		"ko"		"플레이어가 부족하여 랭킹 시스템이 {green}비활성화{default}되었습니다!"
+		"vi"		"Hệ thống xếp hạng đã {green}tắt{default}: không đủ người chơi!"
+	}
+	"L4DStats_MapTimeInvalidSettings"
+	{
+		"en"		"This result is {green}invalid{default} due to a difficulty change, advanced bots, or administrator features; the map time will not be recorded!"
+		"chi"		"此次结果因修改难度、开启高级人机或使用管理员功能而{green}无效{default}，不记录地图时间!"
+		"zho"		"此次結果因修改難度、啟用高級電腦玩家或使用管理員功能而{green}無效{default}，不記錄地圖時間!"
+		"jp"		"難易度の変更、高度なBot、または管理機能の使用により結果は{green}無効{default}で、マップタイムは記録されません!"
+		"ko"		"난이도 변경, 고급 봇 또는 관리자 기능 사용으로 결과가 {green}무효{default}하여 맵 시간을 기록하지 않습니다!"
+		"vi"		"Kết quả {green}không hợp lệ{default} do đổi độ khó, bot nâng cao hoặc tính năng quản trị; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeInvalidBunnyHop"
+	{
+		"en"		"This result is {green}invalid{default} because Tank bunny hopping is disabled; the map time will not be recorded!"
+		"chi"		"此次结果因关闭 Tank 连跳而{green}无效{default}，不记录地图时间!"
+		"zho"		"此次結果因關閉 Tank 連跳而{green}無效{default}，不記錄地圖時間!"
+		"jp"		"Tankのバニーホップが無効のため結果は{green}無効{default}で、マップタイムは記録されません!"
+		"ko"		"Tank 버니합이 비활성화되어 결과가 {green}무효{default}하며 맵 시간을 기록하지 않습니다!"
+		"vi"		"Kết quả {green}không hợp lệ{default} vì Tank bunny hop bị tắt; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeInvalidMultiplayerMode"
+	{
+		"en"		"Multiplayer movement mode is enabled; the map time will not be recorded!"
+		"chi"		"已启用多人运动模式，不记录地图时间!"
+		"zho"		"已啟用多人運動模式，不記錄地圖時間!"
+		"jp"		"マルチプレイヤー移動モードが有効のため、マップタイムは記録されません!"
+		"ko"		"멀티플레이어 이동 모드가 활성화되어 맵 시간을 기록하지 않습니다!"
+		"vi"		"Chế độ di chuyển nhiều người đang bật; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeTooShortNoReward"
+	{
+		"en"		"The recorded time is under 30 seconds and appears invalid; no points awarded!"
+		"chi"		"记录时间小于 30 秒，数据可能有误，不奖励分数!"
+		"zho"		"記錄時間小於 30 秒，資料可能有誤，不獎勵分數!"
+		"jp"		"記録が30秒未満で無効と思われるため、ポイントは付与されません!"
+		"ko"		"기록 시간이 30초 미만이어서 잘못된 데이터로 보이며 점수가 지급되지 않습니다!"
+		"vi"		"Thời gian ghi nhận dưới 30 giây và có vẻ không hợp lệ; không trao điểm!"
+	}
+	"L4DStats_MapTimeTooShortNotRecorded"
+	{
+		"en"		"The time is under 30 seconds and appears invalid; this run will not be recorded!"
+		"chi"		"时间小于 30 秒，数据可能有误，此次成绩不予记录!"
+		"zho"		"時間小於 30 秒，資料可能有誤，此次成績不予記錄!"
+		"jp"		"タイムが30秒未満で無効と思われるため、このランは記録されません!"
+		"ko"		"시간이 30초 미만이어서 잘못된 데이터로 보이며 이 기록은 저장되지 않습니다!"
+		"vi"		"Thời gian dưới 30 giây và có vẻ không hợp lệ; lượt này sẽ không được ghi!"
+	}
+	"L4DStats_NoFastestTimeYet"
+	{
+		"en"		"There is no fastest time for this mode and difficulty yet. Set the first record!"
+		"chi"		"当前模式和难度还没有最快记录，快来挑战吧!"
+		"zho"		"目前模式和難度還沒有最快紀錄，快來挑戰吧!"
+		"jp"		"このモードと難易度にはまだ最速記録がありません。最初の記録を作りましょう!"
+		"ko"		"이 모드와 난이도에는 아직 최단 기록이 없습니다. 첫 기록을 세우세요!"
+		"vi"		"Chưa có thời gian nhanh nhất cho chế độ và độ khó này. Hãy lập kỷ lục đầu tiên!"
+	}
+	"L4DStats_MapRecordNotImprovedAnne"
+	{
+		"en"		"The Anne%s difficulty record of {green}%s{default} was not improved. Better luck next time!"
+		"chi"		"这张图 Anne%s 版本该难度的最快时间 {green}%s{default} 未被刷新，下次继续努力!"
+		"zho"		"這張圖 Anne%s 版本該難度的最快時間 {green}%s{default} 未被刷新，下次繼續努力!"
+		"jp"		"Anne%sのこの難易度の記録 {green}%s{default} は更新されませんでした。次回も挑戦しましょう!"
+		"ko"		"Anne%s 해당 난이도 기록 {green}%s{default}을 갱신하지 못했습니다. 다음에 다시 도전하세요!"
+		"vi"		"Kỷ lục độ khó Anne%s là {green}%s{default} chưa bị phá. Hãy thử lại lần sau!"
+	}
+	"L4DStats_MapRecordNotImproved"
+	{
+		"en"		"The fastest time of {green}%s{default} was not improved. Better luck next time!"
+		"chi"		"这张图的最快时间 {green}%s{default} 未被刷新，下次继续努力!"
+		"zho"		"這張圖的最快時間 {green}%s{default} 未被刷新，下次繼續努力!"
+		"jp"		"最速記録 {green}%s{default} は更新されませんでした。次回も挑戦しましょう!"
+		"ko"		"최단 기록 {green}%s{default}을 갱신하지 못했습니다. 다음에 다시 도전하세요!"
+		"vi"		"Thời gian nhanh nhất {green}%s{default} chưa bị phá. Hãy thử lại lần sau!"
+	}
+	"L4DStats_MapCompletionTime"
+	{
+		"en"		"You completed this map in {green}%s{default}!"
+		"chi"		"你花费了 {green}%s{default} 完成这张地图!"
+		"zho"		"你花費了 {green}%s{default} 完成這張地圖!"
+		"jp"		"{green}%s{default} でこのマップをクリアしました!"
+		"ko"		"{green}%s{default} 만에 이 맵을 클리어했습니다!"
+		"vi"		"Bạn đã hoàn thành bản đồ trong {green}%s{default}!"
+	}
+	"L4DStats_NoBuyBonusAdvancedBotsDisabled"
+	{
+		"en"		"No-buy bonus is unavailable because advanced bots are enabled."
+		"chi"		"由于开启了高级人机，无法获得额外过关积分。"
+		"zho"		"由於啟用了高級電腦玩家，無法獲得額外過關積分。"
+		"jp"		"高度なBotが有効のため、無購入ボーナスは得られません。"
+		"ko"		"고급 봇이 활성화되어 미구매 보너스를 받을 수 없습니다."
+		"vi"		"Không có thưởng không mua đồ vì bot nâng cao đang bật."
+	}
+	"L4DStats_NoBuyBonusBunnyHopDisabled"
+	{
+		"en"		"No-buy bonus is unavailable because Tank bunny hopping is disabled."
+		"chi"		"由于关闭了 Tank 连跳，无法获得额外过关积分。"
+		"zho"		"由於關閉了 Tank 連跳，無法獲得額外過關積分。"
+		"jp"		"Tankのバニーホップが無効のため、無購入ボーナスは得られません。"
+		"ko"		"Tank 버니합이 비활성화되어 미구매 보너스를 받을 수 없습니다."
+		"vi"		"Không có thưởng không mua đồ vì Tank bunny hop bị tắt."
+	}
+	"L4DStats_NoBuyBonusAwarded"
+	{
+		"en"		"The survivors completed the map without purchases and earned {green}%d{default} bonus points!"
+		"chi"		"幸存者未购买任何物品完成关卡，获得 {green}%d{default} 额外过关积分!"
+		"zho"		"生還者未購買任何物品完成關卡，獲得 {green}%d{default} 額外過關積分!"
+		"jp"		"生存者は購入なしでマップをクリアし、{green}%d{default} ボーナスポイントを獲得!"
+		"ko"		"생존자가 구매 없이 맵을 클리어하여 {green}%d{default}점의 보너스를 획득했습니다!"
+		"vi"		"Người sống sót hoàn thành bản đồ mà không mua đồ và nhận {green}%d{default} điểm thưởng!"
+	}
+	"L4DStats_NewPlayerStatus"
+	{
+		"en"		"{lightgreen}You are considered a new player. Experienced survivors receive a {green}%.1fx{default} mentoring multiplier this round."
+		"chi"		"{lightgreen}你当前被判定为新人，本局非新人幸存者会获得 {green}%.1fx{default} 带新分数倍率。"
+		"zho"		"{lightgreen}你目前被判定為新人，本局非新人生還者會獲得 {green}%.1fx{default} 帶新分數倍率。"
+		"jp"		"{lightgreen}初心者と判定されました。このラウンドで経験者の生存者は {green}%.1fx{default} メンターボーナスを得ます。"
+		"ko"		"{lightgreen}신규 플레이어로 판정되었습니다. 이 라운드에서 기존 생존자는 {green}%.1fx{default} 멘토링 배율을 받습니다."
+		"vi"		"{lightgreen}Bạn được xem là người chơi mới. Người sống sót có kinh nghiệm nhận hệ số dìu dắt {green}%.1fx{default} trong vòng này."
+	}
+	"L4DStats_NewPlayerRoundSummary"
+	{
+		"en"		"{lightgreen}%i new player(s) detected; mentoring multiplier is {green}%.1fx{default}. New players do not receive it."
+		"chi"		"{lightgreen}本局检测到 {olive}%i{default} 名新人，带新系数为 {green}%.1fx{default}；新人本身不享受倍率。"
+		"zho"		"{lightgreen}本局偵測到 {olive}%i{default} 名新人，帶新係數為 {green}%.1fx{default}；新人本身不享受倍率。"
+		"jp"		"{lightgreen}初心者を%i人検出。メンター倍率は {green}%.1fx{default}。初心者には適用されません。"
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 멘토링 배율은 {green}%.1fx{default}이며 신규 플레이어에게는 적용되지 않습니다."
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới; hệ số dìu dắt là {green}%.1fx{default}. Người mới không nhận hệ số."
+	}
+	"L4DStats_TeamKillPenaltySelf"
+	{
+		"en"		"You team-killed {olive}%s{default} and lost {green}%i{default} points!"
+		"chi"		"你因误杀队友 {olive}%s{default} 失去 {green}%i{default} 分!"
+		"zho"		"你因誤殺隊友 {olive}%s{default} 失去 {green}%i{default} 分!"
+		"jp"		"チームメイト {olive}%s{default} をキルしたため {green}%i{default} ポイント失いました!"
+		"ko"		"팀원 {olive}%s{default}님을 팀킬하여 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Bạn giết đồng đội {olive}%s{default} và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_TeamKillPenaltyAll"
+	{
+		"en"		"{olive}%s{default} team-killed {olive}%s{default} and lost {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 因误杀队友 {olive}%s{default} 失去 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 因誤殺隊友 {olive}%s{default} 失去 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} はチームメイト {olive}%s{default} をキルしたため {green}%i{default} ポイント失いました!"
+		"ko"		"{olive}%s{default}님이 팀원 {olive}%s{default}님을 팀킬하여 {green}%i{default}점을 잃었습니다!"
+		"vi"		"{olive}%s{default} giết đồng đội {olive}%s{default} và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_HeadshotSpecialKillSelf"
+	{
+		"en"		"You headshot-killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你爆头杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你爆頭殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} をヘッドショットで倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 헤드샷으로 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn bắn vào đầu hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HeadshotSpecialKillAll"
+	{
+		"en"		"{olive}%s{default} headshot-killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 爆头杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 爆頭殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} をヘッドショットで倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 헤드샷으로 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} bắn vào đầu hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_SpecialKillSelf"
+	{
+		"en"		"You killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_SpecialKillAll"
+	{
+		"en"		"{olive}%s{default} killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_AdrenalineGivenSelf"
+	{
+		"en"		"You gave adrenaline to {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你赠送肾上腺素给 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你贈送腮上腺素給 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} にアドレナリンを渡し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님에게 아드레날린을 주어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đưa adrenaline cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_AdrenalineGivenAll"
+	{
+		"en"		"{olive}%s{default} gave adrenaline to {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 赠送肾上腺素给 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 贈送腮上腺素給 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} にアドレナリンを渡し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님에게 아드레날린을 주어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đưa adrenaline cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PillsGivenSelf"
+	{
+		"en"		"You gave pills to {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你赠送药丸给 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你贈送藥丸給 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} に鎮痛剤を渡し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님에게 진통제를 주어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đưa thuốc cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PillsGivenAll"
+	{
+		"en"		"{olive}%s{default} gave pills to {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 赠送药丸给 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 贈送藥丸給 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} に鎮痛剤を渡し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님에게 진통제를 주어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đưa thuốc cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DefibReviveSelf"
+	{
+		"en"		"You revived {olive}%s{default} with a defibrillator and earned {green}%i{default} points!"
+		"chi"		"你用电击器复活了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你用電擊器復活了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"除細動器で {olive}%s{default} を蘇生し、{green}%i{default} ポイント獲得!"
+		"ko"		"제세동기로 {olive}%s{default}님을 부활시켜 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn hồi sinh {olive}%s{default} bằng máy khử rung và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DefibReviveAll"
+	{
+		"en"		"{olive}%s{default} revived {olive}%s{default} with a defibrillator and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 用电击器复活了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 用電擊器復活了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が除細動器で {olive}%s{default} を蘇生し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 제세동기로 {olive}%s{default}님을 부활시켜 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} hồi sinh {olive}%s{default} bằng máy khử rung và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HealTeammateSelf"
+	{
+		"en"		"You healed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你用医疗包治疗了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你用醫療包治療了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を治療し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 치료하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn chữa trị {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HealTeammateAll"
+	{
+		"en"		"{olive}%s{default} healed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 用医疗包治疗了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 用醫療包治療了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を治療し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 치료하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} chữa trị {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TeamIncapPenaltySelf"
+	{
+		"en"		"You lost {green}%i{default} points for incapacitating {olive}%s{default}!"
+		"chi"		"你失去 {green}%i{default} 分，因为黑倒了 {olive}%s{default}!"
+		"zho"		"你失去 {green}%i{default} 分，因為黑倒了 {olive}%s{default}!"
+		"jp"		"{green}%i{default} ポイント失いました: {olive}%s{default} を行動不能にしました!"
+		"ko"		"{green}%i{default}점을 잃었습니다: {olive}%s{default}님을 행동 불능으로 만들었습니다!"
+		"vi"		"Bạn mất {green}%i{default} điểm vì hạ gục {olive}%s{default}!"
+	}
+	"L4DStats_TeamIncapPenaltyAll"
+	{
+		"en"		"{olive}%s{default} lost {green}%i{default} points for incapacitating {olive}%s{default}!"
+		"chi"		"{olive}%s{default} 失去 {green}%i{default} 分，因为黑倒了 {olive}%s{default}!"
+		"zho"		"{olive}%s{default} 失去 {green}%i{default} 分，因為黑倒了 {olive}%s{default}!"
+		"jp"		"{olive}%s{default} は {green}%i{default} ポイント失いました: {olive}%s{default} を行動不能にしました!"
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 잃었습니다: {olive}%s{default}님을 행동 불능으로 만들었습니다!"
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì hạ gục {olive}%s{default}!"
+	}
+	"L4DStats_LedgeHangSelf"
+	{
+		"en"		"You left {olive}%s{default} hanging from a ledge and earned {green}%i{default} points!"
+		"chi"		"你造成 {olive}%s{default} 挂边，获得 {green}%i{default} 分!"
+		"zho"		"你造成 {olive}%s{default} 掛邊，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を崖からぶら下がらせ、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 낭떠러지에 매달리게 하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn làm {olive}%s{default} treo mép và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_LedgeHangAll"
+	{
+		"en"		"{olive}%s{default} left {olive}%s{default} hanging from a ledge and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 造成 {olive}%s{default} 挂边，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 造成 {olive}%s{default} 掛邊，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を崖からぶら下がらせ、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 낭떠러지에 매달리게 하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} làm {olive}%s{default} treo mép và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_JockeySaveSelf"
+	{
+		"en"		"You saved {olive}%s{default} from {green}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+		"zho"		"你將 {olive}%s{default} 從 {green}%s{default} 手中救下，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_JockeySaveAll"
+	{
+		"en"		"{olive}%s{default} saved {olive}%s{default} from {green}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 將 {olive}%s{default} 從 {green}%s{default} 手中救下，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerSaveSelf"
+	{
+		"en"		"You saved {olive}%s{default} from {green}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+		"zho"		"你將 {olive}%s{default} 從 {green}%s{default} 手中救下，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerSaveAll"
+	{
+		"en"		"{olive}%s{default} saved {olive}%s{default} from {green}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 將 {olive}%s{default} 從 {green}%s{default} 手中救下，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_QuickChargerKillSelf"
+	{
+		"en"		"You quickly killed a Charger and earned {green}%i{default} points!"
+		"chi"		"你秒杀了 Charger，获得 {green}%i{default} 分!"
+		"zho"		"你秒殺了 Charger，獲得 {green}%i{default} 分!"
+		"jp"		"Chargerを素早く倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"Charger를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_QuickChargerKillAll"
+	{
+		"en"		"{olive}%s{default} quickly killed a Charger and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 秒杀了 Charger，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 秒殺了 Charger，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がChargerを素早く倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 Charger를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GasCanPouredSelf"
+	{
+		"en"		"You poured a gas can and earned {green}%i{default} points!"
+		"chi"		"你成功灌注一桶油，获得 {green}%i{default} 分!"
+		"zho"		"你成功灌注一桶油，獲得 {green}%i{default} 分!"
+		"jp"		"ガソリンを注ぎ、{green}%i{default} ポイント獲得!"
+		"ko"		"기름통을 부어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn đổ một can xăng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GasCanPouredAll"
+	{
+		"en"		"{olive}%s{default} poured a gas can and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 成功灌注一桶油，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 成功灌注一桶油，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がガソリンを注ぎ、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 기름통을 부어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} đổ một can xăng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ReviveTeammateSelf"
+	{
+		"en"		"You revived {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你拉起了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你拉起了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を助け起こし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 일으켜 세워 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn cứu dậy {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ReviveTeammateAll"
+	{
+		"en"		"{olive}%s{default} revived {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 拉起了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 拉起了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を助け起こし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 일으켜 세워 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} cứu dậy {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_RescueClosetSelf"
+	{
+		"en"		"You rescued {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你解救了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你解救了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 구출하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn giải cứu {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_RescueClosetAll"
+	{
+		"en"		"{olive}%s{default} rescued {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 解救了 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 解救了 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 구출하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} giải cứu {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FinaleSurvivorReward"
+	{
+		"en"		"With {olive}%i{default} survivor(s) completing the finale, all survivors earned {green}%i{default} points!"
+		"chi"		"因 {olive}%i{default} 名幸存者完成救援关，所有幸存者获得 {green}%i{default} 分!"
+		"zho"		"因 {olive}%i{default} 名生還者完成救援關，所有生還者獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%i{default}人の生存者がフィナーレをクリアし、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"생존자 {olive}%i{default}명이 피날레를 완료하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Với {olive}%i{default} người hoàn thành màn cuối, tất cả người sống sót nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FinaleInfectedPenalty"
+	{
+		"en"		"All infected lost {green}%i{default} points for failing to stop the survivors from completing the finale!"
+		"chi"		"所有感染者因未能阻止幸存者完成救援关，失去 {green}%i{default} 分!"
+		"zho"		"所有感染者因未能阻止生還者完成救援關，失去 {green}%i{default} 分!"
+		"jp"		"フィナーレを阻止できず、全感染者が {green}%i{default} ポイント失いました!"
+		"ko"		"생존자의 피날레 완료를 막지 못해 모든 감염자가 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Tất cả phe nhiễm mất {green}%i{default} điểm vì không ngăn được màn cuối!"
+	}
+	"L4DStats_HordeNoIncapReward"
+	{
+		"en"		"All survivors earned {green}%i{default} points for surviving the horde without an incapacitation or death!"
+		"chi"		"所有幸存者因在尸潮后无人倒地或死亡，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者因在屍潮後無人倒地或死亡，獲得 {green}%i{default} 分!"
+		"jp"		"ホード中に行動不能も死亡もなく、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"호드 이벤트에서 행동 불능이나 사망 없이 생존하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm vì qua đợt quân mà không ai gục ngã hay chết!"
+	}
+	"L4DStats_BoomerNoDeathReward"
+	{
+		"en"		"All survivors earned {green}%i{default} points because nobody died after the Boomer explosion!"
+		"chi"		"所有幸存者因 Boomer 爆炸后无人死亡，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者因 Boomer 爆炸後無人死亡，獲得 {green}%i{default} 分!"
+		"jp"		"Boomerの爆発後に誰も死亡せず、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"Boomer 폭발 후 사망자가 없어 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm vì không ai chết sau vụ nổ Boomer!"
+	}
+	"L4DStats_TankKillWithDeaths"
+	{
+		"en"		"With {olive}%i{default} death(s), all survivors earned {green}%i{default} points for killing a Tank!"
+		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下击杀 Tank，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者在 {olive}%i{default} 人死亡的情況下擊殺 Tank，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%i{default}人が死亡した状態でTankを倒し、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%i{default}명이 사망한 상태에서 Tank를 처치하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Với {olive}%i{default} người chết, tất cả người sống sót nhận {green}%i{default} điểm khi giết Tank!"
+	}
+	"L4DStats_NoWitchDisturbanceReward"
+	{
+		"en"		"All survivors earned {green}%i{default} bonus points for not disturbing the Witch!"
+		"chi"		"所有幸存者因没有惊扰 Witch，获得 {green}%i{default} 额外过关分!"
+		"zho"		"所有生還者因沒有驚擾 Witch，獲得 {green}%i{default} 額外過關分!"
+		"jp"		"Witchを驚かせなかったため、全生存者が {green}%i{default} ボーナスポイント獲得!"
+		"ko"		"Witch를 놀라게 하지 않아 모든 생존자가 {green}%i{default}점의 보너스를 획득했습니다!"
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm thưởng vì không chọc giận Witch!"
+	}
+	"L4DStats_SafeRoomWithDeathsReward"
+	{
+		"en"		"With {olive}%i{default} death(s), all survivors earned {green}%i{default} points for reaching the safe room!"
+		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下到达安全门，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者在 {olive}%i{default} 人死亡的情況下到達安全門，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%i{default}人が死亡した状態でセーフルームに到達し、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%i{default}명이 사망한 상태에서 세이프룸에 도달하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Với {olive}%i{default} người chết, tất cả người sống sót nhận {green}%i{default} điểm khi tới phòng an toàn!"
+	}
+	"L4DStats_SafeRoomInfectedPenalty"
+	{
+		"en"		"All infected lost {green}%i{default} points for letting the survivors reach the safe room!"
+		"chi"		"所有感染者因让幸存者进入安全门，失去 {green}%i{default} 分!"
+		"zho"		"所有感染者因讓生還者進入安全門，失去 {green}%i{default} 分!"
+		"jp"		"生存者のセーフルーム到達を許し、全感染者が {green}%i{default} ポイント失いました!"
+		"ko"		"생존자가 세이프룸에 도달하게 해 모든 감염자가 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Tất cả phe nhiễm mất {green}%i{default} điểm vì để người sống sót tới phòng an toàn!"
+	}
+	"L4DStats_WipeSurvivorsReward"
+	{
+		"en"		"All infected earned {green}%i{default} points for killing every survivor!"
+		"chi"		"所有感染者因杀死全部幸存者，获得 {green}%i{default} 分!"
+		"zho"		"所有感染者因殺死全部生還者，獲得 {green}%i{default} 分!"
+		"jp"		"生存者を全滅させ、全感染者が {green}%i{default} ポイント獲得!"
+		"ko"		"모든 생존자를 처치하여 모든 감염자가 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Tất cả phe nhiễm nhận {green}%i{default} điểm vì giết toàn bộ người sống sót!"
+	}
+	"L4DStats_SurvivorWipePenalty"
+	{
+		"en"		"All survivors lost {green}%i{default} points after the team was wiped!"
+		"chi"		"团队全灭，所有幸存者失去 {green}%i{default} 分!"
+		"zho"		"團隊全滅，所有生還者失去 {green}%i{default} 分!"
+		"jp"		"チームが全滅し、全生存者が {green}%i{default} ポイント失いました!"
+		"ko"		"팀이 전멸하여 모든 생존자가 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Cả đội bị tiêu diệt; tất cả người sống sót mất {green}%i{default} điểm!"
+	}
+	"L4DStats_AllSurvivorsLostRoundPenalty"
+	{
+		"en"		"All survivors lost {green}%i{default} points after another failed round!"
+		"chi"		"本局失败，所有幸存者失去 {green}%i{default} 分!"
+		"zho"		"本局失敗，所有生還者失去 {green}%i{default} 分!"
+		"jp"		"ラウンド失敗により、全生存者が {green}%i{default} ポイント失いました!"
+		"ko"		"라운드 실패로 모든 생존자가 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Vòng đấu thất bại; tất cả người sống sót mất {green}%i{default} điểm!"
+	}
+	"L4DStats_AllPlayersLostRoundPenalty"
+	{
+		"en"		"All participating players lost {green}%i{default} points after another failed round!"
+		"chi"		"本局失败，所有参与玩家失去 {green}%i{default} 分!"
+		"zho"		"本局失敗，所有參與玩家失去 {green}%i{default} 分!"
+		"jp"		"ラウンド失敗により、参加プレイヤー全員が {green}%i{default} ポイント失いました!"
+		"ko"		"라운드 실패로 모든 참가 플레이어가 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Vòng đấu thất bại; tất cả người tham gia mất {green}%i{default} điểm!"
+	}
+	"L4DStats_ProtectedTeammateSelf"
+	{
+		"en"		"You protected a teammate and earned {green}%i{default} points!"
+		"chi"		"你保护了队友，获得 {green}%i{default} 分!"
+		"zho"		"你保護了隊友，獲得 {green}%i{default} 分!"
+		"jp"		"チームメイトを守り、{green}%i{default} ポイント獲得!"
+		"ko"		"팀원을 보호하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn bảo vệ đồng đội và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ProtectedTeammateAll"
+	{
+		"en"		"{olive}%s{default} protected a teammate and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 保护了队友，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 保護了隊友，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がチームメイトを守り、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 팀원을 보호하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} bảo vệ đồng đội và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedDamageRewardSelf"
+	{
+		"en"		"You dealt {green}%i{default} damage to survivors and earned {green}%i{default} points!"
+		"chi"		"你对幸存者造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"你對生還者造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"生存者に {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"생존자에게 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn gây {green}%i{default} sát thương cho người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedDamageRewardAll"
+	{
+		"en"		"{olive}%s{default} dealt {green}%i{default} damage to survivors and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 对幸存者造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 對生還者造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が生存者に {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 생존자에게 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} gây {green}%i{default} sát thương cho người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectBoomSelf"
+	{
+		"en"		"You perfectly blinded the survivors and earned {green}%i{default} points!"
+		"chi"		"你完美糊住了幸存者，获得 {green}%i{default} 分!"
+		"zho"		"你完美糊住了生還者，獲得 {green}%i{default} 分!"
+		"jp"		"生存者を完璧に視界不良にし、{green}%i{default} ポイント獲得!"
+		"ko"		"생존자의 시야를 완벽하게 가려 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn làm mù hoàn hảo người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectBoomAll"
+	{
+		"en"		"{olive}%s{default} perfectly blinded the survivors and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 完美糊住了幸存者，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 完美糊住了生還者，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が生存者を完璧に視界不良にし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 생존자의 시야를 완벽하게 가려 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} làm mù hoàn hảo người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GenericPointsSelf"
+	{
+		"en"		"You earned {green}%i{default} points!"
+		"chi"		"你获得 {green}%i{default} 分!"
+		"zho"		"你獲得 {green}%i{default} 分!"
+		"jp"		"{green}%i{default} ポイント獲得!"
+		"ko"		"{green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GenericPointsAll"
+	{
+		"en"		"{olive}%s{default} earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFirePenaltySelf"
+	{
+		"en"		"You dealt {olive}%i{default} friendly-fire damage and lost {green}%i{default} points!"
+		"chi"		"你造成 {olive}%i{default} 点友伤，失去 {green}%i{default} 分!"
+		"zho"		"你造成 {olive}%i{default} 點隊友傷害，失去 {green}%i{default} 分!"
+		"jp"		"{olive}%i{default} のフレンドリーファイアダメージで {green}%i{default} ポイント失いました!"
+		"ko"		"팀 피해 {olive}%i{default}를 입혀 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Bạn gây {olive}%i{default} sát thương đồng đội và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFirePenaltyAll"
+	{
+		"en"		"{olive}%s{default} dealt {olive}%i{default} friendly-fire damage and lost {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 造成 {olive}%i{default} 点友伤，失去 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 造成 {olive}%i{default} 點隊友傷害，失去 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%i{default} のフレンドリーファイアダメージを与え、{green}%i{default} ポイント失いました!"
+		"ko"		"{olive}%s{default}님이 팀 피해 {olive}%i{default}를 입혀 {green}%i{default}점을 잃었습니다!"
+		"vi"		"{olive}%s{default} gây {olive}%i{default} sát thương đồng đội và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltySelf"
+	{
+		"en"		"You lost {green}%i{default} points for friendly-firing {olive}%s{default}!"
+		"chi"		"你失去 {green}%i{default} 分，因为黑枪了 {olive}%s{default}!"
+		"zho"		"你失去 {green}%i{default} 分，因為黑槍了 {olive}%s{default}!"
+		"jp"		"{green}%i{default} ポイント失いました: {olive}%s{default} をフレンドリーファイアしました!"
+		"ko"		"{green}%i{default}점을 잃었습니다: {olive}%s{default}님을 오발했습니다!"
+		"vi"		"Bạn mất {green}%i{default} điểm vì bắn nhầm {olive}%s{default}!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltyAll"
+	{
+		"en"		"{olive}%s{default} lost {green}%i{default} points for friendly-firing {olive}%s{default}!"
+		"chi"		"{olive}%s{default} 失去 {green}%i{default} 分，因为黑枪了 {olive}%s{default}!"
+		"zho"		"{olive}%s{default} 失去 {green}%i{default} 分，因為黑槍了 {olive}%s{default}!"
+		"jp"		"{olive}%s{default} は {green}%i{default} ポイント失いました: {olive}%s{default} をフレンドリーファイアしました!"
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 잃었습니다: {olive}%s{default}님을 오발했습니다!"
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì bắn nhầm {olive}%s{default}!"
+	}
+	"L4DStats_ChargerMultiHitSelf"
+	{
+		"en"		"You charged {lightgreen}%i{default} survivors and earned {green}%i{default} points!"
+		"chi"		"你用 Charger 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+		"zho"		"你用 Charger 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
+		"jp"		"Chargerで {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+		"ko"		"Charger로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerMultiHitAll"
+	{
+		"en"		"{olive}%s{default} charged {lightgreen}%i{default} survivors and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 用 Charger 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 用 Charger 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がChargerで {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 Charger로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CommonKillsRewardSelf"
+	{
+		"en"		"You killed {olive}%i{default} infected and earned {green}%i{default} points!"
+		"chi"		"你击杀 {olive}%i{default} 个感染者，获得 {green}%i{default} 分!"
+		"zho"		"你擊殺 {olive}%i{default} 個感染者，獲得 {green}%i{default} 分!"
+		"jp"		"感染者を {olive}%i{default} 体倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"감염자 {olive}%i{default}마리를 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn giết {olive}%i{default} kẻ nhiễm và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CommonKillsRewardAll"
+	{
+		"en"		"{olive}%s{default} killed {olive}%i{default} infected and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 击杀 {olive}%i{default} 个感染者，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 擊殺 {olive}%i{default} 個感染者，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が感染者を {olive}%i{default} 体倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 감염자 {olive}%i{default}마리를 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} giết {olive}%i{default} kẻ nhiễm và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltySelf"
+	{
+		"en"		"You lost {green}%i{default} points for letting an infected enter the safe room!"
+		"chi"		"你因让感染者进入安全门，失去 {green}%i{default} 分!"
+		"zho"		"你因讓感染者進入安全門，失去 {green}%i{default} 分!"
+		"jp"		"感染者のセーフルーム侵入を許し、{green}%i{default} ポイント失いました!"
+		"ko"		"감염자가 세이프룸에 들어오게 해 {green}%i{default}점을 잃었습니다!"
+		"vi"		"Bạn mất {green}%i{default} điểm vì để kẻ nhiễm vào phòng an toàn!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltyAll"
+	{
+		"en"		"{olive}%s{default} lost {green}%i{default} points for letting an infected enter the safe room!"
+		"chi"		"{olive}%s{default} 因让感染者进入安全门，失去 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 因讓感染者進入安全門，失去 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} は感染者のセーフルーム侵入を許し、{green}%i{default} ポイント失いました!"
+		"ko"		"{olive}%s{default}님이 감염자가 세이프룸에 들어오게 해 {green}%i{default}점을 잃었습니다!"
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì để kẻ nhiễm vào phòng an toàn!"
+	}
+	"L4DStats_AlarmCarPenalty"
+	{
+		"en"		"{green}%N{default} lost {green}%i{default} points for shooting an alarmed car!"
+		"chi"		"{green}%N{default} 因击中警报车，失去 {green}%i{default} 分!"
+		"zho"		"{green}%N{default} 因擊中警報車，失去 {green}%i{default} 分!"
+		"jp"		"{green}%N{default} はカーアラームを鳴らし、{green}%i{default} ポイント失いました!"
+		"ko"		"{green}%N{default}님이 차량 경보기를 작동시켜 {green}%i{default}점을 잃었습니다!"
+		"vi"		"{green}%N{default} mất {green}%i{default} điểm vì bắn xe báo động!"
+	}
+	"L4DStats_SpecialSaveSelf"
+	{
+		"en"		"You saved {olive}%s{default} from {green}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救出，获得 {green}%i{default} 分!"
+		"zho"		"你將 {olive}%s{default} 從 {green}%s{default} 手中救出，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankDamageRewardSelf"
+	{
+		"en"		"You dealt {green}%i{default} damage as the Tank and earned {green}%i{default} points!"
+		"chi"		"你作为 Tank 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"你作為 Tank 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"Tankとして {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"Tank으로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankDamageRewardAll"
+	{
+		"en"		"{olive}%s{default} dealt {green}%i{default} damage as the Tank and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 作为 Tank 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 作為 Tank 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がTankとして {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 Tank으로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchKillSelf"
+	{
+		"en"		"You killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchKillAll"
+	{
+		"en"		"{olive}%s{default} killed {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 殺死 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankRockHitSelf"
+	{
+		"en"		"You hit {olive}%s{default} with a rock and earned {green}%i{default} points!"
+		"chi"		"你用石头击中 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你用石頭擊中 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} に岩を当て、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 돌로 맞혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn ném đá trúng {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankRockHitAll"
+	{
+		"en"		"{olive}%s{default} hit {olive}%s{default} with a rock and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 用石头击中 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 用石頭擊中 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} に岩を当て、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 돌로 맞혀 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} ném đá trúng {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_IncapSurvivorSelf"
+	{
+		"en"		"You incapacitated {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"你制伏 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"你制服 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} を行動不能にし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님을 행동 불능으로 만들어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"Bạn hạ gục {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_IncapSurvivorAll"
+	{
+		"en"		"{olive}%s{default} incapacitated {olive}%s{default} and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 制伏 {olive}%s{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 制服 {olive}%s{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が {olive}%s{default} を行動不能にし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 행동 불능으로 만들어 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} hạ gục {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchCrownReward"
+	{
+		"en"		"{olive}%s{default} crowned the Witch and earned {green}%i{default} points!"
+		"chi"		"{olive}%s{default} 秒杀 Witch，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 秒殺 Witch，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} がWitchをクラウンし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 Witch를 크라운하여 {green}%i{default}점을 획득했습니다!"
+		"vi"		"{olive}%s{default} crown Witch và nhận {green}%i{default} điểm!"
+	}
 }

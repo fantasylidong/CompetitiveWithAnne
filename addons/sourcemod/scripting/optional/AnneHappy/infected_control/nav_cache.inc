@@ -24,6 +24,22 @@ stock void ClearNavAreasCache()
         g_NavAreasCacheCount = 0;
         Debug_Print("[NAV CACHE] Cleared");
     }
+    if (g_AreaNavIds != null)
+    {
+        delete g_AreaNavIds;
+        g_AreaNavIds = null;
+    }
+    if (g_NavCooldownUntil != null)
+    {
+        delete g_NavCooldownUntil;
+        g_NavCooldownUntil = null;
+    }
+    ClearNavWeightMemory();
+    if (g_NavIdToIndex != null)
+    {
+        delete g_NavIdToIndex;
+        g_NavIdToIndex = null;
+    }
 }
 
 stock void RebuildNavAreasCache()
@@ -40,6 +56,9 @@ void BuildNavIdIndexMap()
         g_NavIdToIndex = null;
     }
     g_NavIdToIndex = new StringMap();
+    if (g_AreaNavIds != null)
+        delete g_AreaNavIds;
+    g_AreaNavIds = new ArrayList();
 
     EnsureNavAreasCache();
 
@@ -47,6 +66,7 @@ void BuildNavIdIndexMap()
     {
         Address area = g_AllNavAreasCache.Get(i);
         int navid = L4D_GetNavAreaID(area);
+        g_AreaNavIds.Push(navid);
         if (navid < 0)
             continue;
 
@@ -103,4 +123,3 @@ void SampleAreaCenterAndZ(Address areaAddr, float &cx, float &cy, float &zAvg, f
     cy *= inv;
     zAvg *= inv;
 }
-
