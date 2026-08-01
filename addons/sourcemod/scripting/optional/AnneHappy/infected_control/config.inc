@@ -46,6 +46,7 @@ enum struct Config
     ConVar SiLimit;
     ConVar SiInterval;
     ConVar DebugMode;
+    ConVar SpawnAccelNativeSafety;
 
     ConVar MaxPlayerZombies;
     ConVar VsBossFlowBuffer;
@@ -226,6 +227,7 @@ enum struct Config
     int   iEnableMask;
     int   iTeleportCheckTime;
     int   iDebugMode;
+    bool  bSpawnAccelNativeSafety;
     bool  bTeleport;
     bool  bAutoSpawn;
     bool  bIgnoreIncapSight;
@@ -281,6 +283,11 @@ enum struct Config
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
         this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.SpawnAccelNativeSafety = CreateConVar(
+            "inf_spawn_accel_native_safety", "0",
+            "Use anne_spawn_accel native stuck/visibility traces (0=SourcePawn fallback, 1=native)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
 
         this.AiDifficultyLink = CreateConVar(
             "inf_ai_difficulty_link", "1",
@@ -684,6 +691,7 @@ enum struct Config
         this.AddDmgSmoker.AddChangeHook(OnCfgChanged);
         this.SiLimit.AddChangeHook(OnSiLimitChanged);
         this.DebugMode.AddChangeHook(OnCfgChanged);
+        this.SpawnAccelNativeSafety.AddChangeHook(OnCfgChanged);
 
         // Nav 分桶
         this.NavBucketEnable.AddChangeHook(OnCfgChanged);
@@ -720,6 +728,7 @@ enum struct Config
         this.bAutoSpawn         = this.AutoSpawnTime.BoolValue;
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.iDebugMode         = this.DebugMode.IntValue;
+        this.bSpawnAccelNativeSafety = this.SpawnAccelNativeSafety.BoolValue;
         this.bTraitorEnable     = this.TraitorEnable.BoolValue;
         this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
         int maxTraitorSlots = this.iSiLimit;

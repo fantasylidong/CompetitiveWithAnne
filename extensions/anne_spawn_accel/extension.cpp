@@ -125,6 +125,7 @@ using NavAreaBuildPathFn = bool (*)(void *, void *, const Vector *, const Vector
                                     void **, float, int, bool);
 
 IEngineTrace *g_EngineTrace = nullptr;
+IStaticPropMgrServer *g_StaticPropMgr = nullptr;
 IGameConfig *g_GameConfig = nullptr;
 IsVisibleToPlayerFn g_IsVisibleToPlayer = nullptr;
 NavAreaBuildPathFn g_NavAreaBuildPath = nullptr;
@@ -753,7 +754,19 @@ public:
 
     bool ShouldHitEntity(IHandleEntity *handle, int) override
     {
-        CBaseEntity *entity = reinterpret_cast<CBaseEntity *>(handle);
+        if (!handle)
+            return true;
+
+        // Static-prop trace handles are not CBaseEntity objects. Both safety modes
+        // must treat them as solid without dereferencing them as game entities.
+        if (g_StaticPropMgr && g_StaticPropMgr->IsStaticProp(handle))
+            return true;
+
+        IServerUnknown *unknown = static_cast<IServerUnknown *>(handle);
+        CBaseEntity *entity = unknown->GetBaseEntity();
+        if (!entity)
+            return true;
+
         int index = GetEntityIndex(entity);
         if (index <= 0 || !gpGlobals || index >= gpGlobals->maxEntities)
             return false;
@@ -1465,6 +1478,8 @@ SMEXT_LINK(&g_AnneSpawnAccel);
 bool AnneSpawnAccelExtension::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool)
 {
     GET_V_IFACE_ANY(GetEngineFactory, g_EngineTrace, IEngineTrace, INTERFACEVERSION_ENGINETRACE_SERVER);
+    GET_V_IFACE_ANY(GetEngineFactory, g_StaticPropMgr, IStaticPropMgrServer,
+                    INTERFACEVERSION_STATICPROPMGR_SERVER);
     gpGlobals = ismm->GetCGlobals();
     if (!gpGlobals)
     {
@@ -1566,6 +1581,7 @@ void AnneSpawnAccelExtension::SDK_OnUnload()
     g_IsVisibleToPlayer = nullptr;
     g_NavAreaBuildPath = nullptr;
     g_TheNavAreas = nullptr;
+    g_StaticPropMgr = nullptr;
     g_BlockTypeOffset = -1;
     if (g_GameConfig)
     {

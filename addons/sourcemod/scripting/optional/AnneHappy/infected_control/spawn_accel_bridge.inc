@@ -25,7 +25,6 @@ static const char g_sSpawnAccelRequiredNatives[][] =
     "AnneSpawn_GetWorkerCount",
     "AnneSpawn_SetSurvivorSnapshot",
     "AnneSpawn_ClearSurvivorSnapshot",
-    "AnneSpawn_TestPointSafety",
     "AnneSpawn_ComputePointGeometry",
     "AnneSpawn_MapNearest2D",
     "AnneSpawn_PathExists",
@@ -50,6 +49,14 @@ stock bool SpawnAccel_IsAvailable()
     return LibraryExists(ANNE_SPAWN_ACCEL_LIBRARY)
         && SpawnAccel_HasRequiredNatives()
         && AnneSpawn_IsActive();
+}
+
+stock bool SpawnAccel_CanUseNativeSafety()
+{
+    return g_bSpawnAccel
+        && gCV.bSpawnAccelNativeSafety
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety")
+            == FeatureStatus_Available;
 }
 
 stock void SpawnAccel_LogUnavailableReason()
@@ -81,17 +88,21 @@ stock void SpawnAccel_LogUnavailableReason()
 stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
 {
     bool available = SpawnAccel_IsAvailable();
-    if (forceLog || !g_bSpawnAccelAvailabilityKnown || available != g_bSpawnAccel)
+    bool shouldLog = forceLog || !g_bSpawnAccelAvailabilityKnown || available != g_bSpawnAccel;
+    g_bSpawnAccel = available;
+    g_bSpawnAccelAvailabilityKnown = true;
+
+    if (shouldLog)
     {
         Debug_Print("[SPAWN ACCEL] extension %s",
                     available ? "active (all required natives available)"
                               : "unavailable (using SourcePawn fallbacks)");
         if (!available)
             SpawnAccel_LogUnavailableReason();
+        else
+            Debug_Print("[SPAWN ACCEL] native safety traces %s",
+                        SpawnAccel_CanUseNativeSafety() ? "enabled" : "disabled (SourcePawn fallback)");
     }
-
-    g_bSpawnAccel = available;
-    g_bSpawnAccelAvailabilityKnown = true;
 }
 
 stock void SpawnAccel_StopGraphTimer()

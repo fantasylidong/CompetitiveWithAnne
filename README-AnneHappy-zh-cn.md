@@ -8,7 +8,7 @@
 ## **Accelerator 崩溃报告上传**
 
 > [!IMPORTANT]
-> 仓库内的 `addons/sourcemod/configs/core.cfg` 默认供 Anne 私有服务器使用，崩溃报告上传到 AnneWeb，并且只接收 Anne 私用 SourceBans 服务器白名单中的公网 IP。
+> 仓库内的 `addons/sourcemod/configs/core.cfg` 默认供 Anne 私有服务器使用，崩溃报告上传到 AnneWeb，并且只接收 Anne 私用 SourceBans 服务器白名单中的公网 IP。Anne 地址特意使用 HTTP，以兼容随包 Accelerator/libcurl 不支持 HTTPS 的构建；请勿复用这些私有地址。
 >
 > 如果你在自己的服务器部署本项目，请不要使用 Anne 的私有上传地址，应使用 Accelerator 官方的崩溃、符号和二进制上传接口：
 >

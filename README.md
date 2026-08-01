@@ -56,7 +56,7 @@ In its current state it allows anyone to host their own up to date competitive L
 ### Crash reporting (Accelerator)
 
 > [!IMPORTANT]
-> The checked-in [`addons/sourcemod/configs/core.cfg`](addons/sourcemod/configs/core.cfg) is configured for Anne's private servers. Its crash upload endpoint only accepts public IPs from Anne's private SourceBans-derived allowlist.
+> The checked-in [`addons/sourcemod/configs/core.cfg`](addons/sourcemod/configs/core.cfg) is configured for Anne's private servers. Its crash upload endpoint only accepts public IPs from Anne's private SourceBans-derived allowlist. The Anne URLs intentionally use HTTP because the bundled Accelerator/libcurl build cannot use HTTPS; do not reuse those private URLs.
 >
 > If you are deploying this repository on your own server, do **not** use Anne's private upload endpoints. Use Accelerator's official crash, symbol, and binary upload endpoints:
 >

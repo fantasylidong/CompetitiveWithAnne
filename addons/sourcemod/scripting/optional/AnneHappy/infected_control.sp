@@ -860,6 +860,8 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
     bool traitorDisabled = convar == gCV.TraitorEnable && StringToInt(ov) != 0 && StringToInt(nv) == 0;
     gCV.Refresh();
     gCV.ApplyMaxZombieBound();
+    if (convar == gCV.SpawnAccelNativeSafety)
+        SpawnAccel_UpdateAvailability(true);
     if (convar == gCV.TraitorDailyQuota || convar == gCV.TraitorPublicDailyQuota)
         TraitorQuota_InvalidateAdminQuotaCache();
 

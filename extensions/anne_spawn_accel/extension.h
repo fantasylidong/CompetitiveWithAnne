@@ -9,6 +9,8 @@
 
 #include <IEngineTrace.h>
 #include <datamap.h>
+#include <engine/IStaticPropMgr.h>
+#include <iserverunknown.h>
 
 class AnneSpawnAccelExtension final : public SDKExtension
 {

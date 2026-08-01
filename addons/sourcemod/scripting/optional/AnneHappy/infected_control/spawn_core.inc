@@ -240,7 +240,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     usedExpensive = true;
     bool pointStuck;
     bool pointVisible;
-    if (g_bSpawnAccel)
+    if (SpawnAccel_CanUseNativeSafety())
     {
         AnneSpawnSafetyResult safety = AnneSpawn_TestPointSafety(
             pos, teleportMode, gCV.bIgnoreIncapSight, visibilityRayMode);
