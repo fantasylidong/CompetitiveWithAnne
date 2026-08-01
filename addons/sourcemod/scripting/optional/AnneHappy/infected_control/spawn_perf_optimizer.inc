@@ -4,13 +4,10 @@
 #define _infected_control_spawn_perf_optimizer_included
 
 /**
- * 刷点性能优化器
+ * 刷点性能统计器
  *
- * 核心优化策略：
- * 1. 早期过滤：在评分前就淘汰明显不合格的候选点
- * 2. 渐进式采样：从粗到细，找到足够好的点就停止
- * 3. 缓存复用：高度、距离等计算结果缓存
- * 4. 智能桶序：优先扫描最有可能的桶
+ * 热路径只记录定长样本和过滤计数；排序、百分位和波次总结只在
+ * 显式打印或波次结束时计算。
  */
 
 // ==================== 性能统计 ====================
@@ -18,6 +15,18 @@
 #define SPAWN_PERF_TIMING_COUNT      3
 #define SPAWN_PERF_FILTER_COUNT      11
 #define SPAWN_PERF_SAMPLE_CAP        256
+
+stock void SpawnPerf_Log(const char[] format, any ...)
+{
+    if (!SpawnPerfConfig_ShowStats())
+        return;
+
+    char buffer[1024];
+    VFormat(buffer, sizeof(buffer), format, 2);
+    LogToFile("addons/sourcemod/logs/infected_control_fdxxnav.txt", "%s", buffer);
+    if (gCV.iDebugMode >= 2)
+        PrintToServer("[IC] %s", buffer);
+}
 
 enum SpawnPerfTimingMetric
 {
@@ -139,7 +148,7 @@ static void SpawnPerf_PrintTiming(int group, SpawnPerfTimingMetric metric, const
 
     if (count <= 0)
     {
-        LogMsg("[SpawnPerf][%s] %s samples=0 total=0", groupLabel, metricName);
+        SpawnPerf_Log("[SpawnPerf][%s] %s samples=0 total=0", groupLabel, metricName);
         return;
     }
 
@@ -152,7 +161,7 @@ static void SpawnPerf_PrintTiming(int group, SpawnPerfTimingMetric metric, const
     float p95 = sorted[SpawnPerf_PercentileIndex(count, 0.95)];
     float p99 = sorted[SpawnPerf_PercentileIndex(count, 0.99)];
     float maxMs = sorted[count - 1];
-    LogMsg("[SpawnPerf][%s] %s samples=%d total=%d p50=%.3f p95=%.3f p99=%.3f max=%.3f",
+    SpawnPerf_Log("[SpawnPerf][%s] %s samples=%d total=%d p50=%.3f p95=%.3f p99=%.3f max=%.3f",
         groupLabel, metricName, count, g_SpawnPerfTimingTotal[group][metricIdx],
         p50, p95, p99, maxMs);
 }
@@ -168,7 +177,7 @@ static void SpawnPerf_PrintGroupedStats()
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_MaxSlice, "maxSliceMs");
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_FallbackApi, "fallbackApiMs");
 
-        LogMsg("[SpawnPerf][%s] filters cooldown=%d flags=%d flow=%d distance=%d separation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
+        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d flags=%d flow=%d distance=%d separation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
             groupLabel,
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Cooldown],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flags],
@@ -182,7 +191,7 @@ static void SpawnPerf_PrintGroupedStats()
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Score],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Bucket]);
 
-        LogMsg("[SpawnPerf][%s] fallbackApi hit/call smoker=%d/%d boomer=%d/%d hunter=%d/%d spitter=%d/%d jockey=%d/%d charger=%d/%d",
+        SpawnPerf_Log("[SpawnPerf][%s] fallbackApi hit/call smoker=%d/%d boomer=%d/%d hunter=%d/%d spitter=%d/%d jockey=%d/%d charger=%d/%d",
             groupLabel,
             g_SpawnPerfFallbackHits[group][view_as<int>(SI_Smoker) - 1], g_SpawnPerfFallbackCalls[group][view_as<int>(SI_Smoker) - 1],
             g_SpawnPerfFallbackHits[group][view_as<int>(SI_Boomer) - 1], g_SpawnPerfFallbackCalls[group][view_as<int>(SI_Boomer) - 1],
@@ -256,7 +265,7 @@ enum struct SpawnPerfStats
         if (this.totalAttempts <= 0)
             return;
 
-        LogMsg("[PerfStats] attempts=%d success=%d filters=(flags:%d dist:%d vis:%d bucket:%d) fullEval=%d avgTime=%.2fms",
+        SpawnPerf_Log("[PerfStats] attempts=%d success=%d filters=(flags:%d dist:%d vis:%d bucket:%d) fullEval=%d avgTime=%.2fms",
             this.totalAttempts,
             this.successfulSpawns,
             this.earlyFilteredByFlags,
@@ -271,150 +280,14 @@ enum struct SpawnPerfStats
 // 全局性能统计实例
 static SpawnPerfStats g_PerfStats;
 
-// ==================== 智能桶序优化 ====================
-
-/**
- * 根据扩圈距离智能调整桶窗口
- * 原理：距离越大，生还者附近的桶越多，需要更窄的窗口避免过度扫描
- */
-stock int ComputeAdaptiveBucketWindow(float searchRange, int baseWindow)
-{
-    // 基于扩圈比例动态缩小窗口
-    float ratio = searchRange / gCV.fSpawnMax;
-    if (ratio < 0.5)
-        return baseWindow; // 近距离，保持原窗口
-
-    if (ratio < 0.75)
-        return RoundToFloor(float(baseWindow) * 0.85); // 中距离，缩小15%
-
-    return RoundToFloor(float(baseWindow) * 0.70); // 远距离，缩小30%
-}
-
-/**
- * 优化的桶序生成：优先中心±1，然后跳跃式扩展
- * 原理：大部分情况下，生还者附近±1-2个桶就能找到合适刷点
- */
-stock int BuildOptimizedBucketOrder(int centerBucket, int window, bool includeCenter, int outBuckets[FLOW_BUCKETS])
-{
-    int n = 0;
-
-    // 阶段1：中心 ± 1（最有可能）
-    if (includeCenter && n < FLOW_BUCKETS)
-        outBuckets[n++] = centerBucket;
-
-    for (int offset = 1; offset <= 1 && n < FLOW_BUCKETS; offset++)
-    {
-        int fwd = centerBucket + offset;
-        if (fwd >= 0 && fwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = fwd;
-
-        int bwd = centerBucket - offset;
-        if (bwd >= 0 && bwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = bwd;
-    }
-
-    // 阶段2：跳跃式扫描（2, 4, 6...）避免连续桶浪费
-    for (int offset = 2; offset <= window && n < FLOW_BUCKETS; offset += 2)
-    {
-        int fwd = centerBucket + offset;
-        if (fwd >= 0 && fwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = fwd;
-
-        int bwd = centerBucket - offset;
-        if (bwd >= 0 && bwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = bwd;
-    }
-
-    // 阶段3：填补缺失的奇数偏移
-    for (int offset = 3; offset <= window && n < FLOW_BUCKETS; offset += 2)
-    {
-        int fwd = centerBucket + offset;
-        if (fwd >= 0 && fwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = fwd;
-
-        int bwd = centerBucket - offset;
-        if (bwd >= 0 && bwd <= 100 && n < FLOW_BUCKETS)
-            outBuckets[n++] = bwd;
-    }
-
-    return n;
-}
-
-/**
- * 批量可见性检查：一次扫描多个候选点（利用CPU缓存）
- * 注意：此函数为示例，实际使用需要根据具体情况调整
- */
-/*
-stock int BatchVisibilityCheck(float positions[][], int count, bool teleportMode, bool results[])
-{
-    int passed = 0;
-    for (int i = 0; i < count; i++)
-    {
-        results[i] = !IsPosVisibleSDK(positions[i], teleportMode);
-        if (results[i])
-            passed++;
-    }
-    return passed;
-}
-*/
-
-// ==================== 渐进式采样优化 ====================
-
-/**
- * 渐进式采样：从粗到细，找到足够好就停止
- *
- * 策略：
- * - 第1轮：每个桶采样1个NavArea，评估前3个桶
- * - 第2轮：如果没找到，每个桶采样2个，评估前5个桶
- * - 第3轮：全面扫描
- */
-
-enum SamplingStage
-{
-    Stage_Quick = 1,      // 快速采样：1个/桶，前3桶
-    Stage_Normal = 2,     // 正常采样：2个/桶，前5桶
-    Stage_Exhaustive = 3  // 穷尽采样：全部
-}
-
-stock int GetSamplingBudgetForStage(SamplingStage stage)
-{
-    switch (stage)
-    {
-        case Stage_Quick:     return 3;
-        case Stage_Normal:    return 8;
-        case Stage_Exhaustive: return DifficultyStrategy_GetCandidateBudget();
-    }
-    return 8;
-}
-
-stock int GetMaxBucketsForStage(SamplingStage stage)
-{
-    switch (stage)
-    {
-        case Stage_Quick:     return 3;
-        case Stage_Normal:    return 5;
-        case Stage_Exhaustive: return 999;
-    }
-    return 5;
-}
-
-stock int GetSamplesPerBucketForStage(SamplingStage stage)
-{
-    switch (stage)
-    {
-        case Stage_Quick:     return 1;
-        case Stage_Normal:    return 2;
-        case Stage_Exhaustive: return 4;
-    }
-    return 2;
-}
-
 // ==================== 性能监控 ====================
 
 stock void SpawnPerf_OnRoundStart()
 {
+    WaveSpawnReport_Reset();
     g_PerfStats.Reset();
     SpawnPerf_ResetGroupedStats();
+    SpawnAccel_ResetCandidatePerf();
     Visibility_ClearEyeSnapshot();
 }
 
@@ -423,6 +296,7 @@ stock void SpawnPerf_OnMapEnd()
     SpawnPerf_FlushPendingMaxSlice();
     g_PerfStats.Print();
     SpawnPerf_PrintGroupedStats();
+    SpawnAccel_PrintCandidatePerf();
     Visibility_ClearEyeSnapshot();
 }
 
@@ -566,10 +440,14 @@ stock void SpawnPerf_PrintStats()
     SpawnPerf_FlushPendingMaxSlice();
     g_PerfStats.Print();
     SpawnPerf_PrintGroupedStats();
+    SpawnAccel_PrintCandidatePerf();
+    WaveSpawnReport_PrintCurrent();
 }
 
 stock void SpawnPerf_ResetStats()
 {
+    WaveSpawnReport_Reset();
     g_PerfStats.Reset();
     SpawnPerf_ResetGroupedStats();
+    SpawnAccel_ResetCandidatePerf();
 }

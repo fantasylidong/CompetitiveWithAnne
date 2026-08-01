@@ -320,3 +320,13 @@ stock bool WaveDecider_IsActive()
 {
     return gWD.state != WD_Idle;
 }
+
+stock float WaveDecider_GetReleaseEta()
+{
+    if (gWD.state != WD_TimerRunning)
+        return -1.0;
+
+    float remaining = DifficultyStrategy_GetConfiguredWaveDelay()
+        - (GetGameTime() - gWD.timerStartTime);
+    return (remaining > 0.0) ? remaining : 0.0;
+}

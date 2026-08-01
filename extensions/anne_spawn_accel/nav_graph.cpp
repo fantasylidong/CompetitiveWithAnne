@@ -320,6 +320,84 @@ bool AnneNavGraph::BuildReverseReachability(
     return true;
 }
 
+bool AnneBuildNavCandidateSnapshot(
+    const AnneNavGraph &graph,
+    std::uint32_t targetIndex,
+    float maxPathDistance,
+    const std::vector<std::uint8_t> &blocked,
+    const std::vector<float> &survivorEyes,
+    std::size_t targetSurvivorSlot,
+    float minSurvivorDistance,
+    std::vector<std::uint32_t> &areaIndices,
+    std::vector<float> &targetDistances,
+    std::vector<float> &pathDistances,
+    std::vector<std::uint8_t> &usesSpecialEdge)
+{
+    std::size_t survivorCount = survivorEyes.size() / 3;
+    if (survivorEyes.size() % 3 != 0 || survivorCount == 0 ||
+        targetSurvivorSlot >= survivorCount || targetIndex >= graph.navIds.size() ||
+        maxPathDistance <= 0.0f || minSurvivorDistance < 0.0f)
+    {
+        return false;
+    }
+    if (!graph.BuildReverseReachability(targetIndex, maxPathDistance, blocked,
+                                        pathDistances, usesSpecialEdge))
+    {
+        return false;
+    }
+
+    struct Candidate
+    {
+        float distance;
+        std::uint32_t index;
+    };
+    std::vector<Candidate> candidates;
+    candidates.reserve(graph.navIds.size());
+    float minSurvivorDistanceSquared = minSurvivorDistance * minSurvivorDistance;
+    const float *targetEye = &survivorEyes[targetSurvivorSlot * 3];
+
+    for (std::uint32_t index = 0; index < graph.navIds.size(); ++index)
+    {
+        if (!std::isfinite(pathDistances[index]))
+            continue;
+
+        const float *center = &graph.centers[static_cast<std::size_t>(index) * 3];
+        float nearestSquared = std::numeric_limits<float>::infinity();
+        for (std::size_t survivor = 0; survivor < survivorCount; ++survivor)
+        {
+            const float *eye = &survivorEyes[survivor * 3];
+            float dx = center[0] - eye[0];
+            float dy = center[1] - eye[1];
+            float dz = center[2] - eye[2];
+            nearestSquared = std::min(nearestSquared, dx * dx + dy * dy + dz * dz);
+        }
+        if (nearestSquared < minSurvivorDistanceSquared)
+            continue;
+
+        float dx = center[0] - targetEye[0];
+        float dy = center[1] - targetEye[1];
+        float dz = center[2] - targetEye[2];
+        float targetDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        candidates.push_back({targetDistance, index});
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate &left, const Candidate &right) {
+                  if (left.distance != right.distance)
+                      return left.distance < right.distance;
+                  return left.index < right.index;
+              });
+
+    areaIndices.resize(candidates.size());
+    targetDistances.resize(candidates.size());
+    for (std::size_t row = 0; row < candidates.size(); ++row)
+    {
+        areaIndices[row] = candidates[row].index;
+        targetDistances[row] = candidates[row].distance;
+    }
+    return true;
+}
+
 std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(
     const AnneNavGraphMetadata &metadata,
     std::vector<AnneNavGraphInputEdge> inputEdges,

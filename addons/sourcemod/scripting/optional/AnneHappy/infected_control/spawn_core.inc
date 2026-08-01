@@ -34,11 +34,11 @@ enum struct SpawnFilterStats
 }
 
 // 刷点核心分两层：
-// - FindSpawnPosViaNavArea：准备生还者/Flow/扇区上下文，决定桶扫描或全图扫描。
+// - FindSpawnPosViaNavArea：准备生还者/Flow/扇区上下文，决定有向图候选或全图兜底。
 // - SpawnCore_EvaluateNavCandidate：评估单个 NavArea，按“便宜过滤 -> 昂贵精判 -> 评分”的顺序执行。
 //
 // 修改性能或刷点质量时优先阅读 README_SPAWN_ARCHITECTURE.md。这里的过滤顺序不是随意排列：
-// 先做 area/flags/bucket/cooldown 这类区域级轻量判断，再取随机点，再做距离/stuck/visibility/path。
+// 先做 area/flags/progress/cooldown 这类区域级轻量判断，再取随机点，再做距离/stuck/visibility/path。
 // IsPosVisibleSDK 和 L4D2_NavAreaBuildPath 是最贵的热点，新增过滤器应尽量放在它们之前。
 
 static void SpawnCore_CopyPos(float dest[3], const float src[3])
@@ -144,7 +144,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     bool flowLoaded = false;
     bool rawBadFlow = false;
 
-    // 2) 桶模式调用方已经知道 bucket，避免每个候选都读取 Flow。
+    // 2) 图候选已携带 areaIdx 对应的进度 bucket，避免每个候选都读取 Flow。
     //    全图 fallback 或需要拒绝 badflow 时才加载 area.GetFlow()。
     if (candidateBucket < 0 || rejectBadFlow)
     {
@@ -238,29 +238,16 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
 
     // 8) 卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
     usedExpensive = true;
-    bool pointStuck;
-    bool pointVisible;
-    if (SpawnAccel_CanUseNativeSafety())
-    {
-        AnneSpawnSafetyResult safety = AnneSpawn_TestPointSafety(
-            pos, teleportMode, gCV.bIgnoreIncapSight, visibilityRayMode);
-        pointStuck = (safety == AnneSpawnSafety_Stuck);
-        pointVisible = (safety == AnneSpawnSafety_Visible);
-    }
-    else
-    {
-        pointStuck = WillStuck(pos);
-        pointVisible = !pointStuck
-            && IsPosVisibleSDKWithMode(pos, teleportMode, visibilityRayMode);
-    }
+    AnneSpawnSafetyResult safety = Visibility_TestPointSafety(
+        pos, teleportMode, visibilityRayMode);
 
-    if (pointStuck)
+    if (safety == AnneSpawnSafety_Stuck)
     {
         stats.stuck++;
         SpawnPerf_RecordFilterByStuck();
         return false;
     }
-    if (pointVisible)
+    if (safety == AnneSpawnSafety_Visible)
     {
         stats.visibility++;
         SpawnPerf_RecordFilterByVisibility();
@@ -274,7 +261,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     }
 
     // 9) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
-    //     这能让桶模式下大量失败候选完全不读 area.GetFlow()。
+    //     这能让图候选路径中大量失败候选完全不读 area.GetFlow()。
     if (!flowLoaded)
     {
         flow = area.GetFlow();
@@ -322,37 +309,21 @@ enum SpawnSearchResult
 enum SpawnCandidateSource
 {
     SpawnCandidate_None = 0,
-    SpawnCandidate_Buckets,
+    SpawnCandidate_Graph,
     SpawnCandidate_All
 }
 
-enum struct SpawnSearchState
+enum SpawnCandidateReadResult
 {
-    bool active;
-    int zc;
-    int targetSurvivor;
-    int targetUserid;
-    float minRange;
-    float maxRange;
-    bool teleportMode;
+    SpawnCandidateRead_Pending = 0,
+    SpawnCandidateRead_Found,
+    SpawnCandidateRead_Exhausted
+}
 
-    SpawnCandidateSource source;
-    int allRow;
-    int bucketOrder[FLOW_BUCKETS];
-    int bucketOrderLen;
-    int bucketOrderIdx;
-    int bucketRow;
-
-    int candidateBudget;
-    int acceptedHits;
-    int inspected;
-    bool firstFit;
-    bool found;
-    float bestScore;
-    float elapsedMs;
-    SpawnScoreDbg bestDbg;
-    SpawnFilterStats stats;
-
+// 评估上下文每次调用都从当前 tick 重建。候选点、目标位置、路径起点和评分
+// 不得跨帧保存，否则会把旧 Flow/Nav 上下文和新眼位快照混在一次判定中。
+enum struct SpawnFrameContext
+{
     float mapMaxFlowDist;
     bool finaleArea;
     float center[3];
@@ -365,37 +336,73 @@ enum struct SpawnSearchState
     float lowestFootZ;
     bool hasLowestFootZ;
     Address navStart;
+    int navStartClient;
+    int navStartId;
     int visibilityRayMode;
+    int candidateBudget;
+    bool firstFit;
     float minScore;
     float firstFitScore;
 }
 
-static SpawnSearchState g_NormalSpawnSearchStates[SI_COUNT];
-static SpawnSearchState g_TeleportSpawnSearchStates[SI_COUNT];
-
-static void SpawnSearch_ResetState(SpawnSearchState state)
+// 跨 tick 只保留候选源游标和诊断计数。一个候选从安全检查到评分、刷出
+// 必须在同一 tick 完成，不保存历史 best candidate。
+enum struct SpawnSearchCursor
 {
-    state.active = false;
-    state.source = SpawnCandidate_None;
-    state.allRow = 0;
-    state.bucketOrderLen = 0;
-    state.bucketOrderIdx = 0;
-    state.bucketRow = 0;
-    state.navStart = Address_Null;
-    state.acceptedHits = 0;
-    state.inspected = 0;
-    state.found = false;
-    state.bestScore = -1.0e9;
-    state.elapsedMs = 0.0;
-    state.stats.Reset();
+    bool active;
+    int zc;
+    int targetSurvivor;
+    int targetUserid;
+    float minRange;
+    float maxRange;
+    bool teleportMode;
+    SpawnCandidateSource source;
+    int allRow;
+    int graphTargetClient;
+    int graphTargetNavId;
+    float graphPathLimit;
+    float graphMinTargetDistance;
+    float graphMaxTargetDistance;
+    int graphOffset;
+    int graphTotalInRange;
+    int graphPage[NAV_CANDIDATE_PAGE_SIZE];
+    int graphPageLen;
+    int graphPageRow;
+    float graphPageExpiresAt;
+    int inspected;
+    float elapsedMs;
+    SpawnFilterStats stats;
+}
+
+static SpawnSearchCursor g_NormalSpawnSearchCursors[SI_COUNT];
+static SpawnSearchCursor g_TeleportSpawnSearchCursors[SI_COUNT];
+
+static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
+{
+    cursor.active = false;
+    cursor.source = SpawnCandidate_None;
+    cursor.allRow = 0;
+    cursor.graphTargetClient = -1;
+    cursor.graphTargetNavId = -1;
+    cursor.graphPathLimit = 0.0;
+    cursor.graphMinTargetDistance = 0.0;
+    cursor.graphMaxTargetDistance = 0.0;
+    cursor.graphOffset = 0;
+    cursor.graphTotalInRange = -1;
+    cursor.graphPageLen = 0;
+    cursor.graphPageRow = 0;
+    cursor.graphPageExpiresAt = 0.0;
+    cursor.inspected = 0;
+    cursor.elapsedMs = 0.0;
+    cursor.stats.Reset();
 }
 
 void SpawnSearch_Reset()
 {
     for (int i = 0; i < SI_COUNT; i++)
     {
-        SpawnSearch_ResetState(g_NormalSpawnSearchStates[i]);
-        SpawnSearch_ResetState(g_TeleportSpawnSearchStates[i]);
+        SpawnSearch_ResetCursor(g_NormalSpawnSearchCursors[i]);
+        SpawnSearch_ResetCursor(g_TeleportSpawnSearchCursors[i]);
     }
 }
 
@@ -406,37 +413,33 @@ void SpawnSearch_ResetClass(int zc, bool teleportMode)
         return;
 
     if (teleportMode)
-        SpawnSearch_ResetState(g_TeleportSpawnSearchStates[idx]);
+        SpawnSearch_ResetCursor(g_TeleportSpawnSearchCursors[idx]);
     else
-        SpawnSearch_ResetState(g_NormalSpawnSearchStates[idx]);
+        SpawnSearch_ResetCursor(g_NormalSpawnSearchCursors[idx]);
 }
 
-static bool SpawnSearch_Matches(SpawnSearchState state,
+static bool SpawnSearch_Matches(SpawnSearchCursor cursor,
                                 int zc, int targetSurvivor, float minRange,
                                 float maxRange, bool teleportMode)
 {
-    if (!state.active || state.zc != zc
-        || state.targetSurvivor != targetSurvivor
-        || state.minRange != minRange || state.maxRange != maxRange
-        || state.teleportMode != teleportMode)
+    if (!cursor.active || cursor.zc != zc
+        || cursor.targetSurvivor != targetSurvivor
+        || cursor.minRange != minRange || cursor.maxRange != maxRange
+        || cursor.teleportMode != teleportMode)
     {
         return false;
     }
 
     int userid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
         && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
-    return userid == state.targetUserid;
+    return userid == cursor.targetUserid;
 }
 
-static bool SpawnSearch_Begin(SpawnSearchState state,
-                              int zc, int targetSurvivor, float minRange,
-                              float maxRange, bool teleportMode)
+static bool SpawnSearch_BuildFrameContext(
+    int targetSurvivor, SpawnFrameContext frame)
 {
-    SpawnSearch_ResetState(state);
-    if (!Visibility_HasCurrentEyeSnapshot())
-        Visibility_RefreshEyeSnapshot();
-
     float buildStart = GetEngineTime();
+    Visibility_EnsureCurrentEyeSnapshot();
     if (!GetSurPosData())
     {
         SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
@@ -452,35 +455,28 @@ static bool SpawnSearch_Begin(SpawnSearchState state,
     }
     EnsureNavCooldownSlots();
 
-    state.zc = zc;
-    state.targetSurvivor = targetSurvivor;
-    state.targetUserid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
-        && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
-    state.minRange = minRange;
-    state.maxRange = maxRange;
-    state.teleportMode = teleportMode;
-    state.mapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
-    state.finaleArea = L4D_IsMissionFinalMap()
+    frame.mapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
+    frame.finaleArea = L4D_IsMissionFinalMap()
         && L4D2_GetCurrentFinaleStage() < FINALE_STAGE_ESCAPE;
-    GetSectorCenter(state.center, targetSurvivor);
-    state.sectors = GetCurrentSectors();
+    GetSectorCenter(frame.center, targetSurvivor);
+    frame.sectors = GetCurrentSectors();
 
-    state.allMaxZ = -1.0e9;
+    frame.allMaxZ = -1.0e9;
     SurPosData data;
     for (int i = 0; i < g_iSurPosDataLen; i++)
     {
         g_aSurPosData.GetArray(i, data);
-        if (data.fPos[2] > state.allMaxZ)
-            state.allMaxZ = data.fPos[2];
+        if (data.fPos[2] > frame.allMaxZ)
+            frame.allMaxZ = data.fPos[2];
     }
 
-    state.positionCheckBucket = -1;
+    frame.positionCheckBucket = -1;
     if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
         && !L4D_IsPlayerIncapacitated(targetSurvivor))
     {
-        TryGetClientFlowPercentSafe(targetSurvivor, state.positionCheckBucket);
+        TryGetClientFlowPercentSafe(targetSurvivor, frame.positionCheckBucket);
     }
-    if (state.positionCheckBucket < 0)
+    if (frame.positionCheckBucket < 0)
     {
         float bestFlow = -1.0;
         for (int i = 0; i < g_iSurPosDataLen; i++)
@@ -490,21 +486,24 @@ static bool SpawnSearch_Begin(SpawnSearchState state,
                 bestFlow = data.fFlow;
         }
         if (bestFlow >= 0.0)
-            state.positionCheckBucket = FlowDistanceToPercent(bestFlow);
+            frame.positionCheckBucket = FlowDistanceToPercent(bestFlow);
     }
-    state.centerBucket = (state.positionCheckBucket >= 0)
-        ? state.positionCheckBucket : 50;
+    frame.centerBucket = (frame.positionCheckBucket >= 0)
+        ? frame.positionCheckBucket : 50;
 
-    SpawnCore_CopyPos(state.targetPoint, state.center);
-    state.refEyeZ = state.allMaxZ;
+    SpawnCore_CopyPos(frame.targetPoint, frame.center);
+    frame.refEyeZ = frame.allMaxZ;
     if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
         && !L4D_IsPlayerIncapacitated(targetSurvivor))
     {
-        GetClientEyePosition(targetSurvivor, state.targetPoint);
-        state.refEyeZ = state.targetPoint[2];
+        GetClientEyePosition(targetSurvivor, frame.targetPoint);
+        frame.refEyeZ = frame.targetPoint[2];
     }
-    state.hasLowestFootZ = TryGetLowestSurvivorFootZ(state.lowestFootZ);
+    frame.hasLowestFootZ = TryGetLowestSurvivorFootZ(frame.lowestFootZ);
 
+    frame.navStart = Address_Null;
+    frame.navStartClient = -1;
+    frame.navStartId = -1;
     int pathTarget = targetSurvivor;
     if (!IsValidSurvivor(pathTarget) || !IsPlayerAlive(pathTarget)
         || L4D_IsPlayerIncapacitated(pathTarget))
@@ -513,197 +512,278 @@ static bool SpawnSearch_Begin(SpawnSearchState state,
     }
     if (IsValidSurvivor(pathTarget) && IsPlayerAlive(pathTarget))
     {
+        frame.navStartClient = pathTarget;
         float survivorPos[3];
         GetClientAbsOrigin(pathTarget, survivorPos);
-        state.navStart = L4D2Direct_GetTerrorNavArea(survivorPos);
-        if (state.navStart == Address_Null)
+        frame.navStart = L4D2Direct_GetTerrorNavArea(survivorPos);
+        if (frame.navStart == Address_Null)
         {
-            state.navStart = L4D_GetNearestNavArea(
+            frame.navStart = L4D_GetNearestNavArea(
                 survivorPos, 120.0, false, false, false, TEAM_INFECTED);
         }
     }
-    if (state.navStart == Address_Null)
+    if (frame.navStart == Address_Null)
     {
         SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
         return false;
     }
+    frame.navStartId = L4D_GetNavAreaID(frame.navStart);
 
-    if (gCV.bNavBucketEnable && g_BucketsReady)
-    {
-        state.source = SpawnCandidate_Buckets;
-        int win = ClampInt(ComputeDynamicBucketWindow(maxRange), 0, 100);
-        if (SpawnPerfConfig_UseAdaptiveBucketWindow())
-            win = ClampInt(ComputeAdaptiveBucketWindow(maxRange, win), 0, 100);
-        state.bucketOrderLen = SpawnPerfConfig_UseProgressiveSampling()
-            ? BuildOptimizedBucketOrder(state.centerBucket, win,
-                gCV.bNavBucketIncludeCtr, state.bucketOrder)
-            : BuildBucketOrder(state.centerBucket, win,
-                gCV.bNavBucketIncludeCtr, state.bucketOrder);
-    }
-    else
-    {
-        state.source = SpawnCandidate_All;
-    }
-
-    state.candidateBudget = DifficultyStrategy_GetCandidateBudget();
-    // 回退 Trace 的单候选成本明显更高。只压缩评分样本，不减少 Nav 扫描范围，
-    // 原生安全检查启用后仍使用完整的难度预算。
-    if (!SpawnAccel_CanUseNativeSafety()
-        && state.candidateBudget > NAV_SCAN_FALLBACK_SCORE_BUDGET)
-    {
-        state.candidateBudget = NAV_SCAN_FALLBACK_SCORE_BUDGET;
-    }
-    state.visibilityRayMode = GetEffectiveVisibilityRayMode();
-    state.firstFit = gCV.bNavBucketFirstFit;
-    state.minScore = gCV.fSpawnScoreFloor;
-    state.firstFitScore = FloatMax(
-        ComputeFFThreshold(), state.minScore);
-    state.active = true;
+    frame.candidateBudget = DifficultyStrategy_GetCandidateBudget();
+    // 安全检查实现不应改变刷特节奏。统一限制评分样本，同时保留完整 Nav
+    // 候选源和跨帧游标；找不到足够样本时仍会继续扫描后续区域。
+    if (frame.candidateBudget > NAV_SCAN_SCORE_BUDGET_CAP)
+        frame.candidateBudget = NAV_SCAN_SCORE_BUDGET_CAP;
+    frame.visibilityRayMode = GetEffectiveVisibilityRayMode();
+    frame.firstFit = gCV.bNavBucketFirstFit;
+    frame.minScore = gCV.fSpawnScoreFloor;
+    frame.firstFitScore = FloatMax(ComputeFFThreshold(), frame.minScore);
     SpawnPerf_RecordCandidateBuild((GetEngineTime() - buildStart) * 1000.0);
     return true;
 }
 
-static bool SpawnSearch_NextCandidate(SpawnSearchState state,
-                                      int &areaIdx, int &candidateBucket,
-                                      bool &rejectBadFlow)
+static void SpawnSearch_ConfigureCursor(
+    SpawnSearchCursor cursor, int zc, int targetSurvivor,
+    float minRange, float maxRange, bool teleportMode,
+    int graphTargetClient, int graphTargetNavId)
+{
+    SpawnSearch_ResetCursor(cursor);
+    cursor.zc = zc;
+    cursor.targetSurvivor = targetSurvivor;
+    cursor.targetUserid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
+        && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
+    cursor.minRange = minRange;
+    cursor.maxRange = maxRange;
+    cursor.teleportMode = teleportMode;
+    cursor.graphTargetClient = graphTargetClient;
+    cursor.graphTargetNavId = graphTargetNavId;
+    cursor.graphPathLimit = SpawnAccel_GetCandidatePathLimit();
+    cursor.graphMinTargetDistance = FloatMax(
+        0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
+    cursor.graphMaxTargetDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK;
+    cursor.source = (graphTargetClient > 0 && graphTargetNavId > 0
+        && SpawnAccel_CanUseGraphCandidates())
+        ? SpawnCandidate_Graph : SpawnCandidate_All;
+    cursor.active = true;
+}
+
+static void SpawnSearch_EnsureCursor(
+    SpawnSearchCursor cursor, int zc, int targetSurvivor,
+    float minRange, float maxRange, bool teleportMode,
+    int graphTargetClient, int graphTargetNavId)
+{
+    SpawnCandidateSource wantedSource = (graphTargetClient > 0 && graphTargetNavId > 0
+        && SpawnAccel_CanUseGraphCandidates())
+        ? SpawnCandidate_Graph : SpawnCandidate_All;
+    bool graphTargetMoved = wantedSource == SpawnCandidate_Graph
+        && (cursor.graphTargetClient != graphTargetClient
+            || cursor.graphTargetNavId != graphTargetNavId);
+    if (!SpawnSearch_Matches(cursor, zc, targetSurvivor, minRange, maxRange, teleportMode)
+        || cursor.source != wantedSource || graphTargetMoved)
+    {
+        SpawnSearch_ConfigureCursor(
+            cursor, zc, targetSurvivor, minRange, maxRange, teleportMode,
+            graphTargetClient, graphTargetNavId);
+    }
+}
+
+static SpawnCandidateReadResult SpawnSearch_NextCandidate(
+    SpawnSearchCursor cursor, int &areaIdx, int &candidateBucket,
+    bool &rejectBadFlow)
 {
     candidateBucket = -1;
     rejectBadFlow = false;
-    if (state.source == SpawnCandidate_Buckets)
+    while (cursor.source != SpawnCandidate_None)
     {
-        while (state.bucketOrderIdx < state.bucketOrderLen)
+        if (cursor.source == SpawnCandidate_Graph)
         {
-            int bucketIdx = state.bucketOrder[state.bucketOrderIdx];
-            if (bucketIdx < 0 || bucketIdx >= FLOW_BUCKETS
-                || g_FlowBuckets[bucketIdx] == null
-                || state.bucketRow >= g_FlowBuckets[bucketIdx].Length)
+            float now = GetGameTime();
+            if (cursor.graphPageRow < cursor.graphPageLen
+                && now <= cursor.graphPageExpiresAt)
             {
-                state.bucketOrderIdx++;
-                state.bucketRow = 0;
+                areaIdx = cursor.graphPage[cursor.graphPageRow++];
+                cursor.graphOffset++;
+                TryGetBucketByAreaIdx(areaIdx, candidateBucket);
+                return SpawnCandidateRead_Found;
+            }
+
+            // 未消费页只是一批 areaIdx，不是安全结论；超过 0.2 秒后重新取当前快照。
+            cursor.graphPageLen = 0;
+            cursor.graphPageRow = 0;
+            if (cursor.graphTotalInRange >= 0
+                && cursor.graphOffset >= cursor.graphTotalInRange)
+            {
+                return SpawnCandidateRead_Exhausted;
+            }
+
+            int prepareStatus = SpawnAccel_PrepareTargetCandidates(
+                cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL);
+            if (prepareStatus == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+            {
+                g_bSpawnAccelGraphCandidatesAvailable = false;
+                cursor.source = SpawnCandidate_All;
+                cursor.allRow = 0;
+                Debug_Print("[SPAWN ACCEL] directed candidates unavailable during search; using all-Nav fallback");
                 continue;
             }
-            areaIdx = g_FlowBuckets[bucketIdx].Get(state.bucketRow++);
-            candidateBucket = bucketIdx;
-            return true;
+            if (prepareStatus <= 0)
+                return SpawnCandidateRead_Pending;
+
+            float resultAgeMs;
+            int totalInRange;
+            int page[NAV_CANDIDATE_PAGE_SIZE];
+            int count = AnneSpawn_NavCandidatesCollect(
+                cursor.graphTargetClient,
+                cursor.graphTargetNavId,
+                cursor.graphMinTargetDistance,
+                cursor.graphMaxTargetDistance,
+                cursor.graphPathLimit,
+                NAV_CANDIDATE_TEAM_EXCLUSION,
+                NAV_CANDIDATE_RESULT_TTL,
+                cursor.graphOffset,
+                page,
+                NAV_CANDIDATE_PAGE_SIZE,
+                resultAgeMs,
+                totalInRange);
+            if (count == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+            {
+                g_bSpawnAccelGraphCandidatesAvailable = false;
+                cursor.source = SpawnCandidate_All;
+                cursor.allRow = 0;
+                Debug_Print("[SPAWN ACCEL] directed candidate collect unavailable; using all-Nav fallback");
+                continue;
+            }
+            if (count == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+                return SpawnCandidateRead_Pending;
+
+            cursor.graphTotalInRange = totalInRange;
+            if (count <= 0)
+                return SpawnCandidateRead_Exhausted;
+
+            cursor.graphPageLen = count;
+            for (int row = 0; row < count; row++)
+                cursor.graphPage[row] = page[row];
+            float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;
+            cursor.graphPageExpiresAt = now + FloatMax(0.001, ttlRemaining);
+            continue;
         }
-        return false;
-    }
 
-    if (state.source == SpawnCandidate_All
-        && state.allRow < g_NavAreasCacheCount)
-    {
-        areaIdx = state.allRow++;
-        rejectBadFlow = true;
-        return true;
+        if (cursor.source == SpawnCandidate_All
+            && cursor.allRow < g_NavAreasCacheCount)
+        {
+            areaIdx = cursor.allRow++;
+            rejectBadFlow = true;
+            return SpawnCandidateRead_Found;
+        }
+        return SpawnCandidateRead_Exhausted;
     }
-    return false;
+    return SpawnCandidateRead_Exhausted;
 }
 
-static SpawnSearchResult SpawnSearch_Finish(SpawnSearchState state,
-                                            bool exhausted, float outPos[3],
-                                            int &outAreaIdx, SpawnScoreDbg dbgOut)
-{
-    if (!exhausted)
-        return SpawnSearch_Pending;
-
-    if (state.found)
-    {
-        SpawnScore_CopyDbg(dbgOut, state.bestDbg);
-        SpawnCore_CopyPos(outPos, state.bestDbg.pos);
-        outAreaIdx = state.bestDbg.areaIdx;
-        SpawnPerf_RecordAttempt(state.elapsedMs, true);
-        SpawnSearch_ResetState(state);
-        return SpawnSearch_Found;
-    }
-    Debug_Print("[FIND FAIL] range=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
-                state.minRange, state.maxRange, state.inspected,
-                state.stats.cooldown, state.stats.flags,
-                state.stats.flow, state.stats.distance,
-                state.stats.separation, state.stats.stuck,
-                state.stats.visibility, state.stats.path,
-                state.stats.position, state.stats.score,
-                state.stats.bucket);
-    SpawnPerf_RecordAttempt(state.elapsedMs, false);
-    SpawnSearch_ResetState(state);
-    return SpawnSearch_Exhausted;
-}
-
-static SpawnSearchResult FindSpawnPosViaNavAreaStepForState(
-    SpawnSearchState state,
+static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
+    SpawnSearchCursor cursor,
     int zc, int targetSurvivor, float minRange, float maxRange, bool teleportMode,
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     outAreaIdx = -1;
-    if (!SpawnSearch_Matches(state, zc, targetSurvivor, minRange, maxRange, teleportMode))
+    SpawnFrameContext frame;
+    if (!SpawnSearch_BuildFrameContext(targetSurvivor, frame))
     {
-        if (!SpawnSearch_Begin(state, zc, targetSurvivor, minRange, maxRange, teleportMode))
-        {
-            SpawnPerf_RecordAttempt(0.0, false);
-            return SpawnSearch_Exhausted;
-        }
+        SpawnSearch_ResetCursor(cursor);
+        SpawnPerf_RecordAttempt(0.0, false);
+        return SpawnSearch_Exhausted;
     }
-    if (!Visibility_HasCurrentEyeSnapshot())
-        Visibility_RefreshEyeSnapshot();
+    SpawnSearch_EnsureCursor(
+        cursor, zc, targetSurvivor, minRange, maxRange,
+        teleportMode, frame.navStartClient, frame.navStartId);
 
     float sliceStart = GetEngineTime();
     int sliceInspected = 0;
     int sliceExpensive = 0;
+    int acceptedHits = 0;
     bool exhausted = false;
+    bool foundThisTick = false;
+    float bestScore = -1.0e9;
+    float now = GetGameTime();
+    SpawnScoreDbg bestDbg;
     while (sliceInspected < NAV_SCAN_CANDIDATES_PER_SLICE
         && sliceExpensive < NAV_SCAN_EXPENSIVE_PER_SLICE
-        && state.acceptedHits < state.candidateBudget
+        && acceptedHits < frame.candidateBudget
         && (GetEngineTime() - sliceStart) * 1000.0 < NAV_SCAN_TIME_BUDGET_MS)
     {
         int areaIdx;
         int candidateBucket;
         bool rejectBadFlow;
-        if (!SpawnSearch_NextCandidate(state, areaIdx, candidateBucket, rejectBadFlow))
+        SpawnCandidateReadResult readResult = SpawnSearch_NextCandidate(
+            cursor, areaIdx, candidateBucket, rejectBadFlow);
+        if (readResult == SpawnCandidateRead_Pending)
+            break;
+        if (readResult == SpawnCandidateRead_Exhausted)
         {
             exhausted = true;
             break;
         }
 
         sliceInspected++;
-        state.inspected++;
+        cursor.inspected++;
         bool usedExpensive;
         SpawnScoreDbg candDbg;
         bool accepted = SpawnCore_EvaluateNavCandidate(
-            state.zc, state.targetSurvivor,
-            state.targetPoint, state.minRange,
-            state.maxRange, state.teleportMode,
+            zc, targetSurvivor,
+            frame.targetPoint, minRange,
+            maxRange, teleportMode,
             areaIdx, candidateBucket, rejectBadFlow,
-            state.mapMaxFlowDist, state.finaleArea,
-            state.center, state.sectors,
-            state.allMaxZ, state.centerBucket,
-            state.positionCheckBucket, state.refEyeZ,
-            state.lowestFootZ, state.hasLowestFootZ,
-            state.navStart, state.visibilityRayMode,
-            state.minScore, GetGameTime(), candDbg,
-            state.stats, usedExpensive);
+            frame.mapMaxFlowDist, frame.finaleArea,
+            frame.center, frame.sectors,
+            frame.allMaxZ, frame.centerBucket,
+            frame.positionCheckBucket, frame.refEyeZ,
+            frame.lowestFootZ, frame.hasLowestFootZ,
+            frame.navStart, frame.visibilityRayMode,
+            frame.minScore, now, candDbg,
+            cursor.stats, usedExpensive);
         if (usedExpensive)
             sliceExpensive++;
         if (!accepted)
             continue;
 
-        state.acceptedHits++;
-        if (!state.found || candDbg.total > state.bestScore)
+        acceptedHits++;
+        if (!foundThisTick || candDbg.total > bestScore)
         {
-            state.found = true;
-            state.bestScore = candDbg.total;
-            SpawnScore_CopyDbg(state.bestDbg, candDbg);
+            foundThisTick = true;
+            bestScore = candDbg.total;
+            SpawnScore_CopyDbg(bestDbg, candDbg);
         }
-        if (state.firstFit && candDbg.total >= state.firstFitScore)
+        if (frame.firstFit && candDbg.total >= frame.firstFitScore)
             break;
     }
 
     float sliceMs = (GetEngineTime() - sliceStart) * 1000.0;
-    state.elapsedMs += sliceMs;
+    cursor.elapsedMs += sliceMs;
     SpawnPerf_RecordSlice(sliceMs);
-    bool complete = exhausted
-        || state.acceptedHits >= state.candidateBudget
-        || (state.firstFit && state.found
-            && state.bestScore >= state.firstFitScore);
-    return SpawnSearch_Finish(state, complete, outPos, outAreaIdx, dbgOut);
+
+    if (foundThisTick)
+    {
+        SpawnScore_CopyDbg(dbgOut, bestDbg);
+        SpawnCore_CopyPos(outPos, bestDbg.pos);
+        outAreaIdx = bestDbg.areaIdx;
+        SpawnPerf_RecordAttempt(cursor.elapsedMs, true);
+        SpawnSearch_ResetCursor(cursor);
+        return SpawnSearch_Found;
+    }
+    if (!exhausted)
+        return SpawnSearch_Pending;
+
+    Debug_Print("[FIND FAIL] range=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+                cursor.minRange, cursor.maxRange, cursor.inspected,
+                cursor.stats.cooldown, cursor.stats.flags,
+                cursor.stats.flow, cursor.stats.distance,
+                cursor.stats.separation, cursor.stats.stuck,
+                cursor.stats.visibility, cursor.stats.path,
+                cursor.stats.position, cursor.stats.score,
+                cursor.stats.bucket);
+    SpawnPerf_RecordAttempt(cursor.elapsedMs, false);
+    SpawnSearch_ResetCursor(cursor);
+    return SpawnSearch_Exhausted;
 }
 
 SpawnSearchResult FindSpawnPosViaNavAreaStep(
@@ -716,13 +796,13 @@ SpawnSearchResult FindSpawnPosViaNavAreaStep(
 
     if (teleportMode)
     {
-        return FindSpawnPosViaNavAreaStepForState(
-            g_TeleportSpawnSearchStates[idx], zc, targetSurvivor,
+        return FindSpawnPosViaNavAreaStepForCursor(
+            g_TeleportSpawnSearchCursors[idx], zc, targetSurvivor,
             minRange, maxRange, true, outPos, outAreaIdx, dbgOut);
     }
 
-    return FindSpawnPosViaNavAreaStepForState(
-        g_NormalSpawnSearchStates[idx], zc, targetSurvivor,
+    return FindSpawnPosViaNavAreaStepForCursor(
+        g_NormalSpawnSearchCursors[idx], zc, targetSurvivor,
         minRange, maxRange, false, outPos, outAreaIdx, dbgOut);
 }
 

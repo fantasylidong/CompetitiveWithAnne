@@ -51,8 +51,8 @@ void SpawnPerfConfig_Create()
     );
 
     g_cvSpawnPerfStats = CreateConVar(
-        "inf_spawn_perf_stats", "0",
-        "显示刷点性能统计：0=关闭，1=回合结束时输出",
+        "inf_spawn_perf_stats", "1",
+        "记录刷点性能统计和波次生成报告：0=关闭，1=开启",
         CVAR_FLAG, true, 0.0, true, 1.0
     );
 

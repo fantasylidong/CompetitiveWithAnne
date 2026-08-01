@@ -1,5 +1,8 @@
 # leftdhooks PVS 优化说明
 
+> [!WARNING]
+> 这是已回退方案的历史说明。PVS 实现已在 `70c39b5d5` 删除，当前运行代码不包含本文所述模块。
+
 ## 概述
 
 本次优化使用 leftdhooks 1.150+ 的新 natives 对刷特插件进行性能优化：

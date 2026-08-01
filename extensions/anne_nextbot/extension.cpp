@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <tier1/convar.h>
 
 namespace
 {
@@ -28,6 +29,29 @@ struct BotCacheEntry
     int zombieClass = -1;
 };
 
+struct PathFollowerStats
+{
+    std::uint64_t matched = 0;
+    std::uint64_t forwarded = 0;
+    std::uint64_t invalid = 0;
+    std::uint64_t errors = 0;
+    int lastClient = -1;
+    int lastTick = -1;
+};
+
+struct NextBotStats
+{
+    std::uint64_t shouldUpdateCalls = 0;
+    std::uint64_t shouldUpdateEligible = 0;
+    std::uint64_t shouldUpdateThrottled = 0;
+    std::uint64_t shouldUpdatePassthrough = 0;
+    std::uint64_t registerCalls = 0;
+    std::uint64_t unregisterCalls = 0;
+    std::uint64_t pathFollowerCalls = 0;
+    PathFollowerStats tank;
+    PathFollowerStats charger;
+};
+
 std::array<BotCacheEntry, kMaxNextBots> g_BotCache;
 std::array<int, kNpcClassCount> g_UpdateTicks = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 int g_GlobalUpdateTicks = 1;
@@ -40,6 +64,8 @@ bool g_ShouldUpdateDetourEnabled = false;
 bool g_RegisterDetourEnabled = false;
 bool g_UnregisterDetourEnabled = false;
 bool g_PathFollowerUpdateDetourEnabled = false;
+bool g_StatusCommandRegistered = false;
+NextBotStats g_Stats;
 
 IGameConfig *g_GameConfig = nullptr;
 CDetour *g_ShouldUpdateDetour = nullptr;
@@ -155,42 +181,81 @@ void ClearBot(int id, void *bot)
         g_BotCache[id] = {};
 }
 
-void RunPathForward(IForward *forward, int client, void *pathFollower)
+enum class PathForwardResult
+{
+    Invalid,
+    Forwarded,
+    Error,
+};
+
+PathForwardResult RunPathForward(IForward *forward, int client, void *pathFollower)
 {
     if (!forward || client <= 0 || !pathFollower)
-        return;
+        return PathForwardResult::Invalid;
 
     forward->PushCell(client);
     forward->PushCell(static_cast<cell_t>(reinterpret_cast<std::uintptr_t>(pathFollower)));
-    forward->Execute(nullptr);
+    return forward->Execute(nullptr) == SP_ERROR_NONE ? PathForwardResult::Forwarded : PathForwardResult::Error;
+}
+
+void RecordPathForward(PathFollowerStats &stats, IForward *forward, int client, void *pathFollower)
+{
+    ++stats.matched;
+    PathForwardResult result = RunPathForward(forward, client, pathFollower);
+    if (result == PathForwardResult::Invalid)
+    {
+        ++stats.invalid;
+        return;
+    }
+    if (result == PathForwardResult::Error)
+    {
+        ++stats.errors;
+        return;
+    }
+
+    ++stats.forwarded;
+    stats.lastClient = client;
+    stats.lastTick = gpGlobals ? gpGlobals->tickcount : -1;
 }
 }
 
 DETOUR_DECL_MEMBER1(Anne_ShouldUpdate, bool, void *, bot)
 {
+    ++g_Stats.shouldUpdateCalls;
     if (!g_SchedulerEnabled || !bot || !gpGlobals)
+    {
+        ++g_Stats.shouldUpdatePassthrough;
         return DETOUR_MEMBER_CALL(Anne_ShouldUpdate)(bot);
+    }
 
     BotCacheEntry &entry = CacheBot(bot);
     if (entry.bot != bot || entry.zombieClass < 0 || entry.zombieClass >= kNpcClassCount)
+    {
+        ++g_Stats.shouldUpdatePassthrough;
         return DETOUR_MEMBER_CALL(Anne_ShouldUpdate)(bot);
+    }
 
     int currentTick = gpGlobals->tickcount;
     int lastTick = ReadField<int>(bot, kLastUpdateTickOffset);
     int updateTicks = g_UpdateTicks[entry.zombieClass];
     if (currentTick < lastTick + updateTicks)
+    {
+        ++g_Stats.shouldUpdateThrottled;
         return false;
+    }
 
     WriteField<bool>(bot, kScheduledOffset, true);
     if (updateTicks < g_GlobalUpdateTicks)
         WriteField<int>(bot, kLastUpdateTickOffset, lastTick + updateTicks - g_GlobalUpdateTicks);
 
+    ++g_Stats.shouldUpdateEligible;
     return DETOUR_MEMBER_CALL(Anne_ShouldUpdate)(bot);
 }
 
 DETOUR_DECL_MEMBER1(Anne_Register, int, void *, bot)
 {
     int result = DETOUR_MEMBER_CALL(Anne_Register)(bot);
+    ++g_Stats.registerCalls;
     RegisterBot(result, bot);
     return result;
 }
@@ -199,18 +264,20 @@ DETOUR_DECL_MEMBER1(Anne_Unregister, void, void *, bot)
 {
     int id = GetBotId(bot);
     DETOUR_MEMBER_CALL(Anne_Unregister)(bot);
+    ++g_Stats.unregisterCalls;
     ClearBot(id, bot);
 }
 
 DETOUR_DECL_MEMBER1(Anne_PathFollowerUpdate, void, void *, bot)
 {
+    ++g_Stats.pathFollowerCalls;
     if (g_PathBrokerEnabled && bot)
     {
         BotCacheEntry &entry = CacheBot(bot);
         if (entry.zombieClass == kTankClass && (g_PathConsumers & kPathConsumerTank) != 0)
-            RunPathForward(g_TankPathForward, entry.entity, this);
+            RecordPathForward(g_Stats.tank, g_TankPathForward, entry.entity, this);
         else if (entry.zombieClass == kChargerClass && (g_PathConsumers & kPathConsumerCharger) != 0)
-            RunPathForward(g_ChargerPathForward, entry.entity, this);
+            RecordPathForward(g_Stats.charger, g_ChargerPathForward, entry.entity, this);
     }
 
     DETOUR_MEMBER_CALL(Anne_PathFollowerUpdate)(bot);
@@ -218,6 +285,115 @@ DETOUR_DECL_MEMBER1(Anne_PathFollowerUpdate, void, void *, bot)
 
 namespace
 {
+int CountCachedBots(bool classifiedOnly)
+{
+    int count = 0;
+    for (const BotCacheEntry &entry : g_BotCache)
+    {
+        if (entry.bot && (!classifiedOnly || entry.zombieClass >= 0))
+            ++count;
+    }
+    return count;
+}
+
+double GetLastAgeSeconds(const PathFollowerStats &stats)
+{
+    if (!gpGlobals || stats.lastTick < 0 || gpGlobals->tickcount < stats.lastTick)
+        return -1.0;
+    return static_cast<double>(gpGlobals->tickcount - stats.lastTick) * gpGlobals->interval_per_tick;
+}
+
+const char *GetPathState(bool requested, IForward *forward, const PathFollowerStats &stats)
+{
+    if (!requested)
+        return "not-requested";
+    if (!g_PathBrokerEnabled)
+        return "broker-off";
+    if (!forward || forward->GetFunctionCount() == 0)
+        return "no-listener";
+    if (stats.errors > 0 && stats.forwarded == 0)
+        return "forward-error";
+    if (stats.forwarded == 0)
+        return "waiting";
+
+    double age = GetLastAgeSeconds(stats);
+    return age >= 0.0 && age <= 10.0 ? "active" : "idle";
+}
+
+void PrintPathStatus(const char *name, int consumer, IForward *forward, const PathFollowerStats &stats)
+{
+    bool requested = (g_PathConsumers & consumer) != 0;
+    unsigned int listeners = forward ? forward->GetFunctionCount() : 0;
+    double age = GetLastAgeSeconds(stats);
+    if (age < 0.0)
+    {
+        g_SMAPI->ConPrintf(
+            "[Anne NextBot] %s requested=%s listeners=%u matched=%llu forwarded=%llu invalid=%llu errors=%llu last=never state=%s\n",
+            name,
+            requested ? "yes" : "no",
+            listeners,
+            static_cast<unsigned long long>(stats.matched),
+            static_cast<unsigned long long>(stats.forwarded),
+            static_cast<unsigned long long>(stats.invalid),
+            static_cast<unsigned long long>(stats.errors),
+            GetPathState(requested, forward, stats));
+        return;
+    }
+
+    g_SMAPI->ConPrintf(
+        "[Anne NextBot] %s requested=%s listeners=%u matched=%llu forwarded=%llu invalid=%llu errors=%llu lastClient=%d lastAge=%.2fs state=%s\n",
+        name,
+        requested ? "yes" : "no",
+        listeners,
+        static_cast<unsigned long long>(stats.matched),
+        static_cast<unsigned long long>(stats.forwarded),
+        static_cast<unsigned long long>(stats.invalid),
+        static_cast<unsigned long long>(stats.errors),
+        stats.lastClient,
+        age,
+        GetPathState(requested, forward, stats));
+}
+
+void Command_NextBotStatus(const CCommand &)
+{
+    const char *consumers = g_PathConsumers == kPathConsumerMask ? "tank,charger"
+        : g_PathConsumers == kPathConsumerTank ? "tank"
+        : g_PathConsumers == kPathConsumerCharger ? "charger"
+        : "none";
+
+    g_SMAPI->ConPrintf(
+        "[Anne NextBot] version=%s scheduler=%s pathBroker=%s consumers=%s cached=%d classified=%d tick=%d\n",
+        SMEXT_CONF_VERSION,
+        g_SchedulerEnabled ? "on" : "off",
+        g_PathBrokerEnabled ? "on" : "off",
+        consumers,
+        CountCachedBots(false),
+        CountCachedBots(true),
+        gpGlobals ? gpGlobals->tickcount : -1);
+    g_SMAPI->ConPrintf(
+        "[Anne NextBot] scheduler calls=%llu eligible=%llu throttled=%llu passthrough=%llu register=%llu unregister=%llu ticks(global=%d charger=%d tank=%d)\n",
+        static_cast<unsigned long long>(g_Stats.shouldUpdateCalls),
+        static_cast<unsigned long long>(g_Stats.shouldUpdateEligible),
+        static_cast<unsigned long long>(g_Stats.shouldUpdateThrottled),
+        static_cast<unsigned long long>(g_Stats.shouldUpdatePassthrough),
+        static_cast<unsigned long long>(g_Stats.registerCalls),
+        static_cast<unsigned long long>(g_Stats.unregisterCalls),
+        g_GlobalUpdateTicks,
+        g_UpdateTicks[kChargerClass],
+        g_UpdateTicks[kTankClass]);
+    g_SMAPI->ConPrintf(
+        "[Anne NextBot] pathFollower detourCalls=%llu\n",
+        static_cast<unsigned long long>(g_Stats.pathFollowerCalls));
+    PrintPathStatus("ai_tank", kPathConsumerTank, g_TankPathForward, g_Stats.tank);
+    PrintPathStatus("ai_charger", kPathConsumerCharger, g_ChargerPathForward, g_Stats.charger);
+}
+
+ConCommand g_NextBotStatusCommand(
+    "sm_anne_nextbot_status",
+    Command_NextBotStatus,
+    "Show Anne NextBot scheduler and PathFollower forwarding status.",
+    FCVAR_NONE);
+
 void SetDetourEnabled(CDetour *detour, bool enabled, bool &current)
 {
     if (!detour || enabled == current)
@@ -388,11 +564,25 @@ bool AnneNextBotExtension::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
     sharesys->AddNatives(myself, g_Natives);
     sharesys->RegisterLibrary(myself, "anne_nextbot");
+
+    if (!g_SMAPI->RegisterConCommandBase(g_PLAPI, &g_NextBotStatusCommand))
+    {
+        std::snprintf(error, maxlength, "Could not register sm_anne_nextbot_status");
+        SDK_OnUnload();
+        return false;
+    }
+    g_StatusCommandRegistered = true;
     return true;
 }
 
 void AnneNextBotExtension::SDK_OnUnload()
 {
+    if (g_StatusCommandRegistered)
+    {
+        g_SMAPI->UnregisterConCommandBase(g_PLAPI, &g_NextBotStatusCommand);
+        g_StatusCommandRegistered = false;
+    }
+
     g_SchedulerEnabled = false;
     g_PathBrokerEnabled = false;
     g_PathConsumers = 0;

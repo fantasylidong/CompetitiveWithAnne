@@ -8,6 +8,8 @@
 
 void StartWave()
 {
+    // 下一次开波就是上一波的自然结算边界；首波时没有活动报告。
+    WaveSpawnReport_End("next_wave");
     ClearPathCache();
     RecalcSiCapFromAlive(true);
     ResetWaveClassSpawnCounts();
@@ -40,6 +42,8 @@ void StartWave()
 
     AntiBait_OnWaveStart();
     gST.targetSurvivor = Tactical_ResolveWaveTarget();
+    WaveSpawnReport_Begin(
+        gST.waveIndex, aiBudget, gST.siQueueCount, gST.lastWaveStartTime);
     WaveDecider_OnWaveStart();  // 通知波决策器
     Traitor_ActivateWaitingClients(); // 仅在新的 EarlyCheck 安全窗口晋升普通内鬼
     Debug_Print("Start wave %d", gST.waveIndex);

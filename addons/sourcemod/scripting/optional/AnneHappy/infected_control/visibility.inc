@@ -94,6 +94,12 @@ stock void Visibility_RefreshEyeSnapshot()
     g_VisibilitySnapshotReady = true;
 }
 
+stock void Visibility_EnsureCurrentEyeSnapshot()
+{
+    if (!Visibility_HasCurrentEyeSnapshot())
+        Visibility_RefreshEyeSnapshot();
+}
+
 stock int Visibility_GetEyeSnapshotCount()
 {
     return Visibility_HasCurrentEyeSnapshot() ? g_VisibilitySnapshotCount : 0;
@@ -148,7 +154,7 @@ int GetEffectiveVisibilityRayMode()
     return mode;
 }
 
-bool IsPosVisibleSDKWithMode(float pos[3], bool teleportMode, int effectiveRayMode)
+bool IsPosVisibleSDKWithMode(const float pos[3], bool teleportMode, int effectiveRayMode)
 {
     float head[3];
     head[0] = pos[0]; head[1] = pos[1]; head[2] = pos[2] + 62.0;
@@ -221,9 +227,27 @@ bool IsPosVisibleSDKWithMode(float pos[3], bool teleportMode, int effectiveRayMo
     return false;
 }
 
-bool IsPosVisibleSDK(float pos[3], bool teleportMode)
+bool IsPosVisibleSDK(const float pos[3], bool teleportMode)
 {
     return IsPosVisibleSDKWithMode(pos, teleportMode, GetEffectiveVisibilityRayMode());
+}
+
+AnneSpawnSafetyResult Visibility_TestPointSafety(
+    const float pos[3], bool teleportMode, int effectiveRayMode)
+{
+    Visibility_EnsureCurrentEyeSnapshot();
+
+    if (SpawnAccel_CanUseNativeSafety())
+    {
+        return AnneSpawn_TestPointSafety(
+            pos, teleportMode, gCV.bIgnoreIncapSight, effectiveRayMode);
+    }
+
+    if (WillStuck(pos))
+        return AnneSpawnSafety_Stuck;
+    if (IsPosVisibleSDKWithMode(pos, teleportMode, effectiveRayMode))
+        return AnneSpawnSafety_Visible;
+    return AnneSpawnSafety_Safe;
 }
 
 stock bool TraceFilter_Stuck(int entity, int contentsMask)

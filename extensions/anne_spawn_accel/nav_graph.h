@@ -66,6 +66,19 @@ public:
     static AnneNavEdgeType EdgeType(std::uint32_t edge);
 };
 
+bool AnneBuildNavCandidateSnapshot(
+    const AnneNavGraph &graph,
+    std::uint32_t targetIndex,
+    float maxPathDistance,
+    const std::vector<std::uint8_t> &blocked,
+    const std::vector<float> &survivorEyes,
+    std::size_t targetSurvivorSlot,
+    float minSurvivorDistance,
+    std::vector<std::uint32_t> &areaIndices,
+    std::vector<float> &targetDistances,
+    std::vector<float> &pathDistances,
+    std::vector<std::uint8_t> &usesSpecialEdge);
+
 std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(
     const AnneNavGraphMetadata &metadata,
     std::vector<AnneNavGraphInputEdge> inputEdges,

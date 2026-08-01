@@ -8,9 +8,18 @@
 
 bool g_bSpawnAccel;
 bool g_bSpawnAccelGraphReady;
+bool g_bSpawnAccelGraphCandidatesAvailable;
 bool g_bSpawnAccelAvailabilityKnown;
+bool g_bSpawnAccelNativeSafetyAvailable;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 ArrayList g_SpawnAccelRawFlowDistances = null;
+float g_fSpawnAccelNextCandidateRefresh;
+bool g_bSpawnAccelCandidateWarm;
+int g_iSpawnAccelCandidateIdleRefreshes;
+int g_iSpawnAccelCandidateWarmRefreshes;
+int g_iSpawnAccelCandidatePrepareReady;
+int g_iSpawnAccelCandidatePreparePending;
+int g_iSpawnAccelCandidatePrepareUnavailable;
 
 static const char g_sSpawnAccelRequiredNatives[][] =
 {
@@ -19,6 +28,10 @@ static const char g_sSpawnAccelRequiredNatives[][] =
     "AnneSpawn_NavGraphPump",
     "AnneSpawn_NavGraphStop",
     "AnneSpawn_NavGraphPrepareRange",
+    "AnneSpawn_NavCandidatesPrepare",
+    "AnneSpawn_NavCandidatesCollect",
+    "AnneSpawn_NavCandidatesGetPerf",
+    "AnneSpawn_NavCandidatesResetPerf",
     "AnneSpawn_NavGraphGetAreaCount",
     "AnneSpawn_NavGraphGetEdgeCount",
     "AnneSpawn_NavGraphCollectProgress",
@@ -53,10 +66,14 @@ stock bool SpawnAccel_IsAvailable()
 
 stock bool SpawnAccel_CanUseNativeSafety()
 {
-    return g_bSpawnAccel
-        && gCV.bSpawnAccelNativeSafety
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety")
-            == FeatureStatus_Available;
+    return g_bSpawnAccelNativeSafetyAvailable
+        && gCV.bSpawnAccelNativeSafety;
+}
+
+stock bool SpawnAccel_CanUseGraphCandidates()
+{
+    return g_bSpawnAccel && g_bSpawnAccelGraphReady
+        && g_bSpawnAccelGraphCandidatesAvailable;
 }
 
 stock void SpawnAccel_LogUnavailableReason()
@@ -90,6 +107,11 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
     bool available = SpawnAccel_IsAvailable();
     bool shouldLog = forceLog || !g_bSpawnAccelAvailabilityKnown || available != g_bSpawnAccel;
     g_bSpawnAccel = available;
+    if (!available)
+        g_bSpawnAccelGraphCandidatesAvailable = false;
+    g_bSpawnAccelNativeSafetyAvailable = available
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety")
+            == FeatureStatus_Available;
     g_bSpawnAccelAvailabilityKnown = true;
 
     if (shouldLog)
@@ -199,6 +221,9 @@ stock void SpawnAccel_ClearGraphState(bool stopExtension)
     if (stopExtension && g_bSpawnAccel)
         AnneSpawn_NavGraphStop();
     g_bSpawnAccelGraphReady = false;
+    g_bSpawnAccelGraphCandidatesAvailable = false;
+    g_fSpawnAccelNextCandidateRefresh = 0.0;
+    g_bSpawnAccelCandidateWarm = false;
     SpawnAccel_ClearGraphProgress();
 }
 
@@ -238,6 +263,147 @@ stock bool SpawnAccel_PrepareCurrentSurvivorRange()
     return AnneSpawn_NavGraphPrepareRange(targetId, maxPathDistance, TEAM_INFECTED, false);
 }
 
+stock bool SpawnAccel_GetClientNavId(int client, int &navId)
+{
+    navId = -1;
+    if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+        return false;
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    Address nav = L4D2Direct_GetTerrorNavArea(pos);
+    if (nav == Address_Null)
+        nav = L4D_GetNearestNavArea(pos, 120.0, false, false, false, TEAM_INFECTED);
+    if (nav == Address_Null)
+        return false;
+
+    navId = L4D_GetNavAreaID(nav);
+    return navId > 0;
+}
+
+stock float SpawnAccel_GetCandidatePathLimit()
+{
+    return gCV.fSpawnMax * 1.5 + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
+}
+
+stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
+{
+    if (!SpawnAccel_CanUseGraphCandidates())
+        return ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE;
+
+    int targetNavId;
+    if (!SpawnAccel_GetClientNavId(target, targetNavId))
+        return ANNE_SPAWN_NAV_CANDIDATE_PENDING;
+
+    int status = AnneSpawn_NavCandidatesPrepare(
+        target, targetNavId, SpawnAccel_GetCandidatePathLimit(),
+        NAV_CANDIDATE_TEAM_EXCLUSION, maxAge);
+    if (status > 0)
+        g_iSpawnAccelCandidatePrepareReady++;
+    else if (status == 0 || status == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+        g_iSpawnAccelCandidatePreparePending++;
+    else
+        g_iSpawnAccelCandidatePrepareUnavailable++;
+    return status;
+}
+
+stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
+{
+    if (!SpawnAccel_CanUseGraphCandidates())
+        return;
+
+    // worker 只写待发布队列；每帧 pump 一次让完成结果尽快进入只读缓存。
+    // Dijkstra/排序仍严格按 1.0s/0.1s 节流，不会变成每帧重建。
+    AnneSpawn_NavGraphPump();
+
+    if (warm != g_bSpawnAccelCandidateWarm)
+    {
+        g_bSpawnAccelCandidateWarm = warm;
+        g_fSpawnAccelNextCandidateRefresh = 0.0;
+    }
+
+    float interval = warm ? NAV_CANDIDATE_WARM_INTERVAL : NAV_CANDIDATE_IDLE_INTERVAL;
+    if (now < g_fSpawnAccelNextCandidateRefresh)
+        return;
+    g_fSpawnAccelNextCandidateRefresh = now + interval;
+
+    Visibility_EnsureCurrentEyeSnapshot();
+    float maxAge = interval * 0.75;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+            continue;
+        int status = SpawnAccel_PrepareTargetCandidates(client, maxAge);
+        if (status == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+        {
+            g_bSpawnAccelGraphCandidatesAvailable = false;
+            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; using all-Nav fallback");
+            break;
+        }
+    }
+
+    if (warm)
+        g_iSpawnAccelCandidateWarmRefreshes++;
+    else
+        g_iSpawnAccelCandidateIdleRefreshes++;
+}
+
+stock void SpawnAccel_PrintCandidatePerf()
+{
+    if (!g_bSpawnAccel)
+        return;
+
+    float timings[ANNE_SPAWN_NAV_CANDIDATE_PERF_FLOATS];
+    int counters[ANNE_SPAWN_NAV_CANDIDATE_PERF_COUNTS];
+    if (!AnneSpawn_NavCandidatesGetPerf(
+            timings, sizeof(timings), counters, sizeof(counters)))
+        return;
+
+    SpawnPerf_Log("[SpawnPerf][GraphCandidates] buildMs samples=%d last=%.3f p50=%.3f p95=%.3f p99=%.3f max=%.3f",
+        counters[AnneSpawnCandidatePerf_BuildSamples],
+        timings[AnneSpawnCandidatePerf_BuildLast],
+        timings[AnneSpawnCandidatePerf_BuildP50],
+        timings[AnneSpawnCandidatePerf_BuildP95],
+        timings[AnneSpawnCandidatePerf_BuildP99],
+        timings[AnneSpawnCandidatePerf_BuildMax]);
+    SpawnPerf_Log("[SpawnPerf][GraphCandidates] resultAgeMs last=%.1f p50=%.1f p95=%.1f p99=%.1f max=%.1f",
+        timings[AnneSpawnCandidatePerf_AgeLast],
+        timings[AnneSpawnCandidatePerf_AgeP50],
+        timings[AnneSpawnCandidatePerf_AgeP95],
+        timings[AnneSpawnCandidatePerf_AgeP99],
+        timings[AnneSpawnCandidatePerf_AgeMax]);
+    SpawnPerf_Log("[SpawnPerf][GraphCandidates] queued=%d published=%d cacheHits=%d coalesced=%d staleDrops=%d collect(hit/pending/unavailable)=%d/%d/%d masterCandidates=%d lastRangeCandidates=%d inFlight=%d cache=%d",
+        counters[AnneSpawnCandidatePerf_Queued],
+        counters[AnneSpawnCandidatePerf_Published],
+        counters[AnneSpawnCandidatePerf_CacheHits],
+        counters[AnneSpawnCandidatePerf_Coalesced],
+        counters[AnneSpawnCandidatePerf_StaleDrops],
+        counters[AnneSpawnCandidatePerf_CollectHits],
+        counters[AnneSpawnCandidatePerf_CollectPending],
+        counters[AnneSpawnCandidatePerf_CollectUnavailable],
+        counters[AnneSpawnCandidatePerf_LastCandidates],
+        counters[AnneSpawnCandidatePerf_LastRangeCandidates],
+        counters[AnneSpawnCandidatePerf_InFlight],
+        counters[AnneSpawnCandidatePerf_CacheEntries]);
+    SpawnPerf_Log("[SpawnPerf][GraphCandidates] cadence idle=%d warm=%d prepare(ready/pending/unavailable)=%d/%d/%d",
+        g_iSpawnAccelCandidateIdleRefreshes,
+        g_iSpawnAccelCandidateWarmRefreshes,
+        g_iSpawnAccelCandidatePrepareReady,
+        g_iSpawnAccelCandidatePreparePending,
+        g_iSpawnAccelCandidatePrepareUnavailable);
+}
+
+stock void SpawnAccel_ResetCandidatePerf()
+{
+    g_iSpawnAccelCandidateIdleRefreshes = 0;
+    g_iSpawnAccelCandidateWarmRefreshes = 0;
+    g_iSpawnAccelCandidatePrepareReady = 0;
+    g_iSpawnAccelCandidatePreparePending = 0;
+    g_iSpawnAccelCandidatePrepareUnavailable = 0;
+    if (g_bSpawnAccel)
+        AnneSpawn_NavCandidatesResetPerf();
+}
+
 public Action Timer_SpawnAccelGraphPump(Handle timer)
 {
     if (!g_bSpawnAccel)
@@ -250,8 +416,9 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
     if (status == AnneSpawnNavGraph_Failed)
     {
         g_bSpawnAccelGraphReady = false;
+        g_bSpawnAccelGraphCandidatesAvailable = false;
         g_hSpawnAccelGraphTimer = INVALID_HANDLE;
-        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; enabling legacy flow buckets and BuildPath fallback");
+        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; using SourcePawn progress cache and all-Nav candidate fallback");
         SpawnAccel_EnsureLegacyBuckets();
         return Plugin_Stop;
     }
@@ -263,18 +430,19 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
         if (!SpawnAccel_LoadGraphProgress())
         {
             g_hSpawnAccelGraphTimer = INVALID_HANDLE;
-            Debug_Print("[SPAWN ACCEL] Nav progress export failed; enabling legacy flow buckets");
+            Debug_Print("[SPAWN ACCEL] Nav progress export failed; using SourcePawn progress cache and all-Nav candidate fallback");
             SpawnAccel_EnsureLegacyBuckets();
             return Plugin_Stop;
         }
         g_bSpawnAccelGraphReady = true;
+        g_bSpawnAccelGraphCandidatesAvailable = true;
         Debug_Print("[SPAWN ACCEL] Nav graph/progress ready: areas=%d edges=%d workers=%d",
                     AnneSpawn_NavGraphGetAreaCount(), AnneSpawn_NavGraphGetEdgeCount(),
                     AnneSpawn_GetWorkerCount());
     }
 
-    // Prepare 会发布后台 reachability，后续 AnneSpawn_PathExists 直接消费结果。
-    // CollectRange 当前未进入插件热路径；图加载完成后停止 10Hz pump。
+    // 预热 reachability；候选快照由 OnGameFrame 按空闲/临近刷新频率调度。
+    // 图加载完成后停止建图 timer，后续每帧 pump 只发布已完成结果。
     SpawnAccel_PrepareCurrentSurvivorRange();
     g_hSpawnAccelGraphTimer = INVALID_HANDLE;
     return Plugin_Stop;

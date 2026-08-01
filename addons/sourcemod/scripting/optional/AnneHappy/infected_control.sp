@@ -67,10 +67,17 @@
 
 // Nav 找点按帧分片；候选数与昂贵精判数都有限制。
 #define NAV_RANDOM_POINT_TRIES    3
-#define NAV_SCAN_CANDIDATES_PER_SLICE 48
-#define NAV_SCAN_EXPENSIVE_PER_SLICE  6
-#define NAV_SCAN_TIME_BUDGET_MS       0.80
-#define NAV_SCAN_FALLBACK_SCORE_BUDGET 6
+#define NAV_SCAN_CANDIDATES_PER_SLICE 256
+#define NAV_SCAN_EXPENSIVE_PER_SLICE  8
+#define NAV_SCAN_TIME_BUDGET_MS       1.00
+#define NAV_SCAN_SCORE_BUDGET_CAP     8
+#define NAV_CANDIDATE_PAGE_SIZE       256
+#define NAV_CANDIDATE_TEAM_EXCLUSION  250.0
+#define NAV_CANDIDATE_RANGE_SLACK      128.0
+#define NAV_CANDIDATE_IDLE_INTERVAL      1.0
+#define NAV_CANDIDATE_WARM_INTERVAL      0.1
+#define NAV_CANDIDATE_RESULT_TTL         0.2
+#define NAV_CANDIDATE_WARMUP_LEAD         1.0
 #define TACTICAL_BAND_STAGES      3
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
@@ -181,10 +188,10 @@ Handle g_hFirstWaveTimer = INVALID_HANDLE;
 // =========================
 public Plugin myinfo =
 {
-    name        = "Direct InfectedSpawn (fdxx-nav + buckets + maxdist-fallback)",
+    name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
-    description = "特感刷新控制 / 传送 / 跑男 / fdxx NavArea选点 + 进度分桶 + 最大距离兜底",
-    version     = "2026-07-30",
+    description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
+    version     = "2026-08-01",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -229,6 +236,7 @@ bool CheckClassEnabled(int zc)
 #include "infected_control/nav_buckets.inc"
 #include "infected_control/spawn_perf_optimizer.inc"
 #include "infected_control/spawn_perf_config.inc"
+#include "infected_control/wave_spawn_report.inc"
 #include "infected_control/wave_decider.inc"
 #include "infected_control/traitor_quota.inc"
 #include "infected_control/traitor_mode.inc"
@@ -248,6 +256,10 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_NavGraphStop");
     MarkNativeAsOptional("AnneSpawn_NavGraphPrepareRange");
     MarkNativeAsOptional("AnneSpawn_NavGraphCollectRange");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepare");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesCollect");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesGetPerf");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesResetPerf");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetEdgeCount");
     MarkNativeAsOptional("AnneSpawn_NavGraphCollectProgress");
@@ -375,7 +387,7 @@ public void OnPluginStart()
 
     RegAdminCmd("sm_startspawn", Cmd_StartSpawn, ADMFLAG_ROOT, "管理员重置刷特时钟");
     RegAdminCmd("sm_stopspawn",  Cmd_StopSpawn,  ADMFLAG_ROOT, "管理员停止刷特");
-    RegAdminCmd("sm_rebuildnavcache", Cmd_RebuildNavCache, ADMFLAG_ROOT, "Rebuild Nav bucket cache for current map");
+    RegAdminCmd("sm_rebuildnavcache", Cmd_RebuildNavCache, ADMFLAG_ROOT, "Rebuild Nav graph and progress cache for current map");
     RegAdminCmd("sm_navpeek", Cmd_NavPeek, ADMFLAG_GENERIC, "查看准星 Nav 的分桶与属性");
     RegAdminCmd("sm_np",      Cmd_NavPeek, ADMFLAG_GENERIC, "查看准星 Nav 的分桶与属性(别名)");
     RegAdminCmd("sm_navtest", Cmd_NavTest, ADMFLAG_GENERIC, "测试准星 Nav 能否生成特感及评分");
@@ -418,6 +430,7 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
+    WaveSpawnReport_End("plugin_end");
     g_bInfectedControlStarted = false;
     SpawnAccel_ClearGraphState(true);
     AssaultBurst_Reset();
@@ -430,6 +443,7 @@ public void OnPluginEnd()
 }
 public void OnMapEnd()
 {
+    WaveSpawnReport_End("map_end");
     SpawnAccel_ClearGraphState(true);
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
@@ -557,7 +571,7 @@ public Action Cmd_RebuildNavCache(int client, int args)
     // 强制重建 NavAreas 缓存
     RebuildNavAreasCache();
     
-    // 强制重建并覆盖 Bucket 缓存
+    // 强制重建图拓扑及评分/密度限制使用的进度缓存。
     ClearNavBuckets();
     g_BucketsReady = false;
 
@@ -585,6 +599,7 @@ void ResetDeathState()
 
 static void StopAll()
 {
+    WaveSpawnReport_End("stop_all");
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
     if (g_hFirstWaveTimer != INVALID_HANDLE)
@@ -662,6 +677,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+    WaveSpawnReport_End("round_end");
     Traitor_OnRoundEnd();
     StopAll();
     ClearPathCache();
@@ -896,6 +912,16 @@ public void OnGameFrame()
 {
     float now = GetGameTime();
 
+    bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
+        || (gST.totalSI < gCV.iSiLimit
+            && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
+    float releaseEta = WaveDecider_GetReleaseEta();
+    bool candidateWarm = hasSpawnWork
+        || gST.hSpawn != INVALID_HANDLE
+        || g_hFirstWaveTimer != INVALID_HANDLE
+        || (releaseEta >= 0.0 && releaseEta <= NAV_CANDIDATE_WARMUP_LEAD);
+    SpawnAccel_UpdateCandidateSnapshots(now, candidateWarm);
+
     // 外部插件可能改写 z_max_player_zombies，但没有必要为此每帧读取 ConVar。
     if (now >= gST.nextMaxZombieCheck)
     {
@@ -907,13 +933,10 @@ public void OnGameFrame()
     if (now < gST.nextFrameThink)
         return;
 
-    bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
-        || (gST.totalSI < gCV.iSiLimit
-            && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
     float nextThinkStep = hasSpawnWork ? gCV.fFrameThinkStepActive : gCV.fFrameThinkStep;
-    // SourcePawn Trace 回退每个 slice 完成的候选较少；保持 0.8ms 帧预算，
-    // 但有刷特工作时允许每个 tick 推进一次，避免队列轮转累积数秒延迟。
-    if (hasSpawnWork && !SpawnAccel_CanUseNativeSafety())
+    // 两种安全检查实现使用同一推进频率，避免 native 模式在职业轮转中
+    // 反而只获得一半的搜索时间片。
+    if (hasSpawnWork)
         nextThinkStep = FloatMin(nextThinkStep, 0.01);
     gST.nextFrameThink = now + nextThinkStep;
 

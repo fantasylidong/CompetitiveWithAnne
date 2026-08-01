@@ -48,6 +48,8 @@ static bool FallbackDirectorPosInRange(int zc, int target, bool teleportMode,
     }
 
     float desired = (minRange + maxRange) * 0.5;
+    Visibility_EnsureCurrentEyeSnapshot();
+    int visibilityRayMode = GetEffectiveVisibilityRayMode();
     for (int i = 0; i < DIRECTOR_FALLBACK_SAMPLES; i++)
     {
         float pt[3];
@@ -55,8 +57,8 @@ static bool FallbackDirectorPosInRange(int zc, int target, bool teleportMode,
 
         float minDSq = GetMinEyeDistSquaredToAnySurvivor(pt);
         if (minDSq < minRange * minRange || minDSq > maxRange * maxRange) continue;
-        if (WillStuck(pt)) continue;
-        if (IsPosVisibleSDK(pt, teleportMode)) continue;
+        if (Visibility_TestPointSafety(pt, teleportMode, visibilityRayMode)
+            != AnneSpawnSafety_Safe) continue;
 
         float minD = SquareRoot(minDSq);
         float delta = FloatAbs(desired - minD);
@@ -252,14 +254,6 @@ static int DoSpawnAt(const float pos[3], int zc, bool enforceMinDistance = true)
     return 0;
 }
 
-static bool SpawnAttempts_IsCandidateFresh(const float pos[3], int areaIdx)
-{
-    if (!PassMinSeparation(pos))
-        return false;
-
-    return areaIdx < 0 || !IsNavOnCooldown(areaIdx, GetGameTime());
-}
-
 static void SpawnAttempts_RememberActualSpawn(int client, const float requestedPos[3])
 {
     float actualPos[3];
@@ -399,22 +393,6 @@ void TryNormalSpawnOnce()
         }
 
         bool ok = (searchResult == SpawnSearch_Found);
-        if (ok && !SpawnAttempts_IsCandidateFresh(pos, areaIdx))
-        {
-            Debug_Print("[SPAWN RETRY] stale candidate class=%s area=%d",
-                        g_sInfectedClassNames[want], areaIdx);
-            SpawnAttempts_RotatePendingNormalClass(want);
-            return;
-        }
-        if (ok)
-        {
-            float finalDistSq = GetMinEyeDistSquaredToAnySurvivor(pos);
-            float minDistSq = minRange * minRange;
-            float maxDistSq = bestDbg.ringEff * bestDbg.ringEff;
-            if (finalDistSq < minDistSq || finalDistSq > maxDistSq)
-                ok = false;
-        }
-        if (ok && IsPosVisibleSDK(pos, false)) ok = false;
         if (!ok)
         {
             g_iNormalSearchBand[searchIdx]++;
@@ -422,7 +400,13 @@ void TryNormalSpawnOnce()
             return;
         }
 
-        int spawnedClient = DoSpawnAt(pos, want);
+        // FindSpawnPos 只返回当前 tick 完成 safety/path/评分的候选，无需再次
+        // 遍历生还者做距离与可见性复查。
+        float spawnCallStart = GetEngineTime();
+        int spawnedClient = DoSpawnAt(pos, want, false);
+        float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
+        WaveSpawnReport_RecordScored(
+            want, spawnedClient, WaveSpawn_NormalNav, spawnCallMs, pos, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
@@ -470,8 +454,18 @@ void TryNormalSpawnOnce()
     else
         fallbackFound = FallbackDirectorPosInRange(
             want, gST.targetSurvivor, false, minRange, maxRange, pt);
-    int fallbackClient = fallbackFound
-        ? DoSpawnAt(pt, want, !usedUnrestricted) : 0;
+    int fallbackClient = 0;
+    if (fallbackFound)
+    {
+        float spawnCallStart = GetEngineTime();
+        fallbackClient = DoSpawnAt(pt, want, !usedUnrestricted);
+        float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
+        WaveSpawnMode reportMode = usedUnrestricted
+            ? WaveSpawn_NormalDirectorUnrestricted
+            : WaveSpawn_NormalDirectorRange;
+        WaveSpawnReport_RecordFallback(
+            want, fallbackClient, reportMode, spawnCallMs, pt);
+    }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)
         RecordDirectorSpawnResult(pt, fallbackSpawned);
@@ -558,23 +552,6 @@ void TryTeleportSpawnOnce()
         }
 
         bool ok = (searchResult == SpawnSearch_Found);
-        if (ok && !SpawnAttempts_IsCandidateFresh(pos, areaIdx))
-        {
-            Debug_Print("[TP RETRY] stale candidate class=%s area=%d",
-                        g_sInfectedClassNames[want], areaIdx);
-            SpawnAttempts_RotatePendingTeleportClass(want);
-            return;
-        }
-        if (ok)
-        {
-            float finalDistSq = GetMinEyeDistSquaredToAnySurvivor(pos);
-            float minDistSq = minRange * minRange;
-            float maxDistSq = bestDbg.ringEff * bestDbg.ringEff;
-            if (finalDistSq < minDistSq || finalDistSq > maxDistSq)
-                ok = false;
-        }
-        // teleportMode 下仍按配置忽略倒地视线，最终以实时玩家状态复查。
-        if (ok && IsPosVisibleSDK(pos, true)) ok = false;
         if (!ok)
         {
             g_iTeleportSearchBand[searchIdx]++;
@@ -582,7 +559,12 @@ void TryTeleportSpawnOnce()
             return;
         }
 
-        int spawnedClient = DoSpawnAt(pos, want);
+        // teleportMode 的倒地视线口径已在当前 tick 的安全判定中处理。
+        float spawnCallStart = GetEngineTime();
+        int spawnedClient = DoSpawnAt(pos, want, false);
+        float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
+        WaveSpawnReport_RecordScored(
+            want, spawnedClient, WaveSpawn_TeleportNav, spawnCallMs, pos, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
@@ -628,8 +610,18 @@ void TryTeleportSpawnOnce()
     else
         fallbackFound = FallbackDirectorPosInRange(
             want, gST.targetSurvivor, true, minRange, maxRange, pt);
-    int fallbackClient = fallbackFound
-        ? DoSpawnAt(pt, want, !usedUnrestricted) : 0;
+    int fallbackClient = 0;
+    if (fallbackFound)
+    {
+        float spawnCallStart = GetEngineTime();
+        fallbackClient = DoSpawnAt(pt, want, !usedUnrestricted);
+        float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
+        WaveSpawnMode reportMode = usedUnrestricted
+            ? WaveSpawn_TeleportDirectorUnrestricted
+            : WaveSpawn_TeleportDirectorRange;
+        WaveSpawnReport_RecordFallback(
+            want, fallbackClient, reportMode, spawnCallMs, pt);
+    }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)
         RecordDirectorSpawnResult(pt, fallbackSpawned);

@@ -3,7 +3,9 @@
 #include "worker_pool.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -42,6 +44,11 @@ constexpr int kNavSnapshotBatchAreas = 512;
 constexpr int kMaxFloorConnections = 4096;
 constexpr int kMaxLadderConnections = 256;
 constexpr float kBlockerSnapshotSeconds = 1.0f;
+constexpr float kCandidateSpatialQuantum = 32.0f;
+constexpr std::size_t kCandidateCacheLimit = 8;
+constexpr std::size_t kCandidatePerfSampleCap = 256;
+constexpr int kCandidatePending = -1;
+constexpr int kCandidateUnavailable = -2;
 
 struct NavGraphCapture
 {
@@ -74,6 +81,54 @@ struct ReachabilityRequest
     int team = 0;
     bool ignoreNavBlockers = false;
     int blockedEpoch = -1;
+};
+
+struct NavCandidateResult
+{
+    std::uint64_t generation = 0;
+    std::uint64_t serial = 0;
+    std::uint64_t survivorSpatialKey = 0;
+    int targetClient = 0;
+    std::uint32_t targetId = 0;
+    float maxPathDistance = 0.0f;
+    float minSurvivorDistance = 0.0f;
+    int blockedEpoch = -1;
+    double completedAt = 0.0;
+    float buildMs = 0.0f;
+    std::vector<std::uint32_t> areaIndices;
+    std::vector<float> targetDistances;
+};
+
+struct NavCandidateRequest
+{
+    std::uint64_t serial = 0;
+    std::uint64_t generation = 0;
+    std::uint64_t survivorSpatialKey = 0;
+    int targetClient = 0;
+    std::uint32_t targetId = 0;
+    float maxPathDistance = 0.0f;
+    float minSurvivorDistance = 0.0f;
+    int blockedEpoch = -1;
+};
+
+struct NavCandidatePerf
+{
+    std::array<float, kCandidatePerfSampleCap> buildMs{};
+    std::array<float, kCandidatePerfSampleCap> resultAgeMs{};
+    std::size_t buildWrite = 0;
+    std::size_t buildCount = 0;
+    std::size_t ageWrite = 0;
+    std::size_t ageCount = 0;
+    std::uint64_t queued = 0;
+    std::uint64_t published = 0;
+    std::uint64_t cacheHits = 0;
+    std::uint64_t coalesced = 0;
+    std::uint64_t staleDrops = 0;
+    std::uint64_t collectHits = 0;
+    std::uint64_t collectPending = 0;
+    std::uint64_t collectUnavailable = 0;
+    int lastCandidateCount = 0;
+    int lastRangeCandidateCount = 0;
 };
 
 struct SurvivorSnapshot
@@ -130,7 +185,9 @@ IGameConfig *g_GameConfig = nullptr;
 IsVisibleToPlayerFn g_IsVisibleToPlayer = nullptr;
 NavAreaBuildPathFn g_NavAreaBuildPath = nullptr;
 void *g_TheNavAreas = nullptr;
-std::vector<SurvivorSnapshot> g_Survivors;
+std::array<SurvivorSnapshot, kMaxSnapshotClients> g_Survivors{};
+std::size_t g_SurvivorCount = 0;
+std::uint64_t g_SurvivorSpatialKey = 0;
 std::unordered_map<PathCacheKey, bool, PathCacheKeyHash> g_PathCache;
 int g_PathCacheEpoch = -1;
 int g_BlockTypeOffset = -1;
@@ -152,6 +209,7 @@ AnneWorkerPool g_Workers;
 std::atomic<int> g_NavGraphState{kNavGraphIdle};
 std::atomic<std::uint64_t> g_NavGraphGeneration{0};
 std::atomic<std::uint64_t> g_ReachabilitySerial{0};
+std::atomic<std::uint64_t> g_NavCandidateSerial{0};
 std::mutex g_GraphMutex;
 std::shared_ptr<AnneNavGraphMetadata> g_NavMetadata;
 std::shared_ptr<AnneNavGraph> g_NavGraph;
@@ -160,6 +218,10 @@ std::unique_ptr<NavGraphCapture> g_NavCapture;
 std::vector<std::shared_ptr<ReachabilityResult>> g_ReachabilityCache;
 std::vector<std::shared_ptr<ReachabilityResult>> g_PendingReachability;
 std::vector<ReachabilityRequest> g_ReachabilityInFlight;
+std::vector<std::shared_ptr<NavCandidateResult>> g_NavCandidateCache;
+std::vector<std::shared_ptr<NavCandidateResult>> g_PendingNavCandidates;
+std::vector<NavCandidateRequest> g_NavCandidateInFlight;
+NavCandidatePerf g_NavCandidatePerf;
 std::string g_NavGraphError;
 std::vector<std::uint8_t> g_BlockedSnapshot;
 float g_BlockedSnapshotTime = -1000.0f;
@@ -185,6 +247,11 @@ Vector ReadVector(const cell_t *cells, int offset = 0)
     return Vector(sp_ctof(cells[offset]), sp_ctof(cells[offset + 1]), sp_ctof(cells[offset + 2]));
 }
 
+bool IsFiniteVector(const Vector &value)
+{
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
 void *CellToPointer(cell_t value)
 {
     return reinterpret_cast<void *>(
@@ -206,6 +273,108 @@ void HashBytes(std::uint64_t &hash, const void *data, std::size_t size)
         hash ^= bytes[i];
         hash *= fnvPrime;
     }
+}
+
+double SteadySeconds()
+{
+    return std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+std::uint64_t ComputeSurvivorSpatialKey()
+{
+    std::uint64_t hash = 1469598103934665603ull;
+    HashBytes(hash, &g_SurvivorCount, sizeof(g_SurvivorCount));
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
+    {
+        const SurvivorSnapshot &snapshot = g_Survivors[i];
+        std::int32_t quantized[3] = {
+            static_cast<std::int32_t>(std::floor(snapshot.eyes.x / kCandidateSpatialQuantum)),
+            static_cast<std::int32_t>(std::floor(snapshot.eyes.y / kCandidateSpatialQuantum)),
+            static_cast<std::int32_t>(std::floor(snapshot.eyes.z / kCandidateSpatialQuantum)),
+        };
+        HashBytes(hash, &snapshot.client, sizeof(snapshot.client));
+        HashBytes(hash, &snapshot.incapacitated, sizeof(snapshot.incapacitated));
+        HashBytes(hash, quantized, sizeof(quantized));
+    }
+    return hash;
+}
+
+bool NavCandidateMatches(const NavCandidateResult &result,
+                         int targetClient, std::uint32_t targetId,
+                         float maxPathDistance, float minSurvivorDistance,
+                         std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    return result.generation == g_NavGraphGeneration.load() &&
+           result.targetClient == targetClient && result.targetId == targetId &&
+           result.maxPathDistance + 0.01f >= maxPathDistance &&
+           std::fabs(result.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
+           result.survivorSpatialKey == survivorSpatialKey &&
+           result.blockedEpoch == blockedEpoch;
+}
+
+bool NavCandidateRequestMatches(const NavCandidateRequest &request,
+                                int targetClient, std::uint32_t targetId,
+                                float maxPathDistance, float minSurvivorDistance,
+                                std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    return request.generation == g_NavGraphGeneration.load() &&
+           request.targetClient == targetClient && request.targetId == targetId &&
+           request.maxPathDistance + 0.01f >= maxPathDistance &&
+           std::fabs(request.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
+           request.survivorSpatialKey == survivorSpatialKey &&
+           request.blockedEpoch == blockedEpoch;
+}
+
+std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
+    int targetClient, std::uint32_t targetId,
+    float maxPathDistance, float minSurvivorDistance,
+    std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    for (auto iterator = g_NavCandidateCache.rbegin();
+         iterator != g_NavCandidateCache.rend(); ++iterator)
+    {
+        if (NavCandidateMatches(**iterator, targetClient, targetId,
+                                maxPathDistance, minSurvivorDistance,
+                                survivorSpatialKey, blockedEpoch))
+        {
+            return *iterator;
+        }
+    }
+    return nullptr;
+}
+
+template <std::size_t Size>
+void RecordCandidatePerfSample(std::array<float, Size> &samples,
+                               std::size_t &write, std::size_t &count,
+                               float value)
+{
+    samples[write] = std::max(0.0f, value);
+    write = (write + 1) % Size;
+    if (count < Size)
+        ++count;
+}
+
+void ResetNavCandidatePerfLocked()
+{
+    g_NavCandidatePerf = NavCandidatePerf{};
+}
+
+template <std::size_t Size>
+float CandidatePerfPercentile(const std::array<float, Size> &samples,
+                              std::size_t count, float percentile)
+{
+    if (count == 0)
+        return 0.0f;
+    std::vector<float> sorted(samples.begin(), samples.begin() + count);
+    std::sort(sorted.begin(), sorted.end());
+    std::size_t index = static_cast<std::size_t>(
+        std::ceil(static_cast<float>(count) * percentile));
+    if (index > 0)
+        --index;
+    if (index >= sorted.size())
+        index = sorted.size() - 1;
+    return sorted[index];
 }
 
 void HashLooseMapFile(std::uint64_t &hash, const char *gameDirectory,
@@ -395,6 +564,9 @@ void ClearReachabilityState()
     g_ReachabilityCache.clear();
     g_PendingReachability.clear();
     g_ReachabilityInFlight.clear();
+    g_NavCandidateCache.clear();
+    g_PendingNavCandidates.clear();
+    g_NavCandidateInFlight.clear();
     g_BlockedSnapshot.clear();
     g_BlockedSnapshotTime = -1000.0f;
     g_BlockedSnapshotGeneration = 0;
@@ -434,6 +606,47 @@ void PublishPendingResults()
     g_PendingReachability.clear();
     while (g_ReachabilityCache.size() > 8)
         g_ReachabilityCache.erase(g_ReachabilityCache.begin());
+
+    for (std::shared_ptr<NavCandidateResult> &result : g_PendingNavCandidates)
+    {
+        g_NavCandidateInFlight.erase(
+            std::remove_if(g_NavCandidateInFlight.begin(), g_NavCandidateInFlight.end(),
+                           [&result](const NavCandidateRequest &request) {
+                               return request.serial == result->serial;
+                           }),
+            g_NavCandidateInFlight.end());
+
+        bool stale = result->generation != g_NavGraphGeneration.load() ||
+                     result->survivorSpatialKey != g_SurvivorSpatialKey ||
+                     result->blockedEpoch != g_BlockedStateVersion;
+        if (stale)
+        {
+            ++g_NavCandidatePerf.staleDrops;
+            continue;
+        }
+
+        g_NavCandidateCache.erase(
+            std::remove_if(g_NavCandidateCache.begin(), g_NavCandidateCache.end(),
+                           [&result](const std::shared_ptr<NavCandidateResult> &cached) {
+                               return cached->targetClient == result->targetClient &&
+                                      cached->targetId == result->targetId &&
+                                      cached->survivorSpatialKey == result->survivorSpatialKey &&
+                                      cached->blockedEpoch == result->blockedEpoch &&
+                                      cached->minSurvivorDistance == result->minSurvivorDistance &&
+                                      cached->maxPathDistance <= result->maxPathDistance;
+                           }),
+            g_NavCandidateCache.end());
+        RecordCandidatePerfSample(
+            g_NavCandidatePerf.buildMs, g_NavCandidatePerf.buildWrite,
+            g_NavCandidatePerf.buildCount, result->buildMs);
+        ++g_NavCandidatePerf.published;
+        g_NavCandidatePerf.lastCandidateCount =
+            static_cast<int>(result->areaIndices.size());
+        g_NavCandidateCache.push_back(std::move(result));
+    }
+    g_PendingNavCandidates.clear();
+    while (g_NavCandidateCache.size() > kCandidateCacheLimit)
+        g_NavCandidateCache.erase(g_NavCandidateCache.begin());
 }
 
 void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
@@ -734,6 +947,138 @@ bool PrepareReachability(std::uint32_t targetId, float maxDistance,
     return false;
 }
 
+int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
+                         float maxPathDistance, float minSurvivorDistance,
+                         float maxSnapshotAge)
+{
+    PumpNavGraph();
+    if (g_NavGraphState.load() != kNavGraphReady || maxPathDistance <= 0.0f ||
+        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f)
+    {
+        return kCandidateUnavailable;
+    }
+
+    std::shared_ptr<AnneNavGraph> graph;
+    std::shared_ptr<AnneNavGraphMetadata> metadata;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        graph = g_NavGraph;
+        metadata = g_NavMetadata;
+    }
+    if (!graph || !graph->complete || !metadata ||
+        metadata->areaPointers.size() != graph->navIds.size())
+    {
+        return kCandidateUnavailable;
+    }
+
+    std::uint32_t targetIndex;
+    if (!graph->FindIndex(targetId, targetIndex))
+        return kCandidateUnavailable;
+
+    RefreshBlockedSnapshot(*graph, *metadata, kTeamInfected, false);
+    int blockedEpoch = CurrentBlockedEpoch();
+    std::uint64_t survivorSpatialKey = g_SurvivorSpatialKey;
+    std::size_t targetSlot = g_SurvivorCount;
+    std::vector<float> survivorEyes;
+    survivorEyes.reserve(g_SurvivorCount * 3);
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
+    {
+        if (g_Survivors[i].client == targetClient)
+            targetSlot = i;
+        survivorEyes.push_back(g_Survivors[i].eyes.x);
+        survivorEyes.push_back(g_Survivors[i].eyes.y);
+        survivorEyes.push_back(g_Survivors[i].eyes.z);
+    }
+    if (targetSlot >= g_SurvivorCount)
+        return kCandidatePending;
+
+    double now = SteadySeconds();
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        std::shared_ptr<NavCandidateResult> cached = FindNavCandidateLocked(
+            targetClient, targetId, maxPathDistance, minSurvivorDistance,
+            survivorSpatialKey, blockedEpoch);
+        if (cached && now - cached->completedAt <= maxSnapshotAge)
+        {
+            ++g_NavCandidatePerf.cacheHits;
+            return 1;
+        }
+        for (const NavCandidateRequest &request : g_NavCandidateInFlight)
+        {
+            if (NavCandidateRequestMatches(
+                    request, targetClient, targetId, maxPathDistance,
+                    minSurvivorDistance, survivorSpatialKey, blockedEpoch))
+            {
+                ++g_NavCandidatePerf.coalesced;
+                return 0;
+            }
+        }
+    }
+
+    std::vector<std::uint8_t> blocked = g_BlockedSnapshot;
+    std::uint64_t generation = g_NavGraphGeneration.load();
+    std::uint64_t serial = g_NavCandidateSerial.fetch_add(1) + 1;
+    NavCandidateRequest request{
+        serial, generation, survivorSpatialKey, targetClient, targetId,
+        maxPathDistance, minSurvivorDistance, blockedEpoch};
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavCandidateInFlight.push_back(request);
+    }
+
+    bool queued = g_Workers.Enqueue(
+        [graph = std::move(graph), blocked = std::move(blocked), targetIndex,
+         survivorEyes = std::move(survivorEyes), targetSlot,
+         request]() mutable {
+            double buildStart = SteadySeconds();
+            auto result = std::make_shared<NavCandidateResult>();
+            result->generation = request.generation;
+            result->serial = request.serial;
+            result->survivorSpatialKey = request.survivorSpatialKey;
+            result->targetClient = request.targetClient;
+            result->targetId = request.targetId;
+            result->maxPathDistance = request.maxPathDistance;
+            result->minSurvivorDistance = request.minSurvivorDistance;
+            result->blockedEpoch = request.blockedEpoch;
+
+            std::vector<float> pathDistances;
+            std::vector<std::uint8_t> specialEdges;
+            bool built = AnneBuildNavCandidateSnapshot(
+                *graph, targetIndex, request.maxPathDistance,
+                blocked, survivorEyes, targetSlot,
+                request.minSurvivorDistance, result->areaIndices,
+                result->targetDistances, pathDistances, specialEdges);
+            if (!built)
+            {
+                result->areaIndices.clear();
+                result->targetDistances.clear();
+            }
+
+            result->completedAt = SteadySeconds();
+            result->buildMs = static_cast<float>(
+                (result->completedAt - buildStart) * 1000.0);
+
+            std::lock_guard<std::mutex> lock(g_GraphMutex);
+            g_PendingNavCandidates.push_back(std::move(result));
+        });
+    if (!queued)
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavCandidateInFlight.erase(
+            std::remove_if(g_NavCandidateInFlight.begin(), g_NavCandidateInFlight.end(),
+                           [serial](const NavCandidateRequest &pending) {
+                               return pending.serial == serial;
+                           }),
+            g_NavCandidateInFlight.end());
+        return kCandidatePending;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        ++g_NavCandidatePerf.queued;
+    }
+    return 0;
+}
+
 int GetEntityIndex(CBaseEntity *entity)
 {
     if (!entity)
@@ -833,12 +1178,18 @@ bool IsPointStuck(const Vector &position)
 
 bool IsPointVisible(const Vector &position, bool teleportMode, bool ignoreIncapSight, int rayMode)
 {
+    // Native safety is fail-closed. A missing engine interface or signature must
+    // reject the point instead of calling through a stale pointer during unload.
+    if (!g_EngineTrace || !g_IsVisibleToPlayer || !gamehelpers || !gpGlobals)
+        return true;
+
     Vector head(position.x, position.y, position.z + 62.0f);
     Vector chest(position.x, position.y, position.z + 32.0f);
     constexpr unsigned int visibilityMask = MASK_VISIBLE & MASK_SHOT;
 
-    for (const SurvivorSnapshot &snapshot : g_Survivors)
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
     {
+        const SurvivorSnapshot &snapshot = g_Survivors[i];
         if (teleportMode && ignoreIncapSight && snapshot.incapacitated)
             continue;
 
@@ -849,6 +1200,8 @@ bool IsPointVisible(const Vector &position, bool teleportMode, bool ignoreIncapS
              RayClear(snapshot.eyesRight, head, visibilityMask)))
             return true;
 
+        if (snapshot.client <= 0 || snapshot.client > gpGlobals->maxClients)
+            continue;
         CBaseEntity *player = gamehelpers->ReferenceToEntity(snapshot.client);
         if (!player)
             continue;
@@ -869,8 +1222,9 @@ void ComputeGeometry(const Vector &position, const Vector &center, int sectors,
                      float &targetEyeDistance, int &sector)
 {
     minEyeDistanceSquared = 1.0e20f;
-    for (const SurvivorSnapshot &snapshot : g_Survivors)
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
     {
+        const SurvivorSnapshot &snapshot = g_Survivors[i];
         Vector delta = position - snapshot.eyes;
         float distanceSquared = delta.LengthSqr();
         if (distanceSquared < minEyeDistanceSquared)
@@ -921,6 +1275,7 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         g_PendingNavGraph.reset();
         g_NavCapture.reset();
         ClearReachabilityState();
+        ResetNavCandidatePerfLocked();
         g_NavGraphError.clear();
     }
     g_Workers.ClearPending();
@@ -1068,6 +1423,191 @@ cell_t Native_NavGraphCollectRange(IPluginContext *context, const cell_t *params
     return count;
 }
 
+cell_t Native_NavCandidatesPrepare(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 5)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesPrepare expects 5 parameters");
+    float maxPathDistance = sp_ctof(params[3]);
+    float minSurvivorDistance = sp_ctof(params[4]);
+    float maxSnapshotAge = sp_ctof(params[5]);
+    if (!std::isfinite(maxPathDistance) || !std::isfinite(minSurvivorDistance) ||
+        !std::isfinite(maxSnapshotAge))
+    {
+        return context->ThrowNativeError("Invalid Nav candidate prepare request");
+    }
+    return PrepareNavCandidates(
+        params[1], static_cast<std::uint32_t>(params[2]), maxPathDistance,
+        minSurvivorDistance, maxSnapshotAge);
+}
+
+cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 12)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesCollect expects 12 parameters");
+
+    int targetClient = params[1];
+    std::uint32_t targetId = static_cast<std::uint32_t>(params[2]);
+    float minTargetDistance = std::max(0.0f, sp_ctof(params[3]));
+    float maxTargetDistance = sp_ctof(params[4]);
+    float maxPathDistance = sp_ctof(params[5]);
+    float minSurvivorDistance = sp_ctof(params[6]);
+    float maxSnapshotAge = sp_ctof(params[7]);
+    int startOffset = params[8];
+    int maxResults = params[10];
+    if (!std::isfinite(maxTargetDistance) || !std::isfinite(maxPathDistance) ||
+        !std::isfinite(minSurvivorDistance) || !std::isfinite(maxSnapshotAge) ||
+        maxTargetDistance < minTargetDistance || maxPathDistance <= 0.0f ||
+        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f ||
+        startOffset < 0 || maxResults < 0 || maxResults > kMaxSpatialPoints)
+    {
+        return context->ThrowNativeError("Invalid Nav candidate collect request");
+    }
+
+    cell_t *output = nullptr;
+    cell_t *ageOutput = nullptr;
+    cell_t *totalOutput = nullptr;
+    if ((maxResults > 0 && !GetCells(context, params[9], output)) ||
+        !GetCells(context, params[11], ageOutput) ||
+        !GetCells(context, params[12], totalOutput))
+    {
+        return context->ThrowNativeError("Invalid Nav candidate collect output");
+    }
+    ageOutput[0] = sp_ftoc(0.0f);
+    totalOutput[0] = 0;
+
+    PumpNavGraph();
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    if (!g_NavGraph || !g_NavGraph->complete ||
+        g_NavGraphState.load() != kNavGraphReady)
+    {
+        ++g_NavCandidatePerf.collectUnavailable;
+        return kCandidateUnavailable;
+    }
+
+    std::shared_ptr<NavCandidateResult> result = FindNavCandidateLocked(
+        targetClient, targetId, maxPathDistance, minSurvivorDistance,
+        g_SurvivorSpatialKey, g_BlockedStateVersion);
+    if (!result)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+
+    float ageMs = static_cast<float>((SteadySeconds() - result->completedAt) * 1000.0);
+    if (ageMs > maxSnapshotAge * 1000.0f + 0.01f)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+
+    auto first = std::lower_bound(
+        result->targetDistances.begin(), result->targetDistances.end(), minTargetDistance);
+    auto last = std::upper_bound(
+        first, result->targetDistances.end(), maxTargetDistance);
+    std::size_t firstRow = static_cast<std::size_t>(
+        std::distance(result->targetDistances.begin(), first));
+    std::size_t total = static_cast<std::size_t>(std::distance(first, last));
+    totalOutput[0] = static_cast<cell_t>(
+        std::min<std::size_t>(total, static_cast<std::size_t>(std::numeric_limits<cell_t>::max())));
+    g_NavCandidatePerf.lastRangeCandidateCount = totalOutput[0];
+    ageOutput[0] = sp_ftoc(ageMs);
+
+    std::size_t offset = static_cast<std::size_t>(startOffset);
+    int count = 0;
+    if (offset < total)
+    {
+        std::size_t available = total - offset;
+        count = static_cast<int>(std::min<std::size_t>(
+            available, static_cast<std::size_t>(maxResults)));
+        for (int row = 0; row < count; ++row)
+        {
+            output[row] = static_cast<cell_t>(
+                result->areaIndices[firstRow + offset + static_cast<std::size_t>(row)]);
+        }
+    }
+
+    RecordCandidatePerfSample(
+        g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
+        g_NavCandidatePerf.ageCount, ageMs);
+    ++g_NavCandidatePerf.collectHits;
+    return count;
+}
+
+cell_t Native_NavCandidatesGetPerf(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 4)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesGetPerf expects 4 parameters");
+    int timingCount = params[2];
+    int counterCount = params[4];
+    if (timingCount < 10 || counterCount < 13)
+        return context->ThrowNativeError("Nav candidate perf output arrays are too small");
+
+    cell_t *timings = nullptr;
+    cell_t *counters = nullptr;
+    if (!GetCells(context, params[1], timings) || !GetCells(context, params[3], counters))
+        return context->ThrowNativeError("Invalid Nav candidate perf output arrays");
+
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    auto lastSample = [](const auto &samples, std::size_t write, std::size_t count) {
+        if (count == 0)
+            return 0.0f;
+        std::size_t index = (write + samples.size() - 1) % samples.size();
+        return samples[index];
+    };
+    float values[10] = {
+        lastSample(g_NavCandidatePerf.buildMs, g_NavCandidatePerf.buildWrite,
+                   g_NavCandidatePerf.buildCount),
+        CandidatePerfPercentile(g_NavCandidatePerf.buildMs,
+                                g_NavCandidatePerf.buildCount, 0.50f),
+        CandidatePerfPercentile(g_NavCandidatePerf.buildMs,
+                                g_NavCandidatePerf.buildCount, 0.95f),
+        CandidatePerfPercentile(g_NavCandidatePerf.buildMs,
+                                g_NavCandidatePerf.buildCount, 0.99f),
+        CandidatePerfPercentile(g_NavCandidatePerf.buildMs,
+                                g_NavCandidatePerf.buildCount, 1.00f),
+        lastSample(g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
+                   g_NavCandidatePerf.ageCount),
+        CandidatePerfPercentile(g_NavCandidatePerf.resultAgeMs,
+                                g_NavCandidatePerf.ageCount, 0.50f),
+        CandidatePerfPercentile(g_NavCandidatePerf.resultAgeMs,
+                                g_NavCandidatePerf.ageCount, 0.95f),
+        CandidatePerfPercentile(g_NavCandidatePerf.resultAgeMs,
+                                g_NavCandidatePerf.ageCount, 0.99f),
+        CandidatePerfPercentile(g_NavCandidatePerf.resultAgeMs,
+                                g_NavCandidatePerf.ageCount, 1.00f),
+    };
+    for (int i = 0; i < 10; ++i)
+        timings[i] = sp_ftoc(values[i]);
+
+    auto toCell = [](std::uint64_t value) {
+        return static_cast<cell_t>(std::min<std::uint64_t>(
+            value, static_cast<std::uint64_t>(std::numeric_limits<cell_t>::max())));
+    };
+    counters[0] = static_cast<cell_t>(g_NavCandidatePerf.buildCount);
+    counters[1] = toCell(g_NavCandidatePerf.queued);
+    counters[2] = toCell(g_NavCandidatePerf.published);
+    counters[3] = toCell(g_NavCandidatePerf.cacheHits);
+    counters[4] = toCell(g_NavCandidatePerf.coalesced);
+    counters[5] = toCell(g_NavCandidatePerf.staleDrops);
+    counters[6] = toCell(g_NavCandidatePerf.collectHits);
+    counters[7] = toCell(g_NavCandidatePerf.collectPending);
+    counters[8] = toCell(g_NavCandidatePerf.collectUnavailable);
+    counters[9] = g_NavCandidatePerf.lastCandidateCount;
+    counters[10] = static_cast<cell_t>(g_NavCandidateInFlight.size());
+    counters[11] = static_cast<cell_t>(g_NavCandidateCache.size());
+    counters[12] = g_NavCandidatePerf.lastRangeCandidateCount;
+    return 1;
+}
+
+cell_t Native_NavCandidatesResetPerf(IPluginContext *, const cell_t *params)
+{
+    if (params[0] != 0)
+        return 0;
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    ResetNavCandidatePerfLocked();
+    return 0;
+}
+
 cell_t Native_NavGraphGetAreaCount(IPluginContext *, const cell_t *)
 {
     std::lock_guard<std::mutex> lock(g_GraphMutex);
@@ -1145,24 +1685,31 @@ cell_t Native_SetSurvivorSnapshot(IPluginContext *context, const cell_t *params)
         !GetCells(context, params[5], eyesRight))
         return context->ThrowNativeError("Invalid survivor snapshot arrays");
 
-    g_Survivors.clear();
-    g_Survivors.reserve(count);
+    g_SurvivorCount = 0;
     for (int i = 0; i < count; ++i)
     {
-        SurvivorSnapshot snapshot;
+        SurvivorSnapshot &snapshot = g_Survivors[static_cast<std::size_t>(i)];
         snapshot.client = clients[i];
         snapshot.incapacitated = incapacitated[i] != 0;
         snapshot.eyes = ReadVector(eyes, i * 3);
         snapshot.eyesLeft = ReadVector(eyesLeft, i * 3);
         snapshot.eyesRight = ReadVector(eyesRight, i * 3);
-        g_Survivors.push_back(snapshot);
+        if (!gpGlobals || snapshot.client <= 0 || snapshot.client > gpGlobals->maxClients ||
+            !IsFiniteVector(snapshot.eyes) || !IsFiniteVector(snapshot.eyesLeft) ||
+            !IsFiniteVector(snapshot.eyesRight))
+        {
+            return context->ThrowNativeError("Invalid survivor snapshot entry %d", i);
+        }
     }
+    g_SurvivorCount = static_cast<std::size_t>(count);
+    g_SurvivorSpatialKey = ComputeSurvivorSpatialKey();
     return 1;
 }
 
 cell_t Native_ClearSurvivorSnapshot(IPluginContext *, const cell_t *)
 {
-    g_Survivors.clear();
+    g_SurvivorCount = 0;
+    g_SurvivorSpatialKey = 0;
     return 0;
 }
 
@@ -1176,6 +1723,8 @@ cell_t Native_TestPointSafety(IPluginContext *context, const cell_t *params)
         return context->ThrowNativeError("Invalid spawn position");
 
     Vector position = ReadVector(positionCells);
+    if (!IsFiniteVector(position))
+        return context->ThrowNativeError("Invalid spawn position vector");
     if (IsPointStuck(position))
         return kSafetyStuck;
     return IsPointVisible(position, params[2] != 0, params[3] != 0, params[4])
@@ -1463,6 +2012,10 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavGraphStop", Native_NavGraphStop},
     {"AnneSpawn_NavGraphPrepareRange", Native_NavGraphPrepareRange},
     {"AnneSpawn_NavGraphCollectRange", Native_NavGraphCollectRange},
+    {"AnneSpawn_NavCandidatesPrepare", Native_NavCandidatesPrepare},
+    {"AnneSpawn_NavCandidatesCollect", Native_NavCandidatesCollect},
+    {"AnneSpawn_NavCandidatesGetPerf", Native_NavCandidatesGetPerf},
+    {"AnneSpawn_NavCandidatesResetPerf", Native_NavCandidatesResetPerf},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},
     {"AnneSpawn_NavGraphGetEdgeCount", Native_NavGraphGetEdgeCount},
     {"AnneSpawn_NavGraphCollectProgress", Native_NavGraphCollectProgress},
@@ -1490,9 +2043,10 @@ bool AnneSpawnAccelExtension::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size
     GET_V_IFACE_ANY(GetEngineFactory, g_StaticPropMgr, IStaticPropMgrServer,
                     INTERFACEVERSION_STATICPROPMGR_SERVER);
     gpGlobals = ismm->GetCGlobals();
-    if (!gpGlobals)
+    if (!g_EngineTrace || !g_StaticPropMgr || !gpGlobals)
     {
-        std::snprintf(error, maxlen, "Could not resolve CGlobalVars");
+        std::snprintf(error, maxlen,
+                      "Could not resolve engine trace, static prop manager, or CGlobalVars");
         return false;
     }
     return true;
@@ -1584,13 +2138,16 @@ void AnneSpawnAccelExtension::SDK_OnUnload()
         g_NavGraphError.clear();
     }
     g_NavGraphState.store(kNavGraphIdle);
-    g_Survivors.clear();
+    g_SurvivorCount = 0;
+    g_SurvivorSpatialKey = 0;
     g_PathCache.clear();
     g_PathCacheEpoch = -1;
     g_IsVisibleToPlayer = nullptr;
     g_NavAreaBuildPath = nullptr;
     g_TheNavAreas = nullptr;
+    g_EngineTrace = nullptr;
     g_StaticPropMgr = nullptr;
+    gpGlobals = nullptr;
     g_BlockTypeOffset = -1;
     if (g_GameConfig)
     {

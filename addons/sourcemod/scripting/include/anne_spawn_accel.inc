@@ -21,6 +21,42 @@ enum AnneSpawnNavGraphStatus
     AnneSpawnNavGraph_Failed
 };
 
+#define ANNE_SPAWN_NAV_CANDIDATE_PENDING     -1
+#define ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE -2
+#define ANNE_SPAWN_NAV_CANDIDATE_PERF_FLOATS 10
+#define ANNE_SPAWN_NAV_CANDIDATE_PERF_COUNTS 13
+
+enum AnneSpawnNavCandidatePerfFloat
+{
+    AnneSpawnCandidatePerf_BuildLast = 0,
+    AnneSpawnCandidatePerf_BuildP50,
+    AnneSpawnCandidatePerf_BuildP95,
+    AnneSpawnCandidatePerf_BuildP99,
+    AnneSpawnCandidatePerf_BuildMax,
+    AnneSpawnCandidatePerf_AgeLast,
+    AnneSpawnCandidatePerf_AgeP50,
+    AnneSpawnCandidatePerf_AgeP95,
+    AnneSpawnCandidatePerf_AgeP99,
+    AnneSpawnCandidatePerf_AgeMax
+};
+
+enum AnneSpawnNavCandidatePerfCount
+{
+    AnneSpawnCandidatePerf_BuildSamples = 0,
+    AnneSpawnCandidatePerf_Queued,
+    AnneSpawnCandidatePerf_Published,
+    AnneSpawnCandidatePerf_CacheHits,
+    AnneSpawnCandidatePerf_Coalesced,
+    AnneSpawnCandidatePerf_StaleDrops,
+    AnneSpawnCandidatePerf_CollectHits,
+    AnneSpawnCandidatePerf_CollectPending,
+    AnneSpawnCandidatePerf_CollectUnavailable,
+    AnneSpawnCandidatePerf_LastCandidates,
+    AnneSpawnCandidatePerf_InFlight,
+    AnneSpawnCandidatePerf_CacheEntries,
+    AnneSpawnCandidatePerf_LastRangeCandidates
+};
+
 native bool AnneSpawn_IsActive();
 
 native bool AnneSpawn_NavGraphStart(
@@ -48,6 +84,41 @@ native int AnneSpawn_NavGraphCollectRange(
     int[] outputAreaIndices,
     int maxResults
 );
+
+// 后台构建 candidate -> targetNav 有向可达、全队距离过滤后的目标候选快照。
+// 返回 1=已有足够新的快照，0=已排队/正在构建，-2=图不可用。
+native int AnneSpawn_NavCandidatesPrepare(
+    int targetClient,
+    int targetNavId,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge
+);
+
+// 在按目标空间距离升序的快照中分页取 [minTargetDistance, maxTargetDistance]。
+// 返回 >=0 的本页数量，-1=结果未就绪/已过期，-2=图不可用。
+native int AnneSpawn_NavCandidatesCollect(
+    int targetClient,
+    int targetNavId,
+    float minTargetDistance,
+    float maxTargetDistance,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge,
+    int startOffset,
+    int[] outputAreaIndices,
+    int maxResults,
+    float &resultAgeMs,
+    int &totalInRange
+);
+
+native bool AnneSpawn_NavCandidatesGetPerf(
+    float[] timings,
+    int timingCount,
+    int[] counters,
+    int counterCount
+);
+native void AnneSpawn_NavCandidatesResetPerf();
 
 native int AnneSpawn_NavGraphGetAreaCount();
 native int AnneSpawn_NavGraphGetEdgeCount();

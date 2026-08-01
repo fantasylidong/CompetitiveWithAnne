@@ -3,7 +3,7 @@
 
 #define SMEXT_CONF_NAME          "Anne NextBot"
 #define SMEXT_CONF_DESCRIPTION   "Native NextBot scheduling and PathFollower routing for AnneHappy"
-#define SMEXT_CONF_VERSION       "1.0.0"
+#define SMEXT_CONF_VERSION       "1.1.0"
 #define SMEXT_CONF_AUTHOR        "AnneHappy"
 #define SMEXT_CONF_URL           "https://github.com/morzlee/CompetitiveWithAnne"
 #define SMEXT_CONF_LOGTAG        "ANNE-NEXTBOT"

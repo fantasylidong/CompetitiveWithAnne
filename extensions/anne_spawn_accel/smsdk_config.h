@@ -2,8 +2,8 @@
 #define _INCLUDE_ANNE_SPAWN_ACCEL_CONFIG_H_
 
 #define SMEXT_CONF_NAME          "Anne Spawn Accel"
-#define SMEXT_CONF_DESCRIPTION   "Native spawn-point traces, geometry, spatial mapping, and path cache"
-#define SMEXT_CONF_VERSION       "1.0.0"
+#define SMEXT_CONF_DESCRIPTION   "Directed Nav candidates, spawn traces, geometry, and path cache"
+#define SMEXT_CONF_VERSION       "1.1.0"
 #define SMEXT_CONF_AUTHOR        "AnneHappy"
 #define SMEXT_CONF_URL           "https://github.com/morzlee/CompetitiveWithAnne"
 #define SMEXT_CONF_LOGTAG        "ANNE-SPAWN"

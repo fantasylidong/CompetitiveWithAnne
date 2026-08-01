@@ -12,3 +12,9 @@ disabled again, so non-Anne modes do not pass through extension callbacks.
 
 GitHub Actions builds optimized x86 Linux and Windows artifacts. The Linux artifact is the normal
 Left 4 Dead 2 dedicated-server target.
+
+Run `sm_anne_nextbot_status` in the server console to inspect scheduler activity and PathFollower
+routing. Tank and Charger are reported separately with their consumer request, SourcePawn listener
+count, matched/forwarded/error counters, and the last forwarded client and age. `waiting` means no
+matching PathFollower update has occurred since the extension loaded; `idle` means forwarding worked
+previously but no matching update occurred during the last 10 seconds.
