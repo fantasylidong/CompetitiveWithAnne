@@ -70,6 +70,7 @@
 #define NAV_SCAN_CANDIDATES_PER_SLICE 48
 #define NAV_SCAN_EXPENSIVE_PER_SLICE  6
 #define NAV_SCAN_TIME_BUDGET_MS       0.80
+#define NAV_SCAN_FALLBACK_SCORE_BUDGET 6
 #define TACTICAL_BAND_STAGES      3
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
@@ -909,7 +910,12 @@ public void OnGameFrame()
     bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
         || (gST.totalSI < gCV.iSiLimit
             && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
-    gST.nextFrameThink = now + (hasSpawnWork ? gCV.fFrameThinkStepActive : gCV.fFrameThinkStep);
+    float nextThinkStep = hasSpawnWork ? gCV.fFrameThinkStepActive : gCV.fFrameThinkStep;
+    // SourcePawn Trace 回退每个 slice 完成的候选较少；保持 0.8ms 帧预算，
+    // 但有刷特工作时允许每个 tick 推进一次，避免队列轮转累积数秒延迟。
+    if (hasSpawnWork && !SpawnAccel_CanUseNativeSafety())
+        nextThinkStep = FloatMin(nextThinkStep, 0.01);
+    gST.nextFrameThink = now + nextThinkStep;
 
     if (gST.totalSI >= gCV.iSiLimit)
         return;

@@ -546,6 +546,13 @@ static bool SpawnSearch_Begin(SpawnSearchState state,
     }
 
     state.candidateBudget = DifficultyStrategy_GetCandidateBudget();
+    // 回退 Trace 的单候选成本明显更高。只压缩评分样本，不减少 Nav 扫描范围，
+    // 原生安全检查启用后仍使用完整的难度预算。
+    if (!SpawnAccel_CanUseNativeSafety()
+        && state.candidateBudget > NAV_SCAN_FALLBACK_SCORE_BUDGET)
+    {
+        state.candidateBudget = NAV_SCAN_FALLBACK_SCORE_BUDGET;
+    }
     state.visibilityRayMode = GetEffectiveVisibilityRayMode();
     state.firstFit = gCV.bNavBucketFirstFit;
     state.minScore = gCV.fSpawnScoreFloor;

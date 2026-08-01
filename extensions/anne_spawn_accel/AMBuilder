@@ -9,8 +9,12 @@ if 'l4d2' in SM.sdks:
 
     binary = SM.HL2Library(builder, cxx, 'anne_spawn_accel.ext.' + sdk['extension'], sdk)
     if binary.compiler.like('gcc'):
-      binary.compiler.cxxflags += ['-fPIC']
-      binary.compiler.linkflags += ['-pthread']
+      # Accelerator's bundled Breakpad parser cannot read Clang 22 DWARF 5 and
+      # may crash while preparing symbols after an unrelated server fault.
+      binary.compiler.cxxflags += ['-fPIC', '-gdwarf-4']
+      # HL2SDK static archives may still contain DWARF 5, so remove debug
+      # sections from the final ELF while preserving its regular symbol table.
+      binary.compiler.linkflags += ['-pthread', '-Wl,--strip-debug']
     binary.sources += [
       'extension.cpp',
       'nav_graph.cpp',

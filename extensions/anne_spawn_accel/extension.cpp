@@ -807,6 +807,9 @@ SpawnTraceFilter g_StuckFilter(SpawnTraceFilter::Mode::Stuck);
 
 bool RayClear(const Vector &start, const Vector &end, unsigned int mask)
 {
+    if (!g_EngineTrace)
+        return false;
+
     Ray_t ray;
     trace_t trace;
     ray.Init(start, end);
@@ -816,6 +819,9 @@ bool RayClear(const Vector &start, const Vector &end, unsigned int mask)
 
 bool IsPointStuck(const Vector &position)
 {
+    if (!g_EngineTrace)
+        return true;
+
     static const Vector mins(-16.0f, -16.0f, 0.0f);
     static const Vector maxs(16.0f, 16.0f, 71.0f);
     Ray_t ray;
@@ -847,9 +853,12 @@ bool IsPointVisible(const Vector &position, bool teleportMode, bool ignoreIncapS
         if (!player)
             continue;
 
+        // IsVisibleToPlayer writes the resolved NavArea through this out parameter.
+        // Passing nullptr here crashes on paths where the engine publishes it.
+        void *visibleArea = nullptr;
         bool visibleFlag = true;
         if (g_IsVisibleToPlayer(chest, player, kTeamSurvivor, kTeamInfected, 0.0f,
-                                nullptr, nullptr, &visibleFlag))
+                                nullptr, &visibleArea, &visibleFlag))
             return true;
     }
     return false;

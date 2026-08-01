@@ -14,7 +14,7 @@
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
 #include <l4d2_lobby_match_manager_policy>
 
-#define VERSION "0.11"
+#define VERSION "0.12"
 
 #define RMFLAG_NO_MODE_CHANGE			1
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
@@ -46,7 +46,8 @@ int
 bool
 	g_bDependenciesReady,
 	g_bLobbyReservationObserved,
-	g_bAnneLobbyReleased;
+	g_bAnneLobbyReleased,
+	g_bReservationPresentOnConnect[MAXPLAYERS + 1];
 
 Address
 	g_pMatchExtL4D,
@@ -76,7 +77,7 @@ public void OnPluginStart()
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
 
 	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"0=Keep reservation, 1=Anne mode: unreserve when the third player joins and reject new reservations, 2=Unreserve when lobby full, 3=Clear stale reservation while empty, but keep player-created lobby matchmaking.");
+	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"0=Keep reservation, 1=Anne mode: keep pre-existing reservations until the third player joins, reject reservations created by direct joins, 2=Unreserve when lobby full, 3=Clear stale reservation while empty, but keep player-created lobby matchmaking.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	
 	mp_gamemode.AddChangeHook(OnConVarChanged);
@@ -199,13 +200,32 @@ bool IsNeedForceOfficialMap(SourceKeyValues kvSettings)
 	return strcmp(sApplyMap, sCurMap) != 0;
 }
 
+public bool OnClientConnect(int client, char[] rejectmsg, int maxlen)
+{
+	// qreserve reserves the server before the player starts connecting. A
+	// reservation created later belongs to the direct-join dynamic lobby.
+	g_bReservationPresentOnConnect[client] = HasReservationCookie();
+	return true;
+}
+
 public void OnClientPutInServer(int client)
 {
 	if (IsFakeClient(client))
 		return;
 
+	bool reservationPresentOnConnect = g_bReservationPresentOnConnect[client];
+
 	if (HasReservationCookie())
 		g_bLobbyReservationObserved = true;
+
+	if (g_iUnreserveType == UNRESERVE_ANNE && !reservationPresentOnConnect && !g_bAnneLobbyReleased)
+	{
+		SetReservationCookie(false);
+		sv_allow_lobby_connect_only.BoolValue = false;
+		g_bAnneLobbyReleased = true;
+		RefreshReserveBlockPatch();
+		return;
+	}
 
 	if (g_iUnreserveType == UNRESERVE_ANNE || g_iUnreserveType == UNRESERVE_WHEN_FULL)
 		CreateTimer(1.0, Timer_ClearLobbyOnJoin, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -213,6 +233,8 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+	g_bReservationPresentOnConnect[client] = false;
+
 	if (IsFakeClient(client))
 		return;
 
@@ -259,12 +281,23 @@ void ClearAnneLobbyReservationIfAllowed()
 	if (g_iUnreserveType != UNRESERVE_ANNE)
 		return;
 
-	if (g_bAnneLobbyReleased || !LobbyPolicy_ShouldClearAnneReservation(GetPlayerCount()))
+	if (g_bAnneLobbyReleased || (!HasDirectJoinWithoutReservation() && !LobbyPolicy_ShouldClearAnneReservation(GetPlayerCount())))
 		return;
 
 	SetReservationCookie(false);
 	sv_allow_lobby_connect_only.BoolValue = false;
 	g_bAnneLobbyReleased = true;
+}
+
+bool HasDirectJoinWithoutReservation()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientConnected(i) && !IsFakeClient(i) && !g_bReservationPresentOnConnect[i])
+			return true;
+	}
+
+	return false;
 }
 
 void RefreshReserveBlockPatch()

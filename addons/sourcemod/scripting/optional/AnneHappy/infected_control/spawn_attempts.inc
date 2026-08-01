@@ -252,6 +252,28 @@ static int DoSpawnAt(const float pos[3], int zc, bool enforceMinDistance = true)
     return 0;
 }
 
+static bool SpawnAttempts_IsCandidateFresh(const float pos[3], int areaIdx)
+{
+    if (!PassMinSeparation(pos))
+        return false;
+
+    return areaIdx < 0 || !IsNavOnCooldown(areaIdx, GetGameTime());
+}
+
+static void SpawnAttempts_RememberActualSpawn(int client, const float requestedPos[3])
+{
+    float actualPos[3];
+    actualPos[0] = requestedPos[0];
+    actualPos[1] = requestedPos[1];
+    actualPos[2] = requestedPos[2];
+    if (client > 0 && client <= MaxClients && IsClientInGame(client))
+        GetClientAbsOrigin(client, actualPos);
+
+    float center[3];
+    GetSectorCenter(center, gST.targetSurvivor);
+    RememberSpawn(actualPos, center);
+}
+
 static bool SelectTacticalNormalQueueHead(int &want)
 {
     int guard = SpawnQueue_Length();
@@ -377,6 +399,13 @@ void TryNormalSpawnOnce()
         }
 
         bool ok = (searchResult == SpawnSearch_Found);
+        if (ok && !SpawnAttempts_IsCandidateFresh(pos, areaIdx))
+        {
+            Debug_Print("[SPAWN RETRY] stale candidate class=%s area=%d",
+                        g_sInfectedClassNames[want], areaIdx);
+            SpawnAttempts_RotatePendingNormalClass(want);
+            return;
+        }
         if (ok)
         {
             float finalDistSq = GetMinEyeDistSquaredToAnySurvivor(pos);
@@ -393,7 +422,8 @@ void TryNormalSpawnOnce()
             return;
         }
 
-        bool spawnOk = (DoSpawnAt(pos, want) > 0);
+        int spawnedClient = DoSpawnAt(pos, want);
+        bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
             // 实际生成失败时短冷却该 NavArea，下一档不会立即重复命中同一区域。
@@ -414,9 +444,7 @@ void TryNormalSpawnOnce()
             TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
         }
 
-        float center[3];
-        GetSectorCenter(center, gST.targetSurvivor);
-        RememberSpawn(pos, center);
+        SpawnAttempts_RememberActualSpawn(spawnedClient, pos);
 
         gST.siQueueCount--;
         gST.siAlive[want - 1]++;
@@ -442,8 +470,9 @@ void TryNormalSpawnOnce()
     else
         fallbackFound = FallbackDirectorPosInRange(
             want, gST.targetSurvivor, false, minRange, maxRange, pt);
-    bool fallbackSpawned = fallbackFound
-        && DoSpawnAt(pt, want, !usedUnrestricted) > 0;
+    int fallbackClient = fallbackFound
+        ? DoSpawnAt(pt, want, !usedUnrestricted) : 0;
+    bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)
         RecordDirectorSpawnResult(pt, fallbackSpawned);
 
@@ -462,9 +491,7 @@ void TryNormalSpawnOnce()
 
     if (fallbackSpawned)
     {
-        float center[3];
-        GetSectorCenter(center, gST.targetSurvivor);
-        RememberSpawn(pt, center);
+        SpawnAttempts_RememberActualSpawn(fallbackClient, pt);
 
         gST.siQueueCount--;
         gST.siAlive[want - 1]++;
@@ -531,6 +558,13 @@ void TryTeleportSpawnOnce()
         }
 
         bool ok = (searchResult == SpawnSearch_Found);
+        if (ok && !SpawnAttempts_IsCandidateFresh(pos, areaIdx))
+        {
+            Debug_Print("[TP RETRY] stale candidate class=%s area=%d",
+                        g_sInfectedClassNames[want], areaIdx);
+            SpawnAttempts_RotatePendingTeleportClass(want);
+            return;
+        }
         if (ok)
         {
             float finalDistSq = GetMinEyeDistSquaredToAnySurvivor(pos);
@@ -548,7 +582,8 @@ void TryTeleportSpawnOnce()
             return;
         }
 
-        bool spawnOk = (DoSpawnAt(pos, want) > 0);
+        int spawnedClient = DoSpawnAt(pos, want);
+        bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
             if (areaIdx >= 0)
@@ -570,9 +605,7 @@ void TryTeleportSpawnOnce()
 
         // 传送成功不消耗普通 siQueueCount，只移除 teleport queue。
         // 仍要更新 siAlive/totalSI，因为 DoSpawnAt 实际生成了一只新的 bot。
-        float center[3];
-        GetSectorCenter(center, gST.targetSurvivor);
-        RememberSpawn(pos, center);
+        SpawnAttempts_RememberActualSpawn(spawnedClient, pos);
 
         gST.siAlive[want - 1]++;
         gST.totalSI++;
@@ -595,8 +628,9 @@ void TryTeleportSpawnOnce()
     else
         fallbackFound = FallbackDirectorPosInRange(
             want, gST.targetSurvivor, true, minRange, maxRange, pt);
-    bool fallbackSpawned = fallbackFound
-        && DoSpawnAt(pt, want, !usedUnrestricted) > 0;
+    int fallbackClient = fallbackFound
+        ? DoSpawnAt(pt, want, !usedUnrestricted) : 0;
+    bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)
         RecordDirectorSpawnResult(pt, fallbackSpawned);
 
@@ -615,9 +649,7 @@ void TryTeleportSpawnOnce()
 
     if (fallbackSpawned)
     {
-        float center[3];
-        GetSectorCenter(center, gST.targetSurvivor);
-        RememberSpawn(pt, center);
+        SpawnAttempts_RememberActualSpawn(fallbackClient, pt);
 
         gST.siAlive[want - 1]++;
         gST.totalSI++;
