@@ -38,7 +38,7 @@ void InitiateReadyUp(bool real = true)
 	fStartTimestamp = GetGameTime();
 	
 	SetAllowSpawns(l4d_ready_disable_spawns.BoolValue);
-	CreateTimer(0.3, Timer_RestartCountdowns, false, TIMER_FLAG_NO_MAPCHANGE);
+	ScheduleRestartCountdowns(0.3, false);
 	
 	sv_infinite_primary_ammo.SetBool(true, .notify = false);
 	god.SetBool(true, .notify = false);

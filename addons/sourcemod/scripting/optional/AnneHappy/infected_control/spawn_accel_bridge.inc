@@ -8,6 +8,7 @@
 
 bool g_bSpawnAccel;
 bool g_bSpawnAccelGraphReady;
+bool g_bSpawnAccelAvailabilityKnown;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 ArrayList g_SpawnAccelRawFlowDistances = null;
 
@@ -36,9 +37,18 @@ stock bool SpawnAccel_IsAvailable()
         && AnneSpawn_IsActive();
 }
 
-stock void SpawnAccel_UpdateAvailability()
+stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
 {
-    g_bSpawnAccel = SpawnAccel_IsAvailable();
+    bool available = SpawnAccel_IsAvailable();
+    if (forceLog || !g_bSpawnAccelAvailabilityKnown || available != g_bSpawnAccel)
+    {
+        Debug_Print("[SPAWN ACCEL] extension %s",
+                    available ? "active (all required natives available)"
+                              : "unavailable (using SourcePawn fallbacks)");
+    }
+
+    g_bSpawnAccel = available;
+    g_bSpawnAccelAvailabilityKnown = true;
 }
 
 stock void SpawnAccel_StopGraphTimer()
@@ -209,8 +219,8 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
                     AnneSpawn_GetWorkerCount());
     }
 
-    // Prepare/Collect native 会自行发布后台结果。图加载完成后停止 10Hz pump，
-    // 首次刷点按当前目标建立 reachability，避免空闲时周期性预热。
+    // Prepare 会发布后台 reachability，后续 AnneSpawn_PathExists 直接消费结果。
+    // CollectRange 当前未进入插件热路径；图加载完成后停止 10Hz pump。
     SpawnAccel_PrepareCurrentSurvivorRange();
     g_hSpawnAccelGraphTimer = INVALID_HANDLE;
     return Plugin_Stop;

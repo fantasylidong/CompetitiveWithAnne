@@ -88,6 +88,7 @@ char   g_bwSound[PLATFORM_MAX_PATH];
 // ---- 仅保留 BeQuiet 风格静音开关 ----
 ConVar hCvarCvarChange, hCvarNameChange, hCvarSpecNameChange, hCvarSpecSeeChat;
 bool   bCvarChange, bNameChange, bSpecNameChange, bSpecSeeChat;
+bool   g_bAutoGiveHandledThisRound;
 
 public void OnPluginStart()
 {
@@ -594,6 +595,7 @@ bool IsValidInfected(int client)
 // ====== 最终章 Tank 限制 ======
 public void RoundStart_Event(Event event, const char[] name, bool dontBroadcast)
 {
+    g_bAutoGiveHandledThisRound = false;
     CreateTimer(1.0, Timer_SetFinaleTankRule, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -645,12 +647,15 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 }
 
 // 首离安全区：补给（含 Bot 复活）
-public Action L4D_OnFirstSurvivorLeftSafeArea()
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
+    if (g_bAutoGiveHandledThisRound)
+        return;
+
+    g_bAutoGiveHandledThisRound = true;
     SetBot(0, 0);
     if (!IsRealismORCoop())
         CreateTimer(0.5, Timer_AutoGive, _, TIMER_FLAG_NO_MAPCHANGE);
-    return Plugin_Continue;
 }
 
 public Action Timer_AutoGive(Handle timer)
@@ -682,7 +687,7 @@ public Action Timer_AutoGive(Handle timer)
             GiveItemIfEntityBudgetAllows(i, "pistol");
         }
     }
-    return Plugin_Continue;
+    return Plugin_Stop;
 }
 
 // ====== 巫婆奖励回血 ======

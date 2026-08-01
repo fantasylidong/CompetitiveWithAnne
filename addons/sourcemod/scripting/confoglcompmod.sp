@@ -122,6 +122,8 @@ public Plugin myinfo =
 	url			= "https://github.com/L4D-Community/L4D2-Competitive-Framework"
 };
 
+bool g_bFirstLeftHandled;
+
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	// Plugin functions
@@ -148,6 +150,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	LoadTranslations("confoglcompmod.phrases");
+	HookEvent("round_start", Event_ResetFirstLeft, EventHookMode_PostNoCopy);
 	// Plugin functions
 	Fns_OnModuleStart();		// functions
 	Debug_OnModuleStart();		// debug
@@ -233,6 +236,11 @@ public void OnPluginStart()
 	//AddCustomServerTag("hidden");
 }
 
+static void Event_ResetFirstLeft(Event event, const char[] name, bool dontBroadcast)
+{
+	g_bFirstLeftHandled = false;
+}
+
 public void OnPluginEnd()
 {
 	// Modules
@@ -269,6 +277,8 @@ public void OnPluginEnd()
 
 public void OnMapStart()
 {
+	g_bFirstLeftHandled = false;
+
 	// Modules
 	#if MODULE_MAPINFO
 	MI_OnMapStart();	// MapInfo
@@ -491,14 +501,16 @@ public Action L4D_OnGetScriptValueInt(const char[] key, int &retVal)
 }
 #endif
 
-public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
+	if (g_bFirstLeftHandled)
+		return;
+
+	g_bFirstLeftHandled = true;
 	if (IsPluginEnabled())
 	{
 		CreateTimer(0.1, OFSLA_ForceMobSpawnTimer);
 	}
-
-	return Plugin_Continue;
 }
 
 static Action OFSLA_ForceMobSpawnTimer(Handle hTimer)

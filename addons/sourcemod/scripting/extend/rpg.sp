@@ -1342,12 +1342,14 @@ public void ClientSaveToFileSave(int Client)
 }
 
 //开局发近战能力武器
-public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
 	if(g_bReadyUpSystemAvailable && IsInReady())
-	{
-		return Plugin_Continue;
-	}
+		return;
+	if(IsStart)
+		return;
+
+	IsStart = true;
 
 	if(g_cShopEnable.BoolValue){
 		for(int i=1;i<MaxClients;i++){
@@ -1363,8 +1365,6 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 		CPrintToChatAll("%t", "RPG_RANKCannotObtainAdditionalPoints");
 		SetRoundValid(false);
 	}
-	IsStart=true;
-	return Plugin_Continue;
 }
 
 

@@ -104,6 +104,7 @@ bool
 
 // Spectate Fix
 Handle g_hChangeTeamTimer[MAXPLAYERS+1];
+Handle g_hRestartCountdownTimer;
 
 // Caster System
 bool casterSystemAvailable;
@@ -176,6 +177,7 @@ public void OnPluginStart()
 
 public void OnPluginEnd()
 {
+	delete g_hRestartCountdownTimer;
 	InitiateLive(false);
 }
 
@@ -235,7 +237,7 @@ void RoundStart_Event(Event event, const char[] name, bool dontBroadcast)
 void GameInstructorDraw_Event(Event event, const char[] name, bool dontBroadcast)
 {
 	// Workaround for restarting countdown after scavenge intro
-	CreateTimer(0.1, Timer_RestartCountdowns, false, TIMER_FLAG_NO_MAPCHANGE);
+	ScheduleRestartCountdowns(0.1, false);
 }
 
 void PlayerTeam_Event(Event event, const char[] name, bool dontBroadcast)
@@ -306,6 +308,7 @@ Action Timer_PlayerTeam(Handle timer, DataPack dp)
 
 public void OnMapStart()
 {
+	g_hRestartCountdownTimer = null;
 	PrecacheSounds();
 	
 	for (int client = 1; client <= MAXPLAYERS; client++)
@@ -383,7 +386,7 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 {
 	if (inReadyUp)
 	{
-		CreateTimer(0.1, Timer_RestartCountdowns, false, TIMER_FLAG_NO_MAPCHANGE);
+		ScheduleRestartCountdowns(0.1, false);
 		ReturnPlayerToSaferoom(client, false);
 		return Plugin_Handled;
 	}

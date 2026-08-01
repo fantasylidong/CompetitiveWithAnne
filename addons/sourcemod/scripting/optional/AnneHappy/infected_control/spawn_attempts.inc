@@ -271,32 +271,56 @@ static bool SelectTacticalNormalQueueHead(int &want)
     return false;
 }
 
-static int g_iNormalSearchClass;
-static int g_iNormalSearchBand;
-static int g_iTeleportSearchClass;
-static int g_iTeleportSearchBand;
+static int g_iNormalSearchBand[SI_COUNT];
+static int g_iTeleportSearchBand[SI_COUNT];
 
 void SpawnAttempts_ResetSearchProgress()
 {
-    g_iNormalSearchClass = 0;
-    g_iNormalSearchBand = 0;
-    g_iTeleportSearchClass = 0;
-    g_iTeleportSearchBand = 0;
+    for (int i = 0; i < SI_COUNT; i++)
+    {
+        g_iNormalSearchBand[i] = 0;
+        g_iTeleportSearchBand[i] = 0;
+    }
     SpawnSearch_Reset();
 }
 
-static void SpawnAttempts_ResetNormalProgress()
+static void SpawnAttempts_ResetNormalProgress(int zc)
 {
-    g_iNormalSearchClass = 0;
-    g_iNormalSearchBand = 0;
-    SpawnSearch_Reset();
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return;
+
+    g_iNormalSearchBand[idx] = 0;
+    SpawnSearch_ResetClass(zc, false);
 }
 
-static void SpawnAttempts_ResetTeleportProgress()
+static void SpawnAttempts_ResetTeleportProgress(int zc)
 {
-    g_iTeleportSearchClass = 0;
-    g_iTeleportSearchBand = 0;
-    SpawnSearch_Reset();
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return;
+
+    g_iTeleportSearchBand[idx] = 0;
+    SpawnSearch_ResetClass(zc, true);
+}
+
+static void SpawnAttempts_RotatePendingNormalClass(int zc)
+{
+    int remaining = SpawnQueue_Length();
+    int head;
+    while (remaining-- > 0 && SpawnQueue_Peek(head) && head == zc)
+        SpawnQueue_RotateHead(head);
+}
+
+static void SpawnAttempts_RotatePendingTeleportClass(int zc)
+{
+    int remaining = TeleportQueue_Length();
+    int head;
+    while (remaining-- > 0 && TeleportQueue_Peek(head) && head == zc)
+    {
+        TeleportQueue_DropHead(head);
+        TeleportQueue_Push(head);
+    }
 }
 
 void TryNormalSpawnOnce()
@@ -307,18 +331,14 @@ void TryNormalSpawnOnce()
     int want = 0;
     if (!SelectTacticalNormalQueueHead(want))
         return;
-    if (g_iNormalSearchClass != want)
-    {
-        SpawnAttempts_ResetNormalProgress();
-        g_iNormalSearchClass = want;
-    }
+    int searchIdx = want - 1;
 
     if (HasReachedLimit(want))
     {
         Debug_Print("[SPAWN DROP] class=%s reached alive-cap, drop head", g_sInfectedClassNames[want]);
         SpawnQueue_DropHead(want);
         gST.normalFallbackCycles[want - 1] = 0;
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
         return;
     }
     if (HasReachedWaveClassLimit(want))
@@ -326,23 +346,23 @@ void TryNormalSpawnOnce()
         Debug_Print("[SPAWN DROP] class=%s reached wave-cap, drop head", g_sInfectedClassNames[want]);
         SpawnQueue_DropHead(want);
         gST.normalFallbackCycles[want - 1] = 0;
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
         return;
     }
 
     if (!PassDeathCooldown(want) && !ShouldRelaxDeathCD())
     {
         SpawnQueue_RotateHead(want);
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
         Debug_Print("[QUEUE ROTATE] %s under death-cooldown, rotate to tail", g_sInfectedClassNames[want]);
         return;
     }
 
     float minRange;
     float maxRange;
-    if (g_iNormalSearchBand < TACTICAL_BAND_STAGES)
+    if (g_iNormalSearchBand[searchIdx] < TACTICAL_BAND_STAGES)
     {
-        int band = g_iNormalSearchBand;
+        int band = g_iNormalSearchBand[searchIdx];
         Tactical_GetDistanceBand(want, band, false, minRange, maxRange);
 
         float pos[3];
@@ -351,7 +371,10 @@ void TryNormalSpawnOnce()
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, gST.targetSurvivor, minRange, maxRange, false, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
+        {
+            SpawnAttempts_RotatePendingNormalClass(want);
             return;
+        }
 
         bool ok = (searchResult == SpawnSearch_Found);
         if (ok)
@@ -365,7 +388,8 @@ void TryNormalSpawnOnce()
         if (ok && IsPosVisibleSDK(pos, false)) ok = false;
         if (!ok)
         {
-            g_iNormalSearchBand++;
+            g_iNormalSearchBand[searchIdx]++;
+            SpawnAttempts_RotatePendingNormalClass(want);
             return;
         }
 
@@ -378,7 +402,8 @@ void TryNormalSpawnOnce()
                 float now = GetGameTime();
                 TouchNavCooldown(areaIdx, now, 0.8);
             }
-            g_iNormalSearchBand++;
+            g_iNormalSearchBand[searchIdx]++;
+            SpawnAttempts_RotatePendingNormalClass(want);
             return;
         }
 
@@ -400,7 +425,7 @@ void TryNormalSpawnOnce()
         Tactical_OnClassSpawned(want);
         gST.normalFallbackCycles[want - 1] = 0;
         SpawnQueue_DropHead(want);
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
 
         TriggerAssaultBurst();
         Debug_Print("[SPAWN] success class=%s band=%d range=%.0f..%.0f",
@@ -410,7 +435,7 @@ void TryNormalSpawnOnce()
 
     Tactical_GetDistanceBand(want, TACTICAL_BAND_STAGES - 1, false, minRange, maxRange);
     float pt[3];
-    bool usedUnrestricted = (g_iNormalSearchBand > TACTICAL_BAND_STAGES);
+    bool usedUnrestricted = (g_iNormalSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
     if (usedUnrestricted)
         fallbackFound = FallbackDirectorPosUnrestricted(want, gST.targetSurvivor, pt);
@@ -429,7 +454,8 @@ void TryNormalSpawnOnce()
         if (gST.normalFallbackCycles[cycleIdx] >= UNRESTRICTED_FALLBACK_CYCLES)
         {
             gST.normalFallbackCycles[cycleIdx] = 0;
-            g_iNormalSearchBand = TACTICAL_BAND_STAGES + 1;
+            g_iNormalSearchBand[searchIdx] = TACTICAL_BAND_STAGES + 1;
+            SpawnAttempts_RotatePendingNormalClass(want);
             return;
         }
     }
@@ -447,17 +473,17 @@ void TryNormalSpawnOnce()
         Tactical_OnClassSpawned(want);
         gST.normalFallbackCycles[want - 1] = 0;
         SpawnQueue_DropHead(want);
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
         TriggerAssaultBurst();
         Debug_Print("[SPAWN] %s director fallback success class=%s",
                     usedUnrestricted ? "unrestricted" : "in-range", g_sInfectedClassNames[want]);
     }
     else
     {
-        SpawnQueue_RotateHead(want);
+        SpawnAttempts_RotatePendingNormalClass(want);
         Debug_Print("[SPAWN FAIL] full range cycle=%d class=%s, rotate",
                     gST.normalFallbackCycles[want - 1], g_sInfectedClassNames[want]);
-        SpawnAttempts_ResetNormalProgress();
+        SpawnAttempts_ResetNormalProgress(want);
     }
 }
 
@@ -466,11 +492,7 @@ void TryTeleportSpawnOnce()
     int want = 0;
     if (!TeleportQueue_Peek(want))
         return;
-    if (g_iTeleportSearchClass != want)
-    {
-        SpawnAttempts_ResetTeleportProgress();
-        g_iTeleportSearchClass = want;
-    }
+    int searchIdx = want - 1;
     if (gST.totalSI >= gCV.iSiLimit)
         return;
     if (HasReachedLimit(want))
@@ -484,7 +506,7 @@ void TryTeleportSpawnOnce()
             TeleportQueue_DropHead(want);
             TeleportQueue_Push(want);
             gST.teleportFallbackCycles[want - 1] = 0;
-            SpawnAttempts_ResetTeleportProgress();
+            SpawnAttempts_ResetTeleportProgress(want);
             Debug_Print("[TP QUEUE ROTATE] %s reached alive-cap, rotate to tail", g_sInfectedClassNames[want]);
             return;
         }
@@ -492,9 +514,9 @@ void TryTeleportSpawnOnce()
 
     float minRange;
     float maxRange;
-    if (g_iTeleportSearchBand < TACTICAL_BAND_STAGES)
+    if (g_iTeleportSearchBand[searchIdx] < TACTICAL_BAND_STAGES)
     {
-        int band = g_iTeleportSearchBand;
+        int band = g_iTeleportSearchBand[searchIdx];
         Tactical_GetDistanceBand(want, band, true, minRange, maxRange);
 
         float pos[3];
@@ -503,7 +525,10 @@ void TryTeleportSpawnOnce()
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, gST.targetSurvivor, minRange, maxRange, true, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
+        {
+            SpawnAttempts_RotatePendingTeleportClass(want);
             return;
+        }
 
         bool ok = (searchResult == SpawnSearch_Found);
         if (ok)
@@ -518,7 +543,8 @@ void TryTeleportSpawnOnce()
         if (ok && IsPosVisibleSDK(pos, true)) ok = false;
         if (!ok)
         {
-            g_iTeleportSearchBand++;
+            g_iTeleportSearchBand[searchIdx]++;
+            SpawnAttempts_RotatePendingTeleportClass(want);
             return;
         }
 
@@ -530,7 +556,8 @@ void TryTeleportSpawnOnce()
                 float now = GetGameTime();
                 TouchNavCooldown(areaIdx, now, 0.8);
             }
-            g_iTeleportSearchBand++;
+            g_iTeleportSearchBand[searchIdx]++;
+            SpawnAttempts_RotatePendingTeleportClass(want);
             return;
         }
 
@@ -551,7 +578,7 @@ void TryTeleportSpawnOnce()
         gST.totalSI++;
         gST.teleportFallbackCycles[want - 1] = 0;
         TeleportQueue_DropHead(want);
-        SpawnAttempts_ResetTeleportProgress();
+        SpawnAttempts_ResetTeleportProgress(want);
         TriggerAssaultBurst();
 
         Debug_Print("[TP] success class=%s band=%d range=%.0f..%.0f",
@@ -561,7 +588,7 @@ void TryTeleportSpawnOnce()
 
     Tactical_GetDistanceBand(want, TACTICAL_BAND_STAGES - 1, true, minRange, maxRange);
     float pt[3];
-    bool usedUnrestricted = (g_iTeleportSearchBand > TACTICAL_BAND_STAGES);
+    bool usedUnrestricted = (g_iTeleportSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
     if (usedUnrestricted)
         fallbackFound = FallbackDirectorPosUnrestricted(want, gST.targetSurvivor, pt);
@@ -580,7 +607,8 @@ void TryTeleportSpawnOnce()
         if (gST.teleportFallbackCycles[cycleIdx] >= UNRESTRICTED_FALLBACK_CYCLES)
         {
             gST.teleportFallbackCycles[cycleIdx] = 0;
-            g_iTeleportSearchBand = TACTICAL_BAND_STAGES + 1;
+            g_iTeleportSearchBand[searchIdx] = TACTICAL_BAND_STAGES + 1;
+            SpawnAttempts_RotatePendingTeleportClass(want);
             return;
         }
     }
@@ -595,17 +623,16 @@ void TryTeleportSpawnOnce()
         gST.totalSI++;
         gST.teleportFallbackCycles[want - 1] = 0;
         TeleportQueue_DropHead(want);
-        SpawnAttempts_ResetTeleportProgress();
+        SpawnAttempts_ResetTeleportProgress(want);
         TriggerAssaultBurst();
         Debug_Print("[TP] %s director fallback success class=%s",
                     usedUnrestricted ? "unrestricted" : "in-range", g_sInfectedClassNames[want]);
     }
     else
     {
-        TeleportQueue_DropHead(want);
-        TeleportQueue_Push(want);
+        SpawnAttempts_RotatePendingTeleportClass(want);
         Debug_Print("[TP FAIL] full range cycle=%d class=%s, rotate",
                     gST.teleportFallbackCycles[want - 1], g_sInfectedClassNames[want]);
-        SpawnAttempts_ResetTeleportProgress();
+        SpawnAttempts_ResetTeleportProgress(want);
     }
 }

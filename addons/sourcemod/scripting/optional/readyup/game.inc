@@ -3,8 +3,20 @@
 #endif
 #define _readyup_game_included
 
+void ScheduleRestartCountdowns(float delay, bool startOn)
+{
+	if (g_hRestartCountdownTimer != null)
+		return;
+
+	g_hRestartCountdownTimer = CreateTimer(delay, Timer_RestartCountdowns, startOn, TIMER_FLAG_NO_MAPCHANGE);
+}
+
 Action Timer_RestartCountdowns(Handle timer, bool startOn)
 {
+	if (timer != g_hRestartCountdownTimer)
+		return Plugin_Stop;
+
+	g_hRestartCountdownTimer = null;
 	RestartCountdowns(startOn);
 	return Plugin_Stop;
 }

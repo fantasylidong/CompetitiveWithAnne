@@ -300,7 +300,7 @@ public void OnLibraryRemoved(const char[] name)
     {
         SpawnAttempts_ResetSearchProgress();
         SpawnAccel_ClearGraphState(false);
-        g_bSpawnAccel = false;
+        SpawnAccel_UpdateAvailability();
         Visibility_ClearEyeSnapshot();
         ClearPathCache();
         SpawnAccel_EnsureLegacyBuckets();
@@ -346,9 +346,9 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 public void OnPluginStart()
 {
 	LoadTranslations("infected_control.phrases");
-    SpawnAccel_UpdateAvailability();
     SpawnPerfConfig_Create();
     gCV.Create();
+    SpawnAccel_UpdateAvailability(true);
     ClearPathCache();
     Visibility_ClearEyeSnapshot();
     TraitorQuota_Init();
@@ -515,10 +515,9 @@ public Action Cmd_StartSpawn(int client, int args)
     return Plugin_Handled;
 }
 
-public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
     RequestStartSpawn();
-    return Plugin_Continue;
 }
 public Action Cmd_StopSpawn(int client, int args)
 {

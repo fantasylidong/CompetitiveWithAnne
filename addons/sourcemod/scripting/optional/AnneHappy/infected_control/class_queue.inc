@@ -3,6 +3,10 @@
 #endif
 #define _infected_control_class_queue_included
 
+#define SCARCITY_SCORE_EPSILON 0.0001
+
+static int g_iScarcityTieCursor = 1;
+
 // -------------------------
 // 队列维护 & 选类规则（更新）
 // -------------------------
@@ -250,7 +254,11 @@ static int PickScarceClassImpl(bool relaxCD)
 {
     float bestScore = 9999.0;
     int bestZc = 0;
+    int bestTieRank = SI_COUNT;
     bool supportLocked = SupportRestrictionActive();
+
+    if (g_iScarcityTieCursor < 1 || g_iScarcityTieCursor > SI_COUNT)
+        g_iScarcityTieCursor = 1;
 
     for (int zc = 1; zc <= SI_COUNT; zc++)
     {
@@ -261,21 +269,29 @@ static int PickScarceClassImpl(bool relaxCD)
 
         int idx      = zc - 1;
         int alive    = gST.siAlive[idx];
-        int capTotal = alive + gST.siCap[idx];
+        int reserved = Traitor_CountReservedClassSlots(zc);
+        int queued   = CountQueuedOfClass(zc);
+        int capTotal = alive + gST.siCap[idx] + reserved;
         if (capTotal <= 0) continue;
 
-        // 稀缺度：alive / (alive + remain)，越小越稀缺
-        float ratio = float(alive) / float(capTotal);
+        // 用预计占用率评估稀缺度，避免整批入队期间始终把尚未出生的队列项视为 0。
+        float ratio = float(alive + reserved + queued) / float(capTotal);
         ratio = Tactical_AdjustQueueScarcity(zc, ratio);
 
         // 刷新开头给杀手类一点优先（小幅）
         if (gST.lastSpawnSecs < SUPPORT_SPAWN_DELAY_SECS && IsKillerClassInt(zc))
             ratio -= 0.05;
 
-        if (ratio < bestScore)
+        int tieRank = zc - g_iScarcityTieCursor;
+        if (tieRank < 0)
+            tieRank += SI_COUNT;
+
+        if (ratio < bestScore - SCARCITY_SCORE_EPSILON
+            || (FloatAbs(ratio - bestScore) <= SCARCITY_SCORE_EPSILON && tieRank < bestTieRank))
         {
             bestScore = ratio;
             bestZc = zc;
+            bestTieRank = tieRank;
         }
     }
     return bestZc;
@@ -383,6 +399,7 @@ void MaintainSpawnQueueOnce(bool refreshCaps = true)
 
         // 入队
         SpawnQueue_Push(zc);
+        g_iScarcityTieCursor = (zc % SI_COUNT) + 1;
         Debug_Print("<SpawnQ> +%s size=%d", g_sInfectedClassNames[zc], SpawnQueue_Length());
     }
 }
@@ -411,6 +428,7 @@ void FillSpawnQueueToPendingBudget(bool refreshCaps = true)
 // =========================
 void ResetWaveClassSpawnCounts()
 {
+    g_iScarcityTieCursor = GetRandomInt(1, SI_COUNT);
     for (int i = 0; i < SI_COUNT; i++)
         gST.siSpawnedThisWave[i] = 0;
 }

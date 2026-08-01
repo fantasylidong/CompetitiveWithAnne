@@ -352,7 +352,11 @@ ResetInfVars()
 	}
 }
 
-public Action L4D_OnFirstSurvivorLeftSafeArea(int client){
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client){
+	if (g_bStatsFirstLeftHandled)
+		return;
+
+	g_bStatsFirstLeftHandled = true;
 	g_bStatsPlaytimeStarted = true;
 	Stats_RecordStartGrantedSupportItems();
 	Stats_ScheduleInitialSupportItemScans(12.0);
@@ -365,7 +369,6 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client){
 	NewPlayerBonus_AnnounceRoundStart();
 	//开局提示该难度完成最快速度
 	if(!IsNormalMode())GetThisModeBestTime();
-	return Plugin_Continue;
 }
 
 ResetVars()
@@ -380,6 +383,7 @@ ResetVars()
 	CampaignOver = false;
 	Isstart = false;
 	g_bStatsPlaytimeStarted = false;
+	g_bStatsFirstLeftHandled = false;
 	SupportStartGrantRecorded = false;
 	SupportStartGrantUntil = 0.0;
 	WitchExists = false;
