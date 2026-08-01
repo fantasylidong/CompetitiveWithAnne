@@ -205,7 +205,10 @@ int ChooseTargetSurvivor()
     }
     if (n > 0) return cand[GetRandomInt(0, n-1)];
     int fb = GetHighestFlowSurvivorSafe();
-    LogMsg("[TARGET] fallback to highest-flow %N", fb);
+    if (fb > 0 && fb <= MaxClients && IsClientInGame(fb))
+        LogMsg("[TARGET] fallback to highest-flow %N", fb);
+    else
+        LogMsg("[TARGET] no eligible survivor target");
     return fb;
 }
 

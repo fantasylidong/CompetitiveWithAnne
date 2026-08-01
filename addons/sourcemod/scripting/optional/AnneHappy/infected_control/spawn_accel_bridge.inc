@@ -12,29 +12,70 @@ bool g_bSpawnAccelAvailabilityKnown;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 ArrayList g_SpawnAccelRawFlowDistances = null;
 
+static const char g_sSpawnAccelRequiredNatives[][] =
+{
+    "AnneSpawn_IsActive",
+    "AnneSpawn_NavGraphStart",
+    "AnneSpawn_NavGraphPump",
+    "AnneSpawn_NavGraphStop",
+    "AnneSpawn_NavGraphPrepareRange",
+    "AnneSpawn_NavGraphGetAreaCount",
+    "AnneSpawn_NavGraphGetEdgeCount",
+    "AnneSpawn_NavGraphCollectProgress",
+    "AnneSpawn_GetWorkerCount",
+    "AnneSpawn_SetSurvivorSnapshot",
+    "AnneSpawn_ClearSurvivorSnapshot",
+    "AnneSpawn_TestPointSafety",
+    "AnneSpawn_ComputePointGeometry",
+    "AnneSpawn_MapNearest2D",
+    "AnneSpawn_PathExists",
+    "AnneSpawn_ClearPathCache"
+};
+
+stock bool SpawnAccel_HasRequiredNatives()
+{
+    for (int i = 0; i < sizeof(g_sSpawnAccelRequiredNatives); i++)
+    {
+        if (GetFeatureStatus(FeatureType_Native, g_sSpawnAccelRequiredNatives[i])
+            != FeatureStatus_Available)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 stock bool SpawnAccel_IsAvailable()
 {
     return LibraryExists(ANNE_SPAWN_ACCEL_LIBRARY)
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_IsActive") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphStart") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphPump") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphStop") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphPrepareRange") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphCollectRange") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphGetAreaCount") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphGetEdgeCount") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphCollectProgress") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_GetWorkerCount") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_SetSurvivorSnapshot") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_ClearSurvivorSnapshot") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_ComputePointGeometry") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_ComputeGeometryBatch") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_SelectTopK") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_MapNearest2D") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_PathExists") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_ClearPathCache") == FeatureStatus_Available
+        && SpawnAccel_HasRequiredNatives()
         && AnneSpawn_IsActive();
+}
+
+stock void SpawnAccel_LogUnavailableReason()
+{
+    if (!LibraryExists(ANNE_SPAWN_ACCEL_LIBRARY))
+    {
+        Debug_Print("[SPAWN ACCEL] reason: library '%s' is not loaded; check 'sm exts list' and SourceMod error logs",
+                    ANNE_SPAWN_ACCEL_LIBRARY);
+        return;
+    }
+
+    bool missingNative = false;
+    for (int i = 0; i < sizeof(g_sSpawnAccelRequiredNatives); i++)
+    {
+        if (GetFeatureStatus(FeatureType_Native, g_sSpawnAccelRequiredNatives[i])
+            != FeatureStatus_Available)
+        {
+            Debug_Print("[SPAWN ACCEL] reason: required native missing: %s",
+                        g_sSpawnAccelRequiredNatives[i]);
+            missingNative = true;
+        }
+    }
+    if (missingNative)
+        return;
+
+    Debug_Print("[SPAWN ACCEL] reason: AnneSpawn_IsActive returned false");
 }
 
 stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
@@ -45,6 +86,8 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
         Debug_Print("[SPAWN ACCEL] extension %s",
                     available ? "active (all required natives available)"
                               : "unavailable (using SourcePawn fallbacks)");
+        if (!available)
+            SpawnAccel_LogUnavailableReason();
     }
 
     g_bSpawnAccel = available;
