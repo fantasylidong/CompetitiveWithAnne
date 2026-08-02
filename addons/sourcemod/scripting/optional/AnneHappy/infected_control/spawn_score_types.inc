@@ -33,6 +33,7 @@ enum struct SpawnScoreDbg
     float tacticalQuality;
 
     float dTargetEye;
+    float navDistance;
     float ringEff;
     float slack;
     float sweet;

@@ -303,51 +303,53 @@ void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
     {
         case view_as<int>(SI_Smoker):
         {
-            if (stage == 0)      { minRange = 650.0; maxRange = 1100.0; }
-            else if (stage == 1) { minRange = 450.0; maxRange = 1400.0; }
-            else                 { minRange = 300.0; maxRange = 1500.0; }
+            if (stage == 0)      { minRange = 700.0; maxRange = 1650.0; }
+            else if (stage == 1) { minRange = 500.0; maxRange = 2400.0; }
+            else                 { minRange = 300.0; maxRange = 3000.0; }
         }
         case view_as<int>(SI_Boomer):
         {
-            if (stage == 0)      { minRange = 250.0; maxRange = 450.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 600.0; }
-            else                 { minRange = 250.0; maxRange = 800.0; }
+            if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 1050.0; }
+            else                 { minRange = 250.0; maxRange = 1600.0; }
         }
         case view_as<int>(SI_Hunter):
         {
-            if (stage == 0)      { minRange = 450.0; maxRange = 850.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 1100.0; }
-            else                 { minRange = 250.0; maxRange = 1300.0; }
+            if (stage == 0)      { minRange = 500.0; maxRange = 1300.0; }
+            else if (stage == 1) { minRange = 350.0; maxRange = 1900.0; }
+            else                 { minRange = 250.0; maxRange = 2600.0; }
         }
         case view_as<int>(SI_Spitter):
         {
-            if (stage == 0)      { minRange = 400.0; maxRange = 750.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 900.0; }
-            else                 { minRange = 250.0; maxRange = 1000.0; }
+            if (stage == 0)      { minRange = 450.0; maxRange = 1150.0; }
+            else if (stage == 1) { minRange = 300.0; maxRange = 1550.0; }
+            else                 { minRange = 250.0; maxRange = 2000.0; }
         }
         case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
         {
-            if (stage == 0)      { minRange = 300.0; maxRange = 600.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 800.0; }
-            else                 { minRange = 250.0; maxRange = 1000.0; }
+            if (stage == 0)      { minRange = 300.0; maxRange = 900.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 1350.0; }
+            else                 { minRange = 250.0; maxRange = 2000.0; }
         }
         default:
         {
-            minRange = gCV.fSpawnMin;
-            maxRange = gCV.fSpawnMax;
+            minRange = NAV_CANDIDATE_TEAM_EXCLUSION;
+            maxRange = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
         }
     }
 
-    minRange = FloatMax(minRange, gCV.fSpawnMin);
-    maxRange = FloatMin(maxRange, gCV.fSpawnMax);
+    minRange = FloatMax(minRange, NAV_CANDIDATE_TEAM_EXCLUSION);
+    maxRange = FloatMin(maxRange, gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE);
+    if (maxRange < minRange)
+        minRange = maxRange;
 
     if (teleportMode)
     {
-        minRange = FloatMax(minRange, gCV.fTeleportSpawnMin);
         if (maxRange < minRange + 150.0)
-            maxRange = FloatMin(gCV.fSpawnMax, minRange + 200.0);
+            maxRange = FloatMin(
+                gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE, minRange + 200.0);
     }
 
     if (maxRange < minRange)
-        maxRange = minRange;
+        minRange = maxRange;
 }

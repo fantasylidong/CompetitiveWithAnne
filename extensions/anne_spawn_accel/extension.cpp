@@ -96,7 +96,7 @@ struct NavCandidateResult
     double completedAt = 0.0;
     float buildMs = 0.0f;
     std::vector<std::uint32_t> areaIndices;
-    std::vector<float> targetDistances;
+    std::vector<float> pathDistances;
 };
 
 struct NavCandidateRequest
@@ -1028,8 +1028,7 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
 
     bool queued = g_Workers.Enqueue(
         [graph = std::move(graph), blocked = std::move(blocked), targetIndex,
-         survivorEyes = std::move(survivorEyes), targetSlot,
-         request]() mutable {
+         survivorEyes = std::move(survivorEyes), request]() mutable {
             double buildStart = SteadySeconds();
             auto result = std::make_shared<NavCandidateResult>();
             result->generation = request.generation;
@@ -1041,17 +1040,17 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
             result->minSurvivorDistance = request.minSurvivorDistance;
             result->blockedEpoch = request.blockedEpoch;
 
-            std::vector<float> pathDistances;
+            std::vector<float> allPathDistances;
             std::vector<std::uint8_t> specialEdges;
             bool built = AnneBuildNavCandidateSnapshot(
                 *graph, targetIndex, request.maxPathDistance,
-                blocked, survivorEyes, targetSlot,
-                request.minSurvivorDistance, result->areaIndices,
-                result->targetDistances, pathDistances, specialEdges);
+                blocked, survivorEyes, request.minSurvivorDistance,
+                result->areaIndices,
+                result->pathDistances, allPathDistances, specialEdges);
             if (!built)
             {
                 result->areaIndices.clear();
-                result->targetDistances.clear();
+                result->pathDistances.clear();
             }
 
             result->completedAt = SteadySeconds();
@@ -1442,21 +1441,21 @@ cell_t Native_NavCandidatesPrepare(IPluginContext *context, const cell_t *params
 
 cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params)
 {
-    if (params[0] != 12)
-        return context->ThrowNativeError("AnneSpawn_NavCandidatesCollect expects 12 parameters");
+    if (params[0] != 13)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesCollect expects 13 parameters");
 
     int targetClient = params[1];
     std::uint32_t targetId = static_cast<std::uint32_t>(params[2]);
-    float minTargetDistance = std::max(0.0f, sp_ctof(params[3]));
-    float maxTargetDistance = sp_ctof(params[4]);
+    float minNavDistance = std::max(0.0f, sp_ctof(params[3]));
+    float maxNavDistance = sp_ctof(params[4]);
     float maxPathDistance = sp_ctof(params[5]);
     float minSurvivorDistance = sp_ctof(params[6]);
     float maxSnapshotAge = sp_ctof(params[7]);
     int startOffset = params[8];
-    int maxResults = params[10];
-    if (!std::isfinite(maxTargetDistance) || !std::isfinite(maxPathDistance) ||
+    int maxResults = params[11];
+    if (!std::isfinite(maxNavDistance) || !std::isfinite(maxPathDistance) ||
         !std::isfinite(minSurvivorDistance) || !std::isfinite(maxSnapshotAge) ||
-        maxTargetDistance < minTargetDistance || maxPathDistance <= 0.0f ||
+        maxNavDistance < minNavDistance || maxPathDistance <= 0.0f ||
         minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f ||
         startOffset < 0 || maxResults < 0 || maxResults > kMaxSpatialPoints)
     {
@@ -1464,11 +1463,13 @@ cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params
     }
 
     cell_t *output = nullptr;
+    cell_t *distanceOutput = nullptr;
     cell_t *ageOutput = nullptr;
     cell_t *totalOutput = nullptr;
     if ((maxResults > 0 && !GetCells(context, params[9], output)) ||
-        !GetCells(context, params[11], ageOutput) ||
-        !GetCells(context, params[12], totalOutput))
+        (maxResults > 0 && !GetCells(context, params[10], distanceOutput)) ||
+        !GetCells(context, params[12], ageOutput) ||
+        !GetCells(context, params[13], totalOutput))
     {
         return context->ThrowNativeError("Invalid Nav candidate collect output");
     }
@@ -1501,11 +1502,11 @@ cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params
     }
 
     auto first = std::lower_bound(
-        result->targetDistances.begin(), result->targetDistances.end(), minTargetDistance);
+        result->pathDistances.begin(), result->pathDistances.end(), minNavDistance);
     auto last = std::upper_bound(
-        first, result->targetDistances.end(), maxTargetDistance);
+        first, result->pathDistances.end(), maxNavDistance);
     std::size_t firstRow = static_cast<std::size_t>(
-        std::distance(result->targetDistances.begin(), first));
+        std::distance(result->pathDistances.begin(), first));
     std::size_t total = static_cast<std::size_t>(std::distance(first, last));
     totalOutput[0] = static_cast<cell_t>(
         std::min<std::size_t>(total, static_cast<std::size_t>(std::numeric_limits<cell_t>::max())));
@@ -1523,6 +1524,8 @@ cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params
         {
             output[row] = static_cast<cell_t>(
                 result->areaIndices[firstRow + offset + static_cast<std::size_t>(row)]);
+            distanceOutput[row] = sp_ftoc(
+                result->pathDistances[firstRow + offset + static_cast<std::size_t>(row)]);
         }
     }
 

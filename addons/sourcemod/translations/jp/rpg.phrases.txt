@@ -336,4 +336,8 @@
 	{
 		"jp"		"{green}[AntiKick]{default} 保護された管理者をキックする権限がありません: {olive}%N{default}。"
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"jp"		"{green}[RPG]{default} 内鬼として登録中は購入機能を利用できません。"
+	}
 }

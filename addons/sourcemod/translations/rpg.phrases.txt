@@ -336,4 +336,8 @@
 	{
 		"en"		"{green}[AntiKick]{default} You do not have permission to kick protected admins: {olive}%N{default}."
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"en"		"{green}[RPG]{default} The shop is unavailable while you are registered as a traitor."
+	}
 }

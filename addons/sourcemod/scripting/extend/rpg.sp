@@ -8,6 +8,7 @@
 #include <rpg>
 #include <admin>
 #undef REQUIRE_PLUGIN
+#include <infected_control>
 #include <l4dstats>
 #include <hextags>
 #include <l4d_hats>
@@ -1416,8 +1417,22 @@ public Action BuyMenu(int client,int args)
 	return Plugin_Continue;
 }
 
+static bool IsRegisteredInfectedControlTraitor(int client)
+{
+	return g_bInfectedControlAvailable
+		&& GetFeatureStatus(FeatureType_Native, "InfectedControl_IsTraitorRegistered") == FeatureStatus_Available
+		&& IsValidClient(client)
+		&& InfectedControl_IsTraitorRegistered(client);
+}
+
 static bool CanUseShop(int client)
 {
+	if (IsRegisteredInfectedControlTraitor(client))
+	{
+		CPrintToChat(client, "%t", "RPG_TraitorCannotUseShop");
+		return false;
+	}
+
 	if (g_cShopEnable != null && g_cShopEnable.BoolValue)
 	{
 		return true;
@@ -1803,7 +1818,7 @@ public void BuildMenu(int client)
 		menu.SetTitle(binfo);
 
 		//FormatEx(binfo, sizeof(binfo),  "购买枪械", client);	//武器
-		if(g_cShopEnable.BoolValue){
+		if(g_cShopEnable.BoolValue && !IsRegisteredInfectedControlTraitor(client)){
 			FormatEx(binfo, sizeof(binfo), "购买枪械", client);
 			menu.AddItem("gun", binfo);
 

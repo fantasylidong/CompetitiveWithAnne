@@ -72,10 +72,9 @@ bool AnneBuildNavCandidateSnapshot(
     float maxPathDistance,
     const std::vector<std::uint8_t> &blocked,
     const std::vector<float> &survivorEyes,
-    std::size_t targetSurvivorSlot,
     float minSurvivorDistance,
     std::vector<std::uint32_t> &areaIndices,
-    std::vector<float> &targetDistances,
+    std::vector<float> &candidatePathDistances,
     std::vector<float> &pathDistances,
     std::vector<std::uint8_t> &usesSpecialEdge);
 

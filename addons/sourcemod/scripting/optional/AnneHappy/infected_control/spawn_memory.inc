@@ -86,33 +86,23 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-stock bool PassRealPositionCheck(float candPos[3], int targetSur, int si = 0)
+stock bool PassRealPositionCheck(float candPos[3], int targetSur)
 {
     int candPercent = GetPositionBucketPercent(candPos);
-    return PassRealBucketPositionCheck(candPercent, candPos[2], targetSur, si);
+    return PassRealBucketPositionCheck(candPercent, targetSur);
 }
 
-stock bool PassRealBucketPositionCheckCached(int candPercent, float candZ, int surPercent,
-                                             bool hasLowestFootZ, float lowestFootZ, int si = 0)
+stock bool PassRealBucketPositionCheckCached(int candPercent, int surPercent)
 {
     if (candPercent < 0 || surPercent < 0)
         return true;
 
-    if (candPercent < surPercent - 6)
-        return false;
-
-    if (hasLowestFootZ
-        && candPercent < surPercent
-        && (candZ <= (lowestFootZ - 180.0)
-            || (si != view_as<int>(SI_Smoker) && candZ >= (lowestFootZ + 200.0))))
-    {
-        return false;
-    }
-
-    return true;
+    // 多层地图的上下楼 Nav 可能只有少量 Flow 差值。楼层高度交给有向可达、
+    // path、可见性和评分处理；这里仅阻止明显落后于生还者的回头刷点。
+    return candPercent >= surPercent - 6;
 }
 
-stock bool PassRealBucketPositionCheck(int candPercent, float candZ, int targetSur, int si = 0)
+stock bool PassRealBucketPositionCheck(int candPercent, int targetSur)
 {
     if (candPercent < 0)
         return true;
@@ -141,9 +131,7 @@ stock bool PassRealBucketPositionCheck(int candPercent, float candZ, int targetS
     if (surPercent < 0)
         return true;
 
-    float minFootZ;
-    bool hasMinFootZ = TryGetLowestSurvivorFootZ(minFootZ);
-    return PassRealBucketPositionCheckCached(candPercent, candZ, surPercent, hasMinFootZ, minFootZ, si);
+    return PassRealBucketPositionCheckCached(candPercent, surPercent);
 }
 
 stock bool TryGetLowestSurvivorFootZ(float &outMinZ)

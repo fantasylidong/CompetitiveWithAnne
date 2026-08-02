@@ -336,4 +336,8 @@
 	{
 		"vi"		"{green}[AntiKick]{default} Bạn không có quyền loại bỏ quản trị viên được bảo vệ: {olive}%N{default}."
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"vi"		"{green}[RPG]{default} Không thể mua vật phẩm khi bạn đang đăng ký làm nội gián."
+	}
 }

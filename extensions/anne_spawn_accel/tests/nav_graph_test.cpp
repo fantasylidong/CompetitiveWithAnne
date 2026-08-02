@@ -41,6 +41,41 @@ void TestDirectedReachability()
     assert(!std::isfinite(distances[1]) && !std::isfinite(distances[2]));
 }
 
+void TestCandidateOrderUsesDirectedPath()
+{
+    AnneNavGraphMetadata metadata;
+    metadata.mapName = "candidate_path_order_test";
+    metadata.navIds = {1, 2, 3, 4};
+    metadata.centers = {0.0f, 0.0f, 0.0f,
+                        0.0f, 0.0f, 300.0f,
+                        1000.0f, 0.0f, 0.0f,
+                        600.0f, 0.0f, 0.0f};
+    metadata.flowDistances = {0.0f, 100.0f, 200.0f, 300.0f};
+    metadata.maxFlowDistance = 300.0f;
+    std::vector<AnneNavGraphInputEdge> edges = {
+        {1, 2, AnneNavEdgeType::Floor},
+        {2, 0, AnneNavEdgeType::Floor},
+        {3, 0, AnneNavEdgeType::Floor},
+    };
+    std::string error;
+    std::shared_ptr<AnneNavGraph> graph =
+        AnneBuildNavGraph(metadata, std::move(edges), true, error);
+    assert(graph && error.empty());
+
+    std::vector<std::uint8_t> blocked(4, 0);
+    std::vector<float> survivorEyes = {0.0f, 0.0f, 0.0f};
+    std::vector<std::uint32_t> candidates;
+    std::vector<float> candidatePathDistances;
+    std::vector<float> allPathDistances;
+    std::vector<std::uint8_t> specialEdges;
+    assert(AnneBuildNavCandidateSnapshot(
+        *graph, 0, 3000.0f, blocked, survivorEyes, 250.0f,
+        candidates, candidatePathDistances, allPathDistances, specialEdges));
+    assert(candidates.size() == 3);
+    assert(candidates[0] == 3 && candidates[1] == 2 && candidates[2] == 1);
+    assert(candidatePathDistances[0] < candidatePathDistances[2]);
+}
+
 long Percentile(std::vector<long> values, double percentile)
 {
     assert(!values.empty());
@@ -56,6 +91,7 @@ long Percentile(std::vector<long> values, double percentile)
 int main()
 {
     TestDirectedReachability();
+    TestCandidateOrderUsesDirectedPath();
     constexpr std::uint32_t areaCount = 10000;
     constexpr std::uint32_t edgesPerArea = 6;
     const std::string cachePath = "/tmp/anne_spawn_accel_nav_graph_test.anvg";
@@ -129,12 +165,12 @@ int main()
     }
 
     std::vector<std::uint32_t> candidates;
-    std::vector<float> targetDistances;
+    std::vector<float> candidatePathDistances;
     assert(AnneBuildNavCandidateSnapshot(
-        *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 0, 250.0f,
-        candidates, targetDistances, distances, special));
-    assert(candidates.size() == targetDistances.size() && !candidates.empty());
-    assert(std::is_sorted(targetDistances.begin(), targetDistances.end()));
+        *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 250.0f,
+        candidates, candidatePathDistances, distances, special));
+    assert(candidates.size() == candidatePathDistances.size() && !candidates.empty());
+    assert(std::is_sorted(candidatePathDistances.begin(), candidatePathDistances.end()));
     for (std::uint32_t candidate : candidates)
     {
         std::size_t center = static_cast<std::size_t>(candidate) * 3;
@@ -155,8 +191,8 @@ int main()
     {
         auto start = std::chrono::steady_clock::now();
         assert(AnneBuildNavCandidateSnapshot(
-            *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 0, 250.0f,
-            candidates, targetDistances, distances, special));
+            *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 250.0f,
+            candidates, candidatePathDistances, distances, special));
         candidateBuildMicros.push_back(
             std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::steady_clock::now() - start).count());

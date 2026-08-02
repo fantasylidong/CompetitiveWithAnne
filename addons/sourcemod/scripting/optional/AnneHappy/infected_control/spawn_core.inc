@@ -92,6 +92,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            float searchRange,
                                            bool teleportMode,
                                            int areaIdx,
+                                           float navDistance,
                                            int knownBucket,
                                            bool rejectBadFlow,
                                            float mapMaxFlowDist,
@@ -103,7 +104,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            int positionCheckBucket,
                                            float refEyeZ,
                                            float lowestFootZ,
-                                           bool hasLowestFootZ,
                                            Address navStart,
                                            int visibilityRayMode,
                                            float minScore,
@@ -185,7 +185,11 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     float slack = 0.0;
     float ringEff = searchRange;
     float dminEyeSq = 0.0;
-    float minDistSq = minRange * minRange;
+    float directExclusion = FloatMax(
+        NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
+    if (teleportMode)
+        directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
+    float directExclusionSq = directExclusion * directExclusion;
     bool haveCheapCandidate = false;
     bool geometryReady = false;
     float dTargetEye = 0.0;
@@ -211,9 +215,14 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
             && AnneSpawn_ComputePointGeometry(pos, center, sectors, targetEye,
                                                dminEyeSq, dTargetEye, sector);
         if (!geometryReady)
+        {
             dminEyeSq = GetMinEyeDistSquaredToAnySurvivor(pos);
-        float maxDistSq = ringEff * ringEff;
-        if (dminEyeSq < minDistSq || dminEyeSq > maxDistSq)
+            dTargetEye = GetVectorDistance(pos, targetEye);
+        }
+        bool outsideRange = navDistance >= 0.0
+            ? (navDistance < minRange || navDistance > ringEff)
+            : (dTargetEye < gCV.fSpawnMin || dTargetEye > gCV.fSpawnMax);
+        if (dminEyeSq < directExclusionSq || outsideRange)
         {
             stats.distance++;
             SpawnPerf_RecordFilterByDist();
@@ -221,8 +230,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         }
 
         // 7) 使用已知 candidateBucket 做真实位置检查，避免 GetPositionBucketPercent(pos) 再查 Nav。
-        if (!PassRealBucketPositionCheckCached(candidateBucket, pos[2], positionCheckBucket,
-                                               hasLowestFootZ, lowestFootZ, zc))
+        if (!PassRealBucketPositionCheckCached(candidateBucket, positionCheckBucket))
         {
             stats.position++;
             SpawnPerf_RecordFilterByPosition();
@@ -272,13 +280,15 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!geometryReady)
     {
         sector = ComputeSectorIndex(center, pos, sectors);
-        dTargetEye = GetVectorDistance(pos, targetEye);
     }
     float tacticalQuality = Tactical_GetCandidateQuality(
         zc, pos, targetSurvivor, targetPoint);
     SpawnPerf_RecordFullEvaluation();
     float navWeight = 1.0;
-    if (!SpawnScore_BuildCandidate(zc, pos, dTargetEye, minRange, ringEff, slack,
+    float scoreMinRange = navDistance >= 0.0 ? minRange : gCV.fSpawnMin;
+    float scoreMaxRange = navDistance >= 0.0 ? ringEff : gCV.fSpawnMax;
+    if (!SpawnScore_BuildCandidate(zc, pos, dTargetEye, navDistance,
+                                   scoreMinRange, scoreMaxRange, slack,
                                    candidateBucket, centerBucket, rawBadFlow,
                                    refEyeZ, allMaxZ, lowestFootZ, sector, areaIdx,
                                    navWeight, tacticalQuality, candDbg))
@@ -334,7 +344,6 @@ enum struct SpawnFrameContext
     float targetPoint[3];
     float refEyeZ;
     float lowestFootZ;
-    bool hasLowestFootZ;
     Address navStart;
     int navStartClient;
     int navStartId;
@@ -361,11 +370,12 @@ enum struct SpawnSearchCursor
     int graphTargetClient;
     int graphTargetNavId;
     float graphPathLimit;
-    float graphMinTargetDistance;
-    float graphMaxTargetDistance;
+    float graphMinNavDistance;
+    float graphMaxNavDistance;
     int graphOffset;
     int graphTotalInRange;
     int graphPage[NAV_CANDIDATE_PAGE_SIZE];
+    float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageLen;
     int graphPageRow;
     float graphPageExpiresAt;
@@ -385,8 +395,8 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.graphTargetClient = -1;
     cursor.graphTargetNavId = -1;
     cursor.graphPathLimit = 0.0;
-    cursor.graphMinTargetDistance = 0.0;
-    cursor.graphMaxTargetDistance = 0.0;
+    cursor.graphMinNavDistance = 0.0;
+    cursor.graphMaxNavDistance = 0.0;
     cursor.graphOffset = 0;
     cursor.graphTotalInRange = -1;
     cursor.graphPageLen = 0;
@@ -499,7 +509,8 @@ static bool SpawnSearch_BuildFrameContext(
         GetClientEyePosition(targetSurvivor, frame.targetPoint);
         frame.refEyeZ = frame.targetPoint[2];
     }
-    frame.hasLowestFootZ = TryGetLowestSurvivorFootZ(frame.lowestFootZ);
+    if (!TryGetLowestSurvivorFootZ(frame.lowestFootZ))
+        frame.lowestFootZ = 1.0e9;
 
     frame.navStart = Address_Null;
     frame.navStartClient = -1;
@@ -558,9 +569,9 @@ static void SpawnSearch_ConfigureCursor(
     cursor.graphTargetClient = graphTargetClient;
     cursor.graphTargetNavId = graphTargetNavId;
     cursor.graphPathLimit = SpawnAccel_GetCandidatePathLimit();
-    cursor.graphMinTargetDistance = FloatMax(
+    cursor.graphMinNavDistance = FloatMax(
         0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
-    cursor.graphMaxTargetDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK;
+    cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK;
     cursor.source = (graphTargetClient > 0 && graphTargetNavId > 0
         && SpawnAccel_CanUseGraphCandidates())
         ? SpawnCandidate_Graph : SpawnCandidate_All;
@@ -589,9 +600,10 @@ static void SpawnSearch_EnsureCursor(
 
 static SpawnCandidateReadResult SpawnSearch_NextCandidate(
     SpawnSearchCursor cursor, int &areaIdx, int &candidateBucket,
-    bool &rejectBadFlow)
+    float &navDistance, bool &rejectBadFlow)
 {
     candidateBucket = -1;
+    navDistance = -1.0;
     rejectBadFlow = false;
     while (cursor.source != SpawnCandidate_None)
     {
@@ -601,7 +613,9 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             if (cursor.graphPageRow < cursor.graphPageLen
                 && now <= cursor.graphPageExpiresAt)
             {
-                areaIdx = cursor.graphPage[cursor.graphPageRow++];
+                int pageRow = cursor.graphPageRow++;
+                areaIdx = cursor.graphPage[pageRow];
+                navDistance = cursor.graphPageNavDistance[pageRow];
                 cursor.graphOffset++;
                 TryGetBucketByAreaIdx(areaIdx, candidateBucket);
                 return SpawnCandidateRead_Found;
@@ -632,16 +646,18 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             float resultAgeMs;
             int totalInRange;
             int page[NAV_CANDIDATE_PAGE_SIZE];
+            float pageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
             int count = AnneSpawn_NavCandidatesCollect(
                 cursor.graphTargetClient,
                 cursor.graphTargetNavId,
-                cursor.graphMinTargetDistance,
-                cursor.graphMaxTargetDistance,
+                cursor.graphMinNavDistance,
+                cursor.graphMaxNavDistance,
                 cursor.graphPathLimit,
-                NAV_CANDIDATE_TEAM_EXCLUSION,
+                FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin),
                 NAV_CANDIDATE_RESULT_TTL,
                 cursor.graphOffset,
                 page,
+                pageNavDistance,
                 NAV_CANDIDATE_PAGE_SIZE,
                 resultAgeMs,
                 totalInRange);
@@ -662,7 +678,10 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
 
             cursor.graphPageLen = count;
             for (int row = 0; row < count; row++)
+            {
                 cursor.graphPage[row] = page[row];
+                cursor.graphPageNavDistance[row] = pageNavDistance[row];
+            }
             float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;
             cursor.graphPageExpiresAt = now + FloatMax(0.001, ttlRemaining);
             continue;
@@ -713,9 +732,10 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     {
         int areaIdx;
         int candidateBucket;
+        float navDistance;
         bool rejectBadFlow;
         SpawnCandidateReadResult readResult = SpawnSearch_NextCandidate(
-            cursor, areaIdx, candidateBucket, rejectBadFlow);
+            cursor, areaIdx, candidateBucket, navDistance, rejectBadFlow);
         if (readResult == SpawnCandidateRead_Pending)
             break;
         if (readResult == SpawnCandidateRead_Exhausted)
@@ -732,12 +752,12 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
             zc, targetSurvivor,
             frame.targetPoint, minRange,
             maxRange, teleportMode,
-            areaIdx, candidateBucket, rejectBadFlow,
+            areaIdx, navDistance, candidateBucket, rejectBadFlow,
             frame.mapMaxFlowDist, frame.finaleArea,
             frame.center, frame.sectors,
             frame.allMaxZ, frame.centerBucket,
             frame.positionCheckBucket, frame.refEyeZ,
-            frame.lowestFootZ, frame.hasLowestFootZ,
+            frame.lowestFootZ,
             frame.navStart, frame.visibilityRayMode,
             frame.minScore, now, candDbg,
             cursor.stats, usedExpensive);
@@ -773,7 +793,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (!exhausted)
         return SpawnSearch_Pending;
 
-    Debug_Print("[FIND FAIL] range=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
                 cursor.minRange, cursor.maxRange, cursor.inspected,
                 cursor.stats.cooldown, cursor.stats.flags,
                 cursor.stats.flow, cursor.stats.distance,

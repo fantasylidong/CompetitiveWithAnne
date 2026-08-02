@@ -827,7 +827,7 @@
             <div class="band-block stage-2" id="band-stage-2"><span></span></div>
             <div class="band-block stage-1" id="band-stage-1"><span></span></div>
             <div class="band-block stage-0" id="band-stage-0"><span></span></div>
-            <div class="axis-labels"><span>250</span><span>500</span><span>750</span><span>1000</span><span>1250</span><span>1500</span></div>
+            <div class="axis-labels"><span>250</span><span>800</span><span>1350</span><span>1900</span><span>2450</span><span>3000</span></div>
           </div>
           <div class="class-facts">
             <div class="class-fact"><span>主区间</span><strong id="class-main-band"></strong></div>
@@ -863,13 +863,13 @@
 
       <div class="nav-layout">
         <div class="funnel" id="nav-funnel">
-          <button type="button" class="funnel-stage" data-nav-step="0"><span class="stage-number">01</span><span class="stage-copy"><strong>Flow 桶窗口</strong><span>按目标生还者 Flow 直接定位附近桶</span></span><span class="stage-bar"><span class="stage-fill" style="width:100%"></span></span><span class="stage-count">全量入口</span></button>
-          <button type="button" class="funnel-stage" data-nav-step="1"><span class="stage-number">02</span><span class="stage-copy"><strong>目标中心粗排</strong><span>Nav 中心只计算到当前目标的平方距离</span></span><span class="stage-bar"><span class="stage-fill" style="width:82%"></span></span><span class="stage-count">≤ 48 / 会话</span></button>
-          <button type="button" class="funnel-stage" data-nav-step="2"><span class="stage-number">03</span><span class="stage-copy"><strong>历史权重游标</strong><span>高 / 中 / 低权重按 3:1:1 在线消费</span></span><span class="stage-bar"><span class="stage-fill" style="width:66%"></span></span><span class="stage-count">跨帧恢复</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="0"><span class="stage-number">01</span><span class="stage-copy"><strong>有向图快照</strong><span>从目标 Nav 反向构建可达距离场</span></span><span class="stage-bar"><span class="stage-fill" style="width:100%"></span></span><span class="stage-count">worker</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="1"><span class="stage-number">02</span><span class="stage-copy"><strong>Nav 距离分页</strong><span>按 candidate → target 路径距离升序</span></span><span class="stage-bar"><span class="stage-fill" style="width:82%"></span></span><span class="stage-count">TTL 0.2s</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="2"><span class="stage-number">03</span><span class="stage-copy"><strong>跨帧页游标</strong><span>只保存 areaIdx 与 navDistance 的消费进度</span></span><span class="stage-bar"><span class="stage-fill" style="width:66%"></span></span><span class="stage-count">跨帧恢复</span></button>
           <button type="button" class="funnel-stage" data-nav-step="3"><span class="stage-number">04</span><span class="stage-copy"><strong>全队眼位快照</strong><span>同 Tick 复用眼位、左右视点和朝向</span></span><span class="stage-bar"><span class="stage-fill" style="width:57%"></span></span><span class="stage-count">每帧一次</span></button>
           <button type="button" class="funnel-stage" data-nav-step="4"><span class="stage-number">05</span><span class="stage-copy"><strong>Flags / 冷却 / 桶占用</strong><span>在取随机点前做最便宜硬过滤</span></span><span class="stage-bar"><span class="stage-fill" style="width:43%"></span></span><span class="stage-count">轻量</span></button>
           <button type="button" class="funnel-stage" data-nav-step="5"><span class="stage-number">06</span><span class="stage-copy"><strong>区域内随机点</strong><span>同一 NavArea 最多抽取 3 个点</span></span><span class="stage-bar"><span class="stage-fill" style="width:32%"></span></span><span class="stage-count">随机采样</span></button>
-          <button type="button" class="funnel-stage" data-nav-step="6"><span class="stage-number">07</span><span class="stage-copy"><strong>分散 / 精确距离 / Flow</strong><span>平方距离硬边界与真实位置检查</span></span><span class="stage-bar"><span class="stage-fill" style="width:23%"></span></span><span class="stage-count">轻量</span></button>
+          <button type="button" class="funnel-stage" data-nav-step="6"><span class="stage-number">07</span><span class="stage-copy"><strong>Nav 范围 / 直线 250 / Flow</strong><span>职业路径距离与全队安全距离分开判定</span></span><span class="stage-bar"><span class="stage-fill" style="width:23%"></span></span><span class="stage-count">轻量</span></button>
           <button type="button" class="funnel-stage" data-nav-step="7" data-cost="expensive"><span class="stage-number">08</span><span class="stage-copy"><strong>Hull + 可见性</strong><span>避免卡住和当面刷新</span></span><span class="stage-bar"><span class="stage-fill" style="width:13%"></span></span><span class="stage-count">昂贵预算</span></button>
           <button type="button" class="funnel-stage" data-nav-step="8" data-cost="expensive"><span class="stage-number">09</span><span class="stage-copy"><strong>Nav path</strong><span>最后才检查目标是否可达并复用缓存</span></span><span class="stage-bar"><span class="stage-fill" style="width:8%"></span></span><span class="stage-count">昂贵预算</span></button>
           <button type="button" class="funnel-stage" data-nav-step="9" data-cost="final"><span class="stage-number">10</span><span class="stage-copy"><strong>统一职业评分</strong><span>0–100 基础质量 + 连续战术几何</span></span><span class="stage-bar"><span class="stage-fill" style="width:4%"></span></span><span class="stage-count">取最高分</span></button>
@@ -879,11 +879,11 @@
           <h2 id="nav-step-title"></h2>
           <p id="nav-step-copy"></p>
           <div class="nav-metrics">
-            <div><span>每帧 Nav 检查</span><strong>默认 16</strong></div>
-            <div><span>每帧昂贵检查</span><strong>默认 3</strong></div>
-            <div><span>会话检查上限</span><strong>48</strong></div>
-            <div><span>有命中时间片</span><strong>最多 2</strong></div>
-            <div><span>无命中时间片</span><strong>每距离带最多 3</strong></div>
+            <div><span>每帧 Nav 检查</span><strong>默认 256</strong></div>
+            <div><span>每帧昂贵检查</span><strong>默认 8</strong></div>
+            <div><span>搜索软预算</span><strong>1.0ms</strong></div>
+            <div><span>快照热刷新</span><strong>0.1 秒</strong></div>
+            <div><span>快照有效期</span><strong>0.2 秒</strong></div>
           </div>
           <a class="deep-link" href="nav_spawn_pipeline.html">打开 Nav 专题动画与权重实验室</a>
         </aside>
@@ -907,7 +907,7 @@
       <div class="fallback-ladder" id="fallback-ladder">
         <div class="fallback-step" data-fallback-step="0"><strong>职业主区间</strong><span>每个职业直接进入自己的最佳距离带</span></div>
         <div class="fallback-step" data-fallback-step="1"><strong>第一次放宽</strong><span>距离边界扩大，其他硬限制保持</span></div>
-        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>仍受 SpawnMin / SpawnMax 约束</span></div>
+        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>Nav 上限受 SpawnMax × 2 约束</span></div>
         <div class="fallback-step constrained" data-fallback-step="3"><strong>导演候选 × 8</strong><span>仍检查最终距离、视线和卡位</span></div>
         <div class="fallback-step" data-fallback-step="4"><strong>完整轮次 +1</strong><span>轮转队首，保留职业并重置会话</span></div>
         <div class="fallback-step" data-fallback-step="5"><strong>重复完整流程</strong><span>插件再自救一轮</span></div>
@@ -982,7 +982,7 @@
 
       <div class="lifecycle">
         <section class="life-step"><span>01 · PluginStart</span><h3>注册与依赖</h3><p>翻译、CVar、gamedata patch、命令、事件、数据库、队列与缓存容器。</p></section>
-        <section class="life-step"><span>02 · RoundStart</span><h3>清理上一局</h3><p>StopAll、重置权重/波次/内鬼状态，构建或读取 Nav Flow 桶缓存。</p></section>
+        <section class="life-step"><span>02 · RoundStart</span><h3>清理上一局</h3><p>StopAll、重置权重/波次/内鬼状态，构建或读取 Nav 有向图缓存并刷新 Flow 数据。</p></section>
         <section class="life-step"><span>03 · SafeAreaExit</span><h3>启动刷特</h3><p>首波 timer → StartWave → 1 秒波次 timer；启用时再创建传送 monitor。</p></section>
         <section class="life-step"><span>04 · Runtime</span><h3>三通道协作</h3><p>timer 决策、OnGameFrame 找位、事件回写，暂停时分别保存和恢复。</p></section>
         <section class="life-step"><span>05 · End / MapEnd</span><h3>关闭句柄</h3><p>停止 timers、搜索会话、路径缓存与数据库，避免跨图残留。</p></section>
@@ -996,8 +996,8 @@
             <tbody>
               <tr><td>OnGameFrame 节流</td><td>活跃 / 空闲使用不同 think step</td><td>没有刷特工作时近似零成本。</td></tr>
               <tr><td>普通队列补位</td><td>缺口存在时最短 0.25 秒重试</td><td>避免每帧重新扫描职业容量。</td></tr>
-              <tr><td>Nav 检查</td><td>默认每帧最多 16 个</td><td>限制候选枚举与随机点采样。</td></tr>
-              <tr><td>昂贵检查</td><td>默认每帧最多 3 个</td><td>控制 hull、可见性和 path 峰值。</td></tr>
+              <tr><td>Nav 检查</td><td>默认每帧最多 256 个</td><td>大量便宜距离淘汰可以在同帧快速越过。</td></tr>
+              <tr><td>昂贵检查</td><td>默认每帧最多 8 个，并受 1.0ms 软预算限制</td><td>控制 hull、可见性和 path 峰值。</td></tr>
               <tr><td>候选比较</td><td>普通波 4 / 3；破点波 5 / 4</td><td>至少比较 2 个，84 分可提前结束。</td></tr>
               <tr><td>会话寿命</td><td>有命中最多 2 帧；空搜每带最多 3 帧</td><td>避免单个职业长期垄断热路径。</td></tr>
               <tr><td>眼位与朝向</td><td>每个实际刷特帧快照一次</td><td>距离、视线和战术评分同 Tick 复用。</td></tr>
@@ -1009,7 +1009,7 @@
         <section>
           <div class="subsection-head"><h2>昂贵操作排序</h2><p>修改候选顺序时重点保护这四层。</p></div>
           <div class="cost-stack">
-            <div class="cost-item"><span class="cost-rank">1</span><div><strong>可见性精判</strong><p>多生还者 trace + Left4DHooks 可见性；PVS 只能粗筛，不能替代。</p></div></div>
+            <div class="cost-item"><span class="cost-rank">1</span><div><strong>可见性精判</strong><p>多生还者 trace + Left4DHooks 可见性；当前实现不包含 PVS 粗筛。</p></div></div>
             <div class="cost-item"><span class="cost-rank">2</span><div><strong>NavAreaBuildPath</strong><p>首次构建最贵，放在可见性之后并复用路径起点和 path cache。</p></div></div>
             <div class="cost-item"><span class="cost-rank">3</span><div><strong>Hull stuck 检查</strong><p>只对通过距离、Flow 和分散过滤的点执行。</p></div></div>
             <div class="cost-item"><span class="cost-rank">4</span><div><strong>点位反查 Nav</strong><p>优先携带 area 索引和已知 bucket，避免重复 nearest-nav native。</p></div></div>
@@ -1064,9 +1064,9 @@
         { channel: '决策通道', title: '释放新波', copy: '倒计时到点后通知内鬼 5 秒窗口，并启动下一波。Pressure 会把这次波次标记为破点波，但不会推迟基础释放时间。', entry: 'Timer_CheckSpawnWindow', read: 'WaveReleaseDecision、breachPending', write: 'StartWave、Traitor_OnWaveReleased', module: 'wave_control.inc / traitor_mode.inc' },
         { channel: '帧执行通道', title: '维护普通队列', copy: 'OnGameFrame 先做活跃/空闲节流。只有普通队列存在缺口时才按最短 0.25 秒重试，批量补齐 pending 预算。', entry: 'OnGameFrame', read: '队列数、pendingBudget、职业容量', write: 'normalQueue', module: 'infected_control.sp / class_queue.inc' },
         { channel: '帧执行通道', title: '传送队列优先', copy: '需要回收的旧特感先进入独立传送队列。OnGameFrame 每次优先尝试传送，避免普通新生占满上限后让旧 Bot 永远回不来。', entry: 'OnGameFrame', read: 'teleportQueue、总 SI 上限', write: 'TryTeleportSpawnOnce', module: 'spawn_attempts.inc' },
-        { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用它的主区间。Boomer 和 Spitter 受后手门控；主区间失败才进入两级放宽。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minRange / maxRange', module: 'spawn_tactics.inc' },
-        { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话只初始化目标、Flow、路径起点和 Flow 桶游标，不在首帧物化候选；同一会话最多检查 48 个 Nav。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、距离带、Nav 缓存', write: 'SpawnSearch session、懒生产游标', module: 'spawn_core.inc / nav_buckets.inc' },
-        { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位与朝向，再生产和消费默认最多 16 个 Nav，最多 3 个候选进入昂贵阶段。Pending 留到下一帧。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'flags、bucket、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
+        { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用有向 Nav 路径主区间。Boomer 和 Spitter 受后手门控；主区间失败才进入两级放宽。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minNavRange / maxNavRange', module: 'spawn_tactics.inc' },
+        { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话绑定目标 Nav，分页读取 worker 已按 candidate -> target 路径距离排序的可达快照；Flow 桶不再作为候选源。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、Nav 距离带、图快照', write: 'SpawnSearch session、图分页游标', module: 'spawn_core.inc / spawn_accel_bridge.inc' },
+        { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位与朝向，再消费默认最多 256 个 Nav，最多 8 个候选进入昂贵阶段，并受 1.0ms 软预算限制。Pending 留到下一帧。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'navDistance、flags、bucket、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
         { channel: '帧执行通道', title: '生成与兜底', copy: '合格点交给 DoSpawnAt。三段 Nav 全失败后先尝试受限导演点；连续两轮完整失败后才使用不附加限制的最终导演 API。', entry: 'TryNormalSpawnOnce', read: 'bestPos、fallbackCycles', write: '特感实体或下一兜底阶段', module: 'spawn_attempts.inc' },
         { channel: '事件回写通道', title: '生成与死亡事件', copy: '生成记录最后出生时间；死亡减少存活数并触发对应职业死亡 CD。所有计数再用于下一帧容量和队列维护。', entry: 'player_spawn / player_death', read: '实体职业、是否 ghost、是否内鬼', write: 'siAlive、totalSI、lastDeathTime', module: 'infected_control.sp / si_cap.inc' },
         { channel: '事件回写通道', title: '能力、控制与伤害', copy: 'Charge、Pounce、Ride、Tongue 等事件标记战术交战，让后手支援职业放行；内鬼模式同时维护延迟伤害归属和伤害账本。', entry: 'ability_use / player_hurt / 控制事件', read: '攻击者、受害者、实体归属', write: 'pressureEngaged、traitor damage ledger', module: 'infected_control.sp / traitor_mode.inc' },
@@ -1074,12 +1074,12 @@
       ];
 
       const classData = {
-        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[650,1100],[450,1400],[300,1500]], copy: '主区间远于其他职业，利用高度、Flow、外拉方向和侧后方质量寻找拉扯角度。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
-        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,450],[250,600],[250,800]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
-        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[450,850],[300,1100],[250,1300]], copy: '中远距离给扑击留出展开空间，连续几何分偏好多数枪线未覆盖的侧后方。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
-        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[400,750],[300,900],[250,1000]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
-        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[300,600],[250,800],[250,1000]], copy: '偏近距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
-        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[300,600],[250,800],[250,1000]], copy: '近中距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
+        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[700,1650],[500,2400],[300,3000]], copy: '职业带按有向 Nav 路径距离计算；高度、Flow、外拉方向和侧后方质量继续参与候选评分。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
+        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,700],[250,1050],[250,1600]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
+        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[500,1300],[350,1900],[250,2600]], copy: 'Nav 距离留出扑击展开路线，连续几何分偏好多数枪线未覆盖的侧后方。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
+        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[450,1150],[300,1550],[250,2000]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
+        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[300,900],[250,1350],[250,2000]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
+        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[300,900],[250,1350],[250,2000]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
       };
 
       const stateData = {
@@ -1100,14 +1100,14 @@
       };
 
       const navData = [
-        ['Flow 桶窗口', '目标 Flow 映射到 0..100 的桶，动态窗口随当前距离带变化；磁盘缓存按地图和 Nav 元数据复用。'],
-        ['目标中心粗排', '每帧从 Flow 桶游标恢复，Nav 中心只计算到当前目标的平方距离；整个会话最多检查 48 个。'],
-        ['历史权重游标', '高、中、低权重按 3:1:1 在线消费。失败区域会后移，但仍保留探索机会。'],
+        ['有向图快照', 'worker 从目标 Nav 反向遍历有向边并构建距离场；250 直线范围内的 Nav 可做路径中间节点，但不会作为候选返回。'],
+        ['Nav 距离分页', '扩展按 candidate -> target 路径距离升序返回 areaIdx 与 navDistance；职业范围和距离评分直接复用该值。'],
+        ['跨帧页游标', '跨帧只保留 areaIdx/navDistance 的消费位置和诊断计数；随机点、安全结论与本帧最佳候选不会跨 tick。'],
         ['全队眼位快照', '每个实际刷特帧只读取一次眼位、左右视点和朝向；同 Tick 距离、视线与战术评分复用。'],
         ['Flags / 冷却 / 桶占用', '安全屋、救援等无效 flags、最近使用 Nav 和已拥挤 Flow 桶在随机采样前退出。'],
         ['区域内随机点', '调用 Nav 随机点 API，同一区域最多采样 3 次；这里开始才产生真实世界坐标。'],
-        ['分散 / 精确距离 / Flow', '使用平方距离检查职业硬边界，并检查最近出生点分散度和候选真实 Flow/楼层关系。'],
-        ['Hull + 可见性', '候选先通过卡位检查，再用 PVS/完全可见粗筛配合精确视线判断，防止当面生成。'],
+        ['Nav 范围 / 直线 250 / Flow', '职业硬边界使用有向 navDistance；随机点另用三维平方距离执行全队 250 安全排除，并检查分散度和真实 Flow。'],
+        ['Hull + 可见性', '候选先通过卡位检查，再用精确视线判断防止当面生成；当前实现没有 PVS 粗筛。'],
         ['Nav path', '只对前面全部通过的点构建路径；会话缓存目标起点，path cache 复用量化后的结果。'],
         ['统一职业评分', '距离、高度、Flow、分散度统一为 0..100，再混合连续的外拉、侧后方、推离或范围覆盖质量；默认不因低分拒绝安全点。']
       ];
@@ -1180,8 +1180,8 @@
         document.getElementById('class-breach').textContent = item.breach;
         item.bands.forEach((band, index) => {
           const el = document.getElementById(`band-stage-${index}`);
-          const left = ((band[0] - 250) / 1250) * 100;
-          const width = ((band[1] - band[0]) / 1250) * 100;
+          const left = ((band[0] - 250) / 2750) * 100;
+          const width = ((band[1] - band[0]) / 2750) * 100;
           el.style.left = `${left}%`;
           el.style.width = `${Math.max(width, 8)}%`;
           el.querySelector('span').textContent = `${index === 0 ? '主' : index === 1 ? '放宽 1' : '最终'} ${band[0]}–${band[1]}`;

@@ -49,19 +49,28 @@ static bool FallbackDirectorPosInRange(int zc, int target, bool teleportMode,
 
     float desired = (minRange + maxRange) * 0.5;
     Visibility_EnsureCurrentEyeSnapshot();
+    float targetEye[3];
+    if (!Visibility_GetClientEyeSnapshot(tgt, targetEye))
+        GetClientEyePosition(tgt, targetEye);
     int visibilityRayMode = GetEffectiveVisibilityRayMode();
+    float directExclusion = FloatMax(
+        NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
+    if (teleportMode)
+        directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
+    float directExclusionSq = directExclusion * directExclusion;
     for (int i = 0; i < DIRECTOR_FALLBACK_SAMPLES; i++)
     {
         float pt[3];
         if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt)) continue;
 
         float minDSq = GetMinEyeDistSquaredToAnySurvivor(pt);
-        if (minDSq < minRange * minRange || minDSq > maxRange * maxRange) continue;
+        if (minDSq < directExclusionSq) continue;
+        float targetDistance = GetVectorDistance(pt, targetEye);
+        if (targetDistance < minRange || targetDistance > maxRange) continue;
         if (Visibility_TestPointSafety(pt, teleportMode, visibilityRayMode)
             != AnneSpawnSafety_Safe) continue;
 
-        float minD = SquareRoot(minDSq);
-        float delta = FloatAbs(desired - minD);
+        float delta = FloatAbs(desired - targetDistance);
 
         if (!have)
         {
@@ -406,7 +415,8 @@ void TryNormalSpawnOnce()
         int spawnedClient = DoSpawnAt(pos, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
         WaveSpawnReport_RecordScored(
-            want, spawnedClient, WaveSpawn_NormalNav, spawnCallMs, pos, bestDbg);
+            want, spawnedClient, WaveSpawn_NormalNav, spawnCallMs,
+            pos, minRange, maxRange, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
@@ -440,12 +450,13 @@ void TryNormalSpawnOnce()
         SpawnAttempts_ResetNormalProgress(want);
 
         TriggerAssaultBurst();
-        Debug_Print("[SPAWN] success class=%s band=%d range=%.0f..%.0f",
+        Debug_Print("[SPAWN] success class=%s band=%d navRange=%.0f..%.0f",
                     g_sInfectedClassNames[want], band + 1, minRange, maxRange);
         return;
     }
 
-    Tactical_GetDistanceBand(want, TACTICAL_BAND_STAGES - 1, false, minRange, maxRange);
+    minRange = gCV.fSpawnMin;
+    maxRange = gCV.fSpawnMax;
     float pt[3];
     bool usedUnrestricted = (g_iNormalSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
@@ -464,7 +475,9 @@ void TryNormalSpawnOnce()
             ? WaveSpawn_NormalDirectorUnrestricted
             : WaveSpawn_NormalDirectorRange;
         WaveSpawnReport_RecordFallback(
-            want, fallbackClient, reportMode, spawnCallMs, pt);
+            want, fallbackClient, reportMode, spawnCallMs, pt,
+            usedUnrestricted ? -1.0 : minRange,
+            usedUnrestricted ? -1.0 : maxRange);
     }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)
@@ -564,7 +577,8 @@ void TryTeleportSpawnOnce()
         int spawnedClient = DoSpawnAt(pos, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
         WaveSpawnReport_RecordScored(
-            want, spawnedClient, WaveSpawn_TeleportNav, spawnCallMs, pos, bestDbg);
+            want, spawnedClient, WaveSpawn_TeleportNav, spawnCallMs,
+            pos, minRange, maxRange, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
@@ -596,12 +610,13 @@ void TryTeleportSpawnOnce()
         SpawnAttempts_ResetTeleportProgress(want);
         TriggerAssaultBurst();
 
-        Debug_Print("[TP] success class=%s band=%d range=%.0f..%.0f",
+        Debug_Print("[TP] success class=%s band=%d navRange=%.0f..%.0f",
                     g_sInfectedClassNames[want], band + 1, minRange, maxRange);
         return;
     }
 
-    Tactical_GetDistanceBand(want, TACTICAL_BAND_STAGES - 1, true, minRange, maxRange);
+    minRange = FloatMax(gCV.fSpawnMin, gCV.fTeleportSpawnMin);
+    maxRange = gCV.fSpawnMax;
     float pt[3];
     bool usedUnrestricted = (g_iTeleportSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
@@ -620,7 +635,9 @@ void TryTeleportSpawnOnce()
             ? WaveSpawn_TeleportDirectorUnrestricted
             : WaveSpawn_TeleportDirectorRange;
         WaveSpawnReport_RecordFallback(
-            want, fallbackClient, reportMode, spawnCallMs, pt);
+            want, fallbackClient, reportMode, spawnCallMs, pt,
+            usedUnrestricted ? -1.0 : minRange,
+            usedUnrestricted ? -1.0 : maxRange);
     }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound)

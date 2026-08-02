@@ -336,4 +336,8 @@
 	{
 		"chi"		"{green}[AntiKick]{default} 你无权踢出受保护管理员：{olive}%N{default}。"
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"chi"		"{green}[RPG]{default} 内鬼身份无法使用购买功能。"
+	}
 }

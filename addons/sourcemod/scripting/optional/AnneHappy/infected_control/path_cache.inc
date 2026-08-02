@@ -57,7 +57,10 @@ stock float PathPenalty_NoBuildFromStart(const float candPos[3], Address navStar
     if (navGoal == Address_Null)
         return PATH_NO_BUILD_PENALTY;
 
-    float limitCost = FloatMin(ring * 3.0, spawnmax * 1.5);
+    // ring 已经是有向 Nav 距离上限，只留少量边界余量给最终随机点反查 Nav。
+    float limitCost = FloatMin(
+        ring + NAV_CANDIDATE_RANGE_SLACK,
+        spawnmax * NAV_PATH_DISTANCE_SCALE + NAV_CANDIDATE_RANGE_SLACK);
 
     if (g_bSpawnAccel)
     {

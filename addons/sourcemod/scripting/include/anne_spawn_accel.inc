@@ -95,18 +95,19 @@ native int AnneSpawn_NavCandidatesPrepare(
     float maxSnapshotAge
 );
 
-// 在按目标空间距离升序的快照中分页取 [minTargetDistance, maxTargetDistance]。
+// 在按 candidate -> target 有向 Nav 路径距离升序的快照中分页取范围。
 // 返回 >=0 的本页数量，-1=结果未就绪/已过期，-2=图不可用。
 native int AnneSpawn_NavCandidatesCollect(
     int targetClient,
     int targetNavId,
-    float minTargetDistance,
-    float maxTargetDistance,
+    float minNavDistance,
+    float maxNavDistance,
     float maxPathDistance,
     float minSurvivorDistance,
     float maxSnapshotAge,
     int startOffset,
     int[] outputAreaIndices,
+    float[] outputNavDistances,
     int maxResults,
     float &resultAgeMs,
     int &totalInRange

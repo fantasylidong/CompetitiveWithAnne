@@ -13,8 +13,9 @@ The main thread only snapshots engine-owned Nav pointers in bounded batches. Wor
 engine objects: they consume copied IDs, centers, flow distances, edges, and blocker bytes. Invalid
 flow values inherit the nearest valid progress over the Nav graph on a worker. Ordinary floor paths use a
 reverse distance field shared by every candidate for the same survivor NavArea. Candidate snapshots
-exclude Nav centers within 250 world units of any live survivor, then sort the remaining reachable areas
-by spatial distance to the selected target. The plugin refreshes these snapshots every 1.0 second while
+exclude Nav centers within 250 world units (3D straight-line distance) of any live survivor, then sort the
+remaining reachable areas by directed `candidate -> target` Nav path distance, using the area index only
+as a deterministic tie-break. The plugin refreshes these snapshots every 1.0 second while
 idle and every 0.1 second during the final second before a wave or while spawn work is pending; consumers
 accept results for at most 0.2 seconds. `NavAreaBuildPath`
 remains the conservative fallback while the cache is unavailable and for ladder/elevator paths or

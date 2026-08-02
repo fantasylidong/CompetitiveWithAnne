@@ -74,6 +74,7 @@
 #define NAV_CANDIDATE_PAGE_SIZE       256
 #define NAV_CANDIDATE_TEAM_EXCLUSION  250.0
 #define NAV_CANDIDATE_RANGE_SLACK      128.0
+#define NAV_PATH_DISTANCE_SCALE          2.0
 #define NAV_CANDIDATE_IDLE_INTERVAL      1.0
 #define NAV_CANDIDATE_WARM_INTERVAL      0.1
 #define NAV_CANDIDATE_RESULT_TTL         0.2
@@ -954,15 +955,40 @@ public void OnGameFrame()
     if (!gST.bLate)
         return;
 
-    if (TeleportQueue_Length() > 0 && gST.totalSI < gCV.iSiLimit)
+    float burstStart = GetEngineTime();
+    int burstAttempts = 0;
+    bool budgetStop = false;
+    while (burstAttempts < gCV.iSpawnAttemptsPerFrame && gST.totalSI < gCV.iSiLimit)
     {
-        TryTeleportSpawnOnce();
-        return;
+        bool attempted = false;
+        if (TeleportQueue_Length() > 0)
+        {
+            TryTeleportSpawnOnce();
+            attempted = true;
+        }
+        else if (gST.siQueueCount > 0 && SpawnQueue_Length() > 0)
+        {
+            TryNormalSpawnOnce();
+            attempted = true;
+        }
+
+        if (!attempted)
+            break;
+
+        burstAttempts++;
+        float elapsedMs = (GetEngineTime() - burstStart) * 1000.0;
+        if (elapsedMs >= gCV.fSpawnFrameBudgetMs)
+        {
+            budgetStop = (TeleportQueue_Length() > 0
+                || (gST.siQueueCount > 0 && SpawnQueue_Length() > 0));
+            break;
+        }
     }
 
-    if (gST.siQueueCount > 0 && SpawnQueue_Length() > 0 && gST.totalSI < gCV.iSiLimit)
+    if (burstAttempts > 0)
     {
-        TryNormalSpawnOnce();
+        WaveSpawnReport_RecordFrameBurst(
+            burstAttempts, (GetEngineTime() - burstStart) * 1000.0, budgetStop);
     }
 }
 

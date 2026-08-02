@@ -336,4 +336,8 @@
 	{
 		"zho"		"{green}[AntiKick]{default} 你無權踢出受保護管理員：{olive}%N{default}。"
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"zho"		"{green}[RPG]{default} 內鬼身分無法使用購買功能。"
+	}
 }

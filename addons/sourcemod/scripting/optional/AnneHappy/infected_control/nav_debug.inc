@@ -195,7 +195,7 @@ public Action Cmd_NavTest(int client, int args)
 
     // 5. 位置关系
     int targetSur = ChooseTargetSurvivor();
-    bool passPosition = PassRealPositionCheck(testPos, targetSur, view_as<int>(SI_Smoker));
+    bool passPosition = PassRealPositionCheck(testPos, targetSur);
     int candPercent = GetPositionBucketPercent(testPos);
     int surPercent = -1;
     if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
@@ -260,7 +260,8 @@ public Action Cmd_NavTest(int client, int args)
     float dTargetEye = GetVectorDistance(testPos, targetEye);
     float tacticalQuality = Tactical_GetCandidateQuality(zc, testPos, targetSur, targetEye);
     SpawnScoreDbg scoreDbg;
-    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye, gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
+    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye, -1.0,
+                                                   gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
                                                    candPercent, centerBucket, rawBadFlow,
                                                    refEyeZ, bestEyeZ, lowestFootZ, sidx, index,
                                                    GetNavHistoryWeight(index, GetGameTime()),

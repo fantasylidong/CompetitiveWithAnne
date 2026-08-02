@@ -259,7 +259,8 @@ stock bool SpawnAccel_PrepareCurrentSurvivorRange()
         return false;
 
     int targetId = L4D_GetNavAreaID(navStart);
-    float maxPathDistance = gCV.fSpawnMax * 1.5 + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
+    float maxPathDistance = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE
+        + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
     return AnneSpawn_NavGraphPrepareRange(targetId, maxPathDistance, TEAM_INFECTED, false);
 }
 
@@ -283,7 +284,7 @@ stock bool SpawnAccel_GetClientNavId(int client, int &navId)
 
 stock float SpawnAccel_GetCandidatePathLimit()
 {
-    return gCV.fSpawnMax * 1.5 + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
+    return gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
 }
 
 stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
@@ -297,7 +298,7 @@ stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
 
     int status = AnneSpawn_NavCandidatesPrepare(
         target, targetNavId, SpawnAccel_GetCandidatePathLimit(),
-        NAV_CANDIDATE_TEAM_EXCLUSION, maxAge);
+        FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin), maxAge);
     if (status > 0)
         g_iSpawnAccelCandidatePrepareReady++;
     else if (status == 0 || status == ANNE_SPAWN_NAV_CANDIDATE_PENDING)

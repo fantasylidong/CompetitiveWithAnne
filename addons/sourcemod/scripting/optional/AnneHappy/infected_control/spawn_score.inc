@@ -397,6 +397,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.navPenalty = src.navPenalty;
     dest.tacticalQuality = src.tacticalQuality;
     dest.dTargetEye = src.dTargetEye;
+    dest.navDistance = src.navDistance;
     dest.ringEff = src.ringEff;
     dest.slack = src.slack;
     dest.sweet = src.sweet;
@@ -413,6 +414,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
 bool SpawnScore_BuildCandidate(int zc,
                                       const float pos[3],
                                       float dTargetEye,
+                                      float navDistance,
                                       float minRange,
                                       float ringEff,
                                       float slack,
@@ -434,7 +436,8 @@ bool SpawnScore_BuildCandidate(int zc,
     float sweet, width;
     GetClassDistanceProfile(zc, minRange, ringEff, sweet, width);
 
-    float scoreDist = ScoreDistSmooth(dTargetEye, sweet, width);
+    float scoreDistance = navDistance >= 0.0 ? navDistance : dTargetEye;
+    float scoreDist = ScoreDistSmooth(scoreDistance, sweet, width);
     float scoreHeight = CalculateScore_Height(zc, pos, refEyeZ);
 
     int deltaFlow = candBucket - centerBucket;
@@ -475,6 +478,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.penK = penK;
     dbg.extraPen = behindPenalty;
     dbg.dTargetEye = dTargetEye;
+    dbg.navDistance = navDistance;
     dbg.ringEff = ringEff;
     dbg.slack = slack;
     dbg.sweet = sweet;
@@ -499,11 +503,11 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f ringEff=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f navDistance=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
         dbg.total, dbg.baseTotal, dbg.tacticalQuality, dbg.navWeight, dbg.navPenalty,
         dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
-        dbg.dTargetEye, dbg.ringEff, dbg.slack,
+        dbg.dTargetEye, dbg.navDistance, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         candReal, surReal, candReal - surReal);
 }

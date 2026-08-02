@@ -326,16 +326,15 @@ bool AnneBuildNavCandidateSnapshot(
     float maxPathDistance,
     const std::vector<std::uint8_t> &blocked,
     const std::vector<float> &survivorEyes,
-    std::size_t targetSurvivorSlot,
     float minSurvivorDistance,
     std::vector<std::uint32_t> &areaIndices,
-    std::vector<float> &targetDistances,
+    std::vector<float> &candidatePathDistances,
     std::vector<float> &pathDistances,
     std::vector<std::uint8_t> &usesSpecialEdge)
 {
     std::size_t survivorCount = survivorEyes.size() / 3;
     if (survivorEyes.size() % 3 != 0 || survivorCount == 0 ||
-        targetSurvivorSlot >= survivorCount || targetIndex >= graph.navIds.size() ||
+        targetIndex >= graph.navIds.size() ||
         maxPathDistance <= 0.0f || minSurvivorDistance < 0.0f)
     {
         return false;
@@ -348,13 +347,12 @@ bool AnneBuildNavCandidateSnapshot(
 
     struct Candidate
     {
-        float distance;
+        float pathDistance;
         std::uint32_t index;
     };
     std::vector<Candidate> candidates;
     candidates.reserve(graph.navIds.size());
     float minSurvivorDistanceSquared = minSurvivorDistance * minSurvivorDistance;
-    const float *targetEye = &survivorEyes[targetSurvivorSlot * 3];
 
     for (std::uint32_t index = 0; index < graph.navIds.size(); ++index)
     {
@@ -374,26 +372,22 @@ bool AnneBuildNavCandidateSnapshot(
         if (nearestSquared < minSurvivorDistanceSquared)
             continue;
 
-        float dx = center[0] - targetEye[0];
-        float dy = center[1] - targetEye[1];
-        float dz = center[2] - targetEye[2];
-        float targetDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
-        candidates.push_back({targetDistance, index});
+        candidates.push_back({pathDistances[index], index});
     }
 
     std::sort(candidates.begin(), candidates.end(),
               [](const Candidate &left, const Candidate &right) {
-                  if (left.distance != right.distance)
-                      return left.distance < right.distance;
+                  if (left.pathDistance != right.pathDistance)
+                      return left.pathDistance < right.pathDistance;
                   return left.index < right.index;
               });
 
     areaIndices.resize(candidates.size());
-    targetDistances.resize(candidates.size());
+    candidatePathDistances.resize(candidates.size());
     for (std::size_t row = 0; row < candidates.size(); ++row)
     {
         areaIndices[row] = candidates[row].index;
-        targetDistances[row] = candidates[row].distance;
+        candidatePathDistances[row] = candidates[row].pathDistance;
     }
     return true;
 }

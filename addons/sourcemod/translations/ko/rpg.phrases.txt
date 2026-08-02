@@ -336,4 +336,8 @@
 	{
 		"ko"		"{green}[AntiKick]{default} 보호된 관리자를 추방할 권한이 없습니다: {olive}%N{default}."
 	}
+	"RPG_TraitorCannotUseShop"
+	{
+		"ko"		"{green}[RPG]{default} 내귀로 등록된 동안에는 구매 기능을 사용할 수 없습니다."
+	}
 }
