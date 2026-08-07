@@ -20,9 +20,13 @@
 	}
 	"Anne版本选择"
 	{
-		"sm_fchmatch AnneHappy"
+		"sm_fchmatch annehappy_hardcore"
 		{
-			"message" "26-7月最新版本"
+			"message" "26-8月最新版本"
+		}
+		"exec vote/Anne/Anne26-07.cfg"
+		{
+			"message" "26-7月版本"
 		}
 		"exec vote/Anne/Anne25-11.cfg"
 		{

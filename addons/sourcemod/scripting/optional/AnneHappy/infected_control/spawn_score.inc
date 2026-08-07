@@ -398,6 +398,8 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.tacticalQuality = src.tacticalQuality;
     dest.dTargetEye = src.dTargetEye;
     dest.navDistance = src.navDistance;
+    dest.navDistanceEffective = src.navDistanceEffective;
+    dest.navHighGroundComp = src.navHighGroundComp;
     dest.ringEff = src.ringEff;
     dest.slack = src.slack;
     dest.sweet = src.sweet;
@@ -415,6 +417,8 @@ bool SpawnScore_BuildCandidate(int zc,
                                       const float pos[3],
                                       float dTargetEye,
                                       float navDistance,
+                                      float navDistanceEffective,
+                                      float navHighGroundComp,
                                       float minRange,
                                       float ringEff,
                                       float slack,
@@ -436,7 +440,8 @@ bool SpawnScore_BuildCandidate(int zc,
     float sweet, width;
     GetClassDistanceProfile(zc, minRange, ringEff, sweet, width);
 
-    float scoreDistance = navDistance >= 0.0 ? navDistance : dTargetEye;
+    float scoreDistance = navDistanceEffective >= 0.0
+        ? navDistanceEffective : dTargetEye;
     float scoreDist = ScoreDistSmooth(scoreDistance, sweet, width);
     float scoreHeight = CalculateScore_Height(zc, pos, refEyeZ);
 
@@ -479,6 +484,8 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.extraPen = behindPenalty;
     dbg.dTargetEye = dTargetEye;
     dbg.navDistance = navDistance;
+    dbg.navDistanceEffective = navDistanceEffective;
+    dbg.navHighGroundComp = navHighGroundComp;
     dbg.ringEff = ringEff;
     dbg.slack = slack;
     dbg.sweet = sweet;
@@ -503,11 +510,12 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f navDistance=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f navDistance=%.1f navEffective=%.1f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
         dbg.total, dbg.baseTotal, dbg.tacticalQuality, dbg.navWeight, dbg.navPenalty,
         dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
-        dbg.dTargetEye, dbg.navDistance, dbg.ringEff, dbg.slack,
+        dbg.dTargetEye, dbg.navDistance, dbg.navDistanceEffective,
+        dbg.navHighGroundComp, dbg.ringEff, dbg.slack,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
         candReal, surReal, candReal - surReal);
 }

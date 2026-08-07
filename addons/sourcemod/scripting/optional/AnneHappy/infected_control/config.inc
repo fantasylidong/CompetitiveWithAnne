@@ -3,8 +3,6 @@
 #endif
 #define _infected_control_config_included
 
-#define DEFAULT_TRAITOR_QUOTA_DB_CONFIG "l4dstats"
-
 static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0, 6.0 };
 static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10, 1.10 };
 static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50, 0.50 };
@@ -115,6 +113,10 @@ enum struct Config
     ConVar FrameThinkStepActive;
     ConVar SpawnAttemptsPerFrame;
     ConVar SpawnFrameBudgetMs;
+    ConVar SpawnFailedCycleRetry;
+    ConVar SpawnNavCandidatesPerSlice;
+    ConVar SpawnNavExpensivePerSlice;
+    ConVar SpawnNavSliceBudgetMs;
     ConVar SpawnCandidateBudget;
     ConVar BucketCountCacheTTL;
     // 轻度惩罚 badflow：仅扣 Flow 分项一点点分数（0 关闭）
@@ -140,6 +142,9 @@ enum struct Config
     ConVar AntiBaitMinSiRatio;
     ConVar AntiBaitForceAfter;
     ConVar AntiBaitRecover;
+    ConVar AntiBaitArmBefore;
+    ConVar AntiBaitHoldConfirm;
+    ConVar AntiBaitReleaseConfirm;
     ConVar AntiBaitAction;
     ConVar AntiBaitRunnerGapPct;
     ConVar AntiBaitRunnerNearDist;
@@ -156,11 +161,7 @@ enum struct Config
     ConVar TraitorPlayerLimit;
     ConVar TraitorAdminLimit;
     ConVar TraitorClassMask;
-    ConVar TraitorDailyQuota;
     ConVar TraitorPublicMinScore;
-    ConVar TraitorPublicDailyQuota;
-    ConVar TraitorQuotaDb;
-    ConVar TraitorQuotaTable;
     bool   bAntiBaitEnable;
     float  fAntiBaitGrace;
     float  fAntiBaitWindow;
@@ -168,6 +169,9 @@ enum struct Config
     float  fAntiBaitMinSiRatio;
     float  fAntiBaitForceAfter;
     float  fAntiBaitRecover;
+    float  fAntiBaitArmBefore;
+    float  fAntiBaitHoldConfirm;
+    float  fAntiBaitReleaseConfirm;
     int    iAntiBaitAction;
     int    iAntiBaitRunnerGapPct;
     float  fAntiBaitRunnerNearDist;
@@ -184,9 +188,7 @@ enum struct Config
     int    iTraitorPlayerLimit;
     int    iTraitorAdminLimit;
     int    iTraitorClassMask;
-    int    iTraitorDailyQuota;
     int    iTraitorPublicMinScore;
-    int    iTraitorPublicDailyQuota;
 
     // 缓存值
     float fFlowBadPenalty;
@@ -197,6 +199,10 @@ enum struct Config
     float fFrameThinkStepActive;
     int   iSpawnAttemptsPerFrame;
     float fSpawnFrameBudgetMs;
+    float fSpawnFailedCycleRetry;
+    int   iSpawnNavCandidatesPerSlice;
+    int   iSpawnNavExpensivePerSlice;
+    float fSpawnNavSliceBudgetMs;
     float fBucketCountCacheTTL;
     int   iSpawnCandidateBudget;
 
@@ -404,14 +410,34 @@ enum struct Config
             CVAR_FLAG, true, 0.01, true, 0.25
         );
         this.SpawnAttemptsPerFrame = CreateConVar(
-            "inf_spawn_attempts_per_frame", "4",
+            "inf_spawn_attempts_per_frame", "8",
             "Maximum spawn/teleport attempts in one active think frame",
             CVAR_FLAG, true, 1.0, true, 12.0
         );
         this.SpawnFrameBudgetMs = CreateConVar(
-            "inf_spawn_frame_budget_ms", "2.0",
+            "inf_spawn_frame_budget_ms", "4.0",
             "Maximum wall-clock milliseconds spent on spawn attempts in one active think frame",
             CVAR_FLAG, true, 0.1, true, 6.0
+        );
+        this.SpawnFailedCycleRetry = CreateConVar(
+            "inf_spawn_failed_cycle_retry", "0.10",
+            "Seconds before restarting directed Nav bands after a complete failed spawn cycle",
+            CVAR_FLAG, true, 0.02, true, 1.0
+        );
+        this.SpawnNavCandidatesPerSlice = CreateConVar(
+            "inf_spawn_nav_candidates_per_slice", "512",
+            "Maximum Nav candidates inspected in one search slice",
+            CVAR_FLAG, true, 1.0, true, 1024.0
+        );
+        this.SpawnNavExpensivePerSlice = CreateConVar(
+            "inf_spawn_nav_expensive_per_slice", "16",
+            "Maximum candidates entering visibility/path checks in one search slice",
+            CVAR_FLAG, true, 1.0, true, 32.0
+        );
+        this.SpawnNavSliceBudgetMs = CreateConVar(
+            "inf_spawn_nav_slice_budget_ms", "2.0",
+            "Soft wall-clock milliseconds allowed for one Nav search slice",
+            CVAR_FLAG, true, 0.1, true, 4.0
         );
         this.SpawnCandidateBudget = CreateConVar(
             "inf_spawn_candidate_budget", "12",
@@ -492,13 +518,28 @@ enum struct Config
         );
         this.AntiBaitForceAfter = CreateConVar(
             "inf_antibait_force_after", "25.0",
-            "Legacy compatibility value; anti-bait no longer holds waves",
+            "Legacy compatibility value; no runtime effect",
             CVAR_FLAG, true, 0.0, true, 180.0
         );
         this.AntiBaitRecover = CreateConVar(
             "inf_antibait_recover", "4.0",
             "Seconds to stay in recover state after survivors make progress",
             CVAR_FLAG, true, 0.0, true, 60.0
+        );
+        this.AntiBaitArmBefore = CreateConVar(
+            "inf_antibait_arm_before", "4.0",
+            "Seconds before the base countdown deadline when anti-bait pressure may arm",
+            CVAR_FLAG, true, 0.0, true, 16.0
+        );
+        this.AntiBaitHoldConfirm = CreateConVar(
+            "inf_antibait_hold_confirm", "2.0",
+            "Seconds that a healthy stalled formation must remain stable before it can hold a wave at the deadline",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
+        this.AntiBaitReleaseConfirm = CreateConVar(
+            "inf_antibait_release_confirm", "2.0",
+            "Seconds that hold conditions must remain cleared before an extended wave is released",
+            CVAR_FLAG, true, 0.0, true, 10.0
         );
         this.AntiBaitAction = CreateConVar(
             "inf_antibait_action", "2",
@@ -522,12 +563,12 @@ enum struct Config
         );
         this.AntiBaitLatestBaseScale = CreateConVar(
             "inf_antibait_latest_scale", "1.50",
-            "Legacy compatibility value; anti-bait no longer delays wave release",
+            "Legacy compatibility value; no runtime effect",
             CVAR_FLAG, true, 1.0, true, 3.0
         );
         this.AntiBaitLatestScaleStep = CreateConVar(
             "inf_antibait_latest_scale_step", "0.10",
-            "Legacy compatibility value; anti-bait no longer delays wave release",
+            "Legacy compatibility value; no runtime effect",
             CVAR_FLAG, true, 0.0, true, 0.5
         );
         this.AntiBaitClusterDist = CreateConVar(
@@ -580,30 +621,10 @@ enum struct Config
             "Allowed traitor classes bitmask: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger, 64 tank. 0 = all.",
             CVAR_FLAG, true, 0.0, true, 127.0
         );
-        this.TraitorDailyQuota = CreateConVar(
-            "inf_traitor_daily_quota", "100",
-            "Base daily traitor quota for admins; each full year remaining before sb_admins.expires adds 50.",
-            CVAR_FLAG, true, 0.0, true, 10000.0
-        );
         this.TraitorPublicMinScore = CreateConVar(
             "inf_traitor_public_min_score", "100000",
             "Minimum l4d_stats total score required for a non-admin to register as traitor.",
             CVAR_FLAG, true, 0.0, true, 100000000.0
-        );
-        this.TraitorPublicDailyQuota = CreateConVar(
-            "inf_traitor_public_daily_quota", "20",
-            "Daily traitor quota available to eligible non-admin players.",
-            CVAR_FLAG, true, 0.0, true, 10000.0
-        );
-        this.TraitorQuotaDb = CreateConVar(
-            "inf_traitor_quota_db", DEFAULT_TRAITOR_QUOTA_DB_CONFIG,
-            "MySQL databases.cfg section for shared traitor daily quota storage; defaults to the l4d_stats database.",
-            CVAR_FLAG
-        );
-        this.TraitorQuotaTable = CreateConVar(
-            "inf_traitor_quota_table", "infected_control_traitor_quota",
-            "SQL table name for traitor daily quota storage.",
-            CVAR_FLAG
         );
 
         // 变更回调
@@ -630,6 +651,9 @@ enum struct Config
         this.AntiBaitMinSiRatio.AddChangeHook(OnCfgChanged);
         this.AntiBaitForceAfter.AddChangeHook(OnCfgChanged);
         this.AntiBaitRecover.AddChangeHook(OnCfgChanged);
+        this.AntiBaitArmBefore.AddChangeHook(OnCfgChanged);
+        this.AntiBaitHoldConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitReleaseConfirm.AddChangeHook(OnCfgChanged);
         this.AntiBaitAction.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerGapPct.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerNearDist.AddChangeHook(OnCfgChanged);
@@ -646,9 +670,7 @@ enum struct Config
         this.TraitorPlayerLimit.AddChangeHook(OnCfgChanged);
         this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
         this.TraitorClassMask.AddChangeHook(OnCfgChanged);
-        this.TraitorDailyQuota.AddChangeHook(OnCfgChanged);
         this.TraitorPublicMinScore.AddChangeHook(OnCfgChanged);
-        this.TraitorPublicDailyQuota.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -656,6 +678,10 @@ enum struct Config
         this.FrameThinkStepActive.AddChangeHook(OnCfgChanged);
         this.SpawnAttemptsPerFrame.AddChangeHook(OnCfgChanged);
         this.SpawnFrameBudgetMs.AddChangeHook(OnCfgChanged);
+        this.SpawnFailedCycleRetry.AddChangeHook(OnCfgChanged);
+        this.SpawnNavCandidatesPerSlice.AddChangeHook(OnCfgChanged);
+        this.SpawnNavExpensivePerSlice.AddChangeHook(OnCfgChanged);
+        this.SpawnNavSliceBudgetMs.AddChangeHook(OnCfgChanged);
         this.SpawnCandidateBudget.AddChangeHook(OnCfgChanged);
         this.BucketCountCacheTTL.AddChangeHook(OnCfgChanged);
         this.Score_w_dist.AddChangeHook(OnCfgChanged);
@@ -764,15 +790,9 @@ enum struct Config
         this.iTraitorClassMask = this.TraitorClassMask.IntValue;
         if (this.iTraitorClassMask < 0) this.iTraitorClassMask = 0;
         if (this.iTraitorClassMask > 127) this.iTraitorClassMask = 127;
-        this.iTraitorDailyQuota = this.TraitorDailyQuota.IntValue;
-        if (this.iTraitorDailyQuota < 0) this.iTraitorDailyQuota = 0;
-        if (this.iTraitorDailyQuota > 10000) this.iTraitorDailyQuota = 10000;
         this.iTraitorPublicMinScore = this.TraitorPublicMinScore.IntValue;
         if (this.iTraitorPublicMinScore < 0) this.iTraitorPublicMinScore = 0;
         if (this.iTraitorPublicMinScore > 100000000) this.iTraitorPublicMinScore = 100000000;
-        this.iTraitorPublicDailyQuota = this.TraitorPublicDailyQuota.IntValue;
-        if (this.iTraitorPublicDailyQuota < 0) this.iTraitorPublicDailyQuota = 0;
-        if (this.iTraitorPublicDailyQuota > 10000) this.iTraitorPublicDailyQuota = 10000;
 
         this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
         this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);
@@ -868,6 +888,18 @@ enum struct Config
         this.fSpawnFrameBudgetMs = this.SpawnFrameBudgetMs.FloatValue;
         if (this.fSpawnFrameBudgetMs < 0.1) this.fSpawnFrameBudgetMs = 0.1;
         if (this.fSpawnFrameBudgetMs > 6.0) this.fSpawnFrameBudgetMs = 6.0;
+        this.fSpawnFailedCycleRetry = this.SpawnFailedCycleRetry.FloatValue;
+        if (this.fSpawnFailedCycleRetry < 0.02) this.fSpawnFailedCycleRetry = 0.02;
+        if (this.fSpawnFailedCycleRetry > 1.0) this.fSpawnFailedCycleRetry = 1.0;
+        this.iSpawnNavCandidatesPerSlice = this.SpawnNavCandidatesPerSlice.IntValue;
+        if (this.iSpawnNavCandidatesPerSlice < 1) this.iSpawnNavCandidatesPerSlice = 1;
+        if (this.iSpawnNavCandidatesPerSlice > 1024) this.iSpawnNavCandidatesPerSlice = 1024;
+        this.iSpawnNavExpensivePerSlice = this.SpawnNavExpensivePerSlice.IntValue;
+        if (this.iSpawnNavExpensivePerSlice < 1) this.iSpawnNavExpensivePerSlice = 1;
+        if (this.iSpawnNavExpensivePerSlice > 32) this.iSpawnNavExpensivePerSlice = 32;
+        this.fSpawnNavSliceBudgetMs = this.SpawnNavSliceBudgetMs.FloatValue;
+        if (this.fSpawnNavSliceBudgetMs < 0.1) this.fSpawnNavSliceBudgetMs = 0.1;
+        if (this.fSpawnNavSliceBudgetMs > 4.0) this.fSpawnNavSliceBudgetMs = 4.0;
         this.iSpawnCandidateBudget = this.SpawnCandidateBudget.IntValue;
         if (this.iSpawnCandidateBudget < 1) this.iSpawnCandidateBudget = 1;
         if (this.iSpawnCandidateBudget > 24) this.iSpawnCandidateBudget = 24;
@@ -905,6 +937,9 @@ enum struct Config
         this.fAntiBaitMinSiRatio = this.AntiBaitMinSiRatio.FloatValue;
         this.fAntiBaitForceAfter = this.AntiBaitForceAfter.FloatValue;
         this.fAntiBaitRecover = this.AntiBaitRecover.FloatValue;
+        this.fAntiBaitArmBefore = this.AntiBaitArmBefore.FloatValue;
+        this.fAntiBaitHoldConfirm = this.AntiBaitHoldConfirm.FloatValue;
+        this.fAntiBaitReleaseConfirm = this.AntiBaitReleaseConfirm.FloatValue;
         this.iAntiBaitAction = this.AntiBaitAction.IntValue;
         this.iAntiBaitRunnerGapPct = this.AntiBaitRunnerGapPct.IntValue;
         this.fAntiBaitRunnerNearDist = this.AntiBaitRunnerNearDist.FloatValue;
@@ -920,6 +955,9 @@ enum struct Config
         if (this.fAntiBaitMinSiRatio > 1.0) this.fAntiBaitMinSiRatio = 1.0;
         if (this.fAntiBaitLatestBaseScale < 1.0) this.fAntiBaitLatestBaseScale = 1.0;
         if (this.fAntiBaitFastTeleport < 0.8) this.fAntiBaitFastTeleport = 0.8;
+        if (this.fAntiBaitArmBefore < 0.0) this.fAntiBaitArmBefore = 0.0;
+        if (this.fAntiBaitHoldConfirm < 0.0) this.fAntiBaitHoldConfirm = 0.0;
+        if (this.fAntiBaitReleaseConfirm < 0.0) this.fAntiBaitReleaseConfirm = 0.0;
         if (this.fAntiBaitClusterDist < 0.0) this.fAntiBaitClusterDist = 0.0;
         if (this.fAntiBaitTeamDist < 0.0) this.fAntiBaitTeamDist = 0.0;
         if (this.fAntiBaitPairDist < 0.0) this.fAntiBaitPairDist = 0.0;

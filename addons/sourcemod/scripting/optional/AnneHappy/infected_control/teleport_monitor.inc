@@ -6,6 +6,16 @@
 // 传送监督（1s）：出生宽限 + 跑男/anti-bait 快通道。
 Action Timer_TeleportTick(Handle timer)
 {
+    if (timer != gST.hTeleport)
+        return Plugin_Stop;
+
+    g_fTeleportHeartbeat = GetGameTime();
+    if (!gST.bLate || !gCV.bTeleport)
+    {
+        gST.hTeleport = INVALID_HANDLE;
+        return Plugin_Stop;
+    }
+
     if (g_bPauseLib && IsInPause())
         return Plugin_Continue;
 
@@ -89,6 +99,14 @@ Action Timer_TeleportTick(Handle timer)
         }
     }
 
-    gST.targetSurvivor = ChooseTargetSurvivor();
+    int oldTarget = gST.targetSurvivor;
+    int newTarget = Tactical_ResolveRuntimeTarget();
+    if (newTarget != oldTarget)
+    {
+        gST.targetSurvivor = newTarget;
+        SpawnAttempts_OnTargetChanged(newTarget);
+        Debug_Print("[TARGET] runtime change old=%d new=%d; all directed bands reset",
+            oldTarget, newTarget);
+    }
     return Plugin_Continue;
 }

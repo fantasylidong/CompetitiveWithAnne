@@ -34,38 +34,73 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
-      - name: Gzip
+      - name: Build full, norank, and nomysql archives
         run: |
-          mkdir CompetitiveWithAnne-${{ steps.date.outputs.date }}
-          mkdir CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          cp -R CompetitiveWithAnne/* CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          cp -R anne/left4dead2/sound/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          cp -R anne/left4dead2/models/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          cp -R anne/left4dead2/materials/ CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/
-          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
+          set -euo pipefail
 
-      - name: Gzip norank&&sourcebans&&lilac
-        run: |
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_stats.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/sbpp_*
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/lilac.smx
-          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
+          RELEASE_NAME="CompetitiveWithAnne-${{ steps.date.outputs.date }}"
+          STAGING="$(mktemp -d)"
 
-      - name: Gzip nomysql
-        run: |
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/chat-processor.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/hextags.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/rpg.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/chatlog.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/veterans.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_damage_show.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/punch_angle.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_blacklist.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d2_hitsound.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/global_chat.smx
-          rm -f CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/l4d_player_count_unload_mode.smx
-          cp CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/disabled/rpg.smx CompetitiveWithAnne-${{ steps.date.outputs.date }}/left4dead2/addons/sourcemod/plugins/extend/
-          tar -czvf CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz CompetitiveWithAnne-${{ steps.date.outputs.date }}
+          stage_package() {
+            local variant="$1"
+            PACKAGE_DIR="$STAGING/$variant/$RELEASE_NAME"
+            PLUGIN_DIR="$PACKAGE_DIR/left4dead2/addons/sourcemod/plugins"
+
+            mkdir -p "$PACKAGE_DIR/left4dead2"
+            cp -a CompetitiveWithAnne/* "$PACKAGE_DIR/left4dead2/"
+            cp -a anne/left4dead2/sound "$PACKAGE_DIR/left4dead2/"
+            cp -a anne/left4dead2/models "$PACKAGE_DIR/left4dead2/"
+            cp -a anne/left4dead2/materials "$PACKAGE_DIR/left4dead2/"
+          }
+
+          archive_package() {
+            local variant="$1"
+            local asset="$2"
+            tar -czf "$GITHUB_WORKSPACE/$asset" -C "$STAGING/$variant" "$RELEASE_NAME"
+          }
+
+          remove_anne_optional_plugin() {
+            local plugin="$1"
+            rm -f "$PLUGIN_DIR/optional/AnneHappy/$plugin.smx"
+            find "$PACKAGE_DIR/left4dead2/cfg" -type f -name '*.cfg' \
+              -exec sed -i "\|optional/AnneHappy/$plugin\\.smx|d" {} +
+          }
+
+          stage_package full
+          archive_package full "$RELEASE_NAME.tar.gz"
+
+          stage_package norank
+          # Dynamic difficulty and traitor quota both depend on the removed ranking databases.
+          rm -f \
+            "$PLUGIN_DIR/extend/l4d_stats.smx" \
+            "$PLUGIN_DIR"/extend/sbpp_* \
+            "$PLUGIN_DIR/extend/lilac.smx"
+          remove_anne_optional_plugin annehappy_dynamic_ai_difficulty
+          remove_anne_optional_plugin anne_traitor_quota
+          archive_package norank "$RELEASE_NAME-norank.tar.gz"
+
+          stage_package nomysql
+          # Keep infected_control and spawn_vote_menu.  The former now treats quota
+          # persistence as optional; the latter defaults to SourceMod's local SQLite.
+          rm -f \
+            "$PLUGIN_DIR/chat-processor.smx" \
+            "$PLUGIN_DIR/extend/hextags.smx" \
+            "$PLUGIN_DIR/extend/l4d_stats.smx" \
+            "$PLUGIN_DIR"/extend/sbpp_* \
+            "$PLUGIN_DIR/extend/lilac.smx" \
+            "$PLUGIN_DIR/extend/rpg.smx" \
+            "$PLUGIN_DIR/extend/chatlog.smx" \
+            "$PLUGIN_DIR/extend/veterans.smx" \
+            "$PLUGIN_DIR/extend/l4d2_damage_show.smx" \
+            "$PLUGIN_DIR/extend/punch_angle.smx" \
+            "$PLUGIN_DIR/extend/l4d2_blacklist.smx" \
+            "$PLUGIN_DIR/extend/l4d2_hitsound.smx" \
+            "$PLUGIN_DIR/extend/global_chat.smx" \
+            "$PLUGIN_DIR/extend/l4d_player_count_unload_mode.smx"
+          remove_anne_optional_plugin annehappy_dynamic_ai_difficulty
+          remove_anne_optional_plugin anne_traitor_quota
+          cp -f "$PLUGIN_DIR/disabled/rpg.smx" "$PLUGIN_DIR/extend/rpg.smx"
+          archive_package nomysql "$RELEASE_NAME-nomysql.tar.gz"
 
       - name: Update release
         uses: softprops/action-gh-release@v1

@@ -58,6 +58,21 @@ bool SpawnQueue_RotateHead(int &zc)
     return true;
 }
 
+void SpawnQueue_TrimToLength(int limit)
+{
+    if (gQ.spawn == null)
+    {
+        Queue_SyncSizes();
+        return;
+    }
+
+    if (limit < 0)
+        limit = 0;
+    while (gQ.spawn.Length > limit)
+        gQ.spawn.Erase(gQ.spawn.Length - 1);
+    Queue_SyncSizes();
+}
+
 int TeleportQueue_Length()
 {
     return (gQ.teleport != null) ? gQ.teleport.Length : 0;

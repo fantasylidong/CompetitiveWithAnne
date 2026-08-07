@@ -66,9 +66,9 @@ enum struct State
 
     void Reset()
     {
-        if (this.hTeleport != INVALID_HANDLE) { KillTimer(this.hTeleport); this.hTeleport = INVALID_HANDLE; }
-        if (this.hCheck    != INVALID_HANDLE) { KillTimer(this.hCheck);    this.hCheck    = INVALID_HANDLE; }
-        if (this.hSpawn    != INVALID_HANDLE) { KillTimer(this.hSpawn);    this.hSpawn    = INVALID_HANDLE; }
+        StopTrackedTimer(this.hTeleport);
+        StopTrackedTimer(this.hCheck);
+        StopTrackedTimer(this.hSpawn);
 
         this.bPickRushMan = false;
         this.bShouldCheck = false;

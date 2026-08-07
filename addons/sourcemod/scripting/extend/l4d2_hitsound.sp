@@ -60,6 +60,15 @@ ConVar cv_db_enable;
 ConVar cv_db_conf;
 ConVar cv_db_table;       // 可配置表名（默认 RPG）
 
+enum SoundFeedbackPriority
+{
+    SOUND_FEEDBACK_NONE = 0,
+    SOUND_FEEDBACK_HIT,
+    SOUND_FEEDBACK_HEADSHOT,
+    SOUND_FEEDBACK_KILL,
+    SOUND_FEEDBACK_HEADSHOT_KILL
+};
+
 // --------------------- State ---------------------
 // 「最近套装」用于非管理员在“特定开关”重新开启时恢复为最近一次套装选择（不入库）
 int  g_SndSuite [MAXPLAYERS + 1] = {0, ...}; // 最近一次“音效套装（玩家）”
@@ -94,6 +103,9 @@ int    g_OverlayType[MAXPLAYERS + 1] = { -1, ... };
 int    g_ActiveOverlayCount = 0;
 float  g_OverlayShowTime = 0.3;
 bool   g_IsVictimDeadPlayer[MAXPLAYERS + 1] = { false, ... };
+bool   g_SoundFramePending[MAXPLAYERS + 1] = { false, ... };
+SoundFeedbackPriority g_PendingSoundPriority[MAXPLAYERS + 1] = { SOUND_FEEDBACK_NONE, ... };
+char   g_PendingSoundSample[MAXPLAYERS + 1][PLATFORM_MAX_PATH];
 
 // Fallback KV
 Handle g_SoundStore = INVALID_HANDLE;
@@ -269,6 +281,44 @@ static bool GetSoundPath_BySet(int setId, int which, char[] out, int maxlen)
     else if (which == 1) GetArrayString(g_SetHit,      idx, out, maxlen);
     else                 GetArrayString(g_SetKill,     idx, out, maxlen);
     return (out[0] != '\0');
+}
+
+static void ResetPendingSoundFeedback(int client)
+{
+    g_SoundFramePending[client] = false;
+    g_PendingSoundPriority[client] = SOUND_FEEDBACK_NONE;
+    g_PendingSoundSample[client][0] = '\0';
+}
+
+static void QueueSoundFeedback(int client, const char[] sample, SoundFeedbackPriority priority)
+{
+    if (!IsValidClient(client) || sample[0] == '\0') return;
+
+    if (priority > g_PendingSoundPriority[client])
+    {
+        g_PendingSoundPriority[client] = priority;
+        strcopy(g_PendingSoundSample[client], PLATFORM_MAX_PATH, sample);
+    }
+
+    if (!g_SoundFramePending[client])
+    {
+        g_SoundFramePending[client] = true;
+        RequestFrame(Frame_PlayPendingSoundFeedback, GetClientUserId(client));
+    }
+}
+
+public void Frame_PlayPendingSoundFeedback(any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (!IsValidClient(client) || !g_SoundFramePending[client]) return;
+
+    char sample[PLATFORM_MAX_PATH];
+    strcopy(sample, sizeof(sample), g_PendingSoundSample[client]);
+    ResetPendingSoundFeedback(client);
+
+    if (!GetConVarBool(cv_sound_enable) || sample[0] == '\0') return;
+
+    EmitSoundToClient(client, sample, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
 }
 
 // 根据“图标套装ID(1..N)”与类型取 base：which 0=head 1=hit 2=kill
@@ -646,6 +696,7 @@ public void OnClientPutInServer(int client)
 {
     if (IsFakeClient(client)) return;
 
+    ResetPendingSoundFeedback(client);
     ResetClientOverlayState(client, false);
     g_PrefsRevision[client]++;
 
@@ -714,6 +765,7 @@ public void OnClientDisconnect(int client)
         }
     }
 
+    ResetPendingSoundFeedback(client);
     ResetClientOverlayState(client, false);
     if (g_ActiveOverlayCount == 0)
         StopOverlayCleanTimer();
@@ -1102,7 +1154,7 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
             int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
             if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
             {
-                EmitSoundToClient(attacker, s, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                QueueSoundFeedback(attacker, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
             }
         }
     }
@@ -1114,7 +1166,6 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
 {
     int victim     = GetClientOfUserId(GetEventInt(event, "userid"));
     int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
-    int dmg        = GetEventInt(event, "dmg_health");
     int health     = GetEventInt(event, "health");
     int damagetype = GetEventInt(event, "type");
     bool headshot  = (GetEventInt(event, "hitgroup") == 1);
@@ -1125,8 +1176,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
     if (IsValidClient(victim) && IsValidClient(attacker) && !IsFakeClient(attacker) && GetClientTeam(victim) == 3)
     {
         bool specialTarget = IsSpecialInfectedClient(victim);
-        float AddDamage = 0.0;
-        if (RoundToNearest(float(health - dmg) - AddDamage) <= 0.0)
+        if (health <= 0)
             g_IsVictimDeadPlayer[victim] = true;
 
         if (!g_IsVictimDeadPlayer[victim])
@@ -1148,7 +1198,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
                     char s2[PLATFORM_MAX_PATH];
                     int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                     if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
-                        EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                        QueueSoundFeedback(attacker, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
                 }
             }
         }
@@ -1184,7 +1234,7 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
             int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
             if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
             {
-                EmitSoundToClient(attacker, s, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                QueueSoundFeedback(attacker, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
             }
         }
     }
@@ -1195,7 +1245,6 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
 {
     int victim     = GetEventInt(event, "entityid");
     int attacker   = GetClientOfUserId(GetEventInt(event, "attacker"));
-    int dmg        = GetEventInt(event, "amount");
     int hp         = GetEntProp(victim, Prop_Data, "m_iHealth");
     int damagetype = GetEventInt(event, "type");
     bool headshot  = (GetEventInt(event, "hitgroup") == 1);
@@ -1206,7 +1255,7 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
     if (IsValidClient(attacker) && !IsFakeClient(attacker))
     {
         bool specialTarget = false;
-        bool dead = ((hp - dmg) <= 0);
+        bool dead = (hp <= 0);
 
         if (!dead)
         {
@@ -1224,7 +1273,7 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
                 int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                 if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
                 {
-                    EmitSoundToClient(attacker, s2, SOUND_FROM_PLAYER, SNDCHAN_STATIC, SNDLEVEL_NORMAL);
+                    QueueSoundFeedback(attacker, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
                 }
             }
         }

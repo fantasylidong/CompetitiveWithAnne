@@ -98,6 +98,32 @@ int Tactical_ResolveWaveTarget()
     return ChooseTargetSurvivor();
 }
 
+int Tactical_ResolveRuntimeTarget()
+{
+    int preferred = AntiBait_GetPreferredTarget();
+    if (preferred > 0 && IsEligibleSpawnTarget(preferred)
+        && (!g_bTargetLimitLib || !IsClientReachLimit(preferred)))
+    {
+        return preferred;
+    }
+
+    if (gST.bPickRushMan && IsEligibleSpawnTarget(gST.rushManIndex)
+        && (!g_bTargetLimitLib || !IsClientReachLimit(gST.rushManIndex)))
+    {
+        return gST.rushManIndex;
+    }
+
+    // 普通波内保持目标稳定。每秒随机换人会让某职业在 A 目标推进的距离带
+    // 继续套到 B 目标，并反复丢弃有向候选游标。
+    if (IsEligibleSpawnTarget(gST.targetSurvivor)
+        && (!g_bTargetLimitLib || !IsClientReachLimit(gST.targetSurvivor)))
+    {
+        return gST.targetSurvivor;
+    }
+
+    return ChooseTargetSurvivor();
+}
+
 void Tactical_OnPressureEngaged()
 {
     if (gST.bLate)
@@ -294,6 +320,33 @@ float Tactical_GetCandidateQuality(int zc, const float candidate[3], int targetC
     return ClampFloat(quality, 0.0, 100.0);
 }
 
+float Tactical_GetMaxHighGroundNavCompensation(int zc)
+{
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker): return NAV_HIGH_GROUND_SMOKER_MAX;
+        case view_as<int>(SI_Hunter): return NAV_HIGH_GROUND_HUNTER_MAX;
+    }
+    return 0.0;
+}
+
+float Tactical_GetHighGroundNavCompensation(int zc,
+                                             float candidateZ,
+                                             float targetEyeZ)
+{
+    float maxCompensation = Tactical_GetMaxHighGroundNavCompensation(zc);
+    float heightAbove = candidateZ - targetEyeZ;
+    if (maxCompensation <= 0.0 || heightAbove <= NAV_HIGH_GROUND_COMP_START_Z)
+        return 0.0;
+
+    float scale = zc == view_as<int>(SI_Hunter)
+        ? NAV_HIGH_GROUND_HUNTER_SCALE
+        : NAV_HIGH_GROUND_SMOKER_SCALE;
+    return FloatMin(
+        (heightAbove - NAV_HIGH_GROUND_COMP_START_Z) * scale,
+        maxCompensation);
+}
+
 void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
                               float &minRange, float &maxRange)
 {
@@ -303,33 +356,33 @@ void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
     {
         case view_as<int>(SI_Smoker):
         {
-            if (stage == 0)      { minRange = 700.0; maxRange = 1650.0; }
-            else if (stage == 1) { minRange = 500.0; maxRange = 2400.0; }
-            else                 { minRange = 300.0; maxRange = 3000.0; }
+            if (stage == 0)      { minRange = 500.0; maxRange = 1200.0; }
+            else if (stage == 1) { minRange = 500.0; maxRange = 2100.0; }
+            else                 { minRange = 500.0; maxRange = 3000.0; }
         }
         case view_as<int>(SI_Boomer):
         {
-            if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 1050.0; }
-            else                 { minRange = 250.0; maxRange = 1600.0; }
+            if (stage == 0)      { minRange = 250.0; maxRange = 550.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 1000.0; }
+            else                 { minRange = 250.0; maxRange = 2300.0; }
         }
         case view_as<int>(SI_Hunter):
         {
-            if (stage == 0)      { minRange = 500.0; maxRange = 1300.0; }
-            else if (stage == 1) { minRange = 350.0; maxRange = 1900.0; }
-            else                 { minRange = 250.0; maxRange = 2600.0; }
+            if (stage == 0)      { minRange = 350.0; maxRange = 950.0; }
+            else if (stage == 1) { minRange = 350.0; maxRange = 1750.0; }
+            else                 { minRange = 350.0; maxRange = 2900.0; }
         }
         case view_as<int>(SI_Spitter):
         {
-            if (stage == 0)      { minRange = 450.0; maxRange = 1150.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 1550.0; }
-            else                 { minRange = 250.0; maxRange = 2000.0; }
+            if (stage == 0)      { minRange = 300.0; maxRange = 800.0; }
+            else if (stage == 1) { minRange = 300.0; maxRange = 1450.0; }
+            else                 { minRange = 300.0; maxRange = 2300.0; }
         }
         case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
         {
-            if (stage == 0)      { minRange = 300.0; maxRange = 900.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 1350.0; }
-            else                 { minRange = 250.0; maxRange = 2000.0; }
+            if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 1250.0; }
+            else                 { minRange = 250.0; maxRange = 2200.0; }
         }
         default:
         {
@@ -352,4 +405,29 @@ void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
 
     if (maxRange < minRange)
         minRange = maxRange;
+}
+
+float Tactical_GetDistanceBandScanMin(int zc, int stage, bool teleportMode)
+{
+    stage = ClampInt(stage, 0, TACTICAL_BAND_STAGES - 1);
+
+    float minRange;
+    float maxRange;
+    Tactical_GetDistanceBand(zc, stage, teleportMode, minRange, maxRange);
+    if (stage == 0)
+        return minRange;
+
+    float previousMinRange;
+    float previousMaxRange;
+    Tactical_GetDistanceBand(
+        zc, stage - 1, teleportMode, previousMinRange, previousMaxRange);
+
+    // 后续档只向远端扩展图查询，不重新扫描上一档已经完整检查的区间。
+    if (previousMaxRange >= maxRange)
+    {
+        return maxRange + NAV_CANDIDATE_RANGE_SLACK
+            + Tactical_GetMaxHighGroundNavCompensation(zc);
+    }
+    return FloatMax(
+        FloatMax(minRange, previousMinRange), previousMaxRange + 0.01);
 }

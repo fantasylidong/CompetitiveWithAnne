@@ -4,14 +4,25 @@
 #define _infected_control_spawn_accel_bridge_included
 
 #define SPAWN_ACCEL_MAX_SPATIAL_POINTS 100000
+#define SPAWN_ACCEL_PROGRESS_PAGE_SIZE 16384
 #define SPAWN_ACCEL_PATH_BOUNDARY_SLACK 32.0
+#define SPAWN_ACCEL_TOPOLOGY_RETRY_DELAY 30.0
+#define SPAWN_ACCEL_RETRYABLE_TOPOLOGY_DIAGS (ANNE_SPAWN_NAV_DIAG_UNKNOWN_AREA \
+    | ANNE_SPAWN_NAV_DIAG_INVALID_FLOOR_STORAGE \
+    | ANNE_SPAWN_NAV_DIAG_INVALID_LADDER_STORAGE \
+    | ANNE_SPAWN_NAV_DIAG_UNRESOLVED_DYNAMIC_ELEVATOR)
 
 bool g_bSpawnAccel;
 bool g_bSpawnAccelGraphReady;
 bool g_bSpawnAccelGraphCandidatesAvailable;
 bool g_bSpawnAccelAvailabilityKnown;
 bool g_bSpawnAccelNativeSafetyAvailable;
+Handle g_hSpawnAccelStartTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
+Handle g_hSpawnAccelTopologyRetryTimer = INVALID_HANDLE;
+bool g_bSpawnAccelTopologyRetryAttempted;
+bool g_bSpawnAccelTopologyRetryInProgress;
+bool g_bSpawnAccelDynamicRebuildPending;
 ArrayList g_SpawnAccelRawFlowDistances = null;
 float g_fSpawnAccelNextCandidateRefresh;
 bool g_bSpawnAccelCandidateWarm;
@@ -34,7 +45,7 @@ static const char g_sSpawnAccelRequiredNatives[][] =
     "AnneSpawn_NavCandidatesResetPerf",
     "AnneSpawn_NavGraphGetAreaCount",
     "AnneSpawn_NavGraphGetEdgeCount",
-    "AnneSpawn_NavGraphCollectProgress",
+    "AnneSpawn_NavGraphCollectProgressPage",
     "AnneSpawn_GetWorkerCount",
     "AnneSpawn_SetSurvivorSnapshot",
     "AnneSpawn_ClearSurvivorSnapshot",
@@ -76,6 +87,17 @@ stock bool SpawnAccel_CanUseGraphCandidates()
         && g_bSpawnAccelGraphCandidatesAvailable;
 }
 
+stock bool SpawnAccel_IsDynamicGraphPending()
+{
+    return g_bSpawnAccel && g_bSpawnAccelDynamicRebuildPending;
+}
+
+stock bool SpawnAccel_ShouldRetryTopology(int diagnosticFlags)
+{
+    return diagnosticFlags >= 0
+        && (diagnosticFlags & SPAWN_ACCEL_RETRYABLE_TOPOLOGY_DIAGS) != 0;
+}
+
 stock void SpawnAccel_LogUnavailableReason()
 {
     if (!LibraryExists(ANNE_SPAWN_ACCEL_LIBRARY))
@@ -108,7 +130,10 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
     bool shouldLog = forceLog || !g_bSpawnAccelAvailabilityKnown || available != g_bSpawnAccel;
     g_bSpawnAccel = available;
     if (!available)
+    {
         g_bSpawnAccelGraphCandidatesAvailable = false;
+        g_bSpawnAccelDynamicRebuildPending = false;
+    }
     g_bSpawnAccelNativeSafetyAvailable = available
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety")
             == FeatureStatus_Available;
@@ -129,11 +154,48 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
 
 stock void SpawnAccel_StopGraphTimer()
 {
-    if (g_hSpawnAccelGraphTimer != INVALID_HANDLE)
+    StopTrackedTimer(g_hSpawnAccelGraphTimer);
+}
+
+stock void SpawnAccel_StopGraphStartTimer()
+{
+    StopTrackedTimer(g_hSpawnAccelStartTimer);
+}
+
+stock void SpawnAccel_StopTopologyRetryTimer()
+{
+    StopTrackedTimer(g_hSpawnAccelTopologyRetryTimer);
+}
+
+stock void SpawnAccel_ResetTopologyRetryState()
+{
+    SpawnAccel_StopTopologyRetryTimer();
+    g_bSpawnAccelTopologyRetryAttempted = false;
+    g_bSpawnAccelTopologyRetryInProgress = false;
+}
+
+stock void SpawnAccel_ScheduleNavGraphStart(bool forceRebuild = false)
+{
+    SpawnAccel_StopGraphStartTimer();
+    SpawnAccel_ResetTopologyRetryState();
+    if (!g_bInfectedControlStarted)
+        return;
+
+    // 给 Nav Variant 与 Stripper 一秒完成地图拓扑替换，再捕获实时连接。
+    g_hSpawnAccelStartTimer = CreateTimer(
+        1.0, Timer_StartSpawnAccelGraph, view_as<any>(forceRebuild),
+        TIMER_FLAG_NO_MAPCHANGE);
+}
+
+stock int SpawnAccel_GetGraphDiagnostics(char[] reason, int maxlen)
+{
+    if (GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphGetDiagnostics")
+        != FeatureStatus_Available)
     {
-        KillTimer(g_hSpawnAccelGraphTimer);
-        g_hSpawnAccelGraphTimer = INVALID_HANDLE;
+        strcopy(reason, maxlen, "legacy_extension_no_diagnostics");
+        return -1;
     }
+    return AnneSpawn_NavGraphGetDiagnostics(reason, maxlen);
 }
 
 stock void SpawnAccel_ClearGraphProgress()
@@ -192,19 +254,31 @@ stock bool SpawnAccel_LoadGraphProgress()
         areaCount > SPAWN_ACCEL_MAX_SPATIAL_POINTS)
         return false;
 
-    float[] flowDistances = new float[areaCount];
-    int count = AnneSpawn_NavGraphCollectProgress(
-        flowDistances, areaCount, gCV.bNavBucketMapInvalid,
-        gCV.fNavBucketAssignRadius);
-    if (count != areaCount)
-        return false;
+    ArrayList flowDistances = new ArrayList();
+    float page[SPAWN_ACCEL_PROGRESS_PAGE_SIZE];
+    int offset = 0;
+    while (offset < areaCount)
+    {
+        int pageSize = areaCount - offset;
+        if (pageSize > sizeof(page))
+            pageSize = sizeof(page);
+        int count = AnneSpawn_NavGraphCollectProgressPage(
+            page, pageSize, offset, gCV.bNavBucketMapInvalid,
+            gCV.fNavBucketAssignRadius);
+        if (count != pageSize)
+        {
+            delete flowDistances;
+            return false;
+        }
+        for (int i = 0; i < count; i++)
+            flowDistances.Push(page[i]);
+        offset += count;
+    }
 
     ClearNavBuckets();
     if (g_SpawnAccelRawFlowDistances != null)
         delete g_SpawnAccelRawFlowDistances;
-    g_SpawnAccelRawFlowDistances = new ArrayList();
-    for (int i = 0; i < count; i++)
-        g_SpawnAccelRawFlowDistances.Push(flowDistances[i]);
+    g_SpawnAccelRawFlowDistances = flowDistances;
     g_BucketsReady = false;
     return SpawnAccel_RebuildAreaProgress();
 }
@@ -217,11 +291,14 @@ stock void SpawnAccel_EnsureLegacyBuckets()
 
 stock void SpawnAccel_ClearGraphState(bool stopExtension)
 {
+    SpawnAccel_StopGraphStartTimer();
     SpawnAccel_StopGraphTimer();
+    SpawnAccel_StopTopologyRetryTimer();
     if (stopExtension && g_bSpawnAccel)
         AnneSpawn_NavGraphStop();
     g_bSpawnAccelGraphReady = false;
     g_bSpawnAccelGraphCandidatesAvailable = false;
+    g_bSpawnAccelDynamicRebuildPending = false;
     g_fSpawnAccelNextCandidateRefresh = 0.0;
     g_bSpawnAccelCandidateWarm = false;
     SpawnAccel_ClearGraphProgress();
@@ -260,7 +337,7 @@ stock bool SpawnAccel_PrepareCurrentSurvivorRange()
 
     int targetId = L4D_GetNavAreaID(navStart);
     float maxPathDistance = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE
-        + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
+        + SPAWN_ACCEL_PATH_BOUNDARY_SLACK + NAV_HIGH_GROUND_MAX_COMP;
     return AnneSpawn_NavGraphPrepareRange(targetId, maxPathDistance, TEAM_INFECTED, false);
 }
 
@@ -284,7 +361,8 @@ stock bool SpawnAccel_GetClientNavId(int client, int &navId)
 
 stock float SpawnAccel_GetCandidatePathLimit()
 {
-    return gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE + SPAWN_ACCEL_PATH_BOUNDARY_SLACK;
+    return gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE
+        + SPAWN_ACCEL_PATH_BOUNDARY_SLACK + NAV_HIGH_GROUND_MAX_COMP;
 }
 
 stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
@@ -310,12 +388,54 @@ stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
 
 stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
 {
-    if (!SpawnAccel_CanUseGraphCandidates())
+    if (!g_bSpawnAccel)
         return;
 
-    // worker 只写待发布队列；每帧 pump 一次让完成结果尽快进入只读缓存。
-    // Dijkstra/排序仍严格按 1.0s/0.1s 节流，不会变成每帧重建。
-    AnneSpawn_NavGraphPump();
+    // 有向拓扑监测必须独立于 directed candidate 可用性持续运行。扩展内部按
+    // 空闲 1.0s / 临近刷特 0.1s 节流，变化后稳定 0.2s 才重捕获。
+    AnneSpawnNavGraphStatus graphStatus = AnneSpawn_NavGraphPump(warm);
+    if (graphStatus != AnneSpawnNavGraph_Ready)
+    {
+        if (g_bSpawnAccelGraphReady && g_hSpawnAccelGraphTimer == INVALID_HANDLE)
+        {
+            g_bSpawnAccelGraphReady = false;
+            g_bSpawnAccelGraphCandidatesAvailable = false;
+            g_bSpawnAccelDynamicRebuildPending = true;
+            // 分页 offset 属于旧拓扑；新图发布后必须从当前距离范围的第一个
+            // 有向候选重新开始，不能把旧图游标套到新图上。
+            SpawnSearch_Reset();
+            char diagnostics[768];
+            SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
+            Debug_Print("[SPAWN ACCEL] directed Nav topology change detected; old graph/path cache invalidated, directed searches paused until rebuild; diagnostics=(%s)",
+                        diagnostics);
+        }
+        return;
+    }
+
+    if (!g_bSpawnAccelGraphReady && g_hSpawnAccelGraphTimer == INVALID_HANDLE)
+    {
+        if (!SpawnAccel_LoadGraphProgress())
+        {
+            if (!g_bSpawnAccelDynamicRebuildPending)
+                SpawnAccel_EnsureLegacyBuckets();
+            return;
+        }
+        char diagnostics[768];
+        int diagnosticFlags = SpawnAccel_GetGraphDiagnostics(
+            diagnostics, sizeof diagnostics);
+        g_bSpawnAccelGraphReady = true;
+        g_bSpawnAccelGraphCandidatesAvailable = diagnosticFlags < 0
+            || (diagnosticFlags & ANNE_SPAWN_NAV_DIAG_COMPLETE) != 0;
+        g_bSpawnAccelDynamicRebuildPending = false;
+        g_fSpawnAccelNextCandidateRefresh = 0.0;
+        Debug_Print("[SPAWN ACCEL] directed Nav graph ready: candidateSource=%s diagnostics=(%s)",
+                    g_bSpawnAccelGraphCandidatesAvailable
+                        ? "directed" : "all_path_bracket",
+                    diagnostics);
+    }
+
+    if (!SpawnAccel_CanUseGraphCandidates())
+        return;
 
     if (warm != g_bSpawnAccelCandidateWarm)
     {
@@ -338,7 +458,10 @@ stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
         if (status == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
         {
             g_bSpawnAccelGraphCandidatesAvailable = false;
-            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; using all-Nav fallback");
+            char diagnostics[256];
+            SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
+            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; using all-Nav path-bracket fallback; diagnostics=(%s)",
+                        diagnostics);
             break;
         }
     }
@@ -407,6 +530,9 @@ stock void SpawnAccel_ResetCandidatePerf()
 
 public Action Timer_SpawnAccelGraphPump(Handle timer)
 {
+    if (timer != g_hSpawnAccelGraphTimer)
+        return Plugin_Stop;
+
     if (!g_bSpawnAccel)
     {
         g_hSpawnAccelGraphTimer = INVALID_HANDLE;
@@ -418,8 +544,18 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
     {
         g_bSpawnAccelGraphReady = false;
         g_bSpawnAccelGraphCandidatesAvailable = false;
+        g_bSpawnAccelDynamicRebuildPending = false;
         g_hSpawnAccelGraphTimer = INVALID_HANDLE;
-        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; using SourcePawn progress cache and all-Nav candidate fallback");
+        char diagnostics[768];
+        SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
+        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; using SourcePawn progress cache and all-Nav path-bracket fallback; diagnostics=(%s)",
+                    diagnostics);
+        if (g_bSpawnAccelTopologyRetryInProgress)
+        {
+            Debug_Print("[SPAWN ACCEL] topology retry outcome=failed classification=persistent_or_build_failure diagnostics=(%s)",
+                        diagnostics);
+            g_bSpawnAccelTopologyRetryInProgress = false;
+        }
         SpawnAccel_EnsureLegacyBuckets();
         return Plugin_Stop;
     }
@@ -432,14 +568,57 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
         {
             g_hSpawnAccelGraphTimer = INVALID_HANDLE;
             Debug_Print("[SPAWN ACCEL] Nav progress export failed; using SourcePawn progress cache and all-Nav candidate fallback");
+            if (g_bSpawnAccelTopologyRetryInProgress)
+            {
+                Debug_Print("[SPAWN ACCEL] topology retry outcome=failed classification=progress_export_failure");
+                g_bSpawnAccelTopologyRetryInProgress = false;
+            }
             SpawnAccel_EnsureLegacyBuckets();
             return Plugin_Stop;
         }
         g_bSpawnAccelGraphReady = true;
-        g_bSpawnAccelGraphCandidatesAvailable = true;
-        Debug_Print("[SPAWN ACCEL] Nav graph/progress ready: areas=%d edges=%d workers=%d",
+        char diagnostics[768];
+        int diagnosticFlags = SpawnAccel_GetGraphDiagnostics(
+            diagnostics, sizeof diagnostics);
+        g_bSpawnAccelGraphCandidatesAvailable = diagnosticFlags < 0
+            || (diagnosticFlags & ANNE_SPAWN_NAV_DIAG_COMPLETE) != 0;
+        g_bSpawnAccelDynamicRebuildPending = false;
+        Debug_Print("[SPAWN ACCEL] Nav graph/progress ready: areas=%d edges=%d workers=%d candidateSource=%s diagnostics=(%s)",
                     AnneSpawn_NavGraphGetAreaCount(), AnneSpawn_NavGraphGetEdgeCount(),
-                    AnneSpawn_GetWorkerCount());
+                    AnneSpawn_GetWorkerCount(),
+                    g_bSpawnAccelGraphCandidatesAvailable ? "directed" : "all_path_bracket",
+                    diagnostics);
+        if (!g_bSpawnAccelGraphCandidatesAvailable)
+        {
+            Debug_Print("[SPAWN ACCEL] live topology is incomplete; mapped bad-flow areas remain eligible, final min/max uses directed BuildPath");
+            if (g_bSpawnAccelTopologyRetryInProgress)
+            {
+                Debug_Print("[SPAWN ACCEL] topology retry outcome=incomplete classification=persistent_topology diagnostics=(%s)",
+                            diagnostics);
+                g_bSpawnAccelTopologyRetryInProgress = false;
+            }
+            else if (SpawnAccel_ShouldRetryTopology(diagnosticFlags)
+                && !g_bSpawnAccelTopologyRetryAttempted)
+            {
+                g_bSpawnAccelTopologyRetryAttempted = true;
+                g_hSpawnAccelTopologyRetryTimer = CreateTimer(
+                    SPAWN_ACCEL_TOPOLOGY_RETRY_DELAY, Timer_SpawnAccelTopologyRetry,
+                    _, TIMER_FLAG_NO_MAPCHANGE);
+                Debug_Print("[SPAWN ACCEL] topology retry armed delay=%.1fs diagnostics=(%s)",
+                            SPAWN_ACCEL_TOPOLOGY_RETRY_DELAY, diagnostics);
+            }
+            else if (!SpawnAccel_ShouldRetryTopology(diagnosticFlags))
+            {
+                Debug_Print("[SPAWN ACCEL] topology retry skipped classification=persistent_runtime_topology diagnostics=(%s)",
+                            diagnostics);
+            }
+        }
+        else if (g_bSpawnAccelTopologyRetryInProgress)
+        {
+            Debug_Print("[SPAWN ACCEL] topology retry outcome=complete classification=load_order_recovered diagnostics=(%s)",
+                        diagnostics);
+            g_bSpawnAccelTopologyRetryInProgress = false;
+        }
     }
 
     // 预热 reachability；候选快照由 OnGameFrame 按空闲/临近刷新频率调度。
@@ -449,8 +628,27 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
     return Plugin_Stop;
 }
 
+public Action Timer_SpawnAccelTopologyRetry(Handle timer)
+{
+    if (timer != g_hSpawnAccelTopologyRetryTimer)
+        return Plugin_Stop;
+
+    g_hSpawnAccelTopologyRetryTimer = INVALID_HANDLE;
+    if (!g_bInfectedControlStarted || g_bRuntimeMapEnding || !g_bSpawnAccel)
+        return Plugin_Stop;
+
+    char mapName[64];
+    GetCurrentMap(mapName, sizeof mapName);
+    g_bSpawnAccelTopologyRetryInProgress = true;
+    Debug_Print("[SPAWN ACCEL] topology retry started map=%s delay=%.1fs forceRebuild=1",
+                mapName, SPAWN_ACCEL_TOPOLOGY_RETRY_DELAY);
+    SpawnAccel_StartNavGraph(true);
+    return Plugin_Stop;
+}
+
 stock void SpawnAccel_StartNavGraph(bool forceRebuild = false)
 {
+    SpawnAccel_StopGraphStartTimer();
     SpawnAccel_ClearGraphState(false);
     if (!g_bSpawnAccel)
     {
@@ -462,13 +660,36 @@ stock void SpawnAccel_StartNavGraph(bool forceRebuild = false)
     char graphDir[PLATFORM_MAX_PATH];
     char graphPath[PLATFORM_MAX_PATH];
     char mapName[64];
-    BuildPath(Path_SM, dataDir, sizeof dataDir, "data/anne_spawn_accel");
-    CreateDirectory(dataDir, 511);
-    BuildPath(Path_SM, graphDir, sizeof graphDir, "data/anne_spawn_accel/navgraph");
-    CreateDirectory(graphDir, 511);
+    dataDir[0] = '\0';
+    graphDir[0] = '\0';
+    graphPath[0] = '\0';
+    mapName[0] = '\0';
+    if (BuildPath(Path_SM, dataDir, sizeof dataDir, "data/anne_spawn_accel") <= 0
+        || (!DirExists(dataDir) && !CreateDirectory(dataDir, 511))
+        || !DirExists(dataDir))
+    {
+        Debug_Print("[SPAWN ACCEL] cache directory unavailable path=%s", dataDir);
+        SpawnAccel_EnsureLegacyBuckets();
+        return;
+    }
+    if (BuildPath(Path_SM, graphDir, sizeof graphDir,
+                  "data/anne_spawn_accel/navgraph") <= 0
+        || (!DirExists(graphDir) && !CreateDirectory(graphDir, 511))
+        || !DirExists(graphDir))
+    {
+        Debug_Print("[SPAWN ACCEL] graph cache directory unavailable path=%s", graphDir);
+        SpawnAccel_EnsureLegacyBuckets();
+        return;
+    }
     GetCurrentMap(mapName, sizeof mapName);
-    BuildPath(Path_SM, graphPath, sizeof graphPath,
-              "data/anne_spawn_accel/navgraph/%s.anvg", mapName);
+    if (mapName[0] == '\0'
+        || BuildPath(Path_SM, graphPath, sizeof graphPath,
+                     "data/anne_spawn_accel/navgraph/%s.anvg", mapName) <= 0)
+    {
+        Debug_Print("[SPAWN ACCEL] graph cache path unavailable map=%s", mapName);
+        SpawnAccel_EnsureLegacyBuckets();
+        return;
+    }
 
     float maxFlowDistance = L4D2Direct_GetMapMaxFlowDistance();
     if (maxFlowDistance <= 0.0 ||

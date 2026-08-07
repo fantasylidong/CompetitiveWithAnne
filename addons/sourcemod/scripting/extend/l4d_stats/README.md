@@ -22,17 +22,17 @@
 - `stats_score.inc`：统一按模式选择积分列并给玩家发分。
 - `new_player_bonus.inc`：带新人完成关卡奖励。
 - `no_buy_bonus.inc`：从 `rpg.sp` 迁移来的不使用B数过关额外积分。
-- `score_log.inc`：每次积分加减流水、原因上下文和自动建表。
-- `quarter_rank.inc`：季度积分榜、季度切换清分和季度 native 缓存。
+- `score_log.inc`：每次积分加减流水、原因上下文和批量写入。
+- `quarter_rank.inc`：季度积分榜、季度切换和季度 native 缓存。
 
 ## 新增奖励的建议入口
 
-1. 如果只是给某个玩家加分，优先调用 `Stats_AwardClientScore(client, score)`。
-2. 如果要按当前模式写入 `players` 表的正确积分列，使用 `Stats_GetPointsColumnForTeam`。
-3. 如果奖励需要判断真人/幸存者/感染者，使用 `Stats_IsValidHumanClient`、`Stats_IsSurvivorHuman`、`Stats_IsInfectedHuman`。
-4. 新的独立奖励建议单独建一个 `xxx_bonus.inc`，在 `l4d_stats.sp` 的通用工具模块区域 include，并在 `plugin_start.inc` 里创建对应 ConVar。
-5. 事件触发点优先放在 `events_players.inc` 或 `events_team.inc`，不要把事件逻辑放进工具模块。
-6. 如果新增奖励没有走 `Stats_AwardClientScore`，在调用 `AddScore` 前先调用 `ScoreLog_SetContext("reason", "formula")`，让流水表能显示来源。
+1. 插件内部的所有加扣分统一调用 `Stats_ApplyClientScore`；感染者击杀使用 `Stats_ApplyInfectedKillScore`，不要直接更新 `players` 积分列或直接调用 `AddScore`。
+2. 调用统一入口时必须提供稳定的 `reason` 和 `formula`；同一行的 `award_x`、击杀等计数器通过 `ExtraSet` 一并提交。
+3. `Stats_AwardClientScore(client, score, reason, formula)` 保留给现有 native 和兼容调用，所有调用方必须提供 reason 和 formula。
+4. 如果奖励需要判断真人/幸存者/感染者，使用 `Stats_IsValidHumanClient`、`Stats_IsSurvivorHuman`、`Stats_IsInfectedHuman`。
+5. 新的独立奖励建议单独建一个 `xxx_bonus.inc`，在 `l4d_stats.sp` 的通用工具模块区域 include，并在 `plugin_start.inc` 里创建对应 ConVar。
+6. 事件触发点优先放在 `events_players.inc` 或 `events_team.inc`，不要把事件逻辑放进工具模块。
 
 ## 带新人奖励
 
@@ -78,7 +78,7 @@ l4d_stats_nobuy_bonus_hardcore_multiplier 1.3
 l4d_stats_quarter_rank_enable 1
 ```
 
-`%sscore_quarter` 表按 `steamid + quarter_key` 保存每个玩家每个季度的一行记录。所有走 `AddScore` 的分数都会同时进入总榜和当前季度榜；季度 key 格式是 `YYYYQ`，例如 `20262` 表示 2026 年第 2 季度。检测到季度切换时，新季度会写入新行，旧季度记录会保留为历史数据。玩家进服提示、排名面板、季度 Top10 和季度排名变化提示都会显示当前季度。
+`%sscore_quarter` 表按 `steamid + quarter_key` 保存每个玩家每个季度的一行记录。所有走统一积分入口的分数都会以相同的有符号增量同时进入总榜和当前季度榜；季度分允许为负数，但排名查询仍只统计 `points > 0`。季度 key 格式是 `YYYYQ`，例如 `20262` 表示 2026 年第 2 季度。检测到季度切换时，新季度会写入新行，旧季度记录会保留为历史数据。玩家进服提示、排名面板、季度 Top10 和季度排名变化提示都会显示当前季度。
 
 玩家命令：
 
@@ -106,7 +106,7 @@ native int l4dstats_IsQuarterTopPlayer(int client, int ranklimit);
 l4d_stats_scorelog_enable 1
 ```
 
-插件连接数据库后会自动创建 `%sscore_log` 表；`database.sql` 里也有默认 `score_log` 结构。每次 `AddScore` 都会保留一条独立流水，字段包含玩家、地图、模式、难度、队伍、分数变化、变化后的本图分、原因、公式上下文、RPG 局有效状态、是否使用B数、当前新人数量和带新倍率。写入会在最多 0.25 秒内按 16 行一批合并为 multi-row INSERT，并在换图或插件卸载前强制送入 SQL 队列，以减少击杀尖峰中的数据库任务数。公式字段从版本 2 开始自动以前缀 `formula_version=2,calculated_score=<最终分数>` 保存 l4d_stats 实际计算结果，供网站审查任务独立比对流水中的 `score`；后面的原始公式上下文继续保留。
+`%sscore_log` 表由 `database.sql` 提供，部署插件前必须先建表。每次非零积分变动都会保留一条独立流水，字段包含玩家、地图、模式、难度、计分队伍、分数变化、变化后的本图分、原因、公式上下文、RPG 局有效状态、是否使用B数、当前新人数量和带新倍率。写入会在最多 0.25 秒内按 16 行一批合并为 multi-row INSERT，并在换图或插件卸载前强制送入 SQL 队列，以减少击杀尖峰中的数据库任务数。历史季度校正方法见 `docs/quarter_score_reconciliation.md`，首次线上全量审核见 `docs/quarter_score_audit_2026-08-04.md`，归档逐人重放工具见 `scripts/score-quarter-replay.php`。旧版存在绕过流水的计分路径，因此即使月度归档完整，也禁止直接拿流水总和覆盖全部季度表。
 
 常用排查 SQL：
 

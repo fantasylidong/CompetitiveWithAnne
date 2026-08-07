@@ -9,8 +9,8 @@
  * 负责管理整个刷特时序决策流程：
  * 1. 提前检查窗口（0-checkWindow秒）
  * 2. 正常等待窗口（checkWindow-interval秒）
- * 3. Anti-Bait 只标记下一波为破点波，不延长基础刷新时间
- * 4. 旧密集检测状态保留兼容，但到达基础时间立即放行
+ * 3. 16 秒倒计时到点时，由 Anti-Bait 决定正常放行或进入延长
+ * 4. 延长阶段没有超时；队伍推进或稳定散开后立即恢复刷特
  */
 
 enum WaveDecisionState
@@ -18,7 +18,7 @@ enum WaveDecisionState
     WD_Idle = 0,           // 空闲：没有活跃波
     WD_EarlyCheck,         // 提前检查：0-checkWindow 秒，评估是否提前触发
     WD_TimerRunning,       // 定时器运行中：16秒倒计时，监控玩家行为
-    WD_IntensiveCheck      // 兼容旧状态：基础时间到达后立即放行
+    WD_IntensiveCheck      // Anti-Bait 延长：无超时，条件稳定解除后放行
 }
 
 enum struct WaveDecider
@@ -27,8 +27,10 @@ enum struct WaveDecider
     float waveStartTime;       // 本波开始时间
     float stateStartTime;      // 当前状态开始时间
     float timerStartTime;      // 16秒定时器开始时间
+    float pauseStartedAt;      // 暂停期间冻结全部波次时钟
     bool earlyTriggered;       // 是否已触发提前机制
     bool pressureObserved;     // 定时器运行期间是否观察到破点压力
+    float holdReleaseSince;    // 延长条件首次解除的时间
     int earlyCheckCount;       // 提前检查次数（用于调试）
     int intensiveCheckCount;   // 密集检测次数（用于调试）
 
@@ -39,8 +41,10 @@ enum struct WaveDecider
         this.waveStartTime = now;
         this.stateStartTime = now;
         this.timerStartTime = 0.0;
+        this.pauseStartedAt = 0.0;
         this.earlyTriggered = false;
         this.pressureObserved = false;
+        this.holdReleaseSince = 0.0;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
 
@@ -53,8 +57,10 @@ enum struct WaveDecider
         this.waveStartTime = 0.0;
         this.stateStartTime = 0.0;
         this.timerStartTime = 0.0;
+        this.pauseStartedAt = 0.0;
         this.earlyTriggered = false;
         this.pressureObserved = false;
+        this.holdReleaseSince = 0.0;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
     }
@@ -72,6 +78,27 @@ enum struct WaveDecider
         WaveDecider_GetStateName(oldState, oldStateName, sizeof(oldStateName));
         WaveDecider_GetStateName(newState, newStateName, sizeof(newStateName));
         WaveDecider_Debug("State: %s -> %s (%s)", oldStateName, newStateName, reason);
+    }
+
+    void OnPause()
+    {
+        if (this.state != WD_Idle && this.pauseStartedAt <= 0.0)
+            this.pauseStartedAt = GetGameTime();
+    }
+
+    void OnUnpause()
+    {
+        if (this.pauseStartedAt <= 0.0)
+            return;
+
+        float pausedFor = FloatMax(0.0, GetGameTime() - this.pauseStartedAt);
+        this.waveStartTime += pausedFor;
+        this.stateStartTime += pausedFor;
+        if (this.timerStartTime > 0.0)
+            this.timerStartTime += pausedFor;
+        if (this.holdReleaseSince > 0.0)
+            this.holdReleaseSince += pausedFor;
+        this.pauseStartedAt = 0.0;
     }
 
     // 每秒调用一次的更新函数
@@ -128,7 +155,7 @@ enum struct WaveDecider
         float timerElapsed = now - this.timerStartTime;
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
 
-        // 在刚性倒计时期间记录 Pressure，只改变下一波战术，不改变截止时间。
+        // 16 秒倒计时本身不可提前结束；Pressure 只决定到点后是否延长。
 
         // 检查是否进入卡位状态
         if (AntiBait_ShouldPrepareBreachWave())
@@ -154,8 +181,16 @@ enum struct WaveDecider
             // 根据标记决定走向
             if (this.pressureObserved)
             {
-                // 卡位不会延后刷新；ReleaseWave 会把本波标记为专用破点波。
-                this.ReleaseWave("timer reached with breach pressure");
+                if (AntiBait_ShouldHoldWave())
+                {
+                    this.holdReleaseSince = 0.0;
+                    this.TransitionTo(WD_IntensiveCheck, "timer reached with stable holding pressure");
+                    WaveSpawnReport_RecordAntiBaitHoldStart(now);
+                    return;
+                }
+
+                // 分散停滞等 Pressure 仍可生成破点波，但不会无限延长。
+                this.ReleaseWave("timer reached with attackable pressure");
             }
             else
             {
@@ -167,17 +202,33 @@ enum struct WaveDecider
 
     void UpdateIntensiveCheck()
     {
-        if (AntiBait_ShouldReleaseFromIntensive())
+        float now = GetGameTime();
+        if (!AntiBait_ShouldReleaseFromIntensive())
         {
-            if (AntiBait_IsAttackableSpread())
-                this.ReleaseWave("survivors spread out");
-            else
-                this.ReleaseWave("survivors progressed");
+            this.holdReleaseSince = 0.0;
+            this.intensiveCheckCount++;
             return;
         }
 
-        // 理论上不会再进入此状态；热重载遗留状态最多等待到基础截止时间。
-        this.intensiveCheckCount++;
+        if (this.holdReleaseSince <= 0.0)
+        {
+            this.holdReleaseSince = now;
+            WaveSpawnReport_RecordAntiBaitHoldClearCandidate(now);
+            if (gCV.fAntiBaitReleaseConfirm > 0.0)
+            {
+                this.intensiveCheckCount++;
+                return;
+            }
+        }
+
+        if ((now - this.holdReleaseSince) < gCV.fAntiBaitReleaseConfirm)
+        {
+            this.intensiveCheckCount++;
+            return;
+        }
+
+        WaveSpawnReport_RecordAntiBaitHoldEnd(now);
+        this.ReleaseWave("anti-bait hold cleared");
     }
 
     void StartSpawnTimer(const char[] reason)
@@ -186,6 +237,7 @@ enum struct WaveDecider
         this.timerStartTime = now;
         this.TransitionTo(WD_TimerRunning, reason);
         Traitor_OnFinalRefreshStarted();
+        WaveSpawnReport_RecordCountdownStart(now, reason);
 
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
         WaveDecider_Debug("Start %0.fs timer (%s)", interval, reason);
@@ -193,7 +245,11 @@ enum struct WaveDecider
 
     bool ShouldEarlyTrigger()
     {
-        // 条件1：特感数量过低
+        // 普通波尚未完成实际生成时，totalSI 可能暂时为 0；不能把异步找点误判成快速击杀。
+        if (gST.siQueueCount > 0 || SpawnQueue_Length() > 0)
+            return false;
+
+        // 条件1：本波已刷完且场上特感已降到当前难度的低压阈值
         if (!DifficultyStrategy_IsLowSiPressure())
             return false;
 
@@ -210,9 +266,10 @@ enum struct WaveDecider
 
     void ReleaseWave(const char[] reason)
     {
+        float now = GetGameTime();
         WaveDecider_Debug("Release wave: %s (elapsed=%.1fs early=%d intensive=%d)",
             reason,
-            GetGameTime() - this.waveStartTime,
+            now - this.waveStartTime,
             this.earlyCheckCount,
             this.intensiveCheckCount);
 
@@ -311,6 +368,16 @@ stock void WaveDecider_Update()
     gWD.Update();
 }
 
+stock void WaveDecider_OnPause()
+{
+    gWD.OnPause();
+}
+
+stock void WaveDecider_OnUnpause()
+{
+    gWD.OnUnpause();
+}
+
 stock WaveDecisionState WaveDecider_GetState()
 {
     return gWD.state;
@@ -321,8 +388,22 @@ stock bool WaveDecider_IsActive()
     return gWD.state != WD_Idle;
 }
 
+stock bool WaveDecider_IsAntiBaitArmWindowOpen()
+{
+    if (gWD.state == WD_IntensiveCheck)
+        return true;
+    if (gWD.state != WD_TimerRunning || gWD.timerStartTime <= 0.0)
+        return false;
+
+    float interval = DifficultyStrategy_GetConfiguredWaveDelay();
+    float remaining = interval - (GetGameTime() - gWD.timerStartTime);
+    return remaining <= gCV.fAntiBaitArmBefore;
+}
+
 stock float WaveDecider_GetReleaseEta()
 {
+    if (gWD.state == WD_IntensiveCheck)
+        return 0.0;
     if (gWD.state != WD_TimerRunning)
         return -1.0;
 

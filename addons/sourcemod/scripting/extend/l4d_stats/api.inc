@@ -293,8 +293,7 @@ public int Native_AddClientScore(Handle plugin, int numParams)
 			strcopy(Reason, sizeof(Reason), "native_add_score");
 	}
 
-	ScoreLog_SetContext(Reason, "native=l4dstats_AddClientScore");
-	if (!Stats_AwardClientScore(client, Score))
-		ScoreLog_ClearContext();
+	if (!Stats_AwardClientScore(client, Score, Reason, "native=l4dstats_AddClientScore"))
+		return ClientPoints[client];
 	return ClientPoints[client];
 }

@@ -90,50 +90,12 @@ public Action Event_RoundEnd(Handle:event, String:event_name[], bool:dontBroadca
 		return Plugin_Continue;
 	}
 	
-	for(int i = 1; i <= MaxClients; i++){
-		if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == TEAM_SURVIVORS || Stats_IsRoundParticipant(i)) && !IsFakeClient(i) && Score > 0){
-			StatsPrintToChat(i, "L4DStats_AllPlayersLostRoundPenalty", Score);
-			decl String:UpdatePoints[32];
-			decl String:UserID[MAX_LINE_WIDTH];
-			GetClientRankAuthString(i, UserID, sizeof(UserID));
-
-			switch (Stats_GetCurrentStatsGamemodeID())
-			{
-				case GAMEMODE_VERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-				}
-				case GAMEMODE_REALISM:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-				}
-				case GAMEMODE_SURVIVAL:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-				}
-				case GAMEMODE_SCAVENGE:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-				}
-				case GAMEMODE_REALISMVERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-				}
-				case GAMEMODE_OTHERMUTATIONS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-				}
-				default:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points");
-				}
+		for(int i = 1; i <= MaxClients; i++){
+			if(IsClientConnected(i) && IsClientInGame(i) && (GetClientTeam(i) == TEAM_SURVIVORS || Stats_IsRoundParticipant(i)) && !IsFakeClient(i) && Score > 0){
+				StatsPrintToChat(i, "L4DStats_AllPlayersLostRoundPenalty", Score);
+				Stats_ApplyClientScore(i, Score * (-1), "round_end_penalty", "base=anne_round_end,negative_score", "", false, TEAM_SURVIVORS);
 			}
-
-			decl String:query[1024];
-			Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score * -1, UserID);
-			SendSQLUpdate(query);
 		}
-	}
 	Isstart=false;	
 	return Plugin_Continue;
 }

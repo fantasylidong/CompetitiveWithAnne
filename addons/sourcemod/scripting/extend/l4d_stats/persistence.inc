@@ -121,22 +121,12 @@ public Action:timer_ProtectedFriendly(Handle:timer, any:data)
 
 	new Score = ModifyScoreDifficulty(GetConVarInt(cvar_Protect), 2, 3, TEAM_SURVIVORS);
 	Score = NewPlayerBonus_ApplyScoreMultiplier(client, Score);
-	ScoreLog_SetContext("protect_teammate", "base=l4d_stats_protect,difficulty,newbie_multiplier");
-	AddScore(client, Score);
-
-	UpdateMapStat("points", Score);
-
-	decl String:UpdatePoints[32];
-	decl String:UserID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(client, UserID, sizeof(UserID));
 	decl String:UserName[MAX_LINE_WIDTH];
 	GetClientName(client, UserName, sizeof(UserName));
 
-	Stats_GetPointsColumnForTeam(TEAM_SURVIVORS, UpdatePoints, sizeof(UpdatePoints));
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_protect = award_protect + %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, ProtectedFriendlies, UserID);
-	SendSQLUpdate(query);
+	decl String:ExtraSet[128];
+	Format(ExtraSet, sizeof(ExtraSet), ", award_protect = award_protect + %i", ProtectedFriendlies);
+	Stats_ApplyClientScore(client, Score, "protect_teammate", "base=l4d_stats_protect,difficulty,newbie_multiplier", ExtraSet, true, TEAM_SURVIVORS);
 	QuarterRank_RecordField(client, "award_protect", ProtectedFriendlies);
 
 	if (Score > 0)
@@ -191,15 +181,7 @@ public Action:timer_InfectedDamageCheck(Handle:timer, any:data)
 
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
-		decl String:query[1024];
-		decl String:iID[MAX_LINE_WIDTH];
-		decl String:UpdatePoints[32];
-
-		GetClientRankAuthString(data, iID, sizeof(iID));
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-
-		SendSQLUpdate(query);
+			Stats_ApplyClientScore(data, Score, "infected_damage", "base=damage/l4d_stats_infected_damage,difficulty", "", false, TEAM_INFECTED);
 
 		decl String:MapPoints[32];
 		Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
@@ -260,15 +242,9 @@ public Action:timer_BoomerBlindnessCheck(Handle:timer, any:data)
 		//PrintToConsole(0, "timer_BoomerBlindnessCheck -> Total Score = %i", Score);
 		Score = ModifyScoreDifficultyFloat(Score, 0.75, 0.5, TEAM_INFECTED);
 
-		decl String:query[1024];
-		decl String:iID[MAX_LINE_WIDTH];
-		decl String:UpdatePoints[32];
-		GetClientRankAuthString(data, iID, sizeof(iID));
-
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_perfect_blindness = award_perfect_blindness + %i, infected_boomer_blinded = infected_boomer_blinded + %i, infected_boomer_vomits = infected_boomer_vomits + %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AwardCounter, OriginalHitCounter, (BoomerVomitUpdated[data] ? 0 : 1), iID);
-
-		SendSQLUpdate(query);
+			decl String:ExtraSet[256];
+			Format(ExtraSet, sizeof(ExtraSet), ", award_perfect_blindness = award_perfect_blindness + %i, infected_boomer_blinded = infected_boomer_blinded + %i, infected_boomer_vomits = infected_boomer_vomits + %i", AwardCounter, OriginalHitCounter, (BoomerVomitUpdated[data] ? 0 : 1));
+			Stats_ApplyClientScore(data, Score, "boomer_blindness", "base=l4d_stats_boomersuccess_or_perfect,difficulty,blind_count", ExtraSet, false, TEAM_INFECTED);
 
 		if (!BoomerVomitUpdated[data])
 			UpdateMapStat("infected_boomer_vomits", 1);

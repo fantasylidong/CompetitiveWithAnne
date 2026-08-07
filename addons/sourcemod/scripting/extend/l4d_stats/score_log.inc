@@ -24,7 +24,7 @@ new g_iScoreLogBatchLength = 0;
 stock ScoreLog_CreateCvars()
 {
 	cvar_ScoreLogEnable = CreateConVar("l4d_stats_scorelog_enable", "1", "是否记录每次积分加减流水。0=关闭, 1=开启", 0, true, 0.0, true, 1.0);
-	cvar_ScoreLogFormulaThreshold = CreateConVar("l4d_stats_scorelog_formula_threshold", "500", "仅当单次正向加分大于该值时写入紧凑公式输入。", 0, true, 0.0);
+	cvar_ScoreLogFormulaThreshold = CreateConVar("l4d_stats_scorelog_formula_threshold", "500", "单次正向加分超过该值时写入 v3 紧凑公式；普通计分上下文始终写入。", 0, true, 0.0);
 }
 
 stock ScoreLog_SetContext(const String:Reason[], const String:Formula[], Uses = 1)
@@ -138,24 +138,13 @@ stock ScoreLog_QueueRow(const String:row[])
 		ScoreLog_FlushBatch();
 }
 
-stock ScoreLog_Record(Client, Score)
+stock ScoreLog_RecordIdentity(const String:SteamID[], const String:PlayerName[], Score, ScoreAfter, const String:Reason[], const String:Formula[], ScoreTeam)
 {
-	decl String:Reason[MAX_LINE_WIDTH];
-	decl String:Formula[MAX_MESSAGE_WIDTH];
-	ScoreLog_ConsumeContext(Reason, sizeof(Reason), Formula, sizeof(Formula));
-
 	if (Score == 0 || cvar_ScoreLogEnable == INVALID_HANDLE || !GetConVarBool(cvar_ScoreLogEnable))
 		return;
 
-	if (db == INVALID_HANDLE || !g_bScoreLogTableReady || !Stats_IsValidHumanClient(Client))
+	if (db == INVALID_HANDLE || !g_bScoreLogTableReady || Stats_IsInvalidRankAuthString(SteamID))
 		return;
-
-	decl String:ClientID[MAX_LINE_WIDTH];
-	if (!GetClientRankAuthString(Client, ClientID, sizeof(ClientID)) || Stats_IsInvalidRankAuthString(ClientID))
-		return;
-
-	decl String:ClientName[128];
-	GetClientName(Client, ClientName, sizeof(ClientName));
 
 	decl String:MapName[128];
 	GetCurrentMap(MapName, sizeof(MapName));
@@ -169,16 +158,17 @@ stock ScoreLog_Record(Client, Score)
 	decl String:EscDifficulty[65];
 	decl String:EscReason[MAX_LINE_WIDTH * 2 + 1];
 	decl String:EscFormula[257];
-	decl String:ResolvedFormula[128];
-	ResolvedFormula[0] = '\0';
-	if (cvar_ScoreLogFormulaThreshold != INVALID_HANDLE &&
-		Score > GetConVarInt(cvar_ScoreLogFormulaThreshold) &&
-		(StrContains(Formula, "v3c:", true) == 0 || StrContains(Formula, "v3s:", true) == 0 || StrContains(Formula, "v3n:", true) == 0))
-	{
+	decl String:ResolvedFormula[256];
+	new bool:IsCompactFormula = StrContains(Formula, "v3c:", true) == 0 ||
+		StrContains(Formula, "v3s:", true) == 0 ||
+		StrContains(Formula, "v3n:", true) == 0;
+	if (!IsCompactFormula ||
+		(cvar_ScoreLogFormulaThreshold != INVALID_HANDLE && Score > GetConVarInt(cvar_ScoreLogFormulaThreshold)))
 		strcopy(ResolvedFormula, sizeof(ResolvedFormula), Formula);
-	}
-	SQL_EscapeString(db, ClientID, EscClientID, sizeof(EscClientID));
-	SQL_EscapeString(db, ClientName, EscClientName, sizeof(EscClientName));
+	else
+		ResolvedFormula[0] = '\0';
+	SQL_EscapeString(db, SteamID, EscClientID, sizeof(EscClientID));
+	SQL_EscapeString(db, PlayerName, EscClientName, sizeof(EscClientName));
 	SQL_EscapeString(db, MapName, EscMapName, sizeof(EscMapName));
 	SQL_EscapeString(db, Difficulty, EscDifficulty, sizeof(EscDifficulty));
 	SQL_EscapeString(db, Reason, EscReason, sizeof(EscReason));
@@ -194,7 +184,6 @@ stock ScoreLog_Record(Client, Score)
 
 	new NewbieCount = NewPlayerBonus_CountNewSurvivors();
 	new Float:NewbieMultiplier = NewPlayerBonus_GetMultiplier();
-
 	decl String:row[2048];
 	Format(row, sizeof(row),
 		"(UNIX_TIMESTAMP(), '%s', '%s', '%s', %i, '%s', %i, %i, %i, '%s', '%s', %i, %i, %i, %.3f)",
@@ -203,14 +192,59 @@ stock ScoreLog_Record(Client, Score)
 		EscMapName,
 		Stats_GetCurrentStatsGamemodeID(),
 		EscDifficulty,
-		GetClientTeam(Client),
-		Score,
-		CurrentPoints[Client],
+			ScoreTeam,
+			Score,
+			ScoreAfter,
 		EscReason,
 		EscFormula,
 		RoundValid,
 		UseBuy,
 		NewbieCount,
-		NewbieMultiplier);
+			NewbieMultiplier);
 	ScoreLog_QueueRow(row);
+}
+
+stock ScoreLog_RecordStored(const String:SteamID[], const String:PlayerName[], Score, ScoreAfter, const String:Reason[], const String:Formula[], ScoreTeam)
+{
+	decl String:ResolvedReason[MAX_LINE_WIDTH];
+	if (Reason[0] == '\0')
+		strcopy(ResolvedReason, sizeof(ResolvedReason), "unknown");
+	else
+		strcopy(ResolvedReason, sizeof(ResolvedReason), Reason);
+
+	ScoreLog_RecordIdentity(SteamID, PlayerName, Score, ScoreAfter, ResolvedReason, Formula, ScoreTeam);
+}
+
+stock ScoreLog_Record(Client, Score, const String:ReasonOverride[] = "", const String:FormulaOverride[] = "", ScoreTeam = 0)
+{
+	decl String:Reason[MAX_LINE_WIDTH];
+	decl String:Formula[MAX_MESSAGE_WIDTH];
+	if (ReasonOverride[0] != '\0' || FormulaOverride[0] != '\0')
+	{
+		if (ReasonOverride[0] == '\0')
+			strcopy(Reason, sizeof(Reason), "unknown");
+		else
+			strcopy(Reason, sizeof(Reason), ReasonOverride);
+
+		strcopy(Formula, sizeof(Formula), FormulaOverride);
+	}
+	else
+	{
+		ScoreLog_ConsumeContext(Reason, sizeof(Reason), Formula, sizeof(Formula));
+	}
+
+	if (Score == 0 || !Stats_IsValidHumanClient(Client))
+		return;
+
+	decl String:ClientID[MAX_LINE_WIDTH];
+	if (!GetClientRankAuthString(Client, ClientID, sizeof(ClientID)))
+		return;
+
+	decl String:ClientName[128];
+	GetClientName(Client, ClientName, sizeof(ClientName));
+
+	if (ScoreTeam <= 0)
+		ScoreTeam = GetClientTeam(Client);
+
+	ScoreLog_RecordIdentity(ClientID, ClientName, Score, CurrentPoints[Client], Reason, Formula, ScoreTeam);
 }

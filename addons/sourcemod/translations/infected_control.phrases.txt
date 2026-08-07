@@ -208,6 +208,10 @@
 	{
 		"en"		"{green}[IC]{default} You may now spawn using normal ghost rules."
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"en"		"{green}[IC]{default} Once spawned, a traitor must fight until death. Moving away from the Survivors cannot return you to ghost mode for another spawn."
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"en"		"{green}[IC]{default} No traitor slot is available."

@@ -102,11 +102,9 @@ stock NoBuyBonus_TryAwardSurvivors()
 		if (!Stats_IsSurvivorHuman(i))
 			continue;
 
-		ScoreLog_SetContext("nobuy_bonus", ScoreFormula);
-		if (Stats_AwardClientScore(i, Score))
+		if (Stats_AwardClientScore(i, Score, "nobuy_bonus", ScoreFormula))
 			Awarded++;
 	}
-	ScoreLog_ClearContext();
 
 	if (Awarded > 0)
 		StatsPrintToChatAll("L4DStats_NoBuyBonusAwarded", Score);

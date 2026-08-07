@@ -208,6 +208,10 @@
 	{
 		"ko"		"{green}[IC]{default} You may now spawn using normal ghost rules."
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"ko"		"{green}[IC]{default} 내귀는 생성된 후 죽을 때까지 싸워야 합니다. 생존자에게서 멀어져 고스트 상태로 돌아가 다시 생성할 수 없습니다."
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"ko"		"{green}[IC]{default} No traitor slot is available."

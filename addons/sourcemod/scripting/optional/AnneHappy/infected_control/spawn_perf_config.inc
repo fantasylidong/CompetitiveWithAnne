@@ -132,6 +132,11 @@ stock SpawnPerfMode SpawnPerfConfig_GetMode()
 public Action Cmd_SpawnPerfStats(int client, int args)
 {
     SpawnPerf_PrintStats();
+    char diagnostics[768];
+    int diagnosticFlags = SpawnAccel_GetGraphDiagnostics(
+        diagnostics, sizeof diagnostics);
+    SpawnPerf_Log("[SpawnPerf][Graph] flags=%d diagnostics=(%s)",
+                  diagnosticFlags, diagnostics);
     ReplyToCommand(client, "[IC] 已输出刷点性能统计到服务器日志");
     return Plugin_Handled;
 }

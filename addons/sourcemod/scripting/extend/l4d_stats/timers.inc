@@ -47,29 +47,21 @@ public Action:timer_EndCharge(Handle:timer, any:data)
 	ChargerImpactCounter[data] = 0;
 
 	new Score = 0;
-	new String:ScoreSet[256] = "";
+	new String:ExtraSet[256] = "";
 
 	if (Counter >= GetConVarInt(cvar_ChargerRamHits))
 	{
 		Score = ModifyScoreDifficultyFloat(GetConVarInt(cvar_ChargerRamSuccess), 0.9, 0.8, TEAM_INFECTED);
 
-		decl String:UpdatePoints[32];
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(ScoreSet, sizeof(ScoreSet), "%s = %s + %i", UpdatePoints, UpdatePoints, Score);
-
-		StrCat(ScoreSet, sizeof(ScoreSet), ", award_scatteringram = award_scatteringram + 1, ");
+		Format(ExtraSet, sizeof(ExtraSet), ", award_scatteringram = award_scatteringram + 1");
 
 		if (EnableSounds_Charger_Ram && GetConVarBool(cvar_SoundsEnabled))
 			EmitSoundToAll(SOUND_CHARGER_RAM);
 	}
 	//UPDATE players SET points_infected = points_infected + 40, award_scatteringram = acharger_impacts = charger_impacts + 4 WHERE steamid = 'STEAM_1:1:12345678'
 
-	decl String:AttackerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(data, AttackerID, sizeof(AttackerID));
-
-	decl String:query[512];
-	Format(query, sizeof(query), "UPDATE %splayers SET %scharger_impacts = charger_impacts + %i WHERE steamid = '%s'", DbPrefix, ScoreSet, Counter, AttackerID);
-	SendSQLUpdate(query);
+	Format(ExtraSet[strlen(ExtraSet)], sizeof(ExtraSet) - strlen(ExtraSet), ", charger_impacts = charger_impacts + %i", Counter);
+	Stats_ApplyClientScore(data, Score, "charger_scattering_ram", "base=l4d_stats_chargerramsuccess,difficulty,impact_count", ExtraSet, false, TEAM_INFECTED);
 
 	if (Score > 0)
 	{
@@ -123,13 +115,19 @@ public Action:timer_FriendlyFireDamageEnd(Handle:timer, any:dp)
 	new BotDamage = ReadPackCell(dp);
 	new Attacker = ReadPackCell(dp);
 
-	// This may fail! What happens when a player skips and another joins with the same Client ID (is this even possible in such short time?)
-	FriendlyFireTimer[Attacker][0] = INVALID_HANDLE;
-
 	decl String:AttackerID[MAX_LINE_WIDTH];
 	ReadPackString(dp, AttackerID, sizeof(AttackerID));
 	decl String:AttackerName[MAX_LINE_WIDTH];
 	ReadPackString(dp, AttackerName, sizeof(AttackerName));
+	new ScoreBefore = ReadPackCell(dp);
+
+	new bool:CurrentAttackerMatches = false;
+	decl String:CurrentAttackerID[MAX_LINE_WIDTH];
+	if (Stats_IsValidHumanClient(Attacker) && GetClientRankAuthString(Attacker, CurrentAttackerID, sizeof(CurrentAttackerID)) && StrEqual(CurrentAttackerID, AttackerID))
+	{
+		CurrentAttackerMatches = true;
+		FriendlyFireTimer[Attacker][0] = INVALID_HANDLE;
+	}
 
 	// The damage is read and turned into lost points...
 	ResetPack(dp);
@@ -147,64 +145,37 @@ public Action:timer_FriendlyFireDamageEnd(Handle:timer, any:dp)
 			Score += ModifyScoreDifficultyNR(RoundToNearest(GetConVarFloat(cvar_FriendlyFireMultiplier) * HumanDamage), 2, 4, TEAM_SURVIVORS);
 
 		if (BotDamage > 0)
-			{
-				new Float:BotScoreMultiplier = GetConVarFloat(cvar_BotScoreMultiplier);
-
-				if (BotScoreMultiplier > 0.0)
-					Score += ModifyScoreDifficultyNR(RoundToNearest(GetConVarFloat(cvar_FriendlyFireMultiplier) * BotDamage), 2, 4, TEAM_SURVIVORS);
-			}
-		}
-        char UpdatePoints[32];
-        switch (Stats_GetCurrentStatsGamemodeID())
 		{
-			case GAMEMODE_VERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			}
-			case GAMEMODE_REALISM:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-			}
-			case GAMEMODE_SURVIVAL:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-			}
-			case GAMEMODE_SCAVENGE:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-			}
-			case GAMEMODE_REALISMVERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			}
-			case GAMEMODE_OTHERMUTATIONS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-			}
-			default:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points");
-			}
+			new Float:BotScoreMultiplier = GetConVarFloat(cvar_BotScoreMultiplier);
+
+			if (BotScoreMultiplier > 0.0)
+				Score += ModifyScoreDifficultyNR(RoundToNearest(GetConVarFloat(cvar_FriendlyFireMultiplier) * BotDamage), 2, 4, TEAM_SURVIVORS);
 		}
-        if(IsNormalMode()){
+
+		if (IsNormalMode())
+		{
 			Score = RoundToFloor(Score / 5.0);
 		}
 
-	        decl String:query[1024];
-	        Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i, award_friendlyfire = award_friendlyfire + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-	        SendSQLUpdate(query);
-	        QuarterRank_RecordField(Attacker, "award_friendlyfire", 1);
-	        QuarterRank_RecordScore(Attacker, Score * (-1));
+		if (CurrentAttackerMatches)
+		{
+			Stats_ApplyClientScore(Attacker, Score * (-1), "friendly_fire_damage_penalty", "base=damage*l4d_stats_ffire_multiplier,difficulty,negative_score", ", award_friendlyfire = award_friendlyfire + 1", false, TEAM_SURVIVORS);
+			QuarterRank_RecordField(Attacker, "award_friendlyfire", 1);
+		}
+		else if (Stats_ApplyStoredClientScore(AttackerID, AttackerName, Score * (-1), ScoreBefore - Score, "friendly_fire_damage_penalty", "base=damage*l4d_stats_ffire_multiplier,difficulty,negative_score", ", award_friendlyfire = award_friendlyfire + 1", TEAM_SURVIVORS))
+		{
+			QuarterRank_RecordFieldSteamID(AttackerID, "award_friendlyfire", 1);
+		}
 
 		new Mode = 0;
 		if (Score > 0)
 			Mode = GetConVarInt(cvar_AnnounceMode);
 
-		if ((Mode == 1 || Mode == 2) && IsClientConnected(Attacker) && IsClientInGame(Attacker))
+		if ((Mode == 1 || Mode == 2) && CurrentAttackerMatches)
 			StatsPrintToChat(Attacker, "L4DStats_FriendlyFirePenaltySelf", HumanDamage + BotDamage, Score);
 		else if (Mode == 3)
 			StatsPrintToChatAll("L4DStats_FriendlyFirePenaltyAll", AttackerName, HumanDamage + BotDamage, Score);
-
+	}
 }
 
 // Start team shuffle.
@@ -486,54 +457,11 @@ InterstitialPlayerUpdateEx(client, bool:ApplyNewPlayerMultiplier)
 	if (ApplyNewPlayerMultiplier)
 		AwardPoints = NewPlayerBonus_ApplyScoreMultiplier(client, AwardPoints);
 
-	decl String:ClientID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(client, ClientID, sizeof(ClientID));
-
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
-
-	new len = 0;
-	decl String:query[1024];
-	len += Format(query[len], sizeof(query)-len, "UPDATE %splayers SET %s = %s + %i, ", DbPrefix, UpdatePoints, UpdatePoints, AwardPoints);
-	len += Format(query[len], sizeof(query)-len, "kills = kills + %i, kill_infected = kill_infected + %i, ", TimerKills[client], TimerKills[client]);
-	len += Format(query[len], sizeof(query)-len, "headshots = headshots + %i ", TimerHeadshots[client]);
-	len += Format(query[len], sizeof(query)-len, "WHERE steamid = '%s'", ClientID);
-	SendSQLUpdate(query);
+	decl String:ExtraSet[256];
+	Format(ExtraSet, sizeof(ExtraSet), ", kills = kills + %i, kill_infected = kill_infected + %i, headshots = headshots + %i", TimerKills[client], TimerKills[client], TimerHeadshots[client]);
+	Stats_ApplyInfectedKillScore(client, AwardPoints, "infected", TimerKills[client], TimerHeadshots[client], "common_infected_timer", "timer_points=sum_common_infected_kills,difficulty,newbie_multiplier", ExtraSet, false);
 
 	UpdateMapStat("kills", TimerKills[client]);
 	UpdateMapStat("points", AwardPoints);
 
-	ScoreLog_SetContext("common_infected_timer", "timer_points=sum_common_infected_kills,difficulty,newbie_multiplier");
-	AddInfectedKillScore(client, AwardPoints, "infected", TimerKills[client], TimerHeadshots[client]);
 }

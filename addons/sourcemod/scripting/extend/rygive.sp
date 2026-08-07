@@ -868,7 +868,8 @@ void Miscell(int client, int item) {
 	menu.AddItem("b", "剥夺");
 	menu.AddItem("c", "复活");
 	menu.AddItem("d", "传送");
-	menu.AddItem("e", "友伤");
+	if(GetClientImmunityLevel(client) > RYGIVE_LIMIT_IMMUNITY)
+		menu.AddItem("e", "友伤");
 	if(GetClientImmunityLevel(client) > 90)
 		menu.AddItem("f", "伤害免疫");
 	menu.AddItem("g", "召唤尸潮");
@@ -1290,6 +1291,11 @@ void TeleportToSurvivor(int client) {
 }
 
 void SetFriendlyFire(int client) {
+	if (GetClientImmunityLevel(client) <= RYGIVE_LIMIT_IMMUNITY) {
+		Miscell(client, 0);
+		return;
+	}
+
 	Menu menu = new Menu(SetFriendlyFire_MenuHandler);
 	menu.SetTitle("友伤");
 	menu.AddItem("999", "恢复默认");
@@ -1311,6 +1317,11 @@ void SetFriendlyFire(int client) {
 int SetFriendlyFire_MenuHandler(Menu menu, MenuAction action, int client, int param2) {
 	switch (action) {
 		case MenuAction_Select: {
+			if (GetClientImmunityLevel(client) <= RYGIVE_LIMIT_IMMUNITY) {
+				Miscell(client, 0);
+				return 0;
+			}
+
 			char item[12];
 			menu.GetItem(param2, item, sizeof item);
 			switch (param2) {

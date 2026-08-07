@@ -25,6 +25,13 @@ enum AnneSpawnNavGraphStatus
 #define ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE -2
 #define ANNE_SPAWN_NAV_CANDIDATE_PERF_FLOATS 10
 #define ANNE_SPAWN_NAV_CANDIDATE_PERF_COUNTS 13
+#define ANNE_SPAWN_NAV_DIAG_COMPLETE              (1 << 0)
+#define ANNE_SPAWN_NAV_DIAG_CACHE_HIT             (1 << 1)
+#define ANNE_SPAWN_NAV_DIAG_UNKNOWN_AREA          (1 << 2)
+#define ANNE_SPAWN_NAV_DIAG_INVALID_FLOOR_STORAGE (1 << 3)
+#define ANNE_SPAWN_NAV_DIAG_INVALID_LADDER_STORAGE (1 << 4)
+#define ANNE_SPAWN_NAV_DIAG_DYNAMIC_ELEVATOR      (1 << 5)
+#define ANNE_SPAWN_NAV_DIAG_UNRESOLVED_DYNAMIC_ELEVATOR (1 << 6)
 
 enum AnneSpawnNavCandidatePerfFloat
 {
@@ -66,7 +73,8 @@ native bool AnneSpawn_NavGraphStart(
     bool forceRebuild
 );
 
-native AnneSpawnNavGraphStatus AnneSpawn_NavGraphPump();
+// warm=true 时动态 Nav 以 0.1s 轮询；空闲时自动降到 1.0s。
+native AnneSpawnNavGraphStatus AnneSpawn_NavGraphPump(bool warm = false);
 native void AnneSpawn_NavGraphStop();
 
 native bool AnneSpawn_NavGraphPrepareRange(
@@ -123,10 +131,20 @@ native void AnneSpawn_NavCandidatesResetPerf();
 
 native int AnneSpawn_NavGraphGetAreaCount();
 native int AnneSpawn_NavGraphGetEdgeCount();
+// 返回诊断位，并把缓存来源/拓扑完整性/失效原因写入 reason。
+native int AnneSpawn_NavGraphGetDiagnostics(char[] reason, int maxlen);
 // 一次性导出与图 area index 对齐的原始进度距离；坏 flow 可在扩展后台按 Nav 邻接补齐。
 native int AnneSpawn_NavGraphCollectProgress(
     float[] outputFlowDistances,
     int maxResults,
+    bool mapInvalid,
+    float maxResolveDistance
+);
+// 分页导出进度，避免大地图在 SourcePawn 中为全部 Nav 一次性申请动态数组。
+native int AnneSpawn_NavGraphCollectProgressPage(
+    float[] outputFlowDistances,
+    int maxResults,
+    int offset,
     bool mapInvalid,
     float maxResolveDistance
 );

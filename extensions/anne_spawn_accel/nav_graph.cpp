@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <queue>
@@ -12,8 +15,8 @@
 
 namespace
 {
-constexpr char kDiskMagic[8] = {'A', 'N', 'N', 'E', 'N', 'A', 'V', '3'};
-constexpr std::uint32_t kDiskVersion = 3;
+constexpr char kDiskMagic[8] = {'A', 'N', 'N', 'E', 'N', 'A', 'V', '7'};
+constexpr std::uint32_t kDiskVersion = 7;
 constexpr std::uint32_t kMaxDiskAreas = 100000;
 constexpr std::uint32_t kMaxDiskEdges = 2000000;
 constexpr std::uint32_t kDiskFlagComplete = 1u << 0;
@@ -75,13 +78,40 @@ bool ReadVector(std::ifstream &file, std::vector<T> &values, std::size_t count)
                                        static_cast<std::streamsize>(count * sizeof(T))));
 }
 
-template <typename T>
-bool WriteVector(std::ofstream &file, const std::vector<T> &values)
+std::string CacheIoError(const char *stage, const std::string &path, int errorNumber)
 {
-    if (values.empty())
-        return true;
-    return static_cast<bool>(file.write(reinterpret_cast<const char *>(values.data()),
-                                        static_cast<std::streamsize>(values.size() * sizeof(T))));
+    if (errorNumber == 0)
+        errorNumber = EIO;
+    return std::string("cache_io stage=") + stage + " path=\"" + path +
+        "\" errno=" + std::to_string(errorNumber) + " (" +
+        std::strerror(errorNumber) + ")";
+}
+
+bool WriteBytes(std::FILE *file, const void *data, std::size_t size,
+                const char *stage, const std::string &path, std::string &error)
+{
+    const auto *cursor = static_cast<const std::uint8_t *>(data);
+    while (size > 0)
+    {
+        errno = 0;
+        std::size_t written = std::fwrite(cursor, 1, size, file);
+        if (written == 0)
+        {
+            error = CacheIoError(stage, path, errno);
+            return false;
+        }
+        cursor += written;
+        size -= written;
+    }
+    return true;
+}
+
+template <typename T>
+bool WriteFileVector(std::FILE *file, const std::vector<T> &values,
+                     const char *stage, const std::string &path, std::string &error)
+{
+    return values.empty() ||
+        WriteBytes(file, values.data(), values.size() * sizeof(T), stage, path, error);
 }
 
 float CenterDistance(const std::vector<float> &centers, std::uint32_t left, std::uint32_t right)
@@ -93,6 +123,74 @@ float CenterDistance(const std::vector<float> &centers, std::uint32_t left, std:
     float z = centers[a + 2] - centers[b + 2];
     return std::sqrt(x * x + y * y + z * z);
 }
+
+void CanonicalizeInputEdges(std::vector<AnneNavGraphInputEdge> &inputEdges)
+{
+    std::sort(inputEdges.begin(), inputEdges.end(), [](const auto &left, const auto &right) {
+        if (left.from != right.from)
+            return left.from < right.from;
+        if (left.to != right.to)
+            return left.to < right.to;
+        return static_cast<std::uint32_t>(left.type) < static_cast<std::uint32_t>(right.type);
+    });
+    inputEdges.erase(std::unique(inputEdges.begin(), inputEdges.end(), [](const auto &left, const auto &right) {
+        return left.from == right.from && left.to == right.to && left.type == right.type;
+    }), inputEdges.end());
+}
+}
+
+std::uint64_t AnneComputeNavTopologyFingerprint(
+    std::uint64_t baseFingerprint,
+    std::vector<AnneNavGraphInputEdge> inputEdges,
+    std::uint32_t topologyIssues,
+    std::uint64_t dynamicStateFingerprint)
+{
+    CanonicalizeInputEdges(inputEdges);
+    std::uint64_t hash = baseFingerprint;
+    auto hashValue = [&hash](const void *data, std::size_t size) {
+        constexpr std::uint64_t fnvPrime = 1099511628211ull;
+        const auto *bytes = static_cast<const std::uint8_t *>(data);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            hash ^= bytes[i];
+            hash *= fnvPrime;
+        }
+    };
+    hashValue(&topologyIssues, sizeof(topologyIssues));
+    hashValue(&dynamicStateFingerprint, sizeof(dynamicStateFingerprint));
+    std::uint64_t edgeCount = inputEdges.size();
+    hashValue(&edgeCount, sizeof(edgeCount));
+    for (const AnneNavGraphInputEdge &edge : inputEdges)
+    {
+        std::uint32_t type = static_cast<std::uint32_t>(edge.type);
+        hashValue(&edge.from, sizeof(edge.from));
+        hashValue(&edge.to, sizeof(edge.to));
+        hashValue(&type, sizeof(type));
+    }
+    return hash;
+}
+
+std::string AnneNavGraphVariantCachePath(
+    const std::string &basePath,
+    std::uint64_t fingerprint)
+{
+    if (basePath.empty())
+        return std::string();
+
+    char fingerprintText[24];
+    std::snprintf(
+        fingerprintText, sizeof(fingerprintText), ".%016llx",
+        static_cast<unsigned long long>(fingerprint));
+
+    std::filesystem::path path(basePath);
+    std::filesystem::path parent = path.parent_path();
+    std::string extension = path.extension().string();
+    std::string filename;
+    if (extension.empty())
+        filename = path.filename().string() + fingerprintText + ".anvg";
+    else
+        filename = path.stem().string() + fingerprintText + extension;
+    return (parent / filename).string();
 }
 
 std::uint32_t AnneNavGraph::PackEdge(std::uint32_t target, AnneNavEdgeType type)
@@ -400,22 +498,15 @@ std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(
 {
     auto graph = std::make_shared<AnneNavGraph>();
     graph->fingerprint = metadata.fingerprint;
-    graph->complete = complete;
+    graph->topologyIssues = metadata.topologyIssues;
+    graph->complete = complete &&
+        !AnneNavTopologyHasFatalIssue(metadata.topologyIssues);
     graph->navIds = metadata.navIds;
     graph->centers = metadata.centers;
     graph->flowDistances = metadata.flowDistances;
     graph->maxFlowDistance = metadata.maxFlowDistance;
 
-    std::sort(inputEdges.begin(), inputEdges.end(), [](const auto &left, const auto &right) {
-        if (left.from != right.from)
-            return left.from < right.from;
-        if (left.to != right.to)
-            return left.to < right.to;
-        return static_cast<std::uint32_t>(left.type) < static_cast<std::uint32_t>(right.type);
-    });
-    inputEdges.erase(std::unique(inputEdges.begin(), inputEdges.end(), [](const auto &left, const auto &right) {
-        return left.from == right.from && left.to == right.to && left.type == right.type;
-    }), inputEdges.end());
+    CanonicalizeInputEdges(inputEdges);
 
     std::size_t count = graph->navIds.size();
     graph->offsets.assign(count + 1, 0);
@@ -469,7 +560,9 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
 
     auto graph = std::make_shared<AnneNavGraph>();
     graph->fingerprint = header.fingerprint;
-    graph->complete = (header.flags & kDiskFlagComplete) != 0;
+    graph->topologyIssues = metadata.topologyIssues;
+    graph->complete = (header.flags & kDiskFlagComplete) != 0 &&
+        !AnneNavTopologyHasFatalIssue(metadata.topologyIssues);
     graph->centers = metadata.centers;
     graph->flowDistances = metadata.flowDistances;
     graph->maxFlowDistance = metadata.maxFlowDistance;
@@ -495,6 +588,31 @@ std::shared_ptr<AnneNavGraph> AnneLoadNavGraph(
 bool AnneStageNavGraphCache(const AnneNavGraph &graph, const std::string &path,
                             std::string &temporaryPath, std::string &error)
 {
+    error.clear();
+    temporaryPath.clear();
+    if (path.empty())
+    {
+        error = "cache_io stage=validate path=\"\" error=empty_cache_path";
+        return false;
+    }
+
+    std::filesystem::path cachePath(path);
+    std::filesystem::path parentPath = cachePath.parent_path();
+    if (parentPath.empty())
+    {
+        error = "cache_io stage=validate path=\"" + path +
+            "\" error=missing_parent_directory";
+        return false;
+    }
+    std::error_code directoryError;
+    std::filesystem::create_directories(parentPath, directoryError);
+    if (directoryError || !std::filesystem::is_directory(parentPath, directoryError))
+    {
+        int errorNumber = directoryError.value();
+        error = CacheIoError("prepare_parent", parentPath.string(), errorNumber);
+        return false;
+    }
+
     DiskHeader header{};
     std::memcpy(header.magic, kDiskMagic, sizeof(kDiskMagic));
     header.version = kDiskVersion;
@@ -508,37 +626,61 @@ bool AnneStageNavGraphCache(const AnneNavGraph &graph, const std::string &path,
                                    graph.navIds, graph.offsets, graph.edges);
 
     static std::atomic<std::uint64_t> temporarySerial{0};
-    temporaryPath = path + ".tmp." +
+    auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    temporaryPath = path + ".tmp." + std::to_string(timestamp) + "." +
         std::to_string(temporarySerial.fetch_add(1) + 1);
-    std::ofstream file(temporaryPath, std::ios::binary | std::ios::trunc);
-    if (!file || !file.write(reinterpret_cast<const char *>(&header), sizeof(header)) ||
-        !WriteVector(file, graph.navIds) || !WriteVector(file, graph.offsets) ||
-        !WriteVector(file, graph.edges))
-    {
-        error = "could not write Nav graph cache";
-        file.close();
-        std::remove(temporaryPath.c_str());
-        return false;
-    }
-    file.close();
+
+    errno = 0;
+    std::FILE *file = std::fopen(temporaryPath.c_str(), "wb");
     if (!file)
     {
-        error = "could not flush Nav graph cache";
-        std::remove(temporaryPath.c_str());
+        error = CacheIoError("open", temporaryPath, errno);
         return false;
     }
-    return true;
+
+    bool wrote = WriteBytes(file, &header, sizeof(header), "write_header", temporaryPath, error) &&
+        WriteFileVector(file, graph.navIds, "write_ids", temporaryPath, error) &&
+        WriteFileVector(file, graph.offsets, "write_offsets", temporaryPath, error) &&
+        WriteFileVector(file, graph.edges, "write_edges", temporaryPath, error);
+    if (wrote)
+    {
+        errno = 0;
+        if (std::fflush(file) != 0)
+        {
+            error = CacheIoError("flush", temporaryPath, errno);
+            wrote = false;
+        }
+    }
+
+    errno = 0;
+    if (std::fclose(file) != 0 && wrote)
+    {
+        error = CacheIoError("close", temporaryPath, errno);
+        wrote = false;
+    }
+    if (!wrote)
+        std::remove(temporaryPath.c_str());
+    return wrote;
 }
 
 bool AnnePublishNavGraphCache(const std::string &temporaryPath, const std::string &path,
                               std::string &error)
 {
+    error.clear();
+    if (temporaryPath.empty() || path.empty())
+    {
+        error = "cache_io stage=publish_validate temp=\"" + temporaryPath +
+            "\" target=\"" + path + "\" error=empty_path";
+        return false;
+    }
 #if defined(_WIN32)
     std::remove(path.c_str());
 #endif
+    errno = 0;
     if (std::rename(temporaryPath.c_str(), path.c_str()) != 0)
     {
-        error = "could not publish Nav graph cache";
+        int errorNumber = errno;
+        error = CacheIoError("publish", temporaryPath + " -> " + path, errorNumber);
         std::remove(temporaryPath.c_str());
         return false;
     }
@@ -553,6 +695,7 @@ void AnneDiscardNavGraphCache(const std::string &temporaryPath)
 
 bool AnneSaveNavGraph(const AnneNavGraph &graph, const std::string &path, std::string &error)
 {
+    error.clear();
     std::string temporaryPath;
     if (!AnneStageNavGraphCache(graph, path, temporaryPath, error))
         return false;

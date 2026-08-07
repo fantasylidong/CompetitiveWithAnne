@@ -19,6 +19,26 @@
 					}
 				}
 			}
+
+			// void CBaseServer::ReplyReservationRequest( const ns_address &adr, bf_read &msgIn )
+			"CBaseServer::ReplyReservationRequest"
+			{
+				"signature"		"CBaseServer::ReplyReservationRequest"
+				"callconv"		"thiscall"
+				"return"		"void"
+				"this"			"address"
+				"arguments"
+				{
+					"adr"
+					{
+						"type"	"objectptr"
+					}
+					"msgIn"
+					{
+						"type"	"objectptr"
+					}
+				}
+			}
 		}
 
 		"MemPatches"
@@ -144,4 +164,3 @@
 		}
 	}
 }
-

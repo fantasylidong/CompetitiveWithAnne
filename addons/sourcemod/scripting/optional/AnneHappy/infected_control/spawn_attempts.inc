@@ -6,8 +6,7 @@
 // 本文件只做“一次尝试”的执行层：
 // - TryNormalSpawnOnce：从普通刷特队列取一个 class，找点并生成。
 // - TryTeleportSpawnOnce：从传送队列取一个 class，按 teleportMode 找点并生成。
-// - FallbackDirectorPosInRange：职业范围内的 NavArea 全部失败后，向导演要受限兜底点。
-// - FallbackDirectorPosUnrestricted：连续完整流程失败后，完全交给导演找最终点。
+// - FallbackDirectorPos：职业范围内的 NavArea 全部失败后，直接采用导演 API 返回点。
 //
 // 选类、队列补位、波释放时机不在这里改；分别看 class_queue.inc、wave_decider.inc、wave_control.inc。
 // 找点质量和性能不在这里改；看 spawn_core.inc / spawn_score.inc。
@@ -33,64 +32,8 @@ static int ResolveFallbackTarget(int target)
     return (IsValidSurvivor(tgt) && IsPlayerAlive(tgt)) ? tgt : 0;
 }
 
-static bool FallbackDirectorPosInRange(int zc, int target, bool teleportMode,
-                                       float minRange, float maxRange, float outPos[3])
-{
-    float bestPt[3];
-    bool have = false;
-    float bestDelta = 999999.0;
-
-    int tgt = ResolveFallbackTarget(target);
-    if (tgt <= 0)
-    {
-        Debug_Print("[FALLBACK] no valid survivor to reference, abort");
-        return false;
-    }
-
-    float desired = (minRange + maxRange) * 0.5;
-    Visibility_EnsureCurrentEyeSnapshot();
-    float targetEye[3];
-    if (!Visibility_GetClientEyeSnapshot(tgt, targetEye))
-        GetClientEyePosition(tgt, targetEye);
-    int visibilityRayMode = GetEffectiveVisibilityRayMode();
-    float directExclusion = FloatMax(
-        NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
-    if (teleportMode)
-        directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
-    float directExclusionSq = directExclusion * directExclusion;
-    for (int i = 0; i < DIRECTOR_FALLBACK_SAMPLES; i++)
-    {
-        float pt[3];
-        if (!L4D_GetRandomPZSpawnPosition(tgt, zc, 7, pt)) continue;
-
-        float minDSq = GetMinEyeDistSquaredToAnySurvivor(pt);
-        if (minDSq < directExclusionSq) continue;
-        float targetDistance = GetVectorDistance(pt, targetEye);
-        if (targetDistance < minRange || targetDistance > maxRange) continue;
-        if (Visibility_TestPointSafety(pt, teleportMode, visibilityRayMode)
-            != AnneSpawnSafety_Safe) continue;
-
-        float delta = FloatAbs(desired - targetDistance);
-
-        if (!have)
-        {
-            bestPt = pt;
-            have = true;
-            bestDelta = delta;
-        }
-        else if (delta < bestDelta)
-        {
-            bestPt = pt;
-            bestDelta = delta;
-        }
-    }
-
-    if (!have) return false;
-    outPos = bestPt;
-    return true;
-}
-
-static bool FallbackDirectorPosUnrestricted(int zc, int target, float outPos[3])
+static bool FallbackDirectorPos(int zc, int target, int tries,
+                                float outPos[3])
 {
     int tgt = ResolveFallbackTarget(target);
     if (tgt <= 0)
@@ -98,10 +41,12 @@ static bool FallbackDirectorPosUnrestricted(int zc, int target, float outPos[3])
         Debug_Print("[FALLBACK API] no valid survivor to reference, abort");
         return false;
     }
-
     float apiStart = GetEngineTime();
-    bool apiHit = L4D_GetRandomPZSpawnPosition(tgt, zc, UNRESTRICTED_DIRECTOR_TRIES, outPos);
+    bool apiHit = L4D_GetRandomPZSpawnPosition(tgt, zc, tries, outPos);
     SpawnPerf_RecordFallbackApiMs((GetEngineTime() - apiStart) * 1000.0, apiHit, zc);
+    Debug_Print("[FALLBACK API] class=%s target=%d tries=%d result=%s pos=(%.1f %.1f %.1f)",
+        g_sInfectedClassNames[zc], tgt, tries, apiHit ? "hit" : "miss",
+        outPos[0], outPos[1], outPos[2]);
     return apiHit;
 }
 
@@ -140,8 +85,7 @@ static bool g_bAssaultBurstDirty = false;
 
 void AssaultBurst_Reset()
 {
-    delete g_hAssaultBurstTimer;
-    g_hAssaultBurstTimer = null;
+    StopTrackedTimer(g_hAssaultBurstTimer);
     g_fAssaultBurstLastSpawn = 0.0;
     g_bAssaultBurstDirty = false;
 }
@@ -181,6 +125,8 @@ static Action Timer_AssaultBurst(Handle timer)
 static void TriggerAssaultBurst()
 {
     g_fAssaultBurstLastSpawn = GetGameTime();
+    if (g_hAssaultBurstTimer != null && !IsValidHandle(g_hAssaultBurstTimer))
+        g_hAssaultBurstTimer = null;
     if (g_hAssaultBurstTimer != null)
     {
         g_bAssaultBurstDirty = true;
@@ -235,7 +181,265 @@ static Action Timer_LogSpawnedSIState(Handle timer, any userid)
     return Plugin_Stop;
 }
 
-static int DoSpawnAt(const float pos[3], int zc, bool enforceMinDistance = true)
+static bool g_bRejectedActualSpawn[MAXPLAYERS + 1];
+static int g_iNormalSearchBand[SI_COUNT];
+static int g_iTeleportSearchBand[SI_COUNT];
+static float g_fNormalRetryAfter[SI_COUNT];
+static float g_fTeleportRetryAfter[SI_COUNT];
+static int g_iNormalRetryTargetNav[SI_COUNT];
+static int g_iTeleportRetryTargetNav[SI_COUNT];
+static int g_iNormalDirectedTarget[SI_COUNT];
+static bool g_bNormalDirectedTargetTried[SI_COUNT][MAXPLAYERS + 1];
+static bool g_bDirectedTargetTried[MAXPLAYERS + 1];
+static int g_iNormalDirectedRetargets[SI_COUNT];
+
+#define NORMAL_DIRECTED_RETARGET_LIMIT 3
+#define EXTENDED_DIRECTOR_MAX_SCALE 1.5
+
+enum struct PendingActualSpawn
+{
+    bool active;
+    float createdAt;
+    bool hasStableSample;
+    float stableSince;
+    float stablePos[3];
+    int userid;
+    int zc;
+    int targetSurvivor;
+    int areaIdx;
+    int band;
+    bool teleportMode;
+    bool fallback;
+    WaveSpawnMode mode;
+    float spawnCallMs;
+    float minRange;
+    float maxRange;
+    float graphScanMinRange;
+    float requestedPos[3];
+    SpawnScoreDbg score;
+}
+
+#define ACTUAL_SPAWN_VALIDATION_MIN_AGE       0.10
+#define ACTUAL_SPAWN_STABLE_CONFIRM_SECONDS   0.10
+#define ACTUAL_SPAWN_STABLE_RADIUS             8.00
+#define ACTUAL_SPAWN_VALIDATION_MAX_AGE        1.00
+
+static PendingActualSpawn g_PendingActualSpawns[MAXPLAYERS + 1];
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse,
+                             float vel[3], float angles[3], int &weapon,
+                             int &subtype, int &cmdnum, int &tickcount,
+                             int &seed, int mouse[2])
+{
+    if (!SpawnAttempts_IsPendingActualClient(client))
+        return Plugin_Continue;
+
+    // 只阻止待确认特感主动移动；保留实体物理，允许引擎完成重力落地
+    // 与碰撞修正。确认完成后 pending 状态清除，下一条指令即恢复。
+    int moveButtons = IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT
+        | IN_JUMP | IN_SPEED | IN_ATTACK | IN_ATTACK2;
+    buttons &= ~moveButtons;
+    vel[0] = 0.0;
+    vel[1] = 0.0;
+    vel[2] = 0.0;
+    return Plugin_Changed;
+}
+
+void SpawnAttempts_ClearRejectedActualSpawn(int client)
+{
+    if (client > 0 && client <= MaxClients)
+        g_bRejectedActualSpawn[client] = false;
+}
+
+bool SpawnAttempts_ConsumeRejectedActualDeath(int client)
+{
+    if (client <= 0 || client > MaxClients || !g_bRejectedActualSpawn[client])
+        return false;
+
+    g_bRejectedActualSpawn[client] = false;
+    return true;
+}
+
+bool SpawnAttempts_HasPendingActualSpawn()
+{
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (g_PendingActualSpawns[slot].active)
+            return true;
+    }
+    return false;
+}
+
+int SpawnAttempts_CountPendingActualSpawns(bool teleportOnly = false)
+{
+    int count = 0;
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (!g_PendingActualSpawns[slot].active)
+            continue;
+        if (teleportOnly && !g_PendingActualSpawns[slot].teleportMode)
+            continue;
+        count++;
+    }
+    return count;
+}
+
+int SpawnAttempts_CountRejectedActualSpawns()
+{
+    int count = 0;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (g_bRejectedActualSpawn[client]
+            && IsClientInGame(client)
+            && IsPlayerAlive(client))
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+int SpawnAttempts_CountPendingNormalSpawns()
+{
+    int count = 0;
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (g_PendingActualSpawns[slot].active
+            && !g_PendingActualSpawns[slot].teleportMode)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+int SpawnAttempts_CountPendingClass(int zc, bool normalOnly = false)
+{
+    int count = 0;
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (!g_PendingActualSpawns[slot].active
+            || g_PendingActualSpawns[slot].zc != zc
+            || (normalOnly && g_PendingActualSpawns[slot].teleportMode))
+        {
+            continue;
+        }
+        count++;
+    }
+    return count;
+}
+
+static bool SpawnAttempts_HasReachedAliveLimitWithPending(int zc)
+{
+    if (HasReachedLimit(zc))
+        return true;
+
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return true;
+
+    int reserved = Traitor_CountReservedClassSlots(zc);
+    int cap = gST.siAlive[idx] + gST.siCap[idx] + reserved;
+    return gST.siAlive[idx] + SpawnAttempts_CountPendingClass(zc)
+        + reserved >= cap;
+}
+
+static bool SpawnAttempts_HasReachedWaveLimitWithPending(int zc)
+{
+    if (HasReachedWaveClassLimit(zc))
+        return true;
+
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return true;
+
+    int cap = gST.siAlive[idx] + gST.siCap[idx]
+        + Traitor_CountReservedClassSlots(zc);
+    return gST.siSpawnedThisWave[idx]
+        + SpawnAttempts_CountPendingClass(zc, true) >= cap;
+}
+
+bool SpawnAttempts_IsPendingActualClient(int client)
+{
+    return client > 0
+        && client <= MaxClients
+        && g_PendingActualSpawns[client].active
+        && GetClientUserId(client) == g_PendingActualSpawns[client].userid;
+}
+
+void SpawnAttempts_ResetPendingActualSpawn(bool removeClient = true)
+{
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (!g_PendingActualSpawns[slot].active)
+            continue;
+
+        if (removeClient)
+        {
+            int client = GetClientOfUserId(g_PendingActualSpawns[slot].userid);
+            if (client > 0 && IsClientInGame(client))
+            {
+                g_bRejectedActualSpawn[client] = true;
+                KickClient(client, "Cancelled pending spawn validation");
+            }
+        }
+        g_PendingActualSpawns[slot].active = false;
+        g_PendingActualSpawns[slot].userid = 0;
+    }
+}
+
+static bool SpawnAttempts_ValidateActualSpawn(int client, int zc,
+                                              bool teleportMode,
+                                              bool &persistentUnsafe)
+{
+    persistentUnsafe = false;
+    if (!IsInfectedBot(client) || !IsPlayerAlive(client) || IsGhost(client)
+        || GetInfectedClass(client) != zc)
+    {
+        Debug_Print("[SPAWN REJECT ACTUAL] class=%s idx=%d reason=state",
+            g_sInfectedClassNames[zc], client);
+        return false;
+    }
+
+    float actual[3];
+    GetClientAbsOrigin(client, actual);
+    float directExclusion = FloatMax(
+        NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
+    if (teleportMode)
+        directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
+    float directExclusionSq = directExclusion * directExclusion;
+    if (GetMinEyeDistSquaredToAnySurvivor(actual) < directExclusionSq)
+    {
+        Debug_Print("[SPAWN REJECT ACTUAL] class=%s idx=%d reason=distance min=%.1f pos=(%.1f %.1f %.1f)",
+            g_sInfectedClassNames[zc], client, directExclusion,
+            actual[0], actual[1], actual[2]);
+        return false;
+    }
+
+    // 最终提交是每只特感一次的低频路径，直接刷新当前眼位，避免同 tick
+    // 内其他插件传送生还者后沿用候选阶段的旧快照。
+    Visibility_RefreshEyeSnapshot();
+    int rayMode = GetEffectiveVisibilityRayMode();
+    // 最终提交是低频路径，强制走与独立测试探针一致的 SourcePawn
+    // 射线/引擎可见性复核；扩展 native 继续负责高频候选预筛。
+    AnneSpawnSafetyResult safety = Visibility_TestPointSafetyDirect(
+        actual, teleportMode, rayMode);
+    bool inHurt = IsSpawnPointInHurtTrigger(actual);
+    if (safety != AnneSpawnSafety_Safe || inHurt)
+    {
+        persistentUnsafe = inHurt || safety == AnneSpawnSafety_Stuck;
+        Debug_Print("[SPAWN REJECT ACTUAL] class=%s idx=%d reason=%s pos=(%.1f %.1f %.1f)",
+            g_sInfectedClassNames[zc], client,
+            inHurt ? "hurt" : (safety == AnneSpawnSafety_Visible ? "visible" : "stuck"),
+            actual[0], actual[1], actual[2]);
+        return false;
+    }
+
+    return true;
+}
+
+static int DoSpawnAt(const float pos[3], int zc,
+                     bool enforceMinDistance = true)
 {
     if (enforceMinDistance)
     {
@@ -251,11 +455,8 @@ static int DoSpawnAt(const float pos[3], int zc, bool enforceMinDistance = true)
     int idx = L4D2_SpawnSpecial(zc, pos, NULL_VECTOR);
     if (idx > 0)
     {
-        g_LastSpawnOkTime = GetGameTime();
-        InvalidateBucketShareCache();
-        Debug_Print("[SPAWN OK] %s idx=%d at (%.1f %.1f %.1f)", g_sInfectedClassNames[zc], idx, pos[0], pos[1], pos[2]);
-        if (gCV.iDebugMode > 0)
-            CreateTimer(0.15, Timer_LogSpawnedSIState, GetClientUserId(idx), TIMER_FLAG_NO_MAPCHANGE);
+        Debug_Print("[SPAWN CREATED] %s idx=%d pending actual validation at (%.1f %.1f %.1f)",
+            g_sInfectedClassNames[zc], idx, pos[0], pos[1], pos[2]);
         return idx;
     }
 
@@ -263,7 +464,243 @@ static int DoSpawnAt(const float pos[3], int zc, bool enforceMinDistance = true)
     return 0;
 }
 
-static void SpawnAttempts_RememberActualSpawn(int client, const float requestedPos[3])
+static void SpawnAttempts_BeginPending(
+    int client, int zc, bool teleportMode, bool fallback,
+    WaveSpawnMode mode, float spawnCallMs, const float requestedPos[3],
+    int targetSurvivor, float minRange, float maxRange, int areaIdx, int band,
+    float graphScanMinRange, SpawnScoreDbg score)
+{
+    if (client <= 0 || client > MaxClients)
+        return;
+
+    PendingActualSpawn pending;
+    pending.active = true;
+    pending.createdAt = GetGameTime();
+    pending.hasStableSample = false;
+    pending.stableSince = 0.0;
+    pending.userid = GetClientUserId(client);
+    pending.zc = zc;
+    pending.targetSurvivor = targetSurvivor;
+    pending.areaIdx = areaIdx;
+    pending.band = band;
+    pending.teleportMode = teleportMode;
+    pending.fallback = fallback;
+    pending.mode = mode;
+    pending.spawnCallMs = spawnCallMs;
+    pending.minRange = minRange;
+    pending.maxRange = maxRange;
+    pending.graphScanMinRange = graphScanMinRange;
+    pending.requestedPos = requestedPos;
+    SpawnScore_CopyDbg(pending.score, score);
+    g_PendingActualSpawns[client] = pending;
+
+    int reserved;
+    if (teleportMode)
+        TeleportQueue_DropHead(reserved);
+    else
+        SpawnQueue_DropHead(reserved);
+}
+
+int SpawnAttempts_ProcessPendingActualSpawns()
+{
+    float now = GetGameTime();
+    int processed = 0;
+    for (int slot = 1; slot <= MaxClients; slot++)
+    {
+        if (!g_PendingActualSpawns[slot].active
+            || now - g_PendingActualSpawns[slot].createdAt
+                < ACTUAL_SPAWN_VALIDATION_MIN_AGE)
+        {
+            continue;
+        }
+
+        int client = GetClientOfUserId(g_PendingActualSpawns[slot].userid);
+        int zc = g_PendingActualSpawns[slot].zc;
+        float age = now - g_PendingActualSpawns[slot].createdAt;
+        bool stable = false;
+        if (IsInfectedBot(client) && IsPlayerAlive(client) && !IsGhost(client)
+            && GetInfectedClass(client) == zc)
+        {
+            float actual[3];
+            GetClientAbsOrigin(client, actual);
+            if (!g_PendingActualSpawns[slot].hasStableSample
+                || GetVectorDistance(
+                    actual, g_PendingActualSpawns[slot].stablePos) >
+                    ACTUAL_SPAWN_STABLE_RADIUS)
+            {
+                g_PendingActualSpawns[slot].hasStableSample = true;
+                g_PendingActualSpawns[slot].stableSince = now;
+                g_PendingActualSpawns[slot].stablePos = actual;
+            }
+            else if (now - g_PendingActualSpawns[slot].stableSince
+                >= ACTUAL_SPAWN_STABLE_CONFIRM_SECONDS)
+            {
+                stable = true;
+            }
+        }
+
+        if (!stable && age < ACTUAL_SPAWN_VALIDATION_MAX_AGE)
+            continue;
+
+        float validationStart = GetEngineTime();
+        bool persistentUnsafe = false;
+        // Director API points are trusted by policy. Keep only entity/state
+        // stability confirmation; directed-Nav spawns retain full safety checks.
+        bool valid = stable && (g_PendingActualSpawns[slot].fallback
+            || SpawnAttempts_ValidateActualSpawn(
+                client, zc, g_PendingActualSpawns[slot].teleportMode,
+                persistentUnsafe));
+        if (!stable)
+        {
+            Debug_Print("[SPAWN REJECT ACTUAL] class=%s idx=%d reason=unstable ageMs=%.1f",
+                g_sInfectedClassNames[zc], client, age * 1000.0);
+        }
+        float validationMs = (GetEngineTime() - validationStart) * 1000.0;
+        SpawnPerf_Log("[SpawnPerf][ActualValidation] class=%s result=%s ms=%.3f client=%d mode=%d ageMs=%.1f",
+            g_sInfectedClassNames[zc], valid ? "accepted" : "rejected",
+            validationMs, client, view_as<int>(g_PendingActualSpawns[slot].mode),
+            age * 1000.0);
+
+        if (!valid)
+        {
+            if (g_PendingActualSpawns[slot].fallback)
+            {
+                WaveSpawnReport_RecordFallback(
+                    zc, 0, g_PendingActualSpawns[slot].mode,
+                    g_PendingActualSpawns[slot].spawnCallMs,
+                    g_PendingActualSpawns[slot].requestedPos,
+                    g_PendingActualSpawns[slot].minRange,
+                    g_PendingActualSpawns[slot].maxRange,
+                    g_PendingActualSpawns[slot].targetSurvivor);
+                RecordDirectorSpawnResult(
+                    g_PendingActualSpawns[slot].requestedPos, false);
+            }
+            else
+            {
+                WaveSpawnReport_RecordScored(
+                    zc, 0, g_PendingActualSpawns[slot].mode,
+                    g_PendingActualSpawns[slot].spawnCallMs,
+                    g_PendingActualSpawns[slot].requestedPos,
+                    g_PendingActualSpawns[slot].minRange,
+                    g_PendingActualSpawns[slot].maxRange,
+                    g_PendingActualSpawns[slot].score,
+                    g_PendingActualSpawns[slot].targetSurvivor);
+                if (g_PendingActualSpawns[slot].areaIdx >= 0)
+                {
+                    float cooldown = persistentUnsafe
+                        ? NAV_UNSAFE_GEOMETRY_CD_SECS : NAV_CD_SECS;
+                    TouchNavCooldown(
+                        g_PendingActualSpawns[slot].areaIdx, now, cooldown);
+                    if (persistentUnsafe)
+                    {
+                        Debug_Print("[SPAWN ACTUAL] persistent unsafe area=%d cooldown=%.1fs",
+                            g_PendingActualSpawns[slot].areaIdx, cooldown);
+                    }
+                }
+            }
+            if (client > 0 && IsClientInGame(client))
+            {
+                g_bRejectedActualSpawn[client] = true;
+                KickClient(client, "Rejected unsafe actual spawn position");
+            }
+            if (g_PendingActualSpawns[slot].teleportMode)
+            {
+                TeleportQueue_Push(zc);
+                SpawnSearch_ResetClass(zc, true);
+                g_iTeleportSearchBand[zc - 1] = ClampInt(
+                    g_PendingActualSpawns[slot].band + 1,
+                    0, TACTICAL_BAND_STAGES + 1);
+            }
+            else
+            {
+                SpawnQueue_Push(zc);
+                SpawnSearch_ResetClass(zc, false);
+                g_iNormalSearchBand[zc - 1] = ClampInt(
+                    g_PendingActualSpawns[slot].band + 1,
+                    0, TACTICAL_BAND_STAGES + 1);
+            }
+            Debug_Print("[SPAWN ACTUAL] rejected class=%s; class returned to queue nextBand=%d",
+                g_sInfectedClassNames[zc],
+                g_PendingActualSpawns[slot].teleportMode
+                    ? g_iTeleportSearchBand[zc - 1]
+                    : g_iNormalSearchBand[zc - 1]);
+        }
+        else
+        {
+            if (g_PendingActualSpawns[slot].fallback)
+            {
+                WaveSpawnReport_RecordFallback(
+                    zc, client, g_PendingActualSpawns[slot].mode,
+                    g_PendingActualSpawns[slot].spawnCallMs,
+                    g_PendingActualSpawns[slot].requestedPos,
+                    g_PendingActualSpawns[slot].minRange,
+                    g_PendingActualSpawns[slot].maxRange,
+                    g_PendingActualSpawns[slot].targetSurvivor);
+                RecordDirectorSpawnResult(
+                    g_PendingActualSpawns[slot].requestedPos, true);
+            }
+            else
+            {
+                WaveSpawnReport_RecordScored(
+                    zc, client, g_PendingActualSpawns[slot].mode,
+                    g_PendingActualSpawns[slot].spawnCallMs,
+                    g_PendingActualSpawns[slot].requestedPos,
+                    g_PendingActualSpawns[slot].minRange,
+                    g_PendingActualSpawns[slot].maxRange,
+                    g_PendingActualSpawns[slot].score,
+                    g_PendingActualSpawns[slot].targetSurvivor);
+                LogChosenSpawnScore(zc, g_PendingActualSpawns[slot].score);
+                if (g_PendingActualSpawns[slot].areaIdx >= 0)
+                    TouchNavCooldown(
+                        g_PendingActualSpawns[slot].areaIdx, now, NAV_CD_SECS);
+            }
+
+            SpawnAttempts_RememberActualSpawn(
+                client, g_PendingActualSpawns[slot].requestedPos,
+                g_PendingActualSpawns[slot].targetSurvivor);
+            g_LastSpawnOkTime = now;
+            InvalidateBucketShareCache();
+            gST.siAlive[zc - 1]++;
+            gST.totalSI++;
+            if (g_PendingActualSpawns[slot].teleportMode)
+            {
+                gST.teleportFallbackCycles[zc - 1] = 0;
+                SpawnAttempts_ResetTeleportProgress(zc);
+            }
+            else
+            {
+                if (gST.siQueueCount > 0)
+                    gST.siQueueCount--;
+                MarkWaveClassSpawned(zc);
+                Tactical_OnClassSpawned(zc);
+                gST.normalFallbackCycles[zc - 1] = 0;
+                SpawnAttempts_ResetNormalProgress(zc);
+            }
+            TriggerAssaultBurst();
+            Debug_Print("[SPAWN OK] %s idx=%d actual validated after %.1fms",
+                g_sInfectedClassNames[zc], client,
+                (now - g_PendingActualSpawns[slot].createdAt) * 1000.0);
+            if (gCV.iDebugMode > 0)
+                CreateTimer(0.15, Timer_LogSpawnedSIState,
+                    GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+            if (g_hSpawnCommittedForward != INVALID_HANDLE)
+            {
+                Call_StartForward(g_hSpawnCommittedForward);
+                Call_PushCell(GetClientUserId(client));
+                Call_Finish();
+            }
+        }
+
+        g_PendingActualSpawns[slot].active = false;
+        g_PendingActualSpawns[slot].userid = 0;
+        processed++;
+    }
+    return processed;
+}
+
+static void SpawnAttempts_RememberActualSpawn(int client,
+                                              const float requestedPos[3],
+                                              int targetSurvivor)
 {
     float actualPos[3];
     actualPos[0] = requestedPos[0];
@@ -273,7 +710,7 @@ static void SpawnAttempts_RememberActualSpawn(int client, const float requestedP
         GetClientAbsOrigin(client, actualPos);
 
     float center[3];
-    GetSectorCenter(center, gST.targetSurvivor);
+    GetSectorCenter(center, targetSurvivor);
     RememberSpawn(actualPos, center);
 }
 
@@ -296,17 +733,174 @@ static bool SelectTacticalNormalQueueHead(int &want)
     return false;
 }
 
-static int g_iNormalSearchBand[SI_COUNT];
-static int g_iTeleportSearchBand[SI_COUNT];
-
 void SpawnAttempts_ResetSearchProgress()
 {
     for (int i = 0; i < SI_COUNT; i++)
     {
         g_iNormalSearchBand[i] = 0;
         g_iTeleportSearchBand[i] = 0;
+        g_fNormalRetryAfter[i] = 0.0;
+        g_fTeleportRetryAfter[i] = 0.0;
+        g_iNormalRetryTargetNav[i] = -1;
+        g_iTeleportRetryTargetNav[i] = -1;
     }
     SpawnSearch_Reset();
+}
+
+static void SpawnAttempts_ResetDirectedTargets(int target)
+{
+    for (int client = 1; client <= MaxClients; client++)
+        g_bDirectedTargetTried[client] = false;
+    if (target > 0 && target <= MaxClients)
+        g_bDirectedTargetTried[target] = true;
+
+    for (int idx = 0; idx < SI_COUNT; idx++)
+    {
+        g_iNormalDirectedTarget[idx] = target;
+        g_iNormalDirectedRetargets[idx] = 0;
+        for (int client = 1; client <= MaxClients; client++)
+            g_bNormalDirectedTargetTried[idx][client] = false;
+        if (target > 0 && target <= MaxClients)
+            g_bNormalDirectedTargetTried[idx][target] = true;
+    }
+}
+
+void SpawnAttempts_OnWaveTargetSelected(int target)
+{
+    SpawnAttempts_ResetDirectedTargets(target);
+    SpawnAttempts_ResetSearchProgress();
+}
+
+void SpawnAttempts_OnTargetChanged(int target)
+{
+    SpawnAttempts_ResetDirectedTargets(target);
+    SpawnAttempts_ResetSearchProgress();
+}
+
+static bool SpawnAttempts_TryAlternateDirectedTarget(int zc,
+                                                     bool teleportMode,
+                                                     bool restartRound,
+                                                     bool &pending)
+{
+    pending = false;
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return false;
+    if (!SpawnAccel_CanUseGraphCandidates())
+        return false;
+    if (!teleportMode
+        && !restartRound
+        && g_iNormalDirectedRetargets[idx] >= NORMAL_DIRECTED_RETARGET_LIMIT)
+    {
+        return false;
+    }
+
+    int currentTarget = teleportMode
+        ? gST.targetSurvivor : g_iNormalDirectedTarget[idx];
+    if (restartRound)
+    {
+        if (teleportMode)
+        {
+            for (int client = 1; client <= MaxClients; client++)
+                g_bDirectedTargetTried[client] = false;
+            if (currentTarget > 0 && currentTarget <= MaxClients)
+                g_bDirectedTargetTried[currentTarget] = true;
+        }
+        else
+        {
+            g_iNormalDirectedRetargets[idx] = 0;
+            for (int client = 1; client <= MaxClients; client++)
+                g_bNormalDirectedTargetTried[idx][client] = false;
+            if (currentTarget > 0 && currentTarget <= MaxClients)
+                g_bNormalDirectedTargetTried[idx][currentTarget] = true;
+        }
+    }
+
+    int bestTarget = -1;
+    int fallbackTarget = -1;
+    int bestCoverage = restartRound ? -1 : 0;
+    float pathLimit = SpawnAccel_GetCandidatePathLimit();
+    float minTeamDistance = FloatMax(
+        NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        bool targetTried = teleportMode
+            ? g_bDirectedTargetTried[client]
+            : g_bNormalDirectedTargetTried[idx][client];
+        if (targetTried || !IsEligibleSpawnTarget(client)
+            || (g_bTargetLimitLib && IsClientReachLimit(client)))
+        {
+            continue;
+        }
+        if (fallbackTarget <= 0)
+            fallbackTarget = client;
+
+        int targetNavId;
+        if (!SpawnAccel_GetClientNavId(client, targetNavId))
+            continue;
+
+        int prepareStatus = SpawnAccel_PrepareTargetCandidates(
+            client, NAV_CANDIDATE_RESULT_TTL);
+        if (prepareStatus == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+        {
+            pending = true;
+            continue;
+        }
+        if (prepareStatus <= 0)
+            continue;
+
+        int page[1];
+        float distances[1];
+        float resultAgeMs;
+        int totalInRange;
+        int count = AnneSpawn_NavCandidatesCollect(
+            client, targetNavId,
+            0.0, pathLimit, pathLimit, minTeamDistance,
+            NAV_CANDIDATE_RESULT_TTL, 0,
+            page, distances, sizeof(page),
+            resultAgeMs, totalInRange);
+        if (count == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+        {
+            pending = true;
+            continue;
+        }
+        if (count < 0 || totalInRange <= bestCoverage)
+            continue;
+
+        bestTarget = client;
+        bestCoverage = totalInRange;
+    }
+
+    // A full failed Nav + Director cycle means the current target is exhausted.
+    // Even when alternate coverage is still empty/not ready, rotate to another
+    // eligible survivor so its directed candidate set can be rebuilt next frame.
+    if (bestTarget <= 0 && restartRound)
+    {
+        bestTarget = fallbackTarget;
+        bestCoverage = 0;
+    }
+    if (bestTarget <= 0)
+        return false;
+
+    if (teleportMode)
+    {
+        gST.targetSurvivor = bestTarget;
+        g_bDirectedTargetTried[bestTarget] = true;
+        SpawnAttempts_ResetTeleportProgress(zc);
+    }
+    else
+    {
+        g_iNormalDirectedTarget[idx] = bestTarget;
+        g_bNormalDirectedTargetTried[idx][bestTarget] = true;
+        g_iNormalDirectedRetargets[idx]++;
+        SpawnAttempts_ResetNormalProgress(zc);
+    }
+    Debug_Print("[TARGET] directed %s retarget class=%s old=%d new=%d candidates=%d mode=%s normalRetargets=%d/%d",
+        restartRound ? "full-cycle" : "coverage",
+        g_sInfectedClassNames[zc], currentTarget, bestTarget, bestCoverage,
+        teleportMode ? "teleport" : "normal",
+        g_iNormalDirectedRetargets[idx], NORMAL_DIRECTED_RETARGET_LIMIT);
+    return true;
 }
 
 static void SpawnAttempts_ResetNormalProgress(int zc)
@@ -316,6 +910,8 @@ static void SpawnAttempts_ResetNormalProgress(int zc)
         return;
 
     g_iNormalSearchBand[idx] = 0;
+    g_fNormalRetryAfter[idx] = 0.0;
+    g_iNormalRetryTargetNav[idx] = -1;
     SpawnSearch_ResetClass(zc, false);
 }
 
@@ -326,7 +922,90 @@ static void SpawnAttempts_ResetTeleportProgress(int zc)
         return;
 
     g_iTeleportSearchBand[idx] = 0;
+    g_fTeleportRetryAfter[idx] = 0.0;
+    g_iTeleportRetryTargetNav[idx] = -1;
     SpawnSearch_ResetClass(zc, true);
+}
+
+static int SpawnAttempts_GetSearchTarget(int zc, bool teleportMode)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return 0;
+
+    int target = teleportMode
+        ? gST.targetSurvivor : g_iNormalDirectedTarget[idx];
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        target = ResolveFallbackTarget(gST.targetSurvivor);
+    return target;
+}
+
+static int SpawnAttempts_GetCurrentTargetNavId(int zc, bool teleportMode)
+{
+    int target = SpawnAttempts_GetSearchTarget(zc, teleportMode);
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return -1;
+
+    float survivorPos[3];
+    GetClientAbsOrigin(target, survivorPos);
+    Address nav = L4D2Direct_GetTerrorNavArea(survivorPos);
+    if (nav == Address_Null)
+    {
+        nav = L4D_GetNearestNavArea(
+            survivorPos, 120.0, false, false, false, TEAM_INFECTED);
+    }
+    return nav == Address_Null ? -1 : L4D_GetNavAreaID(nav);
+}
+
+static bool SpawnAttempts_RetryDeferred(int zc, bool teleportMode)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return false;
+
+    float retryAfter = teleportMode
+        ? g_fTeleportRetryAfter[idx] : g_fNormalRetryAfter[idx];
+    if (retryAfter <= 0.0)
+        return false;
+
+    int retryTargetNav = teleportMode
+        ? g_iTeleportRetryTargetNav[idx] : g_iNormalRetryTargetNav[idx];
+    int currentTargetNav = SpawnAttempts_GetCurrentTargetNavId(zc, teleportMode);
+    if (currentTargetNav > 0 && retryTargetNav > 0
+        && currentTargetNav != retryTargetNav)
+    {
+        if (teleportMode)
+            SpawnAttempts_ResetTeleportProgress(zc);
+        else
+            SpawnAttempts_ResetNormalProgress(zc);
+        return false;
+    }
+
+    return GetGameTime() < retryAfter;
+}
+
+static void SpawnAttempts_ScheduleFullRetry(int zc, bool teleportMode)
+{
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT)
+        return;
+
+    float retryAfter = GetGameTime() + gCV.fSpawnFailedCycleRetry;
+    int targetNavId = SpawnAttempts_GetCurrentTargetNavId(zc, teleportMode);
+    if (teleportMode)
+    {
+        g_iTeleportSearchBand[idx] = 0;
+        g_fTeleportRetryAfter[idx] = retryAfter;
+        g_iTeleportRetryTargetNav[idx] = targetNavId;
+        SpawnSearch_ResetClass(zc, true);
+    }
+    else
+    {
+        g_iNormalSearchBand[idx] = 0;
+        g_fNormalRetryAfter[idx] = retryAfter;
+        g_iNormalRetryTargetNav[idx] = targetNavId;
+        SpawnSearch_ResetClass(zc, false);
+    }
 }
 
 static void SpawnAttempts_RotatePendingNormalClass(int zc)
@@ -358,7 +1037,7 @@ void TryNormalSpawnOnce()
         return;
     int searchIdx = want - 1;
 
-    if (HasReachedLimit(want))
+    if (SpawnAttempts_HasReachedAliveLimitWithPending(want))
     {
         Debug_Print("[SPAWN DROP] class=%s reached alive-cap, drop head", g_sInfectedClassNames[want]);
         SpawnQueue_DropHead(want);
@@ -366,7 +1045,7 @@ void TryNormalSpawnOnce()
         SpawnAttempts_ResetNormalProgress(want);
         return;
     }
-    if (HasReachedWaveClassLimit(want))
+    if (SpawnAttempts_HasReachedWaveLimitWithPending(want))
     {
         Debug_Print("[SPAWN DROP] class=%s reached wave-cap, drop head", g_sInfectedClassNames[want]);
         SpawnQueue_DropHead(want);
@@ -382,6 +1061,17 @@ void TryNormalSpawnOnce()
         Debug_Print("[QUEUE ROTATE] %s under death-cooldown, rotate to tail", g_sInfectedClassNames[want]);
         return;
     }
+    if (SpawnAttempts_RetryDeferred(want, false))
+    {
+        SpawnAttempts_RotatePendingNormalClass(want);
+        return;
+    }
+    int searchTarget = SpawnAttempts_GetSearchTarget(want, false);
+    if (searchTarget <= 0)
+    {
+        SpawnAttempts_RotatePendingNormalClass(want);
+        return;
+    }
 
     float minRange;
     float maxRange;
@@ -389,12 +1079,15 @@ void TryNormalSpawnOnce()
     {
         int band = g_iNormalSearchBand[searchIdx];
         Tactical_GetDistanceBand(want, band, false, minRange, maxRange);
+        float graphScanMinRange = Tactical_GetDistanceBandScanMin(
+            want, band, false);
 
         float pos[3];
         int areaIdx = -1;
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
-            want, gST.targetSurvivor, minRange, maxRange, false, pos, areaIdx, bestDbg);
+            want, searchTarget, minRange, maxRange,
+            graphScanMinRange, false, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingNormalClass(want);
@@ -414,12 +1107,12 @@ void TryNormalSpawnOnce()
         float spawnCallStart = GetEngineTime();
         int spawnedClient = DoSpawnAt(pos, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
-        WaveSpawnReport_RecordScored(
-            want, spawnedClient, WaveSpawn_NormalNav, spawnCallMs,
-            pos, minRange, maxRange, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
+            WaveSpawnReport_RecordScored(
+                want, 0, WaveSpawn_NormalNav, spawnCallMs,
+                pos, minRange, maxRange, bestDbg, searchTarget);
             // 实际生成失败时短冷却该 NavArea，下一档不会立即重复命中同一区域。
             if (areaIdx >= 0)
             {
@@ -430,64 +1123,75 @@ void TryNormalSpawnOnce()
             SpawnAttempts_RotatePendingNormalClass(want);
             return;
         }
-
-        LogChosenSpawnScore(want, bestDbg);
-        if (areaIdx >= 0)
-        {
-            float now = GetGameTime();
-            TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
-        }
-
-        SpawnAttempts_RememberActualSpawn(spawnedClient, pos);
-
-        gST.siQueueCount--;
-        gST.siAlive[want - 1]++;
-        gST.totalSI++;
-        MarkWaveClassSpawned(want);
-        Tactical_OnClassSpawned(want);
-        gST.normalFallbackCycles[want - 1] = 0;
-        SpawnQueue_DropHead(want);
-        SpawnAttempts_ResetNormalProgress(want);
-
-        TriggerAssaultBurst();
-        Debug_Print("[SPAWN] success class=%s band=%d navRange=%.0f..%.0f",
-                    g_sInfectedClassNames[want], band + 1, minRange, maxRange);
+        SpawnAttempts_BeginPending(
+            spawnedClient, want, false, false,
+            WaveSpawn_NormalNav, spawnCallMs, pos,
+            searchTarget, minRange, maxRange, areaIdx, band,
+            graphScanMinRange, bestDbg);
         return;
     }
 
     minRange = gCV.fSpawnMin;
     maxRange = gCV.fSpawnMax;
+    bool targetPending;
+    if (SpawnAttempts_TryAlternateDirectedTarget(want, false, false, targetPending)
+        || targetPending)
+    {
+        SpawnAttempts_RotatePendingNormalClass(want);
+        return;
+    }
     float pt[3];
-    bool usedUnrestricted = (g_iNormalSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
+    bool usedExtendedSamples =
+        (g_iNormalSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
-    if (usedUnrestricted)
-        fallbackFound = FallbackDirectorPosUnrestricted(want, gST.targetSurvivor, pt);
+    if (usedExtendedSamples)
+    {
+        // The second fallback widens only the far edge. It never lowers the
+        // configured minimum, avoiding the old near/full-range explosion.
+        maxRange = FloatMin(
+            gCV.fSpawnMax * EXTENDED_DIRECTOR_MAX_SCALE,
+            gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE);
+        fallbackFound = FallbackDirectorPos(
+            want, searchTarget, EXTENDED_DIRECTOR_TRIES, pt);
+    }
     else
-        fallbackFound = FallbackDirectorPosInRange(
-            want, gST.targetSurvivor, false, minRange, maxRange, pt);
+        fallbackFound = FallbackDirectorPos(
+            want, searchTarget, DIRECTOR_BASE_API_TRIES, pt);
     int fallbackClient = 0;
     if (fallbackFound)
     {
         float spawnCallStart = GetEngineTime();
-        fallbackClient = DoSpawnAt(pt, want, !usedUnrestricted);
+        fallbackClient = DoSpawnAt(pt, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
-        WaveSpawnMode reportMode = usedUnrestricted
-            ? WaveSpawn_NormalDirectorUnrestricted
-            : WaveSpawn_NormalDirectorRange;
-        WaveSpawnReport_RecordFallback(
-            want, fallbackClient, reportMode, spawnCallMs, pt,
-            usedUnrestricted ? -1.0 : minRange,
-            usedUnrestricted ? -1.0 : maxRange);
+        WaveSpawnMode reportMode = WaveSpawn_NormalDirectorRange;
+        if (fallbackClient > 0)
+        {
+            SpawnScoreDbg fallbackScore;
+            SpawnAttempts_BeginPending(
+                fallbackClient, want, false, true,
+                reportMode, spawnCallMs, pt,
+                searchTarget, minRange, maxRange,
+                -1, g_iNormalSearchBand[searchIdx], 0.0, fallbackScore);
+        }
+        else
+        {
+            WaveSpawnReport_RecordFallback(
+                want, 0, reportMode, spawnCallMs, pt,
+                minRange, maxRange, searchTarget);
+        }
     }
     bool fallbackSpawned = (fallbackClient > 0);
-    if (fallbackFound)
+    if (fallbackFound && !fallbackSpawned)
         RecordDirectorSpawnResult(pt, fallbackSpawned);
 
-    if (!fallbackSpawned && !usedUnrestricted)
+    if (fallbackSpawned)
+        return;
+
+    if (!fallbackSpawned && !usedExtendedSamples)
     {
         int cycleIdx = want - 1;
         gST.normalFallbackCycles[cycleIdx]++;
-        if (gST.normalFallbackCycles[cycleIdx] >= UNRESTRICTED_FALLBACK_CYCLES)
+        if (gST.normalFallbackCycles[cycleIdx] >= EXTENDED_FALLBACK_CYCLES)
         {
             gST.normalFallbackCycles[cycleIdx] = 0;
             g_iNormalSearchBand[searchIdx] = TACTICAL_BAND_STAGES + 1;
@@ -496,29 +1200,23 @@ void TryNormalSpawnOnce()
         }
     }
 
-    if (fallbackSpawned)
+    if (usedExtendedSamples)
     {
-        SpawnAttempts_RememberActualSpawn(fallbackClient, pt);
-
-        gST.siQueueCount--;
-        gST.siAlive[want - 1]++;
-        gST.totalSI++;
-        MarkWaveClassSpawned(want);
-        Tactical_OnClassSpawned(want);
-        gST.normalFallbackCycles[want - 1] = 0;
-        SpawnQueue_DropHead(want);
-        SpawnAttempts_ResetNormalProgress(want);
-        TriggerAssaultBurst();
-        Debug_Print("[SPAWN] %s director fallback success class=%s",
-                    usedUnrestricted ? "unrestricted" : "in-range", g_sInfectedClassNames[want]);
+        bool retryTargetPending;
+        if (SpawnAttempts_TryAlternateDirectedTarget(
+                want, false, true, retryTargetPending)
+            || retryTargetPending)
+        {
+            SpawnAttempts_RotatePendingNormalClass(want);
+            return;
+        }
+        SpawnAttempts_ScheduleFullRetry(want, false);
     }
-    else
-    {
-        SpawnAttempts_RotatePendingNormalClass(want);
-        Debug_Print("[SPAWN FAIL] full range cycle=%d class=%s, rotate",
-                    gST.normalFallbackCycles[want - 1], g_sInfectedClassNames[want]);
-        SpawnAttempts_ResetNormalProgress(want);
-    }
+    SpawnAttempts_RotatePendingNormalClass(want);
+    Debug_Print("[SPAWN FAIL] full range cycle=%d class=%s, rotate",
+                gST.normalFallbackCycles[want - 1], g_sInfectedClassNames[want]);
+    // Base fallback retries keep their stage so the extended Director pass can
+    // be reached. Only a fully exhausted extended cycle restarts directed bands.
 }
 
 void TryTeleportSpawnOnce()
@@ -527,15 +1225,15 @@ void TryTeleportSpawnOnce()
     if (!TeleportQueue_Peek(want))
         return;
     int searchIdx = want - 1;
-    if (gST.totalSI >= gCV.iSiLimit)
+    if (gST.totalSI + SpawnAttempts_CountPendingActualSpawns() >= gCV.iSiLimit)
         return;
-    if (HasReachedLimit(want))
+    if (SpawnAttempts_HasReachedAliveLimitWithPending(want))
     {
         RecalcSiCapFromAlive(false);
         if (gST.totalSI >= gCV.iSiLimit)
             return;
 
-        if (HasReachedLimit(want))
+        if (SpawnAttempts_HasReachedAliveLimitWithPending(want))
         {
             TeleportQueue_DropHead(want);
             TeleportQueue_Push(want);
@@ -545,6 +1243,17 @@ void TryTeleportSpawnOnce()
             return;
         }
     }
+    if (SpawnAttempts_RetryDeferred(want, true))
+    {
+        SpawnAttempts_RotatePendingTeleportClass(want);
+        return;
+    }
+    int teleportTarget = SpawnAttempts_GetSearchTarget(want, true);
+    if (teleportTarget <= 0)
+    {
+        SpawnAttempts_RotatePendingTeleportClass(want);
+        return;
+    }
 
     float minRange;
     float maxRange;
@@ -552,12 +1261,15 @@ void TryTeleportSpawnOnce()
     {
         int band = g_iTeleportSearchBand[searchIdx];
         Tactical_GetDistanceBand(want, band, true, minRange, maxRange);
+        float graphScanMinRange = Tactical_GetDistanceBandScanMin(
+            want, band, true);
 
         float pos[3];
         int areaIdx = -1;
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
-            want, gST.targetSurvivor, minRange, maxRange, true, pos, areaIdx, bestDbg);
+            want, teleportTarget, minRange, maxRange,
+            graphScanMinRange, true, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingTeleportClass(want);
@@ -576,12 +1288,12 @@ void TryTeleportSpawnOnce()
         float spawnCallStart = GetEngineTime();
         int spawnedClient = DoSpawnAt(pos, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
-        WaveSpawnReport_RecordScored(
-            want, spawnedClient, WaveSpawn_TeleportNav, spawnCallMs,
-            pos, minRange, maxRange, bestDbg);
         bool spawnOk = (spawnedClient > 0);
         if (!spawnOk)
         {
+            WaveSpawnReport_RecordScored(
+                want, 0, WaveSpawn_TeleportNav, spawnCallMs,
+                pos, minRange, maxRange, bestDbg, teleportTarget);
             if (areaIdx >= 0)
             {
                 float now = GetGameTime();
@@ -591,63 +1303,68 @@ void TryTeleportSpawnOnce()
             SpawnAttempts_RotatePendingTeleportClass(want);
             return;
         }
-
-        LogChosenSpawnScore(want, bestDbg);
-        if (areaIdx >= 0)
-        {
-            float now = GetGameTime();
-            TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
-        }
-
-        // 传送成功不消耗普通 siQueueCount，只移除 teleport queue。
-        // 仍要更新 siAlive/totalSI，因为 DoSpawnAt 实际生成了一只新的 bot。
-        SpawnAttempts_RememberActualSpawn(spawnedClient, pos);
-
-        gST.siAlive[want - 1]++;
-        gST.totalSI++;
-        gST.teleportFallbackCycles[want - 1] = 0;
-        TeleportQueue_DropHead(want);
-        SpawnAttempts_ResetTeleportProgress(want);
-        TriggerAssaultBurst();
-
-        Debug_Print("[TP] success class=%s band=%d navRange=%.0f..%.0f",
-                    g_sInfectedClassNames[want], band + 1, minRange, maxRange);
+        SpawnAttempts_BeginPending(
+            spawnedClient, want, true, false,
+            WaveSpawn_TeleportNav, spawnCallMs, pos,
+            teleportTarget, minRange, maxRange, areaIdx, band,
+            graphScanMinRange, bestDbg);
         return;
     }
 
     minRange = FloatMax(gCV.fSpawnMin, gCV.fTeleportSpawnMin);
     maxRange = gCV.fSpawnMax;
+    bool targetPending;
+    if (SpawnAttempts_TryAlternateDirectedTarget(want, true, false, targetPending)
+        || targetPending)
+    {
+        SpawnAttempts_RotatePendingTeleportClass(want);
+        return;
+    }
     float pt[3];
-    bool usedUnrestricted = (g_iTeleportSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
+    bool usedExtendedSamples =
+        (g_iTeleportSearchBand[searchIdx] > TACTICAL_BAND_STAGES);
     bool fallbackFound;
-    if (usedUnrestricted)
-        fallbackFound = FallbackDirectorPosUnrestricted(want, gST.targetSurvivor, pt);
+    if (usedExtendedSamples)
+        fallbackFound = FallbackDirectorPos(
+            want, teleportTarget, EXTENDED_DIRECTOR_TRIES, pt);
     else
-        fallbackFound = FallbackDirectorPosInRange(
-            want, gST.targetSurvivor, true, minRange, maxRange, pt);
+        fallbackFound = FallbackDirectorPos(
+            want, teleportTarget, DIRECTOR_BASE_API_TRIES, pt);
     int fallbackClient = 0;
     if (fallbackFound)
     {
         float spawnCallStart = GetEngineTime();
-        fallbackClient = DoSpawnAt(pt, want, !usedUnrestricted);
+        fallbackClient = DoSpawnAt(pt, want, false);
         float spawnCallMs = (GetEngineTime() - spawnCallStart) * 1000.0;
-        WaveSpawnMode reportMode = usedUnrestricted
-            ? WaveSpawn_TeleportDirectorUnrestricted
-            : WaveSpawn_TeleportDirectorRange;
-        WaveSpawnReport_RecordFallback(
-            want, fallbackClient, reportMode, spawnCallMs, pt,
-            usedUnrestricted ? -1.0 : minRange,
-            usedUnrestricted ? -1.0 : maxRange);
+        WaveSpawnMode reportMode = WaveSpawn_TeleportDirectorRange;
+        if (fallbackClient > 0)
+        {
+            SpawnScoreDbg fallbackScore;
+            SpawnAttempts_BeginPending(
+                fallbackClient, want, true, true,
+                reportMode, spawnCallMs, pt,
+                teleportTarget, minRange, maxRange,
+                -1, g_iTeleportSearchBand[searchIdx], 0.0, fallbackScore);
+        }
+        else
+        {
+            WaveSpawnReport_RecordFallback(
+                want, 0, reportMode, spawnCallMs, pt,
+                minRange, maxRange, teleportTarget);
+        }
     }
     bool fallbackSpawned = (fallbackClient > 0);
-    if (fallbackFound)
+    if (fallbackFound && !fallbackSpawned)
         RecordDirectorSpawnResult(pt, fallbackSpawned);
 
-    if (!fallbackSpawned && !usedUnrestricted)
+    if (fallbackSpawned)
+        return;
+
+    if (!fallbackSpawned && !usedExtendedSamples)
     {
         int cycleIdx = want - 1;
         gST.teleportFallbackCycles[cycleIdx]++;
-        if (gST.teleportFallbackCycles[cycleIdx] >= UNRESTRICTED_FALLBACK_CYCLES)
+        if (gST.teleportFallbackCycles[cycleIdx] >= EXTENDED_FALLBACK_CYCLES)
         {
             gST.teleportFallbackCycles[cycleIdx] = 0;
             g_iTeleportSearchBand[searchIdx] = TACTICAL_BAND_STAGES + 1;
@@ -656,24 +1373,11 @@ void TryTeleportSpawnOnce()
         }
     }
 
-    if (fallbackSpawned)
-    {
-        SpawnAttempts_RememberActualSpawn(fallbackClient, pt);
-
-        gST.siAlive[want - 1]++;
-        gST.totalSI++;
-        gST.teleportFallbackCycles[want - 1] = 0;
-        TeleportQueue_DropHead(want);
-        SpawnAttempts_ResetTeleportProgress(want);
-        TriggerAssaultBurst();
-        Debug_Print("[TP] %s director fallback success class=%s",
-                    usedUnrestricted ? "unrestricted" : "in-range", g_sInfectedClassNames[want]);
-    }
-    else
-    {
-        SpawnAttempts_RotatePendingTeleportClass(want);
-        Debug_Print("[TP FAIL] full range cycle=%d class=%s, rotate",
-                    gST.teleportFallbackCycles[want - 1], g_sInfectedClassNames[want]);
-        SpawnAttempts_ResetTeleportProgress(want);
-    }
+    SpawnAttempts_RotatePendingTeleportClass(want);
+    if (usedExtendedSamples)
+        SpawnAttempts_ScheduleFullRetry(want, true);
+    Debug_Print("[TP FAIL] full range cycle=%d class=%s, rotate",
+                gST.teleportFallbackCycles[want - 1], g_sInfectedClassNames[want]);
+    // Preserve the progressed teleport distance band for the same reason as
+    // the normal queue: a failed fallback must not restart the near search.
 }

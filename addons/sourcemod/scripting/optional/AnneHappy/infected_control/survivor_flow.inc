@@ -264,23 +264,25 @@ static bool TryGetFlowDistanceFromArea(Address area, float &outFlow)
     return true;
 }
 
-// 为 client 获取安全 flow 距离。
-// 1) 直接读玩家 flow；异常 → 2) 用 L4D_GetLastKnownArea(client) 取 Nav flow；仍异常 → 3) 最近 NavArea。
+// 为 client 获取安全 flow 距离。当前位置所属 Nav 优先；最近 Nav 只在坐标不落于
+// 任何 Area 时回退，避免多层地图把生还者映射到另一层的几何近邻。
 static bool TryGetClientFlowDistanceSafe(int client, float &outFlow)
 {
     float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
 
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    Address current = L4D2Direct_GetTerrorNavArea(pos);
+    if (TryGetFlowDistanceFromArea(current, outFlow)) return true;
+
+    Address near = L4D_GetNearestNavArea(pos, 300.0, false, false, false, TEAM_SURVIVOR);
+    if (TryGetFlowDistanceFromArea(near, outFlow)) return true;
+
     float d = L4D2Direct_GetFlowDistance(client);
     if (!IsFlowAbnormal(d, maxFlow)) { outFlow = d; return true; }
 
-    // 显式兜底：使用 L4D_GetLastKnownArea。
     Address last = view_as<Address>(L4D_GetLastKnownArea(client));
     if (TryGetFlowDistanceFromArea(last, outFlow)) return true;
-
-    float pos[3];
-    GetClientAbsOrigin(client, pos);
-    Address near = L4D_GetNearestNavArea(pos, 300.0, false, false, false, TEAM_SURVIVOR);
-    if (TryGetFlowDistanceFromArea(near, outFlow)) return true;
 
     return false;
 }

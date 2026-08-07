@@ -32,6 +32,9 @@ $RECYCLE.BIN/
 addons/sourcemod/scripting/compiled/
 addons/sourcemod/scripting/**/*.smx
 
+# Codex local build scratch output.
+/.codex-build/
+
 # Local per-player weapon-attribute experiment
 private/re/
 addons/sourcemod/scripting/optional/AnneHappy/l4d2_player_weapon_attrs.sp

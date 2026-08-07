@@ -14,15 +14,39 @@ enum class AnneNavEdgeType : std::uint32_t
     Elevator = 2,
 };
 
+enum AnneNavTopologyIssue : std::uint32_t
+{
+    AnneNavTopologyIssue_None = 0,
+    AnneNavTopologyIssue_UnknownArea = 1u << 0,
+    AnneNavTopologyIssue_InvalidFloorStorage = 1u << 1,
+    AnneNavTopologyIssue_InvalidLadderStorage = 1u << 2,
+    AnneNavTopologyIssue_DynamicElevator = 1u << 3,
+    AnneNavTopologyIssue_UnresolvedDynamicElevator = 1u << 4,
+};
+
+constexpr std::uint32_t AnneNavTopologyIssue_FatalMask =
+    AnneNavTopologyIssue_UnknownArea |
+    AnneNavTopologyIssue_InvalidFloorStorage |
+    AnneNavTopologyIssue_InvalidLadderStorage;
+
+inline bool AnneNavTopologyHasFatalIssue(std::uint32_t issues)
+{
+    return (issues & AnneNavTopologyIssue_FatalMask) != 0;
+}
+
 struct AnneNavGraphMetadata
 {
     std::string mapName;
+    std::string baseCachePath;
     std::string cachePath;
     std::uint64_t fingerprint = 0;
+    std::uint64_t dynamicStateFingerprint = 0;
+    std::uint32_t topologyIssues = AnneNavTopologyIssue_None;
     std::vector<std::uint32_t> navIds;
     std::vector<float> centers;
     std::vector<float> flowDistances;
     float maxFlowDistance = 0.0f;
+    std::uintptr_t navAreasListPointer = 0;
     std::vector<std::uintptr_t> areaPointers;
 };
 
@@ -42,6 +66,7 @@ public:
     std::uint64_t fingerprint = 0;
     bool complete = false;
     bool hasElevatorEdges = false;
+    std::uint32_t topologyIssues = AnneNavTopologyIssue_None;
     std::vector<std::uint32_t> navIds;
     std::vector<float> centers;
     std::vector<float> flowDistances;
@@ -65,6 +90,16 @@ public:
     static std::uint32_t EdgeTarget(std::uint32_t edge);
     static AnneNavEdgeType EdgeType(std::uint32_t edge);
 };
+
+std::uint64_t AnneComputeNavTopologyFingerprint(
+    std::uint64_t baseFingerprint,
+    std::vector<AnneNavGraphInputEdge> inputEdges,
+    std::uint32_t topologyIssues,
+    std::uint64_t dynamicStateFingerprint = 0);
+
+std::string AnneNavGraphVariantCachePath(
+    const std::string &basePath,
+    std::uint64_t fingerprint);
 
 bool AnneBuildNavCandidateSnapshot(
     const AnneNavGraph &graph,

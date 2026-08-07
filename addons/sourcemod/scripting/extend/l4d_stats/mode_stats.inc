@@ -78,24 +78,36 @@ stock ModeStats_RecordPlaytime(Client, Minutes)
 	SendSQLUpdate(query);
 }
 
+stock ModeStats_RecordScoreSteamID(const String:SteamID[], Score)
+{
+	if (Score == 0 || db == INVALID_HANDLE || !g_bModeStatsTableReady || StatsDisabled() || Stats_IsInvalidRankAuthString(SteamID))
+		return;
+
+	decl String:EscSteamID[MAX_LINE_WIDTH * 2 + 1];
+	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
+
+	decl String:query[512];
+	Format(query, sizeof(query),
+		"INSERT INTO `%splayer_mode_stats` (steamid, mode_id, anne_mode, points, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = points + %i, updated = UNIX_TIMESTAMP()",
+		DbPrefix,
+		EscSteamID,
+		Stats_GetCurrentStatsGamemodeID(),
+		ModeStats_GetAnneMode(),
+		Score,
+		Score);
+	SendSQLUpdate(query);
+}
+
 stock ModeStats_RecordScore(Client, Score)
 {
 	if (Score == 0 || !ModeStats_ShouldTrackClient(Client))
 		return;
 
 	decl String:ClientID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Client, ClientID, sizeof(ClientID));
+	if (!GetClientRankAuthString(Client, ClientID, sizeof(ClientID)))
+		return;
 
-	decl String:query[512];
-	Format(query, sizeof(query),
-		"INSERT INTO `%splayer_mode_stats` (steamid, mode_id, anne_mode, points, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = points + %i, updated = UNIX_TIMESTAMP()",
-		DbPrefix,
-		ClientID,
-		Stats_GetCurrentStatsGamemodeID(),
-		ModeStats_GetAnneMode(),
-		Score,
-		Score);
-	SendSQLUpdate(query);
+	ModeStats_RecordScoreSteamID(ClientID, Score);
 }
 
 stock ModeStats_RecordKills(Client, Kills, Headshots = 0)

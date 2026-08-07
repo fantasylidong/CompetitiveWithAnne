@@ -1,4 +1,5 @@
 #include "extension.h"
+#include "nav_blocked.h"
 #include "nav_graph.h"
 #include "worker_pool.h"
 
@@ -38,17 +39,106 @@ constexpr int kNavGraphReady = 3;
 constexpr int kNavGraphFailed = 4;
 constexpr int kNavGraphNeedBuild = 5;
 constexpr int kNavGraphReadyPending = 6;
+constexpr int kNavGraphDynamicWait = 7;
 constexpr std::size_t kGraphWorkerCount = 2;
 constexpr std::size_t kGraphWorkerQueueLimit = 32;
 constexpr int kNavSnapshotBatchAreas = 512;
+constexpr std::size_t kTopologyPollBatchAreas = 1024;
 constexpr int kMaxFloorConnections = 4096;
 constexpr int kMaxLadderConnections = 256;
 constexpr float kBlockerSnapshotSeconds = 1.0f;
+constexpr std::size_t kBlockedSnapshotSanityMinAreas = 128;
 constexpr float kCandidateSpatialQuantum = 32.0f;
 constexpr std::size_t kCandidateCacheLimit = 8;
 constexpr std::size_t kCandidatePerfSampleCap = 256;
 constexpr int kCandidatePending = -1;
 constexpr int kCandidateUnavailable = -2;
+constexpr int kNavDiagComplete = 1 << 0;
+constexpr int kNavDiagCacheHit = 1 << 1;
+constexpr int kNavDiagUnknownArea = 1 << 2;
+constexpr int kNavDiagInvalidFloorStorage = 1 << 3;
+constexpr int kNavDiagInvalidLadderStorage = 1 << 4;
+constexpr int kNavDiagDynamicElevator = 1 << 5;
+constexpr int kNavDiagUnresolvedDynamicElevator = 1 << 6;
+constexpr std::size_t kUnknownAreaSampleCap = 8;
+constexpr std::uint32_t kNavMeshElevator = 0x40000000u;
+constexpr double kDynamicNavWarmPollSeconds = 0.1;
+constexpr double kDynamicNavIdlePollSeconds = 1.0;
+constexpr double kDynamicNavStableSeconds = 0.2;
+
+enum class NavUnknownConnectionKind : std::uint8_t
+{
+    Floor,
+    LadderTopForward,
+    LadderTopLeft,
+    LadderTopRight,
+    LadderBottom,
+};
+
+struct NavUnknownAreaSample
+{
+    std::uint32_t sourceIndex = 0;
+    std::uint32_t sourceNavId = 0;
+    std::uintptr_t targetPointer = 0;
+    NavUnknownConnectionKind kind = NavUnknownConnectionKind::Floor;
+    int direction = -1;
+    int slot = -1;
+};
+
+struct DynamicElevatorWatch
+{
+    std::uintptr_t pointer = 0;
+    int entityReference = -1;
+    int originOffset = -1;
+    int velocityOffset = -1;
+    int toggleStateOffset = -1;
+    std::vector<std::uint32_t> areaIndices;
+};
+
+struct DynamicNavStateSample
+{
+    std::uint64_t fingerprint = 0;
+    std::uint64_t floorConnections = 0;
+    std::uint64_t ladderConnections = 0;
+    std::uint64_t entityFingerprint = 0;
+    std::uint32_t areaCount = 0;
+    std::vector<std::uint64_t> areaFingerprints;
+    bool moving = false;
+    bool entitiesResolved = true;
+    bool areaListValid = true;
+    bool topologyReadable = true;
+};
+
+struct DynamicNavMonitor
+{
+    bool watching = false;
+    bool hasDynamicAreas = false;
+    bool dirty = false;
+    bool moving = false;
+    bool entitiesResolved = true;
+    bool areaListValid = true;
+    bool topologyReadable = true;
+    double nextPollAt = 0.0;
+    double lastChangeAt = 0.0;
+    std::uint64_t rawFingerprint = 0;
+    std::uint64_t capturedFingerprint = 0;
+    std::uint64_t epoch = 0;
+    std::uint64_t changes = 0;
+    std::uint64_t rebuilds = 0;
+    std::uint64_t cacheLoads = 0;
+    std::uint64_t pollSamples = 0;
+    std::uint64_t floorConnections = 0;
+    std::uint64_t ladderConnections = 0;
+    std::uint64_t entityFingerprint = 0;
+    std::uint32_t areaCount = 0;
+    std::size_t topologyPollCursor = 0;
+    float pollLastMs = 0.0f;
+    float pollMaxMs = 0.0f;
+    std::vector<std::uint32_t> dynamicAreaIndices;
+    std::vector<std::uint64_t> areaFingerprints;
+    std::vector<DynamicElevatorWatch> elevators;
+    std::unordered_map<std::uintptr_t, std::uint32_t> pointerToIndex;
+};
 
 struct NavGraphCapture
 {
@@ -57,6 +147,14 @@ struct NavGraphCapture
     std::vector<AnneNavGraphInputEdge> edges;
     std::size_t cursor = 0;
     bool complete = true;
+    bool forceRebuild = false;
+    std::uint32_t topologyIssues = AnneNavTopologyIssue_None;
+    std::uint64_t unknownAreaCount = 0;
+    std::vector<NavUnknownAreaSample> unknownAreaSamples;
+    std::vector<std::uint8_t> dynamicAreaMask;
+    std::vector<std::uint32_t> dynamicAreaIndices;
+    std::vector<DynamicElevatorWatch> elevators;
+    DynamicNavStateSample dynamicStateAtStart;
 };
 
 struct ReachabilityResult
@@ -194,7 +292,7 @@ int g_BlockTypeOffset = -1;
 int g_NavAreaIdOffset = -1;
 int g_NavAreaCenterOffset = -1;
 int g_NavAreaFlowOffset = -1;
-int g_NavAreaBlockedOffset = -1;
+int g_NavAreaBlockedBitsOffset = -1;
 int g_NavAreaAttributesOffset = -1;
 int g_NavAreaConnectionsOffset = -1;
 int g_NavAreaLaddersOffset = -1;
@@ -228,6 +326,14 @@ float g_BlockedSnapshotTime = -1000.0f;
 std::uint64_t g_BlockedSnapshotGeneration = 0;
 int g_BlockedStateVersion = 0;
 bool g_BlockedSnapshotIgnoreNavBlockers = false;
+bool g_BlockedSnapshotValid = false;
+int g_BlockedSnapshotTeam = -1;
+std::size_t g_BlockedSnapshotBlockedCount = 0;
+bool g_NavGraphForceRebuild = false;
+bool g_NavGraphCacheHit = false;
+std::uint64_t g_NavUnknownAreaCount = 0;
+std::vector<NavUnknownAreaSample> g_NavUnknownAreaSamples;
+DynamicNavMonitor g_DynamicNav;
 
 template <typename T>
 T ReadField(const void *base, int offset)
@@ -419,11 +525,13 @@ std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
 
     auto metadata = std::make_shared<AnneNavGraphMetadata>();
     metadata->mapName = mapName;
+    metadata->baseCachePath = cachePath;
     metadata->cachePath = cachePath;
     metadata->navIds.reserve(areaCount);
     metadata->centers.reserve(static_cast<std::size_t>(areaCount) * 3);
     metadata->flowDistances.reserve(areaCount);
     metadata->maxFlowDistance = maxFlowDistance;
+    metadata->navAreasListPointer = reinterpret_cast<std::uintptr_t>(areaList);
     metadata->areaPointers.reserve(areaCount);
 
     std::uint64_t fingerprint = 1469598103934665603ull;
@@ -462,8 +570,389 @@ std::shared_ptr<AnneNavGraphMetadata> CaptureNavMetadata(
     return metadata;
 }
 
+void ResolveDynamicElevatorEntity(DynamicElevatorWatch &watch)
+{
+    if (!watch.pointer || !gamehelpers || !gpGlobals)
+        return;
+
+    CBaseEntity *resolved = nullptr;
+    for (int index = gpGlobals->maxClients + 1; index < gpGlobals->maxEntities; ++index)
+    {
+        CBaseEntity *entity = gamehelpers->ReferenceToEntity(index);
+        if (reinterpret_cast<std::uintptr_t>(entity) != watch.pointer)
+            continue;
+        const char *classname = gamehelpers->GetEntityClassname(entity);
+        if (!classname || std::strcmp(classname, "func_elevator") != 0)
+            return;
+        resolved = entity;
+        break;
+    }
+    if (!resolved)
+        return;
+
+    watch.entityReference = gamehelpers->EntityToBCompatRef(resolved);
+    datamap_t *map = gamehelpers->GetDataMap(resolved);
+    if (!map)
+        return;
+
+    auto resolveOffset = [map](const char *name) {
+        sm_datatable_info_t info{};
+        return gamehelpers->FindDataMapInfo(map, name, &info)
+            ? info.actual_offset : -1;
+    };
+    watch.originOffset = resolveOffset("m_vecAbsOrigin");
+    watch.velocityOffset = resolveOffset("m_vecAbsVelocity");
+    watch.toggleStateOffset = resolveOffset("m_toggle_state");
+}
+
+void DiscoverDynamicNavState(NavGraphCapture &capture)
+{
+    std::size_t areaCount = capture.metadata->areaPointers.size();
+    capture.dynamicAreaMask.assign(areaCount, 0);
+    std::unordered_map<std::uintptr_t, std::size_t> elevatorToWatch;
+
+    for (std::uint32_t index = 0; index < areaCount; ++index)
+    {
+        void *area = reinterpret_cast<void *>(capture.metadata->areaPointers[index]);
+        std::uint32_t attributes = ReadField<std::uint32_t>(
+            area, g_NavAreaAttributesOffset);
+        void *elevator = ReadField<void *>(area, g_NavAreaElevatorOffset);
+        if ((attributes & kNavMeshElevator) == 0 && !elevator)
+            continue;
+
+        capture.dynamicAreaMask[index] = 1;
+        capture.dynamicAreaIndices.push_back(index);
+        capture.topologyIssues |= AnneNavTopologyIssue_DynamicElevator;
+        if (!elevator)
+        {
+            // NAV_MESH_ELEVATOR may be present while the engine does not expose
+            // an elevator object for this stable state. The live directed
+            // connections remain authoritative and are still watched.
+            capture.topologyIssues |= AnneNavTopologyIssue_UnresolvedDynamicElevator;
+            continue;
+        }
+
+        std::uintptr_t pointer = reinterpret_cast<std::uintptr_t>(elevator);
+        auto inserted = elevatorToWatch.emplace(pointer, capture.elevators.size());
+        if (inserted.second)
+        {
+            DynamicElevatorWatch watch;
+            watch.pointer = pointer;
+            capture.elevators.push_back(std::move(watch));
+        }
+        capture.elevators[inserted.first->second].areaIndices.push_back(index);
+    }
+
+    std::sort(capture.elevators.begin(), capture.elevators.end(),
+              [&capture](const DynamicElevatorWatch &left,
+                         const DynamicElevatorWatch &right) {
+        std::uint32_t leftId = capture.metadata->navIds[left.areaIndices.front()];
+        std::uint32_t rightId = capture.metadata->navIds[right.areaIndices.front()];
+        return leftId < rightId;
+    });
+    for (DynamicElevatorWatch &watch : capture.elevators)
+    {
+        std::sort(watch.areaIndices.begin(), watch.areaIndices.end(),
+                  [&capture](std::uint32_t left, std::uint32_t right) {
+            return capture.metadata->navIds[left] < capture.metadata->navIds[right];
+        });
+        ResolveDynamicElevatorEntity(watch);
+    }
+}
+
+std::uint32_t DynamicElevatorGroupKey(
+    const AnneNavGraphMetadata &metadata,
+    const std::vector<DynamicElevatorWatch> &watches,
+    std::uintptr_t pointer)
+{
+    for (const DynamicElevatorWatch &watch : watches)
+    {
+        if (watch.pointer == pointer && !watch.areaIndices.empty())
+            return metadata.navIds[watch.areaIndices.front()];
+    }
+    return std::numeric_limits<std::uint32_t>::max();
+}
+
+void HashLiveNavTarget(
+    std::uint64_t &hash, void *target,
+    const AnneNavGraphMetadata &metadata,
+    const std::unordered_map<std::uintptr_t, std::uint32_t> &pointerToIndex)
+{
+    std::uintptr_t targetPointer = reinterpret_cast<std::uintptr_t>(target);
+    std::uint32_t targetId = 0;
+    if (target)
+    {
+        auto found = pointerToIndex.find(targetPointer);
+        if (found != pointerToIndex.end())
+        {
+            targetId = metadata.navIds[found->second];
+        }
+        else
+        {
+            // Keep different unknown pointers distinguishable until the full
+            // capture records the fatal unknown-area diagnostic.
+            targetId = std::numeric_limits<std::uint32_t>::max();
+            HashBytes(hash, &targetPointer, sizeof(targetPointer));
+        }
+    }
+    HashBytes(hash, &targetId, sizeof(targetId));
+}
+
+void HashLiveFloorConnections(
+    DynamicNavStateSample &sample, std::uint64_t &hash, void *area,
+    const AnneNavGraphMetadata &metadata,
+    const std::unordered_map<std::uintptr_t, std::uint32_t> &pointerToIndex)
+{
+    constexpr std::uint32_t floorKind = 0;
+    for (int direction = 0; direction < 4; ++direction)
+    {
+        void *storage = ReadField<void *>(
+            area, g_NavAreaConnectionsOffset + direction * 4);
+        int count = storage ? ReadField<int>(storage, 0) : 0;
+        HashBytes(hash, &floorKind, sizeof(floorKind));
+        HashBytes(hash, &direction, sizeof(direction));
+        HashBytes(hash, &count, sizeof(count));
+        if (count < 0 || count > kMaxFloorConnections)
+        {
+            sample.topologyReadable = false;
+            continue;
+        }
+        for (int slot = 0; slot < count; ++slot)
+        {
+            void *target = ReadField<void *>(storage, 4 + slot * 8);
+            if (target)
+                ++sample.floorConnections;
+            HashLiveNavTarget(hash, target, metadata, pointerToIndex);
+        }
+    }
+}
+
+void HashLiveLadderConnections(
+    DynamicNavStateSample &sample, std::uint64_t &hash, void *area,
+    const AnneNavGraphMetadata &metadata,
+    const std::unordered_map<std::uintptr_t, std::uint32_t> &pointerToIndex)
+{
+    constexpr std::uint32_t ladderKind = 1;
+    for (int goingUp = 0; goingUp < 2; ++goingUp)
+    {
+        void *storage = ReadField<void *>(
+            area, g_NavAreaLaddersOffset + (goingUp ? 0 : 4));
+        int count = storage ? ReadField<int>(storage, 0) : 0;
+        HashBytes(hash, &ladderKind, sizeof(ladderKind));
+        HashBytes(hash, &goingUp, sizeof(goingUp));
+        HashBytes(hash, &count, sizeof(count));
+        if (count < 0 || count > kMaxLadderConnections)
+        {
+            sample.topologyReadable = false;
+            continue;
+        }
+        for (int slot = 0; slot < count; ++slot)
+        {
+            void *ladder = ReadField<void *>(
+                storage, 4 + slot * static_cast<int>(sizeof(void *)));
+            bool validLadder = ladder != nullptr;
+            HashBytes(hash, &validLadder, sizeof(validLadder));
+            if (!validLadder)
+            {
+                sample.topologyReadable = false;
+                continue;
+            }
+
+            if (goingUp)
+            {
+                const int endpointOffsets[] = {
+                    g_LadderTopForwardOffset,
+                    g_LadderTopLeftOffset,
+                    g_LadderTopRightOffset,
+                };
+                for (int endpoint = 0; endpoint < 3; ++endpoint)
+                {
+                    HashBytes(hash, &endpoint, sizeof(endpoint));
+                    void *target = ReadField<void *>(ladder, endpointOffsets[endpoint]);
+                    if (target)
+                        ++sample.ladderConnections;
+                    HashLiveNavTarget(hash, target, metadata, pointerToIndex);
+                }
+            }
+            else
+            {
+                constexpr int endpoint = 3;
+                HashBytes(hash, &endpoint, sizeof(endpoint));
+                void *target = ReadField<void *>(ladder, g_LadderBottomOffset);
+                if (target)
+                    ++sample.ladderConnections;
+                HashLiveNavTarget(hash, target, metadata, pointerToIndex);
+            }
+        }
+    }
+}
+
+std::uint64_t HashLiveAreaTopology(
+    DynamicNavStateSample &sample, void *area, std::uint32_t row,
+    const AnneNavGraphMetadata &metadata,
+    const std::vector<DynamicElevatorWatch> &watches,
+    const std::unordered_map<std::uintptr_t, std::uint32_t> &pointerToIndex)
+{
+    std::uint64_t hash = 1469598103934665603ull;
+    std::uint32_t attributes = ReadField<std::uint32_t>(
+        area, g_NavAreaAttributesOffset);
+    void *elevator = ReadField<void *>(area, g_NavAreaElevatorOffset);
+    std::uint32_t navId = metadata.navIds[row];
+    HashBytes(hash, &navId, sizeof(navId));
+    HashLiveFloorConnections(sample, hash, area, metadata, pointerToIndex);
+    HashLiveLadderConnections(sample, hash, area, metadata, pointerToIndex);
+
+    bool dynamicArea = (attributes & kNavMeshElevator) != 0 || elevator;
+    HashBytes(hash, &dynamicArea, sizeof(dynamicArea));
+    if (dynamicArea)
+    {
+        std::uint32_t elevatorBit = attributes & kNavMeshElevator;
+        std::uint32_t groupKey = DynamicElevatorGroupKey(
+            metadata, watches, reinterpret_cast<std::uintptr_t>(elevator));
+        HashBytes(hash, &elevatorBit, sizeof(elevatorBit));
+        HashBytes(hash, &groupKey, sizeof(groupKey));
+    }
+    return hash;
+}
+
+void HashDynamicEntities(
+    DynamicNavStateSample &sample, const AnneNavGraphMetadata &metadata,
+    const std::vector<DynamicElevatorWatch> &watches)
+{
+    std::uint64_t hash = 1469598103934665603ull;
+    for (const DynamicElevatorWatch &watch : watches)
+    {
+        std::uint32_t memberCount = static_cast<std::uint32_t>(watch.areaIndices.size());
+        HashBytes(hash, &memberCount, sizeof(memberCount));
+        for (std::uint32_t index : watch.areaIndices)
+        {
+            std::uint32_t navId = metadata.navIds[index];
+            HashBytes(hash, &navId, sizeof(navId));
+        }
+
+        CBaseEntity *entity = watch.entityReference >= 0
+            ? gamehelpers->ReferenceToEntity(watch.entityReference) : nullptr;
+        bool resolved = entity && watch.originOffset >= 0 &&
+            reinterpret_cast<std::uintptr_t>(entity) == watch.pointer;
+        sample.entitiesResolved = sample.entitiesResolved && resolved;
+        HashBytes(hash, &resolved, sizeof(resolved));
+        if (!resolved)
+            continue;
+
+        Vector origin(
+            ReadField<float>(entity, watch.originOffset),
+            ReadField<float>(entity, watch.originOffset + 4),
+            ReadField<float>(entity, watch.originOffset + 8));
+        std::int32_t quantizedOrigin[3] = {
+            static_cast<std::int32_t>(std::lround(origin.x)),
+            static_cast<std::int32_t>(std::lround(origin.y)),
+            static_cast<std::int32_t>(std::lround(origin.z)),
+        };
+        HashBytes(hash, quantizedOrigin, sizeof(quantizedOrigin));
+        if (watch.velocityOffset >= 0)
+        {
+            Vector velocity(
+                ReadField<float>(entity, watch.velocityOffset),
+                ReadField<float>(entity, watch.velocityOffset + 4),
+                ReadField<float>(entity, watch.velocityOffset + 8));
+            bool moving = velocity.LengthSqr() > 1.0f;
+            sample.moving = sample.moving || moving;
+            HashBytes(hash, &moving, sizeof(moving));
+        }
+        if (watch.toggleStateOffset >= 0)
+        {
+            int toggleState = ReadField<int>(entity, watch.toggleStateOffset);
+            HashBytes(hash, &toggleState, sizeof(toggleState));
+        }
+    }
+    sample.entityFingerprint = hash;
+}
+
+DynamicNavStateSample ComputeDynamicNavState(
+    const AnneNavGraphMetadata &metadata,
+    const std::vector<DynamicElevatorWatch> &watches,
+    const std::unordered_map<std::uintptr_t, std::uint32_t> &pointerToIndex)
+{
+    DynamicNavStateSample sample;
+    sample.fingerprint = 1469598103934665603ull;
+    if (!g_TheNavAreas)
+    {
+        sample.areaListValid = false;
+        return sample;
+    }
+
+    void *areaList = ReadField<void *>(g_TheNavAreas, 0);
+    int areaCount = ReadField<int>(g_TheNavAreas, g_NavAreasCountOffset);
+    sample.areaListValid = areaList && areaCount > 0 &&
+        static_cast<std::size_t>(areaCount) == metadata.areaPointers.size() &&
+        reinterpret_cast<std::uintptr_t>(areaList) == metadata.navAreasListPointer;
+    sample.areaCount = areaCount > 0 ? static_cast<std::uint32_t>(areaCount) : 0;
+    HashBytes(sample.fingerprint, &areaCount, sizeof(areaCount));
+    if (!sample.areaListValid)
+    {
+        std::uintptr_t listPointer = reinterpret_cast<std::uintptr_t>(areaList);
+        HashBytes(sample.fingerprint, &listPointer, sizeof(listPointer));
+        return sample;
+    }
+
+    sample.areaFingerprints.resize(static_cast<std::size_t>(areaCount));
+    for (int row = 0; row < areaCount; ++row)
+    {
+        void *area = ReadField<void *>(
+            areaList, row * static_cast<int>(sizeof(void *)));
+        if (reinterpret_cast<std::uintptr_t>(area) != metadata.areaPointers[row])
+        {
+            sample.areaListValid = false;
+            HashBytes(sample.fingerprint, &row, sizeof(row));
+            return sample;
+        }
+        std::uint64_t areaFingerprint = HashLiveAreaTopology(
+            sample, area, static_cast<std::uint32_t>(row), metadata,
+            watches, pointerToIndex);
+        sample.areaFingerprints[row] = areaFingerprint;
+        HashBytes(sample.fingerprint, &areaFingerprint, sizeof(areaFingerprint));
+    }
+    HashDynamicEntities(sample, metadata, watches);
+    HashBytes(sample.fingerprint, &sample.entityFingerprint,
+              sizeof(sample.entityFingerprint));
+    return sample;
+}
+
+const char *UnknownConnectionKindName(NavUnknownConnectionKind kind)
+{
+    switch (kind)
+    {
+        case NavUnknownConnectionKind::Floor: return "floor";
+        case NavUnknownConnectionKind::LadderTopForward: return "ladder_top_forward";
+        case NavUnknownConnectionKind::LadderTopLeft: return "ladder_top_left";
+        case NavUnknownConnectionKind::LadderTopRight: return "ladder_top_right";
+        case NavUnknownConnectionKind::LadderBottom: return "ladder_bottom";
+    }
+    return "unknown";
+}
+
+void RecordUnknownArea(NavGraphCapture &capture, std::uint32_t from,
+                       void *target, NavUnknownConnectionKind kind,
+                       int direction, int slot)
+{
+    ++capture.unknownAreaCount;
+    if (capture.unknownAreaSamples.size() >= kUnknownAreaSampleCap)
+        return;
+
+    NavUnknownAreaSample sample;
+    sample.sourceIndex = from;
+    if (from < capture.metadata->navIds.size())
+        sample.sourceNavId = capture.metadata->navIds[from];
+    sample.targetPointer = reinterpret_cast<std::uintptr_t>(target);
+    sample.kind = kind;
+    sample.direction = direction;
+    sample.slot = slot;
+    capture.unknownAreaSamples.push_back(sample);
+}
+
 bool AppendTopologyEdge(NavGraphCapture &capture, std::uint32_t from,
-                        void *target, AnneNavEdgeType type)
+                        void *target, AnneNavEdgeType type,
+                        NavUnknownConnectionKind kind, int direction, int slot)
 {
     if (!target)
         return true;
@@ -471,6 +960,8 @@ bool AppendTopologyEdge(NavGraphCapture &capture, std::uint32_t from,
     if (found == capture.pointerToIndex.end())
     {
         capture.complete = false;
+        capture.topologyIssues |= AnneNavTopologyIssue_UnknownArea;
+        RecordUnknownArea(capture, from, target, kind, direction, slot);
         return false;
     }
     if (found->second != from)
@@ -480,7 +971,7 @@ bool AppendTopologyEdge(NavGraphCapture &capture, std::uint32_t from,
 
 void CaptureConnectionStorage(NavGraphCapture &capture, std::uint32_t from,
                               void *storage, int stride, int maxCount,
-                              AnneNavEdgeType type)
+                              AnneNavEdgeType type, int direction)
 {
     if (!storage)
         return;
@@ -488,12 +979,16 @@ void CaptureConnectionStorage(NavGraphCapture &capture, std::uint32_t from,
     if (count < 0 || count > maxCount)
     {
         capture.complete = false;
+        capture.topologyIssues |= type == AnneNavEdgeType::Ladder
+            ? AnneNavTopologyIssue_InvalidLadderStorage
+            : AnneNavTopologyIssue_InvalidFloorStorage;
         return;
     }
     for (int i = 0; i < count; ++i)
     {
         void *target = ReadField<void *>(storage, 4 + i * stride);
-        AppendTopologyEdge(capture, from, target, type);
+        AppendTopologyEdge(capture, from, target, type,
+                           NavUnknownConnectionKind::Floor, direction, i);
     }
 }
 
@@ -506,6 +1001,7 @@ void CaptureLadderStorage(NavGraphCapture &capture, std::uint32_t from,
     if (count < 0 || count > kMaxLadderConnections)
     {
         capture.complete = false;
+        capture.topologyIssues |= AnneNavTopologyIssue_InvalidLadderStorage;
         return;
     }
     for (int i = 0; i < count; ++i)
@@ -514,25 +1010,30 @@ void CaptureLadderStorage(NavGraphCapture &capture, std::uint32_t from,
         if (!ladder)
         {
             capture.complete = false;
+            capture.topologyIssues |= AnneNavTopologyIssue_InvalidLadderStorage;
             continue;
         }
         if (goingUp)
         {
             AppendTopologyEdge(capture, from,
                                ReadField<void *>(ladder, g_LadderTopForwardOffset),
-                               AnneNavEdgeType::Ladder);
+                               AnneNavEdgeType::Ladder,
+                               NavUnknownConnectionKind::LadderTopForward, -1, i);
             AppendTopologyEdge(capture, from,
                                ReadField<void *>(ladder, g_LadderTopLeftOffset),
-                               AnneNavEdgeType::Ladder);
+                               AnneNavEdgeType::Ladder,
+                               NavUnknownConnectionKind::LadderTopLeft, -1, i);
             AppendTopologyEdge(capture, from,
                                ReadField<void *>(ladder, g_LadderTopRightOffset),
-                               AnneNavEdgeType::Ladder);
+                               AnneNavEdgeType::Ladder,
+                               NavUnknownConnectionKind::LadderTopRight, -1, i);
         }
         else
         {
             AppendTopologyEdge(capture, from,
                                ReadField<void *>(ladder, g_LadderBottomOffset),
-                               AnneNavEdgeType::Ladder);
+                               AnneNavEdgeType::Ladder,
+                               NavUnknownConnectionKind::LadderBottom, -1, i);
         }
     }
 }
@@ -545,17 +1046,21 @@ void CaptureAreaTopology(NavGraphCapture &capture, std::uint32_t index)
         CaptureConnectionStorage(
             capture, index,
             ReadField<void *>(area, g_NavAreaConnectionsOffset + direction * 4),
-            8, kMaxFloorConnections, AnneNavEdgeType::Floor);
+            8, kMaxFloorConnections, AnneNavEdgeType::Floor, direction);
     }
     CaptureLadderStorage(capture, index,
                          ReadField<void *>(area, g_NavAreaLaddersOffset), true);
     CaptureLadderStorage(capture, index,
                          ReadField<void *>(area, g_NavAreaLaddersOffset + 4), false);
 
-    if (ReadField<void *>(area, g_NavAreaElevatorOffset))
+    if ((ReadField<std::uint32_t>(area, g_NavAreaAttributesOffset)
+            & kNavMeshElevator) != 0
+        || ReadField<void *>(area, g_NavAreaElevatorOffset))
     {
-        // Elevator membership can change at runtime, so all elevator paths stay on BuildPath.
-        capture.complete = false;
+        // Stable elevator states use their live directed floor connections. The
+        // issue bit keeps monitoring/variant diagnostics active without making
+        // an otherwise valid snapshot incomplete.
+        capture.topologyIssues |= AnneNavTopologyIssue_DynamicElevator;
     }
 }
 
@@ -570,7 +1075,228 @@ void ClearReachabilityState()
     g_BlockedSnapshot.clear();
     g_BlockedSnapshotTime = -1000.0f;
     g_BlockedSnapshotGeneration = 0;
+    g_BlockedSnapshotIgnoreNavBlockers = false;
+    g_BlockedSnapshotValid = false;
+    g_BlockedSnapshotTeam = -1;
+    g_BlockedSnapshotBlockedCount = 0;
     ++g_BlockedStateVersion;
+}
+
+void InstallDynamicNavMonitor(
+    NavGraphCapture &capture,
+    const DynamicNavStateSample &sample,
+    bool dirty)
+{
+    g_DynamicNav.watching = true;
+    g_DynamicNav.hasDynamicAreas = !capture.dynamicAreaIndices.empty();
+    g_DynamicNav.dirty = dirty;
+    g_DynamicNav.moving = sample.moving;
+    g_DynamicNav.entitiesResolved = sample.entitiesResolved;
+    g_DynamicNav.areaListValid = sample.areaListValid;
+    g_DynamicNav.topologyReadable = sample.topologyReadable;
+    g_DynamicNav.areaCount = sample.areaCount;
+    g_DynamicNav.floorConnections = sample.floorConnections;
+    g_DynamicNav.ladderConnections = sample.ladderConnections;
+    g_DynamicNav.entityFingerprint = sample.entityFingerprint;
+    g_DynamicNav.topologyPollCursor = 0;
+    g_DynamicNav.areaFingerprints = sample.areaFingerprints;
+    g_DynamicNav.rawFingerprint = sample.fingerprint;
+    if (!dirty)
+        g_DynamicNav.capturedFingerprint = sample.fingerprint;
+    g_DynamicNav.lastChangeAt = SteadySeconds();
+    g_DynamicNav.nextPollAt = g_DynamicNav.lastChangeAt +
+        (dirty ? kDynamicNavWarmPollSeconds : kDynamicNavIdlePollSeconds);
+    g_DynamicNav.dynamicAreaIndices = std::move(capture.dynamicAreaIndices);
+    g_DynamicNav.elevators = std::move(capture.elevators);
+    g_DynamicNav.pointerToIndex = std::move(capture.pointerToIndex);
+}
+
+void InvalidateDynamicNavGraph(const DynamicNavStateSample &sample, double now)
+{
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavGraphGeneration.fetch_add(1);
+        g_NavGraph.reset();
+        g_PendingNavGraph.reset();
+        g_NavCapture.reset();
+        ClearReachabilityState();
+        g_NavGraphCacheHit = false;
+        g_NavGraphError = "directed Nav topology changed; waiting for a stable state";
+        g_DynamicNav.dirty = true;
+        g_DynamicNav.rawFingerprint = sample.fingerprint;
+        g_DynamicNav.moving = sample.moving;
+        g_DynamicNav.entitiesResolved = sample.entitiesResolved;
+        g_DynamicNav.areaListValid = sample.areaListValid;
+        g_DynamicNav.topologyReadable = sample.topologyReadable;
+        g_DynamicNav.areaCount = sample.areaCount;
+        g_DynamicNav.floorConnections = sample.floorConnections;
+        g_DynamicNav.ladderConnections = sample.ladderConnections;
+        g_DynamicNav.entityFingerprint = sample.entityFingerprint;
+        g_DynamicNav.lastChangeAt = now;
+        ++g_DynamicNav.epoch;
+        ++g_DynamicNav.changes;
+    }
+    g_Workers.ClearPending();
+    g_PathCache.clear();
+    g_PathCacheEpoch = -1;
+    g_NavGraphState.store(kNavGraphDynamicWait);
+}
+
+void StartDynamicNavRebuild(double now)
+{
+    std::shared_ptr<AnneNavGraphMetadata> previous;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        previous = g_NavMetadata;
+    }
+    if (!previous)
+        return;
+
+    std::string error;
+    std::shared_ptr<AnneNavGraphMetadata> metadata = CaptureNavMetadata(
+        previous->mapName.c_str(), previous->baseCachePath.c_str(),
+        previous->maxFlowDistance, error);
+    if (!metadata)
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavGraphError = "dynamic Nav metadata recapture failed: " + error;
+        g_DynamicNav.lastChangeAt = now;
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavMetadata = std::move(metadata);
+        g_NavGraphForceRebuild = false;
+        g_NavUnknownAreaCount = 0;
+        g_NavUnknownAreaSamples.clear();
+        ++g_DynamicNav.rebuilds;
+    }
+    g_NavGraphState.store(kNavGraphNeedBuild);
+}
+
+void PollDynamicNavState(bool warm)
+{
+    int state = g_NavGraphState.load();
+    if (!g_DynamicNav.watching ||
+        (state != kNavGraphReady && state != kNavGraphReadyPending &&
+         state != kNavGraphDynamicWait))
+    {
+        return;
+    }
+
+    double now = SteadySeconds();
+    if (now < g_DynamicNav.nextPollAt)
+        return;
+    double interval = g_DynamicNav.dirty || warm
+        ? kDynamicNavWarmPollSeconds : kDynamicNavIdlePollSeconds;
+    g_DynamicNav.nextPollAt = now + interval;
+
+    std::shared_ptr<AnneNavGraphMetadata> metadata;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        metadata = g_NavMetadata;
+    }
+    if (!metadata)
+        return;
+
+    double pollStart = SteadySeconds();
+    DynamicNavStateSample sample;
+    sample.fingerprint = g_DynamicNav.rawFingerprint;
+    sample.areaCount = g_DynamicNav.areaCount;
+    sample.floorConnections = g_DynamicNav.floorConnections;
+    sample.ladderConnections = g_DynamicNav.ladderConnections;
+    sample.topologyReadable = g_DynamicNav.topologyReadable;
+    HashDynamicEntities(sample, *metadata, g_DynamicNav.elevators);
+
+    void *areaList = g_TheNavAreas ? ReadField<void *>(g_TheNavAreas, 0) : nullptr;
+    int areaCount = g_TheNavAreas
+        ? ReadField<int>(g_TheNavAreas, g_NavAreasCountOffset) : 0;
+    bool areaListShapeValid = areaList && areaCount > 0 &&
+        static_cast<std::size_t>(areaCount) == metadata->areaPointers.size() &&
+        static_cast<std::size_t>(areaCount) == g_DynamicNav.areaFingerprints.size() &&
+        reinterpret_cast<std::uintptr_t>(areaList) == metadata->navAreasListPointer;
+    sample.areaListValid = g_DynamicNav.areaListValid && areaListShapeValid;
+
+    bool topologyChanged = false;
+    if (sample.areaListValid)
+    {
+        std::size_t count = static_cast<std::size_t>(areaCount);
+        std::size_t batch = std::min(kTopologyPollBatchAreas, count);
+        std::size_t cursor = g_DynamicNav.topologyPollCursor % count;
+        for (std::size_t scanned = 0; scanned < batch; ++scanned)
+        {
+            std::size_t row = (cursor + scanned) % count;
+            void *area = ReadField<void *>(
+                areaList, static_cast<int>(row * sizeof(void *)));
+            if (reinterpret_cast<std::uintptr_t>(area) != metadata->areaPointers[row])
+            {
+                sample.areaListValid = false;
+                topologyChanged = true;
+                break;
+            }
+
+            DynamicNavStateSample areaSample;
+            std::uint64_t areaFingerprint = HashLiveAreaTopology(
+                areaSample, area, static_cast<std::uint32_t>(row), *metadata,
+                g_DynamicNav.elevators, g_DynamicNav.pointerToIndex);
+            if (!areaSample.topologyReadable)
+                sample.topologyReadable = false;
+            if (areaFingerprint == g_DynamicNav.areaFingerprints[row])
+                continue;
+
+            g_DynamicNav.areaFingerprints[row] = areaFingerprint;
+            HashBytes(sample.fingerprint, &row, sizeof(row));
+            HashBytes(sample.fingerprint, &areaFingerprint, sizeof(areaFingerprint));
+            topologyChanged = true;
+        }
+        g_DynamicNav.topologyPollCursor = (cursor + batch) % count;
+    }
+    else if (g_DynamicNav.areaListValid && !areaListShapeValid)
+    {
+        sample.fingerprint = 1469598103934665603ull;
+        topologyChanged = true;
+        std::uintptr_t listPointer = reinterpret_cast<std::uintptr_t>(areaList);
+        HashBytes(sample.fingerprint, &listPointer, sizeof(listPointer));
+        HashBytes(sample.fingerprint, &areaCount, sizeof(areaCount));
+    }
+
+    bool entityChanged = sample.entityFingerprint != g_DynamicNav.entityFingerprint;
+    if (entityChanged)
+        HashBytes(sample.fingerprint, &sample.entityFingerprint,
+                  sizeof(sample.entityFingerprint));
+    float pollMs = static_cast<float>((SteadySeconds() - pollStart) * 1000.0);
+    g_DynamicNav.pollLastMs = pollMs;
+    g_DynamicNav.pollMaxMs = std::max(g_DynamicNav.pollMaxMs, pollMs);
+    ++g_DynamicNav.pollSamples;
+    g_DynamicNav.areaCount = sample.areaCount;
+    g_DynamicNav.floorConnections = sample.floorConnections;
+    g_DynamicNav.ladderConnections = sample.ladderConnections;
+
+    bool changed = topologyChanged || entityChanged ||
+        sample.fingerprint != g_DynamicNav.rawFingerprint ||
+        sample.moving != g_DynamicNav.moving ||
+        sample.entitiesResolved != g_DynamicNav.entitiesResolved ||
+        sample.areaListValid != g_DynamicNav.areaListValid ||
+        sample.topologyReadable != g_DynamicNav.topologyReadable;
+    if (changed)
+    {
+        g_DynamicNav.rawFingerprint = sample.fingerprint;
+        g_DynamicNav.moving = sample.moving;
+        g_DynamicNav.entitiesResolved = sample.entitiesResolved;
+        g_DynamicNav.areaListValid = sample.areaListValid;
+        g_DynamicNav.topologyReadable = sample.topologyReadable;
+        g_DynamicNav.entityFingerprint = sample.entityFingerprint;
+        g_DynamicNav.lastChangeAt = now;
+        if (!g_DynamicNav.dirty)
+            InvalidateDynamicNavGraph(sample, now);
+    }
+
+    if (g_DynamicNav.dirty && !sample.moving &&
+        now - g_DynamicNav.lastChangeAt >= kDynamicNavStableSeconds)
+    {
+        StartDynamicNavRebuild(now);
+    }
 }
 
 void PublishPendingResults()
@@ -649,18 +1375,45 @@ void PublishPendingResults()
         g_NavCandidateCache.erase(g_NavCandidateCache.begin());
 }
 
-void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
-                     std::vector<AnneNavGraphInputEdge> edges,
-                     bool complete, std::uint64_t generation)
+void QueueGraphLoadOrBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
+                           std::vector<AnneNavGraphInputEdge> edges,
+                           bool complete, bool forceRebuild,
+                           std::uint64_t generation)
 {
     bool queued = g_Workers.Enqueue(
-        [metadata = std::move(metadata), edges = std::move(edges), complete, generation]() mutable {
+        [metadata = std::move(metadata), edges = std::move(edges), complete,
+         forceRebuild, generation]() mutable {
             if (g_NavGraphGeneration.load() != generation)
                 return;
 
+            std::uint64_t fingerprint = AnneComputeNavTopologyFingerprint(
+                metadata->fingerprint, edges, metadata->topologyIssues,
+                metadata->dynamicStateFingerprint);
+            const std::string &basePath = metadata->baseCachePath.empty()
+                ? metadata->cachePath : metadata->baseCachePath;
+            std::string cachePath = AnneNavGraphVariantCachePath(
+                basePath, fingerprint);
+            {
+                std::lock_guard<std::mutex> lock(g_GraphMutex);
+                if (g_NavGraphGeneration.load() != generation)
+                    return;
+                metadata->fingerprint = fingerprint;
+                metadata->cachePath = std::move(cachePath);
+            }
             std::string error;
-            std::shared_ptr<AnneNavGraph> graph =
-                AnneBuildNavGraph(*metadata, std::move(edges), complete, error);
+            std::shared_ptr<AnneNavGraph> graph;
+            bool cacheHit = false;
+            if (!forceRebuild)
+            {
+                graph = AnneLoadNavGraph(*metadata, error);
+                cacheHit = graph != nullptr;
+            }
+            if (!graph)
+            {
+                error.clear();
+                graph = AnneBuildNavGraph(
+                    *metadata, std::move(edges), complete, error);
+            }
             if (!graph)
             {
                 {
@@ -675,14 +1428,18 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
             if (g_NavGraphGeneration.load() != generation)
                 return;
 
-            std::string temporaryPath;
             std::string saveError;
-            bool staged = AnneStageNavGraphCache(
-                *graph, metadata->cachePath, temporaryPath, saveError);
-            if (g_NavGraphGeneration.load() != generation)
+            std::string temporaryPath;
+            bool staged = false;
+            if (!cacheHit)
             {
-                AnneDiscardNavGraphCache(temporaryPath);
-                return;
+                staged = AnneStageNavGraphCache(
+                    *graph, metadata->cachePath, temporaryPath, saveError);
+                if (g_NavGraphGeneration.load() != generation)
+                {
+                    AnneDiscardNavGraphCache(temporaryPath);
+                    return;
+                }
             }
 
             bool stale = false;
@@ -691,7 +1448,7 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
                 stale = g_NavGraphGeneration.load() != generation;
                 if (!stale)
                 {
-                    if (staged)
+                    if (!cacheHit && staged)
                         AnnePublishNavGraphCache(
                             temporaryPath, metadata->cachePath, saveError);
                     temporaryPath.clear();
@@ -699,7 +1456,10 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
                 if (!stale)
                 {
                     g_PendingNavGraph = std::move(graph);
-                    g_NavGraphError = saveError;
+                    g_NavGraphCacheHit = cacheHit;
+                    if (cacheHit && metadata->dynamicStateFingerprint != 0)
+                        ++g_DynamicNav.cacheLoads;
+                    g_NavGraphError = cacheHit ? std::string() : saveError;
                     g_NavGraphState.store(kNavGraphReadyPending);
                 }
             }
@@ -713,8 +1473,9 @@ void QueueGraphBuild(std::shared_ptr<AnneNavGraphMetadata> metadata,
     }
 }
 
-void PumpNavGraph()
+void PumpNavGraph(bool dynamicWarm = false)
 {
+    PollDynamicNavState(dynamicWarm);
     PublishPendingResults();
     int state = g_NavGraphState.load();
     if (state == kNavGraphNeedBuild)
@@ -733,10 +1494,14 @@ void PumpNavGraph()
 
         auto capture = std::make_unique<NavGraphCapture>();
         capture->metadata = metadata;
+        capture->forceRebuild = g_NavGraphForceRebuild;
         capture->pointerToIndex.reserve(metadata->areaPointers.size() * 2);
         capture->edges.reserve(metadata->areaPointers.size() * 6);
         for (std::uint32_t i = 0; i < metadata->areaPointers.size(); ++i)
             capture->pointerToIndex.emplace(metadata->areaPointers[i], i);
+        DiscoverDynamicNavState(*capture);
+        capture->dynamicStateAtStart = ComputeDynamicNavState(
+            *metadata, capture->elevators, capture->pointerToIndex);
         g_NavCapture = std::move(capture);
         g_NavGraphState.store(kNavGraphBuilding);
         state = kNavGraphBuilding;
@@ -756,12 +1521,50 @@ void PumpNavGraph()
     if (g_NavCapture->cursor < g_NavCapture->metadata->areaPointers.size())
         return;
 
+    DynamicNavStateSample dynamicStateAtEnd = ComputeDynamicNavState(
+        *g_NavCapture->metadata, g_NavCapture->elevators,
+        g_NavCapture->pointerToIndex);
+    bool topologyUnstable =
+        dynamicStateAtEnd.fingerprint !=
+            g_NavCapture->dynamicStateAtStart.fingerprint ||
+        dynamicStateAtEnd.moving || !dynamicStateAtEnd.areaListValid;
+    if (topologyUnstable)
+    {
+        InstallDynamicNavMonitor(*g_NavCapture, dynamicStateAtEnd, true);
+        g_NavGraphError = "directed Nav topology changed during capture; waiting for stability";
+        g_NavCapture.reset();
+        g_NavGraphState.store(kNavGraphDynamicWait);
+        return;
+    }
+
     std::uint64_t generation = g_NavGraphGeneration.load();
     std::shared_ptr<AnneNavGraphMetadata> metadata = g_NavCapture->metadata;
     std::vector<AnneNavGraphInputEdge> edges = std::move(g_NavCapture->edges);
     bool complete = g_NavCapture->complete;
+    bool forceRebuild = g_NavCapture->forceRebuild;
+    metadata->topologyIssues = g_NavCapture->topologyIssues;
+    if (!g_NavCapture->dynamicAreaIndices.empty() &&
+        !dynamicStateAtEnd.entitiesResolved)
+    {
+        // Entity resolution is an optional early movement signal. A complete
+        // directed-edge capture remains protected by the all-area fingerprint.
+        metadata->topologyIssues |= AnneNavTopologyIssue_UnresolvedDynamicElevator;
+    }
+    metadata->dynamicStateFingerprint = g_NavCapture->dynamicAreaIndices.empty()
+        ? 0 : dynamicStateAtEnd.fingerprint;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        if (g_NavGraphGeneration.load() == generation)
+        {
+            g_NavUnknownAreaCount = g_NavCapture->unknownAreaCount;
+            g_NavUnknownAreaSamples = g_NavCapture->unknownAreaSamples;
+        }
+    }
+    InstallDynamicNavMonitor(*g_NavCapture, dynamicStateAtEnd, false);
     g_NavCapture.reset();
-    QueueGraphBuild(std::move(metadata), std::move(edges), complete, generation);
+    QueueGraphLoadOrBuild(
+        std::move(metadata), std::move(edges), complete,
+        forceRebuild, generation);
 }
 
 int PublicNavGraphState()
@@ -771,6 +1574,8 @@ int PublicNavGraphState()
         return kNavGraphBuilding;
     if (state == kNavGraphReadyPending)
         return kNavGraphLoading;
+    if (state == kNavGraphDynamicWait)
+        return kNavGraphBuilding;
     return state;
 }
 
@@ -779,7 +1584,7 @@ int CurrentBlockedEpoch()
     return g_BlockedStateVersion;
 }
 
-void RefreshBlockedSnapshot(const AnneNavGraph &graph,
+bool RefreshBlockedSnapshot(const AnneNavGraph &graph,
                             const AnneNavGraphMetadata &metadata,
                             int team, bool ignoreNavBlockers)
 {
@@ -787,16 +1592,19 @@ void RefreshBlockedSnapshot(const AnneNavGraph &graph,
     std::uint64_t generation = g_NavGraphGeneration.load();
     bool sameShape = g_BlockedSnapshotGeneration == generation
         && g_BlockedSnapshot.size() == graph.navIds.size()
+        && g_BlockedSnapshotTeam == team
         && g_BlockedSnapshotIgnoreNavBlockers == ignoreNavBlockers;
     if (sameShape && now - g_BlockedSnapshotTime < kBlockerSnapshotSeconds)
-        return;
+        return g_BlockedSnapshotValid;
 
     std::vector<std::uint8_t> next(graph.navIds.size(), 0);
+    std::size_t blockedCount = 0;
     for (std::size_t i = 0; i < next.size(); ++i)
     {
         void *area = reinterpret_cast<void *>(metadata.areaPointers[i]);
-        bool isBlocked = ReadField<std::uint8_t>(
-            area, g_NavAreaBlockedOffset + (team % 2)) != 0;
+        std::uint8_t blockedBits = ReadField<std::uint8_t>(
+            area, g_NavAreaBlockedBitsOffset);
+        bool isBlocked = AnneNavBlockedForTeam(blockedBits, team);
         if (ignoreNavBlockers)
         {
             constexpr std::uint32_t navMeshNavBlocker = 0x80000000u;
@@ -806,18 +1614,27 @@ void RefreshBlockedSnapshot(const AnneNavGraph &graph,
                 isBlocked = false;
         }
         next[i] = isBlocked ? 1 : 0;
+        if (isBlocked)
+            ++blockedCount;
     }
 
-    if (!sameShape || next != g_BlockedSnapshot)
+    bool valid = next.size() < kBlockedSnapshotSanityMinAreas
+        || blockedCount < next.size();
+    if (!sameShape || next != g_BlockedSnapshot
+        || valid != g_BlockedSnapshotValid)
     {
         g_BlockedSnapshot = std::move(next);
         g_BlockedSnapshotGeneration = generation;
+        g_BlockedSnapshotTeam = team;
         g_BlockedSnapshotIgnoreNavBlockers = ignoreNavBlockers;
+        g_BlockedSnapshotValid = valid;
         ++g_BlockedStateVersion;
         g_PathCache.clear();
         g_PathCacheEpoch = g_BlockedStateVersion;
     }
+    g_BlockedSnapshotBlockedCount = blockedCount;
     g_BlockedSnapshotTime = now;
+    return valid;
 }
 
 bool ReachabilityMatches(const ReachabilityResult &result, std::uint32_t targetId,
@@ -862,7 +1679,8 @@ bool PrepareReachability(std::uint32_t targetId, float maxDistance,
     if (!graph || !metadata || metadata->areaPointers.size() != graph->navIds.size())
         return false;
 
-    RefreshBlockedSnapshot(*graph, *metadata, team, ignoreNavBlockers);
+    if (!RefreshBlockedSnapshot(*graph, *metadata, team, ignoreNavBlockers))
+        return false;
     int epoch = CurrentBlockedEpoch();
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
@@ -975,7 +1793,8 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
     if (!graph->FindIndex(targetId, targetIndex))
         return kCandidateUnavailable;
 
-    RefreshBlockedSnapshot(*graph, *metadata, kTeamInfected, false);
+    if (!RefreshBlockedSnapshot(*graph, *metadata, kTeamInfected, false))
+        return kCandidateUnavailable;
     int blockedEpoch = CurrentBlockedEpoch();
     std::uint64_t survivorSpatialKey = g_SurvivorSpatialKey;
     std::size_t targetSlot = g_SurvivorCount;
@@ -1258,8 +2077,8 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
 
     char *mapName = nullptr;
     char *cachePath = nullptr;
-    if (context->LocalToString(params[1], &mapName) != SP_ERROR_NONE || !mapName ||
-        context->LocalToString(params[2], &cachePath) != SP_ERROR_NONE || !cachePath)
+    if (context->LocalToString(params[1], &mapName) != SP_ERROR_NONE || !mapName || !*mapName ||
+        context->LocalToString(params[2], &cachePath) != SP_ERROR_NONE || !cachePath || !*cachePath)
         return context->ThrowNativeError("Invalid Nav graph map or cache path");
     float maxFlowDistance = sp_ctof(params[3]);
     if (!std::isfinite(maxFlowDistance) || maxFlowDistance <= 0.0f)
@@ -1276,6 +2095,11 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         ClearReachabilityState();
         ResetNavCandidatePerfLocked();
         g_NavGraphError.clear();
+        g_NavGraphForceRebuild = params[4] != 0;
+        g_NavGraphCacheHit = false;
+        g_NavUnknownAreaCount = 0;
+        g_NavUnknownAreaSamples.clear();
+        g_DynamicNav = DynamicNavMonitor{};
     }
     g_Workers.ClearPending();
     g_PathCache.clear();
@@ -1305,50 +2129,17 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
         return 0;
     }
 
-    if (params[4] != 0)
-    {
-        g_NavGraphState.store(kNavGraphNeedBuild);
-        return 1;
-    }
-
-    bool queued = g_Workers.Enqueue([metadata = std::move(metadata), generation]() {
-        if (g_NavGraphGeneration.load() != generation)
-            return;
-
-        std::string loadError;
-        std::shared_ptr<AnneNavGraph> graph = AnneLoadNavGraph(*metadata, loadError);
-        if (g_NavGraphGeneration.load() != generation)
-            return;
-        if (!graph)
-        {
-            std::lock_guard<std::mutex> lock(g_GraphMutex);
-            if (g_NavGraphGeneration.load() != generation)
-                return;
-            g_NavGraphError = loadError;
-            g_NavGraphState.store(kNavGraphNeedBuild);
-            return;
-        }
-        {
-            std::lock_guard<std::mutex> lock(g_GraphMutex);
-            if (g_NavGraphGeneration.load() != generation)
-                return;
-            g_PendingNavGraph = std::move(graph);
-            g_NavGraphError.clear();
-            g_NavGraphState.store(kNavGraphReadyPending);
-        }
-    });
-    if (!queued)
-    {
-        SetGraphError("Nav graph worker queue is full");
-        g_NavGraphState.store(kNavGraphFailed);
-        return 0;
-    }
+    // Cache validation needs every live directed floor/ladder edge. Pump first
+    // captures that topology in bounded main-thread batches, then a worker hashes
+    // it and either loads the matching v6 state cache or rebuilds it.
+    g_NavGraphState.store(kNavGraphNeedBuild);
     return 1;
 }
 
-cell_t Native_NavGraphPump(IPluginContext *, const cell_t *)
+cell_t Native_NavGraphPump(IPluginContext *, const cell_t *params)
 {
-    PumpNavGraph();
+    bool dynamicWarm = params && params[0] >= 1 && params[1] != 0;
+    PumpNavGraph(dynamicWarm);
     return PublicNavGraphState();
 }
 
@@ -1363,6 +2154,11 @@ cell_t Native_NavGraphStop(IPluginContext *, const cell_t *)
         g_NavCapture.reset();
         ClearReachabilityState();
         g_NavGraphError.clear();
+        g_NavGraphForceRebuild = false;
+        g_NavGraphCacheHit = false;
+        g_NavUnknownAreaCount = 0;
+        g_NavUnknownAreaSamples.clear();
+        g_DynamicNav = DynamicNavMonitor{};
     }
     g_Workers.Stop();
     g_PathCache.clear();
@@ -1404,7 +2200,7 @@ cell_t Native_NavGraphCollectRange(IPluginContext *context, const cell_t *params
             static_cast<std::uint32_t>(params[1]), maxDistance,
             kTeamInfected, false, true);
     }
-    if (!graph || !graph->complete || graph->hasElevatorEdges || !result)
+    if (!graph || !graph->complete || !result)
         return -1;
 
     int count = 0;
@@ -1623,6 +2419,162 @@ cell_t Native_NavGraphGetEdgeCount(IPluginContext *, const cell_t *)
     return g_NavGraph ? static_cast<cell_t>(g_NavGraph->edges.size()) : 0;
 }
 
+cell_t Native_NavGraphGetDiagnostics(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 2 || params[2] <= 0)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavGraphGetDiagnostics expects a non-empty output buffer");
+
+    int flags = 0;
+    std::string reason;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        int state = PublicNavGraphState();
+        const char *stateName = state == kNavGraphReady ? "ready" :
+            state == kNavGraphFailed ? "failed" :
+            state == kNavGraphBuilding ? "building" :
+            state == kNavGraphLoading ? "loading" : "idle";
+        reason = "state=";
+        reason += stateName;
+        reason += " source=";
+        reason += g_NavGraphCacheHit ? "cache" : "build";
+        if (g_NavMetadata && !g_NavMetadata->mapName.empty())
+        {
+            reason += " map=";
+            reason += g_NavMetadata->mapName;
+        }
+        if (g_NavMetadata && g_NavMetadata->fingerprint != 0)
+        {
+            char fingerprintText[40];
+            std::snprintf(
+                fingerprintText, sizeof(fingerprintText),
+                " variant=%016llx",
+                static_cast<unsigned long long>(g_NavMetadata->fingerprint));
+            reason += fingerprintText;
+        }
+
+        std::uint32_t issues = g_NavGraph
+            ? g_NavGraph->topologyIssues
+            : (g_NavMetadata ? g_NavMetadata->topologyIssues
+                             : AnneNavTopologyIssue_None);
+        if (g_NavGraph && g_NavGraph->complete)
+        {
+            flags |= kNavDiagComplete;
+            reason += " topology=complete";
+        }
+        else
+        {
+            reason += " topology=incomplete";
+        }
+        if (g_NavGraphCacheHit)
+            flags |= kNavDiagCacheHit;
+        if (g_NavGraph
+            && g_BlockedSnapshotGeneration == g_NavGraphGeneration.load()
+            && g_BlockedSnapshot.size() == g_NavGraph->navIds.size())
+        {
+            char blockerText[128];
+            std::snprintf(
+                blockerText, sizeof(blockerText),
+                " blockers=%llu/%llu blocker_team=%d blocker_valid=%d",
+                static_cast<unsigned long long>(g_BlockedSnapshotBlockedCount),
+                static_cast<unsigned long long>(g_BlockedSnapshot.size()),
+                g_BlockedSnapshotTeam, g_BlockedSnapshotValid ? 1 : 0);
+            reason += blockerText;
+        }
+
+        auto appendIssue = [&reason](const char *name) {
+            reason += reason.find(" issues=") == std::string::npos ? " issues=" : ",";
+            reason += name;
+        };
+        if ((issues & AnneNavTopologyIssue_UnknownArea) != 0)
+        {
+            flags |= kNavDiagUnknownArea;
+            appendIssue("unknown_area");
+            reason += " unknown_count=";
+            reason += std::to_string(g_NavUnknownAreaCount);
+            std::size_t sampleCount = std::min<std::size_t>(
+                g_NavUnknownAreaSamples.size(), 3);
+            for (std::size_t i = 0; i < sampleCount; ++i)
+            {
+                const NavUnknownAreaSample &sample = g_NavUnknownAreaSamples[i];
+                char sampleText[192];
+                std::snprintf(
+                    sampleText, sizeof(sampleText),
+                    " unknown[%llu]=%u@%u:%s:dir%d:slot%d->0x%llx",
+                    static_cast<unsigned long long>(i), sample.sourceNavId,
+                    sample.sourceIndex, UnknownConnectionKindName(sample.kind),
+                    sample.direction, sample.slot,
+                    static_cast<unsigned long long>(sample.targetPointer));
+                reason += sampleText;
+            }
+        }
+        if ((issues & AnneNavTopologyIssue_InvalidFloorStorage) != 0)
+        {
+            flags |= kNavDiagInvalidFloorStorage;
+            appendIssue("invalid_floor_storage");
+        }
+        if ((issues & AnneNavTopologyIssue_InvalidLadderStorage) != 0)
+        {
+            flags |= kNavDiagInvalidLadderStorage;
+            appendIssue("invalid_ladder_storage");
+        }
+        if ((issues & AnneNavTopologyIssue_DynamicElevator) != 0)
+        {
+            flags |= kNavDiagDynamicElevator;
+            appendIssue("dynamic_elevator");
+        }
+        if ((issues & AnneNavTopologyIssue_UnresolvedDynamicElevator) != 0)
+        {
+            flags |= kNavDiagUnresolvedDynamicElevator;
+            appendIssue("unresolved_dynamic_elevator");
+        }
+        if (g_DynamicNav.watching)
+        {
+            const char *dynamicState = g_DynamicNav.dirty
+                ? (g_DynamicNav.moving ? "moving" : "stabilizing")
+                : "stable";
+            char dynamicText[768];
+            std::snprintf(
+                dynamicText, sizeof(dynamicText),
+                " topology_watch=all_directed topology_areas=%u"
+                " topology_floor_edges=%llu topology_ladder_edges=%llu"
+                " topology_poll_batch=%llu topology_poll_cursor=%llu"
+                " topology_readable=%d topology_captured_hash=%016llx"
+                " dynamic_state=%s dynamic_areas=%llu dynamic_elevators=%llu"
+                " dynamic_resolved=%d dynamic_list_valid=%d dynamic_epoch=%llu"
+                " dynamic_changes=%llu dynamic_rebuilds=%llu dynamic_cache_loads=%llu"
+                " dynamic_hash=%016llx dynamic_poll_ms=%.3f/%.3f dynamic_polls=%llu",
+                g_DynamicNav.areaCount,
+                static_cast<unsigned long long>(g_DynamicNav.floorConnections),
+                static_cast<unsigned long long>(g_DynamicNav.ladderConnections),
+                static_cast<unsigned long long>(kTopologyPollBatchAreas),
+                static_cast<unsigned long long>(g_DynamicNav.topologyPollCursor),
+                g_DynamicNav.topologyReadable ? 1 : 0,
+                static_cast<unsigned long long>(g_DynamicNav.capturedFingerprint),
+                dynamicState,
+                static_cast<unsigned long long>(g_DynamicNav.dynamicAreaIndices.size()),
+                static_cast<unsigned long long>(g_DynamicNav.elevators.size()),
+                g_DynamicNav.entitiesResolved ? 1 : 0,
+                g_DynamicNav.areaListValid ? 1 : 0,
+                static_cast<unsigned long long>(g_DynamicNav.epoch),
+                static_cast<unsigned long long>(g_DynamicNav.changes),
+                static_cast<unsigned long long>(g_DynamicNav.rebuilds),
+                static_cast<unsigned long long>(g_DynamicNav.cacheLoads),
+                static_cast<unsigned long long>(g_DynamicNav.rawFingerprint),
+                g_DynamicNav.pollLastMs, g_DynamicNav.pollMaxMs,
+                static_cast<unsigned long long>(g_DynamicNav.pollSamples));
+            reason += dynamicText;
+        }
+        if (!g_NavGraphError.empty())
+        {
+            reason += " note=";
+            reason += g_NavGraphError;
+        }
+    }
+    context->StringToLocal(params[1], params[2], reason.c_str());
+    return flags;
+}
+
 cell_t Native_NavGraphCollectProgress(IPluginContext *context, const cell_t *params)
 {
     if (params[0] != 4)
@@ -1656,6 +2608,53 @@ cell_t Native_NavGraphCollectProgress(IPluginContext *context, const cell_t *par
              g_NavGraph->flowResolveDistances[i] <= maxResolveDistance))
         {
             flow = g_NavGraph->resolvedFlowDistances[i];
+            valid = std::isfinite(flow) && flow >= 0.0f &&
+                    flow <= g_NavGraph->maxFlowDistance;
+        }
+        output[i] = sp_ftoc(valid ? flow : -1.0f);
+    }
+    return count;
+}
+
+cell_t Native_NavGraphCollectProgressPage(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 5)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavGraphCollectProgressPage expects 5 parameters");
+
+    int maxResults = params[2];
+    int offset = params[3];
+    bool mapInvalid = params[4] != 0;
+    float maxResolveDistance = sp_ctof(params[5]);
+    if (maxResults < 0 || maxResults > kMaxSpatialPoints || offset < 0 ||
+        !std::isfinite(maxResolveDistance) || maxResolveDistance < 0.0f)
+        return context->ThrowNativeError("Invalid paged Nav graph progress request");
+
+    cell_t *output = nullptr;
+    if (maxResults > 0 && !GetCells(context, params[1], output))
+        return context->ThrowNativeError(
+            "Invalid paged Nav graph progress output array");
+
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    if (!g_NavGraph || g_NavGraphState.load() != kNavGraphReady)
+        return -1;
+
+    int areaCount = static_cast<int>(g_NavGraph->navIds.size());
+    if (offset >= areaCount)
+        return 0;
+    int count = std::min(maxResults, areaCount - offset);
+    for (int i = 0; i < count; ++i)
+    {
+        int areaIndex = offset + i;
+        float flow = g_NavGraph->flowDistances[areaIndex];
+        bool valid = std::isfinite(flow) && flow >= 0.0f &&
+                     flow <= g_NavGraph->maxFlowDistance;
+        if (!valid && mapInvalid &&
+            std::isfinite(g_NavGraph->flowResolveDistances[areaIndex]) &&
+            (maxResolveDistance <= 0.0f ||
+             g_NavGraph->flowResolveDistances[areaIndex] <= maxResolveDistance))
+        {
+            flow = g_NavGraph->resolvedFlowDistances[areaIndex];
             valid = std::isfinite(flow) && flow >= 0.0f &&
                     flow <= g_NavGraph->maxFlowDistance;
         }
@@ -1931,8 +2930,17 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
     float maxPathLength = sp_ctof(params[5]);
     std::uint32_t goalId = static_cast<std::uint32_t>(params[2]);
     std::uint32_t startId = static_cast<std::uint32_t>(params[4]);
-    PrepareReachability(startId, maxPathLength + AnneNavGraph::kBoundarySlack,
-                        params[7], params[8] != 0);
+
+    bool canUseGraph = false;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        canUseGraph = g_NavGraph && g_NavGraph->complete;
+    }
+    if (canUseGraph)
+    {
+        PrepareReachability(startId, maxPathLength + AnneNavGraph::kBoundarySlack,
+                            params[7], params[8] != 0);
+    }
 
     std::shared_ptr<AnneNavGraph> graph;
     std::shared_ptr<ReachabilityResult> reachability;
@@ -1943,7 +2951,7 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
             startId, maxPathLength + AnneNavGraph::kBoundarySlack,
             params[7], params[8] != 0, true);
     }
-    if (graph && reachability)
+    if (graph && graph->complete && reachability)
     {
         std::uint32_t goalIndex;
         if (graph->FindIndex(goalId, goalIndex))
@@ -1951,22 +2959,27 @@ cell_t Native_PathExists(IPluginContext *context, const cell_t *params)
             float distance = reachability->distances[goalIndex];
             if (!std::isfinite(distance))
             {
-                if (graph->complete && !graph->hasElevatorEdges)
-                    return 0;
+                return 0;
             }
             else
             {
                 bool special = reachability->usesSpecialEdge[goalIndex] != 0;
                 if (!special && distance <= maxPathLength - AnneNavGraph::kBoundarySlack)
                     return 1;
-                if (!special && graph->complete && !graph->hasElevatorEdges &&
-                    distance > maxPathLength + AnneNavGraph::kBoundarySlack)
+                if (!special && distance > maxPathLength + AnneNavGraph::kBoundarySlack)
                     return 0;
             }
         }
     }
 
-    bool useCache = params[9] != 0;
+    bool dynamicTopologyDirty = false;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        dynamicTopologyDirty = g_DynamicNav.dirty;
+    }
+    // Invalidation clears this cache before a dynamic state can rebuild. While
+    // dirty, never retain an engine fallback result from a moving topology.
+    bool useCache = params[9] != 0 && !dynamicTopologyDirty;
     int blockedEpoch = CurrentBlockedEpoch();
     if (useCache && g_PathCacheEpoch != blockedEpoch)
     {
@@ -2021,7 +3034,9 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavCandidatesResetPerf", Native_NavCandidatesResetPerf},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},
     {"AnneSpawn_NavGraphGetEdgeCount", Native_NavGraphGetEdgeCount},
+    {"AnneSpawn_NavGraphGetDiagnostics", Native_NavGraphGetDiagnostics},
     {"AnneSpawn_NavGraphCollectProgress", Native_NavGraphCollectProgress},
+    {"AnneSpawn_NavGraphCollectProgressPage", Native_NavGraphCollectProgressPage},
     {"AnneSpawn_GetWorkerCount", Native_GetWorkerCount},
     {"AnneSpawn_SetSurvivorSnapshot", Native_SetSurvivorSnapshot},
     {"AnneSpawn_ClearSurvivorSnapshot", Native_ClearSurvivorSnapshot},
@@ -2093,7 +3108,7 @@ bool AnneSpawnAccelExtension::SDK_OnLoad(char *error, size_t maxlength, bool)
         {"CNavArea::ID", &g_NavAreaIdOffset},
         {"CNavArea::Center", &g_NavAreaCenterOffset},
         {"TerrorNavArea::FlowDistance", &g_NavAreaFlowOffset},
-        {"CNavArea::Blocked", &g_NavAreaBlockedOffset},
+        {"CNavArea::BlockedBits", &g_NavAreaBlockedBitsOffset},
         {"CNavArea::Attributes", &g_NavAreaAttributesOffset},
         {"CNavArea::Connections", &g_NavAreaConnectionsOffset},
         {"CNavArea::Ladders", &g_NavAreaLaddersOffset},
@@ -2139,6 +3154,11 @@ void AnneSpawnAccelExtension::SDK_OnUnload()
         g_NavCapture.reset();
         ClearReachabilityState();
         g_NavGraphError.clear();
+        g_NavGraphForceRebuild = false;
+        g_NavGraphCacheHit = false;
+        g_NavUnknownAreaCount = 0;
+        g_NavUnknownAreaSamples.clear();
+        g_DynamicNav = DynamicNavMonitor{};
     }
     g_NavGraphState.store(kNavGraphIdle);
     g_SurvivorCount = 0;

@@ -232,6 +232,59 @@ bool IsPosVisibleSDK(const float pos[3], bool teleportMode)
     return IsPosVisibleSDKWithMode(pos, teleportMode, GetEffectiveVisibilityRayMode());
 }
 
+AnneSpawnSafetyResult Visibility_TestPointSafetyDirect(
+    const float pos[3], bool teleportMode, int effectiveRayMode)
+{
+    Visibility_EnsureCurrentEyeSnapshot();
+    if (WillStuck(pos))
+        return AnneSpawnSafety_Stuck;
+    if (IsPosVisibleSDKWithMode(pos, teleportMode, effectiveRayMode))
+        return AnneSpawnSafety_Visible;
+    return AnneSpawnSafety_Safe;
+}
+
+bool IsPredictedSpawnLandingVisible(
+    const float pos[3], bool teleportMode, int effectiveRayMode)
+{
+    // ZombieManager 在绝大多数平地会把请求原点下移约 10u。这个吸附并不
+    // 总能由向下 Trace 复现（某些地板会在请求高度提前命中），因此固定
+    // 样本必须独立检查，不能只作为 Trace 失败时的 fallback。
+    float typicalLanding[3];
+    typicalLanding = pos;
+    typicalLanding[2] -= 10.0;
+    if (IsPosVisibleSDKWithMode(
+            typicalLanding, teleportMode, effectiveRayMode))
+    {
+        return true;
+    }
+
+    float start[3];
+    float end[3];
+    start = pos;
+    end = pos;
+    start[2] += 4.0;
+    end[2] -= 32.0;
+    TR_TraceRayFilter(start, end, MASK_PLAYERSOLID, RayType_EndPoint, TraceFilter);
+    if (TR_DidHit() && !TR_StartSolid())
+    {
+        float landing[3];
+        TR_GetEndPosition(landing);
+        return IsPosVisibleSDKWithMode(
+            landing, teleportMode, effectiveRayMode);
+    }
+
+    // 动态实体/边缘几何无法给出稳定命中点时，补充检查较小的吸附量。
+    float landing[3];
+    landing = pos;
+    for (float offset = 2.0; offset <= 6.0; offset += 2.0)
+    {
+        landing[2] = pos[2] - offset;
+        if (IsPosVisibleSDKWithMode(landing, teleportMode, effectiveRayMode))
+            return true;
+    }
+    return false;
+}
+
 AnneSpawnSafetyResult Visibility_TestPointSafety(
     const float pos[3], bool teleportMode, int effectiveRayMode)
 {
@@ -243,11 +296,8 @@ AnneSpawnSafetyResult Visibility_TestPointSafety(
             pos, teleportMode, gCV.bIgnoreIncapSight, effectiveRayMode);
     }
 
-    if (WillStuck(pos))
-        return AnneSpawnSafety_Stuck;
-    if (IsPosVisibleSDKWithMode(pos, teleportMode, effectiveRayMode))
-        return AnneSpawnSafety_Visible;
-    return AnneSpawnSafety_Safe;
+    return Visibility_TestPointSafetyDirect(
+        pos, teleportMode, effectiveRayMode);
 }
 
 stock bool TraceFilter_Stuck(int entity, int contentsMask)
@@ -275,6 +325,107 @@ bool WillStuck(const float at[3])
     static const float maxs[3] = {  16.0,  16.0, 71.0 };
     TR_TraceHullFilter(at, at, mins, maxs, MASK_PLAYERSOLID, TraceFilter_Stuck);
     return TR_DidHit();
+}
+
+static ArrayList g_HurtTriggerRefs;
+static float g_fNextHurtTriggerRefresh;
+
+void Visibility_ResetHurtTriggers()
+{
+    delete g_HurtTriggerRefs;
+    g_HurtTriggerRefs = null;
+    g_fNextHurtTriggerRefresh = 0.0;
+}
+
+static void Visibility_AddHurtTriggerClass(const char[] classname)
+{
+    int entity = -1;
+    while ((entity = FindEntityByClassname(entity, classname)) != -1)
+        g_HurtTriggerRefs.Push(EntIndexToEntRef(entity));
+}
+
+static void Visibility_RefreshHurtTriggers()
+{
+    float now = GetGameTime();
+    if (g_HurtTriggerRefs != null && now < g_fNextHurtTriggerRefresh)
+        return;
+
+    if (g_HurtTriggerRefs == null)
+        g_HurtTriggerRefs = new ArrayList();
+    else
+        g_HurtTriggerRefs.Clear();
+
+    Visibility_AddHurtTriggerClass("trigger_hurt");
+    Visibility_AddHurtTriggerClass("trigger_hurt_ghost");
+    g_fNextHurtTriggerRefresh = now + 1.0;
+}
+
+bool IsSpawnPointInHurtTrigger(const float at[3])
+{
+    Visibility_RefreshHurtTriggers();
+    if (g_HurtTriggerRefs == null)
+        return false;
+
+    float playerMin[3] = { -16.0, -16.0, 0.0 };
+    float playerMax[3] = {  16.0,  16.0, 71.0 };
+    for (int axis = 0; axis < 3; axis++)
+    {
+        playerMin[axis] += at[axis];
+        playerMax[axis] += at[axis];
+    }
+
+    for (int i = 0; i < g_HurtTriggerRefs.Length; i++)
+    {
+        int entity = EntRefToEntIndex(g_HurtTriggerRefs.Get(i));
+        if (entity <= MaxClients || !IsValidEntity(entity))
+            continue;
+        if (HasEntProp(entity, Prop_Data, "m_bDisabled")
+            && GetEntProp(entity, Prop_Data, "m_bDisabled") != 0)
+        {
+            continue;
+        }
+
+        float origin[3];
+        float triggerMin[3];
+        float triggerMax[3];
+        GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", origin);
+        GetEntPropVector(entity, Prop_Send, "m_vecMins", triggerMin);
+        GetEntPropVector(entity, Prop_Send, "m_vecMaxs", triggerMax);
+        bool overlaps = true;
+        for (int axis = 0; axis < 3; axis++)
+        {
+            triggerMin[axis] += origin[axis];
+            triggerMax[axis] += origin[axis];
+            if (playerMax[axis] < triggerMin[axis]
+                || playerMin[axis] > triggerMax[axis])
+            {
+                overlaps = false;
+            }
+        }
+        if (!overlaps)
+            continue;
+
+        Debug_Print("[SPAWN BLOCK] hurtTrigger=%d pos=(%.1f %.1f %.1f) bounds=(%.1f %.1f %.1f)-(%.1f %.1f %.1f)",
+                    entity, at[0], at[1], at[2],
+                    triggerMin[0], triggerMin[1], triggerMin[2],
+                    triggerMax[0], triggerMax[1], triggerMax[2]);
+        return true;
+    }
+    return false;
+}
+
+bool IsPredictedSpawnLandingInHurtTrigger(const float at[3])
+{
+    if (IsSpawnPointInHurtTrigger(at))
+        return true;
+
+    // ZombieManager can snap the requested origin down by more than the usual
+    // 10u. Probe the whole landing window so a point just above trigger_hurt is
+    // rejected before the synchronous spawn call.
+    float landing[3];
+    landing = at;
+    landing[2] -= HURT_TRIGGER_LANDING_MARGIN;
+    return IsSpawnPointInHurtTrigger(landing);
 }
 
 stock bool TraceFilter(int entity, int contentsMask)

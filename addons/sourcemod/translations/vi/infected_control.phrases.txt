@@ -208,6 +208,10 @@
 	{
 		"vi"		"{green}[IC]{default} You may now spawn using normal ghost rules."
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"vi"		"{green}[IC]{default} Sau khi xuất hiện, nội gián phải chiến đấu cho đến khi chết. Không thể rời xa người sống sót để trở lại trạng thái ma và xuất hiện lại."
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"vi"		"{green}[IC]{default} No traitor slot is available."

@@ -208,6 +208,10 @@
 	{
 		"jp"		"{green}[IC]{default} You may now spawn using normal ghost rules."
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"jp"		"{green}[IC]{default} 内鬼は出現後、死亡するまで戦う必要があります。生存者から離れてゴースト状態に戻り、再出現することはできません。"
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"jp"		"{green}[IC]{default} No traitor slot is available."

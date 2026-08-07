@@ -655,7 +655,7 @@
               <p class="step-description" id="step-description">Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。</p>
             </div>
             <dl class="metrics">
-              <div class="metric-row"><dt>职业 Nav 距离带</dt><dd id="metric-range">500–1300</dd></div>
+              <div class="metric-row"><dt>职业 Nav 距离带</dt><dd id="metric-range">350–950</dd></div>
               <div class="metric-row"><dt>图快照有效期</dt><dd id="metric-window">≤ 0.2 秒</dd></div>
               <div class="metric-row"><dt>候选检查</dt><dd id="metric-pool">0 / 图快照</dd></div>
               <div class="metric-row"><dt>本帧 Nav 检查</dt><dd id="metric-nav">0 / 256</dd></div>
@@ -672,9 +672,9 @@
         <ol class="timeline" id="timeline" aria-label="执行阶段"></ol>
 
         <div class="band-strip" aria-label="职业距离带">
-          <div class="band-item"><div class="band-name">主区间</div><div class="band-value" id="band-primary">500–1300</div></div>
-          <div class="band-item"><div class="band-name">第一次放宽</div><div class="band-value" id="band-secondary">350–1900</div></div>
-          <div class="band-item"><div class="band-name">最终区间</div><div class="band-value" id="band-final">250–2600</div></div>
+          <div class="band-item"><div class="band-name">主区间</div><div class="band-value" id="band-primary">350–950</div></div>
+          <div class="band-item"><div class="band-name">第一次放宽</div><div class="band-value" id="band-secondary">350–1750</div></div>
+          <div class="band-item"><div class="band-name">最终区间</div><div class="band-value" id="band-final">350–2900</div></div>
         </div>
       </section>
 
@@ -719,7 +719,7 @@
           <table class="comparison">
             <thead><tr><th>环节</th><th>重构前</th><th>当前实现</th><th>收益与边界</th></tr></thead>
             <tbody>
-              <tr><td>距离预筛口径</td><td>空间眼距兼任职业范围</td><td class="proposal">职业使用有向 Nav 距离；全队直线 250 只做安全排除</td><td>多层和绕路地图不再把楼上楼下当成同一距离</td></tr>
+              <tr><td>距离预筛口径</td><td>空间眼距兼任职业范围</td><td class="proposal">职业使用有向 Nav 距离；Smoker/Hunter 高点有限折减；全队直线 250 只做安全排除</td><td>多层和绕路地图保留通行语义，同时提高高台职业点命中率</td></tr>
               <tr><td>候选来源</td><td>Flow 桶局部枚举</td><td class="proposal">后台反向距离场返回完整可达快照</td><td>直接定位目标 Nav 可达区域</td></tr>
               <tr><td>候选生产</td><td>游戏线程同步物化</td><td class="proposal">0.1 / 1.0 秒节流的 worker 快照</td><td>构图与排序不占用游戏主线程预算</td></tr>
               <tr><td>生还者眼位</td><td>每个随机点调用 native</td><td class="proposal">每个实际刷特帧快照一次</td><td>同 Tick 距离、视线、战术评分复用</td></tr>
@@ -730,7 +730,7 @@
         </div>
 
         <div class="perf-note">
-          <section><h3>已经受控</h3><p>每帧最多 256 个 NavArea、8 个昂贵检查，并受 1.0ms 搜索软预算限制。</p></section>
+          <section><h3>已经受控</h3><p>每个搜索切片默认最多 256 个 NavArea、8 个昂贵检查，并受 1.0ms 搜索软预算限制；三项均可热调。</p></section>
           <section><h3>已经落地</h3><p>有向 Nav 距离分页、全队直线 250 排除和眼位快照同时降低总成本与单帧峰值。</p></section>
           <section><h3>现在可测</h3><p><code>sm_spawnperf</code> 按 6/8/10/12/14+ 输出候选构建、最大切片和最终 API 分位数。</p></section>
         </div>
@@ -820,7 +820,7 @@
           <div class="roadmap-head">
             <div>
               <h2 id="roadmap-heading">当前实现：保留 OnGameFrame</h2>
-              <p>没有改成低频 timer。后台图快照按 0.1 / 1.0 秒节流构建，OnGameFrame 只分页消费，并保持 256 个 Nav、8 个昂贵检查和 1.0ms 的默认搜索预算。</p>
+              <p>没有改成低频 timer。后台图快照按 0.1 / 1.0 秒节流构建，OnGameFrame 只分页消费；每个搜索切片默认采用 256 个 Nav、8 个昂贵检查和 1.0ms 软预算，三项均可通过 ConVar 热调。</p>
             </div>
             <span class="status-label">已写入插件</span>
           </div>
@@ -852,7 +852,7 @@
               <tbody>
                 <tr><td>P0 · 已完成</td><td>分段耗时统计</td><td>新增 candidateBuildMs、maxSliceMs、fallbackApiMs 和每类过滤命中数。</td><td>按 6/8/10/12/14+ 输出真实分位数；不改变生成行为。</td></tr>
                 <tr><td>P1 · 已完成</td><td>有向图候选</td><td>worker 从目标 Nav 反向构建距离场，只返回能够沿有向边到达目标的候选。</td><td>不再依赖 Flow 桶猜测目标附近区域。</td></tr>
-                <tr><td>P1 · 已完成</td><td>Nav 距离粗排</td><td>职业范围和排序使用候选到目标的有向路径距离；随机点最终硬判继续使用全队三维直线 250。</td><td>多层、单向落差和绕路地图使用真实通行语义。</td></tr>
+                <tr><td>P1 · 已完成</td><td>Nav 距离粗排</td><td>职业范围和排序使用候选到目标的有向路径距离；放宽只提高远端上限并只分页新增区间，Smoker/Hunter 高点扩大粗筛后按有效距离判断上限，随机点最终硬判继续使用全队三维直线 250。</td><td>多层、单向落差和绕路地图使用真实通行语义，同时避免重复扫描近端候选。</td></tr>
                 <tr><td>P1 · 已完成</td><td>快照节流</td><td>刷特前 1 秒和待刷期间每 0.1 秒刷新，空闲每 1 秒刷新，结果 TTL 为 0.2 秒。</td><td>跟上 128 tick 玩家移动，同时避免每帧重建。</td></tr>
                 <tr><td>P2 · 已完成</td><td>生还者眼位快照</td><td>每个实际刷特的 OnGameFrame 读取一次眼位和朝向，当前切片复用。</td><td>玩家移动最多产生一个 Tick 的快照误差。</td></tr>
                 <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>保持 50 次导演内部尝试和无插件限制，只独立记录耗时、命中率和职业。</td><td>确认罕见兜底是否造成尖峰，不新增任何刷不出的限制。</td></tr>
@@ -872,7 +872,7 @@
 
     <footer>
       <span>数据来源：<code>spawn_core.inc</code>、<code>spawn_tactics.inc</code>、<code>spawn_attempts.inc</code>、<code>spawn_memory.inc</code></span>
-      <span>当前常量：256 Nav/帧 · 8 昂贵检查/帧 · 1.0ms 搜索预算 · 0.2s 快照 TTL</span>
+      <span>默认参数：256 Nav/切片 · 8 昂贵检查/切片 · 1.0ms 切片预算 · 0.2s 快照 TTL</span>
     </footer>
   </div>
 
@@ -880,20 +880,20 @@
     (() => {
       const SVG_NS = 'http://www.w3.org/2000/svg';
       const classBands = {
-        smoker:  { label: 'Smoker',  bands: [[700, 1650], [500, 2400], [300, 3000]] },
-        boomer:  { label: 'Boomer',  bands: [[250, 700],  [250, 1050], [250, 1600]] },
-        hunter:  { label: 'Hunter',  bands: [[500, 1300], [350, 1900], [250, 2600]] },
-        spitter: { label: 'Spitter', bands: [[450, 1150], [300, 1550], [250, 2000]] },
-        jockey:  { label: 'Jockey',  bands: [[300, 900],  [250, 1350], [250, 2000]] },
-        charger: { label: 'Charger', bands: [[300, 900],  [250, 1350], [250, 2000]] }
+        smoker:  { label: 'Smoker',  bands: [[500, 1200], [500, 2100], [500, 3000]] },
+        boomer:  { label: 'Boomer',  bands: [[250, 550],  [250, 1000], [250, 1800]] },
+        hunter:  { label: 'Hunter',  bands: [[350, 950],  [350, 1750], [350, 2900]] },
+        spitter: { label: 'Spitter', bands: [[300, 800],  [300, 1450], [300, 2300]] },
+        jockey:  { label: 'Jockey',  bands: [[250, 700],  [250, 1250], [250, 2200]] },
+        charger: { label: 'Charger', bands: [[250, 700],  [250, 1250], [250, 2200]] }
       };
 
       const steps = [
         { title: '选择目标', short: '目标', description: 'Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。', event: '冻结本次会话目标，后续每秒目标更新不会重置扫描进度。' },
         { title: '读取图快照', short: '有向图', description: 'worker 从目标 Nav 反向构建距离场，只保留 candidate -> target 有向可达区域。', event: '空闲每 1 秒、刷特前和待刷期间每 0.1 秒刷新；消费 TTL 为 0.2 秒。' },
-        { title: 'Nav 距离分页', short: '候选游标', description: '按职业有向 Nav 距离带从近到远分页，目标直线距离不参与主排序。', event: '每页同时返回 areaIdx 和 navDistance，SourcePawn 不重复寻路计算排序。' },
-        { title: '轻量硬过滤', short: '距离预筛', description: '每个 NavArea 最多随机 3 个点，先执行全队三维直线 250、分散度和真实 Flow 位置检查。', event: '职业 Nav 距离带是硬边界；直线 250 是独立安全边界。' },
-        { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '单帧最多 3 个候选进入昂贵检查，避免 trace 与寻路集中爆发。' },
+        { title: 'Nav 距离分页', short: '候选游标', description: '主区间从近到远分页；放宽档只读取上一档上限之外的新远端区间，Smoker/Hunter 额外预取补偿上限内的高点。', event: '每页同时返回 areaIdx 和原始 navDistance，SourcePawn 不重复寻路计算排序，也不回头重扫近端。' },
+        { title: '轻量硬过滤', short: '距离预筛', description: '每个 NavArea 最多随机 3 个点，先执行高点有效距离、全队三维直线 250、分散度和真实 Flow 位置检查。', event: 'Smoker/Hunter 仅折减职业上限；直线 250 是不可折减的独立安全边界。' },
+        { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '每切片默认最多 8 个候选进入昂贵检查，避免 trace 与寻路集中爆发；可由 ConVar 调整。' },
         { title: '评分并生成', short: '评分生成', description: '通过硬过滤的候选统一按 0–100 基础质量和职业战术几何评分，选择最高分。', event: '至少比较两个候选；普通波比较 3–4 个，破点波比较 4–5 个，84 分可早停。' },
         { title: '受限导演兜底', short: '受限兜底', description: '三个职业距离带都失败后，导演候选仍需满足最终距离、视线和卡位规则。', event: '完整流程第一次失败只轮转职业，继续让插件自己处理。' },
         { title: '无条件 API 兜底', short: '最终 API', description: '同一职业连续两轮完整失败后，导演执行 50 次内部找位，返回坐标后直接生成。', event: '最终 API 不再叠加插件距离、视线、卡位、路径或评分限制。' }
@@ -1051,6 +1051,9 @@
         const config = classBands[state.classKey];
         const bandIndex = state.phase >= 6 ? 2 : state.band;
         const [minRange, maxRange] = config.bands[bandIndex];
+        const scanMinRange = bandIndex === 0
+          ? minRange
+          : config.bands[bandIndex - 1][1];
         return navAreas
           .map(area => ({
             ...area,
@@ -1062,7 +1065,7 @@
           .slice(0, 28)
           .map((area, idx) => ({
             ...area,
-            passDistance: area.navDistance >= minRange && area.navDistance <= maxRange,
+            passDistance: area.navDistance >= scanMinRange && area.navDistance <= maxRange,
             rank: idx
           }));
       }

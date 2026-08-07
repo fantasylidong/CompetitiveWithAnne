@@ -24,6 +24,8 @@ enum struct AntiBaitRuntime
     int lastMedianPct;
     int runner;
     int holdingTarget;
+    int activeCount;
+    int vulnerableCount;
     int isolatedCount;
     int groupCount;
     float stateSince;
@@ -49,6 +51,8 @@ enum struct AntiBaitRuntime
         this.lastMedianPct = -1;
         this.runner = -1;
         this.holdingTarget = -1;
+        this.activeCount = 0;
+        this.vulnerableCount = 0;
         this.isolatedCount = 0;
         this.groupCount = 0;
         this.stateSince = 0.0;
@@ -114,6 +118,8 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
                                          int &highestClient,
                                          float &spreadDist,
                                          float &avgNearestDist,
+                                         int &activeCount,
+                                         int &vulnerableCount,
                                          int &isolatedCount,
                                          int &groupCount)
 {
@@ -124,6 +130,8 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
     highestClient = -1;
     spreadDist = 0.0;
     avgNearestDist = 0.0;
+    activeCount = 0;
+    vulnerableCount = 0;
     isolatedCount = 0;
     groupCount = 0;
     float pos[MAX_SURVIVOR_SLOTS][3];
@@ -132,12 +140,22 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidSurvivor(i) || !IsPlayerAlive(i) || L4D_IsPlayerIncapacitated(i))
+        if (!IsValidSurvivor(i))
             continue;
+
+        if (!IsPlayerAlive(i) || L4D_IsPlayerIncapacitated(i)
+            || IsSurvivorHangingFromLedge(i) || IsPinned(i))
+        {
+            vulnerableCount++;
+            continue;
+        }
 
         int pct;
         if (!TryGetClientFlowPercentSafe(i, pct))
+        {
+            vulnerableCount++;
             continue;
+        }
 
         pct = AntiBait_ClampPct(pct);
         if (n < sizeof(pcts))
@@ -146,6 +164,7 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
             GetClientAbsOrigin(i, pos[n]);
             nearest[n] = 999999.0;
             n++;
+            activeCount++;
         }
         sum += pct;
         if (pct > maxPct)
@@ -254,8 +273,12 @@ static bool AntiBait_IsEventBlocked()
     return false;
 }
 
-static bool AntiBait_TeamHoldingFormation(float spreadDist, float avgNearestDist, int isolatedCount, int groupCount)
+static bool AntiBait_TeamHoldingFormation(float spreadDist, float avgNearestDist,
+                                          int activeCount, int isolatedCount, int groupCount)
 {
+    if (activeCount < 2)
+        return false;
+
     if (groupCount > 1)
         return false;
 
@@ -271,8 +294,12 @@ static bool AntiBait_TeamHoldingFormation(float spreadDist, float avgNearestDist
     return gCV.fAntiBaitPairDist <= 0.0 || avgNearestDist <= gCV.fAntiBaitPairDist;
 }
 
-static bool AntiBait_TeamAttackableSpread(float spreadDist, int isolatedCount, int groupCount)
+static bool AntiBait_TeamAttackableSpread(float spreadDist, int activeCount,
+                                          int isolatedCount, int groupCount)
 {
+    if (activeCount < 2)
+        return true;
+
     if (groupCount > 1)
         return true;
 
@@ -301,22 +328,38 @@ stock bool AntiBait_IsAttackableSpread()
     return gAB.attackableSpread;
 }
 
+stock bool AntiBait_ShouldHoldWave()
+{
+    if (!gCV.bAntiBaitEnable || gCV.iAntiBaitAction < 1)
+        return false;
+    if (gAB.state != AB_Pressure || gAB.spreadStallPressure)
+        return false;
+    if (gAB.activeCount < 2 || gAB.vulnerableCount > 0)
+        return false;
+    if (!gAB.teamHolding || !AntiBait_IsStalled())
+        return false;
+
+    return (GetGameTime() - gAB.pressureSince) >= gCV.fAntiBaitHoldConfirm;
+}
+
 stock bool AntiBait_ShouldReleaseFromIntensive()
 {
-    // 兼容旧状态：基础刷新时间一到必须放行，禁止无限 Intensive。
-    if (DifficultyStrategy_CanStartConfiguredWave())
-        return true;
+    return !AntiBait_ShouldHoldWave();
+}
 
-    if (gAB.attackableSpread)
-        return true;
-
-    if (gAB.state == AB_Recover)
-        return true;
-
-    if (!AntiBait_IsStalled() && !gAB.teamHolding)
-        return true;
-
-    return false;
+stock void AntiBait_GetHoldMetrics(int &activeCount, int &vulnerableCount,
+                                   float &spreadDist, float &avgNearestDist,
+                                   float &stalledSecs, float &pressureSecs)
+{
+    float now = GetGameTime();
+    activeCount = gAB.activeCount;
+    vulnerableCount = gAB.vulnerableCount;
+    spreadDist = gAB.lastSpreadDist;
+    avgNearestDist = gAB.lastAvgNearestDist;
+    stalledSecs = FloatMax(0.0, now - gAB.lastProgressTime);
+    pressureSecs = gAB.pressureSince > 0.0
+        ? FloatMax(0.0, now - gAB.pressureSince)
+        : 0.0;
 }
 
 static bool AntiBait_IsPreferredTargetEligible(int client)
@@ -389,6 +432,7 @@ static void AntiBait_Resume(float now)
     if (pausedFor > 0.0)
     {
         gAB.lastProgressTime += pausedFor;
+        gAB.stateSince += pausedFor;
         if (gAB.pressureSince > 0.0)
             gAB.pressureSince += pausedFor;
     }
@@ -471,6 +515,18 @@ void AntiBait_OnRoundStart()
     gAB.Reset();
 }
 
+void AntiBait_OnPause()
+{
+    if (gAB.state != AB_Off && gAB.state != AB_Paused)
+        AntiBait_Pause(GetGameTime());
+}
+
+void AntiBait_OnUnpause()
+{
+    if (gAB.state == AB_Paused)
+        AntiBait_Resume(GetGameTime());
+}
+
 void AntiBait_OnWaveStart()
 {
     float now = GetGameTime();
@@ -479,9 +535,11 @@ void AntiBait_OnWaveStart()
     gAB.stateSince = now;
     gAB.lastProgressTime = now;
 
-    int avgPct, maxPct, medianPct, highest, isolatedCount, groupCount;
+    int avgPct, maxPct, medianPct, highest, activeCount, vulnerableCount, isolatedCount, groupCount;
     float spreadDist, avgNearestDist;
-    if (AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest, spreadDist, avgNearestDist, isolatedCount, groupCount))
+    if (AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest,
+        spreadDist, avgNearestDist, activeCount, vulnerableCount,
+        isolatedCount, groupCount))
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
@@ -491,10 +549,14 @@ void AntiBait_OnWaveStart()
         gAB.lastMedianPct = medianPct;
         gAB.lastSpreadDist = spreadDist;
         gAB.lastAvgNearestDist = avgNearestDist;
+        gAB.activeCount = activeCount;
+        gAB.vulnerableCount = vulnerableCount;
         gAB.isolatedCount = isolatedCount;
         gAB.groupCount = groupCount;
-        gAB.teamHolding = AntiBait_TeamHoldingFormation(spreadDist, avgNearestDist, isolatedCount, groupCount);
-        gAB.attackableSpread = AntiBait_TeamAttackableSpread(spreadDist, isolatedCount, groupCount);
+        gAB.teamHolding = AntiBait_TeamHoldingFormation(
+            spreadDist, avgNearestDist, activeCount, isolatedCount, groupCount);
+        gAB.attackableSpread = AntiBait_TeamAttackableSpread(
+            spreadDist, activeCount, isolatedCount, groupCount);
     }
 }
 
@@ -522,20 +584,32 @@ void AntiBait_Update()
     if (gAB.state == AB_Paused)
         AntiBait_Resume(now);
 
-    int avgPct, maxPct, medianPct, highest, isolatedCount, groupCount;
+    int avgPct, maxPct, medianPct, highest, activeCount, vulnerableCount, isolatedCount, groupCount;
     float spreadDist, avgNearestDist;
-    if (!AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest, spreadDist, avgNearestDist, isolatedCount, groupCount))
+    if (!AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest,
+        spreadDist, avgNearestDist, activeCount, vulnerableCount,
+        isolatedCount, groupCount))
+    {
+        gAB.activeCount = activeCount;
+        gAB.vulnerableCount = vulnerableCount;
+        gAB.teamHolding = false;
+        gAB.attackableSpread = true;
         return;
+    }
 
     gAB.lastAvgPct = avgPct;
     gAB.lastMaxPct = maxPct;
     gAB.lastMedianPct = medianPct;
     gAB.lastSpreadDist = spreadDist;
     gAB.lastAvgNearestDist = avgNearestDist;
+    gAB.activeCount = activeCount;
+    gAB.vulnerableCount = vulnerableCount;
     gAB.isolatedCount = isolatedCount;
     gAB.groupCount = groupCount;
-    gAB.teamHolding = AntiBait_TeamHoldingFormation(spreadDist, avgNearestDist, isolatedCount, groupCount);
-    gAB.attackableSpread = AntiBait_TeamAttackableSpread(spreadDist, isolatedCount, groupCount);
+    gAB.teamHolding = AntiBait_TeamHoldingFormation(
+        spreadDist, avgNearestDist, activeCount, isolatedCount, groupCount);
+    gAB.attackableSpread = AntiBait_TeamAttackableSpread(
+        spreadDist, activeCount, isolatedCount, groupCount);
     gAB.holdingTarget = gAB.teamHolding ? AntiBait_SelectHoldingTarget() : -1;
     AntiBait_UpdateRunner(highest, maxPct, medianPct);
 
@@ -550,6 +624,13 @@ void AntiBait_Update()
     // 使用下中位数要求过半核心成员推进；单人探路不再替全队重置停滞计时。
     bool progressed = (medianPct - gAB.baselineMedianPct) >= gCV.iAntiBaitProgressPct;
     bool releasedBySpread = gAB.attackableSpread;
+
+    if (gAB.state == AB_Pressure && gAB.spreadStallPressure && gAB.teamHolding)
+    {
+        gAB.spreadStallPressure = false;
+        gAB.pressureSince = now;
+        AntiBait_Debug("spread pressure became stable holding pressure");
+    }
 
     if (progressed)
     {
@@ -595,6 +676,10 @@ void AntiBait_Update()
     if (gAB.state == AB_Observe)
     {
         bool stalled = (now - gAB.lastProgressTime) >= gCV.fAntiBaitWindow;
+
+        // 倒计时前段只观察；临近到点才允许 Anti-Bait 接管刷特决策。
+        if (!WaveDecider_IsAntiBaitArmWindowOpen())
+            return;
 
         // 新增：分散但停滞，也主动施压（不推进+无卡位也打一波）
         if (stalled && !gAB.teamHolding && gAB.attackableSpread)

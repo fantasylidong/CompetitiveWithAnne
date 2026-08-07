@@ -101,7 +101,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            int sectors,
                                            float allMaxZ,
                                            int centerBucket,
-                                           int positionCheckBucket,
                                            float refEyeZ,
                                            float lowestFootZ,
                                            Address navStart,
@@ -189,10 +188,13 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
     if (teleportMode)
         directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
-    float directExclusionSq = directExclusion * directExclusion;
+        float requestExclusion = directExclusion + NAV_CANDIDATE_LANDING_MARGIN;
+        float directExclusionSq = requestExclusion * requestExclusion;
     bool haveCheapCandidate = false;
     bool geometryReady = false;
     float dTargetEye = 0.0;
+    float navDistanceEffective = navDistance;
+    float navHighGroundComp = 0.0;
     int sector = 0;
     float targetEye[3];
     if (!Visibility_GetClientEyeSnapshot(targetSurvivor, targetEye))
@@ -210,7 +212,8 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
             continue;
         }
 
-        // 6) 当前职业范围是硬边界；高度只参与评分，不再隐式扩大搜索范围。
+        // 6) 当前职业范围是硬边界；Smoker/Hunter 的正高度差只折减 Nav
+        //    上限判定，原始距离和全队三维安全距离保持不变。
         geometryReady = g_bSpawnAccel
             && AnneSpawn_ComputePointGeometry(pos, center, sectors, targetEye,
                                                dminEyeSq, dTargetEye, sector);
@@ -219,21 +222,22 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
             dminEyeSq = GetMinEyeDistSquaredToAnySurvivor(pos);
             dTargetEye = GetVectorDistance(pos, targetEye);
         }
+        navHighGroundComp = Tactical_GetHighGroundNavCompensation(
+            zc, pos[2], targetEye[2]);
+        navDistanceEffective = navDistance >= 0.0
+            ? FloatMax(minRange, navDistance - navHighGroundComp)
+            : -1.0;
+        // 无完整图时 direct 只作为路径上限的下界：直线都超上限可直接拒绝；
+        // 最小/最大职业路径边界稍后在同一帧用 candidate -> survivor BuildPath 精判。
+        float fallbackPathMax = ringEff + navHighGroundComp
+            + NAV_CANDIDATE_RANGE_SLACK;
         bool outsideRange = navDistance >= 0.0
-            ? (navDistance < minRange || navDistance > ringEff)
-            : (dTargetEye < gCV.fSpawnMin || dTargetEye > gCV.fSpawnMax);
+            ? (navDistance < minRange || navDistanceEffective > ringEff)
+            : (dTargetEye > fallbackPathMax);
         if (dminEyeSq < directExclusionSq || outsideRange)
         {
             stats.distance++;
             SpawnPerf_RecordFilterByDist();
-            continue;
-        }
-
-        // 7) 使用已知 candidateBucket 做真实位置检查，避免 GetPositionBucketPercent(pos) 再查 Nav。
-        if (!PassRealBucketPositionCheckCached(candidateBucket, positionCheckBucket))
-        {
-            stats.position++;
-            SpawnPerf_RecordFilterByPosition();
             continue;
         }
 
@@ -244,7 +248,9 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!haveCheapCandidate)
         return false;
 
-    // 8) 卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
+    // 7) 有向图已经按 candidate -> survivor 路径距离筛出连通候选。
+    //    Flow 只参与后续评分，不再以旧的进度桶阈值二次否决候选。
+    //    卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
     usedExpensive = true;
     AnneSpawnSafetyResult safety = Visibility_TestPointSafety(
         pos, teleportMode, visibilityRayMode);
@@ -261,14 +267,30 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         SpawnPerf_RecordFilterByVisibility();
         return false;
     }
-    if (PathPenalty_NoBuildFromStart(pos, navStart, searchRange, gCV.fSpawnMax) != 0.0)
+    if (IsPredictedSpawnLandingVisible(pos, teleportMode, visibilityRayMode))
+    {
+        stats.visibility++;
+        SpawnPerf_RecordFilterByVisibility();
+        return false;
+    }
+    if (IsPredictedSpawnLandingInHurtTrigger(pos))
+    {
+        stats.position++;
+        SpawnPerf_RecordFilterByPosition();
+        return false;
+    }
+    float minPathRange = navDistance < 0.0 && dTargetEye < minRange
+        ? minRange : 0.0;
+    if (PathPenalty_NoBuildFromStart(
+            pos, navStart, searchRange + navHighGroundComp,
+            gCV.fSpawnMax, minPathRange) != 0.0)
     {
         stats.path++;
         SpawnPerf_RecordFilterByPath();
         return false;
     }
 
-    // 9) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
+    // 8) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
     //     这能让图候选路径中大量失败候选完全不读 area.GetFlow()。
     if (!flowLoaded)
     {
@@ -285,9 +307,11 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         zc, pos, targetSurvivor, targetPoint);
     SpawnPerf_RecordFullEvaluation();
     float navWeight = 1.0;
-    float scoreMinRange = navDistance >= 0.0 ? minRange : gCV.fSpawnMin;
-    float scoreMaxRange = navDistance >= 0.0 ? ringEff : gCV.fSpawnMax;
-    if (!SpawnScore_BuildCandidate(zc, pos, dTargetEye, navDistance,
+    float scoreMinRange = minRange;
+    float scoreMaxRange = ringEff;
+    if (!SpawnScore_BuildCandidate(
+                                   zc, pos, dTargetEye, navDistance,
+                                   navDistanceEffective, navHighGroundComp,
                                    scoreMinRange, scoreMaxRange, slack,
                                    candidateBucket, centerBucket, rawBadFlow,
                                    refEyeZ, allMaxZ, lowestFootZ, sector, areaIdx,
@@ -364,6 +388,7 @@ enum struct SpawnSearchCursor
     int targetUserid;
     float minRange;
     float maxRange;
+    float graphScanMinRange;
     bool teleportMode;
     SpawnCandidateSource source;
     int allRow;
@@ -395,6 +420,7 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.graphTargetClient = -1;
     cursor.graphTargetNavId = -1;
     cursor.graphPathLimit = 0.0;
+    cursor.graphScanMinRange = 0.0;
     cursor.graphMinNavDistance = 0.0;
     cursor.graphMaxNavDistance = 0.0;
     cursor.graphOffset = 0;
@@ -430,11 +456,13 @@ void SpawnSearch_ResetClass(int zc, bool teleportMode)
 
 static bool SpawnSearch_Matches(SpawnSearchCursor cursor,
                                 int zc, int targetSurvivor, float minRange,
-                                float maxRange, bool teleportMode)
+                                float maxRange, float graphScanMinRange,
+                                bool teleportMode)
 {
     if (!cursor.active || cursor.zc != zc
         || cursor.targetSurvivor != targetSurvivor
         || cursor.minRange != minRange || cursor.maxRange != maxRange
+        || cursor.graphScanMinRange != graphScanMinRange
         || cursor.teleportMode != teleportMode)
     {
         return false;
@@ -508,6 +536,20 @@ static bool SpawnSearch_BuildFrameContext(
     {
         GetClientEyePosition(targetSurvivor, frame.targetPoint);
         frame.refEyeZ = frame.targetPoint[2];
+
+        // 同一 tick 内其他插件可能在本插件抓完快照后传送生还者。图起点已经
+        // 使用实时位置，此处同步校验目标眼位，避免路径距离与直线/可视判断
+        // 分别基于传送后的 Nav 和传送前的眼位。
+        float snapshotTarget[3];
+        if (!Visibility_GetClientEyeSnapshot(targetSurvivor, snapshotTarget)
+            || GetVectorDistance(snapshotTarget, frame.targetPoint) > 8.0)
+        {
+            Debug_Print("[VIS SNAPSHOT] target drifted within tick; refreshing target=%d drift=%.1f",
+                targetSurvivor,
+                Visibility_GetClientEyeSnapshot(targetSurvivor, snapshotTarget)
+                    ? GetVectorDistance(snapshotTarget, frame.targetPoint) : -1.0);
+            Visibility_RefreshEyeSnapshot();
+        }
     }
     if (!TryGetLowestSurvivorFootZ(frame.lowestFootZ))
         frame.lowestFootZ = 1.0e9;
@@ -555,7 +597,8 @@ static bool SpawnSearch_BuildFrameContext(
 
 static void SpawnSearch_ConfigureCursor(
     SpawnSearchCursor cursor, int zc, int targetSurvivor,
-    float minRange, float maxRange, bool teleportMode,
+    float minRange, float maxRange, float graphScanMinRange,
+    bool teleportMode,
     int graphTargetClient, int graphTargetNavId)
 {
     SpawnSearch_ResetCursor(cursor);
@@ -565,13 +608,16 @@ static void SpawnSearch_ConfigureCursor(
         && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
     cursor.minRange = minRange;
     cursor.maxRange = maxRange;
+    cursor.graphScanMinRange = graphScanMinRange;
     cursor.teleportMode = teleportMode;
     cursor.graphTargetClient = graphTargetClient;
     cursor.graphTargetNavId = graphTargetNavId;
     cursor.graphPathLimit = SpawnAccel_GetCandidatePathLimit();
-    cursor.graphMinNavDistance = FloatMax(
-        0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
-    cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK;
+    cursor.graphMinNavDistance = graphScanMinRange > minRange
+        ? graphScanMinRange
+        : FloatMax(0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
+    cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK
+        + Tactical_GetMaxHighGroundNavCompensation(zc);
     cursor.source = (graphTargetClient > 0 && graphTargetNavId > 0
         && SpawnAccel_CanUseGraphCandidates())
         ? SpawnCandidate_Graph : SpawnCandidate_All;
@@ -580,20 +626,25 @@ static void SpawnSearch_ConfigureCursor(
 
 static void SpawnSearch_EnsureCursor(
     SpawnSearchCursor cursor, int zc, int targetSurvivor,
-    float minRange, float maxRange, bool teleportMode,
+    float minRange, float maxRange, float graphScanMinRange,
+    bool teleportMode,
     int graphTargetClient, int graphTargetNavId)
 {
-    SpawnCandidateSource wantedSource = (graphTargetClient > 0 && graphTargetNavId > 0
-        && SpawnAccel_CanUseGraphCandidates())
+    bool matches = SpawnSearch_Matches(
+        cursor, zc, targetSurvivor, minRange, maxRange,
+        graphScanMinRange, teleportMode);
+    SpawnCandidateSource wantedSource = graphTargetClient > 0 && graphTargetNavId > 0
+        && SpawnAccel_CanUseGraphCandidates()
         ? SpawnCandidate_Graph : SpawnCandidate_All;
     bool graphTargetMoved = wantedSource == SpawnCandidate_Graph
         && (cursor.graphTargetClient != graphTargetClient
             || cursor.graphTargetNavId != graphTargetNavId);
-    if (!SpawnSearch_Matches(cursor, zc, targetSurvivor, minRange, maxRange, teleportMode)
+    if (!matches
         || cursor.source != wantedSource || graphTargetMoved)
     {
         SpawnSearch_ConfigureCursor(
-            cursor, zc, targetSurvivor, minRange, maxRange, teleportMode,
+            cursor, zc, targetSurvivor, minRange, maxRange,
+            graphScanMinRange, teleportMode,
             graphTargetClient, graphTargetNavId);
     }
 }
@@ -634,6 +685,8 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL);
             if (prepareStatus == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
             {
+                if (SpawnAccel_IsDynamicGraphPending())
+                    return SpawnCandidateRead_Pending;
                 g_bSpawnAccelGraphCandidatesAvailable = false;
                 cursor.source = SpawnCandidate_All;
                 cursor.allRow = 0;
@@ -663,6 +716,8 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 totalInRange);
             if (count == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
             {
+                if (SpawnAccel_IsDynamicGraphPending())
+                    return SpawnCandidateRead_Pending;
                 g_bSpawnAccelGraphCandidatesAvailable = false;
                 cursor.source = SpawnCandidate_All;
                 cursor.allRow = 0;
@@ -673,6 +728,13 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 return SpawnCandidateRead_Pending;
 
             cursor.graphTotalInRange = totalInRange;
+            if (count == 0 && totalInRange == 0 && cursor.graphOffset == 0)
+            {
+                Debug_Print("[SPAWN ACCEL] directed range exhausted target=%d nav=%d range=%.1f..%.1f; widening directed range",
+                    cursor.graphTargetClient, cursor.graphTargetNavId,
+                    cursor.graphMinNavDistance, cursor.graphMaxNavDistance);
+                return SpawnCandidateRead_Exhausted;
+            }
             if (count <= 0)
                 return SpawnCandidateRead_Exhausted;
 
@@ -691,7 +753,9 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             && cursor.allRow < g_NavAreasCacheCount)
         {
             areaIdx = cursor.allRow++;
-            rejectBadFlow = true;
+            // 映射 badflow 只用于召回/进度评分，绝不冒充路径连通性；
+            // 未映射的坏 Flow 仍拒绝，映射成功的点交给同帧 BuildPath 最终判定。
+            rejectBadFlow = !TryGetBucketByAreaIdx(areaIdx, candidateBucket);
             return SpawnCandidateRead_Found;
         }
         return SpawnCandidateRead_Exhausted;
@@ -701,10 +765,14 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
 
 static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     SpawnSearchCursor cursor,
-    int zc, int targetSurvivor, float minRange, float maxRange, bool teleportMode,
+    int zc, int targetSurvivor, float minRange, float maxRange,
+    float graphScanMinRange, bool teleportMode,
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     outAreaIdx = -1;
+    if (SpawnAccel_IsDynamicGraphPending())
+        return SpawnSearch_Pending;
+
     SpawnFrameContext frame;
     if (!SpawnSearch_BuildFrameContext(targetSurvivor, frame))
     {
@@ -713,7 +781,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         return SpawnSearch_Exhausted;
     }
     SpawnSearch_EnsureCursor(
-        cursor, zc, targetSurvivor, minRange, maxRange,
+        cursor, zc, targetSurvivor, minRange, maxRange, graphScanMinRange,
         teleportMode, frame.navStartClient, frame.navStartId);
 
     float sliceStart = GetEngineTime();
@@ -725,10 +793,10 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     float bestScore = -1.0e9;
     float now = GetGameTime();
     SpawnScoreDbg bestDbg;
-    while (sliceInspected < NAV_SCAN_CANDIDATES_PER_SLICE
-        && sliceExpensive < NAV_SCAN_EXPENSIVE_PER_SLICE
+    while (sliceInspected < gCV.iSpawnNavCandidatesPerSlice
+        && sliceExpensive < gCV.iSpawnNavExpensivePerSlice
         && acceptedHits < frame.candidateBudget
-        && (GetEngineTime() - sliceStart) * 1000.0 < NAV_SCAN_TIME_BUDGET_MS)
+        && (GetEngineTime() - sliceStart) * 1000.0 < gCV.fSpawnNavSliceBudgetMs)
     {
         int areaIdx;
         int candidateBucket;
@@ -756,7 +824,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
             frame.mapMaxFlowDist, frame.finaleArea,
             frame.center, frame.sectors,
             frame.allMaxZ, frame.centerBucket,
-            frame.positionCheckBucket, frame.refEyeZ,
+            frame.refEyeZ,
             frame.lowestFootZ,
             frame.navStart, frame.visibilityRayMode,
             frame.minScore, now, candDbg,
@@ -793,8 +861,9 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (!exhausted)
         return SpawnSearch_Pending;
 
-    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
-                cursor.minRange, cursor.maxRange, cursor.inspected,
+    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+                cursor.minRange, cursor.maxRange, cursor.graphScanMinRange,
+                cursor.inspected,
                 cursor.stats.cooldown, cursor.stats.flags,
                 cursor.stats.flow, cursor.stats.distance,
                 cursor.stats.separation, cursor.stats.stuck,
@@ -807,7 +876,8 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 }
 
 SpawnSearchResult FindSpawnPosViaNavAreaStep(
-    int zc, int targetSurvivor, float minRange, float maxRange, bool teleportMode,
+    int zc, int targetSurvivor, float minRange, float maxRange,
+    float graphScanMinRange, bool teleportMode,
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     int idx = zc - 1;
@@ -818,12 +888,14 @@ SpawnSearchResult FindSpawnPosViaNavAreaStep(
     {
         return FindSpawnPosViaNavAreaStepForCursor(
             g_TeleportSpawnSearchCursors[idx], zc, targetSurvivor,
-            minRange, maxRange, true, outPos, outAreaIdx, dbgOut);
+            minRange, maxRange, graphScanMinRange, true,
+            outPos, outAreaIdx, dbgOut);
     }
 
     return FindSpawnPosViaNavAreaStepForCursor(
         g_NormalSpawnSearchCursors[idx], zc, targetSurvivor,
-        minRange, maxRange, false, outPos, outAreaIdx, dbgOut);
+        minRange, maxRange, graphScanMinRange, false,
+        outPos, outAreaIdx, dbgOut);
 }
 
 // 计算到任意幸存者“眼睛”的最小距离，用于刷出硬下限判定。
@@ -846,6 +918,14 @@ float GetMinEyeDistSquaredToAnySurvivor(const float pos[3])
         return best;
     }
 
+    return GetMinLiveEyeDistSquaredToAnySurvivor(pos);
+}
+
+// 低频最终验证/日志使用实时眼位，不复用候选扫描快照。除了让日志距离可独立
+// 核验，也避免同 tick 内其他插件传送生还者时记录到传送前的旧眼位。
+float GetMinLiveEyeDistSquaredToAnySurvivor(const float pos[3])
+{
+    float best = 1.0e20;
     float eyes[3];
     for (int i = 1; i <= MaxClients; i++)
     {

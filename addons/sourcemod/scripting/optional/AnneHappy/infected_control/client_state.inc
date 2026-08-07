@@ -60,10 +60,19 @@ bool IsAiSmoker(int c)
         && GetClientTeam(c) == TEAM_INFECTED && GetEntProp(c, Prop_Send, "m_zombieClass") == view_as<int>(SI_Smoker) && !IsGhost(c);
 }
 
-bool IsAiTank(int c)
+bool IsActiveTank(int c)
 {
-    return c && c <= MaxClients && IsClientInGame(c) && IsPlayerAlive(c) && IsFakeClient(c)
-        && GetClientTeam(c) == TEAM_INFECTED && GetEntProp(c, Prop_Send, "m_zombieClass") == ZC_TANK && !IsGhost(c);
+    return c > 0 && c <= MaxClients && IsClientInGame(c) && IsPlayerAlive(c)
+        && GetClientTeam(c) == TEAM_INFECTED
+        && GetEntProp(c, Prop_Send, "m_zombieClass") == ZC_TANK
+        && !IsGhost(c);
+}
+
+bool IsSurvivorHangingFromLedge(int client)
+{
+    return IsValidSurvivor(client) && IsPlayerAlive(client)
+        && (GetEntProp(client, Prop_Send, "m_isHangingFromLedge") != 0
+            || GetEntProp(client, Prop_Send, "m_isFallingFromLedge") != 0);
 }
 
 bool IsPinned(int client)
@@ -168,8 +177,13 @@ bool IsAnyTankOrAboveHalfSurvivorDownOrDied(int limit = 0)
     int survMax = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsAiTank(i)) return true;
-        if (IsValidSurvivor(i) && (L4D_IsPlayerIncapacitated(i) || !IsPlayerAlive(i))) down++;
+        if (IsActiveTank(i)) return true;
+        if (IsValidSurvivor(i)
+            && (L4D_IsPlayerIncapacitated(i) || IsSurvivorHangingFromLedge(i)
+                || !IsPlayerAlive(i)))
+        {
+            down++;
+        }
     }
     if (limit == 0)
         return down >= RoundToCeil(float(survMax) / 2.0);

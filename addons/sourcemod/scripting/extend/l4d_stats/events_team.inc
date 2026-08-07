@@ -47,36 +47,6 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 	new FormulaAnneMode = 0;
 	new FormulaInfected = 0;
 
-	decl String:query[1024];
-	decl String:iID[MAX_LINE_WIDTH];
-	decl String:UpdatePoints[32], String:UpdatePointsPenalty[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			Format(UpdatePointsPenalty, sizeof(UpdatePointsPenalty), "points_infected");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			Format(UpdatePointsPenalty, sizeof(UpdatePointsPenalty), "points_realism_infected");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
-
 	if((AnneMultiPlayerMode() || SinglePlayerMode())){
 		int inf= GetAnneInfectedNumber();
 		FormulaAnneMode = SinglePlayerMode() ? 2 : 1;
@@ -134,34 +104,22 @@ public Action:event_CampaignWin(Handle:event, const String:name[], bool:dontBroa
 
 			if (ClientTeam == TEAM_SURVIVORS)
 			{
-				GetClientRankAuthString(i, iID, sizeof(iID));
-				new FormulaNewbie = NewPlayerBonus_ShouldApplyToClient(i) ? view_as<int>(NewPlayerBonus_GetMultiplier()) : 0;
-				new ClientScore = NewPlayerBonus_ApplyScoreMultiplier(i, Score);
+					new FormulaNewbie = NewPlayerBonus_ShouldApplyToClient(i) ? view_as<int>(NewPlayerBonus_GetMultiplier()) : 0;
+					new ClientScore = NewPlayerBonus_ApplyScoreMultiplier(i, Score);
 
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_campaigns = award_campaigns + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, ClientScore, iID);
-				SendSQLUpdate(query);
-
-				if (ClientScore > 0)
-				{
-					UpdateMapStat("points", ClientScore);
-					decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-					Format(ScoreFormula, sizeof(ScoreFormula), "v3c:%i:%i:%i:%i:%i:%i:%i:%i:%i", FormulaBaseScore, SurvivorCount, FormulaAnneMode, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
-					ScoreLog_SetContext("campaign_win", ScoreFormula);
-					AddScore(i, ClientScore);
+					if (ClientScore > 0)
+					{
+						decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+						Format(ScoreFormula, sizeof(ScoreFormula), "v3c:%i:%i:%i:%i:%i:%i:%i:%i:%i", FormulaBaseScore, SurvivorCount, FormulaAnneMode, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
+						Stats_ApplyClientScore(i, ClientScore, "campaign_win", ScoreFormula, ", award_campaigns = award_campaigns + 1", true, TEAM_SURVIVORS);
+					}
+					else
+						Stats_ApplyClientScore(i, ClientScore, "campaign_win", "", ", award_campaigns = award_campaigns + 1", false, TEAM_SURVIVORS);
 				}
-			}
-			else if (ClientTeam == TEAM_INFECTED && NegativeScore)
-			{
-				GetClientRankAuthString(i, iID, sizeof(iID));
-
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i WHERE steamid = '%s'", DbPrefix, UpdatePointsPenalty, UpdatePointsPenalty, Score, iID);
-				SendSQLUpdate(query);
-
-				if (Score > 0)
+				else if (ClientTeam == TEAM_INFECTED && NegativeScore)
 				{
-					ScoreLog_SetContext("campaign_infected_penalty", "base=campaign_win_score,negative_score");
-					AddScore(i, Score * (-1));
-				}
+					if (Score > 0)
+						Stats_ApplyClientScore(i, Score * (-1), "campaign_infected_penalty", "base=campaign_win_score,negative_score", "", false, TEAM_INFECTED);
 			}
 		}
 	}
@@ -234,48 +192,12 @@ public Action:timer_PanicEventEnd(Handle:timer, Handle:hndl)
 
 		if (Score > 0)
 		{
-			decl String:query[1024];
-			decl String:iID[MAX_LINE_WIDTH];
-			decl String:UpdatePoints[32];
-
-			switch (Stats_GetCurrentStatsGamemodeID())
-			{
-				case GAMEMODE_VERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-				}
-				case GAMEMODE_REALISM:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-				}
-				case GAMEMODE_SCAVENGE:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-				}
-				case GAMEMODE_REALISMVERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-				}
-				case GAMEMODE_OTHERMUTATIONS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-				}
-				default:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points");
-				}
-			}
-
-			new maxplayers = MaxClients;
+				new maxplayers = MaxClients;
 			for (new i = 1; i <= maxplayers; i++)
 			{
 				if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
 				{
-					GetClientRankAuthString(i, iID, sizeof(iID));
-					Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s' ", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-					SendSQLUpdate(query);
-					UpdateMapStat("points", Score);
-					AddScore(i, Score);
+						Stats_ApplyClientScore(i, Score, "panic_event_survived", "base=l4d_stats_panic,difficulty", "", true, TEAM_SURVIVORS);
 				}
 			}
 
@@ -354,52 +276,12 @@ public Action:event_PlayerBlindEnd(Handle:event, const String:name[], bool:dontB
 
 		if (Score > 0)
 		{
-			decl String:query[1024];
-			decl String:iID[MAX_LINE_WIDTH];
-			decl String:UpdatePoints[32];
-
-			switch (Stats_GetCurrentStatsGamemodeID())
-			{
-				case GAMEMODE_VERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-				}
-				case GAMEMODE_REALISM:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-				}
-				case GAMEMODE_SURVIVAL:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-				}
-				case GAMEMODE_SCAVENGE:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-				}
-				case GAMEMODE_REALISMVERSUS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-				}
-				case GAMEMODE_OTHERMUTATIONS:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-				}
-				default:
-				{
-					Format(UpdatePoints, sizeof(UpdatePoints), "points");
-				}
-			}
-
-			new maxplayers = MaxClients;
+				new maxplayers = MaxClients;
 			for (new i = 1; i <= maxplayers; i++)
 			{
 				if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i) && GetClientTeam(i) == 2)
 				{
-					GetClientRankAuthString(i, iID, sizeof(iID));
-					Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s' ", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-					SendSQLUpdate(query);
-					UpdateMapStat("points", Score);
-					AddScore(i, Score);
+						Stats_ApplyClientScore(i, Score, "boomer_mob_survived", "base=l4d_stats_boomermob,difficulty", "", true, TEAM_SURVIVORS);
 				}
 			}
 			if (Mode)
@@ -457,9 +339,7 @@ PlayerIncap(Attacker, Victim)
 	// Attacker is a Survivor
 	if (AttackerTeam == TEAM_SURVIVORS && VictimTeam == TEAM_SURVIVORS)
 	{
-		decl String:AttackerID[MAX_LINE_WIDTH];
-		GetClientRankAuthString(Attacker, AttackerID, sizeof(AttackerID));
-		decl String:AttackerName[MAX_LINE_WIDTH];
+			decl String:AttackerName[MAX_LINE_WIDTH];
 		GetClientName(Attacker, AttackerName, sizeof(AttackerName));
 
 		decl String:VictimName[MAX_LINE_WIDTH];
@@ -481,48 +361,12 @@ PlayerIncap(Attacker, Victim)
 		else
 			Mode = 0;
 
-		decl String:UpdatePoints[32];
+			if(IsNormalMode()){
+				Score = RoundToFloor(Score / 5.0);
+			}
 
-		switch (Stats_GetCurrentStatsGamemodeID())
-		{
-			case GAMEMODE_VERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			}
-			case GAMEMODE_REALISM:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-			}
-			case GAMEMODE_SURVIVAL:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-			}
-			case GAMEMODE_SCAVENGE:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-			}
-			case GAMEMODE_REALISMVERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			}
-			case GAMEMODE_OTHERMUTATIONS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-			}
-			default:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points");
-			}
-		}
-		if(IsNormalMode()){
-			Score = RoundToFloor(Score / 5.0);
-		}
-
-			decl String:query[512];
-			Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i, award_fincap = award_fincap + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-			SendSQLUpdate(query);
-			QuarterRank_RecordField(Attacker, "award_fincap", 1);
-			QuarterRank_RecordScore(Attacker, Score * (-1));
+			Stats_ApplyClientScore(Attacker, Score * (-1), "friendly_incap_penalty", "base=l4d_stats_fincap,difficulty,negative_score", ", award_fincap = award_fincap + 1", false, TEAM_SURVIVORS);
+				QuarterRank_RecordField(Attacker, "award_fincap", 1);
 
 		if (Mode == 1 || Mode == 2)
 			StatsPrintToChat(Attacker, "L4DStats_TeamIncapPenaltySelf", Score, VictimName);
@@ -668,15 +512,7 @@ public Action:event_PlayerLedge(Handle:event, const String:name[], bool:dontBroa
 
 		new Mode = GetConVarInt(cvar_AnnounceMode);
 
-		decl String:ClientID[MAX_LINE_WIDTH];
-		GetClientRankAuthString(Attacker, ClientID, sizeof(ClientID));
-
-		decl String:query[1024];
-		decl String:UpdatePoints[32];
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_ledgegrab = award_ledgegrab + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, ClientID);
-
-		SendSQLUpdate(query);
+			Stats_ApplyClientScore(Attacker, Score, "ledge_grab", "base=l4d_stats_playerledgesuccess,difficulty", ", award_ledgegrab = award_ledgegrab + 1", false, TEAM_INFECTED);
 
 		decl String:MapPoints[32];
 		Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
@@ -834,9 +670,10 @@ public Action:event_PlayerHurt(Handle:event, const String:name[], bool:dontBroad
 
 				WritePackCell(dp, OldHumanDamage);
 				WritePackCell(dp, OldBotDamage);
-				WritePackCell(dp, Attacker);
-				WritePackString(dp, AttackerID);
-				WritePackString(dp, AttackerName);
+					WritePackCell(dp, Attacker);
+					WritePackString(dp, AttackerID);
+					WritePackString(dp, AttackerName);
+					WritePackCell(dp, CurrentPoints[Attacker]);
 
 				// This may fail! What happens when a player skips and another joins with the same Client ID (is this even possible in such short time?)
 				FriendlyFireTimer[Attacker][0] = CreateTimer(5.0, timer_FriendlyFireDamageEnd, dp);
@@ -946,53 +783,16 @@ public Action:event_JockeyRelease(Handle:event, const String:name[], bool:dontBr
 
 	if (Rescuer > 0 && !IsClientBot(Rescuer) && IsClientInGame(Rescuer))
 	{
-		decl String:query[1024], String:JockeyName[MAX_LINE_WIDTH], String:VictimName[MAX_LINE_WIDTH], String:RescuerName[MAX_LINE_WIDTH], String:RescuerID[MAX_LINE_WIDTH], String:UpdatePoints[32];
+		decl String:JockeyName[MAX_LINE_WIDTH], String:VictimName[MAX_LINE_WIDTH], String:RescuerName[MAX_LINE_WIDTH];
 		new Score = ModifyScoreDifficulty(GetConVarInt(cvar_JockeyRide), 2, 3, TEAM_SURVIVORS);
 		Score = NewPlayerBonus_ApplyScoreMultiplier(Rescuer, Score);
 
-		GetClientRankAuthString(Rescuer, RescuerID, sizeof(RescuerID));
-
-		switch (Stats_GetCurrentStatsGamemodeID())
-		{
-			case GAMEMODE_VERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			}
-			case GAMEMODE_REALISM:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-			}
-			case GAMEMODE_SURVIVAL:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-			}
-			case GAMEMODE_SCAVENGE:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-			}
-			case GAMEMODE_REALISMVERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			}
-			case GAMEMODE_OTHERMUTATIONS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-			}
-			default:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points");
-			}
-		}
-
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_jockey = award_jockey + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, RescuerID);
-		SendSQLUpdate(query);
-
 		if (Score > 0)
 		{
-			UpdateMapStat("points", Score);
-			ScoreLog_SetContext("save_jockey_ride", "base=l4d_stats_jockeyride,difficulty,newbie_multiplier");
-			AddScore(Rescuer, Score);
+			Stats_ApplyClientScore(Rescuer, Score, "save_jockey_ride", "base=l4d_stats_jockeyride,difficulty,newbie_multiplier", ", award_jockey = award_jockey + 1", true, TEAM_SURVIVORS);
 		}
+		else
+			Stats_ApplyClientScore(Rescuer, Score, "save_jockey_ride", "", ", award_jockey = award_jockey + 1", false, TEAM_SURVIVORS);
 
 		GetClientName(Jockey, JockeyName, sizeof(JockeyName));
 		GetClientName(Victim, VictimName, sizeof(VictimName));
@@ -1057,43 +857,9 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 		return Plugin_Continue;
 
 	new Charger = GetClientOfUserId(GetEventInt(event, "userid"));
-	decl String:query[1024], String:KillerName[MAX_LINE_WIDTH], String:KillerID[MAX_LINE_WIDTH], String:UpdatePoints[32];
+	decl String:KillerName[MAX_LINE_WIDTH];
 	new Score = 0;
 	new bool:IsMatador = GetEventBool(event, "melee") && GetEventBool(event, "charging");
-
-	GetClientRankAuthString(Killer, KillerID, sizeof(KillerID));
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
 
 	if (ChargerCarryVictim[Charger])
 	{
@@ -1110,14 +876,14 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 		Score += ModifyScoreDifficulty(GetConVarInt(cvar_Matador), 2, 3, TEAM_SURVIVORS);
 	}
 
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_charger = award_charger + 1%s WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, (IsMatador ? ", award_matador = award_matador + 1" : ""), KillerID);
-	SendSQLUpdate(query);
+	decl String:ExtraSet[128];
+	Format(ExtraSet, sizeof(ExtraSet), ", award_charger = award_charger + 1%s", (IsMatador ? ", award_matador = award_matador + 1" : ""));
+	Stats_ApplyClientScore(Killer, Score, "charger_kill", "base=l4d_stats_chargercarry_or_pummel_or_matador,difficulty", ExtraSet, false, TEAM_SURVIVORS);
 
 	if (Score <= 0)
 		return Plugin_Continue;
 
 	UpdateMapStat("points", Score);
-	AddScore(Killer, Score);
 
 	new Mode = GetConVarInt(cvar_AnnounceMode);
 
@@ -1308,47 +1074,7 @@ public Action:event_UpgradePackAdded(Handle:event, const String:name[], bool:don
 	if (Score > 0)
 		Score = ModifyScoreDifficulty(Score, 2, 3, TEAM_SURVIVORS);
 
-	decl String:PlayerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Player, PlayerID, sizeof(PlayerID));
-
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_upgrades_added = award_upgrades_added + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, PlayerID);
-
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(Player, Score, "upgrade_pack_added", "base=l4d_stats_amupgrade,difficulty", ", award_upgrades_added = award_upgrades_added + 1", false, TEAM_SURVIVORS);
 
 	if (Score > 0)
 	{
@@ -1395,51 +1121,12 @@ public Action:event_GascanPoured(Handle:event, const String:name[], bool:dontBro
 	if (Score > 0)
 		Score = ModifyScoreDifficulty(Score, 2, 3, TEAM_SURVIVORS);
 
-	decl String:PlayerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Player, PlayerID, sizeof(PlayerID));
-
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
 	if(IsFunGame() > 1)
 	{
 		Score = 0;
 		//return Plugin_Continue;
 	}
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_gascans_poured = award_gascans_poured + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, PlayerID);
-
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(Player, Score, "gascan_poured", "base=l4d_stats_gascanpour,difficulty", ", award_gascans_poured = award_gascans_poured + 1", false, TEAM_SURVIVORS);
 
 	if (Score > 0)
 	{
@@ -1688,22 +1375,18 @@ public Action:event_PlayerPounced(Handle:event, const String:name[], bool:dontBr
 
 	decl String:AttackerName[MAX_LINE_WIDTH];
 	GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-	decl String:AttackerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Attacker, AttackerID, sizeof(AttackerID));
 	decl String:VictimName[MAX_LINE_WIDTH];
 	GetClientName(Victim, VictimName, sizeof(VictimName));
 
 	new Score = 0;
 	new bool:IsPerfectPounce = false;
-	decl String:query[1024];
+	decl String:ExtraSet[128];
 
 	if (Dmg >= PerfectDmgLimit)
 	{
 		IsPerfectPounce = true;
 		Score = GetConVarInt(cvar_HunterPerfectPounceSuccess);
-		decl String:UpdatePoints[32];
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_pounce_perfect = award_pounce_perfect + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
+		Format(ExtraSet, sizeof(ExtraSet), ", award_pounce_perfect = award_pounce_perfect + 1");
 
 		if (EnableSounds_Hunter_Perfect && GetConVarBool(cvar_SoundsEnabled))
 			EmitSoundToAll(StatsSound_Hunter_Perfect);
@@ -1711,12 +1394,10 @@ public Action:event_PlayerPounced(Handle:event, const String:name[], bool:dontBr
 	else
 	{
 		Score = GetConVarInt(cvar_HunterNicePounceSuccess);
-		decl String:UpdatePoints[32];
-		Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_pounce_nice = award_pounce_nice + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
+		Format(ExtraSet, sizeof(ExtraSet), ", award_pounce_nice = award_pounce_nice + 1");
 	}
 
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(Attacker, Score, IsPerfectPounce ? "hunter_perfect_pounce" : "hunter_nice_pounce", "base=l4d_stats_hunterpouncesuccess,distance", ExtraSet, false, TEAM_INFECTED);
 	decl String:MapPoints[32];
 	Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
 	UpdateMapStat(MapPoints, Score);
@@ -1755,8 +1436,6 @@ public Action:event_RevivePlayer(Handle:event, const String:name[], bool:dontBro
 
 	decl String:SaviorName[MAX_LINE_WIDTH];
 	GetClientName(Savior, SaviorName, sizeof(SaviorName));
-	decl String:SaviorID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Savior, SaviorID, sizeof(SaviorID));
 
 	decl String:VictimName[MAX_LINE_WIDTH];
 	GetClientName(Victim, VictimName, sizeof(VictimName));
@@ -1766,50 +1445,10 @@ public Action:event_RevivePlayer(Handle:event, const String:name[], bool:dontBro
 	new Score = ModifyScoreDifficulty(GetConVarInt(cvar_Revive), 2, 3, TEAM_SURVIVORS);
 	Score = NewPlayerBonus_ApplyScoreMultiplier(Savior, Score);
 
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_revive = award_revive + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, SaviorID);
-	SendSQLUpdate(query);
-	QuarterRank_RecordField(Savior, "award_revive", 1);
-
-	UpdateMapStat("points", Score);
 	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
 	Format(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_revive,difficulty,target=%s,newbie_multiplier", VictimID);
-	ScoreLog_SetContext("revive_teammate", ScoreFormula);
-	AddScore(Savior, Score);
+	Stats_ApplyClientScore(Savior, Score, "revive_teammate", ScoreFormula, ", award_revive = award_revive + 1", true, TEAM_SURVIVORS);
+	QuarterRank_RecordField(Savior, "award_revive", 1);
 
 	if (Score > 0)
 	{
@@ -2158,45 +1797,32 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 		return;
 	}
 
-	decl String:UpdatePoints[32];
-	decl String:UserID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(User, UserID, sizeof(UserID));
-
-	switch (Stats_GetCurrentStatsGamemodeID())
+	new String:ScoreReason[MAX_LINE_WIDTH] = "";
+	new String:ScoreFormula[MAX_MESSAGE_WIDTH] = "";
+	if (Score != 0)
 	{
-		case GAMEMODE_VERSUS:
+		if (AwardID == 80)
 		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
+			strcopy(ScoreReason, sizeof(ScoreReason), "rescue_closet");
+			Format(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_rescue,difficulty,subject=%i,newbie_multiplier", SubjectID);
 		}
-		case GAMEMODE_REALISM:
+		else if (AwardID == 95)
 		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
+			strcopy(ScoreReason, sizeof(ScoreReason), "infected_in_saferoom_penalty");
+			strcopy(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_insaferoom,difficulty,negative_score");
 		}
-		case GAMEMODE_SURVIVAL:
+		else if (AwardID == 99)
 		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
+			strcopy(ScoreReason, sizeof(ScoreReason), "round_restart_penalty");
+			strcopy(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_restart_or_anne_restart,difficulty,negative_score");
 		}
-		case GAMEMODE_SCAVENGE:
+		else
 		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
+			strcopy(ScoreReason, sizeof(ScoreReason), "achievement_score");
+			Format(ScoreFormula, sizeof(ScoreFormula), "award_id=%i", AwardID);
 		}
 	}
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i%s WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AwardSQL, UserID);
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(User, Score, ScoreReason, ScoreFormula, AwardSQL, false, TEAM_SURVIVORS);
 	if (AwardID == 80)
 		QuarterRank_RecordField(User, "award_rescue", 1);
 	else if (AwardID == 86)
@@ -2204,29 +1830,6 @@ public Action:event_Award_L4D2(Handle:event, const String:name[], bool:dontBroad
 	else if (AwardID == 95)
 		QuarterRank_RecordField(User, "award_letinsafehouse", 1);
 
-	if (Score != 0)
-	{
-		decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-		if (AwardID == 80)
-		{
-			Format(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_rescue,difficulty,subject=%i,newbie_multiplier", SubjectID);
-			ScoreLog_SetContext("rescue_closet", ScoreFormula);
-		}
-		else if (AwardID == 95)
-		{
-			ScoreLog_SetContext("infected_in_saferoom_penalty", "base=l4d_stats_insaferoom,difficulty,negative_score");
-		}
-		else if (AwardID == 99)
-		{
-			ScoreLog_SetContext("round_restart_penalty", "base=l4d_stats_restart_or_anne_restart,difficulty,negative_score");
-		}
-		else
-		{
-			Format(ScoreFormula, sizeof(ScoreFormula), "award_id=%i", AwardID);
-			ScoreLog_SetContext("achievement_score", ScoreFormula);
-		}
-		AddScore(User, Score);
-	}
 }
 
 // Scavenge halftime code.
@@ -2294,50 +1897,13 @@ public Action:event_CarAlarm(Handle:event, const String:name[], bool:dontBroadca
 	if (Score <= 0)
 		return;
 
-	decl String:UpdatePoints[32];
-	decl String:query[1024];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
 	int attacker = GetClientOfUserId(GetEventInt(event, "userid"));
 	new Mode = GetConVarInt(cvar_AnnounceMode);
 	Score*=2;
-	decl String:iID[MAX_LINE_WIDTH];
 
 	if (IsClientConnected(attacker) && IsClientInGame(attacker) && !IsClientBot(attacker) && GetClientTeam(attacker) == TEAM_SURVIVORS)
 	{
-		GetClientRankAuthString(attacker, iID, sizeof(iID));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-		SendSQLUpdate(query);
+		Stats_ApplyClientScore(attacker, Score * (-1), "car_alarm_penalty", "base=l4d_stats_caralarm*2,difficulty,negative_score", "", false, TEAM_SURVIVORS);
 
 		if (Mode)
 			StatsPrintToChatAll("L4DStats_AlarmCarPenalty", attacker, Score);
@@ -2369,43 +1935,7 @@ public Action:event_WitchCrowned(Handle:event, const String:name[], bool:dontBro
 
 	if (Crowned && Killer > 0 && !IsClientBot(Killer) && IsClientConnected(Killer) && IsClientInGame(Killer))
 	{
-		decl String:SteamID[MAX_LINE_WIDTH];
-		GetClientRankAuthString(Killer, SteamID, sizeof(SteamID));
-
 		new Score = ModifyScoreDifficulty(GetConVarInt(cvar_WitchCrowned), 2, 3, TEAM_SURVIVORS);
-		decl String:UpdatePoints[32];
-
-		switch (Stats_GetCurrentStatsGamemodeID())
-		{
-			case GAMEMODE_VERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			}
-			case GAMEMODE_REALISM:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-			}
-			case GAMEMODE_SURVIVAL:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-			}
-			case GAMEMODE_SCAVENGE:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-			}
-			case GAMEMODE_REALISMVERSUS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			}
-			case GAMEMODE_OTHERMUTATIONS:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-			}
-			default:
-			{
-				Format(UpdatePoints, sizeof(UpdatePoints), "points");
-			}
-		}
 		if(IsWitchParty())
 		{
 			Score = RoundToCeil(Score / 2.0);
@@ -2416,9 +1946,7 @@ public Action:event_WitchCrowned(Handle:event, const String:name[], bool:dontBro
 			//return Plugin_Continue;
 		}
 
-		decl String:query[1024];
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_witchcrowned = award_witchcrowned + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, SteamID);
-		SendSQLUpdate(query);
+		Stats_ApplyClientScore(Killer, Score, "witch_crowned", "base=l4d_stats_witchcrowned,difficulty", ", award_witchcrowned = award_witchcrowned + 1", false, TEAM_SURVIVORS);
 
 		if (Score > 0 && GetConVarInt(cvar_AnnounceMode))
 		{

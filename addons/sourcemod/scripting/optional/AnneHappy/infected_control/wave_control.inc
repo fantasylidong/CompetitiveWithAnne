@@ -42,6 +42,7 @@ void StartWave()
 
     AntiBait_OnWaveStart();
     gST.targetSurvivor = Tactical_ResolveWaveTarget();
+    SpawnAttempts_OnWaveTargetSelected(gST.targetSurvivor);
     WaveSpawnReport_Begin(
         gST.waveIndex, aiBudget, gST.siQueueCount, gST.lastWaveStartTime);
     WaveDecider_OnWaveStart();  // 通知波决策器
@@ -51,19 +52,33 @@ void StartWave()
 
 Action Timer_StartNewWave(Handle timer)
 {
-    StartWave();
+    if (timer != gST.hSpawn)
+        return Plugin_Stop;
+
     gST.hSpawn = INVALID_HANDLE;
+    StartWave();
     return Plugin_Stop;
 }
 
 static void ScheduleNextWave()
 {
     gST.bShouldCheck = false;
-    gST.hSpawn = CreateTimer(0.1, Timer_StartNewWave);
+    StopTrackedTimer(gST.hSpawn);
+    gST.hSpawn = CreateTimer(0.1, Timer_StartNewWave, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action Timer_CheckSpawnWindow(Handle timer)
 {
+    if (timer != gST.hCheck)
+        return Plugin_Stop;
+
+    g_fWaveCheckHeartbeat = GetGameTime();
+    if (!gST.bLate)
+    {
+        gST.hCheck = INVALID_HANDLE;
+        return Plugin_Stop;
+    }
+
     // 暂停检查
     if (g_bPauseLib && IsInPause())
     {
@@ -72,15 +87,13 @@ Action Timer_CheckSpawnWindow(Handle timer)
             gST.unpauseDelay = gCV.fSiInterval - (GetGameTime() - gST.lastWaveStartTime);
             if (gST.unpauseDelay < 0.1)
                 gST.unpauseDelay = 0.1;
-            KillTimer(gST.hSpawn);
-            gST.hSpawn = INVALID_HANDLE;
+            StopTrackedTimer(gST.hSpawn);
             gST.bPausedSpawnTimer = true;
         }
         return Plugin_Continue;
     }
 
     gST.lastSpawnSecs++;
-    if (!gST.bLate) return Plugin_Stop;
 
     // 更新 Anti-Bait 状态
     AntiBait_Update();
@@ -120,8 +133,7 @@ void PauseSpawnTimer()
         gST.unpauseDelay = gCV.fSiInterval - (GetGameTime() - gST.lastWaveStartTime);
         if (gST.unpauseDelay < 0.1)
             gST.unpauseDelay = 0.1;
-        KillTimer(gST.hSpawn);
-        gST.hSpawn = INVALID_HANDLE;
+        StopTrackedTimer(gST.hSpawn);
         gST.bPausedSpawnTimer = true;
         Debug_Print("Pause spawn timer, resume after %.2f", gST.unpauseDelay);
     }
@@ -132,7 +144,7 @@ void UnpauseSpawnTimer(float delay)
     if (gST.bPausedSpawnTimer && gST.hSpawn == INVALID_HANDLE)
     {
         gST.bPausedSpawnTimer = false;
-        gST.hSpawn = CreateTimer(delay, Timer_StartNewWave);
+        gST.hSpawn = CreateTimer(delay, Timer_StartNewWave, _, TIMER_FLAG_NO_MAPCHANGE);
         Debug_Print("Resume spawn in %.2f", delay);
     }
 }

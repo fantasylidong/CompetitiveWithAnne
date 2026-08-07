@@ -36,10 +36,10 @@
                 "linux"  "340"
                 "windows" "332"
             }
-            "CNavArea::Blocked"
+            "CNavArea::BlockedBits"
             {
-                "linux"  "58"
-                "windows" "58"
+                "linux"  "127"
+                "windows" "127"
             }
             "CNavArea::Attributes"
             {
@@ -68,23 +68,23 @@
             }
             "CNavLadder::TopForward"
             {
-                "linux"  "32"
-                "windows" "32"
-            }
-            "CNavLadder::TopLeft"
-            {
                 "linux"  "36"
                 "windows" "36"
             }
-            "CNavLadder::TopRight"
+            "CNavLadder::TopLeft"
             {
                 "linux"  "40"
                 "windows" "40"
             }
+            "CNavLadder::TopRight"
+            {
+                "linux"  "44"
+                "windows" "44"
+            }
             "CNavLadder::Bottom"
             {
-                "linux"  "48"
-                "windows" "48"
+                "linux"  "52"
+                "windows" "52"
             }
         }
 

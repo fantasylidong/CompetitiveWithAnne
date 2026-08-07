@@ -260,7 +260,8 @@ public Action Cmd_NavTest(int client, int args)
     float dTargetEye = GetVectorDistance(testPos, targetEye);
     float tacticalQuality = Tactical_GetCandidateQuality(zc, testPos, targetSur, targetEye);
     SpawnScoreDbg scoreDbg;
-    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye, -1.0,
+    bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye,
+                                                   -1.0, -1.0, 0.0,
                                                    gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
                                                    candPercent, centerBucket, rawBadFlow,
                                                    refEyeZ, bestEyeZ, lowestFootZ, sidx, index,

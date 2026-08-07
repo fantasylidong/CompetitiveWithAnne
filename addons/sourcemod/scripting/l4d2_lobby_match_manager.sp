@@ -14,7 +14,7 @@
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
 #include <l4d2_lobby_match_manager_policy>
 
-#define VERSION "0.13"
+#define VERSION "0.14"
 
 #define RMFLAG_NO_MODE_CHANGE			1
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
@@ -22,6 +22,14 @@
 #define RMFLAG_FORCE_OFFICIAL_MAP		8	// unofficial map -> official map
 
 #define MAX_COOKIE_LENGTH	20
+
+enum LobbyState
+{
+	LobbyState_IdleUnreserved,
+	LobbyState_MatchmakingReserved,
+	LobbyState_ActiveDirect,
+	LobbyState_Released
+};
 
 ConVar
 	mp_gamemode,
@@ -46,9 +54,10 @@ int
 bool
 	g_bDependenciesReady,
 	g_bLobbyReservationObserved,
-	g_bAnneLobbyReleased,
-	g_bDirectJoinReservationBlocked,
-	g_bReservationPresentOnConnect[MAXPLAYERS + 1];
+	g_bHumanClient[MAXPLAYERS + 1];
+
+LobbyState
+	g_eLobbyState = LobbyState_IdleUnreserved;
 
 Address
 	g_pMatchExtL4D,
@@ -58,6 +67,10 @@ Handle
 	g_hSDKUpdateGameType,
 	g_hSDKGetGameModeInfo,
 	g_hSDKGetMapInfo;
+
+DynamicDetour
+	g_hApplyGameSettingsDetour,
+	g_hReplyReservationRequestDetour;
 
 public Plugin myinfo = 
 {
@@ -95,7 +108,9 @@ public void OnAllPluginsLoaded()
 {
 	// Nested shared-plugin dependencies are not fully native-bound during OnPluginStart.
 	g_bDependenciesReady = true;
-	OnConVarChanged(null, "", "");
+	RefreshCachedConVars();
+	RebuildLobbyStateFromEngine("plugins_loaded");
+	EvaluateLobbyReleasePolicy();
 }
 
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -103,38 +118,49 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 	if (!g_bDependenciesReady)
 		return;
 
+	RefreshCachedConVars();
+	ReconcileLobbyState("cvar_changed");
+	EvaluateLobbyReleasePolicy();
+}
+
+void RefreshCachedConVars()
+{
 	mp_gamemode.GetString(g_sGameMode, sizeof(g_sGameMode));
 	z_difficulty.GetString(g_sDifficulty, sizeof(g_sDifficulty));
 	g_iUnreserveType = g_cvUnreserveType.IntValue;
 	g_iReserveModifyFlags = g_cvReserveModifyFlags.IntValue;
-	if (g_iUnreserveType != UNRESERVE_ANNE)
-		g_bAnneLobbyReleased = false;
-
-	if (g_iUnreserveType == UNRESERVE_ANNE)
-	{
-		ClearAnneLobbyReservationIfAllowed();
-	}
-	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
-	{
-		ClearDefaultLobbyIfIdle(false);
-	}
-
-	RefreshReserveBlockPatch();
 }
 
 public void OnConfigsExecuted()
 {
 	sv_reservation_timeout.IntValue = 30;
-	
-	if (g_iUnreserveType == UNRESERVE_ANNE)
-	{
-		ClearAnneLobbyReservationIfAllowed();
-		RefreshReserveBlockPatch();
-	}
-	else if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
-	{
-		ClearDefaultLobbyIfIdle(false);
-	}
+	RefreshCachedConVars();
+	ReconcileLobbyState("configs_executed");
+	EvaluateLobbyReleasePolicy();
+}
+
+public void OnMapStart()
+{
+	RequestFrame(Frame_ReconcileLobbyState);
+}
+
+void Frame_ReconcileLobbyState(any data)
+{
+	if (!g_bDependenciesReady)
+		return;
+
+	ReconcileLobbyState("map_start");
+	EvaluateLobbyReleasePolicy();
+}
+
+public void OnPluginEnd()
+{
+	if (g_hApplyGameSettingsDetour != null)
+		g_hApplyGameSettingsDetour.Disable(Hook_Pre, OnApplyGameSettingsPre);
+	if (g_hReplyReservationRequestDetour != null)
+		g_hReplyReservationRequestDetour.Disable(Hook_Post, OnReplyReservationRequestPost);
+
+	g_mBlockReserve.Disable();
 }
 
 MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
@@ -181,6 +207,30 @@ MRESReturn OnApplyGameSettingsPre(Address pThis, DHookParam hParams)
 	return MRES_Ignored;
 }
 
+MRESReturn OnReplyReservationRequestPost(Address pThis, DHookParam hParams)
+{
+	if (!g_bDependenciesReady)
+		return MRES_Ignored;
+
+	if (!HasReservationCookie())
+		return MRES_Ignored;
+
+	if (g_eLobbyState == LobbyState_IdleUnreserved && GetPlayerCount() == 0)
+	{
+		TransitionLobbyState(LobbyState_MatchmakingReserved, "reservation_accepted");
+	}
+	else if (g_eLobbyState == LobbyState_MatchmakingReserved)
+	{
+		ApplyLobbyState();
+	}
+	else if (g_eLobbyState == LobbyState_ActiveDirect || g_eLobbyState == LobbyState_Released)
+	{
+		ApplyLobbyState();
+	}
+
+	return MRES_Ignored;
+}
+
 bool IsNeedForceOfficialMap(SourceKeyValues kvSettings)
 {
 	char sApplyCampaign[256], sApplyMap[256], sCurMap[256];
@@ -203,143 +253,235 @@ bool IsNeedForceOfficialMap(SourceKeyValues kvSettings)
 
 public bool OnClientConnect(int client, char[] rejectmsg, int maxlen)
 {
-	// qreserve reserves the server before the player starts connecting. A
-	// reservation created later belongs to the direct-join dynamic lobby.
-	g_bReservationPresentOnConnect[client] = HasReservationCookie();
+	if (!g_bDependenciesReady)
+		return true;
+
+	if (IsFakeClient(client))
+		return true;
+
+	g_bHumanClient[client] = true;
+
+	if (g_eLobbyState == LobbyState_IdleUnreserved && HasReservationCookie())
+		TransitionLobbyState(LobbyState_MatchmakingReserved, "reservation_before_connect");
+	else
+		ReconcileLobbyState("client_connect");
+
+	if (g_eLobbyState == LobbyState_IdleUnreserved)
+	{
+		TransitionLobbyState(LobbyState_ActiveDirect, "direct_connect");
+		CreateTimer(5.0, Timer_ReconcilePendingDirectConnect, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+
 	return true;
 }
 
 public void OnClientPutInServer(int client)
 {
+	if (!g_bDependenciesReady)
+		return;
+
 	if (IsFakeClient(client))
 		return;
 
-	bool reservationPresentOnConnect = g_bReservationPresentOnConnect[client];
+	g_bHumanClient[client] = true;
+	ReconcileLobbyState("client_put_in_server");
 
-	if (HasReservationCookie())
-		g_bLobbyReservationObserved = true;
+	if (g_eLobbyState == LobbyState_IdleUnreserved)
+		TransitionLobbyState(LobbyState_ActiveDirect, "direct_put_in_server");
+	else if (g_eLobbyState == LobbyState_ActiveDirect || g_eLobbyState == LobbyState_Released)
+		ApplyLobbyState();
 
-	if (!reservationPresentOnConnect && !g_bDirectJoinReservationBlocked)
-	{
-		SetReservationCookie(false);
-		sv_allow_lobby_connect_only.BoolValue = false;
-		g_bDirectJoinReservationBlocked = true;
-		if (g_iUnreserveType == UNRESERVE_ANNE)
-			g_bAnneLobbyReleased = true;
-		RefreshReserveBlockPatch();
-		return;
-	}
-
-	if (g_iUnreserveType == UNRESERVE_ANNE || g_iUnreserveType == UNRESERVE_WHEN_FULL)
-		CreateTimer(1.0, Timer_ClearLobbyOnJoin, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	if (g_eLobbyState == LobbyState_MatchmakingReserved)
+		CreateTimer(1.0, Timer_EvaluateLobbyRelease, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnClientDisconnect(int client)
 {
-	g_bReservationPresentOnConnect[client] = false;
+	if (!IsFakeClient(client))
+		g_bHumanClient[client] = true;
+}
 
-	if (IsFakeClient(client))
+public void OnClientDisconnect_Post(int client)
+{
+	bool wasHuman = g_bHumanClient[client];
+	g_bHumanClient[client] = false;
+
+	if (!g_bDependenciesReady || !wasHuman || GetPlayerCount() > 0)
 		return;
 
-	if (g_iUnreserveType == UNRESERVE_DEFAULT_EMPTY)
-		CreateTimer(1.0, Timer_ClearDefaultLobbyIfEmpty, _, TIMER_FLAG_NO_MAPCHANGE);
-
-	if (g_bDirectJoinReservationBlocked || g_bAnneLobbyReleased)
-		CreateTimer(1.0, Timer_ResetReservationBlockIfEmpty, _, TIMER_FLAG_NO_MAPCHANGE);
-}
-
-Action Timer_ClearDefaultLobbyIfEmpty(Handle timer)
-{
-	ClearDefaultLobbyIfIdle(true);
-	return Plugin_Stop;
-}
-
-Action Timer_ResetReservationBlockIfEmpty(Handle timer)
-{
-	if (GetPlayerCount() > 0)
-		return Plugin_Stop;
-
-	g_bDirectJoinReservationBlocked = false;
-	g_bAnneLobbyReleased = false;
-	RefreshReserveBlockPatch();
-	return Plugin_Stop;
-}
-
-Action Timer_ClearLobbyOnJoin(Handle timer, any userid)
-{
-	int client = GetClientOfUserId(userid);
-	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
-		return Plugin_Stop;
-
-	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bAnneLobbyReleased))
+	if (g_eLobbyState == LobbyState_MatchmakingReserved && HasReservationCookie() && g_iUnreserveType != UNRESERVE_DEFAULT_EMPTY)
 	{
-		SetReservationCookie(false);
+		ApplyLobbyState();
+		CreateTimer(float(sv_reservation_timeout.IntValue + 1), Timer_ReconcileEmptyReservation, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+	else
+	{
+		TransitionLobbyState(LobbyState_IdleUnreserved, "server_empty");
+	}
+}
+
+Action Timer_ReconcilePendingDirectConnect(Handle timer)
+{
+	if (g_eLobbyState == LobbyState_ActiveDirect && GetPlayerCount() == 0)
+		TransitionLobbyState(LobbyState_IdleUnreserved, "direct_connect_abandoned");
+	return Plugin_Stop;
+}
+
+Action Timer_ReconcileEmptyReservation(Handle timer)
+{
+	if (GetPlayerCount() == 0 && g_eLobbyState == LobbyState_MatchmakingReserved && !HasReservationCookie())
+		TransitionLobbyState(LobbyState_IdleUnreserved, "reservation_timeout");
+	return Plugin_Stop;
+}
+
+Action Timer_EvaluateLobbyRelease(Handle timer)
+{
+	EvaluateLobbyReleasePolicy();
+	return Plugin_Stop;
+}
+
+void EvaluateLobbyReleasePolicy()
+{
+	ReconcileLobbyState("release_policy");
+
+	if (g_eLobbyState != LobbyState_MatchmakingReserved)
+		return;
+
+	int playerCount = GetPlayerCount();
+	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, playerCount, GetMaxLobbySlots(g_sGameMode), false))
+	{
+		TransitionLobbyState(LobbyState_Released, "join_release_policy");
+		return;
+	}
+
+	if (LobbyPolicy_ShouldClearDefaultReservation(g_iUnreserveType, playerCount, false, g_bLobbyReservationObserved))
+		TransitionLobbyState(LobbyState_IdleUnreserved, "default_empty_policy");
+}
+
+void RebuildLobbyStateFromEngine(const char[] reason)
+{
+	if (HasReservationCookie())
+	{
+		TransitionLobbyState(LobbyState_MatchmakingReserved, reason);
+	}
+	else if (GetPlayerCount() > 0)
+	{
+		TransitionLobbyState(LobbyState_ActiveDirect, reason);
+	}
+	else
+	{
+		TransitionLobbyState(LobbyState_IdleUnreserved, reason);
+	}
+}
+
+void ReconcileLobbyState(const char[] reason)
+{
+	int playerCount = GetPlayerCount();
+	bool hasReservation = HasReservationCookie();
+
+	switch (g_eLobbyState)
+	{
+		case LobbyState_IdleUnreserved:
+		{
+			if (hasReservation && playerCount == 0)
+				TransitionLobbyState(LobbyState_MatchmakingReserved, reason);
+			else if (playerCount > 0)
+				TransitionLobbyState(LobbyState_ActiveDirect, reason);
+			else
+				ApplyLobbyState();
+		}
+		case LobbyState_MatchmakingReserved:
+		{
+			if (!hasReservation)
+				TransitionLobbyState(playerCount > 0 ? LobbyState_ActiveDirect : LobbyState_IdleUnreserved, reason);
+			else
+				ApplyLobbyState();
+		}
+		case LobbyState_ActiveDirect, LobbyState_Released:
+		{
+			if (playerCount == 0)
+				TransitionLobbyState(LobbyState_IdleUnreserved, reason);
+			else
+				ApplyLobbyState();
+		}
+	}
+}
+
+void TransitionLobbyState(LobbyState nextState, const char[] reason)
+{
+	LobbyState previousState = g_eLobbyState;
+	g_eLobbyState = nextState;
+
+	if (previousState != nextState)
+	{
+		char previousName[32], nextName[32];
+		GetLobbyStateName(previousState, previousName, sizeof(previousName));
+		GetLobbyStateName(nextState, nextName, sizeof(nextName));
+		LogMessage("[LMM] state %s -> %s, reason=%s, players=%d, cookie=%d", previousName, nextName, reason, GetPlayerCount(), HasReservationCookie());
+	}
+
+	ApplyLobbyState();
+}
+
+void ApplyLobbyState()
+{
+	if (g_eLobbyState == LobbyState_MatchmakingReserved)
+	{
+		if (HasReservationCookie())
+		{
+			sv_hosting_lobby.BoolValue = true;
+			g_bLobbyReservationObserved = true;
+			SDKCall(g_hSDKUpdateGameType);
+		}
+	}
+	else
+	{
 		sv_allow_lobby_connect_only.BoolValue = false;
-		if (g_iUnreserveType == UNRESERVE_ANNE)
-			g_bAnneLobbyReleased = true;
+		SetReservationCookie(false);
 	}
 
 	RefreshReserveBlockPatch();
-
-	return Plugin_Stop;
-}
-
-void ClearDefaultLobbyIfIdle(bool forceClearObserved)
-{
-	if (!LobbyPolicy_ShouldClearDefaultReservation(g_iUnreserveType, GetPlayerCount(), forceClearObserved, g_bLobbyReservationObserved))
-		return;
-
-	SetReservationCookie(false);
-	sv_allow_lobby_connect_only.BoolValue = false;
-}
-
-void ClearAnneLobbyReservationIfAllowed()
-{
-	if (g_iUnreserveType != UNRESERVE_ANNE)
-		return;
-
-	if (g_bAnneLobbyReleased || (!HasDirectJoinWithoutReservation() && !LobbyPolicy_ShouldClearAnneReservation(GetPlayerCount())))
-		return;
-
-	SetReservationCookie(false);
-	sv_allow_lobby_connect_only.BoolValue = false;
-	g_bAnneLobbyReleased = true;
-}
-
-bool HasDirectJoinWithoutReservation()
-{
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (IsClientConnected(i) && !IsFakeClient(i) && !g_bReservationPresentOnConnect[i])
-			return true;
-	}
-
-	return false;
 }
 
 void RefreshReserveBlockPatch()
 {
 	g_mBlockReserve.Disable();
 
-	if (!g_bDirectJoinReservationBlocked && !LobbyPolicy_ShouldBlockReservePatch(g_iUnreserveType, g_bAnneLobbyReleased))
+	if (g_eLobbyState != LobbyState_ActiveDirect && g_eLobbyState != LobbyState_Released)
 		return;
 
 	if (!g_mBlockReserve.Enable())
 		SetFailState("Failed to enable patch.");
 }
 
+void GetLobbyStateName(LobbyState state, char[] buffer, int maxlen)
+{
+	switch (state)
+	{
+		case LobbyState_IdleUnreserved:
+			strcopy(buffer, maxlen, "IdleUnreserved");
+		case LobbyState_MatchmakingReserved:
+			strcopy(buffer, maxlen, "MatchmakingReserved");
+		case LobbyState_ActiveDirect:
+			strcopy(buffer, maxlen, "ActiveDirect");
+		case LobbyState_Released:
+			strcopy(buffer, maxlen, "Released");
+	}
+}
+
 Action Cmd_Status(int client, int args)
 {
 	int iCookie[2];
-	char sCookie[MAX_COOKIE_LENGTH];
+	char sCookie[MAX_COOKIE_LENGTH], stateName[32];
 
 	GetReservationCookie(iCookie);
+	GetLobbyStateName(g_eLobbyState, stateName, sizeof(stateName));
 	if (iCookie[1])
 		FormatEx(sCookie, sizeof(sCookie), "%x%08x", iCookie[1], iCookie[0]);
 	else 
 		FormatEx(sCookie, sizeof(sCookie), "%x", iCookie[0]);
 
-	ReplyToCommand(client, "g_iUnreserveType = %i, iPlayers = %i, iMaxLobbySlots = %i, bAnneLobbyReleased = %i, bDirectJoinReservationBlocked = %i, sv_allow_lobby_connect_only = %i, sCookie = %s", g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bAnneLobbyReleased, g_bDirectJoinReservationBlocked, sv_allow_lobby_connect_only.IntValue, sCookie);
+	ReplyToCommand(client, "state = %s, unreserveType = %i, players = %i, maxLobbySlots = %i, reservationObserved = %i, sv_hosting_lobby = %i, sv_allow_lobby_connect_only = %i, cookie = %s", stateName, g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bLobbyReservationObserved, sv_hosting_lobby.IntValue, sv_allow_lobby_connect_only.IntValue, sCookie);
 	return Plugin_Handled;
 }
 
@@ -348,12 +490,7 @@ Action Cmd_Unreserve(int args)
 	if (!g_bDependenciesReady)
 		return Plugin_Handled;
 
-	SetReservationCookie(false);
-	sv_allow_lobby_connect_only.BoolValue = false;
-	g_bDirectJoinReservationBlocked = GetPlayerCount() > 0;
-	if (g_iUnreserveType == UNRESERVE_ANNE)
-		g_bAnneLobbyReleased = true;
-	RefreshReserveBlockPatch();
+	TransitionLobbyState(GetPlayerCount() > 0 ? LobbyState_Released : LobbyState_IdleUnreserved, "admin_unreserve");
 	return Plugin_Handled;
 }
 
@@ -378,6 +515,11 @@ Action Cmd_Set(int client, int args)
 	
 	if (GetCmdArgInt(4) > 0)
 		SDKCall(g_hSDKUpdateGameType);
+
+	if (HasReservationCookie())
+		TransitionLobbyState(LobbyState_MatchmakingReserved, "admin_set");
+	else
+		TransitionLobbyState(GetPlayerCount() > 0 ? LobbyState_Released : LobbyState_IdleUnreserved, "admin_set");
 
 	Cmd_Status(client, 0);
 	return Plugin_Handled;
@@ -419,9 +561,9 @@ void SetReservationCookie(bool reservation, const int cookie[2]={0, 0})
 {
 	StoreToAddress(g_pReservationCookie, cookie[0], NumberType_Int32);
 	StoreToAddress(g_pReservationCookie + view_as<Address>(4), cookie[1], NumberType_Int32);
-	SDKCall(g_hSDKUpdateGameType);
 	sv_hosting_lobby.BoolValue = reservation;
 	g_bLobbyReservationObserved = reservation;
+	SDKCall(g_hSDKUpdateGameType);
 }
 
 void Init()
@@ -434,11 +576,18 @@ void Init()
 		SetFailState("Failed to load \"%s.txt\" gamedata.", sBuffer);
 
 	strcopy(sBuffer, sizeof(sBuffer), "CServerGameDLL::ApplyGameSettings");
-	DynamicDetour detour = DynamicDetour.FromConf(hGameData, sBuffer);
-	if (detour == null)
+	g_hApplyGameSettingsDetour = DynamicDetour.FromConf(hGameData, sBuffer);
+	if (g_hApplyGameSettingsDetour == null)
 		SetFailState("Failed to create DynamicDetour: %s", sBuffer);
-	if (!detour.Enable(Hook_Pre, OnApplyGameSettingsPre))
+	if (!g_hApplyGameSettingsDetour.Enable(Hook_Pre, OnApplyGameSettingsPre))
 		SetFailState("Failed to detour pre: %s", sBuffer);
+
+	strcopy(sBuffer, sizeof(sBuffer), "CBaseServer::ReplyReservationRequest");
+	g_hReplyReservationRequestDetour = DynamicDetour.FromConf(hGameData, sBuffer);
+	if (g_hReplyReservationRequestDetour == null)
+		SetFailState("Failed to create DynamicDetour: %s", sBuffer);
+	if (!g_hReplyReservationRequestDetour.Enable(Hook_Post, OnReplyReservationRequestPost))
+		SetFailState("Failed to detour post: %s", sBuffer);
 
 	strcopy(sBuffer, sizeof(sBuffer), "CBaseServer::ReplyReservationRequest");
 	g_mBlockReserve = MemoryPatch.CreateFromConf(hGameData, sBuffer);

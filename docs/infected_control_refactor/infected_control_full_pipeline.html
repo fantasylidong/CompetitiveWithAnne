@@ -756,8 +756,8 @@
       <div class="section-head">
         <div>
           <div class="eyebrow">Wave scheduling</div>
-          <h2>基础波次时钟与 Anti-Bait 是并行关系</h2>
-          <p>Anti-Bait 负责给本波增加“破点”战术语义，不延迟基础倒计时。Tank、暂停或半数倒地只暂停 Anti-Bait 状态机，解除后从原进度恢复。</p>
+          <h2>击杀阶段、独立倒计时与 Anti-Bait 延长串联执行</h2>
+          <p>专家击杀阶段最多 8 秒；本波较快进入低压且异步队列已完成时会提前启动完整 16 秒倒计时。Anti-Bait 只在倒计时最后 4 秒允许接管，到点后可无限延长，解除条件稳定 2 秒才恢复刷特。</p>
         </div>
       </div>
 
@@ -769,6 +769,7 @@
             <button class="state-node" type="button" data-state="Idle">Idle</button>
             <button class="state-node" type="button" data-state="EarlyCheck">EarlyCheck</button>
             <button class="state-node" type="button" data-state="TimerRunning">TimerRunning</button>
+            <button class="state-node" type="button" data-state="IntensiveCheck">IntensiveCheck</button>
             <button class="state-node" type="button" data-state="Release">Release</button>
           </div>
           <div class="state-detail"><strong id="wave-state-title"></strong><p id="wave-state-copy"></p></div>
@@ -790,9 +791,9 @@
       </div>
 
       <div class="rule-band">
-        <section><h3>Pressure 门槛</h3><p>零特感、普通队列为空也能进入 Pressure；不再要求场上达到固定特感比例，优势点抱团空窗仍会被识别。</p></section>
-        <section><h3>破点波动作</h3><p>控制型特感前置并选择抱团队伍边缘目标；连续几何分区分侧翼、后方、外拉和推离方向，不再重复放大单一扇区。</p></section>
-        <section><h3 class="red">不会做的事</h3><p>Anti-Bait 不无限扣住计时，不绕过距离/视线/卡位/路径硬过滤，也不增加单帧 Nav 和昂贵检查预算。</p></section>
+        <section><h3>Pressure 门槛</h3><p>持续采样下中位 Flow 与队形，但只在倒计时最后 4 秒进入 Pressure；至少两名有效生还者、无人脆弱、停滞 12 秒且抱团稳定 2 秒才可延长。</p></section>
+        <section><h3>无限延长与恢复</h3><p>16 秒到点仍满足条件便进入 IntensiveCheck，不设最长等待；推进 2%、队形拆组、出现孤立、间距达到 1500 或有人进入脆弱状态，连续 2 秒后立即放波。</p></section>
+        <section><h3 class="red">保守边界</h3><p>Anti-Bait 不绕过距离、视线、卡位与路径硬过滤，也不增加单帧 Nav 预算。高点、瓶颈与 Nav 拓扑暂不作为无限延长硬门槛，避免坏 Nav 造成永久误锁。</p></section>
       </div>
     </section>
 
@@ -879,9 +880,9 @@
           <h2 id="nav-step-title"></h2>
           <p id="nav-step-copy"></p>
           <div class="nav-metrics">
-            <div><span>每帧 Nav 检查</span><strong>默认 256</strong></div>
-            <div><span>每帧昂贵检查</span><strong>默认 8</strong></div>
-            <div><span>搜索软预算</span><strong>1.0ms</strong></div>
+            <div><span>每切片 Nav 检查</span><strong>默认 256，可热调</strong></div>
+            <div><span>每切片昂贵检查</span><strong>默认 8，可热调</strong></div>
+            <div><span>切片软预算</span><strong>默认 1.0ms，可热调</strong></div>
             <div><span>快照热刷新</span><strong>0.1 秒</strong></div>
             <div><span>快照有效期</span><strong>0.2 秒</strong></div>
           </div>
@@ -895,7 +896,7 @@
         <div>
           <div class="eyebrow">Failure handling</div>
           <h2>插件先完整自救，再使用无限制导演 API</h2>
-          <p>选择场景查看失败游标。一个距离带处于 <code>Pending</code> 时不会误判失败、不会扩圈；只有该带跨帧预算耗尽才进入下一带。</p>
+          <p>选择场景查看失败游标。一个距离带处于 <code>Pending</code> 时不会误判失败、不会放宽；只有该带候选完整耗尽才进入下一带。</p>
         </div>
       </div>
 
@@ -906,8 +907,8 @@
       </div>
       <div class="fallback-ladder" id="fallback-ladder">
         <div class="fallback-step" data-fallback-step="0"><strong>职业主区间</strong><span>每个职业直接进入自己的最佳距离带</span></div>
-        <div class="fallback-step" data-fallback-step="1"><strong>第一次放宽</strong><span>距离边界扩大，其他硬限制保持</span></div>
-        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>Nav 上限受 SpawnMax × 2 约束</span></div>
+        <div class="fallback-step" data-fallback-step="1"><strong>第一次放宽</strong><span>只提高上限，只扫描新增远端区间</span></div>
+        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>最小距离不变，上限受 SpawnMax × 2 约束</span></div>
         <div class="fallback-step constrained" data-fallback-step="3"><strong>导演候选 × 8</strong><span>仍检查最终距离、视线和卡位</span></div>
         <div class="fallback-step" data-fallback-step="4"><strong>完整轮次 +1</strong><span>轮转队首，保留职业并重置会话</span></div>
         <div class="fallback-step" data-fallback-step="5"><strong>重复完整流程</strong><span>插件再自救一轮</span></div>
@@ -996,8 +997,8 @@
             <tbody>
               <tr><td>OnGameFrame 节流</td><td>活跃 / 空闲使用不同 think step</td><td>没有刷特工作时近似零成本。</td></tr>
               <tr><td>普通队列补位</td><td>缺口存在时最短 0.25 秒重试</td><td>避免每帧重新扫描职业容量。</td></tr>
-              <tr><td>Nav 检查</td><td>默认每帧最多 256 个</td><td>大量便宜距离淘汰可以在同帧快速越过。</td></tr>
-              <tr><td>昂贵检查</td><td>默认每帧最多 8 个，并受 1.0ms 软预算限制</td><td>控制 hull、可见性和 path 峰值。</td></tr>
+              <tr><td>Nav 检查</td><td>每切片默认最多 256 个，可热调</td><td>大量便宜距离淘汰可以在同帧快速越过。</td></tr>
+              <tr><td>昂贵检查</td><td>每切片默认最多 8 个，并受默认 1.0ms 软预算限制</td><td>控制 hull、可见性和 path 峰值。</td></tr>
               <tr><td>候选比较</td><td>普通波 4 / 3；破点波 5 / 4</td><td>至少比较 2 个，84 分可提前结束。</td></tr>
               <tr><td>会话寿命</td><td>有命中最多 2 帧；空搜每带最多 3 帧</td><td>避免单个职业长期垄断热路径。</td></tr>
               <tr><td>眼位与朝向</td><td>每个实际刷特帧快照一次</td><td>距离、视线和战术评分同 Tick 复用。</td></tr>
@@ -1059,14 +1060,14 @@
       const overviewSteps = [
         { channel: '决策通道', title: '离开安全区', copy: '首名生还者离开安全区或管理员执行 startspawn 后，插件只安排一次首波启动，不在事件回调里直接做找位。', entry: 'L4D_OnFirstSurvivorLeftSafeArea / sm_startspawn', read: '插件启用状态、当前 timers', write: 'Timer_SpawnFirstWave', module: 'infected_control.sp' },
         { channel: '决策通道', title: 'StartWave', copy: '建立一波的完整快照：重算存活容量、清空路径上下文、计算 AI 预算、批量填队列、解析目标，并把 pending 的破点标记提升为 active。', entry: 'Timer_SpawnFirstWave / Timer_StartNewWave', read: 'siAlive、内鬼预留、难度、上一波状态', write: 'waveIndex、pendingBudget、职业队列、waveTarget', module: 'wave_control.inc' },
-        { channel: '决策通道', title: 'Anti-Bait', copy: '每秒读取团队 Flow 和几何关系。停滞使用下中位数 Flow，抱团看连通组与边缘目标；Pressure 只给本波增加破点策略。', entry: 'Timer_CheckSpawnWindow', read: 'Flow 快照、队形、Tank/暂停/倒地事件', write: 'AntiBaitState、breachPending、runner 标记', module: 'anti_baiter.inc' },
-        { channel: '决策通道', title: 'WaveDecider', copy: '低特、团队健康且没有事件阻断时可以提前进入倒计时；否则在检查窗口底线启动。最终时刻严格受配置的波间隔约束。', entry: 'WaveDecider_Update', read: '总 SI、健康状态、配置间隔、Anti-Bait Pressure', write: 'Idle / EarlyCheck / TimerRunning 与 release 决策', module: 'wave_decider.inc' },
-        { channel: '决策通道', title: '释放新波', copy: '倒计时到点后通知内鬼 5 秒窗口，并启动下一波。Pressure 会把这次波次标记为破点波，但不会推迟基础释放时间。', entry: 'Timer_CheckSpawnWindow', read: 'WaveReleaseDecision、breachPending', write: 'StartWave、Traitor_OnWaveReleased', module: 'wave_control.inc / traitor_mode.inc' },
+        { channel: '决策通道', title: 'Anti-Bait', copy: '每秒采样团队 Flow、连通组和队友距离；倒计时最后 4 秒才允许 Pressure 接管。健康抱团且停滞稳定 2 秒可在到点后持续延长。', entry: 'Timer_CheckSpawnWindow', read: 'Flow 快照、队形、Tank/暂停/倒地事件', write: 'AntiBaitState、holding 条件、runner 标记', module: 'anti_baiter.inc' },
+        { channel: '决策通道', title: 'WaveDecider', copy: '低特、团队健康且普通异步队列完成时可提前开始完整 16 秒倒计时；否则在难度检查窗口到点时启动。Pressure 到点后进入无超时 IntensiveCheck。', entry: 'WaveDecider_Update', read: '总 SI、待刷队列、健康状态、配置间隔、Anti-Bait Pressure', write: 'Idle / EarlyCheck / TimerRunning / IntensiveCheck 与 release 决策', module: 'wave_decider.inc' },
+        { channel: '决策通道', title: '释放新波', copy: '普通情况在 16 秒到点启动下一波；稳定卡位则无限延长。推进、稳定散开或出现脆弱状态连续 2 秒后恢复放波。', entry: 'Timer_CheckSpawnWindow', read: 'WaveReleaseDecision、holding 条件', write: 'StartWave、Traitor_OnWaveReleased', module: 'wave_control.inc / traitor_mode.inc' },
         { channel: '帧执行通道', title: '维护普通队列', copy: 'OnGameFrame 先做活跃/空闲节流。只有普通队列存在缺口时才按最短 0.25 秒重试，批量补齐 pending 预算。', entry: 'OnGameFrame', read: '队列数、pendingBudget、职业容量', write: 'normalQueue', module: 'infected_control.sp / class_queue.inc' },
         { channel: '帧执行通道', title: '传送队列优先', copy: '需要回收的旧特感先进入独立传送队列。OnGameFrame 每次优先尝试传送，避免普通新生占满上限后让旧 Bot 永远回不来。', entry: 'OnGameFrame', read: 'teleportQueue、总 SI 上限', write: 'TryTeleportSpawnOnce', module: 'spawn_attempts.inc' },
-        { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用有向 Nav 路径主区间。Boomer 和 Spitter 受后手门控；主区间失败才进入两级放宽。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minNavRange / maxNavRange', module: 'spawn_tactics.inc' },
-        { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话绑定目标 Nav，分页读取 worker 已按 candidate -> target 路径距离排序的可达快照；Flow 桶不再作为候选源。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、Nav 距离带、图快照', write: 'SpawnSearch session、图分页游标', module: 'spawn_core.inc / spawn_accel_bridge.inc' },
-        { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位与朝向，再消费默认最多 256 个 Nav，最多 8 个候选进入昂贵阶段，并受 1.0ms 软预算限制。Pending 留到下一帧。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'navDistance、flags、bucket、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
+        { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用有向 Nav 路径主区间。主区间失败后只提高远端上限，职业最小距离保持不变。Boomer 和 Spitter 仍受后手门控。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minNavRange / maxNavRange / graphScanMinRange', module: 'spawn_tactics.inc' },
+        { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话绑定目标 Nav，分页读取 worker 已按 candidate -> target 路径距离排序的可达快照；第二、三档只从上一档硬上限之后继续，Flow 桶不再作为候选源。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、累计距离带、图扫描下界、图快照', write: 'SpawnSearch session、图分页游标', module: 'spawn_core.inc / spawn_accel_bridge.inc' },
+        { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位与朝向；每个搜索切片默认最多消费 256 个 Nav、8 个候选进入昂贵阶段，并受 1.0ms 软预算限制，三项均可热调。Pending 留到下一帧。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'navDistance、flags、bucket、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
         { channel: '帧执行通道', title: '生成与兜底', copy: '合格点交给 DoSpawnAt。三段 Nav 全失败后先尝试受限导演点；连续两轮完整失败后才使用不附加限制的最终导演 API。', entry: 'TryNormalSpawnOnce', read: 'bestPos、fallbackCycles', write: '特感实体或下一兜底阶段', module: 'spawn_attempts.inc' },
         { channel: '事件回写通道', title: '生成与死亡事件', copy: '生成记录最后出生时间；死亡减少存活数并触发对应职业死亡 CD。所有计数再用于下一帧容量和队列维护。', entry: 'player_spawn / player_death', read: '实体职业、是否 ghost、是否内鬼', write: 'siAlive、totalSI、lastDeathTime', module: 'infected_control.sp / si_cap.inc' },
         { channel: '事件回写通道', title: '能力、控制与伤害', copy: 'Charge、Pounce、Ride、Tongue 等事件标记战术交战，让后手支援职业放行；内鬼模式同时维护延迟伤害归属和伤害账本。', entry: 'ability_use / player_hurt / 控制事件', read: '攻击者、受害者、实体归属', write: 'pressureEngaged、traitor damage ledger', module: 'infected_control.sp / traitor_mode.inc' },
@@ -1074,26 +1075,27 @@
       ];
 
       const classData = {
-        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[700,1650],[500,2400],[300,3000]], copy: '职业带按有向 Nav 路径距离计算；高度、Flow、外拉方向和侧后方质量继续参与候选评分。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
-        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,700],[250,1050],[250,1600]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
-        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[500,1300],[350,1900],[250,2600]], copy: 'Nav 距离留出扑击展开路线，连续几何分偏好多数枪线未覆盖的侧后方。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
-        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[450,1150],[300,1550],[250,2000]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
-        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[300,900],[250,1350],[250,2000]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
-        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[300,900],[250,1350],[250,2000]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
+        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[500,1200],[500,2100],[500,3000]], copy: '高出目标眼位 32 后按 1.5 倍高度差折减 Nav 距离，最多 1000；原始距离、职业 500 下限和直线 250 安全线不变。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
+        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,550],[250,1000],[250,1800]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
+        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[350,950],[350,1750],[350,2900]], copy: '高出目标眼位 32 后按 1.15 倍高度差折减 Nav 距离，最多 800；职业 350 下限不随放宽下降。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
+        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[300,800],[300,1450],[300,2300]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下；职业 300 下限固定，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
+        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[250,700],[250,1250],[250,2200]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
+        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[250,700],[250,1250],[250,2200]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
       };
 
       const stateData = {
         wave: {
           Idle: '本波刚开始，等待低特提前检查或正常检查窗口。',
           EarlyCheck: '低 SI、团队健康、无 Tank/半数倒地等阻断时，允许更早建立最终倒计时。',
-          TimerRunning: '倒计时已经确定，持续观察 Anti-Bait Pressure，但不会被它无限延长。',
-          Release: '达到配置的波间隔，释放普通波或携带 breach 标记的破点波。'
+          TimerRunning: '独立 16 秒倒计时正在运行；前段只采样，最后 4 秒允许 Anti-Bait 进入 Pressure。',
+          IntensiveCheck: '倒计时已到点但稳定卡位仍成立；没有最长等待，每秒复查解除条件。',
+          Release: '无稳定卡位时到点放波；延长中解除条件连续 2 秒后放波。'
         },
         anti: {
           Off: '功能关闭或当前没有有效生还者快照。重新启用后会进入 Grace，而不是永久失效。',
           Grace: '开波后的宽限期，先允许生还者自然处理当前场面。',
           Observe: '持续采样下中位数 Flow、队伍扩散和跑男差距，确认是否真的停滞。',
-          Pressure: '停滞达到门槛，标记下一次释放为破点波，并可加速不可见特感传送。',
+          Pressure: '倒计时临近到点，停滞与队形条件稳定成立；到点可转入无限延长，并可准备破点策略。',
           Recover: '团队重新推进后的稳定观察期，避免单次 Flow 抖动频繁切换。',
           Paused: 'Tank、游戏暂停或至少半数生还者倒地时冻结。解除后扣除暂停时长并恢复先前状态。'
         }
@@ -1101,12 +1103,12 @@
 
       const navData = [
         ['有向图快照', 'worker 从目标 Nav 反向遍历有向边并构建距离场；250 直线范围内的 Nav 可做路径中间节点，但不会作为候选返回。'],
-        ['Nav 距离分页', '扩展按 candidate -> target 路径距离升序返回 areaIdx 与 navDistance；职业范围和距离评分直接复用该值。'],
+        ['Nav 距离分页', '扩展按 candidate -> target 路径距离升序返回 areaIdx 与原始 navDistance；放宽档只读取上一档上限之外的新区间，Smoker/Hunter 高点在主线程计算 navEffective。'],
         ['跨帧页游标', '跨帧只保留 areaIdx/navDistance 的消费位置和诊断计数；随机点、安全结论与本帧最佳候选不会跨 tick。'],
         ['全队眼位快照', '每个实际刷特帧只读取一次眼位、左右视点和朝向；同 Tick 距离、视线与战术评分复用。'],
         ['Flags / 冷却 / 桶占用', '安全屋、救援等无效 flags、最近使用 Nav 和已拥挤 Flow 桶在随机采样前退出。'],
         ['区域内随机点', '调用 Nav 随机点 API，同一区域最多采样 3 次；这里开始才产生真实世界坐标。'],
-        ['Nav 范围 / 直线 250 / Flow', '职业硬边界使用有向 navDistance；随机点另用三维平方距离执行全队 250 安全排除，并检查分散度和真实 Flow。'],
+        ['Nav 范围 / 高点补偿 / 直线 250', '职业硬边界使用有向 Nav 距离；Smoker/Hunter 高点按有限补偿后的有效距离判断上限，随机点仍执行全队三维直线 250 安全排除。'],
         ['Hull + 可见性', '候选先通过卡位检查，再用精确视线判断防止当面生成；当前实现没有 PVS 粗筛。'],
         ['Nav path', '只对前面全部通过的点构建路径；会话缓存目标起点，path cache 复用量化后的结果。'],
         ['统一职业评分', '距离、高度、Flow、分散度统一为 0..100，再混合连续的外拉、侧后方、推离或范围覆盖质量；默认不因低分拒绝安全点。']

@@ -177,64 +177,84 @@ stock bool:QuarterRank_RecoverIfNeeded()
 	return QuarterRank_Enabled();
 }
 
-stock QuarterRank_GetModePointsColumn(Client, String:buffer[], maxlength)
+stock QuarterRank_GetModePointsColumn(Client, String:buffer[], maxlength, ScoreTeam = 0)
 {
-	Stats_GetPointsColumnForTeam(GetClientTeam(Client), buffer, maxlength);
+	if (ScoreTeam <= 0)
+		ScoreTeam = GetClientTeam(Client);
+
+	Stats_GetPointsColumnForTeam(ScoreTeam, buffer, maxlength);
 	if (StrEqual(buffer, "points"))
 		Format(buffer, maxlength, "points_coop");
 }
 
-stock QuarterRank_RecordScore(Client, Score)
+stock bool:QuarterRank_RecordScoreSteamID(const String:SteamID[], Score, ScoreTeam)
 {
 	if (Score == 0)
-		return;
+		return false;
 
 	QuarterRank_EnsureCurrentQuarter();
 
-	if (!QuarterRank_Enabled() || !Stats_IsValidHumanClient(Client))
-		return;
+	if (!QuarterRank_Enabled() || StatsDisabled() || Stats_IsInvalidRankAuthString(SteamID))
+		return false;
 
-	ClientQuarterPoints[Client] += Score;
-	if (ClientQuarterPoints[Client] < 0)
-		ClientQuarterPoints[Client] = 0;
-
-	decl String:SteamID[MAX_LINE_WIDTH];
 	decl String:EscSteamID[MAX_LINE_WIDTH * 2 + 1];
-	GetClientRankAuthString(Client, SteamID, sizeof(SteamID));
 	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
 
-	new InsertScore = Score;
-	if (InsertScore < 0)
-		InsertScore = 0;
-
 	decl String:ModePointsColumn[32];
-	QuarterRank_GetModePointsColumn(Client, ModePointsColumn, sizeof(ModePointsColumn));
+	QuarterRank_GetModePointsColumn(0, ModePointsColumn, sizeof(ModePointsColumn), ScoreTeam);
 
 	decl String:query[1024];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = GREATEST(points + %i, 0), `%s` = GREATEST(`%s` + %i, 0), updated = VALUES(updated)",
-		DbPrefix, ModePointsColumn, EscSteamID, g_iQuarterRankKey, InsertScore, InsertScore, Score, ModePointsColumn, ModePointsColumn, Score);
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, updated) VALUES ('%s', %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = points + %i, `%s` = `%s` + %i, updated = VALUES(updated)",
+		DbPrefix, ModePointsColumn, EscSteamID, g_iQuarterRankKey, Score, Score, Score, ModePointsColumn, ModePointsColumn, Score);
 	SendSQLUpdate(query);
+	return true;
 }
 
-stock QuarterRank_RecordField(Client, const String:Field[], Amount)
+stock QuarterRank_RecordScore(Client, Score, ScoreTeam = 0)
+{
+	if (Score == 0 || !Stats_IsValidHumanClient(Client))
+		return;
+
+	if (ScoreTeam <= 0)
+		ScoreTeam = GetClientTeam(Client);
+
+	decl String:SteamID[MAX_LINE_WIDTH];
+	if (!GetClientRankAuthString(Client, SteamID, sizeof(SteamID)))
+		return;
+
+	if (QuarterRank_RecordScoreSteamID(SteamID, Score, ScoreTeam))
+		ClientQuarterPoints[Client] += Score;
+}
+
+stock QuarterRank_RecordFieldSteamID(const String:SteamID[], const String:Field[], Amount)
 {
 	if (Amount <= 0)
 		return;
 
 	QuarterRank_EnsureCurrentQuarter();
 
-	if (!QuarterRank_Enabled() || StatsDisabled() || !Stats_IsValidHumanClient(Client))
+	if (!QuarterRank_Enabled() || StatsDisabled() || Stats_IsInvalidRankAuthString(SteamID))
 		return;
 
-	decl String:SteamID[MAX_LINE_WIDTH];
 	decl String:EscSteamID[MAX_LINE_WIDTH * 2 + 1];
-	GetClientRankAuthString(Client, SteamID, sizeof(SteamID));
 	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
 
 	decl String:query[1024];
 	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, `%s`, updated) VALUES ('%s', %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
 		DbPrefix, Field, EscSteamID, g_iQuarterRankKey, Amount, Field, Field, Field);
 	SendSQLUpdate(query);
+}
+
+stock QuarterRank_RecordField(Client, const String:Field[], Amount)
+{
+	if (Amount <= 0 || !Stats_IsValidHumanClient(Client))
+		return;
+
+	decl String:SteamID[MAX_LINE_WIDTH];
+	if (!GetClientRankAuthString(Client, SteamID, sizeof(SteamID)))
+		return;
+
+	QuarterRank_RecordFieldSteamID(SteamID, Field, Amount);
 }
 
 stock QuarterRank_RecordInfectedKill(Client, const String:InfectedType[], Kills, Headshots = 0)
@@ -264,7 +284,7 @@ stock QuarterRank_RecordInfectedKill(Client, const String:InfectedType[], Kills,
 	SendSQLUpdate(query);
 }
 
-stock QuarterRank_RecordInfectedKillAndScore(Client, Score, const String:InfectedType[], Kills, Headshots = 0)
+stock QuarterRank_RecordInfectedKillAndScore(Client, Score, const String:InfectedType[], Kills, Headshots = 0, ScoreTeam = 0)
 {
 	if (Score == 0 && Kills <= 0)
 		return;
@@ -288,27 +308,21 @@ stock QuarterRank_RecordInfectedKillAndScore(Client, Score, const String:Infecte
 	}
 
 	ClientQuarterPoints[Client] += Score;
-	if (ClientQuarterPoints[Client] < 0)
-		ClientQuarterPoints[Client] = 0;
 
 	decl String:SteamID[MAX_LINE_WIDTH];
 	decl String:EscSteamID[MAX_LINE_WIDTH * 2 + 1];
 	GetClientRankAuthString(Client, SteamID, sizeof(SteamID));
 	SQL_EscapeString(db, SteamID, EscSteamID, sizeof(EscSteamID));
 
-	new InsertScore = Score;
-	if (InsertScore < 0)
-		InsertScore = 0;
-
 	decl String:ModePointsColumn[32];
-	QuarterRank_GetModePointsColumn(Client, ModePointsColumn, sizeof(ModePointsColumn));
+	QuarterRank_GetModePointsColumn(Client, ModePointsColumn, sizeof(ModePointsColumn), ScoreTeam);
 
 	decl String:KillColumn[32];
 	Format(KillColumn, sizeof(KillColumn), "kill_%s", InfectedType);
 
 	decl String:query[1536];
-	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = GREATEST(points + %i, 0), `%s` = GREATEST(`%s` + %i, 0), kills = kills + VALUES(kills), headshots = headshots + VALUES(headshots), `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
-		DbPrefix, ModePointsColumn, KillColumn, EscSteamID, g_iQuarterRankKey, InsertScore, InsertScore, Kills, Headshots, Kills, Score, ModePointsColumn, ModePointsColumn, Score, KillColumn, KillColumn, KillColumn);
+	Format(query, sizeof(query), "INSERT INTO `%sscore_quarter` (steamid, quarter_key, points, `%s`, kills, headshots, `%s`, updated) VALUES ('%s', %i, %i, %i, %i, %i, %i, UNIX_TIMESTAMP()) ON DUPLICATE KEY UPDATE points = points + %i, `%s` = `%s` + %i, kills = kills + VALUES(kills), headshots = headshots + VALUES(headshots), `%s` = `%s` + VALUES(`%s`), updated = VALUES(updated)",
+		DbPrefix, ModePointsColumn, KillColumn, EscSteamID, g_iQuarterRankKey, Score, Score, Kills, Headshots, Kills, Score, ModePointsColumn, ModePointsColumn, Score, KillColumn, KillColumn, KillColumn);
 	SendSQLUpdate(query);
 }
 

@@ -208,6 +208,10 @@
 	{
 		"chi"		"{green}[IC]{default} 现在可以按正常灵魂规则寻找位置复活。"
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"chi"		"{green}[IC]{default} 内鬼出生后必须战斗至死亡，不能通过远离生还者重新进入灵魂状态再次复活。"
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"chi"		"{green}[IC]{default} 当前没有可用内鬼槽位。"

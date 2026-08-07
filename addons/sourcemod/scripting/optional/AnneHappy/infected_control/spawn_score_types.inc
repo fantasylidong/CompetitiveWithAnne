@@ -34,6 +34,8 @@ enum struct SpawnScoreDbg
 
     float dTargetEye;
     float navDistance;
+    float navDistanceEffective;
+    float navHighGroundComp;
     float ringEff;
     float slack;
     float sweet;

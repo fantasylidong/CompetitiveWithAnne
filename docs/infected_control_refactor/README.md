@@ -1,5 +1,7 @@
 # 特感控制插件重构文档索引
 
+最新实服矩阵：[NAV_WAVE_MATRIX_20260806_SPREAD.md](NAV_WAVE_MATRIX_20260806_SPREAD.md)
+
 ## 📚 文档目录
 
 ### 🎯 核心文档（必读）

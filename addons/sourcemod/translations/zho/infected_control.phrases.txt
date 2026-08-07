@@ -208,6 +208,10 @@
 	{
 		"zho"		"{green}[IC]{default} 現在可以按正常靈魂規則尋找位置復活。"
 	}
+	"InfectedControl_TraitorReghostBlocked"
+	{
+		"zho"		"{green}[IC]{default} 內鬼出生後必須戰鬥至死亡，不能透過遠離生還者重新進入靈魂狀態再次復活。"
+	}
 	"InfectedControl_TraitorNoSlot"
 	{
 		"zho"		"{green}[IC]{default} 目前沒有可用內鬼槽位。"

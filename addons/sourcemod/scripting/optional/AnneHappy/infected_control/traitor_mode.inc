@@ -16,6 +16,7 @@
 #define TRAITOR_DAMAGE_TAIL_SECONDS 0.5
 #define TRAITOR_DAMAGE_POLL_INTERVAL 0.1
 #define TRAITOR_BILE_FALLBACK_SECONDS 15.0
+#define TRAITOR_REGHOST_NOTICE_INTERVAL 3.0
 #define TRAITOR_ENTITY_SLOTS 2048
 
 enum TraitorState
@@ -59,6 +60,7 @@ static bool g_ITDamagePenaltyPending[MAXPLAYERS + 1];
 static float g_ITDamageFinalizeAfter[MAXPLAYERS + 1];
 static bool g_ITDamageHooked[MAXPLAYERS + 1];
 static bool g_ITAutoBhopHooked[MAXPLAYERS + 1];
+static float g_ITNextReghostNoticeAt[MAXPLAYERS + 1];
 static bool g_ITDamageTrackingNeeded;
 static bool g_ITDamageUnhookPending;
 static int g_ITDamageUnhookGeneration;
@@ -1041,11 +1043,7 @@ static void Traitor_CancelSpawnTimer(int client)
     if (client < 1 || client > MaxClients)
         return;
 
-    if (g_ITSpawnTimer[client] != INVALID_HANDLE)
-    {
-        KillTimer(g_ITSpawnTimer[client]);
-        g_ITSpawnTimer[client] = INVALID_HANDLE;
-    }
+    StopTrackedTimer(g_ITSpawnTimer[client]);
     g_ITSpawnDeadline[client] = 0.0;
 }
 
@@ -1858,6 +1856,7 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
     g_ITDeferredClass[client] = 0;
     g_ITDeferredRegistrationOrder[client] = 0;
     g_ITDeferredWaitOrder[client] = 0;
+    g_ITNextReghostNoticeAt[client] = 0.0;
     Traitor_CancelSpawnTimer(client);
     Traitor_RefreshDamageHookDemand();
 }
@@ -2524,6 +2523,10 @@ static bool Traitor_CheckRegistrationAccess(int client)
     if (Traitor_IsAdminClient(client))
         return true;
 
+    // 无配额 provider 代表无数据库构建；此时保留每局限制，但跳过持久化资格门槛。
+    if (!TraitorQuota_IsProviderAvailable())
+        return true;
+
     bool statsAvailable = GetFeatureStatus(FeatureType_Native, "l4dstats_GetClientScore") == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") == FeatureStatus_Available;
     if (!statsAvailable || l4dstats_IsClientScoreReady(client) == 0)
@@ -3091,6 +3094,32 @@ public Action L4D_OnMaterializeFromGhostPre(int client)
         return Plugin_Handled;
 
     return Plugin_Continue;
+}
+
+public Action L4D_OnEnterGhostStatePre(int client)
+{
+    // A materialized traitor must die before receiving another spawn. Block the
+    // engine's distance despawn while leaving the initial ghost setup untouched.
+    if (!g_bRuntimeRoundActive
+        || client < 1 || client > MaxClients
+        || g_ITState[client] != Traitor_Alive
+        || g_ITClass[client] < 1 || g_ITClass[client] > SI_COUNT
+        || !IsValidClient(client)
+        || IsFakeClient(client)
+        || GetClientTeam(client) != TEAM_INFECTED
+        || !IsPlayerAlive(client))
+    {
+        return Plugin_Continue;
+    }
+
+    float now = GetGameTime();
+    if (now >= g_ITNextReghostNoticeAt[client])
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorReghostBlocked");
+        g_ITNextReghostNoticeAt[client] = now + TRAITOR_REGHOST_NOTICE_INTERVAL;
+    }
+
+    return Plugin_Handled;
 }
 
 public void L4D_OnMaterializeFromGhost(int client)

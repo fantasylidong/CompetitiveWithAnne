@@ -1,5 +1,6 @@
 #pragma semicolon 1
 #pragma newdecls required
+#pragma dynamic 32768
 
 /**
  * Infected Control (fdxx-style NavArea spot picking + persisted Nav graph + legacy fallback)
@@ -41,7 +42,6 @@
 
 #include <sourcemod>
 #include <colors>
-#include <dbi>
 #include <sdktools>
 #include <sdkhooks>
 #include <sdktools_tempents>
@@ -49,6 +49,7 @@
 #include <sourcescramble>
 #include <anne_spawn_accel>
 #undef REQUIRE_PLUGIN
+#include <anne_traitor_quota> // 可选：每日配额与 Tank 封禁持久化
 #include <si_target_limit>  // 可选
 #include <pause>            // 可选
 #include <l4dstats>         // 可选：普通玩家内鬼资格读取
@@ -67,14 +68,20 @@
 
 // Nav 找点按帧分片；候选数与昂贵精判数都有限制。
 #define NAV_RANDOM_POINT_TRIES    3
-#define NAV_SCAN_CANDIDATES_PER_SLICE 256
-#define NAV_SCAN_EXPENSIVE_PER_SLICE  8
-#define NAV_SCAN_TIME_BUDGET_MS       1.00
 #define NAV_SCAN_SCORE_BUDGET_CAP     8
 #define NAV_CANDIDATE_PAGE_SIZE       256
 #define NAV_CANDIDATE_TEAM_EXCLUSION  250.0
+#define NAV_CANDIDATE_LANDING_MARGIN    16.0
+#define HURT_TRIGGER_LANDING_MARGIN      40.0
+#define NAV_UNSAFE_GEOMETRY_CD_SECS      30.0
 #define NAV_CANDIDATE_RANGE_SLACK      128.0
 #define NAV_PATH_DISTANCE_SCALE          2.0
+#define NAV_HIGH_GROUND_COMP_START_Z     32.0
+#define NAV_HIGH_GROUND_SMOKER_SCALE      1.5
+#define NAV_HIGH_GROUND_HUNTER_SCALE      1.15
+#define NAV_HIGH_GROUND_SMOKER_MAX     1000.0
+#define NAV_HIGH_GROUND_HUNTER_MAX      800.0
+#define NAV_HIGH_GROUND_MAX_COMP       1000.0
 #define NAV_CANDIDATE_IDLE_INTERVAL      1.0
 #define NAV_CANDIDATE_WARM_INTERVAL      0.1
 #define NAV_CANDIDATE_RESULT_TTL         0.2
@@ -82,9 +89,9 @@
 #define TACTICAL_BAND_STAGES      3
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
-#define DIRECTOR_FALLBACK_SAMPLES 4
-#define UNRESTRICTED_FALLBACK_CYCLES 2
-#define UNRESTRICTED_DIRECTOR_TRIES  12
+#define DIRECTOR_BASE_API_TRIES      7
+#define EXTENDED_FALLBACK_CYCLES     2
+#define EXTENDED_DIRECTOR_TRIES     12
 #define NAV_WEIGHT_MIN            0.10
 
 #define ENABLE_SMOKER             (1 << 0)
@@ -127,7 +134,7 @@
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2026-07"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2026-08"  // 和插件版号保持同步
 
 // areaIdx -> 冷却过期时间；候选热循环直接 O(1) 读取。
 ArrayList g_NavCooldownUntil = null;
@@ -182,7 +189,26 @@ ArrayList g_AreaPct = null;  // int   per areaIdx（-1=未知/坏flow，否则0.
 
 // 跑男通知 forward
 Handle g_hRushManNotifyForward = INVALID_HANDLE;
+Handle g_hSpawnCommittedForward = INVALID_HANDLE;
 Handle g_hFirstWaveTimer = INVALID_HANDLE;
+Handle g_hSaferoomResetTimer = INVALID_HANDLE;
+Handle g_hApplyMaxSpecialsTimer = INVALID_HANDLE;
+
+#define RUNTIME_WATCHDOG_INTERVAL       1.0
+#define RUNTIME_TIMER_STALE_SECONDS     3.5
+#define RUNTIME_FIRST_WAVE_TIMEOUT      5.0
+#define RUNTIME_HARD_RECOVERY_COOLDOWN 10.0
+
+bool g_bRuntimeRoundActive = false;
+bool g_bRuntimeMapEnding = false;
+bool g_bRuntimeRecoveryBusy = false;
+bool g_bRuntimeRecoverySuppressed = false;
+float g_fNextRuntimeWatchdogAt = 0.0;
+float g_fNextRuntimeHardRecoveryAt = 0.0;
+float g_fFirstWaveRequestedAt = 0.0;
+float g_fWaveCheckHeartbeat = 0.0;
+float g_fTeleportHeartbeat = 0.0;
+int g_iRuntimeCountMismatchTicks = 0;
 
 // =========================
 // 全局
@@ -192,9 +218,27 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-01",
+    version     = "2026-08-03.3",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
+
+// NO_MAPCHANGE timers may already be closed when their owner receives a map
+// lifecycle callback. Detach the shared reference first so cleanup is idempotent.
+stock bool StopTrackedTimer(Handle &slot)
+{
+    Handle timer = slot;
+    slot = INVALID_HANDLE;
+    if (timer == INVALID_HANDLE || !IsValidHandle(timer))
+        return false;
+
+    KillTimer(timer);
+    return true;
+}
+
+stock bool IsTrackedTimerValid(Handle timer)
+{
+    return timer != INVALID_HANDLE && IsValidHandle(timer);
+}
 
 #include "infected_control/runtime_state.inc"
 
@@ -263,6 +307,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_NavCandidatesResetPerf");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetEdgeCount");
+    MarkNativeAsOptional("AnneSpawn_NavGraphGetDiagnostics");
     MarkNativeAsOptional("AnneSpawn_NavGraphCollectProgress");
     MarkNativeAsOptional("AnneSpawn_GetWorkerCount");
     MarkNativeAsOptional("AnneSpawn_SetSurvivorSnapshot");
@@ -277,6 +322,8 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     RegPluginLibrary("infected_control");                           // 供其他插件依赖
     g_hRushManNotifyForward = CreateGlobalForward("OnDetectRushman", // 跑男 forward：传入幸存者 index
                                                   ET_Ignore, Param_Cell);
+    g_hSpawnCommittedForward = CreateGlobalForward(
+        "InfectedControl_OnSpawnCommitted", ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
     CreateNative("InfectedControl_IsTraitorRegistered", Native_InfectedControlIsTraitorRegistered);
@@ -301,7 +348,7 @@ public void OnLibraryAdded(const char[] name)
         Visibility_ClearEyeSnapshot();
         ClearPathCache();
         if (g_bInfectedControlStarted)
-            SpawnAccel_StartNavGraph(false);
+            SpawnAccel_ScheduleNavGraphStart(false);
     }
 
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = true;
@@ -349,7 +396,9 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
         return view_as<any>(rem);
     }
 
-    float rem = DifficultyStrategy_GetConfiguredWaveDelay() - float(gST.lastSpawnSecs);
+    float rem = WaveDecider_GetReleaseEta();
+    if (rem < 0.0)
+        rem = DifficultyStrategy_GetConfiguredWaveDelay() - float(gST.lastSpawnSecs);
     if (rem < 0.0) rem = 0.0;
     return view_as<any>(rem);
 }
@@ -365,14 +414,13 @@ public void OnPluginStart()
     SpawnAccel_UpdateAvailability(true);
     ClearPathCache();
     Visibility_ClearEyeSnapshot();
-    TraitorQuota_Init();
     ClassCapMirrors_Create();
     gQ.Create();
     gST.Reset();
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
     BuildNavIdIndexMap();
     g_bInfectedControlStarted = true;
-    SpawnAccel_StartNavGraph(false);
+    SpawnAccel_ScheduleNavGraphStart(false);
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
@@ -433,18 +481,26 @@ public void OnPluginEnd()
 {
     WaveSpawnReport_End("plugin_end");
     g_bInfectedControlStarted = false;
+    g_bRuntimeRoundActive = false;
+    g_bRuntimeMapEnding = true;
+    g_bRuntimeRecoverySuppressed = true;
+    StopAll();
     SpawnAccel_ClearGraphState(true);
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
     Traitor_ResetAll(true);
     Traitor_ShutdownDamageHooks();
+    Visibility_ResetHurtTriggers();
     // 插件结束时清理 Path 缓存
     ClearPathCache();
-    TraitorQuota_Close();
 }
 public void OnMapEnd()
 {
     WaveSpawnReport_End("map_end");
+    g_bRuntimeRoundActive = false;
+    g_bRuntimeMapEnding = true;
+    g_bRuntimeRecoverySuppressed = true;
+    StopAll();
     SpawnAccel_ClearGraphState(true);
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
@@ -464,6 +520,7 @@ public void OnMapEnd()
     if (g_NavIdToIndex != null) { delete g_NavIdToIndex; g_NavIdToIndex = null; }
     ClearPathCache();
     ClearNavAreasCache();
+    Visibility_ResetHurtTriggers();
 
     if (SpawnPerfConfig_ShowStats())
     {
@@ -473,14 +530,25 @@ public void OnMapEnd()
 
 public void OnMapStart()
 {
+    Visibility_ResetHurtTriggers();
+    g_bRuntimeRoundActive = false;
+    g_bRuntimeMapEnding = false;
+    g_bRuntimeRecoverySuppressed = false;
+    g_fNextRuntimeWatchdogAt = 0.0;
+    g_fNextRuntimeHardRecoveryAt = 0.0;
+    g_iRuntimeCountMismatchTicks = 0;
     if (g_bInfectedControlStarted)
-        CreateTimer(1.0, Timer_StartSpawnAccelGraph, _, TIMER_FLAG_NO_MAPCHANGE);
+        SpawnAccel_ScheduleNavGraphStart(false);
 }
 
-public Action Timer_StartSpawnAccelGraph(Handle timer)
+public Action Timer_StartSpawnAccelGraph(Handle timer, any data)
 {
+    if (timer != g_hSpawnAccelStartTimer)
+        return Plugin_Stop;
+
+    g_hSpawnAccelStartTimer = INVALID_HANDLE;
     SpawnAccel_UpdateAvailability();
-    SpawnAccel_StartNavGraph(false);
+    SpawnAccel_StartNavGraph(view_as<bool>(data));
     return Plugin_Stop;
 }
 
@@ -490,7 +558,7 @@ public Action Timer_StartSpawnAccelGraph(Handle timer)
 stock void Debug_Print(const char[] format, any ...)
 {
     if (gCV.iDebugMode <= 0) return;
-    char buf[512];
+    char buf[1024];
     VFormat(buf, sizeof buf, format, 2);
     LogToFile(g_sLogFile, "%s", buf);
     if (gCV.iDebugMode >= 2)
@@ -527,16 +595,19 @@ public Action InfectedControl_OnTraitorCvarCommand(int client, const char[] comm
 
 public Action Cmd_StartSpawn(int client, int args)
 {
+    g_bRuntimeRecoverySuppressed = false;
     RequestStartSpawn();
     return Plugin_Handled;
 }
 
 public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
+    g_bRuntimeRecoverySuppressed = false;
     RequestStartSpawn();
 }
 public Action Cmd_StopSpawn(int client, int args)
 {
+    g_bRuntimeRecoverySuppressed = true;
     StopAll();
     return Plugin_Handled;
 }
@@ -581,7 +652,10 @@ public Action Cmd_RebuildNavCache(int client, int args)
         DeleteFile(g_sBucketCachePath);
 
     if (g_bSpawnAccel)
+    {
+        SpawnAccel_ResetTopologyRetryState();
         SpawnAccel_StartNavGraph(true);
+    }
     else
         BuildNavBuckets();
     
@@ -600,14 +674,17 @@ void ResetDeathState()
 
 static void StopAll()
 {
+    SpawnAttempts_ResetPendingActualSpawn();
     WaveSpawnReport_End("stop_all");
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
-    if (g_hFirstWaveTimer != INVALID_HANDLE)
-    {
-        KillTimer(g_hFirstWaveTimer);
-        g_hFirstWaveTimer = INVALID_HANDLE;
-    }
+    StopTrackedTimer(g_hFirstWaveTimer);
+    StopTrackedTimer(g_hSaferoomResetTimer);
+    StopTrackedTimer(g_hApplyMaxSpecialsTimer);
+    g_fFirstWaveRequestedAt = 0.0;
+    g_fWaveCheckHeartbeat = 0.0;
+    g_fTeleportHeartbeat = 0.0;
+    g_iRuntimeCountMismatchTicks = 0;
 
     gQ.Clear();
     Queue_SyncSizes();
@@ -624,11 +701,27 @@ static void StopAll()
 }
 static Action Timer_ApplyMaxSpecials(Handle timer)
 {
+    if (timer != g_hApplyMaxSpecialsTimer)
+        return Plugin_Stop;
+
+    g_hApplyMaxSpecialsTimer = INVALID_HANDLE;
     gCV.ApplyMaxZombieBound();
     return Plugin_Stop;
 }
+
+static void ScheduleApplyMaxSpecials()
+{
+    StopTrackedTimer(g_hApplyMaxSpecialsTimer);
+    g_hApplyMaxSpecialsTimer = CreateTimer(
+        0.1, Timer_ApplyMaxSpecials, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
 static Action Timer_ResetAtSaferoom(Handle timer)
 {
+    if (timer != g_hSaferoomResetTimer)
+        return Plugin_Stop;
+
+    g_hSaferoomResetTimer = INVALID_HANDLE;
     if (gST.bLate || g_hFirstWaveTimer != INVALID_HANDLE)
         return Plugin_Stop;
 
@@ -636,27 +729,79 @@ static Action Timer_ResetAtSaferoom(Handle timer)
     return Plugin_Stop;
 }
 
+static void ScheduleSaferoomReset()
+{
+    StopTrackedTimer(g_hSaferoomResetTimer);
+    g_hSaferoomResetTimer = CreateTimer(
+        1.0, Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+static void StartWaveCheckTimer(bool recovery)
+{
+    StopTrackedTimer(gST.hCheck);
+    gST.hCheck = CreateTimer(
+        1.0, Timer_CheckSpawnWindow, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    g_fWaveCheckHeartbeat = GetGameTime();
+    if (recovery)
+        LogError("[IC][RECOVERY] Recreated wave state timer without resetting wave timing (wave=%d)", gST.waveIndex);
+}
+
+static void SyncTeleportTimer(bool recovery)
+{
+    if (!gST.bLate || !gCV.bTeleport)
+    {
+        StopTrackedTimer(gST.hTeleport);
+        g_fTeleportHeartbeat = 0.0;
+        return;
+    }
+
+    if (IsTrackedTimerValid(gST.hTeleport))
+        return;
+
+    gST.hTeleport = INVALID_HANDLE;
+    gST.hTeleport = CreateTimer(
+        1.0, Timer_TeleportTick, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    g_fTeleportHeartbeat = GetGameTime();
+    if (recovery)
+        LogError("[IC][RECOVERY] Recreated teleport monitor timer (wave=%d)", gST.waveIndex);
+}
+
 static void RequestStartSpawn()
 {
-    if (gST.bLate || g_hFirstWaveTimer != INVALID_HANDLE)
+    if (gST.bLate || !g_bRuntimeRoundActive || g_bRuntimeMapEnding
+        || g_bRuntimeRecoverySuppressed)
         return;
+
+    if (g_hFirstWaveTimer != INVALID_HANDLE)
+    {
+        if (IsValidHandle(g_hFirstWaveTimer))
+            return;
+        g_hFirstWaveTimer = INVALID_HANDLE;
+    }
 
     ResetMatchState();
     g_hFirstWaveTimer = CreateTimer(0.1, Timer_SpawnFirstWave, _, TIMER_FLAG_NO_MAPCHANGE);
+    g_fFirstWaveRequestedAt = GetGameTime();
     ReadSiCap();
 }
 
 static Action Timer_SpawnFirstWave(Handle timer)
 {
+    if (timer != g_hFirstWaveTimer)
+        return Plugin_Stop;
+
     g_hFirstWaveTimer = INVALID_HANDLE;
+    g_fFirstWaveRequestedAt = 0.0;
+
+    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+        return Plugin_Stop;
 
     if (!gST.bLate)
     {
         gST.bLate = true;
-        gST.hCheck    = CreateTimer(1.0, Timer_CheckSpawnWindow, _, TIMER_REPEAT);
+        StartWaveCheckTimer(false);
         StartWave();
-        if (gCV.bTeleport)
-            gST.hTeleport = CreateTimer(1.0, Timer_TeleportTick, _, TIMER_REPEAT);
+        SyncTeleportTimer(false);
     }
     return Plugin_Stop;
 }
@@ -666,18 +811,26 @@ static Action Timer_SpawnFirstWave(Handle timer)
 // =========================
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+    g_bRuntimeRoundActive = true;
+    g_bRuntimeMapEnding = false;
+    g_bRuntimeRecoverySuppressed = false;
+    g_bRuntimeRecoveryBusy = false;
+    g_fNextRuntimeWatchdogAt = 0.0;
+    g_fNextRuntimeHardRecoveryAt = 0.0;
     Traitor_ResetRoundUseLimits();
     StopAll();
     // 权重只在当前回合学习，避免对抗上下半场继承不同的 Nav 历史。
     ClearNavWeightMemory();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
-    CreateTimer(0.1, Timer_ApplyMaxSpecials);
-    CreateTimer(1.0,  Timer_ResetAtSaferoom, _, TIMER_FLAG_NO_MAPCHANGE);
+    ScheduleApplyMaxSpecials();
+    ScheduleSaferoomReset();
     ClearPathCache();
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+    g_bRuntimeRoundActive = false;
+    g_bRuntimeRecoverySuppressed = true;
     WaveSpawnReport_End("round_end");
     Traitor_OnRoundEnd();
     StopAll();
@@ -767,6 +920,10 @@ public void Event_PlayerReviveSuccess(Event event, const char[] name, bool dontB
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    if (SpawnAttempts_ConsumeRejectedActualDeath(client)
+        || SpawnAttempts_IsPendingActualClient(client))
+        return;
+
     if (IsValidSurvivor(client))
         Traitor_OnSurvivorDeath(client);
 
@@ -777,7 +934,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
     int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
     if (zc != view_as<int>(SI_Spitter))
-        CreateTimer(0.5, Timer_KickBot, GetClientUserId(client));
+        CreateTimer(0.5, Timer_KickBot, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 
     if (zc >= 1 && zc <= SI_COUNT)
     {
@@ -831,6 +988,7 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
+    SpawnAttempts_ClearRejectedActualSpawn(client);
     TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
@@ -865,6 +1023,8 @@ static Action Timer_KickBot(Handle timer, int userid)
 
 public void OnUnpause()
 {
+    AntiBait_OnUnpause();
+    WaveDecider_OnUnpause();
     float delay = (gST.unpauseDelay > 0.1) ? gST.unpauseDelay : 1.0;
     UnpauseSpawnTimer(delay);
 }
@@ -880,8 +1040,7 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
     gCV.ApplyMaxZombieBound();
     if (convar == gCV.SpawnAccelNativeSafety)
         SpawnAccel_UpdateAvailability(true);
-    if (convar == gCV.TraitorDailyQuota || convar == gCV.TraitorPublicDailyQuota)
-        TraitorQuota_InvalidateAdminQuotaCache();
+    SyncTeleportTimer(false);
 
     if (traitorDisabled)
     {
@@ -899,21 +1058,188 @@ void OnFlowBufferChanged(ConVar convar, const char[] ov, const char[] nv)
 void OnSiLimitChanged(ConVar convar, const char[] ov, const char[] nv)
 {
     gCV.iSiLimit = gCV.SiLimit.IntValue;
-    CreateTimer(0.1, Timer_ApplyMaxSpecials);
+    ScheduleApplyMaxSpecials();
     RecalcSiCapFromAlive(false);
+
+    if (gST.siQueueCount < 0)
+        gST.siQueueCount = 0;
+    if (gST.siQueueCount > gCV.iSiLimit)
+        gST.siQueueCount = gCV.iSiLimit;
+    SpawnQueue_TrimToLength(gST.siQueueCount);
 
     // 立刻按新上限收缩记录
     CleanupLastSpawns(GetGameTime());
     gCV.Refresh();
+}
+
+static int CountActualSpecialInfected()
+{
+    int count = 0;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsCountedSpecial(client) && IsPlayerAlive(client) && !IsGhost(client))
+            count++;
+    }
+    return count;
+}
+
+static void ForceRuntimeRecovery(const char[] reason, float now)
+{
+    if (g_bRuntimeRecoveryBusy || now < g_fNextRuntimeHardRecoveryAt)
+        return;
+
+    g_bRuntimeRecoveryBusy = true;
+    g_fNextRuntimeHardRecoveryAt = now + RUNTIME_HARD_RECOVERY_COOLDOWN;
+    LogError("[IC][RECOVERY] Forcing runtime restart: %s (wave=%d state=%d late=%d)",
+        reason, gST.waveIndex, view_as<int>(WaveDecider_GetState()), gST.bLate ? 1 : 0);
+
+    WaveSpawnReport_End("watchdog_recover");
+    StopAll();
+    if (g_bRuntimeRoundActive && !g_bRuntimeMapEnding
+        && !g_bRuntimeRecoverySuppressed && L4D_HasAnySurvivorLeftSafeArea())
+    {
+        RequestStartSpawn();
+    }
+    g_bRuntimeRecoveryBusy = false;
+}
+
+static void RuntimeWatchdog(float now)
+{
+    if (now < g_fNextRuntimeWatchdogAt)
+        return;
+    g_fNextRuntimeWatchdogAt = now + RUNTIME_WATCHDOG_INTERVAL;
+
+    if (!g_bInfectedControlStarted || !g_bRuntimeRoundActive
+        || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+    {
+        return;
+    }
+
+    bool leftSafeArea = L4D_HasAnySurvivorLeftSafeArea();
+    if (!gST.bLate)
+    {
+        if (g_hFirstWaveTimer != INVALID_HANDLE
+            && !IsValidHandle(g_hFirstWaveTimer))
+        {
+            g_hFirstWaveTimer = INVALID_HANDLE;
+            g_fFirstWaveRequestedAt = 0.0;
+            LogError("[IC][RECOVERY] Cleared stale first-wave timer handle");
+        }
+
+        if (!leftSafeArea)
+            return;
+
+        if (g_hFirstWaveTimer == INVALID_HANDLE)
+        {
+            LogError("[IC][RECOVERY] First wave missing after survivors left safe area; rescheduling");
+            RequestStartSpawn();
+            return;
+        }
+
+        if (g_fFirstWaveRequestedAt > 0.0
+            && now - g_fFirstWaveRequestedAt >= RUNTIME_FIRST_WAVE_TIMEOUT)
+        {
+            LogError("[IC][RECOVERY] First-wave timer timed out after %.1fs; rescheduling",
+                now - g_fFirstWaveRequestedAt);
+            StopTrackedTimer(g_hFirstWaveTimer);
+            g_fFirstWaveRequestedAt = 0.0;
+            RequestStartSpawn();
+        }
+        return;
+    }
+
+    if (g_hFirstWaveTimer != INVALID_HANDLE)
+    {
+        LogError("[IC][RECOVERY] Removing duplicate first-wave timer from active runtime");
+        StopTrackedTimer(g_hFirstWaveTimer);
+        g_fFirstWaveRequestedAt = 0.0;
+    }
+
+    bool checkTimerInvalid = !IsTrackedTimerValid(gST.hCheck);
+    bool checkHeartbeatStale = g_fWaveCheckHeartbeat > 0.0
+        && now - g_fWaveCheckHeartbeat >= RUNTIME_TIMER_STALE_SECONDS;
+    if (checkTimerInvalid || checkHeartbeatStale)
+        StartWaveCheckTimer(true);
+
+    bool teleportHeartbeatStale = g_fTeleportHeartbeat > 0.0
+        && now - g_fTeleportHeartbeat >= RUNTIME_TIMER_STALE_SECONDS;
+    if (gCV.bTeleport && (!IsTrackedTimerValid(gST.hTeleport) || teleportHeartbeatStale))
+    {
+        StopTrackedTimer(gST.hTeleport);
+        SyncTeleportTimer(true);
+    }
+    else if (!gCV.bTeleport && gST.hTeleport != INVALID_HANDLE)
+    {
+        SyncTeleportTimer(false);
+    }
+
+    if (gST.hSpawn != INVALID_HANDLE && !IsValidHandle(gST.hSpawn))
+    {
+        gST.hSpawn = INVALID_HANDLE;
+        LogError("[IC][RECOVERY] Cleared stale next-wave timer handle (wave=%d)", gST.waveIndex);
+    }
+
+    if (gST.siQueueCount < 0 || gST.siQueueCount > gCV.iSiLimit
+        || SpawnQueue_Length() > gST.siQueueCount)
+    {
+        int oldPending = gST.siQueueCount;
+        int oldQueueLength = SpawnQueue_Length();
+        if (gST.siQueueCount < 0)
+            gST.siQueueCount = 0;
+        if (gST.siQueueCount > gCV.iSiLimit)
+            gST.siQueueCount = gCV.iSiLimit;
+        SpawnQueue_TrimToLength(gST.siQueueCount);
+        LogError("[IC][RECOVERY] Corrected pending queue bounds: budget=%d->%d queue=%d->%d limit=%d",
+            oldPending, gST.siQueueCount, oldQueueLength,
+            SpawnQueue_Length(), gCV.iSiLimit);
+    }
+
+    int transientSpecials = SpawnAttempts_CountPendingActualSpawns()
+        + SpawnAttempts_CountRejectedActualSpawns();
+    int actualSpecials = CountActualSpecialInfected();
+    if (transientSpecials > 0)
+    {
+        // SpawnSpecial 已创建实体，但 pending 尚未提交；被拒实体也可能仍在
+        // Kick 队列中。此时 Recalc 会把临时实体提前算入，提交/断开后再
+        // 增减一次，反而制造真实漂移，因此等临时态清空后再连续核验。
+        g_iRuntimeCountMismatchTicks = 0;
+    }
+    else if (actualSpecials != gST.totalSI)
+    {
+        g_iRuntimeCountMismatchTicks++;
+    }
+    else
+    {
+        g_iRuntimeCountMismatchTicks = 0;
+    }
+
+    if (g_iRuntimeCountMismatchTicks >= 2)
+    {
+        LogError("[IC][RECOVERY] Correcting SI count drift: tracked=%d actual=%d wave=%d",
+            gST.totalSI, actualSpecials, gST.waveIndex);
+        RecalcSiCapFromAlive(false);
+        g_iRuntimeCountMismatchTicks = 0;
+    }
+
+    bool invalidWaveState = gST.waveIndex <= 0 || gST.lastWaveStartTime <= 0.0
+        || !WaveDecider_IsActive();
+    bool paused = g_bPauseLib && IsInPause();
+    if (invalidWaveState && !paused)
+        ForceRuntimeRecovery("active runtime has no valid wave state", now);
 }
 // =========================
 // 帧驱动
 // =========================
 public void OnGameFrame()
 {
-    float now = GetGameTime();
+    // SpawnSpecial 返回后等待短暂稳定窗口，再批量提交或拒绝临时实体。
+    SpawnAttempts_ProcessPendingActualSpawns();
 
-    bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
+    float now = GetGameTime();
+    RuntimeWatchdog(now);
+
+    bool hasSpawnWork = (gST.bLate && (SpawnAttempts_HasPendingActualSpawn()
+        || Traitor_HasSpawnWork()
         || (gST.totalSI < gCV.iSiLimit
             && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
     float releaseEta = WaveDecider_GetReleaseEta();
@@ -941,12 +1267,16 @@ public void OnGameFrame()
         nextThinkStep = FloatMin(nextThinkStep, 0.01);
     gST.nextFrameThink = now + nextThinkStep;
 
-    if (gST.totalSI >= gCV.iSiLimit)
+    int pendingActual = SpawnAttempts_CountPendingActualSpawns();
+    int rejectedActual = SpawnAttempts_CountRejectedActualSpawns();
+    if (gST.totalSI + pendingActual + rejectedActual >= gCV.iSiLimit)
         return;
 
     // 开波时已经批量补齐队列。只有丢弃队首或死亡 CD 暂时无可用职业时才需要重试，
     // 并限制到每 0.25 秒一次，避免搜索期间反复遍历 MaxClients 重算职业上限。
-    if (SpawnQueue_Length() < gST.siQueueCount && now >= gST.nextQueueMaintain)
+    int pendingNormal = SpawnAttempts_CountPendingNormalSpawns();
+    if (pendingNormal == 0 && SpawnQueue_Length() < gST.siQueueCount
+        && now >= gST.nextQueueMaintain)
     {
         FillSpawnQueueToPendingBudget();
         gST.nextQueueMaintain = now + 0.25;
@@ -958,7 +1288,10 @@ public void OnGameFrame()
     float burstStart = GetEngineTime();
     int burstAttempts = 0;
     bool budgetStop = false;
-    while (burstAttempts < gCV.iSpawnAttemptsPerFrame && gST.totalSI < gCV.iSiLimit)
+    while (burstAttempts < gCV.iSpawnAttemptsPerFrame
+        && gST.totalSI + SpawnAttempts_CountPendingActualSpawns()
+            + SpawnAttempts_CountRejectedActualSpawns()
+            < gCV.iSiLimit)
     {
         bool attempted = false;
         if (TeleportQueue_Length() > 0)
@@ -1022,5 +1355,7 @@ static void InitSDK_FromGamedata()
 // --- pause
 public void OnPause()
 {
+    AntiBait_OnPause();
+    WaveDecider_OnPause();
     PauseSpawnTimer();
 }

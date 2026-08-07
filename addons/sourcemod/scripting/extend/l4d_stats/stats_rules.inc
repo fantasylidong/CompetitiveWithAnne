@@ -37,43 +37,11 @@ HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, String:SaveFro
 
 	new Score = ModifyScoreDifficulty(BasePoints, AdvMult, ExpertMult, TEAM_SURVIVORS);
 	Score = NewPlayerBonus_ApplyScoreMultiplier(Savior, Score);
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, %s = %s + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, SQLField, SQLField, SaviorID);
-	SendSQLUpdate(query);
+	decl String:ExtraSet[128];
+	Format(ExtraSet, sizeof(ExtraSet), ", %s = %s + 1", SQLField, SQLField);
+	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+	Format(ScoreFormula, sizeof(ScoreFormula), "base=%i,difficulty=%i/%i,save_from=%s,newbie_multiplier", BasePoints, AdvMult, ExpertMult, SaveFrom);
+	Stats_ApplyClientScore(Savior, Score, "save_teammate", ScoreFormula, ExtraSet, true, TEAM_SURVIVORS);
 
 	if (Score <= 0)
 		return;
@@ -81,11 +49,6 @@ HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, String:SaveFro
 	if (Mode)
 		StatsPrintToChat(Savior, "L4DStats_SpecialSaveSelf", VictimName, SaveFrom, Score);
 
-	UpdateMapStat("points", Score);
-	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-	Format(ScoreFormula, sizeof(ScoreFormula), "base=%i,difficulty=%i/%i,save_from=%s,newbie_multiplier", BasePoints, AdvMult, ExpertMult, SaveFrom);
-	ScoreLog_SetContext("save_teammate", ScoreFormula);
-	AddScore(Savior, Score);
 }
 
 bool:IsClientBot(client)
@@ -503,14 +466,14 @@ StatsDisabled(bool:MapCheck = false)
 
 // Check that player the score is in the map score limits and return the value that is addable.
 
-public AddScore(Client, Score)
+public AddScore(Client, Score, const String:Reason[], const String:Formula[], ScoreTeam)
 {
 	// ToDo: use cvar_MaxPoints to check if the score is within the map limits
 	CurrentPoints[Client] += Score;
 	ClientPoints[Client] += Score;
 	ClientScoreReady[Client] = true;
-	ScoreLog_Record(Client, Score);
-	QuarterRank_RecordScore(Client, Score);
+	ScoreLog_Record(Client, Score, Reason, Formula, ScoreTeam);
+	QuarterRank_RecordScore(Client, Score, ScoreTeam);
 	ModeStats_RecordScore(Client, Score);
 
 	//if (GetConVarBool(cvar_AnnounceRankChange))
@@ -520,14 +483,14 @@ public AddScore(Client, Score)
 	return Score;
 }
 
-public AddInfectedKillScore(Client, Score, const String:InfectedType[], Kills, Headshots)
+public AddInfectedKillScore(Client, Score, const String:InfectedType[], Kills, Headshots, const String:Reason[], const String:Formula[], ScoreTeam)
 {
 	// Keep the score audit as a separate append-only write, but merge same-table counters.
 	CurrentPoints[Client] += Score;
 	ClientPoints[Client] += Score;
 	ClientScoreReady[Client] = true;
-	ScoreLog_Record(Client, Score);
-	QuarterRank_RecordInfectedKillAndScore(Client, Score, InfectedType, Kills, Headshots);
+	ScoreLog_Record(Client, Score, Reason, Formula, ScoreTeam);
+	QuarterRank_RecordInfectedKillAndScore(Client, Score, InfectedType, Kills, Headshots, ScoreTeam);
 	ModeStats_RecordKillAndScore(Client, Score, Kills, Headshots);
 
 	return Score;
@@ -649,37 +612,8 @@ public CheckSurvivorsWin()
 	//StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}Gameid没问题");
 	new Score = ModifyScoreDifficulty(GetConVarInt(cvar_Witch), 5, 10, TEAM_SURVIVORS);
 	new Mode = GetConVarInt(cvar_AnnounceMode);
-	decl String:iID[MAX_LINE_WIDTH];
-	decl String:query[1024];
 	new maxplayers = MaxClients;
-	decl String:UpdatePoints[32], String:UpdatePointsPenalty[32];
 	new ClientTeam, bool:NegativeScore = GetConVarBool(cvar_EnableNegativeScore);
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-			Format(UpdatePointsPenalty, sizeof(UpdatePointsPenalty), "points_infected");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-			Format(UpdatePointsPenalty, sizeof(UpdatePointsPenalty), "points_realism_infected");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
 	//StatsPrintToChatTeam(TEAM_SURVIVORS, "{lightgreen}Witch分数为%d",Score);
 	if (Score > 0 && WitchExists && !WitchDisturb)
 	{
@@ -687,12 +621,7 @@ public CheckSurvivorsWin()
 		{
 			if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i) && GetClientTeam(i) == TEAM_SURVIVORS)
 			{
-				GetClientRankAuthString(i, iID, sizeof(iID));
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-				SendSQLUpdate(query);
-				UpdateMapStat("points", Score);
-				ScoreLog_SetContext("witch_undisturbed", "base=l4d_stats_witch,difficulty");
-				AddScore(i, Score);
+				Stats_ApplyClientScore(i, Score, "witch_undisturbed", "base=l4d_stats_witch,difficulty", "", true, TEAM_SURVIVORS);
 			}
 		}
 
@@ -794,24 +723,15 @@ public CheckSurvivorsWin()
 				new FormulaNewbie = NewPlayerBonus_ShouldApplyToClient(i) ? view_as<int>(NewPlayerBonus_GetMultiplier()) : 0;
 				new ClientScore = NewPlayerBonus_ApplyScoreMultiplier(i, Score);
 
-				GetClientRankAuthString(i, iID, sizeof(iID));
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i%s WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, ClientScore, All4Safe, iID);
-				SendSQLUpdate(query);
-				UpdateMapStat("points", ClientScore);
-				decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-				Format(ScoreFormula, sizeof(ScoreFormula), "v3s:%i:%i:%i:%i:%i:%i:%i:%i:%i:%i", BaseScore, AliveCount, FormulaSinglePlayer, FormulaInfectedAdjustment, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
-				ScoreLog_SetContext("safehouse", ScoreFormula);
-				AddScore(i, ClientScore);
+					decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+					Format(ScoreFormula, sizeof(ScoreFormula), "v3s:%i:%i:%i:%i:%i:%i:%i:%i:%i:%i", BaseScore, AliveCount, FormulaSinglePlayer, FormulaInfectedAdjustment, FormulaInfected, FormulaAbovePlayers, FormulaHighAi, FormulaHardcore, FormulaFun, FormulaNewbie);
+					Stats_ApplyClientScore(i, ClientScore, "safehouse", ScoreFormula, All4Safe, true, TEAM_SURVIVORS);
 			}
 			else if (ClientTeam == TEAM_INFECTED && NegativeScore)
 			{
 				DoInfectedFinalChecks(i);
 
-				GetClientRankAuthString(i, iID, sizeof(iID));
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, iID);
-				SendSQLUpdate(query);
-				ScoreLog_SetContext("safehouse_infected_penalty", "base=safehouse_score,negative_score");
-				AddScore(i, Score * (-1));
+					Stats_ApplyClientScore(i, Score * (-1), "safehouse_infected_penalty", "base=safehouse_score,negative_score", "", false, TEAM_INFECTED);
 			}
 			if (TimerRankChangeCheck[i] != INVALID_HANDLE)
 				TriggerTimer(TimerRankChangeCheck[i], true);
@@ -946,9 +866,7 @@ CheckSurvivorsAllDown()
 		}
 	}
 
-	decl String:query[1024];
-	decl String:ClientID[MAX_LINE_WIDTH];
-	new Mode = GetConVarInt(cvar_AnnounceMode);
+		new Mode = GetConVarInt(cvar_AnnounceMode);
 
 	for (i = 0; i < AliveInfectedCounter; i++)
 		DoInfectedFinalChecks(AliveInfected[i]);
@@ -959,17 +877,14 @@ CheckSurvivorsAllDown()
 	{
 		for (i = 0; i < InfectedCounter; i++)
 		{
-			GetClientRankAuthString(Infected[i], ClientID, sizeof(ClientID));
-
-			decl String:UpdatePoints[32], String:AwardField[32];
-			Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-			if (StatsGamemodeID == GAMEMODE_SCAVENGE)
-				Format(AwardField, sizeof(AwardField), "award_scavenge_infected_win");
-			else
-				Format(AwardField, sizeof(AwardField), "award_infected_win");
-			Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, %s = %s + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AwardField, AwardField, ClientID);
-
-			SendSQLUpdate(query);
+				decl String:AwardField[32];
+				if (StatsGamemodeID == GAMEMODE_SCAVENGE)
+					Format(AwardField, sizeof(AwardField), "award_scavenge_infected_win");
+				else
+					Format(AwardField, sizeof(AwardField), "award_infected_win");
+				decl String:ExtraSet[128];
+				Format(ExtraSet, sizeof(ExtraSet), ", %s = %s + 1", AwardField, AwardField);
+				Stats_ApplyClientScore(Infected[i], Score, "survivor_wipe_reward", "base=l4d_stats_victoryinfected,difficulty,incap_count", ExtraSet, false, TEAM_INFECTED);
 		}
 	}
 
@@ -1008,13 +923,7 @@ CheckSurvivorsAllDown()
 
 	for (i = 0; i < IncapCounter; i++)
 	{
-		GetClientRankAuthString(KilledSurvivor[i], ClientID, sizeof(ClientID));
-
-		decl String:UpdatePoints[32];
-		Stats_GetPointsColumnForTeam(TEAM_SURVIVORS, UpdatePoints, sizeof(UpdatePoints));
-		Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, ClientID);
-
-		SendSQLUpdate(query);
+		Stats_ApplyClientScore(KilledSurvivor[i], Score * (-1), "survivor_wipe_penalty", "base=l4d_stats_restart,difficulty,negative_score", "", false, TEAM_SURVIVORS);
 	}
 
 	if (Mode && Score > 0)
@@ -1251,16 +1160,7 @@ TankDamage(Client, Damage)
 
 			if (Score > 0)
 			{
-				decl String:ClientID[MAX_LINE_WIDTH];
-				GetClientRankAuthString(Client, ClientID, sizeof(ClientID));
-
-				decl String:query[1024];
-
-				decl String:UpdatePoints[32];
-				Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-				Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_bulldozer = award_bulldozer + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, ClientID);
-
-				SendSQLUpdate(query);
+					Stats_ApplyClientScore(Client, Score, "tank_bulldozer", "base=l4d_stats_tankdamage,difficulty", ", award_bulldozer = award_bulldozer + 1", false, TEAM_INFECTED);
 
 				decl String:MapPoints[32];
 				Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
@@ -1300,9 +1200,6 @@ UpdateFriendlyFire(Attacker, Victim)
 {
 	decl String:AttackerName[MAX_LINE_WIDTH];
 	GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-	decl String:AttackerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Attacker, AttackerID, sizeof(AttackerID));
-
 	decl String:VictimName[MAX_LINE_WIDTH];
 	GetClientName(Victim, VictimName, sizeof(VictimName));
 
@@ -1320,48 +1217,12 @@ UpdateFriendlyFire(Attacker, Victim)
 		}
 	}
 
-	decl String:UpdatePoints[32];
-
-	switch (Stats_GetCurrentStatsGamemodeID())
-	{
-		case GAMEMODE_VERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survivors");
-		}
-		case GAMEMODE_REALISM:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism");
-		}
-		case GAMEMODE_SURVIVAL:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_survival");
-		}
-		case GAMEMODE_SCAVENGE:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_scavenge_survivors");
-		}
-		case GAMEMODE_REALISMVERSUS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_realism_survivors");
-		}
-		case GAMEMODE_OTHERMUTATIONS:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points_mutations");
-		}
-		default:
-		{
-			Format(UpdatePoints, sizeof(UpdatePoints), "points");
-		}
-	}
 	if(IsNormalMode()){
 		Score = RoundToFloor(Score / 5.0);
 	}
 
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s - %i, award_friendlyfire = award_friendlyfire + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(Attacker, Score * (-1), "friendly_fire_penalty", "base=l4d_stats_ffire,difficulty,negative_score", ", award_friendlyfire = award_friendlyfire + 1", false, TEAM_SURVIVORS);
 	QuarterRank_RecordField(Attacker, "award_friendlyfire", 1);
-	QuarterRank_RecordScore(Attacker, Score * (-1));
 
 	new Mode = 0;
 	if (Score > 0)
@@ -1471,22 +1332,12 @@ UpdatePlayerScoreScavenge(Client, ClientTeam, Score)
 		UpdatePlayerScore2(Client, Score, "points_scavenge_infected");
 }
 */
-UpdatePlayerScore2(Client, Score, const String:Points[])
+UpdatePlayerScore2(Client, Score)
 {
 	if (Score == 0)
 		return;
 
-	decl String:ClientID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Client, ClientID, sizeof(ClientID));
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i WHERE steamid = '%s'", DbPrefix, Points, Points, Score, ClientID);
-	SendSQLUpdate(query);
-
-	if (Score > 0)
-		UpdateMapStat("points", Score);
-
-	AddScore(Client, Score);
+	Stats_ApplyClientScore(Client, Score, "tank_rock_hit", "base=l4d_stats_tankthrowrock,difficulty", "", true, TEAM_INFECTED);
 }
 
 UpdateTankSniper(Client)
@@ -1564,11 +1415,7 @@ SurvivorDiedNamed(Attacker, Victim, const String:VictimName[], const String:Atta
 
 	new Score = GetSurvivorKillScore();
 
-	new len = 0;
-	decl String:query[1024];
-	decl String:UpdatePoints[32], String:KillsField[32];
-
-	Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
+	decl String:KillsField[32];
 	switch (Stats_GetCurrentStatsGamemodeID())
 	{
 		case GAMEMODE_VERSUS:
@@ -1582,9 +1429,11 @@ SurvivorDiedNamed(Attacker, Victim, const String:VictimName[], const String:Atta
 		default:
 			Format(KillsField, sizeof(KillsField), "kills");
 	}
-	len += Format(query[len], sizeof(query)-len, "UPDATE %splayers SET %s = %s + %i, %s = %s + 1 ", DbPrefix, UpdatePoints, UpdatePoints, Score, KillsField, KillsField);
-	len += Format(query[len], sizeof(query)-len, "WHERE steamid = '%s'", AttackerID);
-	SendSQLUpdate(query);
+	decl String:ExtraSet[128];
+	Format(ExtraSet, sizeof(ExtraSet), ", %s = %s + 1", KillsField, KillsField);
+	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+	Format(ScoreFormula, sizeof(ScoreFormula), "base=l4d_stats_survivorkill,difficulty,killer=%s", AttackerID);
+	Stats_ApplyClientScore(Attacker, Score, "survivor_kill", ScoreFormula, ExtraSet, false, TEAM_INFECTED);
 	ModeStats_RecordKills(Attacker, 1);
 
 	if (Mode < 0)
@@ -1606,7 +1455,6 @@ SurvivorDiedNamed(Attacker, Victim, const String:VictimName[], const String:Atta
 	decl String:MapPoints[32];
 	Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
 	UpdateMapStat(MapPoints, Score);
-	AddScore(Attacker, Score);
 }
 
 // Survivor got hurt.
@@ -1658,9 +1506,7 @@ SurvivorHurt(Attacker, Victim, Damage, AttackerInfType = -1, Handle:event = INVA
 
 		if (RockHit > 0 && strcmp(Weapon, "tank_rock", false) == 0)
 		{
-			decl String:UpdatePoints[32];
-			Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-			UpdatePlayerScore2(Attacker, RockHit, UpdatePoints);
+			UpdatePlayerScore2(Attacker, RockHit);
 			UpdateTankSniper(Attacker);
 
 			decl String:VictimName[MAX_LINE_WIDTH];
@@ -1862,8 +1708,6 @@ SurvivorIncappedByInfected(Attacker, Victim, Mode = -1)
 	if (Attacker > 0 && !IsClientConnected(Attacker) || Attacker > 0 && IsClientBot(Attacker))
 		return;
 
-	decl String:AttackerID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(Attacker, AttackerID, sizeof(AttackerID));
 	decl String:AttackerName[MAX_LINE_WIDTH];
 	GetClientName(Attacker, AttackerName, sizeof(AttackerName));
 
@@ -1875,12 +1719,7 @@ SurvivorIncappedByInfected(Attacker, Victim, Mode = -1)
 	if (Score <= 0)
 		return;
 
-	decl String:query[512];
-	decl String:UpdatePoints[32];
-
-	Stats_GetPointsColumnForTeam(TEAM_INFECTED, UpdatePoints, sizeof(UpdatePoints));
-	Format(query, sizeof(query), "UPDATE %splayers SET %s = %s + %i, award_survivor_down = award_survivor_down + 1 WHERE steamid = '%s'", DbPrefix, UpdatePoints, UpdatePoints, Score, AttackerID);
-	SendSQLUpdate(query);
+	Stats_ApplyClientScore(Attacker, Score, "survivor_incap", "base=l4d_stats_survivorincap,difficulty", ", award_survivor_down = award_survivor_down + 1", false, TEAM_INFECTED);
 
 	decl String:MapPoints[32];
 	Stats_GetMapPointsFieldForTeam(TEAM_INFECTED, MapPoints, sizeof(MapPoints));
