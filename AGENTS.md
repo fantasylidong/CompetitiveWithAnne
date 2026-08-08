@@ -42,6 +42,9 @@ When rolling the active infected-control version forward:
 - Add its `cfg/vote/Anne/AnneYY-MM.cfg` version-switch configuration, expose it
   in every Anne version-vote menu, and add the SMX to
   `cfg/vote/Anne/unloadall.cfg`.
+- Gate version-specific UI and votes by `AnnePluginVersion`, not by lingering
+  ConVars. Traitor-mode voting and status are available only for 2026-07 and
+  newer releases.
 - Recompile the active `infected_control.smx`, the archived rollback SMX, and
   any changed extension before publishing.
 </INSTRUCTIONS>

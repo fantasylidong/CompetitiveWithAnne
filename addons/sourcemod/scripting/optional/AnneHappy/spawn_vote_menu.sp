@@ -8,7 +8,7 @@
 #include <colors>
 #include <anne_cvar_shield>
 
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.6"
 #define VOTE_TIME 20
 #define MENU_TIME MENU_TIME_FOREVER
 #define SPAWN_MENU_UNSET -999999
@@ -65,6 +65,7 @@ ConVar g_cvAnneAutoSpawn;
 ConVar g_cvAnneDistance;
 ConVar g_cvAnneTeleportCheck;
 ConVar g_cvAnneTraitorEnable;
+ConVar g_cvAnneVersion;
 ConVar g_cvVoteCfgFile;
 ConVar g_cvPresetDbConfig;
 ConVar g_cvPresetTable;
@@ -335,7 +336,54 @@ void RefreshSpawnVoteConVars()
 	g_cvAnneDistance = FindConVar("inf_SpawnDistanceMin");
 	g_cvAnneTeleportCheck = FindConVar("inf_TeleportCheckTime");
 	g_cvAnneTraitorEnable = FindConVar("inf_traitor_enable");
+	g_cvAnneVersion = FindConVar("AnnePluginVersion");
 	g_cvVoteCfgFile = FindConVar("votecfgfile");
+}
+
+bool AnneVersionSupportsTraitor()
+{
+	if (g_cvAnneTraitorEnable == null || g_cvAnneVersion == null)
+	{
+		return false;
+	}
+
+	char version[32];
+	g_cvAnneVersion.GetString(version, sizeof(version));
+	return IsAnneVersionAtLeast(version, 2026, 7);
+}
+
+bool IsAnneVersionAtLeast(const char[] rawVersion, int minimumYear, int minimumMonth)
+{
+	char version[32];
+	strcopy(version, sizeof(version), rawVersion);
+	TrimString(version);
+
+	if (StrEqual(version, "Latest", false))
+	{
+		return true;
+	}
+
+	ReplaceString(version, sizeof(version), ".", "-");
+	ReplaceString(version, sizeof(version), "/", "-");
+
+	char parts[3][12];
+	if (ExplodeString(version, "-", parts, sizeof(parts), sizeof(parts[])) < 2)
+	{
+		return false;
+	}
+
+	int year = StringToInt(parts[0]);
+	int month = StringToInt(parts[1]);
+	if (year > 0 && year < 100)
+	{
+		year += 2000;
+	}
+	if (month < 1 || month > 12)
+	{
+		return false;
+	}
+
+	return year > minimumYear || (year == minimumYear && month >= minimumMonth);
 }
 
 SpawnVoteMode DetectSpawnVoteMode()
@@ -468,7 +516,10 @@ void BuildAnneMenu(Menu menu)
 	menu.AddItem("avm:auto", "刷特模式");
 	menu.AddItem("avm:distance", "特感最低生成距离");
 	menu.AddItem("avm:teleport", "特感传送检测秒数");
-	menu.AddItem("avm:traitor", "内鬼模式");
+	if (AnneVersionSupportsTraitor())
+	{
+		menu.AddItem("avm:traitor", "内鬼模式");
+	}
 }
 
 void BuildAnneSettingMenu(Menu menu, const char[] setting)
@@ -515,6 +566,10 @@ void BuildAnneSettingMenu(Menu menu, const char[] setting)
 	}
 	else if (StrEqual(setting, "traitor"))
 	{
+		if (!AnneVersionSupportsTraitor())
+		{
+			return;
+		}
 		int currentTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 1);
 		char title[128];
 		FormatEx(title, sizeof(title), "刷特设置\n内鬼模式：%s", currentTraitorEnable != 0 ? "开" : "关");
@@ -592,6 +647,11 @@ void HandleAnneSelect(int client, const char[] info, const char[] display)
 {
 	if (StrContains(info, "avm:", false) == 0)
 	{
+		if (StrEqual(info[4], "traitor", false) && !AnneVersionSupportsTraitor())
+		{
+			DisplayAnneSpawnVoteMenu(client);
+			return;
+		}
 		if (!DisplayAnneSettingMenu(client, info[4]))
 		{
 			DisplayAnneSpawnVoteMenu(client);
@@ -601,6 +661,11 @@ void HandleAnneSelect(int client, const char[] info, const char[] display)
 
 	if (StrContains(info, "avc:", false) == 0)
 	{
+		if (StrContains(info[4], "inf_traitor_", false) != -1 && !AnneVersionSupportsTraitor())
+		{
+			DisplayAnneSpawnVoteMenu(client);
+			return;
+		}
 		if (!StartConfigApplyVote(client, SpawnVoteMode_Anne, info[4], display))
 		{
 			DisplayAnneSpawnVoteMenu(client);
@@ -692,7 +757,7 @@ void PrepareAnnePendingFromCurrent()
 	{
 		g_iPendingTeleportCheck = g_cvAnneTeleportCheck.IntValue;
 	}
-	if (g_iPendingTraitorEnable == SPAWN_MENU_UNSET)
+	if (AnneVersionSupportsTraitor() && g_iPendingTraitorEnable == SPAWN_MENU_UNSET)
 	{
 		g_iPendingTraitorEnable = GetConVarIntOrDefault(g_cvAnneTraitorEnable, 1);
 	}
@@ -756,12 +821,17 @@ void FormatVoteTitle(char[] buffer, int maxlen, SpawnVoteMode mode)
 		FormatNativeVoteOnOffState(relax, sizeof(relax), g_iPendingRelax);
 		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_CampaignVoteTitleRelax", g_iPendingLimit, g_iPendingInterval, relax);
 	}
-	else
+	else if (AnneVersionSupportsTraitor() && g_iPendingTraitorEnable != SPAWN_MENU_UNSET)
 	{
 		char traitorState[32];
 		FormatNativeVoteOnOffState(traitorState, sizeof(traitorState), g_iPendingTraitorEnable);
 		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_AnneVoteTitleTraitor",
 			g_iPendingLimit, g_iPendingInterval, traitorState);
+	}
+	else
+	{
+		FormatNativeVotePhrase(buffer, maxlen, "SpawnVote_AnneVoteTitle",
+			g_iPendingLimit, g_iPendingInterval);
 	}
 }
 
@@ -859,7 +929,7 @@ void ApplyPendingSpawnSettings()
 		{
 			g_cvAnneTeleportCheck.SetInt(g_iPendingTeleportCheck);
 		}
-		if (g_cvAnneTraitorEnable != null && g_iPendingTraitorEnable != SPAWN_MENU_UNSET)
+		if (AnneVersionSupportsTraitor() && g_iPendingTraitorEnable != SPAWN_MENU_UNSET)
 		{
 			g_cvAnneTraitorEnable.SetInt(g_iPendingTraitorEnable);
 		}
@@ -1055,6 +1125,10 @@ void AddAnneTeleportVoteEntries(Menu menu)
 
 void AddAnneTraitorVoteEntries(Menu menu)
 {
+	if (!AnneVersionSupportsTraitor())
+	{
+		return;
+	}
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 1", "内鬼模式 开");
 	AddCfgVoteEntry(menu, "avc", "sm_cvar inf_traitor_enable 0", "内鬼模式 关");
 }

@@ -239,6 +239,9 @@ void printinfo(int client = 0, bool All = true){
 
 void PrintTraitorStatus(int client = 0, bool all = true)
 {
+	if(!AnneVersionSupportsTraitor())
+		return;
+
 	ConVar traitorEnable = FindConVar("inf_traitor_enable");
 	ConVar traitorMaxSlots = FindConVar("inf_traitor_max_slots");
 	if(traitorEnable == null || traitorMaxSlots == null)
@@ -256,6 +259,34 @@ void PrintTraitorStatus(int client = 0, bool all = true)
 		CPrintToChatAll("%t", phrase, slots);
 	else if(client >= 1 && client <= MaxClients && IsClientInGame(client))
 		CPrintToChat(client, "%t", phrase, slots);
+}
+
+bool AnneVersionSupportsTraitor()
+{
+	if(g_hCvarPluginVersion == null)
+		return false;
+
+	char version[32];
+	g_hCvarPluginVersion.GetString(version, sizeof(version));
+	TrimString(version);
+	if(StrEqual(version, "Latest", false))
+		return true;
+
+	ReplaceString(version, sizeof(version), ".", "-");
+	ReplaceString(version, sizeof(version), "/", "-");
+
+	char parts[3][12];
+	if(ExplodeString(version, "-", parts, sizeof(parts), sizeof(parts[])) < 2)
+		return false;
+
+	int year = StringToInt(parts[0]);
+	int month = StringToInt(parts[1]);
+	if(year > 0 && year < 100)
+		year += 2000;
+	if(month < 1 || month > 12)
+		return false;
+
+	return year > 2026 || (year == 2026 && month >= 7);
 }
 
 void RefreshDynamicAiCvars()
