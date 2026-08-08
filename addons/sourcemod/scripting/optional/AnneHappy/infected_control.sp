@@ -208,6 +208,7 @@ float g_fNextRuntimeHardRecoveryAt = 0.0;
 float g_fFirstWaveRequestedAt = 0.0;
 float g_fWaveCheckHeartbeat = 0.0;
 float g_fTeleportHeartbeat = 0.0;
+float g_fNextRuntimeGateLogAt = 0.0;
 int g_iRuntimeCountMismatchTicks = 0;
 
 // =========================
@@ -452,6 +453,7 @@ public void OnPluginStart()
     HookEvent("finale_win",      Event_RoundEnd);
     HookEvent("mission_lost",    Event_RoundEnd);
     HookEvent("map_transition",  Event_RoundEnd);
+    HookEvent("round_end",       Event_RoundEnd);
     HookEvent("round_start",     Event_RoundStart);
     HookEvent("player_spawn",    Event_PlayerSpawn);
     HookEvent("player_death",    Event_PlayerDeath);
@@ -531,12 +533,17 @@ public void OnMapEnd()
 public void OnMapStart()
 {
     Visibility_ResetHurtTriggers();
-    g_bRuntimeRoundActive = false;
+    // Some L4D2 server paths dispatch round_start before SourceMod's OnMapStart.
+    // A started map is safe to arm; the first-leave signal still controls spawning.
+    g_bRuntimeRoundActive = true;
     g_bRuntimeMapEnding = false;
+    g_bRuntimeRecoveryBusy = false;
     g_bRuntimeRecoverySuppressed = false;
     g_fNextRuntimeWatchdogAt = 0.0;
     g_fNextRuntimeHardRecoveryAt = 0.0;
+    g_fNextRuntimeGateLogAt = 0.0;
     g_iRuntimeCountMismatchTicks = 0;
+    LogMsg("[RUNTIME] map_start active=1 ending=0 suppressed=0");
     if (g_bInfectedControlStarted)
         SpawnAccel_ScheduleNavGraphStart(false);
 }
@@ -593,17 +600,32 @@ public Action InfectedControl_OnTraitorCvarCommand(int client, const char[] comm
     return Plugin_Handled;
 }
 
+static bool RecoverRuntimeRoundActive(const char[] source)
+{
+    if (g_bRuntimeMapEnding)
+        return false;
+
+    if (g_bRuntimeRoundActive)
+        return true;
+
+    g_bRuntimeRoundActive = true;
+    LogError("[IC][RECOVERY] Recovered round-active state from %s", source);
+    return true;
+}
+
 public Action Cmd_StartSpawn(int client, int args)
 {
-    g_bRuntimeRecoverySuppressed = false;
-    RequestStartSpawn();
+    if (RecoverRuntimeRoundActive("admin_startspawn"))
+        g_bRuntimeRecoverySuppressed = false;
+    RequestStartSpawn("admin_startspawn");
     return Plugin_Handled;
 }
 
 public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 {
-    g_bRuntimeRecoverySuppressed = false;
-    RequestStartSpawn();
+    if (RecoverRuntimeRoundActive("first_survivor_left_safe_area"))
+        g_bRuntimeRecoverySuppressed = false;
+    RequestStartSpawn("first_survivor_left_safe_area");
 }
 public Action Cmd_StopSpawn(int client, int args)
 {
@@ -766,11 +788,31 @@ static void SyncTeleportTimer(bool recovery)
         LogError("[IC][RECOVERY] Recreated teleport monitor timer (wave=%d)", gST.waveIndex);
 }
 
-static void RequestStartSpawn()
+static void LogStartRequestBlocked(const char[] source)
 {
-    if (gST.bLate || !g_bRuntimeRoundActive || g_bRuntimeMapEnding
-        || g_bRuntimeRecoverySuppressed)
+    float now = GetGameTime();
+    if (now < g_fNextRuntimeGateLogAt)
         return;
+
+    g_fNextRuntimeGateLogAt = now + 1.0;
+    LogError("[IC][RUNTIME] Start request blocked: source=%s active=%d ending=%d suppressed=%d late=%d",
+        source,
+        g_bRuntimeRoundActive ? 1 : 0,
+        g_bRuntimeMapEnding ? 1 : 0,
+        g_bRuntimeRecoverySuppressed ? 1 : 0,
+        gST.bLate ? 1 : 0);
+}
+
+static void RequestStartSpawn(const char[] source)
+{
+    if (gST.bLate)
+        return;
+
+    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+    {
+        LogStartRequestBlocked(source);
+        return;
+    }
 
     if (g_hFirstWaveTimer != INVALID_HANDLE)
     {
@@ -794,7 +836,10 @@ static Action Timer_SpawnFirstWave(Handle timer)
     g_fFirstWaveRequestedAt = 0.0;
 
     if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+    {
+        LogStartRequestBlocked("first_wave_timer");
         return Plugin_Stop;
+    }
 
     if (!gST.bLate)
     {
@@ -817,6 +862,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     g_bRuntimeRecoveryBusy = false;
     g_fNextRuntimeWatchdogAt = 0.0;
     g_fNextRuntimeHardRecoveryAt = 0.0;
+    g_fNextRuntimeGateLogAt = 0.0;
     Traitor_ResetRoundUseLimits();
     StopAll();
     // 权重只在当前回合学习，避免对抗上下半场继承不同的 Nav 历史。
@@ -826,15 +872,24 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     ScheduleApplyMaxSpecials();
     ScheduleSaferoomReset();
     ClearPathCache();
+    LogMsg("[RUNTIME] round_start active=1 ending=0 suppressed=0");
 }
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+    if (!g_bRuntimeRoundActive && g_bRuntimeRecoverySuppressed)
+    {
+        LogMsg("[RUNTIME] ignored duplicate %s", name);
+        return;
+    }
+
     g_bRuntimeRoundActive = false;
+    g_bRuntimeMapEnding = true;
     g_bRuntimeRecoverySuppressed = true;
     WaveSpawnReport_End("round_end");
     Traitor_OnRoundEnd();
     StopAll();
     ClearPathCache();
+    LogMsg("[RUNTIME] %s active=0 ending=1 suppressed=1", name);
 }
 public void Event_PlayerSpawn(Event event, const char[] name, bool dont_broadcast)
 {
@@ -1098,7 +1153,7 @@ static void ForceRuntimeRecovery(const char[] reason, float now)
     if (g_bRuntimeRoundActive && !g_bRuntimeMapEnding
         && !g_bRuntimeRecoverySuppressed && L4D_HasAnySurvivorLeftSafeArea())
     {
-        RequestStartSpawn();
+        RequestStartSpawn("watchdog_hard_recovery");
     }
     g_bRuntimeRecoveryBusy = false;
 }
@@ -1132,7 +1187,7 @@ static void RuntimeWatchdog(float now)
         if (g_hFirstWaveTimer == INVALID_HANDLE)
         {
             LogError("[IC][RECOVERY] First wave missing after survivors left safe area; rescheduling");
-            RequestStartSpawn();
+            RequestStartSpawn("watchdog_missing_first_wave");
             return;
         }
 
@@ -1143,7 +1198,7 @@ static void RuntimeWatchdog(float now)
                 now - g_fFirstWaveRequestedAt);
             StopTrackedTimer(g_hFirstWaveTimer);
             g_fFirstWaveRequestedAt = 0.0;
-            RequestStartSpawn();
+            RequestStartSpawn("watchdog_first_wave_timeout");
         }
         return;
     }

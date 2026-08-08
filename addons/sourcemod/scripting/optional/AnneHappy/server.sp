@@ -73,6 +73,7 @@ ConVar hMaxSurvivors, hSurvivorsManagerEnable, hCvarAutoKickTank;
 ConVar g_cvResetOnTransition;          // 满血+清背包（原逻辑）
 ConVar g_cvHeal50OnTransition;         // 新增：通关/切图最低50实血+重置倒地次数
 ConVar g_cvWarpSpawnToStart;           // 生还 player_spawn 后拉回起始点
+ConVar g_cvRoundWipeCount;             // 通过 A2S_RULES 发布当前地图团灭次数
 
 int   iMaxSurvivors, iEnable, iAutoKickTankEnable;
 int   g_RoundWipeCount = 0;
@@ -134,6 +135,10 @@ public void OnPluginStart()
 
     g_cvWarpSpawnToStart = CreateConVar("anne_spawn_warp_to_start", "1",
         "生还者 player_spawn 后是否在未离开安全区前传送到起始点 (0/1)", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvRoundWipeCount = CreateConVar("anne_round_wipe_count", "0",
+        "当前地图已发生的团灭次数（只读状态）",
+        FCVAR_NOTIFY | FCVAR_DONTRECORD, true, 0.0);
+    PublishRoundWipeCount();
 
     // ---- 黑白提醒 ----
     HookEvent("revive_success",       Event_ReviveSuccess);
@@ -313,6 +318,7 @@ public Action L4D2_OnEndVersusModeRound(bool countSurvivors)
     if (!countSurvivors && L4D_HasAnySurvivorLeftSafeArea())
     {
         g_RoundWipeCount++;
+        PublishRoundWipeCount();
         CPrintToChatAll("%t", "Server_PromptFirstGroupWipeoutContinue", g_RoundWipeCount);
     }
     return Plugin_Continue;
@@ -629,6 +635,7 @@ bool IsOfficialFinal(const char[] mapname)
 public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
 {
     g_RoundWipeCount = 0;
+    PublishRoundWipeCount();
 
     if (g_cvResetOnTransition.BoolValue)
     {
@@ -644,6 +651,14 @@ public Action ResetSurvivors(Event event, const char[] name, bool dontBroadcast)
         g_bwAnnounced[i] = false;
 
     return Plugin_Continue;
+}
+
+void PublishRoundWipeCount()
+{
+    if (g_cvRoundWipeCount != null)
+    {
+        g_cvRoundWipeCount.SetInt(g_RoundWipeCount, false, false);
+    }
 }
 
 // 首离安全区：补给（含 Bot 复活）
