@@ -1,7 +1,23 @@
 "Phrases"
 {
 	"L4D2ScriptedHUD_HUDTextsDataFileReloaded"
-	{
-		"chi"		"{green}[数据文件中的 HUD 文本已重新加载]"
+		{
+			"chi"		"{green}[数据文件中的 HUD 文本已重新加载]"
+		}
+		"L4D2ScriptedHUD_PrefsTitle" { "chi" "HUD 显示设置" }
+		"L4D2ScriptedHUD_PrefsLoading" { "chi" "偏好正在加载，请稍后重新打开菜单。" }
+		"L4D2ScriptedHUD_HUD1" { "chi" "HUD 1：进度 / 坦克 / 女巫" }
+		"L4D2ScriptedHUD_HUD2" { "chi" "HUD 2：服务器状态" }
+		"L4D2ScriptedHUD_HUD3" { "chi" "HUD 3：生还者状态" }
+		"L4D2ScriptedHUD_HUD4" { "chi" "HUD 4：自定义文本" }
+		"L4D2ScriptedHUD_HUD2Parts" { "chi" "设置 HUD 2 显示字段" }
+		"L4D2ScriptedHUD_HUD2PartsTitle" { "chi" "HUD 2 显示字段" }
+		"L4D2ScriptedHUD_Reset" { "chi" "恢复默认设置" }
+		"L4D2ScriptedHUD_PartServerName" { "chi" "服务器名" }
+		"L4D2ScriptedHUD_PartMode" { "chi" "游戏模式（普通药役等）" }
+		"L4D2ScriptedHUD_PartAIDifficulty" { "chi" "AI 难度" }
+		"L4D2ScriptedHUD_PartMissingPlayers" { "chi" "缺人状态" }
+		"L4D2ScriptedHUD_PartMod" { "chi" "MOD 状态" }
+		"L4D2ScriptedHUD_PartInfectedTiming" { "chi" "特感数量 / 间隔" }
+		"L4D2ScriptedHUD_PartPlayerCount" { "chi" "玩家人数" }
 	}
-}

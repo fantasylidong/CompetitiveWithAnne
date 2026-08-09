@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for up to 4 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.0.2"
+#define PLUGIN_VERSION                "1.1.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -52,7 +52,11 @@ public Plugin myinfo =
 #include <sdktools>
 #include <sdkhooks>
 #include <basecomm>
+#include <clientprefs>
 #include <left4dhooks>
+#include <l4d2_ems_hud>
+#include <sendproxy>
+#include <sourcescramble>
 
 //#define REQUIRE_PLUGIN
 #undef REQUIRE_PLUGIN
@@ -84,40 +88,21 @@ public Plugin myinfo =
 #define HUD3                          2
 #define HUD4                          3
 
-#define HUD_LEFT_TOP                  0
-#define HUD_LEFT_BOT                  1
-#define HUD_MID_TOP                   2
-#define HUD_MID_BOT                   3
-// #define HUD_RIGHT_TOP                 4
-// #define HUD_RIGHT_BOT                 5
-// #define HUD_TICKER                    6
-// #define HUD_FAR_LEFT                  7
-// #define HUD_FAR_RIGHT                 8
-// #define HUD_MID_BOX                   9
-// #define HUD_SCORE_TITLE               10
-// #define HUD_SCORE_1                   11
-// #define HUD_SCORE_2                   12
-// #define HUD_SCORE_3                   13
-// #define HUD_SCORE_4                   14
+#define HUD_SLOT_DEFAULT_MASK         ((1 << HUD1) | (1 << HUD2))
+#define HUD_SLOT_ALL_MASK             ((1 << 4) - 1)
 
-#define HUD_FLAG_NONE                 0     // no flag
-#define HUD_FLAG_PRESTR               1     // do you want a string/value pair to start(pre) with the static string (default is PRE)
-#define HUD_FLAG_POSTSTR              2     // do you want a string/value pair to end(post) with the static string
-#define HUD_FLAG_BEEP                 4     // Makes a countdown timer blink
-#define HUD_FLAG_BLINK                8     // do you want this field to be blinking
-#define HUD_FLAG_AS_TIME              16    // ?
-#define HUD_FLAG_COUNTDOWN_WARN       32    // auto blink when the timer gets under 10 seconds
-#define HUD_FLAG_NOBG                 64    // dont draw the background box for this UI element
-#define HUD_FLAG_ALLOWNEGTIMER        128   // by default Timers stop on 0:00 to avoid briefly going negative over network, this keeps that from happening
-#define HUD_FLAG_ALIGN_LEFT           256   // Left justify this text
-#define HUD_FLAG_ALIGN_CENTER         512   // Center justify this text
-#define HUD_FLAG_ALIGN_RIGHT          768   // Right justify this text
-#define HUD_FLAG_TEAM_SURVIVORS       1024  // only show to the survivor team
-#define HUD_FLAG_TEAM_INFECTED        2048  // only show to the special infected team
-#define HUD_FLAG_TEAM_MASK            3072  // ?
-#define HUD_FLAG_UNKNOWN1             4096  // ?
-#define HUD_FLAG_TEXT                 8192  // ?
-#define HUD_FLAG_NOTVISIBLE           16384 // if you want to keep the slot data but keep it from displaying
+#define HUD2_PART_SERVER_NAME         (1 << 0)
+#define HUD2_PART_MODE                (1 << 1)
+#define HUD2_PART_AI_DIFFICULTY       (1 << 2)
+#define HUD2_PART_MISSING_PLAYERS     (1 << 3)
+#define HUD2_PART_MOD                 (1 << 4)
+#define HUD2_PART_INFECTED_TIMING     (1 << 5)
+#define HUD2_PART_PLAYER_COUNT        (1 << 6)
+#define HUD2_PART_ALL_MASK            ((1 << 7) - 1)
+
+#define HUD_PREFS_DB_CONFIG           "rpg"
+#define HUD_PREFS_DB_TABLE            "scripted_hud_prefs"
+#define HUD_PREFS_COOKIE              "l4d2_scripted_hud_prefs_v1"
 
 #define HUD_TEAM_ALL                  0
 #define HUD_TEAM_SURVIVOR             1
@@ -291,6 +276,12 @@ static bool   g_bData_HUD2_Text;
 static bool   g_bData_HUD3_Text;
 static bool   g_bData_HUD4_Text;
 bool g_bWitchAndTankSystemAvailable = false;
+static bool g_bLateLoad;
+static bool g_bHUDProxyHooked[4][2];
+static bool g_bHUDResetPending[4];
+static bool g_bHUDPrefsDatabaseReady;
+static bool g_bHUDPrefsDatabaseConnecting;
+static bool g_bClientHasCookie[MAXPLAYERS + 1];
 
 // ====================================================================================================
 // int - Plugin Variables
@@ -319,6 +310,9 @@ static int    g_iHUD1Flags;
 static int    g_iHUD2Flags;
 static int    g_iHUD3Flags;
 static int    g_iHUD4Flags;
+static int    g_iClientHUDMask[MAXPLAYERS + 1];
+static int    g_iClientHUD2Mask[MAXPLAYERS + 1];
+static int    g_iClientHUDRevision[MAXPLAYERS + 1];
 
 // ====================================================================================================
 // float - Plugin Variables
@@ -389,10 +383,41 @@ static char   g_sHUD1_Text[128];
 static char   g_sHUD2_Text[128];
 static char   g_sHUD3_Text[128];
 static char   g_sHUD4_Text[128];
-static char   g_sHUD_Text[512];
 static char   g_sHUD_TextArray[4][128];
 static char   g_sBuffer[128];
 static char   g_sSpaces[128] = "                                                                                                                               ";
+static char   g_sClientHUDText[MAXPLAYERS + 1][4][128];
+static char   g_sClientHUDCookie[MAXPLAYERS + 1][32];
+static char   g_sHUD2Fragments[7][64];
+static char   g_sBaseServerName[64];
+
+enum HUDPrefsLoadState
+{
+    HUDPrefs_None = 0,
+    HUDPrefs_WaitingForCookie,
+    HUDPrefs_WaitingForDatabase,
+    HUDPrefs_DatabasePending,
+    HUDPrefs_Ready
+};
+
+static HUDPrefsLoadState g_eHUDPrefsLoadState[MAXPLAYERS + 1];
+static Cookie g_hHUDPrefsCookie;
+static Handle g_hHUDPrefsDatabase = INVALID_HANDLE;
+static MemoryPatch g_hEMSHUDPatch1;
+static MemoryPatch g_hEMSHUDPatch2;
+
+static ConVar g_hCvar_HostPort;
+static ConVar g_hCvar_Hostname;
+static ConVar g_hCvar_ReadyCfgName;
+static ConVar g_hCvar_AddonsEclipse;
+static ConVar g_hCvar_AIDifficulty;
+static ConVar g_hCvar_InfectedLimit;
+static ConVar g_hCvar_RespawnInterval;
+static ConVar g_hCvar_DirSpawnCount;
+static ConVar g_hCvar_DirSpawnInterval;
+static ConVar g_hCvar_SurvivorLimit;
+static ConVar g_hCvar_InfectedPlayerLimit;
+static ConVar g_hCvar_MaxPlayers;
 
 // ====================================================================================================
 // Timer - Plugin Variables
@@ -423,6 +448,7 @@ Handle g_tUpdateInterval;
 // ====================================================================================================
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
+    g_bLateLoad = late;
     EngineVersion engine = GetEngineVersion();
 
     if (engine != Engine_Left4Dead2)
@@ -438,8 +464,12 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	LoadTranslations("l4d2_scripted_hud.phrases");
+		LoadTranslations("l4d2_scripted_hud.phrases");
     LoadPluginData();
+    ApplyEMSHUDPatches();
+
+    g_hHUDPrefsCookie = new Cookie(HUD_PREFS_COOKIE, "Scripted HUD per-client preferences", CookieAccess_Protected);
+    ConnectHUDPrefsDatabase();
 
     g_hCvar_pain_pills_decay_rate = FindConVar("pain_pills_decay_rate");
 
@@ -493,7 +523,7 @@ public void OnPluginStart()
     g_hCvar_HUD3_BlinkTank   = CreateConVar("l4d2_scripted_hud_hud3_blink_tank", "0", "Makes the text blink from white to red while a tank is alive.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD3_Blink       = CreateConVar("l4d2_scripted_hud_hud3_blink", "0", "Makes the text blink from white to red.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD3_Beep        = CreateConVar("l4d2_scripted_hud_hud3_beep", "0", "Makes the text play a beep sound while blinking.\n0 = OFF, 1 = ON. Note: the blink cvar must be \"1\" to play the beep sound.", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_hCvar_HUD3_Visible     = CreateConVar("l4d2_scripted_hud_hud3_visible", "0", "Makes the text visible.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_hCvar_HUD3_Visible     = CreateConVar("l4d2_scripted_hud_hud3_visible", "1", "Allows players to display this HUD slot.\n0 = Globally disabled, 1 = Player preference.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD3_Background  = CreateConVar("l4d2_scripted_hud_hud3_background", "0", "Shows the text inside a black transparent background.\nNote: the background may not draw properly when initialized as \"0\", start the map with \"1\" to render properly.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD3_Team        = CreateConVar("l4d2_scripted_hud_hud3_team", "2", "Which team should see the text.\n0 = ALL, 1 = SURVIVOR, 2 = INFECTED.", CVAR_FLAGS, true, 0.0, true, 2.0);
     g_hCvar_HUD3_Flag_Debug  = CreateConVar("l4d2_scripted_hud_hud3_flag_debug", "0", "Overwrite the HUD flag.\nFor debug purposes only.\n0 = OFF.", CVAR_FLAGS, true, 0.0, true, 32767.0);
@@ -514,7 +544,7 @@ public void OnPluginStart()
     g_hCvar_HUD4_BlinkTank   = CreateConVar("l4d2_scripted_hud_hud4_blink_tank", "1", "Makes the text blink from white to red while a tank is alive.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD4_Blink       = CreateConVar("l4d2_scripted_hud_hud4_blink", "0", "Makes the text blink from white to red.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD4_Beep        = CreateConVar("l4d2_scripted_hud_hud4_beep", "0", "Makes the text play a beep sound while blinking.\n0 = OFF, 1 = ON. Note: the blink cvar must be \"1\" to play the beep sound.", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_hCvar_HUD4_Visible     = CreateConVar("l4d2_scripted_hud_hud4_visible", "0", "Makes the text visible.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_hCvar_HUD4_Visible     = CreateConVar("l4d2_scripted_hud_hud4_visible", "1", "Allows players to display this HUD slot.\n0 = Globally disabled, 1 = Player preference.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD4_Background  = CreateConVar("l4d2_scripted_hud_hud4_background", "0", "Shows the text inside a black transparent background.\nNote: the background may not draw properly when initialized as \"0\", start the map with \"1\" to render properly.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_HUD4_Team        = CreateConVar("l4d2_scripted_hud_hud4_team", "0", "Which team should see the text.\n0 = ALL, 1 = SURVIVOR, 2 = INFECTED.", CVAR_FLAGS, true, 0.0, true, 2.0);
     g_hCvar_HUD4_Flag_Debug  = CreateConVar("l4d2_scripted_hud_hud4_flag_debug", "0", "Overwrite the HUD flag.\nFor debug purposes only.\n0 = OFF.", CVAR_FLAGS, true, 0.0, true, 32767.0);
@@ -629,6 +659,61 @@ public void OnPluginStart()
     RegAdminCmd("sm_print_cvars_l4d2_scripted_hud", CmdPrintCvars, ADMFLAG_ROOT, "Print the plugin related cvars and their respective values to the console.");
     RegConsoleCmd("sm_spechudon", ShowSpecHud, "打开spechud");
     RegConsoleCmd("sm_spechudoff", offSpecHud, "打开spechud");
+    RegConsoleCmd("sm_hudmenu", CmdHUDMenu, "Open the scripted HUD settings menu.");
+    RegConsoleCmd("sm_hud", CmdHUDMenu, "Open the scripted HUD settings menu.");
+
+    if (g_bLateLoad)
+    {
+        EnableHUD();
+        RefreshHUDStatusCvars();
+        LoadBaseServerName();
+        GetCvars();
+        LateLoad();
+        HookEvents();
+        delete g_tUpdateInterval;
+        g_tUpdateInterval = CreateTimer(g_fCvar_UpdateInterval, TimerUpdateHUD, _, TIMER_REPEAT);
+
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (IsClientInGame(client))
+                InitializeHUDPrefsClient(client);
+        }
+    }
+}
+
+public void OnMapStart()
+{
+    EnableHUD();
+    LoadBaseServerName();
+}
+
+public void OnPluginEnd()
+{
+    UnhookHUDSendProxies();
+    delete g_hEMSHUDPatch1;
+    delete g_hEMSHUDPatch2;
+
+    if (g_hHUDPrefsDatabase != INVALID_HANDLE)
+    {
+        CloseHandle(g_hHUDPrefsDatabase);
+        g_hHUDPrefsDatabase = INVALID_HANDLE;
+    }
+}
+
+void ApplyEMSHUDPatches()
+{
+    GameData gameData = new GameData("l4d2_ems_hud_sig");
+    if (gameData == null)
+        SetFailState("[Scripted HUD] Missing gamedata: l4d2_ems_hud_sig.txt");
+
+    g_hEMSHUDPatch1 = MemoryPatch.CreateFromConf(gameData, "CScriptHud::HUDFrameUpdate::Ptach1");
+    g_hEMSHUDPatch2 = MemoryPatch.CreateFromConf(gameData, "CScriptHud::HUDFrameUpdate::Ptach2");
+    delete gameData;
+
+    if (g_hEMSHUDPatch1 == null || !g_hEMSHUDPatch1.Validate() || !g_hEMSHUDPatch1.Enable())
+        SetFailState("[Scripted HUD] Failed to enable EMS HUD patch 1.");
+    if (g_hEMSHUDPatch2 == null || !g_hEMSHUDPatch2.Validate() || !g_hEMSHUDPatch2.Enable())
+        SetFailState("[Scripted HUD] Failed to enable EMS HUD patch 2.");
 }
 
 /****************************************************************************************************/
@@ -668,7 +753,8 @@ public void LoadPluginData()
 }
 
 public void OnAllPluginsLoaded(){
-	g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
+		g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
+		HookHUDSendProxies();
 }
 public void OnLibraryAdded(const char[] name)
 {
@@ -683,6 +769,10 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnConfigsExecuted()
 {
+    EnableHUD();
+    RefreshHUDStatusCvars();
+    LoadBaseServerName();
+
     GetCvars();
 
     LateLoad();
@@ -722,7 +812,8 @@ public void OnNextFrameHUDBackground(int hudid)
         return;
 
     // if the background has been changed we need to set it invisible first to refresh the changes
-    GameRules_SetProp("m_iScriptedHUDFlags", HUD_FLAG_NOTVISIBLE, _, hudid);
+    g_bHUDResetPending[hudid] = true;
+    ResetHUD(hudid);
 }
 
 /****************************************************************************************************/
@@ -1076,44 +1167,55 @@ public void UpdateHUD()
     GetHUD_Texts();
     GetHUD_Pos();
 
-    if (g_bCvar_HUD1_BlinkTank && g_bAliveTank)
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD1Flags | HUD_FLAG_BLINK, _, HUD1);
-    else
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD1Flags, _, HUD1);
-    GameRules_SetPropFloat("m_fScriptedHUDPosX", g_fHUD1_X, HUD1);
-    GameRules_SetPropFloat("m_fScriptedHUDPosY", g_fHUD1_Y, HUD1);
-    GameRules_SetPropFloat("m_fScriptedHUDWidth", g_fCvar_HUD1_Width, HUD1);
-    GameRules_SetPropFloat("m_fScriptedHUDHeight", g_fCvar_HUD1_Height * (CountCharInString(g_sHUD_TextArray[HUD1], '\n') + 1), HUD1);
+    int flags;
 
-    if (g_bCvar_HUD2_BlinkTank && g_bAliveTank)
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD2Flags | HUD_FLAG_BLINK, _, HUD2);
+    if (g_bHUDResetPending[HUD1])
+        g_bHUDResetPending[HUD1] = false;
     else
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD2Flags, _, HUD2);
-    GameRules_SetPropFloat("m_fScriptedHUDPosX", g_fHUD2_X, HUD2);
-    GameRules_SetPropFloat("m_fScriptedHUDPosY", g_fHUD2_Y, HUD2);
-    GameRules_SetPropFloat("m_fScriptedHUDWidth", g_fCvar_HUD2_Width, HUD2);
-    GameRules_SetPropFloat("m_fScriptedHUDHeight", g_fCvar_HUD2_Height * (CountCharInString(g_sHUD_TextArray[HUD2], '\n') + 1), HUD2);
+    {
+        if (g_bCvar_HUD1_BlinkTank && g_bAliveTank)
+            flags = g_iHUD1Flags | HUD_FLAG_BLINK;
+        else
+            flags = g_iHUD1Flags;
+        HUDSetLayout(HUD1, flags, "%s", g_sHUD_TextArray[HUD1]);
+        HUDPlace(HUD1, g_fHUD1_X, g_fHUD1_Y, g_fCvar_HUD1_Width, g_fCvar_HUD1_Height * (CountCharInString(g_sHUD_TextArray[HUD1], '\n') + 1));
+    }
 
-    if (g_bCvar_HUD3_BlinkTank && g_bAliveTank)
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD3Flags | HUD_FLAG_BLINK, _, HUD3);
+    if (g_bHUDResetPending[HUD2])
+        g_bHUDResetPending[HUD2] = false;
     else
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD3Flags, _, HUD3);
-    GameRules_SetPropFloat("m_fScriptedHUDPosX", g_fHUD3_X, HUD3);
-    GameRules_SetPropFloat("m_fScriptedHUDPosY", g_fHUD3_Y, HUD3);
-    GameRules_SetPropFloat("m_fScriptedHUDWidth", g_fCvar_HUD3_Width, HUD3);
-    GameRules_SetPropFloat("m_fScriptedHUDHeight", g_fCvar_HUD3_Height * (CountCharInString(g_sHUD_TextArray[HUD3], '\n') + 1), HUD3);
+    {
+        if (g_bCvar_HUD2_BlinkTank && g_bAliveTank)
+            flags = g_iHUD2Flags | HUD_FLAG_BLINK;
+        else
+            flags = g_iHUD2Flags;
+        HUDSetLayout(HUD2, flags, "%s", g_sHUD_TextArray[HUD2]);
+        HUDPlace(HUD2, g_fHUD2_X, g_fHUD2_Y, g_fCvar_HUD2_Width, g_fCvar_HUD2_Height * (CountCharInString(g_sHUD_TextArray[HUD2], '\n') + 1));
+    }
 
-    if (g_bCvar_HUD4_BlinkTank && g_bAliveTank)
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD4Flags | HUD_FLAG_BLINK, _, HUD4);
+    if (g_bHUDResetPending[HUD3])
+        g_bHUDResetPending[HUD3] = false;
     else
-        GameRules_SetProp("m_iScriptedHUDFlags", g_iHUD4Flags, _, HUD4);
-    GameRules_SetPropFloat("m_fScriptedHUDPosX", g_fHUD4_X, HUD4);
-    GameRules_SetPropFloat("m_fScriptedHUDPosY", g_fHUD4_Y, HUD4);
-    GameRules_SetPropFloat("m_fScriptedHUDWidth", g_fCvar_HUD4_Width, HUD4);
-    GameRules_SetPropFloat("m_fScriptedHUDHeight", g_fCvar_HUD4_Height * (CountCharInString(g_sHUD_TextArray[HUD4], '\n') + 1), HUD4);
+    {
+        if (g_bCvar_HUD3_BlinkTank && g_bAliveTank)
+            flags = g_iHUD3Flags | HUD_FLAG_BLINK;
+        else
+            flags = g_iHUD3Flags;
+        HUDSetLayout(HUD3, flags, "%s", g_sHUD_TextArray[HUD3]);
+        HUDPlace(HUD3, g_fHUD3_X, g_fHUD3_Y, g_fCvar_HUD3_Width, g_fCvar_HUD3_Height * (CountCharInString(g_sHUD_TextArray[HUD3], '\n') + 1));
+    }
 
-    ImplodeStrings(g_sHUD_TextArray, sizeof(g_sHUD_TextArray), " ", g_sHUD_Text, sizeof(g_sHUD_Text));
-    GameRules_SetPropString("m_szScriptedHUDStringSet", g_sHUD_Text);
+    if (g_bHUDResetPending[HUD4])
+        g_bHUDResetPending[HUD4] = false;
+    else
+    {
+        if (g_bCvar_HUD4_BlinkTank && g_bAliveTank)
+            flags = g_iHUD4Flags | HUD_FLAG_BLINK;
+        else
+            flags = g_iHUD4Flags;
+        HUDSetLayout(HUD4, flags, "%s", g_sHUD_TextArray[HUD4]);
+        HUDPlace(HUD4, g_fHUD4_X, g_fHUD4_Y, g_fCvar_HUD4_Width, g_fCvar_HUD4_Height * (CountCharInString(g_sHUD_TextArray[HUD4], '\n') + 1));
+    }
 }
 
 /****************************************************************************************************/
@@ -1293,6 +1395,8 @@ void GetHUD_Pos()
 
 void GetHUD_Texts()
 {
+    RefreshHUD2Fragments();
+
     g_sBuffer = "\0";
     if (g_bData_HUD1_Text)
     {
@@ -1356,6 +1460,8 @@ void GetHUD_Texts()
         FormatEx(g_sBuffer, sizeof(g_sBuffer), "%s%s", g_sHUD4_Text, g_sSpaces);
     }
     g_sHUD_TextArray[HUD4] = g_sBuffer;
+
+    BuildClientHUDTexts();
 }
 
 /****************************************************************************************************/
@@ -1509,11 +1615,7 @@ stock int GetPlayerNumber()
 }
 void GetHUD2_Text(char[] output, int size)
 {
-	FormatEx(output, size, "\0");
-	int PlayerLimit = GetConVarInt(FindConVar("sv_maxplayers"));
-	char hostname[64];
- 	FindConVar("hostname").GetString(hostname,sizeof(hostname));   
- 	FormatEx(output, size, "%s(%d/%d)",  hostname, GetPlayerNumber(), PlayerLimit);
+		ComposeHUD2Text(output, size, HUD2_PART_ALL_MASK);
 }
 
 /****************************************************************************************************/
@@ -1598,14 +1700,756 @@ void GetHUD4_Text(char[] output, int size)
 
 public Action ShowSpecHud(int client, int args)
 {
-    g_hCvar_HUD3_Visible.SetInt(1);
-    return Plugin_Continue;
+    if (!IsValidClient(client))
+    {
+        g_hCvar_HUD3_Visible.SetInt(1);
+        return Plugin_Handled;
+    }
+
+    if (g_eHUDPrefsLoadState[client] != HUDPrefs_Ready)
+        return Plugin_Handled;
+
+    g_iClientHUDMask[client] |= (1 << HUD3);
+    SaveHUDPrefs(client);
+    return Plugin_Handled;
 }
 
 public Action offSpecHud(int client, int args)
 {
-    g_hCvar_HUD3_Visible.SetInt(0);
-    return Plugin_Continue;
+    if (!IsValidClient(client))
+    {
+        g_hCvar_HUD3_Visible.SetInt(0);
+        return Plugin_Handled;
+    }
+
+    if (g_eHUDPrefsLoadState[client] != HUDPrefs_Ready)
+        return Plugin_Handled;
+
+    g_iClientHUDMask[client] &= ~(1 << HUD3);
+    SaveHUDPrefs(client);
+    return Plugin_Handled;
+}
+
+void HookHUDSendProxies()
+{
+    for (int hud = HUD1; hud <= HUD4; hud++)
+    {
+        if (!g_bHUDProxyHooked[hud][0])
+            g_bHUDProxyHooked[hud][0] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUDFlags, hud);
+
+        if (!g_bHUDProxyHooked[hud][1])
+            g_bHUDProxyHooked[hud][1] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUDString, hud);
+
+        if (!g_bHUDProxyHooked[hud][0] || !g_bHUDProxyHooked[hud][1])
+            LogError("[Scripted HUD] Failed to hook SendProxy for HUD slot %d.", hud + 1);
+    }
+}
+
+void UnhookHUDSendProxies()
+{
+    for (int hud = HUD1; hud <= HUD4; hud++)
+    {
+        if (g_bHUDProxyHooked[hud][0])
+            SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUDFlags, hud);
+        if (g_bHUDProxyHooked[hud][1])
+            SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUDString, hud);
+
+        g_bHUDProxyHooked[hud][0] = false;
+        g_bHUDProxyHooked[hud][1] = false;
+    }
+}
+
+public Action ProxyHUDFlags(const char[] prop, int &value, int element, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+        return Plugin_Continue;
+
+    bool globallyAllowed;
+    switch (element)
+    {
+        case HUD1: globallyAllowed = g_bCvar_HUD1_Visible;
+        case HUD2: globallyAllowed = g_bCvar_HUD2_Visible;
+        case HUD3: globallyAllowed = g_bCvar_HUD3_Visible;
+        case HUD4: globallyAllowed = g_bCvar_HUD4_Visible;
+    }
+
+    if (g_bCvar_Enabled && globallyAllowed && !g_bHUDResetPending[element] && (g_iClientHUDMask[client] & (1 << element)) != 0)
+        value &= ~HUD_FLAG_NOTVISIBLE;
+    else
+        value |= HUD_FLAG_NOTVISIBLE;
+
+    return Plugin_Changed;
+}
+
+public Action ProxyHUDString(const char[] prop, char[] value, int maxlength, int element, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+        return Plugin_Continue;
+
+    strcopy(value, maxlength, g_sClientHUDText[client][element]);
+    return Plugin_Changed;
+}
+
+void BuildClientHUDTexts()
+{
+    char personalizedHUD2[128];
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || IsFakeClient(client))
+            continue;
+
+        for (int hud = HUD1; hud <= HUD4; hud++)
+            strcopy(g_sClientHUDText[client][hud], sizeof(g_sClientHUDText[][]), g_sHUD_TextArray[hud]);
+
+        if (!g_bData_HUD2_Text && !g_bCvar_HUD2_Text)
+        {
+            ComposeHUD2Text(personalizedHUD2, sizeof(personalizedHUD2), g_iClientHUD2Mask[client]);
+            FormatEx(g_sClientHUDText[client][HUD2], sizeof(g_sClientHUDText[][]), "%s%s", personalizedHUD2, g_sSpaces);
+        }
+    }
+}
+
+void RefreshHUDStatusCvars()
+{
+    if (g_hCvar_HostPort == null)             g_hCvar_HostPort = FindConVar("hostport");
+    if (g_hCvar_Hostname == null)             g_hCvar_Hostname = FindConVar("hostname");
+    if (g_hCvar_ReadyCfgName == null)          g_hCvar_ReadyCfgName = FindConVar("l4d_ready_cfg_name");
+    if (g_hCvar_AddonsEclipse == null)         g_hCvar_AddonsEclipse = FindConVar("l4d2_addons_eclipse");
+    if (g_hCvar_AIDifficulty == null)          g_hCvar_AIDifficulty = FindConVar("ah_ai_dynamic_current_level");
+    if (g_hCvar_InfectedLimit == null)         g_hCvar_InfectedLimit = FindConVar("l4d_infected_limit");
+    if (g_hCvar_RespawnInterval == null)       g_hCvar_RespawnInterval = FindConVar("versus_special_respawn_interval");
+    if (g_hCvar_DirSpawnCount == null)         g_hCvar_DirSpawnCount = FindConVar("dirspawn_count");
+    if (g_hCvar_DirSpawnInterval == null)      g_hCvar_DirSpawnInterval = FindConVar("dirspawn_interval");
+    if (g_hCvar_SurvivorLimit == null)         g_hCvar_SurvivorLimit = FindConVar("survivor_limit");
+    if (g_hCvar_InfectedPlayerLimit == null)   g_hCvar_InfectedPlayerLimit = FindConVar("z_max_player_zombies");
+    if (g_hCvar_MaxPlayers == null)            g_hCvar_MaxPlayers = FindConVar("sv_maxplayers");
+}
+
+void LoadBaseServerName()
+{
+    RefreshHUDStatusCvars();
+    g_sBaseServerName[0] = '\0';
+
+    char path[PLATFORM_MAX_PATH];
+    BuildPath(Path_SM, path, sizeof(path), "configs/hostname/hostname.txt");
+
+    KeyValues kv = new KeyValues("AnneHappy");
+    if (kv.ImportFromFile(path) && g_hCvar_HostPort != null)
+    {
+        char port[16];
+        g_hCvar_HostPort.GetString(port, sizeof(port));
+        if (kv.JumpToKey(port, false))
+            kv.GetString("servername", g_sBaseServerName, sizeof(g_sBaseServerName));
+    }
+    delete kv;
+
+    if (g_sBaseServerName[0] == '\0' && g_hCvar_Hostname != null)
+        g_hCvar_Hostname.GetString(g_sBaseServerName, sizeof(g_sBaseServerName));
+}
+
+void RefreshHUD2Fragments()
+{
+    RefreshHUDStatusCvars();
+
+    for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
+        g_sHUD2Fragments[i][0] = '\0';
+
+    strcopy(g_sHUD2Fragments[0], sizeof(g_sHUD2Fragments[]), g_sBaseServerName);
+
+    char cfgName[128];
+    if (g_hCvar_ReadyCfgName != null)
+        g_hCvar_ReadyCfgName.GetString(cfgName, sizeof(cfgName));
+
+    bool isAnne;
+    bool usesDirectorSpawn;
+    GetHUDModeTag(cfgName, g_sHUD2Fragments[1], sizeof(g_sHUD2Fragments[]), isAnne, usesDirectorSpawn);
+
+    if (g_hCvar_AIDifficulty != null)
+    {
+        char difficulty[16];
+        GetHUDAIDifficultyName(g_hCvar_AIDifficulty.IntValue, difficulty, sizeof(difficulty));
+        if (difficulty[0] != '\0')
+            FormatEx(g_sHUD2Fragments[2], sizeof(g_sHUD2Fragments[]), "[AI:%s]", difficulty);
+    }
+
+    if (!IsHUDTeamFull(isAnne))
+        strcopy(g_sHUD2Fragments[3], sizeof(g_sHUD2Fragments[]), "[缺人]");
+
+    if (g_hCvar_AddonsEclipse != null && g_hCvar_AddonsEclipse.IntValue == 0)
+        strcopy(g_sHUD2Fragments[4], sizeof(g_sHUD2Fragments[]), "[无MOD]");
+
+    if (isAnne)
+    {
+        int infectedCount;
+        int spawnInterval = -1;
+
+        if (usesDirectorSpawn)
+        {
+            if (g_hCvar_DirSpawnCount != null)
+                infectedCount = g_hCvar_DirSpawnCount.IntValue;
+            else if (g_hCvar_InfectedLimit != null)
+                infectedCount = g_hCvar_InfectedLimit.IntValue;
+
+            if (g_hCvar_DirSpawnInterval != null)
+                spawnInterval = RoundToNearest(g_hCvar_DirSpawnInterval.FloatValue);
+            else if (g_hCvar_RespawnInterval != null)
+                spawnInterval = g_hCvar_RespawnInterval.IntValue;
+        }
+        else
+        {
+            if (g_hCvar_InfectedLimit != null)
+                infectedCount = g_hCvar_InfectedLimit.IntValue;
+            if (g_hCvar_RespawnInterval != null)
+                spawnInterval = g_hCvar_RespawnInterval.IntValue;
+        }
+
+        if (infectedCount > 0 && spawnInterval >= 0)
+            FormatEx(g_sHUD2Fragments[5], sizeof(g_sHUD2Fragments[]), "[%d特%d秒]", infectedCount, spawnInterval);
+    }
+
+    int playerLimit = (g_hCvar_MaxPlayers == null) ? MaxClients : g_hCvar_MaxPlayers.IntValue;
+    FormatEx(g_sHUD2Fragments[6], sizeof(g_sHUD2Fragments[]), "(%d/%d)", GetPlayerNumber(), playerLimit);
+}
+
+void GetHUDModeTag(const char[] cfgName, char[] output, int size, bool &isAnne, bool &usesDirectorSpawn)
+{
+    output[0] = '\0';
+    isAnne = false;
+    usesDirectorSpawn = false;
+
+    if (StrContains(cfgName, "AnneHappy", false) != -1)
+    {
+        if (StrContains(cfgName, "Shotgun", false) != -1)
+            strcopy(output, size, "[喷子药役]");
+        else if (StrContains(cfgName, "HardCore", false) != -1)
+            strcopy(output, size, "[硬核药役]");
+        else
+            strcopy(output, size, "[普通药役]");
+        isAnne = true;
+    }
+    else if (StrContains(cfgName, "AnneCoop", false) != -1)
+    {
+        strcopy(output, size, "[Anne战役]");
+        isAnne = true;
+        usesDirectorSpawn = true;
+    }
+    else if (StrContains(cfgName, "AnneRealism", false) != -1)
+    {
+        strcopy(output, size, "[Anne写实]");
+        isAnne = true;
+        usesDirectorSpawn = true;
+    }
+    else if (StrContains(cfgName, "AnneMutation4", false) != -1)
+    {
+        strcopy(output, size, "[Anne绝境]");
+        isAnne = true;
+        usesDirectorSpawn = true;
+    }
+    else if (StrContains(cfgName, "AllCharger", false) != -1)
+    {
+        strcopy(output, size, "[牛牛冲刺]");
+        isAnne = true;
+    }
+    else if (StrContains(cfgName, "1vHunters", false) != -1)
+    {
+        strcopy(output, size, "[HT训练]");
+        isAnne = true;
+    }
+    else if (StrContains(cfgName, "WitchParty", false) != -1)
+    {
+        strcopy(output, size, "[女巫派对]");
+        isAnne = true;
+    }
+    else if (StrContains(cfgName, "Alone", false) != -1)
+    {
+        strcopy(output, size, "[单人装逼]");
+        isAnne = true;
+    }
+    else if (cfgName[0] != '\0')
+    {
+        FormatEx(output, size, "[%s]", cfgName);
+    }
+}
+
+void GetHUDAIDifficultyName(int level, char[] output, int size)
+{
+    switch (level)
+    {
+        case 1: strcopy(output, size, "简单");
+        case 2: strcopy(output, size, "普通");
+        case 3: strcopy(output, size, "困难");
+        case 4: strcopy(output, size, "专家");
+        case 5: strcopy(output, size, "极限");
+        case 6: strcopy(output, size, "音理");
+        default: output[0] = '\0';
+    }
+}
+
+bool IsHUDTeamFull(bool isAnne)
+{
+    int players;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && !IsFakeClient(client) && (GetClientTeam(client) == TEAM_SURVIVOR || GetClientTeam(client) == TEAM_INFECTED))
+            players++;
+    }
+
+    if (players == 0)
+        return true;
+
+    int requiredPlayers = (g_hCvar_SurvivorLimit == null) ? 4 : g_hCvar_SurvivorLimit.IntValue;
+    if (!isAnne && g_hCvar_InfectedPlayerLimit != null)
+        requiredPlayers += g_hCvar_InfectedPlayerLimit.IntValue;
+
+    return players >= requiredPlayers;
+}
+
+void ComposeHUD2Text(char[] output, int size, int mask)
+{
+    output[0] = '\0';
+    for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
+    {
+        if ((mask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
+            StrCat(output, size, g_sHUD2Fragments[i]);
+    }
+}
+
+void ResetHUDPrefsClient(int client)
+{
+    g_iClientHUDMask[client] = HUD_SLOT_DEFAULT_MASK;
+    g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
+    g_iClientHUDRevision[client] = 0;
+    g_eHUDPrefsLoadState[client] = HUDPrefs_None;
+    g_bClientHasCookie[client] = false;
+    g_sClientHUDCookie[client][0] = '\0';
+
+    for (int hud = HUD1; hud <= HUD4; hud++)
+        g_sClientHUDText[client][hud][0] = '\0';
+}
+
+void InitializeHUDPrefsClient(int client)
+{
+    ResetHUDPrefsClient(client);
+
+    if (IsFakeClient(client))
+    {
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+        return;
+    }
+
+    if (g_hHUDPrefsCookie != null && AreClientCookiesCached(client))
+    {
+        ReadHUDPrefsCookie(client);
+        LoadHUDPrefs(client);
+    }
+    else
+    {
+        g_eHUDPrefsLoadState[client] = HUDPrefs_WaitingForCookie;
+    }
+}
+
+public void OnClientConnected(int client)
+{
+    ResetHUDPrefsClient(client);
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+    InitializeHUDPrefsClient(client);
+}
+
+public void OnClientCookiesCached(int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return;
+
+    ReadHUDPrefsCookie(client);
+    if (g_eHUDPrefsLoadState[client] == HUDPrefs_WaitingForCookie)
+        LoadHUDPrefs(client);
+    else if (!g_bHUDPrefsDatabaseReady && g_eHUDPrefsLoadState[client] == HUDPrefs_Ready)
+        ApplyHUDPrefsCookie(client);
+}
+
+public void OnClientDisconnect(int client)
+{
+    ResetHUDPrefsClient(client);
+}
+
+void ReadHUDPrefsCookie(int client)
+{
+    if (g_hHUDPrefsCookie == null)
+        return;
+
+    g_hHUDPrefsCookie.Get(client, g_sClientHUDCookie[client], sizeof(g_sClientHUDCookie[]));
+    g_bClientHasCookie[client] = (g_sClientHUDCookie[client][0] != '\0');
+}
+
+bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &savedAt)
+{
+    if (!g_bClientHasCookie[client])
+        return false;
+
+    char parts[3][16];
+    int count = ExplodeString(g_sClientHUDCookie[client], "|", parts, sizeof(parts), sizeof(parts[]));
+    if ((count != 2 && count != 3) || parts[0][0] == '\0' || parts[1][0] == '\0')
+        return false;
+
+    int consumed = StringToIntEx(parts[0], hudMask);
+    if (consumed <= 0 || consumed != strlen(parts[0]) || hudMask < 0 || hudMask > HUD_SLOT_ALL_MASK)
+        return false;
+
+    consumed = StringToIntEx(parts[1], hud2Mask);
+    if (consumed <= 0 || consumed != strlen(parts[1]) || hud2Mask < 0 || hud2Mask > HUD2_PART_ALL_MASK)
+        return false;
+
+    savedAt = 0;
+    if (count == 3)
+    {
+        if (parts[2][0] == '\0')
+            return false;
+        consumed = StringToIntEx(parts[2], savedAt);
+        if (consumed <= 0 || consumed != strlen(parts[2]) || savedAt < 0)
+            return false;
+    }
+
+    return true;
+}
+
+bool ApplyHUDPrefsCookie(int client)
+{
+    int hudMask;
+    int hud2Mask;
+    int savedAt;
+    if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, savedAt))
+        return false;
+
+    g_iClientHUDMask[client] = hudMask;
+    g_iClientHUD2Mask[client] = hud2Mask;
+    g_iClientHUDRevision[client] = savedAt;
+    return true;
+}
+
+void SaveHUDPrefsCookie(int client)
+{
+    if (g_hHUDPrefsCookie == null || IsFakeClient(client))
+        return;
+
+    char value[32];
+    FormatEx(value, sizeof(value), "%d|%d|%d", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client]);
+    g_hHUDPrefsCookie.Set(client, value);
+}
+
+void ConnectHUDPrefsDatabase()
+{
+    if (g_bHUDPrefsDatabaseConnecting || g_bHUDPrefsDatabaseReady)
+        return;
+
+    if (!SQL_CheckConfig(HUD_PREFS_DB_CONFIG))
+    {
+        LogError("[Scripted HUD] Database config '%s' is unavailable; using ClientPrefs only.", HUD_PREFS_DB_CONFIG);
+        return;
+    }
+
+    g_bHUDPrefsDatabaseConnecting = true;
+    SQL_TConnect(SQLCB_ConnectHUDPrefsDatabase, HUD_PREFS_DB_CONFIG);
+}
+
+public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const char[] error, any data)
+{
+    g_bHUDPrefsDatabaseConnecting = false;
+    if (database == INVALID_HANDLE)
+    {
+        LogError("[Scripted HUD] Database connection failed; using ClientPrefs only: %s", error);
+        FinalizeWaitingHUDPrefsWithoutDatabase();
+        return;
+    }
+
+    g_hHUDPrefsDatabase = database;
+    SQL_SetCharset(g_hHUDPrefsDatabase, "utf8mb4");
+
+    char query[512];
+    FormatEx(query, sizeof(query),
+        "CREATE TABLE IF NOT EXISTS `%s` ("
+        ... "`steamid` varchar(64) NOT NULL,"
+        ... "`hud_mask` tinyint unsigned NOT NULL DEFAULT 3,"
+        ... "`hud2_mask` tinyint unsigned NOT NULL DEFAULT 127,"
+        ... "`revision` int unsigned NOT NULL DEFAULT 0,"
+        ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+        ... "PRIMARY KEY (`steamid`)"
+        ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", HUD_PREFS_DB_TABLE);
+
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_CreateHUDPrefsTable, query);
+}
+
+public void SQLCB_CreateHUDPrefsTable(Handle owner, Handle results, const char[] error, any data)
+{
+    if (error[0] != '\0')
+    {
+        LogError("[Scripted HUD] Failed to create preferences table; using ClientPrefs only: %s", error);
+        CloseHandle(g_hHUDPrefsDatabase);
+        g_hHUDPrefsDatabase = INVALID_HANDLE;
+        FinalizeWaitingHUDPrefsWithoutDatabase();
+        return;
+    }
+
+    g_bHUDPrefsDatabaseReady = true;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && !IsFakeClient(client) && g_eHUDPrefsLoadState[client] == HUDPrefs_WaitingForDatabase)
+            LoadHUDPrefs(client);
+    }
+}
+
+void FinalizeWaitingHUDPrefsWithoutDatabase()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || IsFakeClient(client) || g_eHUDPrefsLoadState[client] != HUDPrefs_WaitingForDatabase)
+            continue;
+
+        ApplyHUDPrefsCookie(client);
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+    }
+}
+
+void LoadHUDPrefs(int client)
+{
+    if (!g_bHUDPrefsDatabaseReady || g_hHUDPrefsDatabase == INVALID_HANDLE)
+    {
+        if (g_bHUDPrefsDatabaseConnecting || g_hHUDPrefsDatabase != INVALID_HANDLE)
+        {
+            g_eHUDPrefsLoadState[client] = HUDPrefs_WaitingForDatabase;
+            return;
+        }
+
+        ApplyHUDPrefsCookie(client);
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+        return;
+    }
+
+    char steamId[64];
+    if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)) || StrEqual(steamId, "BOT"))
+    {
+        ApplyHUDPrefsCookie(client);
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+        return;
+    }
+
+    char query[256];
+    SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
+        "SELECT `hud_mask`,`hud2_mask`,`revision` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
+    g_eHUDPrefsLoadState[client] = HUDPrefs_DatabasePending;
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_LoadHUDPrefs, query, GetClientUserId(client));
+}
+
+public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return;
+
+    if (error[0] != '\0')
+    {
+        LogError("[Scripted HUD] Failed to load HUD preferences: %s", error);
+        ApplyHUDPrefsCookie(client);
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+        return;
+    }
+
+    if (results != INVALID_HANDLE && SQL_FetchRow(results))
+    {
+        int databaseHUDMask = SQL_FetchInt(results, 0) & HUD_SLOT_ALL_MASK;
+        int databaseHUD2Mask = SQL_FetchInt(results, 1) & HUD2_PART_ALL_MASK;
+        int databaseRevision = SQL_FetchInt(results, 2);
+        int cookieHUDMask;
+        int cookieHUD2Mask;
+        int cookieRevision;
+
+        if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision) && cookieRevision > databaseRevision)
+        {
+            g_iClientHUDMask[client] = cookieHUDMask;
+            g_iClientHUD2Mask[client] = cookieHUD2Mask;
+            g_iClientHUDRevision[client] = cookieRevision;
+            g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+            SaveHUDPrefs(client, false);
+            return;
+        }
+
+        g_iClientHUDMask[client] = databaseHUDMask;
+        g_iClientHUD2Mask[client] = databaseHUD2Mask;
+        g_iClientHUDRevision[client] = databaseRevision;
+        g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+        SaveHUDPrefsCookie(client);
+        return;
+    }
+
+    ApplyHUDPrefsCookie(client);
+    g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
+    SaveHUDPrefs(client, false);
+}
+
+void SaveHUDPrefs(int client, bool bumpRevision = true)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return;
+
+    g_iClientHUDMask[client] &= HUD_SLOT_ALL_MASK;
+    g_iClientHUD2Mask[client] &= HUD2_PART_ALL_MASK;
+    if (bumpRevision && g_iClientHUDRevision[client] < 2147483647)
+        g_iClientHUDRevision[client]++;
+    SaveHUDPrefsCookie(client);
+
+    if (!g_bHUDPrefsDatabaseReady || g_hHUDPrefsDatabase == INVALID_HANDLE || g_eHUDPrefsLoadState[client] != HUDPrefs_Ready)
+        return;
+
+    char steamId[64];
+    if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)) || StrEqual(steamId, "BOT"))
+        return;
+
+    char query[512];
+    SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
+        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`revision`) VALUES ('%s',%d,%d,%d) "
+        ... "ON DUPLICATE KEY UPDATE "
+        ... "`hud_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud_mask`),`hud_mask`),"
+        ... "`hud2_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud2_mask`),`hud2_mask`),"
+        ... "`revision`=GREATEST(`revision`,VALUES(`revision`))",
+        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client]);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_SaveHUDPrefs, query);
+}
+
+public void SQLCB_SaveHUDPrefs(Handle owner, Handle results, const char[] error, any data)
+{
+    if (error[0] != '\0')
+        LogError("[Scripted HUD] Failed to save HUD preferences: %s", error);
+}
+
+public Action CmdHUDMenu(int client, int args)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Handled;
+
+    OpenHUDPrefsMenu(client);
+    return Plugin_Handled;
+}
+
+void AddHUDToggleItem(Menu menu, int client, const char[] key, const char[] phrase, bool enabled)
+{
+    char name[96];
+    char item[112];
+    FormatEx(name, sizeof(name), "%T", phrase, client);
+    FormatEx(item, sizeof(item), "[%s] %s", enabled ? "X" : " ", name);
+    menu.AddItem(key, item);
+}
+
+void OpenHUDPrefsMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_HUDPrefs);
+    char text[128];
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_PrefsTitle", client);
+    menu.SetTitle(text);
+
+    if (g_eHUDPrefsLoadState[client] != HUDPrefs_Ready)
+    {
+        FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_PrefsLoading", client);
+        menu.AddItem("loading", text, ITEMDRAW_DISABLED);
+        menu.Display(client, MENU_TIME_FOREVER);
+        return;
+    }
+
+    AddHUDToggleItem(menu, client, "hud1", "L4D2ScriptedHUD_HUD1", (g_iClientHUDMask[client] & (1 << HUD1)) != 0);
+    AddHUDToggleItem(menu, client, "hud2", "L4D2ScriptedHUD_HUD2", (g_iClientHUDMask[client] & (1 << HUD2)) != 0);
+    AddHUDToggleItem(menu, client, "hud3", "L4D2ScriptedHUD_HUD3", (g_iClientHUDMask[client] & (1 << HUD3)) != 0);
+    AddHUDToggleItem(menu, client, "hud4", "L4D2ScriptedHUD_HUD4", (g_iClientHUDMask[client] & (1 << HUD4)) != 0);
+
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_HUD2Parts", client);
+    menu.AddItem("hud2_parts", text);
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_Reset", client);
+    menu.AddItem("reset", text);
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    char key[32];
+    menu.GetItem(item, key, sizeof(key));
+
+    if (StrEqual(key, "hud2_parts"))
+    {
+        OpenHUD2PartsMenu(client);
+        return 0;
+    }
+    if (StrEqual(key, "reset"))
+    {
+        g_iClientHUDMask[client] = HUD_SLOT_DEFAULT_MASK;
+        g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
+    }
+    else if (strncmp(key, "hud", 3) == 0)
+    {
+        int hud = StringToInt(key[3]) - 1;
+        if (hud >= HUD1 && hud <= HUD4)
+            g_iClientHUDMask[client] ^= (1 << hud);
+    }
+
+    SaveHUDPrefs(client);
+    OpenHUDPrefsMenu(client);
+    return 0;
+}
+
+void OpenHUD2PartsMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_HUD2Parts);
+    char text[128];
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_HUD2PartsTitle", client);
+    menu.SetTitle(text);
+    menu.ExitBackButton = true;
+
+    AddHUDToggleItem(menu, client, "part0", "L4D2ScriptedHUD_PartServerName", (g_iClientHUD2Mask[client] & HUD2_PART_SERVER_NAME) != 0);
+    AddHUDToggleItem(menu, client, "part1", "L4D2ScriptedHUD_PartMode", (g_iClientHUD2Mask[client] & HUD2_PART_MODE) != 0);
+    AddHUDToggleItem(menu, client, "part2", "L4D2ScriptedHUD_PartAIDifficulty", (g_iClientHUD2Mask[client] & HUD2_PART_AI_DIFFICULTY) != 0);
+    AddHUDToggleItem(menu, client, "part3", "L4D2ScriptedHUD_PartMissingPlayers", (g_iClientHUD2Mask[client] & HUD2_PART_MISSING_PLAYERS) != 0);
+    AddHUDToggleItem(menu, client, "part4", "L4D2ScriptedHUD_PartMod", (g_iClientHUD2Mask[client] & HUD2_PART_MOD) != 0);
+    AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0);
+    AddHUDToggleItem(menu, client, "part6", "L4D2ScriptedHUD_PartPlayerCount", (g_iClientHUD2Mask[client] & HUD2_PART_PLAYER_COUNT) != 0);
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUD2Parts(Menu menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsValidClient(client))
+    {
+        OpenHUDPrefsMenu(client);
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    char key[16];
+    menu.GetItem(item, key, sizeof(key));
+    if (strncmp(key, "part", 4) == 0)
+    {
+        int part = StringToInt(key[4]);
+        if (part >= 0 && part < 7)
+            g_iClientHUD2Mask[client] ^= (1 << part);
+    }
+
+    SaveHUDPrefs(client);
+    OpenHUD2PartsMenu(client);
+    return 0;
 }
 
 // ====================================================================================================

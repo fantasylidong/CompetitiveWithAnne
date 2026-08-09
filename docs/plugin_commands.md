@@ -25,7 +25,7 @@
 
 ## 对抗通用命令
 
-共 384 条命令/监听入口。
+共 386 条命令/监听入口。
 
 | 插件 | 命令 | 类型 | 权限 | 说明 | 出现模式 |
 | --- | --- | --- | --- | --- | --- |
@@ -175,8 +175,10 @@
 | `extend/l4d2_blacklist.smx` | `sm_unblock` | 玩家/控制台 | - | 解除屏蔽: sm_unblock <#userid\|steam64\|名字> | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_l4d2_scripted_hud_reload_data` | 管理员 | ADMFLAG_ROOT | Reload the HUD texts set in the data file. | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_print_cvars_l4d2_scripted_hud` | 管理员 | ADMFLAG_ROOT | Print the plugin related cvars and their respective values to the console. | 34 个模式 |
-| `extend/l4d2_scripted_hud.smx` | `sm_spechudoff` | 玩家/控制台 | - | 打开spechud | 34 个模式 |
-| `extend/l4d2_scripted_hud.smx` | `sm_spechudon` | 玩家/控制台 | - | 打开spechud | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_hud` | 玩家 | - | 打开个人 HUD 显示设置菜单 | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_hudmenu` | 玩家 | - | 打开个人 HUD 显示设置菜单 | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_spechudoff` | 玩家/控制台 | - | 玩家关闭个人 HUD3；控制台关闭全局 HUD3 | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_spechudon` | 玩家/控制台 | - | 玩家打开个人 HUD3；控制台打开全局 HUD3 | 34 个模式 |
 | `extend/rpg.smx` | `sm_ammo` | 玩家/控制台 | - | 快速买子弹 | 34 个模式 |
 | `extend/rpg.smx` | `sm_applytags` | 玩家/控制台 | - | 佩戴自定义称号 | 34 个模式 |
 | `extend/rpg.smx` | `sm_buy` | 玩家/控制台 | - | 打开购买菜单(只能在游戏中) | 34 个模式 |

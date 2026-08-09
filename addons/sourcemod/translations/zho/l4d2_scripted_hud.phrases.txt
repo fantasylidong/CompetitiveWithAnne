@@ -1,7 +1,23 @@
 "Phrases"
 {
 	"L4D2ScriptedHUD_HUDTextsDataFileReloaded"
-	{
-		"zho"		"{green}[資料檔案中的 HUD 文字已重新載入]"
+		{
+			"zho"		"{green}[資料檔案中的 HUD 文字已重新載入]"
+		}
+		"L4D2ScriptedHUD_PrefsTitle" { "zho" "HUD 顯示設定" }
+		"L4D2ScriptedHUD_PrefsLoading" { "zho" "偏好正在載入，請稍後重新開啟選單。" }
+		"L4D2ScriptedHUD_HUD1" { "zho" "HUD 1：進度 / Tank / Witch" }
+		"L4D2ScriptedHUD_HUD2" { "zho" "HUD 2：伺服器狀態" }
+		"L4D2ScriptedHUD_HUD3" { "zho" "HUD 3：倖存者狀態" }
+		"L4D2ScriptedHUD_HUD4" { "zho" "HUD 4：自訂文字" }
+		"L4D2ScriptedHUD_HUD2Parts" { "zho" "設定 HUD 2 顯示欄位" }
+		"L4D2ScriptedHUD_HUD2PartsTitle" { "zho" "HUD 2 顯示欄位" }
+		"L4D2ScriptedHUD_Reset" { "zho" "恢復預設設定" }
+		"L4D2ScriptedHUD_PartServerName" { "zho" "伺服器名稱" }
+		"L4D2ScriptedHUD_PartMode" { "zho" "遊戲模式" }
+		"L4D2ScriptedHUD_PartAIDifficulty" { "zho" "AI 難度" }
+		"L4D2ScriptedHUD_PartMissingPlayers" { "zho" "缺人狀態" }
+		"L4D2ScriptedHUD_PartMod" { "zho" "MOD 狀態" }
+		"L4D2ScriptedHUD_PartInfectedTiming" { "zho" "特感數量 / 間隔" }
+		"L4D2ScriptedHUD_PartPlayerCount" { "zho" "玩家人數" }
 	}
-}
