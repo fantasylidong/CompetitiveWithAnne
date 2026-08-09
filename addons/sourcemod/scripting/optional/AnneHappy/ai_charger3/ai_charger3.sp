@@ -50,7 +50,7 @@ public void OnPluginStart() {
 	// allow charger to bhop?
 	g_cvBhop = CreateConVar("ai_charger3_bhop", "1", "是否允许 Charger 进行在接近状态时连跳操作, 0=禁止, 1=允许", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// charger is allowed to bhop when its distance from the target is between [ai_charger3_bhop_min_dist, ai_charger3_bhop_max_dist], if the distance is less than this value, charger will transition to bait state
-	g_cvBhopMinDist = CreateConVar("ai_charger3_bhop_min_dist", "75.0", "禁止连跳的最小距离, 小于这个距离转换为博弈状态", CVAR_FLAGS, true, 0.0);
+	g_cvBhopMinDist = CreateConVar("ai_charger3_bhop_min_dist", "100.0", "禁止连跳的最小距离, 小于这个距离转换为博弈状态", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxDist = CreateConVar("ai_charger3_bhop_max_dist", "9999.0", "允许连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	g_cvDirectBhopDist = CreateConVar("ai_charger3_bhop_direct_dist", "400.0", "Charger 在接近状态中切换到朝目标方向直线连跳的距离阈值", CVAR_FLAGS, true, 0.0);
 	// the bhop impulse, when charger is allowed to bhop, each time it jumps up from the ground, it will gain a speed impulse with the value of ai_charger3_bhop_impulse
@@ -93,9 +93,9 @@ public void OnPluginStart() {
 	// the maximum allowed duration (in seconds) for charger to stay in the bait state
 	g_cvBaitMaxDuration = CreateConVar("ai_charger3_bait_max_duration", "7.0", "Charger 进入博弈状态的最大允许时间", CVAR_FLAGS, true, 0.0);
 	// the detection interval (in seconds) for charger's probabilistic charge when in the bait state
-	g_cvProbChargeChkDur = CreateConVar("ai_charger3_prob_charge_chk_dur", "1.0", "Charger 进入博弈状态概率冲锋的检测间隔", CVAR_FLAGS, true, 0.0);
+	g_cvProbChargeChkDur = CreateConVar("ai_charger3_prob_charge_chk_dur", "0.5", "Charger 进入博弈状态概率冲锋的检测间隔", CVAR_FLAGS, true, 0.0);
 	// the probability (0.0 to 1.0) of charger performing a probabilistic charge when in the bait state
-	g_cvProbChargeProb = CreateConVar("ai_charger3_prob_charge_prob", "0.5", "Charger 进入博弈状态概率冲锋的概率", CVAR_FLAGS, true, 0.0);
+	g_cvProbChargeProb = CreateConVar("ai_charger3_prob_charge_prob", "0.8", "Charger 进入博弈状态概率冲锋的概率", CVAR_FLAGS, true, 0.0);
 	// whether to prohibit charger from retreating: 0=Disabled (allow retreat), 1=Enabled (forbid retreat)
 	g_cvAntiRetreat = CreateConVar("ai_charger3_anti_retreat", "1", "是否禁止 Charger 逃跑, 0=禁止, 1=允许", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// refresh interval for the target destination used by BehaviorMoveTo while ChargerEvade is intercepted

@@ -588,11 +588,12 @@ Charger 在近距离与目标周旋, 等待最佳冲锋时机。
 
 **行为:**
 - 面对近战目标: 若与目标距离小于近战危险区范围 (melee_range + _ai_charger3_melee_bait_minrange) 时, 向后移动以规避伤害, 等待目标产生破绽以冲锋
-- 面对持枪目标: 每隔 `ai_charger3_prob_charge_chk_dur` 秒以 `ai_charger3_prob_charge_prob` 的概率发动冲锋, 若目标产生破绽则立即冲锋
+- 面对持枪目标: 目标正在注视 Charger 时立即冲锋; 否则每隔 `ai_charger3_prob_charge_chk_dur` 秒以 `ai_charger3_prob_charge_prob` 的概率发动冲锋, 若目标产生破绽也会立即冲锋
 - 博弈状态持续超过 `ai_charger3_bait_max_duration` 秒后强制转换为 **LOCKED** 锁定状态以进行冲锋, 防止无限博弈
 
 **状态转换条件:**
 - 检测到目标漏洞窗口 (近战攻击 CD 时、换弹时、切换武器时、进入右键推 CD 时等) → 转换为 **LOCKED**
+- 普通持枪目标正在注视 Charger → 转换为 **LOCKED**
 - 概率冲锋触发 → 转换为 **LOCKED**
 - 博弈超时 → 转换为 **LOCKED**
 

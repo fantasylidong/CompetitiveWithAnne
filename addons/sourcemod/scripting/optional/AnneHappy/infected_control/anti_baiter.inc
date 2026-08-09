@@ -266,7 +266,12 @@ static bool AntiBait_IsEventBlocked()
         return true;
     if (g_bPauseLib && IsInPause())
         return true;
-    if (IsAnyTankOrAboveHalfSurvivorDownOrDied())
+    // Scripted holdouts are intentional stops and must keep the normal wave cadence.
+    if (EventPressure_ShouldBypassAntiBait())
+        return true;
+    // A distant Tank is not pressure yet: keep holding until it approaches or
+    // the survivor formation becomes attackable.
+    if (IsTankPressureActive() || AreAtLeastHalfSurvivorsDownOrDead())
         return true;
     if (gAB.allPinned)
         return true;
@@ -576,7 +581,11 @@ void AntiBait_Update()
     {
         AntiBait_ClearRunner();
         if (gAB.state != AB_Paused)
-            AntiBait_Debug("blocked state=%s allPinned=%d", g_sAntiBaitStateName[view_as<int>(gAB.state)], gAB.allPinned);
+            AntiBait_Debug("blocked state=%s allPinned=%d scriptedEvent=%d tankPressure=%d",
+                g_sAntiBaitStateName[view_as<int>(gAB.state)],
+                gAB.allPinned,
+                EventPressure_ShouldBypassAntiBait(),
+                IsTankPressureActive());
         AntiBait_Pause(now);
         return;
     }

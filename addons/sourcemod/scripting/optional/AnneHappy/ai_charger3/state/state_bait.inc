@@ -577,16 +577,13 @@ Action handleShotgunThreat(int client, int target, float dist, bool visible) {
 
 /**
 * Charger 面对手持非近战, 非霰弹枪的目标的处理逻辑
-* 1. 目标没有看着 Charger, 且没有其他人看着 Charger, 继续接近挥拳, 同时概率冲锋
+* 1. 目标看着 Charger 时, 直接冲锋
 * 2. 目标处于易受攻击状态, 直接冲锋
-* 3. 无论目标有没有看着 Charger, 若血量大于近战斩杀线, 概率冲锋, 小于则直接冲锋
+* 3. 目标没有看着 Charger 时, 若血量大于近战斩杀线, 概率冲锋, 小于则直接冲锋
 * @param client 客户端索引
 * @param target 目标索引
 * @param dist 距离
-* @param health Charger 生命值
 * @param visible 是否可见目标
-* @param meleeDamage Charger 近战斩杀线
-* @param watchers 正在看着 Charger 的人数
 * @return Action
 **/
 Action handleNonMeleeThreat(int client, int target, float dist, bool visible) {
@@ -599,6 +596,13 @@ Action handleNonMeleeThreat(int client, int target, float dist, bool visible) {
     // 能力未就绪, 不允许冲锋
     if (!isChargeAbilityReady(client))
         return Plugin_Continue;
+
+    // 目标转头看到 Charger 时立即冲锋, 避免继续停留在概率博弈。
+    if (isTargetWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue)) {
+        stateLog.debugAll("Charger (%N) handling non-melee threat: target (%N) is watching, charging", client, target);
+        g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
+        return Plugin_Continue;
+    }
 
     // 如果目标处于易受攻击状态, 直接冲锋
     if (isTargetVulnerable(client, target)) {

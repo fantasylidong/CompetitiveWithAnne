@@ -155,6 +155,7 @@ enum struct Config
     ConVar AntiBaitTeamDist;
     ConVar AntiBaitPairDist;
     ConVar AntiBaitIsolateDist;
+    ConVar AntiBaitTankPressureDist;
     ConVar AntiBaitDebug;
     ConVar TraitorEnable;
     ConVar TraitorMaxSlots;
@@ -182,6 +183,7 @@ enum struct Config
     float  fAntiBaitTeamDist;
     float  fAntiBaitPairDist;
     float  fAntiBaitIsolateDist;
+    float  fAntiBaitTankPressureDist;
     bool   bAntiBaitDebug;
     bool   bTraitorEnable;
     int    iTraitorMaxSlots;
@@ -591,6 +593,11 @@ enum struct Config
             "A survivor whose nearest teammate is farther than this releases anti-bait pressure as pickable",
             CVAR_FLAG, true, 0.0, true, 3000.0
         );
+        this.AntiBaitTankPressureDist = CreateConVar(
+            "inf_antibait_tank_pressure_dist", "1200.0",
+            "Tank distance to any living survivor that clears an anti-bait hold; 0 restores any-active-Tank behavior",
+            CVAR_FLAG, true, 0.0, true, 5000.0
+        );
         this.AntiBaitDebug = CreateConVar(
             "inf_antibait_debug", "0",
             "Log anti-bait state transitions even when inf_DebugMode is off",
@@ -664,6 +671,7 @@ enum struct Config
         this.AntiBaitTeamDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitPairDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitIsolateDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitTankPressureDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitDebug.AddChangeHook(OnCfgChanged);
         this.TraitorEnable.AddChangeHook(OnCfgChanged);
         this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
@@ -950,6 +958,7 @@ enum struct Config
         this.fAntiBaitTeamDist = this.AntiBaitTeamDist.FloatValue;
         this.fAntiBaitPairDist = this.AntiBaitPairDist.FloatValue;
         this.fAntiBaitIsolateDist = this.AntiBaitIsolateDist.FloatValue;
+        this.fAntiBaitTankPressureDist = this.AntiBaitTankPressureDist.FloatValue;
         this.bAntiBaitDebug = this.AntiBaitDebug.BoolValue;
         if (this.fAntiBaitMinSiRatio < 0.0) this.fAntiBaitMinSiRatio = 0.0;
         if (this.fAntiBaitMinSiRatio > 1.0) this.fAntiBaitMinSiRatio = 1.0;
@@ -962,6 +971,7 @@ enum struct Config
         if (this.fAntiBaitTeamDist < 0.0) this.fAntiBaitTeamDist = 0.0;
         if (this.fAntiBaitPairDist < 0.0) this.fAntiBaitPairDist = 0.0;
         if (this.fAntiBaitIsolateDist < 0.0) this.fAntiBaitIsolateDist = 0.0;
+        if (this.fAntiBaitTankPressureDist < 0.0) this.fAntiBaitTankPressureDist = 0.0;
     }
 
     int GetMaxPlayerZombieBound()

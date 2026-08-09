@@ -173,11 +173,50 @@ bool Survivors_AllPinnedOrDown()
 
 bool IsAnyTankOrAboveHalfSurvivorDownOrDied(int limit = 0)
 {
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsActiveTank(i))
+            return true;
+    }
+
+    return AreAtLeastHalfSurvivorsDownOrDead(limit);
+}
+
+bool IsTankPressureActive()
+{
+    float pressureDist = gCV.fAntiBaitTankPressureDist;
+    float pressureDistSq = pressureDist * pressureDist;
+    float tankPos[3], survivorPos[3];
+
+    for (int tank = 1; tank <= MaxClients; tank++)
+    {
+        if (!IsActiveTank(tank))
+            continue;
+
+        if (pressureDist <= 0.0)
+            return true;
+
+        GetClientAbsOrigin(tank, tankPos);
+        for (int survivor = 1; survivor <= MaxClients; survivor++)
+        {
+            if (!IsValidSurvivor(survivor) || !IsPlayerAlive(survivor))
+                continue;
+
+            GetClientAbsOrigin(survivor, survivorPos);
+            if (GetVectorDistance(tankPos, survivorPos, true) <= pressureDistSq)
+                return true;
+        }
+    }
+
+    return false;
+}
+
+bool AreAtLeastHalfSurvivorsDownOrDead(int limit = 0)
+{
     int down = 0;
     int survMax = (gCV.SurvivorLimit != null) ? gCV.SurvivorLimit.IntValue : 4;
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsActiveTank(i)) return true;
         if (IsValidSurvivor(i)
             && (L4D_IsPlayerIncapacitated(i) || IsSurvivorHangingFromLedge(i)
                 || !IsPlayerAlive(i)))
@@ -185,10 +224,10 @@ bool IsAnyTankOrAboveHalfSurvivorDownOrDied(int limit = 0)
             down++;
         }
     }
+
     if (limit == 0)
         return down >= RoundToCeil(float(survMax) / 2.0);
-    else
-        return down >= limit;
+    return down >= limit;
 }
 
 void EmitRushmanForward(int survivor)

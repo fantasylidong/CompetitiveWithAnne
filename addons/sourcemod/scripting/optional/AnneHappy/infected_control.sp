@@ -46,6 +46,7 @@
 #include <sdkhooks>
 #include <sdktools_tempents>
 #include <left4dhooks>
+#include <dhooks>
 #include <sourcescramble>
 #include <anne_spawn_accel>
 #undef REQUIRE_PLUGIN
@@ -261,6 +262,7 @@ bool CheckClassEnabled(int zc)
 #include "infected_control/queue.inc"
 #include "infected_control/class_queue.inc"
 #include "infected_control/client_state.inc"
+#include "infected_control/event_pressure.inc"
 #include "infected_control/spawn_accel_bridge.inc"
 
 // 刷特管线的依赖顺序很重要：
@@ -409,7 +411,8 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 // =========================
 public void OnPluginStart()
 {
-	LoadTranslations("infected_control.phrases");
+    LoadTranslations("infected_control.phrases");
+    EventPressure_Init();
     SpawnPerfConfig_Create();
     gCV.Create();
     SpawnAccel_UpdateAvailability(true);
@@ -455,6 +458,11 @@ public void OnPluginStart()
     HookEvent("map_transition",  Event_RoundEnd);
     HookEvent("round_end",       Event_RoundEnd);
     HookEvent("round_start",     Event_RoundStart);
+    HookEvent("create_panic_event", EventPressure_OnPanicStart, EventHookMode_PostNoCopy);
+    HookEvent("panic_event_finished", EventPressure_OnPanicEnd, EventHookMode_PostNoCopy);
+    HookEvent("finale_start", EventPressure_OnFinaleStart, EventHookMode_PostNoCopy);
+    HookEvent("finale_radio_start", EventPressure_OnFinaleStart, EventHookMode_PostNoCopy);
+    HookEvent("gauntlet_finale_start", EventPressure_OnFinaleStart, EventHookMode_PostNoCopy);
     HookEvent("player_spawn",    Event_PlayerSpawn);
     HookEvent("player_death",    Event_PlayerDeath);
     HookEvent("player_team",     Event_PlayerTeam);
@@ -493,6 +501,7 @@ public void OnPluginEnd()
     Traitor_ResetAll(true);
     Traitor_ShutdownDamageHooks();
     Visibility_ResetHurtTriggers();
+    EventPressure_Shutdown();
     // 插件结束时清理 Path 缓存
     ClearPathCache();
 }
@@ -532,6 +541,7 @@ public void OnMapEnd()
 
 public void OnMapStart()
 {
+    EventPressure_Reset();
     Visibility_ResetHurtTriggers();
     // Some L4D2 server paths dispatch round_start before SourceMod's OnMapStart.
     // A started map is safe to arm; the first-leave signal still controls spawning.
@@ -856,6 +866,7 @@ static Action Timer_SpawnFirstWave(Handle timer)
 // =========================
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+    EventPressure_Reset();
     g_bRuntimeRoundActive = true;
     g_bRuntimeMapEnding = false;
     g_bRuntimeRecoverySuppressed = false;
