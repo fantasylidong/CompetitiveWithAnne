@@ -4,25 +4,88 @@
 		{
 			"jp"		"{green}[データ ファイルからの HUD テキストがリロードされました]"
 		}
-		"L4D2ScriptedHUD_PrefsTitle" { "jp" "HUD 表示設定" }
-		"L4D2ScriptedHUD_PrefsLoading" { "jp" "設定を読み込み中です。しばらくしてから再度開いてください。" }
-		"L4D2ScriptedHUD_HUD1" { "jp" "HUD 1：進行度 / Tank / Witch" }
-		"L4D2ScriptedHUD_HUD2" { "jp" "HUD 2：サーバー状態" }
-		"L4D2ScriptedHUD_HUD3" { "jp" "HUD 3：生存者状態" }
-		"L4D2ScriptedHUD_HUD4" { "jp" "HUD 4：カスタムテキスト" }
-		"L4D2ScriptedHUD_HUD2Parts" { "jp" "HUD 2 の表示項目" }
-		"L4D2ScriptedHUD_HUD2PartsTitle" { "jp" "HUD 2 の表示項目" }
-		"L4D2ScriptedHUD_Reset" { "jp" "既定値に戻す" }
-		"L4D2ScriptedHUD_PartServerName" { "jp" "サーバー名" }
-		"L4D2ScriptedHUD_PartMode" { "jp" "ゲームモード" }
-		"L4D2ScriptedHUD_PartAIDifficulty" { "jp" "AI 難易度" }
-		"L4D2ScriptedHUD_PartMissingPlayers" { "jp" "不足プレイヤー" }
-		"L4D2ScriptedHUD_PartMod" { "jp" "MOD 状態" }
-		"L4D2ScriptedHUD_PartInfectedTiming" { "jp" "特殊感染者数 / 間隔" }
-		"L4D2ScriptedHUD_PartPlayerCount" { "jp" "プレイヤー数" }
-		"L4D2ScriptedHUD_LayoutPreset" { "jp" "画面レイアウト" }
-		"L4D2ScriptedHUD_LayoutPresetTitle" { "jp" "画面レイアウト" }
-		"L4D2ScriptedHUD_LayoutStandard" { "jp" "標準（16:9）" }
-		"L4D2ScriptedHUD_Layout4x3" { "jp" "コンパクト（4:3）" }
-		"L4D2ScriptedHUD_LayoutUltrawide" { "jp" "ウルトラワイド安全領域" }
+		"L4D2ScriptedHUD_PrefsTitle"
+		{
+			"jp"		"HUD 表示設定"
+		}
+		"L4D2ScriptedHUD_PrefsLoading"
+		{
+			"jp"		"設定を読み込み中です。しばらくしてから再度開いてください。"
+		}
+		"L4D2ScriptedHUD_HUD1"
+		{
+			"jp"		"HUD 1：進行度 / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_HUD2"
+		{
+			"jp"		"HUD 2：サーバー状態"
+		}
+		"L4D2ScriptedHUD_HUD3"
+		{
+			"jp"		"HUD 3：生存者状態"
+		}
+		"L4D2ScriptedHUD_HUD4"
+		{
+			"jp"		"HUD 4：カスタムテキスト"
+		}
+		"L4D2ScriptedHUD_HUD2Parts"
+		{
+			"jp"		"HUD 2 の表示項目"
+		}
+		"L4D2ScriptedHUD_HUD2PartsTitle"
+		{
+			"jp"		"HUD 2 の表示項目"
+		}
+		"L4D2ScriptedHUD_Reset"
+		{
+			"jp"		"既定値に戻す"
+		}
+		"L4D2ScriptedHUD_PartServerName"
+		{
+			"jp"		"サーバー名"
+		}
+		"L4D2ScriptedHUD_PartMode"
+		{
+			"jp"		"ゲームモード"
+		}
+		"L4D2ScriptedHUD_PartAIDifficulty"
+		{
+			"jp"		"AI 難易度"
+		}
+		"L4D2ScriptedHUD_PartMissingPlayers"
+		{
+			"jp"		"不足プレイヤー"
+		}
+		"L4D2ScriptedHUD_PartMod"
+		{
+			"jp"		"MOD 状態"
+		}
+		"L4D2ScriptedHUD_PartInfectedTiming"
+		{
+			"jp"		"特殊感染者数 / 間隔"
+		}
+		"L4D2ScriptedHUD_PartPlayerCount"
+		{
+			"jp"		"プレイヤー数"
+		}
+		"L4D2ScriptedHUD_LayoutPreset"
+		{
+			"jp"		"画面レイアウト"
+		}
+		"L4D2ScriptedHUD_LayoutPresetTitle"
+		{
+			"jp"		"画面レイアウト"
+		}
+		"L4D2ScriptedHUD_LayoutStandard"
+		{
+			"jp"		"標準（16:9）"
+		}
+		"L4D2ScriptedHUD_Layout4x3"
+		{
+			"jp"		"コンパクト（4:3）"
+		}
+		"L4D2ScriptedHUD_LayoutUltrawide"
+		{
+			"jp"		"ウルトラワイド安全領域"
+		}
 	}

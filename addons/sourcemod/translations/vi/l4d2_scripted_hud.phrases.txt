@@ -4,25 +4,88 @@
 		{
 			"vi"		"{green}[Đã tải lại văn bản HUD từ tệp dữ liệu]"
 		}
-		"L4D2ScriptedHUD_PrefsTitle" { "vi" "Cài đặt hiển thị HUD" }
-		"L4D2ScriptedHUD_PrefsLoading" { "vi" "Đang tải tùy chọn. Hãy mở lại menu sau giây lát." }
-		"L4D2ScriptedHUD_HUD1" { "vi" "HUD 1: tiến độ / Tank / Witch" }
-		"L4D2ScriptedHUD_HUD2" { "vi" "HUD 2: trạng thái máy chủ" }
-		"L4D2ScriptedHUD_HUD3" { "vi" "HUD 3: trạng thái người sống sót" }
-		"L4D2ScriptedHUD_HUD4" { "vi" "HUD 4: văn bản tùy chỉnh" }
-		"L4D2ScriptedHUD_HUD2Parts" { "vi" "Cấu hình trường HUD 2" }
-		"L4D2ScriptedHUD_HUD2PartsTitle" { "vi" "Các trường HUD 2" }
-		"L4D2ScriptedHUD_Reset" { "vi" "Khôi phục mặc định" }
-		"L4D2ScriptedHUD_PartServerName" { "vi" "Tên máy chủ" }
-		"L4D2ScriptedHUD_PartMode" { "vi" "Chế độ chơi" }
-		"L4D2ScriptedHUD_PartAIDifficulty" { "vi" "Độ khó AI" }
-		"L4D2ScriptedHUD_PartMissingPlayers" { "vi" "Thiếu người chơi" }
-		"L4D2ScriptedHUD_PartMod" { "vi" "Trạng thái MOD" }
-		"L4D2ScriptedHUD_PartInfectedTiming" { "vi" "Số lượng / thời gian infected đặc biệt" }
-		"L4D2ScriptedHUD_PartPlayerCount" { "vi" "Số người chơi" }
-		"L4D2ScriptedHUD_LayoutPreset" { "vi" "Bố cục màn hình" }
-		"L4D2ScriptedHUD_LayoutPresetTitle" { "vi" "Bố cục màn hình" }
-		"L4D2ScriptedHUD_LayoutStandard" { "vi" "Tiêu chuẩn (16:9)" }
-		"L4D2ScriptedHUD_Layout4x3" { "vi" "Thu gọn (4:3)" }
-		"L4D2ScriptedHUD_LayoutUltrawide" { "vi" "Vùng an toàn siêu rộng" }
+		"L4D2ScriptedHUD_PrefsTitle"
+		{
+			"vi"		"Cài đặt hiển thị HUD"
+		}
+		"L4D2ScriptedHUD_PrefsLoading"
+		{
+			"vi"		"Đang tải tùy chọn. Hãy mở lại menu sau giây lát."
+		}
+		"L4D2ScriptedHUD_HUD1"
+		{
+			"vi"		"HUD 1: tiến độ / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_HUD2"
+		{
+			"vi"		"HUD 2: trạng thái máy chủ"
+		}
+		"L4D2ScriptedHUD_HUD3"
+		{
+			"vi"		"HUD 3: trạng thái người sống sót"
+		}
+		"L4D2ScriptedHUD_HUD4"
+		{
+			"vi"		"HUD 4: văn bản tùy chỉnh"
+		}
+		"L4D2ScriptedHUD_HUD2Parts"
+		{
+			"vi"		"Cấu hình trường HUD 2"
+		}
+		"L4D2ScriptedHUD_HUD2PartsTitle"
+		{
+			"vi"		"Các trường HUD 2"
+		}
+		"L4D2ScriptedHUD_Reset"
+		{
+			"vi"		"Khôi phục mặc định"
+		}
+		"L4D2ScriptedHUD_PartServerName"
+		{
+			"vi"		"Tên máy chủ"
+		}
+		"L4D2ScriptedHUD_PartMode"
+		{
+			"vi"		"Chế độ chơi"
+		}
+		"L4D2ScriptedHUD_PartAIDifficulty"
+		{
+			"vi"		"Độ khó AI"
+		}
+		"L4D2ScriptedHUD_PartMissingPlayers"
+		{
+			"vi"		"Thiếu người chơi"
+		}
+		"L4D2ScriptedHUD_PartMod"
+		{
+			"vi"		"Trạng thái MOD"
+		}
+		"L4D2ScriptedHUD_PartInfectedTiming"
+		{
+			"vi"		"Số lượng / thời gian infected đặc biệt"
+		}
+		"L4D2ScriptedHUD_PartPlayerCount"
+		{
+			"vi"		"Số người chơi"
+		}
+		"L4D2ScriptedHUD_LayoutPreset"
+		{
+			"vi"		"Bố cục màn hình"
+		}
+		"L4D2ScriptedHUD_LayoutPresetTitle"
+		{
+			"vi"		"Bố cục màn hình"
+		}
+		"L4D2ScriptedHUD_LayoutStandard"
+		{
+			"vi"		"Tiêu chuẩn (16:9)"
+		}
+		"L4D2ScriptedHUD_Layout4x3"
+		{
+			"vi"		"Thu gọn (4:3)"
+		}
+		"L4D2ScriptedHUD_LayoutUltrawide"
+		{
+			"vi"		"Vùng an toàn siêu rộng"
+		}
 	}

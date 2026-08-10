@@ -4,25 +4,88 @@
 		{
 			"ko"		"{green}[데이터 파일의 HUD 텍스트가 다시 로드됨]"
 		}
-		"L4D2ScriptedHUD_PrefsTitle" { "ko" "HUD 표시 설정" }
-		"L4D2ScriptedHUD_PrefsLoading" { "ko" "설정을 불러오는 중입니다. 잠시 후 메뉴를 다시 여세요." }
-		"L4D2ScriptedHUD_HUD1" { "ko" "HUD 1: 진행도 / Tank / Witch" }
-		"L4D2ScriptedHUD_HUD2" { "ko" "HUD 2: 서버 상태" }
-		"L4D2ScriptedHUD_HUD3" { "ko" "HUD 3: 생존자 상태" }
-		"L4D2ScriptedHUD_HUD4" { "ko" "HUD 4: 사용자 지정 텍스트" }
-		"L4D2ScriptedHUD_HUD2Parts" { "ko" "HUD 2 표시 항목 설정" }
-		"L4D2ScriptedHUD_HUD2PartsTitle" { "ko" "HUD 2 표시 항목" }
-		"L4D2ScriptedHUD_Reset" { "ko" "기본값으로 재설정" }
-		"L4D2ScriptedHUD_PartServerName" { "ko" "서버 이름" }
-		"L4D2ScriptedHUD_PartMode" { "ko" "게임 모드" }
-		"L4D2ScriptedHUD_PartAIDifficulty" { "ko" "AI 난이도" }
-		"L4D2ScriptedHUD_PartMissingPlayers" { "ko" "부족 인원" }
-		"L4D2ScriptedHUD_PartMod" { "ko" "MOD 상태" }
-		"L4D2ScriptedHUD_PartInfectedTiming" { "ko" "특수 감염자 수 / 간격" }
-		"L4D2ScriptedHUD_PartPlayerCount" { "ko" "플레이어 수" }
-		"L4D2ScriptedHUD_LayoutPreset" { "ko" "화면 레이아웃" }
-		"L4D2ScriptedHUD_LayoutPresetTitle" { "ko" "화면 레이아웃" }
-		"L4D2ScriptedHUD_LayoutStandard" { "ko" "표준 (16:9)" }
-		"L4D2ScriptedHUD_Layout4x3" { "ko" "컴팩트 (4:3)" }
-		"L4D2ScriptedHUD_LayoutUltrawide" { "ko" "울트라와이드 안전 영역" }
+		"L4D2ScriptedHUD_PrefsTitle"
+		{
+			"ko"		"HUD 표시 설정"
+		}
+		"L4D2ScriptedHUD_PrefsLoading"
+		{
+			"ko"		"설정을 불러오는 중입니다. 잠시 후 메뉴를 다시 여세요."
+		}
+		"L4D2ScriptedHUD_HUD1"
+		{
+			"ko"		"HUD 1: 진행도 / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_HUD2"
+		{
+			"ko"		"HUD 2: 서버 상태"
+		}
+		"L4D2ScriptedHUD_HUD3"
+		{
+			"ko"		"HUD 3: 생존자 상태"
+		}
+		"L4D2ScriptedHUD_HUD4"
+		{
+			"ko"		"HUD 4: 사용자 지정 텍스트"
+		}
+		"L4D2ScriptedHUD_HUD2Parts"
+		{
+			"ko"		"HUD 2 표시 항목 설정"
+		}
+		"L4D2ScriptedHUD_HUD2PartsTitle"
+		{
+			"ko"		"HUD 2 표시 항목"
+		}
+		"L4D2ScriptedHUD_Reset"
+		{
+			"ko"		"기본값으로 재설정"
+		}
+		"L4D2ScriptedHUD_PartServerName"
+		{
+			"ko"		"서버 이름"
+		}
+		"L4D2ScriptedHUD_PartMode"
+		{
+			"ko"		"게임 모드"
+		}
+		"L4D2ScriptedHUD_PartAIDifficulty"
+		{
+			"ko"		"AI 난이도"
+		}
+		"L4D2ScriptedHUD_PartMissingPlayers"
+		{
+			"ko"		"부족 인원"
+		}
+		"L4D2ScriptedHUD_PartMod"
+		{
+			"ko"		"MOD 상태"
+		}
+		"L4D2ScriptedHUD_PartInfectedTiming"
+		{
+			"ko"		"특수 감염자 수 / 간격"
+		}
+		"L4D2ScriptedHUD_PartPlayerCount"
+		{
+			"ko"		"플레이어 수"
+		}
+		"L4D2ScriptedHUD_LayoutPreset"
+		{
+			"ko"		"화면 레이아웃"
+		}
+		"L4D2ScriptedHUD_LayoutPresetTitle"
+		{
+			"ko"		"화면 레이아웃"
+		}
+		"L4D2ScriptedHUD_LayoutStandard"
+		{
+			"ko"		"표준 (16:9)"
+		}
+		"L4D2ScriptedHUD_Layout4x3"
+		{
+			"ko"		"컴팩트 (4:3)"
+		}
+		"L4D2ScriptedHUD_LayoutUltrawide"
+		{
+			"ko"		"울트라와이드 안전 영역"
+		}
 	}

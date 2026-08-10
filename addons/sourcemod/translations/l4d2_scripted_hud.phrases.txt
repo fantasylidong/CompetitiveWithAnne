@@ -4,25 +4,88 @@
 		{
 			"en"		"{green}[HUD texts from data file reloaded]"
 		}
-		"L4D2ScriptedHUD_PrefsTitle" { "en" "HUD display settings" }
-		"L4D2ScriptedHUD_PrefsLoading" { "en" "Preferences are loading. Reopen this menu shortly." }
-		"L4D2ScriptedHUD_HUD1" { "en" "HUD 1: progress / Tank / Witch" }
-		"L4D2ScriptedHUD_HUD2" { "en" "HUD 2: server status" }
-		"L4D2ScriptedHUD_HUD3" { "en" "HUD 3: survivor status" }
-		"L4D2ScriptedHUD_HUD4" { "en" "HUD 4: custom text" }
-		"L4D2ScriptedHUD_HUD2Parts" { "en" "Configure HUD 2 fields" }
-		"L4D2ScriptedHUD_HUD2PartsTitle" { "en" "HUD 2 fields" }
-		"L4D2ScriptedHUD_Reset" { "en" "Reset to defaults" }
-		"L4D2ScriptedHUD_PartServerName" { "en" "Server name" }
-		"L4D2ScriptedHUD_PartMode" { "en" "Game mode" }
-		"L4D2ScriptedHUD_PartAIDifficulty" { "en" "AI difficulty" }
-		"L4D2ScriptedHUD_PartMissingPlayers" { "en" "Missing players" }
-		"L4D2ScriptedHUD_PartMod" { "en" "MOD status" }
-		"L4D2ScriptedHUD_PartInfectedTiming" { "en" "Special infected count / interval" }
-		"L4D2ScriptedHUD_PartPlayerCount" { "en" "Player count" }
-		"L4D2ScriptedHUD_LayoutPreset" { "en" "Screen layout" }
-		"L4D2ScriptedHUD_LayoutPresetTitle" { "en" "Screen layout" }
-		"L4D2ScriptedHUD_LayoutStandard" { "en" "Standard (16:9)" }
-		"L4D2ScriptedHUD_Layout4x3" { "en" "Compact (4:3)" }
-		"L4D2ScriptedHUD_LayoutUltrawide" { "en" "Ultrawide safe area" }
+		"L4D2ScriptedHUD_PrefsTitle"
+		{
+			"en"		"HUD display settings"
+		}
+		"L4D2ScriptedHUD_PrefsLoading"
+		{
+			"en"		"Preferences are loading. Reopen this menu shortly."
+		}
+		"L4D2ScriptedHUD_HUD1"
+		{
+			"en"		"HUD 1: progress / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_HUD2"
+		{
+			"en"		"HUD 2: server status"
+		}
+		"L4D2ScriptedHUD_HUD3"
+		{
+			"en"		"HUD 3: survivor status"
+		}
+		"L4D2ScriptedHUD_HUD4"
+		{
+			"en"		"HUD 4: custom text"
+		}
+		"L4D2ScriptedHUD_HUD2Parts"
+		{
+			"en"		"Configure HUD 2 fields"
+		}
+		"L4D2ScriptedHUD_HUD2PartsTitle"
+		{
+			"en"		"HUD 2 fields"
+		}
+		"L4D2ScriptedHUD_Reset"
+		{
+			"en"		"Reset to defaults"
+		}
+		"L4D2ScriptedHUD_PartServerName"
+		{
+			"en"		"Server name"
+		}
+		"L4D2ScriptedHUD_PartMode"
+		{
+			"en"		"Game mode"
+		}
+		"L4D2ScriptedHUD_PartAIDifficulty"
+		{
+			"en"		"AI difficulty"
+		}
+		"L4D2ScriptedHUD_PartMissingPlayers"
+		{
+			"en"		"Missing players"
+		}
+		"L4D2ScriptedHUD_PartMod"
+		{
+			"en"		"MOD status"
+		}
+		"L4D2ScriptedHUD_PartInfectedTiming"
+		{
+			"en"		"Special infected count / interval"
+		}
+		"L4D2ScriptedHUD_PartPlayerCount"
+		{
+			"en"		"Player count"
+		}
+		"L4D2ScriptedHUD_LayoutPreset"
+		{
+			"en"		"Screen layout"
+		}
+		"L4D2ScriptedHUD_LayoutPresetTitle"
+		{
+			"en"		"Screen layout"
+		}
+		"L4D2ScriptedHUD_LayoutStandard"
+		{
+			"en"		"Standard (16:9)"
+		}
+		"L4D2ScriptedHUD_Layout4x3"
+		{
+			"en"		"Compact (4:3)"
+		}
+		"L4D2ScriptedHUD_LayoutUltrawide"
+		{
+			"en"		"Ultrawide safe area"
+		}
 	}
