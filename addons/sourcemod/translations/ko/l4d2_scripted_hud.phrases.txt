@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "ko" "MOD 상태" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "ko" "특수 감염자 수 / 간격" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "ko" "플레이어 수" }
+		"L4D2ScriptedHUD_LayoutPreset" { "ko" "화면 레이아웃" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "ko" "화면 레이아웃" }
+		"L4D2ScriptedHUD_LayoutStandard" { "ko" "표준 (16:9)" }
+		"L4D2ScriptedHUD_Layout4x3" { "ko" "컴팩트 (4:3)" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "ko" "울트라와이드 안전 영역" }
 	}

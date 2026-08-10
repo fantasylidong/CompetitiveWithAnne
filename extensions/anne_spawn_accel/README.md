@@ -27,7 +27,8 @@ idle and every 0.1 second during the final second before a wave or while spawn w
 accept results for at most 0.2 seconds. `NavAreaBuildPath` remains only a precision fallback when the graph
 is genuinely unavailable/incomplete or a random point is too close to a path-distance boundary. The main
 thread monitors the `TheNavAreas` identity and all live floor connections and ladder endpoints; resolved
-`func_elevator` origin, velocity, and toggle state additionally prevent capture while a lift is moving.
+`func_elevator` origin, velocity, and toggle state additionally prevent capture and live-edge traversal
+while a lift is moving. Edge polling resumes after the mechanism stops.
 This result-based topology watch also covers ferries, platforms, scripted relays, custom-map mechanisms,
 or any other entity that actually rewires `CNavArea`, without maintaining a fragile classname list.
 Polling is throttled to 1.0 second while idle and 0.1 second near spawn work. Each poll checks at most

@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "en" "MOD status" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "en" "Special infected count / interval" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "en" "Player count" }
+		"L4D2ScriptedHUD_LayoutPreset" { "en" "Screen layout" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "en" "Screen layout" }
+		"L4D2ScriptedHUD_LayoutStandard" { "en" "Standard (16:9)" }
+		"L4D2ScriptedHUD_Layout4x3" { "en" "Compact (4:3)" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "en" "Ultrawide safe area" }
 	}

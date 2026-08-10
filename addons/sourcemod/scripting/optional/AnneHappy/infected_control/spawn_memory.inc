@@ -3,6 +3,132 @@
 #endif
 #define _infected_control_spawn_memory_included
 
+enum PendingSpawnReservationField
+{
+    PendingReservation_Token = 0,
+    PendingReservation_NavId,
+    PendingReservation_AreaIdx,
+    PendingReservation_PosX,
+    PendingReservation_PosY,
+    PendingReservation_PosZ,
+    PendingReservation_ExpiresAt,
+    PendingReservation_FieldCount
+}
+
+static ArrayList g_PendingSpawnReservations = null;
+static int g_iNextPendingSpawnReservationToken = 1;
+
+static void CleanupPendingSpawnReservations(float now)
+{
+    if (g_PendingSpawnReservations == null)
+        return;
+
+    for (int i = g_PendingSpawnReservations.Length - 1; i >= 0; i--)
+    {
+        float expiresAt = view_as<float>(g_PendingSpawnReservations.Get(
+            i, PendingReservation_ExpiresAt));
+        if (now >= expiresAt)
+            g_PendingSpawnReservations.Erase(i);
+    }
+}
+
+stock int ReservePendingSpawn(int areaIdx, const float pos[3])
+{
+    if (g_PendingSpawnReservations == null)
+    {
+        g_PendingSpawnReservations = new ArrayList(
+            view_as<int>(PendingReservation_FieldCount));
+    }
+
+    float now = GetGameTime();
+    CleanupPendingSpawnReservations(now);
+
+    int token = g_iNextPendingSpawnReservationToken++;
+    if (g_iNextPendingSpawnReservationToken <= 0)
+        g_iNextPendingSpawnReservationToken = 1;
+
+    int reservation[PendingReservation_FieldCount];
+    reservation[PendingReservation_Token] = token;
+    reservation[PendingReservation_NavId] = GetNavIDByIndex(areaIdx);
+    reservation[PendingReservation_AreaIdx] = areaIdx;
+    reservation[PendingReservation_PosX] = view_as<int>(pos[0]);
+    reservation[PendingReservation_PosY] = view_as<int>(pos[1]);
+    reservation[PendingReservation_PosZ] = view_as<int>(pos[2]);
+    reservation[PendingReservation_ExpiresAt] = view_as<int>(
+        now + PENDING_RESERVATION_TTL);
+    g_PendingSpawnReservations.PushArray(reservation);
+    return token;
+}
+
+stock void ReleasePendingSpawnReservation(int token)
+{
+    if (token <= 0 || g_PendingSpawnReservations == null)
+        return;
+
+    for (int i = g_PendingSpawnReservations.Length - 1; i >= 0; i--)
+    {
+        if (g_PendingSpawnReservations.Get(i, PendingReservation_Token) == token)
+        {
+            g_PendingSpawnReservations.Erase(i);
+            return;
+        }
+    }
+}
+
+stock void ClearPendingSpawnReservations()
+{
+    if (g_PendingSpawnReservations != null)
+        g_PendingSpawnReservations.Clear();
+}
+
+static float PendingSpawnLimitScale()
+{
+    // 复用现有 SI 上限缩放趋势，但 pending 只从 1.0 缓降至 0.8，
+    // 避免 12 特时直接落到正式刷点记忆的约 0.63 倍。
+    return 0.60 + 0.40 * PenLimitScale();
+}
+
+stock bool PassPendingSpawnSeparation(int areaIdx, const float pos[3],
+                                      bool &sameNavBlocked)
+{
+    sameNavBlocked = false;
+    if (g_PendingSpawnReservations == null
+        || g_PendingSpawnReservations.Length == 0)
+    {
+        return true;
+    }
+
+    CleanupPendingSpawnReservations(GetGameTime());
+    int navId = GetNavIDByIndex(areaIdx);
+    float limitScale = PendingSpawnLimitScale();
+    float nearbyRadius = PENDING_SEP_RADIUS * limitScale;
+    float sameNavRadius = PENDING_SAME_NAV_RADIUS;
+    for (int i = g_PendingSpawnReservations.Length - 1; i >= 0; i--)
+    {
+        int reservedNavId = g_PendingSpawnReservations.Get(
+            i, PendingReservation_NavId);
+        bool sameNav = (navId > 0 && reservedNavId == navId)
+            || (navId <= 0 && reservedNavId <= 0
+                && g_PendingSpawnReservations.Get(
+                    i, PendingReservation_AreaIdx) == areaIdx);
+        float minDistance = sameNav ? sameNavRadius : nearbyRadius;
+        float reservedPos[3];
+        reservedPos[0] = view_as<float>(g_PendingSpawnReservations.Get(
+            i, PendingReservation_PosX));
+        reservedPos[1] = view_as<float>(g_PendingSpawnReservations.Get(
+            i, PendingReservation_PosY));
+        reservedPos[2] = view_as<float>(g_PendingSpawnReservations.Get(
+            i, PendingReservation_PosZ));
+        if (GetVectorDistance(pos, reservedPos, true)
+            < minDistance * minDistance)
+        {
+            sameNavBlocked = sameNav;
+            return false;
+        }
+    }
+    return true;
+}
+
 void EnsureNavCooldownSlots()
 {
     EnsureNavAreasCache();

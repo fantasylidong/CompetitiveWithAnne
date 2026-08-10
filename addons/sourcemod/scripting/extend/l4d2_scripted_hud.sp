@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for up to 4 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.1.0"
+#define PLUGIN_VERSION                "1.1.1"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -103,6 +103,17 @@ public Plugin myinfo =
 #define HUD_PREFS_DB_CONFIG           "rpg"
 #define HUD_PREFS_DB_TABLE            "scripted_hud_prefs"
 #define HUD_PREFS_COOKIE              "l4d2_scripted_hud_prefs_v1"
+
+#define HUD_LAYOUT_STANDARD           0
+#define HUD_LAYOUT_4_3                1
+#define HUD_LAYOUT_ULTRAWIDE          2
+#define HUD_LAYOUT_MAX                HUD_LAYOUT_ULTRAWIDE
+
+#define HUD_PROXY_FLAGS               0
+#define HUD_PROXY_STRING              1
+#define HUD_PROXY_POS_X               2
+#define HUD_PROXY_WIDTH               3
+#define HUD_PROXY_COUNT               4
 
 #define HUD_TEAM_ALL                  0
 #define HUD_TEAM_SURVIVOR             1
@@ -277,7 +288,7 @@ static bool   g_bData_HUD3_Text;
 static bool   g_bData_HUD4_Text;
 bool g_bWitchAndTankSystemAvailable = false;
 static bool g_bLateLoad;
-static bool g_bHUDProxyHooked[4][2];
+static bool g_bHUDProxyHooked[4][HUD_PROXY_COUNT];
 static bool g_bHUDResetPending[4];
 static bool g_bHUDPrefsDatabaseReady;
 static bool g_bHUDPrefsDatabaseConnecting;
@@ -312,6 +323,7 @@ static int    g_iHUD3Flags;
 static int    g_iHUD4Flags;
 static int    g_iClientHUDMask[MAXPLAYERS + 1];
 static int    g_iClientHUD2Mask[MAXPLAYERS + 1];
+static int    g_iClientHUDLayout[MAXPLAYERS + 1];
 static int    g_iClientHUDRevision[MAXPLAYERS + 1];
 
 // ====================================================================================================
@@ -387,7 +399,7 @@ static char   g_sHUD_TextArray[4][128];
 static char   g_sBuffer[128];
 static char   g_sSpaces[128] = "                                                                                                                               ";
 static char   g_sClientHUDText[MAXPLAYERS + 1][4][128];
-static char   g_sClientHUDCookie[MAXPLAYERS + 1][32];
+static char   g_sClientHUDCookie[MAXPLAYERS + 1][64];
 static char   g_sHUD2Fragments[7][64];
 static char   g_sBaseServerName[64];
 
@@ -1734,13 +1746,22 @@ void HookHUDSendProxies()
 {
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
-        if (!g_bHUDProxyHooked[hud][0])
-            g_bHUDProxyHooked[hud][0] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUDFlags, hud);
+        if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+            g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUDFlags, hud);
 
-        if (!g_bHUDProxyHooked[hud][1])
-            g_bHUDProxyHooked[hud][1] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUDString, hud);
+        if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+            g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUDString, hud);
 
-        if (!g_bHUDProxyHooked[hud][0] || !g_bHUDProxyHooked[hud][1])
+        if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+            g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUDLayout, hud);
+
+        if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+            g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUDLayout, hud);
+
+        if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]
+            || !g_bHUDProxyHooked[hud][HUD_PROXY_STRING]
+            || !g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]
+            || !g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
             LogError("[Scripted HUD] Failed to hook SendProxy for HUD slot %d.", hud + 1);
     }
 }
@@ -1749,13 +1770,17 @@ void UnhookHUDSendProxies()
 {
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
-        if (g_bHUDProxyHooked[hud][0])
+        if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
             SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUDFlags, hud);
-        if (g_bHUDProxyHooked[hud][1])
+        if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
             SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUDString, hud);
+        if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+            SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUDLayout, hud);
+        if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+            SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUDLayout, hud);
 
-        g_bHUDProxyHooked[hud][0] = false;
-        g_bHUDProxyHooked[hud][1] = false;
+        for (int proxy = 0; proxy < HUD_PROXY_COUNT; proxy++)
+            g_bHUDProxyHooked[hud][proxy] = false;
     }
 }
 
@@ -1787,6 +1812,35 @@ public Action ProxyHUDString(const char[] prop, char[] value, int maxlength, int
         return Plugin_Continue;
 
     strcopy(value, maxlength, g_sClientHUDText[client][element]);
+    return Plugin_Changed;
+}
+
+public Action ProxyHUDLayout(const char[] prop, float &value, int element, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+        return Plugin_Continue;
+
+    int layout = g_iClientHUDLayout[client];
+    float horizontalScale;
+    switch (layout)
+    {
+        case HUD_LAYOUT_4_3: horizontalScale = 0.75;
+        case HUD_LAYOUT_ULTRAWIDE: horizontalScale = 0.76;
+        default: return Plugin_Continue;
+    }
+
+    if (StrEqual(prop, "m_fScriptedHUDPosX"))
+    {
+        if (layout == HUD_LAYOUT_4_3)
+            value *= horizontalScale;
+        else
+            value = 0.5 + ((value - 0.5) * horizontalScale);
+    }
+    else if (StrEqual(prop, "m_fScriptedHUDWidth"))
+        value *= horizontalScale;
+    else
+        return Plugin_Continue;
+
     return Plugin_Changed;
 }
 
@@ -2019,6 +2073,7 @@ void ResetHUDPrefsClient(int client)
 {
     g_iClientHUDMask[client] = HUD_SLOT_DEFAULT_MASK;
     g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
+    g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
     g_iClientHUDRevision[client] = 0;
     g_eHUDPrefsLoadState[client] = HUDPrefs_None;
     g_bClientHasCookie[client] = false;
@@ -2085,14 +2140,14 @@ void ReadHUDPrefsCookie(int client)
     g_bClientHasCookie[client] = (g_sClientHUDCookie[client][0] != '\0');
 }
 
-bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &savedAt)
+bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision, int &layout)
 {
     if (!g_bClientHasCookie[client])
         return false;
 
-    char parts[3][16];
+    char parts[5][16];
     int count = ExplodeString(g_sClientHUDCookie[client], "|", parts, sizeof(parts), sizeof(parts[]));
-    if ((count != 2 && count != 3) || parts[0][0] == '\0' || parts[1][0] == '\0')
+    if ((count < 2 || count > 4) || parts[0][0] == '\0' || parts[1][0] == '\0')
         return false;
 
     int consumed = StringToIntEx(parts[0], hudMask);
@@ -2103,13 +2158,23 @@ bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &savedAt)
     if (consumed <= 0 || consumed != strlen(parts[1]) || hud2Mask < 0 || hud2Mask > HUD2_PART_ALL_MASK)
         return false;
 
-    savedAt = 0;
-    if (count == 3)
+    revision = 0;
+    if (count >= 3)
     {
         if (parts[2][0] == '\0')
             return false;
-        consumed = StringToIntEx(parts[2], savedAt);
-        if (consumed <= 0 || consumed != strlen(parts[2]) || savedAt < 0)
+        consumed = StringToIntEx(parts[2], revision);
+        if (consumed <= 0 || consumed != strlen(parts[2]) || revision < 0)
+            return false;
+    }
+
+    layout = HUD_LAYOUT_STANDARD;
+    if (count == 4)
+    {
+        if (parts[3][0] == '\0')
+            return false;
+        consumed = StringToIntEx(parts[3], layout);
+        if (consumed <= 0 || consumed != strlen(parts[3]) || layout < HUD_LAYOUT_STANDARD || layout > HUD_LAYOUT_MAX)
             return false;
     }
 
@@ -2120,13 +2185,15 @@ bool ApplyHUDPrefsCookie(int client)
 {
     int hudMask;
     int hud2Mask;
-    int savedAt;
-    if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, savedAt))
+    int revision;
+    int layout;
+    if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, revision, layout))
         return false;
 
     g_iClientHUDMask[client] = hudMask;
     g_iClientHUD2Mask[client] = hud2Mask;
-    g_iClientHUDRevision[client] = savedAt;
+    g_iClientHUDLayout[client] = layout;
+    g_iClientHUDRevision[client] = revision;
     return true;
 }
 
@@ -2135,8 +2202,8 @@ void SaveHUDPrefsCookie(int client)
     if (g_hHUDPrefsCookie == null || IsFakeClient(client))
         return;
 
-    char value[32];
-    FormatEx(value, sizeof(value), "%d|%d|%d", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client]);
+    char value[64];
+    FormatEx(value, sizeof(value), "%d|%d|%d|%d", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client], g_iClientHUDLayout[client]);
     g_hHUDPrefsCookie.Set(client, value);
 }
 
@@ -2168,12 +2235,13 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
     g_hHUDPrefsDatabase = database;
     SQL_SetCharset(g_hHUDPrefsDatabase, "utf8mb4");
 
-    char query[512];
+    char query[768];
     FormatEx(query, sizeof(query),
         "CREATE TABLE IF NOT EXISTS `%s` ("
         ... "`steamid` varchar(64) NOT NULL,"
         ... "`hud_mask` tinyint unsigned NOT NULL DEFAULT 3,"
         ... "`hud2_mask` tinyint unsigned NOT NULL DEFAULT 127,"
+        ... "`layout_preset` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`revision` int unsigned NOT NULL DEFAULT 0,"
         ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
         ... "PRIMARY KEY (`steamid`)"
@@ -2239,7 +2307,7 @@ void LoadHUDPrefs(int client)
 
     char query[256];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "SELECT `hud_mask`,`hud2_mask`,`revision` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
+        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
     g_eHUDPrefsLoadState[client] = HUDPrefs_DatabasePending;
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_LoadHUDPrefs, query, GetClientUserId(client));
 }
@@ -2262,15 +2330,20 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
     {
         int databaseHUDMask = SQL_FetchInt(results, 0) & HUD_SLOT_ALL_MASK;
         int databaseHUD2Mask = SQL_FetchInt(results, 1) & HUD2_PART_ALL_MASK;
-        int databaseRevision = SQL_FetchInt(results, 2);
+        int databaseLayout = SQL_FetchInt(results, 2);
+        if (databaseLayout < HUD_LAYOUT_STANDARD || databaseLayout > HUD_LAYOUT_MAX)
+            databaseLayout = HUD_LAYOUT_STANDARD;
+        int databaseRevision = SQL_FetchInt(results, 3);
         int cookieHUDMask;
         int cookieHUD2Mask;
         int cookieRevision;
+        int cookieLayout;
 
-        if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision) && cookieRevision > databaseRevision)
+        if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision, cookieLayout) && cookieRevision > databaseRevision)
         {
             g_iClientHUDMask[client] = cookieHUDMask;
             g_iClientHUD2Mask[client] = cookieHUD2Mask;
+            g_iClientHUDLayout[client] = cookieLayout;
             g_iClientHUDRevision[client] = cookieRevision;
             g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
             SaveHUDPrefs(client, false);
@@ -2279,6 +2352,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
 
         g_iClientHUDMask[client] = databaseHUDMask;
         g_iClientHUD2Mask[client] = databaseHUD2Mask;
+        g_iClientHUDLayout[client] = databaseLayout;
         g_iClientHUDRevision[client] = databaseRevision;
         g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
         SaveHUDPrefsCookie(client);
@@ -2297,6 +2371,8 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
 
     g_iClientHUDMask[client] &= HUD_SLOT_ALL_MASK;
     g_iClientHUD2Mask[client] &= HUD2_PART_ALL_MASK;
+    if (g_iClientHUDLayout[client] < HUD_LAYOUT_STANDARD || g_iClientHUDLayout[client] > HUD_LAYOUT_MAX)
+        g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
     if (bumpRevision && g_iClientHUDRevision[client] < 2147483647)
         g_iClientHUDRevision[client]++;
     SaveHUDPrefsCookie(client);
@@ -2308,14 +2384,15 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
     if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)) || StrEqual(steamId, "BOT"))
         return;
 
-    char query[512];
+    char query[768];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`revision`) VALUES ('%s',%d,%d,%d) "
+        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`revision`) VALUES ('%s',%d,%d,%d,%d) "
         ... "ON DUPLICATE KEY UPDATE "
         ... "`hud_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud_mask`),`hud_mask`),"
         ... "`hud2_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud2_mask`),`hud2_mask`),"
+        ... "`layout_preset`=IF(VALUES(`revision`)>=`revision`,VALUES(`layout_preset`),`layout_preset`),"
         ... "`revision`=GREATEST(`revision`,VALUES(`revision`))",
-        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client]);
+        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDRevision[client]);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_SaveHUDPrefs, query);
 }
 
@@ -2363,6 +2440,8 @@ void OpenHUDPrefsMenu(int client)
     AddHUDToggleItem(menu, client, "hud3", "L4D2ScriptedHUD_HUD3", (g_iClientHUDMask[client] & (1 << HUD3)) != 0);
     AddHUDToggleItem(menu, client, "hud4", "L4D2ScriptedHUD_HUD4", (g_iClientHUDMask[client] & (1 << HUD4)) != 0);
 
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_LayoutPreset", client);
+    menu.AddItem("layout", text);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_HUD2Parts", client);
     menu.AddItem("hud2_parts", text);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_Reset", client);
@@ -2383,6 +2462,11 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
     char key[32];
     menu.GetItem(item, key, sizeof(key));
 
+    if (StrEqual(key, "layout"))
+    {
+        OpenHUDLayoutMenu(client);
+        return 0;
+    }
     if (StrEqual(key, "hud2_parts"))
     {
         OpenHUD2PartsMenu(client);
@@ -2392,6 +2476,7 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
     {
         g_iClientHUDMask[client] = HUD_SLOT_DEFAULT_MASK;
         g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
+        g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
     }
     else if (strncmp(key, "hud", 3) == 0)
     {
@@ -2402,6 +2487,49 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
 
     SaveHUDPrefs(client);
     OpenHUDPrefsMenu(client);
+    return 0;
+}
+
+void OpenHUDLayoutMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_HUDLayout);
+    char text[128];
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_LayoutPresetTitle", client);
+    menu.SetTitle(text);
+    menu.ExitBackButton = true;
+
+    AddHUDToggleItem(menu, client, "layout0", "L4D2ScriptedHUD_LayoutStandard", g_iClientHUDLayout[client] == HUD_LAYOUT_STANDARD);
+    AddHUDToggleItem(menu, client, "layout1", "L4D2ScriptedHUD_Layout4x3", g_iClientHUDLayout[client] == HUD_LAYOUT_4_3);
+    AddHUDToggleItem(menu, client, "layout2", "L4D2ScriptedHUD_LayoutUltrawide", g_iClientHUDLayout[client] == HUD_LAYOUT_ULTRAWIDE);
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUDLayout(Menu menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsValidClient(client))
+    {
+        OpenHUDPrefsMenu(client);
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    char key[16];
+    menu.GetItem(item, key, sizeof(key));
+    if (strncmp(key, "layout", 6) == 0)
+    {
+        int layout = StringToInt(key[6]);
+        if (layout >= HUD_LAYOUT_STANDARD && layout <= HUD_LAYOUT_MAX)
+            g_iClientHUDLayout[client] = layout;
+    }
+
+    SaveHUDPrefs(client);
+    OpenHUDLayoutMenu(client);
     return 0;
 }
 

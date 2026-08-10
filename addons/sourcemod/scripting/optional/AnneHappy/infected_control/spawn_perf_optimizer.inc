@@ -13,7 +13,7 @@
 // ==================== 性能统计 ====================
 #define SPAWN_PERF_GROUP_COUNT       5
 #define SPAWN_PERF_TIMING_COUNT      3
-#define SPAWN_PERF_FILTER_COUNT      11
+#define SPAWN_PERF_FILTER_COUNT      13
 #define SPAWN_PERF_SAMPLE_CAP        256
 
 stock void SpawnPerf_Log(const char[] format, any ...)
@@ -38,10 +38,12 @@ enum SpawnPerfTimingMetric
 enum SpawnPerfFilterKind
 {
     SpawnPerfFilter_Cooldown = 0,
+    SpawnPerfFilter_PendingSameNav,
     SpawnPerfFilter_Flags,
     SpawnPerfFilter_Flow,
     SpawnPerfFilter_Distance,
     SpawnPerfFilter_Separation,
+    SpawnPerfFilter_PendingSeparation,
     SpawnPerfFilter_Stuck,
     SpawnPerfFilter_Visibility,
     SpawnPerfFilter_Path,
@@ -177,13 +179,15 @@ static void SpawnPerf_PrintGroupedStats()
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_MaxSlice, "maxSliceMs");
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_FallbackApi, "fallbackApiMs");
 
-        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d flags=%d flow=%d distance=%d separation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
+        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d pendingSameNav=%d flags=%d flow=%d distance=%d separation=%d pendingSeparation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
             groupLabel,
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Cooldown],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_PendingSameNav],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flags],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flow],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Distance],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Separation],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_PendingSeparation],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Stuck],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Visibility],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Path],
@@ -334,6 +338,12 @@ stock void SpawnPerf_RecordFilterByCooldown()
     SpawnPerf_RecordFilter(SpawnPerfFilter_Cooldown);
 }
 
+stock void SpawnPerf_RecordFilterByPendingSameNav()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_PendingSameNav);
+}
+
 stock void SpawnPerf_RecordFilterByFlow()
 {
     if (!SpawnPerfConfig_ShowStats()) return;
@@ -344,6 +354,12 @@ stock void SpawnPerf_RecordFilterBySeparation()
 {
     if (!SpawnPerfConfig_ShowStats()) return;
     SpawnPerf_RecordFilter(SpawnPerfFilter_Separation);
+}
+
+stock void SpawnPerf_RecordFilterByPendingSeparation()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_PendingSeparation);
 }
 
 stock void SpawnPerf_RecordFilterByStuck()

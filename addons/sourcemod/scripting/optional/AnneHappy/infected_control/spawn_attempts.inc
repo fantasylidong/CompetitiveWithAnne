@@ -207,6 +207,7 @@ enum struct PendingActualSpawn
     int zc;
     int targetSurvivor;
     int areaIdx;
+    int navId;
     int band;
     bool teleportMode;
     bool fallback;
@@ -216,6 +217,7 @@ enum struct PendingActualSpawn
     float maxRange;
     float graphScanMinRange;
     float requestedPos[3];
+    int reservationToken;
     SpawnScoreDbg score;
 }
 
@@ -249,6 +251,24 @@ void SpawnAttempts_ClearRejectedActualSpawn(int client)
 {
     if (client > 0 && client <= MaxClients)
         g_bRejectedActualSpawn[client] = false;
+}
+
+void SpawnAttempts_OnClientDisconnect(int client)
+{
+    if (client <= 0 || client > MaxClients
+        || g_bRejectedActualSpawn[client]
+        || !g_PendingActualSpawns[client].active)
+    {
+        return;
+    }
+
+    // 自然断线没有实体可继续确认。立即解除空间占位，并让统一超时失败
+    // 路径在下一帧记录失败、恢复队列和推进距离档位。
+    ReleasePendingSpawnReservation(
+        g_PendingActualSpawns[client].reservationToken);
+    g_PendingActualSpawns[client].reservationToken = 0;
+    g_PendingActualSpawns[client].createdAt = GetGameTime()
+        - ACTUAL_SPAWN_VALIDATION_MAX_AGE;
 }
 
 bool SpawnAttempts_ConsumeRejectedActualDeath(int client)
@@ -374,6 +394,10 @@ void SpawnAttempts_ResetPendingActualSpawn(bool removeClient = true)
         if (!g_PendingActualSpawns[slot].active)
             continue;
 
+        ReleasePendingSpawnReservation(
+            g_PendingActualSpawns[slot].reservationToken);
+        g_PendingActualSpawns[slot].reservationToken = 0;
+
         if (removeClient)
         {
             int client = GetClientOfUserId(g_PendingActualSpawns[slot].userid);
@@ -386,6 +410,7 @@ void SpawnAttempts_ResetPendingActualSpawn(bool removeClient = true)
         g_PendingActualSpawns[slot].active = false;
         g_PendingActualSpawns[slot].userid = 0;
     }
+    ClearPendingSpawnReservations();
 }
 
 static bool SpawnAttempts_ValidateActualSpawn(int client, int zc,
@@ -435,6 +460,17 @@ static bool SpawnAttempts_ValidateActualSpawn(int client, int zc,
         return false;
     }
 
+    // The engine may settle a spawned infected far below the requested Nav
+    // point. Recheck dispersion at the actual origin so two distinct requests
+    // cannot commit onto the same landing spot.
+    if (!PassMinSeparation(actual))
+    {
+        Debug_Print("[SPAWN REJECT ACTUAL] class=%s idx=%d reason=separation pos=(%.1f %.1f %.1f)",
+            g_sInfectedClassNames[zc], client,
+            actual[0], actual[1], actual[2]);
+        return false;
+    }
+
     return true;
 }
 
@@ -473,6 +509,38 @@ static void SpawnAttempts_BeginPending(
     if (client <= 0 || client > MaxClients)
         return;
 
+    if (g_PendingActualSpawns[client].active)
+    {
+        LogError("[IC] pending spawn slot reused before cleanup: client=%d oldUserId=%d oldClass=%d",
+            client, g_PendingActualSpawns[client].userid,
+            g_PendingActualSpawns[client].zc);
+        int oldZc = g_PendingActualSpawns[client].zc;
+        bool oldTeleportMode = g_PendingActualSpawns[client].teleportMode;
+        int oldBand = g_PendingActualSpawns[client].band;
+        ReleasePendingSpawnReservation(
+            g_PendingActualSpawns[client].reservationToken);
+        g_PendingActualSpawns[client].reservationToken = 0;
+        g_PendingActualSpawns[client].active = false;
+        g_PendingActualSpawns[client].userid = 0;
+        if (oldZc >= 1 && oldZc <= SI_COUNT)
+        {
+            if (oldTeleportMode)
+            {
+                TeleportQueue_Push(oldZc);
+                SpawnSearch_ResetClass(oldZc, true);
+                g_iTeleportSearchBand[oldZc - 1] = ClampInt(
+                    oldBand + 1, 0, TACTICAL_BAND_STAGES + 1);
+            }
+            else
+            {
+                SpawnQueue_Push(oldZc);
+                SpawnSearch_ResetClass(oldZc, false);
+                g_iNormalSearchBand[oldZc - 1] = ClampInt(
+                    oldBand + 1, 0, TACTICAL_BAND_STAGES + 1);
+            }
+        }
+    }
+
     PendingActualSpawn pending;
     pending.active = true;
     pending.createdAt = GetGameTime();
@@ -482,6 +550,7 @@ static void SpawnAttempts_BeginPending(
     pending.zc = zc;
     pending.targetSurvivor = targetSurvivor;
     pending.areaIdx = areaIdx;
+    pending.navId = areaIdx >= 0 ? GetNavIDByIndex(areaIdx) : -1;
     pending.band = band;
     pending.teleportMode = teleportMode;
     pending.fallback = fallback;
@@ -491,6 +560,8 @@ static void SpawnAttempts_BeginPending(
     pending.maxRange = maxRange;
     pending.graphScanMinRange = graphScanMinRange;
     pending.requestedPos = requestedPos;
+    pending.reservationToken = (!fallback && areaIdx >= 0)
+        ? ReservePendingSpawn(areaIdx, requestedPos) : 0;
     SpawnScore_CopyDbg(pending.score, score);
     g_PendingActualSpawns[client] = pending;
 
@@ -499,6 +570,14 @@ static void SpawnAttempts_BeginPending(
         TeleportQueue_DropHead(reserved);
     else
         SpawnQueue_DropHead(reserved);
+}
+
+static int SpawnAttempts_ResolvePendingAreaIdx(int slot)
+{
+    int navId = g_PendingActualSpawns[slot].navId;
+    if (navId > 0)
+        return GetAreaIndexByNavID_Int(navId);
+    return g_PendingActualSpawns[slot].areaIdx;
 }
 
 int SpawnAttempts_ProcessPendingActualSpawns()
@@ -561,6 +640,9 @@ int SpawnAttempts_ProcessPendingActualSpawns()
             validationMs, client, view_as<int>(g_PendingActualSpawns[slot].mode),
             age * 1000.0);
 
+        int currentAreaIdx = g_PendingActualSpawns[slot].fallback
+            ? -1 : SpawnAttempts_ResolvePendingAreaIdx(slot);
+
         if (!valid)
         {
             if (g_PendingActualSpawns[slot].fallback)
@@ -585,16 +667,16 @@ int SpawnAttempts_ProcessPendingActualSpawns()
                     g_PendingActualSpawns[slot].maxRange,
                     g_PendingActualSpawns[slot].score,
                     g_PendingActualSpawns[slot].targetSurvivor);
-                if (g_PendingActualSpawns[slot].areaIdx >= 0)
+                if (currentAreaIdx >= 0)
                 {
                     float cooldown = persistentUnsafe
                         ? NAV_UNSAFE_GEOMETRY_CD_SECS : NAV_CD_SECS;
                     TouchNavCooldown(
-                        g_PendingActualSpawns[slot].areaIdx, now, cooldown);
+                        currentAreaIdx, now, cooldown);
                     if (persistentUnsafe)
                     {
                         Debug_Print("[SPAWN ACTUAL] persistent unsafe area=%d cooldown=%.1fs",
-                            g_PendingActualSpawns[slot].areaIdx, cooldown);
+                            currentAreaIdx, cooldown);
                     }
                 }
             }
@@ -650,9 +732,9 @@ int SpawnAttempts_ProcessPendingActualSpawns()
                     g_PendingActualSpawns[slot].score,
                     g_PendingActualSpawns[slot].targetSurvivor);
                 LogChosenSpawnScore(zc, g_PendingActualSpawns[slot].score);
-                if (g_PendingActualSpawns[slot].areaIdx >= 0)
+                if (currentAreaIdx >= 0)
                     TouchNavCooldown(
-                        g_PendingActualSpawns[slot].areaIdx, now, NAV_CD_SECS);
+                        currentAreaIdx, now, NAV_CD_SECS);
             }
 
             SpawnAttempts_RememberActualSpawn(
@@ -683,16 +765,21 @@ int SpawnAttempts_ProcessPendingActualSpawns()
             if (gCV.iDebugMode > 0)
                 CreateTimer(0.15, Timer_LogSpawnedSIState,
                     GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
-            if (g_hSpawnCommittedForward != INVALID_HANDLE)
-            {
-                Call_StartForward(g_hSpawnCommittedForward);
-                Call_PushCell(GetClientUserId(client));
-                Call_Finish();
-            }
         }
 
+        int committedUserid = valid ? GetClientUserId(client) : 0;
+        ReleasePendingSpawnReservation(
+            g_PendingActualSpawns[slot].reservationToken);
+        g_PendingActualSpawns[slot].reservationToken = 0;
         g_PendingActualSpawns[slot].active = false;
         g_PendingActualSpawns[slot].userid = 0;
+        if (valid && committedUserid > 0
+            && g_hSpawnCommittedForward != INVALID_HANDLE)
+        {
+            Call_StartForward(g_hSpawnCommittedForward);
+            Call_PushCell(committedUserid);
+            Call_Finish();
+        }
         processed++;
     }
     return processed;

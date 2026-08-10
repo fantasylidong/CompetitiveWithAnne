@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "vi" "Trạng thái MOD" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "vi" "Số lượng / thời gian infected đặc biệt" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "vi" "Số người chơi" }
+		"L4D2ScriptedHUD_LayoutPreset" { "vi" "Bố cục màn hình" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "vi" "Bố cục màn hình" }
+		"L4D2ScriptedHUD_LayoutStandard" { "vi" "Tiêu chuẩn (16:9)" }
+		"L4D2ScriptedHUD_Layout4x3" { "vi" "Thu gọn (4:3)" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "vi" "Vùng an toàn siêu rộng" }
 	}

@@ -1219,7 +1219,10 @@ void PollDynamicNavState(bool warm)
     sample.areaListValid = g_DynamicNav.areaListValid && areaListShapeValid;
 
     bool topologyChanged = false;
-    if (sample.areaListValid)
+    // Elevator transitions may rewrite live connection storage. The entity
+    // state already keeps the graph invalid while moving; inspect edges only
+    // after the mechanism stops so no transient engine pointer is dereferenced.
+    if (sample.areaListValid && !sample.moving)
     {
         std::size_t count = static_cast<std::size_t>(areaCount);
         std::size_t batch = std::min(kTopologyPollBatchAreas, count);

@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "zho" "MOD 狀態" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "zho" "特感數量 / 間隔" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "zho" "玩家人數" }
+		"L4D2ScriptedHUD_LayoutPreset" { "zho" "螢幕配置" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "zho" "螢幕配置" }
+		"L4D2ScriptedHUD_LayoutStandard" { "zho" "標準（16:9）" }
+		"L4D2ScriptedHUD_Layout4x3" { "zho" "緊湊（4:3）" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "zho" "超寬螢幕安全區" }
 	}

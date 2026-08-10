@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "chi" "MOD 状态" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "chi" "特感数量 / 间隔" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "chi" "玩家人数" }
+		"L4D2ScriptedHUD_LayoutPreset" { "chi" "屏幕布局" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "chi" "屏幕布局" }
+		"L4D2ScriptedHUD_LayoutStandard" { "chi" "标准（16:9）" }
+		"L4D2ScriptedHUD_Layout4x3" { "chi" "紧凑（4:3）" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "chi" "超宽屏安全区" }
 	}

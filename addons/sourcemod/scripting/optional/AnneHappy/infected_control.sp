@@ -116,6 +116,9 @@
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
 #define SEP_RADIUS                80.0
+#define PENDING_SEP_RADIUS        80.0    // 不同 NavID 的生成中点基础间距
+#define PENDING_SAME_NAV_RADIUS  120.0    // 同 NavID 允许在大 Nav 的远端再次取点
+#define PENDING_RESERVATION_TTL    1.25   // 略长于实体实际位置确认上限（1.0 秒）
 #define NAV_CD_SECS               0.5
 #define SECTORS_BASE              6       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -1054,6 +1057,7 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
+    SpawnAttempts_OnClientDisconnect(client);
     SpawnAttempts_ClearRejectedActualSpawn(client);
     TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);

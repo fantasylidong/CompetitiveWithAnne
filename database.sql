@@ -570,6 +570,7 @@ CREATE TABLE `scripted_hud_prefs` (
   `steamid` varchar(64) NOT NULL,
   `hud_mask` tinyint unsigned NOT NULL DEFAULT '3',
   `hud2_mask` tinyint unsigned NOT NULL DEFAULT '127',
+  `layout_preset` tinyint unsigned NOT NULL DEFAULT '0',
   `revision` int unsigned NOT NULL DEFAULT '0',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`steamid`)

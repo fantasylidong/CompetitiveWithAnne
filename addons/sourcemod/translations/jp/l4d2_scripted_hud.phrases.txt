@@ -20,4 +20,9 @@
 		"L4D2ScriptedHUD_PartMod" { "jp" "MOD 状態" }
 		"L4D2ScriptedHUD_PartInfectedTiming" { "jp" "特殊感染者数 / 間隔" }
 		"L4D2ScriptedHUD_PartPlayerCount" { "jp" "プレイヤー数" }
+		"L4D2ScriptedHUD_LayoutPreset" { "jp" "画面レイアウト" }
+		"L4D2ScriptedHUD_LayoutPresetTitle" { "jp" "画面レイアウト" }
+		"L4D2ScriptedHUD_LayoutStandard" { "jp" "標準（16:9）" }
+		"L4D2ScriptedHUD_Layout4x3" { "jp" "コンパクト（4:3）" }
+		"L4D2ScriptedHUD_LayoutUltrawide" { "jp" "ウルトラワイド安全領域" }
 	}
