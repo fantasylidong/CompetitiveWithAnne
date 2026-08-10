@@ -202,6 +202,7 @@ Handle g_hApplyMaxSpecialsTimer = INVALID_HANDLE;
 #define RUNTIME_TIMER_STALE_SECONDS     3.5
 #define RUNTIME_FIRST_WAVE_TIMEOUT      5.0
 #define RUNTIME_HARD_RECOVERY_COOLDOWN 10.0
+#define RUNTIME_ROUND_SETTLE_SECONDS     2.0
 
 bool g_bRuntimeRoundActive = false;
 bool g_bRuntimeMapEnding = false;
@@ -213,6 +214,7 @@ float g_fFirstWaveRequestedAt = 0.0;
 float g_fWaveCheckHeartbeat = 0.0;
 float g_fTeleportHeartbeat = 0.0;
 float g_fNextRuntimeGateLogAt = 0.0;
+float g_fRuntimeRoundStartedAt = 0.0;
 int g_iRuntimeCountMismatchTicks = 0;
 
 // =========================
@@ -552,6 +554,7 @@ public void OnMapStart()
     g_bRuntimeMapEnding = false;
     g_bRuntimeRecoveryBusy = false;
     g_bRuntimeRecoverySuppressed = false;
+    g_fRuntimeRoundStartedAt = GetGameTime();
     g_fNextRuntimeWatchdogAt = 0.0;
     g_fNextRuntimeHardRecoveryAt = 0.0;
     g_fNextRuntimeGateLogAt = 0.0;
@@ -808,12 +811,37 @@ static void LogStartRequestBlocked(const char[] source)
         return;
 
     g_fNextRuntimeGateLogAt = now + 1.0;
-    LogError("[IC][RUNTIME] Start request blocked: source=%s active=%d ending=%d suppressed=%d late=%d",
+    bool mobileSurvivor = HasMobileSurvivorForRuntimeStart();
+    float roundAge = g_fRuntimeRoundStartedAt > 0.0
+        ? now - g_fRuntimeRoundStartedAt
+        : -1.0;
+    LogError("[IC][RUNTIME] Start request blocked: source=%s active=%d ending=%d suppressed=%d late=%d mobile=%d round_age=%.2f",
         source,
         g_bRuntimeRoundActive ? 1 : 0,
         g_bRuntimeMapEnding ? 1 : 0,
         g_bRuntimeRecoverySuppressed ? 1 : 0,
-        gST.bLate ? 1 : 0);
+        gST.bLate ? 1 : 0,
+        mobileSurvivor ? 1 : 0,
+        roundAge);
+}
+
+static bool HasMobileSurvivorForRuntimeStart()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsValidSurvivor(client) && IsPlayerAlive(client)
+            && !L4D_IsPlayerIncapacitated(client))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool IsRuntimeRoundSettled()
+{
+    return g_fRuntimeRoundStartedAt > 0.0
+        && GetGameTime() - g_fRuntimeRoundStartedAt >= RUNTIME_ROUND_SETTLE_SECONDS;
 }
 
 static void RequestStartSpawn(const char[] source)
@@ -821,7 +849,8 @@ static void RequestStartSpawn(const char[] source)
     if (gST.bLate)
         return;
 
-    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed
+        || !IsRuntimeRoundSettled() || !HasMobileSurvivorForRuntimeStart())
     {
         LogStartRequestBlocked(source);
         return;
@@ -848,7 +877,8 @@ static Action Timer_SpawnFirstWave(Handle timer)
     g_hFirstWaveTimer = INVALID_HANDLE;
     g_fFirstWaveRequestedAt = 0.0;
 
-    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed)
+    if (!g_bRuntimeRoundActive || g_bRuntimeMapEnding || g_bRuntimeRecoverySuppressed
+        || !IsRuntimeRoundSettled() || !HasMobileSurvivorForRuntimeStart())
     {
         LogStartRequestBlocked("first_wave_timer");
         return Plugin_Stop;
@@ -874,6 +904,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     g_bRuntimeMapEnding = false;
     g_bRuntimeRecoverySuppressed = false;
     g_bRuntimeRecoveryBusy = false;
+    g_fRuntimeRoundStartedAt = GetGameTime();
     g_fNextRuntimeWatchdogAt = 0.0;
     g_fNextRuntimeHardRecoveryAt = 0.0;
     g_fNextRuntimeGateLogAt = 0.0;
@@ -899,6 +930,7 @@ public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
     g_bRuntimeRoundActive = false;
     g_bRuntimeMapEnding = true;
     g_bRuntimeRecoverySuppressed = true;
+    g_fRuntimeRoundStartedAt = 0.0;
     WaveSpawnReport_End("round_end");
     Traitor_OnRoundEnd();
     StopAll();

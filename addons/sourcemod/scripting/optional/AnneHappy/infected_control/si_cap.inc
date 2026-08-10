@@ -128,8 +128,6 @@ void ResetMatchState()
                 gST.totalSI++;
             }
         }
-        if (IsValidSurvivor(i) && !IsPlayerAlive(i))
-            L4D_RespawnPlayer(i);
     }
 
     ResetDeathState();

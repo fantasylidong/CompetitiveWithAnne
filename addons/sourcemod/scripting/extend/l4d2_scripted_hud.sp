@@ -79,6 +79,7 @@ public Plugin myinfo =
 // ====================================================================================================
 #define CONFIG_FILENAME               "l4d2_scripted_hud"
 #define DATA_FILENAME                 "l4d2_scripted_hud"
+#define GAMERULES_PROXY_CLASS         "terror_gamerules"
 
 // ====================================================================================================
 // Defines
@@ -682,6 +683,7 @@ public void OnPluginStart()
         GetCvars();
         LateLoad();
         HookEvents();
+        HookHUDSendProxies();
         delete g_tUpdateInterval;
         g_tUpdateInterval = CreateTimer(g_fCvar_UpdateInterval, TimerUpdateHUD, _, TIMER_REPEAT);
 
@@ -764,17 +766,26 @@ public void LoadPluginData()
     delete kv;
 }
 
-public void OnAllPluginsLoaded(){
-		g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
-		HookHUDSendProxies();
+public void OnAllPluginsLoaded()
+{
+    g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
+    HookHUDSendProxies();
 }
+
 public void OnLibraryAdded(const char[] name)
 {
-    if ( StrEqual(name, "witch_and_tankifier") ) { g_bWitchAndTankSystemAvailable = true; }
+    if (StrEqual(name, "witch_and_tankifier"))
+        g_bWitchAndTankSystemAvailable = true;
+    else if (StrEqual(name, SENDPROXY_LIB))
+        HookHUDSendProxies();
 }
+
 public void OnLibraryRemoved(const char[] name)
 {
-    if ( StrEqual(name, "witch_and_tankifier") ) { g_bWitchAndTankSystemAvailable = true; }
+    if (StrEqual(name, "witch_and_tankifier"))
+        g_bWitchAndTankSystemAvailable = false;
+    else if (StrEqual(name, SENDPROXY_LIB))
+        ResetHUDSendProxyState();
 }
 
 /****************************************************************************************************/
@@ -811,6 +822,9 @@ public void Event_ConVarChanged(ConVar convar, const char[] oldValue, const char
     GetCvars();
 
     HookEvents();
+
+    if (convar == g_hCvar_Enabled && g_bCvar_Enabled)
+        HookHUDSendProxies();
 
     delete g_tUpdateInterval;
     g_tUpdateInterval = CreateTimer(g_fCvar_UpdateInterval, TimerUpdateHUD, _, TIMER_REPEAT);
@@ -1142,9 +1156,10 @@ public void Event_TankKilled(Handle event, const char[] name, bool dontBroadcast
     }
 }
 
-public  void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
+public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
-	g_bAliveTank = false;
+    g_bAliveTank = false;
+    HookHUDSendProxies();
 }
 
 bool IsAiTank(int tank)
@@ -1744,6 +1759,9 @@ public Action offSpecHud(int client, int args)
 
 void HookHUDSendProxies()
 {
+    if (!LibraryExists(SENDPROXY_LIB) || FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) == -1)
+        return;
+
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
         if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
@@ -1768,17 +1786,27 @@ void HookHUDSendProxies()
 
 void UnhookHUDSendProxies()
 {
+    bool canUnhook = LibraryExists(SENDPROXY_LIB) && FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) != -1;
+
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
-        if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
             SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUDFlags, hud);
-        if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
             SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUDString, hud);
-        if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
             SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUDLayout, hud);
-        if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
             SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUDLayout, hud);
+    }
 
+    ResetHUDSendProxyState();
+}
+
+void ResetHUDSendProxyState()
+{
+    for (int hud = HUD1; hud <= HUD4; hud++)
+    {
         for (int proxy = 0; proxy < HUD_PROXY_COUNT; proxy++)
             g_bHUDProxyHooked[hud][proxy] = false;
     }
