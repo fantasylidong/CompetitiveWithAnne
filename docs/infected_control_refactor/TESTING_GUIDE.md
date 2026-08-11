@@ -194,7 +194,8 @@ inf_ai_wave_check_time "16.0 12.0 10.0 6.0 4.0"  // 改为6秒
 ### 如果Anti-Bait太敏感/不敏感
 ```
 inf_antibait_window 15.0          // 增加到15秒（更不敏感）
-inf_antibait_progress_pct 3       // 增加到3%（更不敏感）
+inf_antibait_progress_pct 4       // Flow 下中位数需推进4%才重置停滞基准
+inf_antibait_progress_dist 1000   // 或团队中心移动1000世界单位
 ```
 
 ### 如果想看更详细的输出

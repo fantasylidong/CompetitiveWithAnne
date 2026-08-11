@@ -101,6 +101,48 @@ void TestCandidateOrderUsesDirectedPath()
     assert(candidatePathDistances[0] < candidatePathDistances[2]);
 }
 
+void TestCandidateOrderUsesHighGroundRank()
+{
+    AnneNavGraphMetadata metadata;
+    metadata.mapName = "candidate_high_ground_rank_test";
+    metadata.navIds = {1, 2, 3};
+    metadata.centers = {0.0f, 0.0f, 0.0f,
+                        400.0f, 0.0f, 0.0f,
+                        600.0f, 0.0f, 200.0f};
+    metadata.flowDistances = {0.0f, 100.0f, 200.0f};
+    metadata.maxFlowDistance = 200.0f;
+    std::vector<AnneNavGraphInputEdge> edges = {
+        {1, 0, AnneNavEdgeType::Floor},
+        {2, 0, AnneNavEdgeType::Floor},
+    };
+    std::string error;
+    std::shared_ptr<AnneNavGraph> graph =
+        AnneBuildNavGraph(metadata, std::move(edges), true, error);
+    assert(graph && error.empty());
+
+    std::vector<std::uint8_t> blocked(3, 0);
+    std::vector<float> survivorEyes = {0.0f, 0.0f, 0.0f};
+    std::vector<std::uint32_t> candidates;
+    std::vector<float> rawDistances;
+    std::vector<float> rankDistances;
+    std::vector<float> allPathDistances;
+    std::vector<std::uint8_t> specialEdges;
+    assert(AnneBuildRankedNavCandidateSnapshot(
+        *graph, 0, 2000.0f, blocked, survivorEyes, 250.0f,
+        0.0f, 100.0f, 0.5f,
+        candidates, rawDistances, rankDistances,
+        allPathDistances, specialEdges));
+    assert((candidates == std::vector<std::uint32_t>{2, 1}));
+    assert(rawDistances[0] > rawDistances[1]);
+    assert(rankDistances[0] < rankDistances[1]);
+
+    assert(AnneBuildNavCandidateSnapshot(
+        *graph, 0, 2000.0f, blocked, survivorEyes, 250.0f,
+        candidates, rawDistances, allPathDistances, specialEdges));
+    assert((candidates == std::vector<std::uint32_t>{1, 2}));
+    assert(std::is_sorted(rawDistances.begin(), rawDistances.end()));
+}
+
 void TestTopologyIssueCompletenessAndCache()
 {
     constexpr std::uint64_t baseFingerprint = 0x1020304050607080ull;
@@ -345,6 +387,7 @@ int main()
     TestPackedBlockedBits();
     TestDirectedReachability();
     TestCandidateOrderUsesDirectedPath();
+    TestCandidateOrderUsesHighGroundRank();
     TestTopologyIssueCompletenessAndCache();
     TestGenericTopologyVariantCachesCoexist();
     TestCacheIoLifecycle();
@@ -442,7 +485,10 @@ int main()
 
     constexpr int benchmarkRuns = 200;
     std::vector<long> candidateBuildMicros;
+    std::vector<long> rankedCandidateBuildMicros;
     candidateBuildMicros.reserve(benchmarkRuns);
+    rankedCandidateBuildMicros.reserve(benchmarkRuns);
+    std::vector<float> candidateRankDistances;
     for (int run = 0; run < benchmarkRuns; ++run)
     {
         auto start = std::chrono::steady_clock::now();
@@ -450,6 +496,16 @@ int main()
             *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 250.0f,
             candidates, candidatePathDistances, distances, special));
         candidateBuildMicros.push_back(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - start).count());
+
+        start = std::chrono::steady_clock::now();
+        assert(AnneBuildRankedNavCandidateSnapshot(
+            *loaded, targetIndex, 1000000.0f, blocked, survivorEyes, 250.0f,
+            -200.0f, 64.0f, 0.5f,
+            candidates, candidatePathDistances, candidateRankDistances,
+            distances, special));
+        rankedCandidateBuildMicros.push_back(
             std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::steady_clock::now() - start).count());
     }
@@ -462,6 +518,11 @@ int main()
               << " p50=" << Percentile(candidateBuildMicros, 0.50)
               << " p95=" << Percentile(candidateBuildMicros, 0.95)
               << " max=" << Percentile(candidateBuildMicros, 1.00)
+              << " candidates=" << candidates.size() << '\n';
+    std::cout << "ranked_candidate_build_us runs=" << benchmarkRuns
+              << " p50=" << Percentile(rankedCandidateBuildMicros, 0.50)
+              << " p95=" << Percentile(rankedCandidateBuildMicros, 0.95)
+              << " max=" << Percentile(rankedCandidateBuildMicros, 1.00)
               << " candidates=" << candidates.size() << '\n';
     std::remove(cachePath.c_str());
     return 0;

@@ -121,6 +121,40 @@ native int AnneSpawn_NavCandidatesCollect(
     int &totalInRange
 );
 
+// V2: raw Nav distance still controls the requested min/max range. Within that
+// range, areas whose center is sufficiently above the target are globally
+// ordered by rawDistance * highGroundDistanceScale. Raw and rank distances are
+// returned separately so collection ranges and global visit order cannot be
+// confused; callers may still apply their own class-specific effective range.
+native int AnneSpawn_NavCandidatesPrepareRanked(
+    int targetClient,
+    int targetNavId,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge,
+    float highGroundMinHeight,
+    float highGroundDistanceScale
+);
+
+native int AnneSpawn_NavCandidatesCollectRanked(
+    int targetClient,
+    int targetNavId,
+    float minNavDistance,
+    float maxNavDistance,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge,
+    float highGroundMinHeight,
+    float highGroundDistanceScale,
+    int startOffset,
+    int[] outputAreaIndices,
+    float[] outputNavDistances,
+    float[] outputRankDistances,
+    int maxResults,
+    float &resultAgeMs,
+    int &totalInRange
+);
+
 native bool AnneSpawn_NavCandidatesGetPerf(
     float[] timings,
     int timingCount,

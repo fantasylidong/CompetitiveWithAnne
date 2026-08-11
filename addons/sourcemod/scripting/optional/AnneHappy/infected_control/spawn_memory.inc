@@ -150,18 +150,12 @@ stock bool IsNavOnCooldown(int areaIdx, float now)
     return now < view_as<float>(g_NavCooldownUntil.Get(areaIdx));
 }
 
-stock void TouchNavCooldown(int areaIdx, float now, float cooldown = 8.0)
+stock void TouchNavCooldown(int areaIdx, float now, float cooldown = NAV_CD_SECS)
 {
     EnsureNavCooldownSlots();
     if (areaIdx < 0 || areaIdx >= g_NavCooldownUntil.Length)
         return;
     g_NavCooldownUntil.Set(areaIdx, now + cooldown);
-}
-
-void ClearNavWeightMemory()
-{
-    // 历史权重不参与当前评分。保留入口供生命周期和调试代码调用，
-    // 但不再为每张地图分配三份 per-Nav ArrayList。
 }
 
 stock void CleanupLastSpawns(float now)

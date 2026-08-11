@@ -17,15 +17,17 @@ topology change merely because area IDs and centers stayed the same. Each state 
 of overwriting or rebuilding it. Workers never dereference engine objects: they consume
 copied IDs, centers, flow distances, edges, and packed blocker bits. The live blocker snapshot is
 validated before it reaches a worker; an implausible all-blocked map disables the directed snapshot
-for that query so SourcePawn can scan all NavAreas instead of dropping directly to Director. Invalid
+for that query and leaves the Director API fallback available; SourcePawn does not scan all NavAreas. Invalid
 flow values inherit the nearest valid progress over the Nav graph on a worker. Ordinary floor paths use a
 reverse distance field shared by every candidate for the same survivor NavArea. Candidate snapshots
-exclude Nav centers within 250 world units (3D straight-line distance) of any live survivor, then sort the
-remaining reachable areas by directed `candidate -> target` Nav path distance, using the area index only
-as a deterministic tie-break. The plugin refreshes these snapshots every 1.0 second while
+exclude Nav centers within 250 world units (3D straight-line distance) of any live survivor. The default
+snapshot sorts by raw directed `candidate -> target` path distance. Ranked snapshots retain that raw
+distance but assign Nav centers at least 64 units above the target eye a configurable rank multiplier;
+Smoker and Hunter default to `0.50`, so high ground is visited earlier without falsifying the path range.
+Ties use raw path distance and then area index. The plugin refreshes snapshots every 1.0 second while
 idle and every 0.1 second during the final second before a wave or while spawn work is pending; consumers
-accept results for at most 0.2 seconds. `NavAreaBuildPath` remains only a precision fallback when the graph
-is genuinely unavailable/incomplete or a random point is too close to a path-distance boundary. The main
+accept results for at most 0.2 seconds. `NavAreaBuildPath` remains a final precision check for directed
+candidates. An unavailable or incomplete graph goes to the Director API rather than an unordered all-Nav scan. The main
 thread monitors the `TheNavAreas` identity and all live floor connections and ladder endpoints; resolved
 `func_elevator` origin, velocity, and toggle state additionally prevent capture and live-edge traversal
 while a lift is moving. Edge polling resumes after the mechanism stops.
@@ -45,8 +47,8 @@ blockers use the existing packed blocker snapshot/epoch and do not force a topol
 Mapped bad-flow areas remain recallable, but the mapping is only progress metadata: the current tick still
 checks directed `candidate -> target` reachability against the profession's maximum and, when direct
 distance cannot prove the minimum, its minimum too. Complete static and stable dynamic maps use the
-directed graph; engine `BuildPath` is reserved for precision boundaries or genuinely fatal topology
-errors. Flow buckets are not used as a candidate source or as proof of path connectivity.
+directed graph; engine `BuildPath` only validates candidates returned by that graph. Flow buckets are not
+used as a candidate source or as proof of path connectivity.
 
 The binary payload stores one ID per area plus forward CSR offsets and packed edges. Flow is read fresh
 from the engine on each graph capture, so it does not enlarge or invalidate the topology cache. A synthetic graph
@@ -56,11 +58,11 @@ round-trip test is `tests/nav_graph_test.cpp`.
 Only copied graph, blocker, and survivor-eye data is processed on workers. Spawn rules, random Nav points,
 flags, cooldowns, stuck/visibility traces, final path validation, and score tuning remain in SourcePawn on
 the game thread. A candidate snapshot is therefore an ordered coarse filter, never permission to spawn.
-The plugin automatically falls back to its existing SourcePawn implementation when this extension is not
-available.
+When this extension is unavailable, the plugin retains SourcePawn safety and scoring code but skips the
+unordered all-Nav candidate source and uses the Director API fallback for position selection.
 
 Install the platform binary with `anne_spawn_accel.autoload`, `anne_spawn_accel.games.txt`, and
 `anne_spawn_accel.inc`. Autoloading at server startup is recommended, but late loading is supported;
-`infected_control` detects the library dynamically and switches back to SourcePawn when it unloads.
+`infected_control` detects the library dynamically and switches directed Nav selection off when it unloads.
 The worker pool is created lazily by `AnneSpawn_NavGraphStart` and destroyed by
 `AnneSpawn_NavGraphStop`, so merely autoloading the extension does not create background threads.

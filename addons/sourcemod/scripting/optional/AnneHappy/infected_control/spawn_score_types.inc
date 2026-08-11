@@ -19,6 +19,7 @@ enum struct SpawnScoreDbg
 {
     float total;
     float baseTotal;
+    float weightedQuality;
     float dist;
     float hght;
     float flow;
@@ -28,13 +29,20 @@ enum struct SpawnScoreDbg
     float dispScaled;
     float penK;
     float extraPen;
-    float navWeight;
-    float navPenalty;
+    float behindPen;
+    float lowHeightPen;
+    float targetFootZ;
+    float lowHeightDrop;
+    float lowHeightMultiplier;
+    float highHeightBonus;
+    float highHeightRise;
     float tacticalQuality;
 
     float dTargetEye;
     float navDistance;
+    float navRankDistance;
     float navDistanceEffective;
+    float navHighSortScale;
     float navHighGroundComp;
     float ringEff;
     float slack;
@@ -44,9 +52,12 @@ enum struct SpawnScoreDbg
     int candBucket;
     int centerBucket;
     int deltaFlow;
+    int lowHeightSteps;
+    int highHeightSteps;
     int sector;
     int areaIdx;
     bool rawBadFlow;
+    bool flowBucketKnown;
 
     float pos[3];
 }

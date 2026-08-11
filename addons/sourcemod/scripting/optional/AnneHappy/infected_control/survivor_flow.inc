@@ -251,7 +251,8 @@ float GetSurAvrFlow()
 bool IsFlowAbnormal(float flowDist, float maxFlow)
 {
     if (maxFlow <= 0.0) return true;
-    return (flowDist < 0.0 || flowDist > maxFlow);
+    // 反向比较同时拦截 NaN；普通 < / > 对 NaN 都会返回 false。
+    return !(flowDist >= 0.0) || !(flowDist <= maxFlow);
 }
 
 static bool TryGetFlowDistanceFromArea(Address area, float &outFlow)

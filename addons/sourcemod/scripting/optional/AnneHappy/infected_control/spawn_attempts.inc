@@ -72,7 +72,7 @@ static void RecordDirectorSpawnResult(const float pos[3], bool success)
     }
     else
     {
-        TouchNavCooldown(areaIdx, now, 0.8);
+        TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
     }
 }
 
@@ -1204,7 +1204,7 @@ void TryNormalSpawnOnce()
             if (areaIdx >= 0)
             {
                 float now = GetGameTime();
-                TouchNavCooldown(areaIdx, now, 0.8);
+                TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
             }
             g_iNormalSearchBand[searchIdx]++;
             SpawnAttempts_RotatePendingNormalClass(want);
@@ -1384,7 +1384,7 @@ void TryTeleportSpawnOnce()
             if (areaIdx >= 0)
             {
                 float now = GetGameTime();
-                TouchNavCooldown(areaIdx, now, 0.8);
+                TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
             }
             g_iTeleportSearchBand[searchIdx]++;
             SpawnAttempts_RotatePendingTeleportClass(want);

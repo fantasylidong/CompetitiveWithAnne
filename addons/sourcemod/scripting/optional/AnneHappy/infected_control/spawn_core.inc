@@ -9,6 +9,7 @@ enum struct SpawnFilterStats
     int pendingSameNav;
     int flags;
     int flow;
+    int behindFlow;
     int distance;
     int separation;
     int pendingSeparation;
@@ -25,6 +26,7 @@ enum struct SpawnFilterStats
         this.pendingSameNav = 0;
         this.flags = 0;
         this.flow = 0;
+        this.behindFlow = 0;
         this.distance = 0;
         this.separation = 0;
         this.pendingSeparation = 0;
@@ -38,7 +40,7 @@ enum struct SpawnFilterStats
 }
 
 // 刷点核心分两层：
-// - FindSpawnPosViaNavArea：准备生还者/Flow/扇区上下文，决定有向图候选或全图兜底。
+// - FindSpawnPosViaNavArea：准备生还者/Flow/扇区上下文，只消费有向图候选。
 // - SpawnCore_EvaluateNavCandidate：评估单个 NavArea，按“便宜过滤 -> 昂贵精判 -> 评分”的顺序执行。
 //
 // 修改性能或刷点质量时优先阅读 README_SPAWN_ARCHITECTURE.md。这里的过滤顺序不是随意排列：
@@ -89,6 +91,26 @@ stock bool TryGetBucketByAreaIdx(int areaIdx, int &outBucket)
     return false;
 }
 
+// 目标进度优先取脚下实际 NavArea 的 raw/mapped bucket。若脚下 Area 存在但
+// 无法映射，保持 unknown，避免多层地图用几何最近的另一层伪造目标进度。
+static bool SpawnCore_TryGetTargetBucket(int client, int &outBucket)
+{
+    outBucket = -1;
+    if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+        return false;
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    Address current = L4D2Direct_GetTerrorNavArea(pos);
+    if (current != Address_Null)
+    {
+        int areaIdx = GetAreaIndexByNavID_Int(L4D_GetNavAreaID(current));
+        return TryGetBucketByAreaIdx(areaIdx, outBucket);
+    }
+
+    return TryGetClientFlowPercentSafe(client, outBucket);
+}
+
 static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            int targetSurvivor,
                                            const float targetPoint[3],
@@ -97,16 +119,16 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            bool teleportMode,
                                            int areaIdx,
                                            float navDistance,
+                                           float navRankDistance,
                                            int knownBucket,
                                            bool rejectBadFlow,
                                            float mapMaxFlowDist,
                                            bool finaleArea,
                                            const float center[3],
                                            int sectors,
-                                           float allMaxZ,
                                            int centerBucket,
                                            float refEyeZ,
-                                           float lowestFootZ,
+                                           float targetFootZ,
                                            Address navStart,
                                            int visibilityRayMode,
                                            float minScore,
@@ -146,6 +168,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     float flow = 0.0;
     bool flowLoaded = false;
     bool rawBadFlow = false;
+    bool candidateBucketKnown = candidateBucket >= 0;
 
     // 2) 图候选已携带 areaIdx 对应的进度 bucket，避免每个候选都读取 Flow。
     //    全图 fallback 或需要拒绝 badflow 时才加载 area.GetFlow()。
@@ -162,12 +185,29 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
             return false;
         }
 
-        if (candidateBucket < 0)
+        if (candidateBucket < 0 && !rawBadFlow)
+        {
             candidateBucket = FlowDistanceToPercent(flow);
+            candidateBucketKnown = true;
+        }
     }
+    // 完全无法映射的 badflow 不得伪装成 0% 并触发后点硬拒绝；它继续接受
+    // rawBadFlow 分项扣分，Flow 相对位置按中性处理。
+    if (!candidateBucketKnown)
+        candidateBucket = centerBucket >= 0 ? centerBucket : 50;
     candidateBucket = ClampInt(candidateBucket, 0, 100);
+    int scoringCenterBucket = centerBucket >= 0 ? centerBucket : candidateBucket;
 
-    // 3) 冷却和同桶上限都是区域/桶级判断，放在 GetRandomPoint 之前节省点位级成本。
+    // 3) dF=-8 仍参与评分，dF<-8 在随机点、trace/path 前直接淘汰。
+    if (candidateBucketKnown
+        && SpawnScore_ShouldRejectBehindFlow(candidateBucket, scoringCenterBucket))
+    {
+        stats.behindFlow++;
+        SpawnPerf_RecordFilterByBehindFlow();
+        return false;
+    }
+
+    // 4) 冷却和同桶上限都是区域/桶级判断，放在 GetRandomPoint 之前节省点位级成本。
     if (IsNavOnCooldown(areaIdx, now))
     {
         stats.cooldown++;
@@ -175,14 +215,14 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
     }
 
-    if (!PassBucketShareLimit(candidateBucket))
+    if (candidateBucketKnown && !PassBucketShareLimit(candidateBucket))
     {
         stats.bucket++;
         SpawnPerf_RecordFilterByBucket();
         return false;
     }
 
-    // 4) 从这里开始才进入点位级成本。一个 NavArea 内可能同时跨过距离带边界；
+    // 5) 从这里开始才进入点位级成本。一个 NavArea 内可能同时跨过距离带边界；
     //    若随机点只在廉价检查阶段失败，少量重采样比丢掉整个区域后继续扫图更划算。
     float pos[3];
     float slack = 0.0;
@@ -192,8 +232,8 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
     if (teleportMode)
         directExclusion = FloatMax(directExclusion, gCV.fTeleportSpawnMin);
-        float requestExclusion = directExclusion + NAV_CANDIDATE_LANDING_MARGIN;
-        float directExclusionSq = requestExclusion * requestExclusion;
+    float requestExclusion = directExclusion + NAV_CANDIDATE_LANDING_MARGIN;
+    float directExclusionSq = requestExclusion * requestExclusion;
     bool haveCheapCandidate = false;
     bool geometryReady = false;
     float dTargetEye = 0.0;
@@ -208,7 +248,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     {
         area.GetRandomPoint(pos);
 
-        // 5) 最近刷点分散是纯内存距离检查，比距离/trace/path 都便宜。
+        // 6) 最近刷点分散是纯内存距离检查，比距离/trace/path 都便宜。
         if (!PassMinSeparation(pos))
         {
             stats.separation++;
@@ -232,7 +272,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
             continue;
         }
 
-        // 6) 当前职业范围是硬边界；Smoker/Hunter 的正高度差只折减 Nav
+        // 7) 当前职业范围是硬边界；Smoker/Hunter 的正高度差只折减 Nav
         //    上限判定，原始距离和全队三维安全距离保持不变。
         geometryReady = g_bSpawnAccel
             && AnneSpawn_ComputePointGeometry(pos, center, sectors, targetEye,
@@ -268,8 +308,8 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!haveCheapCandidate)
         return false;
 
-    // 7) 有向图已经按 candidate -> survivor 路径距离筛出连通候选。
-    //    Flow 只参与后续评分，不再以旧的进度桶阈值二次否决候选。
+    // 8) 有向图已经按 candidate -> survivor 路径距离筛出连通候选。
+    //    Flow 已在廉价阶段执行 dF<-8 硬拒绝；允许范围内继续参与评分。
     //    卡壳、可见性、路径都是昂贵检查，必须排在轻量过滤之后。
     usedExpensive = true;
     AnneSpawnSafetyResult safety = Visibility_TestPointSafety(
@@ -310,7 +350,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
     }
 
-    // 8) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
+    // 9) 只有通过所有硬过滤的候选才需要 rawBadFlow 和评分。
     //     这能让图候选路径中大量失败候选完全不读 area.GetFlow()。
     if (!flowLoaded)
     {
@@ -326,24 +366,29 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     float tacticalQuality = Tactical_GetCandidateQuality(
         zc, pos, targetSurvivor, targetPoint);
     SpawnPerf_RecordFullEvaluation();
-    float navWeight = 1.0;
     float scoreMinRange = minRange;
     float scoreMaxRange = ringEff;
     if (!SpawnScore_BuildCandidate(
                                    zc, pos, dTargetEye, navDistance,
                                    navDistanceEffective, navHighGroundComp,
                                    scoreMinRange, scoreMaxRange, slack,
-                                   candidateBucket, centerBucket, rawBadFlow,
-                                   refEyeZ, allMaxZ, lowestFootZ, sector, areaIdx,
-                                   navWeight, tacticalQuality, candDbg))
+                                   candidateBucket, scoringCenterBucket, rawBadFlow,
+                                   candidateBucketKnown,
+                                   refEyeZ, targetFootZ, sector, areaIdx,
+                                   tacticalQuality, candDbg))
     {
         stats.flow++;
         SpawnPerf_RecordFilterByFlow();
         return false;
     }
+    candDbg.navRankDistance = navRankDistance;
+    candDbg.navHighSortScale = (zc >= 1 && zc <= SI_COUNT)
+        ? gCV.fNavHighSortScale[zc] : 1.0;
 
-    // 历史权重仅保留在调试信息中，不改变原扫描顺序或候选资格。
-    if (minScore > 0.0 && candDbg.total < minScore)
+    // 公式结果低于 0 时最终分钳制为 0；0 分候选不具备生成资格。
+    // 正数 floor 仍作为额外实验门槛，等于 floor 的候选允许参与选择。
+    if (candDbg.total <= 0.0
+        || (minScore > 0.0 && candDbg.total < minScore))
     {
         stats.score++;
         SpawnPerf_RecordFilterByScore();
@@ -363,8 +408,7 @@ enum SpawnSearchResult
 enum SpawnCandidateSource
 {
     SpawnCandidate_None = 0,
-    SpawnCandidate_Graph,
-    SpawnCandidate_All
+    SpawnCandidate_Graph
 }
 
 enum SpawnCandidateReadResult
@@ -387,7 +431,7 @@ enum struct SpawnFrameContext
     int positionCheckBucket;
     float targetPoint[3];
     float refEyeZ;
-    float lowestFootZ;
+    float targetFootZ;
     Address navStart;
     int navStartClient;
     int navStartId;
@@ -411,16 +455,18 @@ enum struct SpawnSearchCursor
     float graphScanMinRange;
     bool teleportMode;
     SpawnCandidateSource source;
-    int allRow;
     int graphTargetClient;
     int graphTargetNavId;
     float graphPathLimit;
     float graphMinNavDistance;
     float graphMaxNavDistance;
+    float graphHighSortMinHeight;
+    float graphHighSortScale;
     int graphOffset;
     int graphTotalInRange;
     int graphPage[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
+    float graphPageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageLen;
     int graphPageRow;
     float graphPageExpiresAt;
@@ -436,13 +482,14 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
 {
     cursor.active = false;
     cursor.source = SpawnCandidate_None;
-    cursor.allRow = 0;
     cursor.graphTargetClient = -1;
     cursor.graphTargetNavId = -1;
     cursor.graphPathLimit = 0.0;
     cursor.graphScanMinRange = 0.0;
     cursor.graphMinNavDistance = 0.0;
     cursor.graphMaxNavDistance = 0.0;
+    cursor.graphHighSortMinHeight = 0.0;
+    cursor.graphHighSortScale = 1.0;
     cursor.graphOffset = 0;
     cursor.graphTotalInRange = -1;
     cursor.graphPageLen = 0;
@@ -529,12 +576,14 @@ static bool SpawnSearch_BuildFrameContext(
     }
 
     frame.positionCheckBucket = -1;
-    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
-        && !L4D_IsPlayerIncapacitated(targetSurvivor))
+    bool targetUsable = IsValidSurvivor(targetSurvivor)
+        && IsPlayerAlive(targetSurvivor)
+        && !L4D_IsPlayerIncapacitated(targetSurvivor);
+    if (targetUsable)
     {
-        TryGetClientFlowPercentSafe(targetSurvivor, frame.positionCheckBucket);
+        SpawnCore_TryGetTargetBucket(targetSurvivor, frame.positionCheckBucket);
     }
-    if (frame.positionCheckBucket < 0)
+    if (frame.positionCheckBucket < 0 && !targetUsable)
     {
         float bestFlow = -1.0;
         for (int i = 0; i < g_iSurPosDataLen; i++)
@@ -546,13 +595,12 @@ static bool SpawnSearch_BuildFrameContext(
         if (bestFlow >= 0.0)
             frame.positionCheckBucket = FlowDistanceToPercent(bestFlow);
     }
-    frame.centerBucket = (frame.positionCheckBucket >= 0)
-        ? frame.positionCheckBucket : 50;
+    frame.centerBucket = frame.positionCheckBucket;
 
     SpawnCore_CopyPos(frame.targetPoint, frame.center);
     frame.refEyeZ = frame.allMaxZ;
-    if (IsValidSurvivor(targetSurvivor) && IsPlayerAlive(targetSurvivor)
-        && !L4D_IsPlayerIncapacitated(targetSurvivor))
+    frame.targetFootZ = frame.center[2];
+    if (targetUsable)
     {
         GetClientEyePosition(targetSurvivor, frame.targetPoint);
         frame.refEyeZ = frame.targetPoint[2];
@@ -570,10 +618,11 @@ static bool SpawnSearch_BuildFrameContext(
                     ? GetVectorDistance(snapshotTarget, frame.targetPoint) : -1.0);
             Visibility_RefreshEyeSnapshot();
         }
-    }
-    if (!TryGetLowestSurvivorFootZ(frame.lowestFootZ))
-        frame.lowestFootZ = 1.0e9;
 
+        float targetOrigin[3];
+        GetClientAbsOrigin(targetSurvivor, targetOrigin);
+        frame.targetFootZ = targetOrigin[2];
+    }
     frame.navStart = Address_Null;
     frame.navStartClient = -1;
     frame.navStartId = -1;
@@ -638,9 +687,11 @@ static void SpawnSearch_ConfigureCursor(
         : FloatMax(0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
     cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK
         + Tactical_GetMaxHighGroundNavCompensation(zc);
+    cursor.graphHighSortMinHeight = 0.0;
+    cursor.graphHighSortScale = 1.0;
     cursor.source = (graphTargetClient > 0 && graphTargetNavId > 0
         && SpawnAccel_CanUseGraphCandidates())
-        ? SpawnCandidate_Graph : SpawnCandidate_All;
+        ? SpawnCandidate_Graph : SpawnCandidate_None;
     cursor.active = true;
 }
 
@@ -655,7 +706,7 @@ static void SpawnSearch_EnsureCursor(
         graphScanMinRange, teleportMode);
     SpawnCandidateSource wantedSource = graphTargetClient > 0 && graphTargetNavId > 0
         && SpawnAccel_CanUseGraphCandidates()
-        ? SpawnCandidate_Graph : SpawnCandidate_All;
+        ? SpawnCandidate_Graph : SpawnCandidate_None;
     bool graphTargetMoved = wantedSource == SpawnCandidate_Graph
         && (cursor.graphTargetClient != graphTargetClient
             || cursor.graphTargetNavId != graphTargetNavId);
@@ -671,10 +722,11 @@ static void SpawnSearch_EnsureCursor(
 
 static SpawnCandidateReadResult SpawnSearch_NextCandidate(
     SpawnSearchCursor cursor, int &areaIdx, int &candidateBucket,
-    float &navDistance, bool &rejectBadFlow)
+    float &navDistance, float &navRankDistance, bool &rejectBadFlow)
 {
     candidateBucket = -1;
     navDistance = -1.0;
+    navRankDistance = -1.0;
     rejectBadFlow = false;
     while (cursor.source != SpawnCandidate_None)
     {
@@ -687,6 +739,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 int pageRow = cursor.graphPageRow++;
                 areaIdx = cursor.graphPage[pageRow];
                 navDistance = cursor.graphPageNavDistance[pageRow];
+                navRankDistance = cursor.graphPageRankDistance[pageRow];
                 cursor.graphOffset++;
                 TryGetBucketByAreaIdx(areaIdx, candidateBucket);
                 return SpawnCandidateRead_Found;
@@ -708,10 +761,9 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 if (SpawnAccel_IsDynamicGraphPending())
                     return SpawnCandidateRead_Pending;
                 g_bSpawnAccelGraphCandidatesAvailable = false;
-                cursor.source = SpawnCandidate_All;
-                cursor.allRow = 0;
-                Debug_Print("[SPAWN ACCEL] directed candidates unavailable during search; using all-Nav fallback");
-                continue;
+                cursor.source = SpawnCandidate_None;
+                Debug_Print("[SPAWN ACCEL] directed candidates unavailable during search; all-Nav fallback disabled");
+                return SpawnCandidateRead_Exhausted;
             }
             if (prepareStatus <= 0)
                 return SpawnCandidateRead_Pending;
@@ -720,6 +772,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             int totalInRange;
             int page[NAV_CANDIDATE_PAGE_SIZE];
             float pageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
+            float pageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
             int count = AnneSpawn_NavCandidatesCollect(
                 cursor.graphTargetClient,
                 cursor.graphTargetNavId,
@@ -734,15 +787,16 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 NAV_CANDIDATE_PAGE_SIZE,
                 resultAgeMs,
                 totalInRange);
+            for (int row = 0; row < count; row++)
+                pageRankDistance[row] = pageNavDistance[row];
             if (count == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
             {
                 if (SpawnAccel_IsDynamicGraphPending())
                     return SpawnCandidateRead_Pending;
                 g_bSpawnAccelGraphCandidatesAvailable = false;
-                cursor.source = SpawnCandidate_All;
-                cursor.allRow = 0;
-                Debug_Print("[SPAWN ACCEL] directed candidate collect unavailable; using all-Nav fallback");
-                continue;
+                cursor.source = SpawnCandidate_None;
+                Debug_Print("[SPAWN ACCEL] directed candidate collect unavailable; all-Nav fallback disabled");
+                return SpawnCandidateRead_Exhausted;
             }
             if (count == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
                 return SpawnCandidateRead_Pending;
@@ -763,21 +817,13 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             {
                 cursor.graphPage[row] = page[row];
                 cursor.graphPageNavDistance[row] = pageNavDistance[row];
+                cursor.graphPageRankDistance[row] = pageRankDistance[row];
             }
             float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;
             cursor.graphPageExpiresAt = now + FloatMax(0.001, ttlRemaining);
             continue;
         }
 
-        if (cursor.source == SpawnCandidate_All
-            && cursor.allRow < g_NavAreasCacheCount)
-        {
-            areaIdx = cursor.allRow++;
-            // 映射 badflow 只用于召回/进度评分，绝不冒充路径连通性；
-            // 未映射的坏 Flow 仍拒绝，映射成功的点交给同帧 BuildPath 最终判定。
-            rejectBadFlow = !TryGetBucketByAreaIdx(areaIdx, candidateBucket);
-            return SpawnCandidateRead_Found;
-        }
         return SpawnCandidateRead_Exhausted;
     }
     return SpawnCandidateRead_Exhausted;
@@ -790,7 +836,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     outAreaIdx = -1;
-    if (SpawnAccel_IsDynamicGraphPending())
+    if (SpawnAccel_ShouldWaitForGraph())
         return SpawnSearch_Pending;
 
     SpawnFrameContext frame;
@@ -821,9 +867,11 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         int areaIdx;
         int candidateBucket;
         float navDistance;
+        float navRankDistance;
         bool rejectBadFlow;
         SpawnCandidateReadResult readResult = SpawnSearch_NextCandidate(
-            cursor, areaIdx, candidateBucket, navDistance, rejectBadFlow);
+            cursor, areaIdx, candidateBucket, navDistance,
+            navRankDistance, rejectBadFlow);
         if (readResult == SpawnCandidateRead_Pending)
             break;
         if (readResult == SpawnCandidateRead_Exhausted)
@@ -840,12 +888,11 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
             zc, targetSurvivor,
             frame.targetPoint, minRange,
             maxRange, teleportMode,
-            areaIdx, navDistance, candidateBucket, rejectBadFlow,
+            areaIdx, navDistance, navRankDistance,
+            candidateBucket, rejectBadFlow,
             frame.mapMaxFlowDist, frame.finaleArea,
             frame.center, frame.sectors,
-            frame.allMaxZ, frame.centerBucket,
-            frame.refEyeZ,
-            frame.lowestFootZ,
+            frame.centerBucket, frame.refEyeZ, frame.targetFootZ,
             frame.navStart, frame.visibilityRayMode,
             frame.minScore, now, candDbg,
             cursor.stats, usedExpensive);
@@ -881,12 +928,13 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (!exhausted)
         return SpawnSearch_Pending;
 
-    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,pendingSameNav=%d,flag=%d,flow=%d,dist=%d,sep=%d,pendingSep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,pendingSameNav=%d,flag=%d,flow=%d,behindFlow=%d,dist=%d,sep=%d,pendingSep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
                 cursor.minRange, cursor.maxRange, cursor.graphScanMinRange,
                 cursor.inspected,
                 cursor.stats.cooldown, cursor.stats.pendingSameNav,
                 cursor.stats.flags,
-                cursor.stats.flow, cursor.stats.distance,
+                cursor.stats.flow, cursor.stats.behindFlow,
+                cursor.stats.distance,
                 cursor.stats.separation, cursor.stats.pendingSeparation,
                 cursor.stats.stuck,
                 cursor.stats.visibility, cursor.stats.path,

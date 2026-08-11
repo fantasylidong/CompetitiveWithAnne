@@ -4,7 +4,6 @@
 // ===== 头文件 =====
 #include <sourcemod>
 #include <sdktools>
-#include <dhooks>
 #include <left4dhooks>
 #include <colors>
 #include <treeutil>
@@ -17,18 +16,6 @@
 #define CVAR_FLAGS                 FCVAR_NOTIFY
 #define PLUGIN_PREFIX              "Ai-Tank3"
 #define GAMEDATA                   "l4d2_ai_tank3"
-#define SIG_PATH_FOLLOWER_UPDATE   "PathFollower::Update"
-#define SIG_NEXTBOT_GET_COMBAT_CHARACTER "INextBot::GetNextBotCombatCharacter"
-#define SIG_PATH_GET_CUR_GOAL      "Path::GetCurrentGoal"
-#define SIG_PATH_NEXT_SEGMENT      "Path::NextSegment"
-#define SIG_PATH_LAST_SEGMENT      "Path::LastSegment"
-#define PATH_FOLLOWER_BROKER_LIBRARY "ai_tank3_pathfollower"
-#define PATH_FOLLOWER_BROKER_NATIVE "AIPathFollowerBroker_IsActive"
-#define PATH_FOLLOWER_BROKER_PREPARE_FORWARD "AIPathFollowerBroker_OnPrepare"
-#define PATH_FOLLOWER_BROKER_READY_FORWARD "AIPathFollowerBroker_OnReady"
-#define PATH_FOLLOWER_BROKER_ABORT_FORWARD "AIPathFollowerBroker_OnAbort"
-#define PATH_FOLLOWER_BROKER_STOPPING_FORWARD "AIPathFollowerBroker_OnStopping"
-#define CHARGER_PATH_FOLLOWER_FORWARD "AICharger3_OnPathFollowerUpdate"
 
 #define DEFAULT_THROW_FORCE        800.0
 #define DEFAULT_SV_GRAVITY         800.0
@@ -100,20 +87,8 @@ StringMap g_hThrowAnimMap;
 ArrayList g_hNearbyLadderList;
 
 Handle g_hSdkTankClawSweepFist;
-Handle g_hSdkNextBotGetCombatCharacter;
-Handle g_hSdkPathGetCurGoal;
-Handle g_hSdkPathNextSegment;
-Handle g_hSdkPathLastSegment;
-Handle g_hPathFollowerDetour;
-Handle g_hChargerPathFollowerForward;
-Handle g_hPathFollowerPrepareForward;
-Handle g_hPathFollowerReadyForward;
-Handle g_hPathFollowerAbortForward;
-Handle g_hPathFollowerStoppingForward;
 
 bool  g_bLateLoad;
-bool  g_bPathFollowerDetourEnabled;
-bool  g_bPathFollowerBrokerActive;
 float g_fTankSwingRange;
 float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
 float g_fLastLadderNearbyCheck[MAXPLAYERS + 1];
@@ -205,7 +180,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
-    version     = "1.0.0.2",
+    version     = "1.0.0.3",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -220,32 +195,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     MarkNativeAsOptional("L4D_FindEntityByClassnameNearest");
     MarkNativeAsOptional("L4D_FindEntityByClassnameWithin");
     MarkNativeAsOptional("L4D_NavArea_GetLadder");
-    MarkNativeAsOptional("AnneNextBot_IsActive");
-    MarkNativeAsOptional("AnneNextBot_IsPathBrokerActive");
-    MarkNativeAsOptional("AnneNextBot_SetPathConsumer");
-    RegPluginLibrary(PATH_FOLLOWER_BROKER_LIBRARY);
-    CreateNative(PATH_FOLLOWER_BROKER_NATIVE, Native_PathFollowerBrokerIsActive);
     g_bLateLoad = late;
     return APLRes_Success;
-}
-
-public any Native_PathFollowerBrokerIsActive(Handle plugin, int numParams)
-{
-    return g_bPathFollowerBrokerActive;
 }
 
 // ===== 启动 =====
 public void OnPluginStart()
 {
-    g_hChargerPathFollowerForward = CreateGlobalForward(CHARGER_PATH_FOLLOWER_FORWARD, ET_Ignore, Param_Cell, Param_Cell);
-    g_hPathFollowerPrepareForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_PREPARE_FORWARD, ET_Event);
-    g_hPathFollowerReadyForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_READY_FORWARD, ET_Ignore);
-    g_hPathFollowerAbortForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_ABORT_FORWARD, ET_Ignore);
-    g_hPathFollowerStoppingForward = CreateGlobalForward(PATH_FOLLOWER_BROKER_STOPPING_FORWARD, ET_Ignore);
-    if (!g_hChargerPathFollowerForward || !g_hPathFollowerPrepareForward || !g_hPathFollowerReadyForward
-        || !g_hPathFollowerAbortForward || !g_hPathFollowerStoppingForward)
-        SetFailState("Failed to create PathFollower broker forwards.");
-
     // 总开关
     g_cvEnable = CreateConVar("ai_tank3_enable", "1", "是否启用插件, 0=禁用, 1=启用", CVAR_FLAGS, true, 0.0, true, 1.0);
 
@@ -350,46 +306,9 @@ public void OnAllPluginsLoaded()
     if (!g_hSdkTankClawSweepFist)
         SetFailState("Failed to find signature for CTankClaw::SweepFist.");
 
-    g_hPathFollowerDetour = DHookCreateFromConf(hGamedata, SIG_PATH_FOLLOWER_UPDATE);
-    if (!g_hPathFollowerDetour)
-        SetFailState("Failed to create detour for %s.", SIG_PATH_FOLLOWER_UPDATE);
-    StartPrepSDKCall(SDKCall_Raw);
-    if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_NEXTBOT_GET_COMBAT_CHARACTER))
-        SetFailState("Failed to load offset for %s.", SIG_NEXTBOT_GET_COMBAT_CHARACTER);
-    PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
-    g_hSdkNextBotGetCombatCharacter = EndPrepSDKCall();
-    if (!g_hSdkNextBotGetCombatCharacter)
-        SetFailState("Failed to prep SDKCall for %s.", SIG_NEXTBOT_GET_COMBAT_CHARACTER);
-
-    StartPrepSDKCall(SDKCall_Raw);
-    if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_PATH_GET_CUR_GOAL))
-        SetFailState("Failed to load offset for %s.", SIG_PATH_GET_CUR_GOAL);
-    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-    g_hSdkPathGetCurGoal = EndPrepSDKCall();
-    if (!g_hSdkPathGetCurGoal)
-        SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_GET_CUR_GOAL);
-
-    StartPrepSDKCall(SDKCall_Raw);
-    if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_PATH_NEXT_SEGMENT))
-        SetFailState("Failed to load offset for %s.", SIG_PATH_NEXT_SEGMENT);
-    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-    PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-    g_hSdkPathNextSegment = EndPrepSDKCall();
-    if (!g_hSdkPathNextSegment)
-        SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_NEXT_SEGMENT);
-
-    StartPrepSDKCall(SDKCall_Raw);
-    if (!PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, SIG_PATH_LAST_SEGMENT))
-        SetFailState("Failed to load offset for %s.", SIG_PATH_LAST_SEGMENT);
-    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-    g_hSdkPathLastSegment = EndPrepSDKCall();
-    if (!g_hSdkPathLastSegment)
-        SetFailState("Failed to prep SDKCall for %s.", SIG_PATH_LAST_SEGMENT);
-
     delete hGamedata;
-    SetAnneNextBotPathConsumer(true);
-    if (!IsAnneNextBotPathBrokerActive())
-        StartPathFollowerBroker();
+    if (!SetAnneNextBotPathConsumer(true))
+        SetFailState("ai_tank3 requires anne_nextbot path snapshots.");
 }
 
 bool SetAnneNextBotPathConsumer(bool enabled)
@@ -397,107 +316,23 @@ bool SetAnneNextBotPathConsumer(bool enabled)
     if (!LibraryExists(ANNE_NEXTBOT_LIBRARY)
         || GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") != FeatureStatus_Available
         || GetFeatureStatus(FeatureType_Native, "AnneNextBot_SetPathConsumer") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "AnneNextBot_GetPathSnapshotInfo") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "AnneNextBot_GetPathSegment") != FeatureStatus_Available
         || !AnneNextBot_IsActive())
         return false;
 
     return AnneNextBot_SetPathConsumer(AnneNextBotPathConsumer_Tank, enabled);
 }
 
-bool IsAnneNextBotPathBrokerActive()
+public void AnneNextBot_OnTankPathSnapshotUpdated(int client)
 {
-    return LibraryExists(ANNE_NEXTBOT_LIBRARY)
-        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsPathBrokerActive") == FeatureStatus_Available
-        && AnneNextBot_IsActive()
-        && AnneNextBot_IsPathBrokerActive();
-}
-
-void NotifyPathFollowerBroker(Handle forwardHandle)
-{
-    if (!forwardHandle)
-        return;
-
-    Call_StartForward(forwardHandle);
-    Call_Finish();
-}
-
-void StartPathFollowerBroker()
-{
-    Action prepareResult = Plugin_Continue;
-    Call_StartForward(g_hPathFollowerPrepareForward);
-    Call_Finish(prepareResult);
-    if (prepareResult >= Plugin_Handled)
-    {
-        NotifyPathFollowerBroker(g_hPathFollowerAbortForward);
-        SetFailState("A PathFollower broker consumer could not release its local detour.");
-        return;
-    }
-
-    if (!DHookEnableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
-    {
-        NotifyPathFollowerBroker(g_hPathFollowerAbortForward);
-        SetFailState("Failed to enable detour for %s.", SIG_PATH_FOLLOWER_UPDATE);
-        return;
-    }
-
-    g_bPathFollowerDetourEnabled = true;
-    g_bPathFollowerBrokerActive = true;
-    NotifyPathFollowerBroker(g_hPathFollowerReadyForward);
-}
-
-public MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams)
-{
-    if (!pThis || !hParams || !g_hSdkNextBotGetCombatCharacter)
-        return MRES_Ignored;
-
-    Address pNextBot = view_as<Address>(DHookGetParam(hParams, 1));
-    if (!pNextBot)
-        return MRES_Ignored;
-
-    int client = SDKCall(g_hSdkNextBotGetCombatCharacter, pNextBot);
-    if (!IsValidInfected(client) || !IsFakeClient(client) || !IsPlayerAlive(client) || IsInGhostState(client))
-        return MRES_Ignored;
-
-    int infectedClass = GetInfectedClass(client);
-    if (infectedClass == ZC_CHARGER)
-    {
-        if (g_hChargerPathFollowerForward && GetForwardFunctionCount(g_hChargerPathFollowerForward) > 0)
-        {
-            Call_StartForward(g_hChargerPathFollowerForward);
-            Call_PushCell(client);
-            Call_PushCell(view_as<int>(pThis));
-            Call_Finish();
-        }
-        return MRES_Ignored;
-    }
-
-    HandleTankPathFollowerUpdate(client, pThis);
-    return MRES_Ignored;
-}
-
-public void AnneNextBot_OnTankPathFollowerUpdate(int client, int pathFollower)
-{
-    HandleTankPathFollowerUpdate(client, view_as<Address>(pathFollower));
-}
-
-void HandleTankPathFollowerUpdate(int client, Address pPathFollower)
-{
-    if (!pPathFollower || !g_hSdkPathGetCurGoal)
-        return;
     if (!IsValidInfected(client) || !IsFakeClient(client) || !IsPlayerAlive(client) || IsInGhostState(client))
         return;
     if (GetInfectedClass(client) != ZC_TANK || IsClientIncapped(client))
         return;
 
-    Address pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pPathFollower));
-    if (!pPathSeg)
-    {
+    if (!captureTankPathSnapshot(client))
         clearCachedTankPath(client);
-        return;
-    }
-
-    // PathFollower 和 PathSegment 原生对象只在本次回调内使用，跨帧逻辑只读取值快照。
-    captureTankPathSnapshot(client, pPathFollower, pPathSeg);
 }
 
 // ===== 读取/监听 CVar =====
@@ -521,41 +356,11 @@ void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[]
 public void OnPluginEnd()
 {
     SetAnneNextBotPathConsumer(false);
-    if (g_bPathFollowerBrokerActive)
-    {
-        g_bPathFollowerBrokerActive = false;
-        NotifyPathFollowerBroker(g_hPathFollowerStoppingForward);
-    }
-    if (g_bPathFollowerDetourEnabled && g_hPathFollowerDetour)
-    {
-        if (!DHookDisableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
-            LogError("Failed to disable detour for %s during unload.", SIG_PATH_FOLLOWER_UPDATE);
-        g_bPathFollowerDetourEnabled = false;
-    }
-
     for (int client = 1; client <= MaxClients; client++)
         delete g_TankPathSnapshots[client];
     delete log;
     delete g_hThrowAnimMap;
     delete g_hNearbyLadderList;
-    delete g_hPathFollowerDetour;
-    delete g_hChargerPathFollowerForward;
-    delete g_hPathFollowerPrepareForward;
-    delete g_hPathFollowerReadyForward;
-    delete g_hPathFollowerAbortForward;
-    delete g_hPathFollowerStoppingForward;
-    delete g_hSdkNextBotGetCombatCharacter;
-    delete g_hSdkPathGetCurGoal;
-    delete g_hSdkPathNextSegment;
-    delete g_hSdkPathLastSegment;
-}
-
-public void OnLibraryRemoved(const char[] name)
-{
-    if (!StrEqual(name, ANNE_NEXTBOT_LIBRARY) || g_bPathFollowerBrokerActive || !g_hPathFollowerDetour)
-        return;
-
-    StartPathFollowerBroker();
 }
 
 // ===== 事件 =====
@@ -1557,42 +1362,45 @@ bool hasValidTankPath(int client)
     );
 }
 
-void constructPathSegment(Address pPathSegment, PathSegment segment)
+bool constructPathSegmentFromSnapshot(int client, int sourceIndex, PathSegment segment)
 {
-    if (!pPathSegment)
+    segment.initData();
+    if (!AnneNextBot_GetPathSegment(
+        client,
+        sourceIndex,
+        segment.m_pNavArea,
+        segment.m_iNavTraverseType,
+        segment.m_vecGoalPos,
+        segment.m_SegmentType,
+        segment.m_vecForward,
+        segment.m_flLength,
+        segment.m_flDistFromStart
+    ))
     {
-        segment.initData();
-        return;
+        return false;
     }
 
-    segment.m_pPathSegment = pPathSegment;
-    segment.m_pNavArea = view_as<Address>(LoadFromAddress(pPathSegment, NumberType_Int32));
-    segment.m_iNavTraverseType = view_as<int>(LoadFromAddress(pPathSegment + view_as<Address>(4), NumberType_Int32));
-    segment.m_vecGoalPos[0] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(8), NumberType_Int32));
-    segment.m_vecGoalPos[1] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(12), NumberType_Int32));
-    segment.m_vecGoalPos[2] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(16), NumberType_Int32));
-    segment.m_SegmentType = view_as<int>(LoadFromAddress(pPathSegment + view_as<Address>(24), NumberType_Int32));
-    segment.m_vecForward[0] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(28), NumberType_Int32));
-    segment.m_vecForward[1] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(32), NumberType_Int32));
-    segment.m_vecForward[2] = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(36), NumberType_Int32));
-    segment.m_flLength = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(40), NumberType_Int32));
-    segment.m_flDistFromStart = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(44), NumberType_Int32));
+    // 该字段现在只是稳定的非零节点令牌，不再保存原生 PathSegment 指针。
+    segment.m_pPathSegment = view_as<Address>(sourceIndex + 1);
+    return true;
 }
 
-bool captureTankPathSnapshot(int client, Address pPathFollower, Address pCurrentSeg)
+bool captureTankPathSnapshot(int client)
 {
     clearTankPathSnapshot(client);
 
     ArrayList snapshot = g_TankPathSnapshots[client];
-    if (snapshot == null || !pPathFollower || !pCurrentSeg)
+    int count, currentIndex;
+    bool complete;
+    float age;
+    if (snapshot == null ||
+        !AnneNextBot_GetPathSnapshotInfo(client, count, currentIndex, complete, age) ||
+        currentIndex < 0 || currentIndex >= count)
     {
         clearCachedTankPath(client);
         return false;
     }
 
-    Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pPathFollower));
-    Address pIterSeg = pCurrentSeg;
-    Address pPreviousSeg = Address_Null;
     PathSegment segment;
 
     int maxDepth = g_cvPathLookAheadMaxDepth.IntValue;
@@ -1604,20 +1412,14 @@ bool captureTankPathSnapshot(int client, Address pPathFollower, Address pCurrent
         ? MAX_TANK_PATH_SNAPSHOT_SEGMENTS
         : maxDepth * 2 + 1;
 
-    for (int i = 0; i < snapshotLimit && pIterSeg; i++)
+    int endIndex = currentIndex + snapshotLimit;
+    if (endIndex > count)
+        endIndex = count;
+    for (int sourceIndex = currentIndex; sourceIndex < endIndex; sourceIndex++)
     {
-        constructPathSegment(pIterSeg, segment);
+        if (!constructPathSegmentFromSnapshot(client, sourceIndex, segment))
+            break;
         snapshot.PushArray(segment, sizeof(segment));
-
-        if (pIterSeg == pLastSeg)
-            break;
-
-        Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pIterSeg));
-        if (!pNextSeg || pNextSeg == pIterSeg || pNextSeg == pPreviousSeg)
-            break;
-
-        pPreviousSeg = pIterSeg;
-        pIterSeg = pNextSeg;
     }
 
     if (snapshot.Length < 1)
@@ -1628,9 +1430,7 @@ bool captureTankPathSnapshot(int client, Address pPathFollower, Address pCurrent
 
     snapshot.GetArray(0, g_AiTanks[client].pathSegment, sizeof(PathSegment));
 
-    if (pLastSeg)
-        constructPathSegment(pLastSeg, g_AiTanks[client].lastPathSegment);
-    else
+    if (!complete || !constructPathSegmentFromSnapshot(client, count - 1, g_AiTanks[client].lastPathSegment))
         g_AiTanks[client].lastPathSegment.initData();
 
     return true;

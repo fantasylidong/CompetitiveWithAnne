@@ -180,6 +180,22 @@
 	{
 		"jp"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
 	}
+	"InfectedControl_TraitorWaveMayExtend"
+	{
+		"jp"		"{green}[IC]{default} Find a spawn position now. Survivor holding may delay this wave and your spawn unlock."
+	}
+	"InfectedControl_TraitorReadyCountdown"
+	{
+		"jp"		"Earliest spawn: %d seconds (holding may extend)"
+	}
+	"InfectedControl_TraitorWaveExtended"
+	{
+		"jp"		"{green}[IC]{default} Survivors are holding an advantageous position. Your spawn stays locked until the wave is released."
+	}
+	"InfectedControl_TraitorWaveExtendedHint"
+	{
+		"jp"		"Spawn delayed by survivor holding"
+	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
 		"jp"		"{green}[IC]{default} The SI refresh point has arrived. You have {olive}%d{default} seconds to spawn yourself."

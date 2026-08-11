@@ -180,6 +180,22 @@
 	{
 		"zho"		"{green}[IC]{default} AI 特感大約還有 {olive}%d{default} 秒刷新。"
 	}
+	"InfectedControl_TraitorWaveMayExtend"
+	{
+		"zho"		"{green}[IC]{default} 現在可以先尋找復活位置；生還者守點可能延長本波和你的復活等待。"
+	}
+	"InfectedControl_TraitorReadyCountdown"
+	{
+		"zho"		"最快可復活：%d 秒（守點可能延長）"
+	}
+	"InfectedControl_TraitorWaveExtended"
+	{
+		"zho"		"{green}[IC]{default} 生還者正在優勢位置守點；波次放行前你仍不能復活，請繼續尋找位置。"
+	}
+	"InfectedControl_TraitorWaveExtendedHint"
+	{
+		"zho"		"生還者守點：復活時間延長中"
+	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
 		"zho"		"{green}[IC]{default} 特感刷新時間已到，你有 {olive}%d{default} 秒自己復活。"

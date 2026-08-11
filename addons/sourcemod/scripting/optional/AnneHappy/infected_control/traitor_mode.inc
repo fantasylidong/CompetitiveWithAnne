@@ -4,6 +4,7 @@
 #define _infected_control_traitor_mode_included
 
 #define TRAITOR_SPAWN_WINDOW_SECONDS 5
+#define TRAITOR_READY_COUNTDOWN_SECONDS 3
 #define TRAITOR_ROUND_AUTH_LENGTH 64
 #define TRAITOR_ROUND_USE_KEY_LENGTH 80
 #define TRAITOR_CLASS_TANK ZC_TANK
@@ -71,6 +72,7 @@ static ConVar g_ITVomitFadeDuration = null;
 static int g_ITNoDamageBlockedWaves[MAXPLAYERS + 1];
 static float g_ITSpawnDeadline[MAXPLAYERS + 1];
 static Handle g_ITSpawnTimer[MAXPLAYERS + 1];
+static int g_ITLastReadyCountdown[MAXPLAYERS + 1];
 static bool g_ITRefreshPending[MAXPLAYERS + 1];
 static int g_ITRefreshClass[MAXPLAYERS + 1];
 static float g_ITRefreshOrigin[MAXPLAYERS + 1][3];
@@ -1857,6 +1859,7 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
     g_ITDeferredRegistrationOrder[client] = 0;
     g_ITDeferredWaitOrder[client] = 0;
     g_ITNextReghostNoticeAt[client] = 0.0;
+    g_ITLastReadyCountdown[client] = 0;
     Traitor_CancelSpawnTimer(client);
     Traitor_RefreshDamageHookDemand();
 }
@@ -2923,8 +2926,8 @@ void Traitor_OnFinalRefreshStarted()
             registrationChanged = true;
             continue;
         }
-        float seconds = DifficultyStrategy_GetConfiguredWaveDelay();
-        CPrintToChat(client, "%t", "InfectedControl_TraitorWaveCountdown", RoundToCeil(seconds));
+        g_ITLastReadyCountdown[client] = 0;
+        CPrintToChat(client, "%t", "InfectedControl_TraitorWaveMayExtend");
         CPrintToChat(client, "%t", "InfectedControl_TraitorPending");
         Debug_Print("[TRAITOR] %N locked for wave %d as %s", client, releaseWave, g_sInfectedClassNames[g_ITClass[client]]);
     }
@@ -2933,6 +2936,42 @@ void Traitor_OnFinalRefreshStarted()
 
     if (registrationChanged)
         Traitor_ActivateWaitingClients();
+}
+
+void Traitor_UpdateSpawnLockedCountdown(float remaining)
+{
+    if (remaining <= 0.0 || remaining > float(TRAITOR_READY_COUNTDOWN_SECONDS))
+        return;
+
+    int seconds = RoundToCeil(remaining);
+    if (seconds < 1)
+        seconds = 1;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsValidClient(client)
+            || g_ITState[client] != Traitor_SpawnLocked
+            || g_ITLastReadyCountdown[client] == seconds)
+        {
+            continue;
+        }
+
+        g_ITLastReadyCountdown[client] = seconds;
+        PrintHintText(client, "%t", "InfectedControl_TraitorReadyCountdown", seconds);
+    }
+}
+
+void Traitor_OnAntiBaitHoldStarted()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsValidClient(client) || g_ITState[client] != Traitor_SpawnLocked)
+            continue;
+
+        g_ITLastReadyCountdown[client] = 0;
+        CPrintToChat(client, "%t", "InfectedControl_TraitorWaveExtended");
+        PrintHintText(client, "%t", "InfectedControl_TraitorWaveExtendedHint");
+    }
 }
 
 void Traitor_OnWaveReleased(int waveIndex)

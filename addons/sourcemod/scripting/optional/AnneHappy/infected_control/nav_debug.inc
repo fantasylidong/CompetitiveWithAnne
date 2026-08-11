@@ -195,11 +195,12 @@ public Action Cmd_NavTest(int client, int args)
 
     // 5. 位置关系
     int targetSur = ChooseTargetSurvivor();
-    bool passPosition = PassRealPositionCheck(testPos, targetSur);
     int candPercent = GetPositionBucketPercent(testPos);
     int surPercent = -1;
     if (IsValidSurvivor(targetSur)) TryGetClientFlowPercentSafe(targetSur, surPercent);
     int deltaReal = candPercent - surPercent;
+    bool passPosition = candPercent >= 0 && surPercent >= 0
+        && !SpawnScore_ShouldRejectBehindFlow(candPercent, surPercent);
     PrintToConsole(client, "[5] Position Check: %s | Cand: %d%% | Sur: %d%% | Delta: %d%%",
         passPosition ? "PASS" : "FAIL (behind/underfoot)", candPercent, surPercent, deltaReal);
 
@@ -233,29 +234,19 @@ public Action Cmd_NavTest(int client, int args)
 
     // 高度“偏好”分（独立正向项，不是扣分器）
     float refEyeZ = 0.0;
+    float targetFootZ = center[2];
     float targetEye[3];
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
     {
         GetClientEyePosition(targetSur, targetEye);
         refEyeZ = targetEye[2];
+        float targetOrigin[3];
+        GetClientAbsOrigin(targetSur, targetOrigin);
+        targetFootZ = targetOrigin[2];
     }
-
-    // 计算全队最高眼睛高度，用于 badflow 惩罚参考面
-    float bestEyeZ = -1.0e9;
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (IsValidSurvivor(i) && IsPlayerAlive(i))
-        {
-            float ez[3]; GetClientEyePosition(i, ez);
-            if (ez[2] > bestEyeZ) bestEyeZ = ez[2];
-        }
-    }
-    if (bestEyeZ <= -1.0e8) bestEyeZ = refEyeZ; // 兜底
 
     int centerBucket = surPercent;
     bool  rawBadFlow = (!passFlowRaw && passFlow);
-    float lowestFootZ = 1.0e9;
-    TryGetLowestSurvivorFootZ(lowestFootZ);
     Visibility_RefreshEyeSnapshot();
     float dTargetEye = GetVectorDistance(testPos, targetEye);
     float tacticalQuality = Tactical_GetCandidateQuality(zc, testPos, targetSur, targetEye);
@@ -264,18 +255,20 @@ public Action Cmd_NavTest(int client, int args)
                                                    -1.0, -1.0, 0.0,
                                                    gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
                                                    candPercent, centerBucket, rawBadFlow,
-                                                   refEyeZ, bestEyeZ, lowestFootZ, sidx, index,
-                                                   GetNavHistoryWeight(index, GetGameTime()),
+                                                   passFlow, refEyeZ, targetFootZ,
+                                                   sidx, index,
                                                    tacticalQuality, scoreDbg);
 
     PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)",
         scoreDbg.dist, scoreDbg.sweet, scoreDbg.width);
     PrintToConsole(client, "  Height Score: %.1f (refZ: %.1f, candZ: %.1f, delta: %.1f)",
         scoreDbg.hght, refEyeZ, testPos[2], testPos[2] - refEyeZ);
-    PrintToConsole(client, "  Extra Penalty: %.1f", scoreDbg.extraPen);
-    PrintToConsole(client, "  Nav History: weight=%.2f penalty=%.1f total=%.1f base=%.1f",
-        scoreDbg.navWeight, scoreDbg.navPenalty, scoreDbg.total, scoreDbg.baseTotal);
-
+    PrintToConsole(client, "  High Bonus: %.1f (rise=%.1f steps=%d)",
+        scoreDbg.highHeightBonus, scoreDbg.highHeightRise, scoreDbg.highHeightSteps);
+    PrintToConsole(client, "  Extra Penalty: %.1f (behind=%.1f lowHeight=%.1f footZ=%.1f drop=%.1f steps=%d x%.1f)",
+        scoreDbg.extraPen, scoreDbg.behindPen, scoreDbg.lowHeightPen,
+        scoreDbg.targetFootZ, scoreDbg.lowHeightDrop,
+        scoreDbg.lowHeightSteps, scoreDbg.lowHeightMultiplier);
     if (rawBadFlow)
     {
         PrintToConsole(client, "  Flow Score: base=%.1f, penalty=%.1f -> %.1f (delta: %d)%s",

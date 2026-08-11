@@ -34,16 +34,12 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.2",
+	version 		= "1.0.1.3",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax) {
-	MarkNativeAsOptional("AIPathFollowerBroker_IsActive");
-	MarkNativeAsOptional("AnneNextBot_IsActive");
-	MarkNativeAsOptional("AnneNextBot_IsPathBrokerActive");
-	MarkNativeAsOptional("AnneNextBot_SetPathConsumer");
-	return APLRes_Success;
+		return APLRes_Success;
 }
 
 public void OnPluginStart() {
@@ -153,33 +149,6 @@ public void OnPluginEnd() {
 
 public void OnAllPluginsLoaded() {
 	SetUp_OnAllPluginsLoaded();
-}
-
-public Action AIPathFollowerBroker_OnPrepare() {
-	return SetUp_PreparePathFollowerBroker() ? Plugin_Continue : Plugin_Stop;
-}
-
-public void AIPathFollowerBroker_OnReady() {
-	SetUp_UseActivePathFollowerBroker();
-}
-
-public void AIPathFollowerBroker_OnAbort() {
-	SetUp_UseLocalPathFollowerDetour();
-}
-
-public void AIPathFollowerBroker_OnStopping() {
-	SetUp_UseLocalPathFollowerDetour();
-}
-
-public void OnLibraryRemoved(const char[] name) {
-	if (StrEqual(name, ANNE_NEXTBOT_LIBRARY)) {
-		if (SetUp_IsPathFollowerBrokerActive())
-			SetUp_UseActivePathFollowerBroker();
-		else
-			SetUp_UseLocalPathFollowerDetour();
-	} else if (StrEqual(name, PATH_FOLLOWER_BROKER_LIBRARY)) {
-		SetUp_UseLocalPathFollowerDetour();
-	}
 }
 
 public void OnConfigsExecuted() {
@@ -390,88 +359,50 @@ int selectLegacyCompatibleTarget(int client, int currentTarget)
 	return getClosestSurvivorAndValid(client);
 }
 
-// PathFollower::Update(long double a1@<st0>, PathFollower *this, INextBot *a3)
 // PathFollower::Update 首次执行晚于 OnPlayerRunCmd, 并且频率大概是 OnPlayerRunCmd 的 1/3
-MRESReturn Detour_PathFollower_Update(Address pThis, Handle hParams) {
-	if (!pThis) {
-		stateLog.error("Detour for signature: %s got null this pointer", SIG_PATH_FOLLOWER_UPDATE);
-		return MRES_Ignored;
-	}
-	if (!hParams) {
-		stateLog.error("Detour for signature: %s got null params handle", SIG_PATH_FOLLOWER_UPDATE);
-		return MRES_Ignored;
-	}
+public void AnneNextBot_OnChargerPathSnapshotUpdated(int client) {
+		if (!isAiCharger(client))
+			return;
 
-	// 首先获取 client index
-	static Address pNextBot;
-	pNextBot = view_as<Address>(DHookGetParam(hParams, 1));
-	if (!pNextBot) {
-		stateLog.error("Detour for signature: %s got null parameter 1: nextbot pointer", SIG_PATH_FOLLOWER_UPDATE);
-		return MRES_Ignored;
-	}
-	static int client;
-	client = SDKCall(g_hSdkNextBotGetCombatCharacter, pNextBot);
-	if (!isAiCharger(client))
-		return MRES_Ignored;
+		if (g_AiChargers[client].m_bPathInvalidatePending) {
+			g_AiChargers[client].m_bPathInvalidatePending = false;
+			AnneNextBot_InvalidatePath(client);
+			clearCachedPath(client);
+			return;
+		}
 
-	ProcessChargerPathFollowerUpdate(client, pThis);
-	return MRES_Ignored;
+		int count, currentIndex;
+		bool complete;
+		float age;
+		if (!AnneNextBot_GetPathSnapshotInfo(client, count, currentIndex, complete, age) ||
+			currentIndex < 0 || currentIndex >= count) {
+			clearCachedPath(client);
+			return;
+		}
+
+		PathSegment curSegment;
+		if (!constructPathSegmentFromSnapshot(client, currentIndex, curSegment)) {
+			clearCachedPath(client);
+			return;
+		}
+		g_AiChargers[client].m_PathSegment = curSegment;
+
+		// 检查落后的 m_goal；无法在剩余路径中重新定位时，无效化旧路径并等待原生 Action 重新寻路。
+		if (!checkGoalIsBehind(client, currentIndex))
+			return;
+
+		if (!capturePathSnapshot(client))
+			clearCachedPath(client);
 }
 
-public void AICharger3_OnPathFollowerUpdate(int client, int pathFollower) {
-	if (!g_bUsingSharedPathFollowerDetour || !pathFollower || !isAiCharger(client))
-		return;
+bool checkGoalIsBehind(int client, int currentIndex) {
+		if (!isAiCharger(client))
+			return false;
 
-	ProcessChargerPathFollowerUpdate(client, view_as<Address>(pathFollower));
-}
-
-void ProcessChargerPathFollowerUpdate(int client, Address pThis) {
-
-	// 只在当前回调期间使用 PathFollower。跨帧缓存该原生对象会形成悬空指针。
-	if (g_AiChargers[client].m_bPathInvalidatePending) {
-		g_AiChargers[client].m_bPathInvalidatePending = false;
-		SDKCall(g_hSdkPathInvalidate, pThis);
-		clearCachedPath(client);
-		return;
-	}
-
-	// v37 = *((_DWORD *)this + 4566); 因为 this 被转成了 DWORD 类型, 因此后面的偏移量 4566 也是基于 4 字节的
-	static Address pPathSeg;
-	static PathSegment curSegment;
-	// Current Segment struct
-	pPathSeg = view_as<Address>(SDKCall(g_hSdkPathGetCurGoal, pThis));
-	if (!pPathSeg) {
-		clearCachedPath(client);
-		return;
-	}
-
-	constructPathSegment(pPathSeg, curSegment);
-	g_AiChargers[client].m_PathSegment = curSegment;
-
-	// 检查落后的 m_goal；无法在剩余路径中重新定位时，无效化旧路径并等待原生 Action 重新寻路。
-	checkGoalIsBehind(client, pThis, pPathSeg);
-
-	// 路径前瞻只消费值快照，不把 PathFollower 或 PathSegment 原生对象带出本次回调。
-	pPathSeg = g_AiChargers[client].m_PathSegment.m_pPathSegment;
-	if (pPathSeg)
-		capturePathSnapshot(client, pThis, pPathSeg);
-	else
-		clearCachedPath(client);
-
-}
-
-void checkGoalIsBehind(int client, Address pPathFollower, Address pCurrentSeg) {
-	if (!isAiCharger(client))
-		return;
-	if (!pPathFollower)
-		return;
-	if (!pCurrentSeg)
-		return;
-
-	PathSegment curSeg;
-	curSeg = g_AiChargers[client].m_PathSegment;
-	if (!curSeg.m_pNavArea)
-		return;
+		PathSegment curSeg;
+		curSeg = g_AiChargers[client].m_PathSegment;
+		if (!curSeg.m_pNavArea)
+			return false;
 
 	Address pLastKnownArea = L4D_GetLastKnownArea(client);
 	if (!pLastKnownArea) {
@@ -480,100 +411,57 @@ void checkGoalIsBehind(int client, Address pPathFollower, Address pCurrentSeg) {
 		pos[2] += 20.0;
 		pLastKnownArea = view_as<Address>(L4D_GetNearestNavArea(pos, _, _, true, true, TEAM_INFECTED));
 
-		if (!pLastKnownArea) {
-			log.error("[CheckGoalIsBehind]: Failed to get client %N's LastKnownArea or nearest NavArea", client);
-			return;
-		}
-	}
-
-	/*
-	 * 原生 CheckProgress 的 LookAhead 机制可能一次跳过多个 Segment, 虽然 LookAhead Range 一般会被设置成 0, 所以是关闭的
-	 * 但是为了防止这种情况, 考虑 LookAhead 机制, 开启 LookAhead 时, LastKnownArea 位于 CurrentGoal
-	 * 之前的任意 Segment 都可能是正常状态，不能仅检查 PriorSegment
-	 */
-	static Address pPastSeg;
-	static PathSegment pastSeg;
-	pPastSeg = pCurrentSeg;
-	while (pPastSeg) {
-		constructPathSegment(pPastSeg, pastSeg);
-		if (pastSeg.m_pNavArea == pLastKnownArea)
-			return;
-
-		pPastSeg = view_as<Address>(SDKCall(g_hSdkPathPriorSegment, pPathFollower, pPastSeg));
-	}
-
-	/*
-	* 向前检查当前路径的 PathSegment, 检查 LastKnownArea 是否属于 CurrentGoal 本身或者之前的路径
-	* 如果是, 说明 Charger 正在朝着 CurrentGoal 或者已经到达了 CurrentGoal, 此时无需干预
-	*/
-	if (pPastSeg) {
-		log.debugAll("[CheckGoalIsBehind]: Aborted prior path scan for Charger %N because found a prior segment (NavId: %d) is same as LastKnownArea (NavId: %d)",
-			client, L4D_GetNavAreaID(pastSeg.m_pNavArea)), L4D_GetNavAreaID(pLastKnownArea);
-		return;
-	}
-
-	/*
-	* CurrentGoal 落后于 LastKnownArea 但是 LastKnownArea 仍然在当前 Path 上
-	* 从 CurrengSegment 开始向后扫描, 直到 LastKnownArea, 如果找到了一个 Segment 等于 LastKnownArea, 那么将 CurrentGoal 设置为 LastKnownArea 的 Segment
-	*/
-	static Address pIterSeg, pMatchedSeg;
-	pIterSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pCurrentSeg));
-	pMatchedSeg = Address_Null;
-
-	// 从 CurrentGoal 开始向后扫描整段路径
-	while (pIterSeg) {
-		static PathSegment iterSeg;
-		constructPathSegment(pIterSeg, iterSeg);
-
-		if (iterSeg.m_pNavArea == pLastKnownArea) {
-			pMatchedSeg = pIterSeg;
-			break;
+			if (!pLastKnownArea) {
+				log.error("[CheckGoalIsBehind]: Failed to get client %N's LastKnownArea or nearest NavArea", client);
+				return true;
+			}
 		}
 
-		pIterSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pIterSeg));
-	}
+		int count, refreshedCurrent;
+		bool complete;
+		float age;
+		if (!AnneNextBot_GetPathSnapshotInfo(client, count, refreshedCurrent, complete, age))
+			return false;
+		if (refreshedCurrent != currentIndex)
+			currentIndex = refreshedCurrent;
 
-	if (pMatchedSeg) {
-		// 进入匹配 NavArea 不代表已经越过该 Segment 的 GoalPos, 因此不再额外跳到 NextSegment
-		static Address pNewGoal;
-		pNewGoal = pMatchedSeg;
-		// 将 PathFollower::m_goal 写成当前 LastKnownArea 对应的 PathSegment 的 m_goal
-		StoreToAddress(pPathFollower + view_as<Address>(g_iPathFollowerGoalOffset), pNewGoal, NumberType_Int32);
-
-		static PathSegment newGoalSeg;
-		constructPathSegment(pNewGoal, newGoalSeg);
-		g_AiChargers[client].m_PathSegment = newGoalSeg;
-
-		static Address pNewNext;
-		pNewNext = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pNewGoal));
-		if (pNewNext) {
-			static PathSegment newNextSeg;
-			constructPathSegment(pNewNext, newNextSeg);
-			g_AiChargers[client].m_NextPathSegment = newNextSeg;
-		} else {
-			g_AiChargers[client].m_NextPathSegment.init();
+		PathSegment segment;
+		for (int index = 0; index <= currentIndex && index < count; index++) {
+			if (constructPathSegmentFromSnapshot(client, index, segment) && segment.m_pNavArea == pLastKnownArea)
+				return true;
 		}
 
-		// 重新找到了新的 CurrentGoal, 重置空中速度修正坐标
-		ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
-		g_AiChargers[client].m_AirStrafe.init();
+		int matchedIndex = -1;
+		for (int index = currentIndex + 1; index < count; index++) {
+			if (constructPathSegmentFromSnapshot(client, index, segment) && segment.m_pNavArea == pLastKnownArea) {
+				matchedIndex = index;
+				break;
+			}
+		}
 
-		log.debugAll("[CheckGoalIsBehind]: Advanced Charger %N goal after matching future NavArea %d", client, L4D_GetNavAreaID(pLastKnownArea));
-		return;
-	}
+		if (matchedIndex >= 0 && AnneNextBot_SetPathGoal(client, matchedIndex)) {
+			// 进入匹配 NavArea 不代表已经越过该 Segment 的 GoalPos, 因此不再额外跳到 NextSegment
+			// 重新找到了新的 CurrentGoal, 重置空中速度修正坐标
+			ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+			g_AiChargers[client].m_AirStrafe.init();
+
+			log.debugAll("[CheckGoalIsBehind]: Advanced Charger %N goal after matching future NavArea %d", client, L4D_GetNavAreaID(pLastKnownArea));
+			return true;
+		}
 
 	/*
 	* 如果 LastKnownArea 无法匹配当前 Path 上任何一个节点, 说明 Charger 已经脱离该 Path, 此时需要使旧的 Path 无效化
 	* 然后通过 ChargerAttack::Update 这个 Action 重新构造一条新的 Path
 	*/
-	SDKCall(g_hSdkPathInvalidate, pPathFollower);
+		AnneNextBot_InvalidatePath(client);
 
 	clearCachedPath(client);
 	ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
 	g_AiChargers[client].m_AirStrafe.init();
 	g_AiChargers[client].m_BhopType = BhopType_None;
 
-	log.debugAll("[CheckGoalIsBehind]: Invalidated Charger %N path because LastKnownArea %d is absent from the remaining path", client, L4D_GetNavAreaID(pLastKnownArea));
+		log.debugAll("[CheckGoalIsBehind]: Invalidated Charger %N path because LastKnownArea %d is absent from the remaining path", client, L4D_GetNavAreaID(pLastKnownArea));
+		return false;
 }
 
 /**

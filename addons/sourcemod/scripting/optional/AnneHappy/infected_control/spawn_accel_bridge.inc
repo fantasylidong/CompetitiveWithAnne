@@ -92,6 +92,14 @@ stock bool SpawnAccel_IsDynamicGraphPending()
     return g_bSpawnAccel && g_bSpawnAccelDynamicRebuildPending;
 }
 
+stock bool SpawnAccel_ShouldWaitForGraph()
+{
+    return g_bSpawnAccel
+        && (g_bSpawnAccelDynamicRebuildPending
+            || (!g_bSpawnAccelGraphReady
+                && g_hSpawnAccelGraphTimer != INVALID_HANDLE));
+}
+
 stock bool SpawnAccel_ShouldRetryTopology(int diagnosticFlags)
 {
     return diagnosticFlags >= 0
@@ -143,7 +151,7 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
     {
         Debug_Print("[SPAWN ACCEL] extension %s",
                     available ? "active (all required natives available)"
-                              : "unavailable (using SourcePawn fallbacks)");
+                              : "unavailable (directed Nav disabled; Director fallback remains available)");
         if (!available)
             SpawnAccel_LogUnavailableReason();
         else
@@ -386,6 +394,30 @@ stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
     return status;
 }
 
+stock int SpawnAccel_PrepareTargetCandidatesRanked(
+    int target, float maxAge, float highGroundMinHeight,
+    float highGroundDistanceScale)
+{
+    if (!SpawnAccel_CanUseGraphCandidates())
+        return ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE;
+
+    int targetNavId;
+    if (!SpawnAccel_GetClientNavId(target, targetNavId))
+        return ANNE_SPAWN_NAV_CANDIDATE_PENDING;
+
+    int status = AnneSpawn_NavCandidatesPrepareRanked(
+        target, targetNavId, SpawnAccel_GetCandidatePathLimit(),
+        FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin), maxAge,
+        highGroundMinHeight, highGroundDistanceScale);
+    if (status > 0)
+        g_iSpawnAccelCandidatePrepareReady++;
+    else if (status == 0 || status == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+        g_iSpawnAccelCandidatePreparePending++;
+    else
+        g_iSpawnAccelCandidatePrepareUnavailable++;
+    return status;
+}
+
 stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
 {
     if (!g_bSpawnAccel)
@@ -430,7 +462,7 @@ stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
         g_fSpawnAccelNextCandidateRefresh = 0.0;
         Debug_Print("[SPAWN ACCEL] directed Nav graph ready: candidateSource=%s diagnostics=(%s)",
                     g_bSpawnAccelGraphCandidatesAvailable
-                        ? "directed" : "all_path_bracket",
+                        ? "directed" : "director_only",
                     diagnostics);
     }
 
@@ -460,7 +492,7 @@ stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
             g_bSpawnAccelGraphCandidatesAvailable = false;
             char diagnostics[256];
             SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
-            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; using all-Nav path-bracket fallback; diagnostics=(%s)",
+            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; directed search disabled and Director fallback remains available; diagnostics=(%s)",
                         diagnostics);
             break;
         }
@@ -548,7 +580,7 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
         g_hSpawnAccelGraphTimer = INVALID_HANDLE;
         char diagnostics[768];
         SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
-        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; using SourcePawn progress cache and all-Nav path-bracket fallback; diagnostics=(%s)",
+        Debug_Print("[SPAWN ACCEL] Nav graph build/load failed; using SourcePawn progress metadata and Director spawn fallback; diagnostics=(%s)",
                     diagnostics);
         if (g_bSpawnAccelTopologyRetryInProgress)
         {
@@ -567,7 +599,7 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
         if (!SpawnAccel_LoadGraphProgress())
         {
             g_hSpawnAccelGraphTimer = INVALID_HANDLE;
-            Debug_Print("[SPAWN ACCEL] Nav progress export failed; using SourcePawn progress cache and all-Nav candidate fallback");
+            Debug_Print("[SPAWN ACCEL] Nav progress export failed; directed candidate search disabled and Director fallback remains available");
             if (g_bSpawnAccelTopologyRetryInProgress)
             {
                 Debug_Print("[SPAWN ACCEL] topology retry outcome=failed classification=progress_export_failure");
@@ -586,11 +618,11 @@ public Action Timer_SpawnAccelGraphPump(Handle timer)
         Debug_Print("[SPAWN ACCEL] Nav graph/progress ready: areas=%d edges=%d workers=%d candidateSource=%s diagnostics=(%s)",
                     AnneSpawn_NavGraphGetAreaCount(), AnneSpawn_NavGraphGetEdgeCount(),
                     AnneSpawn_GetWorkerCount(),
-                    g_bSpawnAccelGraphCandidatesAvailable ? "directed" : "all_path_bracket",
+                    g_bSpawnAccelGraphCandidatesAvailable ? "directed" : "director_only",
                     diagnostics);
         if (!g_bSpawnAccelGraphCandidatesAvailable)
         {
-            Debug_Print("[SPAWN ACCEL] live topology is incomplete; mapped bad-flow areas remain eligible, final min/max uses directed BuildPath");
+            Debug_Print("[SPAWN ACCEL] live topology is incomplete; all-Nav scan disabled and Director fallback remains available");
             if (g_bSpawnAccelTopologyRetryInProgress)
             {
                 Debug_Print("[SPAWN ACCEL] topology retry outcome=incomplete classification=persistent_topology diagnostics=(%s)",

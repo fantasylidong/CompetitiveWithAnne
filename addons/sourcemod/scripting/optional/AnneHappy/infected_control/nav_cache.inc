@@ -34,7 +34,6 @@ stock void ClearNavAreasCache()
         delete g_NavCooldownUntil;
         g_NavCooldownUntil = null;
     }
-    ClearNavWeightMemory();
     if (g_NavIdToIndex != null)
     {
         delete g_NavIdToIndex;

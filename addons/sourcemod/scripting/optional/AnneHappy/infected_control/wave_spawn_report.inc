@@ -52,6 +52,9 @@ enum struct WaveSpawnReportState
     float scoreFlowTotal;
     float scoreDispTotal;
     float scoreTacticalTotal;
+    float scoreHighHeightBonusTotal;
+    float scoreBehindPenaltyTotal;
+    float scoreLowHeightPenaltyTotal;
     int targetDistanceSamples;
     float targetDistanceTotal;
     float targetDistanceMin;
@@ -60,6 +63,11 @@ enum struct WaveSpawnReportState
     float navDistanceTotal;
     float navDistanceMin;
     float navDistanceMax;
+    int navRankDistanceSamples;
+    float navRankDistanceTotal;
+    float navRankDistanceMin;
+    float navRankDistanceMax;
+    int navHighRankedSamples;
     int navEffectiveDistanceSamples;
     float navEffectiveDistanceTotal;
     float navEffectiveDistanceMin;
@@ -109,6 +117,9 @@ enum struct WaveSpawnReportState
         this.scoreFlowTotal = 0.0;
         this.scoreDispTotal = 0.0;
         this.scoreTacticalTotal = 0.0;
+        this.scoreHighHeightBonusTotal = 0.0;
+        this.scoreBehindPenaltyTotal = 0.0;
+        this.scoreLowHeightPenaltyTotal = 0.0;
         this.targetDistanceSamples = 0;
         this.targetDistanceTotal = 0.0;
         this.targetDistanceMin = 999999.0;
@@ -117,6 +128,11 @@ enum struct WaveSpawnReportState
         this.navDistanceTotal = 0.0;
         this.navDistanceMin = 999999.0;
         this.navDistanceMax = -1.0;
+        this.navRankDistanceSamples = 0;
+        this.navRankDistanceTotal = 0.0;
+        this.navRankDistanceMin = 999999.0;
+        this.navRankDistanceMax = -1.0;
+        this.navHighRankedSamples = 0;
         this.navEffectiveDistanceSamples = 0;
         this.navEffectiveDistanceTotal = 0.0;
         this.navEffectiveDistanceMin = 999999.0;
@@ -185,7 +201,7 @@ static void WaveSpawnReport_BeginInternal(int wave, int plannedAi,
     g_WaveSpawnReport.configuredIntervalMs =
         DifficultyStrategy_GetConfiguredWaveDelay() * 1000.0;
     SpawnPerf_Log(
-        "[SpawnWave][Begin] wave=%d plannedAi=%d pendingAtStart=%d alive=%d cap=%d target=%d breach=%d configuredIntervalMs=%.1f killWindowMs=%.1f attemptsPerFrame=%d frameBudgetMs=%.2f navPerSlice=%d expensivePerSlice=%d navSliceBudgetMs=%.2f",
+        "[SpawnWave][Begin] wave=%d plannedAi=%d pendingAtStart=%d alive=%d cap=%d target=%d breach=%d configuredIntervalMs=%.1f killWindowMs=%.1f attemptsPerFrame=%d frameBudgetMs=%.2f navPerSlice=%d expensivePerSlice=%d navSliceBudgetMs=%.2f highSortScale=%.2f/%.2f/%.2f/%.2f/%.2f/%.2f highSortMinZ=%.1f highBonus=per50%.2f/cap%.2f lowHeight=footStart%.1f/per100=%.2f/behindX%.2f/cap%.2f behind=rejectGap%d/perFlow%.2f/cap%.2f",
         wave, plannedAi, pendingAtStart, gST.totalSI, gCV.iSiLimit,
         gST.targetSurvivor, gST.breachWaveActive ? 1 : 0,
         g_WaveSpawnReport.configuredIntervalMs,
@@ -193,7 +209,19 @@ static void WaveSpawnReport_BeginInternal(int wave, int plannedAi,
         gCV.iSpawnAttemptsPerFrame, gCV.fSpawnFrameBudgetMs,
         gCV.iSpawnNavCandidatesPerSlice,
         gCV.iSpawnNavExpensivePerSlice,
-        gCV.fSpawnNavSliceBudgetMs);
+        gCV.fSpawnNavSliceBudgetMs,
+        gCV.fNavHighSortScale[view_as<int>(SI_Smoker)],
+        gCV.fNavHighSortScale[view_as<int>(SI_Boomer)],
+        gCV.fNavHighSortScale[view_as<int>(SI_Hunter)],
+        gCV.fNavHighSortScale[view_as<int>(SI_Spitter)],
+        gCV.fNavHighSortScale[view_as<int>(SI_Jockey)],
+        gCV.fNavHighSortScale[view_as<int>(SI_Charger)],
+        gCV.fNavHighSortMinHeight,
+        gCV.fScoreHighHeightPer50, gCV.fScoreHighHeightCap,
+        gCV.fScoreLowHeightStart, gCV.fScoreLowHeightPer100,
+        gCV.fScoreLowHeightBehindMultiplier, gCV.fScoreLowHeightCap,
+        gCV.iScoreBehindRejectGap, gCV.fScoreBehindPerFlow,
+        gCV.fScoreBehindCap);
 }
 
 stock void WaveSpawnReport_Begin(int wave, int plannedAi,
@@ -409,6 +437,9 @@ stock void WaveSpawnReport_RecordScored(
         g_WaveSpawnReport.scoreFlowTotal += score.flow;
         g_WaveSpawnReport.scoreDispTotal += score.dispScaled;
         g_WaveSpawnReport.scoreTacticalTotal += score.tacticalQuality;
+        g_WaveSpawnReport.scoreHighHeightBonusTotal += score.highHeightBonus;
+        g_WaveSpawnReport.scoreBehindPenaltyTotal += score.behindPen;
+        g_WaveSpawnReport.scoreLowHeightPenaltyTotal += score.lowHeightPen;
         g_WaveSpawnReport.targetDistanceSamples++;
         g_WaveSpawnReport.targetDistanceTotal += score.dTargetEye;
         g_WaveSpawnReport.targetDistanceMin = FloatMin(
@@ -423,6 +454,20 @@ stock void WaveSpawnReport_RecordScored(
                 g_WaveSpawnReport.navDistanceMin, score.navDistance);
             g_WaveSpawnReport.navDistanceMax = FloatMax(
                 g_WaveSpawnReport.navDistanceMax, score.navDistance);
+        }
+        if (score.navRankDistance >= 0.0)
+        {
+            g_WaveSpawnReport.navRankDistanceSamples++;
+            g_WaveSpawnReport.navRankDistanceTotal += score.navRankDistance;
+            g_WaveSpawnReport.navRankDistanceMin = FloatMin(
+                g_WaveSpawnReport.navRankDistanceMin, score.navRankDistance);
+            g_WaveSpawnReport.navRankDistanceMax = FloatMax(
+                g_WaveSpawnReport.navRankDistanceMax, score.navRankDistance);
+            if (score.navDistance >= 0.0
+                && score.navRankDistance + 0.01 < score.navDistance)
+            {
+                g_WaveSpawnReport.navHighRankedSamples++;
+            }
         }
         if (score.navDistanceEffective >= 0.0)
         {
@@ -450,18 +495,24 @@ stock void WaveSpawnReport_RecordScored(
     float teamMinDistance = success
         ? SquareRoot(GetMinLiveEyeDistSquaredToAnySurvivor(actualPos)) : -1.0;
     SpawnPerf_Log(
-        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f targetDz=%.1f navDistance=%.1f navEffective=%.1f navHighComp=%.1f navRange=%.0f..%.0f score=%.2f base=%.2f dist=%.2f height=%.2f flow=%.2f dispersion=%.2f tactical=%.2f area=%d bucket=%d targetBucket=%d deltaFlow=%d rawBadFlow=%d target=%d",
+        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f targetDz=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f navHighSort=%.2f navHighComp=%.1f navRange=%.0f..%.0f score=%.2f quality=%.2f dist=%.2f height=%.2f flow=%.2f dispersion=%.2f tactical=%.2f highBonus=%.2f highRise=%.1f highSteps=%d extraPen=%.2f behindPen=%.2f lowHeightPen=%.2f targetFootZ=%.1f lowHeightDrop=%.1f lowHeightSteps=%d lowHeightMultiplier=%.2f area=%d bucket=%d targetBucket=%d deltaFlow=%d bucketKnown=%d rawBadFlow=%d target=%d",
         g_WaveSpawnReport.wave, sequence, success ? "success" : "failed",
         modeName, g_sInfectedClassNames[zc], spawnedClient,
         waveElapsedMs, spawnCallMs,
         requestedPos[0], requestedPos[1], requestedPos[2], actualValid ? 1 : 0,
         actualPos[0], actualPos[1], actualPos[2],
         score.dTargetEye, teamMinDistance, targetDz, score.navDistance,
-        score.navDistanceEffective, score.navHighGroundComp,
+        score.navRankDistance, score.navDistanceEffective,
+        score.navHighSortScale, score.navHighGroundComp,
         minRange, maxRange,
-        score.total, score.baseTotal, score.dist, score.hght, score.flow,
-        score.dispScaled, score.tacticalQuality, score.areaIdx,
+        score.total, score.weightedQuality, score.dist, score.hght, score.flow,
+        score.dispScaled, score.tacticalQuality,
+        score.highHeightBonus, score.highHeightRise, score.highHeightSteps,
+        score.extraPen, score.behindPen, score.lowHeightPen,
+        score.targetFootZ, score.lowHeightDrop, score.lowHeightSteps,
+        score.lowHeightMultiplier, score.areaIdx,
         score.candBucket, score.centerBucket, score.deltaFlow,
+        score.flowBucketKnown ? 1 : 0,
         score.rawBadFlow ? 1 : 0,
         targetSurvivor > 0 ? targetSurvivor : gST.targetSurvivor);
 }
@@ -636,7 +687,7 @@ static void WaveSpawnReport_Print(const char[] reason, bool finalReport)
     {
         float divisor = float(g_WaveSpawnReport.scoredSuccesses);
         SpawnPerf_Log(
-            "[SpawnWave][Scores] wave=%d samples=%d avg=%.2f min=%.2f max=%.2f baseAvg=%.2f distAvg=%.2f heightAvg=%.2f flowAvg=%.2f dispersionAvg=%.2f tacticalAvg=%.2f",
+            "[SpawnWave][Scores] wave=%d samples=%d avg=%.2f min=%.2f max=%.2f qualityAvg=%.2f distAvg=%.2f heightAvg=%.2f flowAvg=%.2f dispersionAvg=%.2f tacticalAvg=%.2f highBonusAvg=%.2f behindPenAvg=%.2f lowHeightPenAvg=%.2f",
             g_WaveSpawnReport.wave, g_WaveSpawnReport.scoredSuccesses,
             g_WaveSpawnReport.scoreTotal / divisor,
             g_WaveSpawnReport.scoreMin, g_WaveSpawnReport.scoreMax,
@@ -645,7 +696,10 @@ static void WaveSpawnReport_Print(const char[] reason, bool finalReport)
             g_WaveSpawnReport.scoreHeightTotal / divisor,
             g_WaveSpawnReport.scoreFlowTotal / divisor,
             g_WaveSpawnReport.scoreDispTotal / divisor,
-            g_WaveSpawnReport.scoreTacticalTotal / divisor);
+            g_WaveSpawnReport.scoreTacticalTotal / divisor,
+            g_WaveSpawnReport.scoreHighHeightBonusTotal / divisor,
+            g_WaveSpawnReport.scoreBehindPenaltyTotal / divisor,
+            g_WaveSpawnReport.scoreLowHeightPenaltyTotal / divisor);
     }
     else
     {
@@ -655,7 +709,7 @@ static void WaveSpawnReport_Print(const char[] reason, bool finalReport)
     if (g_WaveSpawnReport.targetDistanceSamples > 0)
     {
         SpawnPerf_Log(
-            "[SpawnWave][Distances] wave=%d directSamples=%d directAvg=%.1f directMin=%.1f directMax=%.1f navSamples=%d navAvg=%.1f navMin=%.1f navMax=%.1f navEffectiveSamples=%d navEffectiveAvg=%.1f navEffectiveMin=%.1f navEffectiveMax=%.1f highCompSamples=%d highCompAvg=%.1f highCompMax=%.1f verticalSamples=%d absZAvg=%.1f absZMax=%.1f",
+            "[SpawnWave][Distances] wave=%d directSamples=%d directAvg=%.1f directMin=%.1f directMax=%.1f navSamples=%d navAvg=%.1f navMin=%.1f navMax=%.1f navRankSamples=%d navRankAvg=%.1f navRankMin=%.1f navRankMax=%.1f highRankedSamples=%d navEffectiveSamples=%d navEffectiveAvg=%.1f navEffectiveMin=%.1f navEffectiveMax=%.1f highCompSamples=%d highCompAvg=%.1f highCompMax=%.1f verticalSamples=%d absZAvg=%.1f absZMax=%.1f",
             g_WaveSpawnReport.wave, g_WaveSpawnReport.targetDistanceSamples,
             g_WaveSpawnReport.targetDistanceTotal
                 / float(g_WaveSpawnReport.targetDistanceSamples),
@@ -670,6 +724,16 @@ static void WaveSpawnReport_Print(const char[] reason, bool finalReport)
                 ? g_WaveSpawnReport.navDistanceMin : -1.0,
             g_WaveSpawnReport.navDistanceSamples > 0
                 ? g_WaveSpawnReport.navDistanceMax : -1.0,
+            g_WaveSpawnReport.navRankDistanceSamples,
+            g_WaveSpawnReport.navRankDistanceSamples > 0
+                ? g_WaveSpawnReport.navRankDistanceTotal
+                    / float(g_WaveSpawnReport.navRankDistanceSamples)
+                : 0.0,
+            g_WaveSpawnReport.navRankDistanceSamples > 0
+                ? g_WaveSpawnReport.navRankDistanceMin : -1.0,
+            g_WaveSpawnReport.navRankDistanceSamples > 0
+                ? g_WaveSpawnReport.navRankDistanceMax : -1.0,
+            g_WaveSpawnReport.navHighRankedSamples,
             g_WaveSpawnReport.navEffectiveDistanceSamples,
             g_WaveSpawnReport.navEffectiveDistanceSamples > 0
                 ? g_WaveSpawnReport.navEffectiveDistanceTotal

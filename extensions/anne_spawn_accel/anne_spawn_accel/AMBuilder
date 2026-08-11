@@ -1,0 +1,24 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+
+if 'l4d2' in SM.sdks:
+  sdk = SM.sdks['l4d2']
+
+  for cxx in builder.targets:
+    if not cxx.target.arch in sdk['platforms'][cxx.target.platform]:
+      continue
+
+    binary = SM.HL2Library(builder, cxx, 'anne_spawn_accel.ext.' + sdk['extension'], sdk)
+    if binary.compiler.like('gcc'):
+      # Accelerator's bundled Breakpad parser cannot read Clang 22 DWARF 5 and
+      # may crash while preparing symbols after an unrelated server fault.
+      binary.compiler.cxxflags += ['-fPIC', '-gdwarf-4']
+      # HL2SDK static archives may still contain DWARF 5, so remove debug
+      # sections from the final ELF while preserving its regular symbol table.
+      binary.compiler.linkflags += ['-pthread', '-Wl,--strip-debug']
+    binary.sources += [
+      'extension.cpp',
+      'nav_graph.cpp',
+      'worker_pool.cpp',
+      '../../public/smsdk_ext.cpp',
+    ]
+    SM.extensions += [builder.Add(binary)]

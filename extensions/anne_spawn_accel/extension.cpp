@@ -49,6 +49,7 @@ constexpr int kMaxLadderConnections = 256;
 constexpr float kBlockerSnapshotSeconds = 1.0f;
 constexpr std::size_t kBlockedSnapshotSanityMinAreas = 128;
 constexpr float kCandidateSpatialQuantum = 32.0f;
+constexpr float kCandidateRankHeightQuantum = 8.0f;
 constexpr std::size_t kCandidateCacheLimit = 8;
 constexpr std::size_t kCandidatePerfSampleCap = 256;
 constexpr int kCandidatePending = -1;
@@ -190,11 +191,15 @@ struct NavCandidateResult
     std::uint32_t targetId = 0;
     float maxPathDistance = 0.0f;
     float minSurvivorDistance = 0.0f;
+    float targetEyeZ = 0.0f;
+    float highGroundMinHeight = 0.0f;
+    float highGroundDistanceScale = 1.0f;
     int blockedEpoch = -1;
     double completedAt = 0.0;
     float buildMs = 0.0f;
     std::vector<std::uint32_t> areaIndices;
     std::vector<float> pathDistances;
+    std::vector<float> rankDistances;
 };
 
 struct NavCandidateRequest
@@ -206,6 +211,9 @@ struct NavCandidateRequest
     std::uint32_t targetId = 0;
     float maxPathDistance = 0.0f;
     float minSurvivorDistance = 0.0f;
+    float targetEyeZ = 0.0f;
+    float highGroundMinHeight = 0.0f;
+    float highGroundDistanceScale = 1.0f;
     int blockedEpoch = -1;
 };
 
@@ -406,15 +414,40 @@ std::uint64_t ComputeSurvivorSpatialKey()
     return hash;
 }
 
+bool GetCandidateTargetEyeZ(int targetClient, float highGroundDistanceScale,
+                            float &targetEyeZ)
+{
+    if (highGroundDistanceScale >= 0.9999f)
+    {
+        targetEyeZ = 0.0f;
+        return true;
+    }
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
+    {
+        if (g_Survivors[i].client != targetClient)
+            continue;
+        targetEyeZ = std::floor(
+            g_Survivors[i].eyes.z / kCandidateRankHeightQuantum)
+            * kCandidateRankHeightQuantum;
+        return true;
+    }
+    return false;
+}
+
 bool NavCandidateMatches(const NavCandidateResult &result,
                          int targetClient, std::uint32_t targetId,
                          float maxPathDistance, float minSurvivorDistance,
+                         float targetEyeZ, float highGroundMinHeight,
+                         float highGroundDistanceScale,
                          std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
     return result.generation == g_NavGraphGeneration.load() &&
            result.targetClient == targetClient && result.targetId == targetId &&
            result.maxPathDistance + 0.01f >= maxPathDistance &&
            std::fabs(result.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
+           std::fabs(result.targetEyeZ - targetEyeZ) <= 0.01f &&
+           std::fabs(result.highGroundMinHeight - highGroundMinHeight) <= 0.01f &&
+           std::fabs(result.highGroundDistanceScale - highGroundDistanceScale) <= 0.0001f &&
            result.survivorSpatialKey == survivorSpatialKey &&
            result.blockedEpoch == blockedEpoch;
 }
@@ -422,12 +455,17 @@ bool NavCandidateMatches(const NavCandidateResult &result,
 bool NavCandidateRequestMatches(const NavCandidateRequest &request,
                                 int targetClient, std::uint32_t targetId,
                                 float maxPathDistance, float minSurvivorDistance,
+                                float targetEyeZ, float highGroundMinHeight,
+                                float highGroundDistanceScale,
                                 std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
     return request.generation == g_NavGraphGeneration.load() &&
            request.targetClient == targetClient && request.targetId == targetId &&
            request.maxPathDistance + 0.01f >= maxPathDistance &&
            std::fabs(request.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
+           std::fabs(request.targetEyeZ - targetEyeZ) <= 0.01f &&
+           std::fabs(request.highGroundMinHeight - highGroundMinHeight) <= 0.01f &&
+           std::fabs(request.highGroundDistanceScale - highGroundDistanceScale) <= 0.0001f &&
            request.survivorSpatialKey == survivorSpatialKey &&
            request.blockedEpoch == blockedEpoch;
 }
@@ -435,6 +473,8 @@ bool NavCandidateRequestMatches(const NavCandidateRequest &request,
 std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
     int targetClient, std::uint32_t targetId,
     float maxPathDistance, float minSurvivorDistance,
+    float targetEyeZ, float highGroundMinHeight,
+    float highGroundDistanceScale,
     std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
     for (auto iterator = g_NavCandidateCache.rbegin();
@@ -442,6 +482,8 @@ std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
     {
         if (NavCandidateMatches(**iterator, targetClient, targetId,
                                 maxPathDistance, minSurvivorDistance,
+                                targetEyeZ, highGroundMinHeight,
+                                highGroundDistanceScale,
                                 survivorSpatialKey, blockedEpoch))
         {
             return *iterator;
@@ -1362,6 +1404,9 @@ void PublishPendingResults()
                                       cached->survivorSpatialKey == result->survivorSpatialKey &&
                                       cached->blockedEpoch == result->blockedEpoch &&
                                       cached->minSurvivorDistance == result->minSurvivorDistance &&
+                                      cached->targetEyeZ == result->targetEyeZ &&
+                                      cached->highGroundMinHeight == result->highGroundMinHeight &&
+                                      cached->highGroundDistanceScale == result->highGroundDistanceScale &&
                                       cached->maxPathDistance <= result->maxPathDistance;
                            }),
             g_NavCandidateCache.end());
@@ -1770,11 +1815,15 @@ bool PrepareReachability(std::uint32_t targetId, float maxDistance,
 
 int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
                          float maxPathDistance, float minSurvivorDistance,
-                         float maxSnapshotAge)
+                         float maxSnapshotAge, float highGroundMinHeight,
+                         float highGroundDistanceScale)
 {
     PumpNavGraph();
     if (g_NavGraphState.load() != kNavGraphReady || maxPathDistance <= 0.0f ||
-        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f)
+        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f ||
+        !std::isfinite(highGroundMinHeight) ||
+        !std::isfinite(highGroundDistanceScale) || highGroundMinHeight < 0.0f ||
+        highGroundDistanceScale <= 0.0f || highGroundDistanceScale > 1.0f)
     {
         return kCandidateUnavailable;
     }
@@ -1813,12 +1862,19 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
     }
     if (targetSlot >= g_SurvivorCount)
         return kCandidatePending;
+    float targetEyeZ;
+    if (!GetCandidateTargetEyeZ(
+            targetClient, highGroundDistanceScale, targetEyeZ))
+    {
+        return kCandidatePending;
+    }
 
     double now = SteadySeconds();
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
         std::shared_ptr<NavCandidateResult> cached = FindNavCandidateLocked(
             targetClient, targetId, maxPathDistance, minSurvivorDistance,
+            targetEyeZ, highGroundMinHeight, highGroundDistanceScale,
             survivorSpatialKey, blockedEpoch);
         if (cached && now - cached->completedAt <= maxSnapshotAge)
         {
@@ -1829,7 +1885,8 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
         {
             if (NavCandidateRequestMatches(
                     request, targetClient, targetId, maxPathDistance,
-                    minSurvivorDistance, survivorSpatialKey, blockedEpoch))
+                    minSurvivorDistance, targetEyeZ, highGroundMinHeight,
+                    highGroundDistanceScale, survivorSpatialKey, blockedEpoch))
             {
                 ++g_NavCandidatePerf.coalesced;
                 return 0;
@@ -1840,9 +1897,18 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
     std::vector<std::uint8_t> blocked = g_BlockedSnapshot;
     std::uint64_t generation = g_NavGraphGeneration.load();
     std::uint64_t serial = g_NavCandidateSerial.fetch_add(1) + 1;
-    NavCandidateRequest request{
-        serial, generation, survivorSpatialKey, targetClient, targetId,
-        maxPathDistance, minSurvivorDistance, blockedEpoch};
+    NavCandidateRequest request;
+    request.serial = serial;
+    request.generation = generation;
+    request.survivorSpatialKey = survivorSpatialKey;
+    request.targetClient = targetClient;
+    request.targetId = targetId;
+    request.maxPathDistance = maxPathDistance;
+    request.minSurvivorDistance = minSurvivorDistance;
+    request.targetEyeZ = targetEyeZ;
+    request.highGroundMinHeight = highGroundMinHeight;
+    request.highGroundDistanceScale = highGroundDistanceScale;
+    request.blockedEpoch = blockedEpoch;
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
         g_NavCandidateInFlight.push_back(request);
@@ -1860,19 +1926,26 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
             result->targetId = request.targetId;
             result->maxPathDistance = request.maxPathDistance;
             result->minSurvivorDistance = request.minSurvivorDistance;
+            result->targetEyeZ = request.targetEyeZ;
+            result->highGroundMinHeight = request.highGroundMinHeight;
+            result->highGroundDistanceScale = request.highGroundDistanceScale;
             result->blockedEpoch = request.blockedEpoch;
 
             std::vector<float> allPathDistances;
             std::vector<std::uint8_t> specialEdges;
-            bool built = AnneBuildNavCandidateSnapshot(
+            bool built = AnneBuildRankedNavCandidateSnapshot(
                 *graph, targetIndex, request.maxPathDistance,
                 blocked, survivorEyes, request.minSurvivorDistance,
+                request.targetEyeZ, request.highGroundMinHeight,
+                request.highGroundDistanceScale,
                 result->areaIndices,
-                result->pathDistances, allPathDistances, specialEdges);
+                result->pathDistances, result->rankDistances,
+                allPathDistances, specialEdges);
             if (!built)
             {
                 result->areaIndices.clear();
                 result->pathDistances.clear();
+                result->rankDistances.clear();
             }
 
             result->completedAt = SteadySeconds();
@@ -2134,7 +2207,7 @@ cell_t Native_NavGraphStart(IPluginContext *context, const cell_t *params)
 
     // Cache validation needs every live directed floor/ladder edge. Pump first
     // captures that topology in bounded main-thread batches, then a worker hashes
-    // it and either loads the matching v6 state cache or rebuilds it.
+    // it and either loads the matching v7 state cache or rebuilds it.
     g_NavGraphState.store(kNavGraphNeedBuild);
     return 1;
 }
@@ -2235,7 +2308,28 @@ cell_t Native_NavCandidatesPrepare(IPluginContext *context, const cell_t *params
     }
     return PrepareNavCandidates(
         params[1], static_cast<std::uint32_t>(params[2]), maxPathDistance,
-        minSurvivorDistance, maxSnapshotAge);
+        minSurvivorDistance, maxSnapshotAge, 0.0f, 1.0f);
+}
+
+cell_t Native_NavCandidatesPrepareRanked(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 7)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesPrepareRanked expects 7 parameters");
+    float maxPathDistance = sp_ctof(params[3]);
+    float minSurvivorDistance = sp_ctof(params[4]);
+    float maxSnapshotAge = sp_ctof(params[5]);
+    float highGroundMinHeight = sp_ctof(params[6]);
+    float highGroundDistanceScale = sp_ctof(params[7]);
+    if (!std::isfinite(maxPathDistance) || !std::isfinite(minSurvivorDistance) ||
+        !std::isfinite(maxSnapshotAge) || !std::isfinite(highGroundMinHeight) ||
+        !std::isfinite(highGroundDistanceScale))
+    {
+        return context->ThrowNativeError("Invalid ranked Nav candidate prepare request");
+    }
+    return PrepareNavCandidates(
+        params[1], static_cast<std::uint32_t>(params[2]), maxPathDistance,
+        minSurvivorDistance, maxSnapshotAge,
+        highGroundMinHeight, highGroundDistanceScale);
 }
 
 cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params)
@@ -2286,6 +2380,7 @@ cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params
 
     std::shared_ptr<NavCandidateResult> result = FindNavCandidateLocked(
         targetClient, targetId, maxPathDistance, minSurvivorDistance,
+        0.0f, 0.0f, 1.0f,
         g_SurvivorSpatialKey, g_BlockedStateVersion);
     if (!result)
     {
@@ -2328,6 +2423,120 @@ cell_t Native_NavCandidatesCollect(IPluginContext *context, const cell_t *params
         }
     }
 
+    RecordCandidatePerfSample(
+        g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
+        g_NavCandidatePerf.ageCount, ageMs);
+    ++g_NavCandidatePerf.collectHits;
+    return count;
+}
+
+cell_t Native_NavCandidatesCollectRanked(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 16)
+        return context->ThrowNativeError("AnneSpawn_NavCandidatesCollectRanked expects 16 parameters");
+
+    int targetClient = params[1];
+    std::uint32_t targetId = static_cast<std::uint32_t>(params[2]);
+    float minNavDistance = std::max(0.0f, sp_ctof(params[3]));
+    float maxNavDistance = sp_ctof(params[4]);
+    float maxPathDistance = sp_ctof(params[5]);
+    float minSurvivorDistance = sp_ctof(params[6]);
+    float maxSnapshotAge = sp_ctof(params[7]);
+    float highGroundMinHeight = sp_ctof(params[8]);
+    float highGroundDistanceScale = sp_ctof(params[9]);
+    int startOffset = params[10];
+    int maxResults = params[14];
+    if (!std::isfinite(maxNavDistance) || !std::isfinite(maxPathDistance) ||
+        !std::isfinite(minSurvivorDistance) || !std::isfinite(maxSnapshotAge) ||
+        !std::isfinite(highGroundMinHeight) ||
+        !std::isfinite(highGroundDistanceScale) ||
+        maxNavDistance < minNavDistance || maxPathDistance <= 0.0f ||
+        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f ||
+        highGroundMinHeight < 0.0f || highGroundDistanceScale <= 0.0f ||
+        highGroundDistanceScale > 1.0f || startOffset < 0 || maxResults < 0 ||
+        maxResults > kMaxSpatialPoints)
+    {
+        return context->ThrowNativeError("Invalid ranked Nav candidate collect request");
+    }
+
+    cell_t *output = nullptr;
+    cell_t *distanceOutput = nullptr;
+    cell_t *rankOutput = nullptr;
+    cell_t *ageOutput = nullptr;
+    cell_t *totalOutput = nullptr;
+    if ((maxResults > 0 && !GetCells(context, params[11], output)) ||
+        (maxResults > 0 && !GetCells(context, params[12], distanceOutput)) ||
+        (maxResults > 0 && !GetCells(context, params[13], rankOutput)) ||
+        !GetCells(context, params[15], ageOutput) ||
+        !GetCells(context, params[16], totalOutput))
+    {
+        return context->ThrowNativeError("Invalid ranked Nav candidate collect output");
+    }
+    ageOutput[0] = sp_ftoc(0.0f);
+    totalOutput[0] = 0;
+
+    PumpNavGraph();
+    float targetEyeZ;
+    if (!GetCandidateTargetEyeZ(
+            targetClient, highGroundDistanceScale, targetEyeZ))
+    {
+        return kCandidatePending;
+    }
+
+    std::lock_guard<std::mutex> lock(g_GraphMutex);
+    if (!g_NavGraph || !g_NavGraph->complete ||
+        g_NavGraphState.load() != kNavGraphReady)
+    {
+        ++g_NavCandidatePerf.collectUnavailable;
+        return kCandidateUnavailable;
+    }
+
+    std::shared_ptr<NavCandidateResult> result = FindNavCandidateLocked(
+        targetClient, targetId, maxPathDistance, minSurvivorDistance,
+        targetEyeZ, highGroundMinHeight, highGroundDistanceScale,
+        g_SurvivorSpatialKey, g_BlockedStateVersion);
+    if (!result)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+
+    float ageMs = static_cast<float>((SteadySeconds() - result->completedAt) * 1000.0);
+    if (ageMs > maxSnapshotAge * 1000.0f + 0.01f)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+    if (result->areaIndices.size() != result->pathDistances.size() ||
+        result->areaIndices.size() != result->rankDistances.size())
+    {
+        ++g_NavCandidatePerf.collectUnavailable;
+        return kCandidateUnavailable;
+    }
+
+    int total = 0;
+    int count = 0;
+    for (std::size_t row = 0; row < result->areaIndices.size(); ++row)
+    {
+        float rawDistance = result->pathDistances[row];
+        if (rawDistance + 0.01f < minNavDistance ||
+            rawDistance > maxNavDistance + 0.01f)
+        {
+            continue;
+        }
+        if (total >= startOffset && count < maxResults)
+        {
+            output[count] = static_cast<cell_t>(result->areaIndices[row]);
+            distanceOutput[count] = sp_ftoc(rawDistance);
+            rankOutput[count] = sp_ftoc(result->rankDistances[row]);
+            ++count;
+        }
+        ++total;
+    }
+
+    totalOutput[0] = total;
+    g_NavCandidatePerf.lastRangeCandidateCount = total;
+    ageOutput[0] = sp_ftoc(ageMs);
     RecordCandidatePerfSample(
         g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
         g_NavCandidatePerf.ageCount, ageMs);
@@ -3033,6 +3242,8 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavGraphCollectRange", Native_NavGraphCollectRange},
     {"AnneSpawn_NavCandidatesPrepare", Native_NavCandidatesPrepare},
     {"AnneSpawn_NavCandidatesCollect", Native_NavCandidatesCollect},
+    {"AnneSpawn_NavCandidatesPrepareRanked", Native_NavCandidatesPrepareRanked},
+    {"AnneSpawn_NavCandidatesCollectRanked", Native_NavCandidatesCollectRanked},
     {"AnneSpawn_NavCandidatesGetPerf", Native_NavCandidatesGetPerf},
     {"AnneSpawn_NavCandidatesResetPerf", Native_NavCandidatesResetPerf},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},

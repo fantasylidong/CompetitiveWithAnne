@@ -154,6 +154,8 @@ enum struct WaveDecider
     {
         float timerElapsed = now - this.timerStartTime;
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
+        float remaining = interval - timerElapsed;
+        Traitor_UpdateSpawnLockedCountdown(remaining);
 
         // 16 秒倒计时本身不可提前结束；Pressure 只决定到点后是否延长。
 
@@ -185,6 +187,7 @@ enum struct WaveDecider
                 {
                     this.holdReleaseSince = 0.0;
                     this.TransitionTo(WD_IntensiveCheck, "timer reached with stable holding pressure");
+                    Traitor_OnAntiBaitHoldStarted();
                     WaveSpawnReport_RecordAntiBaitHoldStart(now);
                     return;
                 }
@@ -240,6 +243,7 @@ enum struct WaveDecider
         WaveSpawnReport_RecordCountdownStart(now, reason);
 
         float interval = DifficultyStrategy_GetConfiguredWaveDelay();
+        Traitor_UpdateSpawnLockedCountdown(interval);
         WaveDecider_Debug("Start %0.fs timer (%s)", interval, reason);
     }
 

@@ -582,8 +582,8 @@
         <label for="scenario-select">演示场景</label>
         <select id="scenario-select">
           <option value="normal">Nav 评分命中</option>
-          <option value="restricted">受限导演兜底</option>
-          <option value="api">两轮失败后 API</option>
+          <option value="restricted">Director API 首段命中</option>
+          <option value="api">两段 API 无点并轮换目标</option>
         </select>
       </div>
 
@@ -639,8 +639,8 @@
               <g id="candidate-layer"></g>
               <g id="survivor-layer"></g>
               <g id="flow-axis-layer"></g>
-              <text id="fallback-label" class="fallback-label" x="28" y="30">受限导演候选：仍检查最终距离、视线与卡位</text>
-              <text id="api-label" class="api-label" x="28" y="30">连续两轮失败：导演 API 直接生成，不叠加插件限制</text>
+              <text id="fallback-label" class="fallback-label" x="28" y="30">Director API：首段 7 次内部尝试，返回点直接生成</text>
+              <text id="api-label" class="api-label" x="28" y="30">两段 API 均无点：轮换目标并按 0.10s 退避</text>
             </svg>
             <div class="map-footer">
               <span>距离口径：<strong id="distance-model">职业 Nav 路径 · 全队直线 250</strong></span>
@@ -658,8 +658,8 @@
               <div class="metric-row"><dt>职业 Nav 距离带</dt><dd id="metric-range">350–950</dd></div>
               <div class="metric-row"><dt>图快照有效期</dt><dd id="metric-window">≤ 0.2 秒</dd></div>
               <div class="metric-row"><dt>候选检查</dt><dd id="metric-pool">0 / 图快照</dd></div>
-              <div class="metric-row"><dt>本帧 Nav 检查</dt><dd id="metric-nav">0 / 256</dd></div>
-              <div class="metric-row"><dt>本帧昂贵检查</dt><dd id="metric-expensive">0 / 8</dd></div>
+              <div class="metric-row"><dt>本帧 Nav 检查</dt><dd id="metric-nav">0 / 512</dd></div>
+              <div class="metric-row"><dt>本帧昂贵检查</dt><dd id="metric-expensive">0 / 16</dd></div>
               <div class="metric-row"><dt>完整失败轮次</dt><dd id="metric-cycle">0 / 2</dd></div>
             </dl>
             <div class="event-log">
@@ -706,12 +706,12 @@
           <div class="cost-row">
             <span class="cost-label">当前逐帧检查上限</span>
             <div class="cost-track"><div class="cost-bar proposed" style="width:25%"></div></div>
-            <span class="cost-value">48 个</span>
+            <span class="cost-value">≤ 512 个</span>
           </div>
           <div class="cost-row">
             <span class="cost-label">每帧昂贵检查</span>
             <div class="cost-track"><div class="cost-bar current" style="width:18%"></div></div>
-            <span class="cost-value">≤ 3 次</span>
+            <span class="cost-value">≤ 16 次</span>
           </div>
         </div>
 
@@ -719,19 +719,19 @@
           <table class="comparison">
             <thead><tr><th>环节</th><th>重构前</th><th>当前实现</th><th>收益与边界</th></tr></thead>
             <tbody>
-              <tr><td>距离预筛口径</td><td>空间眼距兼任职业范围</td><td class="proposal">职业使用有向 Nav 距离；Smoker/Hunter 高点有限折减；全队直线 250 只做安全排除</td><td>多层和绕路地图保留通行语义，同时提高高台职业点命中率</td></tr>
+              <tr><td>距离预筛口径</td><td>空间眼距兼任职业范围</td><td class="proposal">原始有向路径同时负责全局升序和职业范围；高点不改顺序；全队直线 250 只做安全排除</td><td>多层和绕路地图保留通行语义，高台偏好由真实点位评分表达</td></tr>
               <tr><td>候选来源</td><td>Flow 桶局部枚举</td><td class="proposal">后台反向距离场返回完整可达快照</td><td>直接定位目标 Nav 可达区域</td></tr>
               <tr><td>候选生产</td><td>游戏线程同步物化</td><td class="proposal">0.1 / 1.0 秒节流的 worker 快照</td><td>构图与排序不占用游戏主线程预算</td></tr>
               <tr><td>生还者眼位</td><td>每个随机点调用 native</td><td class="proposal">每个实际刷特帧快照一次</td><td>同 Tick 距离、视线、战术评分复用</td></tr>
-              <tr><td>评分</td><td>混合量纲 + 离散扇区重复放大</td><td class="proposal">0–100 基础质量 + 连续职业战术几何</td><td>只排序安全候选，默认不硬拒绝</td></tr>
-              <tr><td>最终 API</td><td>50 次导演内部尝试，无独立数据</td><td class="proposal">保持无限制并记录 fallbackApiMs</td><td>量化罕见尖峰，不新增限制</td></tr>
+              <tr><td>评分</td><td>混合量纲 + 离散扇区重复放大</td><td class="proposal">四因子职业权重 + 战术；高点奖励、后点/低点直接加减最终分</td><td>dF&lt;-8 硬拒绝，其余安全候选按最终分排序</td></tr>
+              <tr><td>最终 API</td><td>导演点再次被插件复核</td><td class="proposal">7 次、12 次两段调用；命中后直出并记录 fallbackApiMs</td><td>无合法 Nav 时保持可生成，同时量化罕见尖峰</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="perf-note">
-          <section><h3>已经受控</h3><p>每个搜索切片默认最多 256 个 NavArea、8 个昂贵检查，并受 1.0ms 搜索软预算限制；三项均可热调。</p></section>
-          <section><h3>已经落地</h3><p>有向 Nav 距离分页、全队直线 250 排除和眼位快照同时降低总成本与单帧峰值。</p></section>
+          <section><h3>已经受控</h3><p>每个搜索切片默认最多 512 个 NavArea、16 个昂贵检查，并受 2.0ms 搜索软预算限制；三项均可热调。</p></section>
+          <section><h3>已经落地</h3><p>有向 Nav 原始路径分页、全队直线 250 排除和同帧眼位/目标脚高快照同时降低总成本与单帧峰值。</p></section>
           <section><h3>现在可测</h3><p><code>sm_spawnperf</code> 按 6/8/10/12/14+ 输出候选构建、最大切片和最终 API 分位数。</p></section>
         </div>
       </section>
@@ -740,7 +740,7 @@
         <div class="perf-head">
           <div>
             <h2 id="optimization-heading">优化方案与实现边界</h2>
-            <p>Nav 权重反馈与逐帧候选生产都已落地；下方展示它们如何共同工作。</p>
+            <p>当前版本停用了历史 Nav 权重重排，改用短期 Nav 冷却、pending 预留和实际出生点分散；逐帧候选生产仍由有向图快照驱动。</p>
           </div>
           <div class="scope-key" aria-label="实现状态图例">
             <span class="implemented">已经实现</span>
@@ -751,8 +751,8 @@
 
         <section class="weight-lab" aria-labelledby="weight-heading">
           <div class="weight-copy">
-            <h3 id="weight-heading">已经实现：Nav 权重反馈</h3>
-            <p>每个 NavArea 初始权重为 1.00。生成成功、实际生成失败或候选过滤失败都会降低权重，然后按各自恢复时间线性回到 1.00。</p>
+            <h3 id="weight-heading">历史演示：Nav 权重反馈已停用</h3>
+            <p>下方曲线只保留为旧方案对照，不参与当前扫描或评分。当前硬保护是同 Nav 短期冷却、同帧 pending 预留，以及按实际出生坐标执行的短期分散。</p>
 
             <div class="weight-event-control">
               <span class="field-label">模拟事件</span>
@@ -780,7 +780,7 @@
           <div class="weight-chart-wrap">
             <div class="weight-chart-title">
               <h3>权重恢复曲线</h3>
-              <span>最低权重始终钳制在 0.10</span>
+              <span>历史模型，仅作对照</span>
             </div>
             <svg id="weight-chart" viewBox="0 0 720 310" role="img" aria-labelledby="weight-chart-title weight-chart-desc">
               <title id="weight-chart-title">NavArea 权重随时间恢复曲线</title>
@@ -810,17 +810,17 @@
         </section>
 
         <dl class="weight-facts">
-          <div class="weight-fact"><dt>三种降权</dt><dd>成功 ×0.55 · 失败 ×0.25 · 过滤 ×0.85</dd></div>
-          <div class="weight-fact"><dt>线性恢复</dt><dd>8 秒 · 18 秒 · 4 秒</dd></div>
-          <div class="weight-fact"><dt>扫描混合</dt><dd>高 / 中 / 低按 3:1:1 取样</dd></div>
-          <div class="weight-fact"><dt>评分语义</dt><dd>只改变扫描顺序，不重复扣最终分数</dd></div>
+          <div class="weight-fact"><dt>当前 Nav 冷却</dt><dd>成功后同 Nav 短期硬排除</dd></div>
+          <div class="weight-fact"><dt>pending 预留</dt><dd>同 Nav / 邻近请求点避免同帧撞位</dd></div>
+          <div class="weight-fact"><dt>实际点分散</dt><dd>实体稳定后按真实坐标再次去重</dd></div>
+          <div class="weight-fact"><dt>历史权重</dt><dd>实现与诊断字段均已删除</dd></div>
         </dl>
 
         <section class="roadmap" aria-labelledby="roadmap-heading">
           <div class="roadmap-head">
             <div>
               <h2 id="roadmap-heading">当前实现：保留 OnGameFrame</h2>
-              <p>没有改成低频 timer。后台图快照按 0.1 / 1.0 秒节流构建，OnGameFrame 只分页消费；每个搜索切片默认采用 256 个 Nav、8 个昂贵检查和 1.0ms 软预算，三项均可通过 ConVar 热调。</p>
+              <p>没有改成低频 timer。后台图快照按 0.1 / 1.0 秒节流构建，OnGameFrame 只分页消费；每个搜索切片默认采用 512 个 Nav、16 个昂贵检查和 2.0ms 软预算，三项均可通过 ConVar 热调。</p>
             </div>
             <span class="status-label">已写入插件</span>
           </div>
@@ -839,9 +839,9 @@
               <div class="loop-label proposed">当前</div>
               <div class="loop-nodes">
                 <div class="loop-node">读取有向图快照</div><span class="loop-arrow">→</span>
-                <div class="loop-node">按 Nav 距离带分页</div><span class="loop-arrow">→</span>
+                <div class="loop-node">按原始有向路径升序分页</div><span class="loop-arrow">→</span>
                 <div class="loop-node">全队直线 250 点级复核</div><span class="loop-arrow">→</span>
-                <div class="loop-node">同帧消费 256 / 8 / 1.0ms</div>
+                <div class="loop-node">同帧消费 512 / 16 / 2.0ms</div>
               </div>
             </div>
           </div>
@@ -852,17 +852,17 @@
               <tbody>
                 <tr><td>P0 · 已完成</td><td>分段耗时统计</td><td>新增 candidateBuildMs、maxSliceMs、fallbackApiMs 和每类过滤命中数。</td><td>按 6/8/10/12/14+ 输出真实分位数；不改变生成行为。</td></tr>
                 <tr><td>P1 · 已完成</td><td>有向图候选</td><td>worker 从目标 Nav 反向构建距离场，只返回能够沿有向边到达目标的候选。</td><td>不再依赖 Flow 桶猜测目标附近区域。</td></tr>
-                <tr><td>P1 · 已完成</td><td>Nav 距离粗排</td><td>职业范围和排序使用候选到目标的有向路径距离；放宽只提高远端上限并只分页新增区间，Smoker/Hunter 高点扩大粗筛后按有效距离判断上限，随机点最终硬判继续使用全队三维直线 250。</td><td>多层、单向落差和绕路地图使用真实通行语义，同时避免重复扫描近端候选。</td></tr>
+                <tr><td>P1 · 已完成</td><td>原始路径有序分页</td><td>职业范围与全局访问顺序都使用原始有向路径；高点不再缩短排序距离，随机点继续执行全队三维直线 250。</td><td>顺序语义单一可解释，高台优势由实际候选高度的最终分奖励表达。</td></tr>
                 <tr><td>P1 · 已完成</td><td>快照节流</td><td>刷特前 1 秒和待刷期间每 0.1 秒刷新，空闲每 1 秒刷新，结果 TTL 为 0.2 秒。</td><td>跟上 128 tick 玩家移动，同时避免每帧重建。</td></tr>
                 <tr><td>P2 · 已完成</td><td>生还者眼位快照</td><td>每个实际刷特的 OnGameFrame 读取一次眼位和朝向，当前切片复用。</td><td>玩家移动最多产生一个 Tick 的快照误差。</td></tr>
-                <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>保持 50 次导演内部尝试和无插件限制，只独立记录耗时、命中率和职业。</td><td>确认罕见兜底是否造成尖峰，不新增任何刷不出的限制。</td></tr>
+                <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>采用 7 次、12 次两段导演内部尝试；命中点直接生成，只独立记录耗时、命中率和职业。</td><td>确认罕见兜底是否造成尖峰，不新增任何刷不出的限制。</td></tr>
               </tbody>
             </table>
           </div>
 
           <div class="implementation-order" aria-label="建议实施顺序">
             <section class="order-step"><div class="order-index">01</div><h3>采集基线</h3><p>用 <code>sm_spawnperf</code> 建立 P50、P95、P99 和最大切片基线。</p></section>
-            <section class="order-step"><div class="order-index">02</div><h3>观察覆盖</h3><p>确认 48 次检查在低密度地图的三帧内覆盖率。</p></section>
+            <section class="order-step"><div class="order-index">02</div><h3>观察覆盖</h3><p>确认 512 / 16 / 2.0ms 切片预算在低密度地图的覆盖率。</p></section>
             <section class="order-step"><div class="order-index">03</div><h3>检查评分</h3><p>用 SCORE-CHOSEN 日志比较六职业的战术质量和最终分。</p></section>
             <section class="order-step"><div class="order-index">04</div><h3>对照压测</h3><p>按 6/8/10/12/14 特比较刷出延迟、失败轮次和帧峰值。</p></section>
           </div>
@@ -872,7 +872,7 @@
 
     <footer>
       <span>数据来源：<code>spawn_core.inc</code>、<code>spawn_tactics.inc</code>、<code>spawn_attempts.inc</code>、<code>spawn_memory.inc</code></span>
-      <span>默认参数：256 Nav/切片 · 8 昂贵检查/切片 · 1.0ms 切片预算 · 0.2s 快照 TTL</span>
+      <span>默认参数：512 Nav/切片 · 16 昂贵检查/切片 · 2.0ms 切片预算 · 0.2s 快照 TTL</span>
     </footer>
   </div>
 
@@ -881,7 +881,7 @@
       const SVG_NS = 'http://www.w3.org/2000/svg';
       const classBands = {
         smoker:  { label: 'Smoker',  bands: [[500, 1200], [500, 2100], [500, 3000]] },
-        boomer:  { label: 'Boomer',  bands: [[250, 550],  [250, 1000], [250, 1800]] },
+        boomer:  { label: 'Boomer',  bands: [[250, 550],  [250, 1000], [250, 2300]] },
         hunter:  { label: 'Hunter',  bands: [[350, 950],  [350, 1750], [350, 2900]] },
         spitter: { label: 'Spitter', bands: [[300, 800],  [300, 1450], [300, 2300]] },
         jockey:  { label: 'Jockey',  bands: [[250, 700],  [250, 1250], [250, 2200]] },
@@ -891,12 +891,12 @@
       const steps = [
         { title: '选择目标', short: '目标', description: 'Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。', event: '冻结本次会话目标，后续每秒目标更新不会重置扫描进度。' },
         { title: '读取图快照', short: '有向图', description: 'worker 从目标 Nav 反向构建距离场，只保留 candidate -> target 有向可达区域。', event: '空闲每 1 秒、刷特前和待刷期间每 0.1 秒刷新；消费 TTL 为 0.2 秒。' },
-        { title: 'Nav 距离分页', short: '候选游标', description: '主区间从近到远分页；放宽档只读取上一档上限之外的新远端区间，Smoker/Hunter 额外预取补偿上限内的高点。', event: '每页同时返回 areaIdx 和原始 navDistance，SourcePawn 不重复寻路计算排序，也不回头重扫近端。' },
-        { title: '轻量硬过滤', short: '距离预筛', description: '每个 NavArea 最多随机 3 个点，先执行高点有效距离、全队三维直线 250、分散度和真实 Flow 位置检查。', event: 'Smoker/Hunter 仅折减职业上限；直线 250 是不可折减的独立安全边界。' },
-        { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '每切片默认最多 8 个候选进入昂贵检查，避免 trace 与寻路集中爆发；可由 ConVar 调整。' },
-        { title: '评分并生成', short: '评分生成', description: '通过硬过滤的候选统一按 0–100 基础质量和职业战术几何评分，选择最高分。', event: '至少比较两个候选；普通波比较 3–4 个，破点波比较 4–5 个，84 分可早停。' },
-        { title: '受限导演兜底', short: '受限兜底', description: '三个职业距离带都失败后，导演候选仍需满足最终距离、视线和卡位规则。', event: '完整流程第一次失败只轮转职业，继续让插件自己处理。' },
-        { title: '无条件 API 兜底', short: '最终 API', description: '同一职业连续两轮完整失败后，导演执行 50 次内部找位，返回坐标后直接生成。', event: '最终 API 不再叠加插件距离、视线、卡位、路径或评分限制。' }
+        { title: '原始路径分页', short: '候选游标', description: '职业 min/max 与整张快照访问顺序都使用原始 candidate → target 有向路径距离。', event: '每页返回 areaIdx 与 navDistance；高点不会在主线程或 worker 中提前。' },
+        { title: '轻量硬过滤', short: '距离预筛', description: '先拒绝 dF&lt;-8 的 Nav，再在每个 NavArea 最多随机 3 个点，执行职业 raw/effective 范围、全队三维直线 250、分散与 bucket 密度检查。', event: 'dF=-8 允许并扣 32 分；dF=-9 起不参与生成。直线 250 是不可折减的安全边界。' },
+        { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '每切片默认最多 16 个候选进入昂贵检查，避免 trace 与寻路集中爆发；可由 ConVar 调整。' },
+        { title: '评分并生成', short: '评分生成', description: '四因子按职业权重归一后混合战术分；Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 4 分，全职业每低 50u 扣 10 分且后点翻倍。', event: '这些奖励/扣分直接作用最终分；当前 Tick 最多比较 8 个合格点。' },
+        { title: 'Director API 首段', short: 'API × 7', description: '三个职业距离带都失败后调用导演 API；返回坐标后直接生成。', event: '不复核路径、职业距离、视线、卡位、伤害区域或直线 250。' },
+        { title: 'API 失败恢复', short: 'API × 12', description: '首段无点时把内部尝试提高到 12；仍无点则轮换目标，完整轮次后按 0.10 秒退避。', event: '下次从职业主区间重新开始，避免每帧重复撞同一失败路径。' }
       ];
 
       const weightEvents = {
@@ -1159,8 +1159,8 @@
 
         const poolCount = state.phase < 2 ? 0 : Math.round(candidates.length * Math.min(1, (state.phase - 1) / 2));
         document.getElementById('metric-pool').textContent = `${poolCount} / ${candidates.length}`;
-        document.getElementById('metric-nav').textContent = `${state.phase >= 3 && state.phase <= 5 ? Math.min(256, candidates.length) : 0} / 256`;
-        document.getElementById('metric-expensive').textContent = `${state.phase === 4 || state.phase === 5 ? Math.min(8, candidates.filter(c => c.passDistance).length) : 0} / 8`;
+        document.getElementById('metric-nav').textContent = `${state.phase >= 3 && state.phase <= 5 ? Math.min(512, candidates.length) : 0} / 512`;
+        document.getElementById('metric-expensive').textContent = `${state.phase === 4 || state.phase === 5 ? Math.min(16, candidates.filter(c => c.passDistance).length) : 0} / 16`;
         document.getElementById('metric-cycle').textContent = `${state.phase === 7 ? 2 : (state.phase === 6 ? 1 : 0)} / 2`;
 
         timeline.querySelectorAll('button').forEach((button, index) => {

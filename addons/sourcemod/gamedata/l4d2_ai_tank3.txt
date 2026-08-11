@@ -14,31 +14,6 @@
 				"windows"	"448"
 				"linux"		"450"
 			}
-			"INextBot::GetNextBotCombatCharacter"
-			{
-				"windows"	"44"
-				"linux"		"45"
-			}
-			"Path::GetCurrentGoal"
-			{
-				"windows"	"8"
-				"linux"		"9"
-			}
-			"Path::Invalidate"
-			{
-				"windows"	"17"
-				"linux"		"18"
-			}
-			"Path::NextSegment"
-			{
-				"windows"	"21"
-				"linux"		"22"
-			}
-			"Path::LastSegment"
-			{
-				"windows"	"23"
-				"linux"		"24"
-			}
 		}
 		"Signatures"
 		{
@@ -80,31 +55,6 @@
 				"linux"		"@_ZNK13CTerrorPlayer14GetRunTopSpeedEv"
 				"windows"	"\x55\x8B\xEC\x83\xEC\x2A\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\xFF\xD2\x84\xC0\x74\x0D\xA1\x2A\x2A\x2A\x2A\xD9\x40\x2A\x5E"
 			}
-
-			// PathFollower::Update(PathFollower *this, INextBot *nextbot)
-			"PathFollower::Update"
-			{
-				"library"	"server"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x70\xA1\x2A\x2A\x2A\x2A\x53\x56\x33\xF6\x89\x75\xE8\x89\x75\xEC\x57\x8B\xF9\x39\x70\x08\x74\x37\x8B\x40\x08\x68\x2A\x2A\x2A\x2A"
-				"linux"		"@_ZN12PathFollower6UpdateEP8INextBot"
 			}
-		}
-		"Functions"
-		{
-			"PathFollower::Update"
-			{
-				"signature"	"PathFollower::Update"
-				"callconv"	"thiscall"
-				"return"	"void"
-				"this"		"address"
-				"arguments"
-				{
-					"INextBot"
-					{
-						"type"	"int"
-					}
-				}
-			}
-		}
 	}
 }

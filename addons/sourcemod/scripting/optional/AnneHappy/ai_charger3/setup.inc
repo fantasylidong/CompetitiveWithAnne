@@ -6,10 +6,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#include <dhooks>
 #include <anne_nextbot>
-
-native bool AIPathFollowerBroker_IsActive();
 
 // =========================================================================
 // Public Defines
@@ -19,20 +16,11 @@ native bool AIPathFollowerBroker_IsActive();
 #define GAMEDATA 							"l4d2_ai_charger3"
 #define SIG_GET_RUN_TOP_SPEED 				"CTerrorPlayer::GetRunTopSpeed"
 #define SIG_IS_CHARGE_BLOCKED 				"Charger::IsChargeBlocked"
-#define SIG_PATH_FOLLOWER_UPDATE			"PathFollower::Update"
-#define SIG_NEXTBOT_GET_COMBAT_CHARACTER 	"INextBot::GetNextBotCombatCharacter"
-#define OFFSET_PATH_FOLLOWER_GOAL			"PathFollower::m_goal"
-#define SIG_PATH_GET_CUR_GOAL				"Path::GetCurrentGoal"
-#define SIG_PATH_INVALIDATE					"Path::Invalidate"
-#define SIG_PATH_NEXT_SEGMENT				"Path::NextSegment"
-#define SIG_PATH_PRIOR_SEGMENT				"Path::PriorSegment"
-#define SIG_PATH_LAST_SEGMENT 				"Path::LastSegment"
 #define	SIG_MY_NEXTBOT_POINTER				"CBaseEntity::MyNextBotPointer"
 #define SIG_NEXTBOT_GET_LOCOMOTION			"INextBot::GetLocomotionInterface"
 #define SIG_LOCOMOTION_APPROACH				"ILocomotion::Approach"
 #define SIG_LOCOMOTION_FACE_TO				"ILocomotion::FaceTowards"
 #define SIG_LOCOMOTION_HAS_POTENTIAL_GAP	"ILocomotion::HasPotentialGap"
-#define PATH_FOLLOWER_BROKER_LIBRARY		"ai_tank3_pathfollower"
 
 #define PLAYER_HEIGHT 						72.0
 #define JUMP_HEIGHT							57.0	// PlayerLocomotion::GetMaxJumpHeight 返回 57.0
@@ -356,29 +344,13 @@ ConVar
 	cvGravity;
 
 Handle
-	g_hSdkGetRunTopSpeed,
-	g_hSdkIsChargeBlocked,
-	g_hSdkNextBotGetCombatCharacter,
-	g_hSdkPathGetCurGoal,
-	g_hSdkPathInvalidate,
-	g_hSdkPathNextSegment,
-	g_hSdkPathPriorSegment,
-	g_hSdkPathLastSegment,
-	g_hSdkMyNextBotPointer,
+		g_hSdkGetRunTopSpeed,
+		g_hSdkIsChargeBlocked,
+		g_hSdkMyNextBotPointer,
 	g_hSdkGetLocomotionInterface,
 	g_hSdkLocomotionApproach,
 	g_hSdkLocomotionFaceTo,
 	g_hSdkHasPotentialGap;
-
-Handle
-	g_hPathFollowerDetour;
-
-bool
-	g_bLocalPathFollowerDetourEnabled,
-	g_bUsingSharedPathFollowerDetour;
-
-int
-	g_iPathFollowerGoalOffset;
 
 stock void SetUp_OnModuleStart() {
 	// 初始化状态描述列表
@@ -394,71 +366,19 @@ stock void SetUp_OnConfigsExecuted() {
 	cvGravity = FindConVar("sv_gravity");
 }
 
-stock bool SetUp_IsPathFollowerBrokerActive() {
-	if (LibraryExists(ANNE_NEXTBOT_LIBRARY)
-		&& GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") == FeatureStatus_Available
-		&& GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsPathBrokerActive") == FeatureStatus_Available
-		&& AnneNextBot_IsActive()
-		&& AnneNextBot_IsPathBrokerActive())
-		return true;
-
-	return LibraryExists(PATH_FOLLOWER_BROKER_LIBRARY)
-		&& GetFeatureStatus(FeatureType_Native, "AIPathFollowerBroker_IsActive") == FeatureStatus_Available
-		&& AIPathFollowerBroker_IsActive();
-}
-
 stock bool SetUp_SetAnneNextBotPathConsumer(bool enabled) {
 	if (!LibraryExists(ANNE_NEXTBOT_LIBRARY)
 		|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_IsActive") != FeatureStatus_Available
-		|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_SetPathConsumer") != FeatureStatus_Available
-		|| !AnneNextBot_IsActive())
+			|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_SetPathConsumer") != FeatureStatus_Available
+			|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_GetPathSnapshotInfo") != FeatureStatus_Available
+			|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_GetPathSegment") != FeatureStatus_Available
+			|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_SetPathGoal") != FeatureStatus_Available
+			|| GetFeatureStatus(FeatureType_Native, "AnneNextBot_InvalidatePath") != FeatureStatus_Available
+			|| !AnneNextBot_IsActive())
 		return false;
 
 	return AnneNextBot_SetPathConsumer(AnneNextBotPathConsumer_Charger, enabled);
 }
-
-stock bool SetUp_DisableLocalPathFollowerDetour() {
-	if (!g_bLocalPathFollowerDetourEnabled || !g_hPathFollowerDetour)
-		return true;
-
-	if (!DHookDisableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update)) {
-		LogError("Failed to disable local detour for signature: %s.", SIG_PATH_FOLLOWER_UPDATE);
-		return false;
-	}
-
-	g_bLocalPathFollowerDetourEnabled = false;
-	return true;
-}
-
-stock void SetUp_EnableLocalPathFollowerDetour() {
-	if (g_bLocalPathFollowerDetourEnabled || !g_hPathFollowerDetour)
-		return;
-
-	if (!DHookEnableDetour(g_hPathFollowerDetour, false, Detour_PathFollower_Update))
-		SetFailState("Failed to enable local detour for signature: %s.", SIG_PATH_FOLLOWER_UPDATE);
-	g_bLocalPathFollowerDetourEnabled = true;
-}
-
-stock bool SetUp_PreparePathFollowerBroker() {
-	g_bUsingSharedPathFollowerDetour = false;
-	if (SetUp_DisableLocalPathFollowerDetour())
-		return true;
-
-	return false;
-}
-
-stock void SetUp_UseActivePathFollowerBroker() {
-	if (!SetUp_DisableLocalPathFollowerDetour())
-		return;
-
-	g_bUsingSharedPathFollowerDetour = true;
-}
-
-stock void SetUp_UseLocalPathFollowerDetour() {
-	g_bUsingSharedPathFollowerDetour = false;
-	SetUp_EnableLocalPathFollowerDetour();
-}
-
 stock void SetUp_OnAllPluginsLoaded() {
 	char path[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, path, sizeof(path), "gamedata/%s.txt", GAMEDATA);
@@ -468,11 +388,6 @@ stock void SetUp_OnAllPluginsLoaded() {
 	GameData hGameData = new GameData(GAMEDATA);
 	if (!hGameData)
 		SetFailState("Failed to load gamedata file: %s", path);
-
-	// 读取 PathFollower::m_goal 成员的偏移量 (4 * 4566)
-	g_iPathFollowerGoalOffset = hGameData.GetOffset(OFFSET_PATH_FOLLOWER_GOAL);
-	if (g_iPathFollowerGoalOffset < 0)
-		SetFailState("Failed to load offset: %s in gamedata file: %s.", OFFSET_PATH_FOLLOWER_GOAL, GAMEDATA);
 
 	// ============================================================
 	// Read SDK function 'CTerrorPlayer::GetRunTopSpeed'
@@ -497,81 +412,6 @@ stock void SetUp_OnAllPluginsLoaded() {
 	g_hSdkIsChargeBlocked = EndPrepSDKCall();
 	if (!g_hSdkIsChargeBlocked)
 		SetFailState("Could not prep the %s function.", SIG_IS_CHARGE_BLOCKED);
-
-	// ============================================================
-	// PathFollower::Update Detour
-	// ============================================================
-	g_hPathFollowerDetour = DHookCreateFromConf(hGameData, SIG_PATH_FOLLOWER_UPDATE);
-	if (!g_hPathFollowerDetour)
-		SetFailState("Failed to create detour for signature: %s in gamedata file: %s.", SIG_PATH_FOLLOWER_UPDATE, GAMEDATA);
-
-	// ============================================================
-	// CBaseCombatCharacter* GetEntity( void ) const
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_NEXTBOT_GET_COMBAT_CHARACTER))
-		SetFailState("Failed to load signature: %s in gamedata file: %s.", SIG_NEXTBOT_GET_COMBAT_CHARACTER, GAMEDATA);
-	PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
-	g_hSdkNextBotGetCombatCharacter = EndPrepSDKCall();
-	if (!g_hSdkNextBotGetCombatCharacter)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_NEXTBOT_GET_COMBAT_CHARACTER);
-
-	// ============================================================
-	// int __cdecl PathFollower::GetCurrentGoal(PathFollower *this)
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_PATH_GET_CUR_GOAL))
-		SetFailState("Failed to load offset for signature %s", SIG_PATH_GET_CUR_GOAL);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSdkPathGetCurGoal = EndPrepSDKCall();
-	if (!g_hSdkPathGetCurGoal)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_PATH_GET_CUR_GOAL);
-
-	// ============================================================
-	// void Path::Invalidate()
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_PATH_INVALIDATE))
-		SetFailState("Failed to load offset for signature %s", SIG_PATH_INVALIDATE);
-	g_hSdkPathInvalidate = EndPrepSDKCall();
-	if (!g_hSdkPathInvalidate)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_PATH_INVALIDATE);
-
-	// ============================================================
-	// Path::Segment* NextSegment( const Path::Segment* currentSegment )
-	// given current segment, return next segment
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_PATH_NEXT_SEGMENT))
-		SetFailState("Failed to load offset for signature %s", SIG_PATH_NEXT_SEGMENT);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSdkPathNextSegment = EndPrepSDKCall();
-	if (!g_hSdkPathNextSegment)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_PATH_NEXT_SEGMENT);
-
-	// ============================================================
-	// Path::PriorSegment(Path::Segment const*) const
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_PATH_PRIOR_SEGMENT))
-		SetFailState("Failed to load offset for signature %s", SIG_PATH_PRIOR_SEGMENT);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSdkPathPriorSegment = EndPrepSDKCall();
-	if (!g_hSdkPathPriorSegment)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_PATH_PRIOR_SEGMENT);
-
-	// ============================================================
-	// Path::Segment* Path::LastSegment(void)
-	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw);
-	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_PATH_LAST_SEGMENT))
-		SetFailState("Failed to load offset for signature %s", SIG_PATH_LAST_SEGMENT);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSdkPathLastSegment = EndPrepSDKCall();
-	if (!g_hSdkPathLastSegment)
-		SetFailState("Failed to prep sdk call for signature %s", SIG_PATH_LAST_SEGMENT);
 
 	// ============================================================
 	// int CBaseEntity::MyNextBotPointer()
@@ -632,21 +472,13 @@ stock void SetUp_OnAllPluginsLoaded() {
 	if (!g_hSdkHasPotentialGap)
 		SetFailState("Failed to find signature %s", SIG_LOCOMOTION_HAS_POTENTIAL_GAP);
 
-	delete hGameData;
-	SetUp_SetAnneNextBotPathConsumer(true);
-	if (SetUp_IsPathFollowerBrokerActive())
-		SetUp_UseActivePathFollowerBroker();
-	else
-		SetUp_UseLocalPathFollowerDetour();
-}
+		delete hGameData;
+		if (!SetUp_SetAnneNextBotPathConsumer(true))
+			SetFailState("ai_charger3 requires anne_nextbot path snapshots.");
+	}
 
 stock void SetUp_OnModuleEnd() {
-	SetUp_SetAnneNextBotPathConsumer(false);
-	SetUp_DisableLocalPathFollowerDetour();
-	g_bLocalPathFollowerDetourEnabled = false;
-	g_bUsingSharedPathFollowerDetour = false;
-	delete g_hPathFollowerDetour;
-
+		SetUp_SetAnneNextBotPathConsumer(false);
 	for (int client = 1; client <= MaxClients; client++)
 		delete g_ChargerPathSnapshots[client];
 	delete g_ChargerStates;

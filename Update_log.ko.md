@@ -67,3 +67,10 @@
 - `l4d_stats.smx`에 공통 `ruleset_key`, 규칙 버전, 기록 정책, 시간/난이도 프로필을 추가했습니다. Anne 계열은 최고 기록 랭킹을 유지하고, 협동/생존은 규칙별로 분리하며, 대전·리얼리즘 대전·스캐빈지는 최단 시간 비교 대신 라운드 기록으로 저장합니다.
 - `map_runs`, `map_run_players`, `legacy_map_bests`와 반복 실행 가능한 마이그레이션/롤백 스크립트를 추가했습니다. 기존 `timedmaps`/`timedmap_runs`는 유지하며, 이전 플레이어별 최고 기록과 실제 경기를 분리합니다.
 - NewAnneWeb의 플레이어 페이지, 맵 목록, 상세 페이지를 v2에 맞게 갱신했으며 규칙, 버전, 난이도/AI 단계, 팀 인원, Anne 리스폰 설정으로 필터링할 수 있습니다. 배포 순서는 `docs/map_records_v2_migration.md`를 참고하세요.
+
+### 2026년 8월 10일 Boomer/Spitter Path Follow 연속 점프
+- 네이티브 `anne_nextbot` 확장을 1.3.0으로 올렸습니다. 단일 `PathFollower::Update` detour를 유지하면서 제한된 경로 노드 값을 네이티브에서 직접 복사합니다. Tank, Charger, Boomer, Spitter는 native를 통해 스냅샷을 읽으며 SourcePawn은 PathFollower/PathSegment 포인터를 받거나 읽지 않습니다. 공통 경로 시그니처와 가상 함수 오프셋은 `anne_nextbot.games.txt`로 통합했습니다.
+- Tank `ai_tank3`를 1.0.0.3으로, Charger `ai_charger3`를 1.0.1.3으로 올리고 기존 Path Follow 연속 점프를 동일한 native 스냅샷으로 이전했습니다. 각 gamedata에는 발톱 공격, 돌진, locomotion 등 전용 호출만 남기고 공통 PathFollower 정의 중복을 제거했습니다.
+- Boomer를 `ai_boomer_3.smx` 3.0.3으로, Spitter를 `ai_spitter_3.smx` 3.0.1로 올렸습니다. 연속 점프는 유효한 경로 미리보기 지점을 우선 사용하고, 경로가 오래되었거나 막혔거나 앞에 등반·틈 점프 같은 특수 이동이 있으면 기존 AI/직선 행동으로 되돌아갑니다.
+- Boomer는 직접 시야를 잠시 잃은 모퉁이에서도 유효한 PathFollower 경로가 있으면 계속 접근하며, 26-07 AI2의 구토 각도 수정도 유지합니다.
+- 현재 2026-08 AnneHappy, Hardcore, Shotgun 설정은 AI3를 로드합니다. `Anne26-07.cfg`는 변경되지 않은 `ai_boomer_2.smx`와 `ai_spitter_2.smx`를 계속 로드하여 26-07 롤백 버전으로 유지합니다.

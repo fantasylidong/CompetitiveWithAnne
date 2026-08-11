@@ -106,6 +106,17 @@ enum struct Config
     ConVar Score_w_hght;
     ConVar Score_w_flow;
     ConVar Score_w_disp;
+    ConVar NavHighSortScale;
+    ConVar NavHighSortMinHeight;
+    ConVar ScoreLowHeightStart;
+    ConVar ScoreLowHeightPer100;
+    ConVar ScoreLowHeightCap;
+    ConVar ScoreLowHeightBehindMultiplier;
+    ConVar ScoreHighHeightPer50;
+    ConVar ScoreHighHeightCap;
+    ConVar ScoreBehindPerFlow;
+    ConVar ScoreBehindCap;
+    ConVar ScoreBehindRejectGap;
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
@@ -139,6 +150,7 @@ enum struct Config
     ConVar AntiBaitGrace;
     ConVar AntiBaitWindow;
     ConVar AntiBaitProgressPct;
+    ConVar AntiBaitProgressDist;
     ConVar AntiBaitMinSiRatio;
     ConVar AntiBaitForceAfter;
     ConVar AntiBaitRecover;
@@ -167,6 +179,7 @@ enum struct Config
     float  fAntiBaitGrace;
     float  fAntiBaitWindow;
     int    iAntiBaitProgressPct;
+    float  fAntiBaitProgressDist;
     float  fAntiBaitMinSiRatio;
     float  fAntiBaitForceAfter;
     float  fAntiBaitRecover;
@@ -194,6 +207,17 @@ enum struct Config
 
     // 缓存值
     float fFlowBadPenalty;
+    float fNavHighSortScale[7];
+    float fNavHighSortMinHeight;
+    float fScoreLowHeightStart;
+    float fScoreLowHeightPer100;
+    float fScoreLowHeightCap;
+    float fScoreLowHeightBehindMultiplier;
+    float fScoreHighHeightPer50;
+    float fScoreHighHeightCap;
+    float fScoreBehindPerFlow;
+    float fScoreBehindCap;
+    int   iScoreBehindRejectGap;
 
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
@@ -396,6 +420,62 @@ enum struct Config
         this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.NavHighSortScale = CreateConVar(
+            "inf_nav_high_sort_scale", "1.00 1.00 1.00 1.00 1.00 1.00",
+            "兼容旧配置；当前版本不再按高点缩短Nav排序距离，高点优势改由评分奖励表达",
+            CVAR_FLAG);
+        this.NavHighSortMinHeight = CreateConVar(
+            "inf_nav_high_sort_min_height", "64.0",
+            "兼容旧配置；当前版本不参与候选排序",
+            CVAR_FLAG, true, 0.0, true, 1000.0);
+        this.ScoreLowHeightStart = CreateConVar(
+            "inf_score_low_height_start", "50.0",
+            "候选点低于目标生还者脚部多少单位后进入第一个50u离散扣分档",
+            CVAR_FLAG, true, 50.0, true, 1000.0);
+        SetConVarBounds(this.ScoreLowHeightStart,
+            ConVarBound_Lower, true, 50.0);
+        this.ScoreLowHeightPer100 = CreateConVar(
+            "inf_score_low_height_per_100", "20.0",
+            "低点离散扣分率；每满50u扣该值的一半（默认每50u扣10分）",
+            CVAR_FLAG, true, 0.0, true, 200.0);
+        SetConVarBounds(this.ScoreLowHeightPer100,
+            ConVarBound_Upper, true, 200.0);
+        this.ScoreLowHeightCap = CreateConVar(
+            "inf_score_low_height_cap", "100.0",
+            "所有职业低点额外扣分最终上限（落后倍率之后）；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        // CreateConVar returns the existing handle on hot reload and does not
+        // widen bounds left by the previous release (which capped this at 50).
+        SetConVarBounds(this.ScoreLowHeightCap,
+            ConVarBound_Upper, true, 100.0);
+        this.ScoreLowHeightBehindMultiplier = CreateConVar(
+            "inf_score_low_height_behind_multiplier", "2.0",
+            "候选Nav进度落后目标时，低点扣分倍率",
+            CVAR_FLAG, true, 1.0, true, 10.0);
+        this.ScoreHighHeightPer50 = CreateConVar(
+            "inf_score_high_height_per_50", "6.0",
+            "Smoker/Hunter候选点每高于目标脚部满50u增加的最终评分",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        this.ScoreHighHeightCap = CreateConVar(
+            "inf_score_high_height_cap", "100.0",
+            "Smoker/Hunter高点最终评分奖励上限；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        this.ScoreBehindPerFlow = CreateConVar(
+            "inf_score_behind_per_flow", "4.0",
+            "候选Flow每落后目标1个百分点扣多少总分",
+            CVAR_FLAG, true, 0.0, true, 20.0);
+        SetConVarBounds(this.ScoreBehindPerFlow,
+            ConVarBound_Upper, true, 20.0);
+        this.ScoreBehindCap = CreateConVar(
+            "inf_score_behind_cap", "100.0",
+            "Flow后点梯度扣分上限；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        SetConVarBounds(this.ScoreBehindCap,
+            ConVarBound_Upper, true, 100.0);
+        this.ScoreBehindRejectGap = CreateConVar(
+            "inf_score_behind_reject_gap", "8",
+            "候选Nav最多允许落后目标多少个Flow百分点；-1关闭硬拒绝，默认-8允许、-9拒绝",
+            CVAR_FLAG, true, -1.0, true, 100.0);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -467,7 +547,7 @@ enum struct Config
         );
         this.SpawnScoreFloor = CreateConVar(
             "inf_spawn_score_floor", "0.0",
-            "0..100 最小总评分阈值；0=只排序安全候选，不因评分拒绝刷点。",
+            "0..100 额外总评分阈值；最终分<=0始终拒绝，0表示不再提高正分门槛。",
             CVAR_FLAG, true, 0.0, true, 100.0
         );
         this.FlowBucketShare = CreateConVar(
@@ -509,9 +589,14 @@ enum struct Config
             CVAR_FLAG, true, 1.0, true, 120.0
         );
         this.AntiBaitProgressPct = CreateConVar(
-            "inf_antibait_progress_pct", "2",
+            "inf_antibait_progress_pct", "4",
             "Lower-median survivor flow percent needed to reset anti-bait baseline",
             CVAR_FLAG, true, 1.0, true, 20.0
+        );
+        this.AntiBaitProgressDist = CreateConVar(
+            "inf_antibait_progress_dist", "1000.0",
+            "Team-center world distance from the last progress baseline needed to reset anti-bait; 0 disables",
+            CVAR_FLAG, true, 0.0, true, 10000.0
         );
         this.AntiBaitMinSiRatio = CreateConVar(
             "inf_antibait_min_si_ratio", "0.50",
@@ -648,6 +733,17 @@ enum struct Config
         this.SurFlowFallbackEnable.AddChangeHook(OnCfgChanged);
         this.SurFlowFallbackTTL.AddChangeHook(OnCfgChanged);
         this.FlowBadPenaltyPoints.AddChangeHook(OnCfgChanged);
+        this.NavHighSortScale.AddChangeHook(OnCfgChanged);
+        this.NavHighSortMinHeight.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightStart.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightPer100.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightCap.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightBehindMultiplier.AddChangeHook(OnCfgChanged);
+        this.ScoreHighHeightPer50.AddChangeHook(OnCfgChanged);
+        this.ScoreHighHeightCap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindPerFlow.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindCap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindRejectGap.AddChangeHook(OnCfgChanged);
         this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
         this.FlowBucketShare.AddChangeHook(OnCfgChanged);
         this.AntiBaitEnable.AddChangeHook(OnCfgChanged);
@@ -655,6 +751,7 @@ enum struct Config
         this.AntiBaitGrace.AddChangeHook(OnCfgChanged);
         this.AntiBaitWindow.AddChangeHook(OnCfgChanged);
         this.AntiBaitProgressPct.AddChangeHook(OnCfgChanged);
+        this.AntiBaitProgressDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitMinSiRatio.AddChangeHook(OnCfgChanged);
         this.AntiBaitForceAfter.AddChangeHook(OnCfgChanged);
         this.AntiBaitRecover.AddChangeHook(OnCfgChanged);
@@ -872,6 +969,11 @@ enum struct Config
             this.w_disp[i+1] = StringToFloat(parts[i]);
         }
 
+        // 旧的 ranked Nav 接口保留二进制兼容，但 active 搜索固定使用原始
+        // candidate -> target 有向路径距离；高点优势只通过最终评分奖励表达。
+        for (int i = 1; i <= SI_COUNT; i++)
+            this.fNavHighSortScale[i] = 1.0;
+
         // 权重兜底：CVar 值不足或为 0 时回退到 1.0，避免意外禁用某因子。
         // 必须在 ConVar 解析之后执行，确保验证的是新解析的值。
         for (int i = 1; i <= SI_COUNT; i++) {
@@ -918,6 +1020,16 @@ enum struct Config
         this.fFlowBadPenalty = this.FlowBadPenaltyPoints.FloatValue;
         if (this.fFlowBadPenalty < 0.0) this.fFlowBadPenalty = 0.0;
         if (this.fFlowBadPenalty > 100.0) this.fFlowBadPenalty = 100.0;
+        this.fNavHighSortMinHeight = this.NavHighSortMinHeight.FloatValue;
+        this.fScoreLowHeightStart = this.ScoreLowHeightStart.FloatValue;
+        this.fScoreLowHeightPer100 = this.ScoreLowHeightPer100.FloatValue;
+        this.fScoreLowHeightCap = this.ScoreLowHeightCap.FloatValue;
+        this.fScoreLowHeightBehindMultiplier = this.ScoreLowHeightBehindMultiplier.FloatValue;
+        this.fScoreHighHeightPer50 = this.ScoreHighHeightPer50.FloatValue;
+        this.fScoreHighHeightCap = this.ScoreHighHeightCap.FloatValue;
+        this.fScoreBehindPerFlow = this.ScoreBehindPerFlow.FloatValue;
+        this.fScoreBehindCap = this.ScoreBehindCap.FloatValue;
+        this.iScoreBehindRejectGap = this.ScoreBehindRejectGap.IntValue;
         this.iVisRayMode        = this.VisEyeRayMode.IntValue;
         this.fSpawnScoreFloor   = this.SpawnScoreFloor.FloatValue;
         this.fBucketSpawnRatio  = this.FlowBucketShare.FloatValue;
@@ -942,6 +1054,7 @@ enum struct Config
         this.fAntiBaitGrace = this.AntiBaitGrace.FloatValue;
         this.fAntiBaitWindow = this.AntiBaitWindow.FloatValue;
         this.iAntiBaitProgressPct = this.AntiBaitProgressPct.IntValue;
+        this.fAntiBaitProgressDist = this.AntiBaitProgressDist.FloatValue;
         this.fAntiBaitMinSiRatio = this.AntiBaitMinSiRatio.FloatValue;
         this.fAntiBaitForceAfter = this.AntiBaitForceAfter.FloatValue;
         this.fAntiBaitRecover = this.AntiBaitRecover.FloatValue;

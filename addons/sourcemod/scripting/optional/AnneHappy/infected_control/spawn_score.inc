@@ -6,6 +6,7 @@
 #define SPAWN_SCORE_FIRST_FIT       80.0
 #define SPAWN_SCORE_TACTICAL_BLEND_NORMAL  0.10
 #define SPAWN_SCORE_TACTICAL_BLEND_BREACH  0.18
+#define SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS  50.0
 
 static float SpawnScore_ExpF(float x)
 {
@@ -183,82 +184,66 @@ static float CalculateScore_DispersionWithScale(int sidx,
     return ClampFloat(score, 0.0, 100.0);
 }
 
-static float ComputeBehindHeightPenalty(int zc, int candBucket, int centerBucket,
-                                        float candZ, float refEyeZ, float allMaxEyeZ,
-                                        float lowestFootZ)
+stock bool SpawnScore_ShouldRejectBehindFlow(int candBucket, int centerBucket)
 {
-    int bucketGap = centerBucket - candBucket;
+    if (candBucket < 0 || centerBucket < 0 || gCV.iScoreBehindRejectGap < 0)
+        return false;
+
+    return candBucket - centerBucket < -gCV.iScoreBehindRejectGap;
+}
+
+static float ComputeBehindFlowPenalty(int deltaFlow)
+{
+    int bucketGap = -deltaFlow;
     if (bucketGap <= 0)
         return 0.0;
+    return FloatMin(gCV.fScoreBehindCap,
+        float(bucketGap) * gCV.fScoreBehindPerFlow);
+}
 
-    float softCoef;
-    float deepCoef;
-    float abyssCoef;
-    float highCoef;
-    switch (zc)
+static float ComputeLowHeightPenalty(float candZ, float targetFootZ, int deltaFlow,
+                                     float &drop, int &steps, float &multiplier)
+{
+    drop = FloatMax(0.0, targetFootZ - candZ);
+    steps = 0;
+    multiplier = deltaFlow < 0
+        ? FloatMax(1.0, gCV.fScoreLowHeightBehindMultiplier) : 1.0;
+
+    if (gCV.fScoreLowHeightCap <= 0.0
+        || drop < gCV.fScoreLowHeightStart)
     {
-        case view_as<int>(SI_Smoker):
-        {
-            softCoef = 0.20;
-            deepCoef = 0.34;
-            abyssCoef = 0.48;
-            highCoef = 0.12;
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            softCoef = 0.22;
-            deepCoef = 0.38;
-            abyssCoef = 0.55;
-            highCoef = 0.14;
-        }
-        default:
-        {
-            softCoef = 0.28;
-            deepCoef = 0.46;
-            abyssCoef = 0.60;
-            highCoef = 0.18;
-        }
+        return 0.0;
     }
 
-    float penalty = 0.0;
+    steps = RoundToFloor(
+        (drop - gCV.fScoreLowHeightStart) / SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS) + 1;
+    float pointsPerStep = gCV.fScoreLowHeightPer100
+        * (SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS / 100.0);
+    return FloatMin(gCV.fScoreLowHeightCap,
+        float(steps) * pointsPerStep * multiplier);
+}
 
-    float gapPenalty = float(bucketGap) * 10.0;
-    if (gapPenalty > 60.0)
+static bool SpawnScore_IsHighGroundClass(int zc)
+{
+    return zc == view_as<int>(SI_Smoker)
+        || zc == view_as<int>(SI_Hunter);
+}
+
+static float ComputeHighHeightBonus(int zc, float candZ, float targetFootZ,
+                                    float &rise, int &steps)
+{
+    rise = FloatMax(0.0, candZ - targetFootZ);
+    steps = 0;
+    if (!SpawnScore_IsHighGroundClass(zc)
+        || gCV.fScoreHighHeightCap <= 0.0
+        || rise < SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS)
     {
-        float extraGap = FloatMax(0.0, float(bucketGap) - 6.0);
-        gapPenalty = 60.0 + FloatMin(40.0, extraGap * 8.0);
-    }
-    penalty += FloatMin(110.0, gapPenalty);
-
-    bool haveFoot = (lowestFootZ < 1.0e8);
-    float floorBase = haveFoot ? (lowestFootZ - 40.0) : (refEyeZ - 130.0);
-    float drop = floorBase - candZ;
-    if (drop > 0.0)
-    {
-        float softDrop = FloatMin(drop, 70.0);
-        float deepDrop = FloatMax(0.0, FloatMin(drop - 70.0, 60.0));
-        float abyssDrop = FloatMax(0.0, drop - 130.0);
-        float behindFactor = 1.0 + FloatMin(0.60, 0.06 * float(bucketGap));
-        float softGain = 1.0 + 0.5 * (softDrop / 70.0);
-        float deepGain = 1.0 + 0.8 * (deepDrop / 60.0);
-        float abyssLinear = abyssCoef * abyssDrop;
-        float abyssCurve = abyssCoef * Pow(abyssDrop, 1.10);
-        float abyssTerm = FloatMin(80.0, FloatMax(abyssLinear, abyssCurve));
-        float softTerm = softCoef * softDrop * softGain;
-        float deepTerm = deepCoef * deepDrop * deepGain;
-
-        penalty += (softTerm + deepTerm + abyssTerm) * behindFactor;
+        return 0.0;
     }
 
-    float highLimit = allMaxEyeZ + 150.0;
-    float rise = candZ - highLimit;
-    if (rise > 0.0)
-        penalty += FloatMin(50.0, rise * highCoef);
-
-    if (penalty > 150.0)
-        penalty = 150.0;
-
-    return penalty;
+    steps = RoundToFloor(rise / SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS);
+    return FloatMin(gCV.fScoreHighHeightCap,
+        float(steps) * gCV.fScoreHighHeightPer50);
 }
 
 stock float ComputeFFThreshold()
@@ -384,6 +369,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
 {
     dest.total = src.total;
     dest.baseTotal = src.baseTotal;
+    dest.weightedQuality = src.weightedQuality;
     dest.dist = src.dist;
     dest.hght = src.hght;
     dest.flow = src.flow;
@@ -393,12 +379,19 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.dispScaled = src.dispScaled;
     dest.penK = src.penK;
     dest.extraPen = src.extraPen;
-    dest.navWeight = src.navWeight;
-    dest.navPenalty = src.navPenalty;
+    dest.behindPen = src.behindPen;
+    dest.lowHeightPen = src.lowHeightPen;
+    dest.targetFootZ = src.targetFootZ;
+    dest.lowHeightDrop = src.lowHeightDrop;
+    dest.lowHeightMultiplier = src.lowHeightMultiplier;
+    dest.highHeightBonus = src.highHeightBonus;
+    dest.highHeightRise = src.highHeightRise;
     dest.tacticalQuality = src.tacticalQuality;
     dest.dTargetEye = src.dTargetEye;
     dest.navDistance = src.navDistance;
+    dest.navRankDistance = src.navRankDistance;
     dest.navDistanceEffective = src.navDistanceEffective;
+    dest.navHighSortScale = src.navHighSortScale;
     dest.navHighGroundComp = src.navHighGroundComp;
     dest.ringEff = src.ringEff;
     dest.slack = src.slack;
@@ -407,9 +400,12 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.candBucket = src.candBucket;
     dest.centerBucket = src.centerBucket;
     dest.deltaFlow = src.deltaFlow;
+    dest.lowHeightSteps = src.lowHeightSteps;
+    dest.highHeightSteps = src.highHeightSteps;
     dest.sector = src.sector;
     dest.areaIdx = src.areaIdx;
     dest.rawBadFlow = src.rawBadFlow;
+    dest.flowBucketKnown = src.flowBucketKnown;
     SpawnScore_CopyPos(dest.pos, src.pos);
 }
 
@@ -425,12 +421,11 @@ bool SpawnScore_BuildCandidate(int zc,
                                       int candBucket,
                                       int centerBucket,
                                       bool rawBadFlow,
+                                      bool flowBucketKnown,
                                       float refEyeZ,
-                                      float bestSurvivorEyeZ,
-                                      float lowestFootZ,
+                                      float targetFootZ,
                                       int sector,
                                       int areaIdx,
-                                      float navWeight,
                                       float tacticalQuality,
                                       SpawnScoreDbg dbg)
 {
@@ -455,23 +450,30 @@ bool SpawnScore_BuildCandidate(int zc,
         sector, recentSectors, 1.0);
     float dispScaled = CalculateScore_DispersionWithScale(
         sector, recentSectors, penK);
-    float rawBehindPenalty = ComputeBehindHeightPenalty(zc, candBucket, centerBucket,
-                                                        pos[2], refEyeZ, bestSurvivorEyeZ,
-                                                        lowestFootZ);
-    float behindPenalty = 10.0 * ClampFloat(rawBehindPenalty / 150.0, 0.0, 1.0);
+    float behindPenalty = ComputeBehindFlowPenalty(deltaFlow);
+    float lowHeightDrop, lowHeightMultiplier;
+    int lowHeightSteps;
+    float lowHeightPenalty = ComputeLowHeightPenalty(
+        pos[2], targetFootZ, deltaFlow,
+        lowHeightDrop, lowHeightSteps, lowHeightMultiplier);
+    float extraPenalty = behindPenalty + lowHeightPenalty;
+    float highHeightRise;
+    int highHeightSteps;
+    float highHeightBonus = ComputeHighHeightBonus(
+        zc, pos[2], targetFootZ, highHeightRise, highHeightSteps);
 
     float weightedQuality = SpawnScore_WeightedAverage(
         zc, scoreDist, scoreHeight, scoreFlow, dispScaled);
-    dbg.baseTotal = ClampFloat(weightedQuality - behindPenalty, 0.0, 100.0);
-    dbg.navWeight = ClampFloat(navWeight, NAV_WEIGHT_MIN, 1.0);
-    dbg.navPenalty = 0.0;
+    dbg.weightedQuality = ClampFloat(weightedQuality, 0.0, 100.0);
+    dbg.baseTotal = dbg.weightedQuality;
     dbg.tacticalQuality = ClampFloat(tacticalQuality, 0.0, 100.0);
     float tacticalBlend = Tactical_IsBreachWave()
         ? SPAWN_SCORE_TACTICAL_BLEND_BREACH
         : SPAWN_SCORE_TACTICAL_BLEND_NORMAL;
     dbg.total = ClampFloat(
         dbg.baseTotal * (1.0 - tacticalBlend)
-        + dbg.tacticalQuality * tacticalBlend,
+        + dbg.tacticalQuality * tacticalBlend
+        + highHeightBonus - extraPenalty,
         0.0, 100.0);
     dbg.dist = scoreDist;
     dbg.hght = scoreHeight;
@@ -481,7 +483,16 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.dispRaw = scoreDisp;
     dbg.dispScaled = dispScaled;
     dbg.penK = penK;
-    dbg.extraPen = behindPenalty;
+    dbg.extraPen = extraPenalty;
+    dbg.behindPen = behindPenalty;
+    dbg.lowHeightPen = lowHeightPenalty;
+    dbg.targetFootZ = targetFootZ;
+    dbg.lowHeightDrop = lowHeightDrop;
+    dbg.lowHeightMultiplier = lowHeightMultiplier;
+    dbg.lowHeightSteps = lowHeightSteps;
+    dbg.highHeightBonus = highHeightBonus;
+    dbg.highHeightRise = highHeightRise;
+    dbg.highHeightSteps = highHeightSteps;
     dbg.dTargetEye = dTargetEye;
     dbg.navDistance = navDistance;
     dbg.navDistanceEffective = navDistanceEffective;
@@ -496,6 +507,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.sector = sector;
     dbg.areaIdx = areaIdx;
     dbg.rawBadFlow = rawBadFlow;
+    dbg.flowBucketKnown = flowBucketKnown;
     SpawnScore_CopyPos(dbg.pos, pos);
     return true;
 }
@@ -510,12 +522,18 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f base=%.1f tacticalQ=%.1f navW=%.2f navPen=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) extraPen=%.1f | dTargetEye=%.1f navDistance=%.1f navEffective=%.1f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f quality=%.1f tacticalQ=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) highBonus=%.1f(rise=%.1f steps=%d) extraPen=%.1f(back=%.1f low=%.1f) lowGeom=foot%.1f/drop%.1f/steps%d/x%.1f | dTargetEye=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f highSort=%.2f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d known=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
-        dbg.total, dbg.baseTotal, dbg.tacticalQuality, dbg.navWeight, dbg.navPenalty,
-        dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.extraPen,
-        dbg.dTargetEye, dbg.navDistance, dbg.navDistanceEffective,
+        dbg.total, dbg.weightedQuality, dbg.tacticalQuality,
+        dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
+        dbg.highHeightBonus, dbg.highHeightRise, dbg.highHeightSteps,
+        dbg.extraPen, dbg.behindPen, dbg.lowHeightPen,
+        dbg.targetFootZ, dbg.lowHeightDrop, dbg.lowHeightSteps,
+        dbg.lowHeightMultiplier,
+        dbg.dTargetEye, dbg.navDistance, dbg.navRankDistance,
+        dbg.navDistanceEffective, dbg.navHighSortScale,
         dbg.navHighGroundComp, dbg.ringEff, dbg.slack,
-        dbg.candBucket, dbg.centerBucket, dbg.deltaFlow, dbg.sector,
+        dbg.candBucket, dbg.centerBucket, dbg.deltaFlow,
+        dbg.flowBucketKnown ? 1 : 0, dbg.sector,
         candReal, surReal, candReal - surReal);
 }

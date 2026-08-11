@@ -911,63 +911,42 @@ stock bool hasPathSnapshot(int client) {
     );
 }
 
-void constructPathSegment(Address pPathSegment, PathSegment segment) {
-    if (!pPathSegment) {
-        LogError("Stocks.sp::ConstructPathSegment: pPathSegment pointer is null");
-        segment.init();
-        return;
+bool constructPathSegmentFromSnapshot(int client, int sourceIndex, PathSegment segment) {
+    segment.init();
+    int segmentType;
+    if (!AnneNextBot_GetPathSegment(
+        client,
+        sourceIndex,
+        segment.m_pNavArea,
+        segment.m_iNavTraverseType,
+        segment.m_vecGoalPos,
+        segmentType,
+        segment.m_vecForward,
+        segment.m_flLength,
+        segment.m_flDistFromStart
+    )) {
+        return false;
     }
 
-    segment.m_pPathSegment = pPathSegment;
-
-    static Address pArea;
-	pArea = view_as<Address>(LoadFromAddress(pPathSegment, NumberType_Int32));
-    segment.m_pNavArea = pArea;
-
-    static int traverseType, segmentType;
-	traverseType = view_as<int>(LoadFromAddress(pPathSegment + view_as<Address>(4), NumberType_Int32));
-    segmentType = view_as<int>(LoadFromAddress(pPathSegment + view_as<Address>(24), NumberType_Int32));
-    segment.m_iNavTraverseType = traverseType;
-	segment.m_SegmentType = view_as<SegmentType>(segmentType);
-
-    // 从 pPathSegment 结构体中获取 x, y, z 坐标
-	// v99 = *(float *)(v37 + 8);
-	// v38 = *(float *)(v37 + 12);
-	// v39 = *(float *)(v37 + 16);
-    static float x, y, z;
-	x = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(8), NumberType_Int32));
-	y = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(12), NumberType_Int32));
-	z = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(16), NumberType_Int32));
-	segment.m_vecGoalPos[0] = x;
-    segment.m_vecGoalPos[1] = y;
-    segment.m_vecGoalPos[2] = z;
-
-    x = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(28), NumberType_Int32));
-	y = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(32), NumberType_Int32));
-	z = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(36), NumberType_Int32));
-	segment.m_vecForward[0] = x;
-    segment.m_vecForward[1] = y;
-    segment.m_vecForward[2] = z;
-
-    static float length, dist;
-	length = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(40), NumberType_Int32));
-	dist = view_as<float>(LoadFromAddress(pPathSegment + view_as<Address>(44), NumberType_Int32));
-    segment.m_flLength = length;
-    segment.m_flDistFromStart = dist;
+    segment.m_pPathSegment = view_as<Address>(sourceIndex + 1);
+    segment.m_SegmentType = view_as<SegmentType>(segmentType);
+    return true;
 }
 
-stock bool capturePathSnapshot(int client, Address pPathFollower, Address pCurrentSeg) {
+stock bool capturePathSnapshot(int client) {
     clearPathSnapshot(client);
 
     ArrayList snapshot = g_ChargerPathSnapshots[client];
-    if (snapshot == null || !pPathFollower || !pCurrentSeg) {
+    int count, currentIndex;
+    bool complete;
+    float age;
+    if (snapshot == null ||
+        !AnneNextBot_GetPathSnapshotInfo(client, count, currentIndex, complete, age) ||
+        currentIndex < 0 || currentIndex >= count) {
         clearCachedPath(client);
         return false;
     }
 
-    Address pLastSeg = view_as<Address>(SDKCall(g_hSdkPathLastSegment, pPathFollower));
-    Address pIterSeg = pCurrentSeg;
-    Address pPreviousSeg = Address_Null;
     PathSegment segment;
 
     int maxDepth = g_cvPathLookAheadMaxDepth.IntValue;
@@ -979,22 +958,16 @@ stock bool capturePathSnapshot(int client, Address pPathFollower, Address pCurre
         ? MAX_PATH_SNAPSHOT_SEGMENTS
         : maxDepth * 2 + 1;
 
-    for (int i = 0; i < snapshotLimit && pIterSeg; i++) {
-        constructPathSegment(pIterSeg, segment);
+    int endIndex = currentIndex + snapshotLimit;
+    if (endIndex > count)
+        endIndex = count;
+    for (int sourceIndex = currentIndex; sourceIndex < endIndex; sourceIndex++) {
+        if (!constructPathSegmentFromSnapshot(client, sourceIndex, segment))
+            break;
         snapshot.PushArray(segment, sizeof(segment));
-
-        if (pIterSeg == pLastSeg) {
-            g_AiChargers[client].m_bPathSnapshotComplete = true;
-            break;
-        }
-
-        Address pNextSeg = view_as<Address>(SDKCall(g_hSdkPathNextSegment, pPathFollower, pIterSeg));
-        if (!pNextSeg || pNextSeg == pIterSeg || pNextSeg == pPreviousSeg)
-            break;
-
-        pPreviousSeg = pIterSeg;
-        pIterSeg = pNextSeg;
     }
+
+    g_AiChargers[client].m_bPathSnapshotComplete = complete && endIndex == count && snapshot.Length == endIndex - currentIndex;
 
     if (snapshot.Length < 1) {
         clearCachedPath(client);
@@ -1144,19 +1117,6 @@ stock bool getLookAheadGoalPos(int client, const float pos[3], float maxDist, fl
 
 	outPos = lastVisPos;
 	return true;
-}
-
-/**
-* 从 PathFollower 对象中读出 m_minLookAheadDistance 成员
-* @param pPathFollower 指向 PathFollower 对象的指针
-* @return float
-**/
-stock float getMinLookAheadDist(Address pPathFollower) {
-    if (!pPathFollower)
-        return -1.0;
-
-    // *((float *)this + 4567) = a2;
-    return view_as<float>(LoadFromAddress(pPathFollower + view_as<Address>(4 * 4567), NumberType_Int32));
 }
 
 /**

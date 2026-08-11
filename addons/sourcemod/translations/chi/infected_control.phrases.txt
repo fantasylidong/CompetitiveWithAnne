@@ -180,6 +180,22 @@
 	{
 		"chi"		"{green}[IC]{default} AI 特感大约还有 {olive}%d{default} 秒刷新。"
 	}
+	"InfectedControl_TraitorWaveMayExtend"
+	{
+		"chi"		"{green}[IC]{default} 现在可以先寻找复活位置；生还者守点可能延长本波和你的复活等待。"
+	}
+	"InfectedControl_TraitorReadyCountdown"
+	{
+		"chi"		"最快可复活：%d 秒（守点可能延长）"
+	}
+	"InfectedControl_TraitorWaveExtended"
+	{
+		"chi"		"{green}[IC]{default} 生还者正在优势位置守点；波次放行前你仍不能复活，请继续寻找位置。"
+	}
+	"InfectedControl_TraitorWaveExtendedHint"
+	{
+		"chi"		"生还者守点：复活时间延长中"
+	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
 		"chi"		"{green}[IC]{default} 特感刷新时间已到，你有 {olive}%d{default} 秒自己复活。"

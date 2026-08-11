@@ -13,7 +13,7 @@
 // ==================== 性能统计 ====================
 #define SPAWN_PERF_GROUP_COUNT       5
 #define SPAWN_PERF_TIMING_COUNT      3
-#define SPAWN_PERF_FILTER_COUNT      13
+#define SPAWN_PERF_FILTER_COUNT      14
 #define SPAWN_PERF_SAMPLE_CAP        256
 
 stock void SpawnPerf_Log(const char[] format, any ...)
@@ -41,6 +41,7 @@ enum SpawnPerfFilterKind
     SpawnPerfFilter_PendingSameNav,
     SpawnPerfFilter_Flags,
     SpawnPerfFilter_Flow,
+    SpawnPerfFilter_BehindFlow,
     SpawnPerfFilter_Distance,
     SpawnPerfFilter_Separation,
     SpawnPerfFilter_PendingSeparation,
@@ -179,12 +180,13 @@ static void SpawnPerf_PrintGroupedStats()
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_MaxSlice, "maxSliceMs");
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_FallbackApi, "fallbackApiMs");
 
-        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d pendingSameNav=%d flags=%d flow=%d distance=%d separation=%d pendingSeparation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
+        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d pendingSameNav=%d flags=%d flow=%d behindFlow=%d distance=%d separation=%d pendingSeparation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
             groupLabel,
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Cooldown],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_PendingSameNav],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flags],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flow],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_BehindFlow],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Distance],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Separation],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_PendingSeparation],
@@ -348,6 +350,12 @@ stock void SpawnPerf_RecordFilterByFlow()
 {
     if (!SpawnPerfConfig_ShowStats()) return;
     SpawnPerf_RecordFilter(SpawnPerfFilter_Flow);
+}
+
+stock void SpawnPerf_RecordFilterByBehindFlow()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_BehindFlow);
 }
 
 stock void SpawnPerf_RecordFilterBySeparation()

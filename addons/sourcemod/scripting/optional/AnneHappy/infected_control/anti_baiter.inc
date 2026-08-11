@@ -19,6 +19,7 @@ enum struct AntiBaitRuntime
     int baselineAvgPct;
     int baselineMaxPct;
     int baselineMedianPct;
+    float baselineCenter[3];
     int lastAvgPct;
     int lastMaxPct;
     int lastMedianPct;
@@ -46,6 +47,9 @@ enum struct AntiBaitRuntime
         this.baselineAvgPct = -1;
         this.baselineMaxPct = -1;
         this.baselineMedianPct = -1;
+        this.baselineCenter[0] = 0.0;
+        this.baselineCenter[1] = 0.0;
+        this.baselineCenter[2] = 0.0;
         this.lastAvgPct = -1;
         this.lastMaxPct = -1;
         this.lastMedianPct = -1;
@@ -121,7 +125,8 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
                                          int &activeCount,
                                          int &vulnerableCount,
                                          int &isolatedCount,
-                                         int &groupCount)
+                                         int &groupCount,
+                                         float center[3])
 {
     int pcts[MAX_SURVIVOR_SLOTS];
     int n = 0;
@@ -134,6 +139,9 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
     vulnerableCount = 0;
     isolatedCount = 0;
     groupCount = 0;
+    center[0] = 0.0;
+    center[1] = 0.0;
+    center[2] = 0.0;
     float pos[MAX_SURVIVOR_SLOTS][3];
     float nearest[MAX_SURVIVOR_SLOTS];
     bool linked[MAX_SURVIVOR_SLOTS][MAX_SURVIVOR_SLOTS];
@@ -162,6 +170,9 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
         {
             pcts[n] = pct;
             GetClientAbsOrigin(i, pos[n]);
+            center[0] += pos[n][0];
+            center[1] += pos[n][1];
+            center[2] += pos[n][2];
             nearest[n] = 999999.0;
             n++;
             activeCount++;
@@ -176,6 +187,10 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
 
     if (n <= 0)
         return false;
+
+    center[0] /= float(n);
+    center[1] /= float(n);
+    center[2] /= float(n);
 
     SortIntegers(pcts, n, Sort_Ascending);
     avgPct = RoundToNearest(float(sum) / float(n));
@@ -541,14 +556,15 @@ void AntiBait_OnWaveStart()
     gAB.lastProgressTime = now;
 
     int avgPct, maxPct, medianPct, highest, activeCount, vulnerableCount, isolatedCount, groupCount;
-    float spreadDist, avgNearestDist;
+    float spreadDist, avgNearestDist, center[3];
     if (AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest,
         spreadDist, avgNearestDist, activeCount, vulnerableCount,
-        isolatedCount, groupCount))
+        isolatedCount, groupCount, center))
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
         gAB.baselineMedianPct = medianPct;
+        gAB.baselineCenter = center;
         gAB.lastAvgPct = avgPct;
         gAB.lastMaxPct = maxPct;
         gAB.lastMedianPct = medianPct;
@@ -594,10 +610,10 @@ void AntiBait_Update()
         AntiBait_Resume(now);
 
     int avgPct, maxPct, medianPct, highest, activeCount, vulnerableCount, isolatedCount, groupCount;
-    float spreadDist, avgNearestDist;
+    float spreadDist, avgNearestDist, center[3];
     if (!AntiBait_GetProgressSnapshot(avgPct, maxPct, medianPct, highest,
         spreadDist, avgNearestDist, activeCount, vulnerableCount,
-        isolatedCount, groupCount))
+        isolatedCount, groupCount, center))
     {
         gAB.activeCount = activeCount;
         gAB.vulnerableCount = vulnerableCount;
@@ -627,11 +643,17 @@ void AntiBait_Update()
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
         gAB.baselineMedianPct = medianPct;
+        gAB.baselineCenter = center;
         gAB.lastProgressTime = now;
     }
 
     // 使用下中位数要求过半核心成员推进；单人探路不再替全队重置停滞计时。
-    bool progressed = (medianPct - gAB.baselineMedianPct) >= gCV.iAntiBaitProgressPct;
+    int flowDelta = medianPct - gAB.baselineMedianPct;
+    float movedDist = GetVectorDistance(center, gAB.baselineCenter);
+    bool progressedByFlow = flowDelta >= gCV.iAntiBaitProgressPct;
+    bool progressedByDistance = gCV.fAntiBaitProgressDist > 0.0
+        && movedDist >= gCV.fAntiBaitProgressDist;
+    bool progressed = progressedByFlow || progressedByDistance;
     bool releasedBySpread = gAB.attackableSpread;
 
     if (gAB.state == AB_Pressure && gAB.spreadStallPressure && gAB.teamHolding)
@@ -646,11 +668,16 @@ void AntiBait_Update()
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
         gAB.baselineMedianPct = medianPct;
+        gAB.baselineCenter = center;
         gAB.lastProgressTime = now;
         gAB.spreadStallPressure = false;
 
+        AntiBait_Debug("progress reset flowDelta=%d threshold=%d moved=%.1f threshold=%.1f",
+            flowDelta, gCV.iAntiBaitProgressPct, movedDist, gCV.fAntiBaitProgressDist);
+
         if (gAB.state == AB_Pressure)
-            AntiBait_SetState(AB_Recover, now, "progress");
+            AntiBait_SetState(AB_Recover, now,
+                progressedByFlow ? "flow progress" : "position progress");
         else if (gAB.state == AB_Recover && (now - gAB.stateSince) >= gCV.fAntiBaitRecover)
             AntiBait_SetState(AB_Observe, now, "recovered");
         return;

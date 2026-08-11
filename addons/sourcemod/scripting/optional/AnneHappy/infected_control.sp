@@ -93,8 +93,6 @@
 #define DIRECTOR_BASE_API_TRIES      7
 #define EXTENDED_FALLBACK_CYCLES     2
 #define EXTENDED_DIRECTOR_TRIES     12
-#define NAV_WEIGHT_MIN            0.10
-
 #define ENABLE_SMOKER             (1 << 0)
 #define ENABLE_BOOMER             (1 << 1)
 #define ENABLE_HUNTER             (1 << 2)
@@ -112,14 +110,14 @@
 #define SUPPORT_NEED_KILLERS      1
 
 // —— 分散度四件套参数 —— //
-#define SEP_TTL                   3.0    // 最近刷点保留秒数
+#define SEP_TTL                   0.5    // 已确认实际生成点的硬分散保留秒数
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
 #define SEP_RADIUS                80.0
 #define PENDING_SEP_RADIUS        80.0    // 不同 NavID 的生成中点基础间距
 #define PENDING_SAME_NAV_RADIUS  120.0    // 同 NavID 允许在大 Nav 的远端再次取点
 #define PENDING_RESERVATION_TTL    1.25   // 略长于实体实际位置确认上限（1.0 秒）
-#define NAV_CD_SECS               0.5
+#define NAV_CD_SECS               1.0    // 成功及普通实际校验失败后的同 Nav 冷却
 #define SECTORS_BASE              6       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
 #define DYN_SECTORS_MIN           3       // 动态下限
@@ -311,6 +309,8 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_NavGraphCollectRange");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepare");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesCollect");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepareRanked");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectRanked");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesGetPerf");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesResetPerf");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");
@@ -910,8 +910,6 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
     g_fNextRuntimeGateLogAt = 0.0;
     Traitor_ResetRoundUseLimits();
     StopAll();
-    // 权重只在当前回合学习，避免对抗上下半场继承不同的 Nav 历史。
-    ClearNavWeightMemory();
     SpawnPerf_OnRoundStart();
     WaveDecider_OnRoundStart();
     ScheduleApplyMaxSpecials();

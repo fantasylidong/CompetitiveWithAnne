@@ -8,6 +8,8 @@
 
 #define L4D_TEAM_SPECTATE 1
 #define L4D_TEAM_SURVIVORS 2
+#define LERP_RECHECK_INTERVAL 0.5
+#define LERP_LEGAL_CONFIRMATIONS 2
 
 StringMap
     ArrLerpsValue = null,
@@ -34,13 +36,14 @@ bool
 
 // 增加：用于记录玩家的5秒警告定时器
 Handle g_hLerpWarningTimer[MAXPLAYERS + 1] = { null, ... };
+int g_iLerpLegalConfirmations[MAXPLAYERS + 1];
 
 public Plugin myinfo =
 {
     name = "LerpMonitor++",
     author = "ProdigySim, Die Teetasse, vintik, A1m`, Modified by Gemini",
     description = "Keep track of players' lerp settings with 5s warning",
-    version = "2.4.3",
+    version = "2.4.4",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -114,6 +117,7 @@ public void OnClientDisconnect(int client)
         KillTimer(g_hLerpWarningTimer[client]);
         g_hLerpWarningTimer[client] = null;
     }
+    g_iLerpLegalConfirmations[client] = 0;
 }
 
 Action Process(Handle hTimer, int userid)
@@ -240,11 +244,13 @@ Action OnTransfer(Handle hTimer)
 
 void ProcessPlayerLerp(int client, bool load = false, bool team = false)
 {
-    float newLerpTime = GetLerpTime(client);
-
-    SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
+    float newLerpTime;
+    if (!TryGetLerpTime(client, newLerpTime)) {
+        return;
+    }
 
     if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
+        SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
         return;
     }
 
@@ -253,6 +259,9 @@ void ProcessPlayerLerp(int client, bool load = false, bool team = false)
 
     // 修改点：处理超出允许范围的Lerp，给予5秒修改时间
     if ((FloatCompare(newLerpTime, cVarMinLerp.FloatValue) == -1)  || (FloatCompare(newLerpTime, cVarMaxLerp.FloatValue) == 1)) {
+        SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
+        g_iLerpLegalConfirmations[client] = 0;
+
         if (load) {
             return;
         }
@@ -262,15 +271,13 @@ void ProcessPlayerLerp(int client, bool load = false, bool team = false)
             g_hLerpWarningTimer[client] = CreateTimer(5.0, Timer_CheckBadLerpRange, GetClientUserId(client));
         }
         return;
-    } 
-    else {
-        // 如果玩家在5秒内改回了合法的Lerp，取消定时器并通知
-        if (g_hLerpWarningTimer[client] != null) {
-            KillTimer(g_hLerpWarningTimer[client]);
-            g_hLerpWarningTimer[client] = null;
-            CPrintToChatEx(client, client, "%t", "Lerpmonitor_LerpThanksCooperationLerpRestored");
-        }
     }
+
+    if (g_hLerpWarningTimer[client] != null) {
+        return;
+    }
+
+    SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
 
     float currentLerpTime = 0.0;
     if (!ArrLerpsValue.GetValue(steamID, currentLerpTime)) {
@@ -320,13 +327,20 @@ Action Timer_CheckBadLerpRange(Handle timer, int userid) {
         g_hLerpWarningTimer[client] = null; // 清除Handle
         
         if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
+            g_iLerpLegalConfirmations[client] = 0;
             return Plugin_Stop;
         }
 
-        float newLerpTime = GetLerpTime(client);
+        float newLerpTime;
+        if (!TryGetLerpTime(client, newLerpTime)) {
+            g_iLerpLegalConfirmations[client] = 0;
+            g_hLerpWarningTimer[client] = CreateTimer(LERP_RECHECK_INTERVAL, Timer_CheckBadLerpRange, userid, TIMER_FLAG_NO_MAPCHANGE);
+            return Plugin_Stop;
+        }
         
         // 5秒后再次判断，如果还是非法值，则执行对应惩罚
         if ((FloatCompare(newLerpTime, cVarMinLerp.FloatValue) == -1)  || (FloatCompare(newLerpTime, cVarMaxLerp.FloatValue) == 1)) {
+            g_iLerpLegalConfirmations[client] = 0;
             if (cVarBadLerpAction.IntValue == 1) {
                 CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpMovedBystanderDueFailure", client);
                 ChangeClientTeam(client, L4D_TEAM_SPECTATE);
@@ -334,39 +348,57 @@ Action Timer_CheckBadLerpRange(Handle timer, int userid) {
                 CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpKickedGameHeFailed", client);
                 KickClient(client, "Illegal lerp value (min: %.01f, max: %.01f)", cVarMinLerp.FloatValue * 1000, cVarMaxLerp.FloatValue * 1000);
             }
+            return Plugin_Stop;
         }
+
+        g_iLerpLegalConfirmations[client]++;
+        if (g_iLerpLegalConfirmations[client] < LERP_LEGAL_CONFIRMATIONS) {
+            g_hLerpWarningTimer[client] = CreateTimer(LERP_RECHECK_INTERVAL, Timer_CheckBadLerpRange, userid, TIMER_FLAG_NO_MAPCHANGE);
+            return Plugin_Stop;
+        }
+
+        g_iLerpLegalConfirmations[client] = 0;
+        CPrintToChatEx(client, client, "%t", "Lerpmonitor_LerpThanksCooperationLerpRestored");
+        ProcessPlayerLerp(client);
     }
     return Plugin_Stop;
 }
 
-float GetLerpTime(int client)
+bool TryGetClientInfoFloat(int client, const char[] key, float &value)
 {
     char buffer[64];
 
-    if (!GetClientInfo(client, "cl_updaterate", buffer, sizeof(buffer))) {
-        buffer = "";
+    if (!GetClientInfo(client, key, buffer, sizeof(buffer)) || buffer[0] == '\0') {
+        return false;
     }
 
-    int updateRate = StringToInt(buffer);
+    return StringToFloatEx(buffer, value) == strlen(buffer);
+}
+
+bool TryGetLerpTime(int client, float &lerpTime)
+{
+    float clientUpdateRate;
+    float flLerpRatio;
+    float flLerpAmount;
+
+    if (!TryGetClientInfoFloat(client, "cl_updaterate", clientUpdateRate)
+        || !TryGetClientInfoFloat(client, "cl_interp_ratio", flLerpRatio)
+        || !TryGetClientInfoFloat(client, "cl_interp", flLerpAmount)) {
+        return false;
+    }
+
+    int updateRate = RoundFloat(clientUpdateRate);
     updateRate = RoundFloat(clamp(float(updateRate), cVarMinUpdateRate.FloatValue, cVarMaxUpdateRate.FloatValue));
-
-    if (!GetClientInfo(client, "cl_interp_ratio", buffer, sizeof(buffer))) {
-        buffer = "";
+    if (updateRate <= 0) {
+        return false;
     }
-
-    float flLerpRatio = StringToFloat(buffer);
-
-    if (!GetClientInfo(client, "cl_interp", buffer, sizeof(buffer))) {
-        buffer = "";
-    }
-
-    float flLerpAmount = StringToFloat(buffer);
 
     if (cVarMinInterpRatio != null && cVarMaxInterpRatio != null && cVarMinInterpRatio.FloatValue != -1.0) {
         flLerpRatio = clamp(flLerpRatio, cVarMinInterpRatio.FloatValue, cVarMaxInterpRatio.FloatValue);
     }
 
-    return maximum(flLerpAmount, flLerpRatio / updateRate);
+    lerpTime = maximum(flLerpAmount, flLerpRatio / updateRate);
+    return true;
 }
 
 float maximum(float a, float b)
@@ -391,13 +423,22 @@ int LM_GetLerpTime(Handle plugin, int numParams)
         return view_as<int>(fLerpValue);
     }
 
-    return view_as<int>(GetLerpTime(client));
+    if (TryGetLerpTime(client, fLerpValue)) {
+        return view_as<int>(fLerpValue);
+    }
+
+    return view_as<int>(GetEntPropFloat(client, Prop_Data, "m_fLerpTime"));
 }
 
 int LM_GetCurrentLerpTime(Handle plugin, int numParams)
 {
     int client = GetNativeCell(1);
-    return view_as<int>(GetLerpTime(client));
+    float fLerpValue;
+    if (TryGetLerpTime(client, fLerpValue)) {
+        return view_as<int>(fLerpValue);
+    }
+
+    return view_as<int>(GetEntPropFloat(client, Prop_Data, "m_fLerpTime"));
 }
 
 int LM_GetStoredLerpTime(Handle plugin, int numParams)
