@@ -653,6 +653,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新增 `map_runs`、`map_run_players`、`legacy_map_bests` 表和可重复执行的迁移/回滚脚本；旧 `timedmaps`/`timedmap_runs` 保留，并区分“旧玩家最佳”与“真实局”。
 - NewAnneWeb 已按玩法、版本、难度/档位、队伍人数和 Anne 刷特参数读取 v2 记录，个人页、地图列表和详情页已同步；部署步骤见 `docs/map_records_v2_migration.md`。
 
+### 2026年8月10日 Boomer/Spitter Path Follow 连跳
 - `anne_nextbot` 原生扩展升级到 1.3.0，继续作为唯一的 `PathFollower::Update` detour，并在原生层直接复制有界路径节点值；Tank、Charger、Boomer、Spitter 统一通过 native 读取快照，SourcePawn 不再接收或读取 PathFollower/PathSegment 指针。公共路径签名与虚表偏移也统一收口到 `anne_nextbot.games.txt`。
 - Tank `ai_tank3` 升级到 1.0.0.3，Charger `ai_charger3` 升级到 1.0.1.3，既有路径连跳已接入同一 native 快照；各自 gamedata 只保留爪击、冲撞和 locomotion 等专用调用，不再重复维护公共 PathFollower 定义。
 - Boomer 升级为 `ai_boomer_3.smx` 3.0.3，Spitter 升级为 `ai_spitter_3.smx` 3.0.1；连跳会优先沿有效路径前视点前进，路径过期、被遮挡或前方存在攀爬/跳缝等特殊移动时自动保留原生 AI/直线行为。
