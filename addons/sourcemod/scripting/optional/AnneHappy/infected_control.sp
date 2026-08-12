@@ -517,6 +517,7 @@ public void OnPluginEnd()
 }
 public void OnMapEnd()
 {
+    EventPressure_OnMapEnd();
     WaveSpawnReport_End("map_end");
     g_bRuntimeRoundActive = false;
     g_bRuntimeMapEnding = true;
@@ -552,6 +553,7 @@ public void OnMapEnd()
 public void OnMapStart()
 {
     EventPressure_Reset();
+    EventPressure_OnMapStart();
     Visibility_ResetHurtTriggers();
     // Some L4D2 server paths dispatch round_start before SourceMod's OnMapStart.
     // A started map is safe to arm; the first-leave signal still controls spawning.
@@ -1105,6 +1107,7 @@ public void OnClientPutInServer(int client)
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
+    EventPressure_OnEntityCreated(entity, classname);
     Traitor_OnEntityCreated(entity, classname);
 }
 

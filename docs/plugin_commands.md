@@ -253,7 +253,7 @@
 | `left4dhooks.smx` | `sm_l4dhooks_detours` | 管理员 | ADMFLAG_ROOT | Lists the currently active forwards and the plugins using them. | 34 个模式 |
 | `left4dhooks.smx` | `sm_l4dhooks_reload` | 管理员 | ADMFLAG_ROOT | Reloads the detour hooks, enabling or disabling depending if they're required by other plugins. | 34 个模式 |
 | `linux_auto_restart.smx` | `sm_restart` | 管理员 | ADMFLAG_ROOT | - | 34 个模式 |
-| `linux_auto_restart.smx` | `sm_crash` | 管理员 | ADMFLAG_ROOT | 人工触发服务器崩溃；触发前卸载 Accelerator，不上传该次崩溃报告 | 34 个模式 |
+| `linux_auto_restart.smx` | `sm_crash` | 管理员 | ADMFLAG_ROOT | 人工触发服务器崩溃；通知 Accelerator 忽略随后 3 分钟内产生的报告，控制失败时回退到卸载扩展 | 34 个模式 |
 | `map_changer.smx` | `sm_setnext` | 管理员 | ADMFLAG_RCON | 设置下一张地图 | 34 个模式 |
 | `match_vote.smx` | `sm_chmatch` | 玩家/控制台 | - | - | 34 个模式 |
 | `match_vote.smx` | `sm_match` | 玩家/控制台 | - | - | 34 个模式 |

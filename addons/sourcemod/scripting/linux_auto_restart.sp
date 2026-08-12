@@ -2,8 +2,10 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <accelerator>
 
-#define VERSION "0.5"
+#define VERSION "0.6"
+#define CRASH_REPORT_SUPPRESSION_SECONDS 180
 
 ConVar
 	sv_hibernate_when_empty,
@@ -84,7 +86,15 @@ Action RestServer_Timer(Handle timer)
 
 void RestartServer()
 {
-	UnloadAccelerator();
+	bool suppressingReport = GetFeatureStatus(FeatureType_Native, "Accelerator_SuppressCrashReports") == FeatureStatus_Available
+		&& Accelerator_SuppressCrashReports(CRASH_REPORT_SUPPRESSION_SECONDS);
+
+	if (!suppressingReport)
+	{
+		LogToFilePlus("Accelerator 无法设置崩溃报告忽略窗口，回退到卸载扩展");
+		UnloadAccelerator();
+	}
+
 	SetCommandFlags("crash", GetCommandFlags("crash") &~ FCVAR_CHEAT);
 	ServerCommand("crash");
 }
