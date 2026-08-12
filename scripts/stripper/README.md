@@ -1,20 +1,26 @@
-# Conditional Stripper filters
+# Per-map global Stripper filters
 
-This project patches Stripper:Source so a config path is active only when its
-`maps/` directory contains a filter matching the current map. The original map
-prefix matching behavior is preserved. When no map filter matches, neither
-`global_filters.cfg` nor a map filter is applied.
+AnneHappy uses `cfg/stripper/zonemod_anne`. Its runtime `global_filters.cfg`
+file is intentionally empty. The source content lives at
+`scripts/stripper/global_filters/zonemod_anne.cfg` and is prepended to every
+root Anne map config by `expand_global_filters.py`. Other Stripper modes keep
+their original global and map configs unchanged.
 
-The build uses Stripper:Source git141 at commit
-`2a08843241f1858d0727a91fa9dcb2382526f8cb` and produces the 32-bit Linux and
-Windows L4D2 binaries shipped in `addons/stripper/bin`.
+Stripper loads map configs at every underscore-delimited prefix. A map config
+that already inherits from a shorter existing config must not contain another
+generated global block. The generator detects that relationship automatically.
 
-Run from the repository root:
+Regenerate and verify from the repository root:
 
 ```sh
-scripts/stripper/build.sh
+python3 scripts/stripper/expand_global_filters.py
+python3 scripts/stripper/expand_global_filters.py --check
 ```
 
-Docker is required. The script builds and tests both custom core libraries,
-verifies that every active filter path covers all 57 official maps, then installs
-official git141 L4D2 shims/loaders and the patched cores.
+`test_expanded_filters.cpp` is a Linux binary-level smoke test. It loads the
+shipped official core and verifies both the shared and map-specific sections of
+the generated `c2m1_highway.cfg`.
+
+When changing a shared filter, edit its file under
+`scripts/stripper/global_filters/`, regenerate, and commit both the source and
+expanded map configs.

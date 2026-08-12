@@ -1,6 +1,0 @@
-{
-	global:
-		LoadStripper;
-	local:
-		*;
-};
