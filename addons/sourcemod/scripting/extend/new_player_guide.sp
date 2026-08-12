@@ -10,15 +10,13 @@
 #include <left4dhooks>
 #include <rpg>
 
-#define PLUGIN_VERSION "2.1"
+#define PLUGIN_VERSION "2.2"
 #define SERVER_AUTO_STOP_MINUTES (30 * 60)
 #define PERMANENT_DISABLE_MINUTES (10 * 60)
 
 #define AUTO_GUIDE_INITIAL_DELAY 1.0
 #define AUTO_GUIDE_RETRY_DELAY 5.0
 #define AUTO_GUIDE_MAX_RETRIES 10
-#define SERVER_TIME_RETRY_DELAY 1.0
-#define SERVER_TIME_MAX_RETRIES 1
 #define GUIDE_MENU_TIMEOUT 60
 #define MODE_BLOCK_NOTICE_INTERVAL 3
 
@@ -214,7 +212,6 @@ bool g_bConfoglAvailable = false;
 bool g_bLeft4DHooksAvailable = false;
 bool g_bRpgAvailable = false;
 int g_iRetryCount[MAXPLAYERS + 1];
-int g_iServerTimeRetryCount[MAXPLAYERS + 1];
 bool g_bSafeReturnPositionSet[MAXPLAYERS + 1];
 float g_vSafeReturnPosition[MAXPLAYERS + 1][3];
 bool g_bFallbackSafeReturnPositionSet = false;
@@ -311,7 +308,6 @@ public void OnClientPutInServer(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
-	g_iServerTimeRetryCount[client] = 0;
 	g_bSafeReturnPositionSet[client] = false;
 	g_iLastModeBlockNotice[client] = 0;
 
@@ -325,14 +321,12 @@ public void OnClientDisconnect(int client)
 {
 	g_bAutoShown[client] = false;
 	g_iRetryCount[client] = 0;
-	g_iServerTimeRetryCount[client] = 0;
 	g_bSafeReturnPositionSet[client] = false;
 	g_iLastModeBlockNotice[client] = 0;
 }
 
 public void l4dstats_SuccessGetPlayerTime(int client)
 {
-	g_iServerTimeRetryCount[client] = SERVER_TIME_MAX_RETRIES;
 	QueueAutoGuide(client, 0.1);
 }
 
@@ -448,7 +442,7 @@ void TryAutoGuide(int client)
 		return;
 	}
 
-	if (!IsServerPlaytimeReady(client) && RetryServerPlaytime(client))
+	if (!IsServerPlaytimeReady(client))
 	{
 		return;
 	}
@@ -485,18 +479,6 @@ bool RetryAutoGuide(int client)
 
 	g_iRetryCount[client]++;
 	QueueAutoGuide(client, g_hRetryDelay.FloatValue);
-	return true;
-}
-
-bool RetryServerPlaytime(int client)
-{
-	if (g_iServerTimeRetryCount[client] >= SERVER_TIME_MAX_RETRIES)
-	{
-		return false;
-	}
-
-	g_iServerTimeRetryCount[client]++;
-	QueueAutoGuide(client, SERVER_TIME_RETRY_DELAY);
 	return true;
 }
 
@@ -996,8 +978,8 @@ bool CanReadServerPlaytime()
 bool IsServerPlaytimeReady(int client)
 {
 	return g_bL4DStatsAvailable
-		&& GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") == FeatureStatus_Available
-		&& l4dstats_IsClientScoreReady(client) != 0;
+		&& GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientPlaytimeReady") == FeatureStatus_Available
+		&& l4dstats_IsClientPlaytimeReady(client) != 0;
 }
 
 bool IsServerModeLoaded()

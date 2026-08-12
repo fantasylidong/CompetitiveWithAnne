@@ -7,6 +7,15 @@ from pathlib import Path
 
 BEGIN_PREFIX = b"; BEGIN GENERATED GLOBAL FILTERS: "
 END_MARKER = b"; END GENERATED GLOBAL FILTERS\n"
+DIVIDER = b"; ====================================================="
+ALWAYS_GLOBAL_SECTIONS = {
+    b"ITEM DENSITY FIX",
+    b"WEAPON SKINS",
+    b"T2 WEAPON SPAWN FIX",
+    b"PILL CABINET MAX OVERRIDE",
+    b"ITEM PICKUP FIX",
+    b"COMPETITIVE ITEM SPAWNS",
+}
 
 
 def strip_generated_block(data: bytes) -> bytes:
@@ -30,13 +39,37 @@ def inherited_from(map_name: str, names: set[str]) -> str | None:
     return None
 
 
-def expected_map_data(mode: str, source: bytes, map_path: Path, names: set[str]) -> bytes:
+def split_source(source: bytes) -> tuple[bytes, bytes]:
+    lines = source.splitlines(keepends=True)
+    starts: list[int] = []
+    for index in range(len(lines) - 1):
+        if lines[index].rstrip(b"\r\n") == DIVIDER and lines[index + 1].startswith(b"; =="):
+            starts.append(index)
+
+    if not starts or starts[0] != 0:
+        raise ValueError("could not identify global filter sections")
+
+    starts.append(len(lines))
+    always_global: list[bytes] = []
+    map_only: list[bytes] = []
+    for section_index in range(len(starts) - 1):
+        begin = starts[section_index]
+        end = starts[section_index + 1]
+        section = b"".join(lines[begin:end])
+        title = lines[begin + 1].strip().strip(b";= ")
+        target = always_global if title in ALWAYS_GLOBAL_SECTIONS else map_only
+        target.append(section.rstrip(b"\r\n") + b"\n")
+
+    return b"".join(always_global), b"".join(map_only)
+
+
+def expected_map_data(mode: str, map_source: bytes, map_path: Path, names: set[str]) -> bytes:
     original = strip_generated_block(map_path.read_bytes())
     if inherited_from(map_path.stem, names) is not None:
         return original
 
     begin = BEGIN_PREFIX + mode.encode("ascii") + b"\n"
-    normalized_source = source.rstrip(b"\r\n") + b"\n"
+    normalized_source = map_source.rstrip(b"\r\n") + b"\n"
     separator = b"\n" if original else b""
     return begin + normalized_source + END_MARKER + separator + original
 
@@ -58,18 +91,19 @@ def main() -> int:
     runtime_global = mode_root / "global_filters.cfg"
     maps_root = mode_root / "maps"
     source = source_path.read_bytes()
+    always_global, map_source = split_source(source)
     map_paths = sorted(maps_root.glob("*.cfg"))
     names = {path.stem for path in map_paths}
 
     if args.check:
-        if not runtime_global.is_file() or runtime_global.read_bytes() != b"":
-            failures.append(f"{runtime_global}: runtime global filter is not empty")
+        if not runtime_global.is_file() or runtime_global.read_bytes() != always_global:
+            failures.append(f"{runtime_global}: generated global content is stale")
     else:
-        runtime_global.write_bytes(b"")
+        runtime_global.write_bytes(always_global)
 
     for map_path in map_paths:
         try:
-            expected = expected_map_data(mode, source, map_path, names)
+            expected = expected_map_data(mode, map_source, map_path, names)
         except ValueError as error:
             failures.append(f"{map_path}: {error}")
             continue

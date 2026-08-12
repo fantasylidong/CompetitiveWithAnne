@@ -23,6 +23,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("l4dstats_IsQuarterTopPlayer", Native_IsQuarterTopPlayer);
 	CreateNative("l4dstats_IsTopPlayerCacheReady", Native_IsTopPlayerCacheReady);
 	CreateNative("l4dstats_IsClientScoreReady", Native_IsClientScoreReady);
+	CreateNative("l4dstats_IsClientPlaytimeReady", Native_IsClientPlaytimeReady);
 	CreateNative("l4dstats_GetClientRank", Native_GetClientRank);
 
 	//forward
@@ -88,6 +89,26 @@ public int Native_IsClientScoreReady(Handle plugin, int numParams)
 	}
 
 	return ClientScoreReady[client] ? 1 : 0;
+}
+
+public int Native_IsClientPlaytimeReady(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+
+	if (client < 1 || client > MaxClients)
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+	}
+	if (!IsClientConnected(client))
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	}
+	if (IsFakeClient(client))
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is A bot", client);
+	}
+
+	return g_bNewPlayerBonusClientDataReady[client] ? 1 : 0;
 }
 
 public int Native_GetClientRank(Handle plugin, int numParams)

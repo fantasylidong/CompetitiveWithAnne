@@ -3,7 +3,7 @@
 
 #include <sourcemod>
 
-#define VERSION "0.4"
+#define VERSION "0.5"
 
 ConVar
 	sv_hibernate_when_empty,
@@ -33,6 +33,7 @@ public void OnPluginStart()
 
 	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
 	RegAdminCmd("sm_restart", Cmd_RestartServer, ADMFLAG_ROOT);
+	RegAdminCmd("sm_crash", Cmd_RestartServer, ADMFLAG_ROOT);
 
 	//AutoExecConfig(true, "l4d2_auto_restart");
 }

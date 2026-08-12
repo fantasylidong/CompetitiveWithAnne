@@ -1787,17 +1787,7 @@ void HookHUDSendProxies(bool logFailures = true)
 
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
-        if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-            g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUDFlags, hud);
-
-        if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-            g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUDString, hud);
-
-        if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-            g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUDLayout, hud);
-
-        if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-            g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUDLayout, hud);
+        HookHUDSendProxySlot(hud);
 
         if (logFailures && (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_STRING]
@@ -1807,23 +1797,104 @@ void HookHUDSendProxies(bool logFailures = true)
     }
 }
 
+void HookHUDSendProxySlot(int hud)
+{
+    // Left4SendProxy deduplicates array hooks by callback, so every element needs unique callbacks.
+    switch (hud)
+    {
+        case HUD1:
+        {
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD1Flags, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD1String, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD1PosX, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD1Width, hud);
+        }
+        case HUD2:
+        {
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD2Flags, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD2String, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD2PosX, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD2Width, hud);
+        }
+        case HUD3:
+        {
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD3Flags, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD3String, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD3PosX, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD3Width, hud);
+        }
+        case HUD4:
+        {
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
+                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD4Flags, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
+                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD4String, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
+                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD4PosX, hud);
+            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD4Width, hud);
+        }
+    }
+}
+
 void UnhookHUDSendProxies()
 {
     bool canUnhook = LibraryExists(SENDPROXY_LIB) && FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) != -1;
 
     for (int hud = HUD1; hud <= HUD4; hud++)
     {
-        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-            SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUDFlags, hud);
-        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-            SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUDString, hud);
-        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-            SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUDLayout, hud);
-        if (canUnhook && g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-            SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUDLayout, hud);
+        if (canUnhook)
+            UnhookHUDSendProxySlot(hud);
     }
 
     ResetHUDSendProxyState();
+}
+
+void UnhookHUDSendProxySlot(int hud)
+{
+    switch (hud)
+    {
+        case HUD1:
+        {
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD1Flags, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD1String, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD1PosX, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD1Width, hud);
+        }
+        case HUD2:
+        {
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD2Flags, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD2String, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD2PosX, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD2Width, hud);
+        }
+        case HUD3:
+        {
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD3Flags, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD3String, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD3PosX, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD3Width, hud);
+        }
+        case HUD4:
+        {
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD4Flags, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD4String, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD4PosX, hud);
+            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD4Width, hud);
+        }
+    }
 }
 
 void ResetHUDSendProxyState()
@@ -1835,13 +1906,18 @@ void ResetHUDSendProxyState()
     }
 }
 
-public Action ProxyHUDFlags(const char[] prop, int &value, int element, int client)
+public Action ProxyHUD1Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD1, client); }
+public Action ProxyHUD2Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD2, client); }
+public Action ProxyHUD3Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD3, client); }
+public Action ProxyHUD4Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD4, client); }
+
+Action ProxyHUDFlags(int &value, int hud, int client)
 {
-    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+    if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
     bool globallyAllowed;
-    switch (element)
+    switch (hud)
     {
         case HUD1: globallyAllowed = g_bCvar_HUD1_Visible;
         case HUD2: globallyAllowed = g_bCvar_HUD2_Visible;
@@ -1849,7 +1925,7 @@ public Action ProxyHUDFlags(const char[] prop, int &value, int element, int clie
         case HUD4: globallyAllowed = g_bCvar_HUD4_Visible;
     }
 
-    if (g_bCvar_Enabled && globallyAllowed && !g_bHUDResetPending[element] && (g_iClientHUDMask[client] & (1 << element)) != 0)
+    if (g_bCvar_Enabled && globallyAllowed && !g_bHUDResetPending[hud] && (g_iClientHUDMask[client] & (1 << hud)) != 0)
         value &= ~HUD_FLAG_NOTVISIBLE;
     else
         value |= HUD_FLAG_NOTVISIBLE;
@@ -1857,18 +1933,32 @@ public Action ProxyHUDFlags(const char[] prop, int &value, int element, int clie
     return Plugin_Changed;
 }
 
-public Action ProxyHUDString(const char[] prop, char[] value, int maxlength, int element, int client)
+public Action ProxyHUD1String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD1, client); }
+public Action ProxyHUD2String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD2, client); }
+public Action ProxyHUD3String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD3, client); }
+public Action ProxyHUD4String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD4, client); }
+
+Action ProxyHUDString(char[] value, int maxlength, int hud, int client)
 {
-    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+    if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
-    strcopy(value, maxlength, g_sClientHUDText[client][element]);
+    strcopy(value, maxlength, g_sClientHUDText[client][hud]);
     return Plugin_Changed;
 }
 
-public Action ProxyHUDLayout(const char[] prop, float &value, int element, int client)
+public Action ProxyHUD1PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
+public Action ProxyHUD2PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
+public Action ProxyHUD3PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
+public Action ProxyHUD4PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
+public Action ProxyHUD1Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
+public Action ProxyHUD2Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
+public Action ProxyHUD3Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
+public Action ProxyHUD4Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
+
+Action ProxyHUDLayout(float &value, int proxyType, int client)
 {
-    if (!IsValidClient(client) || IsFakeClient(client) || element < HUD1 || element > HUD4)
+    if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
     int layout = g_iClientHUDLayout[client];
@@ -1880,14 +1970,14 @@ public Action ProxyHUDLayout(const char[] prop, float &value, int element, int c
         default: return Plugin_Continue;
     }
 
-    if (StrEqual(prop, "m_fScriptedHUDPosX"))
+    if (proxyType == HUD_PROXY_POS_X)
     {
         if (layout == HUD_LAYOUT_4_3)
             value *= horizontalScale;
         else
             value = 0.5 + ((value - 0.5) * horizontalScale);
     }
-    else if (StrEqual(prop, "m_fScriptedHUDWidth"))
+    else if (proxyType == HUD_PROXY_WIDTH)
         value *= horizontalScale;
     else
         return Plugin_Continue;

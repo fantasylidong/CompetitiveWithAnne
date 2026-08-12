@@ -25,6 +25,7 @@ public void __pl_l4d_stats_SetNTVOptional()
 	MarkNativeAsOptional("l4dstats_IsQuarterTopPlayer");
 	MarkNativeAsOptional("l4dstats_IsTopPlayerCacheReady");
 	MarkNativeAsOptional("l4dstats_IsClientScoreReady");
+	MarkNativeAsOptional("l4dstats_IsClientPlaytimeReady");
 	MarkNativeAsOptional("l4dstats_GetClientRank");
 	MarkNativeAsOptional("l4dstats_GetClientPlayTime");
 	MarkNativeAsOptional("l4dstats_AddClientScore");
@@ -92,6 +93,14 @@ native int l4dstats_IsTopPlayerCacheReady();
  * @return		0 for false, 1 for true.
  */
 native int l4dstats_IsClientScoreReady(int client);
+/**
+ * get whether a player's total playtime query has completed successfully.
+ *
+ * @param client		Client Index.
+ *
+ * @return		0 for false, 1 for true.
+ */
+native int l4dstats_IsClientPlaytimeReady(int client);
 /**
  * get a player's total rank.
  *
