@@ -23,6 +23,8 @@ enum AnneSpawnNavGraphStatus
 
 #define ANNE_SPAWN_NAV_CANDIDATE_PENDING     -1
 #define ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE -2
+#define ANNE_SPAWN_NAV_DISTANCE_PENDING       -1
+#define ANNE_SPAWN_NAV_DISTANCE_UNAVAILABLE   -2
 #define ANNE_SPAWN_NAV_CANDIDATE_PERF_FLOATS 10
 #define ANNE_SPAWN_NAV_CANDIDATE_PERF_COUNTS 13
 #define ANNE_SPAWN_NAV_DIAG_COMPLETE              (1 << 0)
@@ -91,6 +93,18 @@ native int AnneSpawn_NavGraphCollectRange(
     float maxPathDistance,
     int[] outputAreaIndices,
     int maxResults
+);
+
+// 查询 candidate -> targetNav 的原始有向 Nav 中心累计距离。
+// 返回 1=可达且 distance 有效，0=在 maxPathDistance 内不可达，
+// -1=距离场仍在后台构建，-2=图或参数不可用。
+native int AnneSpawn_NavGraphGetPathDistance(
+    int candidateNavId,
+    int targetNavId,
+    float maxPathDistance,
+    int team,
+    bool ignoreNavBlockers,
+    float &distance
 );
 
 // 后台构建 candidate -> targetNav 有向可达、全队距离过滤后的目标候选快照。

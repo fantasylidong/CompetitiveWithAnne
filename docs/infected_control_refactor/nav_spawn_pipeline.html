@@ -248,7 +248,7 @@
 
     .band-strip {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       margin-top: 16px;
       background: var(--surface);
       border: 1px solid var(--line);
@@ -574,7 +574,10 @@
         <div class="segmented" id="band-control">
           <button type="button" data-band="0" aria-pressed="true">主区间</button>
           <button type="button" data-band="1" aria-pressed="false">放宽 1</button>
-          <button type="button" data-band="2" aria-pressed="false">最终区间</button>
+          <button type="button" data-band="2" aria-pressed="false">放宽 2</button>
+          <button type="button" data-band="3" aria-pressed="false">放宽 3</button>
+          <button type="button" data-band="4" aria-pressed="false">放宽 4</button>
+          <button type="button" data-band="5" aria-pressed="false">最终区间</button>
         </div>
       </div>
 
@@ -639,7 +642,7 @@
               <g id="candidate-layer"></g>
               <g id="survivor-layer"></g>
               <g id="flow-axis-layer"></g>
-              <text id="fallback-label" class="fallback-label" x="28" y="30">Director API：首段 7 次内部尝试，返回点直接生成</text>
+              <text id="fallback-label" class="fallback-label" x="28" y="30">Director API：请求点与实际落点距团队均不得超过 2000u</text>
               <text id="api-label" class="api-label" x="28" y="30">两段 API 均无点：轮换目标并按 0.10s 退避</text>
             </svg>
             <div class="map-footer">
@@ -673,7 +676,10 @@
 
         <div class="band-strip" aria-label="职业距离带">
           <div class="band-item"><div class="band-name">主区间</div><div class="band-value" id="band-primary">350–950</div></div>
-          <div class="band-item"><div class="band-name">第一次放宽</div><div class="band-value" id="band-secondary">350–1750</div></div>
+          <div class="band-item"><div class="band-name">放宽 1</div><div class="band-value" id="band-stage-1">350–1250</div></div>
+          <div class="band-item"><div class="band-name">放宽 2</div><div class="band-value" id="band-stage-2">350–1500</div></div>
+          <div class="band-item"><div class="band-name">放宽 3</div><div class="band-value" id="band-stage-3">350–1750</div></div>
+          <div class="band-item"><div class="band-name">放宽 4</div><div class="band-value" id="band-stage-4">350–2300</div></div>
           <div class="band-item"><div class="band-name">最终区间</div><div class="band-value" id="band-final">350–2900</div></div>
         </div>
       </section>
@@ -855,7 +861,7 @@
                 <tr><td>P1 · 已完成</td><td>原始路径有序分页</td><td>职业范围与全局访问顺序都使用原始有向路径；高点不再缩短排序距离，随机点继续执行全队三维直线 250。</td><td>顺序语义单一可解释，高台优势由实际候选高度的最终分奖励表达。</td></tr>
                 <tr><td>P1 · 已完成</td><td>快照节流</td><td>刷特前 1 秒和待刷期间每 0.1 秒刷新，空闲每 1 秒刷新，结果 TTL 为 0.2 秒。</td><td>跟上 128 tick 玩家移动，同时避免每帧重建。</td></tr>
                 <tr><td>P2 · 已完成</td><td>生还者眼位快照</td><td>每个实际刷特的 OnGameFrame 读取一次眼位和朝向，当前切片复用。</td><td>玩家移动最多产生一个 Tick 的快照误差。</td></tr>
-                <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>采用 7 次、12 次两段导演内部尝试；命中点直接生成，只独立记录耗时、命中率和职业。</td><td>确认罕见兜底是否造成尖峰，不新增任何刷不出的限制。</td></tr>
+                <tr><td>P2 · 已完成</td><td>最终 API 观测</td><td>采用 7 次、12 次两段导演内部尝试；请求点和实际落点均执行最近生还者 2000u 硬上限，并记录超距拒绝。</td><td>阻止 Director 极远点，同时保留路径、可见性和卡位直出策略。</td></tr>
               </tbody>
             </table>
           </div>
@@ -880,22 +886,22 @@
     (() => {
       const SVG_NS = 'http://www.w3.org/2000/svg';
       const classBands = {
-        smoker:  { label: 'Smoker',  bands: [[500, 1200], [500, 2100], [500, 3000]] },
-        boomer:  { label: 'Boomer',  bands: [[250, 550],  [250, 1000], [250, 2300]] },
-        hunter:  { label: 'Hunter',  bands: [[350, 950],  [350, 1750], [350, 2900]] },
-        spitter: { label: 'Spitter', bands: [[300, 800],  [300, 1450], [300, 2300]] },
-        jockey:  { label: 'Jockey',  bands: [[250, 700],  [250, 1250], [250, 2200]] },
-        charger: { label: 'Charger', bands: [[250, 700],  [250, 1250], [250, 2200]] }
+        smoker:  { label: 'Smoker',  bands: [[500, 1200], [500, 1500], [500, 1800], [500, 2100], [500, 2550], [500, 3000]] },
+        boomer:  { label: 'Boomer',  bands: [[250, 550],  [250, 750],  [250, 1000], [250, 1400], [250, 1850], [250, 2300]] },
+        hunter:  { label: 'Hunter',  bands: [[350, 950],  [350, 1250], [350, 1500], [350, 1750], [350, 2300], [350, 2900]] },
+        spitter: { label: 'Spitter', bands: [[300, 800],  [300, 1050], [300, 1250], [300, 1450], [300, 1850], [300, 2300]] },
+        jockey:  { label: 'Jockey',  bands: [[250, 700],  [250, 900],  [250, 1100], [250, 1250], [250, 1700], [250, 2200]] },
+        charger: { label: 'Charger', bands: [[250, 700],  [250, 900],  [250, 1100], [250, 1250], [250, 1700], [250, 2200]] }
       };
 
       const steps = [
         { title: '选择目标', short: '目标', description: 'Anti-Bait、跑男和目标限制优先，普通状态从有效生还者中随机选择。', event: '冻结本次会话目标，后续每秒目标更新不会重置扫描进度。' },
         { title: '读取图快照', short: '有向图', description: 'worker 从目标 Nav 反向构建距离场，只保留 candidate -> target 有向可达区域。', event: '空闲每 1 秒、刷特前和待刷期间每 0.1 秒刷新；消费 TTL 为 0.2 秒。' },
         { title: '原始路径分页', short: '候选游标', description: '职业 min/max 与整张快照访问顺序都使用原始 candidate → target 有向路径距离。', event: '每页返回 areaIdx 与 navDistance；高点不会在主线程或 worker 中提前。' },
-        { title: '轻量硬过滤', short: '距离预筛', description: '先拒绝 dF&lt;-8 的 Nav，再在每个 NavArea 最多随机 3 个点，执行职业 raw/effective 范围、全队三维直线 250、分散与 bucket 密度检查。', event: 'dF=-8 允许并扣 32 分；dF=-9 起不参与生成。直线 250 是不可折减的安全边界。' },
+        { title: '轻量硬过滤', short: '距离预筛', description: '先拒绝 dF&lt;-8 的 Nav，再在每个 NavArea 最多随机 3 个点，执行职业 raw/effective 范围、全队三维直线 250、分散与 bucket 密度检查。', event: 'dF=-8 允许并扣 16 分；dF=-9 起不参与生成。直线 250 是不可折减的安全边界。' },
         { title: '昂贵安全检查', short: '安全检查', description: '只有轻量过滤通过后，才执行卡位、可见性和 Nav 路径检查。', event: '每切片默认最多 16 个候选进入昂贵检查，避免 trace 与寻路集中爆发；可由 ConVar 调整。' },
-        { title: '评分并生成', short: '评分生成', description: '四因子按职业权重归一后混合战术分；Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 4 分，全职业每低 50u 扣 10 分且后点翻倍。', event: '这些奖励/扣分直接作用最终分；当前 Tick 最多比较 8 个合格点。' },
-        { title: 'Director API 首段', short: 'API × 7', description: '三个职业距离带都失败后调用导演 API；返回坐标后直接生成。', event: '不复核路径、职业距离、视线、卡位、伤害区域或直线 250。' },
+        { title: '评分并生成', short: '评分生成', description: '四因子按职业权重归一后混合战术分；Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 2 分，全职业每低 50u 扣 5 分且后点翻倍。', event: '这些奖励/扣分直接作用最终分；当前 Tick 最多比较 8 个合格点。' },
+        { title: 'Director API 首段', short: 'API × 7', description: '六个职业距离带都失败后调用导演 API；请求点距最近生还者不得超过 2000u。', event: '实体稳定后复核实际落点 2000u 上限；不复核路径、职业距离、视线、卡位、伤害区域或直线 250 下限。' },
         { title: 'API 失败恢复', short: 'API × 12', description: '首段无点时把内部尝试提高到 12；仍无点则轮换目标，完整轮次后按 0.10 秒退避。', event: '下次从职业主区间重新开始，避免每帧重复撞同一失败路径。' }
       ];
 
@@ -1049,7 +1055,7 @@
 
       function candidateSet() {
         const config = classBands[state.classKey];
-        const bandIndex = state.phase >= 6 ? 2 : state.band;
+        const bandIndex = state.phase >= 6 ? config.bands.length - 1 : state.band;
         const [minRange, maxRange] = config.bands[bandIndex];
         const scanMinRange = bandIndex === 0
           ? minRange
@@ -1172,8 +1178,10 @@
       function renderBands() {
         const config = classBands[state.classKey];
         document.getElementById('band-primary').textContent = config.bands[0].join('–');
-        document.getElementById('band-secondary').textContent = config.bands[1].join('–');
-        document.getElementById('band-final').textContent = config.bands[2].join('–');
+        for (let index = 1; index < config.bands.length - 1; index++) {
+          document.getElementById(`band-stage-${index}`).textContent = config.bands[index].join('–');
+        }
+        document.getElementById('band-final').textContent = config.bands[config.bands.length - 1].join('–');
         document.querySelectorAll('#band-control button').forEach(button => {
           button.setAttribute('aria-pressed', Number(button.dataset.band) === state.band ? 'true' : 'false');
         });
@@ -1237,7 +1245,7 @@
 
       function render() {
         const config = classBands[state.classKey];
-        const bandIndex = state.phase >= 6 ? 2 : state.band;
+        const bandIndex = state.phase >= 6 ? config.bands.length - 1 : state.band;
         const [minRange, maxRange] = config.bands[bandIndex];
         const win = 100;
         const candidates = candidateSet();

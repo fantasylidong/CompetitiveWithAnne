@@ -14,6 +14,7 @@ native bool CTerrorPlayerRoundRespawn(int client);
 #define TEST_SURVIVORS 4
 #define MATRIX_GRAPH_RESULTS 512
 #define MATRIX_MAX_PATH 3000.0
+#define MATRIX_OBSERVER_MAX_PATH 6000.0
 #define MATRIX_SPREAD_MIN 128.0
 #define MATRIX_MEMBER_RADIUS_MAX 650.0
 #define MATRIX_TEAM_SPREAD_MAX 800.0
@@ -43,6 +44,10 @@ int g_InfectedBornClass[MAXPLAYERS + 1];
 int g_SpawnVisibilityChecks;
 int g_SpawnVisibilityViolations;
 bool g_VisibilityChecked[MAXPLAYERS + 1];
+bool g_ProbeRecorded[MAXPLAYERS + 1];
+bool g_ProbePending[MAXPLAYERS + 1];
+int g_ProbeSamples;
+int g_ProbeClassCounts[7];
 float g_FormationMinDistance;
 float g_FormationMaxDistance;
 bool g_FrameMeasureActive;
@@ -58,8 +63,10 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax)
 {
     MarkNativeAsOptional("AnneSpawn_IsActive");
     MarkNativeAsOptional("AnneSpawn_NavGraphPump");
+    MarkNativeAsOptional("AnneSpawn_NavGraphStart");
     MarkNativeAsOptional("AnneSpawn_NavGraphPrepareRange");
     MarkNativeAsOptional("AnneSpawn_NavGraphCollectRange");
+    MarkNativeAsOptional("AnneSpawn_NavGraphGetPathDistance");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetEdgeCount");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetDiagnostics");
@@ -101,6 +108,8 @@ public void OnMapStart()
         g_InfectedBornAt[client] = 0.0;
         g_InfectedBornClass[client] = 0;
         g_VisibilityChecked[client] = false;
+        g_ProbeRecorded[client] = false;
+        g_ProbePending[client] = false;
     }
     delete g_NavAreas;
     g_NavAreas = null;
@@ -112,6 +121,9 @@ public void OnMapStart()
     g_PendingActualArea = Address_Null;
     g_SpawnVisibilityChecks = 0;
     g_SpawnVisibilityViolations = 0;
+    g_ProbeSamples = 0;
+    for (int zombieClass = 0; zombieClass < sizeof(g_ProbeClassCounts); zombieClass++)
+        g_ProbeClassCounts[zombieClass] = 0;
     g_FormationMinDistance = 0.0;
     g_FormationMaxDistance = 0.0;
     g_FrameMeasureActive = false;
@@ -211,6 +223,8 @@ public void OnClientDisconnect(int client)
     g_InfectedBornAt[client] = 0.0;
     g_InfectedBornClass[client] = 0;
     g_VisibilityChecked[client] = false;
+    g_ProbeRecorded[client] = false;
+    g_ProbePending[client] = false;
 }
 
 public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
@@ -226,26 +240,29 @@ public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
     g_InfectedBornAt[client] = GetGameTime();
     g_InfectedBornClass[client] = zombieClass;
     g_VisibilityChecked[client] = false;
+    g_ProbeRecorded[client] = false;
+    g_ProbePending[client] = true;
     MatrixLog("InfectedSpawn userid=%d client=%d class=%d alive=%d ghost=%d",
         GetClientUserId(client), client, zombieClass,
         IsPlayerAlive(client) ? 1 : 0,
         GetEntProp(client, Prop_Send, "m_isGhost") != 0 ? 1 : 0);
+    CreateTimer(0.30, Timer_RecordProbeSpawn, GetClientUserId(client),
+        TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public void InfectedControl_OnSpawnCommitted(int userid)
+bool FinalizeVisibilityCheck(int client)
 {
-    int client = GetClientOfUserId(userid);
     if (client <= 0 || !IsClientInGame(client)
         || GetClientTeam(client) != TEAM_INFECTED || !IsPlayerAlive(client)
         || GetEntProp(client, Prop_Send, "m_isGhost") != 0
         || IsClientInKickQueue(client))
     {
-        return;
+        return false;
     }
 
     int zombieClass = GetEntProp(client, Prop_Send, "m_zombieClass");
     if (zombieClass < 1 || zombieClass > 6)
-        return;
+        return false;
 
     float origin[3];
     GetClientAbsOrigin(client, origin);
@@ -290,6 +307,130 @@ public void InfectedControl_OnSpawnCommitted(int userid)
         rayVisibleMask, engineVisibleMask,
         (rayVisibleMask != 0 || engineVisibleMask != 0) ? 1 : 0,
         origin[0], origin[1], origin[2]);
+    return true;
+}
+
+public void InfectedControl_OnSpawnCommitted(int userid)
+{
+    FinalizeVisibilityCheck(GetClientOfUserId(userid));
+}
+
+public Action Timer_RecordProbeSpawn(Handle timer, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (client <= 0 || !IsClientInGame(client)
+        || GetClientTeam(client) != TEAM_INFECTED || !IsFakeClient(client)
+        || !IsPlayerAlive(client) || GetEntProp(client, Prop_Send, "m_isGhost") != 0
+        || IsClientInKickQueue(client))
+    {
+        return Plugin_Stop;
+    }
+    if (g_ProbeRecorded[client])
+        return Plugin_Stop;
+
+    int zombieClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+    if (zombieClass < 1 || zombieClass > 6)
+        return Plugin_Stop;
+
+    if (!g_VisibilityChecked[client] && !FinalizeVisibilityCheck(client))
+        return Plugin_Stop;
+
+    float origin[3];
+    GetClientAbsOrigin(client, origin);
+    float teamMin = 1.0e30;
+    float teamMax;
+    int survivorCount;
+    for (int survivor = 1; survivor <= MaxClients; survivor++)
+    {
+        if (!g_HasTargetPosition[survivor] || !IsClientInGame(survivor)
+            || GetClientTeam(survivor) != TEAM_SURVIVOR || !IsPlayerAlive(survivor))
+        {
+            continue;
+        }
+        float eyes[3];
+        GetClientEyePosition(survivor, eyes);
+        float distance = GetVectorDistance(origin, eyes);
+        if (distance < teamMin) teamMin = distance;
+        if (distance > teamMax) teamMax = distance;
+        survivorCount++;
+    }
+    if (survivorCount <= 0)
+        return Plugin_Stop;
+
+    Address actualArea = L4D2Direct_GetTerrorNavArea(origin);
+    if (actualArea == Address_Null)
+        actualArea = L4D_GetNearestNavArea(
+            origin, 120.0, false, false, false, TEAM_INFECTED);
+    int actualNavId = actualArea != Address_Null
+        ? L4D_GetNavAreaID(actualArea) : -1;
+    float nearestNavDistance = 1.0e30;
+    int nearestTargetClient;
+    int nearestTargetNavId = -1;
+    int reachableTargets;
+    int unreachableTargets;
+    int unavailableTargets;
+    int pendingTargets;
+    int configuredTargets;
+    bool navPending;
+    FeatureStatus distanceNativeStatus = GetFeatureStatus(
+        FeatureType_Native, "AnneSpawn_NavGraphGetPathDistance");
+    for (int survivor = 1; survivor <= MaxClients; survivor++)
+    {
+        if (g_HasTargetPosition[survivor] && g_TargetNavId[survivor] > 0)
+            configuredTargets++;
+    }
+    if (actualNavId > 0 && distanceNativeStatus == FeatureStatus_Available)
+    {
+        for (int survivor = 1; survivor <= MaxClients; survivor++)
+        {
+            if (!g_HasTargetPosition[survivor] || g_TargetNavId[survivor] <= 0)
+                continue;
+            float navDistance;
+            int result = AnneSpawn_NavGraphGetPathDistance(
+                actualNavId, g_TargetNavId[survivor], MATRIX_OBSERVER_MAX_PATH,
+                TEAM_INFECTED, false, navDistance);
+            if (result == ANNE_SPAWN_NAV_DISTANCE_PENDING)
+            {
+                navPending = true;
+                pendingTargets++;
+                continue;
+            }
+            if (result == 0)
+            {
+                unreachableTargets++;
+                continue;
+            }
+            if (result != 1)
+            {
+                unavailableTargets++;
+                continue;
+            }
+            reachableTargets++;
+            if (navDistance < nearestNavDistance)
+            {
+                nearestNavDistance = navDistance;
+                nearestTargetClient = survivor;
+                nearestTargetNavId = g_TargetNavId[survivor];
+            }
+        }
+    }
+    if (navPending && GetGameTime() - g_InfectedBornAt[client] < 3.0)
+        return Plugin_Continue;
+
+    if (nearestTargetNavId < 0)
+        nearestNavDistance = -1.0;
+    g_ProbeRecorded[client] = true;
+    g_ProbePending[client] = false;
+    g_ProbeSamples++;
+    g_ProbeClassCounts[zombieClass]++;
+    MatrixLog("ProbeSpawn seq=%d userid=%d client=%d class=%d survivors=%d configuredTargets=%d distanceNativeStatus=%d actualNav=%d targetNav=%d targetClient=%d reachableTargets=%d unreachableTargets=%d unavailableTargets=%d pendingTargets=%d teamMinDistance=%.1f teamMaxDistance=%.1f nearestNavDistance=%.1f pos=(%.1f %.1f %.1f)",
+        g_ProbeSamples, userid, client, zombieClass, survivorCount,
+        configuredTargets, view_as<int>(distanceNativeStatus), actualNavId,
+        nearestTargetNavId, nearestTargetClient, reachableTargets,
+        unreachableTargets, unavailableTargets, pendingTargets,
+        teamMin, teamMax, nearestNavDistance,
+        origin[0], origin[1], origin[2]);
+    return Plugin_Stop;
 }
 
 public bool MatrixTraceFilter(int entity, int contentsMask)
@@ -318,6 +459,8 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
     g_InfectedBornAt[client] = 0.0;
     g_InfectedBornClass[client] = 0;
     g_VisibilityChecked[client] = false;
+    g_ProbeRecorded[client] = false;
+    g_ProbePending[client] = false;
 }
 
 public void OnPluginEnd()
@@ -394,6 +537,39 @@ bool HasGraphNatives()
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphCollectRange") == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphGetDiagnostics") == FeatureStatus_Available
         && AnneSpawn_IsActive();
+}
+
+bool EnsureObserverGraphStarted()
+{
+    if (!LibraryExists(ANNE_SPAWN_ACCEL_LIBRARY)
+        || GetFeatureStatus(FeatureType_Native, "AnneSpawn_IsActive") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphStart") != FeatureStatus_Available
+        || GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavGraphPump") != FeatureStatus_Available
+        || !AnneSpawn_IsActive())
+    {
+        return false;
+    }
+
+    AnneSpawnNavGraphStatus status = AnneSpawn_NavGraphPump(false);
+    if (status == AnneSpawnNavGraph_Ready
+        || status == AnneSpawnNavGraph_Loading
+        || status == AnneSpawnNavGraph_Building)
+    {
+        return true;
+    }
+
+    char mapName[64];
+    char graphPath[PLATFORM_MAX_PATH];
+    GetCurrentMap(mapName, sizeof(mapName));
+    float maxFlowDistance = L4D2Direct_GetMapMaxFlowDistance();
+    if (mapName[0] == '\0' || maxFlowDistance <= 0.0
+        || BuildPath(Path_SM, graphPath, sizeof(graphPath),
+            "data/anne_spawn_accel/navgraph/%s.anvg", mapName) <= 0)
+    {
+        return false;
+    }
+    return AnneSpawn_NavGraphStart(
+        mapName, graphPath, maxFlowDistance, false);
 }
 
 bool GetLiveNavArea(int client, Address &area, float position[3])
@@ -1011,6 +1187,15 @@ public Action Command_Prepare(int client, int args)
         return Plugin_Handled;
     }
 
+    for (int survivor = 1; survivor <= MaxClients; survivor++)
+    {
+        if (!g_HasTargetPosition[survivor] || g_TargetNavId[survivor] <= 0)
+            continue;
+        AnneSpawn_NavGraphPrepareRange(
+            g_TargetNavId[survivor], MATRIX_OBSERVER_MAX_PATH,
+            TEAM_INFECTED, false);
+    }
+
     float averagePercent = survivorCount > 0
         ? areaPercentTotal / float(survivorCount) : -1.0;
     MatrixLog("Ready map=%s requested=%d routeStart=%d anchorArea=%d survivors=%d uniqueNav=%d spreadMin=%.1f spreadMax=%.1f minAreaPct=%.2f maxAreaPct=%.2f avgAreaPct=%.2f forwardYaw=%.1f directed(near/long/broad)=%d/%d/%d maxFlow=%.1f",
@@ -1032,11 +1217,16 @@ public Action Command_Clear(int client, int args)
     g_FrameLastAt = 0.0;
     g_SpawnVisibilityChecks = 0;
     g_SpawnVisibilityViolations = 0;
+    g_ProbeSamples = 0;
+    for (int zombieClass = 0; zombieClass < sizeof(g_ProbeClassCounts); zombieClass++)
+        g_ProbeClassCounts[zombieClass] = 0;
     int removed;
     int humans;
     for (int target = 1; target <= MaxClients; target++)
     {
         g_VisibilityChecked[target] = false;
+        g_ProbeRecorded[target] = false;
+        g_ProbePending[target] = false;
         if (!IsClientInGame(target) || GetClientTeam(target) != TEAM_INFECTED)
             continue;
         if (!IsFakeClient(target))
@@ -1060,6 +1250,12 @@ public Action Command_Status(int client, int args)
     int survivors = CountTeam(TEAM_SURVIVOR);
     int infectedTeam = CountTeam(TEAM_INFECTED);
     int aliveSpecialBots = CountAliveSpecialBots();
+    int probePending;
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        if (g_ProbePending[target])
+            probePending++;
+    }
     int humanClients = CountHumanClients();
     int humanInfected = CountHumanClients(TEAM_INFECTED);
     float maxFlow = L4D2Direct_GetMapMaxFlowDistance();
@@ -1109,10 +1305,13 @@ public Action Command_Status(int client, int args)
         graphEdges = AnneSpawn_NavGraphGetEdgeCount();
     }
     ReplyToCommand(client,
-        "[NavMatrix] status map=%s survivors=%d controlled=%d uniqueNav=%d spreadMin=%.1f spreadMax=%.1f visibilityChecks=%d visibilityViolations=%d infectedTeam=%d aliveSI=%d humanClients=%d humanInfected=%d validPosition=%d minPositionPct=%.2f maxPositionPct=%.2f avgPositionPct=%.2f graphStatus=%d graphComplete=%d graphAreas=%d graphEdges=%d frameSamples=%d frameAvgMs=%.3f frameMaxMs=%.3f frameOverTick=%d frameOver2Tick=%d frameOver4Tick=%d",
+        "[NavMatrix] status map=%s survivors=%d controlled=%d uniqueNav=%d spreadMin=%.1f spreadMax=%.1f visibilityChecks=%d visibilityViolations=%d probeSamples=%d probePending=%d probeC1=%d probeC2=%d probeC3=%d probeC4=%d probeC5=%d probeC6=%d infectedTeam=%d aliveSI=%d humanClients=%d humanInfected=%d validPosition=%d minPositionPct=%.2f maxPositionPct=%.2f avgPositionPct=%.2f graphStatus=%d graphComplete=%d graphAreas=%d graphEdges=%d frameSamples=%d frameAvgMs=%.3f frameMaxMs=%.3f frameOverTick=%d frameOver2Tick=%d frameOver4Tick=%d",
         g_CurrentMap, survivors, controlledSurvivors, CountUniqueControlledNavs(),
         g_FormationMinDistance, g_FormationMaxDistance,
         g_SpawnVisibilityChecks, g_SpawnVisibilityViolations,
+        g_ProbeSamples, probePending,
+        g_ProbeClassCounts[1], g_ProbeClassCounts[2], g_ProbeClassCounts[3],
+        g_ProbeClassCounts[4], g_ProbeClassCounts[5], g_ProbeClassCounts[6],
         infectedTeam,
         aliveSpecialBots, humanClients, humanInfected, validPositionClients,
         minPercent, maxPercent, averagePercent, view_as<int>(graphStatus),
@@ -1138,6 +1337,7 @@ public Action Command_Activate(int client, int args)
     }
 
     roundStart.Fire();
+    EnsureObserverGraphStarted();
     MatrixLog("Activate map=%s survivors=%d syntheticRoundStart=1",
         g_CurrentMap, CountTeam(TEAM_SURVIVOR));
     ReplyToCommand(client, "[NavMatrix] active map=%s survivors=%d",

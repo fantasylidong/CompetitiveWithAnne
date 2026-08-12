@@ -9,6 +9,7 @@
 #include <treeutil>
 #include <logger2>
 #include <anne_nextbot>
+#include "ai_path_movement.inc"
 // 你自己的公共方法、工具函数（判定AI Tank / 可见性 / 贴图等）都在这里
 #include "../../archive/AnneHappy/stocks.sp"
 
@@ -38,6 +39,7 @@
 
 #define JUMP_SPEED_Z               300.0  // 跳砖时给的Z轴速度
 #define LADDER_NEARBY_CACHE_DEFAULT 0.20  // 梯子附近检测缓存，避免每帧扫实体/nav
+#define HEAD_BLOCK_PROGRESS_DIST   32.0   // 判定窗口内移动超过该距离视为仍在正常寻路
 
 // ===== ConVar =====
 ConVar g_cvPluginName, g_cvLogLevel;
@@ -90,7 +92,7 @@ Handle g_hSdkTankClawSweepFist;
 
 bool  g_bLateLoad;
 float g_fTankSwingRange;
-float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
+float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1][MAXPLAYERS + 1];
 float g_fLastLadderNearbyCheck[MAXPLAYERS + 1];
 bool  g_bLastLadderNearby[MAXPLAYERS + 1];
 
@@ -136,7 +138,10 @@ enum struct AiTank
     float lastHopSpeed;         // 上次起跳时的速度（用于空中修正还原）
     float backFistExpire;       // 通背拳允许窗口到期时间（EngineTime <= 0 未开启）
     float headBlockStart;       // 头顶卡检测开始时间
+    float headBlockOrigin[3];   // 头顶卡检测窗口开始时的 Tank 位置
     float lastHeadBlockTargetSwitch; // 上次因头顶拉黑强制换目标时间
+    int   forcedTarget;         // 反头顶卡期间锁定的替代目标(userId)
+    float forcedTargetUntil;    // 临时目标锁截止时间
     float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
     int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
     PathSegment pathSegment;    // 当前 PathSegment
@@ -154,7 +159,10 @@ enum struct AiTank
         this.lastHopSpeed = 0.0;
         this.backFistExpire = 0.0;
         this.headBlockStart = 0.0;
+        this.headBlockOrigin = NULL_VECTOR;
         this.lastHeadBlockTargetSwitch = 0.0;
+        this.forcedTarget = -1;
+        this.forcedTargetUntil = 0.0;
         this.forceRockUntil = 0.0;
         this.forceRockTarget = -1;
         this.pathSegment.initData();
@@ -180,7 +188,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
-    version     = "1.0.0.3",
+    version     = "1.0.0.6",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -247,9 +255,9 @@ public void OnPluginStart()
     g_cvHeadBlockForceRockReleaseHoriz = CreateConVar("ai_tank3_head_block_force_rock_release_h", "400", "强制投石期间卡位者离开多远（水平距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseVert  = CreateConVar("ai_tank3_head_block_force_rock_release_v", "250", "强制投石期间卡位者离开多远（垂直距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
 
-    // 梯子附近让出本插件移动/目标/投石逻辑，交还 NextBot 和梯子加速插件处理
-    g_cvLadderNearbyDisable = CreateConVar("ai_tank3_ladder_nearby_disable", "1", "Tank 在梯子附近时暂停 ai_tank3 行为处理", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvLadderNearbyRadius = CreateConVar("ai_tank3_ladder_nearby_radius", "180.0", "Tank 距离梯子多近时暂停 ai_tank3 行为处理", CVAR_FLAGS, true, 0.0);
+    // 梯子附近仅让出移动/投石控制；目标卡住恢复仍需运行
+    g_cvLadderNearbyDisable = CreateConVar("ai_tank3_ladder_nearby_disable", "1", "Tank 在梯子附近时暂停 ai_tank3 移动和投石处理", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvLadderNearbyRadius = CreateConVar("ai_tank3_ladder_nearby_radius", "180.0", "Tank 距离梯子多近时暂停 ai_tank3 移动和投石处理", CVAR_FLAGS, true, 0.0);
     g_cvLadderNearbyCacheTime = CreateConVar("ai_tank3_ladder_nearby_cache", "0.20", "梯子附近检测缓存时间（秒）", CVAR_FLAGS, true, 0.0);
 
     // 日志
@@ -371,12 +379,15 @@ void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].backFistExpire = 0.0;
         g_AiTanks[i].headBlockStart = 0.0;
         g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
+        g_AiTanks[i].forcedTarget = -1;
+        g_AiTanks[i].forcedTargetUntil = 0.0;
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
         clearCachedTankPath(i);
         g_AiTanks[i].bhopType = TankBhopType_None;
-        g_fHeadBlockIgnoreUntil[i] = 0.0;
+        for (int survivor = 1; survivor <= MaxClients; survivor++)
+            g_fHeadBlockIgnoreUntil[i][survivor] = 0.0;
         g_fLastLadderNearbyCheck[i] = 0.0;
         g_bLastLadderNearby[i] = false;
     }
@@ -389,12 +400,15 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
         g_AiTanks[i].backFistExpire = 0.0;
         g_AiTanks[i].headBlockStart = 0.0;
         g_AiTanks[i].lastHeadBlockTargetSwitch = 0.0;
+        g_AiTanks[i].forcedTarget = -1;
+        g_AiTanks[i].forcedTargetUntil = 0.0;
         g_AiTanks[i].forceRockUntil = 0.0;
         g_AiTanks[i].forceRockTarget = -1;
         g_AiTanks[i].lastLookAheadTime = 0.0;
         clearCachedTankPath(i);
         g_AiTanks[i].bhopType = TankBhopType_None;
-        g_fHeadBlockIgnoreUntil[i] = 0.0;
+        for (int survivor = 1; survivor <= MaxClients; survivor++)
+            g_fHeadBlockIgnoreUntil[i][survivor] = 0.0;
         g_fLastLadderNearbyCheck[i] = 0.0;
         g_bLastLadderNearby[i] = false;
     }
@@ -419,32 +433,45 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
     float pos[3];
     GetClientAbsOrigin(client, pos);
-
-    if (isTankNearLadder(client, pos))
-    {
-        resetTankMovementOverrides(client);
-        return Plugin_Continue;
-    }
-
-    handleForceRock(client, buttons, pos);
+    bool nearLadder = isTankNearLadder(client, pos);
+    if (!nearLadder)
+        handleForceRock(client, buttons, pos);
 
     int target = GetClientOfUserId(g_AiTanks[client].target);
     if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+    {
+        if (nearLadder)
+            resetTankMovementOverrides(client);
         return Plugin_Continue;
+    }
 
     float targetPos[3];
     GetClientAbsOrigin(target, targetPos);
     float dist = GetVectorDistance(pos, targetPos);
 
-    bool targetIgnored = isSurvivorIgnored(target);
+    bool targetIgnored = isSurvivorIgnored(client, target);
     if (!targetIgnored)
     {
-        handleHeadBlock(client, target, pos, targetPos);
+        if (handleHeadBlock(client, target, pos, targetPos))
+        {
+            if (!trySwitchHeadBlockTarget(client, target, false))
+                commandTankAttackTarget(client, target, "refreshing route to overhead target");
+            resetTankMovementOverrides(client);
+            return Plugin_Continue;
+        }
     }
     else
     {
         g_AiTanks[client].headBlockStart = 0.0;
         trySwitchHeadBlockTarget(client, target, false);
+        if (nearLadder)
+            resetTankMovementOverrides(client);
+        return Plugin_Continue;
+    }
+
+    if (nearLadder)
+    {
+        resetTankMovementOverrides(client);
         return Plugin_Continue;
     }
 
@@ -460,13 +487,15 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     return Plugin_Continue;
 }
 
-bool isSurvivorIgnored(int survivor)
+bool isSurvivorIgnored(int tank, int survivor)
 {
     if (!g_cvHeadBlockEnable.BoolValue)
         return false;
+    if (tank < 1 || tank > MaxClients)
+        return false;
     if (!IsValidSurvivor(survivor))
         return false;
-    return g_fHeadBlockIgnoreUntil[survivor] > GetEngineTime();
+    return g_fHeadBlockIgnoreUntil[tank][survivor] > GetEngineTime();
 }
 
 bool isTankNearLadder(int client, const float pos[3])
@@ -566,6 +595,7 @@ void resetTankMovementOverrides(int client)
     g_AiTanks[client].bhopType = TankBhopType_None;
     g_AiTanks[client].lastLookAheadTime = 0.0;
     g_AiTanks[client].lastAirVecModifyTime = 0.0;
+    AIPathMovement_Reset(client);
 }
 
 static bool isClientDownState(int client)
@@ -573,29 +603,23 @@ static bool isClientDownState(int client)
     return IsClientIncapped(client) || IsClientHanging(client);
 }
 
-void handleHeadBlock(int tank, int target, const float tankPos[3], const float targetPos[3])
+bool handleHeadBlock(int tank, int target, const float tankPos[3], const float targetPos[3])
 {
     if (!g_cvHeadBlockEnable.BoolValue)
-        return;
+        return false;
     if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
-        return;
+        return false;
     if (isClientDownState(target))
     {
         g_AiTanks[tank].headBlockStart = 0.0;
-        return;
+        return false;
     }
 
-    float targetMins[3], tankMaxs[3];
-    GetClientMins(target, targetMins);
-    GetClientMaxs(tank, tankMaxs);
-
-    float targetFootZ = targetPos[2] + targetMins[2];
-    float tankHeadZ   = tankPos[2] + tankMaxs[2];
-    float verticalDiff = targetFootZ - tankHeadZ;
+    float verticalDiff = targetPos[2] - tankPos[2];
     if (verticalDiff < g_cvHeadBlockVertical.FloatValue)
     {
         g_AiTanks[tank].headBlockStart = 0.0;
-        return;
+        return false;
     }
 
     float dx = targetPos[0] - tankPos[0];
@@ -604,23 +628,38 @@ void handleHeadBlock(int tank, int target, const float tankPos[3], const float t
     if (horizontalDiff > g_cvHeadBlockHorizontal.FloatValue)
     {
         g_AiTanks[tank].headBlockStart = 0.0;
-        return;
+        return false;
+    }
+
+    if (GetEntityMoveType(tank) == MOVETYPE_LADDER)
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return false;
     }
 
     float now = GetEngineTime();
     if (g_AiTanks[tank].headBlockStart <= 0.0)
     {
         g_AiTanks[tank].headBlockStart = now;
-        return;
+        g_AiTanks[tank].headBlockOrigin = tankPos;
+        return false;
+    }
+
+    if (GetVectorDistance(tankPos, g_AiTanks[tank].headBlockOrigin) >= HEAD_BLOCK_PROGRESS_DIST)
+    {
+        g_AiTanks[tank].headBlockStart = now;
+        g_AiTanks[tank].headBlockOrigin = tankPos;
+        return false;
     }
 
     if ((now - g_AiTanks[tank].headBlockStart) < g_cvHeadBlockTime.FloatValue)
-        return;
+        return false;
 
     g_AiTanks[tank].headBlockStart = 0.0;
-    g_fHeadBlockIgnoreUntil[target] = now + g_cvHeadBlockIgnoreTime.FloatValue;
+    g_fHeadBlockIgnoreUntil[tank][target] = now + g_cvHeadBlockIgnoreTime.FloatValue;
     if (log != null)
-        log.debugAll("%N flagged %N for head blocking (v=%.1f h=%.1f)", tank, target, verticalDiff, horizontalDiff);
+        log.debugAll("%N flagged %N for overhead path stall (v=%.1f h=%.1f)", tank, target, verticalDiff, horizontalDiff);
+    return true;
 }
 
 void handleForceRock(int tank, int& buttons, const float tankPos[3])
@@ -698,7 +737,7 @@ int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &
             continue;
         if (i == ignoreTarget)
             continue;
-        if (isSurvivorIgnored(i))
+        if (isSurvivorIgnored(tank, i))
             continue;
 
         bool down = isClientDownState(i);
@@ -711,6 +750,9 @@ int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &
 
         if (!down)
         {
+            if (L4D_IsPlayerPinned(i))
+                continue;
+
             if (dist < bestStandingDist)
             {
                 bestStandingDist = dist;
@@ -719,6 +761,9 @@ int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &
         }
         else
         {
+            if (IsClientHanging(i))
+                continue;
+
             if (dist < bestDownDist)
             {
                 bestDownDist = dist;
@@ -729,7 +774,7 @@ int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &
 
     if (bestStanding != -1)
         return bestStanding;
-    if (nearestDown != -1)
+    if (allOthersDown && nearestDown != -1)
         return nearestDown;
 
     allOthersDown = false;
@@ -740,7 +785,7 @@ bool trySwitchHeadBlockTarget(int tank, int blockedTarget, bool updateVictimOnly
 {
     if (!g_cvHeadBlockEnable.BoolValue || !isAiTank(tank) || !IsValidSurvivor(blockedTarget))
         return false;
-    if (!isSurvivorIgnored(blockedTarget))
+    if (!isSurvivorIgnored(tank, blockedTarget))
         return false;
 
     bool allOthersDown = false;
@@ -772,17 +817,12 @@ bool trySwitchHeadBlockTarget(int tank, int blockedTarget, bool updateVictimOnly
     if (chaseUserId <= 0)
         return false;
 
+    g_AiTanks[tank].forcedTarget = chaseUserId;
+    g_AiTanks[tank].forcedTargetUntil = g_fHeadBlockIgnoreUntil[tank][blockedTarget];
     g_AiTanks[tank].target = chaseUserId;
 
     if (!updateVictimOnly)
-    {
-        float cooldown = g_cvHeadBlockSwitchCooldown.FloatValue;
-        if (cooldown <= 0.0 || now - g_AiTanks[tank].lastHeadBlockTargetSwitch >= cooldown)
-        {
-            Logic_RunScript(COMMANDABOT_ATTACK, GetClientUserId(tank), chaseUserId);
-            g_AiTanks[tank].lastHeadBlockTargetSwitch = now;
-        }
-    }
+        commandTankAttackTarget(tank, chaseTarget, "switching from overhead target");
 
     if (log != null)
         log.debugAll("%N switched head-block target from %N to %N", tank, blockedTarget, chaseTarget);
@@ -790,53 +830,128 @@ bool trySwitchHeadBlockTarget(int tank, int blockedTarget, bool updateVictimOnly
     return true;
 }
 
+void clearTankTargetLock(int tank)
+{
+    if (tank < 1 || tank > MaxClients)
+        return;
+
+    g_AiTanks[tank].forcedTarget = -1;
+    g_AiTanks[tank].forcedTargetUntil = 0.0;
+}
+
+bool canKeepDownTargetForForceRock(int tank, int target, float now)
+{
+    if (!isClientDownState(target) || IsClientHanging(target) || g_AiTanks[tank].forceRockUntil <= now)
+        return false;
+
+    int blockedTarget = GetClientOfUserId(g_AiTanks[tank].forceRockTarget);
+    if (!IsValidSurvivor(blockedTarget) || !IsPlayerAlive(blockedTarget))
+        return false;
+
+    for (int survivor = 1; survivor <= MaxClients; survivor++)
+    {
+        if (!IsValidSurvivor(survivor) || !IsPlayerAlive(survivor) || survivor == blockedTarget)
+            continue;
+        if (!isClientDownState(survivor))
+            return false;
+    }
+
+    return true;
+}
+
+bool getTankForcedTarget(int tank, int &target)
+{
+    target = -1;
+    if (!g_cvHeadBlockEnable.BoolValue || !isAiTank(tank))
+    {
+        clearTankTargetLock(tank);
+        return false;
+    }
+
+    float now = GetEngineTime();
+    if (g_AiTanks[tank].forcedTargetUntil <= now)
+    {
+        clearTankTargetLock(tank);
+        return false;
+    }
+
+    target = GetClientOfUserId(g_AiTanks[tank].forcedTarget);
+    bool keepDownTarget = IsValidSurvivor(target) && canKeepDownTargetForForceRock(tank, target, now);
+    if (IsValidSurvivor(target) && g_AiTanks[tank].forceRockUntil > now &&
+        isClientDownState(target) && !keepDownTarget)
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+    }
+
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target) || IsClientHanging(target) ||
+        L4D_IsPlayerPinned(target) || (isClientDownState(target) && !keepDownTarget) ||
+        isSurvivorIgnored(tank, target))
+    {
+        clearTankTargetLock(tank);
+        target = -1;
+        return false;
+    }
+
+    return true;
+}
+
+bool commandTankAttackTarget(int tank, int target, const char[] reason)
+{
+    if (!isAiTank(tank) || !IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+
+    float now = GetEngineTime();
+    float cooldown = g_cvHeadBlockSwitchCooldown.FloatValue;
+    if (cooldown > 0.0 && now - g_AiTanks[tank].lastHeadBlockTargetSwitch < cooldown)
+        return false;
+
+    int tankUserId = GetClientUserId(tank);
+    int targetUserId = GetClientUserId(target);
+    if (tankUserId <= 0 || targetUserId <= 0)
+        return false;
+
+    Logic_RunScript(COMMANDABOT_RESET, tankUserId);
+    Logic_RunScript(COMMANDABOT_ATTACK, tankUserId, targetUserId);
+    g_AiTanks[tank].target = targetUserId;
+    g_AiTanks[tank].lastHeadBlockTargetSwitch = now;
+
+    if (log != null)
+        log.debugAll("%N reset path and attacked %N: %s", tank, target, reason);
+    return true;
+}
+
 // 确保目标缓存一致并处理反卡逻辑
 public Action L4D2_OnChooseVictim(int client, int &curTarget)
 {
-    if (!isAiTank(client) || !IsValidSurvivor(curTarget))
+    if (!isAiTank(client))
+        return Plugin_Continue;
+
+    int forcedTarget;
+    if (getTankForcedTarget(client, forcedTarget))
+    {
+        g_AiTanks[client].target = GetClientUserId(forcedTarget);
+        if (curTarget != forcedTarget)
+        {
+            curTarget = forcedTarget;
+            return Plugin_Changed;
+        }
+        return Plugin_Continue;
+    }
+
+    if (!IsValidSurvivor(curTarget))
         return Plugin_Continue;
 
     float now = GetEngineTime();
 
     int blockedClient = curTarget;
 
-    if (isSurvivorIgnored(blockedClient))
+    if (isSurvivorIgnored(client, blockedClient) && trySwitchHeadBlockTarget(client, blockedClient, true))
     {
-        bool allOthersDown = false;
-        int nearestDown = -1;
-        int alternative = findAlternativeVictim(client, blockedClient, allOthersDown, nearestDown);
-        if (alternative > 0)
+        int switchedTarget;
+        if (getTankForcedTarget(client, switchedTarget) && switchedTarget != curTarget)
         {
-            if (allOthersDown)
-            {
-                int moveTarget = (nearestDown > 0) ? nearestDown : blockedClient;
-                if (moveTarget > 0)
-                    curTarget = moveTarget;
-
-                int chaseUserId = GetClientUserId(curTarget);
-                if (chaseUserId > 0)
-                    g_AiTanks[client].target = chaseUserId;
-
-                int blockedUserId = GetClientUserId(blockedClient);
-                if (blockedUserId > 0)
-                {
-                    g_AiTanks[client].forceRockTarget = blockedUserId;
-                    g_AiTanks[client].forceRockUntil = now + g_cvHeadBlockForceRockTime.FloatValue;
-                }
-                else
-                {
-                    g_AiTanks[client].forceRockTarget = -1;
-                    g_AiTanks[client].forceRockUntil = 0.0;
-                }
-            }
-            else
-            {
-                curTarget = alternative;
-                g_AiTanks[client].target = GetClientUserId(curTarget);
-                g_AiTanks[client].forceRockTarget = -1;
-                g_AiTanks[client].forceRockUntil = 0.0;
-            }
-
+            curTarget = switchedTarget;
             return Plugin_Changed;
         }
     }
@@ -862,13 +977,27 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget)
 
 public Action L4D_OnTargetOverride(int attacker, int &victim, int order)
 {
-    if (!isAiTank(attacker) || !IsValidSurvivor(victim))
+    if (!isAiTank(attacker))
+        return Plugin_Continue;
+
+    int forcedTarget;
+    if (getTankForcedTarget(attacker, forcedTarget))
+    {
+        if (victim != forcedTarget)
+        {
+            victim = forcedTarget;
+            return Plugin_Changed;
+        }
+        return Plugin_Continue;
+    }
+
+    if (!IsValidSurvivor(victim))
         return Plugin_Continue;
 
     if (trySwitchHeadBlockTarget(attacker, victim, true))
     {
-        int switchedTarget = GetClientOfUserId(g_AiTanks[attacker].target);
-        if (IsValidSurvivor(switchedTarget) && switchedTarget != victim)
+        int switchedTarget;
+        if (getTankForcedTarget(attacker, switchedTarget) && switchedTarget != victim)
         {
             victim = switchedTarget;
             return Plugin_Changed;
@@ -1089,6 +1218,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
 
         // 记录起跳水平速度（空中修正用）
         g_AiTanks[client].lastHopSpeed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
+        AIPathMovement_BeginPathHop(client, targetPos, g_AiTanks[client].lastHopSpeed);
         TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
         return Plugin_Changed;
     }
@@ -1108,33 +1238,34 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
             return pathAir;
     }
 
-    // 空中矫正：角度在 [min, max] 内
-    float vAbsVelVecCpy[3]; vAbsVelVecCpy = vAbsVelVec;
-    NormalizeVector(vAbsVelVec, vAbsVelVec);
+    // 普通连跳也使用共享的渐进式空中修正，目标方向仍由 Tank 自己决定。
     float vDir2[3];
     MakeVectorFromPoints(pos, targetPos, vDir2);
-    NormalizeVector(vDir2, vDir2);
-    vAbsVelVec[2] = 0.0; vDir2[2] = 0.0;
+    vDir2[2] = 0.0;
 
     float dx = SquareRoot(Pow(targetPos[0] - pos[0], 2.0) + Pow(targetPos[1] - pos[1], 2.0));
     float dz = targetPos[2] - pos[2];
-    float pitch = RadToDeg(ArcTangent(dz / dx));
+    float pitch = dx > 0.0 ? RadToDeg(ArcTangent(dz / dx)) : 90.0;
     if (dz > (JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange) && pitch > 45.0)
         return Plugin_Continue;
 
-    float angle = RadToDeg(ArcCosine(GetVectorDotProduct(vAbsVelVec, vDir2)));
-    bool inAngleRange = (angle >= g_cvAirVecModifyDegree.FloatValue && angle <= g_cvAirVecModifyMaxDegree.FloatValue);
     bool notPressBack = !(buttons & IN_BACK);
-    bool delayExpired = (GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime) > g_cvAirVecModifyInterval.FloatValue;
-
-    if (visible && inAngleRange && notPressBack && delayExpired)
+    float correctedVelocity[3];
+    if (visible && notPressBack && AIPathMovement_ComputeAirCorrectionToward(
+        client,
+        vAbsVelVec,
+        vDir2,
+        dist,
+        PATH_GOAL_TOLERANCE_DIST,
+        g_cvAirVecModifyDegree.FloatValue,
+        g_cvAirVecModifyMaxDegree.FloatValue,
+        0.3,
+        g_cvAirVecModifyInterval.FloatValue,
+        0.12,
+        correctedVelocity
+    ))
     {
-        NormalizeVector(vDir2, vDir2);
-        if (vel < g_AiTanks[client].lastHopSpeed)
-            vel = g_AiTanks[client].lastHopSpeed;
-        ScaleVector(vDir2, vel);
-        vDir2[2] = vAbsVelVecCpy[2];
-        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir2);
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, correctedVelocity);
         g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
     }
     return Plugin_Changed;
@@ -1163,7 +1294,14 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
     NormalizeVector(vFwd, vFwd);
     ScaleVector(vFwd, speed + g_cvBhopImpulse.FloatValue);
 
-    if (!nextTickVelocityCheck(client, vFwd, visible))
+    if (!AIPathMovement_IsJumpRouteSafe(
+        client,
+        vFwd,
+        getTankJumpAirTime(),
+        JUMP_HEIGHT,
+        visible,
+        g_cvBhopNoVisionMaxAng.FloatValue
+    ))
         return Plugin_Continue;
 
     float vecLen = getVectorLength2D(vFwd);
@@ -1179,67 +1317,35 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
     g_AiTanks[client].bhopType = TankBhopType_Path;
     g_AiTanks[client].airCorrGoal = lookAheadPos;
     g_AiTanks[client].lastHopSpeed = getVectorLength2D(vFwd);
+    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiTanks[client].lastHopSpeed);
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
     return Plugin_Changed;
 }
 
 Action tryPathAirCorrection(int client, const float pos[3], const float vAbsVelVec[3], float speed)
 {
-    if (!hasValidTankPath(client) || isNullVector(g_AiTanks[client].airCorrGoal))
+    #pragma unused pos
+    #pragma unused speed
+
+    if (!AIPathMovement_IsPathHopActive(client))
         return Plugin_Continue;
 
-    float goal[3];
-    goal = g_AiTanks[client].airCorrGoal;
-
-    float vVel2D[3];
-    vVel2D = vAbsVelVec;
-    vVel2D[2] = 0.0;
-
-    float vDir[3];
-    MakeVectorFromPoints(pos, goal, vDir);
-    vDir[2] = 0.0;
-
-    float d2Goal = getVectorDistance2D(pos, goal);
-    float dotToGoal = calcVectorAngle2D(vVel2D, vDir);
-    bool needLookAhead = d2Goal < PATH_GOAL_TOLERANCE_DIST || dotToGoal > 90.0 || floatIsNan(dotToGoal);
-    float now = GetEngineTime();
-
-    if (needLookAhead && now - g_AiTanks[client].lastLookAheadTime > 0.1)
+    float correctedVelocity[3];
+    if (AIPathMovement_ComputePathAirCorrection(
+        client,
+        vAbsVelVec,
+        PATH_GOAL_TOLERANCE_DIST,
+        g_cvAirVecModifyDegree.FloatValue,
+        g_cvAirVecModifyMaxDegree.FloatValue,
+        0.3,
+        g_cvAirVecModifyInterval.FloatValue,
+        0.12,
+        correctedVelocity
+    ))
     {
-        float newGoal[3];
-        float maxEstimateDist = getVectorLength2D(vAbsVelVec) * getTankJumpAirTime();
-        if (maxEstimateDist < PATH_LOOKAHEAD_MIN_DIST)
-            maxEstimateDist = PATH_LOOKAHEAD_MIN_DIST;
-
-        if (getTankLookAheadGoalPos(client, pos, maxEstimateDist, newGoal, g_cvPathLookAheadMaxDepth.IntValue))
-        {
-            goal = newGoal;
-            g_AiTanks[client].airCorrGoal = newGoal;
-            MakeVectorFromPoints(pos, goal, vDir);
-            vDir[2] = 0.0;
-            d2Goal = getVectorDistance2D(pos, goal);
-            dotToGoal = calcVectorAngle2D(vVel2D, vDir);
-        }
-
-        g_AiTanks[client].lastLookAheadTime = now;
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, correctedVelocity);
+        g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
     }
-
-    if (d2Goal <= PATH_GOAL_TOLERANCE_DIST)
-        return Plugin_Continue;
-
-    bool inAngleRange = (dotToGoal >= g_cvAirVecModifyDegree.FloatValue && dotToGoal <= g_cvAirVecModifyMaxDegree.FloatValue);
-    bool delayExpired = (now - g_AiTanks[client].lastAirVecModifyTime) > g_cvAirVecModifyInterval.FloatValue;
-    if (!inAngleRange || !delayExpired)
-        return Plugin_Continue;
-
-    NormalizeVector(vDir, vDir);
-    if (speed < g_AiTanks[client].lastHopSpeed)
-        speed = g_AiTanks[client].lastHopSpeed;
-    ScaleVector(vDir, speed);
-    vDir[2] = vAbsVelVec[2];
-
-    TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir);
-    g_AiTanks[client].lastAirVecModifyTime = now;
     return Plugin_Changed;
 }
 
@@ -1255,71 +1361,17 @@ stock bool nextTickPosCheck(int client, bool visible)
 
 stock bool nextTickVelocityCheck(int client, const float velocity[3], bool visible)
 {
-    if (!isAiTank(client)) return false;
-
-    float vMins[3], vMaxs[3];
-    GetClientMins(client, vMins);
-    GetClientMaxs(client, vMaxs);
-
-    float pos[3], endPos[3], velVec[3];
-    GetClientAbsOrigin(client, pos);
-    velVec = velocity;
-    float vel = GetVectorLength(velVec);
-    NormalizeVector(velVec, velVec);
-
-    ScaleVector(velVec, vel + FloatAbs(vMaxs[0] - vMins[0]) + 3.0);
-    AddVectors(pos, velVec, endPos);
-    pos[2]     += 10.0;
-    endPos[2]  += 10.0;
-
-    Handle hTrace = TR_TraceHullFilterEx(pos, endPos, {-36.0, -36.0, 10.0}, {36.0, 36.0, 72.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
-    if (TR_DidHit(hTrace))
-    {
-        float hitNormal[3];
-        TR_GetPlaneNormal(hTrace, hitNormal);
-        NormalizeVector(hitNormal, hitNormal);
-        NormalizeVector(velVec, velVec);
-        if (RadToDeg(ArcCosine(GetVectorDotProduct(hitNormal, velVec))) > 165.0)
-        {
-            delete hTrace;
-            return false;
-        }
-    }
-    delete hTrace;
-
-    if (!visible)
-    {
-        float eyeAng[3], dir[3];
-        GetClientEyeAngles(client, eyeAng);
-        GetAngleVectors(eyeAng, dir, NULL_VECTOR, NULL_VECTOR);
-        NormalizeVector(dir, dir);
-        NormalizeVector(velVec, velVec);
-        dir[2] = velVec[2] = 0.0;
-        float ang = RadToDeg(ArcCosine(GetVectorDotProduct(dir, velVec)));
-        if (floatIsNan(ang) || ang > g_cvBhopNoVisionMaxAng.FloatValue)
-            return false;
-    }
-
-    float downPos[3]; downPos = endPos; downPos[2] -= 99999.0;
-    hTrace = TR_TraceHullFilterEx(endPos, downPos, {-16.0, -16.0, 0.0}, {16.0, 16.0, 0.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
-    if (!TR_DidHit(hTrace))
-    {
-        delete hTrace;
+    if (!isAiTank(client))
         return false;
-    }
-    int hitEnt = TR_GetEntityIndex(hTrace);
-    if (IsValidEntity(hitEnt))
-    {
-        char className[32];
-        GetEntityClassname(hitEnt, className, sizeof(className));
-        if (strcmp(className, "trigger_hurt", false) == 0)
-        {
-            delete hTrace;
-            return false;
-        }
-    }
-    delete hTrace;
-    return true;
+
+    return AIPathMovement_IsJumpRouteSafe(
+        client,
+        velocity,
+        getTankJumpAirTime(),
+        JUMP_HEIGHT,
+        visible,
+        g_cvBhopNoVisionMaxAng.FloatValue
+    );
 }
 
 void clearTankPathSnapshot(int client)
@@ -1337,6 +1389,7 @@ void clearCachedTankPath(int client)
     g_AiTanks[client].pathSegment.initData();
     g_AiTanks[client].lastPathSegment.initData();
     g_AiTanks[client].airCorrGoal = NULL_VECTOR;
+    AIPathMovement_Reset(client);
 
     if (g_AiTanks[client].bhopType == TankBhopType_Path)
         g_AiTanks[client].bhopType = TankBhopType_None;
@@ -1541,9 +1594,7 @@ bool getTankLookAheadGoalPos(int client, const float pos[3], float maxDist, floa
 
 float getTankJumpAirTime()
 {
-    ConVar cvGravity = FindConVar("sv_gravity");
-    float gravity = (!cvGravity) ? DEFAULT_SV_GRAVITY : cvGravity.FloatValue;
-    return SquareRoot((JUMP_HEIGHT * 2.0) / gravity) * 2.0;
+    return AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
 }
 
 float getVectorLength2D(const float vec[3])
@@ -1556,34 +1607,17 @@ float getVectorDistance2D(const float vec1[3], const float vec2[3])
     return SquareRoot(Pow(vec1[0] - vec2[0], 2.0) + Pow(vec1[1] - vec2[1], 2.0));
 }
 
-float calcVectorAngle2D(const float vec1[3], const float vec2[3])
-{
-    float v1[3], v2[3];
-    v1 = vec1;
-    v2 = vec2;
-    v1[2] = 0.0;
-    v2[2] = 0.0;
-
-    NormalizeVector(v1, v1);
-    NormalizeVector(v2, v2);
-
-    float dot = GetVectorDotProduct(v1, v2);
-    if (dot > 1.0) dot = 1.0;
-    else if (dot < -1.0) dot = -1.0;
-    return RadToDeg(ArcCosine(dot));
-}
-
-bool isNullVector(const float vec[3])
-{
-    return vec[0] == 0.0 && vec[1] == 0.0 && vec[2] == 0.0;
-}
-
 // ===== 玩家进服：启用动画钩子 & 梯子常驻维护 =====
 public void OnClientPutInServer(int client)
 {
     g_AiTanks[client].initData();
+    AIPathMovement_Reset(client);
     clearTankPathSnapshot(client);
-    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        g_fHeadBlockIgnoreUntil[client][i] = 0.0;
+        g_fHeadBlockIgnoreUntil[i][client] = 0.0;
+    }
     // 后置动画钩子：识别投石/翻越等序列变化
     AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
 }
@@ -1593,9 +1627,14 @@ public void OnClientDisconnect(int client)
     if (client < 1 || client > MaxClients)
         return;
 
-    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        g_fHeadBlockIgnoreUntil[client][i] = 0.0;
+        g_fHeadBlockIgnoreUntil[i][client] = 0.0;
+    }
     g_AiTanks[client].headBlockStart = 0.0;
     g_AiTanks[client].lastHeadBlockTargetSwitch = 0.0;
+    clearTankTargetLock(client);
     g_AiTanks[client].forceRockUntil = 0.0;
     g_AiTanks[client].forceRockTarget = -1;
     g_AiTanks[client].lastLookAheadTime = 0.0;

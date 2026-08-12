@@ -378,9 +378,9 @@
     .band-chart { position: relative; height: 118px; margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .band-axis { position: absolute; inset: 48px 0 auto; height: 2px; background: var(--line-strong); }
     .band-block { position: absolute; top: 24px; height: 50px; border-radius: 4px; transition: left 220ms ease, width 220ms ease; }
-    .band-block.stage-2 { background: var(--amber-soft); border: 1px solid var(--amber); }
-    .band-block.stage-1 { background: var(--blue-soft); border: 1px solid var(--blue); }
-    .band-block.stage-0 { background: var(--teal-soft); border: 1px solid var(--teal); }
+    .band-block.stage-5, .band-block.stage-4 { background: var(--amber-soft); border: 1px solid var(--amber); }
+    .band-block.stage-3, .band-block.stage-2 { background: var(--blue-soft); border: 1px solid var(--blue); }
+    .band-block.stage-1, .band-block.stage-0 { background: var(--teal-soft); border: 1px solid var(--teal); }
     .band-block span { display: block; padding: 4px 6px; color: var(--ink); font-size: 10px; font-weight: 700; white-space: nowrap; }
     .axis-labels { position: absolute; inset: 81px 0 auto; display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
     .class-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -446,7 +446,7 @@
     .nav-metrics strong { text-align: right; }
     .deep-link { display: inline-flex; margin-top: 16px; }
 
-    .fallback-ladder { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: stretch; }
+    .fallback-ladder { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); align-items: stretch; }
     .fallback-step {
       position: relative;
       min-width: 0;
@@ -809,7 +809,7 @@
       <div class="queue-workspace">
         <section class="class-selector">
           <h3>查看职业策略</h3>
-          <p>主区间失败只放宽两次，不再从 250 开始盲目扩圈。</p>
+          <p>主区间失败后分五次逐步放宽，不再从近距离直接跳到最终上限。</p>
           <div class="class-buttons" id="class-buttons">
             <button class="class-button" type="button" data-class="smoker">Smoker<small>控制 / 远距离</small></button>
             <button class="class-button" type="button" data-class="boomer">Boomer<small>支援 / 后手</small></button>
@@ -825,6 +825,9 @@
           <p class="subtitle" id="class-copy"></p>
           <div class="band-chart" aria-label="职业距离带图">
             <div class="band-axis"></div>
+            <div class="band-block stage-5" id="band-stage-5"><span></span></div>
+            <div class="band-block stage-4" id="band-stage-4"><span></span></div>
+            <div class="band-block stage-3" id="band-stage-3"><span></span></div>
             <div class="band-block stage-2" id="band-stage-2"><span></span></div>
             <div class="band-block stage-1" id="band-stage-1"><span></span></div>
             <div class="band-block stage-0" id="band-stage-0"><span></span></div>
@@ -895,7 +898,7 @@
       <div class="section-head">
         <div>
           <div class="eyebrow">Failure handling</div>
-          <h2>有向 Nav 三档耗尽后，使用导演 API 直出</h2>
+          <h2>有向 Nav 六档耗尽后，使用受限导演 API</h2>
           <p>选择场景查看失败游标。一个距离带处于 <code>Pending</code> 时不会误判失败、不会放宽；只有该带候选完整耗尽才进入下一带。</p>
         </div>
       </div>
@@ -907,24 +910,27 @@
       </div>
       <div class="fallback-ladder" id="fallback-ladder">
         <div class="fallback-step" data-fallback-step="0"><strong>职业主区间</strong><span>每个职业直接进入自己的最佳距离带</span></div>
-        <div class="fallback-step" data-fallback-step="1"><strong>第一次放宽</strong><span>只提高上限，只扫描新增远端区间</span></div>
-        <div class="fallback-step" data-fallback-step="2"><strong>最终区间</strong><span>最小距离不变，上限受 SpawnMax × 2 约束</span></div>
-        <div class="fallback-step constrained" data-fallback-step="3"><strong>Director API × 7</strong><span>返回坐标后直接生成，不做插件位置复核</span></div>
-        <div class="fallback-step" data-fallback-step="4"><strong>Director API × 12</strong><span>首段无点时提高导演内部尝试数</span></div>
-        <div class="fallback-step" data-fallback-step="5"><strong>轮换目标</strong><span>改用其他生还者的目标 Nav 重新搜索</span></div>
-        <div class="fallback-step api" data-fallback-step="6"><strong>失败周期退避</strong><span>默认 0.10 秒后从主区间重试</span></div>
+        <div class="fallback-step" data-fallback-step="1"><strong>放宽 1</strong><span>只扫描主区间上限之后的新 Nav</span></div>
+        <div class="fallback-step" data-fallback-step="2"><strong>放宽 2</strong><span>继续小步提高路径上限</span></div>
+        <div class="fallback-step" data-fallback-step="3"><strong>放宽 3</strong><span>仍不重复处理已失败近端</span></div>
+        <div class="fallback-step" data-fallback-step="4"><strong>放宽 4</strong><span>进入职业中远距离范围</span></div>
+        <div class="fallback-step" data-fallback-step="5"><strong>最终区间</strong><span>最小距离不变，上限受 SpawnMax × 2 约束</span></div>
+        <div class="fallback-step constrained" data-fallback-step="6"><strong>Director API × 7</strong><span>请求点距最近生还者不得超过 2000u</span></div>
+        <div class="fallback-step" data-fallback-step="7"><strong>Director API × 12</strong><span>首段无点时提高导演内部尝试数</span></div>
+        <div class="fallback-step" data-fallback-step="8"><strong>轮换目标</strong><span>改用其他生还者的目标 Nav 重新搜索</span></div>
+        <div class="fallback-step api" data-fallback-step="9"><strong>失败周期退避</strong><span>默认 0.10 秒后从主区间重试</span></div>
       </div>
 
       <div class="fallback-note">
-        <section><h3>API 直出契约</h3><p>Director 返回坐标后直接调用生成，不再复核有向路径、职业距离、可见性、stuck、伤害区域或 250 直线距离。</p></section>
-        <section><h3>实体确认</h3><p>API 生成后只确认职业、存活和短暂稳定存在；这是生成提交确认，不是第二轮位置安全检查。</p></section>
+        <section><h3>API 距离契约</h3><p>Director 请求点距任一存活生还者的最近三维距离不得超过 2000u；仍不复核有向路径、职业距离、可见性、stuck、伤害区域或 250 直线下限。</p></section>
+        <section><h3>实体确认</h3><p>API 生成后确认职业、存活和短暂稳定存在，并按实际落点再次检查 2000u 上限。</p></section>
         <section><h3>失败恢复</h3><p>两段 API 都无点时轮换目标；目标轮完后按默认 0.10 秒退避，再从职业主区间开始。</p></section>
       </div>
 
       <div class="subsection">
         <div class="subsection-head"><h2>传送队列</h2><p>1 秒 monitor 只判断“谁该被回收”，实际重新生成仍由 OnGameFrame 优先消费。</p></div>
         <div class="teleport-flow">
-          <section><span>01</span><h3>状态过滤</h3><p>跳过 Tank、控人中、刚生成、喷吐时机等不适合回收的特感。</p></section>
+          <section><span>01</span><h3>状态过滤</h3><p>跳过 Tank、控人中、pending、ghost、待踢以及仍处出生宽限的特感；缺失出生时间按禁止传送处理。</p></section>
           <section><span>02</span><h3>位置与 Flow</h3><p>检查距离、是否跑到生还者前方，以及 Smoker 技能准备。</p></section>
           <section><span>03</span><h3>可见性计数</h3><p>被看见就归零；持续不可见才累加，跑男与 Anti-Bait 可缩短阈值。</p></section>
           <section><span>04</span><h3>进入传送队列</h3><p>记录职业后踢掉旧 Bot，不占用普通 pending 预算。</p></section>
@@ -1068,19 +1074,19 @@
         { channel: '帧执行通道', title: '选择职业距离带', copy: '队首职业直接使用有向 Nav 路径主区间。主区间失败后只提高远端上限，职业最小距离保持不变。Boomer 和 Spitter 仍受后手门控。', entry: 'TryNormalSpawnOnce / TryTeleportSpawnOnce', read: '队首职业、bandStage、teleportMode', write: 'minNavRange / maxNavRange / graphScanMinRange', module: 'spawn_tactics.inc' },
         { channel: '帧执行通道', title: '建立 Nav 候选会话', copy: '会话绑定目标 Nav，按原始 candidate → target 有向路径距离升序分页；职业 min/max 也使用这条原始路径。高点不再缩短排序距离，优势只在真实候选点评分时计算。', entry: 'FindSpawnPosViaNavArea', read: '目标、职业、原始 Nav 距离带、图快照', write: 'SpawnSearch session、图分页游标', module: 'spawn_core.inc / spawn_accel_bridge.inc' },
         { channel: '帧执行通道', title: '时间片筛选', copy: '每帧先快照生还者眼位、目标脚高和朝向；dF&lt;-8 在随机点前硬拒绝。每个搜索切片默认最多消费 512 个 Nav、16 个候选进入昂贵阶段，并受 2.0ms 软预算限制。', entry: 'SpawnCore_EvaluateNavCandidate', read: 'navDistance、flags、bucket、目标脚高、冷却、候选点、眼位快照', write: 'bestCandidate 或 Pending', module: 'spawn_core.inc / visibility.inc' },
-        { channel: '帧执行通道', title: '生成与兜底', copy: '合格点交给 DoSpawnAt。三段 Nav 全失败后调用 Director API，先尝试 7 次、再尝试 12 次；API 返回点直接生成，不附加插件位置限制。', entry: 'TryNormalSpawnOnce', read: 'bestPos、API 阶段、目标轮次', write: '特感实体、目标轮换或退避', module: 'spawn_attempts.inc' },
-        { channel: '事件回写通道', title: '生成与死亡事件', copy: '生成记录最后出生时间；死亡减少存活数并触发对应职业死亡 CD。所有计数再用于下一帧容量和队列维护。', entry: 'player_spawn / player_death', read: '实体职业、是否 ghost、是否内鬼', write: 'siAlive、totalSI、lastDeathTime', module: 'infected_control.sp / si_cap.inc' },
+        { channel: '帧执行通道', title: '生成与兜底', copy: '合格点交给 DoSpawnAt。六段 Nav 全失败后调用 Director API，先尝试 7 次、再尝试 12 次；请求点和实际落点距最近生还者都不得超过 2000u。', entry: 'TryNormalSpawnOnce', read: 'bestPos、API 阶段、目标轮次', write: '特感实体、目标轮换或退避', module: 'spawn_attempts.inc' },
+        { channel: '事件回写通道', title: '生成与死亡事件', copy: '实体创建、pending 建立和最终提交都会刷新出生时间并清空传送计数，player_spawn 只作额外兜底；死亡释放存活数并触发职业死亡 CD。', entry: 'SpawnSpecial / pending commit / player_spawn / player_death', read: '实体职业、pending、ghost、是否内鬼', write: '出生宽限、siAlive、totalSI、lastDeathTime', module: 'spawn_attempts.inc / infected_control.sp / si_cap.inc' },
         { channel: '事件回写通道', title: '能力、控制与伤害', copy: 'Charge、Pounce、Ride、Tongue 等事件标记战术交战，让后手支援职业放行；内鬼模式同时维护延迟伤害归属和伤害账本。', entry: 'ability_use / player_hurt / 控制事件', read: '攻击者、受害者、实体归属', write: 'pressureEngaged、traitor damage ledger', module: 'infected_control.sp / traitor_mode.inc' },
         { channel: '事件回写通道', title: '冷却与位置记忆', copy: '当前实现不使用历史 Nav 权重重排。成功点写入短期 Nav 冷却和实际坐标分散记忆；pending 点先预留同 Nav 与邻近位置，防止同帧密集生成。', entry: '候选结果 / 实际实体确认', read: 'areaIdx、NavID、请求点、实际点、当前时间', write: 'Nav cooldown、pending reservation、lastSpawns、path cache', module: 'spawn_memory.inc / path_cache.inc' }
       ];
 
       const classData = {
-        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[500,1200],[500,2100],[500,3000]], copy: '高出目标眼位 32 后仍按 1.5 倍高度差折减有效 Nav 距离，最多 1000；另按目标脚高每满 50u 直接增加 6 个最终分。原始排序、职业 500 下限和直线 250 安全线不变。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
-        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,550],[250,1000],[250,2300]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
-        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[350,950],[350,1750],[350,2900]], copy: '高出目标眼位 32 后仍按 1.15 倍高度差折减有效 Nav 距离，最多 800；另按目标脚高每满 50u 直接增加 6 个最终分。职业 350 下限不随放宽下降。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
-        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[300,800],[300,1450],[300,2300]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下；职业 300 下限固定，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
-        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[250,700],[250,1250],[250,2200]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
-        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[250,700],[250,1250],[250,2200]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
+        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[500,1200],[500,1500],[500,1800],[500,2100],[500,2550],[500,3000]], copy: '高出目标眼位 32 后仍按 1.5 倍高度差折减有效 Nav 距离，最多 1000；另按目标脚高每满 50u 直接增加 6 个最终分。原始排序、职业 500 下限和直线 250 安全线不变。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
+        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,550],[250,750],[250,1000],[250,1400],[250,1850],[250,2300]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
+        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[350,950],[350,1250],[350,1500],[350,1750],[350,2300],[350,2900]], copy: '高出目标眼位 32 后仍按 1.15 倍高度差折减有效 Nav 距离，最多 800；另按目标脚高每满 50u 直接增加 6 个最终分。职业 350 下限不随放宽下降。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
+        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[300,800],[300,1050],[300,1250],[300,1450],[300,1850],[300,2300]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下；职业 300 下限固定，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
+        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[250,700],[250,900],[250,1100],[250,1250],[250,1700],[250,2200]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
+        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[250,700],[250,900],[250,1100],[250,1250],[250,1700],[250,2200]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
       };
 
       const stateData = {
@@ -1111,7 +1117,7 @@
         ['Nav 范围 / 高点补偿 / 直线 250', '职业硬边界使用有向 Nav 距离；Smoker/Hunter 高点按有限补偿后的有效距离判断上限，随机点仍执行全队三维直线 250 安全排除。'],
         ['Hull + 可见性', '候选先通过卡位检查，再用精确视线判断防止当面生成；当前实现没有 PVS 粗筛。'],
         ['Nav path', '只对前面全部通过的点构建路径；会话缓存目标起点，path cache 复用量化后的结果。'],
-        ['统一职业评分', '距离、高度、Flow、分散度先按职业权重归一为质量分，再混合 10% 战术分（破点波 18%）；之后 Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 4 分，全职业每低 50u 扣 10 分且后点翻倍。']
+        ['统一职业评分', '距离、高度、Flow、分散度先按职业权重归一为质量分，再混合 10% 战术分（破点波 18%）；之后 Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 2 分，全职业每低 50u 扣 5 分且后点翻倍。']
       ];
 
       const traitorData = [
@@ -1186,7 +1192,8 @@
           const width = ((band[1] - band[0]) / 2750) * 100;
           el.style.left = `${left}%`;
           el.style.width = `${Math.max(width, 8)}%`;
-          el.querySelector('span').textContent = `${index === 0 ? '主' : index === 1 ? '放宽 1' : '最终'} ${band[0]}–${band[1]}`;
+          const label = index === 0 ? '主' : index === item.bands.length - 1 ? '最终' : `放宽 ${index}`;
+          el.querySelector('span').textContent = `${label} ${band[0]}–${band[1]}`;
         });
       }
 
@@ -1200,7 +1207,7 @@
       }
 
       function renderFallback(scenario) {
-        const last = scenario === 'main' ? 0 : scenario === 'constrained' ? 3 : 6;
+        const last = scenario === 'main' ? 0 : scenario === 'constrained' ? 6 : 9;
         document.querySelectorAll('#fallback-controls button').forEach(button => button.setAttribute('aria-pressed', button.dataset.fallback === scenario ? 'true' : 'false'));
         document.querySelectorAll('.fallback-step').forEach(step => {
           const index = Number(step.dataset.fallbackStep);

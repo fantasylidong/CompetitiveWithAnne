@@ -87,12 +87,13 @@
 #define NAV_CANDIDATE_WARM_INTERVAL      0.1
 #define NAV_CANDIDATE_RESULT_TTL         0.2
 #define NAV_CANDIDATE_WARMUP_LEAD         1.0
-#define TACTICAL_BAND_STAGES      3
+#define TACTICAL_BAND_STAGES      6
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
 #define DIRECTOR_BASE_API_TRIES      7
 #define EXTENDED_FALLBACK_CYCLES     2
 #define EXTENDED_DIRECTOR_TRIES     12
+#define DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE 2000.0
 #define ENABLE_SMOKER             (1 << 0)
 #define ENABLE_BOOMER             (1 << 1)
 #define ENABLE_HUNTER             (1 << 2)
@@ -488,7 +489,11 @@ public void OnPluginStart()
     for (int client = 1; client <= MaxClients; client++)
     {
         if (IsClientInGame(client))
+        {
             Traitor_InitializeClientDamage(client);
+            if (IsInfectedBot(client) && IsPlayerAlive(client))
+                TeleportState_StampSpawn(client, "plugin_adopt");
+        }
     }
 }
 
@@ -944,12 +949,7 @@ public void Event_PlayerSpawn(Event event, const char[] name, bool dont_broadcas
         Traitor_OnSurvivorRevived(client);
 
     if (!IsFakeClient(client)) return;
-
-    g_LastSpawnTime[client] = GetGameTime();     // 记录出生时间
-    gST.teleCount[client]   = 0;                 // 清计数，避免继承旧值
-
-    if (IsSpitter(client))
-        gST.spitterSpitTime[client] = GetGameTime();
+    TeleportState_StampSpawn(client, "player_spawn");
 }
 
 public void Event_AbilityUse(Event event, const char[] name, bool dont_broadcast)
@@ -1019,6 +1019,7 @@ public void Event_PlayerReviveSuccess(Event event, const char[] name, bool dontB
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
+    TeleportState_ClearClient(client);
     if (SpawnAttempts_ConsumeRejectedActualDeath(client)
         || SpawnAttempts_IsPendingActualClient(client))
         return;
@@ -1092,10 +1093,12 @@ public void OnClientDisconnect(int client)
     TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
+    TeleportState_ClearClient(client);
 }
 
 public void OnClientPutInServer(int client)
 {
+    TeleportState_ClearClient(client);
     TraitorQuota_InvalidateClientCache(client);
     Traitor_InitializeClientDamage(client);
 }

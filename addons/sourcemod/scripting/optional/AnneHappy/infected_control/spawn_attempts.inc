@@ -6,7 +6,7 @@
 // 本文件只做“一次尝试”的执行层：
 // - TryNormalSpawnOnce：从普通刷特队列取一个 class，找点并生成。
 // - TryTeleportSpawnOnce：从传送队列取一个 class，按 teleportMode 找点并生成。
-// - FallbackDirectorPos：职业范围内的 NavArea 全部失败后，直接采用导演 API 返回点。
+// - FallbackDirectorPos：职业范围内的 NavArea 全部失败后，采用团队距离不超过 2000u 的导演 API 点。
 //
 // 选类、队列补位、波释放时机不在这里改；分别看 class_queue.inc、wave_decider.inc、wave_control.inc。
 // 找点质量和性能不在这里改；看 spawn_core.inc / spawn_score.inc。
@@ -32,6 +32,21 @@ static int ResolveFallbackTarget(int target)
     return (IsValidSurvivor(tgt) && IsPlayerAlive(tgt)) ? tgt : 0;
 }
 
+static bool DirectorFallback_IsWithinTeamDistance(
+    const float pos[3], float &teamMinDistance)
+{
+    float distanceSq = GetMinLiveEyeDistSquaredToAnySurvivor(pos);
+    if (distanceSq >= 1.0e19)
+    {
+        teamMinDistance = -1.0;
+        return false;
+    }
+
+    teamMinDistance = SquareRoot(distanceSq);
+    return distanceSq <= DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE
+        * DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE;
+}
+
 static bool FallbackDirectorPos(int zc, int target, int tries,
                                 float outPos[3])
 {
@@ -44,10 +59,24 @@ static bool FallbackDirectorPos(int zc, int target, int tries,
     float apiStart = GetEngineTime();
     bool apiHit = L4D_GetRandomPZSpawnPosition(tgt, zc, tries, outPos);
     SpawnPerf_RecordFallbackApiMs((GetEngineTime() - apiStart) * 1000.0, apiHit, zc);
-    Debug_Print("[FALLBACK API] class=%s target=%d tries=%d result=%s pos=(%.1f %.1f %.1f)",
-        g_sInfectedClassNames[zc], tgt, tries, apiHit ? "hit" : "miss",
+    float teamMinDistance = -1.0;
+    bool withinDistance = apiHit
+        && DirectorFallback_IsWithinTeamDistance(outPos, teamMinDistance);
+    if (apiHit && !withinDistance)
+    {
+        SpawnPerf_Log(
+            "[SpawnPerf][DirectorCap] stage=request class=%s result=rejected teamMinDistance=%.1f cap=%.1f pos=(%.1f %.1f %.1f) target=%d tries=%d",
+            g_sInfectedClassNames[zc], teamMinDistance,
+            DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE,
+            outPos[0], outPos[1], outPos[2], tgt, tries);
+    }
+    Debug_Print(
+        "[FALLBACK API] class=%s target=%d tries=%d result=%s teamMinDistance=%.1f cap=%.1f pos=(%.1f %.1f %.1f)",
+        g_sInfectedClassNames[zc], tgt, tries,
+        !apiHit ? "miss" : (withinDistance ? "hit" : "cap_reject"),
+        teamMinDistance, DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE,
         outPos[0], outPos[1], outPos[2]);
-    return apiHit;
+    return withinDistance;
 }
 
 static int GetAreaIndexForSpawnPoint(const float pos[3])
@@ -383,6 +412,7 @@ bool SpawnAttempts_IsPendingActualClient(int client)
 {
     return client > 0
         && client <= MaxClients
+        && IsClientInGame(client)
         && g_PendingActualSpawns[client].active
         && GetClientUserId(client) == g_PendingActualSpawns[client].userid;
 }
@@ -405,6 +435,7 @@ void SpawnAttempts_ResetPendingActualSpawn(bool removeClient = true)
             {
                 g_bRejectedActualSpawn[client] = true;
                 KickClient(client, "Cancelled pending spawn validation");
+                TeleportState_ClearClient(client);
             }
         }
         g_PendingActualSpawns[slot].active = false;
@@ -491,6 +522,7 @@ static int DoSpawnAt(const float pos[3], int zc,
     int idx = L4D2_SpawnSpecial(zc, pos, NULL_VECTOR);
     if (idx > 0)
     {
+        TeleportState_StampSpawn(idx, "spawn_created");
         Debug_Print("[SPAWN CREATED] %s idx=%d pending actual validation at (%.1f %.1f %.1f)",
             g_sInfectedClassNames[zc], idx, pos[0], pos[1], pos[2]);
         return idx;
@@ -564,6 +596,7 @@ static void SpawnAttempts_BeginPending(
         ? ReservePendingSpawn(areaIdx, requestedPos) : 0;
     SpawnScore_CopyDbg(pending.score, score);
     g_PendingActualSpawns[client] = pending;
+    TeleportState_StampSpawn(client, "pending_begin");
 
     int reserved;
     if (teleportMode)
@@ -623,10 +656,36 @@ int SpawnAttempts_ProcessPendingActualSpawns()
 
         float validationStart = GetEngineTime();
         bool persistentUnsafe = false;
-        // Director API points are trusted by policy. Keep only entity/state
-        // stability confirmation; directed-Nav spawns retain full safety checks.
+        bool directorDistanceValid = true;
+        if (stable && g_PendingActualSpawns[slot].fallback)
+        {
+            float actual[3];
+            float teamMinDistance;
+            GetClientAbsOrigin(client, actual);
+            directorDistanceValid = DirectorFallback_IsWithinTeamDistance(
+                actual, teamMinDistance);
+            if (!directorDistanceValid)
+            {
+                SpawnPerf_Log(
+                    "[SpawnPerf][DirectorCap] stage=actual class=%s result=rejected teamMinDistance=%.1f cap=%.1f request=(%.1f %.1f %.1f) actual=(%.1f %.1f %.1f) client=%d mode=%d",
+                    g_sInfectedClassNames[zc], teamMinDistance,
+                    DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE,
+                    g_PendingActualSpawns[slot].requestedPos[0],
+                    g_PendingActualSpawns[slot].requestedPos[1],
+                    g_PendingActualSpawns[slot].requestedPos[2],
+                    actual[0], actual[1], actual[2], client,
+                    view_as<int>(g_PendingActualSpawns[slot].mode));
+                Debug_Print(
+                    "[SPAWN REJECT ACTUAL] class=%s idx=%d reason=director_distance teamMinDistance=%.1f cap=%.1f",
+                    g_sInfectedClassNames[zc], client, teamMinDistance,
+                    DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE);
+            }
+        }
+        // Director API points keep their legacy visibility/path policy, but
+        // request and settled positions must remain within the team hard cap.
         bool valid = stable && (g_PendingActualSpawns[slot].fallback
-            || SpawnAttempts_ValidateActualSpawn(
+            ? directorDistanceValid
+            : SpawnAttempts_ValidateActualSpawn(
                 client, zc, g_PendingActualSpawns[slot].teleportMode,
                 persistentUnsafe));
         if (!stable)
@@ -684,6 +743,7 @@ int SpawnAttempts_ProcessPendingActualSpawns()
             {
                 g_bRejectedActualSpawn[client] = true;
                 KickClient(client, "Rejected unsafe actual spawn position");
+                TeleportState_ClearClient(client);
             }
             if (g_PendingActualSpawns[slot].teleportMode)
             {
@@ -740,6 +800,7 @@ int SpawnAttempts_ProcessPendingActualSpawns()
             SpawnAttempts_RememberActualSpawn(
                 client, g_PendingActualSpawns[slot].requestedPos,
                 g_PendingActualSpawns[slot].targetSurvivor);
+            TeleportState_StampSpawn(client, "pending_commit");
             g_LastSpawnOkTime = now;
             InvalidateBucketShareCache();
             gST.siAlive[zc - 1]++;

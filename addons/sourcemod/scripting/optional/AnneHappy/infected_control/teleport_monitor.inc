@@ -29,18 +29,20 @@ Action Timer_TeleportTick(Handle timer)
 
     for (int c = 1; c <= MaxClients; c++)
     {
+        if (SpawnAttempts_IsPendingActualClient(c))
+        {
+            gST.teleCount[c] = 0;
+            continue;
+        }
+
+        if (TeleportState_IsInSpawnGrace(c, now))
+        {
+            gST.teleCount[c] = 0;
+            continue;
+        }
+
         if (!CanBeTeleport(c))
             continue;
-
-        if (gCV.fTeleportSpawnGrace > 0.0)
-        {
-            float born = g_LastSpawnTime[c];
-            if (born > 0.0 && (now - born) < gCV.fTeleportSpawnGrace)
-            {
-                if (gST.teleCount[c] != 0) gST.teleCount[c] = 0;
-                continue;
-            }
-        }
 
         float eyes[3];
         GetClientEyePosition(c, eyes);
@@ -80,13 +82,16 @@ Action Timer_TeleportTick(Handle timer)
                     if (gST.totalSI > 0) gST.totalSI--; else gST.totalSI = 0;
                     InvalidateBucketShareCache();
 
-                    LogMsg("[TP] %N class=%s invisible for %.1f sec%s -> teleport respawn",
+                    float born = g_LastSpawnTime[c];
+                    float age = born > 0.0 ? now - born : -1.0;
+                    LogMsg("[TP] %N class=%s invisible for %.1f sec age=%.2f grace=%.2f%s -> teleport respawn",
                            c, g_sInfectedClassNames[zc], float(gST.teleCount[c]),
+                           age, gCV.fTeleportSpawnGrace,
                            runnerFastPath ? " (runner-fast)" : "");
 
                     KickClient(c, "Teleport SI");
+                    TeleportState_ClearClient(c);
                     RecalcSiCapFromAlive(false);
-                    gST.teleCount[c] = 0;
                 }
             }
         }

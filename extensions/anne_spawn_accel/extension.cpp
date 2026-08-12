@@ -2294,6 +2294,57 @@ cell_t Native_NavGraphCollectRange(IPluginContext *context, const cell_t *params
     return count;
 }
 
+cell_t Native_NavGraphGetPathDistance(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 6)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavGraphGetPathDistance expects 6 parameters");
+
+    cell_t *outputDistance = nullptr;
+    if (!GetCells(context, params[6], outputDistance))
+        return context->ThrowNativeError("invalid distance output");
+    *outputDistance = sp_ftoc(-1.0f);
+
+    std::uint32_t candidateId = static_cast<std::uint32_t>(params[1]);
+    std::uint32_t targetId = static_cast<std::uint32_t>(params[2]);
+    float maxDistance = sp_ctof(params[3]);
+    int team = params[4];
+    bool ignoreNavBlockers = params[5] != 0;
+    if (candidateId == 0 || targetId == 0 || maxDistance <= 0.0f ||
+        team != kTeamInfected)
+        return -2;
+
+    PumpNavGraph();
+    if (g_NavGraphState.load() != kNavGraphReady)
+        return -2;
+
+    PrepareReachability(targetId, maxDistance, team, ignoreNavBlockers);
+
+    std::shared_ptr<AnneNavGraph> graph;
+    std::shared_ptr<ReachabilityResult> reachability;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        graph = g_NavGraph;
+        reachability = FindReachabilityLocked(
+            targetId, maxDistance, team, ignoreNavBlockers, true);
+    }
+    if (!graph || !graph->complete)
+        return -2;
+    if (!reachability)
+        return -1;
+
+    std::uint32_t candidateIndex;
+    if (!graph->FindIndex(candidateId, candidateIndex) ||
+        candidateIndex >= reachability->distances.size())
+        return -2;
+
+    float distance = reachability->distances[candidateIndex];
+    if (!std::isfinite(distance))
+        return 0;
+    *outputDistance = sp_ftoc(distance);
+    return 1;
+}
+
 cell_t Native_NavCandidatesPrepare(IPluginContext *context, const cell_t *params)
 {
     if (params[0] != 5)
@@ -3240,6 +3291,7 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavGraphStop", Native_NavGraphStop},
     {"AnneSpawn_NavGraphPrepareRange", Native_NavGraphPrepareRange},
     {"AnneSpawn_NavGraphCollectRange", Native_NavGraphCollectRange},
+    {"AnneSpawn_NavGraphGetPathDistance", Native_NavGraphGetPathDistance},
     {"AnneSpawn_NavCandidatesPrepare", Native_NavCandidatesPrepare},
     {"AnneSpawn_NavCandidatesCollect", Native_NavCandidatesCollect},
     {"AnneSpawn_NavCandidatesPrepareRanked", Native_NavCandidatesPrepareRanked},

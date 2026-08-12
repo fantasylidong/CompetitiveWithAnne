@@ -9,6 +9,46 @@ bool IsInfectedBot(int client)
            && GetClientTeam(client) == TEAM_INFECTED && (GetEntProp(client, Prop_Send, "m_zombieClass") >= 1 && GetEntProp(client, Prop_Send, "m_zombieClass") <= 6);
 }
 
+void TeleportState_ClearClient(int client)
+{
+    if (client <= 0 || client > MaxClients)
+        return;
+
+    g_LastSpawnTime[client] = 0.0;
+    gST.teleCount[client] = 0;
+    gST.spitterSpitTime[client] = 0.0;
+}
+
+void TeleportState_StampSpawn(int client, const char[] source)
+{
+    if (client <= 0 || client > MaxClients)
+        return;
+
+    float now = GetGameTime();
+    g_LastSpawnTime[client] = now;
+    gST.teleCount[client] = 0;
+    if (IsClientInGame(client) && IsInfectedBot(client)
+        && GetInfectedClass(client) == view_as<int>(SI_Spitter))
+    {
+        gST.spitterSpitTime[client] = now;
+    }
+    Debug_Print(
+        "[TP GRACE] event=stamp source=%s client=%d userid=%d gameTime=%.3f grace=%.2f",
+        source, client, IsClientInGame(client) ? GetClientUserId(client) : 0,
+        now, gCV.fTeleportSpawnGrace);
+}
+
+bool TeleportState_IsInSpawnGrace(int client, float now)
+{
+    if (gCV.fTeleportSpawnGrace <= 0.0)
+        return false;
+    if (client <= 0 || client > MaxClients)
+        return true;
+
+    float born = g_LastSpawnTime[client];
+    return born <= 0.0 || (now - born) < gCV.fTeleportSpawnGrace;
+}
+
 stock bool IsSmokerReadyToAttack(int client)
 {
     if (!IsAiSmoker(client))
@@ -124,17 +164,15 @@ bool CanBeTeleport(int client)
 {
     if (!IsInfectedBot(client) || !IsClientInGame(client) || !IsPlayerAlive(client))
         return false;
+    if (IsGhost(client) || IsClientInKickQueue(client))
+        return false;
     if (GetEntProp(client, Prop_Send, "m_zombieClass") == ZC_TANK)
         return false;
     if (IsPinningSomeone(client))
         return false;
 
-    if (gCV.fTeleportSpawnGrace > 0.0)
-    {
-        float born = g_LastSpawnTime[client];
-        if (born > 0.0 && (GetGameTime() - born) < gCV.fTeleportSpawnGrace)
-            return false;
-    }
+    if (TeleportState_IsInSpawnGrace(client, GetGameTime()))
+        return false;
 
     if (IsSpitter(client) && (GetGameTime() - gST.spitterSpitTime[client]) < SPIT_INTERVAL)
         return false;

@@ -701,6 +701,11 @@ public void OnMapStart()
     LoadBaseServerName();
 }
 
+public void OnMapEnd()
+{
+    ResetHUDSendProxyState();
+}
+
 public void OnPluginEnd()
 {
     UnhookHUDSendProxies();
@@ -1182,7 +1187,11 @@ public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 public Action TimerUpdateHUD(Handle timer)
 {
     if (g_bCvar_Enabled)
+    {
+        if (!AreAllHUDSendProxiesHooked())
+            HookHUDSendProxies(false);
         UpdateHUD();
+    }
 
     return Plugin_Continue;
 }
@@ -1757,7 +1766,21 @@ public Action offSpecHud(int client, int args)
     return Plugin_Handled;
 }
 
-void HookHUDSendProxies()
+bool AreAllHUDSendProxiesHooked()
+{
+    for (int hud = HUD1; hud <= HUD4; hud++)
+    {
+        for (int proxy = 0; proxy < HUD_PROXY_COUNT; proxy++)
+        {
+            if (!g_bHUDProxyHooked[hud][proxy])
+                return false;
+        }
+    }
+
+    return true;
+}
+
+void HookHUDSendProxies(bool logFailures = true)
 {
     if (!LibraryExists(SENDPROXY_LIB) || FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) == -1)
         return;
@@ -1776,10 +1799,10 @@ void HookHUDSendProxies()
         if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
             g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUDLayout, hud);
 
-        if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]
+        if (logFailures && (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_STRING]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]
-            || !g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
+            || !g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]))
             LogError("[Scripted HUD] Failed to hook SendProxy for HUD slot %d.", hud + 1);
     }
 }

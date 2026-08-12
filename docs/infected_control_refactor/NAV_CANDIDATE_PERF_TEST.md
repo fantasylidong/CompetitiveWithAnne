@@ -111,12 +111,15 @@ cadence idle=... warm=... prepare(ready/pending/unavailable)=...
 - `request/actual`：请求坐标和实体生成后的实际坐标；`actualValid=0` 表示生成失败或实体坐标尚不可读。
 - `targetDistance/targetDz`：候选到本次目标生还者眼位的 3D 直线距离和垂直差，只用于诊断楼层与实际空间位置。
 - `navDistance/navRank/navEffective/navHighSort/navHighComp/navRange`：原始有向路径距离、兼容诊断距离、既有 Smoker/Hunter 高点有效距离/折减量，以及本次职业距离带。active 路径中 `navRank=navDistance`、`navHighSort=1.00`；职业上限和距离评分仍按既有 `navEffective` 语义。
-- 导演兜底没有可靠的图路径距离，记录 `navDistance=N/A`，并用 `directRange` 明确标出其执行的直线距离范围。
+- 导演兜底没有可靠的图路径距离，记录 `navDistance=N/A`；`directRange` 仅保留调用阶段的兼容诊断值。真正的硬规则是 API 请求点和实体实际落点距任一存活生还者的最近三维距离都不得超过 2000u。
 - `bucket/targetBucket/deltaFlow/bucketKnown/rawBadFlow`：候选与目标的 Flow 进度、差值、该差值是否可信，以及候选原始 Flow 是否异常；`deltaFlow<-8` 的候选在评分前已淘汰。
 - `score/quality/dist/height/flow/dispersion/tactical`：最终分、四因子职业加权质量及主要分项。普通波公式为 `score=0.90*quality+0.10*tactical+highBonus-behindPen-lowHeightPen`；破点波的混合比例为 0.82/0.18。
 - `highBonus/highRise/highSteps`：仅 Smoker/Hunter 生效，每高于目标脚部满 50u 加 6 个最终分。
-- `targetFootZ/lowHeightDrop/lowHeightSteps/lowHeightMultiplier`：低点以目标脚部为基准，每低满 50u 扣 10 个最终分；候选进度落后目标时倍率为 2，低点项最高扣 100 分。
+- `targetFootZ/lowHeightDrop/lowHeightSteps/lowHeightMultiplier`：低点以目标脚部为基准，每低满 50u 扣 5 个最终分；候选进度落后目标时倍率为 2，低点项最高扣 100 分。
 - `mode`：区分普通/传送、Nav 候选/导演范围兜底/无限制兜底。导演兜底没有 `SpawnScoreDbg`，固定记录 `score=N/A`。
+- `[SpawnPerf][DirectorCap]`：记录 Director 请求点或实际落点因最近团队距离超过 2000u 被拒绝；`stage=request/actual` 用于区分 API 返回坐标和实体稳定落点。
+
+传送出生宽限另有两类结构化诊断。`[TP GRACE] event=stamp source=...` 会在实体创建、pending 建立、最终提交、`player_spawn` 事件或插件热加载接管现存 AI 时记录出生时刻；同一实体出现多次是预期行为，最后一次 stamp 是当前宽限起点。真正回收时的 `[TP]` 行包含 `age` 与 `grace`。验收必须满足 `age >= grace`，并确认 pending、ghost、待踢实体在宽限期内没有进入传送队列。普通不可见阈值仍默认 5 个一秒 tick，出生宽限不会计入这 5 秒。
 
 下一波开始、回合结束、地图结束或插件停止时会自动写最终总结；`sm_spawnperf` 写当前波快照但不会结束本波：
 

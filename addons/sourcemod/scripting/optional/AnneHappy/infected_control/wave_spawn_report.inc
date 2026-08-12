@@ -389,6 +389,35 @@ static bool WaveSpawnReport_GetTargetGeometry(
     return true;
 }
 
+static bool WaveSpawnReport_GetTeamDistanceRange(
+    const float pos[3], float &minDistance, float &maxDistance)
+{
+    float minDistanceSq = 1.0e20;
+    float maxDistanceSq = -1.0;
+    float eyes[3];
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+            continue;
+
+        GetClientEyePosition(client, eyes);
+        float distanceSq = GetVectorDistance(pos, eyes, true);
+        minDistanceSq = FloatMin(minDistanceSq, distanceSq);
+        maxDistanceSq = FloatMax(maxDistanceSq, distanceSq);
+    }
+
+    if (maxDistanceSq < 0.0)
+    {
+        minDistance = -1.0;
+        maxDistance = -1.0;
+        return false;
+    }
+
+    minDistance = SquareRoot(minDistanceSq);
+    maxDistance = SquareRoot(maxDistanceSq);
+    return true;
+}
+
 static void WaveSpawnReport_RecordVerticalDistance(bool success, float verticalDelta)
 {
     if (!success || verticalDelta <= -9998.0)
@@ -492,16 +521,20 @@ stock void WaveSpawnReport_RecordScored(
 
     char modeName[40];
     WaveSpawnReport_GetModeName(mode, modeName, sizeof(modeName));
-    float teamMinDistance = success
-        ? SquareRoot(GetMinLiveEyeDistSquaredToAnySurvivor(actualPos)) : -1.0;
+    float teamMinDistance = -1.0;
+    float teamMaxDistance = -1.0;
+    if (success)
+        WaveSpawnReport_GetTeamDistanceRange(
+            actualPos, teamMinDistance, teamMaxDistance);
     SpawnPerf_Log(
-        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f targetDz=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f navHighSort=%.2f navHighComp=%.1f navRange=%.0f..%.0f score=%.2f quality=%.2f dist=%.2f height=%.2f flow=%.2f dispersion=%.2f tactical=%.2f highBonus=%.2f highRise=%.1f highSteps=%d extraPen=%.2f behindPen=%.2f lowHeightPen=%.2f targetFootZ=%.1f lowHeightDrop=%.1f lowHeightSteps=%d lowHeightMultiplier=%.2f area=%d bucket=%d targetBucket=%d deltaFlow=%d bucketKnown=%d rawBadFlow=%d target=%d",
+        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f teamMaxDistance=%.1f targetDz=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f navHighSort=%.2f navHighComp=%.1f navRange=%.0f..%.0f score=%.2f quality=%.2f dist=%.2f height=%.2f flow=%.2f dispersion=%.2f tactical=%.2f highBonus=%.2f highRise=%.1f highSteps=%d extraPen=%.2f behindPen=%.2f lowHeightPen=%.2f targetFootZ=%.1f lowHeightDrop=%.1f lowHeightSteps=%d lowHeightMultiplier=%.2f area=%d bucket=%d targetBucket=%d deltaFlow=%d bucketKnown=%d rawBadFlow=%d target=%d",
         g_WaveSpawnReport.wave, sequence, success ? "success" : "failed",
         modeName, g_sInfectedClassNames[zc], spawnedClient,
         waveElapsedMs, spawnCallMs,
         requestedPos[0], requestedPos[1], requestedPos[2], actualValid ? 1 : 0,
         actualPos[0], actualPos[1], actualPos[2],
-        score.dTargetEye, teamMinDistance, targetDz, score.navDistance,
+        score.dTargetEye, teamMinDistance, teamMaxDistance, targetDz,
+        score.navDistance,
         score.navRankDistance, score.navDistanceEffective,
         score.navHighSortScale, score.navHighGroundComp,
         minRange, maxRange,
@@ -554,16 +587,19 @@ stock void WaveSpawnReport_RecordFallback(
 
     char modeName[40];
     WaveSpawnReport_GetModeName(mode, modeName, sizeof(modeName));
-    float teamMinDistance = success
-        ? SquareRoot(GetMinLiveEyeDistSquaredToAnySurvivor(actualPos)) : -1.0;
+    float teamMinDistance = -1.0;
+    float teamMaxDistance = -1.0;
+    if (success)
+        WaveSpawnReport_GetTeamDistanceRange(
+            actualPos, teamMinDistance, teamMaxDistance);
     SpawnPerf_Log(
-        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f targetDz=%.1f navDistance=N/A directRange=%.0f..%.0f score=N/A target=%d",
+        "[SpawnWave][Spawn] wave=%d seq=%d result=%s mode=%s class=%s entity=%d waveElapsedMs=%.1f spawnCallMs=%.3f request=(%.1f %.1f %.1f) actualValid=%d actual=(%.1f %.1f %.1f) targetDistance=%.1f teamMinDistance=%.1f teamMaxDistance=%.1f targetDz=%.1f navDistance=N/A directRange=%.0f..%.0f score=N/A target=%d",
         g_WaveSpawnReport.wave, sequence, success ? "success" : "failed",
         modeName, g_sInfectedClassNames[zc], spawnedClient,
         waveElapsedMs, spawnCallMs,
         requestedPos[0], requestedPos[1], requestedPos[2], actualValid ? 1 : 0,
         actualPos[0], actualPos[1], actualPos[2],
-        targetDistance, teamMinDistance, targetDz,
+        targetDistance, teamMinDistance, teamMaxDistance, targetDz,
         minRange, maxRange,
         targetSurvivor > 0 ? targetSurvivor : gST.targetSurvivor);
 }

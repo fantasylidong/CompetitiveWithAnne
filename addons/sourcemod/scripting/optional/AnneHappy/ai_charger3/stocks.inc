@@ -468,9 +468,7 @@ stock bool isChargerProbCharge(int client) {
 * @return float
 **/
 stock float getJumpAirTime() {
-    static float gravity;
-    gravity = !cvGravity ? DEFAULT_GRAVITY : cvGravity.FloatValue;
-    return SquareRoot(112 / gravity) * 2.0;
+    return AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
 }
 
 /**
@@ -483,88 +481,14 @@ stock bool nextTickPosCheck(int client, float vFwd[3], bool visible) {
 	if (!isAiCharger(client))
 		return false;
 
-	static float vMins[3], vMaxs[3];
-	GetClientMins(client, vMins);
-	GetClientMaxs(client, vMaxs);
-
-	static float pos[3], endPos[3], velVec[3], vel;
-	L4D_GetEntityWorldSpaceCenter(client, pos);
-    velVec = vFwd;
-    // 根据跳跃滞空时间对 velVec 进行缩放
-    ScaleVector(velVec, getJumpAirTime());
-
-	vel = GetVectorLength(velVec);
-	NormalizeVector(velVec, velVec);
-	// 为下一帧检测的位置留出一些余量 (bbox 宽度 + 3), endPos 为下一帧位置
-	ScaleVector(velVec, vel + FloatAbs(vMaxs[0] - vMins[0]) + 3.0);
-	AddVectors(pos, velVec, endPos);
-
-    // For debug print next tick position
-    /* ShowPos(COLOR_GREEN, pos, endPos); */
-
-	// 射线检测
-	static Handle hTrace;
-	hTrace = TR_TraceHullFilterEx(pos, endPos, {-36.0, -36.0, 10.0}, {36.0, 36.0, 72.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
-	if (TR_DidHit(hTrace)) {
-		// 防止下次连跳速度方向撞墙 (速度方向与墙的法向量垂直为 180 度)
-		static float rayEndPos[3], hitNormal[3];
-		TR_GetEndPosition(rayEndPos, hTrace);
-		TR_GetPlaneNormal(hTrace, hitNormal);
-		NormalizeVector(hitNormal, hitNormal);
-		NormalizeVector(velVec, velVec);
-		if (RadToDeg(ArcCosine(GetVectorDotProduct(hitNormal, velVec))) > 165.0) {
-			delete hTrace;
-			return false;
-		}
-	}
-
-	if (!visible) {
-		// 无视野情况, 计算视角与速度向量夹角, 若太大则禁止连跳
-		static float eyeAng[3], dir[3], dot, angle;
-		GetClientEyeAngles(client, eyeAng);
-		GetAngleVectors(eyeAng, dir, NULL_VECTOR, NULL_VECTOR);
-		NormalizeVector(dir, dir);
-		NormalizeVector(velVec, velVec);
-		dir[2] = velVec[2] = 0.0;
-
-        dot = GetVectorDotProduct(dir, velVec);
-        if (dot > 1.0) dot = 1.0;
-        else if (dot < -1.0) dot = -1.0;
-		angle = RadToDeg(ArcCosine(dot));
-
-		if (angle > g_cvBhopNoVisionMaxAng.FloatValue) {
-			delete hTrace;
-			return false;
-		}
-	}
-
-	delete hTrace;
-	// 检测下一帧向下的位置是否会死亡
-	static float downPos[3], landPos[3];
-	downPos = endPos;
-	downPos[2] -= 99999.0;
-	hTrace = TR_TraceHullFilterEx(endPos, downPos, {-16.0, -16.0, 0.0}, {16.0, 16.0, 0.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
-	// 太高了, 返回 false
-	if (!TR_DidHit(hTrace)) {
-		delete hTrace;
-		return false;
-	}
-
-    // 获取实际落地点
-    TR_GetEndPosition(landPos, hTrace);
-
-	static int hitEnt;
-	hitEnt = TR_GetEntityIndex(hTrace);
-	if (IsValidEntity(hitEnt)) {
-		static char className[32];
-		GetEntityClassname(hitEnt, className, sizeof(className));
-		if (strcmp(className, "trigger_hurt", false) == 0) {
-			delete hTrace;
-			return false;
-		}
-	}
-	delete hTrace;
-	return true;
+	return AIPathMovement_IsJumpRouteSafe(
+		client,
+		vFwd,
+		getJumpAirTime(),
+		JUMP_HEIGHT,
+		visible,
+		g_cvBhopNoVisionMaxAng.FloatValue
+	);
 }
 
 stock float navAreaGetCenterZ(Address navArea) {
@@ -1167,157 +1091,12 @@ stock float calcRemainingAirTime(const float pos[3], const float vVel[3]) {
     return t;
 }
 
-#define DIRECT_GROUND_SAMPLE_STEP   50.0    // hasPotentialGap2 函数的从 start 到 end 路线上的采样步长
-#define DIRECT_MAX_LOCAL_STEP_UP    56.0    // 后续采样点以第一个采样点的地面高度向上或者向下 (STEP_UP + margin) 开始向下射线
-#define DIRECT_GROUND_TRACE_MARGIN  10.0
-#define DIRECT_MIN_GROUND_NORMAL_Z  0.20
-
 stock bool hasPotentialGap2(int client, const float start[3], const float end[3], float maxLocalDrop) {
-    if (maxLocalDrop <= 0.0)
-        return true;
-    
-    // 从 start 到 end 只计算水平路线
-    static float routeDir[3];
-    MakeVectorFromPoints(start, end, routeDir);
-    routeDir[2] = 0.0;
-
-    // NormalizeVector 返回归一化之前的向量长度, 同时将 routeDir 转化为单位方向向量
-    static float routeDist;
-    routeDist = NormalizeVector(routeDir, routeDir);
-
-    if (routeDist <= 0.0)
-        return false;
-
-    int sampleCount = RoundToCeil(routeDist / DIRECT_GROUND_SAMPLE_STEP);
-    if (sampleCount < 1) {
-        sampleCount = 1;
-    }
-
-    static float previousGroundZ;
-    bool hasPreviousGround;
-
-    previousGroundZ = start[2];
-    hasPreviousGround = false;
-
-    for (int sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex++) {
-        static float sampleFraction;
-        sampleFraction = float(sampleIndex) / float(sampleCount);
-
-        static float samplePos[3];
-        samplePos[0] = start[0] + routeDir[0] * routeDist * sampleFraction;
-        samplePos[1] = start[1] + routeDir[1] * routeDist * sampleFraction;
-        samplePos[2] = start[2];
-
-        /*
-        * 第一个采样点以 start[2] 高度为基准, 后续采样点以上一个真实地面高度为基准
-        * 这样可以允许长斜坡之间存在很大的累计高度差, 比如中间有个坑这种, 但不允许相邻采样点之间高度差断崖式下降或者上升
-        */
-        static float referenceGroundZ;
-        referenceGroundZ = hasPreviousGround ? previousGroundZ : start[2];
-
-        static float currentGroundZ;
-        if (!tryFindGroundAtRouteSample(client, samplePos, referenceGroundZ, hasPreviousGround, maxLocalDrop, currentGroundZ)) {
-            return true;
-        }
-
-        if (hasPreviousGround) {
-            if (isLocalGroundHeightDiscontinuous(previousGroundZ, currentGroundZ, maxLocalDrop)) {
-                return true;
-            }
-        }
-
-        previousGroundZ = currentGroundZ;
-        hasPreviousGround = true;
-    }
-
-    return false;
-}
-
-stock bool tryFindGroundAtRouteSample(int client, const float samplePos[3], float referenceGroundZ, bool hasPreviousGround, float maxLocalDrop, float& outGroundZ) {
-    static float traceStart[3], traceEnd[3];
-
-    traceStart[0] = samplePos[0];
-    traceStart[1] = samplePos[1];
-
-    traceEnd[0] = samplePos[0];
-    traceEnd[1] = samplePos[1];
-
-    /*
-    * 第一个采样点, Charger 通常已经在地面上, 只需要从 start 上方向下寻找地面
-    * 后续采样点, 允许当前地面比上一个地面高 DIRECT_MAX_LOCAL_STEP_UP, 如果上升超过这个范围, 要么 trace 失败, 要么后续的高度差检查会拒绝
-    */
-    if (hasPreviousGround) {
-        traceStart[2] = referenceGroundZ + (DIRECT_MAX_LOCAL_STEP_UP + DIRECT_GROUND_TRACE_MARGIN);
-    } else {
-        traceStart[2] = referenceGroundZ + DIRECT_GROUND_TRACE_MARGIN;
-    }
-
-    /*
-    * 最低只允许下降 max local drop, 如果这个范围内找不到地面, 认为存在 Gap 或者断崖
-    */
-    traceEnd[2] = referenceGroundZ - maxLocalDrop;
-
-    static Handle hTrace;
-    hTrace = TR_TraceRayFilterEx(traceStart, traceEnd, MASK_PLAYERSOLID, RayType_EndPoint, _TraceWallFilter, client);
-
-    if (!TR_DidHit(hTrace) || TR_StartSolid(hTrace)) {
-        delete hTrace;
-        return false;
-    }
-
-    static float groundPos[3], groundNormal[3];
-    TR_GetEndPosition(groundPos, hTrace);
-    TR_GetPlaneNormal(hTrace, groundNormal);
-
-    delete hTrace;
-
-    /*
-    * GroundNormal 越接近于 1, 说明越接近水平地面, 如果 GroundNormal 接近于 0, 则说明地面倾斜严重, 无法站立
-    */
-    if (groundNormal[2] < DIRECT_MIN_GROUND_NORMAL_Z) {
-        return false;
-    }
-
-    outGroundZ = groundPos[2];
-    return true;
-}
-
-stock bool isLocalGroundHeightDiscontinuous(float previousGroundZ, float currentGroundZ, float maxLocalDrop) {
-    static float deltaZ;
-    deltaZ = currentGroundZ - previousGroundZ;
-
-    if (deltaZ > DIRECT_MAX_LOCAL_STEP_UP + 1.0) {
-        return true;
-    }
-
-    if (deltaZ < -maxLocalDrop - 1.0) {
-        return true;
-    }
-
-    return false;
+    return AIPathMovement_HasPotentialGap(client, start, end, maxLocalDrop);
 }
 
 stock float calcVectorAngle(const float v1[3], const float v2[3], bool ignoreZ = true) {
-    if ((v1[0] == 0.0 && v1[1] == 0.0 && v1[2] == 0.0) ||
-        (v2[0] == 0.0 && v2[1] == 0.0 && v2[2] == 0.0))
-        return 0.0;
-    
-    static float v1_cpy[3], v2_cpy[3];
-    v1_cpy = v1;
-    v2_cpy = v2;
-
-    if (ignoreZ) {
-        v1_cpy[2] = 0.0;
-        v2_cpy[2] = 0.0;
-    }
-
-    NormalizeVector(v1_cpy, v1_cpy);
-    NormalizeVector(v2_cpy, v2_cpy);
-    static float dot;
-    dot = GetVectorDotProduct(v1_cpy, v2_cpy);
-    if (dot > 1.0) dot = 1.0;
-    else if (dot < -1.0) dot = -1.0;
-    return RadToDeg(ArcCosine(dot));
+    return AIPathMovement_VectorAngle(v1, v2, ignoreZ);
 }
 
 /**

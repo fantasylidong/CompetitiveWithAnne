@@ -655,7 +655,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 ### 2026年8月10日 Boomer/Spitter Path Follow 连跳
 - `anne_nextbot` 原生扩展升级到 1.3.0，继续作为唯一的 `PathFollower::Update` detour，并在原生层直接复制有界路径节点值；Tank、Charger、Boomer、Spitter 统一通过 native 读取快照，SourcePawn 不再接收或读取 PathFollower/PathSegment 指针。公共路径签名与虚表偏移也统一收口到 `anne_nextbot.games.txt`。
-- Tank `ai_tank3` 升级到 1.0.0.3，Charger `ai_charger3` 升级到 1.0.1.3，既有路径连跳已接入同一 native 快照；各自 gamedata 只保留爪击、冲撞和 locomotion 等专用调用，不再重复维护公共 PathFollower 定义。
-- Boomer 升级为 `ai_boomer_3.smx` 3.0.3，Spitter 升级为 `ai_spitter_3.smx` 3.0.1；连跳会优先沿有效路径前视点前进，路径过期、被遮挡或前方存在攀爬/跳缝等特殊移动时自动保留原生 AI/直线行为。
+- Tank `ai_tank3` 升级到 1.0.0.4，Charger `ai_charger3` 升级到 1.0.1.4，既有路径连跳已接入同一 native 快照；各自 gamedata 只保留爪击、冲撞和 locomotion 等专用调用，不再重复维护公共 PathFollower 定义。
+- Boomer 升级为 `ai_boomer_3.smx` 3.0.4，Spitter 升级为 `ai_spitter_3.smx` 3.0.2；连跳会优先沿有效路径前视点前进，路径过期、被遮挡或前方存在攀爬/跳缝等特殊移动时自动保留原生 AI/直线行为。
+- 四个 AI 统一使用 `ai_path_movement.inc` 的滞空时间预测、墙体/落点/局部断层安全检查和渐进式空中速度修正；Charger 的冲锋、重寻路和侧向博弈仍由其状态机负责。
 - Boomer 在拐角等暂时失去直视的场景仍可依靠有效 PathFollower 路径继续接近，同时保留 26-07 AI2 的喷吐仰角修复。
 - 当前 2026-08 AnneHappy、Hardcore 和 Shotgun 配置加载 AI3；`Anne26-07.cfg` 继续加载未修改的 `ai_boomer_2.smx` 与 `ai_spitter_2.smx`，作为 26-07 回滚版本。

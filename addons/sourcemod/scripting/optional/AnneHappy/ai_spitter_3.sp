@@ -8,6 +8,7 @@
 #include <treeutil>
 #include <anne_nextbot>
 #include "ai_path_snapshot.inc"
+#include "ai_path_movement.inc"
 
 #define CVAR_FLAG FCVAR_NOTIFY
 #define SPITTER_JUMP_DELAY 1.0
@@ -19,7 +20,7 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.1",
+		version 		= "3.0.2",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -35,8 +36,6 @@ ConVar
 	g_hSpitRange;
 float
 	clientDelay[MAXPLAYERS + 1][8];
-bool
-	g_bPathHop[MAXPLAYERS + 1];
 int
 	pinnedPriority[6] = {0},
 	pinnedTarget = -1,
@@ -93,8 +92,8 @@ public void OnPluginEnd()
 
 public void AnneNextBot_OnSpitterPathSnapshotUpdated(int client)
 {
-    if (isAiSpitter(client) && !AIPathSnapshot_IsReady(client))
-        g_bPathHop[client] = false;
+	if (isAiSpitter(client) && !AIPathSnapshot_IsReady(client))
+		AIPathMovement_Reset(client);
 }
 
 void pinnedPriorityCvarChangedHandler(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -125,17 +124,17 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	curSpeed = SquareRoot(Pow(velVec[0], 2.0) + Pow(velVec[1], 2.0));
 	targetDist = GetClosetSurvivorDistance(spitter);
 	if (buttons & (IN_ATTACK | IN_ATTACK2))
-		g_bPathHop[spitter] = false;
+		AIPathMovement_Reset(spitter);
 	if (GetEntityMoveType(spitter) & MOVETYPE_LADDER)
 	{
-		g_bPathHop[spitter] = false;
+		AIPathMovement_Reset(spitter);
 		buttons &= ~IN_JUMP;
 		buttons &= ~IN_DUCK;
 		return Plugin_Changed;
 	}
 	if ((buttons & IN_ATTACK) && delayExpired(spitter, 0, SPITTER_JUMP_DELAY))
 	{
-		g_bPathHop[spitter] = false;
+		AIPathMovement_Reset(spitter);
 		delayStart(spitter, 0);
 		buttons |= IN_JUMP;
 		return Plugin_Changed;
@@ -143,20 +142,27 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
 	if (!onGround)
 	{
-		if (g_bPathHop[spitter])
+		if (AIPathMovement_IsPathHopActive(spitter))
 		{
-			AIPathSnapshot_AlignFacing(spitter, velVec, angles);
+			float correctedVelocity[3];
+			if (AIPathMovement_ComputePathAirCorrection(spitter, velVec, 25.0, 1.0, 89.0, 0.3, 0.3, 0.12, correctedVelocity))
+			{
+				velVec = correctedVelocity;
+				TeleportEntity(spitter, NULL_VECTOR, NULL_VECTOR, correctedVelocity);
+			}
+			AIPathMovement_AlignFacing(velVec, angles);
 			return Plugin_Changed;
 		}
 		return Plugin_Continue;
 	}
-	g_bPathHop[spitter] = false;
+	AIPathMovement_Reset(spitter);
 	if (!(targetDist < 1000.0 && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
 	GetClientEyeAngles(spitter, eyeAngle);
 	bool pathGuided = false;
+	float pathGoal[3];
 	if (g_hPathBhop.BoolValue && AIPathSnapshot_IsReady(spitter) && !AIPathSnapshot_HasSpecialMoveAhead(spitter, 2))
 	{
-		float pathGoal[3], selfPos[3];
+		float selfPos[3];
 		float maxEstimateDist = curSpeed * 0.50;
 		if (maxEstimateDist < 130.0)
 			maxEstimateDist = 130.0;
@@ -177,20 +183,41 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	}
 	buttons |= IN_JUMP;
 	buttons |= IN_DUCK;
+	float proposedVelocity[3], pushVelocity[3];
+	GetAngleVectors(eyeAngle, pushVelocity, NULL_VECTOR, NULL_VECTOR);
+	NormalizeVector(pushVelocity, pushVelocity);
+	ScaleVector(pushVelocity, g_hBhopSpeed.FloatValue);
+	GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", proposedVelocity);
+	AddVectors(proposedVelocity, pushVelocity, proposedVelocity);
+	bool hasSight = view_as<bool>(GetEntProp(spitter, Prop_Send, "m_hasVisibleThreats"));
+	if (!AIPathMovement_IsJumpRouteSafe(
+		spitter,
+		proposedVelocity,
+		AIPathMovement_GetJumpAirTime(),
+		56.0,
+		hasSight,
+		89.0
+	))
+		return Plugin_Continue;
 	bool hopped = spitterDoBhop(spitter, buttons, eyeAngle);
 	if (pathGuided && hopped)
 	{
 		float pathVelocity[3];
 		GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", pathVelocity);
-		AIPathSnapshot_AlignFacing(spitter, pathVelocity, angles);
-		g_bPathHop[spitter] = true;
+		AIPathMovement_AlignFacing(pathVelocity, angles);
+		AIPathMovement_BeginPathHop(spitter, pathGoal, AIPathMovement_GetHorizontalSpeed(pathVelocity));
 	}
 	return Plugin_Changed;
 }
 
 public void OnClientDisconnect(int client)
 {
-	g_bPathHop[client] = false;
+	AIPathMovement_Reset(client);
+}
+
+public void OnClientPutInServer(int client)
+{
+	AIPathMovement_Reset(client);
 }
 
 public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)

@@ -16,6 +16,17 @@ from collections import Counter
 from pathlib import Path
 
 
+PROBE_CLASS_NAMES = {
+    1: "smoker",
+    2: "boomer",
+    3: "hunter",
+    4: "spitter",
+    5: "jockey",
+    6: "charger",
+}
+PROBE_EXPECTED_CLASSES = {name: 2 for name in PROBE_CLASS_NAMES.values()}
+
+
 OFFICIAL_MAPS = [
     "c1m1_hotel", "c1m2_streets", "c1m3_mall", "c1m4_atrium",
     "c2m1_highway", "c2m2_fairgrounds", "c2m3_coaster", "c2m4_barns", "c2m5_concert",
@@ -49,6 +60,9 @@ TEST_CVARS = {
     "inf_traitor_enable": "0",
     "inf_antibait_enable": "0",
     "inf_TeleportSi": "0",
+    "inf_TeleportCheckTime": "5",
+    "inf_TeleportSpawnGrace": "2.5",
+    "inf_TeleportRunnerFast": "1.5",
     # This fixture measures directed-Nav candidate throughput, so support-class
     # tactical release must not hold Boomer/Spitter in the queue after the
     # pressure classes have been seeded.
@@ -67,22 +81,22 @@ TEST_CVARS = {
     # silently mix a new SMX with the previous scoring profile.
     "inf_nav_high_sort_scale": "1.00 1.00 1.00 1.00 1.00 1.00",
     "inf_score_low_height_start": "50.0",
-    "inf_score_low_height_per_100": "20.0",
+    "inf_score_low_height_per_100": "10.0",
     "inf_score_low_height_cap": "100.0",
     "inf_score_low_height_behind_multiplier": "2.0",
     "inf_score_high_height_per_50": "6.0",
     "inf_score_high_height_cap": "100.0",
-    "inf_score_behind_per_flow": "4.0",
+    "inf_score_behind_per_flow": "2.0",
     "inf_score_behind_cap": "100.0",
     "inf_score_behind_reject_gap": "8",
     "versus_special_respawn_interval": "16.0",
     "l4d_infected_limit": "12",
-    "z_smoker_limit": "3",
+    "z_smoker_limit": "2",
     "z_boomer_limit": "2",
-    "z_hunter_limit": "3",
+    "z_hunter_limit": "2",
     "z_spitter_limit": "2",
-    "z_jockey_limit": "3",
-    "z_charger_limit": "3",
+    "z_jockey_limit": "2",
+    "z_charger_limit": "2",
 }
 
 # Restore Anne production policy even when a previous aborted matrix run left
@@ -93,12 +107,12 @@ PRODUCTION_RESTORE_CVARS = {
     "inf_support_unlock_grace": "1.0",
     "inf_nav_high_sort_scale": "1.00 1.00 1.00 1.00 1.00 1.00",
     "inf_score_low_height_start": "50.0",
-    "inf_score_low_height_per_100": "20.0",
+    "inf_score_low_height_per_100": "10.0",
     "inf_score_low_height_cap": "100.0",
     "inf_score_low_height_behind_multiplier": "2.0",
     "inf_score_high_height_per_50": "6.0",
     "inf_score_high_height_cap": "100.0",
-    "inf_score_behind_per_flow": "4.0",
+    "inf_score_behind_per_flow": "2.0",
     "inf_score_behind_cap": "100.0",
     "inf_score_behind_reject_gap": "8",
 }
@@ -164,6 +178,10 @@ class SourceRcon:
         raise RuntimeError(f"RCON command failed: {command}: {last_error}")
 
 
+class HumanClientsPresent(RuntimeError):
+    pass
+
+
 class MatrixRunner:
     log_path = "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/infected_control_fdxxnav.txt"
 
@@ -199,12 +217,18 @@ class MatrixRunner:
         raw = self.log_since(offset)
         marker = f" begin requested={percent}"
         marker_index = raw.rfind(marker)
-        return (marker_index >= 0
-                and "[SpawnWave][Begin] wave=1" in raw[marker_index:])
+        if marker_index < 0:
+            return False
+        wave_log = raw[marker_index:]
+        return ("[SpawnWave][Begin] wave=1" in wave_log
+                or "[NavMatrix] InfectedSpawn " in wave_log)
 
     def start_wave_with_confirmation(self, offset: int,
                                      percent: int) -> tuple[bool, int, float]:
         started = time.monotonic()
+        if self.args.assume_wave_start:
+            self.rcon.command("sm_startspawn")
+            return True, 1, time.monotonic() - started
         attempts = 0
         for _ in range(3):
             attempts += 1
@@ -242,6 +266,7 @@ class MatrixRunner:
         patterns = (
             rf'Value of cvar "{re.escape(name)}":\s*"([^"]*)"',
             rf'"{re.escape(name)}"\s*=\s*"([^"]*)"',
+            rf'cvar\s+"{re.escape(name)}"[^:\r\n]*:\s*"([^"]*)"',
         )
         for pattern in patterns:
             match = re.search(pattern, output, re.IGNORECASE)
@@ -365,6 +390,9 @@ class MatrixRunner:
         while time.monotonic() < deadline:
             last = self.rcon.command("sm_navmatrix_status")
             status = self.parse_status(last)
+            if int(status.get("humanClients", 0)) > 0:
+                raise HumanClientsPresent(
+                    f"human clients present at test baseline: {last.strip()}")
             if (status.get("infectedTeam") == 0
                     and status.get("aliveSI") == 0
                     and status.get("humanClients") == 0
@@ -398,6 +426,12 @@ class MatrixRunner:
         # tails, especially on compact multi-floor maps such as c6m2.
         if self.args.wave_reset_wait > 0.0:
             time.sleep(self.args.wave_reset_wait)
+        # Old releases can leave a spawn/timer callback queued after the first
+        # reset. Fence the fixture a second time after the settle interval so a
+        # previous wave cannot emit player_spawn into the next begin/result window.
+        self.rcon.command("sm_stopspawn")
+        self.rcon.command("sm_navmatrix_clear")
+        self.wait_for_empty_infected()
         response = ""
         status = ""
         for _ in range(100):
@@ -429,11 +463,15 @@ class MatrixRunner:
         while time.monotonic() < deadline:
             last_status = self.rcon.command("sm_navmatrix_status")
             status = self.parse_status(last_status)
+            if int(status.get("humanClients", 0)) > 0:
+                raise HumanClientsPresent(
+                    f"human clients entered during wave: {last_status.strip()}")
             alive = int(status.get("aliveSI", 0))
             peak_alive = max(peak_alive, alive)
             if (alive == 12
                     and status.get("humanInfected") == 0
-                    and int(status.get("visibilityChecks", 0)) >= 12):
+                    and int(status.get("visibilityChecks", 0)) >= 12
+                    and int(status.get("probeSamples", 0)) >= 12):
                 return True, last_status, time.monotonic() - started, peak_alive
             time.sleep(0.1)
         return False, last_status, time.monotonic() - started, peak_alive
@@ -471,12 +509,49 @@ class MatrixRunner:
     @staticmethod
     def summarize(raw: str) -> dict:
         lines = raw.splitlines()
-        begin_mark = next((index for index, line in enumerate(lines)
-                           if "[NavMatrix] End" in line and " begin requested=" in line), 0)
+        begin_marks = [index for index, line in enumerate(lines)
+                       if "[NavMatrix] End" in line and " begin requested=" in line]
+        begin_mark = begin_marks[-1] if begin_marks else 0
         result_mark = next((index for index, line in enumerate(lines[begin_mark:], begin_mark)
                             if "[NavMatrix] End" in line and " result requested=" in line),
                            len(lines) - 1)
         lines = lines[begin_mark:result_mark + 1]
+        probe_lines = [line for line in lines if "[NavMatrix] ProbeSpawn " in line]
+        probe_classes = Counter()
+        probe_class_lines: dict[str, list[str]] = {}
+        probe_sequences = set()
+        for line in probe_lines:
+            class_match = re.search(r"\bclass=(\d+)", line)
+            sequence_match = re.search(r"\bseq=(\d+)", line)
+            if sequence_match:
+                probe_sequences.add(int(sequence_match.group(1)))
+            if not class_match:
+                continue
+            class_name = PROBE_CLASS_NAMES.get(int(class_match.group(1)))
+            if class_name is None:
+                continue
+            probe_classes[class_name] += 1
+            probe_class_lines.setdefault(class_name, []).append(line)
+        probe_class_metrics = {
+            class_name: {
+                "success": len(samples),
+                "team_min_distance": MatrixRunner.metric_summary(
+                    samples, "teamMinDistance"),
+                "team_max_distance": MatrixRunner.metric_summary(
+                    samples, "teamMaxDistance"),
+                "nearest_nav_distance": MatrixRunner.metric_summary(
+                    samples, "nearestNavDistance"),
+            }
+            for class_name, samples in sorted(probe_class_lines.items())
+        }
+        probe_distance_metrics = {
+            "team_min_distance": MatrixRunner.metric_summary(
+                probe_lines, "teamMinDistance"),
+            "team_max_distance": MatrixRunner.metric_summary(
+                probe_lines, "teamMaxDistance"),
+            "nearest_nav_distance": MatrixRunner.metric_summary(
+                probe_lines, "nearestNavDistance"),
+        }
         begin_lines = [line for line in lines if "[SpawnWave][Begin]" in line]
         first_wave = None
         if begin_lines:
@@ -517,14 +592,74 @@ class MatrixRunner:
                     normal_nav_visibility_violations += int(visibility_match.group(1))
                 pending_visibility_mode = ""
         classes = Counter()
+        class_lines = {}
         elapsed = []
         for line in normal_successes:
             class_match = re.search(r"class=(\w+)", line)
             elapsed_match = re.search(r"waveElapsedMs=([0-9.]+)", line)
             if class_match:
-                classes[class_match.group(1)] += 1
+                class_name = class_match.group(1)
+                classes[class_name] += 1
+                class_lines.setdefault(class_name, []).append(line)
             if elapsed_match:
                 elapsed.append(float(elapsed_match.group(1)))
+        class_metrics = {}
+        for class_name, samples in sorted(class_lines.items()):
+            class_metrics[class_name] = {
+                "success": len(samples),
+                "nav_success": sum("mode=normal_nav" in line for line in samples),
+                "director_range_success": sum(
+                    "mode=normal_director_range" in line for line in samples),
+                "director_unrestricted_success": sum(
+                    "mode=normal_director_unrestricted" in line for line in samples),
+                "team_min_distance": MatrixRunner.metric_summary(
+                    samples, "teamMinDistance"),
+                "team_max_distance": MatrixRunner.metric_summary(
+                    samples, "teamMaxDistance"),
+                "target_distance": MatrixRunner.metric_summary(
+                    samples, "targetDistance"),
+                "nav_distance": MatrixRunner.metric_summary(
+                    samples, "navDistance"),
+            }
+        director_api_lines = [
+            line for line in lines
+            if "[FALLBACK API]" in line and " class=" in line
+        ]
+        director_api_by_class = {}
+        director_api_totals = Counter()
+        for line in director_api_lines:
+            match = re.search(
+                r"\bclass=(\w+).*\btries=(\d+).*\bresult=(miss|hit|cap_reject)",
+                line)
+            if not match:
+                continue
+            class_name, _, api_result = match.groups()
+            director_api_totals["calls"] += 1
+            director_api_totals[api_result] += 1
+            class_counts = director_api_by_class.setdefault(class_name, Counter())
+            class_counts["calls"] += 1
+            class_counts[api_result] += 1
+        director_api = {
+            "calls": director_api_totals["calls"],
+            "hits": director_api_totals["hit"],
+            "misses": director_api_totals["miss"],
+            "request_cap_rejects": director_api_totals["cap_reject"],
+            "actual_cap_rejects": sum(
+                "[SpawnPerf][DirectorCap]" in line and "stage=actual" in line
+                for line in lines),
+            "tries": MatrixRunner.metric_summary(director_api_lines, "tries"),
+            "team_min_distance": MatrixRunner.metric_summary(
+                director_api_lines, "teamMinDistance"),
+            "by_class": {
+                class_name: {
+                    "calls": counts["calls"],
+                    "hits": counts["hit"],
+                    "misses": counts["miss"],
+                    "request_cap_rejects": counts["cap_reject"],
+                }
+                for class_name, counts in sorted(director_api_by_class.items())
+            },
+        }
         graph_lines = [line for line in lines if "[SpawnPerf][Graph]" in line]
         summary_lines = [line for line in lines if "[SpawnWave][Summary]" in line
                          and (first_wave is None or f"wave={first_wave} " in line)]
@@ -537,6 +672,8 @@ class MatrixRunner:
         distance_metrics = {
             "team_min_distance": MatrixRunner.metric_summary(
                 normal_successes, "teamMinDistance"),
+            "team_max_distance": MatrixRunner.metric_summary(
+                normal_successes, "teamMaxDistance"),
             "target_distance": MatrixRunner.metric_summary(
                 normal_successes, "targetDistance"),
             "nav_distance": MatrixRunner.metric_summary(
@@ -545,6 +682,10 @@ class MatrixRunner:
                 normal_successes, "spawnCallMs"),
         }
         return {
+            "probe_success": len(probe_sequences),
+            "probe_classes": dict(sorted(probe_classes.items())),
+            "probe_class_metrics": probe_class_metrics,
+            "probe_distance_metrics": probe_distance_metrics,
             "wave": first_wave,
             "wave_count": len(begin_lines),
             "spawn_success": len(normal_successes),
@@ -563,6 +704,8 @@ class MatrixRunner:
             "server_wave_ms": max(elapsed) if elapsed else None,
             "distance_metrics": distance_metrics,
             "classes": dict(sorted(classes.items())),
+            "class_metrics": class_metrics,
+            "director_api": director_api,
             "begin": first_begin,
             "summary": first_summary,
             "begin_values": begin_values,
@@ -589,6 +732,16 @@ class MatrixRunner:
         )
         if not prepared:
             raise RuntimeError(f"survivor flow positioning failed: {prepare_output.strip()}")
+        # Teleporting the fixture team out of the saferoom can fire
+        # player_left_start_area. Older releases immediately arm their first wave
+        # from that event, so fence it after positioning and before the begin mark.
+        self.rcon.command("sm_stopspawn")
+        self.rcon.command("sm_navmatrix_clear")
+        self.wait_for_empty_infected()
+        time.sleep(self.args.post_prepare_reset_wait)
+        self.rcon.command("sm_stopspawn")
+        self.rcon.command("sm_navmatrix_clear")
+        self.wait_for_empty_infected()
         self.rcon.command("sm_spawnperf_reset")
         self.rcon.command(f"sm_navmatrix_mark begin requested={percent}")
         wave_started, wave_start_attempts, start_seconds = (
@@ -618,25 +771,39 @@ class MatrixRunner:
             summary.get("normal_nav_visibility_checks") == summary.get("nav_success")
             and summary.get("normal_nav_visibility_violations") == 0
         )
-        complete = (
+        probe_complete = (
             wave_started
             and observed_alive_12
             and peak_alive == 12
-            and summary.get("wave") == 1
-            and summary.get("wave_count") == 1
-            and summary.get("spawn_success") == 12
-            and summary.get("actual_valid") == 12
-            and summary.get("spawn_failed_calls")
-                == summary.get("actual_spawn_rejects")
-            and begin_values.get("plannedAi") == 12
-            and begin_values.get("pendingAtStart") == 12
-            and summary_values.get("normalSuccess") == 12
-            and summary_values.get("remainingQueue") == 0
-            and summary_values.get("failed")
-                == summary.get("actual_spawn_rejects")
+            and summary.get("probe_success") == 12
+            and summary.get("probe_classes") == PROBE_EXPECTED_CLASSES
+            and summary.get("probe_distance_metrics", {})
+                .get("team_min_distance", {}).get("count") == 12
+            and summary.get("probe_distance_metrics", {})
+                .get("team_max_distance", {}).get("count") == 12
+            and summary.get("probe_distance_metrics", {})
+                .get("nearest_nav_distance", {}).get("count") == 12
             and int(final_status_values.get("visibilityChecks", 0)) == 12
-            and nav_visibility_ok
         )
+        production_crosscheck = (
+            summary.get("wave") is None
+            or (
+                summary.get("wave") == 1
+                and summary.get("wave_count") == 1
+                and summary.get("spawn_success") == 12
+                and summary.get("actual_valid") == 12
+                and summary.get("spawn_failed_calls")
+                    == summary.get("actual_spawn_rejects")
+                and begin_values.get("plannedAi") == 12
+                and begin_values.get("pendingAtStart") == 12
+                and summary_values.get("normalSuccess") == 12
+                and summary_values.get("remainingQueue") == 0
+                and summary_values.get("failed")
+                    == summary.get("actual_spawn_rejects")
+                and nav_visibility_ok
+            )
+        )
+        complete = probe_complete and production_crosscheck
         result = {
             "index": index,
             "map": map_name,
@@ -649,6 +816,8 @@ class MatrixRunner:
             "spread_max": float(status_values.get("spreadMax", 0.0)),
             "visibility_checks": int(final_status_values.get("visibilityChecks", 0)),
             "visibility_violations": int(final_status_values.get("visibilityViolations", -1)),
+            "probe_samples": int(final_status_values.get("probeSamples", 0)),
+            "probe_pending": int(final_status_values.get("probePending", 0)),
             "frame_samples": int(final_status_values.get("frameSamples", 0)),
             "frame_avg_ms": float(final_status_values.get("frameAvgMs", 0.0)),
             "frame_max_ms": float(final_status_values.get("frameMaxMs", 0.0)),
@@ -708,17 +877,23 @@ class MatrixRunner:
                             "complete_12": False,
                             "error": str(error),
                         }
+                        abort_for_humans = isinstance(error, HumanClientsPresent)
+                    else:
+                        abort_for_humans = False
                     results.append(result)
                     jsonl.write(json.dumps(result, ensure_ascii=False) + "\n")
                     jsonl.flush()
                     print(
                         f"CASE {index} {map_name} {percent}% complete={result.get('complete_12')} "
-                        f"success={result.get('spawn_success')} nav={result.get('nav_success')} "
+                        f"probe={result.get('probe_success')} success={result.get('spawn_success')} "
+                        f"nav={result.get('nav_success')} "
                         f"actual_rejects={result.get('actual_spawn_rejects')} "
                         f"server_wave_ms={result.get('server_wave_ms')} "
                         f"observer_wall_ms={result.get('observer_wall_ms')} "
                         f"error={result.get('error', '')}",
                         flush=True)
+                    if abort_for_humans:
+                        raise HumanClientsPresent(result["error"])
         return results
 
     def restore(self) -> None:
@@ -756,6 +931,7 @@ def write_csv(path: Path, results: list[dict]) -> None:
         "min_percent", "max_percent", "observed_alive_12", "peak_alive",
         "unique_nav", "spread_min", "spread_max",
         "visibility_checks", "visibility_violations",
+        "probe_samples", "probe_pending", "probe_success",
         "normal_nav_visibility_checks", "normal_nav_visibility_violations",
         "frame_samples", "frame_avg_ms", "frame_max_ms",
         "frame_over_tick", "frame_over_2tick", "frame_over_4tick",
@@ -765,7 +941,9 @@ def write_csv(path: Path, results: list[dict]) -> None:
         "directed_retargets", "runtime_target_changes",
         "nav_success", "director_range_success", "director_unrestricted_success",
         "last_spawn_ms", "server_wave_ms", "within_nominal_target",
-        "observer_wall_ms", "distance_metrics", "classes", "error",
+        "observer_wall_ms", "distance_metrics", "classes", "class_metrics",
+        "probe_distance_metrics", "probe_classes", "probe_class_metrics",
+        "director_api", "error",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
@@ -775,6 +953,16 @@ def write_csv(path: Path, results: list[dict]) -> None:
             row["classes"] = json.dumps(row.get("classes", {}), ensure_ascii=False, sort_keys=True)
             row["distance_metrics"] = json.dumps(
                 row.get("distance_metrics", {}), ensure_ascii=False, sort_keys=True)
+            row["class_metrics"] = json.dumps(
+                row.get("class_metrics", {}), ensure_ascii=False, sort_keys=True)
+            row["probe_classes"] = json.dumps(
+                row.get("probe_classes", {}), ensure_ascii=False, sort_keys=True)
+            row["probe_distance_metrics"] = json.dumps(
+                row.get("probe_distance_metrics", {}), ensure_ascii=False, sort_keys=True)
+            row["probe_class_metrics"] = json.dumps(
+                row.get("probe_class_metrics", {}), ensure_ascii=False, sort_keys=True)
+            row["director_api"] = json.dumps(
+                row.get("director_api", {}), ensure_ascii=False, sort_keys=True)
             writer.writerow(row)
 
 
@@ -801,12 +989,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--graph-timeout", type=float, default=20.0)
     parser.add_argument("--map-timeout", type=float, default=45.0)
     parser.add_argument("--wave-timeout", type=float, default=8.0)
+    parser.add_argument(
+        "--post-prepare-reset-wait", type=float, default=0.35,
+        help="seconds to fence automatic saferoom-exit waves before the marked test wave")
     parser.add_argument("--target-wave-ms", type=float, default=3000.0,
         help="nominal server-side 12-SI completion target; does not fail open-terrain cases")
     parser.add_argument("--flow-tolerance", type=float, default=8.0)
     parser.add_argument(
         "--reuse-map", action="store_true",
         help="load each map once and reset the wave/bots between progress checkpoints")
+    parser.add_argument(
+        "--assume-wave-start", action="store_true",
+        help="issue sm_startspawn once and observe directly when the target plugin has no begin log")
     args = parser.parse_args()
     if not args.password:
         parser.error("--password or RCON_PASSWORD is required")

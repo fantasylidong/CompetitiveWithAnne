@@ -192,6 +192,7 @@ stock Action checkShouldBhop(
     isOnGround = IsClientOnGround(client);
     if (isOnGround) {
         g_AiChargers[client].m_bHasAirBreaked = false;
+        AIPathMovement_Reset(client);
     }
 
     // 连跳距离限制
@@ -407,6 +408,7 @@ stock void enterPathWait(int client, bool invalidateOldPath) {
         g_AiChargers[client].m_flPathWaitStart = now;
 
     ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+    AIPathMovement_Reset(client);
     g_AiChargers[client].m_BhopType = BhopType_None;
     g_AiChargers[client].m_AirStrafe.init();
 
@@ -560,6 +562,7 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
     // 保存起跳速度, 防止空中速度衰减
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiChargers[client].m_flLastHopSpeed);
 
     stateLog.debugAll("Charger(%N) Path Ground Bhop, speed: %.2f, target dist: %.2f, air correction dist: %.2f, strafe type: %d",
         client, g_AiChargers[client].m_flLastHopSpeed, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
@@ -606,6 +609,7 @@ stock Action performDirectGrounBhop(int client, float targetDist, const float po
 
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+    AIPathMovement_BeginPathHop(client, targetPos, g_AiChargers[client].m_flLastHopSpeed);
 
     stateLog.debugAll("Charger(%N) Direct Ground Bhop, speed: %.2f, target dist: %.2f, air correction dist: %.2f, strafe type: %d",
         client, g_AiChargers[client].m_flLastHopSpeed, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
@@ -931,6 +935,7 @@ stock Action executeAirCorrection(
     int client, float dist, float speed, bool visible,
     const float pos[3], const float targetPos[3], const float vVel[3], int& buttons, float ang[3]
 ) {
+    #pragma unused speed
 
     static float vFwd[3], vDir[3], dot, d2Goal;
 
@@ -943,10 +948,6 @@ stock Action executeAirCorrection(
     // 空中只保留朝实际运动方向的前进姿态，避免重复跳/蹲造成动画抽搐。
     setForwardBhopInput(buttons, false);
     alignChargerFacingWithMovement(client, vVel, ang);
-
-    static float now, smoothLerp;
-    static bool correctionReady;
-    correctionReady = prepareSmoothAirCorrection(client, g_cvAirVecModifyLerp.FloatValue, now, smoothLerp);
 
     // ============================================================
     // 1. 当前连跳模式为基于 PATH 的连跳, 进行基于 PATH 的空中速度方向修正
@@ -986,46 +987,32 @@ stock Action executeAirCorrection(
         static bool isStrafing;
         isStrafing = buildStrafedDesiredVector(client, vDir, d2Goal, vDesired);
 
-        static float desiredAngle;
-        desiredAngle = calcVectorAngle(vVel, vDesired, true);
-
-        // ============================================================
-        // 正常连跳, 判断是否需要空中速度修正
-        // ============================================================
-        static bool shouldCorrect;
-        shouldCorrect = false;
-        
-        static float airCorrLerp;
-        airCorrLerp = smoothLerp;
         static float maxTurnAngle;
         maxTurnAngle = g_cvAirVecModifyMaxDegree.FloatValue;
         if (maxTurnAngle > AIR_CORRECTION_MAX_TURN_DEG)
             maxTurnAngle = AIR_CORRECTION_MAX_TURN_DEG;
 
-        if (isStrafing &&
-            desiredAngle >= AIR_CORRECTION_MIN_TARGET_DEG &&
-            desiredAngle <= maxTurnAngle &&
-            d2Goal > GOAL_POS_TOLERANCE_DIST
-        ) {
-            shouldCorrect = true;
-        } else {
-            if (
-                dot >= g_cvAirVecModifyMinDegree.FloatValue &&
-                dot <= maxTurnAngle &&
-                d2Goal > GOAL_POS_TOLERANCE_DIST
-            ) {
-                shouldCorrect = true;
-            }
-        }
-
-        if (shouldCorrect && correctionReady) {
-            buildAirCorrectionVelocity2D(vVel, vDesired, airCorrLerp, speed, vFwd);
+        static float minTurnAngle;
+        minTurnAngle = isStrafing ? AIR_CORRECTION_MIN_TARGET_DEG : g_cvAirVecModifyMinDegree.FloatValue;
+        if (AIPathMovement_ComputeAirCorrectionToward(
+            client,
+            vVel,
+            vDesired,
+            d2Goal,
+            GOAL_POS_TOLERANCE_DIST,
+            minTurnAngle,
+            maxTurnAngle,
+            g_cvAirVecModifyLerp.FloatValue,
+            g_cvAirVecModifyInterval.FloatValue,
+            g_cvAirTurnSpeedLoss.FloatValue,
+            vFwd
+        )) {
 
             alignChargerFacingWithMovement(client, vFwd, ang);
             TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
 
             // 记录空中速度方向修正时间
-            g_AiChargers[client].m_flLastAirVecModifyTime = now;
+            g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
             return Plugin_Changed;
         }
 
@@ -1058,77 +1045,56 @@ stock Action executeAirCorrection(
     static float directDesiredAngle;
     directDesiredAngle = calcVectorAngle(vVel, vDirectDesired, true);
 
-    static bool inAngleRange;
-
     static float directMaxTurnAngle;
     directMaxTurnAngle = g_cvAirVecModifyMaxDegree.FloatValue;
     if (directMaxTurnAngle > AIR_CORRECTION_MAX_TURN_DEG)
         directMaxTurnAngle = AIR_CORRECTION_MAX_TURN_DEG;
 
-    inAngleRange = (dot >= g_cvAirVecModifyMinDegree.FloatValue && dot <= directMaxTurnAngle);
-
     if (visible &&
-        correctionReady &&
         directDesiredAngle <= directMaxTurnAngle &&
         (
             (isDirectStrafing && directDesiredAngle >= AIR_CORRECTION_MIN_TARGET_DEG) ||
             (
-                inAngleRange &&
+                dot >= g_cvAirVecModifyMinDegree.FloatValue &&
                 dist <= g_cvDirectBhopDist.FloatValue
             )
         )
     ) {
         stateLog.debugAll("Charger: %N triggered air speed modify, current vector angle: %.2f", client, dot);
 
-        static float directAirCorrLerp;
-        directAirCorrLerp = smoothLerp;
-        
-        buildAirCorrectionVelocity2D(vVel, vDirectDesired, directAirCorrLerp, speed, vFwd);
-
-        vFwd[2] = vVel[2];
-        alignChargerFacingWithMovement(client, vFwd, ang);
-        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
-        // 记录空中速度方向修正时间
-        g_AiChargers[client].m_flLastAirVecModifyTime = now;
+        static float directMinTurnAngle;
+        directMinTurnAngle = isDirectStrafing ? AIR_CORRECTION_MIN_TARGET_DEG : g_cvAirVecModifyMinDegree.FloatValue;
+        if (AIPathMovement_ComputeAirCorrectionToward(
+            client,
+            vVel,
+            vDirectDesired,
+            dist,
+            GOAL_POS_TOLERANCE_DIST,
+            directMinTurnAngle,
+            directMaxTurnAngle,
+            g_cvAirVecModifyLerp.FloatValue,
+            g_cvAirVecModifyInterval.FloatValue,
+            g_cvAirTurnSpeedLoss.FloatValue,
+            vFwd
+        )) {
+            alignChargerFacingWithMovement(client, vFwd, ang);
+            TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
+            // 记录空中速度方向修正时间
+            g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+        }
     }
     return Plugin_Changed;
 }
 
 stock void buildAirCorrectionVelocity2D(const float curVel[3], const float desiredVec[3], float lerp, float finalSpeed, float outVel[3]) {
-    static float curDir[3], desireDir[3];
-    curDir = curVel;
-    curDir[2] = 0.0;
-
-    desireDir = desiredVec;
-    desireDir[2] = 0.0;
-
-    NormalizeVector(curDir, curDir);
-    NormalizeVector(desireDir, desireDir);
-
-    if (lerp < 0.0) {
-        lerp = 0.0;
-    } else if (lerp > 1.0) {
-        lerp = 1.0;
-    }
-
-    outVel[0] = curDir[0] + (desireDir[0] - curDir[0]) * lerp;
-    outVel[1] = curDir[1] + (desireDir[1] - curDir[1]) * lerp;
-    outVel[2] = 0.0;
-    NormalizeVector(outVel, outVel);
-
-    // 只按这一小步真正转过的角度损失动量，轻微修正几乎不受影响。
-    static float actualTurnAngle, speedLoss;
-    actualTurnAngle = calcVectorAngle(curDir, outVel, true);
-    speedLoss = g_cvAirTurnSpeedLoss.FloatValue * (actualTurnAngle / 90.0);
-    if (speedLoss < 0.0)
-        speedLoss = 0.0;
-    else if (speedLoss > 0.5)
-        speedLoss = 0.5;
-
-    finalSpeed *= 1.0 - speedLoss;
-    ScaleVector(outVel, finalSpeed);
-    
-    outVel[2] = curVel[2];
+    AIPathMovement_BuildAirCorrectionVelocity(
+        curVel,
+        desiredVec,
+        lerp,
+        finalSpeed,
+        g_cvAirTurnSpeedLoss.FloatValue,
+        outVel
+    );
 }
 
 /**

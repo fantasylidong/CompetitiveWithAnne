@@ -357,31 +357,46 @@ void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
         case view_as<int>(SI_Smoker):
         {
             if (stage == 0)      { minRange = 500.0; maxRange = 1200.0; }
-            else if (stage == 1) { minRange = 500.0; maxRange = 2100.0; }
+            else if (stage == 1) { minRange = 500.0; maxRange = 1500.0; }
+            else if (stage == 2) { minRange = 500.0; maxRange = 1800.0; }
+            else if (stage == 3) { minRange = 500.0; maxRange = 2100.0; }
+            else if (stage == 4) { minRange = 500.0; maxRange = 2550.0; }
             else                 { minRange = 500.0; maxRange = 3000.0; }
         }
         case view_as<int>(SI_Boomer):
         {
             if (stage == 0)      { minRange = 250.0; maxRange = 550.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 1000.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 750.0; }
+            else if (stage == 2) { minRange = 250.0; maxRange = 1000.0; }
+            else if (stage == 3) { minRange = 250.0; maxRange = 1400.0; }
+            else if (stage == 4) { minRange = 250.0; maxRange = 1850.0; }
             else                 { minRange = 250.0; maxRange = 2300.0; }
         }
         case view_as<int>(SI_Hunter):
         {
             if (stage == 0)      { minRange = 350.0; maxRange = 950.0; }
-            else if (stage == 1) { minRange = 350.0; maxRange = 1750.0; }
+            else if (stage == 1) { minRange = 350.0; maxRange = 1250.0; }
+            else if (stage == 2) { minRange = 350.0; maxRange = 1500.0; }
+            else if (stage == 3) { minRange = 350.0; maxRange = 1750.0; }
+            else if (stage == 4) { minRange = 350.0; maxRange = 2300.0; }
             else                 { minRange = 350.0; maxRange = 2900.0; }
         }
         case view_as<int>(SI_Spitter):
         {
             if (stage == 0)      { minRange = 300.0; maxRange = 800.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 1450.0; }
+            else if (stage == 1) { minRange = 300.0; maxRange = 1050.0; }
+            else if (stage == 2) { minRange = 300.0; maxRange = 1250.0; }
+            else if (stage == 3) { minRange = 300.0; maxRange = 1450.0; }
+            else if (stage == 4) { minRange = 300.0; maxRange = 1850.0; }
             else                 { minRange = 300.0; maxRange = 2300.0; }
         }
         case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
         {
             if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 1250.0; }
+            else if (stage == 1) { minRange = 250.0; maxRange = 900.0; }
+            else if (stage == 2) { minRange = 250.0; maxRange = 1100.0; }
+            else if (stage == 3) { minRange = 250.0; maxRange = 1250.0; }
+            else if (stage == 4) { minRange = 250.0; maxRange = 1700.0; }
             else                 { minRange = 250.0; maxRange = 2200.0; }
         }
         default:

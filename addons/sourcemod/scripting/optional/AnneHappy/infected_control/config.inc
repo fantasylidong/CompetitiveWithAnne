@@ -435,8 +435,8 @@ enum struct Config
         SetConVarBounds(this.ScoreLowHeightStart,
             ConVarBound_Lower, true, 50.0);
         this.ScoreLowHeightPer100 = CreateConVar(
-            "inf_score_low_height_per_100", "20.0",
-            "低点离散扣分率；每满50u扣该值的一半（默认每50u扣10分）",
+            "inf_score_low_height_per_100", "10.0",
+            "低点离散扣分率；每满50u扣该值的一半（默认每50u扣5分）",
             CVAR_FLAG, true, 0.0, true, 200.0);
         SetConVarBounds(this.ScoreLowHeightPer100,
             ConVarBound_Upper, true, 200.0);
@@ -461,7 +461,7 @@ enum struct Config
             "Smoker/Hunter高点最终评分奖励上限；0关闭",
             CVAR_FLAG, true, 0.0, true, 100.0);
         this.ScoreBehindPerFlow = CreateConVar(
-            "inf_score_behind_per_flow", "4.0",
+            "inf_score_behind_per_flow", "2.0",
             "候选Flow每落后目标1个百分点扣多少总分",
             CVAR_FLAG, true, 0.0, true, 20.0);
         SetConVarBounds(this.ScoreBehindPerFlow,

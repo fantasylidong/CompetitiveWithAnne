@@ -70,7 +70,8 @@
 
 ### 2026년 8월 10일 Boomer/Spitter Path Follow 연속 점프
 - 네이티브 `anne_nextbot` 확장을 1.3.0으로 올렸습니다. 단일 `PathFollower::Update` detour를 유지하면서 제한된 경로 노드 값을 네이티브에서 직접 복사합니다. Tank, Charger, Boomer, Spitter는 native를 통해 스냅샷을 읽으며 SourcePawn은 PathFollower/PathSegment 포인터를 받거나 읽지 않습니다. 공통 경로 시그니처와 가상 함수 오프셋은 `anne_nextbot.games.txt`로 통합했습니다.
-- Tank `ai_tank3`를 1.0.0.3으로, Charger `ai_charger3`를 1.0.1.3으로 올리고 기존 Path Follow 연속 점프를 동일한 native 스냅샷으로 이전했습니다. 각 gamedata에는 발톱 공격, 돌진, locomotion 등 전용 호출만 남기고 공통 PathFollower 정의 중복을 제거했습니다.
-- Boomer를 `ai_boomer_3.smx` 3.0.3으로, Spitter를 `ai_spitter_3.smx` 3.0.1로 올렸습니다. 연속 점프는 유효한 경로 미리보기 지점을 우선 사용하고, 경로가 오래되었거나 막혔거나 앞에 등반·틈 점프 같은 특수 이동이 있으면 기존 AI/직선 행동으로 되돌아갑니다.
+- Tank `ai_tank3`를 1.0.0.4로, Charger `ai_charger3`를 1.0.1.4로 올리고 기존 Path Follow 연속 점프를 동일한 native 스냅샷으로 이전했습니다. 각 gamedata에는 발톱 공격, 돌진, locomotion 등 전용 호출만 남기고 공통 PathFollower 정의 중복을 제거했습니다.
+- Boomer를 `ai_boomer_3.smx` 3.0.4로, Spitter를 `ai_spitter_3.smx` 3.0.2로 올렸습니다. 연속 점프는 유효한 경로 미리보기 지점을 우선 사용하고, 경로가 오래되었거나 막혔거나 앞에 등반·틈 점프 같은 특수 이동이 있으면 기존 AI/직선 행동으로 되돌아갑니다.
+- 네 AI 플러그인은 체공 시간 예측, 벽·착지점·국지 단차 안전 검사, 점진적인 공중 속도 보정을 `ai_path_movement.inc`에서 공유합니다. Charger 전용 돌진, 재경로 탐색, 측면 교전 판단은 기존 상태 머신이 계속 담당합니다.
 - Boomer는 직접 시야를 잠시 잃은 모퉁이에서도 유효한 PathFollower 경로가 있으면 계속 접근하며, 26-07 AI2의 구토 각도 수정도 유지합니다.
 - 현재 2026-08 AnneHappy, Hardcore, Shotgun 설정은 AI3를 로드합니다. `Anne26-07.cfg`는 변경되지 않은 `ai_boomer_2.smx`와 `ai_spitter_2.smx`를 계속 로드하여 26-07 롤백 버전으로 유지합니다.

@@ -11,7 +11,6 @@
  * 
  * Once you receive this sp file, you are deemed to have agreed, understood and applied to the content above.
  * 
-/**
  * 好服务器始终保留给多人模式；高峰期时普通服务器也不开放单人模式。
  * 管理员在场时不强制卸载模式。
  */

@@ -14,6 +14,7 @@
 #include <vector_show>
 
 #include "./setup.inc"
+#include "../ai_path_movement.inc"
 #include "./stocks.inc"
 #include "./state/state.inc"
 
@@ -34,7 +35,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.3",
+	version 		= "1.0.1.4",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -233,6 +234,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
 	if (g_ChargerStateContext[client].userId != GetClientUserId(client)) {
 		g_AiChargers[client].init();
+		AIPathMovement_Reset(client);
 		clearPathSnapshot(client);
 		// 目标变化, 重置状态
 		g_ChargerStateContext[client].init(client);
@@ -260,6 +262,7 @@ void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 	
 	// 新的 charger, 重置状态
 	g_AiChargers[client].init();
+	AIPathMovement_Reset(client);
 	clearPathSnapshot(client);
 	g_ChargerStateContext[client].init(client);
 	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
@@ -443,6 +446,7 @@ bool checkGoalIsBehind(int client, int currentIndex) {
 			// 进入匹配 NavArea 不代表已经越过该 Segment 的 GoalPos, 因此不再额外跳到 NextSegment
 			// 重新找到了新的 CurrentGoal, 重置空中速度修正坐标
 			ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+			AIPathMovement_Reset(client);
 			g_AiChargers[client].m_AirStrafe.init();
 
 			log.debugAll("[CheckGoalIsBehind]: Advanced Charger %N goal after matching future NavArea %d", client, L4D_GetNavAreaID(pLastKnownArea));
@@ -457,6 +461,7 @@ bool checkGoalIsBehind(int client, int currentIndex) {
 
 	clearCachedPath(client);
 	ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+	AIPathMovement_Reset(client);
 	g_AiChargers[client].m_AirStrafe.init();
 	g_AiChargers[client].m_BhopType = BhopType_None;
 

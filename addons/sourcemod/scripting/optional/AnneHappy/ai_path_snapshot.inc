@@ -294,18 +294,3 @@ float AIPathSnapshot_GetSuggestedLateralOffset(int client, float maxOffset)
     }
     return maxOffset;
 }
-
-bool AIPathSnapshot_AlignFacing(int client, const float movement[3], float commandAngles[3])
-{
-    float direction[3];
-    direction = movement;
-    direction[2] = 0.0;
-    if (NormalizeVector(direction, direction) <= 0.0)
-        return false;
-
-    GetVectorAngles(direction, commandAngles);
-    commandAngles[0] = 0.0;
-    commandAngles[2] = 0.0;
-    TeleportEntity(client, NULL_VECTOR, commandAngles, NULL_VECTOR);
-    return true;
-}

@@ -8,6 +8,7 @@
 #include <treeutil>
 #include <anne_nextbot>
 #include "ai_path_snapshot.inc"
+#include "ai_path_movement.inc"
 
 #define CVAR_FLAG FCVAR_NOTIFY
 #define EYE_ANGLE_UP_HEIGHT 15.0
@@ -30,7 +31,7 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.3",
+		version 		= "3.0.4",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -56,7 +57,6 @@ ConVar
 bool
 	can_bile[MAXPLAYERS + 1] = { true },
 	in_bile_interval[MAXPLAYERS + 1] = { false },
-	pathHop[MAXPLAYERS + 1] = { false },
 	isInBileState[MAXPLAYERS + 1] = { false };
 
 // Ints，bile_frame 0 位：当前目标索引，1 位：循环次数
@@ -131,13 +131,13 @@ public void OnPluginEnd()
 
 public void OnClientDisconnect(int client)
 {
-	pathHop[client] = false;
+	AIPathMovement_Reset(client);
 }
 
 public void AnneNextBot_OnBoomerPathSnapshotUpdated(int client)
 {
     if (IsBoomer(client) && !AIPathSnapshot_IsReady(client))
-        pathHop[client] = false;
+        AIPathMovement_Reset(client);
 }
 
 /* 回合开始，每个玩家的二次检测帧数为 0 */
@@ -146,7 +146,7 @@ public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 	for (int i = 0; i < MAXPLAYERS + 1; i++)
 	{
 		secondCheckFrame[i] = 0;
-		pathHop[i] = false;
+		AIPathMovement_Reset(i);
 	}
 }
 
@@ -154,7 +154,7 @@ public void evt_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if (!IsBoomer(client)) { return; }
-	pathHop[client] = false;
+	AIPathMovement_Reset(client);
 	in_bile_interval[client] = true;
 	CreateTimer(1.5, Timer_ResetAbility, client);
 }
@@ -165,7 +165,7 @@ public void evt_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 	if (!IsBoomer(client)) { return; }
 	can_bile[client] = true;
 	in_bile_interval[client] = false;
-	pathHop[client] = false;
+	AIPathMovement_Reset(client);
 	bile_frame[client][0] = bile_frame[client][1] = 0;
 	// Build ArrayList
 	if (targetList[client] != null) { targetList[client].Clear(); }
@@ -209,12 +209,20 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	bool onGround = (flags & FL_ONGROUND) != 0;
 	bool onLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
 	if (onGround || onLadder)
-		pathHop[client] = false;
+		AIPathMovement_Reset(client);
 	else if (isAbilityUsing || (buttons & (IN_ATTACK | IN_ATTACK2)))
-		pathHop[client] = false;
-	bool pathAirFacing = pathHop[client] && !onGround && !onLadder;
+		AIPathMovement_Reset(client);
+	bool pathAirFacing = AIPathMovement_IsPathHopActive(client) && !onGround && !onLadder;
 	if (pathAirFacing)
-		AIPathSnapshot_AlignFacing(client, vec_speed, angles);
+	{
+		float correctedVelocity[3];
+		if (AIPathMovement_ComputePathAirCorrection(client, vec_speed, 25.0, 1.0, 89.0, 0.3, 0.3, 0.12, correctedVelocity))
+		{
+			vec_speed = correctedVelocity;
+			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, correctedVelocity);
+		}
+		AIPathMovement_AlignFacing(vec_speed, angles);
+	}
 
 	GetClientAbsOrigin(client, self_pos);
 	GetClientEyePosition(client, self_eye_pos);
@@ -427,6 +435,18 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			pathGuided = AIPathSnapshot_GetLookAheadGoal(client, maxEstimateDist, laneOffset, bhopTarget, g_hPathLookAheadDepth.IntValue);
 		}
 		vel_buffer = CalculateVel(self_pos, bhopTarget, g_hBhopSpeed.FloatValue);
+		float airTime = AIPathMovement_GetJumpAirTime();
+		if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, has_sight, 89.0))
+		{
+			if (!pathGuided || !has_sight)
+				return pathAirFacing ? Plugin_Changed : Plugin_Continue;
+
+			bhopTarget = targetPos;
+			vel_buffer = CalculateVel(self_pos, bhopTarget, g_hBhopSpeed.FloatValue);
+			pathGuided = false;
+			if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, true, 89.0))
+				return pathAirFacing ? Plugin_Changed : Plugin_Continue;
+		}
 		if (pathGuided)
 		{
 			buttons &= ~(IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_LEFT | IN_RIGHT);
@@ -440,8 +460,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			{
 				float pathVelocity[3];
 				GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", pathVelocity);
-				AIPathSnapshot_AlignFacing(client, pathVelocity, angles);
-				pathHop[client] = true;
+				AIPathMovement_AlignFacing(pathVelocity, angles);
+				AIPathMovement_BeginPathHop(client, bhopTarget, AIPathMovement_GetHorizontalSpeed(pathVelocity));
 			}
 			return Plugin_Changed;
 		}

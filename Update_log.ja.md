@@ -70,7 +70,8 @@
 
 ### 2026年8月10日 Boomer/Spitter Path Follow 連続ジャンプ
 - ネイティブ拡張 `anne_nextbot` を 1.3.0 へ更新しました。唯一の `PathFollower::Update` detour として、上限付きの経路ノード値をネイティブ側で直接コピーします。Tank、Charger、Boomer、Spitter は native 経由でスナップショットを読み取り、SourcePawn は PathFollower/PathSegment ポインタを受け取らず、読み取りもしません。共通の経路シグネチャと仮想関数オフセットは `anne_nextbot.games.txt` に集約しました。
-- Tank `ai_tank3` を 1.0.0.3、Charger `ai_charger3` を 1.0.1.3 に更新し、既存の Path Follow 連続ジャンプを同じ native スナップショットへ移行しました。各 gamedata には爪攻撃、突進、locomotion など固有の呼び出しだけを残し、共通 PathFollower 定義の重複を削除しました。
-- Boomer を `ai_boomer_3.smx` 3.0.3、Spitter を `ai_spitter_3.smx` 3.0.1 へ更新しました。連続ジャンプは有効な経路先読み地点を優先し、経路が古い、遮られている、または前方に登り・隙間ジャンプなどの特殊移動がある場合は従来の AI/直線動作へ戻ります。
+- Tank `ai_tank3` を 1.0.0.4、Charger `ai_charger3` を 1.0.1.4 に更新し、既存の Path Follow 連続ジャンプを同じ native スナップショットへ移行しました。各 gamedata には爪攻撃、突進、locomotion など固有の呼び出しだけを残し、共通 PathFollower 定義の重複を削除しました。
+- Boomer を `ai_boomer_3.smx` 3.0.4、Spitter を `ai_spitter_3.smx` 3.0.2 へ更新しました。連続ジャンプは有効な経路先読み地点を優先し、経路が古い、遮られている、または前方に登り・隙間ジャンプなどの特殊移動がある場合は従来の AI/直線動作へ戻ります。
+- 4 つの AI は、滞空時間予測、壁・着地点・局所的な段差の安全確認、段階的な空中速度補正を `ai_path_movement.inc` で共有します。Charger 固有の突進、再経路探索、横方向の駆け引きは従来どおり状態機械が担当します。
 - Boomer は一時的に直接視認できない曲がり角でも、有効な PathFollower 経路があれば接近を続けます。26-07 AI2 の吐しゃ角度修正も維持しています。
 - 現行 2026-08 の AnneHappy、Hardcore、Shotgun は AI3 を読み込みます。`Anne26-07.cfg` は未変更の `ai_boomer_2.smx` と `ai_spitter_2.smx` を引き続き読み込み、26-07 ロールバック版として保持します。
