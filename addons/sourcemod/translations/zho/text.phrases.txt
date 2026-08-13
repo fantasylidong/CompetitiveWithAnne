@@ -16,4 +16,88 @@
 	{
 		"zho"		"{lightgreen}內鬼模式{olive}[{green}關閉{olive}] {lightgreen}槽位{olive}[{green}%d{olive}]"
 	}
+	"Text_TankBhopOn"
+	{
+		"zho"		"{lightgreen}Tank連跳{olive}[{green}開啟{olive}]"
+	}
+	"Text_TankBhopOff"
+	{
+		"zho"		"{lightgreen}Tank連跳{olive}[{green}關閉{olive}]"
+	}
+	"Text_Weapon"
+	{
+		"zho"		"{lightgreen}武器{olive}[{green}%s{olive}]"
+	}
+	"Text_AiDifficulty"
+	{
+		"zho"		"{lightgreen}動態難度{olive}[{green}%s-%s{olive}]"
+	}
+	"Text_AiModeAuto"
+	{
+		"zho"		"自動"
+	}
+	"Text_AiModeFixed"
+	{
+		"zho"		"固定"
+	}
+	"Text_AiLevelEasy"
+	{
+		"zho"		"簡單"
+	}
+	"Text_AiLevelNormal"
+	{
+		"zho"		"普通"
+	}
+	"Text_AiLevelHard"
+	{
+		"zho"		"困難"
+	}
+	"Text_AiLevelExpert"
+	{
+		"zho"		"專家"
+	}
+	"Text_AiLevelExtreme"
+	{
+		"zho"		"極限"
+	}
+	"Text_AiLevelNeri"
+	{
+		"zho"		"音理"
+	}
+	"Text_AiLevelPending"
+	{
+		"zho"		"待定"
+	}
+	"Text_SpawnAuto"
+	{
+		"zho"		"自動"
+	}
+	"Text_SpawnFixed"
+	{
+		"zho"		"固定"
+	}
+	"Text_SpecialInfected"
+	{
+		"zho"		"{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}電信服{olive}[{green}%s{olive}]"
+	}
+	"Text_SpawnDistanceMin"
+	{
+		"zho"		"{lightgreen}特感最近生成距離{olive}[{green}%d{olive}]"
+	}
+	"Text_TeleportUnseen"
+	{
+		"zho"		"{lightgreen}特感傳送條件{olive}[{green}%d秒不可見{olive}]"
+	}
+	"Text_ReturnBloodOn"
+	{
+		"zho"		"{lightgreen}回血{olive}[{green}開啟{olive}]"
+	}
+	"Text_TankConsumeOn"
+	{
+		"zho"		"{lightgreen}坦克消耗{olive}[{green}開啟{olive}]"
+	}
+	"Text_SneakyTankOn"
+	{
+		"zho"		"{lightgreen}狡猾坦克{olive}[{green}開啟{olive}]"
+	}
 }

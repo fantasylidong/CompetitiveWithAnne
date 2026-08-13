@@ -2,11 +2,11 @@
 {
 	"Text_NotExceed10SpecialAnne"
 	{
-		"vi"		"{lightgreen} Vì không vượt quá 10 đặc biệt nên vũ khí AnneHappy+ được tự động chuyển sang vũ khí AnneHappy"
+		"vi"		"{lightgreen}Số SI dưới 10 nên vũ khí AnneHappy+ đã được chuyển về AnneHappy."
 	}
 	"Text_CannotUseAnneHappyPlus"
 	{
-		"vi"		"{lightgreen} không thể sử dụng vũ khí AnneHappyPlus vì không vượt quá 10 đặc biệt"
+		"vi"		"{lightgreen}Không thể dùng vũ khí AnneHappyPlus vì số SI chưa đạt 10."
 	}
 	"Text_TraitorStatusEnabled"
 	{
@@ -15,5 +15,89 @@
 	"Text_TraitorStatusDisabled"
 	{
 		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Tắt{olive}] {lightgreen}Vị trí{olive}[{green}%d{olive}]"
+	}
+	"Text_TankBhopOn"
+	{
+		"vi"		"{lightgreen}Tank bhop{olive}[{green}Bật{olive}]"
+	}
+	"Text_TankBhopOff"
+	{
+		"vi"		"{lightgreen}Tank bhop{olive}[{green}Tắt{olive}]"
+	}
+	"Text_Weapon"
+	{
+		"vi"		"{lightgreen}Vũ khí{olive}[{green}%s{olive}]"
+	}
+	"Text_AiDifficulty"
+	{
+		"vi"		"{lightgreen}Độ khó động{olive}[{green}%s-%s{olive}]"
+	}
+	"Text_AiModeAuto"
+	{
+		"vi"		"Tự động"
+	}
+	"Text_AiModeFixed"
+	{
+		"vi"		"Cố định"
+	}
+	"Text_AiLevelEasy"
+	{
+		"vi"		"Dễ"
+	}
+	"Text_AiLevelNormal"
+	{
+		"vi"		"Thường"
+	}
+	"Text_AiLevelHard"
+	{
+		"vi"		"Khó"
+	}
+	"Text_AiLevelExpert"
+	{
+		"vi"		"Chuyên gia"
+	}
+	"Text_AiLevelExtreme"
+	{
+		"vi"		"Cực hạn"
+	}
+	"Text_AiLevelNeri"
+	{
+		"vi"		"Neri"
+	}
+	"Text_AiLevelPending"
+	{
+		"vi"		"Chưa đặt"
+	}
+	"Text_SpawnAuto"
+	{
+		"vi"		"Tự động"
+	}
+	"Text_SpawnFixed"
+	{
+		"vi"		"Cố định"
+	}
+	"Text_SpecialInfected"
+	{
+		"vi"		"{lightgreen}SI{olive}[{green}%s %i SI / %i giây{olive}] {lightgreen}Phiên bản{olive}[{green}%s{olive}]"
+	}
+	"Text_SpawnDistanceMin"
+	{
+		"vi"		"{lightgreen}Khoảng cách spawn SI tối thiểu{olive}[{green}%d{olive}]"
+	}
+	"Text_TeleportUnseen"
+	{
+		"vi"		"{lightgreen}Dịch chuyển SI{olive}[{green]%d giây không nhìn thấy{olive}]"
+	}
+	"Text_ReturnBloodOn"
+	{
+		"vi"		"{lightgreen}Hồi máu{olive}[{green}Bật{olive}]"
+	}
+	"Text_TankConsumeOn"
+	{
+		"vi"		"{lightgreen}Tank tiêu hao{olive}[{green}Bật{olive}]"
+	}
+	"Text_SneakyTankOn"
+	{
+		"vi"		"{lightgreen}Tank xảo quyệt{olive}[{green}Bật{olive}]"
 	}
 }

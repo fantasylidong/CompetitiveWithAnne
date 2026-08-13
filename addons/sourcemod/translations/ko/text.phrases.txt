@@ -2,11 +2,11 @@
 {
 	"Text_NotExceed10SpecialAnne"
 	{
-		"ko"		"{lightgreen} 특수 10개를 초과하지 않기 때문에 AnneHappy+ 무기가 AnneHappy 무기로 자동 전환되었습니다."
+		"ko"		"{lightgreen}특감이 10마리 미만이라 AnneHappy+ 무기가 AnneHappy로 자동 전환되었습니다."
 	}
 	"Text_CannotUseAnneHappyPlus"
 	{
-		"ko"		"{lightgreen}는 특수무기 10개를 초과하지 않기 때문에 AnneHappyPlus 무기를 사용할 수 없습니다."
+		"ko"		"{lightgreen}특감이 10마리 미만이라 AnneHappyPlus 무기를 사용할 수 없습니다."
 	}
 	"Text_TraitorStatusEnabled"
 	{
@@ -15,5 +15,89 @@
 	"Text_TraitorStatusDisabled"
 	{
 		"ko"		"{lightgreen}트레이터 모드{olive}[{green}꺼짐{olive}] {lightgreen}슬롯{olive}[{green}%d{olive}]"
+	}
+	"Text_TankBhopOn"
+	{
+		"ko"		"{lightgreen}Tank 연속점프{olive}[{green}켜짐{olive}]"
+	}
+	"Text_TankBhopOff"
+	{
+		"ko"		"{lightgreen}Tank 연속점프{olive}[{green}꺼짐{olive}]"
+	}
+	"Text_Weapon"
+	{
+		"ko"		"{lightgreen}무기{olive}[{green}%s{olive}]"
+	}
+	"Text_AiDifficulty"
+	{
+		"ko"		"{lightgreen}동적 난이도{olive}[{green}%s-%s{olive}]"
+	}
+	"Text_AiModeAuto"
+	{
+		"ko"		"자동"
+	}
+	"Text_AiModeFixed"
+	{
+		"ko"		"고정"
+	}
+	"Text_AiLevelEasy"
+	{
+		"ko"		"쉬움"
+	}
+	"Text_AiLevelNormal"
+	{
+		"ko"		"보통"
+	}
+	"Text_AiLevelHard"
+	{
+		"ko"		"어려움"
+	}
+	"Text_AiLevelExpert"
+	{
+		"ko"		"전문가"
+	}
+	"Text_AiLevelExtreme"
+	{
+		"ko"		"극한"
+	}
+	"Text_AiLevelNeri"
+	{
+		"ko"		"음리"
+	}
+	"Text_AiLevelPending"
+	{
+		"ko"		"미정"
+	}
+	"Text_SpawnAuto"
+	{
+		"ko"		"자동"
+	}
+	"Text_SpawnFixed"
+	{
+		"ko"		"고정"
+	}
+	"Text_SpecialInfected"
+	{
+		"ko"		"{lightgreen}특감{olive}[{green}%s %i특/%i초{olive}] {lightgreen}버전{olive}[{green}%s{olive}]"
+	}
+	"Text_SpawnDistanceMin"
+	{
+		"ko"		"{lightgreen}특감 최소 스폰 거리{olive}[{green}%d{olive}]"
+	}
+	"Text_TeleportUnseen"
+	{
+		"ko"		"{lightgreen}특감 텔레포트{olive}[{green}%d초 미시야{olive}]"
+	}
+	"Text_ReturnBloodOn"
+	{
+		"ko"		"{lightgreen}체력 회복{olive}[{green}켜짐{olive}]"
+	}
+	"Text_TankConsumeOn"
+	{
+		"ko"		"{lightgreen}Tank 소모{olive}[{green}켜짐{olive}]"
+	}
+	"Text_SneakyTankOn"
+	{
+		"ko"		"{lightgreen}교활한 Tank{olive}[{green}켜짐{olive}]"
 	}
 }

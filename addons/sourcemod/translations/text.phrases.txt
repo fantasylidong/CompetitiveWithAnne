@@ -2,18 +2,102 @@
 {
 	"Text_NotExceed10SpecialAnne"
 	{
-		"en"		"{lightgreen} Because it does not exceed 10 special, the AnneHappy+ weapon has been automatically switched to the AnneHappy weapon"
+		"en"		"{lightgreen}SI limit is below 10, so AnneHappy+ weapons were switched back to AnneHappy."
 	}
 	"Text_CannotUseAnneHappyPlus"
 	{
-		"en"		"{lightgreen} cannot use AnneHappyPlus weapons because it does not exceed 10 special"
+		"en"		"{lightgreen}AnneHappyPlus weapons require at least 10 SI."
 	}
 	"Text_TraitorStatusEnabled"
 	{
-		"en"		"{lightgreen}Traitor mode{olive}[{green}Enabled{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
+		"en"		"{lightgreen}Traitor mode{olive}[{green}On{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
 	}
 	"Text_TraitorStatusDisabled"
 	{
-		"en"		"{lightgreen}Traitor mode{olive}[{green}Disabled{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
+		"en"		"{lightgreen}Traitor mode{olive}[{green}Off{olive}] {lightgreen}Slots{olive}[{green}%d{olive}]"
+	}
+	"Text_TankBhopOn"
+	{
+		"en"		"{lightgreen}Tank bhop{olive}[{green}On{olive}]"
+	}
+	"Text_TankBhopOff"
+	{
+		"en"		"{lightgreen}Tank bhop{olive}[{green}Off{olive}]"
+	}
+	"Text_Weapon"
+	{
+		"en"		"{lightgreen}Weapons{olive}[{green}%s{olive}]"
+	}
+	"Text_AiDifficulty"
+	{
+		"en"		"{lightgreen}Dynamic AI{olive}[{green}%s-%s{olive}]"
+	}
+	"Text_AiModeAuto"
+	{
+		"en"		"Auto"
+	}
+	"Text_AiModeFixed"
+	{
+		"en"		"Fixed"
+	}
+	"Text_AiLevelEasy"
+	{
+		"en"		"Easy"
+	}
+	"Text_AiLevelNormal"
+	{
+		"en"		"Normal"
+	}
+	"Text_AiLevelHard"
+	{
+		"en"		"Hard"
+	}
+	"Text_AiLevelExpert"
+	{
+		"en"		"Expert"
+	}
+	"Text_AiLevelExtreme"
+	{
+		"en"		"Extreme"
+	}
+	"Text_AiLevelNeri"
+	{
+		"en"		"Neri"
+	}
+	"Text_AiLevelPending"
+	{
+		"en"		"Pending"
+	}
+	"Text_SpawnAuto"
+	{
+		"en"		"Auto"
+	}
+	"Text_SpawnFixed"
+	{
+		"en"		"Fixed"
+	}
+	"Text_SpecialInfected"
+	{
+		"en"		"{lightgreen}SI{olive}[{green}%s %i SI / %i sec{olive}] {lightgreen}Version{olive}[{green}%s{olive}]"
+	}
+	"Text_SpawnDistanceMin"
+	{
+		"en"		"{lightgreen}Min SI spawn distance{olive}[{green}%d{olive}]"
+	}
+	"Text_TeleportUnseen"
+	{
+		"en"		"{lightgreen}SI teleport{olive}[{green}unseen %d sec{olive}]"
+	}
+	"Text_ReturnBloodOn"
+	{
+		"en"		"{lightgreen}Return HP{olive}[{green}On{olive}]"
+	}
+	"Text_TankConsumeOn"
+	{
+		"en"		"{lightgreen}Tank consume{olive}[{green}On{olive}]"
+	}
+	"Text_SneakyTankOn"
+	{
+		"en"		"{lightgreen}Sneaky Tank{olive}[{green}On{olive}]"
 	}
 }
