@@ -98,6 +98,10 @@
 - Upgraded `ai_spitter_3` to 3.0.4: fixed the crowded-target policy copy-paste bug that used the pinned target's position (including a -1 index error), fixed `getTargetByPriority` leaking its ArrayList whenever someone was pinned or only one survivor remained, allowed a lone survivor to be selected by flow, zero-initialized the crowd-distance accumulator cell, and removed the always-false ray filter dead code.
 - Trace-cost optimization: `ai_path_movement.inc` gains a jump-route failure throttle — safety checks that fail due to terrain (walls, gaps, dangerous landings) are not retried within a 0.1s cooldown. All four AI ground-hop attempts use it, cutting hull/ray trace cost while an SI is terrain-blocked to roughly 1/6 (at 60 tick), with the biggest win in multi-Charger lineups. `AIPathMovement_IsJumpRouteSafe` also moves the trace-free no-vision angle rejection ahead of the hull trace, so rejected attempts no longer emit any traces.
 
+### August 13, 2026 Network Quality Reports
+- Upgraded `network_quality_hint.smx` to 1.1.4. The plugin ConVar still defaults to `nqh_report_enable "0"`, so local ping/loss/choke checks do not depend on reporting. This repository now sets `nqh_report_enable "1"` in `cfg/sourcemod/network_quality_hint.cfg` for Anne game servers on the website whitelist.
+- Reporting requires SteamWorks. Without SteamWorks the plugin still loads and shows local hints, but it will not POST to `nqh_report_url`.
+- Community servers that are not on the website whitelist should keep or restore `nqh_report_enable "0"`.
 ### August 13, 2026 Hat/Skin Save Fixes
 - Upgraded `l4d_hats.smx` to 1.46.1: added `Hats_SetClientHat` / `Hats_GetClientHat` natives so RPG can restore hats without going through the `sm_hatclient` console command.
 - `L4D_OnHatLoadSave` now reports `-1` when a hat is removed, instead of colliding with the first hat's 0-based index. Cookie deletion and saved-hat restore now follow menu access (including top 100) and wait for rank data, so saved hats are no longer wiped.

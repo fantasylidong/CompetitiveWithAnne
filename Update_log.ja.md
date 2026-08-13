@@ -98,6 +98,10 @@
 - `ai_spitter_3` を 3.0.4 へ更新：人混み目標がピン留め対象の座標を誤用していたコピーペースト（-1 インデックスエラー含む）を修正。`getTargetByPriority` がピン留め中または生存者 1 人のときに ArrayList を漏らす問題を修正。生存者が 1 人でも flow で選べるようにし、群衆距離累積セルを明示的にゼロ初期化し、常に偽になるレイフィルタの死コードを削除しました。
 - レイコスト最適化：`ai_path_movement.inc` にジャンプ経路失敗のスロットルを追加。地形（壁、段差、危険な着地点）で失敗した安全確認は 0.1 秒冷却中に再試行しません。4 つの AI の地上ジャンプ試行がこれを使い、地形に引っかかっているときの hull/ray trace コストを約 1/6（60 tick）に下げます。`AIPathMovement_IsJumpRouteSafe` はレイ不要の無視界角度拒否を hull trace より前に移し、拒否された試行は一切トレースを出しません。
 
+### 2026年8月13日 ネットワーク品質レポート
+- `network_quality_hint.smx` を 1.1.4 へ更新。プラグインの ConVar 既定値は引き続き `nqh_report_enable "0"` で、ローカルの ping/loss/choke 検出はレポートに依存しません。本リポジトリはウェブサイトのホワイトリスト内 Anne ゲームサーバー向けに `cfg/sourcemod/network_quality_hint.cfg` で `nqh_report_enable "1"` を明示します。
+- レポートには SteamWorks が必要です。SteamWorks が無い場合でもプラグインはロードされローカル通知は出ますが、`nqh_report_url` へは送信しません。
+- ウェブサイトのホワイトリスト外のコミュニティサーバーは `nqh_report_enable "0"` のままにしてください。
 ### 2026年8月13日 帽子/スキン保存修正
 - `l4d_hats.smx` を 1.46.1 へ更新：`Hats_SetClientHat` / `Hats_GetClientHat` native を追加し、RPG は `sm_hatclient` コンソールコマンドを使わずに帽子を復元できます。
 - 帽子を外したとき `L4D_OnHatLoadSave` は `-1` を返すようになり、最初の帽子の 0 番インデックスと衝突しません。Cookie 削除と自動装着は帽子メニュー権限（上位 100 を含む）に合わせ、ランキングキャッシュ待ちで保存済み帽子を消さないようにしました。

@@ -98,6 +98,10 @@
 - `ai_spitter_3`를 3.0.4로 올림: 혼잡 목표가 핀된 대상 좌표를 쓰던 복사-붙여넣기 버그(-1 인덱스 오류 포함)를 고쳤습니다. `getTargetByPriority`가 누군가 핀되었거나 생존자가 한 명일 때 ArrayList를 새던 문제를 수정하고, 생존자가 1명이어도 flow로 고를 수 있게 했으며, 군중 거리 누적 셀을 명시적으로 0으로 초기화하고 항상 거짓인 레이 필터 죽은 코드를 제거했습니다.
 - 레이 비용 최적화: `ai_path_movement.inc`에 점프 경로 실패 스로틀을 추가했습니다. 지형(벽, 단차, 위험한 착지)으로 실패한 안전 검사는 0.1초 쿨다운 안에 재시도하지 않습니다. 네 AI의 지면 점프 시도가 이를 사용해, 지형에 걸린 동안 hull/ray trace 비용을 약 1/6(60 tick)로 줄입니다. `AIPathMovement_IsJumpRouteSafe`는 레이가 필요 없는 무시야 각도 거부를 hull trace 앞으로 옮겨, 거부된 시도는 트레이스를 내지 않습니다.
 
+### 2026년 8월 13일 네트워크 품질 보고
+- `network_quality_hint.smx`를 1.1.4로 올림. 플러그인 ConVar 기본값은 여전히 `nqh_report_enable "0"`이라 로컬 ping/loss/choke 검사는 보고에 의존하지 않습니다. 이 저장소는 웹사이트 화이트리스트에 있는 Anne 게임 서버를 위해 `cfg/sourcemod/network_quality_hint.cfg`에서 `nqh_report_enable "1"`을 명시합니다.
+- 보고에는 SteamWorks가 필요합니다. SteamWorks가 없어도 플러그인은 로드되고 로컬 안내는 동작하지만 `nqh_report_url`로는 보내지 않습니다.
+- 웹사이트 화이트리스트에 없는 커뮤니티 서버는 `nqh_report_enable "0"`을 유지하거나 되돌리세요.
 ### 2026년 8월 13일 모자/스킨 저장 수정
 - `l4d_hats.smx`를 1.46.1로 올렸습니다. `Hats_SetClientHat` / `Hats_GetClientHat` native를 추가해 RPG가 `sm_hatclient` 콘솔 명령 없이 모자를 복원할 수 있습니다.
 - 모자를 벗을 때 `L4D_OnHatLoadSave`가 `-1`을 반환하도록 바꿔, 첫 번째 모자의 0번 인덱스와 겹치지 않습니다. Cookie 삭제와 자동 착용은 모자 메뉴 권한(상위 100 포함)을 따르고 랭킹 캐시를 기다린 뒤에만 저장된 모자를 지우지 않습니다.
