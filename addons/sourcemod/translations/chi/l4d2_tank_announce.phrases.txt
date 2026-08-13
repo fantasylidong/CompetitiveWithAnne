@@ -6,11 +6,11 @@
 	}
 	"Spawned"
 	{
-		"chi"		"{olive}Tank {default}({red}控制人: %s{default}) 已经生成!"
+		"chi"		"{olive}Tank {default}({red}控制: %s{default}) 已经生成!"
 	}
 	"Spawned2"
 	{
-		"chi"		"{olive}Tank {default}({red}控制人: %N{default}) 已经生成!"
+		"chi"		"{olive}Tank {default}({red}控制: %N{default}) 已经生成!"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated"
 	{
@@ -19,5 +19,17 @@
 	"L4D2TankAnnounce_TankControllerGenerated_2"
 	{
 		"chi"		"{default}[{blue}!{default}] {green}Tank {default}({blue}控制者：%s{default}) 已经生成！"
+	}
+	"L4D2TankAnnounce_PlayerName"
+	{
+		"chi"		"(玩家) %N"
+	}
+	"L4D2TankAnnounce_AIName"
+	{
+		"chi"		"(AI) %N"
+	}
+	"L4D2TankAnnounce_Hint"
+	{
+		"chi"		"[Tank] 控制者：%s 已经生成！"
 	}
 }

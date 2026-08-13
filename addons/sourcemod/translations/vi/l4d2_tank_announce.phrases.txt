@@ -6,18 +6,30 @@
 	}
 	"Spawned"
 	{
-		"vi"		"{olive}Tank {default}({red} được điều khiển bởi: %s{default}) đã được tạo!"
+		"vi"		"{olive}Tank {default}({red}Điều khiển: %s{default}) đã xuất hiện!"
 	}
 	"Spawned2"
 	{
-		"vi"		"{olive}Tank {default}({red} được kiểm soát bởi: %N{default}) đã được tạo!"
+		"vi"		"{olive}Tank {default}({red}Điều khiển: %N{default}) đã xuất hiện!"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated"
 	{
-		"vi"		"{default}[{red}!{default}] {green}Tank {default}({red} được điều khiển bởi: %s{default}) đã được tạo!"
+		"vi"		"{default}[{red}!{default}] {green}Tank {default}({red}Điều khiển: %s{default}) đã xuất hiện!"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated_2"
 	{
-		"vi"		"{default}[{blue}!{default}] {green}Tank {default}({blue} được điều khiển bởi: %s{default}) đã được tạo!"
+		"vi"		"{default}[{blue}!{default}] {green}Tank {default}({blue}Điều khiển: %s{default}) đã xuất hiện!"
+	}
+	"L4D2TankAnnounce_PlayerName"
+	{
+		"vi"		"(Người chơi) %N"
+	}
+	"L4D2TankAnnounce_AIName"
+	{
+		"vi"		"(AI) %N"
+	}
+	"L4D2TankAnnounce_Hint"
+	{
+		"vi"		"[Tank] Điều khiển: %s đã xuất hiện!"
 	}
 }

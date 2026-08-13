@@ -108,3 +108,8 @@
 - Upgraded `rpg.smx` to 2.0.1: hats, skins, and glows are reapplied after the database load finishes; hats/skins are no longer cleared to 0 while the scoreboard cache is still loading.
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
+
+### August 13, 2026 Anne Tank Announce Translations
+- Upgraded `optional/AnneHappy/l4d2_tank_announce.smx` to 1.0.1.1. Chat, hint, and center text now all use i18n phrases; Player/AI name prefixes are built in the client's language, so English players no longer see a hard-coded Chinese "(玩家)".
+- English no longer uses Chinese word-for-word phrasing ("has been generated / controller"), and the hint line is translated. Spanish now includes the previously missing Anne-specific keys.
+- Also aligned the versus `Spawned` phrases in Japanese, Korean, Vietnamese, and Traditional Chinese, keeping Tank as a proper noun.
