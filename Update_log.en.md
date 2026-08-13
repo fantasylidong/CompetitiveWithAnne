@@ -108,3 +108,7 @@
 - Upgraded `rpg.smx` to 2.0.1: hats, skins, and glows are reapplied after the database load finishes; hats/skins are no longer cleared to 0 while the scoreboard cache is still loading.
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
+
+### August 13, 2026 Water Slowdown Chat Translations
+- Fixed `l4d2_slowdown_control` chat lines for water slowdown while Tank is in play and after Tank dies. English no longer uses Chinese word-for-word phrasing such as "tank generation", Vietnamese no longer mistranslates Tank as "xe tăng", and Japanese no longer uses two different plugin names.
+- Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese now match the upstream meaning: water slowdown is reduced while Tank is in play, then restored to normal.

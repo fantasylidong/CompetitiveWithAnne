@@ -2,10 +2,10 @@
 {
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffect"
 	{
-		"ko"		"{default}[{olive}물 감속{default}] {green} 물 감속 {default} 탱크 생성으로 인해 효과가 약화됩니다."
+		"ko"		"{default}[{olive}Water Slowdown{default}] {green}물속 감속{default} 효과가 Tank 등장으로 약화됩니다."
 	}
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffectRestored"
 	{
-		"ko"		"{default}[{olive}물 감속{default}] {green}물 감속{default} 효과가 정상 수준으로 복원되었습니다."
+		"ko"		"{default}[{olive}Water Slowdown{default}] {green}물속 감속{default} 효과가 정상 수준으로 복원되었습니다."
 	}
 }
