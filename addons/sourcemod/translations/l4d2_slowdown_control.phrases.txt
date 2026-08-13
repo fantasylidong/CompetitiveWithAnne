@@ -2,10 +2,10 @@
 {
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffect"
 	{
-		"en"		"{default}[{olive}Water Slowdown{default}] {green} Water Slowdown {default} The effect is weakened due to tank generation."
+		"en"		"{default}[{olive}Water Slowdown{default}] {green}Water Slowdown{default} has been reduced while Tank is in play."
 	}
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffectRestored"
 	{
-		"en"		"{default}[{olive}Water Slowdown{default}] {green}Water Slowdown{default} The effect has been restored to normal levels."
+		"en"		"{default}[{olive}Water Slowdown{default}] {green}Water Slowdown{default} has been restored to normal."
 	}
 }

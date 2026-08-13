@@ -2,10 +2,10 @@
 {
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffect"
 	{
-		"vi"		"{default}[{olive}Water Slowdown{default}] {green} Water Slowdown {default} Hiệu ứng bị suy yếu do tạo ra xe tăng."
+		"vi"		"{default}[{olive}Water Slowdown{default}] {green}Làm chậm dưới nước{default} đã bị giảm khi Tank xuất hiện."
 	}
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffectRestored"
 	{
-		"vi"		"{default}[{olive}Water Slowdown{default}] {green} Water Slowdown {default} Hiệu ứng đã được khôi phục về mức bình thường."
+		"vi"		"{default}[{olive}Water Slowdown{default}] {green}Làm chậm dưới nước{default} đã được khôi phục về mức bình thường."
 	}
 }
