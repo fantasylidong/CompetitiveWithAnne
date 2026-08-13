@@ -139,3 +139,13 @@
 - `server_name.smx` を 1.4.8 へ更新。`[AI:専門家]` のような部屋名タグは、`annehappy_dynamic_ai_difficulty.smx` が実際にロードされ、かつ档位が決まっているときだけ表示します。
 - 動的難度プラグインをアンロードしても SourceMod は `ah_ai_dynamic_current_level` を残します。旧処理は残留した 1-6 档を `hostname` / `sn_main_name` へ書き続けていました。いまはプラグインが動作中かを確認し、すでに部屋名へ書き込まれた `[AI:...]` も取り除きます。
 - `annehappy_dynamic_ai_difficulty.smx` を 2026.08.13.1 へ更新。`annehappy_dynamic_ai_difficulty` ライブラリを登録し、アンロード時に `current_level` / `current_mode` / `current_ppm` / `current_locked` を 0 に戻します。HUD、`!xx`、スポーン戦略が古い档位を読み続けないようにします。
+
+### 2026年8月13日 スポーン分散と職業多様性
+- `infected_control.smx` を 2026-08-13.3 へ更新。1 ウェーブの特殊感染者が狭い一角に固まる問題に対して分散処理を作り直し、職業構成に制御されたランダム性を導入しました。ウェーブ時序契約（キルフェーズ、独立した 16 秒基礎カウントダウン、Anti-Bait）は変わりません。
+- 有向候補ページの取得後にページ内シャッフル（`inf_spawn_candidate_shuffle`、既定オン）：旧実装は経路距離の昇順で候補を消費し、1 回の試行で最大 8 個の合格点しか受け付けないため、常に「最も近い一塊」からしか選べませんでした。シャッフル後は採点対象が距離帯全体に広がります。ranked 高所チャンネルは並び順の利点を保つためシャッフルしません。
+- ハード分散を CVar 化して強化：`inf_spawn_sep_radius`（既定 180、旧ハードコード 80）と `inf_spawn_sep_ttl`（既定 2.5 秒、旧 0.5 秒）。特殊上限によるスケーリングは維持。
+- 分散スコアに連続カーネル減点を追加：生存中の特殊感染者と直近スポーン地点に対して exp(-d/r) を累積して減点（`inf_spawn_kernel_radius` 既定 280、`inf_spawn_kernel_points` 既定 40）。「直近 3 セクターだけ覚える」粗い記憶を補完し、セクター減点は維持します。
+- ウェーブ内セクター配分を新設：1 ウェーブ・1 セクターの着地数 ≤ ceil(特殊上限/セクター数)+`inf_spawn_sector_quota_bonus`（既定 +1、-1 で無効）。制約は近い 4 つの距離帯のみで、遠帯とディレクター代替は対象外のため、細長いマップでもスポーンが止まりません。
+- 高所優先は拡張の ranked 有向候補へ移行：`inf_nav_high_sort_scale` を再有効化（新既定 Smoker 0.85 / Hunter 0.90）。ターゲットより `inf_nav_high_sort_min_height`（既定 64）以上高い候補は割引距離で前倒しされ、限られた採点枠に入ります。地面近くの塊の中で事後加点に頼る必要がなくなりました。
+- 職業多様性：職業選択の希少度に ±`inf_class_scarcity_jitter`（既定 0.06）の小さなランダム揺らぎを加え、占有率が近い職業間の固定ローテーションを崩します。支援ゲート（Boomer/Spitter は圧制職の後）はウェーブごとに確率 `inf_support_gate_waive_prob`（既定 0.15）で緩和。Breach ウェーブは緩和しません。
+- `[SCORE-CHOSEN]` デバッグログと `sm_navdebug` の採点内訳にカーネル項（kern）を追加。

@@ -724,3 +724,13 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `server_name.smx` 升级到 1.4.8：`[AI:专家]` 这类房间名标签只在 `annehappy_dynamic_ai_difficulty.smx` 实际加载且已定档时显示。
 - 动态难度插件卸载后，SourceMod 会留下 `ah_ai_dynamic_current_level`；旧逻辑只要看到残留 1-6 档就会继续写进 `hostname` / `sn_main_name`。现在改为检测插件是否在跑，并清掉已经写进房间名的 `[AI:...]`。
 - `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。
+
+### 2026年8月13日 刷特分散度与职业多样性
+- `infected_control.smx` 升级到 2026-08-13.3，针对“一波特感挤在同一小块区域”重做分散度，并给刷特职业组成引入受控随机性；波次时序契约（击杀阶段、独立 16 秒基础倒计时、Anti-Bait）不变。
+- 有向候选分页读取后页内洗牌（`inf_spawn_candidate_shuffle`，默认开）：原实现按路径距离升序消费候选、每次尝试最多接受 8 个合格点，等于永远只在“最近的一小簇”里选优；洗牌后进入评分的候选覆盖整个距离带。ranked 高点通道不洗牌，保留其排序收益。
+- 硬分散参数 CVar 化并加强：`inf_spawn_sep_radius`（默认 180，原硬编码 80）与 `inf_spawn_sep_ttl`（默认 2.5 秒，原 0.5 秒），仍随特感上限缩放。
+- 分散度评分新增连续核密度惩罚：对存活特感与最近刷点按 exp(-d/r) 累加扣分（`inf_spawn_kernel_radius` 默认 280、`inf_spawn_kernel_points` 默认 40），弥补“只记最近 3 次扇区”的粗粒度记忆；扇区惩罚保留。
+- 新增波内扇区配额：单波单扇区落点数 ≤ ceil(特感上限/扇区数)+`inf_spawn_sector_quota_bonus`（默认 +1，设 -1 关闭）；只约束前四个距离带，远带与导演兜底不受限，狭长地形不会因配额刷不出特感。
+- 高点优先改走扩展 ranked 有向候选：重新启用 `inf_nav_high_sort_scale`（新默认 Smoker 0.85 / Hunter 0.90），高于目标 `inf_nav_high_sort_min_height`（默认 64）以上的候选按折减距离前置进入有限的评分名额，高位点不再只能靠评分在近地面簇里“事后加分”。
+- 职业多样性：选类稀缺度加入 ±`inf_class_scarcity_jitter`（默认 0.06）的小幅随机抖动，打散占用率接近的职业之间的固定轮转；支援闸门（Boomer/Spitter 需先刷压制类）每波按 `inf_support_gate_waive_prob`（默认 0.15）随机放宽一波，Breach 波不参与放宽。
+- `[SCORE-CHOSEN]` 调试日志与 `sm_navdebug` 评分演算输出新增核密度项（kern）。
