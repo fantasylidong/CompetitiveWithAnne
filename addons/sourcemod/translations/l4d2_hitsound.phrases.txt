@@ -116,4 +116,24 @@
 	{
 		"en"		"Kill icon: set to %d"
 	}
+	"L4D2Hitsound_HeadKillSoundOn"
+	{
+		"en"		"Headshot-kill sound: ON (headshot kills play the set's dedicated sound when configured)"
+	}
+	"L4D2Hitsound_HeadKillSoundOff"
+	{
+		"en"		"Headshot-kill sound: OFF (headshot kills fall back to the normal headshot sound)"
+	}
+	"L4D2Hitsound_StackModeFollow"
+	{
+		"en"		"Sound playback mode: follow set (the sound set decides whether feedback stacks)"
+	}
+	"L4D2Hitsound_StackModeStack"
+	{
+		"en"		"Sound playback mode: force stacking (every hit/kill rings separately and can overlap in the same frame)"
+	}
+	"L4D2Hitsound_StackModeMerge"
+	{
+		"en"		"Sound playback mode: force merging (at most one sound per frame, priority kill > headshot > hit)"
+	}
 }

@@ -14,8 +14,12 @@
  *
  * 音效套装可选定制键（用于自定义“何时响”）：
  *   "headshot_kill"  爆头击杀专用音效；留空/缺省 = 沿用 headshot 音（旧行为）
- *   "stack"          1 = 每个命中/击杀事件立即独立播放（可同帧叠加，复刻老 killsound 手感）；
- *                    0/缺省 = 同帧按优先级合并为一条（击杀>爆头>命中）
+ *   "stack"          1/缺省 = 每个命中/击杀事件立即独立播放（可同帧叠加，复刻老 killsound 手感）；
+ *                    0 = 同帧按优先级合并为一条（击杀>爆头>命中）
+ *
+ * 玩家个人设置（存 KV data/SoundSelect.txt，不入数据库）：
+ *   - 爆头击杀专用音 开/关（关闭时爆头击杀回退普通爆头音）
+ *   - 音效播放模式：跟随套装 / 强制叠加 / 强制合并
  *
  * 重要编号约定：
  *   - 套装ID：1..N，0 表示禁用
@@ -91,6 +95,12 @@ int  g_IcKill   [MAXPLAYERS + 1] = {0, ...};
 bool g_SndSpecialOnly[MAXPLAYERS + 1] = { false, ... };
 bool g_IcSpecialOnly [MAXPLAYERS + 1] = { false, ... };
 
+// 个人播放定制（仅 KV 持久化，不入数据库）
+// 播放模式：0=跟随套装 stack 设置；1=强制叠加（逐事件）；2=强制合并（同帧一条）
+int  g_SndStackMode [MAXPLAYERS + 1] = { 0, ... };
+// 爆头击杀专用音（套装 headshot_kill）：true=启用；false=回退普通爆头音
+bool g_SndHeadKillOn[MAXPLAYERS + 1] = { true, ... };
+
 bool g_PrefsLoaded[MAXPLAYERS + 1] = { false, ... };
 bool g_PrefsDirty [MAXPLAYERS + 1] = { false, ... };
 bool g_DBLoadInFlight[MAXPLAYERS + 1] = { false, ... };
@@ -122,7 +132,7 @@ Handle g_SetHeadshot = INVALID_HANDLE;
 Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
 Handle g_SetHeadKill = INVALID_HANDLE; // 爆头击杀专用音（可选；空 = 回退 headshot）
-Handle g_SetStack    = INVALID_HANDLE; // 1 = 逐事件立即播放（不做同帧合并去重）
+Handle g_SetStack    = INVALID_HANDLE; // 1 = 逐事件立即播放（不做同帧合并去重；缺省 1）
 int    g_SetCount    = 0; // 套装总数（音效），套装ID有效范围：1..g_SetCount
 
 // --------------------- Overlay icon sets（玩家自选） ---------------------
@@ -297,7 +307,15 @@ static bool IsStackSet(int setId)
     return GetArrayCell(g_SetStack, setId - 1) != 0;
 }
 
-// 击杀事件取样本：爆头击杀优先套装的 headshot_kill，未配置则回退 headshot（旧行为）
+// 玩家最终是否逐事件叠加播放：个人强制设置优先，否则跟随套装 stack
+static bool ShouldStackFeedback(int client, int setId)
+{
+    if (g_SndStackMode[client] == 1) return true;
+    if (g_SndStackMode[client] == 2) return false;
+    return IsStackSet(setId);
+}
+
+// 击杀事件取样本：爆头击杀优先套装的 headshot_kill（玩家可关闭），未配置/关闭则回退 headshot
 static bool GetKillSoundSample(int attacker, bool headshot, char[] out, int maxlen, int &setId)
 {
     setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
@@ -305,7 +323,7 @@ static bool GetKillSoundSample(int attacker, bool headshot, char[] out, int maxl
 
     if (headshot)
     {
-        if (GetSoundPath_BySet(setId, 3, out, maxlen)) return true;
+        if (g_SndHeadKillOn[attacker] && GetSoundPath_BySet(setId, 3, out, maxlen)) return true;
         return GetSoundPath_BySet(setId, 0, out, maxlen);
     }
     return GetSoundPath_BySet(setId, 2, out, maxlen);
@@ -322,8 +340,8 @@ static void QueueSoundFeedback(int client, int setId, const char[] sample, Sound
 {
     if (!IsValidClient(client) || sample[0] == '\0') return;
 
-    // stack 套装：逐事件立即播放，可同帧叠加（复刻老 killsound 行为）
-    if (IsStackSet(setId))
+    // 叠加播放：逐事件立即播放，可同帧叠加（复刻老 killsound 行为）
+    if (ShouldStackFeedback(client, setId))
     {
         EmitSoundToClient(client, sample, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
         return;
@@ -595,7 +613,7 @@ void LoadHitSoundSets()
             KvGetString(kv, "kill",     ki, sizeof(ki), "");
             KvGetString(kv, "headshot_kill", hk, sizeof(hk), "");
             isbuiltin = KvGetNum(kv, "builtin", 0);
-            stack     = KvGetNum(kv, "stack", 0);
+            stack     = KvGetNum(kv, "stack", 1); // 缺省叠加播放；显式 "stack 0" 才启用同帧合并
             DBG("SoundSet #%d '%s' builtin=%d stack=%d hs='%s' hit='%s' kill='%s' hskill='%s'",
                 g_SetCount+1, name, isbuiltin, stack, sh, hi, ki, hk);
 
@@ -765,6 +783,10 @@ public void OnClientPutInServer(int client)
 
     g_SndSpecialOnly[client] = false;
     g_IcSpecialOnly [client] = false;
+
+    g_SndStackMode [client] = 0;
+    g_SndHeadKillOn[client] = true;
+    KV_LoadExtraPrefs(client); // 个人播放定制只存 KV，进服时同步读取（与 DB 路径无关）
 
     g_PrefsLoaded[client] = false;
     g_PrefsDirty [client] = false;
@@ -1099,9 +1121,30 @@ void KV_SavePlayer(int client)
     KvSetNum(g_SoundStore, "SndSpecialOnly", g_SndSpecialOnly[client] ? 1 : 0);
     KvSetNum(g_SoundStore, "IcSpecialOnly",  g_IcSpecialOnly [client] ? 1 : 0);
 
+    KvSetNum(g_SoundStore, "SndStackMode", g_SndStackMode [client]);
+    KvSetNum(g_SoundStore, "SndHeadKill",  g_SndHeadKillOn[client] ? 1 : 0);
+
     KvGoBack(g_SoundStore);
     KvRewind(g_SoundStore);
     KeyValuesToFile(g_SoundStore, g_SavePath);
+}
+
+// 仅读取个人播放定制两项（KV 专属字段，DB 加载路径也要调用）
+void KV_LoadExtraPrefs(int client)
+{
+    char uid[128] = "";
+    if (!GetClientAuthId(client, AuthId_Engine, uid, sizeof(uid), true) || uid[0] == '\0')
+        return;
+
+    if (KvJumpToKey(g_SoundStore, uid, false))
+    {
+        int mode = KvGetNum(g_SoundStore, "SndStackMode", 0);
+        if (mode < 0 || mode > 2) mode = 0;
+        g_SndStackMode [client] = mode;
+        g_SndHeadKillOn[client] = (KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0);
+        KvGoBack(g_SoundStore);
+    }
+    KvRewind(g_SoundStore);
 }
 
 void KV_LoadPlayer(int client)
@@ -1125,6 +1168,11 @@ void KV_LoadPlayer(int client)
 
     g_SndSpecialOnly[client] = (KvGetNum(g_SoundStore, "SndSpecialOnly", 0) != 0);
     g_IcSpecialOnly [client] = (KvGetNum(g_SoundStore, "IcSpecialOnly",  0) != 0);
+
+    int stackMode = KvGetNum(g_SoundStore, "SndStackMode", 0);
+    if (stackMode < 0 || stackMode > 2) stackMode = 0;
+    g_SndStackMode [client] = stackMode;
+    g_SndHeadKillOn[client] = (KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0);
 
     // 兼容旧 KV 键：若音效三项全0，尝试旧 Snd
     if (g_SndHead[client]==0 && g_SndHit[client]==0 && g_SndKill[client]==0) {
@@ -1494,6 +1542,18 @@ public Action Cmd_MenuMain(int client, int args)
     // 特定开关（非管理员也可用）：三项在 0 与 最近套装ID 之间切
     AddMenuItem(menu, "snd_toggle_each", "特定音效开关（命中/击杀/爆头）");
     AddMenuItem(menu, "ico_toggle_each", "特定图标开关（命中/击杀/爆头）");
+
+    // 个人播放定制（非管理员可用）
+    char headKillLabel[128], stackLabel[160];
+    Format(headKillLabel, sizeof(headKillLabel), "爆头击杀专用音：%s（关=回退普通爆头音）",
+        g_SndHeadKillOn[client] ? "开" : "关");
+    char modeName[16];
+    if (g_SndStackMode[client] == 1)      strcopy(modeName, sizeof(modeName), "强制叠加");
+    else if (g_SndStackMode[client] == 2) strcopy(modeName, sizeof(modeName), "强制合并");
+    else                                  strcopy(modeName, sizeof(modeName), "跟随套装");
+    Format(stackLabel, sizeof(stackLabel), "音效播放模式：%s（点击切换）", modeName);
+    AddMenuItem(menu, "snd_headkill",   headKillLabel);
+    AddMenuItem(menu, "snd_stack_mode", stackLabel);
     AddMenuItem(menu, "snd_special_only", g_SndSpecialOnly[client] ? "音效范围：仅特感/Tank" : "音效范围：全部感染者");
     AddMenuItem(menu, "ico_special_only", g_IcSpecialOnly [client] ? "图标范围：仅特感/Tank" : "图标范围：全部感染者");
 
@@ -1545,6 +1605,27 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
         if (StrEqual(info, "ico_toggle_each"))
         {
             OpenToggleEachMenu(client, false);
+            return 0;
+        }
+        if (StrEqual(info, "snd_headkill"))
+        {
+            g_SndHeadKillOn[client] = !g_SndHeadKillOn[client];
+            PrintToChat(client, "%t", g_SndHeadKillOn[client] ? "L4D2Hitsound_HeadKillSoundOn" : "L4D2Hitsound_HeadKillSoundOff");
+            MarkDirtyAndSave(client);
+            Cmd_MenuMain(client, 0);
+            return 0;
+        }
+        if (StrEqual(info, "snd_stack_mode"))
+        {
+            g_SndStackMode[client] = (g_SndStackMode[client] + 1) % 3;
+            switch (g_SndStackMode[client])
+            {
+                case 1:  PrintToChat(client, "%t", "L4D2Hitsound_StackModeStack");
+                case 2:  PrintToChat(client, "%t", "L4D2Hitsound_StackModeMerge");
+                default: PrintToChat(client, "%t", "L4D2Hitsound_StackModeFollow");
+            }
+            MarkDirtyAndSave(client);
+            Cmd_MenuMain(client, 0);
             return 0;
         }
         if (StrEqual(info, "snd_special_only"))
