@@ -134,3 +134,8 @@
 ### August 13, 2026 Water Slowdown Chat Translations
 - Fixed `l4d2_slowdown_control` chat lines for water slowdown while Tank is in play and after Tank dies. English no longer uses Chinese word-for-word phrasing such as "tank generation", Vietnamese no longer mistranslates Tank as "xe tăng", and Japanese no longer uses two different plugin names.
 - Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese now match the upstream meaning: water slowdown is reduced while Tank is in play, then restored to normal.
+
+### August 13, 2026 server_name leftover AI difficulty tag
+- Upgraded `server_name.smx` to 1.4.8. Room-name tags such as `[AI:Expert]` are shown only while `annehappy_dynamic_ai_difficulty.smx` is actually loaded and a tier has been chosen.
+- Unloading the dynamic-difficulty plugin leaves `ah_ai_dynamic_current_level` behind in SourceMod. The old hostname logic kept writing a leftover 1-6 value into `hostname` / `sn_main_name`. It now checks whether the plugin is running and strips any `[AI:...]` already baked into the room name.
+- Upgraded `annehappy_dynamic_ai_difficulty.smx` to 2026.08.13.1. It registers the `annehappy_dynamic_ai_difficulty` library and resets `current_level` / `current_mode` / `current_ppm` / `current_locked` to 0 on unload, so HUD, `!xx`, and spawn strategy do not keep reading a stale tier.

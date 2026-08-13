@@ -134,3 +134,8 @@
 ### 2026年8月13日 水中減速チャット翻訳
 - `l4d2_slowdown_control` の Tank 出現中／撃破後の水中減速チャットを修正。英語の中国語直訳（「tank generation」など）、ベトナム語の Tank を「xe tăng」と誤訳する問題、日本語のプラグイン名の不一致を解消しました。
 - 簡体中文、繁体中文、英語、日本語、韓国語、ベトナム語を上流の意味に揃えました。Tank 出現中は水中減速が弱まり、Tank がいなくなると通常に戻ります。
+
+### 2026年8月13日 server_name の AI 難度タグ残留
+- `server_name.smx` を 1.4.8 へ更新。`[AI:専門家]` のような部屋名タグは、`annehappy_dynamic_ai_difficulty.smx` が実際にロードされ、かつ档位が決まっているときだけ表示します。
+- 動的難度プラグインをアンロードしても SourceMod は `ah_ai_dynamic_current_level` を残します。旧処理は残留した 1-6 档を `hostname` / `sn_main_name` へ書き続けていました。いまはプラグインが動作中かを確認し、すでに部屋名へ書き込まれた `[AI:...]` も取り除きます。
+- `annehappy_dynamic_ai_difficulty.smx` を 2026.08.13.1 へ更新。`annehappy_dynamic_ai_difficulty` ライブラリを登録し、アンロード時に `current_level` / `current_mode` / `current_ppm` / `current_locked` を 0 に戻します。HUD、`!xx`、スポーン戦略が古い档位を読み続けないようにします。

@@ -59,6 +59,8 @@ PPM 从 `l4d_stats` 获取。当前默认对每个真人生还者使用总积分
 | `ah_ai_dynamic_announce` | `1` | 调档时聊天提示 |
 | `ah_ai_dynamic_debug` | `0` | 输出调试日志 |
 
+运行时状态 cvar（`FCVAR_DONTRECORD`，不写进 cfg）：`ah_ai_dynamic_current_level` / `current_mode` / `current_ppm` / `current_locked`。SourceMod 卸载插件时不会删除这些 ConVar，因此插件 `OnPluginEnd` 会把它们清回 `0`。`server_name.smx` 只在动态难度插件实际在跑时才往房间名写 `[AI:简单]` 这类标签；投票切模式卸载该插件后，残留档位不会继续污染服务器名。插件会注册 `annehappy_dynamic_ai_difficulty` 库，方便其他插件用 `LibraryExists` 判断它是否加载。
+
 命令：
 
 | 命令 | 说明 |

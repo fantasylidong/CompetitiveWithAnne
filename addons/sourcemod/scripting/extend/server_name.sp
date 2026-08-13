@@ -10,7 +10,8 @@
  *  规则：
  *  - 服务器名（房间名）：{hostname}{gamemode}
  *      => hostname设置的名字[<模式>][AI:<难度>][缺人][无mod][<几特><几秒>]
- *      * [AI:<难度>]：ah_ai_dynamic_current_level 已定档时显示
+ *      * [AI:<难度>]：动态难度插件已加载且 ah_ai_dynamic_current_level 已定档时显示
+ *        插件未加载时不读取残留 ConVar，并清掉已写进房间名的 [AI:...] 标签
  *      * [缺人]：未满员显示（Anne 系列只看幸存者位）
  *      * [无mod]：l4d2_addons_eclipse == 0 时显示
  *  - A2S_INFO GameDescription 由 a2s-proxy-go 按服务器名标签重写
@@ -22,7 +23,7 @@ public Plugin myinfo =
     name        = "Anne ServerName",
     author      = "东",
     description = "动态服务器名",
-    version     = "1.4.7",
+    version     = "1.4.8",
     url         = ""
 };
 
@@ -40,7 +41,7 @@ ConVar
     cvarHostPort,                // hostport
     cvarDirCount,                // dirspawn_count
     cvarDirInterval,             // dirspawn_interval
-    cvarAIDifficulty;            // ah_ai_dynamic_current_level（旧版 Anne 可能不存在）
+    cvarAIDifficulty;            // ah_ai_dynamic_current_level（插件未加载时不得使用残留值）
 
 // -----------------------------
 // 其它全局
@@ -51,6 +52,10 @@ char SavePath[256];
 char g_sDefaultN[68];
 
 ConVar g_hHostNameFormat;        // sn_hostname_format（默认 "{hostname}{gamemode}"）
+
+#define AI_DIFFICULTY_LIBRARY "annehappy_dynamic_ai_difficulty"
+#define AI_DIFFICULTY_PLUGIN_FILE "optional/AnneHappy/annehappy_dynamic_ai_difficulty.smx"
+#define AI_DIFFICULTY_PLUGIN_SHORT "annehappy_dynamic_ai_difficulty.smx"
 
 // -----------------------------
 // Lifecycle
@@ -146,7 +151,22 @@ public void OnPluginEnd()
     cvarMod          = null;
     cvarDirCount     = null;
     cvarDirInterval  = null;
-    cvarAIDifficulty = null;
+    ReleaseAIDifficultyCvar();
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+    if (StrEqual(name, AI_DIFFICULTY_LIBRARY))
+        Update();
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+    if (!StrEqual(name, AI_DIFFICULTY_LIBRARY))
+        return;
+
+    ReleaseAIDifficultyCvar();
+    Update();
 }
 
 public void Event_PlayerTeam(Event hEvent, const char[] sName, bool bDontBroadcast)
@@ -290,8 +310,35 @@ public void UpdateServerName()
     ChangeServerName(FinalHostname);
 }
 
+bool IsAIDifficultyPluginRunning()
+{
+    if (LibraryExists(AI_DIFFICULTY_LIBRARY))
+        return true;
+
+    Handle plugin = FindPluginByFile(AI_DIFFICULTY_PLUGIN_FILE);
+    if (plugin == null)
+        plugin = FindPluginByFile(AI_DIFFICULTY_PLUGIN_SHORT);
+
+    return plugin != null && GetPluginStatus(plugin) == Plugin_Running;
+}
+
+void ReleaseAIDifficultyCvar()
+{
+    if (cvarAIDifficulty == null)
+        return;
+
+    cvarAIDifficulty.RemoveChangeHook(OnCvarChanged);
+    cvarAIDifficulty = null;
+}
+
 void RefreshAIDifficultyCvar()
 {
+    if (!IsAIDifficultyPluginRunning())
+    {
+        ReleaseAIDifficultyCvar();
+        return;
+    }
+
     if (cvarAIDifficulty != null)
         return;
 
@@ -315,6 +362,16 @@ void AddAIDifficultyTag(char[] hostname, int maxlen)
     // 旧的自定义模板没有该占位符时，仍自动把 AI 难度追加到末尾。
     if (ReplaceString(hostname, maxlen, "{AIDifficulty}", tag) == 0 && tag[0] != '\0')
         StrCat(hostname, maxlen, tag);
+}
+
+void StripStaleAIDifficultyTag(char[] hostname, int maxlen)
+{
+    static const char tags[][] = {
+        "[AI:简单]", "[AI:普通]", "[AI:困难]", "[AI:专家]", "[AI:极限]", "[AI:音理]"
+    };
+
+    for (int i = 0; i < sizeof(tags); i++)
+        ReplaceString(hostname, maxlen, tags[i], "");
 }
 
 void GetAIDifficultyName(int level, char[] buffer, int maxlen)
@@ -387,6 +444,9 @@ void ChangeServerName(const char[] suffix = "")
         ReplaceString(sNewName, sizeof(sNewName), "{hostname}", sPath);
         ReplaceString(sNewName, sizeof(sNewName), "{gamemode}", suffix);
     }
+
+    if (!IsAIDifficultyPluginRunning())
+        StripStaleAIDifficultyTag(sNewName, sizeof(sNewName));
 
     SetConVarString(cvarHostName, sNewName);
     SetConVarString(cvarMainName, sNewName);

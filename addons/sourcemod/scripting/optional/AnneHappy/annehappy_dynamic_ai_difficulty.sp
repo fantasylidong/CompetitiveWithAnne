@@ -6,8 +6,9 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define PLUGIN_VERSION "2026.07.22.1"
+#define PLUGIN_VERSION "2026.08.13.1"
 #define TEAM_SURVIVOR 2
+#define AI_DIFFICULTY_LIBRARY "annehappy_dynamic_ai_difficulty"
 #define DEFAULT_CONFIG_PATH "configs/AnneHappy/dynamic_ai_difficulty.cfg"
 #define DEFAULT_THRESHOLD_DB_CONFIG "l4dstats"
 #define DEFAULT_THRESHOLD_TABLE "ai_dynamic_ppm_thresholds"
@@ -79,6 +80,12 @@ public Plugin myinfo =
     url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+    RegPluginLibrary(AI_DIFFICULTY_LIBRARY);
+    return APLRes_Success;
+}
+
 public void OnPluginStart()
 {
 	LoadTranslations("annehappy_dynamic_ai_difficulty.phrases");
@@ -144,6 +151,9 @@ public void OnPluginEnd()
     StopDifficultyTimer();
     StopThresholdDbReconnect();
     CloseThresholdDb();
+    // SourceMod 不会在插件卸载时删除已创建的 ConVar。把状态位清零，
+    // 避免 server_name / HUD / text 继续读取残留档位造成房间名污染。
+    ClearPublishedDifficulty();
 }
 
 void StartDifficultyTimer()
@@ -529,6 +539,16 @@ public Action Cmd_ReloadDifficulty(int client, int args)
 
     ReplyToCommand(client, "[AnneHappyAI] 已重新读取配置并应用当前难度 %d，应用 %d 个 cvar。", g_iCurrentLevel, applied);
     return Plugin_Handled;
+}
+
+void ClearPublishedDifficulty()
+{
+    g_iCurrentLevel = 0;
+    g_iCurrentMode = 0;
+    g_fCurrentPPM = 0.0;
+    g_bDifficultyLocked = false;
+    if (g_cvCurrentLevel != null)
+        PublishCurrentDifficulty();
 }
 
 void PublishCurrentDifficulty()
