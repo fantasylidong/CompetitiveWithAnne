@@ -687,3 +687,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `network_quality_hint.smx` 升级到 1.1.4。插件源码仍默认 `nqh_report_enable "0"`，本地 ping/loss/choke 检测不依赖上报；本仓库在 `cfg/sourcemod/network_quality_hint.cfg` 为网站白名单内的 Anne 游戏服显式打开上报。
 - 上报需要 SteamWorks。未安装 SteamWorks 时插件仍可加载并做本地提示，但不会向 `nqh_report_url` 发送数据。
 - 未进网站白名单的社区服请保持或改回 `nqh_report_enable "0"`。
+### 2026年8月13日 帽子/皮肤保存修复
+- `l4d_hats.smx` 升级到 1.46.1：新增 `Hats_SetClientHat` / `Hats_GetClientHat` native，RPG 回戴不再走 `sm_hatclient` 控制台命令。
+- 关闭帽子时 `L4D_OnHatLoadSave` 改为回传 `-1`，不再和第一顶帽子的 0 号索引冲突；Cookie 删除与自动回戴改为跟随帽子菜单权限（含前 100），并等待积分缓存就绪，避免把已保存帽子清掉。
+- `rpg.smx` 升级到 2.0.1：数据库加载完成后再回戴帽子、皮肤和轮廓；积分排行榜尚未就绪时不再把帽子/皮肤清成 0。
+- 第一顶帽子用 `-2` 存库，避免 `HAT=0` 既表示“没帽子”又表示“第一顶”；进服先选帽子再读到旧数据时，不会把刚选的帽子覆盖掉。
+- 皮肤存在同样的“数据库异步加载后不回戴、排行榜未就绪就清除”问题，已一并修复；称号、后坐力、伤害 HUD、命中音效等走各自加载完成回调或独立 Cookie/数据库，没有同样的回戴空洞。

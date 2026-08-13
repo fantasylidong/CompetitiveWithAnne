@@ -102,3 +102,9 @@
 - Upgraded `network_quality_hint.smx` to 1.1.4. The plugin ConVar still defaults to `nqh_report_enable "0"`, so local ping/loss/choke checks do not depend on reporting. This repository now sets `nqh_report_enable "1"` in `cfg/sourcemod/network_quality_hint.cfg` for Anne game servers on the website whitelist.
 - Reporting requires SteamWorks. Without SteamWorks the plugin still loads and shows local hints, but it will not POST to `nqh_report_url`.
 - Community servers that are not on the website whitelist should keep or restore `nqh_report_enable "0"`.
+### August 13, 2026 Hat/Skin Save Fixes
+- Upgraded `l4d_hats.smx` to 1.46.1: added `Hats_SetClientHat` / `Hats_GetClientHat` natives so RPG can restore hats without going through the `sm_hatclient` console command.
+- `L4D_OnHatLoadSave` now reports `-1` when a hat is removed, instead of colliding with the first hat's 0-based index. Cookie deletion and saved-hat restore now follow menu access (including top 100) and wait for rank data, so saved hats are no longer wiped.
+- Upgraded `rpg.smx` to 2.0.1: hats, skins, and glows are reapplied after the database load finishes; hats/skins are no longer cleared to 0 while the scoreboard cache is still loading.
+- The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
+- Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
