@@ -71,7 +71,7 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 
 // Nav 找点按帧分片；候选数与昂贵精判数都有限制。
 #define NAV_RANDOM_POINT_TRIES    3
-#define NAV_SCAN_SCORE_BUDGET_CAP     8
+#define NAV_SCAN_SCORE_BUDGET_CAP     12
 #define NAV_CANDIDATE_PAGE_SIZE       256
 #define NAV_CANDIDATE_TEAM_EXCLUSION  250.0
 #define NAV_CANDIDATE_LANDING_MARGIN    16.0
@@ -220,7 +220,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-13.4",
+    version     = "2026-08-13.5",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 

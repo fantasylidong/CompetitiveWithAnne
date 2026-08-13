@@ -141,6 +141,9 @@ enum struct Config
     ConVar SpawnKernelRadius;    // 核密度惩罚衰减距离(0 关闭)
     ConVar SpawnKernelPoints;    // 核密度惩罚强度
     ConVar SpawnCandidateShuffle;// 有向候选页内洗牌
+    ConVar SpawnBudgetNear;      // 当前页近距三分位评分名额
+    ConVar SpawnBudgetMid;       // 当前页中距三分位评分名额
+    ConVar SpawnBudgetFar;       // 当前页远距三分位评分名额
     // === 职业多样性 ===
     ConVar ScarcityJitter;       // 稀缺度随机抖动幅度
     ConVar SupportWaiveProb;     // 每波支援闸门随机放宽概率
@@ -309,6 +312,9 @@ enum struct Config
     float fKernelRadius;
     float fKernelPoints;
     bool  bCandidateShuffle;
+    int   iSpawnBudgetNear;
+    int   iSpawnBudgetMid;
+    int   iSpawnBudgetFar;
     float fScarcityJitter;
     float fSupportWaiveProb;
 
@@ -532,7 +538,7 @@ enum struct Config
             CVAR_FLAG, true, 1.0, true, 1024.0
         );
         this.SpawnNavExpensivePerSlice = CreateConVar(
-            "inf_spawn_nav_expensive_per_slice", "16",
+            "inf_spawn_nav_expensive_per_slice", "24",
             "Maximum candidates entering visibility/path checks in one search slice",
             CVAR_FLAG, true, 1.0, true, 32.0
         );
@@ -604,6 +610,21 @@ enum struct Config
             "inf_spawn_candidate_shuffle", "1",
             "有向候选分页读取后页内洗牌，打散“永远评估最近一簇”的偏置(0/1)。",
             CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SpawnBudgetNear = CreateConVar(
+            "inf_spawn_budget_near", "6",
+            "当前候选页近距三分位最多接受的评分名额；与 mid/far 全 0 时退回整页名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
+        );
+        this.SpawnBudgetMid = CreateConVar(
+            "inf_spawn_budget_mid", "4",
+            "当前候选页中距三分位最多接受的评分名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
+        );
+        this.SpawnBudgetFar = CreateConVar(
+            "inf_spawn_budget_far", "2",
+            "当前候选页远距三分位最多接受的评分名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
         );
         this.ScarcityJitter = CreateConVar(
             "inf_class_scarcity_jitter", "0.06",
@@ -817,6 +838,9 @@ enum struct Config
         this.SpawnKernelRadius.AddChangeHook(OnCfgChanged);
         this.SpawnKernelPoints.AddChangeHook(OnCfgChanged);
         this.SpawnCandidateShuffle.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetNear.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetMid.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetFar.AddChangeHook(OnCfgChanged);
         this.ScarcityJitter.AddChangeHook(OnCfgChanged);
         this.SupportWaiveProb.AddChangeHook(OnCfgChanged);
         this.AntiBaitEnable.AddChangeHook(OnCfgChanged);
@@ -1140,6 +1164,15 @@ enum struct Config
         this.fKernelPoints = this.SpawnKernelPoints.FloatValue;
         if (this.fKernelPoints < 0.0) this.fKernelPoints = 0.0;
         this.bCandidateShuffle = this.SpawnCandidateShuffle.BoolValue;
+        this.iSpawnBudgetNear = this.SpawnBudgetNear.IntValue;
+        if (this.iSpawnBudgetNear < 0) this.iSpawnBudgetNear = 0;
+        if (this.iSpawnBudgetNear > 24) this.iSpawnBudgetNear = 24;
+        this.iSpawnBudgetMid = this.SpawnBudgetMid.IntValue;
+        if (this.iSpawnBudgetMid < 0) this.iSpawnBudgetMid = 0;
+        if (this.iSpawnBudgetMid > 24) this.iSpawnBudgetMid = 24;
+        this.iSpawnBudgetFar = this.SpawnBudgetFar.IntValue;
+        if (this.iSpawnBudgetFar < 0) this.iSpawnBudgetFar = 0;
+        if (this.iSpawnBudgetFar > 24) this.iSpawnBudgetFar = 24;
         this.fScarcityJitter = this.ScarcityJitter.FloatValue;
         if (this.fScarcityJitter < 0.0) this.fScarcityJitter = 0.0;
         this.fSupportWaiveProb = this.SupportWaiveProb.FloatValue;

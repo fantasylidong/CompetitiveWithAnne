@@ -456,6 +456,7 @@ enum struct SpawnSearchCursor
     int graphPage[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
+    int graphPageTertile[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageLen;
     int graphPageRow;
     float graphPageExpiresAt;
@@ -725,13 +726,242 @@ static void SpawnSearch_EnsureCursor(
     }
 }
 
+#define SPAWN_TERTILE_NEAR 0
+#define SPAWN_TERTILE_MID  1
+#define SPAWN_TERTILE_FAR  2
+
+static bool SpawnSearch_TertileEnabled()
+{
+    return gCV.iSpawnBudgetNear > 0
+        || gCV.iSpawnBudgetMid > 0
+        || gCV.iSpawnBudgetFar > 0;
+}
+
+static int SpawnSearch_TertileBudget(int tertile, int totalBudget)
+{
+    if (!SpawnSearch_TertileEnabled())
+        return totalBudget;
+    int cap = 0;
+    if (tertile == SPAWN_TERTILE_NEAR)
+        cap = gCV.iSpawnBudgetNear;
+    else if (tertile == SPAWN_TERTILE_MID)
+        cap = gCV.iSpawnBudgetMid;
+    else
+        cap = gCV.iSpawnBudgetFar;
+    if (cap < 0)
+        cap = 0;
+    if (cap > totalBudget)
+        cap = totalBudget;
+    return cap;
+}
+
+static int SpawnSearch_TertileOfDistance(float navDistance, float lo, float hi)
+{
+    if (navDistance < 0.0 || hi - lo < 8.0)
+        return SPAWN_TERTILE_NEAR;
+    float t = (navDistance - lo) / (hi - lo);
+    if (t < 0.33333334)
+        return SPAWN_TERTILE_NEAR;
+    if (t < 0.66666669)
+        return SPAWN_TERTILE_MID;
+    return SPAWN_TERTILE_FAR;
+}
+
+static void SpawnSearch_CountUnreadTertiles(SpawnSearchCursor cursor, int unread[3])
+{
+    unread[0] = unread[1] = unread[2] = 0;
+    for (int row = cursor.graphPageRow; row < cursor.graphPageLen; row++)
+    {
+        int tertile = cursor.graphPageTertile[row];
+        if (tertile < 0 || tertile > 2)
+            tertile = SPAWN_TERTILE_NEAR;
+        unread[tertile]++;
+    }
+}
+
+static bool SpawnSearch_TertileCanTake(
+    int tertile, int accepted[3], int unread[3],
+    int totalBudget, int acceptedHits)
+{
+    if (acceptedHits >= totalBudget)
+        return false;
+    if (tertile < 0 || tertile > 2)
+        tertile = SPAWN_TERTILE_NEAR;
+    int cap = SpawnSearch_TertileBudget(tertile, totalBudget);
+    if (accepted[tertile] < cap)
+        return true;
+    for (int other = 0; other < 3; other++)
+    {
+        if (other == tertile)
+            continue;
+        if (accepted[other] < SpawnSearch_TertileBudget(other, totalBudget)
+            && unread[other] > 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void SpawnSearch_ShuffleIndexRange(int indices[NAV_CANDIDATE_PAGE_SIZE], int start, int len)
+{
+    if (len <= 2)
+        return;
+    int last = start + len - 1;
+    for (int row = last; row > start; row--)
+    {
+        int swap = GetRandomInt(start, row);
+        if (swap == row)
+            continue;
+        int tmp = indices[row];
+        indices[row] = indices[swap];
+        indices[swap] = tmp;
+    }
+}
+
+static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
+{
+    int count = cursor.graphPageLen;
+    for (int row = 0; row < count; row++)
+        cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
+    if (count <= 2)
+        return;
+
+    bool tertileOn = SpawnSearch_TertileEnabled();
+    if (!tertileOn)
+    {
+        if (gCV.bCandidateShuffle && !ranked)
+        {
+            for (int row = count - 1; row > 0; row--)
+            {
+                int swap = GetRandomInt(0, row);
+                if (swap == row)
+                    continue;
+                int tmpArea = cursor.graphPage[row];
+                cursor.graphPage[row] = cursor.graphPage[swap];
+                cursor.graphPage[swap] = tmpArea;
+                float tmpNav = cursor.graphPageNavDistance[row];
+                cursor.graphPageNavDistance[row] = cursor.graphPageNavDistance[swap];
+                cursor.graphPageNavDistance[swap] = tmpNav;
+                float tmpRank = cursor.graphPageRankDistance[row];
+                cursor.graphPageRankDistance[row] = cursor.graphPageRankDistance[swap];
+                cursor.graphPageRankDistance[swap] = tmpRank;
+            }
+        }
+        return;
+    }
+
+    float lo = 1.0e20;
+    float hi = -1.0;
+    for (int row = 0; row < count; row++)
+    {
+        float navDistance = cursor.graphPageNavDistance[row];
+        if (navDistance < 0.0)
+            continue;
+        if (navDistance < lo)
+            lo = navDistance;
+        if (navDistance > hi)
+            hi = navDistance;
+    }
+
+    int binIdx[NAV_CANDIDATE_PAGE_SIZE];
+    int binLen[3];
+    binLen[0] = binLen[1] = binLen[2] = 0;
+    for (int row = 0; row < count; row++)
+    {
+        int tertile = (hi >= lo)
+            ? SpawnSearch_TertileOfDistance(cursor.graphPageNavDistance[row], lo, hi)
+            : SPAWN_TERTILE_NEAR;
+        cursor.graphPageTertile[row] = tertile;
+        binLen[tertile]++;
+    }
+    int binStart[3];
+    binStart[0] = 0;
+    binStart[1] = binLen[0];
+    binStart[2] = binLen[0] + binLen[1];
+    int binFill[3];
+    binFill[0] = binStart[0];
+    binFill[1] = binStart[1];
+    binFill[2] = binStart[2];
+    for (int row = 0; row < count; row++)
+    {
+        int tertile = cursor.graphPageTertile[row];
+        binIdx[binFill[tertile]++] = row;
+    }
+    if (gCV.bCandidateShuffle && !ranked)
+    {
+        SpawnSearch_ShuffleIndexRange(binIdx, binStart[0], binLen[0]);
+        SpawnSearch_ShuffleIndexRange(binIdx, binStart[1], binLen[1]);
+        SpawnSearch_ShuffleIndexRange(binIdx, binStart[2], binLen[2]);
+    }
+
+    int takeN[3];
+    takeN[0] = 3;
+    takeN[1] = 2;
+    takeN[2] = 1;
+    int binCursor[3];
+    binCursor[0] = binStart[0];
+    binCursor[1] = binStart[1];
+    binCursor[2] = binStart[2];
+    int binEnd[3];
+    binEnd[0] = binStart[0] + binLen[0];
+    binEnd[1] = binStart[1] + binLen[1];
+    binEnd[2] = binStart[2] + binLen[2];
+
+    int order[NAV_CANDIDATE_PAGE_SIZE];
+    int outRow = 0;
+    int guard = 0;
+    while (outRow < count && guard++ < NAV_CANDIDATE_PAGE_SIZE * 4)
+    {
+        bool progressed = false;
+        for (int tertile = 0; tertile < 3; tertile++)
+        {
+            int remain = takeN[tertile];
+            while (remain-- > 0 && binCursor[tertile] < binEnd[tertile] && outRow < count)
+            {
+                order[outRow++] = binIdx[binCursor[tertile]++];
+                progressed = true;
+            }
+        }
+        if (!progressed)
+            break;
+    }
+    for (int tertile = 0; tertile < 3 && outRow < count; tertile++)
+    {
+        while (binCursor[tertile] < binEnd[tertile] && outRow < count)
+            order[outRow++] = binIdx[binCursor[tertile]++];
+    }
+
+    int newArea[NAV_CANDIDATE_PAGE_SIZE];
+    float newNav[NAV_CANDIDATE_PAGE_SIZE];
+    float newRank[NAV_CANDIDATE_PAGE_SIZE];
+    int newTertile[NAV_CANDIDATE_PAGE_SIZE];
+    for (int row = 0; row < count; row++)
+    {
+        int src = order[row];
+        newArea[row] = cursor.graphPage[src];
+        newNav[row] = cursor.graphPageNavDistance[src];
+        newRank[row] = cursor.graphPageRankDistance[src];
+        newTertile[row] = cursor.graphPageTertile[src];
+    }
+    for (int row = 0; row < count; row++)
+    {
+        cursor.graphPage[row] = newArea[row];
+        cursor.graphPageNavDistance[row] = newNav[row];
+        cursor.graphPageRankDistance[row] = newRank[row];
+        cursor.graphPageTertile[row] = newTertile[row];
+    }
+}
+
 static SpawnCandidateReadResult SpawnSearch_NextCandidate(
     SpawnSearchCursor cursor, int &areaIdx, int &candidateBucket,
-    float &navDistance, float &navRankDistance, bool &rejectBadFlow)
+    float &navDistance, float &navRankDistance, int &candidateTertile,
+    bool &rejectBadFlow)
 {
     candidateBucket = -1;
     navDistance = -1.0;
     navRankDistance = -1.0;
+    candidateTertile = SPAWN_TERTILE_NEAR;
     rejectBadFlow = false;
     while (cursor.source != SpawnCandidate_None)
     {
@@ -745,6 +975,9 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 areaIdx = cursor.graphPage[pageRow];
                 navDistance = cursor.graphPageNavDistance[pageRow];
                 navRankDistance = cursor.graphPageRankDistance[pageRow];
+                candidateTertile = cursor.graphPageTertile[pageRow];
+                if (candidateTertile < SPAWN_TERTILE_NEAR || candidateTertile > SPAWN_TERTILE_FAR)
+                    candidateTertile = SPAWN_TERTILE_NEAR;
                 cursor.graphOffset++;
                 TryGetBucketByAreaIdx(areaIdx, candidateBucket);
                 return SpawnCandidateRead_Found;
@@ -853,28 +1086,12 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 cursor.graphPage[row] = page[row];
                 cursor.graphPageNavDistance[row] = pageNavDistance[row];
                 cursor.graphPageRankDistance[row] = pageRankDistance[row];
+                cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
             }
-            // 页内洗牌：接受名额有限(candidateBudget)，顺序消费会让评分
-            // 永远只见到"最近的一小簇"。洗牌后接受集覆盖整页跨度，
-            // 评分再从中选优。ranked 高点通道保留其排序收益，不洗牌。
-            if (gCV.bCandidateShuffle && !ranked && count > 2)
-            {
-                for (int row = count - 1; row > 0; row--)
-                {
-                    int swap = GetRandomInt(0, row);
-                    if (swap == row)
-                        continue;
-                    int tmpArea = cursor.graphPage[row];
-                    cursor.graphPage[row] = cursor.graphPage[swap];
-                    cursor.graphPage[swap] = tmpArea;
-                    float tmpNav = cursor.graphPageNavDistance[row];
-                    cursor.graphPageNavDistance[row] = cursor.graphPageNavDistance[swap];
-                    cursor.graphPageNavDistance[swap] = tmpNav;
-                    float tmpRank = cursor.graphPageRankDistance[row];
-                    cursor.graphPageRankDistance[row] = cursor.graphPageRankDistance[swap];
-                    cursor.graphPageRankDistance[swap] = tmpRank;
-                }
-            }
+            // 页内按路径距离三分位交错消费：近:中:远 = 3:2:1，
+            // 评分名额默认 6/4/2。非 ranked 时三分位内部仍可洗牌；
+            // ranked 高点通道只做三分位交错，组内保序。
+            SpawnSearch_PreparePageOrder(cursor, ranked);
             float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;
             cursor.graphPageExpiresAt = now + FloatMax(0.001, ttlRemaining);
             continue;
@@ -915,6 +1132,8 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     int sliceInspected = 0;
     int sliceExpensive = 0;
     int acceptedHits = 0;
+    int tertileAccepted[3];
+    tertileAccepted[0] = tertileAccepted[1] = tertileAccepted[2] = 0;
     bool exhausted = false;
     bool foundThisTick = false;
     float bestScore = -1.0e9;
@@ -929,10 +1148,11 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         int candidateBucket;
         float navDistance;
         float navRankDistance;
+        int candidateTertile;
         bool rejectBadFlow;
         SpawnCandidateReadResult readResult = SpawnSearch_NextCandidate(
             cursor, areaIdx, candidateBucket, navDistance,
-            navRankDistance, rejectBadFlow);
+            navRankDistance, candidateTertile, rejectBadFlow);
         if (readResult == SpawnCandidateRead_Pending)
             break;
         if (readResult == SpawnCandidateRead_Exhausted)
@@ -943,6 +1163,17 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 
         sliceInspected++;
         cursor.inspected++;
+        if (SpawnSearch_TertileEnabled())
+        {
+            int unread[3];
+            SpawnSearch_CountUnreadTertiles(cursor, unread);
+            if (!SpawnSearch_TertileCanTake(
+                    candidateTertile, tertileAccepted, unread,
+                    frame.candidateBudget, acceptedHits))
+            {
+                continue;
+            }
+        }
         bool usedExpensive;
         SpawnScoreDbg candDbg;
         bool accepted = SpawnCore_EvaluateNavCandidate(
@@ -964,6 +1195,9 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
             continue;
 
         acceptedHits++;
+        if (candidateTertile < 0 || candidateTertile > 2)
+            candidateTertile = SPAWN_TERTILE_NEAR;
+        tertileAccepted[candidateTertile]++;
         if (!foundThisTick || candDbg.total > bestScore)
         {
             foundThisTick = true;
@@ -980,6 +1214,11 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 
     if (foundThisTick)
     {
+        Debug_Print("[SCORE BUDGET] near=%d/%d mid=%d/%d far=%d/%d accepted=%d budget=%d inspected=%d expensive=%d",
+            tertileAccepted[0], SpawnSearch_TertileBudget(SPAWN_TERTILE_NEAR, frame.candidateBudget),
+            tertileAccepted[1], SpawnSearch_TertileBudget(SPAWN_TERTILE_MID, frame.candidateBudget),
+            tertileAccepted[2], SpawnSearch_TertileBudget(SPAWN_TERTILE_FAR, frame.candidateBudget),
+            acceptedHits, frame.candidateBudget, sliceInspected, sliceExpensive);
         SpawnScore_CopyDbg(dbgOut, bestDbg);
         SpawnCore_CopyPos(outPos, bestDbg.pos);
         outAreaIdx = bestDbg.areaIdx;
