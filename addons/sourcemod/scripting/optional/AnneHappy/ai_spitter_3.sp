@@ -20,7 +20,7 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.2",
+		version 		= "3.0.3",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -86,8 +86,10 @@ public void OnAllPluginsLoaded()
 public void OnPluginEnd()
 {
 	if (LibraryExists(ANNE_NEXTBOT_LIBRARY))
+	{
 		AnneNextBot_SetPathConsumer(AnneNextBotPathConsumer_Spitter, false);
-		delete checkPinnedTimer;
+	}
+	delete checkPinnedTimer;
 }
 
 public void AnneNextBot_OnSpitterPathSnapshotUpdated(int client)
@@ -249,7 +251,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 		{
 			if (IsValidSurvivor(crowdedTarget) && IsPlayerAlive(crowdedTarget))
 			{
-				GetEntPropVector(pinnedTarget, Prop_Send, "m_vecOrigin", targetPos);
+				GetEntPropVector(crowdedTarget, Prop_Send, "m_vecOrigin", targetPos);
 				if (GetVectorDistance(selfPos, targetPos) > g_hSpitRange.FloatValue) { return Plugin_Continue; }
 				curTarget = crowdedTarget;
 				return Plugin_Changed;
@@ -316,27 +318,6 @@ public Action checkPinnedAndCrowdTargetHandler(Handle timer)
 	return Plugin_Continue;
 }
 
-stock bool spitterCanSeeTarget(int spitter, int target)
-{
-	if (!isAiSpitter(spitter) || !IsPlayerAlive(spitter) || !IsValidSurvivor(target) || !IsPlayerAlive(target)) { return false; }
-	static Handle trace;
-	static float selfPos[3], targetPos[3];
-	GetClientEyePosition(spitter, selfPos);
-	GetClientEyePosition(target, targetPos);
-	trace = TR_TraceRayFilterEx(selfPos, targetPos, MASK_VISIBLE, RayType_EndPoint, rayFilter, spitter);
-	if (TR_DidHit(trace) && TR_GetEntityIndex(trace) != target)
-	{
-		delete trace;
-		return false;
-	}
-	delete trace;
-	return true;
-}
-stock bool rayFilter(int entity, int contentsMask, any self)
-{
-	return entity < 1 && entity > MaxClients && entity != self;
-}
-
 int getTargetByPriority()
 {
 	static int i, pummelTarget, pouncedTarget, pulledTarget, jockedTarget;
@@ -385,13 +366,12 @@ int getTargetByPriority()
 			return -1;
 		}
 		flowList.Sort(Sort_Descending, Sort_Float);
-		if (flowList.Length >= 2)
-		{
-			i = flowList.Get(0, 1);
-			delete flowList;
-			return i;
-		}
+		i = flowList.Get(0, 1);
+		delete flowList;
+		return i;
 	}
+	// 后续按优先级选取被控玩家，不再使用路程列表，先释放防止句柄泄漏
+	delete flowList;
 	// 根据优先级选取被控玩家
 	for (i = 0; i < 6; i++)
 	{
@@ -417,6 +397,8 @@ int getCrowdTarget()
 		if (!IsClientInGame(i) || GetClientTeam(i) != TEAM_SURVIVOR	|| !IsPlayerAlive(i)) { continue; }
 		GetClientAbsOrigin(i, selfPos);
 		index = flowList.Push(i);
+		// Push 只写入块内第一格，第二格（距离和）需要显式清零
+		flowList.Set(index, 0.0, 1);
 		for (j = 1; j <= MaxClients; j++)
 		{
 			if (!IsClientInGame(j) || GetClientTeam(j) != TEAM_SURVIVOR	|| !IsPlayerAlive(j) || i == j) { continue; }
