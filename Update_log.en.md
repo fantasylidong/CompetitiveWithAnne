@@ -113,6 +113,9 @@
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
 
+### August 13, 2026 text Plugin Status Translations
+- `optional/AnneHappy/text.smx` now prints `!xx` / join / round-start status lines in the client's language, so English players no longer see hard-coded Chinese such as "特感", "连跳", "动态难度", or "回血".
+- English no longer uses Chinese word-for-word phrasing such as "does not exceed 10 special". Japanese no longer mistranslates AnneHappy as "unhappy".
 ### August 13, 2026 Survivor MVP Translations
 - Upgraded `survivor_mvp.smx` to 0.3.4. Round MVP/LVP lines, personal ranks, and bot prefixes no longer hard-code Chinese; they are printed in the client's language, so English players no longer see "特感/小僵尸/友伤/[机器人]".
 - Japanese, Korean, and Vietnamese no longer mistranslate SI/FF/Anne compact stats as "special sense", "black gun", or "pharmacy". Spanish now includes the previously missing Tag and Anne compact-stat keys.
