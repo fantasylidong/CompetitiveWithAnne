@@ -6,18 +6,30 @@
 	}
 	"Spawned"
 	{
-		"zho"		"{olive}坦克{default}（{red}控制：%s {default}）已生成！"
+		"zho"		"{olive}Tank{default}（{red}控制：%s{default}）已生成！"
 	}
 	"Spawned2"
 	{
-		"zho"		"{olive}坦克{default}（{red}控制：%N {default}）已生成！"
+		"zho"		"{olive}Tank{default}（{red}控制：%N{default}）已生成！"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated"
 	{
-		"zho"		"{default}[{red}!{default}] {green}Tank {default}({red}控制者：%s{default}) 已經產生！"
+		"zho"		"{default}[{red}!{default}] {green}Tank {default}({red}控制者：%s{default}) 已經生成！"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated_2"
 	{
-		"zho"		"{default}[{blue}!{default}] {green}Tank {default}({blue}控制者：%s{default}) 已經產生！"
+		"zho"		"{default}[{blue}!{default}] {green}Tank {default}({blue}控制者：%s{default}) 已經生成！"
+	}
+	"L4D2TankAnnounce_PlayerName"
+	{
+		"zho"		"(玩家) %N"
+	}
+	"L4D2TankAnnounce_AIName"
+	{
+		"zho"		"(AI) %N"
+	}
+	"L4D2TankAnnounce_Hint"
+	{
+		"zho"		"[Tank] 控制者：%s 已經生成！"
 	}
 }

@@ -2,10 +2,10 @@
 {
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffect"
 	{
-		"jp"		"{default}[{olive}水減速{default}] {green}水減速 {default} タンク生成により効果が弱まります。"
+		"jp"		"{default}[{olive}Water Slowdown{default}] {green}水中減速{default} は Tank 出現中に弱まります。"
 	}
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffectRestored"
 	{
-		"jp"		"{default}[{olive}ウォータースローダウン{default}] {green}ウォータースローダウン{default} 効果が通常レベルに戻りました。"
+		"jp"		"{default}[{olive}Water Slowdown{default}] {green}水中減速{default} が通常の強さに戻りました。"
 	}
 }

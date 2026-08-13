@@ -6,13 +6,14 @@
 // 插件常量、数据库表达式和固定资源名。
 
 #define PLUGIN_NAME "玩家排名系统"
-#define PLUGIN_VERSION "1.5.5"
+#define PLUGIN_VERSION "1.5.6"
 #define PLUGIN_DESCRIPTION "求生之路2状态和排名系统."
 
 #define MAX_LINE_WIDTH 64
 #define MAX_MESSAGE_WIDTH 256
 #define MAX_QUERY_COUNTER 256
 #define MAP_RECORD_PLAYER_NAMES_MAX 80
+#define MAP_RECORD_TEAM_MARKER "@L4DSTATS_TEAM"
 #define DB_CONF_NAME "l4dstats"
 
 #define GAMEMODE_UNKNOWN -1

@@ -211,25 +211,44 @@ public Action:event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 
 		if (Mode && Score > 0)
 		{
-				if (IsHeadshot)
+			decl String:VictimLabel[MAX_LINE_WIDTH];
+			if (IsHeadshot)
 			{
 				if (Mode > 1)
 				{
 					GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-					StatsPrintToChatAll("L4DStats_HeadshotSpecialKillAll", AttackerName, VictimName, Score);
+					for (new i = 1; i <= MaxClients; i++)
+					{
+						if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+							continue;
+						Stats_FormatKillVictimLabel(i, Victim, VictimInfType, VictimName, VictimLabel, sizeof(VictimLabel));
+						StatsPrintToChat(i, "L4DStats_HeadshotSpecialKillAll", AttackerName, VictimLabel, Score);
+					}
 				}
 				else
-					StatsPrintToChat(Attacker, "L4DStats_HeadshotSpecialKillSelf", VictimName, Score);
+				{
+					Stats_FormatKillVictimLabel(Attacker, Victim, VictimInfType, VictimName, VictimLabel, sizeof(VictimLabel));
+					StatsPrintToChat(Attacker, "L4DStats_HeadshotSpecialKillSelf", VictimLabel, Score);
+				}
 			}
 			else
 			{
 				if (Mode > 1)
 				{
 					GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-					StatsPrintToChatAll("L4DStats_SpecialKillAll", AttackerName, VictimName, Score);
+					for (new i = 1; i <= MaxClients; i++)
+					{
+						if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+							continue;
+						Stats_FormatKillVictimLabel(i, Victim, VictimInfType, VictimName, VictimLabel, sizeof(VictimLabel));
+						StatsPrintToChat(i, "L4DStats_SpecialKillAll", AttackerName, VictimLabel, Score);
+					}
 				}
 				else
-					StatsPrintToChat(Attacker, "L4DStats_SpecialKillSelf", VictimName, Score);
+				{
+					Stats_FormatKillVictimLabel(Attacker, Victim, VictimInfType, VictimName, VictimLabel, sizeof(VictimLabel));
+					StatsPrintToChat(Attacker, "L4DStats_SpecialKillSelf", VictimLabel, Score);
+				}
 			}
 		}
 

@@ -98,6 +98,10 @@
 - Upgraded `ai_spitter_3` to 3.0.4: fixed the crowded-target policy copy-paste bug that used the pinned target's position (including a -1 index error), fixed `getTargetByPriority` leaking its ArrayList whenever someone was pinned or only one survivor remained, allowed a lone survivor to be selected by flow, zero-initialized the crowd-distance accumulator cell, and removed the always-false ray filter dead code.
 - Trace-cost optimization: `ai_path_movement.inc` gains a jump-route failure throttle — safety checks that fail due to terrain (walls, gaps, dangerous landings) are not retried within a 0.1s cooldown. All four AI ground-hop attempts use it, cutting hull/ray trace cost while an SI is terrain-blocked to roughly 1/6 (at 60 tick), with the biggest win in multi-Charger lineups. `AIPathMovement_IsJumpRouteSafe` also moves the trace-free no-vision angle rejection ahead of the hull trace, so rejected attempts no longer emit any traces.
 
+### August 13, 2026 Hit-Feedback Sound Set Customization
+- `l4d2_hitsound.smx` sound sets gain two optional config keys to customize when they ring: `headshot_kill` assigns a dedicated sound for headshot kills (empty = fall back to the headshot sound, i.e. the old behavior), and `stack` controls whether the set plays every hit/kill event immediately and independently (same-frame stacking). `stack` defaults to 1 (stacking); only an explicit `stack 0` enables the one-sound-per-frame priority merge (kill > headshot > hit).
+- Set 9 "original ding vote plugin" uses these to replicate the old killsound (Dingshot) feel: headshot hit = ding (littlereward), headshot kill = bell (bell_normal), non-headshot hits/kills stay silent; shotgun multi-kills ring once per kill again.
+- The `!snd` main menu now offers two personal playback settings to all players (stored in the per-server KV file, not the database): "headshot-kill sound on/off" (off = headshot kills fall back to the normal headshot sound) and a three-state "sound playback mode" toggle (follow set / force stacking / force merging). The toggle replies use translation phrases (5 new phrases across zh-CN/zh-TW/en/ja/ko/vi) explaining what each mode does.
 ### August 13, 2026 Network Quality Reports
 - Upgraded `network_quality_hint.smx` to 1.1.4. The plugin ConVar still defaults to `nqh_report_enable "0"`, so local ping/loss/choke checks do not depend on reporting. This repository now sets `nqh_report_enable "1"` in `cfg/sourcemod/network_quality_hint.cfg` for Anne game servers on the website whitelist.
 - Reporting requires SteamWorks. Without SteamWorks the plugin still loads and shows local hints, but it will not POST to `nqh_report_url`.
@@ -112,3 +116,14 @@
 ### August 13, 2026 Survivor MVP Translations
 - Upgraded `survivor_mvp.smx` to 0.3.4. Round MVP/LVP lines, personal ranks, and bot prefixes no longer hard-code Chinese; they are printed in the client's language, so English players no longer see "特感/小僵尸/友伤/[机器人]".
 - Japanese, Korean, and Vietnamese no longer mistranslate SI/FF/Anne compact stats as "special sense", "black gun", or "pharmacy". Spanish now includes the previously missing Tag and Anne compact-stat keys.
+### August 13, 2026 l4d_stats Chat i18n
+- Upgraded `l4d_stats.smx` to 1.5.6. Remaining hardcoded English chat fragments now use translation phrases; all 315 Simplified/Traditional Chinese, English, Japanese, Korean, and Vietnamese phrases are aligned, and the per-language files are no longer limited to the 13 map-record strings.
+- Special Infected kill, Smoker/Hunter save, Charger rescue, and Tank rock announcements now show class names in the viewer's language. Human players still appear by nickname.
+- Map-record team fallback names and the console `[RANK]` prefix are translated. Upgraded `global_chat.smx` to 1.1.1 so global map-record broadcasts use the same team-name phrases.
+### August 13, 2026 Anne Tank Announce Translations
+- Upgraded `optional/AnneHappy/l4d2_tank_announce.smx` to 1.0.1.1. Chat, hint, and center text now all use i18n phrases; Player/AI name prefixes are built in the client's language, so English players no longer see a hard-coded Chinese "(玩家)".
+- English no longer uses Chinese word-for-word phrasing ("has been generated / controller"), and the hint line is translated. Spanish now includes the previously missing Anne-specific keys.
+- Also aligned the versus `Spawned` phrases in Japanese, Korean, Vietnamese, and Traditional Chinese, keeping Tank as a proper noun.
+### August 13, 2026 Water Slowdown Chat Translations
+- Fixed `l4d2_slowdown_control` chat lines for water slowdown while Tank is in play and after Tank dies. English no longer uses Chinese word-for-word phrasing such as "tank generation", Vietnamese no longer mistranslates Tank as "xe tăng", and Japanese no longer uses two different plugin names.
+- Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese now match the upstream meaning: water slowdown is reduced while Tank is in play, then restored to normal.
