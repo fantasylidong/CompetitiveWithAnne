@@ -185,4 +185,13 @@
 		{
 			"zho"		"延遲 (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"zho"		"團滅次數"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"zho"		"[團滅x{1}]"
+		}
 	}

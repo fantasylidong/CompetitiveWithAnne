@@ -185,4 +185,13 @@
 		{
 			"ko"		"핑 (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"ko"		"전멸 횟수"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"ko"		"[전멸x{1}]"
+		}
 	}

@@ -185,4 +185,13 @@
 		{
 			"vi"		"Ping (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"vi"		"Số lần cả đội bị diệt"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"vi"		"[Wipe x{1}]"
+		}
 	}

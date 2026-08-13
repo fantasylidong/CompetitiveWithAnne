@@ -185,4 +185,13 @@
 		{
 			"jp"		"Ping (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"jp"		"全滅回数"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"jp"		"[全滅x{1}]"
+		}
 	}

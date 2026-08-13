@@ -185,4 +185,13 @@
 		{
 			"en"		"Ping (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"en"		"Team wipe count"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"en"		"[Wipes x{1}]"
+		}
 	}

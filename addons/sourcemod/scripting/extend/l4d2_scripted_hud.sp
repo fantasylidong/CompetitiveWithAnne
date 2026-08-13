@@ -99,7 +99,9 @@ public Plugin myinfo =
 #define HUD2_PART_MOD                 (1 << 4)
 #define HUD2_PART_INFECTED_TIMING     (1 << 5)
 #define HUD2_PART_PLAYER_COUNT        (1 << 6)
-#define HUD2_PART_ALL_MASK            ((1 << 7) - 1)
+#define HUD2_PART_WIPE_COUNT          (1 << 7)
+#define HUD2_PART_COUNT               8
+#define HUD2_PART_ALL_MASK            ((1 << HUD2_PART_COUNT) - 1)
 
 #define HUD_PREFS_DB_CONFIG           "rpg"
 #define HUD_PREFS_DB_TABLE            "scripted_hud_prefs"
@@ -340,6 +342,7 @@ static int    g_iClientHUDRevision[MAXPLAYERS + 1];
 static int    g_iClientHUDSource[MAXPLAYERS + 1][HUD_CUSTOM_SLOT_COUNT];
 static int    g_iClientSpecialKills[MAXPLAYERS + 1];
 static int    g_iClientCommonKills[MAXPLAYERS + 1];
+static int    g_iHUD2WipeCount;
 
 // ====================================================================================================
 // float - Plugin Variables
@@ -454,6 +457,7 @@ static ConVar g_hCvar_DirSpawnInterval;
 static ConVar g_hCvar_SurvivorLimit;
 static ConVar g_hCvar_InfectedPlayerLimit;
 static ConVar g_hCvar_MaxPlayers;
+static ConVar g_hCvar_RoundWipeCount;
 
 // ====================================================================================================
 // Timer - Plugin Variables
@@ -2115,7 +2119,7 @@ void BuildClientHUDTexts()
 
         if (!g_bData_HUD2_Text && !g_bCvar_HUD2_Text)
         {
-            ComposeHUD2Text(personalized, sizeof(personalized), g_iClientHUD2Mask[client]);
+            ComposeHUD2Text(personalized, sizeof(personalized), g_iClientHUD2Mask[client], client);
             FormatEx(g_sClientHUDText[client][HUD2], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
         }
 
@@ -2344,6 +2348,7 @@ void RefreshHUDStatusCvars()
     if (g_hCvar_SurvivorLimit == null)         g_hCvar_SurvivorLimit = FindConVar("survivor_limit");
     if (g_hCvar_InfectedPlayerLimit == null)   g_hCvar_InfectedPlayerLimit = FindConVar("z_max_player_zombies");
     if (g_hCvar_MaxPlayers == null)            g_hCvar_MaxPlayers = FindConVar("sv_maxplayers");
+    if (g_hCvar_RoundWipeCount == null)        g_hCvar_RoundWipeCount = FindConVar("anne_round_wipe_count");
 }
 
 void LoadBaseServerName()
@@ -2430,6 +2435,10 @@ void RefreshHUD2Fragments()
 
     int playerLimit = (g_hCvar_MaxPlayers == null) ? MaxClients : g_hCvar_MaxPlayers.IntValue;
     FormatEx(g_sHUD2Fragments[6], sizeof(g_sHUD2Fragments[]), "(%d/%d)", GetPlayerNumber(), playerLimit);
+
+    // Published by optional/AnneHappy/server.smx; gate on the Anne mode tag so a
+    // stale value from an unloaded plugin is not displayed after a mode switch.
+    g_iHUD2WipeCount = (isAnne && g_hCvar_RoundWipeCount != null) ? g_hCvar_RoundWipeCount.IntValue : 0;
 }
 
 void GetHUDModeTag(const char[] cfgName, char[] output, int size, bool &isAnne, bool &usesDirectorSpawn)
@@ -2525,13 +2534,20 @@ bool IsHUDTeamFull(bool isAnne)
     return players >= requiredPlayers;
 }
 
-void ComposeHUD2Text(char[] output, int size, int mask)
+void ComposeHUD2Text(char[] output, int size, int mask, int langTarget = LANG_SERVER)
 {
     output[0] = '\0';
     for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
     {
         if ((mask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
             StrCat(output, size, g_sHUD2Fragments[i]);
+    }
+
+    if ((mask & HUD2_PART_WIPE_COUNT) != 0 && g_iHUD2WipeCount > 0)
+    {
+        char wipes[32];
+        FormatEx(wipes, sizeof(wipes), "%T", "L4D2ScriptedHUD_WipeCount", langTarget, g_iHUD2WipeCount);
+        StrCat(output, size, wipes);
     }
 }
 
@@ -2729,7 +2745,7 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
         "CREATE TABLE IF NOT EXISTS `%s` ("
         ... "`steamid` varchar(64) NOT NULL,"
         ... "`hud_mask` tinyint unsigned NOT NULL DEFAULT 3,"
-        ... "`hud2_mask` tinyint unsigned NOT NULL DEFAULT 127,"
+        ... "`hud2_mask` tinyint unsigned NOT NULL DEFAULT 255,"
         ... "`layout_preset` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`hud3_source` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`hud4_source` tinyint unsigned NOT NULL DEFAULT 0,"
@@ -3163,6 +3179,7 @@ void OpenHUD2PartsMenu(int client)
     AddHUDToggleItem(menu, client, "part4", "L4D2ScriptedHUD_PartMod", (g_iClientHUD2Mask[client] & HUD2_PART_MOD) != 0);
     AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0);
     AddHUDToggleItem(menu, client, "part6", "L4D2ScriptedHUD_PartPlayerCount", (g_iClientHUD2Mask[client] & HUD2_PART_PLAYER_COUNT) != 0);
+    AddHUDToggleItem(menu, client, "part7", "L4D2ScriptedHUD_PartWipeCount", (g_iClientHUD2Mask[client] & HUD2_PART_WIPE_COUNT) != 0);
     menu.Display(client, MENU_TIME_FOREVER);
 }
 
@@ -3186,7 +3203,7 @@ public int MenuHandler_HUD2Parts(Menu menu, MenuAction action, int client, int i
     if (strncmp(key, "part", 4) == 0)
     {
         int part = StringToInt(key[4]);
-        if (part >= 0 && part < 7)
+        if (part >= 0 && part < HUD2_PART_COUNT)
             g_iClientHUD2Mask[client] ^= (1 << part);
     }
 

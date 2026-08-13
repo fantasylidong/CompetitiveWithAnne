@@ -185,4 +185,13 @@
 		{
 			"chi"		"延迟 (ms)"
 		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"chi"		"团灭次数"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"chi"		"[团灭x{1}]"
+		}
 	}
