@@ -297,5 +297,37 @@
 	{
 		"jp"		"[IC] Nav グラフとエリア別進行度キャッシュを再構築しています。"
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"jp"		"[IC] スポーンシステムはまだ開始されていません。"
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"jp"		"[IC] ウェーブ決定器の状態: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"jp"		"  ウェーブ番号: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"jp"		"  経過時間: %.1f秒"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"jp"		"  特殊感染者: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"jp"		"  Anti-Bait: ホールド中"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"jp"		"  Anti-Bait: 解放"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"jp"		"[IC] Nav デバッグコマンドはコンパイルされていません。必要な場合は DEBUG_NAV で再コンパイルしてください。"
+	}
 
 }

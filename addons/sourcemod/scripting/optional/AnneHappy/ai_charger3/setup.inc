@@ -269,14 +269,15 @@ enum struct ChargerStateContext {
 		if (!IsValidClient(GetClientOfUserId(this.userId)))
 			return;
 
-		// 执行旧状态的退出逻辑
+		// 执行旧状态的退出逻辑（必须先读取旧状态数据，再判断 OnExit 是否有效）
 		static ChargerState oldState;
-		if (this.currentStateId != CH_STATE_NONE && oldState.OnExit != INVALID_FUNCTION) {
-			// 如果旧状态不是 STATE_NONE, 则获取旧的状态
+		if (this.currentStateId != CH_STATE_NONE && g_ChargerStates != null) {
 			g_ChargerStates.GetArray(this.currentStateId, oldState, sizeof(oldState));
-			Call_StartFunction(INVALID_HANDLE, oldState.OnExit);
-			Call_PushCell(GetClientOfUserId(this.userId));
-			Call_Finish();
+			if (oldState.OnExit != INVALID_FUNCTION) {
+				Call_StartFunction(INVALID_HANDLE, oldState.OnExit);
+				Call_PushCell(GetClientOfUserId(this.userId));
+				Call_Finish();
+			}
 		}
 
 		// 设置状态管理器的当前状态 ID 和开始时间
@@ -287,7 +288,7 @@ enum struct ChargerStateContext {
 		static ChargerState newState;
 		g_ChargerStates.GetArray(this.currentStateId, newState, sizeof(newState));
 		if (newState.OnEnter != INVALID_FUNCTION) {
-			Call_StartFunction(INVALID_FUNCTION, newState.OnEnter);
+			Call_StartFunction(INVALID_HANDLE, newState.OnEnter);
 			Call_PushCell(GetClientOfUserId(this.userId));
 			Call_Finish();
 		}
@@ -461,7 +462,7 @@ stock void SetUp_OnAllPluginsLoaded() {
 	// ============================================================
 	// ILocomotion::HasPotentialGap(Vector const&, Vector const&, float*) const
 	// ============================================================
-	StartPrepSDKCall(SDKCall_Raw)
+	StartPrepSDKCall(SDKCall_Raw);
 	if (!PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, SIG_LOCOMOTION_HAS_POTENTIAL_GAP))
 		SetFailState("Failed to load offset for signature %s", SIG_LOCOMOTION_HAS_POTENTIAL_GAP);
 	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);

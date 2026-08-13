@@ -26,6 +26,15 @@ void InvalidateBucketShareCache()
     g_BucketAliveCountTime = -9999.0;
 }
 
+// 回合/换图复位：GetGameTime() 在新图会回落，若沿用旧时间戳，负的时间差
+// 会让 TTL 判断误认为“未过期”，把上一张图的进度和分桶计数带进新回合。
+void SurvivorFlow_ResetRoundCaches()
+{
+    g_LastGoodSurPct = -1;
+    g_LastGoodSurPctTime = 0.0;
+    InvalidateBucketShareCache();
+}
+
 // 每秒轻量刷新一次“最后一次有效团队进度”(0..100)
 // 设计：至少有1名生还者拿到有效进度才更新；无效则保持旧值不变。
 void RefreshLastGoodSurPctTick()

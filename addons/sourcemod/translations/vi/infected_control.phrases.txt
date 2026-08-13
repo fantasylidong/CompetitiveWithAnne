@@ -297,5 +297,37 @@
 	{
 		"vi"		"[IC] Dang xay dung lai do thi Nav va bo nho dem tien do tung khu vuc."
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"vi"		"[IC] He thong sinh quai chua khoi dong."
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"vi"		"[IC] Trang thai bo quyet dinh dot: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"vi"		"  So thu tu dot: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"vi"		"  Thoi gian troi qua: %.1f giay"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"vi"		"  Quai dac biet: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"vi"		"  Anti-Bait: dang giu"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"vi"		"  Anti-Bait: tha"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"vi"		"[IC] Lenh go loi Nav chua duoc bien dich; khi can hay bien dich lai voi DEBUG_NAV."
+	}
 
 }

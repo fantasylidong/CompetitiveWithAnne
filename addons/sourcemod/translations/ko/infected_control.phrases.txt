@@ -297,5 +297,37 @@
 	{
 		"ko"		"[IC] Nav 그래프와 영역별 진행도 캐시를 다시 빌드하고 있습니다."
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"ko"		"[IC] 스폰 시스템이 아직 시작되지 않았습니다."
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"ko"		"[IC] 웨이브 결정기 상태: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"ko"		"  웨이브 번호: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"ko"		"  경과 시간: %.1f초"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"ko"		"  특수 감염자: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"ko"		"  Anti-Bait: 홀드 중"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"ko"		"  Anti-Bait: 해제"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"ko"		"[IC] Nav 디버그 명령이 컴파일되지 않았습니다. 필요하면 DEBUG_NAV로 다시 컴파일하세요."
+	}
 
 }

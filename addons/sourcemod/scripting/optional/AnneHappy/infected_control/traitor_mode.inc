@@ -3118,10 +3118,13 @@ public Action L4D_OnMaterializeFromGhostPre(int client)
     if (allowedTraitorSi < 0)
         allowedTraitorSi = 0;
 
+    // 不检查 gST.totalSI：内鬼的名额在其释放波开波时已从该波 AI 预算中
+    // 扣除（Traitor_AdjustWaveSpawnBudget）。只要处于 SpawnAllowed 且已到
+    // 释放波（本波配额尚未消耗），即使残存 AI 暂时占满了 iSiLimit 也放行；
+    // AI 侧的刷新总闸会在超编期间自行暂停补位。
     if (!IsValidClient(client)
         || g_ITState[client] != Traitor_SpawnAllowed
         || gST.waveIndex < g_ITReleaseWave[client]
-        || gST.totalSI >= gCV.iSiLimit
         || (Traitor_CountActiveTankClients() > 0
             && Traitor_CountActiveSiClients() >= allowedTraitorSi))
     {

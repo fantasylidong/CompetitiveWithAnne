@@ -35,7 +35,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.4",
+	version 		= "1.0.1.6",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -131,7 +131,7 @@ public void OnPluginStart() {
 
 	HookEvent("round_start", evtRoundStart);
 	HookEvent("round_end", evtRoundEnd);
-	HookEvent("player_spawn", evtPlayerSpawn, EventHookMode_Pre);
+	HookEvent("player_spawn", evtPlayerSpawn);
 
 	log = new Logger(PLUGIN_PREFIX, g_cvLogLevel.IntValue);
 
@@ -213,7 +213,12 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
 	maintainEvadeMoveCommand(client);
 
+	// 梯子上清除跳/蹲输入后必须以 Plugin_Changed 返回, 否则按键修改会被丢弃
+	static bool ladderButtonsChanged;
+	ladderButtonsChanged = false;
 	if (GetEntityMoveType(client) == MOVETYPE_LADDER) {
+		if (buttons & (IN_JUMP | IN_DUCK))
+			ladderButtonsChanged = true;
 		buttons &= ~IN_JUMP;
 		buttons &= ~IN_DUCK;
 	}
@@ -221,7 +226,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	static int ability;
 	ability = getChargeAbilityEnt(client);
 	if (!IsValidEdict(ability))
-		return Plugin_Continue;
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
 	static bool isCharging;
 	isCharging = view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
 	if (isCharging && g_AiChargers[client].m_bChargeDelayed)
@@ -230,7 +235,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	static int target;
 	target = GetClientOfUserId(g_AiChargers[client].m_iTarget);
 	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
-		return Plugin_Continue;
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
 
 	if (g_ChargerStateContext[client].userId != GetClientUserId(client)) {
 		g_AiChargers[client].init();
@@ -243,7 +248,11 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
 
 	// 执行当前状态的每帧行为更新操作
-	return g_ChargerStateContext[client].update(buttons, vel, angles);
+	static Action stateResult;
+	stateResult = g_ChargerStateContext[client].update(buttons, vel, angles);
+	if (ladderButtonsChanged && stateResult == Plugin_Continue)
+		stateResult = Plugin_Changed;
+	return stateResult;
 }
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {
