@@ -172,15 +172,21 @@ stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
 
 
 static float CalculateScore_DispersionWithScale(int sidx,
-                                                const int a_recentSectors[3], float penaltyScale)
+                                                const int a_recentSectors[3], float penaltyScale,
+                                                float kernelProximity)
 {
     float recentPenalty = 0.0;
     if (sidx == a_recentSectors[0])      recentPenalty = 70.0;
     else if (sidx == a_recentSectors[1]) recentPenalty = 45.0;
     else if (sidx == a_recentSectors[2]) recentPenalty = 25.0;
 
-    // 方向偏好由连续战术几何分表达；这里仅负责避免连续从同一扇区刷出。
-    float score = 70.0 - ClampFloat(penaltyScale, 0.0, 1.0) * recentPenalty;
+    // 方向偏好由连续战术几何分表达；扇区项避免连续同方向刷出，
+    // 核密度项对靠近存活特感/最近刷点的候选做连续距离衰减扣分。
+    float kernelPenalty = gCV.fKernelPoints
+        * ClampFloat(kernelProximity, 0.0, 1.5);
+    float score = 100.0
+        - ClampFloat(penaltyScale, 0.0, 1.0) * recentPenalty
+        - kernelPenalty;
     return ClampFloat(score, 0.0, 100.0);
 }
 
@@ -377,6 +383,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.flowPenalty = src.flowPenalty;
     dest.dispRaw = src.dispRaw;
     dest.dispScaled = src.dispScaled;
+    dest.dispKernel = src.dispKernel;
     dest.penK = src.penK;
     dest.extraPen = src.extraPen;
     dest.behindPen = src.behindPen;
@@ -427,6 +434,7 @@ bool SpawnScore_BuildCandidate(int zc,
                                       int sector,
                                       int areaIdx,
                                       float tacticalQuality,
+                                      float kernelProximity,
                                       SpawnScoreDbg dbg)
 {
     // 评分只排序“已经通过硬过滤”的候选点，不负责可见性、卡壳、路径等安全判定。
@@ -447,9 +455,9 @@ bool SpawnScore_BuildCandidate(int zc,
 
     float penK = ComputePenScaleByLimit(gCV.iSiLimit);
     float scoreDisp = CalculateScore_DispersionWithScale(
-        sector, recentSectors, 1.0);
+        sector, recentSectors, 1.0, kernelProximity);
     float dispScaled = CalculateScore_DispersionWithScale(
-        sector, recentSectors, penK);
+        sector, recentSectors, penK, kernelProximity);
     float behindPenalty = ComputeBehindFlowPenalty(deltaFlow);
     float lowHeightDrop, lowHeightMultiplier;
     int lowHeightSteps;
@@ -482,6 +490,7 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.flowPenalty = flowPenalty;
     dbg.dispRaw = scoreDisp;
     dbg.dispScaled = dispScaled;
+    dbg.dispKernel = kernelProximity;
     dbg.penK = penK;
     dbg.extraPen = extraPenalty;
     dbg.behindPen = behindPenalty;
@@ -522,10 +531,10 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f quality=%.1f tacticalQ=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f) highBonus=%.1f(rise=%.1f steps=%d) extraPen=%.1f(back=%.1f low=%.1f) lowGeom=foot%.1f/drop%.1f/steps%d/x%.1f | dTargetEye=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f highSort=%.2f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d known=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f quality=%.1f tacticalQ=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f kern=%.2f) highBonus=%.1f(rise=%.1f steps=%d) extraPen=%.1f(back=%.1f low=%.1f) lowGeom=foot%.1f/drop%.1f/steps%d/x%.1f | dTargetEye=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f highSort=%.2f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d known=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
         dbg.total, dbg.weightedQuality, dbg.tacticalQuality,
-        dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK,
+        dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.dispKernel,
         dbg.highHeightBonus, dbg.highHeightRise, dbg.highHeightSteps,
         dbg.extraPen, dbg.behindPen, dbg.lowHeightPen,
         dbg.targetFootZ, dbg.lowHeightDrop, dbg.lowHeightSteps,

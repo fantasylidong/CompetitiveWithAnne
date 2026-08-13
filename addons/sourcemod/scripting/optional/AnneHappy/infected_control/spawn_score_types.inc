@@ -27,6 +27,7 @@ enum struct SpawnScoreDbg
     float flowPenalty;
     float dispRaw;
     float dispScaled;
+    float dispKernel;
     float penK;
     float extraPen;
     float behindPen;

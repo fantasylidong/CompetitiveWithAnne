@@ -408,6 +408,10 @@ static void SpawnAttempts_RememberActualSpawn(int client,
     float center[3];
     GetSectorCenter(center, targetSurvivor);
     RememberSpawn(actualPos, center);
+    // 波内扇区配额按实际落点统计；导演兜底路径也计入，
+    // 避免兜底刷出绕过方向配额。
+    MarkWaveSectorSpawned(
+        ComputeSectorIndex(center, actualPos, GetCurrentSectors()));
 }
 
 static bool SelectTacticalNormalQueueHead(int &want)
@@ -783,7 +787,7 @@ void TryNormalSpawnOnce()
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, searchTarget, minRange, maxRange,
-            graphScanMinRange, false, pos, areaIdx, bestDbg);
+            graphScanMinRange, false, band, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingNormalClass(want);
@@ -964,7 +968,7 @@ void TryTeleportSpawnOnce()
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, teleportTarget, minRange, maxRange,
-            graphScanMinRange, true, pos, areaIdx, bestDbg);
+            graphScanMinRange, true, band, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingTeleportClass(want);

@@ -22,12 +22,32 @@ static int Tactical_CountPressureSpawnedThisWave()
          + gST.siSpawnedThisWave[view_as<int>(SI_Charger) - 1];
 }
 
+// 每波按概率放宽支援闸门：偶尔允许 Boomer/Spitter 先于压制类出场，
+// 打破"每波必然杀手先、支援后"的固定顺序。
+static bool g_bSupportGateWaived = false;
+
+bool Tactical_IsSupportGateWaived()
+{
+    return g_bSupportGateWaived;
+}
+
+void Tactical_ResetSupportGateWaiver()
+{
+    g_bSupportGateWaived = false;
+}
+
 void Tactical_OnWaveStart()
 {
     gST.breachWaveActive = gST.breachWavePending;
     gST.breachWavePending = false;
     gST.waveEngaged = false;
     gST.firstPressureSpawnTime = 0.0;
+    // Breach 波保持压制类优先，不参与支援闸门放宽。
+    g_bSupportGateWaived = !gST.breachWaveActive
+        && gCV.fSupportWaiveProb > 0.0
+        && GetURandomFloat() < gCV.fSupportWaiveProb;
+    if (g_bSupportGateWaived)
+        Debug_Print("[SUPPORT GATE] waived for this wave (p=%.2f)", gCV.fSupportWaiveProb);
     for (int i = 0; i < SI_COUNT; i++)
     {
         gST.normalFallbackCycles[i] = 0;
@@ -149,6 +169,9 @@ void Tactical_OnClassSpawned(int zc)
 bool Tactical_CanReleaseSupport(int zc)
 {
     if (!IsSupportGateClassInt(zc))
+        return true;
+
+    if (Tactical_IsSupportGateWaived())
         return true;
 
     int need = GetSupportUnlockNeed();

@@ -40,7 +40,7 @@ stock void CleanupLastSpawns(float now)
     {
         float rec[4];
         lastSpawns.GetArray(i, rec);
-        if (now - rec[3] > SEP_TTL)
+        if (now - rec[3] > gCV.fSepTtl)
             lastSpawns.Erase(i);
     }
 
@@ -52,10 +52,11 @@ stock void CleanupLastSpawns(float now)
 stock bool PassMinSeparation(const float pos[3])
 {
     if (lastSpawns == null || lastSpawns.Length == 0) return true;
+    if (gCV.fSepRadius <= 0.0) return true;
 
     float now = GetGameTime();
     float k = PenLimitScale();
-    float sepRadiusEff = SEP_RADIUS * k;
+    float sepRadiusEff = gCV.fSepRadius * k;
     float sep2 = sepRadiusEff * sepRadiusEff;
 
     for (int i = lastSpawns.Length - 1; i >= 0; i--)
@@ -63,7 +64,7 @@ stock bool PassMinSeparation(const float pos[3])
         float rec[4];
         lastSpawns.GetArray(i, rec);
 
-        if (now - rec[3] > SEP_TTL)
+        if (now - rec[3] > gCV.fSepTtl)
         {
             lastSpawns.Erase(i);
             continue;
@@ -78,6 +79,117 @@ stock bool PassMinSeparation(const float pos[3])
             return false;
     }
     return true;
+}
+
+// —— 分散度核惩罚：对存活特感与最近刷点做距离衰减累加 —— //
+// 快照按 game tick 节流，一个 tick 内多次刷特尝试共用同一份来源列表。
+#define KERNEL_SOURCE_MAX 64
+#define KERNEL_SPAWN_MEMORY_WEIGHT 0.5
+
+static float g_KernelSources[KERNEL_SOURCE_MAX][4]; // x,y,z,weight
+static int g_KernelSourceCount = 0;
+static float g_KernelSnapshotTime = -1.0;
+
+void SpawnMemory_RefreshKernelSnapshot()
+{
+    if (gCV.fKernelRadius <= 0.0 || gCV.fKernelPoints <= 0.0)
+    {
+        g_KernelSourceCount = 0;
+        g_KernelSnapshotTime = GetGameTime();
+        return;
+    }
+
+    float now = GetGameTime();
+    if (now == g_KernelSnapshotTime)
+        return;
+    g_KernelSnapshotTime = now;
+    g_KernelSourceCount = 0;
+
+    float pos[3];
+    for (int i = 1; i <= MaxClients && g_KernelSourceCount < KERNEL_SOURCE_MAX; i++)
+    {
+        if (!IsInfectedBot(i) || !IsPlayerAlive(i) || IsGhost(i))
+            continue;
+
+        GetClientAbsOrigin(i, pos);
+        g_KernelSources[g_KernelSourceCount][0] = pos[0];
+        g_KernelSources[g_KernelSourceCount][1] = pos[1];
+        g_KernelSources[g_KernelSourceCount][2] = pos[2];
+        g_KernelSources[g_KernelSourceCount][3] = 1.0;
+        g_KernelSourceCount++;
+    }
+
+    if (lastSpawns == null)
+        return;
+    for (int i = lastSpawns.Length - 1;
+         i >= 0 && g_KernelSourceCount < KERNEL_SOURCE_MAX; i--)
+    {
+        float rec[4];
+        lastSpawns.GetArray(i, rec);
+        if (now - rec[3] > gCV.fSepTtl)
+            continue;
+
+        g_KernelSources[g_KernelSourceCount][0] = rec[0];
+        g_KernelSources[g_KernelSourceCount][1] = rec[1];
+        g_KernelSources[g_KernelSourceCount][2] = rec[2];
+        g_KernelSources[g_KernelSourceCount][3] = KERNEL_SPAWN_MEMORY_WEIGHT;
+        g_KernelSourceCount++;
+    }
+}
+
+// 返回候选点周边的核密度和（Σ weight*exp(-d/r)），仅用于评分排序。
+float SpawnMemory_GetKernelProximity(const float pos[3])
+{
+    if (gCV.fKernelRadius <= 0.0 || gCV.fKernelPoints <= 0.0
+        || g_KernelSourceCount <= 0)
+    {
+        return 0.0;
+    }
+
+    float sum = 0.0;
+    float src[3];
+    for (int i = 0; i < g_KernelSourceCount; i++)
+    {
+        src[0] = g_KernelSources[i][0];
+        src[1] = g_KernelSources[i][1];
+        src[2] = g_KernelSources[i][2];
+        float d = GetVectorDistance(pos, src);
+        sum += g_KernelSources[i][3] * Pow(FLOAT_EULER, -d / gCV.fKernelRadius);
+    }
+    return sum;
+}
+
+// —— 波内扇区落点配额 —— //
+// 目标:阻止同一波在同一方向连续落点;搜索后段(远带)与导演兜底不受限,
+// 确保狭长地形不会因为配额而把刷特推迟到下一波。
+static int g_WaveSectorSpawnCounts[SECTORS_MAX];
+
+void ResetWaveSectorSpawnCounts()
+{
+    for (int i = 0; i < SECTORS_MAX; i++)
+        g_WaveSectorSpawnCounts[i] = 0;
+}
+
+bool PassWaveSectorQuota(int sector)
+{
+    int bonus = gCV.iSectorQuotaBonus;
+    if (bonus < 0)
+        return true;
+    if (sector < 0 || sector >= SECTORS_MAX)
+        return true;
+
+    int sectors = GetCurrentSectors();
+    int quota = RoundToCeil(float(gCV.iSiLimit) / float(sectors)) + bonus;
+    if (quota < 1)
+        quota = 1;
+    return g_WaveSectorSpawnCounts[sector] < quota;
+}
+
+void MarkWaveSectorSpawned(int sector)
+{
+    if (sector < 0 || sector >= SECTORS_MAX)
+        return;
+    g_WaveSectorSpawnCounts[sector]++;
 }
 
 stock bool PassRealPositionCheck(float candPos[3], int targetSur)

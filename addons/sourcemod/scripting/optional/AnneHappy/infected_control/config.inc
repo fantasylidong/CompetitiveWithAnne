@@ -134,6 +134,16 @@ enum struct Config
     ConVar FlowBadPenaltyPoints;
     ConVar SpawnScoreFloor;      // 总分下限
     ConVar FlowBucketShare;      // Flow 桶占比上限
+    // === 刷点分散度强化 ===
+    ConVar SpawnSepRadius;       // 最近实际刷出点硬分散半径
+    ConVar SpawnSepTtl;          // 硬分散记忆秒数
+    ConVar SectorQuotaBonus;     // 波内单扇区配额加成(-1 关闭)
+    ConVar SpawnKernelRadius;    // 核密度惩罚衰减距离(0 关闭)
+    ConVar SpawnKernelPoints;    // 核密度惩罚强度
+    ConVar SpawnCandidateShuffle;// 有向候选页内洗牌
+    // === 职业多样性 ===
+    ConVar ScarcityJitter;       // 稀缺度随机抖动幅度
+    ConVar SupportWaiveProb;     // 每波支援闸门随机放宽概率
     // === 可视射线控制 ===
     ConVar VisEyeRayMode;        // 0=仅中线；1=中+左+右；2=自动：>4只中线，<=4三线
     int    iVisRayMode;
@@ -293,6 +303,14 @@ enum struct Config
     float fSpawnScoreFloor;
     float fBucketSpawnRatio;
     int   iBucketMaxPerFlow;
+    float fSepRadius;
+    float fSepTtl;
+    int   iSectorQuotaBonus;
+    float fKernelRadius;
+    float fKernelPoints;
+    bool  bCandidateShuffle;
+    float fScarcityJitter;
+    float fSupportWaiveProb;
 
     void RefreshRuntimeConVars()
     {
@@ -423,12 +441,12 @@ enum struct Config
         this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.NavHighSortScale = CreateConVar(
-            "inf_nav_high_sort_scale", "1.00 1.00 1.00 1.00 1.00 1.00",
-            "兼容旧配置；当前版本不再按高点缩短Nav排序距离，高点优势改由评分奖励表达",
+            "inf_nav_high_sort_scale", "0.85 1.00 0.90 1.00 1.00 1.00",
+            "有向候选排序的高点距离折减(S,B,H,P,J,C)；<1 时高于目标的候选按折减后距离前置，1.00=不折减",
             CVAR_FLAG);
         this.NavHighSortMinHeight = CreateConVar(
             "inf_nav_high_sort_min_height", "64.0",
-            "兼容旧配置；当前版本不参与候选排序",
+            "候选中心高于目标眼位多少单位后才参与高点排序折减",
             CVAR_FLAG, true, 0.0, true, 1000.0);
         this.ScoreLowHeightStart = CreateConVar(
             "inf_score_low_height_start", "50.0",
@@ -555,6 +573,46 @@ enum struct Config
         this.FlowBucketShare = CreateConVar(
             "inf_spawn_bucket_ratio", "0.50",
             "同一 Flow 桶中允许同时存在的特感占比（相对 l4d_infected_limit）；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SpawnSepRadius = CreateConVar(
+            "inf_spawn_sep_radius", "180.0",
+            "最近实际刷出点的硬分散半径（会乘以特感上限缩放系数）；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 500.0
+        );
+        this.SpawnSepTtl = CreateConVar(
+            "inf_spawn_sep_ttl", "2.5",
+            "最近实际刷出点的硬分散记忆秒数。",
+            CVAR_FLAG, true, 0.1, true, 10.0
+        );
+        this.SectorQuotaBonus = CreateConVar(
+            "inf_spawn_sector_quota_bonus", "1",
+            "波内单扇区落点配额=ceil(上限/扇区数)+该值；-1=关闭扇区配额。",
+            CVAR_FLAG, true, -1.0, true, 8.0
+        );
+        this.SpawnKernelRadius = CreateConVar(
+            "inf_spawn_kernel_radius", "280.0",
+            "分散度核惩罚的距离衰减常数（对存活特感与最近刷点按 exp(-d/r) 累加）；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1000.0
+        );
+        this.SpawnKernelPoints = CreateConVar(
+            "inf_spawn_kernel_points", "40.0",
+            "分散度核惩罚强度：扣分=该值*min(核密度和,1.5)。",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
+        this.SpawnCandidateShuffle = CreateConVar(
+            "inf_spawn_candidate_shuffle", "1",
+            "有向候选分页读取后页内洗牌，打散“永远评估最近一簇”的偏置(0/1)。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.ScarcityJitter = CreateConVar(
+            "inf_class_scarcity_jitter", "0.06",
+            "选类稀缺度随机抖动幅度（±该值），打破每波固定轮转；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 0.5
+        );
+        this.SupportWaiveProb = CreateConVar(
+            "inf_support_gate_waive_prob", "0.15",
+            "每波按该概率放宽支援特感(Boomer/Spitter)解锁闸门；0=关闭。",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
 
@@ -753,6 +811,14 @@ enum struct Config
         this.ScoreBehindRejectGap.AddChangeHook(OnCfgChanged);
         this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
         this.FlowBucketShare.AddChangeHook(OnCfgChanged);
+        this.SpawnSepRadius.AddChangeHook(OnCfgChanged);
+        this.SpawnSepTtl.AddChangeHook(OnCfgChanged);
+        this.SectorQuotaBonus.AddChangeHook(OnCfgChanged);
+        this.SpawnKernelRadius.AddChangeHook(OnCfgChanged);
+        this.SpawnKernelPoints.AddChangeHook(OnCfgChanged);
+        this.SpawnCandidateShuffle.AddChangeHook(OnCfgChanged);
+        this.ScarcityJitter.AddChangeHook(OnCfgChanged);
+        this.SupportWaiveProb.AddChangeHook(OnCfgChanged);
         this.AntiBaitEnable.AddChangeHook(OnCfgChanged);
         this.LegacyAntiBaitEnable.AddChangeHook(OnCfgChanged);
         this.AntiBaitGrace.AddChangeHook(OnCfgChanged);
@@ -977,10 +1043,19 @@ enum struct Config
             this.w_disp[i+1] = StringToFloat(parts[i]);
         }
 
-        // 旧的 ranked Nav 接口保留二进制兼容，但 active 搜索固定使用原始
-        // candidate -> target 有向路径距离；高点优势只通过最终评分奖励表达。
+        // 高点排序折减：<1 时 Smoker/Hunter 等职业改走 ranked 有向候选，
+        // 高于目标的候选按折减后的距离前置，使其进入有限的评分名额。
+        this.NavHighSortScale.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
         for (int i = 1; i <= SI_COUNT; i++)
             this.fNavHighSortScale[i] = 1.0;
+        for (int i = 0; i < numParts && i < SI_COUNT; i++)
+        {
+            float scale = StringToFloat(parts[i]);
+            if (scale <= 0.0)
+                scale = 1.0;
+            this.fNavHighSortScale[i + 1] = ClampFloat(scale, 0.50, 1.0);
+        }
 
         // 权重兜底：CVar 值不足或为 0 时回退到 1.0，避免意外禁用某因子。
         // 必须在 ConVar 解析之后执行，确保验证的是新解析的值。
@@ -1053,6 +1128,22 @@ enum struct Config
             if (cap < 1) cap = 1;
             this.iBucketMaxPerFlow = cap;
         }
+
+        this.fSepRadius = this.SpawnSepRadius.FloatValue;
+        if (this.fSepRadius < 0.0) this.fSepRadius = 0.0;
+        this.fSepTtl = this.SpawnSepTtl.FloatValue;
+        if (this.fSepTtl < 0.1) this.fSepTtl = 0.1;
+        this.iSectorQuotaBonus = this.SectorQuotaBonus.IntValue;
+        if (this.iSectorQuotaBonus < -1) this.iSectorQuotaBonus = -1;
+        this.fKernelRadius = this.SpawnKernelRadius.FloatValue;
+        if (this.fKernelRadius < 0.0) this.fKernelRadius = 0.0;
+        this.fKernelPoints = this.SpawnKernelPoints.FloatValue;
+        if (this.fKernelPoints < 0.0) this.fKernelPoints = 0.0;
+        this.bCandidateShuffle = this.SpawnCandidateShuffle.BoolValue;
+        this.fScarcityJitter = this.ScarcityJitter.FloatValue;
+        if (this.fScarcityJitter < 0.0) this.fScarcityJitter = 0.0;
+        this.fSupportWaiveProb = this.SupportWaiveProb.FloatValue;
+        this.fSupportWaiveProb = ClampFloat(this.fSupportWaiveProb, 0.0, 1.0);
 
         this.bSurFlowFallback   = this.SurFlowFallbackEnable.BoolValue;
         this.fSurFlowFallbackTTL= this.SurFlowFallbackTTL.FloatValue;

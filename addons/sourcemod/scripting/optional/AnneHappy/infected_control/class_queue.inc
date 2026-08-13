@@ -93,6 +93,12 @@ int GetSupportUnlockNeed()
 
 bool SupportRestrictionActive()
 {
+    if (Tactical_IsSupportGateWaived())
+    {
+        g_SupportShortageStart = 0.0;
+        return false;
+    }
+
     int need = GetSupportUnlockNeed();
     if (need <= 0)
     {
@@ -281,6 +287,11 @@ static int PickScarceClassImpl(bool relaxCD)
         // 刷新开头给杀手类一点优先（小幅）
         if (gST.lastSpawnSecs < SUPPORT_SPAWN_DELAY_SECS && IsKillerClassInt(zc))
             ratio -= 0.05;
+
+        // 小幅随机抖动：只打散占用率接近的职业之间的固定轮转顺序，
+        // 不足以颠倒真正稀缺与饱和职业的相对关系。
+        if (gCV.fScarcityJitter > 0.0)
+            ratio += (GetURandomFloat() * 2.0 - 1.0) * gCV.fScarcityJitter;
 
         int tieRank = zc - g_iScarcityTieCursor;
         if (tieRank < 0)
