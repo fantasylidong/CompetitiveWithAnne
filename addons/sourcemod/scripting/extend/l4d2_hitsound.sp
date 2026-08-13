@@ -12,6 +12,11 @@
  *   addons/sourcemod/configs/hitsound_sets.cfg   （音效套装：headshot/hit/kill，支持 builtin）
  *   addons/sourcemod/configs/hiticon_sets.cfg    （图标套装：head/hit/kill，支持 builtin）
  *
+ * 音效套装可选定制键（用于自定义“何时响”）：
+ *   "headshot_kill"  爆头击杀专用音效；留空/缺省 = 沿用 headshot 音（旧行为）
+ *   "stack"          1 = 每个命中/击杀事件立即独立播放（可同帧叠加，复刻老 killsound 手感）；
+ *                    0/缺省 = 同帧按优先级合并为一条（击杀>爆头>命中）
+ *
  * 重要编号约定：
  *   - 套装ID：1..N，0 表示禁用
  *   - 数组索引：内部数组存放为 0..N-1（故读取时用 setId-1）
@@ -33,7 +38,7 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "2.2.0"
+#define PLUGIN_VERSION "2.3.0"
 #define CVAR_FLAGS     FCVAR_NOTIFY
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 #define OVERLAY_CLEAN_INTERVAL 0.1
@@ -116,6 +121,8 @@ Handle g_SetNames    = INVALID_HANDLE;
 Handle g_SetHeadshot = INVALID_HANDLE;
 Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
+Handle g_SetHeadKill = INVALID_HANDLE; // 爆头击杀专用音（可选；空 = 回退 headshot）
+Handle g_SetStack    = INVALID_HANDLE; // 1 = 逐事件立即播放（不做同帧合并去重）
 int    g_SetCount    = 0; // 套装总数（音效），套装ID有效范围：1..g_SetCount
 
 // --------------------- Overlay icon sets（玩家自选） ---------------------
@@ -272,15 +279,36 @@ static void KV_SetDBPendingFlag(int client, bool pending)
     KeyValuesToFile(g_SoundStore, g_SavePath);
 }
 
-// 根据“音效套装ID(1..N)”与类型取路径：which 0=headshot, 1=hit, 2=kill
+// 根据“音效套装ID(1..N)”与类型取路径：which 0=headshot, 1=hit, 2=kill, 3=headshot_kill
 static bool GetSoundPath_BySet(int setId, int which, char[] out, int maxlen)
 {
     if (setId <= 0 || setId > g_SetCount) { out[0] = '\0'; return false; }
     int idx = setId - 1;
     if (which == 0)      GetArrayString(g_SetHeadshot, idx, out, maxlen);
     else if (which == 1) GetArrayString(g_SetHit,      idx, out, maxlen);
+    else if (which == 3) GetArrayString(g_SetHeadKill, idx, out, maxlen);
     else                 GetArrayString(g_SetKill,     idx, out, maxlen);
     return (out[0] != '\0');
+}
+
+static bool IsStackSet(int setId)
+{
+    if (setId <= 0 || setId > g_SetCount) return false;
+    return GetArrayCell(g_SetStack, setId - 1) != 0;
+}
+
+// 击杀事件取样本：爆头击杀优先套装的 headshot_kill，未配置则回退 headshot（旧行为）
+static bool GetKillSoundSample(int attacker, bool headshot, char[] out, int maxlen, int &setId)
+{
+    setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
+    if (setId <= 0) { out[0] = '\0'; return false; }
+
+    if (headshot)
+    {
+        if (GetSoundPath_BySet(setId, 3, out, maxlen)) return true;
+        return GetSoundPath_BySet(setId, 0, out, maxlen);
+    }
+    return GetSoundPath_BySet(setId, 2, out, maxlen);
 }
 
 static void ResetPendingSoundFeedback(int client)
@@ -290,9 +318,16 @@ static void ResetPendingSoundFeedback(int client)
     g_PendingSoundSample[client][0] = '\0';
 }
 
-static void QueueSoundFeedback(int client, const char[] sample, SoundFeedbackPriority priority)
+static void QueueSoundFeedback(int client, int setId, const char[] sample, SoundFeedbackPriority priority)
 {
     if (!IsValidClient(client) || sample[0] == '\0') return;
+
+    // stack 套装：逐事件立即播放，可同帧叠加（复刻老 killsound 行为）
+    if (IsStackSet(setId))
+    {
+        EmitSoundToClient(client, sample, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_NORMAL);
+        return;
+    }
 
     if (priority > g_PendingSoundPriority[client])
     {
@@ -454,6 +489,8 @@ public void OnPluginStart()
     g_SetHeadshot = CreateArray(PLATFORM_MAX_PATH);
     g_SetHit      = CreateArray(PLATFORM_MAX_PATH);
     g_SetKill     = CreateArray(PLATFORM_MAX_PATH);
+    g_SetHeadKill = CreateArray(PLATFORM_MAX_PATH);
+    g_SetStack    = CreateArray(1);
 
     g_OvNames = CreateArray(64);
     g_OvHead  = CreateArray(PLATFORM_MAX_PATH);
@@ -530,6 +567,8 @@ void LoadHitSoundSets()
     ClearArray(g_SetHeadshot);
     ClearArray(g_SetHit);
     ClearArray(g_SetKill);
+    ClearArray(g_SetHeadKill);
+    ClearArray(g_SetStack);
     g_SetCount = 0;
 
     Handle kv = CreateKeyValues("HitSoundSets");
@@ -546,21 +585,26 @@ void LoadHitSoundSets()
     {
         do {
             char name[64];
-            char sh[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH];
+            char sh[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH], hk[PLATFORM_MAX_PATH];
             int  isbuiltin = 0;
+            int  stack = 0;
 
             KvGetString(kv, "name", name, sizeof(name), "未命名音效套装");
             KvGetString(kv, "headshot", sh, sizeof(sh), "");
             KvGetString(kv, "hit",      hi, sizeof(hi), "");
             KvGetString(kv, "kill",     ki, sizeof(ki), "");
+            KvGetString(kv, "headshot_kill", hk, sizeof(hk), "");
             isbuiltin = KvGetNum(kv, "builtin", 0);
-            DBG("SoundSet #%d '%s' builtin=%d hs='%s' hit='%s' kill='%s'",
-                g_SetCount+1, name, isbuiltin, sh, hi, ki);
+            stack     = KvGetNum(kv, "stack", 0);
+            DBG("SoundSet #%d '%s' builtin=%d stack=%d hs='%s' hit='%s' kill='%s' hskill='%s'",
+                g_SetCount+1, name, isbuiltin, stack, sh, hi, ki, hk);
 
             PushArrayString(g_SetNames, name);
             PushArrayString(g_SetHeadshot, sh);
             PushArrayString(g_SetHit, hi);
             PushArrayString(g_SetKill, ki);
+            PushArrayString(g_SetHeadKill, hk);
+            PushArrayCell(g_SetStack, stack != 0 ? 1 : 0);
             g_SetCount++;
 
             if (!isbuiltin)
@@ -568,12 +612,14 @@ void LoadHitSoundSets()
                 if (sh[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", sh); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
                 if (hi[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hi); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
                 if (ki[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", ki); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
+                if (hk[0] != '\0') { char p[PLATFORM_MAX_PATH]; Format(p, sizeof(p), "sound/%s", hk); DBG("FDL add: %s", p); AddFileToDownloadsTable(p); }
             }
             else
             {
                 if (sh[0] != '\0') DBG("FDL skip(builtin): sound/%s", sh);
                 if (hi[0] != '\0') DBG("FDL skip(builtin): sound/%s", hi);
                 if (ki[0] != '\0') DBG("FDL skip(builtin): sound/%s", ki);
+                if (hk[0] != '\0') DBG("FDL skip(builtin): sound/%s", hk);
             }
         } while (KvGotoNextKey(kv));
     }
@@ -1151,10 +1197,10 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
         if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
         {
             char s[PLATFORM_MAX_PATH];
-            int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
-            if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
+            int setId;
+            if (GetKillSoundSample(attacker, headshot, s, sizeof(s), setId))
             {
-                QueueSoundFeedback(attacker, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
+                QueueSoundFeedback(attacker, setId, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
             }
         }
     }
@@ -1198,7 +1244,7 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
                     char s2[PLATFORM_MAX_PATH];
                     int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                     if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
-                        QueueSoundFeedback(attacker, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
+                        QueueSoundFeedback(attacker, setId, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
                 }
             }
         }
@@ -1231,10 +1277,10 @@ public Action Event_InfectedDeath(Handle event, const char[] name, bool dontBroa
         if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
         {
             char s[PLATFORM_MAX_PATH];
-            int setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
-            if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 2, s, sizeof(s)))
+            int setId;
+            if (GetKillSoundSample(attacker, headshot, s, sizeof(s), setId))
             {
-                QueueSoundFeedback(attacker, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
+                QueueSoundFeedback(attacker, setId, s, headshot ? SOUND_FEEDBACK_HEADSHOT_KILL : SOUND_FEEDBACK_KILL);
             }
         }
     }
@@ -1273,7 +1319,7 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
                 int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                 if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
                 {
-                    QueueSoundFeedback(attacker, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
+                    QueueSoundFeedback(attacker, setId, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
                 }
             }
         }
@@ -1336,6 +1382,9 @@ static void PrecacheAllAssets()
         if (s[0]) PrecacheSound(s, true);
 
         GetArrayString(g_SetKill, i, s, sizeof(s));
+        if (s[0]) PrecacheSound(s, true);
+
+        GetArrayString(g_SetHeadKill, i, s, sizeof(s));
         if (s[0]) PrecacheSound(s, true);
     }
 
