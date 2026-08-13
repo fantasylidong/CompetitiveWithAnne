@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"en"		"Standard (16:9)"
+			"en"		"16:9 widescreen (default positions)"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"en"		"Compact (4:3)"
+			"en"		"4:3 / 5:4 (narrow, no right clip)"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"en"		"Ultrawide safe area"
+			"en"		"21:9 ultrawide (center safe area)"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"en"		"16:10 monitor"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

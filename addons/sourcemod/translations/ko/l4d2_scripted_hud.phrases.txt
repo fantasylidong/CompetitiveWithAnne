@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"ko"		"표준 (16:9)"
+			"ko"		"16:9 와이드 (기본 좌표)"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"ko"		"컴팩트 (4:3)"
+			"ko"		"4:3 / 5:4 좁은 화면 (오른쪽 잘림 방지)"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"ko"		"울트라와이드 안전 영역"
+			"ko"		"21:9 울트라와이드 (중앙 안전 영역)"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"ko"		"16:10 모니터"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

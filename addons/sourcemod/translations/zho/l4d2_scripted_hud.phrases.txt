@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"zho"		"標準（16:9）"
+			"zho"		"16:9 寬螢幕（預設座標）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"zho"		"緊湊（4:3）"
+			"zho"		"4:3 / 5:4 窄螢幕（收窄防右側裁切）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"zho"		"超寬螢幕安全區"
+			"zho"		"21:9 超寬（收到中間安全區）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"zho"		"16:10 顯示器"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

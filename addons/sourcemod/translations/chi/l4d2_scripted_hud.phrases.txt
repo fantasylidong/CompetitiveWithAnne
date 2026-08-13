@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"chi"		"标准（16:9）"
+			"chi"		"16:9 宽屏（默认坐标）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"chi"		"紧凑（4:3）"
+			"chi"		"4:3 / 5:4 窄屏（收窄防右边裁切）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"chi"		"超宽屏安全区"
+			"chi"		"21:9 超宽（收到中间安全区）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"chi"		"16:10 显示器"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

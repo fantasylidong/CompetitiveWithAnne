@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"jp"		"標準（16:9）"
+			"jp"		"16:9 ワイド（既定座標）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"jp"		"コンパクト（4:3）"
+			"jp"		"4:3 / 5:4 狭幅（右端の切れ防止）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"jp"		"ウルトラワイド安全領域"
+			"jp"		"21:9 ウルトラワイド（中央の安全領域）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"jp"		"16:10 モニター"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

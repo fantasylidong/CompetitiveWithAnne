@@ -78,15 +78,19 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"vi"		"Tiêu chuẩn (16:9)"
+			"vi"		"16:9 widescreen (tọa độ mặc định)"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"vi"		"Thu gọn (4:3)"
+			"vi"		"4:3 / 5:4 hẹp (không cắt mép phải)"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"vi"		"Vùng an toàn siêu rộng"
+			"vi"		"21:9 siêu rộng (vùng an toàn giữa)"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"vi"		"Màn 16:10"
 		}
 		"L4D2ScriptedHUD_HUD3Content"
 		{

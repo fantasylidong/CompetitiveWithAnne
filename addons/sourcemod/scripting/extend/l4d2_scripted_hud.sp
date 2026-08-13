@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for all 15 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.4.0"
+#define PLUGIN_VERSION                "1.4.1"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -97,7 +97,6 @@ public Plugin myinfo =
 #define HUD_SLOT_DEFAULT_MASK         ((1 << HUD1) | (1 << HUD2))
 #define HUD_SLOT_ALL_MASK             ((1 << HUD_SLOT_COUNT) - 1)
 #define HUD_EXTRA_LINE_HEIGHT         0.026
-#define HUD_EXTRA_WIDTH               0.24
 #define HUD_PREFS_COOKIE_SIZE         100
 #define HUD_PREFS_MIGRATIONS          4
 
@@ -140,7 +139,9 @@ public Plugin myinfo =
 #define HUD_LAYOUT_STANDARD           0
 #define HUD_LAYOUT_4_3                1
 #define HUD_LAYOUT_ULTRAWIDE          2
-#define HUD_LAYOUT_MAX                HUD_LAYOUT_ULTRAWIDE
+#define HUD_LAYOUT_16_10              3
+#define HUD_LAYOUT_MAX                HUD_LAYOUT_16_10
+#define HUD_LAYOUT_COUNT              (HUD_LAYOUT_MAX + 1)
 
 #define HUD_PROXY_FLAGS               0
 #define HUD_PROXY_STRING              1
@@ -491,20 +492,80 @@ static const char g_sHUDEngineNamePhrases[][] =
     "L4D2ScriptedHUD_SlotScore4"
 };
 
-// Default placement for engine slots 4-14. Slots 0-3 keep their cvars.
-// Left column sits under HUD1; right column sits below HUD4 / the kill feed.
-static const float g_fExtraSlotX[HUD_SLOT_COUNT] =
+// Per-layout extra-slot geometry. HUD 1-4 keep their cvars as a 16:9 baseline
+// and are remapped with origin/scale so 4:3 does not clip and 21:9 stays in the
+// center safe area. Extra slots 4-9 are a left column under HUD1; 10-14 are a
+// right column below HUD4 / the kill feed, above the weapon HUD.
+static const float g_fLayoutOriginX[HUD_LAYOUT_COUNT] =
 {
-    0.00, 0.00, 0.00, 0.00,
-    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-    0.76, 0.76, 0.76, 0.76, 0.76
+    0.00,  // 16:9
+    0.00,  // 4:3
+    0.13,  // 21:9
+    0.00   // 16:10
 };
 
-static const float g_fExtraSlotY[HUD_SLOT_COUNT] =
+static const float g_fLayoutScaleX[HUD_LAYOUT_COUNT] =
 {
-    0.00, 0.00, 0.00, 0.00,
-    0.10, 0.20, 0.30, 0.40, 0.50, 0.60,
-    0.46, 0.54, 0.62, 0.70, 0.78
+    1.00,
+    0.88,
+    0.74,
+    0.94
+};
+
+static const float g_fLayoutExtraW[HUD_LAYOUT_COUNT] =
+{
+    0.220,
+    0.198,
+    0.162,
+    0.208
+};
+
+static const float g_fLayoutExtraLeftX[HUD_LAYOUT_COUNT] =
+{
+    0.012,
+    0.010,
+    0.138,
+    0.012
+};
+
+static const float g_fLayoutExtraLeftY0[HUD_LAYOUT_COUNT] =
+{
+    0.085,
+    0.080,
+    0.085,
+    0.085
+};
+
+static const float g_fLayoutExtraLeftStep[HUD_LAYOUT_COUNT] =
+{
+    0.110,
+    0.108,
+    0.110,
+    0.110
+};
+
+static const float g_fLayoutExtraRightX[HUD_LAYOUT_COUNT] =
+{
+    0.778,
+    0.688,
+    0.698,
+    0.752
+};
+
+static const float g_fLayoutExtraRightY0[HUD_LAYOUT_COUNT] =
+{
+    0.520,
+    0.500,
+    0.520,
+    0.520
+};
+
+static const float g_fLayoutExtraRightStep[HUD_LAYOUT_COUNT] =
+{
+    0.078,
+    0.076,
+    0.078,
+    0.078
 };
 
 enum HUDPrefsLoadState
@@ -817,15 +878,90 @@ void ClearUnusedHUDSlots()
 
 void PlaceOwnedExtraHUDSlots()
 {
+    float x, y, w;
     for (int slot = HUD_EXTRA_FIRST; slot < HUD_KILL_SHARE_FIRST; slot++)
     {
         int flags = g_iExtraHUDFlags | HUD_FLAG_NOTVISIBLE;
         if (IsExtraSlotUsedByAnyone(slot))
             flags = g_iExtraHUDFlags;
 
+        GetLayoutExtraSlotRect(HUD_LAYOUT_STANDARD, slot, x, y, w);
         HUDSetLayout(slot, flags, " ");
-        HUDPlace(slot, g_fExtraSlotX[slot], g_fExtraSlotY[slot], HUD_EXTRA_WIDTH, HUD_EXTRA_LINE_HEIGHT * 6.0);
+        HUDPlace(slot, x, y, w, HUD_EXTRA_LINE_HEIGHT * 4.0);
     }
+}
+
+int GetHUDLayoutIndex(int client)
+{
+    int layout = g_iClientHUDLayout[client];
+    if (layout < HUD_LAYOUT_STANDARD || layout > HUD_LAYOUT_MAX)
+        return HUD_LAYOUT_STANDARD;
+    return layout;
+}
+
+void GetLayoutExtraSlotRect(int layout, int hud, float &x, float &y, float &w)
+{
+    if (layout < HUD_LAYOUT_STANDARD || layout > HUD_LAYOUT_MAX)
+        layout = HUD_LAYOUT_STANDARD;
+
+    w = g_fLayoutExtraW[layout];
+    if (hud <= HUD_MID_BOX)
+    {
+        int index = hud - HUD_EXTRA_FIRST;
+        x = g_fLayoutExtraLeftX[layout];
+        y = g_fLayoutExtraLeftY0[layout] + float(index) * g_fLayoutExtraLeftStep[layout];
+        return;
+    }
+
+    int index = hud - HUD_SCORE_TITLE;
+    x = g_fLayoutExtraRightX[layout];
+    y = g_fLayoutExtraRightY0[layout] + float(index) * g_fLayoutExtraRightStep[layout];
+}
+
+void GetClientHUDSlotRect(int client, int hud, float &x, float &y, float &w)
+{
+    int layout = GetHUDLayoutIndex(client);
+
+    if (hud >= HUD_EXTRA_FIRST)
+    {
+        GetLayoutExtraSlotRect(layout, hud, x, y, w);
+        return;
+    }
+
+    switch (hud)
+    {
+        case HUD1:
+        {
+            x = g_fHUD1_X;
+            y = g_fHUD1_Y;
+            w = g_fCvar_HUD1_Width;
+        }
+        case HUD2:
+        {
+            x = g_fHUD2_X;
+            y = g_fHUD2_Y;
+            w = g_fCvar_HUD2_Width;
+        }
+        case HUD3:
+        {
+            x = g_fHUD3_X;
+            y = g_fHUD3_Y;
+            w = g_fCvar_HUD3_Width;
+        }
+        default:
+        {
+            x = g_fHUD4_X;
+            y = g_fHUD4_Y;
+            w = g_fCvar_HUD4_Width;
+        }
+    }
+
+    x = g_fLayoutOriginX[layout] + x * g_fLayoutScaleX[layout];
+    w *= g_fLayoutScaleX[layout];
+    if (x < 0.0)
+        x = 0.0;
+    if (x > 0.98)
+        x = 0.98;
 }
 
 bool IsKillHudSharedSlot(int hud)
@@ -2260,17 +2396,13 @@ Action ProxyHUDPosX(float &value, int hud, int client)
     if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
         return Plugin_Continue;
 
-    bool changed = false;
-    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
-    {
-        value = g_fExtraSlotX[hud];
-        changed = true;
-    }
+    if (hud >= HUD_EXTRA_FIRST && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
 
-    if (ApplyHUDLayoutScale(value, HUD_PROXY_POS_X, client))
-        changed = true;
-
-    return changed ? Plugin_Changed : Plugin_Continue;
+    float x, y, w;
+    GetClientHUDSlotRect(client, hud, x, y, w);
+    value = x;
+    return Plugin_Changed;
 }
 
 Action ProxyHUDPosY(float &value, int hud, int client)
@@ -2281,13 +2413,13 @@ Action ProxyHUDPosY(float &value, int hud, int client)
     if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
         return Plugin_Continue;
 
-    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
-    {
-        value = g_fExtraSlotY[hud];
-        return Plugin_Changed;
-    }
+    if (hud < HUD_EXTRA_FIRST || !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
 
-    return Plugin_Continue;
+    float x, y, w;
+    GetClientHUDSlotRect(client, hud, x, y, w);
+    value = y;
+    return Plugin_Changed;
 }
 
 Action ProxyHUDWidth(float &value, int hud, int client)
@@ -2298,17 +2430,13 @@ Action ProxyHUDWidth(float &value, int hud, int client)
     if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
         return Plugin_Continue;
 
-    bool changed = false;
-    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
-    {
-        value = HUD_EXTRA_WIDTH;
-        changed = true;
-    }
+    if (hud >= HUD_EXTRA_FIRST && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
 
-    if (ApplyHUDLayoutScale(value, HUD_PROXY_WIDTH, client))
-        changed = true;
-
-    return changed ? Plugin_Changed : Plugin_Continue;
+    float x, y, w;
+    GetClientHUDSlotRect(client, hud, x, y, w);
+    value = w;
+    return Plugin_Changed;
 }
 
 Action ProxyHUDHeight(float &value, int hud, int client)
@@ -2324,35 +2452,6 @@ Action ProxyHUDHeight(float &value, int hud, int client)
 
     value = GetHUDSlotLineHeight(hud) * float(CountCharInString(g_sClientHUDText[client][hud], '\n') + 1);
     return Plugin_Changed;
-}
-
-bool ApplyHUDLayoutScale(float &value, int proxyType, int client)
-{
-    int layout = g_iClientHUDLayout[client];
-    float horizontalScale;
-    switch (layout)
-    {
-        case HUD_LAYOUT_4_3: horizontalScale = 0.75;
-        case HUD_LAYOUT_ULTRAWIDE: horizontalScale = 0.76;
-        default: return false;
-    }
-
-    if (proxyType == HUD_PROXY_POS_X)
-    {
-        if (layout == HUD_LAYOUT_4_3)
-            value *= horizontalScale;
-        else
-            value = 0.5 + ((value - 0.5) * horizontalScale);
-        return true;
-    }
-
-    if (proxyType == HUD_PROXY_WIDTH)
-    {
-        value *= horizontalScale;
-        return true;
-    }
-
-    return false;
 }
 
 void BuildClientHUDTexts()
@@ -3847,6 +3946,7 @@ void OpenHUDLayoutMenu(int client)
     menu.ExitBackButton = true;
 
     AddHUDToggleItem(menu, client, "layout0", "L4D2ScriptedHUD_LayoutStandard", g_iClientHUDLayout[client] == HUD_LAYOUT_STANDARD);
+    AddHUDToggleItem(menu, client, "layout3", "L4D2ScriptedHUD_Layout16x10", g_iClientHUDLayout[client] == HUD_LAYOUT_16_10);
     AddHUDToggleItem(menu, client, "layout1", "L4D2ScriptedHUD_Layout4x3", g_iClientHUDLayout[client] == HUD_LAYOUT_4_3);
     AddHUDToggleItem(menu, client, "layout2", "L4D2ScriptedHUD_LayoutUltrawide", g_iClientHUDLayout[client] == HUD_LAYOUT_ULTRAWIDE);
     menu.Display(client, MENU_TIME_FOREVER);
