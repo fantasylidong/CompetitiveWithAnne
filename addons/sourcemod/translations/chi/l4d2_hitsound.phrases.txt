@@ -116,4 +116,24 @@
 	{
 		"chi"		"击杀图标：已设置为 %d"
 	}
+	"L4D2Hitsound_HeadKillSoundOn"
+	{
+		"chi"		"爆头击杀专用音：已开启（套装配置了专用音时，爆头击杀播放专用音）"
+	}
+	"L4D2Hitsound_HeadKillSoundOff"
+	{
+		"chi"		"爆头击杀专用音：已关闭（爆头击杀回退为普通爆头音）"
+	}
+	"L4D2Hitsound_StackModeFollow"
+	{
+		"chi"		"音效播放模式：跟随套装（是否叠加由音效套装自身决定）"
+	}
+	"L4D2Hitsound_StackModeStack"
+	{
+		"chi"		"音效播放模式：强制叠加（每次命中/击杀都独立响一声，同帧可叠加）"
+	}
+	"L4D2Hitsound_StackModeMerge"
+	{
+		"chi"		"音效播放模式：强制合并（同帧最多响一条，按 击杀>爆头>命中 优先）"
+	}
 }
