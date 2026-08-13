@@ -113,6 +113,10 @@
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
 
+### August 13, 2026 Anne Tank Announce Translations
+- Upgraded `optional/AnneHappy/l4d2_tank_announce.smx` to 1.0.1.1. Chat, hint, and center text now all use i18n phrases; Player/AI name prefixes are built in the client's language, so English players no longer see a hard-coded Chinese "(玩家)".
+- English no longer uses Chinese word-for-word phrasing ("has been generated / controller"), and the hint line is translated. Spanish now includes the previously missing Anne-specific keys.
+- Also aligned the versus `Spawned` phrases in Japanese, Korean, Vietnamese, and Traditional Chinese, keeping Tank as a proper noun.
 ### August 13, 2026 Water Slowdown Chat Translations
 - Fixed `l4d2_slowdown_control` chat lines for water slowdown while Tank is in play and after Tank dies. English no longer uses Chinese word-for-word phrasing such as "tank generation", Vietnamese no longer mistranslates Tank as "xe tăng", and Japanese no longer uses two different plugin names.
 - Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese now match the upstream meaning: water slowdown is reduced while Tank is in play, then restored to normal.

@@ -6,18 +6,30 @@
 	}
 	"Spawned"
 	{
-		"jp"		"{olive} タンク {default} ( {red} コントロール: %s {default} ) がスポーンしました。"
+		"jp"		"{olive}Tank {default}({red}操作: %s{default}) が出現しました！"
 	}
 	"Spawned2"
 	{
-		"jp"		"{olive} タンク {default} ( {red} コントロール: %N {default} ) がスポーンしました。"
+		"jp"		"{olive}Tank {default}({red}操作: %N{default}) が出現しました！"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated"
 	{
-		"jp"		"{default}[{red}!{default}] {green}タンク {default}({red}コントローラー：%s{default})が生成されました！"
+		"jp"		"{default}[{red}!{default}] {green}Tank {default}({red}操作者: %s{default}) が出現しました！"
 	}
 	"L4D2TankAnnounce_TankControllerGenerated_2"
 	{
-		"jp"		"{default}[{blue}!{default}] {green}タンク {default}({blue}コントローラー：%s{default})が生成されました！"
+		"jp"		"{default}[{blue}!{default}] {green}Tank {default}({blue}操作者: %s{default}) が出現しました！"
+	}
+	"L4D2TankAnnounce_PlayerName"
+	{
+		"jp"		"(プレイヤー) %N"
+	}
+	"L4D2TankAnnounce_AIName"
+	{
+		"jp"		"(AI) %N"
+	}
+	"L4D2TankAnnounce_Hint"
+	{
+		"jp"		"[Tank] 操作者: %s が出現しました！"
 	}
 }

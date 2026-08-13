@@ -12,15 +12,13 @@
 ConVar g_hPlaySound, g_hMessageType;
 // Ints
 int g_iPlaySound, g_iMessageType;
-// Chars
-char sTankName[MAX_NAME_LENGTH];
 
 public Plugin myinfo = 
 {
 	name 			= "Tank刷新提示",
 	author 			= "夜羽真白",
 	description 	= "当Tank生成时，进行提示",
-	version 		= "1.0.1.0",
+	version 		= "1.0.1.1",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -59,20 +57,20 @@ public void evt_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 				// 非对抗模式下无法使用红色
 				if (StrEqual(sGameMod, "versus", false))
 				{
-					CPrintToChatAll("%t", "L4D2TankAnnounce_TankControllerGenerated", sTankName);
+					AnnounceTankSpawn(client, "L4D2TankAnnounce_TankControllerGenerated", 1);
 				}
 				else
 				{
-					CPrintToChatAll("%t", "L4D2TankAnnounce_TankControllerGenerated_2", sTankName);
+					AnnounceTankSpawn(client, "L4D2TankAnnounce_TankControllerGenerated_2", 1);
 				}
 			}
 			case 2:
 			{
-				PrintHintTextToAll("[Tank] 控制者：%s 已经生成！", sTankName);
+				AnnounceTankSpawn(client, "L4D2TankAnnounce_Hint", 2);
 			}
 			case 3:
 			{
-				PrintCenterTextAll("[Tank] 控制者：%N 已经生成！", sTankName);
+				AnnounceTankSpawn(client, "L4D2TankAnnounce_Hint", 3);
 			}
 		}
 		if (g_iPlaySound == 1)
@@ -82,20 +80,57 @@ public void evt_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 	}
 }
 
+void AnnounceTankSpawn(int tank, const char[] phrase, int msgType)
+{
+	char sTankName[MAX_NAME_LENGTH];
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || (IsFakeClient(i) && !IsClientSourceTV(i)))
+		{
+			continue;
+		}
+
+		SetGlobalTransTarget(i);
+		FormatTankControllerName(tank, i, sTankName, sizeof(sTankName));
+		switch (msgType)
+		{
+			case 1:
+			{
+				CPrintToChat(i, "%t", phrase, sTankName);
+			}
+			case 2:
+			{
+				PrintHintText(i, "%t", phrase, sTankName);
+			}
+			case 3:
+			{
+				PrintCenterText(i, "%t", phrase, sTankName);
+			}
+		}
+	}
+}
+
+void FormatTankControllerName(int tank, int langClient, char[] buffer, int maxlen)
+{
+	if (!IsFakeClient(tank))
+	{
+		FormatEx(buffer, maxlen, "%T", "L4D2TankAnnounce_PlayerName", langClient, tank);
+	}
+	else
+	{
+		FormatEx(buffer, maxlen, "%T", "L4D2TankAnnounce_AIName", langClient, tank);
+	}
+}
+
 bool IsAiTank(int tank)
 {
-	// 是否玩家Tank
-	if (!IsFakeClient(tank) && IsClientInGame(tank) && GetClientTeam(tank) == 3 && GetEntProp(tank, Prop_Send, "m_zombieClass") == 8)
+	if (tank <= 0 || !IsClientInGame(tank) || GetClientTeam(tank) != 3 || GetEntProp(tank, Prop_Send, "m_zombieClass") != 8)
 	{
-		FormatEx(sTankName, sizeof(sTankName), "(玩家) %N", tank);
-		return true;
+		return false;
 	}
-	else if (tank != 0 && GetClientTeam(tank) == 3 && GetEntProp(tank, Prop_Send, "m_zombieClass") == 8)
-	{
-		FormatEx(sTankName, sizeof(sTankName), "(AI) %N", tank);
-		return true;
-	}
-	return false;
+
+	return true;
 }
 
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
