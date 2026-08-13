@@ -14,10 +14,11 @@
 #include <l4d_hats>
 #include <godframecontrol>
 #include <readyup>
-#define PLUGIN_VERSION "2.0"
+#define PLUGIN_VERSION "2.0.1"
 #define MAX_LINE_WIDTH 64
 #define DB_CONF_NAME  "rpg"
 #define RPG_DB_LOAD_RETRY_DELAY 2.0
+#define RPG_HAT_FIRST -2
 
 // 进行 MySQL 连接相关变量
 Handle db = INVALID_HANDLE;
@@ -45,6 +46,8 @@ bool IsAllowBigGun = false;
 bool g_bEnableGlow = true;
 bool  g_bAllowUseB = true;
 bool g_bPendingGlowRetry[MAXPLAYERS + 1];
+bool g_bHatDirty[MAXPLAYERS + 1];
+bool g_bPendingCosmeticRetry[MAXPLAYERS + 1];
 ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
 // === Admin Anti-Kick ===
@@ -370,6 +373,143 @@ static bool IsGlowRankDataReady(int client)
 	return l4dstats_IsTopPlayerCacheReady() != 0 && l4dstats_IsClientScoreReady(client) != 0;
 }
 
+static void ScheduleCosmeticRetry(int client)
+{
+	if (g_bPendingCosmeticRetry[client])
+		return;
+
+	g_bPendingCosmeticRetry[client] = true;
+	CreateTimer(3.0, Timer_RetryGlowApply, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+}
+
+static bool CanClientUseHat(int client)
+{
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return false;
+
+	ConVar hatsMenu = FindConVar("l4d_hats_menu");
+	char flags[32];
+	int menuFlags = ADMFLAG_KICK;
+	if (hatsMenu != null)
+	{
+		hatsMenu.GetString(flags, sizeof(flags));
+		TrimString(flags);
+		if (flags[0] == '\0')
+			return true;
+		menuFlags = ReadFlagString(flags);
+	}
+
+	int userFlags = GetUserFlagBits(client);
+	if ((userFlags & ADMFLAG_ROOT) || (menuFlags && (userFlags & menuFlags)))
+		return true;
+
+	if (!g_bl4dstatsSystemAvailable)
+		return true;
+
+	return l4dstats_IsTopPlayer(client, 100) != 0;
+}
+
+static int StoredHatToIndex(int stored)
+{
+	if (stored == RPG_HAT_FIRST)
+		return 0;
+	if (stored > 0)
+		return stored;
+	return -1;
+}
+
+static int HatIndexToStored(int index)
+{
+	if (index < 0)
+		return 0;
+	if (index == 0)
+		return RPG_HAT_FIRST;
+	return index;
+}
+
+static void ApplyClientHat(int client)
+{
+	if (!g_bHatSystemAvailable)
+		return;
+
+	int index = StoredHatToIndex(player[client].ClientHat);
+	if (index < 0)
+		return;
+
+	if (!CanClientUseHat(client))
+	{
+		if (!IsGlowRankDataReady(client))
+		{
+			ScheduleCosmeticRetry(client);
+			return;
+		}
+
+		player[client].ClientHat = 0;
+		if (GetFeatureStatus(FeatureType_Native, "Hats_SetClientHat") == FeatureStatus_Available)
+			Hats_SetClientHat(client, -1);
+		ClientSaveToFileSave(client);
+		return;
+	}
+
+	if (GetFeatureStatus(FeatureType_Native, "Hats_SetClientHat") == FeatureStatus_Available)
+		Hats_SetClientHat(client, index);
+	else
+		ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), index);
+}
+
+static bool CanClientUseSkin(int client, int skinType)
+{
+	if (skinType == 0)
+		return true;
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return false;
+	if (!g_bl4dstatsSystemAvailable)
+		return true;
+
+	if (skinType < 15 || skinType >= 17)
+		return l4dstats_IsTopPlayer(client, 50) != 0 || CheckCommandAccess(client, "", ADMFLAG_SLAY);
+
+	return l4dstats_IsTopPlayer(client, 5) != 0
+		|| GetClientImmunityLevel(client) >= 100
+		|| CheckCommandAccess(client, "", ADMFLAG_PASSWORD);
+}
+
+static void ApplyClientSkin(int client)
+{
+	if (!player[client].SkinType)
+		return;
+
+	if (!CanClientUseSkin(client, player[client].SkinType))
+	{
+		if (!IsGlowRankDataReady(client))
+		{
+			ScheduleCosmeticRetry(client);
+			return;
+		}
+
+		player[client].SkinType = 0;
+		DisableSkin(client);
+		ClientSaveToFileSave(client);
+		return;
+	}
+
+	GetSkin(client, player[client].SkinType, false);
+}
+
+static void ApplyClientCosmetics(int client)
+{
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return;
+	if (GetClientTeam(client) != 2 || !IsPlayerAlive(client))
+		return;
+
+	if (player[client].GlowType && g_bEnableGlow && ValidateClientGlow(client, true, true))
+		GetAura(client, player[client].GlowType, false, false);
+
+	ApplyClientHat(client);
+	ApplyClientSkin(client);
+}
+
 static void ClearClientGlow(int client, bool persist, bool notify = false)
 {
 	if (!IsValidClient(client))
@@ -396,11 +536,7 @@ static bool ValidateClientGlow(int client, bool persist, bool notify = false)
 
 	if (!IsGlowRankDataReady(client))
 	{
-		if (!g_bPendingGlowRetry[client])
-		{
-			g_bPendingGlowRetry[client] = true;
-			CreateTimer(3.0, Timer_RetryGlowApply, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
-		}
+		ScheduleCosmeticRetry(client);
 		return false;
 	}
 
@@ -415,8 +551,8 @@ public Action Timer_RetryGlowApply(Handle timer, any userid)
 		return Plugin_Stop;
 
 	g_bPendingGlowRetry[client] = false;
-	if (player[client].GlowType && g_bEnableGlow && GetClientTeam(client) == 2 && ValidateClientGlow(client, true, true))
-		GetAura(client, player[client].GlowType, false, false);
+	g_bPendingCosmeticRetry[client] = false;
+	ApplyClientCosmetics(client);
 
 	return Plugin_Stop;
 }
@@ -552,12 +688,17 @@ public void L4D2_GodFrameRenderChange(int client){
 
 public void L4D_OnHatLoadSave(int client, int index)
 {
-	//PrintToConsoleAll("index:%d load:%d",index,load);
-	//LogError("index:%d load:%d",index,load);
-	if(index >= 0 && IsValidClient(client) && !IsFakeClient(client)){
-		player[client].ClientHat = index;
-		ClientSaveToFileSave(client);
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return;
+
+	player[client].ClientHat = HatIndexToStored(index);
+	if (!player[client].DataLoaded)
+	{
+		g_bHatDirty[client] = true;
+		return;
 	}
+
+	ClientSaveToFileSave(client);
 }
 
 //载入事件
@@ -727,6 +868,8 @@ public void Event_PlayerDisconnectOrAFK( Event hEvent, const char[] sName, bool 
 		player[client].AnneGuidePrompt = 1;
 		player[client].DataLoaded = false;
 		player[client].tags.ChatTag = NULL_STRING;
+		g_bHatDirty[client] = false;
+		g_bPendingCosmeticRetry[client] = false;
 	}
 
 }
@@ -762,14 +905,7 @@ public Action PlayerSpawnTimer( Handle hTimer, any UserID )
 	
 	if( GetClientTeam( client ) == 2 && IsPlayerGhost( client ) != true )
 	{
-		if(player[client].GlowType && g_bEnableGlow)
-		{
-			GetAura(client, player[client].GlowType, false, false);
-		}
-		if(player[client].ClientHat)
-			ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
-		if(player[client].SkinType)
-			GetSkin(client, player[client].SkinType);
+		ApplyClientCosmetics(client);
 	}
 	else if( GetClientTeam( client ) == 3 )
 	{
@@ -786,15 +922,7 @@ public void Event_PlayerTeam(Event hEvent, const char[] name, bool dontBroadcast
 	int iTeam = hEvent.GetInt("team");
 	if( iTeam == 2 )
 	{
-		if(player[client].GlowType && g_bEnableGlow)
-		{
-			GetAura(client, player[client].GlowType, false, false);
-		}
-		if(player[client].ClientHat)
-			ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
-		if(player[client].SkinType)
-			GetSkin(client, player[client].SkinType);
-		//PrintToConsole(client,"sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat-1);
+		ApplyClientCosmetics(client);
 	}
 	if( iTeam == 3 ) {
 		DisableGlow( client );
@@ -1008,9 +1136,11 @@ public void OnClientPostAdminCheck(int client)
 		player[client].AnneGuidePrompt = 1;
 		player[client].DataLoaded = false;
 		player[client].tags.ChatTag = NULL_STRING;
+		g_bHatDirty[client] = false;
+		g_bPendingCosmeticRetry[client] = false;
 		ClientSaveToFileLoad(client);
 	}
-	CreateTimer(3.0, CheckPlayer, client);
+	CreateTimer(3.0, CheckPlayer, GetClientUserId(client));
 	CreateTimer(10.0, SetClientTag, client);
 }
 
@@ -1019,6 +1149,8 @@ public void OnClientDisconnect(int client)
 	g_iDbLoadRetryCount[client] = 0;
 	g_bPendingCustomTagApply[client] = false;
 	g_bPendingGlowRetry[client] = false;
+	g_bPendingCosmeticRetry[client] = false;
+	g_bHatDirty[client] = false;
 	player[client].AnneGuidePrompt = 1;
 	player[client].DataLoaded = false;
 }
@@ -1117,70 +1249,20 @@ bool ApplyCustomTagIfReady(int client)
 }
 
 
-public Action CheckPlayer(Handle timer, int client)
+public Action CheckPlayer(Handle timer, any userid)
 {
+	int client = GetClientOfUserId(userid);
 	if(!IsValidClient(client))
 		return Plugin_Handled;
-	if(player[client].GlowType || player[client].ClientHat || player[client].SkinType)
-		SetPlayer(client);
+	ApplyClientCosmetics(client);
+	if(g_bl4dstatsSystemAvailable && l4dstats_GetClientScore(client) < 500000 && !(CheckCommandAccess(client, "", ADMFLAG_SLAY)))
+		player[client].tags.ChatTag = NULL_STRING;
 	return Plugin_Continue;
 }
 
 public void SetPlayer(int client)
 {
-	if(IsValidClient(client) && GetClientTeam( client ) == 2 )
-	{
-		
-		if(player[client].GlowType && g_bEnableGlow)
-		{
-			GetAura(client, player[client].GlowType, false, false);
-		}
-
-		if(player[client].ClientHat)
-		{
-
-			if(l4dstats_IsTopPlayer(client, 100) || (CheckCommandAccess(client, "", ADMFLAG_SLAY)))
-			{
-				ServerCommand("sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
-			}else
-			{
-				player[client].ClientHat = 0;
-				//ClientSaveToFileSave(client);
-			}			
-		}
-
-		if(player[client].SkinType)
-		{
-			if(player[client].SkinType < 15 || player[client].SkinType >= 17)
-			{
-				if(l4dstats_IsTopPlayer(client, 50) || (CheckCommandAccess(client, "", ADMFLAG_SLAY)))
-				{
-					GetSkin(client,player[client].SkinType);
-				}else
-				{
-					player[client].SkinType = 0;
-					//ClientSaveToFileSave(client);
-				}
-			}			
-			else if(l4dstats_IsTopPlayer(client, 5) || GetUserAdmin(client).ImmunityLevel == 100 || (CheckCommandAccess(client, "", ADMFLAG_PASSWORD)))
-			{
-				GetSkin(client,player[client].SkinType);
-			}	
-			else
-			{
-				player[client].SkinType = 0;
-				ClientSaveToFileSave(client);
-			}
-		}
-
-		if(g_bl4dstatsSystemAvailable && l4dstats_GetClientScore(client) < 500000 && !(CheckCommandAccess(client, "", ADMFLAG_SLAY)))
-		{
-			player[client].tags.ChatTag = NULL_STRING;
-		}
-			
-		//PrintToConsole(client,"sm_hatclient #%d %d", GetClientUserId(client), player[client].ClientHat);
-		
-	}
+	ApplyClientCosmetics(client);
 }
 
 public void BypassAndExecuteCommand(int client, char []strCommand, char []strParam1)
@@ -1287,11 +1369,11 @@ public void ClientSaveToFileCreate(int Client)
 	if(StrEqual(SteamID,"BOT"))return;
 	if (g_bGuidePreferenceColumnAvailable)
 	{
-		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,ANNE_GUIDE_PROMPT) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d)", SteamID, 0, 0, 0, 0, 0, 1, 1);
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,ANNE_GUIDE_PROMPT) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt);
 	}
 	else
 	{
-		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL) VALUES ('%s',%d,%d,%d,%d,%d,%d)", SteamID, 0, 0, 0, 0, 0, 1);
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL) VALUES ('%s',%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil);
 	}
 	SendSQLUpdate(query);
 	return;
@@ -1760,7 +1842,9 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 	{
  		player[client].ClientMelee = SQL_FetchInt(hndl, 0);
  		player[client].ClientBlood = SQL_FetchInt(hndl, 1);
- 		player[client].ClientHat = SQL_FetchInt(hndl, 2);
+		int storedHat = SQL_FetchInt(hndl, 2);
+		if (!g_bHatDirty[client])
+			player[client].ClientHat = storedHat;
  		player[client].GlowType = SQL_FetchInt(hndl, 3);
  		player[client].SkinType = SQL_FetchInt(hndl, 4);
 		player[client].ClientRecoil = SQL_FetchInt(hndl, 5);
@@ -1768,8 +1852,11 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
 		player[client].AnneGuidePrompt = g_bGuidePreferenceColumnAvailable ? SQL_FetchInt(hndl, 7) : 1;
 		player[client].DataLoaded = true;
+		if (g_bHatDirty[client])
+			ClientSaveToFileSave(client);
+		g_bHatDirty[client] = false;
 		ApplyCustomTagIfReady(client);
-		ValidateClientGlow(client, true, true);
+		ApplyClientCosmetics(client);
 	}
 	else
 	{
@@ -1777,6 +1864,8 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 		player[client].AnneGuidePrompt = 1;
 		player[client].DataLoaded = true;
 		ClientSaveToFileCreate(client);
+		g_bHatDirty[client] = false;
+		ApplyClientCosmetics(client);
 	}
 }
 

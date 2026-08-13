@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.46"
+#define PLUGIN_VERSION 		"1.46.1"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,11 @@
 
 ========================================================================================
 	Change Log:
+
+1.46.1 (13-Aug-2026)
+	- Added natives "Hats_SetClientHat" and "Hats_GetClientHat" so other plugins can restore hats without going through sm_hatclient.
+	- L4D_OnHatLoadSave now reports -1 when a hat is removed, instead of 0 (which collided with the first hat index).
+	- Restoring saved hats no longer requires l4d_hats_make flags; cookie deletion now follows menu access (including top-100) and waits for rank data.
 
 1.46 (13-Jun-2022)
 	- Added forward "L4D_OnHatLoadSave" to report when loading or saving a clients hat type cookies. Requested by "morzlee".
@@ -387,11 +392,81 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	RegPluginLibrary("l4d_hats");
 
 	g_hForwardLoadSave = new GlobalForward("L4D_OnHatLoadSave", ET_Ignore, Param_Cell, Param_Cell);
-
+	CreateNative("Hats_SetClientHat", Native_SetClientHat);
+	CreateNative("Hats_GetClientHat", Native_GetClientHat);
 
 	MarkNativeAsOptional("ToggleReadyPanel");
 
 	return APLRes_Success;
+}
+
+void FireHatLoadSave(int client, int index)
+{
+	Call_StartForward(g_hForwardLoadSave);
+	Call_PushCell(client);
+	Call_PushCell(index);
+	Call_Finish();
+}
+
+bool HatsRankDataReady(int client)
+{
+	if( !g_bl4dstatsAvailable )
+		return true;
+	if( GetFeatureStatus(FeatureType_Native, "l4dstats_IsTopPlayerCacheReady") != FeatureStatus_Available )
+		return true;
+	if( GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") != FeatureStatus_Available )
+		return true;
+	return l4dstats_IsTopPlayerCacheReady() != 0 && l4dstats_IsClientScoreReady(client) != 0;
+}
+
+bool HatsClientHasMenuAccess(int client)
+{
+	if( !client || !IsClientInGame(client) || IsFakeClient(client) )
+		return false;
+
+	if( g_iCvarMenu == 0 )
+		return true;
+
+	int flags = GetUserFlagBits(client);
+	if( (flags & ADMFLAG_ROOT) || (flags & g_iCvarMenu) )
+		return true;
+
+	if( !g_bl4dstatsAvailable )
+		return true;
+
+	return l4dstats_IsTopPlayer(client, 100) != 0;
+}
+
+any Native_SetClientHat(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	int index = GetNativeCell(2);
+	if( client < 1 || client > MaxClients || !IsClientInGame(client) )
+		return false;
+
+	g_bHatOff[client] = false;
+	RemoveHat(client);
+
+	if( index < 0 )
+	{
+		g_iType[client] = -1;
+		return true;
+	}
+
+	if( index >= g_iCount )
+		return false;
+
+	return CreateHat(client, index, false);
+}
+
+any Native_GetClientHat(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if( client < 1 || client > MaxClients )
+		return -1;
+	if( g_iType[client] <= 0 )
+		return -1;
+	return g_iType[client] - 1;
 }
 
 public void OnAllPluginsLoaded()
@@ -892,14 +967,16 @@ void CookieAuthTest(int client)
 	// Check if clients allowed to use hats otherwise delete cookie/hat
 	if( g_iCvarMake && g_bCookieAuth[client] && !IsFakeClient(client) )
 	{
-		int flags = GetUserFlagBits(client);
+		if( HatsClientHasMenuAccess(client) )
+			return;
 
-		if( !(flags & ADMFLAG_ROOT) && !(flags & g_iCvarMake) )
-		{
-			g_iType[client] = 0;
-			RemoveHat(client);
-			SetClientCookie(client, g_hCookie_Hat, "0");
-		}
+		// Rank data may not be ready yet; keep the cookie until we know they lost access.
+		if( !HatsRankDataReady(client) )
+			return;
+
+		g_iType[client] = 0;
+		RemoveHat(client);
+		SetClientCookie(client, g_hCookie_Hat, "0");
 	} else {
 		g_bCookieAuth[client] = true;
 	}
@@ -1154,22 +1231,26 @@ Action TimerDelayCreate(Handle timer, any client)
 			return Plugin_Continue;
 		}
 
-		if( !fake && g_iCvarMake != 0 )
-		{
-			int flags = GetUserFlagBits(client);
-
-			if( !(flags & ADMFLAG_ROOT) && !(flags & g_iCvarMake) )
-			{
-				return Plugin_Continue;
-			}
-		}
-
 		if( g_iCvarRand == 2 )
 			CreateHat(client, -2);
-		else if( g_iCvarSave && !IsFakeClient(client) )
+		else if( g_iCvarSave && !fake )
+		{
+			if( !HatsClientHasMenuAccess(client) && HatsRankDataReady(client) )
+				return Plugin_Continue;
+
 			CreateHat(client, -3);
+		}
 		else if( g_iCvarRand )
+		{
+			if( !fake && g_iCvarMake != 0 )
+			{
+				int flags = GetUserFlagBits(client);
+				if( !(flags & ADMFLAG_ROOT) && !(flags & g_iCvarMake) )
+					return Plugin_Continue;
+			}
+
 			CreateHat(client, -1);
+		}
 	}
 
 	return Plugin_Continue;
@@ -1461,16 +1542,10 @@ Action CmdHat(int client, int args)
 		return Plugin_Handled;
 	}
 
-	if( g_iCvarMenu != 0)
+	if( g_iCvarMenu != 0 && !HatsClientHasMenuAccess(client) )
 	{
-		int flags = GetUserFlagBits(client);
-
-		if( !(flags & ADMFLAG_ROOT) && !(flags & g_iCvarMenu) && !((g_bl4dstatsAvailable && l4dstats_IsTopPlayer(client, 100)) || !g_bl4dstatsAvailable))
-		{
-			CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "No Access", client);
-			//CPrintToChat(client, "{GREEN}[HAT]{DEFAULT}你还没有权限使用帽子，请确认你是否为{ORANGE}管理员或积分排名榜前100名玩家");
-			return Plugin_Handled;
-		}
+		CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "No Access", client);
+		return Plugin_Handled;
 	}
 
 	g_iMenuType[client] = 0;
@@ -1500,12 +1575,7 @@ Action CmdHat(int client, int args)
 						SetClientCookie(client, g_hCookie_Hat, "-1");
 						g_iType[client] = -1;
 					}
-					// Forward
-					int type = 0;
-					Call_StartForward(g_hForwardLoadSave);
-					Call_PushCell(client);
-					Call_PushCell(type);
-					Call_Finish();
+					FireHatLoadSave(client, -1);
 
 					CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Off", client);
 				}
@@ -1607,12 +1677,7 @@ int HatMenuHandler(Menu menu, MenuAction action, int client, int index)
 
 				}
 
-				// Forward
-				int type = 0;
-				Call_StartForward(g_hForwardLoadSave);
-				Call_PushCell(client);
-				Call_PushCell(type);
-				Call_Finish();
+				FireHatLoadSave(client, -1);
 				CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Off", client);
 			}
 			else if( CreateHat(client, index - 1) )
@@ -2629,10 +2694,12 @@ void RemoveHat(int client)
 		RemoveEntity(entity);
 }
 
-bool CreateHat(int client, int index = -1)
+bool CreateHat(int client, int index = -1, bool notify = true)
 {
 	if( g_bBlocked[client] || g_bHatOff[client] || IsValidEntRef(g_iHatIndex[client]) == true || HatsValidClient(client) == false )
 		return false;
+
+	int requested = index;
 
 	if( index == -1 ) // Random hat
 	{
@@ -2691,12 +2758,8 @@ bool CreateHat(int client, int index = -1)
 	{
 		g_iType[client] = index + 1;
 	}
-	// Forward
-	int type = g_iType[client] - 1;
-	Call_StartForward(g_hForwardLoadSave);
-	Call_PushCell(client);
-	Call_PushCell(type);
-	Call_Finish();
+	if( notify && requested >= 0 )
+		FireHatLoadSave(client, g_iType[client] - 1);
 
 	if( g_iCvarSave && !IsFakeClient(client) )
 	{
