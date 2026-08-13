@@ -359,4 +359,94 @@
 			"#format"	"{1:d}"
 			"jp"		"他{1}体"
 		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"jp"		"HUDスロット15個すべて"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"jp"		"HUDスロット（1-15）"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"jp"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"jp"		"HUD {1} 表示内容（キルフィードと共用）"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"jp"		"未使用（非表示）"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"jp"		"進行 / タンク / ウィッチ"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"jp"		"サーバー状態"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"jp"		"左上"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"jp"		"左下"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"jp"		"中央上"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"jp"		"中央下"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"jp"		"右上"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"jp"		"右下"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"jp"		"ティッカー"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"jp"		"最左"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"jp"		"最右"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"jp"		"中央枠"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"jp"		"スコア見出し"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"jp"		"スコア1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"jp"		"スコア2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"jp"		"スコア3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"jp"		"スコア4"
+		}
 	}

@@ -359,4 +359,94 @@
 			"#format"	"{1:d}"
 			"ko"		"외 {1}마리"
 		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"ko"		"HUD 슬롯 15개 모두"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"ko"		"HUD 슬롯 (1-15)"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"ko"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"ko"		"HUD {1} 표시 내용 (킬 피드와 공유)"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"ko"		"사용 안 함 (숨김)"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"ko"		"진행 / 탱크 / Witch"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"ko"		"서버 상태"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"ko"		"좌상단"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"ko"		"좌하단"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"ko"		"중앙 상단"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"ko"		"중앙 하단"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"ko"		"우상단"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"ko"		"우하단"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"ko"		"티커"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"ko"		"맨 왼쪽"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"ko"		"맨 오른쪽"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"ko"		"중앙 상자"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"ko"		"점수 제목"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"ko"		"점수1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"ko"		"점수2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"ko"		"점수3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"ko"		"점수4"
+		}
 	}

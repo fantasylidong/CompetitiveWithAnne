@@ -28,8 +28,8 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 // ====================================================================================================
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
-#define PLUGIN_DESCRIPTION            "Display text for up to 4 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.3.0"
+#define PLUGIN_DESCRIPTION            "Display text for all 15 scripted HUD slots on the screen"
+#define PLUGIN_VERSION                "1.4.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -57,6 +57,7 @@ public Plugin myinfo =
 #include <l4d2_ems_hud>
 #include <sendproxy>
 #include <sourcescramble>
+#include <l4d2_scripted_hud_proxies>
 
 //#define REQUIRE_PLUGIN
 #undef REQUIRE_PLUGIN
@@ -90,8 +91,15 @@ public Plugin myinfo =
 #define HUD3                          2
 #define HUD4                          3
 
+#define HUD_SLOT_COUNT                MAX_SIZE_HUD
+#define HUD_EXTRA_FIRST               HUD_RIGHT_TOP
+#define HUD_KILL_SHARE_FIRST          HUD_FAR_RIGHT
 #define HUD_SLOT_DEFAULT_MASK         ((1 << HUD1) | (1 << HUD2))
-#define HUD_SLOT_ALL_MASK             ((1 << 4) - 1)
+#define HUD_SLOT_ALL_MASK             ((1 << HUD_SLOT_COUNT) - 1)
+#define HUD_EXTRA_LINE_HEIGHT         0.026
+#define HUD_EXTRA_WIDTH               0.24
+#define HUD_PREFS_COOKIE_SIZE         100
+#define HUD_PREFS_MIGRATIONS          4
 
 #define HUD2_PART_SERVER_NAME         (1 << 0)
 #define HUD2_PART_MODE                (1 << 1)
@@ -120,14 +128,14 @@ public Plugin myinfo =
 #define HUD_CONTENT_SPEED             8
 #define HUD_CONTENT_ROUND             9
 #define HUD_CONTENT_WITCH            10
-#define HUD_CONTENT_MAX               HUD_CONTENT_WITCH
+#define HUD_CONTENT_PROGRESS         11
+#define HUD_CONTENT_SERVER           12
+#define HUD_CONTENT_MAX               HUD_CONTENT_SERVER
 
 #define HUD_PANIC_WINDOW              60.0
 #define HUD_WITCH_NEAR_UNITS          600.0
 #define HUD_BHOP_RESET_SPEED          230.0
 #define HUD_BHOP_RESET_HOLD           0.25
-
-#define HUD_CUSTOM_SLOT_COUNT         2 // HUD3 + HUD4
 
 #define HUD_LAYOUT_STANDARD           0
 #define HUD_LAYOUT_4_3                1
@@ -139,7 +147,8 @@ public Plugin myinfo =
 #define HUD_PROXY_POS_X               2
 #define HUD_PROXY_WIDTH               3
 #define HUD_PROXY_HEIGHT              4
-#define HUD_PROXY_COUNT               5
+#define HUD_PROXY_POS_Y               5
+#define HUD_PROXY_COUNT               6
 
 #define HUD_TEAM_ALL                  0
 #define HUD_TEAM_SURVIVOR             1
@@ -317,8 +326,8 @@ static bool g_bInfectedControlAvailable;
 static bool g_bLateLoad;
 static bool g_bTankBoardFrozen;
 static bool g_bPanicActive;
-static bool g_bHUDProxyHooked[4][HUD_PROXY_COUNT];
-static bool g_bHUDResetPending[4];
+static bool g_bHUDProxyHooked[HUD_SLOT_COUNT][HUD_PROXY_COUNT];
+static bool g_bHUDResetPending[HUD_SLOT_COUNT];
 static bool g_bHUDPrefsDatabaseReady;
 static bool g_bHUDPrefsDatabaseConnecting;
 static bool g_bClientHasCookie[MAXPLAYERS + 1];
@@ -354,7 +363,10 @@ static int    g_iClientHUDMask[MAXPLAYERS + 1];
 static int    g_iClientHUD2Mask[MAXPLAYERS + 1];
 static int    g_iClientHUDLayout[MAXPLAYERS + 1];
 static int    g_iClientHUDRevision[MAXPLAYERS + 1];
-static int    g_iClientHUDSource[MAXPLAYERS + 1][HUD_CUSTOM_SLOT_COUNT];
+static int    g_iClientHUDSource[MAXPLAYERS + 1][HUD_SLOT_COUNT];
+static int    g_iHUDMenuSlot[MAXPLAYERS + 1];
+static int    g_iHUDPrefsMigrationsLeft;
+static int    g_iExtraHUDFlags = HUD_FLAG_TEXT | HUD_FLAG_NOBG | HUD_FLAG_ALIGN_LEFT;
 static int    g_iClientSpecialKills[MAXPLAYERS + 1];
 static int    g_iClientCommonKills[MAXPLAYERS + 1];
 static int    g_iHUD2WipeCount;
@@ -438,8 +450,8 @@ static char   g_sHUD4_Text[128];
 static char   g_sHUD_TextArray[4][128];
 static char   g_sBuffer[128];
 static char   g_sSpaces[128] = "                                                                                                                               ";
-static char   g_sClientHUDText[MAXPLAYERS + 1][4][128];
-static char   g_sClientHUDCookie[MAXPLAYERS + 1][64];
+static char   g_sClientHUDText[MAXPLAYERS + 1][HUD_SLOT_COUNT][128];
+static char   g_sClientHUDCookie[MAXPLAYERS + 1][HUD_PREFS_COOKIE_SIZE];
 static char   g_sHUD2Fragments[7][64];
 static char   g_sBaseServerName[64];
 
@@ -455,7 +467,44 @@ static const char g_sHUDSourcePhrases[][] =
     "L4D2ScriptedHUD_SourceWave",
     "L4D2ScriptedHUD_SourceSpeed",
     "L4D2ScriptedHUD_SourceRound",
-    "L4D2ScriptedHUD_SourceWitch"
+    "L4D2ScriptedHUD_SourceWitch",
+    "L4D2ScriptedHUD_SourceProgress",
+    "L4D2ScriptedHUD_SourceServer"
+};
+
+static const char g_sHUDEngineNamePhrases[][] =
+{
+    "L4D2ScriptedHUD_SlotLeftTop",
+    "L4D2ScriptedHUD_SlotLeftBot",
+    "L4D2ScriptedHUD_SlotMidTop",
+    "L4D2ScriptedHUD_SlotMidBot",
+    "L4D2ScriptedHUD_SlotRightTop",
+    "L4D2ScriptedHUD_SlotRightBot",
+    "L4D2ScriptedHUD_SlotTicker",
+    "L4D2ScriptedHUD_SlotFarLeft",
+    "L4D2ScriptedHUD_SlotFarRight",
+    "L4D2ScriptedHUD_SlotMidBox",
+    "L4D2ScriptedHUD_SlotScoreTitle",
+    "L4D2ScriptedHUD_SlotScore1",
+    "L4D2ScriptedHUD_SlotScore2",
+    "L4D2ScriptedHUD_SlotScore3",
+    "L4D2ScriptedHUD_SlotScore4"
+};
+
+// Default placement for engine slots 4-14. Slots 0-3 keep their cvars.
+// Left column sits under HUD1; right column sits below HUD4 / the kill feed.
+static const float g_fExtraSlotX[HUD_SLOT_COUNT] =
+{
+    0.00, 0.00, 0.00, 0.00,
+    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+    0.76, 0.76, 0.76, 0.76, 0.76
+};
+
+static const float g_fExtraSlotY[HUD_SLOT_COUNT] =
+{
+    0.00, 0.00, 0.00, 0.00,
+    0.10, 0.20, 0.30, 0.40, 0.50, 0.60,
+    0.46, 0.54, 0.62, 0.70, 0.78
 };
 
 enum HUDPrefsLoadState
@@ -757,14 +806,119 @@ public void OnMapStart()
     LoadBaseServerName();
 }
 
-// Slots HUD_RIGHT_TOP..HUD_FAR_LEFT (4..7) are used neither by this plugin nor by
-// the CS kill hud (slots 8..14). Because the EMS HUDFrameUpdate patches stop the
-// engine from auto-hiding unused slots, stale/uninitialized slot data would render
-// as empty background frames (white-outlined boxes). Explicitly hide them.
+// Slots 4-7 are owned by this plugin. Initialize them as TEXT|NOBG|NOTVISIBLE so
+// the EMS HUDFrameUpdate patches cannot leave stale/uninitialized data that
+// renders as empty white-outlined boxes. Slots 8-14 stay untouched so the CS
+// kill HUD can keep driving them until a player assigns custom content.
 void ClearUnusedHUDSlots()
 {
-    for (int slot = HUD_RIGHT_TOP; slot <= HUD_FAR_LEFT; slot++)
-        RemoveHUD(slot);
+    PlaceOwnedExtraHUDSlots();
+}
+
+void PlaceOwnedExtraHUDSlots()
+{
+    for (int slot = HUD_EXTRA_FIRST; slot < HUD_KILL_SHARE_FIRST; slot++)
+    {
+        int flags = g_iExtraHUDFlags | HUD_FLAG_NOTVISIBLE;
+        if (IsExtraSlotUsedByAnyone(slot))
+            flags = g_iExtraHUDFlags;
+
+        HUDSetLayout(slot, flags, " ");
+        HUDPlace(slot, g_fExtraSlotX[slot], g_fExtraSlotY[slot], HUD_EXTRA_WIDTH, HUD_EXTRA_LINE_HEIGHT * 6.0);
+    }
+}
+
+bool IsKillHudSharedSlot(int hud)
+{
+    return hud >= HUD_KILL_SHARE_FIRST;
+}
+
+bool IsSlotGloballyAllowed(int hud)
+{
+    switch (hud)
+    {
+        case HUD1: return g_bCvar_HUD1_Visible;
+        case HUD2: return g_bCvar_HUD2_Visible;
+        case HUD3: return g_bCvar_HUD3_Visible;
+        case HUD4: return g_bCvar_HUD4_Visible;
+    }
+
+    return true;
+}
+
+int GetClientHUDSource(int client, int hud)
+{
+    if (hud < HUD1 || hud >= HUD_SLOT_COUNT)
+        return HUD_CONTENT_DEFAULT;
+
+    return g_iClientHUDSource[client][hud];
+}
+
+bool IsClientSlotVisible(int client, int hud)
+{
+    if (!g_bCvar_Enabled || !IsValidClient(client) || IsFakeClient(client))
+        return false;
+
+    if (!IsSlotGloballyAllowed(hud))
+        return false;
+
+    if ((g_iClientHUDMask[client] & (1 << hud)) == 0)
+        return false;
+
+    if (hud >= HUD_EXTRA_FIRST && GetClientHUDSource(client, hud) == HUD_CONTENT_DEFAULT)
+        return false;
+
+    return true;
+}
+
+bool IsExtraSlotUsedByAnyone(int hud)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && IsClientSlotVisible(client, hud))
+            return true;
+    }
+
+    return false;
+}
+
+float GetHUDSlotLineHeight(int hud)
+{
+    switch (hud)
+    {
+        case HUD1: return g_fCvar_HUD1_Height;
+        case HUD2: return g_fCvar_HUD2_Height;
+        case HUD3: return g_fCvar_HUD3_Height;
+        case HUD4: return g_fCvar_HUD4_Height;
+    }
+
+    return HUD_EXTRA_LINE_HEIGHT;
+}
+
+int GetHUDSlotBaseFlags(int hud)
+{
+    switch (hud)
+    {
+        case HUD1: return g_iHUD1Flags;
+        case HUD2: return g_iHUD2Flags;
+        case HUD3: return g_iHUD3Flags;
+        case HUD4: return g_iHUD4Flags;
+    }
+
+    return g_iExtraHUDFlags;
+}
+
+bool GetHUDSlotBlinkTank(int hud)
+{
+    switch (hud)
+    {
+        case HUD1: return g_bCvar_HUD1_BlinkTank;
+        case HUD2: return g_bCvar_HUD2_BlinkTank;
+        case HUD3: return g_bCvar_HUD3_BlinkTank;
+        case HUD4: return g_bCvar_HUD4_BlinkTank;
+    }
+
+    return false;
 }
 
 public void OnMapEnd()
@@ -1194,6 +1348,8 @@ void GetHUD_Flags()
         if (g_bCvar_HUD4_Beep)
             g_iHUD4Flags |= HUD_FLAG_BEEP;
     }
+
+    g_iExtraHUDFlags = HUD_FLAG_TEXT | HUD_FLAG_NOBG | HUD_FLAG_ALIGN_LEFT;
 }
 
 /****************************************************************************************************/
@@ -1441,6 +1597,10 @@ public void UpdateHUD()
         HUDSetLayout(HUD4, flags, "%s", g_sHUD_TextArray[HUD4]);
         HUDPlace(HUD4, g_fHUD4_X, g_fHUD4_Y, g_fCvar_HUD4_Width, g_fCvar_HUD4_Height * (CountCharInString(g_sHUD_TextArray[HUD4], '\n') + 1));
     }
+
+    // Own slots 4-7 globally. Slots 8-14 are SendProxy-only so the kill HUD
+    // keeps its netprops; opted-in clients see our content through the proxy.
+    PlaceOwnedExtraHUDSlots();
 }
 
 /****************************************************************************************************/
@@ -1957,7 +2117,7 @@ public Action offSpecHud(int client, int args)
 
 bool AreAllHUDSendProxiesHooked()
 {
-    for (int hud = HUD1; hud <= HUD4; hud++)
+    for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
     {
         for (int proxy = 0; proxy < HUD_PROXY_COUNT; proxy++)
         {
@@ -1974,84 +2134,44 @@ void HookHUDSendProxies(bool logFailures = true)
     if (!LibraryExists(SENDPROXY_LIB) || FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) == -1)
         return;
 
-    for (int hud = HUD1; hud <= HUD4; hud++)
+    for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
     {
         HookHUDSendProxySlot(hud);
 
         if (logFailures && (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_STRING]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]
+            || !g_bHUDProxyHooked[hud][HUD_PROXY_POS_Y]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]
             || !g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT]))
-            LogError("[Scripted HUD] Failed to hook SendProxy for HUD slot %d.", hud + 1);
+            LogError("[Scripted HUD] Failed to hook SendProxy for HUD slot %d.", hud);
     }
 }
 
 void HookHUDSendProxySlot(int hud)
 {
-    // Left4SendProxy deduplicates array hooks by callback, so every element needs unique callbacks.
-    switch (hud)
-    {
-        case HUD1:
-        {
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD1Flags, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD1String, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD1PosX, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD1Width, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT])
-                g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT] = SendProxy_HookGameRules("m_fScriptedHUDHeight", Prop_Float, ProxyHUD1Height, hud);
-        }
-        case HUD2:
-        {
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD2Flags, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD2String, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD2PosX, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD2Width, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT])
-                g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT] = SendProxy_HookGameRules("m_fScriptedHUDHeight", Prop_Float, ProxyHUD2Height, hud);
-        }
-        case HUD3:
-        {
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD3Flags, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD3String, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD3PosX, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD3Width, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT])
-                g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT] = SendProxy_HookGameRules("m_fScriptedHUDHeight", Prop_Float, ProxyHUD3Height, hud);
-        }
-        case HUD4:
-        {
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS])
-                g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS] = SendProxy_HookGameRules("m_iScriptedHUDFlags", Prop_Int, ProxyHUD4Flags, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_STRING])
-                g_bHUDProxyHooked[hud][HUD_PROXY_STRING] = SendProxy_HookGameRules("m_szScriptedHUDStringSet", Prop_String, ProxyHUD4String, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_POS_X])
-                g_bHUDProxyHooked[hud][HUD_PROXY_POS_X] = SendProxy_HookGameRules("m_fScriptedHUDPosX", Prop_Float, ProxyHUD4PosX, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH])
-                g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH] = SendProxy_HookGameRules("m_fScriptedHUDWidth", Prop_Float, ProxyHUD4Width, hud);
-            if (!g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT])
-                g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT] = SendProxy_HookGameRules("m_fScriptedHUDHeight", Prop_Float, ProxyHUD4Height, hud);
-        }
-    }
+    HOOK_HUD_SLOT(0)
+    HOOK_HUD_SLOT(1)
+    HOOK_HUD_SLOT(2)
+    HOOK_HUD_SLOT(3)
+    HOOK_HUD_SLOT(4)
+    HOOK_HUD_SLOT(5)
+    HOOK_HUD_SLOT(6)
+    HOOK_HUD_SLOT(7)
+    HOOK_HUD_SLOT(8)
+    HOOK_HUD_SLOT(9)
+    HOOK_HUD_SLOT(10)
+    HOOK_HUD_SLOT(11)
+    HOOK_HUD_SLOT(12)
+    HOOK_HUD_SLOT(13)
+    HOOK_HUD_SLOT(14)
 }
 
 void UnhookHUDSendProxies()
 {
     bool canUnhook = LibraryExists(SENDPROXY_LIB) && FindEntityByClassname(-1, GAMERULES_PROXY_CLASS) != -1;
 
-    for (int hud = HUD1; hud <= HUD4; hud++)
+    for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
     {
         if (canUnhook)
             UnhookHUDSendProxySlot(hud);
@@ -2062,74 +2182,44 @@ void UnhookHUDSendProxies()
 
 void UnhookHUDSendProxySlot(int hud)
 {
-    switch (hud)
-    {
-        case HUD1:
-        {
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD1Flags, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD1String, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD1PosX, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD1Width, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT]) SendProxy_UnhookGameRules("m_fScriptedHUDHeight", ProxyHUD1Height, hud);
-        }
-        case HUD2:
-        {
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD2Flags, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD2String, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD2PosX, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD2Width, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT]) SendProxy_UnhookGameRules("m_fScriptedHUDHeight", ProxyHUD2Height, hud);
-        }
-        case HUD3:
-        {
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD3Flags, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD3String, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD3PosX, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD3Width, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT]) SendProxy_UnhookGameRules("m_fScriptedHUDHeight", ProxyHUD3Height, hud);
-        }
-        case HUD4:
-        {
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_FLAGS]) SendProxy_UnhookGameRules("m_iScriptedHUDFlags", ProxyHUD4Flags, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_STRING]) SendProxy_UnhookGameRules("m_szScriptedHUDStringSet", ProxyHUD4String, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_POS_X]) SendProxy_UnhookGameRules("m_fScriptedHUDPosX", ProxyHUD4PosX, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_WIDTH]) SendProxy_UnhookGameRules("m_fScriptedHUDWidth", ProxyHUD4Width, hud);
-            if (g_bHUDProxyHooked[hud][HUD_PROXY_HEIGHT]) SendProxy_UnhookGameRules("m_fScriptedHUDHeight", ProxyHUD4Height, hud);
-        }
-    }
+    UNHOOK_HUD_SLOT(0)
+    UNHOOK_HUD_SLOT(1)
+    UNHOOK_HUD_SLOT(2)
+    UNHOOK_HUD_SLOT(3)
+    UNHOOK_HUD_SLOT(4)
+    UNHOOK_HUD_SLOT(5)
+    UNHOOK_HUD_SLOT(6)
+    UNHOOK_HUD_SLOT(7)
+    UNHOOK_HUD_SLOT(8)
+    UNHOOK_HUD_SLOT(9)
+    UNHOOK_HUD_SLOT(10)
+    UNHOOK_HUD_SLOT(11)
+    UNHOOK_HUD_SLOT(12)
+    UNHOOK_HUD_SLOT(13)
+    UNHOOK_HUD_SLOT(14)
 }
 
 void ResetHUDSendProxyState()
 {
-    for (int hud = HUD1; hud <= HUD4; hud++)
+    for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
     {
         for (int proxy = 0; proxy < HUD_PROXY_COUNT; proxy++)
             g_bHUDProxyHooked[hud][proxy] = false;
     }
 }
 
-public Action ProxyHUD1Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD1, client); }
-public Action ProxyHUD2Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD2, client); }
-public Action ProxyHUD3Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD3, client); }
-public Action ProxyHUD4Flags(const char[] prop, int &value, int element, int client) { return ProxyHUDFlags(value, HUD4, client); }
-
 Action ProxyHUDFlags(int &value, int hud, int client)
 {
     if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
-    bool globallyAllowed;
-    int baseFlags;
-    bool blinkTank;
-    switch (hud)
-    {
-        case HUD1: { globallyAllowed = g_bCvar_HUD1_Visible; baseFlags = g_iHUD1Flags; blinkTank = g_bCvar_HUD1_BlinkTank; }
-        case HUD2: { globallyAllowed = g_bCvar_HUD2_Visible; baseFlags = g_iHUD2Flags; blinkTank = g_bCvar_HUD2_BlinkTank; }
-        case HUD3: { globallyAllowed = g_bCvar_HUD3_Visible; baseFlags = g_iHUD3Flags; blinkTank = g_bCvar_HUD3_BlinkTank; }
-        case HUD4: { globallyAllowed = g_bCvar_HUD4_Visible; baseFlags = g_iHUD4Flags; blinkTank = g_bCvar_HUD4_BlinkTank; }
-    }
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
 
-    if (g_bCvar_Enabled && globallyAllowed && !g_bHUDResetPending[hud] && (g_iClientHUDMask[client] & (1 << hud)) != 0)
+    int baseFlags = GetHUDSlotBaseFlags(hud);
+    bool blinkTank = GetHUDSlotBlinkTank(hud);
+
+    if (IsClientSlotVisible(client, hud) && !g_bHUDResetPending[hud])
     {
         // Rebuild from the authoritative configured flags instead of patching the raw
         // netprop value. This guarantees a client can never receive a transient
@@ -2139,79 +2229,112 @@ Action ProxyHUDFlags(int &value, int hud, int client)
             baseFlags |= HUD_FLAG_BLINK;
         value = baseFlags & ~HUD_FLAG_NOTVISIBLE;
 
-        // A player who explicitly selected a personal content source for HUD3/HUD4
-        // should see it regardless of the slot's global team restriction.
-        if ((hud == HUD3 || hud == HUD4) && g_iClientHUDSource[client][hud - HUD3] != HUD_CONTENT_DEFAULT)
+        // A player who explicitly selected a personal content source should see it
+        // regardless of the slot's global team restriction.
+        if (GetClientHUDSource(client, hud) != HUD_CONTENT_DEFAULT)
             value &= ~HUD_FLAG_TEAM_MASK;
     }
     else
-        value |= HUD_FLAG_NOTVISIBLE;
+        value = (baseFlags | HUD_FLAG_NOTVISIBLE | HUD_FLAG_TEXT | HUD_FLAG_NOBG);
 
     return Plugin_Changed;
 }
-
-public Action ProxyHUD1String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD1, client); }
-public Action ProxyHUD2String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD2, client); }
-public Action ProxyHUD3String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD3, client); }
-public Action ProxyHUD4String(const char[] prop, char[] value, int maxlength, int element, int client) { return ProxyHUDString(value, maxlength, HUD4, client); }
 
 Action ProxyHUDString(char[] value, int maxlength, int hud, int client)
 {
     if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
+
     strcopy(value, maxlength, g_sClientHUDText[client][hud]);
     return Plugin_Changed;
 }
 
-public Action ProxyHUD1PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
-public Action ProxyHUD2PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
-public Action ProxyHUD3PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
-public Action ProxyHUD4PosX(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_POS_X, client); }
-public Action ProxyHUD1Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
-public Action ProxyHUD2Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
-public Action ProxyHUD3Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
-public Action ProxyHUD4Width(const char[] prop, float &value, int element, int client) { return ProxyHUDLayout(value, HUD_PROXY_WIDTH, client); }
-public Action ProxyHUD1Height(const char[] prop, float &value, int element, int client) { return ProxyHUDHeight(value, HUD1, client); }
-public Action ProxyHUD2Height(const char[] prop, float &value, int element, int client) { return ProxyHUDHeight(value, HUD2, client); }
-public Action ProxyHUD3Height(const char[] prop, float &value, int element, int client) { return ProxyHUDHeight(value, HUD3, client); }
-public Action ProxyHUD4Height(const char[] prop, float &value, int element, int client) { return ProxyHUDHeight(value, HUD4, client); }
+Action ProxyHUDPosX(float &value, int hud, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Continue;
 
-// Personalized content can have a different line count than the global text,
-// so the panel height has to be personalized as well.
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
+
+    bool changed = false;
+    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
+    {
+        value = g_fExtraSlotX[hud];
+        changed = true;
+    }
+
+    if (ApplyHUDLayoutScale(value, HUD_PROXY_POS_X, client))
+        changed = true;
+
+    return changed ? Plugin_Changed : Plugin_Continue;
+}
+
+Action ProxyHUDPosY(float &value, int hud, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Continue;
+
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
+
+    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
+    {
+        value = g_fExtraSlotY[hud];
+        return Plugin_Changed;
+    }
+
+    return Plugin_Continue;
+}
+
+Action ProxyHUDWidth(float &value, int hud, int client)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Continue;
+
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
+
+    bool changed = false;
+    if (hud >= HUD_EXTRA_FIRST && IsClientSlotVisible(client, hud))
+    {
+        value = HUD_EXTRA_WIDTH;
+        changed = true;
+    }
+
+    if (ApplyHUDLayoutScale(value, HUD_PROXY_WIDTH, client))
+        changed = true;
+
+    return changed ? Plugin_Changed : Plugin_Continue;
+}
+
 Action ProxyHUDHeight(float &value, int hud, int client)
 {
     if (!IsValidClient(client) || IsFakeClient(client))
         return Plugin_Continue;
 
+    if (IsKillHudSharedSlot(hud) && !IsClientSlotVisible(client, hud))
+        return Plugin_Continue;
+
     if (g_sClientHUDText[client][hud][0] == '\0')
         return Plugin_Continue;
 
-    float lineHeight;
-    switch (hud)
-    {
-        case HUD1: lineHeight = g_fCvar_HUD1_Height;
-        case HUD2: lineHeight = g_fCvar_HUD2_Height;
-        case HUD3: lineHeight = g_fCvar_HUD3_Height;
-        case HUD4: lineHeight = g_fCvar_HUD4_Height;
-    }
-
-    value = lineHeight * float(CountCharInString(g_sClientHUDText[client][hud], '\n') + 1);
+    value = GetHUDSlotLineHeight(hud) * float(CountCharInString(g_sClientHUDText[client][hud], '\n') + 1);
     return Plugin_Changed;
 }
 
-Action ProxyHUDLayout(float &value, int proxyType, int client)
+bool ApplyHUDLayoutScale(float &value, int proxyType, int client)
 {
-    if (!IsValidClient(client) || IsFakeClient(client))
-        return Plugin_Continue;
-
     int layout = g_iClientHUDLayout[client];
     float horizontalScale;
     switch (layout)
     {
         case HUD_LAYOUT_4_3: horizontalScale = 0.75;
         case HUD_LAYOUT_ULTRAWIDE: horizontalScale = 0.76;
-        default: return Plugin_Continue;
+        default: return false;
     }
 
     if (proxyType == HUD_PROXY_POS_X)
@@ -2220,13 +2343,16 @@ Action ProxyHUDLayout(float &value, int proxyType, int client)
             value *= horizontalScale;
         else
             value = 0.5 + ((value - 0.5) * horizontalScale);
+        return true;
     }
-    else if (proxyType == HUD_PROXY_WIDTH)
-        value *= horizontalScale;
-    else
-        return Plugin_Continue;
 
-    return Plugin_Changed;
+    if (proxyType == HUD_PROXY_WIDTH)
+    {
+        value *= horizontalScale;
+        return true;
+    }
+
+    return false;
 }
 
 void BuildClientHUDTexts()
@@ -2238,6 +2364,9 @@ void BuildClientHUDTexts()
         if (!IsClientInGame(client) || IsFakeClient(client))
             continue;
 
+        for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
+            g_sClientHUDText[client][hud][0] = '\0';
+
         for (int hud = HUD1; hud <= HUD4; hud++)
             strcopy(g_sClientHUDText[client][hud], sizeof(g_sClientHUDText[][]), g_sHUD_TextArray[hud]);
 
@@ -2247,9 +2376,9 @@ void BuildClientHUDTexts()
             FormatEx(g_sClientHUDText[client][HUD2], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
         }
 
-        for (int hud = HUD3; hud <= HUD4; hud++)
+        for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
         {
-            int source = g_iClientHUDSource[client][hud - HUD3];
+            int source = GetClientHUDSource(client, hud);
             if (source == HUD_CONTENT_DEFAULT)
                 continue;
 
@@ -2279,6 +2408,8 @@ void BuildHUDSourceText(int client, int source, char[] output, int size)
         case HUD_CONTENT_SPEED:     BuildSpeedText(client, output, size);
         case HUD_CONTENT_ROUND:     BuildRoundStatusText(client, output, size);
         case HUD_CONTENT_WITCH:     BuildWitchWarnText(client, output, size);
+        case HUD_CONTENT_PROGRESS:  GetHUD1_Text(output, size);
+        case HUD_CONTENT_SERVER:    ComposeHUD2Text(output, size, g_iClientHUD2Mask[client], client);
         default: output[0] = '\0';
     }
 }
@@ -3020,12 +3151,13 @@ void ResetHUDPrefsClient(int client)
     g_iTankDamage[client] = 0;
     g_fClientBhopPeak[client] = 0.0;
     g_fClientGroundedSince[client] = 0.0;
+    g_iHUDMenuSlot[client] = HUD3;
 
-    for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+    {
         g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
-
-    for (int hud = HUD1; hud <= HUD4; hud++)
-        g_sClientHUDText[client][hud][0] = '\0';
+        g_sClientHUDText[client][slot][0] = '\0';
+    }
 }
 
 void InitializeHUDPrefsClient(int client)
@@ -3085,12 +3217,58 @@ void ReadHUDPrefsCookie(int client)
     g_bClientHasCookie[client] = (g_sClientHUDCookie[client][0] != '\0');
 }
 
-bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision, int &layout, int sources[HUD_CUSTOM_SLOT_COUNT])
+void ClearHUDSources(int sources[HUD_SLOT_COUNT])
 {
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        sources[slot] = HUD_CONTENT_DEFAULT;
+}
+
+void CopyHUDSources(int dest[HUD_SLOT_COUNT], const int src[HUD_SLOT_COUNT])
+{
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        dest[slot] = src[slot];
+}
+
+void ApplyHUDSources(int client, const int sources[HUD_SLOT_COUNT])
+{
+    CopyHUDSources(g_iClientHUDSource[client], sources);
+}
+
+void PackSlotSources(const int sources[HUD_SLOT_COUNT], char[] output, int size)
+{
+    output[0] = '\0';
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+    {
+        char piece[8];
+        FormatEx(piece, sizeof(piece), "%s%d", (slot == 0) ? "" : ",", sources[slot]);
+        StrCat(output, size, piece);
+    }
+}
+
+void ParsePackedSlotSources(const char[] packed, int sources[HUD_SLOT_COUNT])
+{
+    ClearHUDSources(sources);
+    if (packed[0] == '\0')
+        return;
+
+    char bits[HUD_SLOT_COUNT][8];
+    int count = ExplodeString(packed, ",", bits, sizeof(bits), sizeof(bits[]));
+    for (int slot = 0; slot < count && slot < HUD_SLOT_COUNT; slot++)
+    {
+        int source = StringToInt(bits[slot]);
+        if (source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
+            source = HUD_CONTENT_DEFAULT;
+        sources[slot] = source;
+    }
+}
+
+bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision, int &layout, int sources[HUD_SLOT_COUNT])
+{
+    ClearHUDSources(sources);
     if (!g_bClientHasCookie[client])
         return false;
 
-    char parts[7][16];
+    char parts[7][80];
     int count = ExplodeString(g_sClientHUDCookie[client], "|", parts, sizeof(parts), sizeof(parts[]));
     if ((count < 2 || count > 6) || parts[0][0] == '\0' || parts[1][0] == '\0')
         return false;
@@ -3123,18 +3301,22 @@ bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision,
             return false;
     }
 
-    for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
+    if (count == 5 && StrContains(parts[4], ",") != -1)
+        ParsePackedSlotSources(parts[4], sources);
+    else if (count >= 5)
     {
-        sources[slot] = HUD_CONTENT_DEFAULT;
-        if (count >= 5 + slot)
+        int source;
+        consumed = StringToIntEx(parts[4], source);
+        if (consumed <= 0 || consumed != strlen(parts[4]) || source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
+            return false;
+        sources[HUD3] = source;
+
+        if (count >= 6)
         {
-            if (parts[4 + slot][0] == '\0')
+            consumed = StringToIntEx(parts[5], source);
+            if (consumed <= 0 || consumed != strlen(parts[5]) || source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
                 return false;
-            int source;
-            consumed = StringToIntEx(parts[4 + slot], source);
-            if (consumed <= 0 || consumed != strlen(parts[4 + slot]) || source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
-                return false;
-            sources[slot] = source;
+            sources[HUD4] = source;
         }
     }
 
@@ -3147,7 +3329,7 @@ bool ApplyHUDPrefsCookie(int client)
     int hud2Mask;
     int revision;
     int layout;
-    int sources[HUD_CUSTOM_SLOT_COUNT];
+    int sources[HUD_SLOT_COUNT];
     if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, revision, layout, sources))
         return false;
 
@@ -3155,8 +3337,7 @@ bool ApplyHUDPrefsCookie(int client)
     g_iClientHUD2Mask[client] = hud2Mask;
     g_iClientHUDLayout[client] = layout;
     g_iClientHUDRevision[client] = revision;
-    for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
-        g_iClientHUDSource[client][slot] = sources[slot];
+    ApplyHUDSources(client, sources);
     return true;
 }
 
@@ -3165,8 +3346,10 @@ void SaveHUDPrefsCookie(int client)
     if (g_hHUDPrefsCookie == null || IsFakeClient(client))
         return;
 
-    char value[64];
-    FormatEx(value, sizeof(value), "%d|%d|%d|%d|%d|%d", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][0], g_iClientHUDSource[client][1]);
+    char packed[80];
+    char value[HUD_PREFS_COOKIE_SIZE];
+    PackSlotSources(g_iClientHUDSource[client], packed, sizeof(packed));
+    FormatEx(value, sizeof(value), "%d|%d|%d|%d|%s", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client], g_iClientHUDLayout[client], packed);
     g_hHUDPrefsCookie.Set(client, value);
 }
 
@@ -3198,15 +3381,16 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
     g_hHUDPrefsDatabase = database;
     SQL_SetCharset(g_hHUDPrefsDatabase, "utf8mb4");
 
-    char query[900];
+    char query[1024];
     FormatEx(query, sizeof(query),
         "CREATE TABLE IF NOT EXISTS `%s` ("
         ... "`steamid` varchar(64) NOT NULL,"
-        ... "`hud_mask` tinyint unsigned NOT NULL DEFAULT 3,"
+        ... "`hud_mask` smallint unsigned NOT NULL DEFAULT 3,"
         ... "`hud2_mask` tinyint unsigned NOT NULL DEFAULT 255,"
         ... "`layout_preset` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`hud3_source` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`hud4_source` tinyint unsigned NOT NULL DEFAULT 0,"
+        ... "`slot_sources` varchar(80) NOT NULL DEFAULT '',"
         ... "`revision` int unsigned NOT NULL DEFAULT 0,"
         ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
         ... "PRIMARY KEY (`steamid`)"
@@ -3226,22 +3410,32 @@ public void SQLCB_CreateHUDPrefsTable(Handle owner, Handle results, const char[]
         return;
     }
 
-    // Migrate pre-1.2.0 tables that lack the per-slot content source columns.
-    // "Duplicate column" errors are expected on already-migrated tables.
-    char query[192];
+    // Migrate older tables: 1.2.0 added hud3/hud4 sources, 1.4.0 widens the
+    // slot mask and stores all 15 content sources. Duplicate-column errors are
+    // expected on already-migrated tables.
+    g_iHUDPrefsMigrationsLeft = HUD_PREFS_MIGRATIONS;
+    char query[256];
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `hud3_source` tinyint unsigned NOT NULL DEFAULT 0", HUD_PREFS_DB_TABLE);
-    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query, 0);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `hud4_source` tinyint unsigned NOT NULL DEFAULT 0", HUD_PREFS_DB_TABLE);
-    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query, 1);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
+    FormatEx(query, sizeof(query), "ALTER TABLE `%s` MODIFY COLUMN `hud_mask` smallint unsigned NOT NULL DEFAULT 3", HUD_PREFS_DB_TABLE);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
+    FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `slot_sources` varchar(80) NOT NULL DEFAULT ''", HUD_PREFS_DB_TABLE);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
 }
 
-public void SQLCB_MigrateHUDPrefsColumn(Handle owner, Handle results, const char[] error, any index)
+public void SQLCB_MigrateHUDPrefsColumn(Handle owner, Handle results, const char[] error, any data)
 {
-    if (error[0] != '\0' && StrContains(error, "Duplicate column", false) == -1 && StrContains(error, "duplicate column", false) == -1)
+    if (error[0] != '\0'
+        && StrContains(error, "Duplicate column", false) == -1
+        && StrContains(error, "duplicate column", false) == -1)
         LogError("[Scripted HUD] Failed to migrate preferences table column: %s", error);
 
-    // Mark the database ready once the last migration statement returns.
-    if (index != HUD_CUSTOM_SLOT_COUNT - 1 || g_hHUDPrefsDatabase == INVALID_HANDLE)
+    if (g_iHUDPrefsMigrationsLeft > 0)
+        g_iHUDPrefsMigrationsLeft--;
+
+    if (g_iHUDPrefsMigrationsLeft != 0 || g_hHUDPrefsDatabase == INVALID_HANDLE)
         return;
 
     g_bHUDPrefsDatabaseReady = true;
@@ -3288,9 +3482,9 @@ void LoadHUDPrefs(int client)
         return;
     }
 
-    char query[320];
+    char query[400];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
+        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source`,`slot_sources` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
     g_eHUDPrefsLoadState[client] = HUDPrefs_DatabasePending;
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_LoadHUDPrefs, query, GetClientUserId(client));
 }
@@ -3317,10 +3511,19 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         if (databaseLayout < HUD_LAYOUT_STANDARD || databaseLayout > HUD_LAYOUT_MAX)
             databaseLayout = HUD_LAYOUT_STANDARD;
         int databaseRevision = SQL_FetchInt(results, 3);
-        int databaseSources[HUD_CUSTOM_SLOT_COUNT];
-        for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
+        int databaseSources[HUD_SLOT_COUNT];
+        ClearHUDSources(databaseSources);
+        databaseSources[HUD3] = SQL_FetchInt(results, 4);
+        databaseSources[HUD4] = SQL_FetchInt(results, 5);
+        if (SQL_GetFieldCount(results) > 6)
         {
-            databaseSources[slot] = SQL_FetchInt(results, 4 + slot);
+            char packed[80];
+            SQL_FetchString(results, 6, packed, sizeof(packed));
+            if (packed[0] != '\0')
+                ParsePackedSlotSources(packed, databaseSources);
+        }
+        for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        {
             if (databaseSources[slot] < HUD_CONTENT_DEFAULT || databaseSources[slot] > HUD_CONTENT_MAX)
                 databaseSources[slot] = HUD_CONTENT_DEFAULT;
         }
@@ -3328,7 +3531,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         int cookieHUD2Mask;
         int cookieRevision;
         int cookieLayout;
-        int cookieSources[HUD_CUSTOM_SLOT_COUNT];
+        int cookieSources[HUD_SLOT_COUNT];
 
         if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision, cookieLayout, cookieSources) && cookieRevision > databaseRevision)
         {
@@ -3336,8 +3539,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
             g_iClientHUD2Mask[client] = cookieHUD2Mask;
             g_iClientHUDLayout[client] = cookieLayout;
             g_iClientHUDRevision[client] = cookieRevision;
-            for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
-                g_iClientHUDSource[client][slot] = cookieSources[slot];
+            ApplyHUDSources(client, cookieSources);
             g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
             SaveHUDPrefs(client, false);
             return;
@@ -3347,8 +3549,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         g_iClientHUD2Mask[client] = databaseHUD2Mask;
         g_iClientHUDLayout[client] = databaseLayout;
         g_iClientHUDRevision[client] = databaseRevision;
-        for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
-            g_iClientHUDSource[client][slot] = databaseSources[slot];
+        ApplyHUDSources(client, databaseSources);
         g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
         SaveHUDPrefsCookie(client);
         return;
@@ -3368,7 +3569,7 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
     g_iClientHUD2Mask[client] &= HUD2_PART_ALL_MASK;
     if (g_iClientHUDLayout[client] < HUD_LAYOUT_STANDARD || g_iClientHUDLayout[client] > HUD_LAYOUT_MAX)
         g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
-    for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
     {
         if (g_iClientHUDSource[client][slot] < HUD_CONTENT_DEFAULT || g_iClientHUDSource[client][slot] > HUD_CONTENT_MAX)
             g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
@@ -3384,17 +3585,21 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
     if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)) || StrEqual(steamId, "BOT"))
         return;
 
-    char query[1024];
+    char packed[80];
+    PackSlotSources(g_iClientHUDSource[client], packed, sizeof(packed));
+
+    char query[1400];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,%d) "
+        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`slot_sources`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,'%s',%d) "
         ... "ON DUPLICATE KEY UPDATE "
         ... "`hud_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud_mask`),`hud_mask`),"
         ... "`hud2_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud2_mask`),`hud2_mask`),"
         ... "`layout_preset`=IF(VALUES(`revision`)>=`revision`,VALUES(`layout_preset`),`layout_preset`),"
         ... "`hud3_source`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud3_source`),`hud3_source`),"
         ... "`hud4_source`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud4_source`),`hud4_source`),"
+        ... "`slot_sources`=IF(VALUES(`revision`)>=`revision`,VALUES(`slot_sources`),`slot_sources`),"
         ... "`revision`=GREATEST(`revision`,VALUES(`revision`))",
-        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][0], g_iClientHUDSource[client][1], g_iClientHUDRevision[client]);
+        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][HUD3], g_iClientHUDSource[client][HUD4], packed, g_iClientHUDRevision[client]);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_SaveHUDPrefs, query);
 }
 
@@ -3446,22 +3651,11 @@ void OpenHUDPrefsMenu(int client)
     menu.AddItem("layout", text);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_HUD2Parts", client);
     menu.AddItem("hud2_parts", text);
-    AddHUDContentItem(menu, client, "hud3_content", "L4D2ScriptedHUD_HUD3Content", g_iClientHUDSource[client][HUD3 - HUD3]);
-    AddHUDContentItem(menu, client, "hud4_content", "L4D2ScriptedHUD_HUD4Content", g_iClientHUDSource[client][HUD4 - HUD3]);
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_SlotsMenu", client);
+    menu.AddItem("slots", text);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_Reset", client);
     menu.AddItem("reset", text);
     menu.Display(client, MENU_TIME_FOREVER);
-}
-
-void AddHUDContentItem(Menu menu, int client, const char[] key, const char[] phrase, int source)
-{
-    char label[96];
-    char sourceName[64];
-    char item[176];
-    FormatEx(label, sizeof(label), "%T", phrase, client);
-    FormatEx(sourceName, sizeof(sourceName), "%T", g_sHUDSourcePhrases[source], client);
-    FormatEx(item, sizeof(item), "%s: %s", label, sourceName);
-    menu.AddItem(key, item);
 }
 
 public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int item)
@@ -3487,14 +3681,9 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
         OpenHUD2PartsMenu(client);
         return 0;
     }
-    if (StrEqual(key, "hud3_content"))
+    if (StrEqual(key, "slots"))
     {
-        OpenHUDContentMenu(client, HUD3);
-        return 0;
-    }
-    if (StrEqual(key, "hud4_content"))
-    {
-        OpenHUDContentMenu(client, HUD4);
+        OpenHUDSlotListMenu(client);
         return 0;
     }
     if (StrEqual(key, "reset"))
@@ -3502,7 +3691,7 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
         g_iClientHUDMask[client] = HUD_SLOT_DEFAULT_MASK;
         g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
         g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
-        for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
+        for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
             g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
     }
     else if (strncmp(key, "hud", 3) == 0)
@@ -3517,35 +3706,43 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
     return 0;
 }
 
-void OpenHUDContentMenu(int client, int hud)
+void GetHUDSourcePhrase(int hud, int source, char[] phrase, int size)
 {
-    Menu menu = new Menu(hud == HUD3 ? MenuHandler_HUD3Content : MenuHandler_HUD4Content);
+    if (source == HUD_CONTENT_DEFAULT && hud >= HUD_EXTRA_FIRST)
+        strcopy(phrase, size, "L4D2ScriptedHUD_SourceOff");
+    else if (source >= HUD_CONTENT_DEFAULT && source <= HUD_CONTENT_MAX)
+        strcopy(phrase, size, g_sHUDSourcePhrases[source]);
+    else
+        strcopy(phrase, size, "L4D2ScriptedHUD_SourceOff");
+}
+
+void OpenHUDSlotListMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_HUDSlotList);
     char text[128];
-    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_ContentTitle", client, hud + 1);
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_SlotsTitle", client);
     menu.SetTitle(text);
     menu.ExitBackButton = true;
 
-    int current = g_iClientHUDSource[client][hud - HUD3];
-    char key[16];
-    for (int source = HUD_CONTENT_DEFAULT; source <= HUD_CONTENT_MAX; source++)
+    for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
     {
-        FormatEx(key, sizeof(key), "src%d", source);
-        AddHUDToggleItem(menu, client, key, g_sHUDSourcePhrases[source], current == source);
+        char key[16];
+        char engineName[32];
+        char sourceName[64];
+        char sourcePhrase[64];
+        char item[192];
+        FormatEx(key, sizeof(key), "slot%d", hud);
+        FormatEx(engineName, sizeof(engineName), "%T", g_sHUDEngineNamePhrases[hud], client);
+        GetHUDSourcePhrase(hud, GetClientHUDSource(client, hud), sourcePhrase, sizeof(sourcePhrase));
+        FormatEx(sourceName, sizeof(sourceName), "%T", sourcePhrase, client);
+        FormatEx(item, sizeof(item), "[%s] %T", IsClientSlotVisible(client, hud) ? "X" : " ", "L4D2ScriptedHUD_SlotItem", client, hud + 1, engineName, sourceName);
+        menu.AddItem(key, item);
     }
+
     menu.Display(client, MENU_TIME_FOREVER);
 }
 
-public int MenuHandler_HUD3Content(Menu menu, MenuAction action, int client, int item)
-{
-    return HandleHUDContentMenu(menu, action, client, item, HUD3);
-}
-
-public int MenuHandler_HUD4Content(Menu menu, MenuAction action, int client, int item)
-{
-    return HandleHUDContentMenu(menu, action, client, item, HUD4);
-}
-
-int HandleHUDContentMenu(Menu menu, MenuAction action, int client, int item, int hud)
+public int MenuHandler_HUDSlotList(Menu menu, MenuAction action, int client, int item)
 {
     if (action == MenuAction_End)
     {
@@ -3562,15 +3759,77 @@ int HandleHUDContentMenu(Menu menu, MenuAction action, int client, int item, int
 
     char key[16];
     menu.GetItem(item, key, sizeof(key));
+    if (strncmp(key, "slot", 4) == 0)
+    {
+        int hud = StringToInt(key[4]);
+        if (hud >= HUD1 && hud < HUD_SLOT_COUNT)
+            OpenHUDContentMenu(client, hud);
+    }
+    return 0;
+}
+
+void OpenHUDContentMenu(int client, int hud)
+{
+    g_iHUDMenuSlot[client] = hud;
+    Menu menu = new Menu(MenuHandler_HUDContent);
+    char text[192];
+    if (IsKillHudSharedSlot(hud))
+        FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_ContentTitleKillHud", client, hud + 1);
+    else
+        FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_ContentTitle", client, hud + 1);
+    menu.SetTitle(text);
+    menu.ExitBackButton = true;
+
+    int current = GetClientHUDSource(client, hud);
+    char key[16];
+    for (int source = HUD_CONTENT_DEFAULT; source <= HUD_CONTENT_MAX; source++)
+    {
+        FormatEx(key, sizeof(key), "src%d", source);
+        char phrase[64];
+        GetHUDSourcePhrase(hud, source, phrase, sizeof(phrase));
+        AddHUDToggleItem(menu, client, key, phrase, current == source);
+    }
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUDContent(Menu menu, MenuAction action, int client, int item)
+{
+    int hud = HUD3;
+    if (action != MenuAction_End && client >= 1 && client <= MaxClients)
+        hud = g_iHUDMenuSlot[client];
+    return HandleHUDContentMenu(menu, action, client, item, hud);
+}
+
+int HandleHUDContentMenu(Menu menu, MenuAction action, int client, int item, int hud)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsValidClient(client))
+    {
+        OpenHUDSlotListMenu(client);
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    if (hud < HUD1 || hud >= HUD_SLOT_COUNT)
+        hud = HUD3;
+
+    char key[16];
+    menu.GetItem(item, key, sizeof(key));
     if (strncmp(key, "src", 3) == 0)
     {
         int source = StringToInt(key[3]);
         if (source >= HUD_CONTENT_DEFAULT && source <= HUD_CONTENT_MAX)
         {
-            g_iClientHUDSource[client][hud - HUD3] = source;
-            // Choosing a content source implies the player wants to see the slot.
+            g_iClientHUDSource[client][hud] = source;
             if (source != HUD_CONTENT_DEFAULT)
                 g_iClientHUDMask[client] |= (1 << hud);
+            else if (hud >= HUD_EXTRA_FIRST)
+                g_iClientHUDMask[client] &= ~(1 << hud);
         }
     }
 

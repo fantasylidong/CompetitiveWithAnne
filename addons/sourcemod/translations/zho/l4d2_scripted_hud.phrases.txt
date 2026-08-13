@@ -359,4 +359,94 @@
 			"#format"	"{1:d}"
 			"zho"		"另有{1}隻"
 		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"zho"		"全部 15 個 HUD 槽位"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"zho"		"HUD 槽位（1-15）"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"zho"		"HUD {1} {2}：{3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"zho"		"HUD {1} 顯示內容（與擊殺列表共用）"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"zho"		"未使用（隱藏）"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"zho"		"進度 / 坦克 / 女巫"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"zho"		"伺服器狀態"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"zho"		"左上"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"zho"		"左下"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"zho"		"中上"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"zho"		"中下"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"zho"		"右上"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"zho"		"右下"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"zho"		"滾動條"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"zho"		"最左"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"zho"		"最右"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"zho"		"中框"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"zho"		"計分標題"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"zho"		"計分1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"zho"		"計分2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"zho"		"計分3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"zho"		"計分4"
+		}
 	}

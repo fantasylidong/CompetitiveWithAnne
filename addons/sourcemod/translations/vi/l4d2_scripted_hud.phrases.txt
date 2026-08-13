@@ -359,4 +359,94 @@
 			"#format"	"{1:d}"
 			"vi"		"thêm {1}"
 		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"vi"		"Tất cả 15 ô HUD"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"vi"		"Ô HUD (1-15)"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"vi"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Nội dung HUD {1} (dùng chung kill feed)"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"vi"		"Không dùng (ẩn)"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"vi"		"Tiến độ / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"vi"		"Trạng thái máy chủ"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"vi"		"TRÊN TRÁI"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"vi"		"DƯỚI TRÁI"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"vi"		"TRÊN GIỮA"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"vi"		"DƯỚI GIỮA"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"vi"		"TRÊN PHẢI"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"vi"		"DƯỚI PHẢI"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"vi"		"TICKER"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"vi"		"XA TRÁI"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"vi"		"XA PHẢI"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"vi"		"HỘP GIỮA"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"vi"		"TIÊU ĐỀ ĐIỂM"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"vi"		"ĐIỂM 1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"vi"		"ĐIỂM 2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"vi"		"ĐIỂM 3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"vi"		"ĐIỂM 4"
+		}
 	}

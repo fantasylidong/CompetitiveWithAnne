@@ -359,4 +359,94 @@
 			"#format"	"{1:d}"
 			"en"		"+{1} more"
 		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"en"		"All 15 HUD slots"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"en"		"HUD slots (1-15)"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"en"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"en"		"HUD {1} content (shares kill feed)"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"en"		"Unused (hidden)"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"en"		"Progress / Tank / Witch"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"en"		"Server status"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"en"		"LEFT_TOP"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"en"		"LEFT_BOT"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"en"		"MID_TOP"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"en"		"MID_BOT"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"en"		"RIGHT_TOP"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"en"		"RIGHT_BOT"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"en"		"TICKER"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"en"		"FAR_LEFT"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"en"		"FAR_RIGHT"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"en"		"MID_BOX"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"en"		"SCORE_TITLE"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"en"		"SCORE_1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"en"		"SCORE_2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"en"		"SCORE_3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"en"		"SCORE_4"
+		}
 	}

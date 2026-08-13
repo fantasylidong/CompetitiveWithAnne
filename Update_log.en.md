@@ -155,3 +155,8 @@
 - Speed / bhop: horizontal speed of yourself (or your spectated survivor) and the current bhop peak; the peak clears after about 0.25s of grounded walking.
 - Round timer + horde: mm:ss from `round_start`; "ON" during the 60-second rolling `create_panic_event` window, otherwise the director horde countdown (`L4D2CT_MobSpawnTimer`).
 - Witch distance warning: meters to the nearest Witch and state (calm / near / alert / enraged); "NEAR" inside 15 m. Extra Witches are counted separately. New phrases are translated in all six languages.
+
+### August 13, 2026 Scripted HUD uses all 15 engine slots
+- Upgraded `extend/l4d2_scripted_hud.smx` to 1.4.0. All 15 EMS HUD slots can be assigned a content source in `!hudmenu` → "All 15 HUD slots" (server default / unused / survivor status / SI HP / kills / ping / tank damage / team items / next wave / speed / round timer / Witch warning / progress-tank-witch / server status).
+- HUD 1-4 keep their old defaults. Slots 5-8 (engine 4-7) stay hidden until a source is chosen, then they appear in a left column. Slots 9-15 (engine 8-14) keep passing through the CS kill feed until you bind content to that slot, which then covers that kill line and moves it to the lower right so it does not sit on the crosshair.
+- Preferences are stored in the cookie and `scripted_hud_prefs` (`hud_mask` widened to smallint, new `slot_sources` column; old 6-field cookies and hud3/hud4 columns still load). Slot names and menus are translated in all six languages.
