@@ -666,3 +666,4 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `ai_charger3` 升级到 1.0.1.5：修复状态机 `transitionTo` 中旧状态 `OnExit` 因先判断后读取而永远不会执行的问题，空中急停、后跳与人为冲锋延时标记现在会在状态切换时正确重置；`player_spawn` 事件改为 Post 钩子；梯子上清除跳/蹲输入后正确返回 `Plugin_Changed`。
 - `ai_boomer_3` 升级到 3.0.5：`L4D_OnVomitedUpon` 增加 attacker 有效性校验，修复胆汁弹等 attacker 为 0 的场景每次触发报错的问题；已存在转喷队列时不再重复构建，避免强喷递归导致目标重复膨胀；修复目标选择提前返回时的 trace 句柄泄漏与强制被喷循环中标错玩家的问题；最近生还者查询增加 0.2 秒缓存以降低每帧排序开销。
 - `ai_spitter_3` 升级到 3.0.3：修复“人多处”目标策略误用被控目标坐标（含 -1 索引报错）的复制粘贴错误；修复 `getTargetByPriority` 在有人被控或仅剩单人时的 ArrayList 句柄泄漏；场上仅剩 1 名生还者时也能正确按路程选为目标；人群目标累加距离前显式清零，移除条件恒假的射线过滤器死代码。
+- 射线开销优化（tank3 1.0.0.8 / charger3 1.0.1.6 / boomer3 3.0.6 / spitter3 3.0.4）：`ai_path_movement.inc` 新增起跳安全检查失败节流——因撞墙/断层/落点危险导致的检查失败在 0.1 秒冷却内不再重试，四个 AI 的地面起跳尝试统一接入，特感被地形卡住时的 hull/ray trace 开销降为原来的约 1/6（60 tick 下），多牛阵容收益最明显；`AIPathMovement_IsJumpRouteSafe` 将零射线的无视野角度拒绝提前到 hull trace 之前，被拒绝的尝试不再产生任何 trace。
