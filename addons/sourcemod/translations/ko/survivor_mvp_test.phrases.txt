@@ -6,11 +6,11 @@
 	}
 	"SurvivorMVPTest_DamageClient"
 	{
-		"ko"		"플레이어 피해: {olive}%d{default}"
+		"ko"		"플레이어 데미지: {olive}%d{default}"
 	}
 	"SurvivorMVPTest_SIKillsClient"
 	{
-		"ko"		"플레이어 스페셜 킬: {olive}%d{default}"
+		"ko"		"플레이어 SI 킬: {olive}%d{default}"
 	}
 	"SurvivorMVPTest_DamagePercentClient"
 	{
@@ -18,14 +18,14 @@
 	}
 	"SurvivorMVPTest_CurrentRoundMVPClientCommon"
 	{
-		"ko"		"이번 라운드의 전반적인 느낌은 MVP 플레이어: {olive}%N{default}"
+		"ko"		"현재 라운드 CI MVP: {olive}%N{default}"
 	}
 	"SurvivorMVPTest_CommonKillsClient"
 	{
-		"ko"		"플레이어 일반 감지 킬: {olive}%d{default}"
+		"ko"		"플레이어 CI 킬: {olive}%d{default}"
 	}
 	"SurvivorMVPTest_CIPercentClient"
 	{
-		"ko"		"플레이어의 상식적인 킬 비율: {olive}%f{default}"
+		"ko"		"플레이어 CI 킬 비율: {olive}%f{default}"
 	}
 }

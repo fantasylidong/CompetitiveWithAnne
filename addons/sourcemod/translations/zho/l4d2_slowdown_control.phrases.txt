@@ -2,7 +2,7 @@
 {
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffect"
 	{
-		"zho"		"{default}[{olive}Water Slowdown{default}] {green}水中減速{default} 效果因tank生成而減弱."
+		"zho"		"{default}[{olive}Water Slowdown{default}] {green}水中減速{default} 效果因 Tank 在場而減弱。"
 	}
 	"L4D2SlowdownControl_WaterSlowdownWaterSlowdownEffectRestored"
 	{

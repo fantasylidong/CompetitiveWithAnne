@@ -52,4 +52,1212 @@
 	{
 		"jp"		"不明"
 	}
+	"L4DStats_Yes"
+	{
+		"jp"		"はい"
+	}
+	"L4DStats_No"
+	{
+		"jp"		"いいえ"
+	}
+	"L4DStats_Close"
+	{
+		"jp"		"閉じる"
+	}
+	"L4DStats_Back"
+	{
+		"jp"		"戻る"
+	}
+	"L4DStats_More"
+	{
+		"jp"		"その他"
+	}
+	"L4DStats_MoreEllipsis"
+	{
+		"jp"		"その他..."
+	}
+	"L4DStats_All"
+	{
+		"jp"		"すべて"
+	}
+	"L4DStats_GamemodeCoop"
+	{
+		"jp"		"キャンペーン"
+	}
+	"L4DStats_GamemodeVersus"
+	{
+		"jp"		"対抗"
+	}
+	"L4DStats_GamemodeRealism"
+	{
+		"jp"		"リアリズム"
+	}
+	"L4DStats_GamemodeSurvival"
+	{
+		"jp"		"サバイバル"
+	}
+	"L4DStats_GamemodeScavenge"
+	{
+		"jp"		"スカベンジ"
+	}
+	"L4DStats_GamemodeRealismVersus"
+	{
+		"jp"		"リアリズム対抗"
+	}
+	"L4DStats_GamemodeMutations"
+	{
+		"jp"		"ミューテーション"
+	}
+	"L4DStats_GamemodeUnknown"
+	{
+		"jp"		"不明なモード"
+	}
+	"L4DStats_RankMenuTitle"
+	{
+		"jp"		"プレイヤーランキング:"
+	}
+	"L4DStats_MenuCurrentRank"
+	{
+		"jp"		"自分のランクを表示"
+	}
+	"L4DStats_MenuTop10"
+	{
+		"jp"		"上位10人を表示"
+	}
+	"L4DStats_MenuQuarterTop10"
+	{
+		"jp"		"四半期トップ10を表示"
+	}
+	"L4DStats_MenuTop10PPM"
+	{
+		"jp"		"PPM上位10人を表示"
+	}
+	"L4DStats_MenuNextRank"
+	{
+		"jp"		"次のランクまで"
+	}
+	"L4DStats_MenuCurrentMapTime"
+	{
+		"jp"		"現在のマップ時間を表示"
+	}
+	"L4DStats_MenuOtherPlayerRank"
+	{
+		"jp"		"他のプレイヤーのランク"
+	}
+	"L4DStats_MenuOtherPlayerPPM"
+	{
+		"jp"		"他のプレイヤーのPPM"
+	}
+	"L4DStats_MenuRankVote"
+	{
+		"jp"		"PPMでチーム分けを投票"
+	}
+	"L4DStats_MenuAllMapTimes"
+	{
+		"jp"		"すべてのマップ記録"
+	}
+	"L4DStats_MenuThisMapTimes"
+	{
+		"jp"		"このマップの記録"
+	}
+	"L4DStats_MenuSettings"
+	{
+		"jp"		"ランク通知設定"
+	}
+	"L4DStats_MenuAbout"
+	{
+		"jp"		"ランクプラグインについて"
+	}
+	"L4DStats_NextRankTitle"
+	{
+		"jp"		"次のランクの条件:"
+	}
+	"L4DStats_NextRankPointsNeeded"
+	{
+		"jp"		"必要ポイント: %i"
+	}
+	"L4DStats_CurrentRank"
+	{
+		"jp"		"現在のランク: %i"
+	}
+	"L4DStats_AlreadyFirst"
+	{
+		"jp"		"すでに1位です"
+	}
+	"L4DStats_PointsAndPlayer"
+	{
+		"jp"		"%i ポイント: %s"
+	}
+	"L4DStats_PlayerRankTitle"
+	{
+		"jp"		"%s のランク"
+	}
+	"L4DStats_OverallRank"
+	{
+		"jp"		"総合ランク: %i / %i"
+	}
+	"L4DStats_ModeRank"
+	{
+		"jp"		"%s ランク: %i / %i"
+	}
+	"L4DStats_PlaytimeHours"
+	{
+		"jp"		"プレイ時間: %.2f 時間"
+	}
+	"L4DStats_PlaytimeMinutes"
+	{
+		"jp"		"プレイ時間: %i 分"
+	}
+	"L4DStats_CurrentPoints"
+	{
+		"jp"		"現在のポイント: %i"
+	}
+	"L4DStats_QuarterLabel"
+	{
+		"jp"		"%i年第%i四半期"
+	}
+	"L4DStats_QuarterPoints"
+	{
+		"jp"		"%s ポイント: %i"
+	}
+	"L4DStats_QuarterRank"
+	{
+		"jp"		"%s ランク: %i / %i"
+	}
+	"L4DStats_PointsPerMinute"
+	{
+		"jp"		"1分あたりのポイント: %.2f"
+	}
+	"L4DStats_CommonKilled"
+	{
+		"jp"		"コモン感染者キル: %i"
+	}
+	"L4DStats_SurvivorsKilled"
+	{
+		"jp"		"サバイバーキル: %i"
+	}
+	"L4DStats_Headshots"
+	{
+		"jp"		"ヘッドショット: %i"
+	}
+	"L4DStats_HeadshotRatio"
+	{
+		"jp"		"ヘッドショット率: %.2f%%"
+	}
+	"L4DStats_FullStatsUrl"
+	{
+		"jp"		"詳細統計: %s"
+	}
+	"L4DStats_UnknownPlayer"
+	{
+		"jp"		"不明"
+	}
+	"L4DStats_PlayerRanksTitle"
+	{
+		"jp"		"プレイヤーランク:"
+	}
+	"L4DStats_PlayerPointsMenuItem"
+	{
+		"jp"		"%s (%i ポイント)"
+	}
+	"L4DStats_PlayerScoreMenuItem"
+	{
+		"jp"		"%s (%i)"
+	}
+	"L4DStats_PlayerPPMTitle"
+	{
+		"jp"		"プレイヤー PPM:"
+	}
+	"L4DStats_PlayerPPMMenuItem"
+	{
+		"jp"		"%s (PPM: %.2f)"
+	}
+	"L4DStats_TimedMapsTitle"
+	{
+		"jp"		"マップタイム:"
+	}
+	"L4DStats_ModeTimesTitle"
+	{
+		"jp"		"モードタイム:"
+	}
+	"L4DStats_MapNeverPlayed"
+	{
+		"jp"		"このマップはまだプレイされていません。"
+	}
+	"L4DStats_ModeNeverPlayed"
+	{
+		"jp"		"このモードはまだプレイされていません。"
+	}
+	"L4DStats_Top10Title"
+	{
+		"jp"		"上位10人"
+	}
+	"L4DStats_QuarterTop10Title"
+	{
+		"jp"		"%s 上位10人"
+	}
+	"L4DStats_Top10PPMTitle"
+	{
+		"jp"		"PPM上位10人"
+	}
+	"L4DStats_ClearPlayerStatsTitle"
+	{
+		"jp"		"プレイヤー統計を消去:"
+	}
+	"L4DStats_AboutTitle"
+	{
+		"jp"		"プレイヤーランキングについて:"
+	}
+	"L4DStats_AboutVersion"
+	{
+		"jp"		"バージョン: %s"
+	}
+	"L4DStats_AboutAuthor"
+	{
+		"jp"		"作者: Mikko Andersson (muukis); Anne対応: Dong"
+	}
+	"L4DStats_AboutDescription"
+	{
+		"jp"		"プレイヤーの統計とランクを記録します。"
+	}
+	"L4DStats_SettingsTitle"
+	{
+		"jp"		"ランク通知設定:"
+	}
+	"L4DStats_SettingsMute"
+	{
+		"jp"		"ランク通知をミュート (現在有効)"
+	}
+	"L4DStats_SettingsUnmute"
+	{
+		"jp"		"ランク通知のミュートを解除"
+	}
+	"L4DStats_TimeHoursMinutesSeconds"
+	{
+		"jp"		"%i時間 %i分 %.1f秒"
+	}
+	"L4DStats_TimeMinutesSeconds"
+	{
+		"jp"		"%i分 %.1f秒"
+	}
+	"L4DStats_TimeSeconds"
+	{
+		"jp"		"%.1f秒"
+	}
+	"L4DStats_AdminCategory"
+	{
+		"jp"		"プレイヤーランキング"
+	}
+	"L4DStats_AdminClearTitle"
+	{
+		"jp"		"ランキングデータを消去:"
+	}
+	"L4DStats_AdminClearCurrentPlayers"
+	{
+		"jp"		"現在のプレイヤー統計を消去"
+	}
+	"L4DStats_AdminClearMapTimes"
+	{
+		"jp"		"マップクリアタイムを消去"
+	}
+	"L4DStats_AdminClearRecordedMapsTitle"
+	{
+		"jp"		"記録済みのマップタイムを消去:"
+	}
+	"L4DStats_AdminClearPlayers"
+	{
+		"jp"		"プレイヤー統計を消去"
+	}
+	"L4DStats_AdminClearMaps"
+	{
+		"jp"		"プレイヤーのマップ統計を消去"
+	}
+	"L4DStats_AdminClearAll"
+	{
+		"jp"		"すべての統計を消去"
+	}
+	"L4DStats_AdminClearRecordedTimes"
+	{
+		"jp"		"すべてのマップタイムを消去"
+	}
+	"L4DStats_AdminRemoveCustomMaps"
+	{
+		"jp"		"カスタムマップを削除"
+	}
+	"L4DStats_ConfirmClearPlayerStats"
+	{
+		"jp"		"すべてのプレイヤー統計を消去しますか?"
+	}
+	"L4DStats_ConfirmClearPlayerMapStats"
+	{
+		"jp"		"すべてのプレイヤーのマップ統計を消去しますか?"
+	}
+	"L4DStats_ConfirmClearAllStats"
+	{
+		"jp"		"すべてのランキング統計を消去しますか?"
+	}
+	"L4DStats_ConfirmClearAllMapTimes"
+	{
+		"jp"		"すべてのマップタイムを消去しますか?"
+	}
+	"L4DStats_ConfirmClearCoopMapTimes"
+	{
+		"jp"		"協力モードのマップタイムを消去しますか?"
+	}
+	"L4DStats_ConfirmClearSurvivalMapTimes"
+	{
+		"jp"		"サバイバルのマップタイムを消去しますか?"
+	}
+	"L4DStats_ConfirmClearRealismMapTimes"
+	{
+		"jp"		"リアリズムのマップタイムを消去しますか?"
+	}
+	"L4DStats_ConfirmClearMutationMapTimes"
+	{
+		"jp"		"ミューテーションのマップタイムを消去しますか?"
+	}
+	"L4DStats_ConfirmRemoveCustomMaps"
+	{
+		"jp"		"すべてのカスタムマップを削除しますか?"
+	}
+	"L4DStats_ConfirmCleanInactivePlayers"
+	{
+		"jp"		"非アクティブなプレイヤーを削除しますか?"
+	}
+	"L4DStats_CommandInGameOnly"
+	{
+		"jp"		"このコマンドはゲーム内でのみ使用できます。"
+	}
+	"L4DStats_CommandUnavailableFromServer"
+	{
+		"jp"		"このコマンドはサーバーコンソールから使用できません。"
+	}
+	"L4DStats_MapTimerNotStarted"
+	{
+		"jp"		"マップタイマーはまだ開始していません。"
+	}
+	"L4DStats_CurrentMapTimeConsole"
+	{
+		"jp"		"現在のマップタイム: %s"
+	}
+	"L4DStats_TeamShuffleUnavailable"
+	{
+		"jp"		"現在チームシャッフルは使用できません。"
+	}
+	"L4DStats_TeamShuffleExecuting"
+	{
+		"jp"		"チームをシャッフルしています..."
+	}
+	"L4DStats_ClearDatabaseServerDisabled"
+	{
+		"jp"		"サーバーコンソールからのデータベース消去は無効です。"
+	}
+	"L4DStats_ClearDatabaseStarted"
+	{
+		"jp"		"データベースの消去を開始しました。"
+	}
+	"L4DStats_ClearDatabaseConfirm"
+	{
+		"jp"		"%i秒以内にもう一度コマンドを実行するとデータベースを消去します。"
+	}
+	"L4DStats_ClearTimedMapsRollback"
+	{
+		"jp"		"マップタイムの消去に失敗したため、ロールバックします。"
+	}
+	"L4DStats_ClearPlayersRollback"
+	{
+		"jp"		"プレイヤー統計の消去に失敗したため、ロールバックします。"
+	}
+	"L4DStats_ClearMapsRollback"
+	{
+		"jp"		"マップ統計の消去に失敗したため、ロールバックします。"
+	}
+	"L4DStats_ClearStatsFailure"
+	{
+		"jp"		"統計は消去されませんでした。"
+	}
+	"L4DStats_ClearRanksSuccess"
+	{
+		"jp"		"プレイヤーランキングを消去しました。"
+	}
+	"L4DStats_ClearStatsSuccess"
+	{
+		"jp"		"統計を消去しました。"
+	}
+	"L4DStats_ClearQueryFailed"
+	{
+		"jp"		"データベースクエリに失敗: %s"
+	}
+	"L4DStats_FastQueryError"
+	{
+		"jp"		"高速クエリに失敗: %s | クエリ: %s"
+	}
+	"L4DStats_FastQueryFailed"
+	{
+		"jp"		"高速クエリに失敗: %s"
+	}
+	"L4DStats_FastestTimeWithBuy"
+	{
+		"jp"		"購入ありの最速クリアタイム: {green}%s{default}。"
+	}
+	"L4DStats_FastestTimeWithoutBuy"
+	{
+		"jp"		"最速クリアタイム: {green}%s{default}。"
+	}
+	"L4DStats_MapRecordImprovedCurrent"
+	{
+		"jp"		"Anne%sのこの難易度で新記録: {green}%s{default}!"
+	}
+	"L4DStats_MapRecordImprovedPlayer"
+	{
+		"jp"		"Anne%sのこの難易度で自己の記録を {green}%s{default} に更新!"
+	}
+	"L4DStats_RankMenuHint"
+	{
+		"jp"		"{green}!rank{default} でランキングメニューを開きます。"
+	}
+	"L4DStats_RankRose"
+	{
+		"jp"		"総合ランクが {green}%i{default} 上がり、{green}%i{default} 位になりました。"
+	}
+	"L4DStats_RankFell"
+	{
+		"jp"		"総合ランクが {green}%i{default} 下がり、{green}%i{default} 位になりました。"
+	}
+	"L4DStats_QuarterRankRose"
+	{
+		"jp"		"%sのランクが {green}%i{default} 上がり、{green}%i{default} 位（{green}%i{default} ポイント）になりました。"
+	}
+	"L4DStats_QuarterRankFell"
+	{
+		"jp"		"%sのランクが {green}%i{default} 下がり、{green}%i{default} 位（{green}%i{default} ポイント）になりました。"
+	}
+	"L4DStats_RankMessagesMuted"
+	{
+		"jp"		"ランク通知をミュートしました。"
+	}
+	"L4DStats_RankMessagesUnmuted"
+	{
+		"jp"		"ランク通知を有効にしました。"
+	}
+	"L4DStats_RankMuteUsage"
+	{
+		"jp"		"使い方: sm_rankmute [0/1]"
+	}
+	"L4DStats_RankVoteQuestion"
+	{
+		"jp"		"プレイヤーランキングを有効にしますか?"
+	}
+	"L4DStats_RankVotePassed"
+	{
+		"jp"		"ランク投票が可決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
+	}
+	"L4DStats_RankVoteFailed"
+	{
+		"jp"		"ランク投票は否決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
+	}
+	"L4DStats_RankVotePluginDisabledConsole"
+	{
+		"jp"		"プラグインが無効のためランク投票を開始できません。"
+	}
+	"L4DStats_RankVoteGamemodeDisabledConsole"
+	{
+		"jp"		"このゲームモードではランク投票が無効です。"
+	}
+	"L4DStats_RankVoteAlreadyStartedConsole"
+	{
+		"jp"		"ランク投票はすでに進行中です。"
+	}
+	"L4DStats_RankVoteGamedataMissingConsole"
+	{
+		"jp"		"ランク投票の設定に失敗: 必要なgamedataがありません。"
+	}
+	"L4DStats_RankVoteDisabledConsole"
+	{
+		"jp"		"ランク投票は無効です。"
+	}
+	"L4DStats_MotdCreateFailed"
+	{
+		"jp"		"MOTDファイルを作成できません。"
+	}
+	"L4DStats_MotdPrepareFailed"
+	{
+		"jp"		"MOTDリクエストを準備できません。"
+	}
+	"L4DStats_MotdUpdateError"
+	{
+		"jp"		"MOTDの更新に失敗: %s"
+	}
+	"L4DStats_MotdUpdateFailed"
+	{
+		"jp"		"MOTDの更新に失敗しました。"
+	}
+	"L4DStats_MotdUpdateSuccess"
+	{
+		"jp"		"MOTDを更新しました。"
+	}
+	"L4DStats_MotdMessage"
+	{
+		"jp"		"本日のメッセージ: {green}%s{default}"
+	}
+	"L4DStats_NewPlayerSafeRoomMultiplier"
+	{
+		"jp"		"{lightgreen}初心者を%i人検出。経験者の生存者はセーフルームで {green}%.1fx{default} ボーナスを得ますが、初心者には倍率が適用されません。"
+	}
+	"L4DStats_NewPlayerFinaleMultiplier"
+	{
+		"jp"		"{lightgreen}初心者を%i人検出。経験者の生存者はフィナーレで {green}%.1fx{default} ボーナスを得ますが、初心者には倍率が適用されません。"
+	}
+	"L4DStats_SinglePlayerTripleBonus"
+	{
+		"jp"		"生存者が1人のため、スコアが3倍になります。"
+	}
+	"L4DStats_SinglePlayerTripleBonusWithDifficulty"
+	{
+		"jp"		"生存者が1人のためスコアが3倍になり、難易度ボーナス {green}%i{default} ポイントを得ます。"
+	}
+	"L4DStats_MedkitReductionL4D1"
+	{
+		"jp"		"救急キット1個ごとにクリアボーナスが {green}%i%%{default} 減少（{green}%i{default}個使用）。"
+	}
+	"L4DStats_MedkitReductionL4D2"
+	{
+		"jp"		"最初の4個以降、救急キット1個ごとにクリアボーナスが {green}%i%%{default} 減少（{green}%i{default}個使用）。"
+	}
+	"L4DStats_DeployIncendiarySelf"
+	{
+		"jp"		"焼夷弾パックを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DeployExplosiveSelf"
+	{
+		"jp"		"爆発弾パックを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DeployUnknownSelf"
+	{
+		"jp"		"弾薬アップグレードを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DeployIncendiaryAll"
+	{
+		"jp"		"{olive}%s{default} が焼夷弾パックを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DeployExplosiveAll"
+	{
+		"jp"		"{olive}%s{default} が爆発弾パックを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DeployUnknownAll"
+	{
+		"jp"		"{olive}%s{default} が弾薬アップグレードを設置し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_PerfectPounceSelf"
+	{
+		"jp"		"{olive}%s{default} へ完璧な飛びかかり! {green}%i{default} ポイント獲得。"
+	}
+	"L4DStats_PerfectPounceAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} へ完璧な飛びかかりを決め、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_NicePounceSelf"
+	{
+		"jp"		"{olive}%s{default} へ見事な飛びかかり! {green}%i{default} ポイント獲得。"
+	}
+	"L4DStats_NicePounceAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} へ見事な飛びかかりを決め、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_CurrentMapTime"
+	{
+		"jp"		"現在のマップタイム: {green}%s"
+	}
+	"L4DStats_QuarterRankingLeft"
+	{
+		"jp"		"{olive}%s{default} ランキングから外れました。"
+	}
+	"L4DStats_QuarterRankingEntered"
+	{
+		"jp"		"{olive}%s{default} ランキングに入りました: {green}%i{default}位、{green}%i{default}ポイント。"
+	}
+	"L4DStats_PlayerJoinedOverallRanked"
+	{
+		"jp"		"プレイヤー {olive}%s{default} が参加!（総合: {lightgreen}%i/%i{default}、ポイント: {lightgreen}%i{default}）"
+	}
+	"L4DStats_PlayerJoinedOverallUnranked"
+	{
+		"jp"		"プレイヤー {olive}%s{default} が参加!（総合ランク外）"
+	}
+	"L4DStats_CurrentQuarterRanked"
+	{
+		"jp"		"現在の {olive}%s{default}: {lightgreen}%i/%i{default}位、{lightgreen}%i{default}ポイント"
+	}
+	"L4DStats_CurrentQuarterUnranked"
+	{
+		"jp"		"現在の {olive}%s{default}: ランク外"
+	}
+	"L4DStats_PlayerJoinedModeRanked"
+	{
+		"jp"		"プレイヤー {olive}%s{default} が参加!（{lightgreen}%i{default}位 / {lightgreen}%i{default}ポイント）"
+	}
+	"L4DStats_PlayerJoinedModeUnranked"
+	{
+		"jp"		"プレイヤー {olive}%s{default} が参加!（ランク外）"
+	}
+	"L4DStats_QuarterRankingUnavailable"
+	{
+		"jp"		"四半期ランキングは現在利用できません。後で再試行してください。"
+	}
+	"L4DStats_QuarterRankingQueryFailed"
+	{
+		"jp"		"四半期ランキングの取得に失敗しました。後で再試行してください。"
+	}
+	"L4DStats_PlayerJoinedSurvivors"
+	{
+		"jp"		"{olive}%s{default} が {lightgreen}生存者{default} チームに参加!"
+	}
+	"L4DStats_PlayerJoinedInfected"
+	{
+		"jp"		"{olive}%s{default} が {lightgreen}感染者{default} チームに参加!"
+	}
+	"L4DStats_AllPlayerStatsCleared"
+	{
+		"jp"		"すべてのプレイヤー統計を消去しました!"
+	}
+	"L4DStats_AllMapStatsCleared"
+	{
+		"jp"		"すべてのマップ統計を消去しました!"
+	}
+	"L4DStats_AllStatsCleared"
+	{
+		"jp"		"すべての統計を消去しました!"
+	}
+	"L4DStats_PlayerCleaningSuccess"
+	{
+		"jp"		"非アクティブなプレイヤーを削除しました!"
+	}
+	"L4DStats_PlayerCleaningFailed"
+	{
+		"jp"		"プレイヤーの削除に失敗しました!"
+	}
+	"L4DStats_PlayerCleaningDisabled"
+	{
+		"jp"		"設定によりプレイヤーの削除が無効です!"
+	}
+	"L4DStats_CustomMapsRemoved"
+	{
+		"jp"		"すべてのカスタムマップを削除しました!"
+	}
+	"L4DStats_CustomMapsRemoveFailed"
+	{
+		"jp"		"カスタムマップの削除に失敗しました!"
+	}
+	"L4DStats_AllMapTimesRemoved"
+	{
+		"jp"		"すべてのマップタイムを削除しました!"
+	}
+	"L4DStats_MapTimesRemoveFailed"
+	{
+		"jp"		"マップタイムの削除に失敗しました!"
+	}
+	"L4DStats_CoopMapTimesClearSuccess"
+	{
+		"jp"		"協力モードのマップタイムを消去しました!"
+	}
+	"L4DStats_CoopMapTimesClearFailed"
+	{
+		"jp"		"協力モードのマップタイム消去に失敗!"
+	}
+	"L4DStats_SurvivalMapTimesClearSuccess"
+	{
+		"jp"		"サバイバルのマップタイムを消去しました!"
+	}
+	"L4DStats_SurvivalMapTimesClearFailed"
+	{
+		"jp"		"サバイバルのマップタイム消去に失敗!"
+	}
+	"L4DStats_RealismMapTimesClearSuccess"
+	{
+		"jp"		"リアリズムのマップタイムを消去しました!"
+	}
+	"L4DStats_RealismMapTimesClearFailed"
+	{
+		"jp"		"リアリズムのマップタイム消去に失敗!"
+	}
+	"L4DStats_MutationMapTimesClearSuccess"
+	{
+		"jp"		"ミューテーションのマップタイムを消去しました!"
+	}
+	"L4DStats_MutationMapTimesClearFailed"
+	{
+		"jp"		"ミューテーションのマップタイム消去に失敗!"
+	}
+	"L4DStats_OwnStatsCleared"
+	{
+		"jp"		"あなたのプレイ統計が消去されました!"
+	}
+	"L4DStats_PlayerStatsCleared"
+	{
+		"jp"		"{olive}%s{default} のプレイ統計を消去しました!"
+	}
+	"L4DStats_PlayerStatsClearFailed"
+	{
+		"jp"		"プレイヤーのプレイ統計消去に失敗!"
+	}
+	"L4DStats_RankVoteSettingsFailed"
+	{
+		"jp"		"プラグイン設定に失敗したため、{green}ランク投票{default}は{lightgreen}無効{default}です。"
+	}
+	"L4DStats_RankVoteDisabledChat"
+	{
+		"jp"		"{green}ランク投票{default}は{lightgreen}無効{default}です。"
+	}
+	"L4DStats_RankVoteSpectatorDenied"
+	{
+		"jp"		"観戦者は {green}ランク投票{default} を開始できません。"
+	}
+	"L4DStats_NotImplemented"
+	{
+		"jp"		"{olive}まだ実装されていません。"
+	}
+	"L4DStats_RankVoteProgress"
+	{
+		"jp"		"{olive}%s{default} が投票しました。{green}%i/%i{default}人が投票済みです。"
+	}
+	"L4DStats_RankVotePluginDisabledChat"
+	{
+		"jp"		"プラグインが無効のためランク投票を開始できません!"
+	}
+	"L4DStats_RankVoteVersusOnly"
+	{
+		"jp"		"{green}ランク投票{default}は {lightgreen}対戦{default} モードで有効です!"
+	}
+	"L4DStats_RankVoteCompetitiveModes"
+	{
+		"jp"		"{green}ランク投票{default}は{lightgreen}対戦{default}、{lightgreen}リアリズム対戦{default}、{lightgreen}スカベンジ{default}で有効です!"
+	}
+	"L4DStats_RankVoteOncePerMap"
+	{
+		"jp"		"{green}ランク投票{default}は各マップ1回だけ開始できます!"
+	}
+	"L4DStats_RankVoteInitiated"
+	{
+		"jp"		"{olive}%s{default} が {green}ランク投票{default} を開始しました!"
+	}
+	"L4DStats_RankVoteInitiatedConsole"
+	{
+		"jp"		"サーバーコンソールから {green}ランク投票{default} が開始されました!"
+	}
+	"L4DStats_TeamShuffleAdminExecuted"
+	{
+		"jp"		"管理者がチームシャッフルを実行しました。"
+	}
+	"L4DStats_TeamShuffleFailed"
+	{
+		"jp"		"エラーによりチームシャッフルに失敗しました。"
+	}
+	"L4DStats_TeamShuffleDone"
+	{
+		"jp"		"プレイヤーPPMによるチームシャッフルが{lightgreen}完了{default}しました。"
+	}
+	"L4DStats_TeamsAlreadyEven"
+	{
+		"jp"		"チームはすでにプレイヤーPPMで均等です。"
+	}
+	"L4DStats_TeamShuffleNotEnoughPlayers"
+	{
+		"jp"		"チームシャッフルに失敗: {lightgreen}プレイヤーが足りません{default}!"
+	}
+	"L4DStats_RankDisabledNotEnoughPlayers"
+	{
+		"jp"		"プレイヤー不足のためランキングシステムが{green}無効{default}になりました!"
+	}
+	"L4DStats_MapTimeInvalidSettings"
+	{
+		"jp"		"難易度の変更、高度なBot、または管理機能の使用により結果は{green}無効{default}で、マップタイムは記録されません!"
+	}
+	"L4DStats_MapTimeInvalidBunnyHop"
+	{
+		"jp"		"{green}タンク{default}のバニーホップが無効のため結果は{green}無効{default}で、マップタイムは記録されません!"
+	}
+	"L4DStats_MapTimeInvalidMultiplayerMode"
+	{
+		"jp"		"マルチプレイヤー移動モードが有効のため、マップタイムは記録されません!"
+	}
+	"L4DStats_MapTimeTooShortNoReward"
+	{
+		"jp"		"記録が30秒未満で無効と思われるため、ポイントは付与されません!"
+	}
+	"L4DStats_MapTimeTooShortNotRecorded"
+	{
+		"jp"		"タイムが30秒未満で無効と思われるため、このランは記録されません!"
+	}
+	"L4DStats_NoFastestTimeYet"
+	{
+		"jp"		"このモードと難易度にはまだ最速記録がありません。最初の記録を作りましょう!"
+	}
+	"L4DStats_MapRecordNotImprovedAnne"
+	{
+		"jp"		"Anne%sのこの難易度の記録 {green}%s{default} は更新されませんでした。次回も挑戦しましょう!"
+	}
+	"L4DStats_MapRecordNotImproved"
+	{
+		"jp"		"最速記録 {green}%s{default} は更新されませんでした。次回も挑戦しましょう!"
+	}
+	"L4DStats_MapCompletionTime"
+	{
+		"jp"		"{green}%s{default} でこのマップをクリアしました!"
+	}
+	"L4DStats_NoBuyBonusAdvancedBotsDisabled"
+	{
+		"jp"		"高度なBotが有効のため、無購入ボーナスは得られません。"
+	}
+	"L4DStats_NoBuyBonusBunnyHopDisabled"
+	{
+		"jp"		"{green}タンク{default}のバニーホップが無効のため、無購入ボーナスは得られません。"
+	}
+	"L4DStats_NoBuyBonusAwarded"
+	{
+		"jp"		"生存者は購入なしでマップをクリアし、{green}%d{default} ボーナスポイントを獲得!"
+	}
+	"L4DStats_NewPlayerStatus"
+	{
+		"jp"		"{lightgreen}初心者と判定されました。このラウンドで経験者の生存者は {green}%.1fx{default} メンターボーナスを得ます。"
+	}
+	"L4DStats_NewPlayerRoundSummary"
+	{
+		"jp"		"{lightgreen}初心者を%i人検出。メンター倍率は {green}%.1fx{default}。初心者には適用されません。"
+	}
+	"L4DStats_TeamKillPenaltySelf"
+	{
+		"jp"		"チームメイト {olive}%s{default} をキルしたため {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_TeamKillPenaltyAll"
+	{
+		"jp"		"{olive}%s{default} はチームメイト {olive}%s{default} をキルしたため {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_HeadshotSpecialKillSelf"
+	{
+		"jp"		"{olive}%s{default} をヘッドショットで倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_HeadshotSpecialKillAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} をヘッドショットで倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_SpecialKillSelf"
+	{
+		"jp"		"{olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_SpecialKillAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_AdrenalineGivenSelf"
+	{
+		"jp"		"{olive}%s{default} にアドレナリンを渡し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_AdrenalineGivenAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} にアドレナリンを渡し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_PillsGivenSelf"
+	{
+		"jp"		"{olive}%s{default} に鎮痛剤を渡し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_PillsGivenAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} に鎮痛剤を渡し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DefibReviveSelf"
+	{
+		"jp"		"除細動器で {olive}%s{default} を蘇生し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_DefibReviveAll"
+	{
+		"jp"		"{olive}%s{default} が除細動器で {olive}%s{default} を蘇生し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_HealTeammateSelf"
+	{
+		"jp"		"{olive}%s{default} を治療し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_HealTeammateAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を治療し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TeamIncapPenaltySelf"
+	{
+		"jp"		"{green}%i{default} ポイント失いました: {olive}%s{default} を行動不能にしました!"
+	}
+	"L4DStats_TeamIncapPenaltyAll"
+	{
+		"jp"		"{olive}%s{default} は {green}%i{default} ポイント失いました: {olive}%s{default} を行動不能にしました!"
+	}
+	"L4DStats_LedgeHangSelf"
+	{
+		"jp"		"{olive}%s{default} を崖からぶら下がらせ、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_LedgeHangAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を崖からぶら下がらせ、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_JockeySaveSelf"
+	{
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_JockeySaveAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ChargerSaveSelf"
+	{
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ChargerSaveAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_QuickChargerKillSelf"
+	{
+		"jp"		"{green}チャージャー{default}を素早く倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_QuickChargerKillAll"
+	{
+		"jp"		"{olive}%s{default} が{green}チャージャー{default}を素早く倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_GasCanPouredSelf"
+	{
+		"jp"		"ガソリンを注ぎ、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_GasCanPouredAll"
+	{
+		"jp"		"{olive}%s{default} がガソリンを注ぎ、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ReviveTeammateSelf"
+	{
+		"jp"		"{olive}%s{default} を助け起こし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ReviveTeammateAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を助け起こし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_RescueClosetSelf"
+	{
+		"jp"		"{olive}%s{default} を救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_RescueClosetAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_FinaleSurvivorReward"
+	{
+		"jp"		"{olive}%i{default}人の生存者がフィナーレをクリアし、全生存者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_FinaleInfectedPenalty"
+	{
+		"jp"		"フィナーレを阻止できず、全感染者が {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_HordeNoIncapReward"
+	{
+		"jp"		"ホード中に行動不能も死亡もなく、全生存者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_BoomerNoDeathReward"
+	{
+		"jp"		"{green}ブーマー{default}の爆発後に誰も死亡せず、全生存者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TankKillWithDeaths"
+	{
+		"jp"		"{olive}%i{default}人が死亡した状態で{green}タンク{default}を倒し、全生存者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_NoWitchDisturbanceReward"
+	{
+		"jp"		"{green}ウィッチ{default}を驚かせなかったため、全生存者が {green}%i{default} ボーナスポイント獲得!"
+	}
+	"L4DStats_SafeRoomWithDeathsReward"
+	{
+		"jp"		"{olive}%i{default}人が死亡した状態でセーフルームに到達し、全生存者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_SafeRoomInfectedPenalty"
+	{
+		"jp"		"生存者のセーフルーム到達を許し、全感染者が {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_WipeSurvivorsReward"
+	{
+		"jp"		"生存者を全滅させ、全感染者が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_SurvivorWipePenalty"
+	{
+		"jp"		"チームが全滅し、全生存者が {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_AllSurvivorsLostRoundPenalty"
+	{
+		"jp"		"ラウンド失敗により、全生存者が {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_AllPlayersLostRoundPenalty"
+	{
+		"jp"		"ラウンド失敗により、参加プレイヤー全員が {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_ProtectedTeammateSelf"
+	{
+		"jp"		"チームメイトを守り、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ProtectedTeammateAll"
+	{
+		"jp"		"{olive}%s{default} がチームメイトを守り、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_InfectedDamageRewardSelf"
+	{
+		"jp"		"生存者に {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_InfectedDamageRewardAll"
+	{
+		"jp"		"{olive}%s{default} が生存者に {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_PerfectBoomSelf"
+	{
+		"jp"		"生存者を完璧に視界不良にし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_PerfectBoomAll"
+	{
+		"jp"		"{olive}%s{default} が生存者を完璧に視界不良にし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_GenericPointsSelf"
+	{
+		"jp"		"{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_GenericPointsAll"
+	{
+		"jp"		"{olive}%s{default} が {green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_FriendlyFirePenaltySelf"
+	{
+		"jp"		"{olive}%i{default} のフレンドリーファイアダメージで {green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_FriendlyFirePenaltyAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%i{default} のフレンドリーファイアダメージを与え、{green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltySelf"
+	{
+		"jp"		"{green}%i{default} ポイント失いました: {olive}%s{default} をフレンドリーファイアしました!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltyAll"
+	{
+		"jp"		"{olive}%s{default} は {green}%i{default} ポイント失いました: {olive}%s{default} をフレンドリーファイアしました!"
+	}
+	"L4DStats_ChargerMultiHitSelf"
+	{
+		"jp"		"{green}チャージャー{default}で {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ChargerMultiHitAll"
+	{
+		"jp"		"{olive}%s{default} が{green}チャージャー{default}で {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_CommonKillsRewardSelf"
+	{
+		"jp"		"感染者を {olive}%i{default} 体倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_CommonKillsRewardAll"
+	{
+		"jp"		"{olive}%s{default} が感染者を {olive}%i{default} 体倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltySelf"
+	{
+		"jp"		"感染者のセーフルーム侵入を許し、{green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltyAll"
+	{
+		"jp"		"{olive}%s{default} は感染者のセーフルーム侵入を許し、{green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_AlarmCarPenalty"
+	{
+		"jp"		"{green}%N{default} はカーアラームを鳴らし、{green}%i{default} ポイント失いました!"
+	}
+	"L4DStats_SpecialSaveSelf"
+	{
+		"jp"		"{olive}%s{default} を {green}%s{default} から救出し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TankDamageRewardSelf"
+	{
+		"jp"		"{green}タンク{default}として {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TankDamageRewardAll"
+	{
+		"jp"		"{olive}%s{default} が{green}タンク{default}として {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_WitchKillSelf"
+	{
+		"jp"		"{olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_WitchKillAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を倒し、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TankRockHitSelf"
+	{
+		"jp"		"{olive}%s{default} に岩を当て、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_TankRockHitAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} に岩を当て、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_IncapSurvivorSelf"
+	{
+		"jp"		"{olive}%s{default} を行動不能にし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_IncapSurvivorAll"
+	{
+		"jp"		"{olive}%s{default} が {olive}%s{default} を行動不能にし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_WitchCrownReward"
+	{
+		"jp"		"{olive}%s{default} が{green}ウィッチ{default}をクラウンし、{green}%i{default} ポイント獲得!"
+	}
+	"L4DStats_ClassSmoker"
+	{
+		"jp"		"スモーカー"
+	}
+	"L4DStats_ClassBoomer"
+	{
+		"jp"		"ブーマー"
+	}
+	"L4DStats_ClassHunter"
+	{
+		"jp"		"ハンター"
+	}
+	"L4DStats_ClassSpitter"
+	{
+		"jp"		"スピッター"
+	}
+	"L4DStats_ClassJockey"
+	{
+		"jp"		"ジョッキー"
+	}
+	"L4DStats_ClassCharger"
+	{
+		"jp"		"チャージャー"
+	}
+	"L4DStats_ClassTank"
+	{
+		"jp"		"タンク"
+	}
+	"L4DStats_ClassWitch"
+	{
+		"jp"		"ウィッチ"
+	}
+	"L4DStats_ClassUnknown"
+	{
+		"jp"		"不明"
+	}
+	"L4DStats_ASurvivor"
+	{
+		"jp"		"生存者"
+	}
+	"L4DStats_MapRecordTeam"
+	{
+		"jp"		"チーム"
+	}
+	"L4DStats_MapRecordTeamCount"
+	{
+		"jp"		"チーム（%d人）"
+	}
+	"L4DStats_ConsolePrefix"
+	{
+		"jp"		"[ランク]"
+	}
 }

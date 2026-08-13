@@ -249,14 +249,14 @@ BuildMapTimingRunPlayerNames(String:Names[], MaxLength)
 			if (strlen(Buffer) < MaxLength)
 				strcopy(Names, MaxLength, Buffer);
 			else
-				Format(Names, MaxLength, "Team (%d)", total);
+				Format(Names, MaxLength, "%s:%d", MAP_RECORD_TEAM_MARKER, total);
 		}
 		else
-			Format(Names, MaxLength, "Team (%d)", total);
+			Format(Names, MaxLength, "%s:%d", MAP_RECORD_TEAM_MARKER, total);
 	}
 	else if (Names[0] == '\0')
 	{
-		strcopy(Names, MaxLength, "Team");
+		strcopy(Names, MaxLength, MAP_RECORD_TEAM_MARKER);
 	}
 }
 
@@ -578,10 +578,12 @@ BroadcastMapRecordLocally(const String:MapName[], const String:RunPlayers[], Mod
 			continue;
 
 		decl String:ModeLabel[64], String:DifficultyLabel[64], String:Summary[256], String:Details[256];
+		decl String:PlayersLabel[MAP_RECORD_PLAYER_NAMES_MAX];
 		Format(ModeLabel, sizeof(ModeLabel), "%T", ModePhrase, i);
 		Format(DifficultyLabel, sizeof(DifficultyLabel), "%T", DifficultyPhrase, i);
+		Stats_FormatMapRecordPlayers(i, RunPlayers, PlayersLabel, sizeof(PlayersLabel));
 		Format(Summary, sizeof(Summary), "%T", "L4DStats_MapRecordSummary", i, TimeLabel, ModeLabel, MapName);
-		Format(Details, sizeof(Details), "%T", "L4DStats_MapRecordDetails", i, RunPlayers, InfectedNumber, SISpawnTime, DifficultyLabel);
+		Format(Details, sizeof(Details), "%T", "L4DStats_MapRecordDetails", i, PlayersLabel, InfectedNumber, SISpawnTime, DifficultyLabel);
 
 		StatsPrintToChatRaw(i, Summary);
 		StatsPrintToChatRaw(i, Details);
@@ -1180,13 +1182,76 @@ stock StatsFormatPhrase(Client, String:Buffer[], MaxLength, const String:Phrase[
 	VFormat(Buffer, MaxLength, "%t", 4);
 }
 
+stock Stats_GetInfectedClassPhrase(InfType, String:Phrase[], MaxLength)
+{
+	switch (InfType)
+	{
+		case INF_ID_SMOKER:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassSmoker");
+		case INF_ID_BOOMER:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassBoomer");
+		case INF_ID_HUNTER:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassHunter");
+		case INF_ID_SPITTER_L4D2:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassSpitter");
+		case INF_ID_JOCKEY_L4D2:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassJockey");
+		case INF_ID_CHARGER_L4D2:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassCharger");
+		case INF_ID_WITCH_L4D2:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassWitch");
+		case INF_ID_TANK_L4D2:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassTank");
+		default:
+			strcopy(Phrase, MaxLength, "L4DStats_ClassUnknown");
+	}
+}
+
+stock Stats_FormatInfectedClass(Client, InfType, String:Buffer[], MaxLength)
+{
+	decl String:Phrase[64];
+	Stats_GetInfectedClassPhrase(InfType, Phrase, sizeof(Phrase));
+	StatsFormatPhrase(Client, Buffer, MaxLength, Phrase);
+}
+
+stock bool:Stats_ShouldTranslateInfectedVictimName(Victim)
+{
+	return Victim <= 0 || !IsClientConnected(Victim) || IsClientBot(Victim);
+}
+
+stock Stats_FormatKillVictimLabel(Client, Victim, VictimInfType, const String:VictimName[], String:Buffer[], MaxLength)
+{
+	if (Stats_ShouldTranslateInfectedVictimName(Victim))
+		Stats_FormatInfectedClass(Client, VictimInfType, Buffer, MaxLength);
+	else
+		strcopy(Buffer, MaxLength, VictimName);
+}
+
+stock Stats_FormatMapRecordPlayers(Client, const String:StoredNames[], String:Buffer[], MaxLength)
+{
+	new MarkerLen = strlen(MAP_RECORD_TEAM_MARKER);
+	if (strncmp(StoredNames, MAP_RECORD_TEAM_MARKER, MarkerLen) == 0)
+	{
+		if (StoredNames[MarkerLen] == ':')
+			StatsFormatPhrase(Client, Buffer, MaxLength, "L4DStats_MapRecordTeamCount", StringToInt(StoredNames[MarkerLen + 1]));
+		else
+			StatsFormatPhrase(Client, Buffer, MaxLength, "L4DStats_MapRecordTeam");
+		return;
+	}
+
+	strcopy(Buffer, MaxLength, StoredNames);
+}
+
 stock StatsPrintToConsolePhrase(Client, const String:Phrase[], any:...)
 {
 	#pragma unused Phrase
 	decl String:Message[1024];
 	SetGlobalTransTarget(Client > 0 ? Client : LANG_SERVER);
 	VFormat(Message, sizeof(Message), "%t", 2);
-	PrintToConsole(Client, "[RANK] %s", Message);
+
+	decl String:Prefix[32];
+	StatsFormatPhrase(Client > 0 ? Client : LANG_SERVER, Prefix, sizeof(Prefix), "L4DStats_ConsolePrefix");
+	PrintToConsole(Client, "%s %s", Prefix, Message);
 }
 
 stock StatsSetMenuTitle(Handle:MenuHandle, Client, const String:Phrase[])

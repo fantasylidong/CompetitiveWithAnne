@@ -4,80 +4,84 @@
 	{
 		"ko"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"ko"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"ko"		"{green} 특별한 느낌 {blue} 순위: {olive}#%d {blue}({default}%d {green} 데미지 {blue}[{default}%.0f%%{blue}]{default}, %d {green} 킬 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{blue}내 순위 {green}SI{default}: {olive}#%d {blue}({default}%d {green}데미지 {blue}[{default}%.0f%%{blue}]{default}, %d {green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"ko"		"{green} 좀비 {blue} 순위: {olive}#%d {blue}({default}%d {green} 좀비 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{blue}내 순위 {green}CI{default}: {olive}#%d {blue}({default}%d {green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"ko"		"{green} 검은 총 {blue} 순위 : {olive}#%d {blue}({default}%d {green} 아군 데미지 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{blue}내 순위 {green}FF{default}: {olive}#%d {blue}({default}%d {green}아군 피해 {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
-		"ko"		"[봇]"
+		"ko"		"[BOT]"
 	}
 	"NobodyName"
 	{
-		"ko"		"{blue}({default} 아무도 {blue})"
+		"ko"		"{blue}({default}없음{blue})"
 	}
 	"NotEnoughAction"
 	{
-		"ko"		"{blue}({default}에는 {blue} 작업이 충분하지 않습니다.)"
+		"ko"		"{blue}({default}아직 충분한 기록이 없습니다{blue})"
 	}
 	"ReportSI_Absolute"
 	{
-		"ko"		"{green} 특별한 감각: {olive}%s {blue}({default}%d {green} 데미지 {default}, %d {green} 킬 {blue})"
+		"ko"		"{green}SI: {olive}%s {blue}({default}%d {green}데미지{default}, %d {green}킬{blue})"
 	}
 	"ReportSI_Percent"
 	{
-		"ko"		"{green} 특별한 감각: {olive}%s {blue}({green} 손상 {blue}[{default}%.0f%%{blue}]{default}, {green} 킬 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}SI: {olive}%s {blue}({green}데미지 {blue}[{default}%.0f%%{blue}]{default}, {green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Full"
 	{
-		"ko"		"{green} 특별한 감각: {olive}%s {blue}({default}%d {green} 손상 {blue}[{default}%.0f%%{blue}]{default}, %d {green} 킬 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}SI: {olive}%s {blue}({default}%d {green}데미지 {blue}[{default}%.0f%%{blue}]{default}, %d {green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Nobody"
 	{
-		"ko"		"{green} 특별한 느낌: {blue}({blue}가 없는 {default})"
+		"ko"		"{green}SI: {blue}({default}없음{blue})"
 	}
 	"ReportCI_Absolute"
 	{
-		"ko"		"{green} 좀비: {olive}%s {blue}({default}%d {green}좀비 {blue})"
+		"ko"		"{green}CI: {olive}%s {blue}({default}%d {green}킬{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"ko"		"{green} 좀비: {olive}%s {blue}({green} 좀비 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}CI: {olive}%s {blue}({green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"ko"		"{green} 좀비: {olive}%s {blue}({default}%d {green} 좀비 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}CI: {olive}%s {blue}({default}%d {green}킬 {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"ko"		"{blue} ({default}에는 검은 총이 전혀 없습니다! {blue})"
+		"ko"		"{green}FF{default}: {blue}({default}이번 라운드에 아군 피해가 없습니다!{blue})"
 	}
 	"ReportFF_Absolute"
 	{
-		"ko"		"{green} 아군 피해: {olive}%s {blue}({default}%d {green} 아군 피해 {blue})"
+		"ko"		"{green}FF: {olive}%s {blue}({default}%d {green}아군 피해{blue})"
 	}
 	"ReportFF_Percent"
 	{
-		"ko"		"{green} 아군 피해: {olive}%s {blue}({green} 아군 피해 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}FF: {olive}%s {blue}({green}아군 피해 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportFF_Full"
 	{
-		"ko"		"{green} 아군 피해: {olive}%s {blue}({default}%d {green} 아군 피해 {blue}[{default}%.0f%%{blue}])"
+		"ko"		"{green}FF: {olive}%s {blue}({default}%d {green}아군 피해 {blue}[{default}%.0f%%{blue}])"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsHeader"
 	{
-		"ko"		"{blue}[{default}제약 MVP통계{blue}]"
+		"ko"		"{blue}[{default}Anne MVP 통계{blue}]"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsLine"
 	{
-		"ko"		"{olive} 특수 감각 {green}%2d {olive} 일반 감각 {green}%3d {olive} 우호적 부상/상해 {green}%2d/%2d {olive} 포인트{green}%4d {default}%N"
+		"ko"		"{olive}SI{green}%2d {olive}CI{green}%3d {olive}FF/피격{green}%2d/%2d {olive}점수{green}%4d {default}%N"
 	}
 }

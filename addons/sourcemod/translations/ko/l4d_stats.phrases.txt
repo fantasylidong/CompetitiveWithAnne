@@ -52,4 +52,1212 @@
 	{
 		"ko"		"알 수 없음"
 	}
+	"L4DStats_Yes"
+	{
+		"ko"		"예"
+	}
+	"L4DStats_No"
+	{
+		"ko"		"아니오"
+	}
+	"L4DStats_Close"
+	{
+		"ko"		"닫기"
+	}
+	"L4DStats_Back"
+	{
+		"ko"		"뒤로"
+	}
+	"L4DStats_More"
+	{
+		"ko"		"더 보기"
+	}
+	"L4DStats_MoreEllipsis"
+	{
+		"ko"		"더 보기..."
+	}
+	"L4DStats_All"
+	{
+		"ko"		"전체"
+	}
+	"L4DStats_GamemodeCoop"
+	{
+		"ko"		"캠페인"
+	}
+	"L4DStats_GamemodeVersus"
+	{
+		"ko"		"대전"
+	}
+	"L4DStats_GamemodeRealism"
+	{
+		"ko"		"리얼리즘"
+	}
+	"L4DStats_GamemodeSurvival"
+	{
+		"ko"		"생존"
+	}
+	"L4DStats_GamemodeScavenge"
+	{
+		"ko"		"수집"
+	}
+	"L4DStats_GamemodeRealismVersus"
+	{
+		"ko"		"리얼리즘 대전"
+	}
+	"L4DStats_GamemodeMutations"
+	{
+		"ko"		"변이"
+	}
+	"L4DStats_GamemodeUnknown"
+	{
+		"ko"		"알 수 없는 모드"
+	}
+	"L4DStats_RankMenuTitle"
+	{
+		"ko"		"플레이어 랭킹 시스템:"
+	}
+	"L4DStats_MenuCurrentRank"
+	{
+		"ko"		"내 순위 보기"
+	}
+	"L4DStats_MenuTop10"
+	{
+		"ko"		"상위 10명 보기"
+	}
+	"L4DStats_MenuQuarterTop10"
+	{
+		"ko"		"분기 상위 10명 보기"
+	}
+	"L4DStats_MenuTop10PPM"
+	{
+		"ko"		"PPM 상위 10명 보기"
+	}
+	"L4DStats_MenuNextRank"
+	{
+		"ko"		"다음 순위 필요 점수"
+	}
+	"L4DStats_MenuCurrentMapTime"
+	{
+		"ko"		"현재 맵 시간 보기"
+	}
+	"L4DStats_MenuOtherPlayerRank"
+	{
+		"ko"		"다른 플레이어 순위"
+	}
+	"L4DStats_MenuOtherPlayerPPM"
+	{
+		"ko"		"다른 플레이어 PPM"
+	}
+	"L4DStats_MenuRankVote"
+	{
+		"ko"		"PPM 기준 팀 재편성 투표"
+	}
+	"L4DStats_MenuAllMapTimes"
+	{
+		"ko"		"모든 맵 기록 보기"
+	}
+	"L4DStats_MenuThisMapTimes"
+	{
+		"ko"		"현재 맵 기록 보기"
+	}
+	"L4DStats_MenuSettings"
+	{
+		"ko"		"랭킹 알림 설정"
+	}
+	"L4DStats_MenuAbout"
+	{
+		"ko"		"랭킹 플러그인 정보"
+	}
+	"L4DStats_NextRankTitle"
+	{
+		"ko"		"다음 순위 요구 조건:"
+	}
+	"L4DStats_NextRankPointsNeeded"
+	{
+		"ko"		"필요 점수: %i"
+	}
+	"L4DStats_CurrentRank"
+	{
+		"ko"		"현재 순위: %i"
+	}
+	"L4DStats_AlreadyFirst"
+	{
+		"ko"		"이미 1위입니다"
+	}
+	"L4DStats_PointsAndPlayer"
+	{
+		"ko"		"%i점: %s"
+	}
+	"L4DStats_PlayerRankTitle"
+	{
+		"ko"		"%s의 순위"
+	}
+	"L4DStats_OverallRank"
+	{
+		"ko"		"종합 순위: %i / %i"
+	}
+	"L4DStats_ModeRank"
+	{
+		"ko"		"%s 순위: %i / %i"
+	}
+	"L4DStats_PlaytimeHours"
+	{
+		"ko"		"플레이 시간: %.2f시간"
+	}
+	"L4DStats_PlaytimeMinutes"
+	{
+		"ko"		"플레이 시간: %i분"
+	}
+	"L4DStats_CurrentPoints"
+	{
+		"ko"		"현재 점수: %i"
+	}
+	"L4DStats_QuarterLabel"
+	{
+		"ko"		"%i년 %i분기"
+	}
+	"L4DStats_QuarterPoints"
+	{
+		"ko"		"%s 점수: %i"
+	}
+	"L4DStats_QuarterRank"
+	{
+		"ko"		"%s 순위: %i / %i"
+	}
+	"L4DStats_PointsPerMinute"
+	{
+		"ko"		"분당 점수: %.2f"
+	}
+	"L4DStats_CommonKilled"
+	{
+		"ko"		"일반 감염자 처치: %i"
+	}
+	"L4DStats_SurvivorsKilled"
+	{
+		"ko"		"생존자 처치: %i"
+	}
+	"L4DStats_Headshots"
+	{
+		"ko"		"헤드샷: %i"
+	}
+	"L4DStats_HeadshotRatio"
+	{
+		"ko"		"헤드샷 비율: %.2f%%"
+	}
+	"L4DStats_FullStatsUrl"
+	{
+		"ko"		"전체 통계: %s"
+	}
+	"L4DStats_UnknownPlayer"
+	{
+		"ko"		"알 수 없음"
+	}
+	"L4DStats_PlayerRanksTitle"
+	{
+		"ko"		"플레이어 순위:"
+	}
+	"L4DStats_PlayerPointsMenuItem"
+	{
+		"ko"		"%s (%i점)"
+	}
+	"L4DStats_PlayerScoreMenuItem"
+	{
+		"ko"		"%s (%i)"
+	}
+	"L4DStats_PlayerPPMTitle"
+	{
+		"ko"		"플레이어 PPM:"
+	}
+	"L4DStats_PlayerPPMMenuItem"
+	{
+		"ko"		"%s (PPM: %.2f)"
+	}
+	"L4DStats_TimedMapsTitle"
+	{
+		"ko"		"맵 시간 기록:"
+	}
+	"L4DStats_ModeTimesTitle"
+	{
+		"ko"		"모드 시간:"
+	}
+	"L4DStats_MapNeverPlayed"
+	{
+		"ko"		"이 맵은 아직 플레이되지 않았습니다."
+	}
+	"L4DStats_ModeNeverPlayed"
+	{
+		"ko"		"이 모드는 아직 플레이되지 않았습니다."
+	}
+	"L4DStats_Top10Title"
+	{
+		"ko"		"상위 10명"
+	}
+	"L4DStats_QuarterTop10Title"
+	{
+		"ko"		"%s 상위 10명"
+	}
+	"L4DStats_Top10PPMTitle"
+	{
+		"ko"		"PPM 상위 10명"
+	}
+	"L4DStats_ClearPlayerStatsTitle"
+	{
+		"ko"		"플레이어 통계 삭제:"
+	}
+	"L4DStats_AboutTitle"
+	{
+		"ko"		"플레이어 랭킹 시스템 정보:"
+	}
+	"L4DStats_AboutVersion"
+	{
+		"ko"		"버전: %s"
+	}
+	"L4DStats_AboutAuthor"
+	{
+		"ko"		"제작: Mikko Andersson (muukis); Anne 적용: Dong"
+	}
+	"L4DStats_AboutDescription"
+	{
+		"ko"		"플레이어 통계와 순위를 기록합니다."
+	}
+	"L4DStats_SettingsTitle"
+	{
+		"ko"		"랭킹 알림 설정:"
+	}
+	"L4DStats_SettingsMute"
+	{
+		"ko"		"랭킹 알림 음소거 (현재 활성)"
+	}
+	"L4DStats_SettingsUnmute"
+	{
+		"ko"		"랭킹 알림 음소거 해제"
+	}
+	"L4DStats_TimeHoursMinutesSeconds"
+	{
+		"ko"		"%i시간 %i분 %.1f초"
+	}
+	"L4DStats_TimeMinutesSeconds"
+	{
+		"ko"		"%i분 %.1f초"
+	}
+	"L4DStats_TimeSeconds"
+	{
+		"ko"		"%.1f초"
+	}
+	"L4DStats_AdminCategory"
+	{
+		"ko"		"플레이어 랭킹"
+	}
+	"L4DStats_AdminClearTitle"
+	{
+		"ko"		"랭킹 데이터 삭제:"
+	}
+	"L4DStats_AdminClearCurrentPlayers"
+	{
+		"ko"		"현재 플레이어 통계 삭제"
+	}
+	"L4DStats_AdminClearMapTimes"
+	{
+		"ko"		"맵 클리어 시간 삭제"
+	}
+	"L4DStats_AdminClearRecordedMapsTitle"
+	{
+		"ko"		"기록된 맵 시간 삭제:"
+	}
+	"L4DStats_AdminClearPlayers"
+	{
+		"ko"		"플레이어 통계 삭제"
+	}
+	"L4DStats_AdminClearMaps"
+	{
+		"ko"		"플레이어 맵 통계 삭제"
+	}
+	"L4DStats_AdminClearAll"
+	{
+		"ko"		"모든 통계 삭제"
+	}
+	"L4DStats_AdminClearRecordedTimes"
+	{
+		"ko"		"모든 맵 기록 삭제"
+	}
+	"L4DStats_AdminRemoveCustomMaps"
+	{
+		"ko"		"커스텀 맵 제거"
+	}
+	"L4DStats_ConfirmClearPlayerStats"
+	{
+		"ko"		"모든 플레이어 통계를 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearPlayerMapStats"
+	{
+		"ko"		"모든 플레이어 맵 통계를 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearAllStats"
+	{
+		"ko"		"모든 랭킹 통계를 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearAllMapTimes"
+	{
+		"ko"		"모든 맵 시간 기록을 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearCoopMapTimes"
+	{
+		"ko"		"협동 모드 맵 시간을 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearSurvivalMapTimes"
+	{
+		"ko"		"생존 모드 맵 시간을 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearRealismMapTimes"
+	{
+		"ko"		"리얼리즘 모드 맵 시간을 삭제할까요?"
+	}
+	"L4DStats_ConfirmClearMutationMapTimes"
+	{
+		"ko"		"변이 모드 맵 시간을 삭제할까요?"
+	}
+	"L4DStats_ConfirmRemoveCustomMaps"
+	{
+		"ko"		"모든 커스텀 맵을 제거할까요?"
+	}
+	"L4DStats_ConfirmCleanInactivePlayers"
+	{
+		"ko"		"비활성 플레이어를 제거할까요?"
+	}
+	"L4DStats_CommandInGameOnly"
+	{
+		"ko"		"이 명령어는 게임 내에서만 사용할 수 있습니다."
+	}
+	"L4DStats_CommandUnavailableFromServer"
+	{
+		"ko"		"서버 콘솔에서는 이 명령어를 사용할 수 없습니다."
+	}
+	"L4DStats_MapTimerNotStarted"
+	{
+		"ko"		"맵 타이머가 아직 시작되지 않았습니다."
+	}
+	"L4DStats_CurrentMapTimeConsole"
+	{
+		"ko"		"현재 맵 시간: %s"
+	}
+	"L4DStats_TeamShuffleUnavailable"
+	{
+		"ko"		"현재 팀 섞기를 사용할 수 없습니다."
+	}
+	"L4DStats_TeamShuffleExecuting"
+	{
+		"ko"		"팀을 섞는 중..."
+	}
+	"L4DStats_ClearDatabaseServerDisabled"
+	{
+		"ko"		"서버 콘솔에서의 데이터베이스 삭제가 비활성화되었습니다."
+	}
+	"L4DStats_ClearDatabaseStarted"
+	{
+		"ko"		"데이터베이스 삭제를 시작했습니다."
+	}
+	"L4DStats_ClearDatabaseConfirm"
+	{
+		"ko"		"%i초 안에 명령어를 다시 실행하여 데이터베이스 삭제를 확인하세요."
+	}
+	"L4DStats_ClearTimedMapsRollback"
+	{
+		"ko"		"맵 시간 삭제에 실패하여 롤백합니다."
+	}
+	"L4DStats_ClearPlayersRollback"
+	{
+		"ko"		"플레이어 통계 삭제에 실패하여 롤백합니다."
+	}
+	"L4DStats_ClearMapsRollback"
+	{
+		"ko"		"맵 통계 삭제에 실패하여 롤백합니다."
+	}
+	"L4DStats_ClearStatsFailure"
+	{
+		"ko"		"통계가 삭제되지 않았습니다."
+	}
+	"L4DStats_ClearRanksSuccess"
+	{
+		"ko"		"플레이어 랭킹을 삭제했습니다."
+	}
+	"L4DStats_ClearStatsSuccess"
+	{
+		"ko"		"통계를 삭제했습니다."
+	}
+	"L4DStats_ClearQueryFailed"
+	{
+		"ko"		"데이터베이스 쿼리 실패: %s"
+	}
+	"L4DStats_FastQueryError"
+	{
+		"ko"		"빠른 쿼리 실패: %s | 쿼리: %s"
+	}
+	"L4DStats_FastQueryFailed"
+	{
+		"ko"		"빠른 쿼리 실패: %s"
+	}
+	"L4DStats_FastestTimeWithBuy"
+	{
+		"ko"		"구매를 포함한 최단 클리어 시간: {green}%s{default}."
+	}
+	"L4DStats_FastestTimeWithoutBuy"
+	{
+		"ko"		"최단 클리어 시간: {green}%s{default}."
+	}
+	"L4DStats_MapRecordImprovedCurrent"
+	{
+		"ko"		"Anne%s 해당 난이도 신기록: {green}%s{default}!"
+	}
+	"L4DStats_MapRecordImprovedPlayer"
+	{
+		"ko"		"Anne%s 해당 난이도 개인 기록을 {green}%s{default}(으)로 갱신!"
+	}
+	"L4DStats_RankMenuHint"
+	{
+		"ko"		"{green}!rank{default}를 입력하여 랭킹 메뉴를 여세요."
+	}
+	"L4DStats_RankRose"
+	{
+		"ko"		"전체 순위가 {green}%i{default}등 올라 {green}%i{default}등이 되었습니다."
+	}
+	"L4DStats_RankFell"
+	{
+		"ko"		"전체 순위가 {green}%i{default}등 내려가 {green}%i{default}등이 되었습니다."
+	}
+	"L4DStats_QuarterRankRose"
+	{
+		"ko"		"%s 순위가 {green}%i{default}등 올라 {green}%i{default}등({green}%i{default}점)이 되었습니다."
+	}
+	"L4DStats_QuarterRankFell"
+	{
+		"ko"		"%s 순위가 {green}%i{default}등 내려가 {green}%i{default}등({green}%i{default}점)이 되었습니다."
+	}
+	"L4DStats_RankMessagesMuted"
+	{
+		"ko"		"랭킹 알림을 음소거했습니다."
+	}
+	"L4DStats_RankMessagesUnmuted"
+	{
+		"ko"		"랭킹 알림을 활성화했습니다."
+	}
+	"L4DStats_RankMuteUsage"
+	{
+		"ko"		"사용법: sm_rankmute [0/1]"
+	}
+	"L4DStats_RankVoteQuestion"
+	{
+		"ko"		"플레이어 랭킹을 활성화할까요?"
+	}
+	"L4DStats_RankVotePassed"
+	{
+		"ko"		"랭킹 투표가 가결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
+	}
+	"L4DStats_RankVoteFailed"
+	{
+		"ko"		"랭킹 투표가 부결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
+	}
+	"L4DStats_RankVotePluginDisabledConsole"
+	{
+		"ko"		"플러그인이 비활성화된 동안 랭킹 투표를 시작할 수 없습니다."
+	}
+	"L4DStats_RankVoteGamemodeDisabledConsole"
+	{
+		"ko"		"이 게임 모드에서는 랭킹 투표가 비활성화됩니다."
+	}
+	"L4DStats_RankVoteAlreadyStartedConsole"
+	{
+		"ko"		"랭킹 투표가 이미 진행 중입니다."
+	}
+	"L4DStats_RankVoteGamedataMissingConsole"
+	{
+		"ko"		"랭킹 투표 설정 실패: 필요한 gamedata가 없습니다."
+	}
+	"L4DStats_RankVoteDisabledConsole"
+	{
+		"ko"		"랭킹 투표가 비활성화되었습니다."
+	}
+	"L4DStats_MotdCreateFailed"
+	{
+		"ko"		"MOTD 파일을 생성할 수 없습니다."
+	}
+	"L4DStats_MotdPrepareFailed"
+	{
+		"ko"		"MOTD 요청을 준비할 수 없습니다."
+	}
+	"L4DStats_MotdUpdateError"
+	{
+		"ko"		"MOTD 업데이트 실패: %s"
+	}
+	"L4DStats_MotdUpdateFailed"
+	{
+		"ko"		"MOTD 업데이트에 실패했습니다."
+	}
+	"L4DStats_MotdUpdateSuccess"
+	{
+		"ko"		"MOTD를 업데이트했습니다."
+	}
+	"L4DStats_MotdMessage"
+	{
+		"ko"		"오늘의 메시지: {green}%s{default}"
+	}
+	"L4DStats_NewPlayerSafeRoomMultiplier"
+	{
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 기존 생존자는 세이프룸에서 {green}%.1fx{default} 보너스를 받지만 신규 플레이어에게는 배율이 적용되지 않습니다."
+	}
+	"L4DStats_NewPlayerFinaleMultiplier"
+	{
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 기존 생존자는 피날레에서 {green}%.1fx{default} 보너스를 받지만 신규 플레이어에게는 배율이 적용되지 않습니다."
+	}
+	"L4DStats_SinglePlayerTripleBonus"
+	{
+		"ko"		"생존자가 한 명만 남아 점수가 3배로 적용됩니다."
+	}
+	"L4DStats_SinglePlayerTripleBonusWithDifficulty"
+	{
+		"ko"		"생존자가 한 명만 남아 점수가 3배로 적용되고 난이도 보너스 {green}%i{default}점을 받습니다."
+	}
+	"L4DStats_MedkitReductionL4D1"
+	{
+		"ko"		"구급키트를 사용할 때마다 클리어 보상이 {green}%i%%{default} 감소합니다({green}%i{default}개 사용)."
+	}
+	"L4DStats_MedkitReductionL4D2"
+	{
+		"ko"		"첫 4개 이후 구급키트를 사용할 때마다 클리어 보상이 {green}%i%%{default} 감소합니다({green}%i{default}개 사용)."
+	}
+	"L4DStats_DeployIncendiarySelf"
+	{
+		"ko"		"소소탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DeployExplosiveSelf"
+	{
+		"ko"		"폭발탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DeployUnknownSelf"
+	{
+		"ko"		"탄약 업그레이드를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DeployIncendiaryAll"
+	{
+		"ko"		"{olive}%s{default}님이 소소탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DeployExplosiveAll"
+	{
+		"ko"		"{olive}%s{default}님이 폭발탄 패키지를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DeployUnknownAll"
+	{
+		"ko"		"{olive}%s{default}님이 탄약 업그레이드를 배치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_PerfectPounceSelf"
+	{
+		"ko"		"{olive}%s{default}에게 완벽한 폰스! {green}%i{default}점을 획득했습니다."
+	}
+	"L4DStats_PerfectPounceAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}에게 완벽한 폰스를 성공하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_NicePounceSelf"
+	{
+		"ko"		"{olive}%s{default}에게 멋진 폰스! {green}%i{default}점을 획득했습니다."
+	}
+	"L4DStats_NicePounceAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}에게 멋진 폰스를 성공하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_CurrentMapTime"
+	{
+		"ko"		"현재 맵 시간: {green}%s"
+	}
+	"L4DStats_QuarterRankingLeft"
+	{
+		"ko"		"{olive}%s{default} 랭킹에서 벗어났습니다."
+	}
+	"L4DStats_QuarterRankingEntered"
+	{
+		"ko"		"{olive}%s{default} 랭킹에 진입했습니다: {green}%i{default}등, {green}%i{default}점."
+	}
+	"L4DStats_PlayerJoinedOverallRanked"
+	{
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (전체: {lightgreen}%i/%i{default}, 점수: {lightgreen}%i{default})"
+	}
+	"L4DStats_PlayerJoinedOverallUnranked"
+	{
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (전체 랭킹 외)"
+	}
+	"L4DStats_CurrentQuarterRanked"
+	{
+		"ko"		"현재 {olive}%s{default}: {lightgreen}%i/%i{default}등, {lightgreen}%i{default}점"
+	}
+	"L4DStats_CurrentQuarterUnranked"
+	{
+		"ko"		"현재 {olive}%s{default}: 순위 없음"
+	}
+	"L4DStats_PlayerJoinedModeRanked"
+	{
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! ({lightgreen}%i{default}등 / {lightgreen}%i{default}점)"
+	}
+	"L4DStats_PlayerJoinedModeUnranked"
+	{
+		"ko"		"플레이어 {olive}%s{default}님이 참가했습니다! (순위 없음)"
+	}
+	"L4DStats_QuarterRankingUnavailable"
+	{
+		"ko"		"분기 랭킹을 현재 사용할 수 없습니다. 나중에 다시 시도하세요."
+	}
+	"L4DStats_QuarterRankingQueryFailed"
+	{
+		"ko"		"분기 랭킹 조회에 실패했습니다. 나중에 다시 시도하세요."
+	}
+	"L4DStats_PlayerJoinedSurvivors"
+	{
+		"ko"		"{olive}%s{default}님이 {lightgreen}생존자{default} 팀에 합류했습니다!"
+	}
+	"L4DStats_PlayerJoinedInfected"
+	{
+		"ko"		"{olive}%s{default}님이 {lightgreen}감염자{default} 팀에 합류했습니다!"
+	}
+	"L4DStats_AllPlayerStatsCleared"
+	{
+		"ko"		"모든 플레이어 통계를 삭제했습니다!"
+	}
+	"L4DStats_AllMapStatsCleared"
+	{
+		"ko"		"모든 맵 통계를 삭제했습니다!"
+	}
+	"L4DStats_AllStatsCleared"
+	{
+		"ko"		"모든 통계를 삭제했습니다!"
+	}
+	"L4DStats_PlayerCleaningSuccess"
+	{
+		"ko"		"비활성 플레이어를 정리했습니다!"
+	}
+	"L4DStats_PlayerCleaningFailed"
+	{
+		"ko"		"플레이어 정리에 실패했습니다!"
+	}
+	"L4DStats_PlayerCleaningDisabled"
+	{
+		"ko"		"설정에서 플레이어 정리가 비활성화되었습니다!"
+	}
+	"L4DStats_CustomMapsRemoved"
+	{
+		"ko"		"모든 커스텀 맵을 제거했습니다!"
+	}
+	"L4DStats_CustomMapsRemoveFailed"
+	{
+		"ko"		"커스텀 맵 제거에 실패했습니다!"
+	}
+	"L4DStats_AllMapTimesRemoved"
+	{
+		"ko"		"모든 맵 시간을 제거했습니다!"
+	}
+	"L4DStats_MapTimesRemoveFailed"
+	{
+		"ko"		"맵 시간 제거에 실패했습니다!"
+	}
+	"L4DStats_CoopMapTimesClearSuccess"
+	{
+		"ko"		"협동 모드 맵 시간을 삭제했습니다!"
+	}
+	"L4DStats_CoopMapTimesClearFailed"
+	{
+		"ko"		"협동 모드 맵 시간 삭제 실패!"
+	}
+	"L4DStats_SurvivalMapTimesClearSuccess"
+	{
+		"ko"		"생존 모드 맵 시간을 삭제했습니다!"
+	}
+	"L4DStats_SurvivalMapTimesClearFailed"
+	{
+		"ko"		"생존 모드 맵 시간 삭제 실패!"
+	}
+	"L4DStats_RealismMapTimesClearSuccess"
+	{
+		"ko"		"리얼리즘 모드 맵 시간을 삭제했습니다!"
+	}
+	"L4DStats_RealismMapTimesClearFailed"
+	{
+		"ko"		"리얼리즘 모드 맵 시간 삭제 실패!"
+	}
+	"L4DStats_MutationMapTimesClearSuccess"
+	{
+		"ko"		"변이 모드 맵 시간을 삭제했습니다!"
+	}
+	"L4DStats_MutationMapTimesClearFailed"
+	{
+		"ko"		"변이 모드 맵 시간 삭제 실패!"
+	}
+	"L4DStats_OwnStatsCleared"
+	{
+		"ko"		"플레이 통계가 삭제되었습니다!"
+	}
+	"L4DStats_PlayerStatsCleared"
+	{
+		"ko"		"{olive}%s{default}님의 플레이 통계를 삭제했습니다!"
+	}
+	"L4DStats_PlayerStatsClearFailed"
+	{
+		"ko"		"플레이어 플레이 통계 삭제 실패!"
+	}
+	"L4DStats_RankVoteSettingsFailed"
+	{
+		"ko"		"플러그인 설정 실패로 {green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
+	}
+	"L4DStats_RankVoteDisabledChat"
+	{
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
+	}
+	"L4DStats_RankVoteSpectatorDenied"
+	{
+		"ko"		"관전자는 {green}랭킹 투표{default}를 시작할 수 없습니다."
+	}
+	"L4DStats_NotImplemented"
+	{
+		"ko"		"{olive}아직 구현되지 않았습니다."
+	}
+	"L4DStats_RankVoteProgress"
+	{
+		"ko"		"{olive}%s{default}님이 투표했습니다. {green}%i/%i{default}명이 투표했습니다."
+	}
+	"L4DStats_RankVotePluginDisabledChat"
+	{
+		"ko"		"플러그인이 비활성화되어 랭킹 투표를 시작할 수 없습니다!"
+	}
+	"L4DStats_RankVoteVersusOnly"
+	{
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default} 모드에서 활성화됩니다!"
+	}
+	"L4DStats_RankVoteCompetitiveModes"
+	{
+		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default}, {lightgreen}리얼리즘 대전{default}, {lightgreen}스캐빈지{default} 모드에서 활성화됩니다!"
+	}
+	"L4DStats_RankVoteOncePerMap"
+	{
+		"ko"		"{green}랭킹 투표{default}는 맵당 한 번만 시작할 수 있습니다!"
+	}
+	"L4DStats_RankVoteInitiated"
+	{
+		"ko"		"{olive}%s{default}님이 {green}랭킹 투표{default}를 시작했습니다!"
+	}
+	"L4DStats_RankVoteInitiatedConsole"
+	{
+		"ko"		"서버 콘솔에서 {green}랭킹 투표{default}를 시작했습니다!"
+	}
+	"L4DStats_TeamShuffleAdminExecuted"
+	{
+		"ko"		"관리자가 팀 섞기를 실행했습니다."
+	}
+	"L4DStats_TeamShuffleFailed"
+	{
+		"ko"		"오류로 팀 섞기에 실패했습니다."
+	}
+	"L4DStats_TeamShuffleDone"
+	{
+		"ko"		"플레이어 PPM 기준 팀 섞기가 {lightgreen}완료{default}되었습니다."
+	}
+	"L4DStats_TeamsAlreadyEven"
+	{
+		"ko"		"팀이 이미 플레이어 PPM 기준으로 균형 잡혀 있습니다."
+	}
+	"L4DStats_TeamShuffleNotEnoughPlayers"
+	{
+		"ko"		"팀 섞기 실패: {lightgreen}플레이어 부족{default}!"
+	}
+	"L4DStats_RankDisabledNotEnoughPlayers"
+	{
+		"ko"		"플레이어가 부족하여 랭킹 시스템이 {green}비활성화{default}되었습니다!"
+	}
+	"L4DStats_MapTimeInvalidSettings"
+	{
+		"ko"		"난이도 변경, 고급 봇 또는 관리자 기능 사용으로 결과가 {green}무효{default}하여 맵 시간을 기록하지 않습니다!"
+	}
+	"L4DStats_MapTimeInvalidBunnyHop"
+	{
+		"ko"		"{green}탱크{default} 버니합이 비활성화되어 결과가 {green}무효{default}하며 맵 시간을 기록하지 않습니다!"
+	}
+	"L4DStats_MapTimeInvalidMultiplayerMode"
+	{
+		"ko"		"멀티플레이어 이동 모드가 활성화되어 맵 시간을 기록하지 않습니다!"
+	}
+	"L4DStats_MapTimeTooShortNoReward"
+	{
+		"ko"		"기록 시간이 30초 미만이어서 잘못된 데이터로 보이며 점수가 지급되지 않습니다!"
+	}
+	"L4DStats_MapTimeTooShortNotRecorded"
+	{
+		"ko"		"시간이 30초 미만이어서 잘못된 데이터로 보이며 이 기록은 저장되지 않습니다!"
+	}
+	"L4DStats_NoFastestTimeYet"
+	{
+		"ko"		"이 모드와 난이도에는 아직 최단 기록이 없습니다. 첫 기록을 세우세요!"
+	}
+	"L4DStats_MapRecordNotImprovedAnne"
+	{
+		"ko"		"Anne%s 해당 난이도 기록 {green}%s{default}을 갱신하지 못했습니다. 다음에 다시 도전하세요!"
+	}
+	"L4DStats_MapRecordNotImproved"
+	{
+		"ko"		"최단 기록 {green}%s{default}을 갱신하지 못했습니다. 다음에 다시 도전하세요!"
+	}
+	"L4DStats_MapCompletionTime"
+	{
+		"ko"		"{green}%s{default} 만에 이 맵을 클리어했습니다!"
+	}
+	"L4DStats_NoBuyBonusAdvancedBotsDisabled"
+	{
+		"ko"		"고급 봇이 활성화되어 미구매 보너스를 받을 수 없습니다."
+	}
+	"L4DStats_NoBuyBonusBunnyHopDisabled"
+	{
+		"ko"		"{green}탱크{default} 버니합이 비활성화되어 미구매 보너스를 받을 수 없습니다."
+	}
+	"L4DStats_NoBuyBonusAwarded"
+	{
+		"ko"		"생존자가 구매 없이 맵을 클리어하여 {green}%d{default}점의 보너스를 획득했습니다!"
+	}
+	"L4DStats_NewPlayerStatus"
+	{
+		"ko"		"{lightgreen}신규 플레이어로 판정되었습니다. 이 라운드에서 기존 생존자는 {green}%.1fx{default} 멘토링 배율을 받습니다."
+	}
+	"L4DStats_NewPlayerRoundSummary"
+	{
+		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 멘토링 배율은 {green}%.1fx{default}이며 신규 플레이어에게는 적용되지 않습니다."
+	}
+	"L4DStats_TeamKillPenaltySelf"
+	{
+		"ko"		"팀원 {olive}%s{default}님을 팀킬하여 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_TeamKillPenaltyAll"
+	{
+		"ko"		"{olive}%s{default}님이 팀원 {olive}%s{default}님을 팀킬하여 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_HeadshotSpecialKillSelf"
+	{
+		"ko"		"{olive}%s{default}님을 헤드샷으로 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_HeadshotSpecialKillAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 헤드샷으로 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_SpecialKillSelf"
+	{
+		"ko"		"{olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_SpecialKillAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_AdrenalineGivenSelf"
+	{
+		"ko"		"{olive}%s{default}님에게 아드레날린을 주어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_AdrenalineGivenAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님에게 아드레날린을 주어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_PillsGivenSelf"
+	{
+		"ko"		"{olive}%s{default}님에게 진통제를 주어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_PillsGivenAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님에게 진통제를 주어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DefibReviveSelf"
+	{
+		"ko"		"제세동기로 {olive}%s{default}님을 부활시켜 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_DefibReviveAll"
+	{
+		"ko"		"{olive}%s{default}님이 제세동기로 {olive}%s{default}님을 부활시켜 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_HealTeammateSelf"
+	{
+		"ko"		"{olive}%s{default}님을 치료하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_HealTeammateAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 치료하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TeamIncapPenaltySelf"
+	{
+		"ko"		"{green}%i{default}점을 잃었습니다: {olive}%s{default}님을 행동 불능으로 만들었습니다!"
+	}
+	"L4DStats_TeamIncapPenaltyAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 잃었습니다: {olive}%s{default}님을 행동 불능으로 만들었습니다!"
+	}
+	"L4DStats_LedgeHangSelf"
+	{
+		"ko"		"{olive}%s{default}님을 낭떠러지에 매달리게 하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_LedgeHangAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 낭떠러지에 매달리게 하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_JockeySaveSelf"
+	{
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_JockeySaveAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ChargerSaveSelf"
+	{
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ChargerSaveAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_QuickChargerKillSelf"
+	{
+		"ko"		"{green}차저{default}를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_QuickChargerKillAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}차저{default}를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_GasCanPouredSelf"
+	{
+		"ko"		"기름통을 부어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_GasCanPouredAll"
+	{
+		"ko"		"{olive}%s{default}님이 기름통을 부어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ReviveTeammateSelf"
+	{
+		"ko"		"{olive}%s{default}님을 일으켜 세워 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ReviveTeammateAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 일으켜 세워 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_RescueClosetSelf"
+	{
+		"ko"		"{olive}%s{default}님을 구출하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_RescueClosetAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 구출하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_FinaleSurvivorReward"
+	{
+		"ko"		"생존자 {olive}%i{default}명이 피날레를 완료하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_FinaleInfectedPenalty"
+	{
+		"ko"		"생존자의 피날레 완료를 막지 못해 모든 감염자가 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_HordeNoIncapReward"
+	{
+		"ko"		"호드 이벤트에서 행동 불능이나 사망 없이 생존하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_BoomerNoDeathReward"
+	{
+		"ko"		"{green}부머{default} 폭발 후 사망자가 없어 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TankKillWithDeaths"
+	{
+		"ko"		"{olive}%i{default}명이 사망한 상태에서 {green}탱크{default}를 처치하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_NoWitchDisturbanceReward"
+	{
+		"ko"		"{green}위치{default}를 놀라게 하지 않아 모든 생존자가 {green}%i{default}점의 보너스를 획득했습니다!"
+	}
+	"L4DStats_SafeRoomWithDeathsReward"
+	{
+		"ko"		"{olive}%i{default}명이 사망한 상태에서 세이프룸에 도달하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_SafeRoomInfectedPenalty"
+	{
+		"ko"		"생존자가 세이프룸에 도달하게 해 모든 감염자가 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_WipeSurvivorsReward"
+	{
+		"ko"		"모든 생존자를 처치하여 모든 감염자가 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_SurvivorWipePenalty"
+	{
+		"ko"		"팀이 전멸하여 모든 생존자가 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_AllSurvivorsLostRoundPenalty"
+	{
+		"ko"		"라운드 실패로 모든 생존자가 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_AllPlayersLostRoundPenalty"
+	{
+		"ko"		"라운드 실패로 모든 참가 플레이어가 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_ProtectedTeammateSelf"
+	{
+		"ko"		"팀원을 보호하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ProtectedTeammateAll"
+	{
+		"ko"		"{olive}%s{default}님이 팀원을 보호하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_InfectedDamageRewardSelf"
+	{
+		"ko"		"생존자에게 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_InfectedDamageRewardAll"
+	{
+		"ko"		"{olive}%s{default}님이 생존자에게 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_PerfectBoomSelf"
+	{
+		"ko"		"생존자의 시야를 완벽하게 가려 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_PerfectBoomAll"
+	{
+		"ko"		"{olive}%s{default}님이 생존자의 시야를 완벽하게 가려 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_GenericPointsSelf"
+	{
+		"ko"		"{green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_GenericPointsAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_FriendlyFirePenaltySelf"
+	{
+		"ko"		"팀 피해 {olive}%i{default}를 입혀 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_FriendlyFirePenaltyAll"
+	{
+		"ko"		"{olive}%s{default}님이 팀 피해 {olive}%i{default}를 입혀 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltySelf"
+	{
+		"ko"		"{green}%i{default}점을 잃었습니다: {olive}%s{default}님을 오발했습니다!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltyAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}%i{default}점을 잃었습니다: {olive}%s{default}님을 오발했습니다!"
+	}
+	"L4DStats_ChargerMultiHitSelf"
+	{
+		"ko"		"{green}차저{default}로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ChargerMultiHitAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}차저{default}로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_CommonKillsRewardSelf"
+	{
+		"ko"		"감염자 {olive}%i{default}마리를 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_CommonKillsRewardAll"
+	{
+		"ko"		"{olive}%s{default}님이 감염자 {olive}%i{default}마리를 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltySelf"
+	{
+		"ko"		"감염자가 세이프룸에 들어오게 해 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltyAll"
+	{
+		"ko"		"{olive}%s{default}님이 감염자가 세이프룸에 들어오게 해 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_AlarmCarPenalty"
+	{
+		"ko"		"{green}%N{default}님이 차량 경보기를 작동시켜 {green}%i{default}점을 잃었습니다!"
+	}
+	"L4DStats_SpecialSaveSelf"
+	{
+		"ko"		"{olive}%s{default}님을 {green}%s{default}(으)로부터 구해 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TankDamageRewardSelf"
+	{
+		"ko"		"{green}탱크{default}로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TankDamageRewardAll"
+	{
+		"ko"		"{olive}%s{default}님이 {green}탱크{default}로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_WitchKillSelf"
+	{
+		"ko"		"{olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_WitchKillAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 처치하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TankRockHitSelf"
+	{
+		"ko"		"{olive}%s{default}님을 돌로 맞혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_TankRockHitAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 돌로 맞혀 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_IncapSurvivorSelf"
+	{
+		"ko"		"{olive}%s{default}님을 행동 불능으로 만들어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_IncapSurvivorAll"
+	{
+		"ko"		"{olive}%s{default}님이 {olive}%s{default}님을 행동 불능으로 만들어 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_WitchCrownReward"
+	{
+		"ko"		"{olive}%s{default}님이 {green}위치{default}를 크라운하여 {green}%i{default}점을 획득했습니다!"
+	}
+	"L4DStats_ClassSmoker"
+	{
+		"ko"		"스모커"
+	}
+	"L4DStats_ClassBoomer"
+	{
+		"ko"		"부머"
+	}
+	"L4DStats_ClassHunter"
+	{
+		"ko"		"헌터"
+	}
+	"L4DStats_ClassSpitter"
+	{
+		"ko"		"스피터"
+	}
+	"L4DStats_ClassJockey"
+	{
+		"ko"		"자키"
+	}
+	"L4DStats_ClassCharger"
+	{
+		"ko"		"차저"
+	}
+	"L4DStats_ClassTank"
+	{
+		"ko"		"탱크"
+	}
+	"L4DStats_ClassWitch"
+	{
+		"ko"		"위치"
+	}
+	"L4DStats_ClassUnknown"
+	{
+		"ko"		"알 수 없음"
+	}
+	"L4DStats_ASurvivor"
+	{
+		"ko"		"생존자"
+	}
+	"L4DStats_MapRecordTeam"
+	{
+		"ko"		"팀"
+	}
+	"L4DStats_MapRecordTeamCount"
+	{
+		"ko"		"팀 (%d명)"
+	}
+	"L4DStats_ConsolePrefix"
+	{
+		"ko"		"[순위]"
+	}
 }

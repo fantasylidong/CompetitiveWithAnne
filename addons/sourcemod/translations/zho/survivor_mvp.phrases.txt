@@ -4,21 +4,25 @@
 	{
 		"zho"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"zho"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"zho"		"{green}特感{blue}排名: {olive}#%d {blue}({default}%d {green}傷害 {blue}[{default}%.0f%%{blue}]{default}, %d {green}擊殺 {blue}[{default}%.0f%%{blue}])"
+		"zho"		"{blue}你的排名 {green}特感{default}: {olive}#%d {blue}({default}%d {green}傷害 {blue}[{default}%.0f%%{blue}]{default}, %d {green}擊殺 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"zho"		"{green}喪屍{blue}排名: {olive}#%d {blue}({default}%d {green}喪屍 {blue}[{default}%.0f%%{blue}])"
+		"zho"		"{blue}你的排名 {green}小殭屍{default}: {olive}#%d {blue}({default}%d {green}擊殺 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"zho"		"{green}黑槍{blue}排名: {olive}#%d {blue}({default}%d {green}友傷 {blue}[{default}%.0f%%{blue}])"
+		"zho"		"{blue}你的排名 {green}友傷{default}: {olive}#%d {blue}({default}%d {green}友傷 {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
-		"zho"		"[BOT]"
+		"zho"		"[機器人]"
 	}
 	"NobodyName"
 	{
@@ -26,7 +30,7 @@
 	}
 	"NotEnoughAction"
 	{
-		"zho"		"{blue}({default}還沒有足夠多的操作{blue})"
+		"zho"		"{blue}({default}目前資料不足，尚無法評選{blue})"
 	}
 	"ReportSI_Absolute"
 	{
@@ -46,19 +50,19 @@
 	}
 	"ReportCI_Absolute"
 	{
-		"zho"		"{green}喪屍: {olive}%s {blue}({default}%d {green}喪屍{blue})"
+		"zho"		"{green}小殭屍: {olive}%s {blue}({default}%d {green}擊殺{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"zho"		"{green}喪屍: {olive}%s {blue}({green}喪屍 {blue}[{default}%.0f%%{blue}])"
+		"zho"		"{green}小殭屍: {olive}%s {blue}({green}擊殺 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"zho"		"{green}喪屍: {olive}%s {blue}({default}%d {green}喪屍 {blue}[{default}%.0f%%{blue}])"
+		"zho"		"{green}小殭屍: {olive}%s {blue}({default}%d {green}擊殺 {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"zho"		"{blue}({default}完全沒有黑槍!{blue})"
+		"zho"		"{green}友傷{default}: {blue}({default}本局沒有任何友傷！{blue})"
 	}
 	"ReportFF_Absolute"
 	{

@@ -116,4 +116,24 @@
 	{
 		"zho"		"擊殺圖示：已設定為 %d"
 	}
+	"L4D2Hitsound_HeadKillSoundOn"
+	{
+		"zho"		"爆頭擊殺專用音：已開啟（套裝配置了專用音時，爆頭擊殺播放專用音）"
+	}
+	"L4D2Hitsound_HeadKillSoundOff"
+	{
+		"zho"		"爆頭擊殺專用音：已關閉（爆頭擊殺回退為普通爆頭音）"
+	}
+	"L4D2Hitsound_StackModeFollow"
+	{
+		"zho"		"音效播放模式：跟隨套裝（是否疊加由音效套裝自身決定）"
+	}
+	"L4D2Hitsound_StackModeStack"
+	{
+		"zho"		"音效播放模式：強制疊加（每次命中/擊殺都獨立響一聲，同幀可疊加）"
+	}
+	"L4D2Hitsound_StackModeMerge"
+	{
+		"zho"		"音效播放模式：強制合併（同幀最多響一條，按 擊殺>爆頭>命中 優先）"
+	}
 }
