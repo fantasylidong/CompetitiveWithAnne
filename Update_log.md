@@ -719,3 +719,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 ### 2026年8月13日 水中减速提示翻译
 - 修正 `l4d2_slowdown_control` 的 Tank 在场/离场水中减速聊天提示：英语不再使用中文直译（如 “tank generation”），越南语不再把 Tank 误译成“xe tăng”，日语两条提示的插件名也不再前后不一致。
 - 简中、繁中、英、日、韩、越六种语言统一为上游原意：Tank 在场时水中减速减弱，Tank 离场后恢复正常。
+
+### 2026年8月13日 server_name AI 难度标签残留
+- `server_name.smx` 升级到 1.4.8：`[AI:专家]` 这类房间名标签只在 `annehappy_dynamic_ai_difficulty.smx` 实际加载且已定档时显示。
+- 动态难度插件卸载后，SourceMod 会留下 `ah_ai_dynamic_current_level`；旧逻辑只要看到残留 1-6 档就会继续写进 `hostname` / `sn_main_name`。现在改为检测插件是否在跑，并清掉已经写进房间名的 `[AI:...]`。
+- `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。

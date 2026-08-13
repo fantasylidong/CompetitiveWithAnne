@@ -134,3 +134,8 @@
 ### 2026년 8월 13일 물속 감속 채팅 번역
 - `l4d2_slowdown_control`의 Tank 등장/퇴장 시 물속 감속 채팅을 고쳤습니다. 영어의 중국어 직역(“tank generation” 등), 베트남어가 Tank를 “xe tăng”으로 오역하던 문제, 일본어 플러그인 이름 불일치를 바로잡았습니다.
 - 간체/번체 중국어, 영어, 일본어, 한국어, 베트남어를 업스트림 의미에 맞췄습니다. Tank가 있으면 물속 감속이 약해지고, Tank가 사라지면 정상으로 돌아갑니다.
+
+### 2026년 8월 13일 server_name AI 난이도 태그 잔류
+- `server_name.smx`를 1.4.8로 올렸습니다. `[AI:전문가]` 같은 방 이름 태그는 `annehappy_dynamic_ai_difficulty.smx`가 실제로 로드되어 있고 등급이 정해진 경우에만 표시합니다.
+- 동적 난이도 플러그인을 언로드해도 SourceMod는 `ah_ai_dynamic_current_level`을 남깁니다. 이전 로직은 남은 1-6 값을 `hostname` / `sn_main_name`에 계속 썼습니다. 이제 플러그인이 실행 중인지 확인하고, 이미 방 이름에 들어간 `[AI:...]`도 지웁니다.
+- `annehappy_dynamic_ai_difficulty.smx`를 2026.08.13.1로 올렸습니다. `annehappy_dynamic_ai_difficulty` 라이브러리를 등록하고, 언로드 시 `current_level` / `current_mode` / `current_ppm` / `current_locked`를 0으로 되돌립니다. HUD, `!xx`, 스폰 전략이 옛 등급을 계속 읽지 않게 합니다.
