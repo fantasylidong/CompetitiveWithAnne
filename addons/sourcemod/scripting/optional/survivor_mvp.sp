@@ -86,7 +86,7 @@ public Plugin:myinfo =
     name = "Survivor MVP notification",
     author = "Tabun, Artifacial",
     description = "Shows MVP for survivor team at end of round",
-    version = "0.3.3",
+    version = "0.3.4",
     url = "https://github.com/alexberriman/l4d2_survivor_mvp"
 };
 
@@ -562,7 +562,7 @@ Action SurvivorMVP_Cmd(client, args)
     decl String:printBuffer[4096];
     new String:strLines[8][192];
     
-    GetMVPString(printBuffer, sizeof(printBuffer));
+    GetMVPString(client, printBuffer, sizeof(printBuffer));
     
     // PrintToChat has a max length. Split it in to individual lines to output separately
     new intPieces = ExplodeString(printBuffer, "\n", strLines, sizeof(strLines), sizeof(strLines[]));
@@ -571,7 +571,10 @@ Action SurvivorMVP_Cmd(client, args)
     {
         for (new i = 0; i < intPieces; i++) 
         {
-            CPrintToChat(client, "%s", strLines[i]);
+            if (strLines[i][0] != '\0')
+            {
+                CPrintToChat(client, "%s", strLines[i]);
+            }
         }
     }
     PrintLoserz(true, client);
@@ -597,15 +600,23 @@ Action:delayedMVPPrint(Handle:timer)
     decl String:printBuffer[4096];
     new String:strLines[8][192];
     
-    GetMVPString(printBuffer, sizeof(printBuffer));
-    
-    // PrintToChatAll has a max length. Split it in to individual lines to output separately
-    new intPieces = ExplodeString(printBuffer, "\n", strLines, sizeof(strLines), sizeof(strLines[]));
-    for (new i = 0; i < intPieces; i++) 
+    for (new client = 1; client <= MaxClients; client++)
     {
-        for (new client = 1; client <= MaxClients; client++)
+        if (!IsClientInGame(client) || (IsFakeClient(client) && !IsClientSourceTV(client)))
         {
-            if (IsClientInGame(client)) CPrintToChat(client, "{default}%s", strLines[i]);
+            continue;
+        }
+
+        GetMVPString(client, printBuffer, sizeof(printBuffer));
+
+        // PrintToChat has a max length. Split it in to individual lines to output separately
+        new intPieces = ExplodeString(printBuffer, "\n", strLines, sizeof(strLines), sizeof(strLines[]));
+        for (new i = 0; i < intPieces; i++)
+        {
+            if (strLines[i][0] != '\0')
+            {
+                CPrintToChat(client, "{default}%s", strLines[i]);
+            }
         }
     }
     
@@ -625,53 +636,31 @@ Action:delayedAnneHappyMVPPrint(Handle:timer)
 
 void PrintLoserz(bool:bSolo, client)
 {
-    decl String:tmpBuffer[512];
-
-    // —— 特感（SI）排名 —— 
+    // SI rank (2nd-4th)
     if (iTotalDamageAll > 0)
     {
         new mvp_SI = findMVPSI();
         new mvp_SI_losers[3];
-        mvp_SI_losers[0] = findMVPSI(mvp_SI);                         // 第二名
-        mvp_SI_losers[1] = findMVPSI(mvp_SI, mvp_SI_losers[0]);       // 第三名
-        mvp_SI_losers[2] = findMVPSI(mvp_SI, mvp_SI_losers[0], mvp_SI_losers[1]); // 第四名
+        mvp_SI_losers[0] = findMVPSI(mvp_SI);
+        mvp_SI_losers[1] = findMVPSI(mvp_SI, mvp_SI_losers[0]);
+        mvp_SI_losers[2] = findMVPSI(mvp_SI, mvp_SI_losers[0], mvp_SI_losers[1]);
         
         for (new i = 0; i <= 2; i++)
         {
-            if (IsClientAndInGame(mvp_SI_losers[i]) && !IsFakeClient(mvp_SI_losers[i])) 
+            if (IsClientAndInGame(mvp_SI_losers[i]) && !IsFakeClient(mvp_SI_losers[i]) && (!bSolo || mvp_SI_losers[i] == client))
             {
-                if (bSolo)
-                {
-                    if (mvp_SI_losers[i] == client)
-                    {
-                        Format(tmpBuffer, sizeof(tmpBuffer),
-                            "{blue}你的排名 {green}特感{default}: {olive}#%d - {blue}({default}%d {green}伤害 {blue}[{default}%.0f%%{blue}]{olive}, {default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])",
-                            (i + 2),
-                            iDidDamageAll[mvp_SI_losers[i]],
-                            (float(iDidDamageAll[mvp_SI_losers[i]]) / float(iTotalDamageAll)) * 100.0,
-                            iGotKills[mvp_SI_losers[i]],
-                            (float(iGotKills[mvp_SI_losers[i]]) / float(iTotalKills)) * 100.0
-                        );
-                        CPrintToChat(mvp_SI_losers[i], "%s", tmpBuffer);
-                    }
-                }
-                else 
-                {
-                    Format(tmpBuffer, sizeof(tmpBuffer),
-                        "{blue}你的排名 {green}特感{default}: {olive}#%d - {blue}({default}%d {green}伤害 {blue}[{default}%.0f%%{blue}]{olive}, {default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])",
-                        (i + 2),
-                        iDidDamageAll[mvp_SI_losers[i]],
-                        (float(iDidDamageAll[mvp_SI_losers[i]]) / float(iTotalDamageAll)) * 100.0,
-                        iGotKills[mvp_SI_losers[i]],
-                        (float(iGotKills[mvp_SI_losers[i]]) / float(iTotalKills)) * 100.0
-                    );
-                    CPrintToChat(mvp_SI_losers[i], "%s", tmpBuffer);
-                }
+                CPrintToChat(mvp_SI_losers[i], "%t", "YourRankSI",
+                    (i + 2),
+                    iDidDamageAll[mvp_SI_losers[i]],
+                    (float(iDidDamageAll[mvp_SI_losers[i]]) / float(iTotalDamageAll)) * 100.0,
+                    iGotKills[mvp_SI_losers[i]],
+                    (float(iGotKills[mvp_SI_losers[i]]) / float(iTotalKills)) * 100.0
+                );
             }
         }
     }
     
-    // —— 小僵尸（CI）排名 —— 
+    // CI rank (2nd-4th)
     if (iTotalCommon > 0)
     {
         new mvp_CI = findMVPCommon();
@@ -682,36 +671,18 @@ void PrintLoserz(bool:bSolo, client)
         
         for (new i = 0; i <= 2; i++)
         {
-            if (IsClientAndInGame(mvp_CI_losers[i]) && !IsFakeClient(mvp_CI_losers[i])) 
+            if (IsClientAndInGame(mvp_CI_losers[i]) && !IsFakeClient(mvp_CI_losers[i]) && (!bSolo || mvp_CI_losers[i] == client))
             {
-                if (bSolo)
-                {
-                    if (mvp_CI_losers[i] == client)
-                    {
-                        Format(tmpBuffer, sizeof(tmpBuffer),
-                            "{blue}你的排名 {green}小僵尸{default}: {olive}#%d {blue}({default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])",
-                            (i + 2),
-                            iGotCommon[mvp_CI_losers[i]],
-                            (float(iGotCommon[mvp_CI_losers[i]]) / float(iTotalCommon)) * 100.0
-                        );
-                        CPrintToChat(mvp_CI_losers[i], "%s", tmpBuffer);
-                    }
-                }
-                else
-                {
-                    Format(tmpBuffer, sizeof(tmpBuffer),
-                        "{blue}你的排名 {green}小僵尸{default}: {olive}#%d {blue}({default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])",
-                        (i + 2),
-                        iGotCommon[mvp_CI_losers[i]],
-                        (float(iGotCommon[mvp_CI_losers[i]]) / float(iTotalCommon)) * 100.0
-                    );
-                    CPrintToChat(mvp_CI_losers[i], "%s", tmpBuffer);
-                }
+                CPrintToChat(mvp_CI_losers[i], "%t", "YourRankCI",
+                    (i + 2),
+                    iGotCommon[mvp_CI_losers[i]],
+                    (float(iGotCommon[mvp_CI_losers[i]]) / float(iTotalCommon)) * 100.0
+                );
             }
         }
     }
     
-    // —— 友伤（FF）排名 —— 
+    // FF rank (2nd-4th)
     if (iTotalFF > 0)
     {
         new mvp_FF = findLVPFF();
@@ -722,31 +693,13 @@ void PrintLoserz(bool:bSolo, client)
         
         for (new i = 0; i <= 2; i++)
         {
-            if (IsClientAndInGame(mvp_FF_losers[i]) &&  !IsFakeClient(mvp_FF_losers[i])) 
+            if (IsClientAndInGame(mvp_FF_losers[i]) && !IsFakeClient(mvp_FF_losers[i]) && (!bSolo || mvp_FF_losers[i] == client))
             {
-                if (bSolo)
-                {
-                    if (mvp_FF_losers[i] == client)
-                    {
-                        Format(tmpBuffer, sizeof(tmpBuffer),
-                            "{blue}你的排名 {green}友伤{default}: {olive}#%d {blue}({default}%d {green}友伤 {blue}[{default}%.0f%%{blue}])",
-                            (i + 2),
-                            iDidFF[mvp_FF_losers[i]],
-                            (float(iDidFF[mvp_FF_losers[i]]) / float(iTotalFF)) * 100.0
-                        );
-                        CPrintToChat(mvp_FF_losers[i], "%s", tmpBuffer);
-                    }
-                }
-                else
-                {
-                    Format(tmpBuffer, sizeof(tmpBuffer),
-                        "{blue}你的排名 {green}友伤{default}: {olive}#%d {blue}({default}%d {green}友伤 {blue}[{default}%.0f%%{blue}])",
-                        (i + 2),
-                        iDidFF[mvp_FF_losers[i]],
-                        (float(iDidFF[mvp_FF_losers[i]]) / float(iTotalFF)) * 100.0
-                    );
-                    CPrintToChat(mvp_FF_losers[i], "%s", tmpBuffer);
-                }
+                CPrintToChat(mvp_FF_losers[i], "%t", "YourRankFF",
+                    (i + 2),
+                    iDidFF[mvp_FF_losers[i]],
+                    (float(iDidFF[mvp_FF_losers[i]]) / float(iTotalFF)) * 100.0
+                );
             }
         }
     }
@@ -1201,12 +1154,35 @@ void InfectedDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 *      MVP string & 'sorting'
 *      ======================
 */
-void GetMVPString(char[] printBuffer, const int iSize)
+void GetMVPDisplayName(mvp, langClient, String:buffer[], maxlen)
+{
+    buffer[0] = '\0';
+    if (mvp <= 0)
+    {
+        return;
+    }
+
+    if (IsClientConnected(mvp))
+    {
+        GetClientName(mvp, buffer, maxlen);
+        if (IsFakeClient(mvp))
+        {
+            decl String:botTag[32];
+            Format(botTag, sizeof(botTag), " {default}%T", "BotName", langClient);
+            StrCat(buffer, maxlen, botTag);
+        }
+    }
+    else
+    {
+        strcopy(buffer, maxlen, sClientName[mvp]);
+    }
+}
+
+void GetMVPString(langClient, char[] printBuffer, const int iSize)
 {
     decl String:tmpBuffer[1024];
     printBuffer[0] = '\0';
 
-    decl String:tmpName[64];
     decl String:mvp_SI_name[64];
     decl String:mvp_Common_name[64];
     decl String:mvp_FF_name[64];
@@ -1214,120 +1190,53 @@ void GetMVPString(char[] printBuffer, const int iSize)
     new mvp_SI = 0;
     new mvp_Common = 0;
     new mvp_FF = 0;
-    
-    // —— 计算各项 MVP —— 
 
-    // 特感 MVP
+    SetGlobalTransTarget(langClient);
+    
     if (!(iBrevityFlags & BREV_SI))
     {
         mvp_SI = findMVPSI();
-        if (mvp_SI > 0)
-        {
-            if (IsClientConnected(mvp_SI))
-            {
-                GetClientName(mvp_SI, tmpName, sizeof(tmpName));
-                if (IsFakeClient(mvp_SI))
-                {
-                    StrCat(tmpName, 64, " {default}[机器人]");
-                }
-            } 
-            else 
-            {
-                strcopy(tmpName, 64, sClientName[mvp_SI]);
-            }
-            mvp_SI_name = tmpName;
-        } 
-        else 
-        {
-            mvp_SI_name = "(无)";
-        }
+        GetMVPDisplayName(mvp_SI, langClient, mvp_SI_name, sizeof(mvp_SI_name));
     }
     
-    // 小僵尸 MVP
     if (!(iBrevityFlags & BREV_CI))
     {
         mvp_Common = findMVPCommon();
-        if (mvp_Common > 0)
-        {
-            if (IsClientConnected(mvp_Common))
-            {
-                GetClientName(mvp_Common, tmpName, sizeof(tmpName));
-                if (IsFakeClient(mvp_Common))
-                {
-                    StrCat(tmpName, 64, " {default}[机器人]");
-                }
-            } 
-            else 
-            {
-                strcopy(tmpName, 64, sClientName[mvp_Common]);
-            }
-            mvp_Common_name = tmpName;
-        } 
-        else 
-        {
-            mvp_Common_name = "(无)";
-        }
+        GetMVPDisplayName(mvp_Common, langClient, mvp_Common_name, sizeof(mvp_Common_name));
     }
     
-    // 友伤 LVP
     if (!(iBrevityFlags & BREV_FF) && bTrackFF)
     {
         mvp_FF = findLVPFF();
-        if (mvp_FF > 0)
-        {
-            if (IsClientConnected(mvp_FF))
-            {
-                GetClientName(mvp_FF, tmpName, sizeof(tmpName));
-                if (IsFakeClient(mvp_FF))
-                {
-                    StrCat(tmpName, 64, " {default}[机器人]");
-                }
-            } 
-            else 
-            {
-                strcopy(tmpName, 64, sClientName[mvp_FF]);
-            }
-            mvp_FF_name = tmpName;
-        } 
-        else 
-        {
-            mvp_FF_name = "(无)";
-        }
+        GetMVPDisplayName(mvp_FF, langClient, mvp_FF_name, sizeof(mvp_FF_name));
     }
     
-    // —— 汇总输出 —— 
-
     if (mvp_SI == 0 && mvp_Common == 0 && !(iBrevityFlags & BREV_SI && iBrevityFlags & BREV_CI))
     {
-        Format(tmpBuffer, sizeof(tmpBuffer), "{blue}[{default}MVP{blue}]{default} {blue}({default}当前数据不足，尚无法评选{blue}){default}\n");
+        Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "NotEnoughAction");
         StrCat(printBuffer, iSize, tmpBuffer);
     }
     else
     {
-        // 特感输出
         if (!(iBrevityFlags & BREV_SI))
         {
             if (mvp_SI > 0)
             {
                 if (iBrevityFlags & BREV_PERCENT) 
                 {
-                    // 只显示绝对值
-                    Format(tmpBuffer, sizeof(tmpBuffer), "[MVP] 特感:{lightgreen} %s {default}({olive}%d {default}伤害,{olive} %d {default}击杀)\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportSI_Absolute",
                         mvp_SI_name, iDidDamageAll[mvp_SI], iGotKills[mvp_SI]);
                 } 
                 else if (iBrevityFlags & BREV_ABSOLUTE) 
                 {
-                    // 只显示百分比（沿用原含义）
-                    Format(tmpBuffer, sizeof(tmpBuffer), "[MVP] 特感:{lightgreen} %s {default}(伤害 {green}%2.0f%%{default}, 击杀 {green}%.0f%%{default})\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportSI_Percent",
                         mvp_SI_name,
                         (float(iDidDamageAll[mvp_SI]) / float(iTotalDamageAll)) * 100.0,
                         (float(iGotKills[mvp_SI]) / float(iTotalKills)) * 100.0);
                 } 
                 else 
                 {
-                    // 同时显示绝对值+百分比（默认）
-                    Format(tmpBuffer, sizeof(tmpBuffer),
-                        "{blue}[{default}MVP{blue}] 特感: {olive}%s {blue}({default}%d {green}伤害 {blue}[{default}%.0f%%{blue}]{olive}, {default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportSI_Full",
                         mvp_SI_name,
                         iDidDamageAll[mvp_SI],
                         (float(iDidDamageAll[mvp_SI]) / float(iTotalDamageAll)) * 100.0,
@@ -1339,30 +1248,29 @@ void GetMVPString(char[] printBuffer, const int iSize)
             }
             else
             {
-                StrCat(printBuffer, iSize, "{blue}[{default}MVP{blue}] 特感: {blue}({default}无{blue}){default}\n");
+                Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportSI_Nobody");
+                StrCat(printBuffer, iSize, tmpBuffer);
             }
         }
         
-        // 小僵尸输出
         if (!(iBrevityFlags & BREV_CI))
         {
             if (mvp_Common > 0)
             {
                 if (iBrevityFlags & BREV_PERCENT) 
                 {
-                    Format(tmpBuffer, sizeof(tmpBuffer), "[MVP] 小僵尸:{lightgreen} %s {default}({olive}%d {default}击杀)\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportCI_Absolute",
                         mvp_Common_name, iGotCommon[mvp_Common]);
                 } 
                 else if (iBrevityFlags & BREV_ABSOLUTE) 
                 {
-                    Format(tmpBuffer, sizeof(tmpBuffer), "[MVP] 小僵尸:{lightgreen} %s {default}({green}%.0f%%{default})\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportCI_Percent",
                         mvp_Common_name,
                         (float(iGotCommon[mvp_Common]) / float(iTotalCommon)) * 100.0);
                 } 
                 else 
                 {
-                    Format(tmpBuffer, sizeof(tmpBuffer),
-                        "{blue}[{default}MVP{blue}] 小僵尸: {olive}%s {blue}({default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])\n",
+                    Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "Tag", "ReportCI_Full",
                         mvp_Common_name,
                         iGotCommon[mvp_Common],
                         (float(iGotCommon[mvp_Common]) / float(iTotalCommon)) * 100.0
@@ -1373,31 +1281,29 @@ void GetMVPString(char[] printBuffer, const int iSize)
         }
     }
     
-    // 友伤输出（LVP）
     if (!(iBrevityFlags & BREV_FF) && bTrackFF)
     {
         if (mvp_FF == 0)
         {
-            Format(tmpBuffer, sizeof(tmpBuffer), "{blue}[{default}LVP{blue}] 友伤{default}: {green}本局没有任何友伤！{default}\n");
+            Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "TagLVP", "NoFF");
             StrCat(printBuffer, iSize, tmpBuffer);
         }
         else
         {
             if (iBrevityFlags & BREV_PERCENT) 
             {
-                Format(tmpBuffer, sizeof(tmpBuffer), "[LVP] 友伤:{lightgreen} %s {default}({olive}%d {default}友伤)\n",
+                Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "TagLVP", "ReportFF_Absolute",
                     mvp_FF_name, iDidFF[mvp_FF]);
             } 
             else if (iBrevityFlags & BREV_ABSOLUTE) 
             {
-                Format(tmpBuffer, sizeof(tmpBuffer), "[LVP] 友伤:{lightgreen} %s {default}({green}%.0f%%{default})\n",
+                Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "TagLVP", "ReportFF_Percent",
                     mvp_FF_name,
                     (float(iDidFF[mvp_FF]) / float(iTotalFF)) * 100.0);
             } 
             else 
             {
-                Format(tmpBuffer, sizeof(tmpBuffer),
-                    "{blue}[{default}LVP{blue}] 友伤{default}: {olive}%s {blue}({default}%d {green}友伤 {blue}[{default}%.0f%%{blue}]){default}\n",
+                Format(tmpBuffer, sizeof(tmpBuffer), "%t %t\n", "TagLVP", "ReportFF_Full",
                     mvp_FF_name,
                     iDidFF[mvp_FF],
                     (float(iDidFF[mvp_FF]) / float(iTotalFF)) * 100.0

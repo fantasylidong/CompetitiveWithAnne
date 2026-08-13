@@ -4,17 +4,21 @@
 	{
 		"en"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"en"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"en"		"{blue}Rank {green}SI: {olive}#%d {blue}({default}%d {green}dmg {blue}[{default}%.0f%%{blue}]{default}, %d {green}kills {blue}[{default}%.0f%%{blue}])"
+		"en"		"{blue}Your rank {green}SI{default}: {olive}#%d {blue}({default}%d {green}dmg {blue}[{default}%.0f%%{blue}]{default}, %d {green}kills {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"en"		"{blue}Rank {green}CI: {olive}#%d {blue}({default}%d {green}common {blue}[{default}%.0f%%{blue}])"
+		"en"		"{blue}Your rank {green}CI{default}: {olive}#%d {blue}({default}%d {green}common {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"en"		"{blue}Rank {green}FF: {olive}#%d {blue}({default}%d {green}friendly fire {blue}[{default}%.0f%%{blue}])"
+		"en"		"{blue}Your rank {green}FF{default}: {olive}#%d {blue}({default}%d {green}friendly fire {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
@@ -58,7 +62,7 @@
 	}
 	"NoFF"
 	{
-		"en"		"{blue}({default}No friendly fire at all!{blue})"
+		"en"		"{green}FF{default}: {blue}({default}no friendly fire this round!{blue})"
 	}
 	"ReportFF_Absolute"
 	{
