@@ -724,3 +724,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `server_name.smx` 升级到 1.4.8：`[AI:专家]` 这类房间名标签只在 `annehappy_dynamic_ai_difficulty.smx` 实际加载且已定档时显示。
 - 动态难度插件卸载后，SourceMod 会留下 `ah_ai_dynamic_current_level`；旧逻辑只要看到残留 1-6 档就会继续写进 `hostname` / `sn_main_name`。现在改为检测插件是否在跑，并清掉已经写进房间名的 `[AI:...]`。
 - `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。
+
+### 2026年8月13日 Scripted HUD 自定义槽位与白框修复
+- `extend/l4d2_scripted_hud.smx` 升级到 1.2.0：HUD 3 / HUD 4 支持玩家自选显示内容，`!hudmenu` 新增“HUD 3/4 显示内容”子菜单，可在“跟随服务器默认 / 生还者状态 / 特感血量 / 击杀统计 / 玩家延迟”之间切换；选择写入 Cookie 与 `scripted_hud_prefs` 数据库（旧表自动 ALTER 迁移新列），跨服保留。
+- 特感血量页显示存活特感数/上限、每只小特（舌/胖/猎/口/猴/牛）的当前血量、Tank 当前/最大血量与女巫数量；击杀统计页按生还者统计本回合特感/普感击杀；延迟页列出真人玩家 ping（生还者优先）。全部文字走翻译短语（简中/繁中/英/日/韩/越）。
+- 加固“打开 hudmenu 时偶发三个白色描边空矩形”的问题：这类空框是 EMS 脚本 HUD 槽位在“可见但缺 NOBG/TEXT 标志”瞬态下画出的空背景面板。per-client flags 现在按服务器权威 flags 重建，ResetHUD 刷新窗口不再可能把 flags 清成 0 下发；地图开始时显式隐藏两个 HUD 插件都不用的 EMS 槽位 4–7，杜绝遗留槽位数据画空框。
+- HUD 面板高度按每位玩家实际文本行数个性化（新增 m_fScriptedHUDHeight sendproxy），多行自定义内容不再被裁切；`l4d2_scripted_hud_hud3_team` 默认从 2（仅感染者可见）改为 0（全体），生还者自选的 HUD 3 内容现在真正可见。

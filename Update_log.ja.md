@@ -139,3 +139,9 @@
 - `server_name.smx` を 1.4.8 へ更新。`[AI:専門家]` のような部屋名タグは、`annehappy_dynamic_ai_difficulty.smx` が実際にロードされ、かつ档位が決まっているときだけ表示します。
 - 動的難度プラグインをアンロードしても SourceMod は `ah_ai_dynamic_current_level` を残します。旧処理は残留した 1-6 档を `hostname` / `sn_main_name` へ書き続けていました。いまはプラグインが動作中かを確認し、すでに部屋名へ書き込まれた `[AI:...]` も取り除きます。
 - `annehappy_dynamic_ai_difficulty.smx` を 2026.08.13.1 へ更新。`annehappy_dynamic_ai_difficulty` ライブラリを登録し、アンロード時に `current_level` / `current_mode` / `current_ppm` / `current_locked` を 0 に戻します。HUD、`!xx`、スポーン戦略が古い档位を読み続けないようにします。
+
+### 2026年8月13日 Scripted HUD カスタムスロットと白枠対策
+- `extend/l4d2_scripted_hud.smx` を 1.2.0 へ更新。HUD 3 / HUD 4 でプレイヤーが表示内容を選べるようになり、`!hudmenu` に「HUD 3/4 表示内容」サブメニューを追加（サーバー既定 / 生存者状態 / 特殊感染者のHP / キル統計 / プレイヤーのPing）。選択は Cookie と `scripted_hud_prefs` データベースに保存され（旧テーブルは自動で ALTER 移行）、サーバーをまたいで保持されます。
+- 特殊感染者HPページは生存 SI 数/上限、各小型 SI の現在HP、Tank の現在/最大HP、Witch 数を表示。キル統計は生存者ごとのラウンド内 SI/雑魚キルを集計し、Ping ページは人間プレイヤーの遅延を一覧します（生存者優先）。文言はすべて翻訳フレーズ（簡中/繁中/英/日/韓/越）です。
+- hudmenu 周りで時々出ていた「白い縁取りの空の長方形」への対策：あれは EMS スクリプト HUD スロットが一時的に「可視だが NOBG/TEXT なし」のフラグ状態で描いた空の背景パネルです。クライアント別フラグをサーバーの正規フラグから再構築するようにし、ResetHUD のリフレッシュ窓でフラグ 0 が配信されることをなくしました。加えて両 HUD プラグインが使わない EMS スロット 4-7 をマップ開始時に明示的に非表示へ。
+- パネルの高さをクライアントごとの実際の行数で個別化（m_fScriptedHUDHeight の sendproxy を追加）し、複数行のカスタム内容が切れなくなりました。`l4d2_scripted_hud_hud3_team` の既定値を 2（感染者のみ）から 0（全員）へ変更し、生存者が選んだ HUD 3 の内容が実際に見えるようにしました。

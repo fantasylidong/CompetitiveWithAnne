@@ -88,4 +88,101 @@
 		{
 			"chi"		"超宽屏安全区"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"chi"		"HUD 3 显示内容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"chi"		"HUD 4 显示内容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"chi"		"HUD {1} 显示内容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"chi"		"跟随服务器默认"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"chi"		"生还者状态"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"chi"		"特感血量"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"chi"		"击杀统计"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"chi"		"玩家延迟"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"chi"		"玩家状态[药][倒地]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"chi"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"chi"		"无"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"chi"		"特感 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"chi"		"特感 x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"chi"		"女巫x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"chi"		"坦克 {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"chi"		"舌"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"chi"		"胖"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"chi"		"猎"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"chi"		"口"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"chi"		"猴"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"chi"		"牛"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"chi"		"击杀 [特感|普感]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"chi"		"延迟 (ms)"
+		}
 	}

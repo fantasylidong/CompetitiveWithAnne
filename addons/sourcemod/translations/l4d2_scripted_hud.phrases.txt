@@ -88,4 +88,101 @@
 		{
 			"en"		"Ultrawide safe area"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"en"		"HUD 3 content"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"en"		"HUD 4 content"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"en"		"HUD {1} content"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"en"		"Server default"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"en"		"Survivor status"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"en"		"Special infected HP"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"en"		"Kill stats"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"en"		"Player ping"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"en"		"Survivors [Pills][Revives]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"en"		"P"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"en"		"-"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"en"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"en"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"en"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"en"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"en"		"Smk"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"en"		"Bmr"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"en"		"Hnt"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"en"		"Spt"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"en"		"Jky"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"en"		"Chg"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"en"		"Kills [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"en"		"Ping (ms)"
+		}
 	}

@@ -139,3 +139,9 @@
 - `server_name.smx`를 1.4.8로 올렸습니다. `[AI:전문가]` 같은 방 이름 태그는 `annehappy_dynamic_ai_difficulty.smx`가 실제로 로드되어 있고 등급이 정해진 경우에만 표시합니다.
 - 동적 난이도 플러그인을 언로드해도 SourceMod는 `ah_ai_dynamic_current_level`을 남깁니다. 이전 로직은 남은 1-6 값을 `hostname` / `sn_main_name`에 계속 썼습니다. 이제 플러그인이 실행 중인지 확인하고, 이미 방 이름에 들어간 `[AI:...]`도 지웁니다.
 - `annehappy_dynamic_ai_difficulty.smx`를 2026.08.13.1로 올렸습니다. `annehappy_dynamic_ai_difficulty` 라이브러리를 등록하고, 언로드 시 `current_level` / `current_mode` / `current_ppm` / `current_locked`를 0으로 되돌립니다. HUD, `!xx`, 스폰 전략이 옛 등급을 계속 읽지 않게 합니다.
+
+### 2026년 8월 13일 Scripted HUD 사용자 지정 슬롯과 흰 테두리 상자 대응
+- `extend/l4d2_scripted_hud.smx`를 1.2.0으로 올렸습니다. HUD 3 / HUD 4에서 플레이어가 표시 내용을 고를 수 있으며, `!hudmenu`에 “HUD 3/4 표시 내용” 하위 메뉴(서버 기본값 / 생존자 상태 / 특수 감염자 체력 / 킬 통계 / 플레이어 핑)를 추가했습니다. 선택은 쿠키와 `scripted_hud_prefs` 데이터베이스에 저장되며(구 테이블은 자동 ALTER 마이그레이션) 서버를 옮겨도 유지됩니다.
+- 특수 감염자 체력 페이지는 생존 SI 수/상한, 각 소형 SI의 현재 체력, Tank 현재/최대 체력, Witch 수를 보여 줍니다. 킬 통계는 생존자별 라운드 내 SI/일반 좀비 킬을 집계하고, 핑 페이지는 사람 플레이어의 지연을 나열합니다(생존자 우선). 모든 문구는 번역 문구를 사용합니다(간체/번체 중국어, 영어, 일본어, 한국어, 베트남어).
+- hudmenu 주변에서 가끔 보이던 “흰 테두리의 빈 직사각형”에 대한 대응: 이는 EMS 스크립트 HUD 슬롯이 일시적으로 “보이지만 NOBG/TEXT 없음” 플래그 상태로 그린 빈 배경 패널입니다. 클라이언트별 플래그를 서버의 정식 플래그에서 재구성하도록 바꿔 ResetHUD 새로 고침 구간에 플래그 0이 전송되지 않게 했고, 두 HUD 플러그인이 쓰지 않는 EMS 슬롯 4-7을 맵 시작 시 명시적으로 숨깁니다.
+- 패널 높이를 클라이언트별 실제 줄 수로 개인화(m_fScriptedHUDHeight sendproxy 추가)해 여러 줄 사용자 지정 내용이 잘리지 않습니다. `l4d2_scripted_hud_hud3_team` 기본값을 2(감염자만)에서 0(전원)으로 바꿔 생존자가 고른 HUD 3 내용이 실제로 보이게 했습니다.

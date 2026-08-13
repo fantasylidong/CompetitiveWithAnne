@@ -88,4 +88,101 @@
 		{
 			"jp"		"ウルトラワイド安全領域"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"jp"		"HUD 3 表示内容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"jp"		"HUD 4 表示内容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"jp"		"HUD {1} 表示内容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"jp"		"サーバー既定"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"jp"		"生存者状態"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"jp"		"特殊感染者のHP"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"jp"		"キル統計"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"jp"		"プレイヤーのPing"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"jp"		"生存者状態[薬][蘇生]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"jp"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"jp"		"無"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"jp"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"jp"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"jp"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"jp"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"jp"		"スモ"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"jp"		"ブマ"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"jp"		"ハン"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"jp"		"スピ"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"jp"		"ジョ"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"jp"		"チャ"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"jp"		"キル [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"jp"		"Ping (ms)"
+		}
 	}

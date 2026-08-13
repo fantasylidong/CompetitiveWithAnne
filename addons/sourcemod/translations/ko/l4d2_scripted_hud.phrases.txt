@@ -88,4 +88,101 @@
 		{
 			"ko"		"울트라와이드 안전 영역"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"ko"		"HUD 3 표시 내용"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"ko"		"HUD 4 표시 내용"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"ko"		"HUD {1} 표시 내용"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"ko"		"서버 기본값"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"ko"		"생존자 상태"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"ko"		"특수 감염자 체력"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"ko"		"킬 통계"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"ko"		"플레이어 핑"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"ko"		"생존자 상태[약][소생]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"ko"		"유"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"ko"		"무"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"ko"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"ko"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"ko"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"ko"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"ko"		"스모"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"ko"		"부머"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"ko"		"헌터"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"ko"		"스핏"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"ko"		"자키"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"ko"		"차저"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"ko"		"킬 [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"ko"		"핑 (ms)"
+		}
 	}

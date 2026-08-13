@@ -88,4 +88,101 @@
 		{
 			"zho"		"超寬螢幕安全區"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"zho"		"HUD 3 顯示內容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"zho"		"HUD 4 顯示內容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"zho"		"HUD {1} 顯示內容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"zho"		"跟隨伺服器預設"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"zho"		"生還者狀態"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"zho"		"特感血量"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"zho"		"擊殺統計"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"zho"		"玩家延遲"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"zho"		"玩家狀態[藥][倒地]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"zho"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"zho"		"無"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"zho"		"特感 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"zho"		"特感 x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"zho"		"女巫x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"zho"		"坦克 {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"zho"		"舌"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"zho"		"胖"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"zho"		"獵"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"zho"		"口"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"zho"		"猴"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"zho"		"牛"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"zho"		"擊殺 [特感|普感]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"zho"		"延遲 (ms)"
+		}
 	}

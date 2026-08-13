@@ -88,4 +88,101 @@
 		{
 			"vi"		"Vùng an toàn siêu rộng"
 		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"vi"		"Nội dung HUD 3"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"vi"		"Nội dung HUD 4"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Nội dung HUD {1}"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"vi"		"Mặc định máy chủ"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"vi"		"Trạng thái người sống sót"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"vi"		"Máu đặc nhiễm"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"vi"		"Thống kê tiêu diệt"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"vi"		"Ping người chơi"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"vi"		"Người chơi [Thuốc][Gục]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"vi"		"Có"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"vi"		"Ko"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"vi"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"vi"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"vi"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"vi"		"Smk"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"vi"		"Bmr"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"vi"		"Hnt"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"vi"		"Spt"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"vi"		"Jky"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"vi"		"Chg"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"vi"		"Diệt [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"vi"		"Ping (ms)"
+		}
 	}
