@@ -290,7 +290,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         return false;
 
     // 7.5) 波内扇区配额：便宜的角度/计数判断，放在昂贵检查之前。
-    //      远带(后两档)搜索不受限，避免狭长地形因配额而完全找不到点。
+    //      后 1/3 远带搜索不受限，避免狭长地形因配额而完全找不到点。
     if (!geometryReady)
         sector = ComputeSectorIndex(center, pos, sectors);
     if (enforceSectorQuota && !PassWaveSectorQuota(sector))
@@ -895,10 +895,10 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (SpawnAccel_ShouldWaitForGraph())
         return SpawnSearch_Pending;
 
-    // 扇区配额只约束前四个距离带；远带说明近处已找不到点，
-    // 此时优先保证按时刷出，不再限制方向。
+    // 扇区配额只约束前 2/3 的距离带；进入后 1/3 远带说明近处已找不到点，
+    // 此时优先保证按时刷出，不再限制方向。(10 档时为 0..6 受限、7..9 放开)
     bool enforceSectorQuota = bandStage >= 0
-        && bandStage <= TACTICAL_BAND_STAGES - 3;
+        && bandStage < TACTICAL_BAND_STAGES - (TACTICAL_BAND_STAGES / 3);
 
     SpawnFrameContext frame;
     if (!SpawnSearch_BuildFrameContext(targetSurvivor, frame))

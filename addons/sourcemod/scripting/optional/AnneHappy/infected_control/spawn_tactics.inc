@@ -380,63 +380,60 @@ float Tactical_GetHighGroundNavCompensation(int zc,
         maxCompensation);
 }
 
+// 每类三个锚点：最小距离 / 首选档上界(stage 0) / 最远档上界(最后一档)。
+// stage 0 保持完整首选区间不切分——逐档搜索是"哪档先找到点就用哪档"，
+// 切细首选档会让刷点整体更贴近目标并缩小页内洗牌的覆盖面。
+// stage 1..N-1 在首选上界与最远上界之间线性扩圈，失败升档时每次
+// 只多扫一小环，距离升级更平滑。
+static bool Tactical_GetClassBandProfile(int zc, float &minRange,
+                                         float &baseMax, float &finalMax)
+{
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker):
+        {
+            minRange = 500.0; baseMax = 1200.0; finalMax = 3000.0;
+        }
+        case view_as<int>(SI_Boomer):
+        {
+            minRange = 250.0; baseMax = 550.0;  finalMax = 2300.0;
+        }
+        case view_as<int>(SI_Hunter):
+        {
+            minRange = 350.0; baseMax = 950.0;  finalMax = 2900.0;
+        }
+        case view_as<int>(SI_Spitter):
+        {
+            minRange = 300.0; baseMax = 800.0;  finalMax = 2300.0;
+        }
+        case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
+        {
+            minRange = 250.0; baseMax = 700.0;  finalMax = 2200.0;
+        }
+        default:
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
                               float &minRange, float &maxRange)
 {
     stage = ClampInt(stage, 0, TACTICAL_BAND_STAGES - 1);
 
-    switch (zc)
+    float baseMax, finalMax;
+    if (Tactical_GetClassBandProfile(zc, minRange, baseMax, finalMax))
     {
-        case view_as<int>(SI_Smoker):
-        {
-            if (stage == 0)      { minRange = 500.0; maxRange = 1200.0; }
-            else if (stage == 1) { minRange = 500.0; maxRange = 1500.0; }
-            else if (stage == 2) { minRange = 500.0; maxRange = 1800.0; }
-            else if (stage == 3) { minRange = 500.0; maxRange = 2100.0; }
-            else if (stage == 4) { minRange = 500.0; maxRange = 2550.0; }
-            else                 { minRange = 500.0; maxRange = 3000.0; }
-        }
-        case view_as<int>(SI_Boomer):
-        {
-            if (stage == 0)      { minRange = 250.0; maxRange = 550.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 750.0; }
-            else if (stage == 2) { minRange = 250.0; maxRange = 1000.0; }
-            else if (stage == 3) { minRange = 250.0; maxRange = 1400.0; }
-            else if (stage == 4) { minRange = 250.0; maxRange = 1850.0; }
-            else                 { minRange = 250.0; maxRange = 2300.0; }
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            if (stage == 0)      { minRange = 350.0; maxRange = 950.0; }
-            else if (stage == 1) { minRange = 350.0; maxRange = 1250.0; }
-            else if (stage == 2) { minRange = 350.0; maxRange = 1500.0; }
-            else if (stage == 3) { minRange = 350.0; maxRange = 1750.0; }
-            else if (stage == 4) { minRange = 350.0; maxRange = 2300.0; }
-            else                 { minRange = 350.0; maxRange = 2900.0; }
-        }
-        case view_as<int>(SI_Spitter):
-        {
-            if (stage == 0)      { minRange = 300.0; maxRange = 800.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 1050.0; }
-            else if (stage == 2) { minRange = 300.0; maxRange = 1250.0; }
-            else if (stage == 3) { minRange = 300.0; maxRange = 1450.0; }
-            else if (stage == 4) { minRange = 300.0; maxRange = 1850.0; }
-            else                 { minRange = 300.0; maxRange = 2300.0; }
-        }
-        case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
-        {
-            if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 900.0; }
-            else if (stage == 2) { minRange = 250.0; maxRange = 1100.0; }
-            else if (stage == 3) { minRange = 250.0; maxRange = 1250.0; }
-            else if (stage == 4) { minRange = 250.0; maxRange = 1700.0; }
-            else                 { minRange = 250.0; maxRange = 2200.0; }
-        }
-        default:
-        {
-            minRange = NAV_CANDIDATE_TEAM_EXCLUSION;
-            maxRange = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
-        }
+        maxRange = baseMax
+            + (finalMax - baseMax) * float(stage)
+                / float(TACTICAL_BAND_STAGES - 1);
+    }
+    else
+    {
+        minRange = NAV_CANDIDATE_TEAM_EXCLUSION;
+        maxRange = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
     }
 
     minRange = FloatMax(minRange, NAV_CANDIDATE_TEAM_EXCLUSION);
