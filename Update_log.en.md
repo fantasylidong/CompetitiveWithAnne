@@ -108,3 +108,8 @@
 - Upgraded `rpg.smx` to 2.0.1: hats, skins, and glows are reapplied after the database load finishes; hats/skins are no longer cleared to 0 while the scoreboard cache is still loading.
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
+
+### August 13, 2026 l4d_stats Chat i18n
+- Upgraded `l4d_stats.smx` to 1.5.6. Remaining hardcoded English chat fragments now use translation phrases; all 315 Simplified/Traditional Chinese, English, Japanese, Korean, and Vietnamese phrases are aligned, and the per-language files are no longer limited to the 13 map-record strings.
+- Special Infected kill, Smoker/Hunter save, Charger rescue, and Tank rock announcements now show class names in the viewer's language. Human players still appear by nickname.
+- Map-record team fallback names and the console `[RANK]` prefix are translated. Upgraded `global_chat.smx` to 1.1.1 so global map-record broadcasts use the same team-name phrases.

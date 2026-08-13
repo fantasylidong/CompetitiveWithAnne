@@ -6,9 +6,10 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.1.1"
 #define LOCAL_ECHO_CACHE_SIZE 64
 #define MAP_RECORD_BROADCAST_PREFIX "@L4D_STATS_MAP_RECORD"
+#define MAP_RECORD_TEAM_MARKER "@L4DSTATS_TEAM"
 #define MAP_RECORD_FIELD_SEPARATOR "\x1f"
 
 Database g_hDatabase = null;
@@ -1557,11 +1558,28 @@ void DispatchMapRecordMessage(const char[] message)
 
 		char modeLabel[64];
 		char difficultyLabel[64];
+		char playersLabel[128];
 		FormatEx(modeLabel, sizeof(modeLabel), "%T", modePhrase, i);
 		FormatEx(difficultyLabel, sizeof(difficultyLabel), "%T", difficultyPhrase, i);
+		FormatMapRecordPlayers(i, fields[2], playersLabel, sizeof(playersLabel));
 		CPrintToChat(i, "%t", "L4DStats_MapRecordSummary", fields[7], modeLabel, fields[1]);
-		CPrintToChat(i, "%t", "L4DStats_MapRecordDetails", fields[2], infectedNumber, siSpawnTime, difficultyLabel);
+		CPrintToChat(i, "%t", "L4DStats_MapRecordDetails", playersLabel, infectedNumber, siSpawnTime, difficultyLabel);
 	}
+}
+
+void FormatMapRecordPlayers(int client, const char[] storedNames, char[] buffer, int maxlen)
+{
+	int markerLen = strlen(MAP_RECORD_TEAM_MARKER);
+	if (strncmp(storedNames, MAP_RECORD_TEAM_MARKER, markerLen) == 0)
+	{
+		if (storedNames[markerLen] == ':')
+			FormatEx(buffer, maxlen, "%T", "L4DStats_MapRecordTeamCount", client, StringToInt(storedNames[markerLen + 1]));
+		else
+			FormatEx(buffer, maxlen, "%T", "L4DStats_MapRecordTeam", client);
+		return;
+	}
+
+	strcopy(buffer, maxlen, storedNames);
 }
 
 void GetMapRecordModePhrase(int mode, char[] phrase, int maxlen)

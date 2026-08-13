@@ -52,4 +52,1212 @@
 	{
 		"chi"		"未知"
 	}
+	"L4DStats_Yes"
+	{
+		"chi"		"是"
+	}
+	"L4DStats_No"
+	{
+		"chi"		"否"
+	}
+	"L4DStats_Close"
+	{
+		"chi"		"关闭"
+	}
+	"L4DStats_Back"
+	{
+		"chi"		"返回"
+	}
+	"L4DStats_More"
+	{
+		"chi"		"更多"
+	}
+	"L4DStats_MoreEllipsis"
+	{
+		"chi"		"更多..."
+	}
+	"L4DStats_All"
+	{
+		"chi"		"全部"
+	}
+	"L4DStats_GamemodeCoop"
+	{
+		"chi"		"战役"
+	}
+	"L4DStats_GamemodeVersus"
+	{
+		"chi"		"对抗"
+	}
+	"L4DStats_GamemodeRealism"
+	{
+		"chi"		"写实"
+	}
+	"L4DStats_GamemodeSurvival"
+	{
+		"chi"		"生存"
+	}
+	"L4DStats_GamemodeScavenge"
+	{
+		"chi"		"清道夫"
+	}
+	"L4DStats_GamemodeRealismVersus"
+	{
+		"chi"		"写实对抗"
+	}
+	"L4DStats_GamemodeMutations"
+	{
+		"chi"		"突变"
+	}
+	"L4DStats_GamemodeUnknown"
+	{
+		"chi"		"未知模式"
+	}
+	"L4DStats_RankMenuTitle"
+	{
+		"chi"		"玩家排名系统:"
+	}
+	"L4DStats_MenuCurrentRank"
+	{
+		"chi"		"显示当前排名"
+	}
+	"L4DStats_MenuTop10"
+	{
+		"chi"		"显示前10名玩家"
+	}
+	"L4DStats_MenuQuarterTop10"
+	{
+		"chi"		"显示季度前10名"
+	}
+	"L4DStats_MenuTop10PPM"
+	{
+		"chi"		"显示前10名 PPM 玩家"
+	}
+	"L4DStats_MenuNextRank"
+	{
+		"chi"		"下一名达标要求"
+	}
+	"L4DStats_MenuCurrentMapTime"
+	{
+		"chi"		"显示当前地图时间"
+	}
+	"L4DStats_MenuOtherPlayerRank"
+	{
+		"chi"		"显示其他玩家排名"
+	}
+	"L4DStats_MenuOtherPlayerPPM"
+	{
+		"chi"		"显示其他玩家 PPM"
+	}
+	"L4DStats_MenuRankVote"
+	{
+		"chi"		"投票按 PPM 重新分队"
+	}
+	"L4DStats_MenuAllMapTimes"
+	{
+		"chi"		"显示所有地图时间记录"
+	}
+	"L4DStats_MenuThisMapTimes"
+	{
+		"chi"		"显示当前地图时间记录"
+	}
+	"L4DStats_MenuSettings"
+	{
+		"chi"		"Rank 提醒设置"
+	}
+	"L4DStats_MenuAbout"
+	{
+		"chi"		"关于排名插件"
+	}
+	"L4DStats_NextRankTitle"
+	{
+		"chi"		"下一名达标要求:"
+	}
+	"L4DStats_NextRankPointsNeeded"
+	{
+		"chi"		"还需分数: %i"
+	}
+	"L4DStats_CurrentRank"
+	{
+		"chi"		"当前排名: %i"
+	}
+	"L4DStats_AlreadyFirst"
+	{
+		"chi"		"你已位居第一"
+	}
+	"L4DStats_PointsAndPlayer"
+	{
+		"chi"		"%i 分: %s"
+	}
+	"L4DStats_PlayerRankTitle"
+	{
+		"chi"		"%s 的排名"
+	}
+	"L4DStats_OverallRank"
+	{
+		"chi"		"总排名: %i (共 %i)"
+	}
+	"L4DStats_ModeRank"
+	{
+		"chi"		"%s 排名: %i (共 %i)"
+	}
+	"L4DStats_PlaytimeHours"
+	{
+		"chi"		"游玩时间: %.2f 小时"
+	}
+	"L4DStats_PlaytimeMinutes"
+	{
+		"chi"		"游玩时间: %i 分钟"
+	}
+	"L4DStats_CurrentPoints"
+	{
+		"chi"		"当前分数: %i"
+	}
+	"L4DStats_QuarterLabel"
+	{
+		"chi"		"%i 年第 %i 季度"
+	}
+	"L4DStats_QuarterPoints"
+	{
+		"chi"		"%s 分数: %i"
+	}
+	"L4DStats_QuarterRank"
+	{
+		"chi"		"%s 排名: %i (共 %i)"
+	}
+	"L4DStats_PointsPerMinute"
+	{
+		"chi"		"每分钟分数: %.2f"
+	}
+	"L4DStats_CommonKilled"
+	{
+		"chi"		"击杀普通感染者: %i"
+	}
+	"L4DStats_SurvivorsKilled"
+	{
+		"chi"		"击杀幸存者: %i"
+	}
+	"L4DStats_Headshots"
+	{
+		"chi"		"爆头数: %i"
+	}
+	"L4DStats_HeadshotRatio"
+	{
+		"chi"		"爆头率: %.2f%%"
+	}
+	"L4DStats_FullStatsUrl"
+	{
+		"chi"		"完整数据: %s"
+	}
+	"L4DStats_UnknownPlayer"
+	{
+		"chi"		"未知"
+	}
+	"L4DStats_PlayerRanksTitle"
+	{
+		"chi"		"玩家排名:"
+	}
+	"L4DStats_PlayerPointsMenuItem"
+	{
+		"chi"		"%s (%i 分)"
+	}
+	"L4DStats_PlayerScoreMenuItem"
+	{
+		"chi"		"%s (%i)"
+	}
+	"L4DStats_PlayerPPMTitle"
+	{
+		"chi"		"玩家 PPM:"
+	}
+	"L4DStats_PlayerPPMMenuItem"
+	{
+		"chi"		"%s (PPM: %.2f)"
+	}
+	"L4DStats_TimedMapsTitle"
+	{
+		"chi"		"地图时间记录:"
+	}
+	"L4DStats_ModeTimesTitle"
+	{
+		"chi"		"模式时间:"
+	}
+	"L4DStats_MapNeverPlayed"
+	{
+		"chi"		"这张地图还没有记录。"
+	}
+	"L4DStats_ModeNeverPlayed"
+	{
+		"chi"		"这个模式还没有记录。"
+	}
+	"L4DStats_Top10Title"
+	{
+		"chi"		"前 10 名玩家"
+	}
+	"L4DStats_QuarterTop10Title"
+	{
+		"chi"		"%s 前 10 名玩家"
+	}
+	"L4DStats_Top10PPMTitle"
+	{
+		"chi"		"PPM 前 10 名玩家"
+	}
+	"L4DStats_ClearPlayerStatsTitle"
+	{
+		"chi"		"清除玩家统计:"
+	}
+	"L4DStats_AboutTitle"
+	{
+		"chi"		"关于玩家排名系统:"
+	}
+	"L4DStats_AboutVersion"
+	{
+		"chi"		"版本: %s"
+	}
+	"L4DStats_AboutAuthor"
+	{
+		"chi"		"作者: Mikko Andersson (muukis); Anne 适配: 东"
+	}
+	"L4DStats_AboutDescription"
+	{
+		"chi"		"记录玩家统计和排名。"
+	}
+	"L4DStats_SettingsTitle"
+	{
+		"chi"		"排名提醒设置:"
+	}
+	"L4DStats_SettingsMute"
+	{
+		"chi"		"禁用 Rank 提醒 (当前已启用)"
+	}
+	"L4DStats_SettingsUnmute"
+	{
+		"chi"		"恢复 Rank 提醒 (当前已禁用)"
+	}
+	"L4DStats_TimeHoursMinutesSeconds"
+	{
+		"chi"		"%i 小时 %i 分 %.1f 秒"
+	}
+	"L4DStats_TimeMinutesSeconds"
+	{
+		"chi"		"%i 分 %.1f 秒"
+	}
+	"L4DStats_TimeSeconds"
+	{
+		"chi"		"%.1f 秒"
+	}
+	"L4DStats_AdminCategory"
+	{
+		"chi"		"玩家排名"
+	}
+	"L4DStats_AdminClearTitle"
+	{
+		"chi"		"清除排名数据:"
+	}
+	"L4DStats_AdminClearCurrentPlayers"
+	{
+		"chi"		"清除当前玩家统计"
+	}
+	"L4DStats_AdminClearMapTimes"
+	{
+		"chi"		"清除地图通关时间"
+	}
+	"L4DStats_AdminClearRecordedMapsTitle"
+	{
+		"chi"		"清除已记录的地图时间:"
+	}
+	"L4DStats_AdminClearPlayers"
+	{
+		"chi"		"清除玩家统计"
+	}
+	"L4DStats_AdminClearMaps"
+	{
+		"chi"		"清除玩家地图统计"
+	}
+	"L4DStats_AdminClearAll"
+	{
+		"chi"		"清除全部统计"
+	}
+	"L4DStats_AdminClearRecordedTimes"
+	{
+		"chi"		"清除全部地图记录"
+	}
+	"L4DStats_AdminRemoveCustomMaps"
+	{
+		"chi"		"移除自定义地图"
+	}
+	"L4DStats_ConfirmClearPlayerStats"
+	{
+		"chi"		"确定清除所有玩家统计吗?"
+	}
+	"L4DStats_ConfirmClearPlayerMapStats"
+	{
+		"chi"		"确定清除所有玩家地图统计吗?"
+	}
+	"L4DStats_ConfirmClearAllStats"
+	{
+		"chi"		"确定清除全部排名统计吗?"
+	}
+	"L4DStats_ConfirmClearAllMapTimes"
+	{
+		"chi"		"确定清除全部地图时间记录吗?"
+	}
+	"L4DStats_ConfirmClearCoopMapTimes"
+	{
+		"chi"		"确定清除合作模式地图时间吗?"
+	}
+	"L4DStats_ConfirmClearSurvivalMapTimes"
+	{
+		"chi"		"确定清除生存模式地图时间吗?"
+	}
+	"L4DStats_ConfirmClearRealismMapTimes"
+	{
+		"chi"		"确定清除写实模式地图时间吗?"
+	}
+	"L4DStats_ConfirmClearMutationMapTimes"
+	{
+		"chi"		"确定清除过往之役模式地图时间吗?"
+	}
+	"L4DStats_ConfirmRemoveCustomMaps"
+	{
+		"chi"		"确定移除所有自定义地图吗?"
+	}
+	"L4DStats_ConfirmCleanInactivePlayers"
+	{
+		"chi"		"确定清理不活跃玩家吗?"
+	}
+	"L4DStats_CommandInGameOnly"
+	{
+		"chi"		"此命令只能在游戏内使用。"
+	}
+	"L4DStats_CommandUnavailableFromServer"
+	{
+		"chi"		"服务器控制台无法使用此命令。"
+	}
+	"L4DStats_MapTimerNotStarted"
+	{
+		"chi"		"地图计时器尚未开始。"
+	}
+	"L4DStats_CurrentMapTimeConsole"
+	{
+		"chi"		"当前地图时间: %s"
+	}
+	"L4DStats_TeamShuffleUnavailable"
+	{
+		"chi"		"当前无法随机重组队伍。"
+	}
+	"L4DStats_TeamShuffleExecuting"
+	{
+		"chi"		"正在随机重组队伍..."
+	}
+	"L4DStats_ClearDatabaseServerDisabled"
+	{
+		"chi"		"已禁用从服务器控制台清除数据库。"
+	}
+	"L4DStats_ClearDatabaseStarted"
+	{
+		"chi"		"已开始清除数据库。"
+	}
+	"L4DStats_ClearDatabaseConfirm"
+	{
+		"chi"		"请在 %i 秒内再次执行命令以确认清除数据库。"
+	}
+	"L4DStats_ClearTimedMapsRollback"
+	{
+		"chi"		"清除地图时间失败，正在回滚。"
+	}
+	"L4DStats_ClearPlayersRollback"
+	{
+		"chi"		"清除玩家统计失败，正在回滚。"
+	}
+	"L4DStats_ClearMapsRollback"
+	{
+		"chi"		"清除地图统计失败，正在回滚。"
+	}
+	"L4DStats_ClearStatsFailure"
+	{
+		"chi"		"统计数据未清除。"
+	}
+	"L4DStats_ClearRanksSuccess"
+	{
+		"chi"		"玩家排名已成功清除。"
+	}
+	"L4DStats_ClearStatsSuccess"
+	{
+		"chi"		"统计数据已成功清除。"
+	}
+	"L4DStats_ClearQueryFailed"
+	{
+		"chi"		"数据库查询失败: %s"
+	}
+	"L4DStats_FastQueryError"
+	{
+		"chi"		"快速查询失败: %s | 查询: %s"
+	}
+	"L4DStats_FastQueryFailed"
+	{
+		"chi"		"快速查询失败: %s"
+	}
+	"L4DStats_FastestTimeWithBuy"
+	{
+		"chi"		"当前带购买的最快通关时间: {green}%s{default}。"
+	}
+	"L4DStats_FastestTimeWithoutBuy"
+	{
+		"chi"		"当前最快通关时间: {green}%s{default}。"
+	}
+	"L4DStats_MapRecordImprovedCurrent"
+	{
+		"chi"		"刷新了 Anne%s 版本该难度的最快记录: {green}%s{default}!"
+	}
+	"L4DStats_MapRecordImprovedPlayer"
+	{
+		"chi"		"你在 Anne%s 版本该难度的最快记录提升至 {green}%s{default}!"
+	}
+	"L4DStats_RankMenuHint"
+	{
+		"chi"		"输入 {green}!rank{default} 打开排名菜单。"
+	}
+	"L4DStats_RankRose"
+	{
+		"chi"		"你的总榜排名上升 {green}%i{default} 名，当前第 {green}%i{default} 名。"
+	}
+	"L4DStats_RankFell"
+	{
+		"chi"		"你的总榜排名下降 {green}%i{default} 名，当前第 {green}%i{default} 名。"
+	}
+	"L4DStats_QuarterRankRose"
+	{
+		"chi"		"你在 %s 的排名上升 {green}%i{default} 名，当前第 {green}%i{default} 名（{green}%i{default} 分）。"
+	}
+	"L4DStats_QuarterRankFell"
+	{
+		"chi"		"你在 %s 的排名下降 {green}%i{default} 名，当前第 {green}%i{default} 名（{green}%i{default} 分）。"
+	}
+	"L4DStats_RankMessagesMuted"
+	{
+		"chi"		"已禁用 Rank 提醒。"
+	}
+	"L4DStats_RankMessagesUnmuted"
+	{
+		"chi"		"已恢复 Rank 提醒。"
+	}
+	"L4DStats_RankMuteUsage"
+	{
+		"chi"		"用法: sm_rankmute [0/1]"
+	}
+	"L4DStats_RankVoteQuestion"
+	{
+		"chi"		"是否启用玩家排名?"
+	}
+	"L4DStats_RankVotePassed"
+	{
+		"chi"		"Rank 投票已通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
+	}
+	"L4DStats_RankVoteFailed"
+	{
+		"chi"		"Rank 投票未通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
+	}
+	"L4DStats_RankVotePluginDisabledConsole"
+	{
+		"chi"		"插件已禁用，无法发起 Rank 投票。"
+	}
+	"L4DStats_RankVoteGamemodeDisabledConsole"
+	{
+		"chi"		"当前游戏模式已禁用 Rank 投票。"
+	}
+	"L4DStats_RankVoteAlreadyStartedConsole"
+	{
+		"chi"		"已有 Rank 投票正在进行。"
+	}
+	"L4DStats_RankVoteGamedataMissingConsole"
+	{
+		"chi"		"Rank 投票设置失败：缺少所需的 gamedata。"
+	}
+	"L4DStats_RankVoteDisabledConsole"
+	{
+		"chi"		"Rank 投票已禁用。"
+	}
+	"L4DStats_MotdCreateFailed"
+	{
+		"chi"		"无法创建 MOTD 文件。"
+	}
+	"L4DStats_MotdPrepareFailed"
+	{
+		"chi"		"无法准备 MOTD 请求。"
+	}
+	"L4DStats_MotdUpdateError"
+	{
+		"chi"		"MOTD 更新失败: %s"
+	}
+	"L4DStats_MotdUpdateFailed"
+	{
+		"chi"		"MOTD 更新失败。"
+	}
+	"L4DStats_MotdUpdateSuccess"
+	{
+		"chi"		"MOTD 更新成功。"
+	}
+	"L4DStats_MotdMessage"
+	{
+		"chi"		"今日消息: {green}%s{default}"
+	}
+	"L4DStats_NewPlayerSafeRoomMultiplier"
+	{
+		"chi"		"{lightgreen}检测到 %i 名新人，带新系数为 {green}%.1fx{default}；新人不享受倍率，非新人幸存者获得安全屋加成。"
+	}
+	"L4DStats_NewPlayerFinaleMultiplier"
+	{
+		"chi"		"{lightgreen}检测到 %i 名新人，带新系数为 {green}%.1fx{default}；新人不享受倍率，非新人幸存者获得救援关加成。"
+	}
+	"L4DStats_SinglePlayerTripleBonus"
+	{
+		"chi"		"仅剩一名幸存者，其得分将乘三。"
+	}
+	"L4DStats_SinglePlayerTripleBonusWithDifficulty"
+	{
+		"chi"		"仅剩一名幸存者，其得分将乘三，并获得 {green}%i{default} 点难度加成。"
+	}
+	"L4DStats_MedkitReductionL4D1"
+	{
+		"chi"		"每使用一个医疗包，过关奖励减少 {green}%i%%{default}（已使用 {green}%i{default} 个）。"
+	}
+	"L4DStats_MedkitReductionL4D2"
+	{
+		"chi"		"前四个医疗包后，每额外使用一个，过关奖励减少 {green}%i%%{default}（已使用 {green}%i{default} 个）。"
+	}
+	"L4DStats_DeployIncendiarySelf"
+	{
+		"chi"		"你部署了燃烧弹药，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DeployExplosiveSelf"
+	{
+		"chi"		"你部署了高爆弹药，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DeployUnknownSelf"
+	{
+		"chi"		"你部署了弹药升级，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DeployIncendiaryAll"
+	{
+		"chi"		"{olive}%s{default} 部署了燃烧弹药，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DeployExplosiveAll"
+	{
+		"chi"		"{olive}%s{default} 部署了高爆弹药，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DeployUnknownAll"
+	{
+		"chi"		"{olive}%s{default} 部署了弹药升级，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_PerfectPounceSelf"
+	{
+		"chi"		"完美飞扑 {olive}%s{default}!你获得 {green}%i{default} 分。"
+	}
+	"L4DStats_PerfectPounceAll"
+	{
+		"chi"		"{olive}%s{default} 对 {olive}%s{default} 完成完美飞扑，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_NicePounceSelf"
+	{
+		"chi"		"漂亮的飞扑 {olive}%s{default}!你获得 {green}%i{default} 分。"
+	}
+	"L4DStats_NicePounceAll"
+	{
+		"chi"		"{olive}%s{default} 对 {olive}%s{default} 完成了漂亮的飞扑，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_CurrentMapTime"
+	{
+		"chi"		"当前地图时间: {green}%s"
+	}
+	"L4DStats_QuarterRankingLeft"
+	{
+		"chi"		"你已离开 {olive}%s{default} 排行榜。"
+	}
+	"L4DStats_QuarterRankingEntered"
+	{
+		"chi"		"你进入了 {olive}%s{default} 排行榜!当前季度排名 {green}%i{default}，季度分数 {green}%i{default}。"
+	}
+	"L4DStats_PlayerJoinedOverallRanked"
+	{
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（总榜: {lightgreen}%i/%i{default}，总分: {lightgreen}%i{default}）"
+	}
+	"L4DStats_PlayerJoinedOverallUnranked"
+	{
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（总榜未上榜）"
+	}
+	"L4DStats_CurrentQuarterRanked"
+	{
+		"chi"		"当前 {olive}%s{default}: 季度排名 {lightgreen}%i/%i{default}，季度分 {lightgreen}%i{default}"
+	}
+	"L4DStats_CurrentQuarterUnranked"
+	{
+		"chi"		"当前 {olive}%s{default}: 季度未上榜"
+	}
+	"L4DStats_PlayerJoinedModeRanked"
+	{
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（排名: {lightgreen}%i{default} / 分数: {lightgreen}%i{default}）"
+	}
+	"L4DStats_PlayerJoinedModeUnranked"
+	{
+		"chi"		"玩家 {olive}%s{default} 进入游戏!（未进入排行榜）"
+	}
+	"L4DStats_QuarterRankingUnavailable"
+	{
+		"chi"		"季度榜单当前不可用，请稍后再试。"
+	}
+	"L4DStats_QuarterRankingQueryFailed"
+	{
+		"chi"		"季度榜单查询失败，请稍后再试。"
+	}
+	"L4DStats_PlayerJoinedSurvivors"
+	{
+		"chi"		"{olive}%s{default} 加入了 {lightgreen}幸存者{default} 阵营!"
+	}
+	"L4DStats_PlayerJoinedInfected"
+	{
+		"chi"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 阵营!"
+	}
+	"L4DStats_AllPlayerStatsCleared"
+	{
+		"chi"		"已清除所有玩家统计!"
+	}
+	"L4DStats_AllMapStatsCleared"
+	{
+		"chi"		"已清除所有地图统计!"
+	}
+	"L4DStats_AllStatsCleared"
+	{
+		"chi"		"已清除所有统计!"
+	}
+	"L4DStats_PlayerCleaningSuccess"
+	{
+		"chi"		"不活跃玩家清理成功!"
+	}
+	"L4DStats_PlayerCleaningFailed"
+	{
+		"chi"		"玩家清理失败!"
+	}
+	"L4DStats_PlayerCleaningDisabled"
+	{
+		"chi"		"配置已禁用玩家清理!"
+	}
+	"L4DStats_CustomMapsRemoved"
+	{
+		"chi"		"已移除所有自定义地图!"
+	}
+	"L4DStats_CustomMapsRemoveFailed"
+	{
+		"chi"		"移除自定义地图失败!"
+	}
+	"L4DStats_AllMapTimesRemoved"
+	{
+		"chi"		"已移除所有地图时间记录!"
+	}
+	"L4DStats_MapTimesRemoveFailed"
+	{
+		"chi"		"移除地图时间记录失败!"
+	}
+	"L4DStats_CoopMapTimesClearSuccess"
+	{
+		"chi"		"合作模式地图时间已清除!"
+	}
+	"L4DStats_CoopMapTimesClearFailed"
+	{
+		"chi"		"清除合作模式地图时间失败!"
+	}
+	"L4DStats_SurvivalMapTimesClearSuccess"
+	{
+		"chi"		"生存模式地图时间已清除!"
+	}
+	"L4DStats_SurvivalMapTimesClearFailed"
+	{
+		"chi"		"清除生存模式地图时间失败!"
+	}
+	"L4DStats_RealismMapTimesClearSuccess"
+	{
+		"chi"		"写实模式地图时间已清除!"
+	}
+	"L4DStats_RealismMapTimesClearFailed"
+	{
+		"chi"		"清除写实模式地图时间失败!"
+	}
+	"L4DStats_MutationMapTimesClearSuccess"
+	{
+		"chi"		"过往之役模式地图时间已清除!"
+	}
+	"L4DStats_MutationMapTimesClearFailed"
+	{
+		"chi"		"清除过往之役模式地图时间失败!"
+	}
+	"L4DStats_OwnStatsCleared"
+	{
+		"chi"		"你的游玩记录已被清除!"
+	}
+	"L4DStats_PlayerStatsCleared"
+	{
+		"chi"		"玩家 {olive}%s{default} 的游玩记录已清除!"
+	}
+	"L4DStats_PlayerStatsClearFailed"
+	{
+		"chi"		"清除玩家游玩记录失败!"
+	}
+	"L4DStats_RankVoteSettingsFailed"
+	{
+		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}: 插件设置失败。"
+	}
+	"L4DStats_RankVoteDisabledChat"
+	{
+		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}。"
+	}
+	"L4DStats_RankVoteSpectatorDenied"
+	{
+		"chi"		"观众无法发起 {green}Rank 投票{default}。"
+	}
+	"L4DStats_NotImplemented"
+	{
+		"chi"		"{olive}此功能尚未实现。"
+	}
+	"L4DStats_RankVoteProgress"
+	{
+		"chi"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
+	}
+	"L4DStats_RankVotePluginDisabledChat"
+	{
+		"chi"		"插件已关闭，无法发起 Rank 投票!"
+	}
+	"L4DStats_RankVoteVersusOnly"
+	{
+		"chi"		"{green}Rank 投票{default}已在 {lightgreen}对抗{default} 模式中启用!"
+	}
+	"L4DStats_RankVoteCompetitiveModes"
+	{
+		"chi"		"{green}Rank 投票{default}已在{lightgreen}对抗{default}、{lightgreen}写实对抗{default}和{lightgreen}清道夫{default}模式中启用!"
+	}
+	"L4DStats_RankVoteOncePerMap"
+	{
+		"chi"		"每张地图只能发起一次 {green}Rank 投票{default}!"
+	}
+	"L4DStats_RankVoteInitiated"
+	{
+		"chi"		"{olive}%s{default} 发起了 {green}Rank 投票{default}!"
+	}
+	"L4DStats_RankVoteInitiatedConsole"
+	{
+		"chi"		"服务器控制台发起了 {green}Rank 投票{default}!"
+	}
+	"L4DStats_TeamShuffleAdminExecuted"
+	{
+		"chi"		"管理员已执行队伍随机重组。"
+	}
+	"L4DStats_TeamShuffleFailed"
+	{
+		"chi"		"队伍随机重组因错误失败。"
+	}
+	"L4DStats_TeamShuffleDone"
+	{
+		"chi"		"按玩家 PPM 随机重组队伍{lightgreen}完成{default}。"
+	}
+	"L4DStats_TeamsAlreadyEven"
+	{
+		"chi"		"队伍已按玩家 PPM 达到平衡。"
+	}
+	"L4DStats_TeamShuffleNotEnoughPlayers"
+	{
+		"chi"		"队伍随机重组失败: {lightgreen}玩家不足{default}!"
+	}
+	"L4DStats_RankDisabledNotEnoughPlayers"
+	{
+		"chi"		"没有足够玩家，排名系统现已{green}关闭{default}!"
+	}
+	"L4DStats_MapTimeInvalidSettings"
+	{
+		"chi"		"此次结果因修改难度、开启高级人机或使用管理员功能而{green}无效{default}，不记录地图时间!"
+	}
+	"L4DStats_MapTimeInvalidBunnyHop"
+	{
+		"chi"		"此次结果因关闭 {green}坦克{default} 连跳而{green}无效{default}，不记录地图时间!"
+	}
+	"L4DStats_MapTimeInvalidMultiplayerMode"
+	{
+		"chi"		"已启用多人运动模式，不记录地图时间!"
+	}
+	"L4DStats_MapTimeTooShortNoReward"
+	{
+		"chi"		"记录时间小于 30 秒，数据可能有误，不奖励分数!"
+	}
+	"L4DStats_MapTimeTooShortNotRecorded"
+	{
+		"chi"		"时间小于 30 秒，数据可能有误，此次成绩不予记录!"
+	}
+	"L4DStats_NoFastestTimeYet"
+	{
+		"chi"		"当前模式和难度还没有最快记录，快来挑战吧!"
+	}
+	"L4DStats_MapRecordNotImprovedAnne"
+	{
+		"chi"		"这张图 Anne%s 版本该难度的最快时间 {green}%s{default} 未被刷新，下次继续努力!"
+	}
+	"L4DStats_MapRecordNotImproved"
+	{
+		"chi"		"这张图的最快时间 {green}%s{default} 未被刷新，下次继续努力!"
+	}
+	"L4DStats_MapCompletionTime"
+	{
+		"chi"		"你花费了 {green}%s{default} 完成这张地图!"
+	}
+	"L4DStats_NoBuyBonusAdvancedBotsDisabled"
+	{
+		"chi"		"由于开启了高级人机，无法获得额外过关积分。"
+	}
+	"L4DStats_NoBuyBonusBunnyHopDisabled"
+	{
+		"chi"		"由于关闭了 {green}坦克{default} 连跳，无法获得额外过关积分。"
+	}
+	"L4DStats_NoBuyBonusAwarded"
+	{
+		"chi"		"幸存者未购买任何物品完成关卡，获得 {green}%d{default} 额外过关积分!"
+	}
+	"L4DStats_NewPlayerStatus"
+	{
+		"chi"		"{lightgreen}你当前被判定为新人，本局非新人幸存者会获得 {green}%.1fx{default} 带新分数倍率。"
+	}
+	"L4DStats_NewPlayerRoundSummary"
+	{
+		"chi"		"{lightgreen}本局检测到 {olive}%i{default} 名新人，带新系数为 {green}%.1fx{default}；新人本身不享受倍率。"
+	}
+	"L4DStats_TeamKillPenaltySelf"
+	{
+		"chi"		"你因误杀队友 {olive}%s{default} 失去 {green}%i{default} 分!"
+	}
+	"L4DStats_TeamKillPenaltyAll"
+	{
+		"chi"		"{olive}%s{default} 因误杀队友 {olive}%s{default} 失去 {green}%i{default} 分!"
+	}
+	"L4DStats_HeadshotSpecialKillSelf"
+	{
+		"chi"		"你爆头杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_HeadshotSpecialKillAll"
+	{
+		"chi"		"{olive}%s{default} 爆头杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_SpecialKillSelf"
+	{
+		"chi"		"你杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_SpecialKillAll"
+	{
+		"chi"		"{olive}%s{default} 杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_AdrenalineGivenSelf"
+	{
+		"chi"		"你赠送肾上腺素给 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_AdrenalineGivenAll"
+	{
+		"chi"		"{olive}%s{default} 赠送肾上腺素给 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_PillsGivenSelf"
+	{
+		"chi"		"你赠送药丸给 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_PillsGivenAll"
+	{
+		"chi"		"{olive}%s{default} 赠送药丸给 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DefibReviveSelf"
+	{
+		"chi"		"你用电击器复活了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_DefibReviveAll"
+	{
+		"chi"		"{olive}%s{default} 用电击器复活了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_HealTeammateSelf"
+	{
+		"chi"		"你用医疗包治疗了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_HealTeammateAll"
+	{
+		"chi"		"{olive}%s{default} 用医疗包治疗了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TeamIncapPenaltySelf"
+	{
+		"chi"		"你失去 {green}%i{default} 分，因为黑倒了 {olive}%s{default}!"
+	}
+	"L4DStats_TeamIncapPenaltyAll"
+	{
+		"chi"		"{olive}%s{default} 失去 {green}%i{default} 分，因为黑倒了 {olive}%s{default}!"
+	}
+	"L4DStats_LedgeHangSelf"
+	{
+		"chi"		"你造成 {olive}%s{default} 挂边，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_LedgeHangAll"
+	{
+		"chi"		"{olive}%s{default} 造成 {olive}%s{default} 挂边，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_JockeySaveSelf"
+	{
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_JockeySaveAll"
+	{
+		"chi"		"{olive}%s{default} 将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ChargerSaveSelf"
+	{
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ChargerSaveAll"
+	{
+		"chi"		"{olive}%s{default} 将 {olive}%s{default} 从 {green}%s{default} 手中救下，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_QuickChargerKillSelf"
+	{
+		"chi"		"你秒杀了 {green}牛{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_QuickChargerKillAll"
+	{
+		"chi"		"{olive}%s{default} 秒杀了 {green}牛{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_GasCanPouredSelf"
+	{
+		"chi"		"你成功灌注一桶油，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_GasCanPouredAll"
+	{
+		"chi"		"{olive}%s{default} 成功灌注一桶油，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ReviveTeammateSelf"
+	{
+		"chi"		"你拉起了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ReviveTeammateAll"
+	{
+		"chi"		"{olive}%s{default} 拉起了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_RescueClosetSelf"
+	{
+		"chi"		"你解救了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_RescueClosetAll"
+	{
+		"chi"		"{olive}%s{default} 解救了 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_FinaleSurvivorReward"
+	{
+		"chi"		"因 {olive}%i{default} 名幸存者完成救援关，所有幸存者获得 {green}%i{default} 分!"
+	}
+	"L4DStats_FinaleInfectedPenalty"
+	{
+		"chi"		"所有感染者因未能阻止幸存者完成救援关，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_HordeNoIncapReward"
+	{
+		"chi"		"所有幸存者因在尸潮后无人倒地或死亡，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_BoomerNoDeathReward"
+	{
+		"chi"		"所有幸存者因 {green}胖子{default} 爆炸后无人死亡，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TankKillWithDeaths"
+	{
+		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下击杀 {green}坦克{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_NoWitchDisturbanceReward"
+	{
+		"chi"		"所有幸存者因没有惊扰 {green}女巫{default}，获得 {green}%i{default} 额外过关分!"
+	}
+	"L4DStats_SafeRoomWithDeathsReward"
+	{
+		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下到达安全门，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_SafeRoomInfectedPenalty"
+	{
+		"chi"		"所有感染者因让幸存者进入安全门，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_WipeSurvivorsReward"
+	{
+		"chi"		"所有感染者因杀死全部幸存者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_SurvivorWipePenalty"
+	{
+		"chi"		"团队全灭，所有幸存者失去 {green}%i{default} 分!"
+	}
+	"L4DStats_AllSurvivorsLostRoundPenalty"
+	{
+		"chi"		"本局失败，所有幸存者失去 {green}%i{default} 分!"
+	}
+	"L4DStats_AllPlayersLostRoundPenalty"
+	{
+		"chi"		"本局失败，所有参与玩家失去 {green}%i{default} 分!"
+	}
+	"L4DStats_ProtectedTeammateSelf"
+	{
+		"chi"		"你保护了队友，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ProtectedTeammateAll"
+	{
+		"chi"		"{olive}%s{default} 保护了队友，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_InfectedDamageRewardSelf"
+	{
+		"chi"		"你对幸存者造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_InfectedDamageRewardAll"
+	{
+		"chi"		"{olive}%s{default} 对幸存者造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_PerfectBoomSelf"
+	{
+		"chi"		"你完美糊住了幸存者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_PerfectBoomAll"
+	{
+		"chi"		"{olive}%s{default} 完美糊住了幸存者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_GenericPointsSelf"
+	{
+		"chi"		"你获得 {green}%i{default} 分!"
+	}
+	"L4DStats_GenericPointsAll"
+	{
+		"chi"		"{olive}%s{default} 获得 {green}%i{default} 分!"
+	}
+	"L4DStats_FriendlyFirePenaltySelf"
+	{
+		"chi"		"你造成 {olive}%i{default} 点友伤，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_FriendlyFirePenaltyAll"
+	{
+		"chi"		"{olive}%s{default} 造成 {olive}%i{default} 点友伤，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltySelf"
+	{
+		"chi"		"你失去 {green}%i{default} 分，因为黑枪了 {olive}%s{default}!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltyAll"
+	{
+		"chi"		"{olive}%s{default} 失去 {green}%i{default} 分，因为黑枪了 {olive}%s{default}!"
+	}
+	"L4DStats_ChargerMultiHitSelf"
+	{
+		"chi"		"你用 {green}牛{default} 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ChargerMultiHitAll"
+	{
+		"chi"		"{olive}%s{default} 用 {green}牛{default} 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_CommonKillsRewardSelf"
+	{
+		"chi"		"你击杀 {olive}%i{default} 个感染者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_CommonKillsRewardAll"
+	{
+		"chi"		"{olive}%s{default} 击杀 {olive}%i{default} 个感染者，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltySelf"
+	{
+		"chi"		"你因让感染者进入安全门，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltyAll"
+	{
+		"chi"		"{olive}%s{default} 因让感染者进入安全门，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_AlarmCarPenalty"
+	{
+		"chi"		"{green}%N{default} 因击中警报车，失去 {green}%i{default} 分!"
+	}
+	"L4DStats_SpecialSaveSelf"
+	{
+		"chi"		"你将 {olive}%s{default} 从 {green}%s{default} 手中救出，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TankDamageRewardSelf"
+	{
+		"chi"		"你作为 {green}坦克{default} 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TankDamageRewardAll"
+	{
+		"chi"		"{olive}%s{default} 作为 {green}坦克{default} 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_WitchKillSelf"
+	{
+		"chi"		"你杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_WitchKillAll"
+	{
+		"chi"		"{olive}%s{default} 杀死 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TankRockHitSelf"
+	{
+		"chi"		"你用石头击中 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_TankRockHitAll"
+	{
+		"chi"		"{olive}%s{default} 用石头击中 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_IncapSurvivorSelf"
+	{
+		"chi"		"你制伏 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_IncapSurvivorAll"
+	{
+		"chi"		"{olive}%s{default} 制伏 {olive}%s{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_WitchCrownReward"
+	{
+		"chi"		"{olive}%s{default} 秒杀 {green}女巫{default}，获得 {green}%i{default} 分!"
+	}
+	"L4DStats_ClassSmoker"
+	{
+		"chi"		"舌头"
+	}
+	"L4DStats_ClassBoomer"
+	{
+		"chi"		"胖子"
+	}
+	"L4DStats_ClassHunter"
+	{
+		"chi"		"猎人"
+	}
+	"L4DStats_ClassSpitter"
+	{
+		"chi"		"口水"
+	}
+	"L4DStats_ClassJockey"
+	{
+		"chi"		"猴子"
+	}
+	"L4DStats_ClassCharger"
+	{
+		"chi"		"牛"
+	}
+	"L4DStats_ClassTank"
+	{
+		"chi"		"坦克"
+	}
+	"L4DStats_ClassWitch"
+	{
+		"chi"		"女巫"
+	}
+	"L4DStats_ClassUnknown"
+	{
+		"chi"		"未知特感"
+	}
+	"L4DStats_ASurvivor"
+	{
+		"chi"		"一名幸存者"
+	}
+	"L4DStats_MapRecordTeam"
+	{
+		"chi"		"队伍"
+	}
+	"L4DStats_MapRecordTeamCount"
+	{
+		"chi"		"队伍（%d人）"
+	}
+	"L4DStats_ConsolePrefix"
+	{
+		"chi"		"[排名]"
+	}
 }
