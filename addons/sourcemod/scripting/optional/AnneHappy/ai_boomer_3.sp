@@ -31,7 +31,7 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.4",
+		version 		= "3.0.5",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -68,6 +68,24 @@ int
 // Lists
 ArrayList
 	targetList[MAXPLAYERS + 1] = { null };
+
+// 最近生还者缓存（GetClosetSurvivor 内部有排序开销，无需每帧刷新）
+#define CLOSEST_TARGET_CACHE_TIME 0.2
+int cachedClosestTarget[MAXPLAYERS + 1] = { 0, ... };
+float nextClosestTargetRefresh[MAXPLAYERS + 1] = { 0.0, ... };
+
+int GetCachedClosestSurvivor(int client)
+{
+	float now = GetGameTime();
+	int cached = cachedClosestTarget[client];
+	if (now < nextClosestTargetRefresh[client] && IsValidSurvivor(cached) && IsPlayerAlive(cached))
+		return cached;
+
+	cached = GetClosetSurvivor(client);
+	cachedClosestTarget[client] = cached;
+	nextClosestTargetRefresh[client] = now + CLOSEST_TARGET_CACHE_TIME;
+	return cached;
+}
 
 public void OnPluginStart()
 {
@@ -119,8 +137,10 @@ public void OnAllPluginsLoaded()
 public void OnPluginEnd()
 {
 	if (LibraryExists(ANNE_NEXTBOT_LIBRARY))
+	{
 		AnneNextBot_SetPathConsumer(AnneNextBotPathConsumer_Boomer, false);
-		FindConVar("boomer_exposed_time_tolerance").RestoreDefault();
+	}
+	FindConVar("boomer_exposed_time_tolerance").RestoreDefault();
 	FindConVar("boomer_vomit_delay").RestoreDefault();
 	for (int i = 0; i < MAXPLAYERS + 1; i++)
 	{
@@ -146,6 +166,8 @@ public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 	for (int i = 0; i < MAXPLAYERS + 1; i++)
 	{
 		secondCheckFrame[i] = 0;
+		cachedClosestTarget[i] = 0;
+		nextClosestTargetRefresh[i] = 0.0;
 		AIPathMovement_Reset(i);
 	}
 }
@@ -197,7 +219,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	bool has_sight;
 
 	flags = GetEntityFlags(client);
-	target = GetClosetSurvivor(client);
+	target = GetCachedClosestSurvivor(client);
 	ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
 	if (!IsValidEntity(ability)) { return Plugin_Continue; }
 
@@ -410,7 +432,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				#endif
 				delete trace;
 				L4D_CTerrorPlayer_OnVomitedUpon(i, client);	
-				isInBileState[target] = true;
+				isInBileState[i] = true;
 			}
 			delete trace;
 		}
@@ -551,6 +573,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 					Handle hTrace = TR_TraceRayFilterEx(eyePos, targetEyePos, MASK_VISIBLE, RayType_EndPoint, TR_VomitClientFilter, specialInfected);
 					if (!TR_DidHit(hTrace) || TR_GetEntityIndex(hTrace) == i)
 					{
+						delete hTrace;
 						curTarget = i;
 						return Plugin_Changed;
 					}
@@ -565,10 +588,13 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 // 当生还被胖子喷中时，开始计算范围内的玩家
 public Action L4D_OnVomitedUpon(int victim, int &attacker, bool &boomerExplosion)
 {
-	isInBileState[victim] = true;
+	if (victim >= 1 && victim <= MaxClients) { isInBileState[victim] = true; }
+	// attacker 可能为 0（胆汁弹、Boomer 爆炸溅射），无效或非 AI Boomer 不构建转喷队列
+	if (attacker < 1 || attacker > MaxClients || !IsClientInGame(attacker) || !IsBoomer(attacker)) { return Plugin_Continue; }
 	/* 每次喷吐排除当前被喷目标与已经被喷了的目标，选择最近目标继续喷吐 */
 	if (targetList[attacker] == null) { targetList[attacker] = new ArrayList(2); }
-	if (!IsBoomer(attacker) && targetList[attacker].Length > 1) { return Plugin_Continue; }
+	// 已存在转喷队列时不重复构建，防止强喷同步触发本 forward 时目标重复膨胀
+	if (targetList[attacker].Length > 0) { return Plugin_Continue; }
 
 	// 当前 Boomer 目标集合中没有目标，开始获取目标
 	int i;
