@@ -68,11 +68,6 @@ In its current state it allows anyone to host their own up to date competitive L
 >
 > Configure `MinidumpAccount` for the account that should own the reports. The Anne-specific configuration uses the maintainer's SteamID64 because AnneWeb displays reports to the matching Steam account.
 
-### l4d_stats 积分流水核验
-
-`l4d_stats` 默认记录积分流水。为了控制数据库体积，只有单次正向加分大于 `l4d_stats_scorelog_formula_threshold`（默认 `500`）时，救援关、进安全屋和无 B 数奖励才会在 `formula` 写入约 15–40 字节的 `v3c` / `v3s` / `v3n` 紧凑计算输入；其他流水保持空字符串。网页会用这些输入独立复算最终分数，`SCORE_LOG_FORMULA_CHECK_THRESHOLD` 应与该 ConVar 保持一致。
-
----
 
 ## **Credits:**
 
