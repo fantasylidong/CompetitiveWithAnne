@@ -265,6 +265,17 @@ static bool SpawnAttempts_HasReachedAliveLimit(int zc)
     return HasReachedLimit(zc);
 }
 
+// “临时态”客户端：已被拒绝等待踢出，或已进入踢出队列（传送/内鬼刷新踢出）。
+// 这些实体只在 commit/death 时增减计数，任何全图清点（RecalcSiCapFromAlive
+// 等）都必须跳过，否则会被计入两次。当前刷特路径已改为创建即提交，不再有
+// pending 校验窗口，因此这里只识别踢出队列中的实体。
+bool SpawnAttempts_IsTransientSpawnClient(int client)
+{
+    if (client <= 0 || client > MaxClients)
+        return false;
+    return IsClientInGame(client) && IsClientInKickQueue(client);
+}
+
 static bool SpawnAttempts_HasReachedWaveLimit(int zc)
 {
     return HasReachedWaveClassLimit(zc);

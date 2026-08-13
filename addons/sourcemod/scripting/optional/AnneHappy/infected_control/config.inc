@@ -157,6 +157,7 @@ enum struct Config
     ConVar AntiBaitArmBefore;
     ConVar AntiBaitHoldConfirm;
     ConVar AntiBaitReleaseConfirm;
+    ConVar AntiBaitSpreadConfirm;
     ConVar AntiBaitAction;
     ConVar AntiBaitRunnerGapPct;
     ConVar AntiBaitRunnerNearDist;
@@ -186,6 +187,7 @@ enum struct Config
     float  fAntiBaitArmBefore;
     float  fAntiBaitHoldConfirm;
     float  fAntiBaitReleaseConfirm;
+    float  fAntiBaitSpreadConfirm;
     int    iAntiBaitAction;
     int    iAntiBaitRunnerGapPct;
     float  fAntiBaitRunnerNearDist;
@@ -628,6 +630,11 @@ enum struct Config
             "Seconds that hold conditions must remain cleared before an extended wave is released",
             CVAR_FLAG, true, 0.0, true, 10.0
         );
+        this.AntiBaitSpreadConfirm = CreateConVar(
+            "inf_antibait_spread_confirm", "3.0",
+            "Seconds a spread/isolated formation must persist before anti-bait pressure demotes; brief walk-away fake-outs keep the hold",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
         this.AntiBaitAction = CreateConVar(
             "inf_antibait_action", "2",
             "0=debug only, 1=prepare breach waves, 2=also fast-teleport invisible SI",
@@ -758,6 +765,7 @@ enum struct Config
         this.AntiBaitArmBefore.AddChangeHook(OnCfgChanged);
         this.AntiBaitHoldConfirm.AddChangeHook(OnCfgChanged);
         this.AntiBaitReleaseConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitSpreadConfirm.AddChangeHook(OnCfgChanged);
         this.AntiBaitAction.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerGapPct.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerNearDist.AddChangeHook(OnCfgChanged);
@@ -1061,6 +1069,7 @@ enum struct Config
         this.fAntiBaitArmBefore = this.AntiBaitArmBefore.FloatValue;
         this.fAntiBaitHoldConfirm = this.AntiBaitHoldConfirm.FloatValue;
         this.fAntiBaitReleaseConfirm = this.AntiBaitReleaseConfirm.FloatValue;
+        this.fAntiBaitSpreadConfirm = this.AntiBaitSpreadConfirm.FloatValue;
         this.iAntiBaitAction = this.AntiBaitAction.IntValue;
         this.iAntiBaitRunnerGapPct = this.AntiBaitRunnerGapPct.IntValue;
         this.fAntiBaitRunnerNearDist = this.AntiBaitRunnerNearDist.FloatValue;
@@ -1080,6 +1089,7 @@ enum struct Config
         if (this.fAntiBaitArmBefore < 0.0) this.fAntiBaitArmBefore = 0.0;
         if (this.fAntiBaitHoldConfirm < 0.0) this.fAntiBaitHoldConfirm = 0.0;
         if (this.fAntiBaitReleaseConfirm < 0.0) this.fAntiBaitReleaseConfirm = 0.0;
+        if (this.fAntiBaitSpreadConfirm < 0.0) this.fAntiBaitSpreadConfirm = 0.0;
         if (this.fAntiBaitClusterDist < 0.0) this.fAntiBaitClusterDist = 0.0;
         if (this.fAntiBaitTeamDist < 0.0) this.fAntiBaitTeamDist = 0.0;
         if (this.fAntiBaitPairDist < 0.0) this.fAntiBaitPairDist = 0.0;

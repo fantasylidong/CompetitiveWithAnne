@@ -297,5 +297,37 @@
 	{
 		"chi"		"[IC] 正在重建 Nav 图和逐区域进度缓存。"
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"chi"		"[IC] 刷特系统尚未启动。"
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"chi"		"[IC] 波决策器状态: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"chi"		"  波序号: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"chi"		"  已用时: %.1f秒"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"chi"		"  特感: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"chi"		"  Anti-Bait: 拦截中"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"chi"		"  Anti-Bait: 放行"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"chi"		"[IC] Nav 调试命令未编译；需要时请用 DEBUG_NAV 重新编译。"
+	}
 
 }

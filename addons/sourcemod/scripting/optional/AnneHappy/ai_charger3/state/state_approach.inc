@@ -203,6 +203,10 @@ stock Action checkShouldBhop(
     if (speed < g_cvBhopMinSpeed.FloatValue)
         return Plugin_Continue;
 
+    // 上次起跳安全检查因地形失败且仍在冷却期内, 跳过本帧的地面起跳尝试, 避免每帧重复整套 trace
+    if (isOnGround && AIPathMovement_IsRouteCheckThrottled(client))
+        return Plugin_Continue;
+
     if (isOnGround)
         return executeGroundBhop(client, target, dist, speed, visible, pos, targetPos, vVel, buttons, ang);
     else
@@ -519,7 +523,9 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
         ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
         g_AiChargers[client].m_BhopType = BhopType_None;
         g_AiChargers[client].m_AirStrafe.m_StrafeType = StrafeType_None;
-        
+
+        // 前视首节点被遮挡属于地形失败, 冷却期内不再重试
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
     }
 
@@ -543,6 +549,7 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
     if (!nextTickPosCheck(client, vFwd, visible)) {
         g_AiChargers[client].m_BhopType = BhopType_None;
         g_AiChargers[client].m_AirStrafe.m_StrafeType = StrafeType_None;
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
     }
 
@@ -584,12 +591,14 @@ stock Action performDirectGrounBhop(int client, float targetDist, const float po
     if (!isDirectBhopSafe(client, pos, targetPos, vFwd)) {
         g_AiChargers[client].m_BhopType = BhopType_None;
         g_AiChargers[client].m_AirStrafe.m_StrafeType = StrafeType_None;
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
     }
 
     if (!nextTickPosCheck(client, vFwd, visible)) {
         g_AiChargers[client].m_BhopType = BhopType_None;
         g_AiChargers[client].m_AirStrafe.m_StrafeType = StrafeType_None;
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
     }
 

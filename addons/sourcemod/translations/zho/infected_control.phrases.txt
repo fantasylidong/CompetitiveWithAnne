@@ -297,5 +297,37 @@
 	{
 		"zho"		"[IC] 正在重建 Nav 圖和逐區域進度快取。"
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"zho"		"[IC] 刷特系統尚未啟動。"
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"zho"		"[IC] 波決策器狀態: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"zho"		"  波序號: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"zho"		"  已用時: %.1f秒"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"zho"		"  特感: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"zho"		"  Anti-Bait: 攔截中"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"zho"		"  Anti-Bait: 放行"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"zho"		"[IC] Nav 除錯指令未編譯；需要時請用 DEBUG_NAV 重新編譯。"
+	}
 
 }

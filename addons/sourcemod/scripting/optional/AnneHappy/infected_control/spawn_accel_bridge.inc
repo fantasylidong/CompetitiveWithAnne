@@ -448,8 +448,15 @@ stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
     {
         if (!SpawnAccel_LoadGraphProgress())
         {
-            if (!g_bSpawnAccelDynamicRebuildPending)
-                SpawnAccel_EnsureLegacyBuckets();
+            // 动态重建后进度导出失败不能保持 pending，否则
+            // SpawnAccel_ShouldWaitForGraph 永远为真，普通/传送找位会一直
+            // 停在 Pending，导演兜底也永远走不到（刷特完全停摆）。
+            if (g_bSpawnAccelDynamicRebuildPending)
+            {
+                g_bSpawnAccelDynamicRebuildPending = false;
+                LogError("[IC][SPAWN ACCEL] dynamic graph progress export failed; clearing pending state and falling back to legacy buckets");
+            }
+            SpawnAccel_EnsureLegacyBuckets();
             return;
         }
         char diagnostics[768];

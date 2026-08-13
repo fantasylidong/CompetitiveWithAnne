@@ -462,3 +462,16 @@ stock float WaveDecider_GetReleaseEta()
         - (GetGameTime() - gWD.timerStartTime);
     return (remaining > 0.0) ? remaining : 0.0;
 }
+
+// 击杀阶段（EarlyCheck）剩余的兜底时间；非该状态返回 -1。
+// 供 ETA 估算使用：击杀阶段的时间不属于基础 16 秒倒计时，估算下一波
+// 时间时应为“剩余检查窗口 + 完整基础倒计时”，而不是从波开始起算间隔。
+stock float WaveDecider_GetEarlyCheckRemaining()
+{
+    if (gWD.state != WD_EarlyCheck)
+        return -1.0;
+
+    float remaining = DifficultyStrategy_GetWaveCheckDelay()
+        - (GetGameTime() - gWD.waveStartTime);
+    return (remaining > 0.0) ? remaining : 0.0;
+}

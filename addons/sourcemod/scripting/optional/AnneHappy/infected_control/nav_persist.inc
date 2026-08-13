@@ -127,6 +127,7 @@ bool TryLoadBucketsFromCache()
         return false;
     }
 
+    int loadedAreas = 0;
     if (kv.GotoFirstSubKey(false))
     {
         do {
@@ -157,11 +158,24 @@ bool TryLoadBucketsFromCache()
             if (zMin < g_BucketMinZ[bucketIdx]) g_BucketMinZ[bucketIdx] = zMin;
             if (zMax > g_BucketMaxZ[bucketIdx]) g_BucketMaxZ[bucketIdx] = zMax;
 
+            loadedAreas++;
         } while (kv.GotoNextKey(false));
         kv.GoBack();
     }
 
     delete kv;
+
+    // 元数据匹配但一个区域都没有成功入桶（残缺/损坏缓存）时，不能把空桶
+    // 当成可用缓存，否则整局刷点质量会静默退化。删除坏文件并走重建。
+    if (loadedAreas <= 0)
+    {
+        LogError("[BUCKET] cache matched but contained no usable areas, rebuilding: %s", g_sBucketCachePath);
+        ClearNavBuckets();
+        if (FileExists(g_sBucketCachePath))
+            DeleteFile(g_sBucketCachePath);
+        return false;
+    }
+
     g_BucketsReady = true;
     Debug_Print("[BUCKET] loaded from cache: %s", g_sBucketCachePath);
     return true;
@@ -225,7 +239,15 @@ void SaveBucketsToCache()
     }
     kv.GoBack();
 
-    kv.ExportToFile(g_sBucketCachePath);
+    if (!kv.ExportToFile(g_sBucketCachePath))
+    {
+        LogError("[BUCKET] failed to export cache: %s", g_sBucketCachePath);
+        // 导出中断可能留下半截文件；删掉它，避免下次按残缺缓存加载。
+        if (FileExists(g_sBucketCachePath))
+            DeleteFile(g_sBucketCachePath);
+        delete kv;
+        return;
+    }
     delete kv;
     Debug_Print("[BUCKET] saved to cache: %s", g_sBucketCachePath);
 }
