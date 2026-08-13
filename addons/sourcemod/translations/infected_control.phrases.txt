@@ -297,5 +297,37 @@
 	{
 		"en"		"[IC] Rebuilding the Nav graph and per-area progress cache."
 	}
+	"InfectedControl_WaveStatusNotStarted"
+	{
+		"en"		"[IC] The spawn system has not started yet."
+	}
+	"InfectedControl_WaveStatusState"
+	{
+		"en"		"[IC] Wave decider state: %s"
+	}
+	"InfectedControl_WaveStatusWaveIndex"
+	{
+		"en"		"  Wave index: %d"
+	}
+	"InfectedControl_WaveStatusElapsed"
+	{
+		"en"		"  Elapsed: %.1fs"
+	}
+	"InfectedControl_WaveStatusSiCount"
+	{
+		"en"		"  Specials: %d/%d"
+	}
+	"InfectedControl_WaveStatusAntiBaitHold"
+	{
+		"en"		"  Anti-Bait: holding"
+	}
+	"InfectedControl_WaveStatusAntiBaitRelease"
+	{
+		"en"		"  Anti-Bait: releasing"
+	}
+	"InfectedControl_NavDebugNotCompiled"
+	{
+		"en"		"[IC] Nav debug commands are not compiled in; rebuild with DEBUG_NAV when needed."
+	}
 
 }

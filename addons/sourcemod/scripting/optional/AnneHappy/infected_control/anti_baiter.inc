@@ -32,9 +32,11 @@ enum struct AntiBaitRuntime
     float stateSince;
     float lastProgressTime;
     float pressureSince;
+    float spreadSince;         // Pressure 中散开候选的起始时间；0=无候选
     float blockedSince;
     float lastSpreadDist;
     float lastAvgNearestDist;
+    bool baselineCenterValid;  // 位置基线是否已建立（防止从原点误判位移推进）
     bool teamHolding;
     bool attackableSpread;
     bool allPinned;
@@ -62,9 +64,11 @@ enum struct AntiBaitRuntime
         this.stateSince = 0.0;
         this.lastProgressTime = 0.0;
         this.pressureSince = 0.0;
+        this.spreadSince = 0.0;
         this.blockedSince = 0.0;
         this.lastSpreadDist = 0.0;
         this.lastAvgNearestDist = 0.0;
+        this.baselineCenterValid = false;
         this.teamHolding = false;
         this.attackableSpread = false;
         this.allPinned = false;
@@ -104,7 +108,10 @@ static void AntiBait_SetState(AntiBaitState next, float now, const char[] reason
     gAB.state = next;
     gAB.stateSince = now;
     if (next == AB_Pressure)
+    {
         gAB.pressureSince = now;
+        gAB.spreadSince = 0.0;
+    }
     else
         gAB.spreadStallPressure = false;
 }
@@ -128,10 +135,13 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
                                          int &groupCount,
                                          float center[3])
 {
-    int pcts[MAX_SURVIVOR_SLOTS];
+    int flowPcts[MAX_SURVIVOR_SLOTS];
     int n = 0;
-    int sum = 0;
+    int flowN = 0;
+    int flowSum = 0;
+    avgPct = -1;
     maxPct = -1;
+    medianPct = -1;
     highestClient = -1;
     spreadDist = 0.0;
     avgNearestDist = 0.0;
@@ -158,30 +168,31 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
             continue;
         }
 
-        int pct;
-        if (!TryGetClientFlowPercentSafe(i, pct))
-        {
-            vulnerableCount++;
+        if (n >= MAX_SURVIVOR_SLOTS)
             continue;
-        }
 
-        pct = AntiBait_ClampPct(pct);
-        if (n < sizeof(pcts))
+        // 行动能力正常的成员一律参与位置/队形统计。flow 读取失败（电梯、
+        // 坏 Nav 等）不算“脆弱”，只是不参与 flow 进度统计，避免短暂的
+        // 进度读取故障错误地阻止或解除强化保持。
+        GetClientAbsOrigin(i, pos[n]);
+        center[0] += pos[n][0];
+        center[1] += pos[n][1];
+        center[2] += pos[n][2];
+        nearest[n] = 999999.0;
+        n++;
+        activeCount++;
+
+        int pct;
+        if (TryGetClientFlowPercentSafe(i, pct))
         {
-            pcts[n] = pct;
-            GetClientAbsOrigin(i, pos[n]);
-            center[0] += pos[n][0];
-            center[1] += pos[n][1];
-            center[2] += pos[n][2];
-            nearest[n] = 999999.0;
-            n++;
-            activeCount++;
-        }
-        sum += pct;
-        if (pct > maxPct)
-        {
-            maxPct = pct;
-            highestClient = i;
+            pct = AntiBait_ClampPct(pct);
+            flowPcts[flowN++] = pct;
+            flowSum += pct;
+            if (pct > maxPct)
+            {
+                maxPct = pct;
+                highestClient = i;
+            }
         }
     }
 
@@ -192,9 +203,13 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
     center[1] /= float(n);
     center[2] /= float(n);
 
-    SortIntegers(pcts, n, Sort_Ascending);
-    avgPct = RoundToNearest(float(sum) / float(n));
-    medianPct = pcts[(n - 1) / 2];
+    if (flowN > 0)
+    {
+        SortIntegers(flowPcts, flowN, Sort_Ascending);
+        avgPct = RoundToNearest(float(flowSum) / float(flowN));
+        medianPct = flowPcts[(flowN - 1) / 2];
+    }
+    // flowN == 0：avg/max/median 保持 -1，进度改由位置位移判定。
 
     for (int i = 0; i < n; i++)
     {
@@ -356,9 +371,12 @@ stock bool AntiBait_ShouldHoldWave()
         return false;
     if (gAB.activeCount < 2 || gAB.vulnerableCount > 0)
         return false;
-    if (!gAB.teamHolding || !AntiBait_IsStalled())
+    if (!AntiBait_IsStalled())
         return false;
 
+    // 队形语义由状态机维护：进入 Pressure 需要集结确认，离开 Pressure
+    // 需要散开持续 fAntiBaitSpreadConfirm 秒。这里不再看瞬时 teamHolding，
+    // 否则一两秒的假走位就能把保持骗掉。
     return (GetGameTime() - gAB.pressureSince) >= gCV.fAntiBaitHoldConfirm;
 }
 
@@ -455,6 +473,8 @@ static void AntiBait_Resume(float now)
         gAB.stateSince += pausedFor;
         if (gAB.pressureSince > 0.0)
             gAB.pressureSince += pausedFor;
+        if (gAB.spreadSince > 0.0)
+            gAB.spreadSince += pausedFor;
     }
 
     AntiBaitState resume = gAB.resumeState;
@@ -565,6 +585,7 @@ void AntiBait_OnWaveStart()
         gAB.baselineMaxPct = maxPct;
         gAB.baselineMedianPct = medianPct;
         gAB.baselineCenter = center;
+        gAB.baselineCenterValid = true;
         gAB.lastAvgPct = avgPct;
         gAB.lastMaxPct = maxPct;
         gAB.lastMedianPct = medianPct;
@@ -638,19 +659,29 @@ void AntiBait_Update()
     gAB.holdingTarget = gAB.teamHolding ? AntiBait_SelectHoldingTarget() : -1;
     AntiBait_UpdateRunner(highest, maxPct, medianPct);
 
-    if (gAB.baselineAvgPct < 0 || gAB.baselineMaxPct < 0 || gAB.baselineMedianPct < 0)
+    // 位置基线：本波第一次拿到有效快照时建立（含停滞时钟起点）。
+    if (!gAB.baselineCenterValid)
+    {
+        gAB.baselineCenter = center;
+        gAB.baselineCenterValid = true;
+        gAB.lastProgressTime = now;
+    }
+
+    // Flow 基线：flow 从不可读恢复为可读时补建。这不是玩家推进，
+    // 不重置停滞时钟。
+    if ((gAB.baselineAvgPct < 0 || gAB.baselineMaxPct < 0 || gAB.baselineMedianPct < 0)
+        && medianPct >= 0)
     {
         gAB.baselineAvgPct = avgPct;
         gAB.baselineMaxPct = maxPct;
         gAB.baselineMedianPct = medianPct;
-        gAB.baselineCenter = center;
-        gAB.lastProgressTime = now;
     }
 
     // 使用下中位数要求过半核心成员推进；单人探路不再替全队重置停滞计时。
-    int flowDelta = medianPct - gAB.baselineMedianPct;
+    bool flowKnown = (medianPct >= 0 && gAB.baselineMedianPct >= 0);
+    int flowDelta = flowKnown ? (medianPct - gAB.baselineMedianPct) : 0;
     float movedDist = GetVectorDistance(center, gAB.baselineCenter);
-    bool progressedByFlow = flowDelta >= gCV.iAntiBaitProgressPct;
+    bool progressedByFlow = flowKnown && flowDelta >= gCV.iAntiBaitProgressPct;
     bool progressedByDistance = gCV.fAntiBaitProgressDist > 0.0
         && movedDist >= gCV.fAntiBaitProgressDist;
     bool progressed = progressedByFlow || progressedByDistance;
@@ -671,6 +702,7 @@ void AntiBait_Update()
         gAB.baselineCenter = center;
         gAB.lastProgressTime = now;
         gAB.spreadStallPressure = false;
+        gAB.spreadSince = 0.0;
 
         AntiBait_Debug("progress reset flowDelta=%d threshold=%d moved=%.1f threshold=%.1f",
             flowDelta, gCV.iAntiBaitProgressPct, movedDist, gCV.fAntiBaitProgressDist);
@@ -683,16 +715,32 @@ void AntiBait_Update()
         return;
     }
 
-    if (releasedBySpread && gAB.state == AB_Pressure && !gAB.spreadStallPressure)
+    // 散开不算推进：不重置停滞时钟。Pressure 中的散开需要持续
+    // fAntiBaitSpreadConfirm 秒才降级为 Recover；短暂走位马上回聚会
+    // 取消散开候选，保持不被“假走位”骗掉。
+    if (gAB.state == AB_Pressure && !gAB.spreadStallPressure)
     {
-        gAB.lastProgressTime = now;
-        AntiBait_SetState(AB_Recover, now, "spread");
-        return;
-    }
-    else if (releasedBySpread && gAB.state == AB_Recover && (now - gAB.stateSince) >= gCV.fAntiBaitRecover)
-    {
-        AntiBait_SetState(AB_Observe, now, "recovered");
-        return;
+        if (releasedBySpread)
+        {
+            if (gAB.spreadSince <= 0.0)
+            {
+                gAB.spreadSince = now;
+                AntiBait_Debug("spread candidate started (confirm=%.1fs)",
+                    gCV.fAntiBaitSpreadConfirm);
+            }
+            else if ((now - gAB.spreadSince) >= gCV.fAntiBaitSpreadConfirm)
+            {
+                gAB.spreadSince = 0.0;
+                AntiBait_SetState(AB_Recover, now, "spread confirmed");
+                return;
+            }
+            // 确认期内维持 Pressure，波次拦截不解除。
+        }
+        else if (gAB.spreadSince > 0.0)
+        {
+            gAB.spreadSince = 0.0;
+            AntiBait_Debug("spread candidate cancelled (regrouped)");
+        }
     }
 
     if (gAB.state == AB_Grace)
@@ -704,6 +752,18 @@ void AntiBait_Update()
 
     if (gAB.state == AB_Recover)
     {
+        // 停滞从未被真实推进打断且重新集结时，武装窗口内直接重返
+        // Pressure。视作同一次保持的延续，补齐 pressureSince，避免
+        // WaveDecider 的释放确认在重武装完成前先到期。
+        if (WaveDecider_IsAntiBaitArmWindowOpen() && gAB.teamHolding
+            && (now - gAB.lastProgressTime) >= gCV.fAntiBaitWindow)
+        {
+            AntiBait_SetState(AB_Pressure, now, "regrouped while still stalled");
+            gAB.spreadStallPressure = false;
+            gAB.pressureSince = now - gCV.fAntiBaitHoldConfirm;
+            return;
+        }
+
         if ((now - gAB.stateSince) >= gCV.fAntiBaitRecover)
             AntiBait_SetState(AB_Observe, now, "recover done");
         return;

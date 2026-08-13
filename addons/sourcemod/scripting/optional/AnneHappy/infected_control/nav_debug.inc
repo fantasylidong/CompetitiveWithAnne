@@ -381,13 +381,13 @@ static void NavDebug_DrawAimLineOnce(int client, const float end[3])
 
 public Action Cmd_NavPeek(int client, int args)
 {
-    ReplyToCommand(client, "[IC] Nav 调试命令未编译；需要时请用 DEBUG_NAV 重新编译。");
+    ReplyToCommand(client, "%t", "InfectedControl_NavDebugNotCompiled");
     return Plugin_Handled;
 }
 
 public Action Cmd_NavTest(int client, int args)
 {
-    ReplyToCommand(client, "[IC] Nav 调试命令未编译；需要时请用 DEBUG_NAV 重新编译。");
+    ReplyToCommand(client, "%t", "InfectedControl_NavDebugNotCompiled");
     return Plugin_Handled;
 }
 

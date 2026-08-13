@@ -14,9 +14,16 @@ enum EventPressurePanicKind
     EventPressurePanic_MapEvent
 }
 
+#define EVENT_PRESSURE_PANIC_EVENT_HOLD 60.0
+
 static DynamicDetour g_hMapPanicDetour = null;
 static bool g_bMapPanicDetourActive = false;
-static bool g_bPanicGameEventActive = false;
+// create_panic_event 的滚动有效窗口：每次收到新的 panic 事件都刷新，
+// panic_event_finished 立即清除。带超时是为了防止三方图只发 create 不发
+// finished 时整回合旁路 Anti-Bait；真正的无限尸潮由脚本重复触发 panic
+// 事件（会不断刷新窗口）或由 trigger_horde_notify 的 L4D2_HordeStatus(1)
+// 转发覆盖。
+static float g_fPanicGameEventUntil = 0.0;
 static bool g_bFinaleEventActive = false;
 static bool g_bHoldoutEventActive = false;
 static bool g_bForwardInfiniteHordeActive = false;
@@ -61,7 +68,7 @@ void EventPressure_Shutdown()
 
 void EventPressure_Reset()
 {
-    g_bPanicGameEventActive = false;
+    g_fPanicGameEventUntil = 0.0;
     g_bFinaleEventActive = false;
     g_bHoldoutEventActive = false;
     g_bForwardInfiniteHordeActive = false;
@@ -70,9 +77,14 @@ void EventPressure_Reset()
     g_eMapPanicKind = EventPressurePanic_None;
 }
 
+static bool EventPressure_IsPanicGameEventActive()
+{
+    return g_fPanicGameEventUntil > 0.0 && GetGameTime() < g_fPanicGameEventUntil;
+}
+
 bool EventPressure_ShouldBypassAntiBait()
 {
-    return g_bPanicGameEventActive
+    return EventPressure_IsPanicGameEventActive()
         || EventPressure_IsMapPanicWindowActive()
         || g_bFinaleEventActive
         || g_bHoldoutEventActive
@@ -174,9 +186,11 @@ public MRESReturn EventPressure_OnMapPanicPost(int pThis, Handle hReturn, Handle
 
 public void EventPressure_OnPanicStart(Event event, const char[] name, bool dontBroadcast)
 {
-    if (!g_bPanicGameEventActive)
-        Debug_Print("[EVENT] panic game event started");
-    g_bPanicGameEventActive = true;
+    if (!EventPressure_IsPanicGameEventActive())
+        Debug_Print("[EVENT] panic game event started (hold=%.0fs, refreshed per event)",
+            EVENT_PRESSURE_PANIC_EVENT_HOLD);
+    // 每个新的 panic 事件都刷新窗口；连续/无限尸潮脚本会不断触发该事件。
+    g_fPanicGameEventUntil = GetGameTime() + EVENT_PRESSURE_PANIC_EVENT_HOLD;
 
     if (!g_bMapPanicDetourActive)
     {
@@ -187,10 +201,10 @@ public void EventPressure_OnPanicStart(Event event, const char[] name, bool dont
 
 public void EventPressure_OnPanicEnd(Event event, const char[] name, bool dontBroadcast)
 {
-    if (g_bPanicGameEventActive)
+    if (EventPressure_IsPanicGameEventActive())
         Debug_Print("[EVENT] panic game event finished; classified window remains=%d",
             EventPressure_IsMapPanicWindowActive());
-    g_bPanicGameEventActive = false;
+    g_fPanicGameEventUntil = 0.0;
 }
 
 public void EventPressure_OnFinaleStart(Event event, const char[] name, bool dontBroadcast)
