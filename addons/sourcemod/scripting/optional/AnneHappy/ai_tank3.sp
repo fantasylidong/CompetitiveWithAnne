@@ -188,7 +188,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
-    version     = "1.0.0.7",
+    version     = "1.0.0.8",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -1152,6 +1152,10 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
         if (!g_cvBhopNoVision.BoolValue && !visible)
             return Plugin_Continue;
 
+        // 上次起跳安全检查因地形失败且仍在冷却期内时跳过尝试，避免受阻时每帧重复整套 trace
+        if (AIPathMovement_IsRouteCheckThrottled(client))
+            return Plugin_Continue;
+
         if (!useCurrentBhop)
         {
             bool pathHandled = false;
@@ -1161,7 +1165,10 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
         }
 
         if (!nextTickPosCheck(client, visible))
+        {
+            AIPathMovement_MarkRouteCheckFailure(client);
             return Plugin_Continue;
+        }
 
         float vPredict[3], vDir[3], vFwd[3], vRight[3];
         g_AiTanks[client].bhopType = TankBhopType_Normal;
@@ -1298,7 +1305,11 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
         maxEstimateDist = PATH_LOOKAHEAD_MIN_DIST;
 
     if (!getTankLookAheadGoalPos(client, pos, maxEstimateDist, lookAheadPos, g_cvPathLookAheadMaxDepth.IntValue))
+    {
+        // 前视首节点被遮挡属于地形失败, 冷却期内不再重试
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
+    }
 
     float vFwd[3];
     MakeVectorFromPoints(pos, lookAheadPos, vFwd);
@@ -1314,7 +1325,10 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
         visible,
         g_cvBhopNoVisionMaxAng.FloatValue
     ))
+    {
+        AIPathMovement_MarkRouteCheckFailure(client);
         return Plugin_Continue;
+    }
 
     float vecLen = getVectorLength2D(vFwd);
     if (vecLen > g_cvBhopMaxSpeed.FloatValue)

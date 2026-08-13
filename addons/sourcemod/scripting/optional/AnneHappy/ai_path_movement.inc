@@ -10,6 +10,7 @@
 #define AI_PATH_MOVEMENT_MAX_LOCAL_STEP_UP 56.0
 #define AI_PATH_MOVEMENT_GROUND_TRACE_MARGIN 10.0
 #define AI_PATH_MOVEMENT_MIN_GROUND_NORMAL_Z 0.20
+#define AI_PATH_MOVEMENT_ROUTE_FAIL_RETRY 0.1
 
 enum struct AIPathMovementState
 {
@@ -28,7 +29,38 @@ enum struct AIPathMovementState
 }
 
 AIPathMovementState g_AIPathMovementState[MAXPLAYERS + 1];
+float g_AIPathMovementRouteFailTime[MAXPLAYERS + 1];
 ConVar g_AIPathMovementGravityCvar;
+
+/**
+* 起跳路线安全检查的失败节流。
+* 地形导致的检查失败（撞墙/断层/落点危险）在极短时间内不会自行消失，
+* 每帧重试只会重复烧掉相同的 hull/ray trace。失败后在冷却时间内跳过重试，
+* 即可把受阻状态下的射线开销压到 1/N，而重试延迟最多 AI_PATH_MOVEMENT_ROUTE_FAIL_RETRY 秒。
+*/
+stock void AIPathMovement_MarkRouteCheckFailure(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_AIPathMovementRouteFailTime[client] = GetGameTime();
+}
+
+stock bool AIPathMovement_IsRouteCheckThrottled(int client, float cooldown = AI_PATH_MOVEMENT_ROUTE_FAIL_RETRY)
+{
+    if (client < 1 || client > MaxClients)
+        return false;
+
+    float now = GetGameTime();
+    float failTime = g_AIPathMovementRouteFailTime[client];
+    // 换图后 GameTime 回卷，旧时间戳会比当前时间大，直接清掉避免长时间误节流
+    if (failTime > now)
+    {
+        g_AIPathMovementRouteFailTime[client] = 0.0;
+        return false;
+    }
+    return now - failTime < cooldown;
+}
 
 stock void AIPathMovement_Reset(int client)
 {
@@ -239,6 +271,16 @@ stock bool AIPathMovement_IsJumpRouteSafe(
     if (airTime <= 0.0)
         airTime = AIPathMovement_GetJumpAirTime(maxLocalDrop);
 
+    // 无视野角度拒绝不需要任何 trace，放在最前面可让被拒绝的尝试零射线开销
+    if (!visible && noVisionMaxAngle > 0.0)
+    {
+        float eyeAngles[3], eyeDirection[3];
+        GetClientEyeAngles(client, eyeAngles);
+        GetAngleVectors(eyeAngles, eyeDirection, NULL_VECTOR, NULL_VECTOR);
+        if (AIPathMovement_VectorAngle(eyeDirection, velocity, true) > noVisionMaxAngle)
+            return false;
+    }
+
     float start[3], routeEnd[3];
     GetClientAbsOrigin(client, start);
     routeEnd = start;
@@ -273,15 +315,6 @@ stock bool AIPathMovement_IsJumpRouteSafe(
     delete trace;
     if (blocked)
         return false;
-
-    if (!visible && noVisionMaxAngle > 0.0)
-    {
-        float eyeAngles[3], eyeDirection[3];
-        GetClientEyeAngles(client, eyeAngles);
-        GetAngleVectors(eyeAngles, eyeDirection, NULL_VECTOR, NULL_VECTOR);
-        if (AIPathMovement_VectorAngle(eyeDirection, velocity, true) > noVisionMaxAngle)
-            return false;
-    }
 
     return !AIPathMovement_HasPotentialGap(client, start, routeEnd, maxLocalDrop);
 }

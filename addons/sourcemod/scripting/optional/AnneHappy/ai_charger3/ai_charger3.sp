@@ -35,7 +35,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.5",
+	version 		= "1.0.1.6",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 

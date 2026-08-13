@@ -20,7 +20,7 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.3",
+		version 		= "3.0.4",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -159,6 +159,8 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	}
 	AIPathMovement_Reset(spitter);
 	if (!(targetDist < 1000.0 && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
+	// 上次起跳安全检查因地形失败且仍在冷却期内时跳过尝试，避免受阻时每帧重复整套 trace
+	if (AIPathMovement_IsRouteCheckThrottled(spitter)) { return Plugin_Continue; }
 	GetClientEyeAngles(spitter, eyeAngle);
 	bool pathGuided = false;
 	float pathGoal[3];
@@ -200,7 +202,10 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		hasSight,
 		89.0
 	))
+	{
+		AIPathMovement_MarkRouteCheckFailure(spitter);
 		return Plugin_Continue;
+	}
 	bool hopped = spitterDoBhop(spitter, buttons, eyeAngle);
 	if (pathGuided && hopped)
 	{

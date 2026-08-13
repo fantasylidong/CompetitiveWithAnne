@@ -31,7 +31,7 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.5",
+		version 		= "3.0.6",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -440,10 +440,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	}
 
 	// 有有效路径时允许在拐角等无直视场景继续沿 PathFollower 连跳。
+	// 上次起跳安全检查因地形失败且仍在冷却期内时跳过尝试，避免受阻时每帧重复整套 trace。
 	bool canUsePath = g_hPathBhop.BoolValue && AIPathSnapshot_IsReady(client) && !AIPathSnapshot_HasSpecialMoveAhead(client, 2);
 	if (g_hAllowBhop.BoolValue && IsValidSurvivor(target) && (has_sight || canUsePath) && (flags & FL_ONGROUND)
 		&& ((0.5 * g_hVomitRange.FloatValue) < targetDist && targetDist < 1000.0)
-		&& cur_speed > 160.0)
+		&& cur_speed > 160.0 && !AIPathMovement_IsRouteCheckThrottled(client))
 	{
 		float bhopTarget[3];
 		bhopTarget = targetPos;
@@ -461,13 +462,19 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, has_sight, 89.0))
 		{
 			if (!pathGuided || !has_sight)
+			{
+				AIPathMovement_MarkRouteCheckFailure(client);
 				return pathAirFacing ? Plugin_Changed : Plugin_Continue;
+			}
 
 			bhopTarget = targetPos;
 			vel_buffer = CalculateVel(self_pos, bhopTarget, g_hBhopSpeed.FloatValue);
 			pathGuided = false;
 			if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, true, 89.0))
+			{
+				AIPathMovement_MarkRouteCheckFailure(client);
 				return pathAirFacing ? Plugin_Changed : Plugin_Continue;
+			}
 		}
 		if (pathGuided)
 		{
