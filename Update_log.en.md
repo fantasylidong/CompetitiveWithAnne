@@ -108,3 +108,8 @@
 - Upgraded `rpg.smx` to 2.0.1: hats, skins, and glows are reapplied after the database load finishes; hats/skins are no longer cleared to 0 while the scoreboard cache is still loading.
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
+
+### August 13, 2026 All-Newbie Team Bonus
+- Upgraded `l4d_stats.smx` to 1.5.6. When every human survivor is a new player and there are at least four of them, the whole team earns a 1.5x newbie-team multiplier instead of nobody getting the mentoring bonus.
+- One to three new players still use the old rule: only experienced survivors receive 1.1 / 1.3 / 1.5.
+- Added `l4d_stats_newbie_bonus_all_newbie_multiplier` (default 1.5) and `l4d_stats_newbie_bonus_all_newbie_min` (default 4). Saferoom, finale, and round-start chat explain the team bonus in each language.

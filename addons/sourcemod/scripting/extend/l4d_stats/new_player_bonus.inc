@@ -9,13 +9,16 @@ new Handle:cvar_NewPlayerBonusMaxPoints = INVALID_HANDLE;
 new Handle:cvar_NewPlayerBonusFirstMultiplier = INVALID_HANDLE;
 new Handle:cvar_NewPlayerBonusExtraMultiplier = INVALID_HANDLE;
 new Handle:cvar_NewPlayerBonusMaxMultiplier = INVALID_HANDLE;
+new Handle:cvar_NewPlayerBonusAllNewbieMultiplier = INVALID_HANDLE;
+new Handle:cvar_NewPlayerBonusAllNewbieMinPlayers = INVALID_HANDLE;
 new bool:g_bNewPlayerBonusRoundAnnounced = false;
 new bool:g_bNewPlayerBonusClientDataReady[MAXPLAYERS + 1];
 
 // 带新人奖励配置：
 // - 同时以累计游玩时间和总分判断新人。
-// - 新人本身不吃带新倍率，非新人幸存者才会吃倍率。
+// - 通常新人本身不吃带新倍率，非新人幸存者才会吃倍率。
 // - 默认 1 名新人 x1.1，之后每多 1 名新人 +0.2，即 2 名 x1.3、3 名 x1.5。
+// - 当场上真人幸存者都是新人且人数达到门槛（默认 4 人）时，全员获得新人组队加成（默认 x1.5）。
 stock NewPlayerBonus_CreateCvars()
 {
 	cvar_NewPlayerBonusEnable = CreateConVar("l4d_stats_newbie_bonus_enable", "1", "是否启用带新人分数倍率。0=关闭, 1=开启", 0, true, 0.0, true, 1.0);
@@ -24,6 +27,8 @@ stock NewPlayerBonus_CreateCvars()
 	cvar_NewPlayerBonusFirstMultiplier = CreateConVar("l4d_stats_newbie_bonus_first_multiplier", "1.1", "带 1 名新人时的分数倍率。", 0, true, 1.0);
 	cvar_NewPlayerBonusExtraMultiplier = CreateConVar("l4d_stats_newbie_bonus_extra_multiplier", "0.2", "第 2 名新人开始，每多 1 名新人额外增加的倍率。", 0, true, 0.0);
 	cvar_NewPlayerBonusMaxMultiplier = CreateConVar("l4d_stats_newbie_bonus_max_multiplier", "0.0", "带新人分数倍率上限。0=不限制", 0, true, 0.0);
+	cvar_NewPlayerBonusAllNewbieMultiplier = CreateConVar("l4d_stats_newbie_bonus_all_newbie_multiplier", "1.5", "真人幸存者全部为新人且人数达到门槛时，全员获得的组队倍率。", 0, true, 1.0);
+	cvar_NewPlayerBonusAllNewbieMinPlayers = CreateConVar("l4d_stats_newbie_bonus_all_newbie_min", "4", "触发全员新人组队加成所需的最少真人生还者人数。", 0, true, 1.0);
 }
 
 stock NewPlayerBonus_ResetRound()
@@ -63,6 +68,19 @@ stock bool:NewPlayerBonus_IsNewPlayer(client)
 		ClientPoints[client] < GetConVarInt(cvar_NewPlayerBonusMaxPoints);
 }
 
+stock NewPlayerBonus_CountHumanSurvivors()
+{
+	new Count = 0;
+
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		if (Stats_IsSurvivorHuman(i))
+			Count++;
+	}
+
+	return Count;
+}
+
 stock NewPlayerBonus_CountNewSurvivors()
 {
 	if (!NewPlayerBonus_AreSurvivorStatsReady())
@@ -79,19 +97,20 @@ stock NewPlayerBonus_CountNewSurvivors()
 	return Count;
 }
 
-stock Float:NewPlayerBonus_GetMultiplier()
+stock bool:NewPlayerBonus_IsAllNewbieTeam()
 {
-	if (!GetConVarBool(cvar_NewPlayerBonusEnable))
-		return 1.0;
+	if (!GetConVarBool(cvar_NewPlayerBonusEnable) || !NewPlayerBonus_AreSurvivorStatsReady())
+		return false;
 
-	new NewPlayerCount = NewPlayerBonus_CountNewSurvivors();
-	if (NewPlayerCount <= 0)
-		return 1.0;
+	new HumanCount = NewPlayerBonus_CountHumanSurvivors();
+	if (HumanCount < GetConVarInt(cvar_NewPlayerBonusAllNewbieMinPlayers))
+		return false;
 
-	new Float:Multiplier = GetConVarFloat(cvar_NewPlayerBonusFirstMultiplier);
-	if (NewPlayerCount > 1)
-		Multiplier += float(NewPlayerCount - 1) * GetConVarFloat(cvar_NewPlayerBonusExtraMultiplier);
+	return HumanCount == NewPlayerBonus_CountNewSurvivors();
+}
 
+stock Float:NewPlayerBonus_ClampMultiplier(Float:Multiplier)
+{
 	new Float:MaxMultiplier = GetConVarFloat(cvar_NewPlayerBonusMaxMultiplier);
 	if (MaxMultiplier > 0.0 && Multiplier > MaxMultiplier)
 		Multiplier = MaxMultiplier;
@@ -102,12 +121,37 @@ stock Float:NewPlayerBonus_GetMultiplier()
 	return Multiplier;
 }
 
+stock Float:NewPlayerBonus_GetMultiplier()
+{
+	if (!GetConVarBool(cvar_NewPlayerBonusEnable))
+		return 1.0;
+
+	if (NewPlayerBonus_IsAllNewbieTeam())
+		return NewPlayerBonus_ClampMultiplier(GetConVarFloat(cvar_NewPlayerBonusAllNewbieMultiplier));
+
+	new NewPlayerCount = NewPlayerBonus_CountNewSurvivors();
+	if (NewPlayerCount <= 0)
+		return 1.0;
+
+	new Float:Multiplier = GetConVarFloat(cvar_NewPlayerBonusFirstMultiplier);
+	if (NewPlayerCount > 1)
+		Multiplier += float(NewPlayerCount - 1) * GetConVarFloat(cvar_NewPlayerBonusExtraMultiplier);
+
+	return NewPlayerBonus_ClampMultiplier(Multiplier);
+}
+
 stock bool:NewPlayerBonus_ShouldApplyToClient(client)
 {
 	if (!GetConVarBool(cvar_NewPlayerBonusEnable))
 		return false;
 
-	if (!NewPlayerBonus_AreSurvivorStatsReady() || !Stats_IsSurvivorHuman(client) || NewPlayerBonus_IsNewPlayer(client))
+	if (!NewPlayerBonus_AreSurvivorStatsReady() || !Stats_IsSurvivorHuman(client))
+		return false;
+
+	if (NewPlayerBonus_IsAllNewbieTeam())
+		return true;
+
+	if (NewPlayerBonus_IsNewPlayer(client))
 		return false;
 
 	return NewPlayerBonus_CountNewSurvivors() > 0;
@@ -135,7 +179,10 @@ stock NewPlayerBonus_AnnounceMultiplier(bool:IsFinaleRescue, BaseScore)
 	if (NewPlayerCount <= 0 || Multiplier <= 1.0)
 		return;
 
-	StatsPrintToChatTeam(TEAM_SURVIVORS, IsFinaleRescue ? "L4DStats_NewPlayerFinaleMultiplier" : "L4DStats_NewPlayerSafeRoomMultiplier", NewPlayerCount, Multiplier);
+	if (NewPlayerBonus_IsAllNewbieTeam())
+		StatsPrintToChatTeam(TEAM_SURVIVORS, IsFinaleRescue ? "L4DStats_NewPlayerAllNewbieFinale" : "L4DStats_NewPlayerAllNewbieSafeRoom", NewPlayerCount, Multiplier);
+	else
+		StatsPrintToChatTeam(TEAM_SURVIVORS, IsFinaleRescue ? "L4DStats_NewPlayerFinaleMultiplier" : "L4DStats_NewPlayerSafeRoomMultiplier", NewPlayerCount, Multiplier);
 }
 
 stock NewPlayerBonus_AnnounceRoundStart()
@@ -150,13 +197,14 @@ stock NewPlayerBonus_AnnounceRoundStart()
 
 	g_bNewPlayerBonusRoundAnnounced = true;
 
+	new bool:AllNewbieTeam = NewPlayerBonus_IsAllNewbieTeam();
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		if (!NewPlayerBonus_IsNewPlayer(i))
 			continue;
 
-		StatsPrintToChat(i, "L4DStats_NewPlayerStatus", Multiplier);
+		StatsPrintToChat(i, AllNewbieTeam ? "L4DStats_NewPlayerAllNewbieStatus" : "L4DStats_NewPlayerStatus", Multiplier);
 	}
 
-	StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_NewPlayerRoundSummary", NewPlayerCount, Multiplier);
+	StatsPrintToChatTeam(TEAM_SURVIVORS, AllNewbieTeam ? "L4DStats_NewPlayerAllNewbieRoundSummary" : "L4DStats_NewPlayerRoundSummary", NewPlayerCount, Multiplier);
 }

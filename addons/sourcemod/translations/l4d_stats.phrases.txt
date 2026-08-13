@@ -1303,6 +1303,24 @@
 		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 기존 생존자는 피날레에서 {green}%.1fx{default} 보너스를 받지만 신규 플레이어에게는 배율이 적용되지 않습니다."
 		"vi"		"{lightgreen}Phát hiện %i người chơi mới. Người sống sót có kinh nghiệm nhận thưởng màn cuối {green}%.1fx{default}; người mới không nhận hệ số."
 	}
+	"L4DStats_NewPlayerAllNewbieSafeRoom"
+	{
+		"en"		"{lightgreen}All {olive}%i{default} survivors are new players. Everyone earns a {green}%.1fx{default} newbie-team safe-room bonus."
+		"chi"		"{lightgreen}本局 {olive}%i{default} 名生还者都是新人，全员获得 {green}%.1fx{default} 新人组队安全屋加成。"
+		"zho"		"{lightgreen}本局 {olive}%i{default} 名生還者都是新人，全員獲得 {green}%.1fx{default} 新人組隊安全室加成。"
+		"jp"		"{lightgreen}生存者%i人が全員初心者です。全員にセーフルームの新人チームボーナス {green}%.1fx{default} が入ります。"
+		"ko"		"{lightgreen}생존자 {olive}%i{default}명이 모두 신규입니다. 전원에게 세이프룸 신규 팀 보너스 {green}%.1fx{default}가 적용됩니다."
+		"vi"		"{lightgreen}Cả {olive}%i{default} người sống sót đều là người mới. Cả đội nhận thưởng phòng an toàn {green}%.1fx{default}."
+	}
+	"L4DStats_NewPlayerAllNewbieFinale"
+	{
+		"en"		"{lightgreen}All {olive}%i{default} survivors are new players. Everyone earns a {green}%.1fx{default} newbie-team finale bonus."
+		"chi"		"{lightgreen}本局 {olive}%i{default} 名生还者都是新人，全员获得 {green}%.1fx{default} 新人组队救援关加成。"
+		"zho"		"{lightgreen}本局 {olive}%i{default} 名生還者都是新人，全員獲得 {green}%.1fx{default} 新人組隊救援關加成。"
+		"jp"		"{lightgreen}生存者%i人が全員初心者です。全員にフィナーレの新人チームボーナス {green}%.1fx{default} が入ります。"
+		"ko"		"{lightgreen}생존자 {olive}%i{default}명이 모두 신규입니다. 전원에게 피날레 신규 팀 보너스 {green}%.1fx{default}가 적용됩니다."
+		"vi"		"{lightgreen}Cả {olive}%i{default} người sống sót đều là người mới. Cả đội nhận thưởng màn cuối {green}%.1fx{default}."
+	}
 	"L4DStats_SinglePlayerTripleBonus"
 	{
 		"en"		"Only one survivor remains; their score is tripled."
@@ -2013,6 +2031,24 @@
 		"jp"		"{lightgreen}初心者を%i人検出。メンター倍率は {green}%.1fx{default}。初心者には適用されません。"
 		"ko"		"{lightgreen}신규 플레이어 %i명 감지. 멘토링 배율은 {green}%.1fx{default}이며 신규 플레이어에게는 적용되지 않습니다."
 		"vi"		"{lightgreen}Phát hiện %i người chơi mới; hệ số dìu dắt là {green}%.1fx{default}. Người mới không nhận hệ số."
+	}
+	"L4DStats_NewPlayerAllNewbieStatus"
+	{
+		"en"		"{lightgreen}This round is an all-newbie team. You earn a {green}%.1fx{default} newbie-team score multiplier."
+		"chi"		"{lightgreen}本局生还者都是新人，你将获得 {green}%.1fx{default} 新人组队分数倍率。"
+		"zho"		"{lightgreen}本局生還者都是新人，你將獲得 {green}%.1fx{default} 新人組隊分數倍率。"
+		"jp"		"{lightgreen}このラウンドは生存者が全員初心者です。新人チーム倍率 {green}%.1fx{default} が入ります。"
+		"ko"		"{lightgreen}이번 라운드는 생존자가 모두 신규입니다. 신규 팀 배율 {green}%.1fx{default}가 적용됩니다."
+		"vi"		"{lightgreen}Vòng này cả đội đều là người mới. Bạn nhận hệ số đội người mới {green}%.1fx{default}."
+	}
+	"L4DStats_NewPlayerAllNewbieRoundSummary"
+	{
+		"en"		"{lightgreen}All {olive}%i{default} survivors are new players. Everyone earns a {green}%.1fx{default} newbie-team multiplier."
+		"chi"		"{lightgreen}本局 {olive}%i{default} 名生还者都是新人，全员获得 {green}%.1fx{default} 新人组队加成。"
+		"zho"		"{lightgreen}本局 {olive}%i{default} 名生還者都是新人，全員獲得 {green}%.1fx{default} 新人組隊加成。"
+		"jp"		"{lightgreen}生存者%i人が全員初心者です。全員に新人チーム倍率 {green}%.1fx{default} が入ります。"
+		"ko"		"{lightgreen}생존자 {olive}%i{default}명이 모두 신규입니다. 전원에게 신규 팀 배율 {green}%.1fx{default}가 적용됩니다."
+		"vi"		"{lightgreen}Cả {olive}%i{default} người sống sót đều là người mới. Cả đội nhận hệ số {green}%.1fx{default}."
 	}
 	"L4DStats_TeamKillPenaltySelf"
 	{
