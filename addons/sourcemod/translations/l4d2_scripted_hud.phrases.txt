@@ -194,4 +194,169 @@
 			"#format"	"{1:d}"
 			"en"		"[Wipes x{1}]"
 		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"en"		"Tank damage board"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"en"		"Team items"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"en"		"Next SI wave"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"en"		"Speed / bhop"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"en"		"Round timer / horde"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"en"		"Witch distance"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"en"		"Tank dmg"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"en"		"Tank down"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"en"		"Tank dmg --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"en"		"No Tank"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"en"		"Items"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"en"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"en"		"M"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"en"		"P"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"en"		"B"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"en"		"K"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"en"		"D"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"en"		"I"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"en"		"E"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"en"		"p"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"en"		"a"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"en"		"Next SI {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"en"		"Alive {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"en"		"Alive {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"en"		"Speed --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"en"		"Speed {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"en"		"Bhop {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"en"		"Bhop --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"en"		"Round {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"en"		"Horde ON"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"en"		"Horde {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"en"		"Horde --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"en"		"No Witch"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"en"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"en"		"ENRAGED"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"en"		"NEAR"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"en"		"alert"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"en"		"calm"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"en"		"+{1} more"
+		}
 	}

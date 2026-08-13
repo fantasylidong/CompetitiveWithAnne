@@ -194,4 +194,169 @@
 			"#format"	"{1:d}"
 			"zho"		"[團滅x{1}]"
 		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"zho"		"坦克傷害榜"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"zho"		"隊伍道具"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"zho"		"下一波特感"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"zho"		"速度 / 連跳"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"zho"		"回合計時 / 屍潮"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"zho"		"女巫距離預警"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"zho"		"坦克傷害"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"zho"		"坦克已擊殺"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"zho"		"坦克傷害 --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"zho"		"目前無坦克"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"zho"		"道具"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"zho"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"zho"		"火"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"zho"		"管"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"zho"		"膽"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"zho"		"包"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"zho"		"電"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"zho"		"燃"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"zho"		"爆"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"zho"		"藥"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"zho"		"針"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"zho"		"下一波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"zho"		"場上 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"zho"		"場上 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"zho"		"速度 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"zho"		"速度 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"zho"		"連跳 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"zho"		"連跳 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"zho"		"回合 {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"zho"		"屍潮 進行中"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"zho"		"屍潮 {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"zho"		"屍潮 --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"zho"		"目前無女巫"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"zho"		"女巫 {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"zho"		"激怒"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"zho"		"近"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"zho"		"警覺"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"zho"		"靜"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"zho"		"另有{1}隻"
+		}
 	}

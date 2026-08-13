@@ -194,4 +194,169 @@
 			"#format"	"{1:d}"
 			"ko"		"[전멸x{1}]"
 		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"ko"		"탱크 피해 순위"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"ko"		"팀 아이템"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"ko"		"다음 특수 감염자"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"ko"		"속도 / 버니합"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"ko"		"라운드 시간 / 호드"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"ko"		"Witch 거리 경고"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"ko"		"탱크 피해"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"ko"		"탱크 처치"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"ko"		"탱크 피해 --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"ko"		"탱크 없음"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"ko"		"아이템"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"ko"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"ko"		"화"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"ko"		"관"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"ko"		"담"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"ko"		"킷"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"ko"		"제"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"ko"		"소"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"ko"		"폭"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"ko"		"약"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"ko"		"주"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"ko"		"다음 파 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"ko"		"생존 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"ko"		"생존 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"ko"		"속도 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"ko"		"속도 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"ko"		"버니합 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"ko"		"버니합 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"ko"		"라운드 {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"ko"		"호드 진행 중"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"ko"		"호드 {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"ko"		"호드 --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"ko"		"Witch 없음"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"ko"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"ko"		"격노"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"ko"		"근접"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"ko"		"경계"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"ko"		"평온"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"ko"		"외 {1}마리"
+		}
 	}

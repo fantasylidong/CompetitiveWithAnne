@@ -194,4 +194,169 @@
 			"#format"	"{1:d}"
 			"vi"		"[Wipe x{1}]"
 		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"vi"		"Bảng sát thương Tank"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"vi"		"Đồ đội"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"vi"		"Đợt SI tiếp theo"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"vi"		"Tốc độ / bhop"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"vi"		"Thời gian hiệp / horde"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"vi"		"Cảnh báo khoảng cách Witch"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"vi"		"Tank dmg"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"vi"		"Tank gục"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"vi"		"Tank dmg --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"vi"		"Không Tank"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"vi"		"Đồ"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"vi"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"vi"		"M"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"vi"		"P"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"vi"		"B"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"vi"		"K"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"vi"		"D"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"vi"		"I"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"vi"		"E"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"vi"		"p"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"vi"		"a"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"vi"		"Đợt sau {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"vi"		"Sống {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Sống {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"vi"		"Tốc độ --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Tốc độ {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Bhop {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"vi"		"Bhop --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"vi"		"Hiệp {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"vi"		"Horde ON"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"vi"		"Horde {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"vi"		"Horde --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"vi"		"Không Witch"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"vi"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"vi"		"NỔI ĐIÊN"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"vi"		"GẦN"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"vi"		"cảnh giác"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"vi"		"yên"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"vi"		"thêm {1}"
+		}
 	}

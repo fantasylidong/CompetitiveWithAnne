@@ -194,4 +194,169 @@
 			"#format"	"{1:d}"
 			"jp"		"[全滅x{1}]"
 		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"jp"		"Tank ダメージ"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"jp"		"チームアイテム"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"jp"		"次の特殊感染"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"jp"		"速度 / 連跳"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"jp"		"ラウンド時間 / ホード"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"jp"		"Witch 距離警告"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"jp"		"Tank ダメ"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"jp"		"Tank 撃破"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"jp"		"Tank ダメ --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"jp"		"Tank なし"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"jp"		"アイテム"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"jp"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"jp"		"火"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"jp"		"パ"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"jp"		"バ"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"jp"		"キ"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"jp"		"除"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"jp"		"焼"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"jp"		"爆"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"jp"		"薬"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"jp"		"針"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"jp"		"次波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"jp"		"生存 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"jp"		"生存 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"jp"		"速度 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"jp"		"速度 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"jp"		"連跳 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"jp"		"連跳 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"jp"		"ラウンド {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"jp"		"ホード 発生中"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"jp"		"ホード {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"jp"		"ホード --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"jp"		"Witch なし"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"jp"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"jp"		"激怒"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"jp"		"近"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"jp"		"警戒"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"jp"		"静"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"jp"		"他{1}体"
+		}
 	}

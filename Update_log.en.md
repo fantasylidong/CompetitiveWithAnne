@@ -146,3 +146,12 @@
 - Hardened the occasional "three empty white-outlined rectangles" seen around the hudmenu: those frames are EMS scripted HUD slots rendered in a transient "visible but neither NOBG nor TEXT" flag state. Per-client HUD flags are now rebuilt from the authoritative server flags so the ResetHUD refresh window can no longer send flags of 0, and unused EMS slots 4-7 are explicitly hidden on map start so stale slot data cannot draw empty background frames.
 - Panel height is personalized per client from the actual line count (new m_fScriptedHUDHeight sendproxy), so multi-line custom content is no longer clipped. The `l4d2_scripted_hud_hud3_team` default changed from 2 (infected only) to 0 (everyone), so survivors can actually see their chosen HUD 3 content.
 - HUD 2 gains a "Team wipe count" field: it reads `anne_round_wipe_count` published by `server.smx` (wipes on the current map, reset on transition), and shows `[Wipes xN]` at the end of HUD 2 once at least one wipe happened. HUD only - the room name is untouched. Toggle it under `!hudmenu` -> "Configure HUD 2 fields". Players with previously saved HUD 2 preferences start with the field off and need to enable it once; new players get it on by default.
+
+### August 13, 2026 Scripted HUD extra content sources
+- Upgraded `extend/l4d2_scripted_hud.smx` to 1.3.0. HUD 3 / HUD 4 content menus gain six extra sources, still chosen per slot and saved to cookies/database.
+- Tank damage board: ranks survivors by damage this tank fight (top 4, with percent). The board stays after the Tank dies until the next Tank; "No Tank" when none is in play.
+- Team items: one compact line per survivor for throwable / heal / temp (molotov/pipe/bile, kit/defib/incendiary/explosive, pills/adrenaline; empty is -).
+- Next SI wave: reads `infected_control`'s `GetNextSpawnTime` native (shows -- if the plugin is not loaded) plus live small-SI count vs the limit.
+- Speed / bhop: horizontal speed of yourself (or your spectated survivor) and the current bhop peak; the peak clears after about 0.25s of grounded walking.
+- Round timer + horde: mm:ss from `round_start`; "ON" during the 60-second rolling `create_panic_event` window, otherwise the director horde countdown (`L4D2CT_MobSpawnTimer`).
+- Witch distance warning: meters to the nearest Witch and state (calm / near / alert / enraged); "NEAR" inside 15 m. Extra Witches are counted separately. New phrases are translated in all six languages.

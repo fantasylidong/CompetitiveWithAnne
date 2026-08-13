@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for up to 4 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.2.0"
+#define PLUGIN_VERSION                "1.3.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -61,6 +61,7 @@ public Plugin myinfo =
 //#define REQUIRE_PLUGIN
 #undef REQUIRE_PLUGIN
 #include <witch_and_tankifier>
+#include <infected_control>
 
 // ====================================================================================================
 // Pragmas
@@ -113,7 +114,18 @@ public Plugin myinfo =
 #define HUD_CONTENT_SPECIALS          2
 #define HUD_CONTENT_KILLS             3
 #define HUD_CONTENT_PING              4
-#define HUD_CONTENT_MAX               HUD_CONTENT_PING
+#define HUD_CONTENT_TANK_DMG          5
+#define HUD_CONTENT_ITEMS             6
+#define HUD_CONTENT_WAVE              7
+#define HUD_CONTENT_SPEED             8
+#define HUD_CONTENT_ROUND             9
+#define HUD_CONTENT_WITCH            10
+#define HUD_CONTENT_MAX               HUD_CONTENT_WITCH
+
+#define HUD_PANIC_WINDOW              60.0
+#define HUD_WITCH_NEAR_UNITS          600.0
+#define HUD_BHOP_RESET_SPEED          230.0
+#define HUD_BHOP_RESET_HOLD           0.25
 
 #define HUD_CUSTOM_SLOT_COUNT         2 // HUD3 + HUD4
 
@@ -301,7 +313,10 @@ static bool   g_bData_HUD2_Text;
 static bool   g_bData_HUD3_Text;
 static bool   g_bData_HUD4_Text;
 bool g_bWitchAndTankSystemAvailable = false;
+static bool g_bInfectedControlAvailable;
 static bool g_bLateLoad;
+static bool g_bTankBoardFrozen;
+static bool g_bPanicActive;
 static bool g_bHUDProxyHooked[4][HUD_PROXY_COUNT];
 static bool g_bHUDResetPending[4];
 static bool g_bHUDPrefsDatabaseReady;
@@ -343,6 +358,9 @@ static int    g_iClientHUDSource[MAXPLAYERS + 1][HUD_CUSTOM_SLOT_COUNT];
 static int    g_iClientSpecialKills[MAXPLAYERS + 1];
 static int    g_iClientCommonKills[MAXPLAYERS + 1];
 static int    g_iHUD2WipeCount;
+static int    g_iTankDamage[MAXPLAYERS + 1];
+static int    g_iTankMaxHealth;
+static int    g_iTankLastHealth;
 
 // ====================================================================================================
 // float - Plugin Variables
@@ -397,6 +415,10 @@ static float  g_fHUD3_X;
 static float  g_fHUD3_Y;
 static float  g_fHUD4_X;
 static float  g_fHUD4_Y;
+static float  g_fRoundStartTime;
+static float  g_fPanicUntil;
+static float  g_fClientBhopPeak[MAXPLAYERS + 1];
+static float  g_fClientGroundedSince[MAXPLAYERS + 1];
 
 // ====================================================================================================
 // string - Plugin Variables
@@ -427,7 +449,13 @@ static const char g_sHUDSourcePhrases[][] =
     "L4D2ScriptedHUD_SourceSurvivors",
     "L4D2ScriptedHUD_SourceSpecials",
     "L4D2ScriptedHUD_SourceKills",
-    "L4D2ScriptedHUD_SourcePing"
+    "L4D2ScriptedHUD_SourcePing",
+    "L4D2ScriptedHUD_SourceTankDmg",
+    "L4D2ScriptedHUD_SourceItems",
+    "L4D2ScriptedHUD_SourceWave",
+    "L4D2ScriptedHUD_SourceSpeed",
+    "L4D2ScriptedHUD_SourceRound",
+    "L4D2ScriptedHUD_SourceWitch"
 };
 
 enum HUDPrefsLoadState
@@ -812,6 +840,7 @@ public void LoadPluginData()
 public void OnAllPluginsLoaded()
 {
     g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
+    g_bInfectedControlAvailable = LibraryExists("infected_control");
     HookHUDSendProxies();
 }
 
@@ -819,6 +848,8 @@ public void OnLibraryAdded(const char[] name)
 {
     if (StrEqual(name, "witch_and_tankifier"))
         g_bWitchAndTankSystemAvailable = true;
+    else if (StrEqual(name, "infected_control"))
+        g_bInfectedControlAvailable = true;
     else if (StrEqual(name, SENDPROXY_LIB))
         HookHUDSendProxies();
 }
@@ -827,6 +858,8 @@ public void OnLibraryRemoved(const char[] name)
 {
     if (StrEqual(name, "witch_and_tankifier"))
         g_bWitchAndTankSystemAvailable = false;
+    else if (StrEqual(name, "infected_control"))
+        g_bInfectedControlAvailable = false;
     else if (StrEqual(name, SENDPROXY_LIB))
         ResetHUDSendProxyState();
 }
@@ -891,6 +924,9 @@ public void LateLoad()
 {
     if (g_bCvar_BlinkTank)
         g_bAliveTank = HasAnyTankAlive();
+    if (g_fRoundStartTime <= 0.0)
+        g_fRoundStartTime = GetGameTime();
+    g_bInfectedControlAvailable = LibraryExists("infected_control");
 }
 
 /****************************************************************************************************/
@@ -1170,8 +1206,11 @@ public void HookEvents()
 
         HookEvent("tank_spawn", Event_TankSpawn);
         HookEvent("player_death", Event_PlayerDeath);
+        HookEvent("player_hurt", Event_PlayerHurt);
         HookEvent("infected_death", Event_InfectedDeath);
         HookEvent("round_start", Event_RoundStart);
+        HookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
+        HookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
         return;
     }
 
@@ -1181,8 +1220,11 @@ public void HookEvents()
 
         UnhookEvent("tank_spawn", Event_TankSpawn);
         UnhookEvent("player_death", Event_PlayerDeath);
+        UnhookEvent("player_hurt", Event_PlayerHurt);
         UnhookEvent("infected_death", Event_InfectedDeath);
         UnhookEvent("round_start", Event_RoundStart);
+        UnhookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
+        UnhookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
         return;
     }
 }
@@ -1199,6 +1241,14 @@ public void Event_PlayerDeath(Handle event, const char[] name, bool dontBroadcas
 		int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 		if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR)
 			g_iClientSpecialKills[attacker]++;
+
+		if (GetZombieClass(victim) == L4D2_ZOMBIECLASS_TANK)
+		{
+			if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR && g_iTankLastHealth > 0)
+				g_iTankDamage[attacker] += g_iTankLastHealth;
+			g_bTankBoardFrozen = true;
+			g_iTankLastHealth = 0;
+		}
 	}
 
 	if (!g_bAliveTank) return; // No tank in play; no damage to record
@@ -1216,11 +1266,48 @@ public void Event_InfectedDeath(Handle event, const char[] name, bool dontBroadc
         g_iClientCommonKills[attacker]++;
 }
 
+public void Event_PlayerHurt(Handle event, const char[] name, bool dontBroadcast)
+{
+    int victim = GetClientOfUserId(GetEventInt(event, "userid"));
+    if (!IsValidClient(victim) || GetClientTeam(victim) != TEAM_INFECTED || GetZombieClass(victim) != L4D2_ZOMBIECLASS_TANK)
+        return;
+
+    if (!IsPlayerAlive(victim) || IsPlayerIncapacitated(victim))
+        return;
+
+    int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+    int damage = GetEventInt(event, "dmg_health");
+    int remain = GetEventInt(event, "health");
+    if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR && damage > 0)
+        g_iTankDamage[attacker] += damage;
+
+    g_iTankLastHealth = remain;
+    int maxHP = GetEntProp(victim, Prop_Data, "m_iMaxHealth");
+    if (maxHP > g_iTankMaxHealth)
+        g_iTankMaxHealth = maxHP;
+}
+
 public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
     g_bAliveTank = false;
+    g_fRoundStartTime = GetGameTime();
+    g_fPanicUntil = 0.0;
+    g_bPanicActive = false;
     ResetHUDKillStats();
+    ResetTankDamageBoard();
     HookHUDSendProxies();
+}
+
+public void Event_PanicStart(Handle event, const char[] name, bool dontBroadcast)
+{
+    g_bPanicActive = true;
+    g_fPanicUntil = GetGameTime() + HUD_PANIC_WINDOW;
+}
+
+public void Event_PanicEnd(Handle event, const char[] name, bool dontBroadcast)
+{
+    g_bPanicActive = false;
+    g_fPanicUntil = 0.0;
 }
 
 void ResetHUDKillStats()
@@ -1229,7 +1316,18 @@ void ResetHUDKillStats()
     {
         g_iClientSpecialKills[client] = 0;
         g_iClientCommonKills[client] = 0;
+        g_fClientBhopPeak[client] = 0.0;
+        g_fClientGroundedSince[client] = 0.0;
     }
+}
+
+void ResetTankDamageBoard()
+{
+    for (int client = 1; client <= MaxClients; client++)
+        g_iTankDamage[client] = 0;
+    g_iTankMaxHealth = 0;
+    g_iTankLastHealth = 0;
+    g_bTankBoardFrozen = false;
 }
 
 bool IsAiTank(int tank)
@@ -1245,6 +1343,31 @@ public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     if (g_bCvar_BlinkTank)
         g_bAliveTank = true;
+
+    int tank = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsValidClient(tank))
+        return;
+
+    // A new tank fight starts a fresh board; extra tanks in the same fight keep accumulating.
+    if (g_bTankBoardFrozen || !HasAnyTankDamage())
+        ResetTankDamageBoard();
+
+    int maxHP = GetEntProp(tank, Prop_Data, "m_iMaxHealth");
+    int health = GetClientHealth(tank);
+    if (maxHP < health)
+        maxHP = health;
+    if (maxHP > g_iTankMaxHealth)
+        g_iTankMaxHealth = maxHP;
+}
+
+bool HasAnyTankDamage()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (g_iTankDamage[client] > 0)
+            return true;
+    }
+    return false;
 }
 
 /****************************************************************************************************/
@@ -1255,6 +1378,7 @@ public Action TimerUpdateHUD(Handle timer)
     {
         if (!AreAllHUDSendProxiesHooked())
             HookHUDSendProxies(false);
+        UpdateClientSpeeds();
         UpdateHUD();
     }
 
@@ -2149,6 +2273,12 @@ void BuildHUDSourceText(int client, int source, char[] output, int size)
         case HUD_CONTENT_SPECIALS:  BuildSpecialInfectedText(client, output, size);
         case HUD_CONTENT_KILLS:     BuildKillStatsText(client, output, size);
         case HUD_CONTENT_PING:      BuildPingText(client, output, size);
+        case HUD_CONTENT_TANK_DMG:  BuildTankDamageText(client, output, size);
+        case HUD_CONTENT_ITEMS:     BuildTeamItemsText(client, output, size);
+        case HUD_CONTENT_WAVE:      BuildWaveCountdownText(client, output, size);
+        case HUD_CONTENT_SPEED:     BuildSpeedText(client, output, size);
+        case HUD_CONTENT_ROUND:     BuildRoundStatusText(client, output, size);
+        case HUD_CONTENT_WITCH:     BuildWitchWarnText(client, output, size);
         default: output[0] = '\0';
     }
 }
@@ -2316,6 +2446,331 @@ void BuildPingText(int client, char[] output, int size)
             shown++;
         }
     }
+}
+
+void BuildTankDamageText(int client, char[] output, int size)
+{
+    if (!HasAnyTankDamage())
+    {
+        FormatEx(output, size, "%T", g_bAliveTank ? "L4D2ScriptedHUD_TankDmgEmpty" : "L4D2ScriptedHUD_TankDmgNone", client);
+        return;
+    }
+
+    FormatEx(output, size, "%T", g_bTankBoardFrozen ? "L4D2ScriptedHUD_TankDmgDead" : "L4D2ScriptedHUD_TankDmgHeader", client);
+
+    int topClients[4];
+    int topDamage[4];
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        if (g_iTankDamage[target] <= 0)
+            continue;
+        if (!IsClientInGame(target) && !IsClientConnected(target))
+            continue;
+
+        for (int slot = 0; slot < 4; slot++)
+        {
+            if (g_iTankDamage[target] > topDamage[slot])
+            {
+                for (int shift = 3; shift > slot; shift--)
+                {
+                    topClients[shift] = topClients[shift - 1];
+                    topDamage[shift] = topDamage[shift - 1];
+                }
+                topClients[slot] = target;
+                topDamage[slot] = g_iTankDamage[target];
+                break;
+            }
+        }
+    }
+
+    int maxHP = g_iTankMaxHealth;
+    for (int slot = 0; slot < 4; slot++)
+    {
+        if (topClients[slot] == 0)
+            break;
+
+        char name[12];
+        if (IsClientInGame(topClients[slot]))
+            GetClientName(topClients[slot], name, sizeof(name));
+        else
+            FormatEx(name, sizeof(name), "#%d", topClients[slot]);
+
+        if (maxHP > 0)
+            Format(output, size, "%s\n%s %d %d%%", output, name, topDamage[slot], RoundToNearest(float(topDamage[slot]) * 100.0 / float(maxHP)));
+        else
+            Format(output, size, "%s\n%s %d", output, name, topDamage[slot]);
+    }
+}
+
+void BuildTeamItemsText(int client, char[] output, int size)
+{
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_ItemsHeader", client);
+
+    int num = 0;
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        if (!IsClientInGame(target) || GetClientTeam(target) != TEAM_SURVIVOR)
+            continue;
+
+        num++;
+        if (num > 4)
+            continue;
+
+        char name[12];
+        char items[24];
+        GetClientName(target, name, sizeof(name));
+        FormatSurvivorItems(target, client, items, sizeof(items));
+        Format(output, size, "%s\n%s %s", output, name, items);
+    }
+}
+
+void FormatSurvivorItems(int target, int lang, char[] output, int size)
+{
+    char throwable[8];
+    char heal[8];
+    char temp[8];
+    GetWeaponSlotAbbrev(target, 2, lang, throwable, sizeof(throwable));
+    GetWeaponSlotAbbrev(target, 3, lang, heal, sizeof(heal));
+    GetWeaponSlotAbbrev(target, 4, lang, temp, sizeof(temp));
+    FormatEx(output, size, "%s%s%s", throwable, heal, temp);
+}
+
+void GetWeaponSlotAbbrev(int target, int slot, int lang, char[] output, int size)
+{
+    int weapon = GetPlayerWeaponSlot(target, slot);
+    if (weapon <= MaxClients || !IsValidEdict(weapon))
+    {
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_ItemEmpty", lang);
+        return;
+    }
+
+    char classname[32];
+    GetEdictClassname(weapon, classname, sizeof(classname));
+
+    char phrase[40];
+    if (StrEqual(classname, "weapon_molotov"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemMolotov");
+    else if (StrEqual(classname, "weapon_pipe_bomb"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemPipe");
+    else if (StrEqual(classname, "weapon_vomitjar"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemBile");
+    else if (StrEqual(classname, "weapon_first_aid_kit"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemKit");
+    else if (StrEqual(classname, "weapon_defibrillator"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemDefib");
+    else if (StrEqual(classname, "weapon_upgradepack_incendiary"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemIncendiary");
+    else if (StrEqual(classname, "weapon_upgradepack_explosive"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemExplosive");
+    else if (StrEqual(classname, "weapon_pain_pills"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemPills");
+    else if (StrEqual(classname, "weapon_adrenaline"))
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemAdrenaline");
+    else
+        strcopy(phrase, sizeof(phrase), "L4D2ScriptedHUD_ItemEmpty");
+
+    FormatEx(output, size, "%T", phrase, lang);
+}
+
+void BuildWaveCountdownText(int client, char[] output, int size)
+{
+    char eta[24];
+    if (g_bInfectedControlAvailable && GetFeatureStatus(FeatureType_Native, "GetNextSpawnTime") == FeatureStatus_Available)
+    {
+        float remaining = GetNextSpawnTime();
+        if (remaining < 0.0)
+            FormatEx(eta, sizeof(eta), "--");
+        else
+            FormatEx(eta, sizeof(eta), "%.1fs", remaining);
+    }
+    else
+        FormatEx(eta, sizeof(eta), "--");
+
+    int aliveSpecials;
+    int siLimit = (g_hCvar_InfectedLimit == null) ? 0 : g_hCvar_InfectedLimit.IntValue;
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        if (!IsClientInGame(target) || GetClientTeam(target) != TEAM_INFECTED)
+            continue;
+        if (!IsPlayerAlive(target) || IsPlayerGhost(target))
+            continue;
+        int zclass = GetZombieClass(target);
+        if (zclass >= L4D2_ZOMBIECLASS_SMOKER && zclass <= L4D2_ZOMBIECLASS_CHARGER)
+            aliveSpecials++;
+    }
+
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_WaveHeader", client, eta);
+    if (siLimit > 0)
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_WaveAlive", client, aliveSpecials, siLimit);
+    else
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_WaveAliveNoLimit", client, aliveSpecials);
+}
+
+void BuildSpeedText(int client, char[] output, int size)
+{
+    int subject = GetHUDSpeedSubject(client);
+    if (subject <= 0)
+    {
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_SpeedNone", client);
+        return;
+    }
+
+    int current = RoundToNearest(GetHorizontalSpeed(subject));
+    int peak = RoundToNearest(g_fClientBhopPeak[subject]);
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_SpeedLine", client, current);
+    if (peak > 0)
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_BhopLine", client, peak);
+    else
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_BhopNone", client);
+}
+
+void BuildRoundStatusText(int client, char[] output, int size)
+{
+    int elapsed = 0;
+    if (g_fRoundStartTime > 0.0)
+        elapsed = RoundToFloor(GetGameTime() - g_fRoundStartTime);
+    if (elapsed < 0)
+        elapsed = 0;
+
+    char clock[16];
+    FormatEx(clock, sizeof(clock), "%d:%02d", elapsed / 60, elapsed % 60);
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_RoundTimer", client, clock);
+
+    if (g_bPanicActive || (g_fPanicUntil > 0.0 && GetGameTime() < g_fPanicUntil))
+    {
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeActive", client);
+        return;
+    }
+
+    float remaining = -1.0;
+    if (GetFeatureStatus(FeatureType_Native, "L4D2_CTimerGetRemainingTime") == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "L4D2_CTimerHasStarted") == FeatureStatus_Available)
+    {
+        if (L4D2_CTimerHasStarted(L4D2CT_MobSpawnTimer) && !L4D2_CTimerIsElapsed(L4D2CT_MobSpawnTimer))
+            remaining = L4D2_CTimerGetRemainingTime(L4D2CT_MobSpawnTimer);
+    }
+
+    if (remaining >= 0.0 && remaining < 180.0)
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeSoon", client, RoundToCeil(remaining));
+    else
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeIdle", client);
+}
+
+void BuildWitchWarnText(int client, char[] output, int size)
+{
+    int subject = GetHUDSpeedSubject(client);
+    float origin[3];
+    bool hasOrigin;
+    if (subject > 0)
+    {
+        GetClientAbsOrigin(subject, origin);
+        hasOrigin = true;
+    }
+
+    int nearest = -1;
+    float nearestDist = 0.0;
+    int witchCount;
+    int entity = -1;
+    while ((entity = FindEntityByClassname(entity, "witch")) != -1)
+    {
+        if (GetEntProp(entity, Prop_Data, "m_iHealth") <= 0)
+            continue;
+        witchCount++;
+        if (!hasOrigin)
+            continue;
+
+        float witchPos[3];
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", witchPos);
+        float dist = GetVectorDistance(origin, witchPos);
+        if (nearest == -1 || dist < nearestDist)
+        {
+            nearest = entity;
+            nearestDist = dist;
+        }
+    }
+
+    if (witchCount <= 0)
+    {
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_WitchNone", client);
+        return;
+    }
+
+    if (nearest == -1)
+    {
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_WitchCount", client, witchCount);
+        return;
+    }
+
+    float meters = nearestDist / 39.37;
+    char state[32];
+    float rage;
+    if (HasEntProp(nearest, Prop_Send, "m_rage"))
+        rage = GetEntPropFloat(nearest, Prop_Send, "m_rage");
+
+    if (rage >= 1.0)
+        FormatEx(state, sizeof(state), "%T", "L4D2ScriptedHUD_WitchEnraged", client);
+    else if (nearestDist <= HUD_WITCH_NEAR_UNITS)
+        FormatEx(state, sizeof(state), "%T", "L4D2ScriptedHUD_WitchNear", client);
+    else if (rage > 0.15)
+        FormatEx(state, sizeof(state), "%T", "L4D2ScriptedHUD_WitchAlert", client);
+    else
+        FormatEx(state, sizeof(state), "%T", "L4D2ScriptedHUD_WitchCalm", client);
+
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_WitchLine", client, meters, state);
+    if (witchCount > 1)
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_WitchExtra", client, witchCount - 1);
+}
+
+void UpdateClientSpeeds()
+{
+    float now = GetGameTime();
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || GetClientTeam(client) != TEAM_SURVIVOR || !IsPlayerAlive(client))
+            continue;
+
+        float speed = GetHorizontalSpeed(client);
+        bool onGround = (GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") != -1);
+        if (!onGround)
+        {
+            if (speed > g_fClientBhopPeak[client])
+                g_fClientBhopPeak[client] = speed;
+            g_fClientGroundedSince[client] = 0.0;
+            continue;
+        }
+
+        if (speed >= HUD_BHOP_RESET_SPEED)
+        {
+            if (speed > g_fClientBhopPeak[client])
+                g_fClientBhopPeak[client] = speed;
+            g_fClientGroundedSince[client] = 0.0;
+            continue;
+        }
+
+        if (g_fClientGroundedSince[client] <= 0.0)
+            g_fClientGroundedSince[client] = now;
+        else if (now - g_fClientGroundedSince[client] >= HUD_BHOP_RESET_HOLD)
+            g_fClientBhopPeak[client] = 0.0;
+    }
+}
+
+float GetHorizontalSpeed(int client)
+{
+    float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecVelocity", vel);
+    return SquareRoot(vel[0] * vel[0] + vel[1] * vel[1]);
+}
+
+int GetHUDSpeedSubject(int client)
+{
+    if (IsClientInGame(client) && GetClientTeam(client) == TEAM_SURVIVOR && IsPlayerAlive(client))
+        return client;
+
+    int target = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
+    if (IsValidClient(target) && GetClientTeam(target) == TEAM_SURVIVOR && IsPlayerAlive(target))
+        return target;
+
+    return 0;
 }
 
 char[] GetZombieClassPhrase(int zclass)
@@ -2562,6 +3017,9 @@ void ResetHUDPrefsClient(int client)
     g_sClientHUDCookie[client][0] = '\0';
     g_iClientSpecialKills[client] = 0;
     g_iClientCommonKills[client] = 0;
+    g_iTankDamage[client] = 0;
+    g_fClientBhopPeak[client] = 0.0;
+    g_fClientGroundedSince[client] = 0.0;
 
     for (int slot = 0; slot < HUD_CUSTOM_SLOT_COUNT; slot++)
         g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
