@@ -39,6 +39,7 @@ enum struct AntiBaitRuntime
     bool attackableSpread;
     bool allPinned;
     bool spreadStallPressure;
+    bool eventSuppressed;
     AntiBaitState resumeState;
 
     void Reset()
@@ -69,6 +70,7 @@ enum struct AntiBaitRuntime
         this.attackableSpread = false;
         this.allPinned = false;
         this.spreadStallPressure = false;
+        this.eventSuppressed = false;
         this.resumeState = AB_Grace;
     }
 }
@@ -280,9 +282,6 @@ static bool AntiBait_IsEventBlocked()
     if (!gST.bLate)
         return true;
     if (g_bPauseLib && IsInPause())
-        return true;
-    // Scripted holdouts are intentional stops and must keep the normal wave cadence.
-    if (EventPressure_ShouldBypassAntiBait())
         return true;
     // A distant Tank is not pressure yet: keep holding until it approaches or
     // the survivor formation becomes attackable.
@@ -530,26 +529,8 @@ static void AntiBait_ClearRunner()
     gST.rushManIndex = -1;
 }
 
-void AntiBait_OnRoundStart()
+static void AntiBait_StartFresh(float now, const char[] reason)
 {
-    gAB.Reset();
-}
-
-void AntiBait_OnPause()
-{
-    if (gAB.state != AB_Off && gAB.state != AB_Paused)
-        AntiBait_Pause(GetGameTime());
-}
-
-void AntiBait_OnUnpause()
-{
-    if (gAB.state == AB_Paused)
-        AntiBait_Resume(GetGameTime());
-}
-
-void AntiBait_OnWaveStart()
-{
-    float now = GetGameTime();
     gAB.Reset();
     gAB.state = gCV.bAntiBaitEnable ? AB_Grace : AB_Off;
     gAB.stateSince = now;
@@ -579,12 +560,67 @@ void AntiBait_OnWaveStart()
         gAB.attackableSpread = AntiBait_TeamAttackableSpread(
             spreadDist, activeCount, isolatedCount, groupCount);
     }
+
+    AntiBait_Debug("fresh start state=%s reason=%s",
+        g_sAntiBaitStateName[view_as<int>(gAB.state)], reason);
+}
+
+void AntiBait_OnEventPressureStarted(const char[] source)
+{
+    if (gAB.eventSuppressed)
+        return;
+
+    AntiBait_ClearRunner();
+    gAB.Reset();
+    gAB.eventSuppressed = true;
+    gAB.state = AB_Off;
+    gAB.stateSince = GetGameTime();
+    gAB.lastProgressTime = gAB.stateSince;
+    AntiBait_Debug("disabled by event pressure source=%s", source);
+}
+
+void AntiBait_OnRoundStart()
+{
+    gAB.Reset();
+}
+
+void AntiBait_OnPause()
+{
+    if (gAB.state != AB_Off && gAB.state != AB_Paused)
+        AntiBait_Pause(GetGameTime());
+}
+
+void AntiBait_OnUnpause()
+{
+    if (gAB.state == AB_Paused)
+        AntiBait_Resume(GetGameTime());
+}
+
+void AntiBait_OnWaveStart()
+{
+    float now = GetGameTime();
+    if (EventPressure_ShouldBypassAntiBait())
+    {
+        AntiBait_OnEventPressureStarted("wave_start_during_event");
+        return;
+    }
+
+    AntiBait_StartFresh(now, "wave start");
 }
 
 void AntiBait_Update()
 {
     float now = GetGameTime();
     gAB.allPinned = Survivors_AllPinnedOrDown();
+
+    if (EventPressure_ShouldBypassAntiBait())
+    {
+        AntiBait_OnEventPressureStarted("active_event");
+        return;
+    }
+
+    if (gAB.eventSuppressed)
+        AntiBait_StartFresh(now, "event pressure ended");
 
     if (!gCV.bAntiBaitEnable)
     {

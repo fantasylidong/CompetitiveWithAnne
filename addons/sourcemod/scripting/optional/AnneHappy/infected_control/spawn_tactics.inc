@@ -45,6 +45,16 @@ void Tactical_PrepareBreachWave()
     Debug_Print("[BREACH] prepared target=%d", gST.breachTarget);
 }
 
+void Tactical_OnEventPressureStarted()
+{
+    if (gST.breachWaveActive || gST.breachWavePending || gST.breachTarget > 0)
+        Debug_Print("[BREACH] cleared by event pressure");
+
+    gST.breachWaveActive = false;
+    gST.breachWavePending = false;
+    gST.breachTarget = -1;
+}
+
 bool Tactical_IsBreachWave()
 {
     return gST.breachWaveActive;

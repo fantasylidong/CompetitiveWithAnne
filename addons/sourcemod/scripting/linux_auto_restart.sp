@@ -2,7 +2,10 @@
 #pragma newdecls required
 
 #include <sourcemod>
+
+#undef REQUIRE_EXTENSIONS
 #include <accelerator>
+#define REQUIRE_EXTENSIONS
 
 #define VERSION "0.6"
 #define CRASH_REPORT_SUPPRESSION_SECONDS 180

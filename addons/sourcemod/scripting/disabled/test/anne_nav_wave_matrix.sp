@@ -58,6 +58,7 @@ int g_FrameSamples;
 int g_FrameOverTick;
 int g_FrameOver2Tick;
 int g_FrameOver4Tick;
+ConVar g_AllowInfectedMovement;
 
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax)
 {
@@ -84,6 +85,10 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
+    g_AllowInfectedMovement = CreateConVar(
+        "anne_navmatrix_allow_infected_movement", "0",
+        "Allow checked infected bots to move during movement diagnostics",
+        FCVAR_DONTRECORD, true, 0.0, true, 1.0);
     RegAdminCmd("sm_navmatrix_prepare", Command_Prepare, ADMFLAG_ROOT,
         "sm_navmatrix_prepare <raw-flow-percent>");
     RegAdminCmd("sm_navmatrix_clear", Command_Clear, ADMFLAG_ROOT,
@@ -94,8 +99,30 @@ public void OnPluginStart()
         "Create survivor bots and initialize an empty-server test round");
     RegAdminCmd("sm_navmatrix_mark", Command_Mark, ADMFLAG_ROOT,
         "sm_navmatrix_mark <text>");
+    RegAdminCmd("sm_navmatrix_spawn_tank", Command_SpawnTank, ADMFLAG_ROOT,
+        "Spawn one Tank at the validated matrix anchor");
     HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
     HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
+}
+
+public Action Command_SpawnTank(int client, int args)
+{
+    if (!g_HasPendingAnchor || g_PendingActualArea == Address_Null)
+    {
+        ReplyToCommand(client, "[NavMatrix] tank failed: prepare a valid anchor first");
+        return Plugin_Handled;
+    }
+
+    float angles[3];
+    int tank = L4D2_SpawnTank(g_PendingAnchorPosition, angles);
+    if (tank <= 0 || tank > MaxClients)
+    {
+        ReplyToCommand(client, "[NavMatrix] tank failed: spawn returned %d", tank);
+        return Plugin_Handled;
+    }
+
+    ReplyToCommand(client, "[NavMatrix] tank client=%d userid=%d", tank, GetClientUserId(tank));
+    return Plugin_Handled;
 }
 
 public void OnMapStart()
@@ -198,6 +225,9 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse,
                              int &subtype, int &cmdnum, int &tickcount,
                              int &seed, int mouse[2])
 {
+    if (g_AllowInfectedMovement.BoolValue)
+        return Plugin_Continue;
+
     if (client <= 0 || client > MaxClients || !g_VisibilityChecked[client]
         || !IsClientInGame(client) || GetClientTeam(client) != TEAM_INFECTED
         || !IsPlayerAlive(client))

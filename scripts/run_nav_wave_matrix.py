@@ -629,7 +629,7 @@ class MatrixRunner:
         director_api_totals = Counter()
         for line in director_api_lines:
             match = re.search(
-                r"\bclass=(\w+).*\btries=(\d+).*\bresult=(miss|hit|cap_reject)",
+                r"\bclass=(\w+).*\btries=(\d+).*\bresult=(miss|hit|cap_reject|safety_reject)",
                 line)
             if not match:
                 continue
@@ -644,6 +644,7 @@ class MatrixRunner:
             "hits": director_api_totals["hit"],
             "misses": director_api_totals["miss"],
             "request_cap_rejects": director_api_totals["cap_reject"],
+            "request_safety_rejects": director_api_totals["safety_reject"],
             "actual_cap_rejects": sum(
                 "[SpawnPerf][DirectorCap]" in line and "stage=actual" in line
                 for line in lines),
@@ -656,6 +657,7 @@ class MatrixRunner:
                     "hits": counts["hit"],
                     "misses": counts["miss"],
                     "request_cap_rejects": counts["cap_reject"],
+                    "request_safety_rejects": counts["safety_reject"],
                 }
                 for class_name, counts in sorted(director_api_by_class.items())
             },

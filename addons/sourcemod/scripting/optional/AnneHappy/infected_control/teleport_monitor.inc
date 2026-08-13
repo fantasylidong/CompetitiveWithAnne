@@ -29,12 +29,6 @@ Action Timer_TeleportTick(Handle timer)
 
     for (int c = 1; c <= MaxClients; c++)
     {
-        if (SpawnAttempts_IsPendingActualClient(c))
-        {
-            gST.teleCount[c] = 0;
-            continue;
-        }
-
         if (TeleportState_IsInSpawnGrace(c, now))
         {
             gST.teleCount[c] = 0;
@@ -44,9 +38,9 @@ Action Timer_TeleportTick(Handle timer)
         if (!CanBeTeleport(c))
             continue;
 
-        float eyes[3];
-        GetClientEyePosition(c, eyes);
-        bool vis = IsPosVisibleSDK(eyes, true);
+        float origin[3];
+        GetClientAbsOrigin(c, origin);
+        bool vis = IsPosVisibleSDK(origin, true);
 
         if (!vis)
         {

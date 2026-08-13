@@ -32,9 +32,9 @@ Action Timer_TeleportTick(Handle timer)
             }
         }
 
-        float eyes[3];
-        GetClientEyePosition(c, eyes);
-        bool vis = IsPosVisibleSDK(eyes, true);
+        float origin[3];
+        GetClientAbsOrigin(c, origin);
+        bool vis = IsPosVisibleSDK(origin, true);
 
         if (!vis)
         {

@@ -37,6 +37,7 @@ OnGameFrame 按轻量节流执行
   -> TryTeleportSpawnOnce 优先处理传送队列，否则 TryNormalSpawnOnce 处理普通队列
   -> FindSpawnPosViaNavAreaStep 按预算续扫当前距离带
   -> DoSpawnAt
+  -> 生成成功后同帧提交职业、队列、分散记忆和出生宽限
 ```
 
 `Timer_CheckSpawnWindow` 决定什么时候开下一波，`OnGameFrame` 决定这一帧是否真正尝试生成。两者分离是为了让“波节奏”和“单帧 CPU 负载”可以分别调整。
@@ -87,10 +88,10 @@ OnGameFrame 按轻量节流执行
 2. `SpawnAttributes` flags：安全屋、救援等区域先过滤。
 3. `candidate progress / rawBadFlow`：图模式复用 areaIdx 进度缓存；已经完成进度映射的 badflow Nav 仍可评估。完全未知的进度保持 unknown，不伪装成 0%。
 4. 后方进度硬门：`dF = candidateFlow - targetFlow`；`dF=-8` 允许继续评分，`dF<-8` 在取随机点前直接拒绝。进度 unknown 时不执行该硬门。
-5. Nav 冷却：成功确认后同一块 Nav 硬冷却 1.0 秒，避免连续复用。
+5. Nav 冷却：生成成功后同一块 Nav 硬冷却 1.0 秒，避免连续复用。
 6. bucket 存活上限：同一 Flow 桶特感过多时提前跳过。
 7. `GetRandomPoint`：到这里才取随机点；同一区域最多抽取 3 个点。
-8. 最近刷点分散：成功确认后的实际落点保留 0.5 秒，期间按动态半径硬拒绝邻近请求点。
+8. 最近刷点分散：生成成功后的即时实际落点保留 0.5 秒，期间按动态半径硬拒绝邻近请求点。
 9. 距离范围：图候选用原始 `navDistance` 执行职业下限；Smoker/Hunter 高于目标眼位时用 `navEffective = navDistance - highComp` 判断上限。所有模式同时执行全队 250 单位三维直线排除。
 10. stuck 检查：避免刷进障碍。
 11. `IsPosVisibleSDK` 精判：过滤玩家能直接看到的点。
@@ -113,7 +114,9 @@ OnGameFrame 按轻量节流执行
 
 表内范围是累计可接受的有向 Nav 路径距离，不是空间半径。放宽只提高远端上限，不降低职业下限；后续五档实际都从上一档上限之后继续扫描，因此不会重新处理已经完整失败的近端候选。Smoker 高出目标眼位 32 单位后按高度差的 `1.5` 倍折减 Nav 距离，最多折减 1000；Hunter 按 `1.15` 倍折减，最多 800。该 `navEffective` 折减用于职业上限、最终路径预算和距离评分。候选访问顺序始终使用原始 `navDistance`；高点不再乘 0.50 提前。普通有效 Nav 上限受 `inf_SpawnDistanceMax * 2` 限制，高点粗筛最多额外预取 1000。传送刷新仍把直线下限提高到 `inf_TeleportDistanceMin`。扩展或静态图不可用时不进行无序全 Nav 搜索，直接进入 Director API。日志模式名 `directRange` 为历史兼容名称；Director 点不受职业 Nav 区间限制，但必须满足距任一存活生还者最近三维直线距离不超过 2000。
 
-职业范围内的有向 Nav 候选完整扫描后仍无合法点，或有向图明确不可用/不完整时，插件调用 `FallbackDirectorPos`。Director API 返回成功后先按实时生还者眼位检查最近三维直线距离，超过固定上限 2000 的坐标直接拒绝；通过后才交给 `L4D2_SpawnSpecial`。实体稳定落地后再执行同一 2000 上限复核，避免引擎安置位置偏移。Director 点仍不复核职业 Nav 路径区间、可见性、stuck、预测落点、伤害触发器或 `DoSpawnAt` 的最小距离门槛。第一次 API 调用内部尝试 7 次，未返回合格点时第二阶段提高到 12 次。
+职业范围内的有向 Nav 候选完整扫描后仍无合法点，或有向图明确不可用/不完整时，插件调用 `FallbackDirectorPos`。Director API 返回成功后，必须先通过全队最小/最大直线距离、最近刷点分散、实时可见性、stuck、预测落点可见性和伤害触发器检查，才会交给 `L4D2_SpawnSpecial`；Director 点仍不复核职业 Nav 路径区间。第一次 API 调用内部尝试 7 次，未返回合格点时第二阶段提高到 12 次。
+
+所有可在生成前判断的安全条件都在创建实体前完成。`L4D2_SpawnSpecial` 成功后立即提交，不再等待实体稳定，也不会因实际落点二次验证而踢掉并重新生成；日志保留请求坐标和同帧读取的即时实际坐标，后续 `[SPAWN STATE]` 只用于诊断，不参与接受或拒绝。
 
 普通刷特为每个职业分别保存目标生还者、距离档、分页游标和已尝试目标集合，不能用一个全局目标让不同职业互相重置搜索。单个职业完整六档 Nav 与两级 Director 都失败后，先在其余存活生还者中选择有向覆盖较高且尚未尝试的目标；四人轮完后只重置该职业的目标轮次。随后该职业默认退避 `0.10s`，再从第一档重新建立有向 Nav 搜索；目标生还者切换 Nav 时提前解除退避。`inf_spawn_failed_cycle_retry` 可在 `0.02–1.0s` 调整，弱机器可提高到 `0.2s`。成功生成一只后，该职业下次仍从第一档开始，其他职业的搜索进度不受影响。这避免无合法点时每帧重复调用 Director，也避免某个职业或某个目标长期卡住整波。
 
@@ -128,7 +131,7 @@ Boomer 和 Spitter 作为后手支援类，开波时若排在队首会轮转到�
 - `IntensiveCheck` 没有强制超时。推进、分组断开、出现孤立成员或任何脆弱状态连续达到 `inf_antibait_release_confirm` 后立即释放。
 - 推进满足任一条件即可：生还者 Flow 下中位数相对基准提高 `inf_antibait_progress_pct`（默认 4%），或健康有效成员的团队中心距基准点移动 `inf_antibait_progress_dist`（默认 1000 世界单位）。四人队的 Flow 条件需要至少三人有效推进，位置条件使用团队中心，单人前探不会替全队重置停滞计时。
 - 抱团使用连通组、最大跨度、平均最近队友距离和孤立成员数；单人生还者不能触发无限延长。
-- 机关尸潮、终局事件或 `holdout_bonus` 标记的守点期间绕过 Anti-Bait 延长，基础刷特仍按正常节奏运行，不把合理守点判作 bait。地图机关沿用 `trigger_horde_notify` 的 Director 原因分类；警报车至少保持 10 秒、普通机关至少保持 60 秒，避免 `panic_event_finished` 的生成结束边沿过早清掉机关状态。
+- 机关尸潮、终局事件或 `holdout_bonus` 标记的守点期间完全关闭 Anti-Bait，清除既有 Pressure、队形基准和释放确认，基础刷特仍按正常节奏运行。机关若在 16 秒倒计时期间开始，倒计时不会缩短；若开始时已经进入 `IntensiveCheck` 延长，则立即释放下一波，不再等待解除确认。机关结束后 Anti-Bait 从新的 Grace/基准重新观察，不恢复机关前状态。地图 panic 由 `infected_control` 自己注册 `trigger_horde_notify` 同款 Director detour，不依赖 `trigger_horde_notify.smx`；警报车至少保持 10 秒、普通 panic 至少保持 60 秒。有限机关采用统一来源仲裁：`l4d2_horde_equaliser` 已加载且当前地图 `horde_limit > 0` 时，以它用于“剩余尸潮数”提示的 `L4D_OnSpawnMob + mob timer 0..10 秒` 判据为权威；每次有效 mob 请求或持续生成 common 都把事件活动窗口续到 12 秒，停止活动后自动结束，允许少量自然尸潮误报但不会永久关闭 Anti-Bait。该权威模式会忽略重复的普通 panic/旧 infinite 通知，但仍保留警报车、终局和 `holdout` 压力。只有没有有效有限尸潮配置时，才启用逐图实体生命周期映射。`c5m2_park` 的兜底映射为 `finale_start_trigger.OnStartTouch` 开始、`finale_alarm_stop_button.OnPressed` 后 5 秒结束。
 - Tank 存活但仍远离队伍时，健康抱团停滞可继续延长下一波；Tank 接近任一存活生还者至 `inf_antibait_tank_pressure_dist`（默认 1200）、队伍散开/推进或出现脆弱状态并稳定达到解除确认后，立即放行。至少半数生还者倒地时也不允许延长。
 - 真正的游戏暂停会同时冻结击杀窗口、16 秒倒计时和延长解除确认。
 - 分散但停滞仍可产生破点波，但属于可攻击队形，不会扣住刷新。
@@ -174,13 +177,13 @@ Boomer 和 Spitter 作为后手支援类，开波时若排在队首会轮转到�
 - 随机点安全硬判复用本 tick 的全队眼位快照。
 - 每个实际执行刷点的 `OnGameFrame` 只读取一次活着生还者的眼位、左右视点和朝向，同 Tick 的距离、可见性和战术评分直接复用。
 - 目标 Nav 起点、目标 Flow、目标生还者脚高和可见性射线模式每 tick 重建，不跨 tick 复用。
-- 候选的 stuck、visibility、path 和评分必须在同一 tick 完成；生成前不再重复执行一整轮可见性 trace。
+- Nav 候选的 stuck、visibility、path 和评分必须在同一 tick 完成；Director fallback 也在创建前完成对应的点位安全检查。
 - 全队 250 三维直线排除使用平方距离；扩展分页返回原始 `navDistance`。随机点确认后才按实际 Z 差计算 Smoker/Hunter 高点奖励，并保留既有有限 `navEffective` 折减，不重复寻路。
 - 测试探针可调用只读 `AnneSpawn_NavGraphGetPathDistance(startNavId, targetNavId, ...)` 查询任意实际出生 Nav 到夹具目标 Nav 的同代有向距离；返回 `1/0/-1/-2/-3` 分别表示可达、不可达、图 pending、参数无效、功能不可用。该 native 只读取当前图快照，不进入生产候选选择。
 - 普通刷特队列在开波时批量补齐，不再每个 think slice 遍历 `MaxClients` 重算职业上限。
 - Flow bucket 用于评分、同桶密度限制和 `dF<-8` 的廉价硬拒绝；旧版 `PassRealBucketPositionCheck` 不再进入主路径。
 - `PathPenalty_NoBuildFromStart` 复用生还者起点 NavArea，避免每个候选重复反查起点。
-- NavArea 生成成功、实际生成失败和点位过滤失败仍写入历史诊断/冷却。
+- NavArea 生成成功、引擎创建失败和点位过滤失败仍写入历史诊断/冷却。
 - `sm_spawnperf` 除原有分组统计外，还输出图候选构建/结果年龄 p50、p95、p99、max，以及 queue、cache、stale、完整快照候选数、当前距离带候选数和 1.0s/0.1s 调度次数。
 - `inf_spawn_perf_stats 1` 还会把每次实际实体生成的波号、职业、普通/传送/导演模式、开波后耗时、生成调用耗时、请求/实际坐标、目标直线距离、目标垂直差、原始/有效 Nav 距离、高点奖励及阶梯、后点/低点扣分、目标脚高、执行范围和位置评分写入同一日志；下一波或回合结束时分别汇总这些字段与单帧工作量。导演兜底没有 Nav 距离和评分时明确写 `N/A`。
 
@@ -207,8 +210,8 @@ Boomer 和 Spitter 作为后手支援类，开波时若排在队首会轮转到�
 
 - 入口：`teleport_monitor.inc`。
 - 实际传送刷点：`TryTeleportSpawnOnce`。
-- AI 特感创建、进入实际落点确认和确认提交时都会重置不可见计数并刷新出生时间；`player_spawn` 事件只是额外兜底，不是出生宽限的唯一数据源。插件热加载时，已在场的存活 AI 特感按加载时刻重新进入宽限。
-- `inf_TeleportSpawnGrace` 默认 2.5 秒。宽限内、出生时间未知、仍在 pending 实际落点确认、ghost 或待踢队列中的实体都不能累计不可见时间；缺失时间戳按禁止传送处理，不能绕过宽限。
+- AI 特感创建并立即提交时会重置不可见计数并刷新出生时间；`player_spawn` 事件只是额外兜底，不是出生宽限的唯一数据源。插件热加载时，已在场的存活 AI 特感按加载时刻重新进入宽限。
+- `inf_TeleportSpawnGrace` 默认 2.5 秒。宽限内、出生时间未知或 ghost 实体都不能累计不可见时间；缺失时间戳按禁止传送处理，不能绕过宽限。
 - 宽限结束后才开始原有不可见计数。普通阈值仍由 `inf_TeleportCheckTime` 控制，默认 5 个一秒 tick；跑男和 Anti-Bait 快通道只缩短这段不可见阈值，不绕过出生宽限。
 - 注意 `teleportMode` 下 `bIgnoreIncapSight` 会影响可见性口径，SourcePawn fallback 与 native safety 必须保持一致。
 
@@ -250,5 +253,5 @@ sm_rebuildnavcache
 - `queued/published/cacheHits/coalesced/staleDrops`：节流、复用和位置变化造成的废弃是否健康。
 - 搜索分片耗时、完整搜索累计耗时和 `fallbackApiMs`：分别判断单帧预算、完整续扫与职业范围导演兜底是否产生尖峰。
 - 分组过滤计数：确认 6/8/10/12/14+ 特时真正消耗预算的过滤阶段。
-- `[TP GRACE]`：确认 `player_spawn`、实体创建、pending 建立、提交或热加载接管都刷新了出生时间；同一实体允许出现多个来源，最后一次写入是宽限起点。
-- `[TP] ... age=... grace=...`：真正进入传送队列时的实体年龄和配置宽限。任何 `age < grace`、pending、ghost 或待踢实体进入该日志都属于回归。
+- `[TP GRACE]`：确认 `player_spawn`、实体创建、立即提交或热加载接管都刷新了出生时间；同一实体允许出现多个来源，最后一次写入是宽限起点。
+- `[TP] ... age=... grace=...`：真正进入传送队列时的实体年龄和配置宽限。任何 `age < grace` 或 ghost 实体进入该日志都属于回归。

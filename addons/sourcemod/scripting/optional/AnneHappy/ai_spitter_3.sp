@@ -20,13 +20,14 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.2",
+		version 		= "3.0.3",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopStartDistance,
 	g_hPathBhop,
 	g_hPathLookAheadDepth,
 	g_hPathLaneOffset,
@@ -55,6 +56,7 @@ public void OnPluginStart()
 {
 	g_hAllowBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启 Spitter 连跳功能", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳的速度", CVAR_FLAG, true, 0.0);
+	g_hBhopStartDistance = CreateConVar("ai_SpitterBhopStartDistance", "2500.0", "Spitter 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hPathBhop = CreateConVar("ai_spitter3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hPathLookAheadDepth = CreateConVar("ai_spitter3_path_lookahead_depth", "6", "路径连跳最大前视节点数", CVAR_FLAG, true, 1.0, true, 16.0);
 	g_hPathLaneOffset = CreateConVar("ai_spitter3_path_lane_offset", "12.0", "路径连跳的最大稳定侧向分流距离", CVAR_FLAG, true, 0.0, true, 40.0);
@@ -156,7 +158,7 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		return Plugin_Continue;
 	}
 	AIPathMovement_Reset(spitter);
-	if (!(targetDist < 1000.0 && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
+	if (!(targetDist < g_hBhopStartDistance.FloatValue && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
 	GetClientEyeAngles(spitter, eyeAngle);
 	bool pathGuided = false;
 	float pathGoal[3];

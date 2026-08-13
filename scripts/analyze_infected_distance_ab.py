@@ -34,7 +34,7 @@ SPAWN_RE = re.compile(
 )
 API_RE = re.compile(
     r"\[FALLBACK API\] class=(?P<class>\S+) target=\d+ tries=(?P<tries>\d+) "
-    r"result=(?P<result>hit|miss|cap_reject)"
+    r"result=(?P<result>hit|miss|cap_reject|safety_reject)"
 )
 DIRECTOR_CAP_RE = re.compile(
     r"\[SpawnPerf\]\[DirectorCap\] stage=(?P<stage>request|actual) .*?"
@@ -485,6 +485,7 @@ def main() -> int:
             "hits": sum(call["result"] == "hit" for call in class_calls),
             "misses": sum(call["result"] == "miss" for call in class_calls),
             "request_cap_rejects": sum(call["result"] == "cap_reject" for call in class_calls),
+            "request_safety_rejects": sum(call["result"] == "safety_reject" for call in class_calls),
             "actual_cap_rejects": sum(
                 reject["stage"] == "actual" and reject["class"] == class_name
                 for reject in director_cap_rejects
@@ -499,6 +500,7 @@ def main() -> int:
         "hits": sum(call["result"] == "hit" for call in api_calls),
         "misses": sum(call["result"] == "miss" for call in api_calls),
         "request_cap_rejects": sum(call["result"] == "cap_reject" for call in api_calls),
+        "request_safety_rejects": sum(call["result"] == "safety_reject" for call in api_calls),
         "actual_cap_rejects": sum(reject["stage"] == "actual" for reject in director_cap_rejects),
         "tries_7": sum(call["tries"] == 7 for call in api_calls),
         "tries_12": sum(call["tries"] == 12 for call in api_calls),

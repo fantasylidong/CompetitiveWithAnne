@@ -15,6 +15,7 @@
 
 #define HORDE_MIN_SIZE_AUDIAL_FEEDBACK 120
 #define MAX_CHECKPOINTS 4
+#define FINITE_EVENT_ACTIVITY_HOLD 12.0
 
 #define HORDE_SOUND "/npc/mega_mob/mega_mob_incoming.wav"
 
@@ -36,8 +37,15 @@ int
 bool
 	announcedInChat,
 	announcedEventEnd,
+	finiteEventActive,
 	deferredMobSavedForTank,
 	checkpointAnnounced[MAX_CHECKPOINTS];
+
+float
+	finiteEventActiveUntil,
+	finiteEventPauseStartedAt;
+
+Handle g_hFiniteEventStateChangedForward = INVALID_HANDLE;
 
 public Plugin myinfo = 
 {
@@ -48,10 +56,22 @@ public Plugin myinfo =
 	url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
+public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax)
+{
+	RegPluginLibrary("l4d2_horde_equaliser");
+	CreateNative("L4D2HordeEqualiser_IsFiniteEventActive", Native_IsFiniteEventActive);
+	CreateNative("L4D2HordeEqualiser_GetFiniteEventLimit", Native_GetFiniteEventLimit);
+	return APLRes_Success;
+}
+
 public void OnPluginStart()
 {
 	LoadTranslation("l4d2_horde_equaliser.phrases");
 	InitGameData();
+	g_hFiniteEventStateChangedForward = CreateGlobalForward(
+		"L4D2HordeEqualiser_OnFiniteEventStateChanged",
+		ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
+	RefreshMapSettings();
 	
 	hCvarNoEventHordeDuringTanks = CreateConVar("l4d2_heq_no_tank_horde", "0", "Put infinite hordes on a 'hold up' during Tank fights");
 	hCvarHordeCheckpointAnnounce = CreateConVar("l4d2_heq_checkpoint_sound", "1", "Play the incoming mob sound at checkpoints (each 1/4 of total commons killed off) to simulate L4D1 behaviour");
@@ -91,10 +111,25 @@ void InitGameData()
 
 public void OnMapStart()
 {
-	commonLimit = L4D2_GetMapValueInt("horde_limit", -1);
-	commonTank = L4D2_GetMapValueInt("horde_tank", -1);
+	finiteEventActive = false;
+	finiteEventActiveUntil = 0.0;
+	finiteEventPauseStartedAt = 0.0;
+	RefreshMapSettings();
 
 	PrecacheSound(HORDE_SOUND);
+}
+
+void RefreshMapSettings()
+{
+	commonLimit = L4D2_GetMapValueInt("horde_limit", -1);
+	commonTank = L4D2_GetMapValueInt("horde_tank", -1);
+	finiteEventActive = false;
+	finiteEventActiveUntil = 0.0;
+	if (commonLimit > 0 && IsInfiniteHordeActive()) {
+		finiteEventActive = true;
+		finiteEventActiveUntil = GetFiniteEventTime() + FINITE_EVENT_ACTIVITY_HOLD;
+	}
+	PublishFiniteEventState();
 }
 
 void RoundStartEvent(Event hEvent, const char[] name, bool dontBroadcast)
@@ -105,21 +140,123 @@ void RoundStartEvent(Event hEvent, const char[] name, bool dontBroadcast)
 	deferredMobSavedForTank = false;
 	announcedInChat = false;
 	announcedEventEnd = false;
+	finiteEventPauseStartedAt = 0.0;
 	for (int i = 0; i < MAX_CHECKPOINTS; i++) {
 		checkpointAnnounced[i] = false;
 	}
+	SetFiniteEventActive(false, true);
 }
 
 void RoundEndEvent(Event hEvent, const char[] name, bool dontBroadcast)
 {
+	SetFiniteEventActive(false);
+	finiteEventPauseStartedAt = 0.0;
 	deferredMobCount = 0;
 	deferredMobSavedForTank = false;
 }
 
 public void OnMapEnd()
 {
+	SetFiniteEventActive(false);
+	finiteEventPauseStartedAt = 0.0;
 	deferredMobCount = 0;
 	deferredMobSavedForTank = false;
+}
+
+public void OnPluginEnd()
+{
+	SetFiniteEventActive(false);
+}
+
+public any Native_IsFiniteEventActive(Handle plugin, int numParams)
+{
+	return finiteEventActive;
+}
+
+public any Native_GetFiniteEventLimit(Handle plugin, int numParams)
+{
+	return commonLimit;
+}
+
+void PublishFiniteEventState()
+{
+	if (g_hFiniteEventStateChangedForward == INVALID_HANDLE) {
+		return;
+	}
+
+	Call_StartForward(g_hFiniteEventStateChangedForward);
+	Call_PushCell(finiteEventActive);
+	Call_PushCell(commonLimit);
+	Call_PushCell(commonTotal);
+	Call_Finish();
+}
+
+void SetFiniteEventActive(bool active, bool forceNotify = false)
+{
+	if (finiteEventActive == active && !forceNotify) {
+		return;
+	}
+
+	finiteEventActive = active;
+	if (!active) {
+		finiteEventActiveUntil = 0.0;
+	}
+	PublishFiniteEventState();
+}
+
+void TouchFiniteEventActivity()
+{
+	finiteEventActiveUntil = GetFiniteEventTime() + FINITE_EVENT_ACTIVITY_HOLD;
+	SetFiniteEventActive(true);
+}
+
+float GetFiniteEventTime()
+{
+	return (finiteEventPauseStartedAt > 0.0) ? finiteEventPauseStartedAt : GetGameTime();
+}
+
+public void OnPause()
+{
+	if (finiteEventPauseStartedAt <= 0.0) {
+		finiteEventPauseStartedAt = GetGameTime();
+	}
+}
+
+public void OnUnpause()
+{
+	if (finiteEventPauseStartedAt <= 0.0) {
+		return;
+	}
+
+	float pausedFor = GetGameTime() - finiteEventPauseStartedAt;
+	if (pausedFor > 0.0 && finiteEventActiveUntil > 0.0) {
+		finiteEventActiveUntil += pausedFor;
+	}
+	finiteEventPauseStartedAt = 0.0;
+}
+
+public void OnGameFrame()
+{
+	if (finiteEventPauseStartedAt > 0.0) {
+		return;
+	}
+
+	if (deferredMobSavedForTank) {
+		if (IsTankUp()) {
+			if (finiteEventActive) {
+				finiteEventActiveUntil = GetGameTime() + FINITE_EVENT_ACTIVITY_HOLD;
+			}
+			return;
+		}
+		RestoreDeferredMobCount();
+	}
+
+	if (!finiteEventActive || finiteEventActiveUntil <= 0.0
+		|| GetFiniteEventTime() < finiteEventActiveUntil) {
+		return;
+	}
+
+	SetFiniteEventActive(false);
 }
 
 void TankDeath(Event event, const char[] name, bool dontBroadcast)
@@ -132,7 +269,12 @@ void TankDeath(Event event, const char[] name, bool dontBroadcast)
 
 void TankSpawn(Event event, const char[] name, bool dontBroadcast)
 {
-	if ((hCvarNoEventHordeDuringTanks.BoolValue || commonTank > 0) && IsInfiniteHordeActive()) {
+	bool infiniteHordeActive = IsInfiniteHordeActive();
+	if (commonLimit > 0 && infiniteHordeActive) {
+		TouchFiniteEventActivity();
+	}
+
+	if ((hCvarNoEventHordeDuringTanks.BoolValue || commonTank > 0) && infiniteHordeActive) {
 		DeferMobCount(0);
 		SetPendingMobCount(0);
 	}
@@ -162,7 +304,11 @@ public void OnEntityCreated(int entity, const char[] classname)
 		if (hCvarNoEventHordeDuringTanks.BoolValue && IsTankUp()) {
 			return;
 		}
-		
+
+		if (commonLimit > 0) {
+			TouchFiniteEventActivity();
+		}
+
 		// Our job here is done
 		if (commonTotal >= commonLimit) {
 			if (!announcedEventEnd){
@@ -171,9 +317,9 @@ public void OnEntityCreated(int entity, const char[] classname)
 			}
 			return;
 		}
-		
+
 		commonTotal++;
-		if (hCvarHordeCheckpointAnnounce.BoolValue && 
+		if (hCvarHordeCheckpointAnnounce.BoolValue &&
 			(commonTotal >= ((lastCheckpoint + 1) * RoundFloat(float(commonLimit / MAX_CHECKPOINTS))))
 		) {
 			if (commonLimit >= HORDE_MIN_SIZE_AUDIAL_FEEDBACK) {
@@ -205,6 +351,11 @@ public Action L4D_OnSpawnMob(int &amount)
 	
 	bool bInfiniteHordeActive = IsInfiniteHordeActive();
 	bool bHoldingForTank = ((hCvarNoEventHordeDuringTanks.BoolValue || commonTank > 0) && IsTankUp() && bInfiniteHordeActive);
+	bool bFiniteEventActive = (bInfiniteHordeActive && commonLimit > 0);
+
+	if (bFiniteEventActive) {
+		TouchFiniteEventActivity();
+	}
 
 	// "Pause" the infinite horde during the Tank fight
 	if (bHoldingForTank){

@@ -30,6 +30,7 @@ enum struct WaveDecider
     float pauseStartedAt;      // 暂停期间冻结全部波次时钟
     bool earlyTriggered;       // 是否已触发提前机制
     bool pressureObserved;     // 定时器运行期间是否观察到破点压力
+    bool eventReleasePending;  // 暂停中触发机关时，解除暂停后立即结束 Anti-Bait 延长
     float holdReleaseSince;    // 延长条件首次解除的时间
     int earlyCheckCount;       // 提前检查次数（用于调试）
     int intensiveCheckCount;   // 密集检测次数（用于调试）
@@ -44,6 +45,7 @@ enum struct WaveDecider
         this.pauseStartedAt = 0.0;
         this.earlyTriggered = false;
         this.pressureObserved = false;
+        this.eventReleasePending = false;
         this.holdReleaseSince = 0.0;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
@@ -60,6 +62,7 @@ enum struct WaveDecider
         this.pauseStartedAt = 0.0;
         this.earlyTriggered = false;
         this.pressureObserved = false;
+        this.eventReleasePending = false;
         this.holdReleaseSince = 0.0;
         this.earlyCheckCount = 0;
         this.intensiveCheckCount = 0;
@@ -88,17 +91,26 @@ enum struct WaveDecider
 
     void OnUnpause()
     {
-        if (this.pauseStartedAt <= 0.0)
-            return;
+        if (this.pauseStartedAt > 0.0)
+        {
+            float pausedFor = FloatMax(0.0, GetGameTime() - this.pauseStartedAt);
+            this.waveStartTime += pausedFor;
+            this.stateStartTime += pausedFor;
+            if (this.timerStartTime > 0.0)
+                this.timerStartTime += pausedFor;
+            if (this.holdReleaseSince > 0.0)
+                this.holdReleaseSince += pausedFor;
+            this.pauseStartedAt = 0.0;
+        }
 
-        float pausedFor = FloatMax(0.0, GetGameTime() - this.pauseStartedAt);
-        this.waveStartTime += pausedFor;
-        this.stateStartTime += pausedFor;
-        if (this.timerStartTime > 0.0)
-            this.timerStartTime += pausedFor;
-        if (this.holdReleaseSince > 0.0)
-            this.holdReleaseSince += pausedFor;
-        this.pauseStartedAt = 0.0;
+        if (this.eventReleasePending && this.state == WD_IntensiveCheck)
+        {
+            this.eventReleasePending = false;
+            float now = GetGameTime();
+            WaveDecider_Debug("Release deferred event-pressure hold after unpause");
+            WaveSpawnReport_RecordAntiBaitHoldEnd(now);
+            this.ReleaseWave("event pressure disabled anti-bait hold after unpause");
+        }
     }
 
     // 每秒调用一次的更新函数
@@ -106,6 +118,12 @@ enum struct WaveDecider
     {
         if (this.state == WD_Idle)
             return;
+
+        if (EventPressure_ShouldBypassAntiBait())
+        {
+            if (this.OnEventPressureStarted("state_guard"))
+                return;
+        }
 
         float now = GetGameTime();
         float waveElapsed = now - this.waveStartTime;
@@ -232,6 +250,30 @@ enum struct WaveDecider
 
         WaveSpawnReport_RecordAntiBaitHoldEnd(now);
         this.ReleaseWave("anti-bait hold cleared");
+    }
+
+    bool OnEventPressureStarted(const char[] source)
+    {
+        this.pressureObserved = false;
+        this.holdReleaseSince = 0.0;
+        AntiBait_OnEventPressureStarted(source);
+        Tactical_OnEventPressureStarted();
+
+        if (this.state != WD_IntensiveCheck)
+            return false;
+
+        if (this.pauseStartedAt > 0.0 || (g_bPauseLib && IsInPause()))
+        {
+            this.eventReleasePending = true;
+            WaveDecider_Debug("Event pressure disabled Anti-Bait during pause; defer hold release (%s)", source);
+            return false;
+        }
+
+        float now = GetGameTime();
+        WaveDecider_Debug("Event pressure disabled Anti-Bait during hold; release immediately (%s)", source);
+        WaveSpawnReport_RecordAntiBaitHoldEnd(now);
+        this.ReleaseWave("event pressure disabled anti-bait hold");
+        return true;
     }
 
     void StartSpawnTimer(const char[] reason)
@@ -370,6 +412,11 @@ stock void WaveDecider_OnWaveStart()
 stock void WaveDecider_Update()
 {
     gWD.Update();
+}
+
+stock void WaveDecider_OnEventPressureStarted(const char[] source)
+{
+    gWD.OnEventPressureStarted(source);
 }
 
 stock void WaveDecider_OnPause()

@@ -6,13 +6,11 @@
 enum struct SpawnFilterStats
 {
     int cooldown;
-    int pendingSameNav;
     int flags;
     int flow;
     int behindFlow;
     int distance;
     int separation;
-    int pendingSeparation;
     int stuck;
     int visibility;
     int path;
@@ -23,13 +21,11 @@ enum struct SpawnFilterStats
     void Reset()
     {
         this.cooldown = 0;
-        this.pendingSameNav = 0;
         this.flags = 0;
         this.flow = 0;
         this.behindFlow = 0;
         this.distance = 0;
         this.separation = 0;
-        this.pendingSeparation = 0;
         this.stuck = 0;
         this.visibility = 0;
         this.path = 0;
@@ -253,22 +249,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
         {
             stats.separation++;
             SpawnPerf_RecordFilterBySeparation();
-            continue;
-        }
-
-        bool pendingSameNav;
-        if (!PassPendingSpawnSeparation(areaIdx, pos, pendingSameNav))
-        {
-            if (pendingSameNav)
-            {
-                stats.pendingSameNav++;
-                SpawnPerf_RecordFilterByPendingSameNav();
-            }
-            else
-            {
-                stats.pendingSeparation++;
-                SpawnPerf_RecordFilterByPendingSeparation();
-            }
             continue;
         }
 
@@ -928,14 +908,13 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (!exhausted)
         return SpawnSearch_Pending;
 
-    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,pendingSameNav=%d,flag=%d,flow=%d,behindFlow=%d,dist=%d,sep=%d,pendingSep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,behindFlow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
                 cursor.minRange, cursor.maxRange, cursor.graphScanMinRange,
                 cursor.inspected,
-                cursor.stats.cooldown, cursor.stats.pendingSameNav,
-                cursor.stats.flags,
+                cursor.stats.cooldown, cursor.stats.flags,
                 cursor.stats.flow, cursor.stats.behindFlow,
                 cursor.stats.distance,
-                cursor.stats.separation, cursor.stats.pendingSeparation,
+                cursor.stats.separation,
                 cursor.stats.stuck,
                 cursor.stats.visibility, cursor.stats.path,
                 cursor.stats.position, cursor.stats.score,

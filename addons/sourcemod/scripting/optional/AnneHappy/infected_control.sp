@@ -49,6 +49,8 @@
 #include <dhooks>
 #include <sourcescramble>
 #include <anne_spawn_accel>
+native bool L4D2HordeEqualiser_IsFiniteEventActive();
+native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #undef REQUIRE_PLUGIN
 #include <anne_traitor_quota> // 可选：每日配额与 Tank 封禁持久化
 #include <si_target_limit>  // 可选
@@ -115,9 +117,6 @@
 //#define SEP_MAX                   20     // 记录上限（防止无限增长）
 // === Dispersion tuning (lighter penalties) ===
 #define SEP_RADIUS                80.0
-#define PENDING_SEP_RADIUS        80.0    // 不同 NavID 的生成中点基础间距
-#define PENDING_SAME_NAV_RADIUS  120.0    // 同 NavID 允许在大 Nav 的远端再次取点
-#define PENDING_RESERVATION_TTL    1.25   // 略长于实体实际位置确认上限（1.0 秒）
 #define NAV_CD_SECS               1.0    // 成功及普通实际校验失败后的同 Nav 冷却
 #define SECTORS_BASE              6       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -328,6 +327,8 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_MapNearest2D");
     MarkNativeAsOptional("AnneSpawn_PathExists");
     MarkNativeAsOptional("AnneSpawn_ClearPathCache");
+    MarkNativeAsOptional("L4D2HordeEqualiser_IsFiniteEventActive");
+    MarkNativeAsOptional("L4D2HordeEqualiser_GetFiniteEventLimit");
     RegPluginLibrary("infected_control");                           // 供其他插件依赖
     g_hRushManNotifyForward = CreateGlobalForward("OnDetectRushman", // 跑男 forward：传入幸存者 index
                                                   ET_Ignore, Param_Cell);
@@ -347,6 +348,7 @@ public void OnAllPluginsLoaded()
     g_bSmokerLib      = LibraryExists("ai_smoker_new");
     g_bPauseLib       = LibraryExists("pause");
     SpawnAccel_UpdateAvailability();
+    EventPressure_SyncEqualiserState("horde_equaliser_all_plugins_loaded");
 }
 public void OnLibraryAdded(const char[] name)
 {
@@ -363,6 +365,8 @@ public void OnLibraryAdded(const char[] name)
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = true;
     else if (StrEqual(name, "ai_smoker_new")) g_bSmokerLib   = true;
     else if (StrEqual(name, "pause"))         g_bPauseLib    = true;
+    else if (StrEqual(name, "l4d2_horde_equaliser"))
+        EventPressure_SyncEqualiserState("horde_equaliser_library_added");
 }
 public void OnLibraryRemoved(const char[] name)
 {
@@ -379,6 +383,8 @@ public void OnLibraryRemoved(const char[] name)
     if (StrEqual(name, "si_target_limit")) g_bTargetLimitLib = false;
     else if (StrEqual(name, "ai_smoker_new")) g_bSmokerLib   = false;
     else if (StrEqual(name, "pause"))         g_bPauseLib    = false;
+    else if (StrEqual(name, "l4d2_horde_equaliser"))
+        EventPressure_OnEqualiserLibraryRemoved();
 }
 //native
 public any Native_GetNextSpawnTime(Handle plugin, int numParams)
@@ -719,7 +725,6 @@ void ResetDeathState()
 
 static void StopAll()
 {
-    SpawnAttempts_ResetPendingActualSpawn();
     WaveSpawnReport_End("stop_all");
     AssaultBurst_Reset();
     SpawnAttempts_ResetSearchProgress();
@@ -907,6 +912,7 @@ static Action Timer_SpawnFirstWave(Handle timer)
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     EventPressure_Reset();
+    EventPressure_OnRoundStart();
     g_bRuntimeRoundActive = true;
     g_bRuntimeMapEnding = false;
     g_bRuntimeRecoverySuppressed = false;
@@ -1022,9 +1028,6 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
     TeleportState_ClearClient(client);
-    if (SpawnAttempts_ConsumeRejectedActualDeath(client)
-        || SpawnAttempts_IsPendingActualClient(client))
-        return;
 
     if (IsValidSurvivor(client))
         Traitor_OnSurvivorDeath(client);
@@ -1090,8 +1093,6 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
-    SpawnAttempts_OnClientDisconnect(client);
-    SpawnAttempts_ClearRejectedActualSpawn(client);
     TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
@@ -1129,6 +1130,7 @@ static Action Timer_KickBot(Handle timer, int userid)
 
 public void OnUnpause()
 {
+    EventPressure_OnUnpause();
     AntiBait_OnUnpause();
     WaveDecider_OnUnpause();
     float delay = (gST.unpauseDelay > 0.1) ? gST.unpauseDelay : 1.0;
@@ -1300,17 +1302,8 @@ static void RuntimeWatchdog(float now)
             SpawnQueue_Length(), gCV.iSiLimit);
     }
 
-    int transientSpecials = SpawnAttempts_CountPendingActualSpawns()
-        + SpawnAttempts_CountRejectedActualSpawns();
     int actualSpecials = CountActualSpecialInfected();
-    if (transientSpecials > 0)
-    {
-        // SpawnSpecial 已创建实体，但 pending 尚未提交；被拒实体也可能仍在
-        // Kick 队列中。此时 Recalc 会把临时实体提前算入，提交/断开后再
-        // 增减一次，反而制造真实漂移，因此等临时态清空后再连续核验。
-        g_iRuntimeCountMismatchTicks = 0;
-    }
-    else if (actualSpecials != gST.totalSI)
+    if (actualSpecials != gST.totalSI)
     {
         g_iRuntimeCountMismatchTicks++;
     }
@@ -1338,14 +1331,12 @@ static void RuntimeWatchdog(float now)
 // =========================
 public void OnGameFrame()
 {
-    // SpawnSpecial 返回后等待短暂稳定窗口，再批量提交或拒绝临时实体。
-    SpawnAttempts_ProcessPendingActualSpawns();
+    EventPressure_Update();
 
     float now = GetGameTime();
     RuntimeWatchdog(now);
 
-    bool hasSpawnWork = (gST.bLate && (SpawnAttempts_HasPendingActualSpawn()
-        || Traitor_HasSpawnWork()
+    bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
         || (gST.totalSI < gCV.iSiLimit
             && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
     float releaseEta = WaveDecider_GetReleaseEta();
@@ -1373,15 +1364,12 @@ public void OnGameFrame()
         nextThinkStep = FloatMin(nextThinkStep, 0.01);
     gST.nextFrameThink = now + nextThinkStep;
 
-    int pendingActual = SpawnAttempts_CountPendingActualSpawns();
-    int rejectedActual = SpawnAttempts_CountRejectedActualSpawns();
-    if (gST.totalSI + pendingActual + rejectedActual >= gCV.iSiLimit)
+    if (gST.totalSI >= gCV.iSiLimit)
         return;
 
     // 开波时已经批量补齐队列。只有丢弃队首或死亡 CD 暂时无可用职业时才需要重试，
     // 并限制到每 0.25 秒一次，避免搜索期间反复遍历 MaxClients 重算职业上限。
-    int pendingNormal = SpawnAttempts_CountPendingNormalSpawns();
-    if (pendingNormal == 0 && SpawnQueue_Length() < gST.siQueueCount
+    if (SpawnQueue_Length() < gST.siQueueCount
         && now >= gST.nextQueueMaintain)
     {
         FillSpawnQueueToPendingBudget();
@@ -1395,9 +1383,7 @@ public void OnGameFrame()
     int burstAttempts = 0;
     bool budgetStop = false;
     while (burstAttempts < gCV.iSpawnAttemptsPerFrame
-        && gST.totalSI + SpawnAttempts_CountPendingActualSpawns()
-            + SpawnAttempts_CountRejectedActualSpawns()
-            < gCV.iSiLimit)
+        && gST.totalSI < gCV.iSiLimit)
     {
         bool attempted = false;
         if (TeleportQueue_Length() > 0)
@@ -1461,6 +1447,7 @@ static void InitSDK_FromGamedata()
 // --- pause
 public void OnPause()
 {
+    EventPressure_OnPause();
     AntiBait_OnPause();
     WaveDecider_OnPause();
     PauseSpawnTimer();

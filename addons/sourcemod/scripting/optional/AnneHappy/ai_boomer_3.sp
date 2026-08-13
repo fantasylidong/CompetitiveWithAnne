@@ -31,13 +31,14 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.4",
+		version 		= "3.0.5",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopStartDistance,
 	g_hJumpVomit,
 	g_hPathBhop,
 	g_hPathLookAheadDepth,
@@ -74,6 +75,7 @@ public void OnPluginStart()
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳速度", CVAR_FLAG, true, 0.0);
+	g_hBhopStartDistance = CreateConVar("ai_BoomerBhopStartDistance", "2500.0", "Boomer 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hJumpVomit = CreateConVar("ai_BoomerJumpVomit", "0", "是否允许 Boomer 已在空中时主动喷吐；不额外强制起跳，原连跳逻辑照常", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hPathBhop = CreateConVar("ai_boomer3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hPathLookAheadDepth = CreateConVar("ai_boomer3_path_lookahead_depth", "5", "路径连跳最大前视节点数", CVAR_FLAG, true, 1.0, true, 16.0);
@@ -420,7 +422,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	// 有有效路径时允许在拐角等无直视场景继续沿 PathFollower 连跳。
 	bool canUsePath = g_hPathBhop.BoolValue && AIPathSnapshot_IsReady(client) && !AIPathSnapshot_HasSpecialMoveAhead(client, 2);
 	if (g_hAllowBhop.BoolValue && IsValidSurvivor(target) && (has_sight || canUsePath) && (flags & FL_ONGROUND)
-		&& ((0.5 * g_hVomitRange.FloatValue) < targetDist && targetDist < 1000.0)
+		&& ((0.5 * g_hVomitRange.FloatValue) < targetDist && targetDist < g_hBhopStartDistance.FloatValue)
 		&& cur_speed > 160.0)
 	{
 		float bhopTarget[3];
