@@ -2,14 +2,34 @@
 {
 	"Tag"
 	{
-		"es"	"{red}[{default}!{red}]"
+		"es"		"{red}[{default}!{red}]"
 	}
 	"Spawned"
 	{
-    	"es"	"¡Se ha generado un {olive}Tank {default}({red}Control: %s{default})!"
+		"es"		"¡Se ha generado un {olive}Tank {default}({red}Control: %s{default})!"
 	}
 	"Spawned2"
 	{
-		"es"	"¡Se ha generado un {olive}Tank {default}({red}Control: %N{default})!"
+		"es"		"¡Se ha generado un {olive}Tank {default}({red}Control: %N{default})!"
+	}
+	"L4D2TankAnnounce_TankControllerGenerated"
+	{
+		"es"		"{default}[{red}!{default}] ¡{green}Tank {default}({red}Control: %s{default}) ha aparecido!"
+	}
+	"L4D2TankAnnounce_TankControllerGenerated_2"
+	{
+		"es"		"{default}[{blue}!{default}] ¡{green}Tank {default}({blue}Control: %s{default}) ha aparecido!"
+	}
+	"L4D2TankAnnounce_PlayerName"
+	{
+		"es"		"(Jugador) %N"
+	}
+	"L4D2TankAnnounce_AIName"
+	{
+		"es"		"(AI) %N"
+	}
+	"L4D2TankAnnounce_Hint"
+	{
+		"es"		"[Tank] Control: %s ha aparecido!"
 	}
 }

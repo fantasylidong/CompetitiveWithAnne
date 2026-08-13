@@ -4,17 +4,21 @@
 	{
 		"vi"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"vi"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"vi"		"{green} cảm giác đặc biệt Xếp hạng {blue}: {olive}#%d {blue}({default}%d {green} thiệt hại {blue}[{default}%.0f%%{blue}]{default}, %d {green} tiêu diệt {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{blue}Hạng của bạn {green}SI{default}: {olive}#%d {blue}({default}%d {green}sát thương {blue}[{default}%.0f%%{blue}]{default}, %d {green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"vi"		"{green} zombie {blue} xếp hạng: {olive}#%d {blue}({default}%d {green} zombie {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{blue}Hạng của bạn {green}CI{default}: {olive}#%d {blue}({default}%d {green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"vi"		"Súng đen {green} Xếp hạng {blue}: {olive}#%d {blue}({default}%d {green} sát thương thân thiện {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{blue}Hạng của bạn {green}FF{default}: {olive}#%d {blue}({default}%d {green}friendly fire {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
@@ -22,62 +26,62 @@
 	}
 	"NobodyName"
 	{
-		"vi"		"{blue}({default} không có ai {blue})"
+		"vi"		"{blue}({default}không có{blue})"
 	}
 	"NotEnoughAction"
 	{
-		"vi"		"{blue} ({default} không có đủ thao tác {blue})"
+		"vi"		"{blue}({default}chưa đủ dữ liệu để bình chọn{blue})"
 	}
 	"ReportSI_Absolute"
 	{
-		"vi"		"{green} ý nghĩa đặc biệt: {olive}%s {blue}({default}%d {green} sát thương {default}, %d {green} giết chết {blue})"
+		"vi"		"{green}SI: {olive}%s {blue}({default}%d {green}sát thương{default}, %d {green}hạ gục{blue})"
 	}
 	"ReportSI_Percent"
 	{
-		"vi"		"{green} ý nghĩa đặc biệt: {olive}%s {blue}({green} thiệt hại {blue}[{default}%.0f%%{blue}]{default}, {green} tiêu diệt {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}SI: {olive}%s {blue}({green}sát thương {blue}[{default}%.0f%%{blue}]{default}, {green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Full"
 	{
-		"vi"		"{green} ý nghĩa đặc biệt: {olive}%s {blue}({default}%d {green} thiệt hại {blue}[{default}%.0f%%{blue}]{default}, %d {green} tiêu diệt {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}SI: {olive}%s {blue}({default}%d {green}sát thương {blue}[{default}%.0f%%{blue}]{default}, %d {green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Nobody"
 	{
-		"vi"		"{green} cảm giác đặc biệt: {blue} ({default} không có {blue})"
+		"vi"		"{green}SI: {blue}({default}Không có{blue})"
 	}
 	"ReportCI_Absolute"
 	{
-		"vi"		"{green} thây ma: {olive}%s {blue}({default}%d {green}zombie {blue})"
+		"vi"		"{green}CI: {olive}%s {blue}({default}%d {green}hạ gục{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"vi"		"{green} zombie: {olive}%s {blue}({green} zombie {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}CI: {olive}%s {blue}({green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"vi"		"Zombie {green}: {olive}%s {blue}({default}%d {green} zombie {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}CI: {olive}%s {blue}({default}%d {green}hạ gục {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"vi"		"{blue} ({default} không có súng đen nào cả! {blue})"
+		"vi"		"{green}FF{default}: {blue}({default}vòng này không có friendly fire!{blue})"
 	}
 	"ReportFF_Absolute"
 	{
-		"vi"		"{green} sát thương thân thiện: {olive}%s {blue}({default}%d {green} sát thương thân thiện {blue})"
+		"vi"		"{green}FF: {olive}%s {blue}({default}%d {green}friendly fire{blue})"
 	}
 	"ReportFF_Percent"
 	{
-		"vi"		"{green} Sát thương thân thiện: {olive}%s {blue}({green} sát thương thân thiện {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}FF: {olive}%s {blue}({green}friendly fire {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportFF_Full"
 	{
-		"vi"		"Sát thương thân thiện với {green}: {olive}%s {blue}({default}%d {green} sát thương thân thiện {blue}[{default}%.0f%%{blue}])"
+		"vi"		"{green}FF: {olive}%s {blue}({default}%d {green}friendly fire {blue}[{default}%.0f%%{blue}])"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsHeader"
 	{
-		"vi"		"{blue}[{default}dược phẩm MVPstatistics{blue}]"
+		"vi"		"{blue}[{default}Thống kê Anne MVP{blue}]"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsLine"
 	{
-		"vi"		"{olive} giác quan đặc biệt {green}%2d {olive} giác quan chung {green}%3d {olive} chấn thương/chấn thương thân thiện {green}%2d/%2d Điểm {olive}{green}%4d {default}%N"
+		"vi"		"{olive}SI{green}%2d {olive}CI{green}%3d {olive}FF/Nhận{green}%2d/%2d {olive}Điểm{green}%4d {default}%N"
 	}
 }

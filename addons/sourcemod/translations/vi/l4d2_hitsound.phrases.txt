@@ -116,4 +116,24 @@
 	{
 		"vi"		"Biểu tượng tiêu diệt: đặt thành %d"
 	}
+	"L4D2Hitsound_HeadKillSoundOn"
+	{
+		"vi"		"Âm thanh riêng cho hạ gục bằng headshot: BẬT (phát âm thanh riêng của bộ nếu được cấu hình)"
+	}
+	"L4D2Hitsound_HeadKillSoundOff"
+	{
+		"vi"		"Âm thanh riêng cho hạ gục bằng headshot: TẮT (quay về âm thanh headshot thông thường)"
+	}
+	"L4D2Hitsound_StackModeFollow"
+	{
+		"vi"		"Chế độ phát âm thanh: theo bộ (bộ âm thanh tự quyết định có chồng tiếng hay không)"
+	}
+	"L4D2Hitsound_StackModeStack"
+	{
+		"vi"		"Chế độ phát âm thanh: buộc chồng tiếng (mỗi lần trúng/hạ gục vang riêng, có thể chồng trong cùng khung hình)"
+	}
+	"L4D2Hitsound_StackModeMerge"
+	{
+		"vi"		"Chế độ phát âm thanh: buộc gộp (tối đa một âm mỗi khung hình, ưu tiên hạ gục > headshot > trúng)"
+	}
 }

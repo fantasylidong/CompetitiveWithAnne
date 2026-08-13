@@ -4,80 +4,84 @@
 	{
 		"jp"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"jp"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"jp"		"{green} 特別感 {blue} ランク：{olive}#%d {blue}({default}%d {green} ダメージ{blue}[{default}%.0f%%{blue}]{default}、%d {green} {blue}[{default}%.0f%%{blue}])をキルします"
+		"jp"		"{blue}あなたの順位 {green}SI{default}: {olive}#%d {blue}({default}%d {green}ダメージ {blue}[{default}%.0f%%{blue}]{default}, %d {green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"jp"		"{green} ゾンビ {blue} ランキング: {olive}#%d {blue}({default}%d {green} ゾンビ{blue}[{default}%.0f%%{blue}])"
+		"jp"		"{blue}あなたの順位 {green}CI{default}: {olive}#%d {blue}({default}%d {green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"jp"		"{green} ブラックガン {blue} ランキング: {olive}#%d {blue}({default}%d {green} 味方ダメージ{blue}[{default}%.0f%%{blue}])"
+		"jp"		"{blue}あなたの順位 {green}FF{default}: {olive}#%d {blue}({default}%d {green}味方傷害 {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
-		"jp"		"[ボット]"
+		"jp"		"[BOT]"
 	}
 	"NobodyName"
 	{
-		"jp"		"{blue}({default}誰もいない {blue})"
+		"jp"		"{blue}({default}なし{blue})"
 	}
 	"NotEnoughAction"
 	{
-		"jp"		"{blue} ({default} には十分な操作がありません {blue})"
+		"jp"		"{blue}({default}まだ十分な戦績がありません{blue})"
 	}
 	"ReportSI_Absolute"
 	{
-		"jp"		"{green} 特殊センス: {olive}%s {blue}({default}%d {green} ダメージ {default}、%d {green} キル {blue})"
+		"jp"		"{green}SI: {olive}%s {blue}({default}%d {green}ダメージ{default}, %d {green}キル{blue})"
 	}
 	"ReportSI_Percent"
 	{
-		"jp"		"{green} 特殊センス: {olive}%s {blue}({green} ダメージ {blue}[{default}%.0f%%{blue}]{default}、{green} キル{blue}[{default}%.0f%%{blue}])"
+		"jp"		"{green}SI: {olive}%s {blue}({green}ダメージ {blue}[{default}%.0f%%{blue}]{default}, {green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Full"
 	{
-		"jp"		"{green} 特殊センス: {olive}%s {blue}({default}%d {green} ダメージ {blue}[{default}%.0f%%{blue}]{default}、 %d {green} {blue} をキル [{default}%.0f%%{blue}])"
+		"jp"		"{green}SI: {olive}%s {blue}({default}%d {green}ダメージ {blue}[{default}%.0f%%{blue}]{default}, %d {green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Nobody"
 	{
-		"jp"		"{green} 特別感: {blue} ({default} なし {blue})"
+		"jp"		"{green}SI: {blue}({default}なし{blue})"
 	}
 	"ReportCI_Absolute"
 	{
-		"jp"		"{green} ゾンビ: {olive}%s {blue}({default}%d {green}ゾンビ {blue})"
+		"jp"		"{green}CI: {olive}%s {blue}({default}%d {green}キル{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"jp"		"{green} ゾンビ: {olive}%s {blue}({green} ゾンビ {blue}[{default}%.0f%%{blue}])"
+		"jp"		"{green}CI: {olive}%s {blue}({green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"jp"		"{green} ゾンビ: {olive}%s {blue}({default}%d {green} ゾンビ {blue}[{default}%.0f%%{blue}])"
+		"jp"		"{green}CI: {olive}%s {blue}({default}%d {green}キル {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"jp"		"{blue} ({default} には黒い銃がまったくありません! {blue})"
+		"jp"		"{green}FF{default}: {blue}({default}このラウンドに味方傷害はありません！{blue})"
 	}
 	"ReportFF_Absolute"
 	{
-		"jp"		"{green} 味方ダメージ: {olive}%s {blue}({default}%d {green} 味方ダメージ {blue})"
+		"jp"		"{green}FF: {olive}%s {blue}({default}%d {green}味方傷害{blue})"
 	}
 	"ReportFF_Percent"
 	{
-		"jp"		"{green} 味方ダメージ: {olive}%s {blue}({green} 味方ダメージ {blue}[{default}%.0f%%{blue}])"
+		"jp"		"{green}FF: {olive}%s {blue}({green}味方傷害 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportFF_Full"
 	{
-		"jp"		"{green} 味方ダメージ: {olive}%s {blue}({default}%d {green} 味方ダメージ {blue}[{default}%.0f%%{blue}])"
+		"jp"		"{green}FF: {olive}%s {blue}({default}%d {green}味方傷害 {blue}[{default}%.0f%%{blue}])"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsHeader"
 	{
-		"jp"		"{blue}[{default}医薬品MVP統計{blue}]"
+		"jp"		"{blue}[{default}Anne MVP統計{blue}]"
 	}
 	"SurvivorMVP_PharmacyMVPStatisticsLine"
 	{
-		"jp"		"{olive} 特殊センス {green}%2d {olive} 一般センス {green}%3d {olive} 味方傷害/負傷 {green}%2d/%2d {olive}ポイント{green}%4d {default}%N"
+		"jp"		"{olive}SI{green}%2d {olive}CI{green}%3d {olive}FF/被FF{green}%2d/%2d {olive}スコア{green}%4d {default}%N"
 	}
 }

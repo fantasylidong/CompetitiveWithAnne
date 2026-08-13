@@ -404,7 +404,7 @@ public Action:event_TongueSave(Handle:event, const String:name[], bool:dontBroad
 	new Victim = GetClientOfUserId(GetEventInt(event, "victim"));
 	new Savior = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_SmokerDrag), 2, 3, "Smoker", "award_smoker");
+	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_SmokerDrag), 2, 3, INF_ID_SMOKER, "award_smoker");
 }
 
 // Save friendly from being choked by Smoker.
@@ -417,7 +417,7 @@ public Action:event_ChokeSave(Handle:event, const String:name[], bool:dontBroadc
 	new Victim = GetClientOfUserId(GetEventInt(event, "victim"));
 	new Savior = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_ChokePounce), 2, 3, "Smoker", "award_smoker");
+	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_ChokePounce), 2, 3, INF_ID_SMOKER, "award_smoker");
 }
 
 // Save friendly from being pounced by Hunter.
@@ -433,7 +433,7 @@ public Action:event_PounceSave(Handle:event, const String:name[], bool:dontBroad
 	if (Victim > 0)
 		CreateTimer(INF_WEAROFF_TIME, timer_EndHunterLunged, Victim);
 
-	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_ChokePounce), 2, 3, "Hunter", "award_hunter");
+	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_ChokePounce), 2, 3, INF_ID_HUNTER, "award_hunter");
 }
 
 // Player is hanging from a ledge.
@@ -909,17 +909,35 @@ public Action:event_ChargerKilled(Handle:event, const String:name[], bool:dontBr
 			if (ChargerCarryVictim[Charger] > 0 && (IsClientBot(ChargerCarryVictim[Charger]) || (IsClientConnected(ChargerCarryVictim[Charger]) && IsClientInGame(ChargerCarryVictim[Charger]))))
 			{
 				GetClientName(ChargerCarryVictim[Charger], VictimName, sizeof(VictimName));
-				Format(VictimName, sizeof(VictimName), "{olive}%s{default}", VictimName);
 			}
 			else
-				Format(VictimName, sizeof(VictimName), "a survivor");
-			if(StrEqual(KillerName, VictimName))
+				VictimName[0] = '\0';
+			if (VictimName[0] != '\0' && StrEqual(KillerName, VictimName))
 				return Plugin_Continue;
 
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Killer, "L4DStats_ChargerSaveSelf", VictimName, ChargerName, Score);
+			{
+				decl String:VictimLabel[MAX_LINE_WIDTH];
+				if (VictimName[0] != '\0')
+					strcopy(VictimLabel, sizeof(VictimLabel), VictimName);
+				else
+					StatsFormatPhrase(Killer, VictimLabel, sizeof(VictimLabel), "L4DStats_ASurvivor");
+				StatsPrintToChat(Killer, "L4DStats_ChargerSaveSelf", VictimLabel, ChargerName, Score);
+			}
 			else if (Mode == 3)
-				StatsPrintToChatAll("L4DStats_ChargerSaveAll", KillerName, VictimName, ChargerName, Score);
+			{
+				for (new i = 1; i <= MaxClients; i++)
+				{
+					if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+						continue;
+					decl String:VictimLabel[MAX_LINE_WIDTH];
+					if (VictimName[0] != '\0')
+						strcopy(VictimLabel, sizeof(VictimLabel), VictimName);
+					else
+						StatsFormatPhrase(i, VictimLabel, sizeof(VictimLabel), "L4DStats_ASurvivor");
+					StatsPrintToChat(i, "L4DStats_ChargerSaveAll", KillerName, VictimLabel, ChargerName, Score);
+				}
+			}
 		}
 	}
 }

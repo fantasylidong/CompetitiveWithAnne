@@ -3,54 +3,119 @@
 	"L4DStats_RankMessage"
 	{
 		"en"		"{green}[{lightgreen}RANK{green}] {default}%s"
+		"chi"		"{green} [ {lightgreen} 排名 {green} ] {default} %s"
+		"zho"		"{green} [ {lightgreen} 排名 {green} ] {default} %s"
+		"jp"		"{green} [ {lightgreen} ランク {green} ] {default} %s"
+		"ko"		"{green} [ {lightgreen} 순위 {green} ] {default} %s"
+		"vi"		"{green} [ {lightgreen} HẠNG {green} ] {default} %s"
 	}
 	"L4DStats_MapRecordSummary"
 	{
 		"en"		"{green}%s{default} {olive}[Map record]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+		"chi"		"{green}%s{default} {olive}[地图记录]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+		"zho"		"{green}%s{default} {olive}[地圖記錄]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+		"jp"		"{green}%s{default} {olive}[マップ記録]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+		"ko"		"{green}%s{default} {olive}[맵 기록]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
+		"vi"		"{green}%s{default} {olive}[Kỷ lục bản đồ]{default} {lightgreen}[%s]{default} {lightgreen}[%s]{default}"
 	}
 	"L4DStats_MapRecordDetails"
 	{
 		"en"		"{olive}%s{default} set a {green}%d SI / %ds / no-shop / %s difficulty{default} record."
+		"chi"		"{olive}%s{default} 刷新了 {green}%d特/%d秒/无商店/%s难度{default}记录。"
+		"zho"		"{olive}%s{default} 刷新了 {green}%d特/%d秒/無商店/%s難度{default}記錄。"
+		"jp"		"{olive}%s{default} が {green}%d特/%d秒/ショップなし/%s難易度{default} の記録を更新しました。"
+		"ko"		"{olive}%s{default} 님이 {green}%d특/%d초/상점 없음/%s 난이도{default} 기록을 갱신했습니다."
+		"vi"		"{olive}%s{default} đã lập kỷ lục {green}%d SI / %d giây / không shop / độ khó %s{default}."
 	}
 	"L4DStats_MapRecordModeNormal"
 	{
 		"en"		"Anne"
+		"chi"		"普通药役"
+		"zho"		"普通藥役"
+		"jp"		"通常Anne"
+		"ko"		"일반 Anne"
+		"vi"		"Anne thường"
 	}
 	"L4DStats_MapRecordModeHardcore"
 	{
 		"en"		"Hardcore Anne"
+		"chi"		"硬核药役"
+		"zho"		"硬核藥役"
+		"jp"		"ハードAnne"
+		"ko"		"하드코어 Anne"
+		"vi"		"Anne khó"
 	}
 	"L4DStats_MapRecordModeShotgun"
 	{
 		"en"		"Shotgun Anne"
+		"chi"		"喷子药役"
+		"zho"		"噴子藥役"
+		"jp"		"ショットガンAnne"
+		"ko"		"샷건 Anne"
+		"vi"		"Anne shotgun"
 	}
 	"L4DStats_MapRecordDifficultyEasy"
 	{
 		"en"		"Easy"
+		"chi"		"简单"
+		"zho"		"簡單"
+		"jp"		"イージー"
+		"ko"		"쉬움"
+		"vi"		"Dễ"
 	}
 	"L4DStats_MapRecordDifficultyNormal"
 	{
 		"en"		"Normal"
+		"chi"		"普通"
+		"zho"		"普通"
+		"jp"		"ノーマル"
+		"ko"		"보통"
+		"vi"		"Thường"
 	}
 	"L4DStats_MapRecordDifficultyHard"
 	{
 		"en"		"Hard"
+		"chi"		"困难"
+		"zho"		"困難"
+		"jp"		"ハード"
+		"ko"		"어려움"
+		"vi"		"Khó"
 	}
 	"L4DStats_MapRecordDifficultyExpert"
 	{
 		"en"		"Expert"
+		"chi"		"专家"
+		"zho"		"專家"
+		"jp"		"エキスパート"
+		"ko"		"전문가"
+		"vi"		"Chuyên gia"
 	}
 	"L4DStats_MapRecordDifficultyExtreme"
 	{
 		"en"		"Extreme"
+		"chi"		"极限"
+		"zho"		"極限"
+		"jp"		"エクストリーム"
+		"ko"		"극한"
+		"vi"		"Cực hạn"
 	}
 	"L4DStats_MapRecordDifficultyNeri"
 	{
 		"en"		"Neri"
+		"chi"		"Neri"
+		"zho"		"Neri"
+		"jp"		"Neri"
+		"ko"		"Neri"
+		"vi"		"Neri"
 	}
 	"L4DStats_MapRecordDifficultyUnknown"
 	{
 		"en"		"Unknown"
+		"chi"		"未知"
+		"zho"		"未知"
+		"jp"		"不明"
+		"ko"		"알 수 없음"
+		"vi"		"Không rõ"
 	}
 	"L4DStats_Yes"
 	{
@@ -1918,10 +1983,10 @@
 	"L4DStats_MapTimeInvalidBunnyHop"
 	{
 		"en"		"This result is {green}invalid{default} because Tank bunny hopping is disabled; the map time will not be recorded!"
-		"chi"		"此次结果因关闭 Tank 连跳而{green}无效{default}，不记录地图时间!"
-		"zho"		"此次結果因關閉 Tank 連跳而{green}無效{default}，不記錄地圖時間!"
-		"jp"		"Tankのバニーホップが無効のため結果は{green}無効{default}で、マップタイムは記録されません!"
-		"ko"		"Tank 버니합이 비활성화되어 결과가 {green}무효{default}하며 맵 시간을 기록하지 않습니다!"
+		"chi"		"此次结果因关闭 {green}坦克{default} 连跳而{green}无效{default}，不记录地图时间!"
+		"zho"		"此次結果因關閉 {green}坦克{default} 連跳而{green}無效{default}，不記錄地圖時間!"
+		"jp"		"{green}タンク{default}のバニーホップが無効のため結果は{green}無効{default}で、マップタイムは記録されません!"
+		"ko"		"{green}탱크{default} 버니합이 비활성화되어 결과가 {green}무효{default}하며 맵 시간을 기록하지 않습니다!"
 		"vi"		"Kết quả {green}không hợp lệ{default} vì Tank bunny hop bị tắt; thời gian sẽ không được ghi!"
 	}
 	"L4DStats_MapTimeInvalidMultiplayerMode"
@@ -1999,10 +2064,10 @@
 	"L4DStats_NoBuyBonusBunnyHopDisabled"
 	{
 		"en"		"No-buy bonus is unavailable because Tank bunny hopping is disabled."
-		"chi"		"由于关闭了 Tank 连跳，无法获得额外过关积分。"
-		"zho"		"由於關閉了 Tank 連跳，無法獲得額外過關積分。"
-		"jp"		"Tankのバニーホップが無効のため、無購入ボーナスは得られません。"
-		"ko"		"Tank 버니합이 비활성화되어 미구매 보너스를 받을 수 없습니다."
+		"chi"		"由于关闭了 {green}坦克{default} 连跳，无法获得额外过关积分。"
+		"zho"		"由於關閉了 {green}坦克{default} 連跳，無法獲得額外過關積分。"
+		"jp"		"{green}タンク{default}のバニーホップが無効のため、無購入ボーナスは得られません。"
+		"ko"		"{green}탱크{default} 버니합이 비활성화되어 미구매 보너스를 받을 수 없습니다."
 		"vi"		"Không có thưởng không mua đồ vì Tank bunny hop bị tắt."
 	}
 	"L4DStats_NoBuyBonusAwarded"
@@ -2251,19 +2316,19 @@
 	"L4DStats_QuickChargerKillSelf"
 	{
 		"en"		"You quickly killed a Charger and earned {green}%i{default} points!"
-		"chi"		"你秒杀了 Charger，获得 {green}%i{default} 分!"
-		"zho"		"你秒殺了 Charger，獲得 {green}%i{default} 分!"
-		"jp"		"Chargerを素早く倒し、{green}%i{default} ポイント獲得!"
-		"ko"		"Charger를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+		"chi"		"你秒杀了 {green}牛{default}，获得 {green}%i{default} 分!"
+		"zho"		"你秒殺了 {green}牛{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{green}チャージャー{default}を素早く倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{green}차저{default}를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
 		"vi"		"Bạn hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_QuickChargerKillAll"
 	{
 		"en"		"{olive}%s{default} quickly killed a Charger and earned {green}%i{default} points!"
-		"chi"		"{olive}%s{default} 秒杀了 Charger，获得 {green}%i{default} 分!"
-		"zho"		"{olive}%s{default} 秒殺了 Charger，獲得 {green}%i{default} 分!"
-		"jp"		"{olive}%s{default} がChargerを素早く倒し、{green}%i{default} ポイント獲得!"
-		"ko"		"{olive}%s{default}님이 Charger를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
+		"chi"		"{olive}%s{default} 秒杀了 {green}牛{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 秒殺了 {green}牛{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が{green}チャージャー{default}を素早く倒し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {green}차저{default}를 빠르게 처치하여 {green}%i{default}점을 획득했습니다!"
 		"vi"		"{olive}%s{default} hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_GasCanPouredSelf"
@@ -2350,28 +2415,28 @@
 	"L4DStats_BoomerNoDeathReward"
 	{
 		"en"		"All survivors earned {green}%i{default} points because nobody died after the Boomer explosion!"
-		"chi"		"所有幸存者因 Boomer 爆炸后无人死亡，获得 {green}%i{default} 分!"
-		"zho"		"所有生還者因 Boomer 爆炸後無人死亡，獲得 {green}%i{default} 分!"
-		"jp"		"Boomerの爆発後に誰も死亡せず、全生存者が {green}%i{default} ポイント獲得!"
-		"ko"		"Boomer 폭발 후 사망자가 없어 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"chi"		"所有幸存者因 {green}胖子{default} 爆炸后无人死亡，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者因 {green}胖子{default} 爆炸後無人死亡，獲得 {green}%i{default} 分!"
+		"jp"		"{green}ブーマー{default}の爆発後に誰も死亡せず、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"{green}부머{default} 폭발 후 사망자가 없어 모든 생존자가 {green}%i{default}점을 획득했습니다!"
 		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm vì không ai chết sau vụ nổ Boomer!"
 	}
 	"L4DStats_TankKillWithDeaths"
 	{
 		"en"		"With {olive}%i{default} death(s), all survivors earned {green}%i{default} points for killing a Tank!"
-		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下击杀 Tank，获得 {green}%i{default} 分!"
-		"zho"		"所有生還者在 {olive}%i{default} 人死亡的情況下擊殺 Tank，獲得 {green}%i{default} 分!"
-		"jp"		"{olive}%i{default}人が死亡した状態でTankを倒し、全生存者が {green}%i{default} ポイント獲得!"
-		"ko"		"{olive}%i{default}명이 사망한 상태에서 Tank를 처치하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
+		"chi"		"所有幸存者在 {olive}%i{default} 人死亡的情况下击杀 {green}坦克{default}，获得 {green}%i{default} 分!"
+		"zho"		"所有生還者在 {olive}%i{default} 人死亡的情況下擊殺 {green}坦克{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%i{default}人が死亡した状態で{green}タンク{default}を倒し、全生存者が {green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%i{default}명이 사망한 상태에서 {green}탱크{default}를 처치하여 모든 생존자가 {green}%i{default}점을 획득했습니다!"
 		"vi"		"Với {olive}%i{default} người chết, tất cả người sống sót nhận {green}%i{default} điểm khi giết Tank!"
 	}
 	"L4DStats_NoWitchDisturbanceReward"
 	{
 		"en"		"All survivors earned {green}%i{default} bonus points for not disturbing the Witch!"
-		"chi"		"所有幸存者因没有惊扰 Witch，获得 {green}%i{default} 额外过关分!"
-		"zho"		"所有生還者因沒有驚擾 Witch，獲得 {green}%i{default} 額外過關分!"
-		"jp"		"Witchを驚かせなかったため、全生存者が {green}%i{default} ボーナスポイント獲得!"
-		"ko"		"Witch를 놀라게 하지 않아 모든 생존자가 {green}%i{default}점의 보너스를 획득했습니다!"
+		"chi"		"所有幸存者因没有惊扰 {green}女巫{default}，获得 {green}%i{default} 额外过关分!"
+		"zho"		"所有生還者因沒有驚擾 {green}女巫{default}，獲得 {green}%i{default} 額外過關分!"
+		"jp"		"{green}ウィッチ{default}を驚かせなかったため、全生存者が {green}%i{default} ボーナスポイント獲得!"
+		"ko"		"{green}위치{default}를 놀라게 하지 않아 모든 생존자가 {green}%i{default}점의 보너스를 획득했습니다!"
 		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm thưởng vì không chọc giận Witch!"
 	}
 	"L4DStats_SafeRoomWithDeathsReward"
@@ -2539,19 +2604,19 @@
 	"L4DStats_ChargerMultiHitSelf"
 	{
 		"en"		"You charged {lightgreen}%i{default} survivors and earned {green}%i{default} points!"
-		"chi"		"你用 Charger 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
-		"zho"		"你用 Charger 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
-		"jp"		"Chargerで {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
-		"ko"		"Charger로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+		"chi"		"你用 {green}牛{default} 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+		"zho"		"你用 {green}牛{default} 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
+		"jp"		"{green}チャージャー{default}で {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+		"ko"		"{green}차저{default}로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
 		"vi"		"Bạn húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_ChargerMultiHitAll"
 	{
 		"en"		"{olive}%s{default} charged {lightgreen}%i{default} survivors and earned {green}%i{default} points!"
-		"chi"		"{olive}%s{default} 用 Charger 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
-		"zho"		"{olive}%s{default} 用 Charger 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
-		"jp"		"{olive}%s{default} がChargerで {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
-		"ko"		"{olive}%s{default}님이 Charger로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
+		"chi"		"{olive}%s{default} 用 {green}牛{default} 撞到 {lightgreen}%i{default} 名幸存者，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 用 {green}牛{default} 撞到 {lightgreen}%i{default} 名生還者，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が{green}チャージャー{default}で {lightgreen}%i{default}人の生存者に衝突し、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {green}차저{default}로 생존자 {lightgreen}%i{default}명을 충돌하여 {green}%i{default}점을 획득했습니다!"
 		"vi"		"{olive}%s{default} húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_CommonKillsRewardSelf"
@@ -2611,19 +2676,19 @@
 	"L4DStats_TankDamageRewardSelf"
 	{
 		"en"		"You dealt {green}%i{default} damage as the Tank and earned {green}%i{default} points!"
-		"chi"		"你作为 Tank 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
-		"zho"		"你作為 Tank 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
-		"jp"		"Tankとして {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
-		"ko"		"Tank으로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"chi"		"你作为 {green}坦克{default} 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"你作為 {green}坦克{default} 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"{green}タンク{default}として {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"{green}탱크{default}로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
 		"vi"		"Bạn gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_TankDamageRewardAll"
 	{
 		"en"		"{olive}%s{default} dealt {green}%i{default} damage as the Tank and earned {green}%i{default} points!"
-		"chi"		"{olive}%s{default} 作为 Tank 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
-		"zho"		"{olive}%s{default} 作為 Tank 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
-		"jp"		"{olive}%s{default} がTankとして {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
-		"ko"		"{olive}%s{default}님이 Tank으로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
+		"chi"		"{olive}%s{default} 作为 {green}坦克{default} 造成 {green}%i{default} 伤害，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 作為 {green}坦克{default} 造成 {green}%i{default} 傷害，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が{green}タンク{default}として {green}%i{default} ダメージを与え、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {green}탱크{default}로 {green}%i{default} 피해를 입혀 {green}%i{default}점을 획득했습니다!"
 		"vi"		"{olive}%s{default} gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
 	}
 	"L4DStats_WitchKillSelf"
@@ -2683,10 +2748,127 @@
 	"L4DStats_WitchCrownReward"
 	{
 		"en"		"{olive}%s{default} crowned the Witch and earned {green}%i{default} points!"
-		"chi"		"{olive}%s{default} 秒杀 Witch，获得 {green}%i{default} 分!"
-		"zho"		"{olive}%s{default} 秒殺 Witch，獲得 {green}%i{default} 分!"
-		"jp"		"{olive}%s{default} がWitchをクラウンし、{green}%i{default} ポイント獲得!"
-		"ko"		"{olive}%s{default}님이 Witch를 크라운하여 {green}%i{default}점을 획득했습니다!"
+		"chi"		"{olive}%s{default} 秒杀 {green}女巫{default}，获得 {green}%i{default} 分!"
+		"zho"		"{olive}%s{default} 秒殺 {green}女巫{default}，獲得 {green}%i{default} 分!"
+		"jp"		"{olive}%s{default} が{green}ウィッチ{default}をクラウンし、{green}%i{default} ポイント獲得!"
+		"ko"		"{olive}%s{default}님이 {green}위치{default}를 크라운하여 {green}%i{default}점을 획득했습니다!"
 		"vi"		"{olive}%s{default} crown Witch và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ClassSmoker"
+	{
+		"en"		"Smoker"
+		"chi"		"舌头"
+		"zho"		"舌頭"
+		"jp"		"スモーカー"
+		"ko"		"스모커"
+		"vi"		"Smoker"
+	}
+	"L4DStats_ClassBoomer"
+	{
+		"en"		"Boomer"
+		"chi"		"胖子"
+		"zho"		"胖子"
+		"jp"		"ブーマー"
+		"ko"		"부머"
+		"vi"		"Boomer"
+	}
+	"L4DStats_ClassHunter"
+	{
+		"en"		"Hunter"
+		"chi"		"猎人"
+		"zho"		"獵人"
+		"jp"		"ハンター"
+		"ko"		"헌터"
+		"vi"		"Hunter"
+	}
+	"L4DStats_ClassSpitter"
+	{
+		"en"		"Spitter"
+		"chi"		"口水"
+		"zho"		"口水"
+		"jp"		"スピッター"
+		"ko"		"스피터"
+		"vi"		"Spitter"
+	}
+	"L4DStats_ClassJockey"
+	{
+		"en"		"Jockey"
+		"chi"		"猴子"
+		"zho"		"猴子"
+		"jp"		"ジョッキー"
+		"ko"		"자키"
+		"vi"		"Jockey"
+	}
+	"L4DStats_ClassCharger"
+	{
+		"en"		"Charger"
+		"chi"		"牛"
+		"zho"		"牛"
+		"jp"		"チャージャー"
+		"ko"		"차저"
+		"vi"		"Charger"
+	}
+	"L4DStats_ClassTank"
+	{
+		"en"		"Tank"
+		"chi"		"坦克"
+		"zho"		"坦克"
+		"jp"		"タンク"
+		"ko"		"탱크"
+		"vi"		"Tank"
+	}
+	"L4DStats_ClassWitch"
+	{
+		"en"		"Witch"
+		"chi"		"女巫"
+		"zho"		"女巫"
+		"jp"		"ウィッチ"
+		"ko"		"위치"
+		"vi"		"Witch"
+	}
+	"L4DStats_ClassUnknown"
+	{
+		"en"		"Unknown"
+		"chi"		"未知特感"
+		"zho"		"未知特感"
+		"jp"		"不明"
+		"ko"		"알 수 없음"
+		"vi"		"Không rõ"
+	}
+	"L4DStats_ASurvivor"
+	{
+		"en"		"a survivor"
+		"chi"		"一名幸存者"
+		"zho"		"一名生還者"
+		"jp"		"生存者"
+		"ko"		"생존자"
+		"vi"		"một người sống sót"
+	}
+	"L4DStats_MapRecordTeam"
+	{
+		"en"		"Team"
+		"chi"		"队伍"
+		"zho"		"隊伍"
+		"jp"		"チーム"
+		"ko"		"팀"
+		"vi"		"Đội"
+	}
+	"L4DStats_MapRecordTeamCount"
+	{
+		"en"		"Team (%d)"
+		"chi"		"队伍（%d人）"
+		"zho"		"隊伍（%d人）"
+		"jp"		"チーム（%d人）"
+		"ko"		"팀 (%d명)"
+		"vi"		"Đội (%d)"
+	}
+	"L4DStats_ConsolePrefix"
+	{
+		"en"		"[RANK]"
+		"chi"		"[排名]"
+		"zho"		"[排名]"
+		"jp"		"[ランク]"
+		"ko"		"[순위]"
+		"vi"		"[HẠNG]"
 	}
 }

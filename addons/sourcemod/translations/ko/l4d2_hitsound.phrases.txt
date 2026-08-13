@@ -116,4 +116,24 @@
 	{
 		"ko"		"킬 아이콘: %d로 설정"
 	}
+	"L4D2Hitsound_HeadKillSoundOn"
+	{
+		"ko"		"헤드샷 킬 전용음: 켜짐(세트에 전용음이 설정되어 있으면 헤드샷 킬에서 재생)"
+	}
+	"L4D2Hitsound_HeadKillSoundOff"
+	{
+		"ko"		"헤드샷 킬 전용음: 꺼짐(헤드샷 킬은 일반 헤드샷 사운드로 폴백)"
+	}
+	"L4D2Hitsound_StackModeFollow"
+	{
+		"ko"		"사운드 재생 모드: 세트 따름(겹침 여부는 사운드 세트 설정이 결정)"
+	}
+	"L4D2Hitsound_StackModeStack"
+	{
+		"ko"		"사운드 재생 모드: 강제 겹침(타격/킬마다 개별로 울리며 같은 프레임에서 겹칠 수 있음)"
+	}
+	"L4D2Hitsound_StackModeMerge"
+	{
+		"ko"		"사운드 재생 모드: 강제 병합(프레임당 최대 1개, 킬>헤드샷>타격 우선)"
+	}
 }

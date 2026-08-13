@@ -52,4 +52,1212 @@
 	{
 		"vi"		"Không rõ"
 	}
+	"L4DStats_Yes"
+	{
+		"vi"		"Có"
+	}
+	"L4DStats_No"
+	{
+		"vi"		"Không"
+	}
+	"L4DStats_Close"
+	{
+		"vi"		"Đóng"
+	}
+	"L4DStats_Back"
+	{
+		"vi"		"Quay lại"
+	}
+	"L4DStats_More"
+	{
+		"vi"		"Thêm"
+	}
+	"L4DStats_MoreEllipsis"
+	{
+		"vi"		"Thêm..."
+	}
+	"L4DStats_All"
+	{
+		"vi"		"Tất cả"
+	}
+	"L4DStats_GamemodeCoop"
+	{
+		"vi"		"Chiến dịch"
+	}
+	"L4DStats_GamemodeVersus"
+	{
+		"vi"		"Đối kháng"
+	}
+	"L4DStats_GamemodeRealism"
+	{
+		"vi"		"Hiện thực"
+	}
+	"L4DStats_GamemodeSurvival"
+	{
+		"vi"		"Sinh tồn"
+	}
+	"L4DStats_GamemodeScavenge"
+	{
+		"vi"		"Thu gom"
+	}
+	"L4DStats_GamemodeRealismVersus"
+	{
+		"vi"		"Đối kháng hiện thực"
+	}
+	"L4DStats_GamemodeMutations"
+	{
+		"vi"		"Đột biến"
+	}
+	"L4DStats_GamemodeUnknown"
+	{
+		"vi"		"Chế độ không xác định"
+	}
+	"L4DStats_RankMenuTitle"
+	{
+		"vi"		"Hệ thống xếp hạng:"
+	}
+	"L4DStats_MenuCurrentRank"
+	{
+		"vi"		"Xem hạng của tôi"
+	}
+	"L4DStats_MenuTop10"
+	{
+		"vi"		"Xem 10 người dẫn đầu"
+	}
+	"L4DStats_MenuQuarterTop10"
+	{
+		"vi"		"Xem top 10 theo quý"
+	}
+	"L4DStats_MenuTop10PPM"
+	{
+		"vi"		"Xem top 10 PPM"
+	}
+	"L4DStats_MenuNextRank"
+	{
+		"vi"		"Điểm cần cho hạng tiếp theo"
+	}
+	"L4DStats_MenuCurrentMapTime"
+	{
+		"vi"		"Xem thời gian bản đồ hiện tại"
+	}
+	"L4DStats_MenuOtherPlayerRank"
+	{
+		"vi"		"Xem hạng người chơi khác"
+	}
+	"L4DStats_MenuOtherPlayerPPM"
+	{
+		"vi"		"Xem PPM người chơi khác"
+	}
+	"L4DStats_MenuRankVote"
+	{
+		"vi"		"Bỏ phiếu chia lại đội theo PPM"
+	}
+	"L4DStats_MenuAllMapTimes"
+	{
+		"vi"		"Xem mọi kỷ lục bản đồ"
+	}
+	"L4DStats_MenuThisMapTimes"
+	{
+		"vi"		"Xem kỷ lục bản đồ này"
+	}
+	"L4DStats_MenuSettings"
+	{
+		"vi"		"Cài đặt thông báo xếp hạng"
+	}
+	"L4DStats_MenuAbout"
+	{
+		"vi"		"Giới thiệu plugin xếp hạng"
+	}
+	"L4DStats_NextRankTitle"
+	{
+		"vi"		"Yêu cầu cho hạng tiếp theo:"
+	}
+	"L4DStats_NextRankPointsNeeded"
+	{
+		"vi"		"Điểm cần thêm: %i"
+	}
+	"L4DStats_CurrentRank"
+	{
+		"vi"		"Hạng hiện tại: %i"
+	}
+	"L4DStats_AlreadyFirst"
+	{
+		"vi"		"Bạn đã đứng hạng nhất"
+	}
+	"L4DStats_PointsAndPlayer"
+	{
+		"vi"		"%i điểm: %s"
+	}
+	"L4DStats_PlayerRankTitle"
+	{
+		"vi"		"Hạng của %s"
+	}
+	"L4DStats_OverallRank"
+	{
+		"vi"		"Hạng tổng: %i / %i"
+	}
+	"L4DStats_ModeRank"
+	{
+		"vi"		"Hạng %s: %i / %i"
+	}
+	"L4DStats_PlaytimeHours"
+	{
+		"vi"		"Thời gian chơi: %.2f giờ"
+	}
+	"L4DStats_PlaytimeMinutes"
+	{
+		"vi"		"Thời gian chơi: %i phút"
+	}
+	"L4DStats_CurrentPoints"
+	{
+		"vi"		"Điểm hiện tại: %i"
+	}
+	"L4DStats_QuarterLabel"
+	{
+		"vi"		"Năm %i, quý %i"
+	}
+	"L4DStats_QuarterPoints"
+	{
+		"vi"		"Điểm %s: %i"
+	}
+	"L4DStats_QuarterRank"
+	{
+		"vi"		"Hạng %s: %i / %i"
+	}
+	"L4DStats_PointsPerMinute"
+	{
+		"vi"		"Điểm mỗi phút: %.2f"
+	}
+	"L4DStats_CommonKilled"
+	{
+		"vi"		"Kẻ nhiễm thường đã diệt: %i"
+	}
+	"L4DStats_SurvivorsKilled"
+	{
+		"vi"		"Người sống sót đã diệt: %i"
+	}
+	"L4DStats_Headshots"
+	{
+		"vi"		"Bắn đầu: %i"
+	}
+	"L4DStats_HeadshotRatio"
+	{
+		"vi"		"Tỷ lệ bắn đầu: %.2f%%"
+	}
+	"L4DStats_FullStatsUrl"
+	{
+		"vi"		"Thống kê đầy đủ: %s"
+	}
+	"L4DStats_UnknownPlayer"
+	{
+		"vi"		"Không xác định"
+	}
+	"L4DStats_PlayerRanksTitle"
+	{
+		"vi"		"Xếp hạng người chơi:"
+	}
+	"L4DStats_PlayerPointsMenuItem"
+	{
+		"vi"		"%s (%i điểm)"
+	}
+	"L4DStats_PlayerScoreMenuItem"
+	{
+		"vi"		"%s (%i)"
+	}
+	"L4DStats_PlayerPPMTitle"
+	{
+		"vi"		"PPM người chơi:"
+	}
+	"L4DStats_PlayerPPMMenuItem"
+	{
+		"vi"		"%s (PPM: %.2f)"
+	}
+	"L4DStats_TimedMapsTitle"
+	{
+		"vi"		"Thời gian bản đồ:"
+	}
+	"L4DStats_ModeTimesTitle"
+	{
+		"vi"		"Thời gian chế độ:"
+	}
+	"L4DStats_MapNeverPlayed"
+	{
+		"vi"		"Bản đồ này chưa được chơi."
+	}
+	"L4DStats_ModeNeverPlayed"
+	{
+		"vi"		"Chế độ này chưa được chơi."
+	}
+	"L4DStats_Top10Title"
+	{
+		"vi"		"10 người dẫn đầu"
+	}
+	"L4DStats_QuarterTop10Title"
+	{
+		"vi"		"Top 10 người chơi %s"
+	}
+	"L4DStats_Top10PPMTitle"
+	{
+		"vi"		"10 người có PPM cao nhất"
+	}
+	"L4DStats_ClearPlayerStatsTitle"
+	{
+		"vi"		"Xóa thống kê người chơi:"
+	}
+	"L4DStats_AboutTitle"
+	{
+		"vi"		"Giới thiệu hệ thống xếp hạng:"
+	}
+	"L4DStats_AboutVersion"
+	{
+		"vi"		"Phiên bản: %s"
+	}
+	"L4DStats_AboutAuthor"
+	{
+		"vi"		"Tác giả: Mikko Andersson (muukis); bản Anne: Dong"
+	}
+	"L4DStats_AboutDescription"
+	{
+		"vi"		"Theo dõi thống kê và xếp hạng người chơi."
+	}
+	"L4DStats_SettingsTitle"
+	{
+		"vi"		"Cài đặt thông báo xếp hạng:"
+	}
+	"L4DStats_SettingsMute"
+	{
+		"vi"		"Tắt thông báo hạng (hiện đang bật)"
+	}
+	"L4DStats_SettingsUnmute"
+	{
+		"vi"		"Bật lại thông báo hạng"
+	}
+	"L4DStats_TimeHoursMinutesSeconds"
+	{
+		"vi"		"%i giờ %i phút %.1f giây"
+	}
+	"L4DStats_TimeMinutesSeconds"
+	{
+		"vi"		"%i phút %.1f giây"
+	}
+	"L4DStats_TimeSeconds"
+	{
+		"vi"		"%.1f giây"
+	}
+	"L4DStats_AdminCategory"
+	{
+		"vi"		"Xếp hạng người chơi"
+	}
+	"L4DStats_AdminClearTitle"
+	{
+		"vi"		"Xóa dữ liệu xếp hạng:"
+	}
+	"L4DStats_AdminClearCurrentPlayers"
+	{
+		"vi"		"Xóa thống kê người chơi hiện tại"
+	}
+	"L4DStats_AdminClearMapTimes"
+	{
+		"vi"		"Xóa thời gian hoàn thành bản đồ"
+	}
+	"L4DStats_AdminClearRecordedMapsTitle"
+	{
+		"vi"		"Xóa thời gian bản đồ đã ghi:"
+	}
+	"L4DStats_AdminClearPlayers"
+	{
+		"vi"		"Xóa thống kê người chơi"
+	}
+	"L4DStats_AdminClearMaps"
+	{
+		"vi"		"Xóa thống kê bản đồ của người chơi"
+	}
+	"L4DStats_AdminClearAll"
+	{
+		"vi"		"Xóa toàn bộ thống kê"
+	}
+	"L4DStats_AdminClearRecordedTimes"
+	{
+		"vi"		"Xóa mọi thời gian bản đồ đã ghi"
+	}
+	"L4DStats_AdminRemoveCustomMaps"
+	{
+		"vi"		"Xóa bản đồ tùy chỉnh"
+	}
+	"L4DStats_ConfirmClearPlayerStats"
+	{
+		"vi"		"Xóa toàn bộ thống kê người chơi?"
+	}
+	"L4DStats_ConfirmClearPlayerMapStats"
+	{
+		"vi"		"Xóa toàn bộ thống kê bản đồ của người chơi?"
+	}
+	"L4DStats_ConfirmClearAllStats"
+	{
+		"vi"		"Xóa toàn bộ thống kê xếp hạng?"
+	}
+	"L4DStats_ConfirmClearAllMapTimes"
+	{
+		"vi"		"Xóa toàn bộ thời gian bản đồ đã ghi?"
+	}
+	"L4DStats_ConfirmClearCoopMapTimes"
+	{
+		"vi"		"Xóa thời gian bản đồ Coop?"
+	}
+	"L4DStats_ConfirmClearSurvivalMapTimes"
+	{
+		"vi"		"Xóa thời gian bản đồ Survival?"
+	}
+	"L4DStats_ConfirmClearRealismMapTimes"
+	{
+		"vi"		"Xóa thời gian bản đồ Realism?"
+	}
+	"L4DStats_ConfirmClearMutationMapTimes"
+	{
+		"vi"		"Xóa thời gian bản đồ Mutation?"
+	}
+	"L4DStats_ConfirmRemoveCustomMaps"
+	{
+		"vi"		"Xóa tất cả bản đồ tùy chỉnh?"
+	}
+	"L4DStats_ConfirmCleanInactivePlayers"
+	{
+		"vi"		"Xóa người chơi không hoạt động?"
+	}
+	"L4DStats_CommandInGameOnly"
+	{
+		"vi"		"Lệnh này chỉ có thể dùng trong trò chơi."
+	}
+	"L4DStats_CommandUnavailableFromServer"
+	{
+		"vi"		"Không thể dùng lệnh này từ bảng điều khiển máy chủ."
+	}
+	"L4DStats_MapTimerNotStarted"
+	{
+		"vi"		"Bộ đếm giờ bản đồ chưa bắt đầu."
+	}
+	"L4DStats_CurrentMapTimeConsole"
+	{
+		"vi"		"Thời gian bản đồ hiện tại: %s"
+	}
+	"L4DStats_TeamShuffleUnavailable"
+	{
+		"vi"		"Hiện không thể xáo trộn đội."
+	}
+	"L4DStats_TeamShuffleExecuting"
+	{
+		"vi"		"Đang xáo trộn đội..."
+	}
+	"L4DStats_ClearDatabaseServerDisabled"
+	{
+		"vi"		"Tính năng xóa cơ sở dữ liệu từ bảng điều khiển máy chủ đã bị tắt."
+	}
+	"L4DStats_ClearDatabaseStarted"
+	{
+		"vi"		"Đã bắt đầu xóa cơ sở dữ liệu."
+	}
+	"L4DStats_ClearDatabaseConfirm"
+	{
+		"vi"		"Chạy lại lệnh trong %i giây để xác nhận xóa cơ sở dữ liệu."
+	}
+	"L4DStats_ClearTimedMapsRollback"
+	{
+		"vi"		"Xóa thời gian bản đồ thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearPlayersRollback"
+	{
+		"vi"		"Xóa thống kê người chơi thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearMapsRollback"
+	{
+		"vi"		"Xóa thống kê bản đồ thất bại; đang hoàn tác."
+	}
+	"L4DStats_ClearStatsFailure"
+	{
+		"vi"		"Thống kê chưa được xóa."
+	}
+	"L4DStats_ClearRanksSuccess"
+	{
+		"vi"		"Đã xóa xếp hạng người chơi."
+	}
+	"L4DStats_ClearStatsSuccess"
+	{
+		"vi"		"Đã xóa thống kê."
+	}
+	"L4DStats_ClearQueryFailed"
+	{
+		"vi"		"Truy vấn cơ sở dữ liệu thất bại: %s"
+	}
+	"L4DStats_FastQueryError"
+	{
+		"vi"		"Truy vấn nhanh thất bại: %s | Truy vấn: %s"
+	}
+	"L4DStats_FastQueryFailed"
+	{
+		"vi"		"Truy vấn nhanh thất bại: %s"
+	}
+	"L4DStats_FastestTimeWithBuy"
+	{
+		"vi"		"Thời gian hoàn thành nhanh nhất có mua vật phẩm: {green}%s{default}."
+	}
+	"L4DStats_FastestTimeWithoutBuy"
+	{
+		"vi"		"Thời gian hoàn thành nhanh nhất: {green}%s{default}."
+	}
+	"L4DStats_MapRecordImprovedCurrent"
+	{
+		"vi"		"Kỷ lục mới cho độ khó Anne%s: {green}%s{default}!"
+	}
+	"L4DStats_MapRecordImprovedPlayer"
+	{
+		"vi"		"Kỷ lục cá nhân ở độ khó Anne%s đã tăng lên {green}%s{default}!"
+	}
+	"L4DStats_RankMenuHint"
+	{
+		"vi"		"Nhập {green}!rank{default} để mở menu xếp hạng."
+	}
+	"L4DStats_RankRose"
+	{
+		"vi"		"Xếp hạng tổng của bạn tăng {green}%i{default} bậc lên hạng {green}%i{default}."
+	}
+	"L4DStats_RankFell"
+	{
+		"vi"		"Xếp hạng tổng của bạn giảm {green}%i{default} bậc xuống hạng {green}%i{default}."
+	}
+	"L4DStats_QuarterRankRose"
+	{
+		"vi"		"Hạng %s của bạn tăng {green}%i{default} bậc lên hạng {green}%i{default} ({green}%i{default} điểm)."
+	}
+	"L4DStats_QuarterRankFell"
+	{
+		"vi"		"Hạng %s của bạn giảm {green}%i{default} bậc xuống hạng {green}%i{default} ({green}%i{default} điểm)."
+	}
+	"L4DStats_RankMessagesMuted"
+	{
+		"vi"		"Đã tắt thông báo xếp hạng."
+	}
+	"L4DStats_RankMessagesUnmuted"
+	{
+		"vi"		"Đã bật thông báo xếp hạng."
+	}
+	"L4DStats_RankMuteUsage"
+	{
+		"vi"		"Cách dùng: sm_rankmute [0/1]"
+	}
+	"L4DStats_RankVoteQuestion"
+	{
+		"vi"		"Bật xếp hạng người chơi?"
+	}
+	"L4DStats_RankVotePassed"
+	{
+		"vi"		"Bỏ phiếu xếp hạng đã thông qua ({green}%i{default} có, {green}%i{default} không)."
+	}
+	"L4DStats_RankVoteFailed"
+	{
+		"vi"		"Bỏ phiếu xếp hạng không thông qua ({green}%i{default} có, {green}%i{default} không)."
+	}
+	"L4DStats_RankVotePluginDisabledConsole"
+	{
+		"vi"		"Không thể bắt đầu bỏ phiếu xếp hạng khi plugin đang tắt."
+	}
+	"L4DStats_RankVoteGamemodeDisabledConsole"
+	{
+		"vi"		"Bỏ phiếu xếp hạng bị tắt trong chế độ này."
+	}
+	"L4DStats_RankVoteAlreadyStartedConsole"
+	{
+		"vi"		"Cuộc bỏ phiếu xếp hạng đang diễn ra."
+	}
+	"L4DStats_RankVoteGamedataMissingConsole"
+	{
+		"vi"		"Thiết lập bỏ phiếu xếp hạng thất bại: thiếu gamedata cần thiết."
+	}
+	"L4DStats_RankVoteDisabledConsole"
+	{
+		"vi"		"Bỏ phiếu xếp hạng đang tắt."
+	}
+	"L4DStats_MotdCreateFailed"
+	{
+		"vi"		"Không thể tạo tệp MOTD."
+	}
+	"L4DStats_MotdPrepareFailed"
+	{
+		"vi"		"Không thể chuẩn bị yêu cầu MOTD."
+	}
+	"L4DStats_MotdUpdateError"
+	{
+		"vi"		"Cập nhật MOTD thất bại: %s"
+	}
+	"L4DStats_MotdUpdateFailed"
+	{
+		"vi"		"Cập nhật MOTD thất bại."
+	}
+	"L4DStats_MotdUpdateSuccess"
+	{
+		"vi"		"Đã cập nhật MOTD."
+	}
+	"L4DStats_MotdMessage"
+	{
+		"vi"		"Thông điệp hôm nay: {green}%s{default}"
+	}
+	"L4DStats_NewPlayerSafeRoomMultiplier"
+	{
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới. Người sống sót có kinh nghiệm nhận thưởng phòng an toàn {green}%.1fx{default}; người mới không nhận hệ số."
+	}
+	"L4DStats_NewPlayerFinaleMultiplier"
+	{
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới. Người sống sót có kinh nghiệm nhận thưởng màn cuối {green}%.1fx{default}; người mới không nhận hệ số."
+	}
+	"L4DStats_SinglePlayerTripleBonus"
+	{
+		"vi"		"Chỉ còn một người sống sót; điểm được nhân ba."
+	}
+	"L4DStats_SinglePlayerTripleBonusWithDifficulty"
+	{
+		"vi"		"Chỉ còn một người sống sót; điểm được nhân ba và thêm {green}%i{default} điểm độ khó."
+	}
+	"L4DStats_MedkitReductionL4D1"
+	{
+		"vi"		"Mỗi túi cứu thương làm giảm {green}%i%%{default} thưởng hoàn thành (đã dùng {green}%i{default})."
+	}
+	"L4DStats_MedkitReductionL4D2"
+	{
+		"vi"		"Sau bốn túi đầu, mỗi túi cứu thương làm giảm {green}%i%%{default} thưởng hoàn thành (đã dùng {green}%i{default})."
+	}
+	"L4DStats_DeployIncendiarySelf"
+	{
+		"vi"		"Bạn đã triển khai đạn lửa và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployExplosiveSelf"
+	{
+		"vi"		"Bạn đã triển khai đạn nổ và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployUnknownSelf"
+	{
+		"vi"		"Bạn đã triển khai nâng cấp đạn và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployIncendiaryAll"
+	{
+		"vi"		"{olive}%s{default} đã triển khai đạn lửa và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployExplosiveAll"
+	{
+		"vi"		"{olive}%s{default} đã triển khai đạn nổ và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DeployUnknownAll"
+	{
+		"vi"		"{olive}%s{default} đã triển khai nâng cấp đạn và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectPounceSelf"
+	{
+		"vi"		"Cú vồ hoàn hảo vào {olive}%s{default}! Bạn nhận {green}%i{default} điểm."
+	}
+	"L4DStats_PerfectPounceAll"
+	{
+		"vi"		"{olive}%s{default} vồ hoàn hảo vào {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_NicePounceSelf"
+	{
+		"vi"		"Cú vồ đẹp mắt vào {olive}%s{default}! Bạn nhận {green}%i{default} điểm."
+	}
+	"L4DStats_NicePounceAll"
+	{
+		"vi"		"{olive}%s{default} vồ đẹp mắt vào {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CurrentMapTime"
+	{
+		"vi"		"Thời gian bản đồ hiện tại: {green}%s"
+	}
+	"L4DStats_QuarterRankingLeft"
+	{
+		"vi"		"Bạn đã rời khỏi bảng xếp hạng {olive}%s{default}."
+	}
+	"L4DStats_QuarterRankingEntered"
+	{
+		"vi"		"Bạn đã vào bảng {olive}%s{default} ở hạng {green}%i{default} với {green}%i{default} điểm."
+	}
+	"L4DStats_PlayerJoinedOverallRanked"
+	{
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Tổng: {lightgreen}%i/%i{default}, điểm: {lightgreen}%i{default})"
+	}
+	"L4DStats_PlayerJoinedOverallUnranked"
+	{
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Chưa có trong bảng tổng)"
+	}
+	"L4DStats_CurrentQuarterRanked"
+	{
+		"vi"		"{olive}%s{default} hiện tại: hạng {lightgreen}%i/%i{default}, {lightgreen}%i{default} điểm"
+	}
+	"L4DStats_CurrentQuarterUnranked"
+	{
+		"vi"		"{olive}%s{default} hiện tại: chưa xếp hạng"
+	}
+	"L4DStats_PlayerJoinedModeRanked"
+	{
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Hạng: {lightgreen}%i{default} / điểm: {lightgreen}%i{default})"
+	}
+	"L4DStats_PlayerJoinedModeUnranked"
+	{
+		"vi"		"Người chơi {olive}%s{default} đã tham gia! (Chưa xếp hạng)"
+	}
+	"L4DStats_QuarterRankingUnavailable"
+	{
+		"vi"		"Bảng xếp hạng quý hiện không khả dụng. Vui lòng thử lại sau."
+	}
+	"L4DStats_QuarterRankingQueryFailed"
+	{
+		"vi"		"Truy vấn bảng xếp hạng quý thất bại. Vui lòng thử lại sau."
+	}
+	"L4DStats_PlayerJoinedSurvivors"
+	{
+		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Người sống sót{default}!"
+	}
+	"L4DStats_PlayerJoinedInfected"
+	{
+		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Nhiễm bệnh{default}!"
+	}
+	"L4DStats_AllPlayerStatsCleared"
+	{
+		"vi"		"Đã xóa toàn bộ thống kê người chơi!"
+	}
+	"L4DStats_AllMapStatsCleared"
+	{
+		"vi"		"Đã xóa toàn bộ thống kê bản đồ!"
+	}
+	"L4DStats_AllStatsCleared"
+	{
+		"vi"		"Đã xóa toàn bộ thống kê!"
+	}
+	"L4DStats_PlayerCleaningSuccess"
+	{
+		"vi"		"Đã dọn người chơi không hoạt động!"
+	}
+	"L4DStats_PlayerCleaningFailed"
+	{
+		"vi"		"Dọn người chơi thất bại!"
+	}
+	"L4DStats_PlayerCleaningDisabled"
+	{
+		"vi"		"Tính năng dọn người chơi bị tắt trong cấu hình!"
+	}
+	"L4DStats_CustomMapsRemoved"
+	{
+		"vi"		"Đã xóa tất cả bản đồ tùy chỉnh!"
+	}
+	"L4DStats_CustomMapsRemoveFailed"
+	{
+		"vi"		"Xóa bản đồ tùy chỉnh thất bại!"
+	}
+	"L4DStats_AllMapTimesRemoved"
+	{
+		"vi"		"Đã xóa toàn bộ thời gian bản đồ!"
+	}
+	"L4DStats_MapTimesRemoveFailed"
+	{
+		"vi"		"Xóa thời gian bản đồ thất bại!"
+	}
+	"L4DStats_CoopMapTimesClearSuccess"
+	{
+		"vi"		"Đã xóa thời gian bản đồ Coop!"
+	}
+	"L4DStats_CoopMapTimesClearFailed"
+	{
+		"vi"		"Xóa thời gian bản đồ Coop thất bại!"
+	}
+	"L4DStats_SurvivalMapTimesClearSuccess"
+	{
+		"vi"		"Đã xóa thời gian bản đồ Survival!"
+	}
+	"L4DStats_SurvivalMapTimesClearFailed"
+	{
+		"vi"		"Xóa thời gian bản đồ Survival thất bại!"
+	}
+	"L4DStats_RealismMapTimesClearSuccess"
+	{
+		"vi"		"Đã xóa thời gian bản đồ Realism!"
+	}
+	"L4DStats_RealismMapTimesClearFailed"
+	{
+		"vi"		"Xóa thời gian bản đồ Realism thất bại!"
+	}
+	"L4DStats_MutationMapTimesClearSuccess"
+	{
+		"vi"		"Đã xóa thời gian bản đồ Mutation!"
+	}
+	"L4DStats_MutationMapTimesClearFailed"
+	{
+		"vi"		"Xóa thời gian bản đồ Mutation thất bại!"
+	}
+	"L4DStats_OwnStatsCleared"
+	{
+		"vi"		"Thống kê chơi của bạn đã bị xóa!"
+	}
+	"L4DStats_PlayerStatsCleared"
+	{
+		"vi"		"Đã xóa thống kê chơi của {olive}%s{default}!"
+	}
+	"L4DStats_PlayerStatsClearFailed"
+	{
+		"vi"		"Xóa thống kê chơi thất bại!"
+	}
+	"L4DStats_RankVoteSettingsFailed"
+	{
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã {lightgreen}tắt{default}: thiết lập plugin thất bại."
+	}
+	"L4DStats_RankVoteDisabledChat"
+	{
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đang {lightgreen}tắt{default}."
+	}
+	"L4DStats_RankVoteSpectatorDenied"
+	{
+		"vi"		"Khán giả không thể bắt đầu {green}bỏ phiếu xếp hạng{default}."
+	}
+	"L4DStats_NotImplemented"
+	{
+		"vi"		"{olive}Chưa được triển khai."
+	}
+	"L4DStats_RankVoteProgress"
+	{
+		"vi"		"{olive}%s{default} đã bỏ phiếu. {green}%i/%i{default} người đã bỏ phiếu."
+	}
+	"L4DStats_RankVotePluginDisabledChat"
+	{
+		"vi"		"Không thể bắt đầu bỏ phiếu khi plugin đang tắt!"
+	}
+	"L4DStats_RankVoteVersusOnly"
+	{
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong chế độ {lightgreen}Versus{default}!"
+	}
+	"L4DStats_RankVoteCompetitiveModes"
+	{
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong {lightgreen}Versus{default}, {lightgreen}Realism Versus{default} và {lightgreen}Scavenge{default}!"
+	}
+	"L4DStats_RankVoteOncePerMap"
+	{
+		"vi"		"Bạn chỉ có thể bắt đầu {green}bỏ phiếu xếp hạng{default} một lần mỗi bản đồ!"
+	}
+	"L4DStats_RankVoteInitiated"
+	{
+		"vi"		"{olive}%s{default} đã bắt đầu {green}bỏ phiếu xếp hạng{default}!"
+	}
+	"L4DStats_RankVoteInitiatedConsole"
+	{
+		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã được bắt đầu từ bảng điều khiển máy chủ!"
+	}
+	"L4DStats_TeamShuffleAdminExecuted"
+	{
+		"vi"		"Quản trị viên đã xáo trộn đội."
+	}
+	"L4DStats_TeamShuffleFailed"
+	{
+		"vi"		"Xáo trộn đội thất bại do lỗi."
+	}
+	"L4DStats_TeamShuffleDone"
+	{
+		"vi"		"Xáo trộn đội theo PPM người chơi đã {lightgreen}hoàn tất{default}."
+	}
+	"L4DStats_TeamsAlreadyEven"
+	{
+		"vi"		"Các đội đã cân bằng theo PPM người chơi."
+	}
+	"L4DStats_TeamShuffleNotEnoughPlayers"
+	{
+		"vi"		"Xáo trộn đội thất bại: {lightgreen}không đủ người chơi{default}!"
+	}
+	"L4DStats_RankDisabledNotEnoughPlayers"
+	{
+		"vi"		"Hệ thống xếp hạng đã {green}tắt{default}: không đủ người chơi!"
+	}
+	"L4DStats_MapTimeInvalidSettings"
+	{
+		"vi"		"Kết quả {green}không hợp lệ{default} do đổi độ khó, bot nâng cao hoặc tính năng quản trị; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeInvalidBunnyHop"
+	{
+		"vi"		"Kết quả {green}không hợp lệ{default} vì Tank bunny hop bị tắt; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeInvalidMultiplayerMode"
+	{
+		"vi"		"Chế độ di chuyển nhiều người đang bật; thời gian sẽ không được ghi!"
+	}
+	"L4DStats_MapTimeTooShortNoReward"
+	{
+		"vi"		"Thời gian ghi nhận dưới 30 giây và có vẻ không hợp lệ; không trao điểm!"
+	}
+	"L4DStats_MapTimeTooShortNotRecorded"
+	{
+		"vi"		"Thời gian dưới 30 giây và có vẻ không hợp lệ; lượt này sẽ không được ghi!"
+	}
+	"L4DStats_NoFastestTimeYet"
+	{
+		"vi"		"Chưa có thời gian nhanh nhất cho chế độ và độ khó này. Hãy lập kỷ lục đầu tiên!"
+	}
+	"L4DStats_MapRecordNotImprovedAnne"
+	{
+		"vi"		"Kỷ lục độ khó Anne%s là {green}%s{default} chưa bị phá. Hãy thử lại lần sau!"
+	}
+	"L4DStats_MapRecordNotImproved"
+	{
+		"vi"		"Thời gian nhanh nhất {green}%s{default} chưa bị phá. Hãy thử lại lần sau!"
+	}
+	"L4DStats_MapCompletionTime"
+	{
+		"vi"		"Bạn đã hoàn thành bản đồ trong {green}%s{default}!"
+	}
+	"L4DStats_NoBuyBonusAdvancedBotsDisabled"
+	{
+		"vi"		"Không có thưởng không mua đồ vì bot nâng cao đang bật."
+	}
+	"L4DStats_NoBuyBonusBunnyHopDisabled"
+	{
+		"vi"		"Không có thưởng không mua đồ vì Tank bunny hop bị tắt."
+	}
+	"L4DStats_NoBuyBonusAwarded"
+	{
+		"vi"		"Người sống sót hoàn thành bản đồ mà không mua đồ và nhận {green}%d{default} điểm thưởng!"
+	}
+	"L4DStats_NewPlayerStatus"
+	{
+		"vi"		"{lightgreen}Bạn được xem là người chơi mới. Người sống sót có kinh nghiệm nhận hệ số dìu dắt {green}%.1fx{default} trong vòng này."
+	}
+	"L4DStats_NewPlayerRoundSummary"
+	{
+		"vi"		"{lightgreen}Phát hiện %i người chơi mới; hệ số dìu dắt là {green}%.1fx{default}. Người mới không nhận hệ số."
+	}
+	"L4DStats_TeamKillPenaltySelf"
+	{
+		"vi"		"Bạn giết đồng đội {olive}%s{default} và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_TeamKillPenaltyAll"
+	{
+		"vi"		"{olive}%s{default} giết đồng đội {olive}%s{default} và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_HeadshotSpecialKillSelf"
+	{
+		"vi"		"Bạn bắn vào đầu hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HeadshotSpecialKillAll"
+	{
+		"vi"		"{olive}%s{default} bắn vào đầu hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_SpecialKillSelf"
+	{
+		"vi"		"Bạn hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_SpecialKillAll"
+	{
+		"vi"		"{olive}%s{default} hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_AdrenalineGivenSelf"
+	{
+		"vi"		"Bạn đưa adrenaline cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_AdrenalineGivenAll"
+	{
+		"vi"		"{olive}%s{default} đưa adrenaline cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PillsGivenSelf"
+	{
+		"vi"		"Bạn đưa thuốc cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PillsGivenAll"
+	{
+		"vi"		"{olive}%s{default} đưa thuốc cho {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DefibReviveSelf"
+	{
+		"vi"		"Bạn hồi sinh {olive}%s{default} bằng máy khử rung và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_DefibReviveAll"
+	{
+		"vi"		"{olive}%s{default} hồi sinh {olive}%s{default} bằng máy khử rung và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HealTeammateSelf"
+	{
+		"vi"		"Bạn chữa trị {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_HealTeammateAll"
+	{
+		"vi"		"{olive}%s{default} chữa trị {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TeamIncapPenaltySelf"
+	{
+		"vi"		"Bạn mất {green}%i{default} điểm vì hạ gục {olive}%s{default}!"
+	}
+	"L4DStats_TeamIncapPenaltyAll"
+	{
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì hạ gục {olive}%s{default}!"
+	}
+	"L4DStats_LedgeHangSelf"
+	{
+		"vi"		"Bạn làm {olive}%s{default} treo mép và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_LedgeHangAll"
+	{
+		"vi"		"{olive}%s{default} làm {olive}%s{default} treo mép và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_JockeySaveSelf"
+	{
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_JockeySaveAll"
+	{
+		"vi"		"{olive}%s{default} cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerSaveSelf"
+	{
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerSaveAll"
+	{
+		"vi"		"{olive}%s{default} cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_QuickChargerKillSelf"
+	{
+		"vi"		"Bạn hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_QuickChargerKillAll"
+	{
+		"vi"		"{olive}%s{default} hạ Charger nhanh chóng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GasCanPouredSelf"
+	{
+		"vi"		"Bạn đổ một can xăng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GasCanPouredAll"
+	{
+		"vi"		"{olive}%s{default} đổ một can xăng và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ReviveTeammateSelf"
+	{
+		"vi"		"Bạn cứu dậy {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ReviveTeammateAll"
+	{
+		"vi"		"{olive}%s{default} cứu dậy {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_RescueClosetSelf"
+	{
+		"vi"		"Bạn giải cứu {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_RescueClosetAll"
+	{
+		"vi"		"{olive}%s{default} giải cứu {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FinaleSurvivorReward"
+	{
+		"vi"		"Với {olive}%i{default} người hoàn thành màn cuối, tất cả người sống sót nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FinaleInfectedPenalty"
+	{
+		"vi"		"Tất cả phe nhiễm mất {green}%i{default} điểm vì không ngăn được màn cuối!"
+	}
+	"L4DStats_HordeNoIncapReward"
+	{
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm vì qua đợt quân mà không ai gục ngã hay chết!"
+	}
+	"L4DStats_BoomerNoDeathReward"
+	{
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm vì không ai chết sau vụ nổ Boomer!"
+	}
+	"L4DStats_TankKillWithDeaths"
+	{
+		"vi"		"Với {olive}%i{default} người chết, tất cả người sống sót nhận {green}%i{default} điểm khi giết Tank!"
+	}
+	"L4DStats_NoWitchDisturbanceReward"
+	{
+		"vi"		"Tất cả người sống sót nhận {green}%i{default} điểm thưởng vì không chọc giận Witch!"
+	}
+	"L4DStats_SafeRoomWithDeathsReward"
+	{
+		"vi"		"Với {olive}%i{default} người chết, tất cả người sống sót nhận {green}%i{default} điểm khi tới phòng an toàn!"
+	}
+	"L4DStats_SafeRoomInfectedPenalty"
+	{
+		"vi"		"Tất cả phe nhiễm mất {green}%i{default} điểm vì để người sống sót tới phòng an toàn!"
+	}
+	"L4DStats_WipeSurvivorsReward"
+	{
+		"vi"		"Tất cả phe nhiễm nhận {green}%i{default} điểm vì giết toàn bộ người sống sót!"
+	}
+	"L4DStats_SurvivorWipePenalty"
+	{
+		"vi"		"Cả đội bị tiêu diệt; tất cả người sống sót mất {green}%i{default} điểm!"
+	}
+	"L4DStats_AllSurvivorsLostRoundPenalty"
+	{
+		"vi"		"Vòng đấu thất bại; tất cả người sống sót mất {green}%i{default} điểm!"
+	}
+	"L4DStats_AllPlayersLostRoundPenalty"
+	{
+		"vi"		"Vòng đấu thất bại; tất cả người tham gia mất {green}%i{default} điểm!"
+	}
+	"L4DStats_ProtectedTeammateSelf"
+	{
+		"vi"		"Bạn bảo vệ đồng đội và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ProtectedTeammateAll"
+	{
+		"vi"		"{olive}%s{default} bảo vệ đồng đội và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedDamageRewardSelf"
+	{
+		"vi"		"Bạn gây {green}%i{default} sát thương cho người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedDamageRewardAll"
+	{
+		"vi"		"{olive}%s{default} gây {green}%i{default} sát thương cho người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectBoomSelf"
+	{
+		"vi"		"Bạn làm mù hoàn hảo người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_PerfectBoomAll"
+	{
+		"vi"		"{olive}%s{default} làm mù hoàn hảo người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GenericPointsSelf"
+	{
+		"vi"		"Bạn nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_GenericPointsAll"
+	{
+		"vi"		"{olive}%s{default} nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFirePenaltySelf"
+	{
+		"vi"		"Bạn gây {olive}%i{default} sát thương đồng đội và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFirePenaltyAll"
+	{
+		"vi"		"{olive}%s{default} gây {olive}%i{default} sát thương đồng đội và mất {green}%i{default} điểm!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltySelf"
+	{
+		"vi"		"Bạn mất {green}%i{default} điểm vì bắn nhầm {olive}%s{default}!"
+	}
+	"L4DStats_FriendlyFireVictimPenaltyAll"
+	{
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì bắn nhầm {olive}%s{default}!"
+	}
+	"L4DStats_ChargerMultiHitSelf"
+	{
+		"vi"		"Bạn húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ChargerMultiHitAll"
+	{
+		"vi"		"{olive}%s{default} húc {lightgreen}%i{default} người sống sót và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CommonKillsRewardSelf"
+	{
+		"vi"		"Bạn giết {olive}%i{default} kẻ nhiễm và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_CommonKillsRewardAll"
+	{
+		"vi"		"{olive}%s{default} giết {olive}%i{default} kẻ nhiễm và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltySelf"
+	{
+		"vi"		"Bạn mất {green}%i{default} điểm vì để kẻ nhiễm vào phòng an toàn!"
+	}
+	"L4DStats_InfectedEnteredSafeRoomPenaltyAll"
+	{
+		"vi"		"{olive}%s{default} mất {green}%i{default} điểm vì để kẻ nhiễm vào phòng an toàn!"
+	}
+	"L4DStats_AlarmCarPenalty"
+	{
+		"vi"		"{green}%N{default} mất {green}%i{default} điểm vì bắn xe báo động!"
+	}
+	"L4DStats_SpecialSaveSelf"
+	{
+		"vi"		"Bạn cứu {olive}%s{default} khỏi {green}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankDamageRewardSelf"
+	{
+		"vi"		"Bạn gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankDamageRewardAll"
+	{
+		"vi"		"{olive}%s{default} gây {green}%i{default} sát thương khi là Tank và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchKillSelf"
+	{
+		"vi"		"Bạn hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchKillAll"
+	{
+		"vi"		"{olive}%s{default} hạ {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankRockHitSelf"
+	{
+		"vi"		"Bạn ném đá trúng {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_TankRockHitAll"
+	{
+		"vi"		"{olive}%s{default} ném đá trúng {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_IncapSurvivorSelf"
+	{
+		"vi"		"Bạn hạ gục {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_IncapSurvivorAll"
+	{
+		"vi"		"{olive}%s{default} hạ gục {olive}%s{default} và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_WitchCrownReward"
+	{
+		"vi"		"{olive}%s{default} crown Witch và nhận {green}%i{default} điểm!"
+	}
+	"L4DStats_ClassSmoker"
+	{
+		"vi"		"Smoker"
+	}
+	"L4DStats_ClassBoomer"
+	{
+		"vi"		"Boomer"
+	}
+	"L4DStats_ClassHunter"
+	{
+		"vi"		"Hunter"
+	}
+	"L4DStats_ClassSpitter"
+	{
+		"vi"		"Spitter"
+	}
+	"L4DStats_ClassJockey"
+	{
+		"vi"		"Jockey"
+	}
+	"L4DStats_ClassCharger"
+	{
+		"vi"		"Charger"
+	}
+	"L4DStats_ClassTank"
+	{
+		"vi"		"Tank"
+	}
+	"L4DStats_ClassWitch"
+	{
+		"vi"		"Witch"
+	}
+	"L4DStats_ClassUnknown"
+	{
+		"vi"		"Không rõ"
+	}
+	"L4DStats_ASurvivor"
+	{
+		"vi"		"một người sống sót"
+	}
+	"L4DStats_MapRecordTeam"
+	{
+		"vi"		"Đội"
+	}
+	"L4DStats_MapRecordTeamCount"
+	{
+		"vi"		"Đội (%d)"
+	}
+	"L4DStats_ConsolePrefix"
+	{
+		"vi"		"[HẠNG]"
+	}
 }

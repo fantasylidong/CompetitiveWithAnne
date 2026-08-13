@@ -2,11 +2,11 @@
 {
 	"Text_NotExceed10SpecialAnne"
 	{
-		"jp"		"{lightgreen} スペシャル10を超えないため、アンハッピー+武器はアンハッピー武器に自動的に切り替わりました"
+		"jp"		"{lightgreen}SI が 10 体未満のため、AnneHappy+ 武器は AnneHappy に切り替わりました。"
 	}
 	"Text_CannotUseAnneHappyPlus"
 	{
-		"jp"		"{lightgreen}はアンハッピープラス武器がスペシャル10を超えないため使用できません"
+		"jp"		"{lightgreen}SI が 10 体未満のため、AnneHappyPlus 武器は使用できません。"
 	}
 	"Text_TraitorStatusEnabled"
 	{
@@ -15,5 +15,89 @@
 	"Text_TraitorStatusDisabled"
 	{
 		"jp"		"{lightgreen}トレイターモード{olive}[{green}無効{olive}] {lightgreen}スロット{olive}[{green}%d{olive}]"
+	}
+	"Text_TankBhopOn"
+	{
+		"jp"		"{lightgreen}Tank連跳{olive}[{green}オン{olive}]"
+	}
+	"Text_TankBhopOff"
+	{
+		"jp"		"{lightgreen}Tank連跳{olive}[{green}オフ{olive}]"
+	}
+	"Text_Weapon"
+	{
+		"jp"		"{lightgreen}武器{olive}[{green}%s{olive}]"
+	}
+	"Text_AiDifficulty"
+	{
+		"jp"		"{lightgreen}動的難易度{olive}[{green}%s-%s{olive}]"
+	}
+	"Text_AiModeAuto"
+	{
+		"jp"		"自動"
+	}
+	"Text_AiModeFixed"
+	{
+		"jp"		"固定"
+	}
+	"Text_AiLevelEasy"
+	{
+		"jp"		"簡単"
+	}
+	"Text_AiLevelNormal"
+	{
+		"jp"		"普通"
+	}
+	"Text_AiLevelHard"
+	{
+		"jp"		"困難"
+	}
+	"Text_AiLevelExpert"
+	{
+		"jp"		"専門家"
+	}
+	"Text_AiLevelExtreme"
+	{
+		"jp"		"極限"
+	}
+	"Text_AiLevelNeri"
+	{
+		"jp"		"音理"
+	}
+	"Text_AiLevelPending"
+	{
+		"jp"		"未定"
+	}
+	"Text_SpawnAuto"
+	{
+		"jp"		"自動"
+	}
+	"Text_SpawnFixed"
+	{
+		"jp"		"固定"
+	}
+	"Text_SpecialInfected"
+	{
+		"jp"		"{lightgreen}SI{olive}[{green}%s %i体/%i秒{olive}] {lightgreen}バージョン{olive}[{green}%s{olive}]"
+	}
+	"Text_SpawnDistanceMin"
+	{
+		"jp"		"{lightgreen}SI最短スポーン距離{olive}[{green}%d{olive}]"
+	}
+	"Text_TeleportUnseen"
+	{
+		"jp"		"{lightgreen}SIテレポート{olive}[{green}%d秒非視認{olive}]"
+	}
+	"Text_ReturnBloodOn"
+	{
+		"jp"		"{lightgreen}回復{olive}[{green}オン{olive}]"
+	}
+	"Text_TankConsumeOn"
+	{
+		"jp"		"{lightgreen}Tank消耗{olive}[{green}オン{olive}]"
+	}
+	"Text_SneakyTankOn"
+	{
+		"jp"		"{lightgreen}狡猾Tank{olive}[{green}オン{olive}]"
 	}
 }

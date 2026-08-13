@@ -177,64 +177,106 @@ public void CvarWeapon(ConVar convar, const char[] oldValue, const char[] newVal
 }
 
 
-void printinfo(int client = 0, bool All = true){
-	//FormatTime(sBuffer, sizeof(sBuffer), "%Y/%m/%d");
-	char buffer[256];
-	char buffer2[256];
-	char buffer3[256];
-	char aiBuffer[64];
-	buffer3[0] = '\0';
-	if(g_hCvarTankBhop != null){
-		Format(buffer, sizeof(buffer), "{lightgreen}Tank连跳{olive}[{green}%s{olive}]", TankBhop > 0?"开启":"关闭");
-		Format(buffer, sizeof(buffer), "%s {lightgreen}武器{olive}[{green}%s{olive}]", buffer, Weapon > 0?(Weapon > 1?"Anne+":"Zone"):"Anne");
-	}else
+void printinfo(int client = 0, bool All = true)
+{
+	if(All)
 	{
-		Format(buffer, sizeof(buffer), "{lightgreen}武器{olive}[{green}%s{olive}]",  Weapon > 0?(Weapon > 1?"Anne+":"Zone"):"Anne");
+		for(int i = 1; i <= MaxClients; i++)
+		{
+			if(IsClientInGame(i) && (!IsFakeClient(i) || IsClientSourceTV(i)))
+				PrintInfoToClient(i);
+		}
+		PrintTraitorStatus();
+		return;
 	}
 
-	if(BuildAiDifficultyText(aiBuffer, sizeof(aiBuffer)))
-		Format(buffer, sizeof(buffer), "%s %s", buffer, aiBuffer);
+	PrintInfoToClient(client);
+	PrintTraitorStatus(client, false);
+}
+
+void AppendChatPart(char[] buffer, int maxlen, const char[] part)
+{
+	if(part[0] == '\0')
+		return;
+	if(buffer[0] == '\0')
+		strcopy(buffer, maxlen, part);
+	else
+		Format(buffer, maxlen, "%s %s", buffer, part);
+}
+
+void PrintInfoToClient(int client)
+{
+	if(!IsValidClient(client))
+		return;
+
+	SetGlobalTransTarget(client);
+
+	char line1[384];
+	char line2[256];
+	char line3[384];
+	char part[192];
+	char weaponName[16];
+	char spawnMode[32];
+	line1[0] = '\0';
+	line3[0] = '\0';
+
+	if(g_hCvarTankBhop != null)
+		FormatEx(line1, sizeof(line1), "%t", TankBhop > 0 ? "Text_TankBhopOn" : "Text_TankBhopOff");
+
+	strcopy(weaponName, sizeof(weaponName), Weapon > 1 ? "Anne+" : (Weapon > 0 ? "Zone" : "Anne"));
+	FormatEx(part, sizeof(part), "%t", "Text_Weapon", weaponName);
+	AppendChatPart(line1, sizeof(line1), part);
+
+	if(BuildAiDifficultyText(client, part, sizeof(part)))
+		AppendChatPart(line1, sizeof(line1), part);
 
 	if(PLUGIN_VERSION[0] == '\0')
-	GetConVarString(g_hCvarPluginVersion, PLUGIN_VERSION, sizeof(PLUGIN_VERSION));
+		GetConVarString(g_hCvarPluginVersion, PLUGIN_VERSION, sizeof(PLUGIN_VERSION));
+
 	ConVar autoSpawnTimeControl = FindConVar("inf_EnableAutoSpawnTime");
-	Format(buffer2, sizeof(buffer2), "{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}电信服{olive}[{green}%s{olive}]", (autoSpawnTimeControl != null && autoSpawnTimeControl.BoolValue)?"自动":"固定", CommonLimit, CommonTime, PLUGIN_VERSION);
+	FormatEx(spawnMode, sizeof(spawnMode), "%T",
+		(autoSpawnTimeControl != null && autoSpawnTimeControl.BoolValue) ? "Text_SpawnAuto" : "Text_SpawnFixed",
+		client);
+	FormatEx(line2, sizeof(line2), "%t", "Text_SpecialInfected", spawnMode, CommonLimit, CommonTime, PLUGIN_VERSION);
+
 	ConVar spawnDistanceMin = FindConVar("inf_SpawnDistanceMin");
 	if(spawnDistanceMin != null)
 	{
-		int max_dist = GetConVarInt(spawnDistanceMin);
-		Format(buffer3, sizeof(buffer3), "{lightgreen}特感最近生成距离{olive}[{green}%d{olive}]", max_dist);
+		FormatEx(part, sizeof(part), "%t", "Text_SpawnDistanceMin", GetConVarInt(spawnDistanceMin));
+		AppendChatPart(line3, sizeof(line3), part);
 	}
+
 	ConVar teleportCheckTime = FindConVar("inf_TeleportCheckTime");
-	if(teleportCheckTime != null){
-		int Teleport_CheckTime = GetConVarInt(teleportCheckTime);
-		Format(buffer3, sizeof(buffer3), "%s {lightgreen}特感传送条件{olive}[{green}%d秒不可见{olive}]", buffer3, Teleport_CheckTime);
+	if(teleportCheckTime != null)
+	{
+		FormatEx(part, sizeof(part), "%t", "Text_TeleportUnseen", GetConVarInt(teleportCheckTime));
+		AppendChatPart(line3, sizeof(line3), part);
 	}
+
 	ConVar returnBlood = FindConVar("ReturnBlood");
 	if(returnBlood != null && GetConVarInt(returnBlood) > 0)
-		Format(buffer3, sizeof(buffer3), "%s {lightgreen}回血{olive}[{green}开启{olive}]", buffer3);
+	{
+		FormatEx(part, sizeof(part), "%t", "Text_ReturnBloodOn");
+		AppendChatPart(line3, sizeof(line3), part);
+	}
+
 	ConVar tankConsume = FindConVar("ai_TankConsume");
 	ConVar tankSneakTime = FindConVar("ai_TankSneakTime");
 	if(tankConsume != null && GetConVarInt(tankConsume) > 0)
-		Format(buffer3, sizeof(buffer3), "%s {lightgreen}坦克消耗{olive}[{green}开启{olive}]", buffer3);
+	{
+		FormatEx(part, sizeof(part), "%t", "Text_TankConsumeOn");
+		AppendChatPart(line3, sizeof(line3), part);
+	}
 	else if(tankSneakTime != null && GetConVarFloat(tankSneakTime) > 0.0)
 	{
-		Format(buffer3, sizeof(buffer3), "%s {lightgreen}狡猾坦克{olive}[{green}开启{olive}]", buffer3);
+		FormatEx(part, sizeof(part), "%t", "Text_SneakyTankOn");
+		AppendChatPart(line3, sizeof(line3), part);
 	}
-	if(All){
-		CPrintToChatAll(buffer);
-		CPrintToChatAll(buffer2);
-		if(buffer3[0] != '\0')
-			CPrintToChatAll(buffer3);
-		PrintTraitorStatus();
-	}else
-	{
-		CPrintToChat(client, buffer);
-		CPrintToChat(client, buffer2);
-		if(buffer3[0] != '\0')
-			CPrintToChat(client, buffer3);
-		PrintTraitorStatus(client, false);
-	}
+
+	CPrintToChat(client, "%s", line1);
+	CPrintToChat(client, "%s", line2);
+	if(line3[0] != '\0')
+		CPrintToChat(client, "%s", line3);
 }
 
 void PrintTraitorStatus(int client = 0, bool all = true)
@@ -301,7 +343,7 @@ void RefreshDynamicAiCvars()
 		g_hCvarAiFixedLevel = FindConVar("ah_ai_dynamic_fixed_level");
 }
 
-bool BuildAiDifficultyText(char[] buffer, int maxlen)
+bool BuildAiDifficultyText(int langClient, char[] buffer, int maxlen)
 {
 	RefreshDynamicAiCvars();
 
@@ -320,44 +362,34 @@ bool BuildAiDifficultyText(char[] buffer, int maxlen)
 		mode = 1;
 	}
 
+	char modeName[16];
 	char levelName[16];
-	GetAiLevelName(level, levelName, sizeof(levelName));
-	Format(buffer, maxlen, "{lightgreen}动态难度{olive}[{green}%s-%s{olive}]", mode > 0 ? "固定" : "自动", levelName);
+	char levelPhrase[32];
+	FormatEx(modeName, sizeof(modeName), "%T", mode > 0 ? "Text_AiModeFixed" : "Text_AiModeAuto", langClient);
+	GetAiLevelPhrase(level, levelPhrase, sizeof(levelPhrase));
+	FormatEx(levelName, sizeof(levelName), "%T", levelPhrase, langClient);
+	FormatEx(buffer, maxlen, "%T", "Text_AiDifficulty", langClient, modeName, levelName);
 	return true;
 }
 
-void GetAiLevelName(int level, char[] buffer, int maxlen)
+void GetAiLevelPhrase(int level, char[] buffer, int maxlen)
 {
 	switch(level)
 	{
 		case 1:
-		{
-			strcopy(buffer, maxlen, "简单");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelEasy");
 		case 2:
-		{
-			strcopy(buffer, maxlen, "普通");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelNormal");
 		case 3:
-		{
-			strcopy(buffer, maxlen, "困难");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelHard");
 		case 4:
-		{
-			strcopy(buffer, maxlen, "专家");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelExpert");
 		case 5:
-		{
-			strcopy(buffer, maxlen, "极限");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelExtreme");
 		case 6:
-		{
-			strcopy(buffer, maxlen, "音理");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelNeri");
 		default:
-		{
-			strcopy(buffer, maxlen, "待定");
-		}
+			strcopy(buffer, maxlen, "Text_AiLevelPending");
 	}
 }
 
