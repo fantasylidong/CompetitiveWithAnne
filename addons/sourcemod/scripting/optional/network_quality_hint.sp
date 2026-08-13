@@ -3,9 +3,12 @@
 
 #include <sourcemod>
 #include <colors>
-#include <SteamWorks>
 
-#define PLUGIN_VERSION "1.1.3"
+#undef REQUIRE_EXTENSIONS
+#include <SteamWorks>
+#define REQUIRE_EXTENSIONS
+
+#define PLUGIN_VERSION "1.1.4"
 #define CHAT_TAG "{green}[网络]{default}"
 #define MAX_REPORT_SAMPLES 128
 
@@ -127,9 +130,10 @@ public void OnPluginStart()
 	HookConVarChange(g_hReportBadSamples, OnCvarChanged);
 	HookConVarChange(g_hReportRecoverySamples, OnCvarChanged);
 
+	AutoExecConfig(true, "network_quality_hint");
 	ReadCvars();
 	RestartTimer();
-	AutoExecConfig(true, "network_quality_hint");
+	LogReportStatus();
 }
 
 public void OnMapStart()
@@ -516,6 +520,23 @@ bool CanReportQuality()
 	return g_bReportEnable
 			&& g_sReportUrl[0] != '\0'
 			&& GetFeatureStatus(FeatureType_Native, "SteamWorks_CreateHTTPRequest") == FeatureStatus_Available;
+}
+
+void LogReportStatus()
+{
+	if (!g_bReportEnable) {
+		LogMessage("[network-quality] reporting disabled (nqh_report_enable 0); local checks still run");
+		return;
+	}
+	if (g_sReportUrl[0] == '\0') {
+		LogError("[network-quality] nqh_report_enable is 1 but nqh_report_url is empty");
+		return;
+	}
+	if (GetFeatureStatus(FeatureType_Native, "SteamWorks_CreateHTTPRequest") != FeatureStatus_Available) {
+		LogError("[network-quality] nqh_report_enable is 1 but SteamWorks HTTP is unavailable");
+		return;
+	}
+	LogMessage("[network-quality] reporting enabled -> %s", g_sReportUrl);
 }
 
 void LogReportFailure(const char[] message)
