@@ -417,6 +417,20 @@ bool SpawnAttempts_IsPendingActualClient(int client)
         && GetClientUserId(client) == g_PendingActualSpawns[client].userid;
 }
 
+// “临时态”客户端：pending 校验中、已被拒绝等待踢出、或已进入踢出队列
+// （传送/内鬼刷新踢出）。这些实体只在 commit/death 时增减计数，任何
+// 全图清点（RecalcSiCapFromAlive 等）都必须跳过，否则会被计入两次。
+bool SpawnAttempts_IsTransientSpawnClient(int client)
+{
+    if (client <= 0 || client > MaxClients)
+        return false;
+    if (g_bRejectedActualSpawn[client])
+        return true;
+    if (SpawnAttempts_IsPendingActualClient(client))
+        return true;
+    return IsClientInGame(client) && IsClientInKickQueue(client);
+}
+
 void SpawnAttempts_ResetPendingActualSpawn(bool removeClient = true)
 {
     for (int slot = 1; slot <= MaxClients; slot++)
@@ -459,6 +473,12 @@ static bool SpawnAttempts_ValidateActualSpawn(int client, int zc,
 
     float actual[3];
     GetClientAbsOrigin(client, actual);
+
+    // 最终提交是每只特感一次的低频路径，直接刷新当前眼位，避免同 tick
+    // 内其他插件传送生还者后沿用候选阶段的旧快照。刷新必须先于最终
+    // 距离硬判定，否则距离检查仍会读到传送前的旧眼位。
+    Visibility_RefreshEyeSnapshot();
+
     float directExclusion = FloatMax(
         NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
     if (teleportMode)
@@ -472,9 +492,6 @@ static bool SpawnAttempts_ValidateActualSpawn(int client, int zc,
         return false;
     }
 
-    // 最终提交是每只特感一次的低频路径，直接刷新当前眼位，避免同 tick
-    // 内其他插件传送生还者后沿用候选阶段的旧快照。
-    Visibility_RefreshEyeSnapshot();
     int rayMode = GetEffectiveVisibilityRayMode();
     // 最终提交是低频路径，强制走与独立测试探针一致的 SourcePawn
     // 射线/引擎可见性复核；扩展 native 继续负责高频候选预筛。

@@ -118,9 +118,12 @@ void ResetMatchState()
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsCountedSpecial(i) && IsPlayerAlive(i) && !IsGhost(i))
+        if (IsCountedSpecial(i) && IsPlayerAlive(i) && !IsGhost(i)
+            && !SpawnAttempts_IsTransientSpawnClient(i))
         {
-            gST.teleCount[i] = 0;
+            // 收编的存活特感补一次出生时间戳，避免硬恢复/重开刷特后
+            // g_LastSpawnTime 为 0 被传送监督当成“永久出生宽限”。
+            TeleportState_StampSpawn(i, "match_reset");
             int zc = GetEntProp(i, Prop_Send, "m_zombieClass");
             if (zc >= 1 && zc <= SI_COUNT)
             {
@@ -182,9 +185,12 @@ void RecalcSiCapFromAlive(bool log = false)
     for (int i = 0; i < SI_COUNT; i++) gST.siAlive[i] = 0;
     gST.totalSI = 0;
 
+    // 跳过临时态实体（pending 校验/等待踢出/踢出队列）：它们由 commit 或
+    // death 事件单独增减，这里再计入会造成双重计数，进而提前打满上限。
     for (int c = 1; c <= MaxClients; c++)
     {
-        if (IsCountedSpecial(c) && IsPlayerAlive(c) && !IsGhost(c))
+        if (IsCountedSpecial(c) && IsPlayerAlive(c) && !IsGhost(c)
+            && !SpawnAttempts_IsTransientSpawnClient(c))
         {
             int zc = GetEntProp(c, Prop_Send, "m_zombieClass");
             if (1 <= zc && zc <= SI_COUNT)

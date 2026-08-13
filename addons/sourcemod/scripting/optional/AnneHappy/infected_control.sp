@@ -224,7 +224,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-03.3",
+    version     = "2026-08-13.1",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -389,13 +389,10 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 
     float now = GetGameTime();
 
-    // 如果在暂停，返回预计恢复倒计时
-    if (g_bPauseLib && IsInPause())
-    {
-        float rem = gST.unpauseDelay;
-        if (rem <= 0.0) rem = -1.0;
-        return view_as<any>(rem);
-    }
+    // 如果在暂停且旧 hSpawn 暂停路径记录了恢复延迟，直接返回；
+    // 否则按 WaveDecider 冻结后的时钟继续估算（暂停期间 GetGameTime 不走）。
+    if (g_bPauseLib && IsInPause() && gST.unpauseDelay > 0.0)
+        return view_as<any>(gST.unpauseDelay);
 
     // 如果“下一波定时器”存在，按 (间隔 - 已经过的时间) 粗略估算
     if (gST.hSpawn != INVALID_HANDLE)
@@ -407,7 +404,16 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 
     float rem = WaveDecider_GetReleaseEta();
     if (rem < 0.0)
-        rem = DifficultyStrategy_GetConfiguredWaveDelay() - float(gST.lastSpawnSecs);
+    {
+        // 击杀阶段：基础 16 秒倒计时尚未开始，ETA 是“剩余检查窗口 +
+        // 完整间隔”的上界估算（提前触发时会缩短），不能把击杀阶段耗时
+        // 折算进基础倒计时。
+        float earlyRemaining = WaveDecider_GetEarlyCheckRemaining();
+        if (earlyRemaining >= 0.0)
+            rem = earlyRemaining + DifficultyStrategy_GetConfiguredWaveDelay();
+        else
+            rem = DifficultyStrategy_GetConfiguredWaveDelay() - float(gST.lastSpawnSecs);
+    }
     if (rem < 0.0) rem = 0.0;
     return view_as<any>(rem);
 }
@@ -742,6 +748,7 @@ static void StopAll()
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
     ResetDeathState();
+    SurvivorFlow_ResetRoundCaches();
     for (int i = 0; i <= MAXPLAYERS; i++) g_LastSpawnTime[i] = 0.0;
 }
 static Action Timer_ApplyMaxSpecials(Handle timer)
@@ -1183,8 +1190,11 @@ static int CountActualSpecialInfected()
     int count = 0;
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (IsCountedSpecial(client) && IsPlayerAlive(client) && !IsGhost(client))
+        if (IsCountedSpecial(client) && IsPlayerAlive(client) && !IsGhost(client)
+            && !SpawnAttempts_IsTransientSpawnClient(client))
+        {
             count++;
+        }
     }
     return count;
 }

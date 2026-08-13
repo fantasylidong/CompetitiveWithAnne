@@ -309,6 +309,9 @@ void BuildNavBuckets()
             gCV.bNavBucketMapInvalid ? 1 : 0, validIdxs.Length, badIdxs.Length);
     }
 
+    delete badIdxs;
+    delete validIdxs;
+
     // 6) 完成：标记就绪 & 存缓存
     g_BucketsReady = true;
     Debug_Print("[BUCKET] build done: took=%.3fs", GetEngineTime() - t0);

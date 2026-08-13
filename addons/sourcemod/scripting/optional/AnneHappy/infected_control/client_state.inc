@@ -45,8 +45,12 @@ bool TeleportState_IsInSpawnGrace(int client, float now)
     if (client <= 0 || client > MaxClients)
         return true;
 
+    // born<=0 表示出生时间未知（如硬恢复清空后未重新盖章）。未知视为
+    // “早已出生”，否则这些特感会永久停留在宽限期内、无法被传送监督处理。
     float born = g_LastSpawnTime[client];
-    return born <= 0.0 || (now - born) < gCV.fTeleportSpawnGrace;
+    if (born <= 0.0)
+        return false;
+    return (now - born) < gCV.fTeleportSpawnGrace;
 }
 
 stock bool IsSmokerReadyToAttack(int client)
@@ -180,8 +184,9 @@ bool CanBeTeleport(int client)
     if (GetClosestSurvivorDistance(client) < gCV.fSpawnMin)
         return false;
 
-    if (IsAiSmoker(client) && g_bSmokerLib && !IsSmokerReadyToAttack(client))
-        return false;
+    // Smoker 技能是否就绪由 Timer_TeleportTick 处理：未就绪只累计隐身
+    // 计时、不踢出。在这里直接拒绝会让监督内的该分支永远走不到，导致
+    // Smoker 必须“技能就绪后再重新攒满隐身秒数”才能传送。
 
     float p[3];
     GetClientAbsOrigin(client, p);
