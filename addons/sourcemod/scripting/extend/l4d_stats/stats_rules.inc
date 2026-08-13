@@ -11,7 +11,7 @@ Private functions
 -----------------------------------------------------------------------------
 */
 
-HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, String:SaveFrom[], String:SQLField[])
+HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, InfType, String:SQLField[])
 {
 	int human = CheckSurvivorsHumans();
 	if (StatsDisabled() || human < 3)
@@ -40,15 +40,28 @@ HunterSmokerSave(Savior, Victim, BasePoints, AdvMult, ExpertMult, String:SaveFro
 	decl String:ExtraSet[128];
 	Format(ExtraSet, sizeof(ExtraSet), ", %s = %s + 1", SQLField, SQLField);
 	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-	Format(ScoreFormula, sizeof(ScoreFormula), "base=%i,difficulty=%i/%i,save_from=%s,newbie_multiplier", BasePoints, AdvMult, ExpertMult, SaveFrom);
+	decl String:SaveFromKey[16];
+	switch (InfType)
+	{
+		case INF_ID_SMOKER:
+			strcopy(SaveFromKey, sizeof(SaveFromKey), "smoker");
+		case INF_ID_HUNTER:
+			strcopy(SaveFromKey, sizeof(SaveFromKey), "hunter");
+		default:
+			strcopy(SaveFromKey, sizeof(SaveFromKey), "special");
+	}
+	Format(ScoreFormula, sizeof(ScoreFormula), "base=%i,difficulty=%i/%i,save_from=%s,newbie_multiplier", BasePoints, AdvMult, ExpertMult, SaveFromKey);
 	Stats_ApplyClientScore(Savior, Score, "save_teammate", ScoreFormula, ExtraSet, true, TEAM_SURVIVORS);
 
 	if (Score <= 0)
 		return;
 
 	if (Mode)
-		StatsPrintToChat(Savior, "L4DStats_SpecialSaveSelf", VictimName, SaveFrom, Score);
-
+	{
+		decl String:SaveFromLabel[64];
+		Stats_FormatInfectedClass(Savior, InfType, SaveFromLabel, sizeof(SaveFromLabel));
+		StatsPrintToChat(Savior, "L4DStats_SpecialSaveSelf", VictimName, SaveFromLabel, Score);
+	}
 }
 
 bool:IsClientBot(client)
@@ -1514,17 +1527,34 @@ SurvivorHurt(Attacker, Victim, Damage, AttackerInfType = -1, Handle:event = INVA
 			if (Victim > 0)
 				GetClientName(Victim, VictimName, sizeof(VictimName));
 			else
-				Format(VictimName, sizeof(VictimName), "UNKNOWN");
+				VictimName[0] = '\0';
 
 			new Mode = GetConVarInt(cvar_AnnounceMode);
 
 			if (Mode == 1 || Mode == 2)
-				StatsPrintToChat(Attacker, "L4DStats_TankRockHitSelf", VictimName, RockHit);
+			{
+				decl String:VictimLabel[MAX_LINE_WIDTH];
+				if (VictimName[0] != '\0')
+					strcopy(VictimLabel, sizeof(VictimLabel), VictimName);
+				else
+					StatsFormatPhrase(Attacker, VictimLabel, sizeof(VictimLabel), "L4DStats_UnknownPlayer");
+				StatsPrintToChat(Attacker, "L4DStats_TankRockHitSelf", VictimLabel, RockHit);
+			}
 			else if (Mode == 3)
 			{
 				decl String:AttackerName[MAX_LINE_WIDTH];
 				GetClientName(Attacker, AttackerName, sizeof(AttackerName));
-				StatsPrintToChatAll("L4DStats_TankRockHitAll", AttackerName, VictimName, RockHit);
+				for (new i = 1; i <= MaxClients; i++)
+				{
+					if (!IsClientConnected(i) || !IsClientInGame(i) || IsClientBot(i))
+						continue;
+					decl String:VictimLabel[MAX_LINE_WIDTH];
+					if (VictimName[0] != '\0')
+						strcopy(VictimLabel, sizeof(VictimLabel), VictimName);
+					else
+						StatsFormatPhrase(i, VictimLabel, sizeof(VictimLabel), "L4DStats_UnknownPlayer");
+					StatsPrintToChat(i, "L4DStats_TankRockHitAll", AttackerName, VictimLabel, RockHit);
+				}
 			}
 		}
 	}
