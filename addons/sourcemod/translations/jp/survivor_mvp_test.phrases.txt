@@ -10,22 +10,22 @@
 	}
 	"SurvivorMVPTest_SIKillsClient"
 	{
-		"jp"		"プレイヤーの必殺技: {olive}%d{default}"
+		"jp"		"プレイヤーの SI キル: {olive}%d{default}"
 	}
 	"SurvivorMVPTest_DamagePercentClient"
 	{
-		"jp"		"プレイヤーダメージ率: {olive}%f{default}"
+		"jp"		"プレイヤーのダメージ割合: {olive}%f{default}"
 	}
 	"SurvivorMVPTest_CurrentRoundMVPClientCommon"
 	{
-		"jp"		"このラウンドの全体的な感触 MVP プレイヤー: {olive}%N{default}"
+		"jp"		"現在のラウンド CI MVP: {olive}%N{default}"
 	}
 	"SurvivorMVPTest_CommonKillsClient"
 	{
-		"jp"		"プレイヤー一般感覚キル: {olive}%d{default}"
+		"jp"		"プレイヤーの CI キル: {olive}%d{default}"
 	}
 	"SurvivorMVPTest_CIPercentClient"
 	{
-		"jp"		"プレイヤーの常識的キルの割合: {olive}%f{default}"
+		"jp"		"プレイヤーの CI キル割合: {olive}%f{default}"
 	}
 }

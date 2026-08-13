@@ -1,16 +1,24 @@
 "Phrases"
 {
+	"Tag"
+	{
+		"es"		"{blue}[{default}MVP{blue}]{default}"
+	}
+	"TagLVP"
+	{
+		"es"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"es"		"{blue}Rango {green}Especial: {olive}#%d {blue}({default}%d {green}daño {blue}[{default}%.0f%%{blue}]{default}, %d {green}muertes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{blue}Tu rango {green}SI{default}: {olive}#%d {blue}({default}%d {green}daño {blue}[{default}%.0f%%{blue}]{default}, %d {green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"es"		"{blue}Rango {green}Común: {olive}#%d {blue}({default}%d {green}comúnes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{blue}Tu rango {green}CI{default}: {olive}#%d {blue}({default}%d {green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"es"		"{blue}Rango {green}Fuego Amigo: {olive}#%d {blue}({default}%d {green}fuego amigo {blue}[{default}%.0f%%{blue}])"
+		"es"		"{blue}Tu rango {green}FF{default}: {olive}#%d {blue}({default}%d {green}fuego amigo {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
@@ -22,19 +30,19 @@
 	}
 	"NotEnoughAction"
 	{
-		"es"		"{blue}({default}no hay suficiente acción todavía{blue})"
+		"es"		"{blue}({default}aún no hay suficiente acción{blue})"
 	}
 	"ReportSI_Absolute"
 	{
-		"es"		"{green}SI: {olive}%s {blue}({default}%d {green}daño{default}, %d {green}muertes{blue})"
+		"es"		"{green}SI: {olive}%s {blue}({default}%d {green}daño{default}, %d {green}bajas{blue})"
 	}
 	"ReportSI_Percent"
 	{
-		"es"		"{green}SI: {olive}%s {blue}({green}daño {blue}[{default}%.0f%%{blue}]{default}, {green}muertes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{green}SI: {olive}%s {blue}({green}daño {blue}[{default}%.0f%%{blue}]{default}, {green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Full"
 	{
-		"es"		"{green}Especial: {olive}%s {blue}({default}%d {green}daño {blue}[{default}%.0f%%{blue}]{default}, %d {green}muertes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{green}SI: {olive}%s {blue}({default}%d {green}daño {blue}[{default}%.0f%%{blue}]{default}, %d {green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportSI_Nobody"
 	{
@@ -42,19 +50,19 @@
 	}
 	"ReportCI_Absolute"
 	{
-		"es"		"{green}CI: {olive}%s {blue}({default}%d {green}comúnes{blue})"
+		"es"		"{green}CI: {olive}%s {blue}({default}%d {green}bajas{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"es"		"{green}CI: {olive}%s {blue}({green}comúnes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{green}CI: {olive}%s {blue}({green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"es"		"{green}Comun: {olive}%s {blue}({default}%d {green}muertes {blue}[{default}%.0f%%{blue}])"
+		"es"		"{green}CI: {olive}%s {blue}({default}%d {green}bajas {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"es"		"{blue}({default}No hay fuego amigo en absoluto!{blue})" 
+		"es"		"{green}FF{default}: {blue}({default}¡no hubo fuego amigo esta ronda!{blue})"
 	}
 	"ReportFF_Absolute"
 	{
@@ -66,6 +74,14 @@
 	}
 	"ReportFF_Full"
 	{
-		"es"		"{green}Fuego Amigo: {olive}%s {blue}({default}%d {green}daño {blue}[{default}%.0f%%{blue}])"
+		"es"		"{green}FF: {olive}%s {blue}({default}%d {green}fuego amigo {blue}[{default}%.0f%%{blue}])"
+	}
+	"SurvivorMVP_PharmacyMVPStatisticsHeader"
+	{
+		"es"		"{blue}[{default}Estadísticas Anne MVP{blue}]"
+	}
+	"SurvivorMVP_PharmacyMVPStatisticsLine"
+	{
+		"es"		"{olive}SI{green}%2d {olive}CI{green}%3d {olive}FF/Recibido{green}%2d/%2d {olive}Puntos{green}%4d {default}%N"
 	}
 }

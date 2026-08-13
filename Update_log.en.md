@@ -113,6 +113,9 @@
 - The first hat is stored as `-2` so `HAT=0` no longer means both "no hat" and "first hat". Selecting a hat before the old row is read no longer overwrites the new choice.
 - Skins had the same "not restored after async DB load / cleared before rank data is ready" hole and are fixed together. Titles, recoil, damage HUD, and hit sounds already restore from their own load callbacks or separate cookie/database paths.
 
+### August 13, 2026 Survivor MVP Translations
+- Upgraded `survivor_mvp.smx` to 0.3.4. Round MVP/LVP lines, personal ranks, and bot prefixes no longer hard-code Chinese; they are printed in the client's language, so English players no longer see "特感/小僵尸/友伤/[机器人]".
+- Japanese, Korean, and Vietnamese no longer mistranslate SI/FF/Anne compact stats as "special sense", "black gun", or "pharmacy". Spanish now includes the previously missing Tag and Anne compact-stat keys.
 ### August 13, 2026 l4d_stats Chat i18n
 - Upgraded `l4d_stats.smx` to 1.5.6. Remaining hardcoded English chat fragments now use translation phrases; all 315 Simplified/Traditional Chinese, English, Japanese, Korean, and Vietnamese phrases are aligned, and the per-language files are no longer limited to the 13 map-record strings.
 - Special Infected kill, Smoker/Hunter save, Charger rescue, and Tank rock announcements now show class names in the viewer's language. Human players still appear by nickname.

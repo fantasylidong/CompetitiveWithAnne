@@ -4,21 +4,25 @@
 	{
 		"chi"		"{blue}[{default}MVP{blue}]{default}"
 	}
+	"TagLVP"
+	{
+		"chi"		"{blue}[{default}LVP{blue}]{default}"
+	}
 	"YourRankSI"
 	{
-		"chi"		"{green}特感{blue}排名: {olive}#%d {blue}({default}%d {green}伤害 {blue}[{default}%.0f%%{blue}]{default}, %d {green}击杀 {blue}[{default}%.0f%%{blue}])"
+		"chi"		"{blue}你的排名 {green}特感{default}: {olive}#%d {blue}({default}%d {green}伤害 {blue}[{default}%.0f%%{blue}]{default}, %d {green}击杀 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankCI"
 	{
-		"chi"		"{green}丧尸{blue}排名: {olive}#%d {blue}({default}%d {green}丧尸 {blue}[{default}%.0f%%{blue}])"
+		"chi"		"{blue}你的排名 {green}小僵尸{default}: {olive}#%d {blue}({default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])"
 	}
 	"YourRankFF"
 	{
-		"chi"		"{green}黑枪{blue}排名: {olive}#%d {blue}({default}%d {green}友伤 {blue}[{default}%.0f%%{blue}])"
+		"chi"		"{blue}你的排名 {green}友伤{default}: {olive}#%d {blue}({default}%d {green}友伤 {blue}[{default}%.0f%%{blue}])"
 	}
 	"BotName"
 	{
-		"chi"		"[BOT]"
+		"chi"		"[机器人]"
 	}
 	"NobodyName"
 	{
@@ -26,7 +30,7 @@
 	}
 	"NotEnoughAction"
 	{
-		"chi"		"{blue}({default}还没有足够多的操作{blue})"
+		"chi"		"{blue}({default}当前数据不足，尚无法评选{blue})"
 	}
 	"ReportSI_Absolute"
 	{
@@ -46,19 +50,19 @@
 	}
 	"ReportCI_Absolute"
 	{
-		"chi"		"{green}丧尸: {olive}%s {blue}({default}%d {green}丧尸{blue})"
+		"chi"		"{green}小僵尸: {olive}%s {blue}({default}%d {green}击杀{blue})"
 	}
 	"ReportCI_Percent"
 	{
-		"chi"		"{green}丧尸: {olive}%s {blue}({green}丧尸 {blue}[{default}%.0f%%{blue}])"
+		"chi"		"{green}小僵尸: {olive}%s {blue}({green}击杀 {blue}[{default}%.0f%%{blue}])"
 	}
 	"ReportCI_Full"
 	{
-		"chi"		"{green}丧尸: {olive}%s {blue}({default}%d {green}丧尸 {blue}[{default}%.0f%%{blue}])"
+		"chi"		"{green}小僵尸: {olive}%s {blue}({default}%d {green}击杀 {blue}[{default}%.0f%%{blue}])"
 	}
 	"NoFF"
 	{
-		"chi"		"{blue}({default}完全没有黑枪!{blue})"
+		"chi"		"{green}友伤{default}: {blue}({default}本局没有任何友伤！{blue})"
 	}
 	"ReportFF_Absolute"
 	{
