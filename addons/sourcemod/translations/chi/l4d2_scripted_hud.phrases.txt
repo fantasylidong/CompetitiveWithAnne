@@ -78,14 +78,400 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"chi"		"标准（16:9）"
+			"chi"		"16:9 宽屏（默认坐标）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"chi"		"紧凑（4:3）"
+			"chi"		"4:3 / 5:4 窄屏（收窄防右边裁切）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"chi"		"超宽屏安全区"
+			"chi"		"21:9 超宽（收到中间安全区）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"chi"		"16:10 显示器"
+		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"chi"		"HUD 3 显示内容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"chi"		"HUD 4 显示内容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"chi"		"HUD {1} 显示内容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"chi"		"跟随服务器默认"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"chi"		"生还者状态"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"chi"		"特感血量"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"chi"		"击杀统计"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"chi"		"玩家延迟"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"chi"		"玩家状态[药][倒地]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"chi"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"chi"		"无"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"chi"		"特感 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"chi"		"特感 x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"chi"		"女巫x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"chi"		"坦克 {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"chi"		"舌"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"chi"		"胖"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"chi"		"猎"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"chi"		"口"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"chi"		"猴"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"chi"		"牛"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"chi"		"击杀 [特感|普感]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"chi"		"延迟 (ms)"
+		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"chi"		"团灭次数"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"chi"		"[团灭x{1}]"
+		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"chi"		"[{1}特{2}秒]"
+		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"chi"		"坦克伤害榜"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"chi"		"队伍道具"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"chi"		"下一波特感"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"chi"		"速度 / 连跳"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"chi"		"回合计时 / 尸潮"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"chi"		"女巫距离预警"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"chi"		"下一波刷新队列"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"chi"		"（旁观/特感）"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"chi"		"坦克伤害"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"chi"		"坦克已击杀"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"chi"		"坦克伤害 --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"chi"		"当前无坦克"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"chi"		"道具"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"chi"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"chi"		"火"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"chi"		"管"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"chi"		"胆"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"chi"		"包"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"chi"		"电"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"chi"		"燃"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"chi"		"爆"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"chi"		"药"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"chi"		"针"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"chi"		"下一波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"chi"		"场上 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"chi"		"场上 {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"chi"		"刷新队列"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"chi"		"空"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"chi"		"速度 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"chi"		"速度 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"chi"		"连跳 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"chi"		"连跳 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"chi"		"回合 {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"chi"		"尸潮 进行中"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"chi"		"尸潮 {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"chi"		"尸潮 --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"chi"		"当前无女巫"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"chi"		"女巫 {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"chi"		"激怒"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"chi"		"近"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"chi"		"警觉"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"chi"		"静"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"chi"		"另有{1}只"
+		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"chi"		"全部 15 个 HUD 槽位"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"chi"		"HUD 槽位（1-15）"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"chi"		"HUD {1} {2}：{3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"chi"		"HUD {1} 显示内容（与击杀列表共用）"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"chi"		"未使用（隐藏）"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"chi"		"进度 / 坦克 / 女巫"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"chi"		"服务器状态"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"chi"		"左上"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"chi"		"左下"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"chi"		"中上"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"chi"		"中下"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"chi"		"右上"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"chi"		"右下"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"chi"		"滚动条"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"chi"		"最左"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"chi"		"最右"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"chi"		"中框"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"chi"		"计分标题"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"chi"		"计分1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"chi"		"计分2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"chi"		"计分3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"chi"		"计分4"
 		}
 	}

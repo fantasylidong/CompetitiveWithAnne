@@ -15,6 +15,21 @@ int SpawnQueue_Length()
     return (gQ.spawn != null) ? gQ.spawn.Length : 0;
 }
 
+int SpawnQueue_Copy(int[] classes, int maxlen)
+{
+    if (maxlen <= 0 || gQ.spawn == null)
+        return 0;
+
+    int count = gQ.spawn.Length;
+    if (count > maxlen)
+        count = maxlen;
+
+    for (int i = 0; i < count; i++)
+        classes[i] = gQ.spawn.Get(i);
+
+    return count;
+}
+
 bool SpawnQueue_Peek(int &zc)
 {
     if (gQ.spawn == null || gQ.spawn.Length <= 0)

@@ -725,6 +725,28 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 动态难度插件卸载后，SourceMod 会留下 `ah_ai_dynamic_current_level`；旧逻辑只要看到残留 1-6 档就会继续写进 `hostname` / `sn_main_name`。现在改为检测插件是否在跑，并清掉已经写进房间名的 `[AI:...]`。
 - `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。
 
+### 2026年8月13日 Scripted HUD 自定义槽位与白框修复
+- `extend/l4d2_scripted_hud.smx` 升级到 1.2.0：HUD 3 / HUD 4 支持玩家自选显示内容，`!hudmenu` 新增“HUD 3/4 显示内容”子菜单，可在“跟随服务器默认 / 生还者状态 / 特感血量 / 击杀统计 / 玩家延迟”之间切换；选择写入 Cookie 与 `scripted_hud_prefs` 数据库（旧表自动 ALTER 迁移新列），跨服保留。
+- 特感血量页显示存活特感数/上限、每只小特（舌/胖/猎/口/猴/牛）的当前血量、Tank 当前/最大血量与女巫数量；击杀统计页按生还者统计本回合特感/普感击杀；延迟页列出真人玩家 ping（生还者优先）。全部文字走翻译短语（简中/繁中/英/日/韩/越）。
+- 加固“打开 hudmenu 时偶发三个白色描边空矩形”的问题：这类空框是 EMS 脚本 HUD 槽位在“可见但缺 NOBG/TEXT 标志”瞬态下画出的空背景面板。per-client flags 现在按服务器权威 flags 重建，ResetHUD 刷新窗口不再可能把 flags 清成 0 下发；地图开始时显式隐藏两个 HUD 插件都不用的 EMS 槽位 4–7，杜绝遗留槽位数据画空框。
+- HUD 面板高度按每位玩家实际文本行数个性化（新增 m_fScriptedHUDHeight sendproxy），多行自定义内容不再被裁切；`l4d2_scripted_hud_hud3_team` 默认从 2（仅感染者可见）改为 0（全体），生还者自选的 HUD 3 内容现在真正可见。
+- HUD 2 新增"团灭次数"字段：读取 `server.smx` 发布的 `anne_round_wipe_count`（当前地图团灭数，切图/通关清零），团灭 ≥1 次时在 HUD 2 末尾显示 `[团灭xN]`，只进 HUD 不写入房间名；可在 `!hudmenu` → "HUD 2 显示字段" 单独开关。已保存过 HUD 2 偏好的老玩家该字段默认关闭，需在菜单中手动开启一次；新玩家默认开启。
+
+### 2026年8月13日 Scripted HUD 扩展内容源
+- `extend/l4d2_scripted_hud.smx` 升级到 1.3.0：HUD 3 / HUD 4 内容菜单新增六项，均可按槽位自选并写入 Cookie/数据库。
+- 坦克伤害榜：按本场对坦克伤害排序（最多 4 人，带百分比）；坦克死后保留榜单直到下一场坦克，无坦克时显示“当前无坦克”。
+- 队伍道具：每位生还者一行压缩显示投掷物/医疗/临时补给（火/管/胆、包/电/燃/爆、药/针，空为 -）。
+- 下一波特感：读取 `infected_control` 的 `GetNextSpawnTime` native（插件未加载时显示 --），并附场上小特数/上限。
+- 速度/连跳：显示自己（旁观则跟随观察目标）的水平速度与本次连跳峰值；落地走稳约 0.25 秒后清峰值。
+- 回合计时+尸潮：从 `round_start` 起算 mm:ss；`create_panic_event` 的 60 秒滚动窗口内显示“进行中”，否则显示导演尸潮倒计时（`L4D2CT_MobSpawnTimer`）。
+- 女巫距离预警：最近一只女巫的米制距离与状态（静/近/警觉/激怒），15 米内标“近”；多只时另计剩余数量。全部新增短语走六语翻译。
+
+### 2026年8月13日 Scripted HUD 15 槽全开
+- `extend/l4d2_scripted_hud.smx` 升级到 1.4.0：L4D2 EMS 的 15 个引擎槽位全部可由玩家在 `!hudmenu` →「全部 15 个 HUD 槽位」里指定显示内容（服务器默认 / 未使用 / 生还者状态 / 特感血量 / 击杀统计 / 延迟 / 坦克伤害榜 / 队伍道具 / 下一波 / 速度 / 回合计时 / 女巫预警 / 进度坦克女巫 / 服务器状态）。
+- HUD 1–4 默认行为不变；槽位 5–8（引擎 4–7）默认隐藏，选内容后出现在左侧栏。槽位 9–15（引擎 8–14）默认把击杀列表透传给 `l4d2_cs_kill_hud`；只有自己把内容绑到该槽时才会覆盖对应击杀行，并移到右侧下方以免挡住准星。
+- 偏好写入 Cookie 与 `scripted_hud_prefs`（`hud_mask` 扩为 smallint，新增 `slot_sources`；旧 6 段 Cookie 和 hud3/hud4 列仍可读取）。六语菜单/槽位名已补全。
+- 1.4.1：槽位坐标按屏幕比例排版。`!hudmenu` →「屏幕布局」可选 16:9 / 16:10 / 4:3 / 21:9。额外槽左侧 4–9、右侧 10–14 分行间距加大，避开 HUD1–4、击杀列表、准星和武器栏；4:3 收窄防右裁切，21:9 收到中间 16:9 安全区。每人通过 SendProxy 用自己的布局，不互相覆盖。
+- 1.4.2：特感血量、下一波倒计时、下一波刷新队列，以及 HUD2 的「特感数量/间隔」只给旁观和特感看，生还者整槽隐藏；菜单用「（旁观/特感）」标注。新增「下一波刷新队列」内容源，读取 `infected_control` 的 `InfectedControl_GetSpawnQueue`（旧插件显示 --）。同列额外槽按实际行数向下堆叠，额外槽最多 4 行、HUD3/4 最多 6 行，避免长文本互相重叠。
 ### 2026年8月13日 刷特分散度与职业多样性
 - `infected_control.smx` 升级到 2026-08-13.11：再压一档 Hunter / Jockey / Charger 后方生成。硬拒绝 **-5→-4**（`inf_score_behind_reject_gap_hjc`），落后扣分倍率 **2.0→2.5**；Flow 后锚收到 **-4/-3**。Hunter rear 0.15→0.05，Jockey 不再吃 rear。同进度点仍可评分。Smoker / Spitter / Boomer 与波次时序不变。
 - `infected_control.smx` 升级到 2026-08-13.10：继续压低 Hunter / Jockey / Charger 刷在生还者后方的几率。这三类后方硬拒绝从全局 -8 收到 **-5**（`inf_score_behind_reject_gap_hjc`），落后扣分按 `inf_score_behind_hjc_scale`（默认 **2.0**）加倍；Flow 曲线后锚从 -10/-9 收到 **-5/-4**，同进度点仍可评分。Hunter 战术质量减少 rear、改偏侧翼/边缘；Jockey rear 权重 0.15→0.05。Smoker / Spitter / Boomer 的全局后方规则不变。波次时序契约不变。
