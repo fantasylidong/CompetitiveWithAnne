@@ -141,6 +141,7 @@
 - `annehappy_dynamic_ai_difficulty.smx`를 2026.08.13.1로 올렸습니다. `annehappy_dynamic_ai_difficulty` 라이브러리를 등록하고, 언로드 시 `current_level` / `current_mode` / `current_ppm` / `current_locked`를 0으로 되돌립니다. HUD, `!xx`, 스폰 전략이 옛 등급을 계속 읽지 않게 합니다.
 
 ### 2026년 8월 13일 스폰 분산과 클래스 다양성
+- `infected_control.smx`를 2026-08-13.11로 올렸습니다. Hunter / Jockey / Charger 후방 생성을 한 단계 더 조입니다. 하드 거부 **-5→-4**(`inf_score_behind_reject_gap_hjc`), 후방 감점 배율 **2.0→2.5**, Flow 뒤 앵커 **-4/-3**. Hunter rear 0.15→0.05, Jockey는 rear를 쓰지 않습니다. 같은 진행도 후보는 계속 점수를 받습니다. Smoker / Spitter / Boomer와 웨이브 시간 계약은 그대로입니다.
 - `infected_control.smx`를 2026-08-13.10으로 올렸습니다. Hunter / Jockey / Charger가 생존자 후방에 뜨는 확률을 더 낮춥니다. 이 세 종류의 후방 하드 거부는 전역 -8에서 **-5**(`inf_score_behind_reject_gap_hjc`)로, 후방 감점은 `inf_score_behind_hjc_scale`(기본 **2.0**)배입니다. Flow 뒤 앵커는 -10/-9에서 **-5/-4**로 당깁니다. 같은 진행도 후보는 계속 점수를 받습니다. Hunter 전술 품질은 rear를 줄이고 측면/가장자리를 더 보고, Jockey rear 비중은 0.15→0.05입니다. Smoker / Spitter / Boomer의 전역 후방 규칙은 그대로입니다. 웨이브 시간 계약은 변하지 않습니다.
 - `infected_control.smx`를 2026-08-13.9로 올렸습니다. 하드 분산을 한 단계 더 낮춥니다. `inf_spawn_sep_radius` 150→**120**, `inf_spawn_sep_ttl` 2.5→**1.5**. 같은 Nav 쿨다운 `NAV_CD_SECS`는 **1.0**초 유지. 웨이브 시간 계약은 그대로입니다.
 - `infected_control.smx`를 2026-08-13.8로 올렸습니다. Hunter 습격 준비 거리를 조금 밖으로 밉니다. 선호 대역을 350–750에서 **350–850**로, 스위트스팟을 고리의 38%(약 500)에서 48%(약 **590**)로 바꿨습니다. 중거리로 유지하며 예전 950 원거리로는 돌아가지 않습니다. Charger / Jockey는 그대로입니다. 웨이브 시간 계약은 그대로입니다.

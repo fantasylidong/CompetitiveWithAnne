@@ -141,6 +141,7 @@
 - `annehappy_dynamic_ai_difficulty.smx` を 2026.08.13.1 へ更新。`annehappy_dynamic_ai_difficulty` ライブラリを登録し、アンロード時に `current_level` / `current_mode` / `current_ppm` / `current_locked` を 0 に戻します。HUD、`!xx`、スポーン戦略が古い档位を読み続けないようにします。
 
 ### 2026年8月13日 スポーン分散と職業多様性
+- `infected_control.smx` を 2026-08-13.11 へ更新。Hunter / Jockey / Charger の後方生成をもう一段締めます。ハード拒否 **-5→-4**（`inf_score_behind_reject_gap_hjc`）、後方減点倍率 **2.0→2.5**、Flow 後アンカー **-4/-3**。Hunter の rear は 0.15→0.05、Jockey は rear を使いません。同じ進捗の候補は引き続き採点します。Smoker / Spitter / Boomer とウェーブ時序は変わりません。
 - `infected_control.smx` を 2026-08-13.10 へ更新。Hunter / Jockey / Charger が生存者後方に出る確率をさらに下げます。この3種の後方ハード拒否は全局の -8 から **-5**（`inf_score_behind_reject_gap_hjc`）へ、後方減点は `inf_score_behind_hjc_scale`（既定 **2.0**）倍。Flow 後アンカーは -10/-9 から **-5/-4** へ。同じ進捗の候補は引き続き採点します。Hunter の戦術品質は rear を減らし側面/端を優先、Jockey の rear 比重は 0.15→0.05。Smoker / Spitter / Boomer の全局後方ルールは変更しません。ウェーブ時序は変わりません。
 - `infected_control.smx` を 2026-08-13.9 へ更新。ハード分散をもう一段緩めます。`inf_spawn_sep_radius` 150→**120**、`inf_spawn_sep_ttl` 2.5→**1.5**。同一 Nav クールダウン `NAV_CD_SECS` は **1.0** 秒のまま。ウェーブ時序は変わりません。
 - `infected_control.smx` を 2026-08-13.8 へ更新。Hunter の飛びつき準備距離を少し外へ。優先帯を 350–750 から **350–850** へ、甘口を環の 38%（約 500）から 48%（約 **590**）へ。中距離のまま、旧 950 の遠点には戻しません。Charger / Jockey は変更なし。ウェーブ時序は変わりません。

@@ -220,7 +220,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-13.10",
+    version     = "2026-08-13.11",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 

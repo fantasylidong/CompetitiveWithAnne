@@ -100,8 +100,8 @@ TEST_CVARS = {
     "inf_score_behind_per_flow": "2.0",
     "inf_score_behind_cap": "100.0",
     "inf_score_behind_reject_gap": "8",
-    "inf_score_behind_reject_gap_hjc": "5",
-    "inf_score_behind_hjc_scale": "2.0",
+    "inf_score_behind_reject_gap_hjc": "4",
+    "inf_score_behind_hjc_scale": "2.5",
     "versus_special_respawn_interval": "16.0",
     "l4d_infected_limit": "12",
     "z_smoker_limit": "2",
@@ -140,8 +140,8 @@ PRODUCTION_RESTORE_CVARS = {
     "inf_score_behind_per_flow": "2.0",
     "inf_score_behind_cap": "100.0",
     "inf_score_behind_reject_gap": "8",
-    "inf_score_behind_reject_gap_hjc": "5",
-    "inf_score_behind_hjc_scale": "2.0",
+    "inf_score_behind_reject_gap_hjc": "4",
+    "inf_score_behind_hjc_scale": "2.5",
 }
 
 PLUGIN_PATHS = (

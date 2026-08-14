@@ -507,11 +507,11 @@ enum struct Config
             "候选Nav最多允许落后目标多少个Flow百分点；-1关闭硬拒绝，默认-8允许、-9拒绝",
             CVAR_FLAG, true, -1.0, true, 100.0);
         this.ScoreBehindRejectGapHjc = CreateConVar(
-            "inf_score_behind_reject_gap_hjc", "5",
-            "Hunter/Jockey/Charger 后方硬拒绝缺口；默认-5允许、-6拒绝。-1沿用全局 inf_score_behind_reject_gap",
+            "inf_score_behind_reject_gap_hjc", "4",
+            "Hunter/Jockey/Charger 后方硬拒绝缺口；默认-4允许、-5拒绝。-1沿用全局 inf_score_behind_reject_gap",
             CVAR_FLAG, true, -1.0, true, 100.0);
         this.ScoreBehindHjcScale = CreateConVar(
-            "inf_score_behind_hjc_scale", "2.0",
+            "inf_score_behind_hjc_scale", "2.5",
             "Hunter/Jockey/Charger 的 Flow 后点梯度扣分倍率；1.0 与全局相同",
             CVAR_FLAG, true, 1.0, true, 5.0);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",

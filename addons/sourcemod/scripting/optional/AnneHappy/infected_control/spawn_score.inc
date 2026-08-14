@@ -317,9 +317,9 @@ static void GetClassFlowProfile(int zc, int &backAnchor, int &peakAnchor, int &f
         case view_as<int>(SI_Smoker),
              view_as<int>(SI_Spitter): { backAnchor = -12; peakAnchor = 4; frontAnchor = 20; }
         case view_as<int>(SI_Boomer):  { backAnchor = -8;  peakAnchor = 1; frontAnchor = 14; }
-        case view_as<int>(SI_Hunter):  { backAnchor = -5;  peakAnchor = 3; frontAnchor = 18; }
+        case view_as<int>(SI_Hunter):  { backAnchor = -4;  peakAnchor = 3; frontAnchor = 18; }
         case view_as<int>(SI_Jockey),
-             view_as<int>(SI_Charger): { backAnchor = -4;  peakAnchor = 2; frontAnchor = 16; }
+             view_as<int>(SI_Charger): { backAnchor = -3;  peakAnchor = 2; frontAnchor = 16; }
         default:                       { backAnchor = -10; peakAnchor = 3; frontAnchor = 18; }
     }
 }
