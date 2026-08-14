@@ -68,6 +68,19 @@ In its current state it allows anyone to host their own up to date competitive L
 >
 > Configure `MinidumpAccount` for the account that should own the reports. The Anne-specific configuration uses the maintainer's SteamID64 because AnneWeb displays reports to the matching Steam account.
 
+### Network quality reports
+
+`network_quality_hint` samples ping/loss/choke locally. HTTPS reporting to NewAnneWeb is optional: the plugin ConVar default is **`nqh_report_enable "0"`**, so community copies keep local hints without uploading.
+
+This repository sets **`nqh_report_enable "1"`** in [`cfg/sourcemod/network_quality_hint.cfg`](cfg/sourcemod/network_quality_hint.cfg) for Anne's website-whitelisted game servers. Reporting requires:
+
+* `network_quality_hint` 1.1.5 or newer
+* SteamWorks (`addons/sourcemod/extensions/SteamWorks.ext.so`)
+* an explicit `nqh_report_enable "1"`
+
+Website incidents focus on packet loss. Choke below `nqh_report_choke_limit` (default 20%) is not reported as an incident. Local chat warnings still use `nqh_choke_limit` (default 5%).
+
+If you deploy this pack on a server that is **not** on the website whitelist, set `nqh_report_enable "0"`. Local detection still works; the website will not accept reports from unknown servers.
 
 ## **Credits:**
 

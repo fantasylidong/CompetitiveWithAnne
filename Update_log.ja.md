@@ -179,3 +179,7 @@
 - 高所優先は拡張の ranked 有向候補へ移行：`inf_nav_high_sort_scale` を再有効化（新既定 Smoker 0.85 / Hunter 0.90）。ターゲットより `inf_nav_high_sort_min_height`（既定 64）以上高い候補は割引距離で前倒しされ、限られた採点枠に入ります。地面近くの塊の中で事後加点に頼る必要がなくなりました。
 - 職業多様性：職業選択の希少度に ±`inf_class_scarcity_jitter`（既定 0.06）の小さなランダム揺らぎを加え、占有率が近い職業間の固定ローテーションを崩します。支援ゲート（Boomer/Spitter は圧制職の後）はウェーブごとに確率 `inf_support_gate_waive_prob`（既定 0.15）で緩和。Breach ウェーブは緩和しません。
 - `[SCORE-CHOSEN]` デバッグログと `sm_navdebug` の採点内訳にカーネル項（kern）を追加。
+
+### 2026年8月14日 ネットワーク品質レポートはロス優先
+- `network_quality_hint.smx` を 1.1.5 へ更新。ウェブサイトの異常イベントはパケットロスを優先します。`choke` が `nqh_report_choke_limit`（既定 20%）以下なら異常として報告しません。ゲーム内チャット警告は引き続き `nqh_choke_limit`（既定 5%）を使います。
+- 異常理由：タイムアウトは `timing_out`。それ以外は `loss` を優先し、次に `ping`、しきい値を超えた `choke` です。

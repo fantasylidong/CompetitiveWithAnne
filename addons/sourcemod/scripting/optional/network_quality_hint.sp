@@ -8,7 +8,7 @@
 #include <SteamWorks>
 #define REQUIRE_EXTENSIONS
 
-#define PLUGIN_VERSION "1.1.4"
+#define PLUGIN_VERSION "1.1.5"
 #define CHAT_TAG "{green}[网络]{default}"
 #define MAX_REPORT_SAMPLES 128
 
@@ -38,6 +38,7 @@ ConVar
 	g_hReportEnable,
 	g_hReportUrl,
 	g_hReportInterval,
+	g_hReportChokeLimit,
 	g_hReportBadSamples,
 	g_hReportRecoverySamples;
 
@@ -53,12 +54,14 @@ int g_iBadSamples;
 float g_fWarnCooldown;
 float g_fIntroDelay;
 int g_iReportInterval;
+float g_fReportChokeLimit;
 int g_iReportBadSamples;
 int g_iReportRecoverySamples;
 char g_sIpPageUrl[192];
 char g_sReportUrl[256];
 
 int g_iBadCount[MAXPLAYERS + 1];
+int g_iWarnCount[MAXPLAYERS + 1];
 int g_iGoodCount[MAXPLAYERS + 1];
 float g_fLastWarnAt[MAXPLAYERS + 1];
 bool g_bIncidentActive[MAXPLAYERS + 1];
@@ -107,6 +110,7 @@ public void OnPluginStart()
 	g_hReportEnable = CreateConVar("nqh_report_enable", "0", "Enable optional HTTPS player connection quality reports when a URL is configured.", _, true, 0.0, true, 1.0);
 	g_hReportUrl = CreateConVar("nqh_report_url", "http://anne.trygek.com/api/player/connection_quality.php", "HTTP endpoint for player connection quality reports.");
 	g_hReportInterval = CreateConVar("nqh_report_interval", "600", "Seconds between normal summary reports. Incidents and disconnects report immediately.", _, true, 60.0, true, 3600.0);
+	g_hReportChokeLimit = CreateConVar("nqh_report_choke_limit", "20.0", "Report a choke incident only when choke is higher than this percent. -1 disables choke incidents. Local chat warnings still use nqh_choke_limit.", _, true, -1.0);
 	g_hReportBadSamples = CreateConVar("nqh_report_bad_samples", "1", "Consecutive bad local samples required to report an incident.", _, true, 1.0, true, 20.0);
 	g_hReportRecoverySamples = CreateConVar("nqh_report_recovery_samples", "3", "Consecutive good local samples required to report recovery.", _, true, 1.0, true, 20.0);
 
@@ -127,6 +131,7 @@ public void OnPluginStart()
 	HookConVarChange(g_hReportEnable, OnCvarChanged);
 	HookConVarChange(g_hReportUrl, OnCvarChanged);
 	HookConVarChange(g_hReportInterval, OnCvarChanged);
+	HookConVarChange(g_hReportChokeLimit, OnCvarChanged);
 	HookConVarChange(g_hReportBadSamples, OnCvarChanged);
 	HookConVarChange(g_hReportRecoverySamples, OnCvarChanged);
 
@@ -211,6 +216,7 @@ void ReadCvars()
 	g_fWarnCooldown = g_hWarnCooldown.FloatValue;
 	g_fIntroDelay = g_hIntroDelay.FloatValue;
 	g_iReportInterval = g_hReportInterval.IntValue;
+	g_fReportChokeLimit = g_hReportChokeLimit.FloatValue;
 	g_iReportBadSamples = g_hReportBadSamples.IntValue;
 	g_iReportRecoverySamples = g_hReportRecoverySamples.IntValue;
 
@@ -284,13 +290,15 @@ void CheckClient(int client)
 	float choke = chokeOutgoing < 0.0 ? 0.0 : chokeOutgoing;
 	bool badPing = g_iPingLimit >= 0 && latencyOutgoing >= 0.0 && ping > g_iPingLimit;
 	bool badLoss = g_fLossLimit >= 0.0 && lossOutgoing >= 0.0 && lossOutgoing > g_fLossLimit;
-	bool badChoke = g_fChokeLimit >= 0.0 && chokeOutgoing >= 0.0 && chokeOutgoing > g_fChokeLimit;
-	bool bad = timingOut || badPing || badLoss || badChoke;
+	bool warnChoke = g_fChokeLimit >= 0.0 && chokeOutgoing >= 0.0 && chokeOutgoing > g_fChokeLimit;
+	bool reportChoke = g_fReportChokeLimit >= 0.0 && chokeOutgoing >= 0.0 && chokeOutgoing > g_fReportChokeLimit;
+	bool warnBad = timingOut || badPing || badLoss || warnChoke;
+	bool reportBad = timingOut || badLoss || badPing || reportChoke;
 
 	if (timingOut) {
 		g_iTimeoutSampleCount[client]++;
 	}
-	if (bad) {
+	if (reportBad) {
 		g_iBadSampleCount[client]++;
 		g_iBadCount[client]++;
 		g_iGoodCount[client] = 0;
@@ -298,10 +306,11 @@ void CheckClient(int client)
 			g_iMaxConsecutiveBad[client] = g_iBadCount[client];
 		}
 		if (!g_bIncidentActive[client] && g_iBadCount[client] >= g_iReportBadSamples) {
-			SendQualityReport(client, "incident", timingOut ? "timing_out" : "quality_threshold", "");
+			char incidentCode[32];
+			ClassifyIncidentReason(timingOut, badLoss, badPing, reportChoke, incidentCode, sizeof(incidentCode));
+			SendQualityReport(client, "incident", incidentCode, "");
 			g_bIncidentActive[client] = true;
 		}
-		MaybeWarnPlayer(client, ping, loss, choke, badPing, badLoss, badChoke);
 	} else {
 		g_iBadCount[client] = 0;
 		g_iGoodCount[client]++;
@@ -312,6 +321,13 @@ void CheckClient(int client)
 		}
 	}
 
+	if (warnBad) {
+		g_iWarnCount[client]++;
+		MaybeWarnPlayer(client, ping, loss, choke, badPing, badLoss, warnChoke);
+	} else {
+		g_iWarnCount[client] = 0;
+	}
+
 	if (g_iWindowStartedAt[client] > 0 && GetTime() - g_iWindowStartedAt[client] >= g_iReportInterval) {
 		SendQualityReport(client, "summary", "periodic", "");
 	}
@@ -319,7 +335,7 @@ void CheckClient(int client)
 
 void MaybeWarnPlayer(int client, int ping, float loss, float choke, bool badPing, bool badLoss, bool badChoke)
 {
-	if (g_iBadCount[client] < g_iBadSamples) {
+	if (g_iWarnCount[client] < g_iBadSamples) {
 		return;
 	}
 	float now = GetEngineTime();
@@ -587,6 +603,7 @@ void GetReportServerIdentity(char[] serverId, int serverIdLength, char[] serverN
 void ResetClientState(int client)
 {
 	g_iBadCount[client] = 0;
+	g_iWarnCount[client] = 0;
 	g_iGoodCount[client] = 0;
 	g_fLastWarnAt[client] = 0.0;
 	g_bIncidentActive[client] = false;
@@ -610,6 +627,21 @@ void ResetReportWindow(int client, int startedAt)
 		g_iMetricValidCount[client][metric] = 0;
 		g_iMetricStoredCount[client][metric] = 0;
 		g_iMetricWriteIndex[client][metric] = 0;
+	}
+}
+
+void ClassifyIncidentReason(bool timingOut, bool badLoss, bool badPing, bool reportChoke, char[] code, int maxlen)
+{
+	if (timingOut) {
+		strcopy(code, maxlen, "timing_out");
+	} else if (badLoss) {
+		strcopy(code, maxlen, "loss");
+	} else if (badPing) {
+		strcopy(code, maxlen, "ping");
+	} else if (reportChoke) {
+		strcopy(code, maxlen, "choke");
+	} else {
+		strcopy(code, maxlen, "quality_threshold");
 	}
 }
 

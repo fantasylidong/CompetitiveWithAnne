@@ -179,3 +179,7 @@
 - 고지대 우선은 확장의 ranked 방향 후보로 전환했습니다: `inf_nav_high_sort_scale`을 다시 활성화(새 기본 Smoker 0.85 / Hunter 0.90). 대상보다 `inf_nav_high_sort_min_height`(기본 64) 이상 높은 후보는 할인된 거리로 앞당겨져 제한된 채점 정원에 들어가며, 더 이상 지면 근처 덩어리 안에서 사후 가점에만 의존하지 않습니다.
 - 클래스 다양성: 클래스 선택 희소도에 ±`inf_class_scarcity_jitter`(기본 0.06)의 작은 무작위 흔들림을 더해 점유율이 비슷한 클래스 간 고정 순환을 깨고, 지원 게이트(Boomer/Spitter는 압박 클래스 이후)는 웨이브마다 확률 `inf_support_gate_waive_prob`(기본 0.15)로 완화합니다. Breach 웨이브는 완화하지 않습니다.
 - `[SCORE-CHOSEN]` 디버그 로그와 `sm_navdebug` 채점 내역에 커널 항목(kern)을 추가했습니다.
+
+### 2026년 8월 14일 네트워크 품질 보고는 손실 우선
+- `network_quality_hint.smx`를 1.1.5로 올림. 웹사이트 이상 이벤트는 패킷 손실을 우선합니다. `choke`가 `nqh_report_choke_limit`(기본 20%) 이하면 이상으로 보고하지 않습니다. 게임 내 채팅 안내는 계속 `nqh_choke_limit`(기본 5%)를 씁니다.
+- 이상 사유: 타임아웃은 `timing_out`. 그 외에는 `loss`를 우선하고, 다음이 `ping`, 보고 임계값을 넘는 `choke`입니다.

@@ -763,3 +763,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 高点优先改走扩展 ranked 有向候选：重新启用 `inf_nav_high_sort_scale`（新默认 Smoker 0.85 / Hunter 0.90），高于目标 `inf_nav_high_sort_min_height`（默认 64）以上的候选按折减距离前置进入有限的评分名额，高位点不再只能靠评分在近地面簇里“事后加分”。
 - 职业多样性：选类稀缺度加入 ±`inf_class_scarcity_jitter`（默认 0.06）的小幅随机抖动，打散占用率接近的职业之间的固定轮转；支援闸门（Boomer/Spitter 需先刷压制类）每波按 `inf_support_gate_waive_prob`（默认 0.15）随机放宽一波，Breach 波不参与放宽。
 - `[SCORE-CHOSEN]` 调试日志与 `sm_navdebug` 评分演算输出新增核密度项（kern）。
+
+### 2026年8月14日 网络质量上报以丢包为主
+- `network_quality_hint.smx` 升级到 1.1.5。网站异常事件以丢包为主：`choke` 未高于 `nqh_report_choke_limit`（默认 20%）不再上报异常；本地聊天提醒仍用 `nqh_choke_limit`（默认 5%）。
+- 异常事件原因：超时单独记 `timing_out`；其余优先记 `loss`，其次 `ping`，`choke` 仅在高于上报阈值时记录。
