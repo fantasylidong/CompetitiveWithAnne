@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"zho"		"[團滅x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"zho"		"[{1}特{2}秒]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"zho"		"坦克傷害榜"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"zho"		"女巫距離預警"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"zho"		"下一波刷新隊列"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"zho"		"（旁觀/特感）"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"zho"		"場上 {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"zho"		"刷新隊列"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"zho"		"空"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{

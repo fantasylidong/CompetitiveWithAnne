@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"en"		"[Wipes x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"en"		"[{1} SI / {2}s]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"en"		"Tank damage board"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"en"		"Witch distance"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"en"		"Next SI queue"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"en"		" (spec/SI)"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"en"		"Alive {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"en"		"Spawn queue"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"en"		"empty"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{

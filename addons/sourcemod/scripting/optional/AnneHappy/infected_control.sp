@@ -332,6 +332,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     g_hSpawnCommittedForward = CreateGlobalForward(
         "InfectedControl_OnSpawnCommitted", ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
+    CreateNative("InfectedControl_GetSpawnQueue", Native_GetSpawnQueue);
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
     CreateNative("InfectedControl_IsTraitorRegistered", Native_InfectedControlIsTraitorRegistered);
     CreateNative("InfectedControl_IsTraitorModeEnabled", Native_InfectedControlIsTraitorModeEnabled);
@@ -383,6 +384,19 @@ public void OnLibraryRemoved(const char[] name)
     else if (StrEqual(name, "l4d2_horde_equaliser"))
         EventPressure_OnEqualiserLibraryRemoved();
 }
+public int Native_GetSpawnQueue(Handle plugin, int numParams)
+{
+    int maxlen = GetNativeCell(2);
+    if (maxlen <= 0)
+        return 0;
+
+    int[] classes = new int[maxlen];
+    int count = SpawnQueue_Copy(classes, maxlen);
+    if (count > 0)
+        SetNativeArray(1, classes, count);
+    return count;
+}
+
 //native
 public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 {

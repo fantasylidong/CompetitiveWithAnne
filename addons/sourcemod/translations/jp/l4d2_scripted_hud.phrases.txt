@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"jp"		"[全滅x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"jp"		"[{1}特{2}秒]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"jp"		"Tank ダメージ"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"jp"		"Witch 距離警告"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"jp"		"次ウェーブ隊列"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"jp"		"（観戦/特感）"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"jp"		"生存 {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"jp"		"出現隊列"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"jp"		"空"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{

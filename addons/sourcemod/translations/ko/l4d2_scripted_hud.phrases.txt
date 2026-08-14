@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"ko"		"[전멸x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"ko"		"[{1}특 {2}초]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"ko"		"탱크 피해 순위"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"ko"		"Witch 거리 경고"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"ko"		"다음 특수 감염자 대기열"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"ko"		" (관전/특감)"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"ko"		"생존 {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"ko"		"생성 대기열"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"ko"		"비어 있음"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{
