@@ -42,10 +42,18 @@
 	}
 	"Server_PromptsAlreadyBlackWhiteGive"
 	{
-		"vi"		"[{olive} nhắc {default}] {green}%N{default} Đã {olive} đen trắng {default}, hãy ưu tiên bảo vệ và xử lý!"
+		"vi"		"[{olive}Thông báo{default}] {green}%N{default} đã {olive}đen trắng{default} (gục thêm một lần sẽ chết). Hãy ưu tiên bảo vệ và chữa trị!"
 	}
 	"Server_PromptBlackWhiteTreatSoon"
 	{
-		"vi"		"[{olive} nhắc {default}] Bạn hiện là {green} {default} đen trắng, hãy xử lý nó càng sớm càng tốt!"
+		"vi"		"[{olive}Thông báo{default}] Bạn đang {green}đen trắng{default} (gục thêm một lần sẽ chết). Hãy chữa trị ngay!"
+	}
+	"Server_PromptBlackWhiteHintOther"
+	{
+		"vi"		"%N đã đen trắng (gục thêm một lần sẽ chết)!"
+	}
+	"Server_PromptBlackWhiteHintSelf"
+	{
+		"vi"		"Bạn đang đen trắng (gục thêm một lần sẽ chết)!"
 	}
 }

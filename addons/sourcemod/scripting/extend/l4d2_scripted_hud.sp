@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for all 15 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.4.2"
+#define PLUGIN_VERSION                "1.4.3"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -2256,37 +2256,9 @@ bool HavePills(int client)
 
 void GetHUD3_Text(char[] output, int size)
 {
-	FormatEx(output, size, "\0");
-		
-	int num = 0;
-	for (int client = 1; client <= MaxClients; client++)
-	{
-		if (!IsClientInGame(client))
-		    continue;
-
-		if (GetClientTeam(client) != TEAM_SURVIVOR)
-		    continue;
-		num += 1;
-		if (num > 4)
-			continue;
-		char health[64];
-		if (!IsPlayerAlive(client))
-		    FormatEx(health, sizeof(health), "☠");
-		else if(L4D_IsPlayerIncapacitated(client))
-			FormatEx(health, sizeof(health), "(%dHP)",GetClientHealth(client) + GetClientTempHealth(client));
-		else
-		    FormatEx(health, sizeof(health), "%dHP", GetClientHealth(client) + GetClientTempHealth(client));
-		char name[12];
-		GetClientName(client,name,sizeof(name));
-		if (output[0] == 0)
-			FormatEx(output, size, "玩家状态[药][倒地]\n%s: %s", name, health);
-		else
-			Format(output, size, "%s\n%s: %s", output, name, health);
-		if(HavePills(client)&&IsPlayerAlive(client))
-			Format(output, size, "%s[%s][%d]", output, "有",L4D_GetPlayerReviveCount(client));  
-		else if(!HavePills(client)&&IsPlayerAlive(client))
-			Format(output, size, "%s[%s][%d]", output, "无",L4D_GetPlayerReviveCount(client));	
-    }
+	// Shared fallback only (no per-client language). BuildClientHUDTexts
+	// rebuilds HUD3 default with BuildSurvivorStatusText for each player.
+	BuildSurvivorStatusText(LANG_SERVER, output, size);
 }
 
 /****************************************************************************************************/
@@ -2570,6 +2542,13 @@ void BuildClientHUDTexts()
         {
             ComposeHUD2Text(personalized, sizeof(personalized), g_iClientHUD2Mask[client], client);
             FormatEx(g_sClientHUDText[client][HUD2], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
+        }
+
+        if (GetClientHUDSource(client, HUD3) == HUD_CONTENT_DEFAULT
+            && !g_bData_HUD3_Text && !g_bCvar_HUD3_Text)
+        {
+            BuildSurvivorStatusText(client, personalized, sizeof(personalized));
+            FormatEx(g_sClientHUDText[client][HUD3], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
         }
 
         for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)

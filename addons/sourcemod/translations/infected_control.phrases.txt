@@ -182,19 +182,19 @@
 	}
 	"InfectedControl_TraitorWaveMayExtend"
 	{
-		"en"		"{green}[IC]{default} Find a spawn position now. Survivor holding may delay this wave and your spawn unlock."
+		"en"		"{green}[IC]{default} Find a spawn position now. Survivor stalling may delay this wave and your spawn unlock."
 	}
 	"InfectedControl_TraitorReadyCountdown"
 	{
-		"en"		"Earliest spawn: %d seconds (holding may extend)"
+		"en"		"Earliest spawn: %d seconds (stalling may extend)"
 	}
 	"InfectedControl_TraitorWaveExtended"
 	{
-		"en"		"{green}[IC]{default} Survivors are holding an advantageous position. Your spawn stays locked until the wave is released."
+		"en"		"{green}[IC]{default} Survivors are stalling in an advantageous position. Your spawn stays locked until the wave is released."
 	}
 	"InfectedControl_TraitorWaveExtendedHint"
 	{
-		"en"		"Spawn delayed by survivor holding"
+		"en"		"Spawn delayed by survivor stalling"
 	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
@@ -319,11 +319,11 @@
 	}
 	"InfectedControl_WaveStatusAntiBaitHold"
 	{
-		"en"		"  Anti-Bait: holding"
+		"en"		"  Anti-Bait: hold active"
 	}
 	"InfectedControl_WaveStatusAntiBaitRelease"
 	{
-		"en"		"  Anti-Bait: releasing"
+		"en"		"  Anti-Bait: wave released"
 	}
 	"InfectedControl_NavDebugNotCompiled"
 	{

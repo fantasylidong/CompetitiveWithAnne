@@ -2,7 +2,7 @@
 {
 	"InfectedControl_ICFailedObtainCrosshairHit"
 	{
-		"vi"		"{green}[IC]{default} không đạt được điểm trúng tâm ngắm."
+		"vi"		"{green}[IC]{default} không lấy được điểm trúng tâm ngắm."
 	}
 	"InfectedControl_ICNoNavAreaNearby"
 	{
@@ -10,35 +10,35 @@
 	}
 	"InfectedControl_ICNavidBucketCalculationReturn"
 	{
-		"vi"		"{green}[IC]{default} navid=%d xô=%d(tính toán) / %d(trả về) cờ=%s"
+		"vi"		"{green}[IC]{default} navid=%d xô=%d(tính) / %d(trả) cờ=%s"
 	}
 	"InfectedControl_ICNavidBucketReturnFlag"
 	{
-		"vi"		"{green}[IC]{default} navid=%d xô=N/A / %d(trở lại) cờ=%s"
+		"vi"		"{green}[IC]{default} navid=%d xô=N/A / %d(trả) cờ=%s"
 	}
 	"InfectedControl_ICNavCanGenerateTotal"
 	{
-		"vi"		"{green}[IC]{default} Nav %d {olive} có thể tạo {default} | Tổng số điểm: {lightgreen}%.1f{default} | Xem bảng điều khiển để biết chi tiết"
+		"vi"		"{green}[IC]{default} Nav %d {olive}có thể spawn{default} | Tổng điểm: {lightgreen}%.1f{default} | Xem console để biết chi tiết"
 	}
 	"InfectedControl_ICNavCannotGenerateSee"
 	{
-		"vi"		"{green}[IC]{default} Nav %d {lightgreen} không thể tạo {default} | Xem bảng điều khiển để biết chi tiết"
+		"vi"		"{green}[IC]{default} Nav %d {lightgreen}không thể spawn{default} | Xem console để biết chi tiết"
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"vi"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
+		"vi"		"{green}[IC]{default} Cách dùng: !it mở menu loại nội gián; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] đăng ký trực tiếp."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
-		"vi"		"Select traitor class"
+		"vi"		"Chọn loại nội gián"
 	}
 	"InfectedControl_TraitorMenuRandom"
 	{
-		"vi"		"Random enabled class"
+		"vi"		"Ngẫu nhiên loại đang bật"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{
-		"vi"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
+		"vi"		"{green}[IC]{default} Bạn đã dùng hết lượt đăng ký nội gián trong vòng này (%d)."
 	}
 	"InfectedControl_TraitorClassLimitReached"
 	{
@@ -46,87 +46,87 @@
 	}
 	"InfectedControl_TraitorSameClassConsecutive"
 	{
-		"vi"		"{green}[IC]{default} Quản trị viên không thể chơi {olive}%s{default} liên tiếp. Hãy chọn loại đặc cảm khác."
+		"vi"		"{green}[IC]{default} Quản trị viên không thể chơi {olive}%s{default} liên tiếp. Hãy chọn loại SI khác."
 	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
-		"vi"		"{green}[IC]{default} Traitor quota database is unavailable."
+		"vi"		"{green}[IC]{default} Cơ sở dữ liệu hạn ngạch nội gián không khả dụng."
 	}
 	"InfectedControl_TraitorPublicStatsUnavailable"
 	{
-		"vi"		"{green}[IC]{default} Điểm l4d_stats chưa sẵn sàng. Người chơi thường vui lòng thử đăng ký traitor lại sau."
+		"vi"		"{green}[IC]{default} Điểm l4d_stats chưa sẵn sàng. Người chơi thường vui lòng thử đăng ký nội gián lại sau."
 	}
 	"InfectedControl_TraitorPublicScoreRequired"
 	{
-		"vi"		"{green}[IC]{default} Người chơi thường cần ít nhất {olive}%d{default} điểm để đăng ký traitor; hiện bạn có {olive}%d{default} điểm."
+		"vi"		"{green}[IC]{default} Người chơi thường cần ít nhất {olive}%d{default} điểm để đăng ký nội gián; hiện bạn có {olive}%d{default} điểm."
 	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
-		"vi"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."
+		"vi"		"{green}[IC]{default} Hạn ngạch nội gián hôm nay đã hết ({olive}%d{default}/{olive}%d{default}). Sẽ reset vào ngày mai."
 	}
 	"InfectedControl_TraitorRootCvarOnly"
 	{
-		"vi"		"{green}[IC]{default} Only root admins may change {olive}%s{default}."
+		"vi"		"{green}[IC]{default} Chỉ quản trị root mới được đổi {olive}%s{default}."
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"vi"		"{green}[IC]{default} Không ghi nhận sát thương hoặc đòn tấn công hiệu quả trước khi đợt SI tiếp theo được thả. Vai trò traitor bị hủy và AI tiếp quản SI này."
+		"vi"		"{green}[IC]{default} Không ghi nhận sát thương hoặc đòn tấn công hiệu quả trước khi đợt SI tiếp theo được thả. Vai trò nội gián bị hủy và AI tiếp quản SI này."
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"vi"		"{green}[IC]{default} Bạn không thể làm traitor trong %d đợt SI tiếp theo."
+		"vi"		"{green}[IC]{default} Bạn không thể làm nội gián trong %d đợt SI tiếp theo."
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
-		"vi"		"{green}[IC]{default} Lần chơi traitor này bạn đã gây {olive}%d{default} sát thương lên người sống sót."
+		"vi"		"{green}[IC]{default} Lần chơi nội gián này bạn đã gây {olive}%d{default} sát thương lên người sống sót."
 	}
 	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"vi"		"{green}[IC]{default} Bạn phải chờ thêm %d đợt SI mới có thể làm traitor vì lần trước không gây sát thương."
+		"vi"		"{green}[IC]{default} Bạn phải chờ thêm %d đợt SI mới có thể làm nội gián vì lần trước không gây sát thương."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
-		"vi"		"{green}[IC]{default} Cảnh báo phạt: traitor phải gây sát thương hoặc tấn công hiệu quả trước khi đợt SI tiếp theo được thả."
+		"vi"		"{green}[IC]{default} Cảnh báo phạt: nội gián phải gây sát thương hoặc tấn công hiệu quả trước khi đợt SI tiếp theo được thả."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"vi"		"{green}[IC]{default} Nếu không, vai trò sẽ bị hủy, AI tiếp quản và traitor bị vô hiệu hóa trong %d đợt SI."
+		"vi"		"{green}[IC]{default} Nếu không, vai trò sẽ bị hủy, AI tiếp quản và nội gián bị vô hiệu hóa trong %d đợt SI."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"vi"		"{green}[IC]{default} Cảnh báo Tank: traitor Tank phải gây ít nhất {olive}%d{default} sát thương lên người sống sót."
+		"vi"		"{green}[IC]{default} Cảnh báo Tank: nội gián Tank phải gây ít nhất {olive}%d{default} sát thương lên người sống sót."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageBlock"
 	{
-		"vi"		"{green}[IC]{default} Nếu không, traitor Tank sẽ bị vô hiệu hóa trong {olive}%d{default} ngày."
+		"vi"		"{green}[IC]{default} Nếu không, nội gián Tank sẽ bị vô hiệu hóa trong {olive}%d{default} ngày."
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
-		"vi"		"{green}[IC]{default} Your Tank traitor is blocked for about {olive}%d{default} more minutes."
+		"vi"		"{green}[IC]{default} Nội gián Tank của bạn còn bị chặn khoảng {olive}%d{default} phút."
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"vi"		"{green}[IC]{default} Traitor Tank của bạn đã gây {olive}%d{default}/{olive}%d{default} sát thương lên người sống sót."
+		"vi"		"{green}[IC]{default} Nội gián Tank của bạn đã gây {olive}%d{default}/{olive}%d{default} sát thương lên người sống sót."
 	}
 	"InfectedControl_TraitorTankBlockApplied"
 	{
-		"vi"		"{green}[IC]{default} Traitor Tank bị vô hiệu hóa trong {olive}%d{default} ngày."
+		"vi"		"{green}[IC]{default} Nội gián Tank bị vô hiệu hóa trong {olive}%d{default} ngày."
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{
-		"vi"		"{green}[IC]{default} Next wave traitor: {olive}%s{default} registered as {olive}%s{default}."
+		"vi"		"{green}[IC]{default} Nội gián đợt sau: {olive}%s{default} đăng ký {olive}%s{default}."
 	}
 	"InfectedControl_TraitorNextWaveNone"
 	{
-		"vi"		"{green}[IC]{default} No traitor is registered for the next wave."
+		"vi"		"{green}[IC]{default} Đợt sau chưa có nội gián đăng ký."
 	}
 	"InfectedControl_TraitorBhopEnabled"
 	{
-		"vi"		"{green}[IC]{default} Auto-bhop is enabled for your traitor. Hold SPACE to jump continuously."
+		"vi"		"{green}[IC]{default} Nội gián đã bật auto-bhop. Giữ SPACE để nhảy liên tục."
 	}
 	"InfectedControl_TraitorDisabled"
 	{
-		"vi"		"{green}[IC]{default} Traitor mode is disabled."
+		"vi"		"{green}[IC]{default} Chế độ nội gián đang tắt."
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
@@ -134,19 +134,19 @@
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
-		"vi"		"{green}[IC]{default} Unsupported traitor class."
+		"vi"		"{green}[IC]{default} Loại nội gián không được hỗ trợ."
 	}
 	"InfectedControl_TraitorClassDisabled"
 	{
-		"vi"		"{green}[IC]{default} That infected class is disabled in the current spawn settings."
+		"vi"		"{green}[IC]{default} Loại SI này đang tắt trong cài đặt spawn hiện tại."
 	}
 	"InfectedControl_TraitorNoEnabledClass"
 	{
-		"vi"		"{green}[IC]{default} No enabled infected class is available for traitor mode."
+		"vi"		"{green}[IC]{default} Không có loại SI nào khả dụng cho chế độ nội gián."
 	}
 	"InfectedControl_TraitorWindowClosed"
 	{
-		"vi"		"{green}[IC]{default} Traitor registration is closed for this wave."
+		"vi"		"{green}[IC]{default} Đăng ký nội gián của đợt này đã đóng."
 	}
 	"InfectedControl_TraitorAlreadyRegistered"
 	{
@@ -154,23 +154,23 @@
 	}
 	"InfectedControl_TraitorQueued"
 	{
-		"vi"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
+		"vi"		"{green}[IC]{default} Bạn đã đăng ký nội gián {olive}%s{default}."
 	}
 	"InfectedControl_TraitorNextQueued"
 	{
-		"vi"		"{green}[IC]{default} Bạn đã đăng ký traitor tiếp theo là {olive}%s{default}; đăng ký sẽ vào hàng chờ khi SI hiện tại chết."
+		"vi"		"{green}[IC]{default} Bạn đã đăng ký nội gián tiếp theo là {olive}%s{default}; sẽ vào hàng chờ khi SI hiện tại chết."
 	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"vi"		"{green}[IC]{default} Bạn đang chờ làm traitor {olive}%s{default} (vị trí %d)."
+		"vi"		"{green}[IC]{default} Bạn đang chờ làm nội gián {olive}%s{default} (thứ tự %d)."
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
-		"vi"		"{green}[IC]{default} A traitor slot opened. You are now queued as {olive}%s{default}."
+		"vi"		"{green}[IC]{default} Đã có slot nội gián trống. Bạn được đăng ký là {olive}%s{default}."
 	}
 	"InfectedControl_TraitorPending"
 	{
-		"vi"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
+		"vi"		"{green}[IC]{default} Bạn đã vào trạng thái ghost. Hãy chờ đợt SI tiếp theo."
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
@@ -178,31 +178,31 @@
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
-		"vi"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
+		"vi"		"{green}[IC]{default} AI SI sẽ làm mới sau khoảng {olive}%d{default} giây."
 	}
 	"InfectedControl_TraitorWaveMayExtend"
 	{
-		"vi"		"{green}[IC]{default} Find a spawn position now. Survivor holding may delay this wave and your spawn unlock."
+		"vi"		"{green}[IC]{default} Hãy tìm vị trí spawn ngay. Người sống sót stall có thể làm chậm đợt này và lúc bạn được spawn."
 	}
 	"InfectedControl_TraitorReadyCountdown"
 	{
-		"vi"		"Earliest spawn: %d seconds (holding may extend)"
+		"vi"		"Spawn sớm nhất: %d giây (stall có thể kéo dài)"
 	}
 	"InfectedControl_TraitorWaveExtended"
 	{
-		"vi"		"{green}[IC]{default} Survivors are holding an advantageous position. Your spawn stays locked until the wave is released."
+		"vi"		"{green}[IC]{default} Người sống sót đang stall ở vị trí có lợi. Bạn chưa được spawn cho đến khi đợt được thả."
 	}
 	"InfectedControl_TraitorWaveExtendedHint"
 	{
-		"vi"		"Spawn delayed by survivor holding"
+		"vi"		"Spawn bị chậm vì người sống sót stall"
 	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
-		"vi"		"{green}[IC]{default} The SI refresh point has arrived. You have {olive}%d{default} seconds to spawn yourself."
+		"vi"		"{green}[IC]{default} Đã đến lúc SI làm mới. Bạn có {olive}%d{default} giây để tự spawn."
 	}
 	"InfectedControl_TraitorSpawnCountdown"
 	{
-		"vi"		"Spawn now: %d seconds left"
+		"vi"		"Spawn ngay: còn %d giây"
 	}
 	"InfectedControl_TraitorTankSpawnWindow"
 	{
@@ -214,31 +214,31 @@
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
-		"vi"		"{green}[IC]{default} You did not spawn in time. An AI special infected will take this slot."
+		"vi"		"{green}[IC]{default} Bạn không spawn kịp. AI SI sẽ chiếm slot này."
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{
-		"vi"		"{green}[IC]{default} Wait for the normal SI wave before spawning."
+		"vi"		"{green}[IC]{default} Hãy chờ đợt SI thường trước khi spawn."
 	}
 	"InfectedControl_TraitorSpawnAllowed"
 	{
-		"vi"		"{green}[IC]{default} You may now spawn using normal ghost rules."
+		"vi"		"{green}[IC]{default} Bạn có thể spawn theo luật ghost thông thường."
 	}
 	"InfectedControl_TraitorReghostBlocked"
 	{
-		"vi"		"{green}[IC]{default} Sau khi xuất hiện, nội gián phải chiến đấu cho đến khi chết. Không thể rời xa người sống sót để trở lại trạng thái ma và xuất hiện lại."
+		"vi"		"{green}[IC]{default} Sau khi xuất hiện, nội gián phải chiến đấu cho đến khi chết. Không thể rời xa người sống sót để trở lại trạng thái ghost và xuất hiện lại."
 	}
 	"InfectedControl_TraitorNoSlot"
 	{
-		"vi"		"{green}[IC]{default} No traitor slot is available."
+		"vi"		"{green}[IC]{default} Không còn slot nội gián."
 	}
 	"InfectedControl_TraitorNotQueued"
 	{
-		"vi"		"{green}[IC]{default} You are not queued as a traitor."
+		"vi"		"{green}[IC]{default} Bạn chưa đăng ký nội gián."
 	}
 	"InfectedControl_TraitorCancelled"
 	{
-		"vi"		"{green}[IC]{default} Traitor queue cancelled."
+		"vi"		"{green}[IC]{default} Đã hủy đăng ký nội gián."
 	}
 	"InfectedControl_TraitorCancelledJoinedSurvivor"
 	{
@@ -246,15 +246,15 @@
 	}
 	"InfectedControl_TraitorTankTookSlot"
 	{
-		"vi"		"{green}[IC]{default} Tank đã chiếm một ô nội gián dùng chung. AI đã tiếp quản {olive}%s{default} của bạn và hạn ngạch ngày đã dùng được hoàn lại."
+		"vi"		"{green}[IC]{default} Tank đã chiếm một slot nội gián dùng chung. AI đã tiếp quản {olive}%s{default} của bạn và hạn ngạch ngày đã dùng được hoàn lại."
 	}
 	"InfectedControl_TraitorTankCancelledSlot"
 	{
-		"vi"		"{green}[IC]{default} Tank đã chiếm một ô nội gián dùng chung. Đăng ký {olive}%s{default} chưa xuất hiện của bạn đã bị hủy và không trừ hạn ngạch ngày."
+		"vi"		"{green}[IC]{default} Tank đã chiếm một slot nội gián dùng chung. Đăng ký {olive}%s{default} chưa xuất hiện của bạn đã bị hủy và không trừ hạn ngạch ngày."
 	}
 	"InfectedControl_TraitorSpawned"
 	{
-		"vi"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
+		"vi"		"{green}[IC]{default} Bạn đã spawn thành nội gián {olive}%s{default}."
 	}
 	"InfectedControl_TraitorFailed"
 	{
@@ -291,43 +291,43 @@
 
 	"InfectedControl_TraitorWaveStatusReserved"
 	{
-		"vi"		"{green}[IC]{default} Traitor reserved slots: %d"
+		"vi"		"{green}[IC]{default} Slot nội gián đã giữ: %d"
 	}
 	"InfectedControl_NavCacheRebuildStarted"
 	{
-		"vi"		"[IC] Dang xay dung lai do thi Nav va bo nho dem tien do tung khu vuc."
+		"vi"		"[IC] Đang dựng lại đồ thị Nav và cache tiến độ từng khu vực."
 	}
 	"InfectedControl_WaveStatusNotStarted"
 	{
-		"vi"		"[IC] He thong sinh quai chua khoi dong."
+		"vi"		"[IC] Hệ thống spawn chưa khởi động."
 	}
 	"InfectedControl_WaveStatusState"
 	{
-		"vi"		"[IC] Trang thai bo quyet dinh dot: %s"
+		"vi"		"[IC] Trạng thái bộ quyết định đợt: %s"
 	}
 	"InfectedControl_WaveStatusWaveIndex"
 	{
-		"vi"		"  So thu tu dot: %d"
+		"vi"		"  Số thứ tự đợt: %d"
 	}
 	"InfectedControl_WaveStatusElapsed"
 	{
-		"vi"		"  Thoi gian troi qua: %.1f giay"
+		"vi"		"  Thời gian đã qua: %.1f giây"
 	}
 	"InfectedControl_WaveStatusSiCount"
 	{
-		"vi"		"  Quai dac biet: %d/%d"
+		"vi"		"  SI: %d/%d"
 	}
 	"InfectedControl_WaveStatusAntiBaitHold"
 	{
-		"vi"		"  Anti-Bait: dang giu"
+		"vi"		"  Anti-Bait: đang giữ đợt"
 	}
 	"InfectedControl_WaveStatusAntiBaitRelease"
 	{
-		"vi"		"  Anti-Bait: tha"
+		"vi"		"  Anti-Bait: đã thả đợt"
 	}
 	"InfectedControl_NavDebugNotCompiled"
 	{
-		"vi"		"[IC] Lenh go loi Nav chua duoc bien dich; khi can hay bien dich lai voi DEBUG_NAV."
+		"vi"		"[IC] Lệnh gỡ lỗi Nav chưa được biên dịch; khi cần hãy biên dịch lại với DEBUG_NAV."
 	}
 
 }

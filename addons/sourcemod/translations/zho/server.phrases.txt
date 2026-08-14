@@ -42,10 +42,18 @@
 	}
 	"Server_PromptsAlreadyBlackWhiteGive"
 	{
-		"zho"		"[{olive}提示{default}] {green}%N{default} 已經 {olive}黑白{default}，請優先保護並治療！"
+		"zho"		"[{olive}提示{default}] {green}%N{default} 已經 {olive}黑白{default}（再倒地即死），請優先保護並治療！"
 	}
 	"Server_PromptBlackWhiteTreatSoon"
 	{
-		"zho"		"[{olive}提示{default}] 你現在 {green}黑白{default}，請儘快治療！"
+		"zho"		"[{olive}提示{default}] 你現在 {green}黑白{default}（再倒地即死），請儘快治療！"
+	}
+	"Server_PromptBlackWhiteHintOther"
+	{
+		"zho"		"%N 已經黑白（再倒地即死）！"
+	}
+	"Server_PromptBlackWhiteHintSelf"
+	{
+		"zho"		"你現在黑白（再倒地即死）！"
 	}
 }

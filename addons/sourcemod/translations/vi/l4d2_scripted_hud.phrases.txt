@@ -127,7 +127,7 @@
 		}
 		"L4D2ScriptedHUD_SurvHeader"
 		{
-			"vi"		"Người chơi [Thuốc][Gục]"
+			"vi"		"Người chơi [Thuốc][Hồi sinh]"
 		}
 		"L4D2ScriptedHUD_PillsYes"
 		{

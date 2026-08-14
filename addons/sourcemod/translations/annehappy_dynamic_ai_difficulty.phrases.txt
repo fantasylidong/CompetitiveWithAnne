@@ -10,11 +10,11 @@
 	}
 	"DynamicAIDifficulty_SwitchedAutomaticDifficultyTakeEffect"
 	{
-		"en"		"{green}[AnneHappyAI]{default} has been switched to automatic difficulty, which will take effect from the next round; the difficulty of the current round remains unchanged."
+		"en"		"{green}[AnneHappyAI]{default} Switched to automatic difficulty. It takes effect next round; this round stays unchanged."
 	}
 	"DynamicAIDifficulty_SwitchedAutomaticDifficulty"
 	{
-		"en"		"{green}[AnneHappyAI]{default} has been switched to automatic difficulty."
+		"en"		"{green}[AnneHappyAI]{default} Switched to automatic difficulty."
 	}
 	"DynamicAIDifficulty_DifficultyNextRoundFixedDifficulty"
 	{
@@ -26,7 +26,7 @@
 	}
 	"DynamicAIDifficulty_L4DStatsAveragePersonalPPM"
 	{
-		"en"		"{green}[AnneHappyAI]{default} l4d_stats Average personal PPM %.2f, %d person points %d / %d minutes (%d people in the quarter/%d people in the overall rankings), and the dynamic difficulty is adjusted to {lightgreen}%s{default}."
+		"en"		"{green}[AnneHappyAI]{default} l4d_stats average personal PPM %.2f, %d players, %d points / %d minutes (%d quarterly / %d overall fallback), dynamic difficulty set to {lightgreen}%s{default}."
 	}
 	"DynamicAIDifficulty_LevelUnset"
 	{

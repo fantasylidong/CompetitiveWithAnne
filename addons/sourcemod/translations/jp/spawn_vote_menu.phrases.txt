@@ -1,0 +1,123 @@
+"Phrases"
+{
+	"SpawnVote_SpectatorsNotAllowed"
+	{
+		"jp"		"[{blue}スポーン投票{default}] 観戦者はスポーン投票を開始できません。"
+	}
+	"SpawnVote_AlreadyVoteProgress"
+	{
+		"jp"		"[{blue}スポーン投票{default}] すでに投票が進行中です。"
+	}
+	"SpawnVote_NoSpawnController"
+	{
+		"jp"		"[{blue}スポーン投票{default}] 現在のモードでは対応するスポーン制御プラグインがありません。"
+	}
+	"SpawnVote_MenuBackendUnavailable"
+	{
+		"jp"		"[{blue}スポーン投票{default}] 今はスポーンメニューを表示できません。"
+	}
+	"SpawnVote_CampaignStatus"
+	{
+		"jp"		"[{blue}スポーン投票{default}] このメニューはキャンペーン dirspawn を制御します。"
+	}
+	"SpawnVote_AnneStatus"
+	{
+		"jp"		"[{blue}スポーン投票{default}] このメニューは Anne infected_control を制御します。"
+	}
+	"SpawnVote_MenuClosed"
+	{
+		"jp"		"[{blue}スポーン投票{default}] スポーン投票メニューを閉じました。"
+	}
+	"SpawnVote_InitiatedVote"
+	{
+		"jp"		"[{blue}スポーン投票{default}] %N がスポーン設定の投票を開始しました。"
+	}
+	"SpawnVote_AppliedByRequester"
+	{
+		"jp"		"[{blue}スポーン投票{default}] %N のスポーン設定投票が可決されました。"
+	}
+	"SpawnVote_Applied"
+	{
+		"jp"		"[{blue}スポーン投票{default}] スポーン設定投票が可決されました。"
+	}
+	"SpawnVote_CampaignVoteTitle"
+	{
+		"jp"		"キャンペーンスポーンを適用: %d SI/%d 秒?"
+	}
+	"SpawnVote_CampaignVoteTitleRelax"
+	{
+		"jp"		"キャンペーンスポーンを適用: %d SI/%d 秒、Relax %s?"
+	}
+	"SpawnVote_AnneVoteTitle"
+	{
+		"jp"		"Anne スポーンを適用: %d SI/%d 秒?"
+	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"jp"		"Anne スポーンを適用: %d SI/%d 秒、トレイター %s?"
+	}
+	"SpawnVote_RelaxOn"
+	{
+		"jp"		"オン"
+	}
+	"SpawnVote_RelaxOff"
+	{
+		"jp"		"オフ"
+	}
+	"SpawnVote_AppliedVoteTitle"
+	{
+		"jp"		"スポーン設定を適用しました"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"jp"		"変更を適用: %s?"
+	}
+	"SpawnVote_ModeCampaign"
+	{
+		"jp"		"キャンペーン"
+	}
+	"SpawnVote_ModeAnne"
+	{
+		"jp"		"Anne"
+	}
+	"SpawnVote_ModeUnknown"
+	{
+		"jp"		"現在"
+	}
+	"SpawnVote_PresetDbUnavailable"
+	{
+		"jp"		"[{blue}スポーン投票{default}] プリセットデータベースを利用できません。"
+	}
+	"SpawnVote_PresetNameRequired"
+	{
+		"jp"		"[{blue}スポーン投票{default}] 使い方: sm_spawnpreset_save <名前> または sm_spawnpreset_delete <名前>。"
+	}
+	"SpawnVote_PresetSaved"
+	{
+		"jp"		"[{blue}スポーン投票{default}] プリセットを保存しました: %s"
+	}
+	"SpawnVote_PresetDeleted"
+	{
+		"jp"		"[{blue}スポーン投票{default}] プリセットを削除しました: %s"
+	}
+	"SpawnVote_PresetListHeader"
+	{
+		"jp"		"[{blue}スポーン投票{default}] %s モードのプリセット:"
+	}
+	"SpawnVote_PresetListItem"
+	{
+		"jp"		"[{blue}スポーン投票{default}] - %s"
+	}
+	"SpawnVote_PresetListEmpty"
+	{
+		"jp"		"[{blue}スポーン投票{default}] このモードに保存済みプリセットはありません。"
+	}
+	"SpawnVote_PresetVoteTitle"
+	{
+		"jp"		"プリセットを適用: %s?"
+	}
+	"SpawnVote_PresetVoteTitleRelax"
+	{
+		"jp"		"プリセットを適用: %s、Relax %s?"
+	}
+}

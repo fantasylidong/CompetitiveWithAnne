@@ -18,11 +18,11 @@
 	}
 	"Text_TankBhopOn"
 	{
-		"jp"		"{lightgreen}Tank連跳{olive}[{green}オン{olive}]"
+		"jp"		"{lightgreen}Tank連続ジャンプ{olive}[{green}オン{olive}]"
 	}
 	"Text_TankBhopOff"
 	{
-		"jp"		"{lightgreen}Tank連跳{olive}[{green}オフ{olive}]"
+		"jp"		"{lightgreen}Tank連続ジャンプ{olive}[{green}オフ{olive}]"
 	}
 	"Text_Weapon"
 	{
@@ -54,7 +54,7 @@
 	}
 	"Text_AiLevelExpert"
 	{
-		"jp"		"専門家"
+		"jp"		"エキスパート"
 	}
 	"Text_AiLevelExtreme"
 	{
@@ -90,11 +90,11 @@
 	}
 	"Text_ReturnBloodOn"
 	{
-		"jp"		"{lightgreen}回復{olive}[{green}オン{olive}]"
+		"jp"		"{lightgreen}HP回復{olive}[{green}オン{olive}]"
 	}
 	"Text_TankConsumeOn"
 	{
-		"jp"		"{lightgreen}Tank消耗{olive}[{green}オン{olive}]"
+		"jp"		"{lightgreen}Tank停滞{olive}[{green}オン{olive}]"
 	}
 	"Text_SneakyTankOn"
 	{

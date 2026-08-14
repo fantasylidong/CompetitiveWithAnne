@@ -127,7 +127,7 @@
 		}
 		"L4D2ScriptedHUD_SurvHeader"
 		{
-			"chi"		"玩家状态[药][倒地]"
+			"chi"		"玩家状态[药][倒地次数]"
 		}
 		"L4D2ScriptedHUD_PillsYes"
 		{

@@ -1,0 +1,123 @@
+"Phrases"
+{
+	"SpawnVote_SpectatorsNotAllowed"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Khán giả không thể bắt đầu vote spawn."
+	}
+	"SpawnVote_AlreadyVoteProgress"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Đã có một cuộc vote đang diễn ra."
+	}
+	"SpawnVote_NoSpawnController"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Chế độ hiện tại không có plugin điều khiển spawn."
+	}
+	"SpawnVote_MenuBackendUnavailable"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Hiện không thể hiện menu spawn."
+	}
+	"SpawnVote_CampaignStatus"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Menu này điều khiển dirspawn chiến dịch."
+	}
+	"SpawnVote_AnneStatus"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Menu này điều khiển Anne infected_control."
+	}
+	"SpawnVote_MenuClosed"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Đã đóng menu vote spawn."
+	}
+	"SpawnVote_InitiatedVote"
+	{
+		"vi"		"[{blue}Vote spawn{default}] %N đã bắt đầu vote cài đặt spawn."
+	}
+	"SpawnVote_AppliedByRequester"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Vote cài đặt spawn của %N đã thông qua."
+	}
+	"SpawnVote_Applied"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Vote cài đặt spawn đã thông qua."
+	}
+	"SpawnVote_CampaignVoteTitle"
+	{
+		"vi"		"Áp dụng spawn chiến dịch: %d SI/%d giây?"
+	}
+	"SpawnVote_CampaignVoteTitleRelax"
+	{
+		"vi"		"Áp dụng spawn chiến dịch: %d SI/%d giây, Relax %s?"
+	}
+	"SpawnVote_AnneVoteTitle"
+	{
+		"vi"		"Áp dụng spawn Anne: %d SI/%d giây?"
+	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"vi"		"Áp dụng spawn Anne: %d SI/%d giây, nội gián %s?"
+	}
+	"SpawnVote_RelaxOn"
+	{
+		"vi"		"bật"
+	}
+	"SpawnVote_RelaxOff"
+	{
+		"vi"		"tắt"
+	}
+	"SpawnVote_AppliedVoteTitle"
+	{
+		"vi"		"Đã áp dụng cài đặt spawn"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"vi"		"Áp dụng thay đổi: %s?"
+	}
+	"SpawnVote_ModeCampaign"
+	{
+		"vi"		"chiến dịch"
+	}
+	"SpawnVote_ModeAnne"
+	{
+		"vi"		"Anne"
+	}
+	"SpawnVote_ModeUnknown"
+	{
+		"vi"		"hiện tại"
+	}
+	"SpawnVote_PresetDbUnavailable"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Cơ sở dữ liệu preset không khả dụng."
+	}
+	"SpawnVote_PresetNameRequired"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Cách dùng: sm_spawnpreset_save <tên> hoặc sm_spawnpreset_delete <tên>."
+	}
+	"SpawnVote_PresetSaved"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Đã lưu preset: %s"
+	}
+	"SpawnVote_PresetDeleted"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Đã xóa preset: %s"
+	}
+	"SpawnVote_PresetListHeader"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Preset của chế độ %s:"
+	}
+	"SpawnVote_PresetListItem"
+	{
+		"vi"		"[{blue}Vote spawn{default}] - %s"
+	}
+	"SpawnVote_PresetListEmpty"
+	{
+		"vi"		"[{blue}Vote spawn{default}] Chế độ này chưa có preset."
+	}
+	"SpawnVote_PresetVoteTitle"
+	{
+		"vi"		"Áp dụng preset: %s?"
+	}
+	"SpawnVote_PresetVoteTitleRelax"
+	{
+		"vi"		"Áp dụng preset: %s, Relax %s?"
+	}
+}

@@ -1,0 +1,123 @@
+"Phrases"
+{
+	"SpawnVote_SpectatorsNotAllowed"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 관전자는 스폰 투표를 시작할 수 없습니다."
+	}
+	"SpawnVote_AlreadyVoteProgress"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 이미 진행 중인 투표가 있습니다."
+	}
+	"SpawnVote_NoSpawnController"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 현재 모드에서 사용할 수 있는 스폰 제어 플러그인이 없습니다."
+	}
+	"SpawnVote_MenuBackendUnavailable"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 지금은 스폰 메뉴를 표시할 수 없습니다."
+	}
+	"SpawnVote_CampaignStatus"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 이 메뉴는 캠페인 dirspawn을 제어합니다."
+	}
+	"SpawnVote_AnneStatus"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 이 메뉴는 Anne infected_control을 제어합니다."
+	}
+	"SpawnVote_MenuClosed"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 스폰 투표 메뉴를 닫았습니다."
+	}
+	"SpawnVote_InitiatedVote"
+	{
+		"ko"		"[{blue}스폰 투표{default}] %N 님이 스폰 설정 투표를 시작했습니다."
+	}
+	"SpawnVote_AppliedByRequester"
+	{
+		"ko"		"[{blue}스폰 투표{default}] %N 님의 스폰 설정 투표가 통과되었습니다."
+	}
+	"SpawnVote_Applied"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 스폰 설정 투표가 통과되었습니다."
+	}
+	"SpawnVote_CampaignVoteTitle"
+	{
+		"ko"		"캠페인 스폰 적용: %d특/%d초?"
+	}
+	"SpawnVote_CampaignVoteTitleRelax"
+	{
+		"ko"		"캠페인 스폰 적용: %d특/%d초, Relax %s?"
+	}
+	"SpawnVote_AnneVoteTitle"
+	{
+		"ko"		"Anne 스폰 적용: %d특/%d초?"
+	}
+	"SpawnVote_AnneVoteTitleTraitor"
+	{
+		"ko"		"Anne 스폰 적용: %d특/%d초, 트레이터 %s?"
+	}
+	"SpawnVote_RelaxOn"
+	{
+		"ko"		"켜짐"
+	}
+	"SpawnVote_RelaxOff"
+	{
+		"ko"		"꺼짐"
+	}
+	"SpawnVote_AppliedVoteTitle"
+	{
+		"ko"		"스폰 설정을 적용했습니다"
+	}
+	"SpawnVote_ChangeVoteTitle"
+	{
+		"ko"		"변경 적용: %s?"
+	}
+	"SpawnVote_ModeCampaign"
+	{
+		"ko"		"캠페인"
+	}
+	"SpawnVote_ModeAnne"
+	{
+		"ko"		"Anne"
+	}
+	"SpawnVote_ModeUnknown"
+	{
+		"ko"		"현재"
+	}
+	"SpawnVote_PresetDbUnavailable"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 프리셋 데이터베이스를 사용할 수 없습니다."
+	}
+	"SpawnVote_PresetNameRequired"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 사용법: sm_spawnpreset_save <이름> 또는 sm_spawnpreset_delete <이름>."
+	}
+	"SpawnVote_PresetSaved"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 프리셋을 저장했습니다: %s"
+	}
+	"SpawnVote_PresetDeleted"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 프리셋을 삭제했습니다: %s"
+	}
+	"SpawnVote_PresetListHeader"
+	{
+		"ko"		"[{blue}스폰 투표{default}] %s 모드 프리셋:"
+	}
+	"SpawnVote_PresetListItem"
+	{
+		"ko"		"[{blue}스폰 투표{default}] - %s"
+	}
+	"SpawnVote_PresetListEmpty"
+	{
+		"ko"		"[{blue}스폰 투표{default}] 이 모드에 저장된 프리셋이 없습니다."
+	}
+	"SpawnVote_PresetVoteTitle"
+	{
+		"ko"		"프리셋 적용: %s?"
+	}
+	"SpawnVote_PresetVoteTitleRelax"
+	{
+		"ko"		"프리셋 적용: %s, Relax %s?"
+	}
+}

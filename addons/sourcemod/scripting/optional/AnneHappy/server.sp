@@ -64,7 +64,7 @@ public Plugin myinfo =
     name        = "AnneServer Server Function (quiet minimal)",
     author      = "def075, Caibiii, 东, simplified by ChatGPT",
     description = "Helpers + BeQuiet-style suppressors only (server_cvar / namechange / spec chat)",
-    version     = "2025.10.20",
+    version     = "2026.08.14",
     url         = "https://github.com/Caibiii/AnneServer"
 };
 
@@ -859,13 +859,19 @@ void AnnounceBW(int client)
     {
         CPrintToChatAll("%t", "Server_PromptsAlreadyBlackWhiteGive", client);
         for (int i = 1; i <= MaxClients; i++)
+        {
             if (IsValidClient(i) && GetClientTeam(i) == 2)
-                PrintHintText(i, "%N 已经黑白（再次倒地会直接死亡）！", client);
+            {
+                SetGlobalTransTarget(i);
+                PrintHintText(i, "%t", "Server_PromptBlackWhiteHintOther", client);
+            }
+        }
     }
     else
     {
         CPrintToChat(client, "%t", "Server_PromptBlackWhiteTreatSoon");
-        PrintHintText(client, "你现在黑白（再次倒地会直接死亡）！");
+        SetGlobalTransTarget(client);
+        PrintHintText(client, "%t", "Server_PromptBlackWhiteHintSelf");
     }
 
     if (g_bwSound[0] != ' ')

@@ -23,7 +23,7 @@
 	}
 	"PoppedBot"
 	{
-		"zho"		"{olive}%N{default} 悄無聲息解決了一隻 boomer."
+		"zho"		"{olive}%N{default} 悄無聲息解決了一隻胖子."
 	}
 	"Leveled"
 	{
@@ -32,7 +32,7 @@
 	}
 	"LeveledBot"
 	{
-		"zho"		"{olive}%N{default} 使用 {blue}近戰滿血秒殺{default}{olive} 一隻 charger{default}"
+		"zho"		"{olive}%N{default} 使用 {blue}近戰滿血秒殺{default}{olive} 一隻牛{default}"
 	}
 	"LeveledHurt"
 	{
@@ -51,16 +51,16 @@
 	}
 	"DeadstoppedBot"
 	{
-		"zho"		"{olive}%N{default} {blue}推停了{default} {olive}一隻 hunter{default}"
+		"zho"		"{olive}%N{default} {blue}推停了{default} {olive}一隻獵人{default}"
 	}
 	"Shoved"
 	{
 		"#format"	"{1:N},{2:N}"
-		"zho"		"{olive}{1}{default} {blue}推到了{default} {olive}{2}{default}."
+		"zho"		"{olive}{1}{default} {blue}推開了{default} {olive}{2}{default}."
 	}
 	"ShovedBot"
 	{
-		"zho"		"{olive}%N{default} {blue}推到了{default} 一個 {olive}特感{default}."
+		"zho"		"{olive}%N{default} {blue}推開了{default} 一個 {olive}特感{default}."
 	}
 	"TeamSkeeted"
 	{
@@ -68,7 +68,7 @@
 	}
 	"TeamSkeetedBot"
 	{
-		"zho"		"{olive}Hunter{default} 被 {blue}團隊空爆{default}."
+		"zho"		"{olive}獵人{default} 被 {blue}團隊空爆{default}."
 	}
 	"Skeeted"
 	{
@@ -78,7 +78,7 @@
 	"SkeetedBot"
 	{
 		"#format"		"{1:N},{2:t}"
-		"zho"		"{olive}{1}{default} {blue}{2}空爆{default} 了 {olive}一隻hunter{default}."
+		"zho"		"{olive}{1}{default} {blue}{2}空爆{default} 了 {olive}一隻獵人{default}."
 	}
 	"Melee"
 	{
@@ -100,11 +100,11 @@
 	"HurtSkeetBot"
 	{
 		"#format"		"{1:i},{2:t}"
-		"zho"		"{olive}Hunter{default} 被 {green}殘血空爆{default} ({blue}{1}{default} 傷害).{2}"
+		"zho"		"{olive}獵人{default} 被 {green}殘血空爆{default} ({blue}{1}{default} 傷害).{2}"
 	}
 	"Unchipped"
 	{
-		"zho"		"(如果hunter在空中被擊殺，就是空爆!)"
+		"zho"		"(如果獵人在空中被擊殺，就是空爆!)"
 	}
 	"CrownedWitch"
 	{
@@ -123,7 +123,7 @@
 	"DrawCrowned2"
 	{
 		"#format"	"{1:i},{2:i}"
-		"zho"		"Witch 被引秒 ({blue}{1}{default} 傷害, {olive}{2}{default} 引秒傷害)."
+		"zho"		"女巫被引秒 ({blue}{1}{default} 傷害, {olive}{2}{default} 引秒傷害)."
 	}
 	"CutTongue"
 	{
@@ -132,7 +132,7 @@
 	}
 	"CutTongueBot"
 	{
-		"zho"		"{olive}%N{default} {blue}砍斷{default} smoker 的舌頭"
+		"zho"		"{olive}%N{default} {blue}砍斷{default}了一隻舌頭"
 	}
 	"SelfClearedTongue"
 	{
@@ -142,7 +142,7 @@
 	"SelfClearedTongueBot"
 	{
 		"#format"		"{1:N},{2:t}"
-		"zho"		"{olive}{1}{default} 從 {olive}smoker{default}的舌頭下 {blue}{2}{default} {blue}自救{default} "
+		"zho"		"{olive}{1}{default} 從 {olive}舌頭{default}控制下 {blue}{2}{default} {blue}自救{default} "
 	}
 	"Shoving"
 	{
@@ -155,7 +155,7 @@
 	}
 	"SkeetedRockBot"
 	{
-		"zho"		"{olive}%N{default} {blue}空爆{default} 了 tank 石頭"
+		"zho"		"{olive}%N{default} {blue}空爆{default} 了坦克的石頭"
 	}
 	"HunterHP"
 	{
@@ -165,7 +165,7 @@
 	"HunterHPBot"
 	{
 		"#format"	"{1:N},{2:i},{3:i}"
-		"zho"		"{olive}Hunter{default} {red}高撲{default} {olive}{1}{default} ({red}{2}{default} 傷害, 高度: {red}{3}{default})"
+		"zho"		"{olive}獵人{default} {red}高撲{default} {olive}{1}{default} ({red}{2}{default} 傷害, 高度: {red}{3}{default})"
 	}
 	"JockeyHP"
 	{
@@ -175,7 +175,7 @@
 	"JockeyHPBot"
 	{
 		"#format"	"{1:N},{2:i}"
-		"zho"		"{olive}Jockey{default} {red}高處掉下騎了{default} {olive}{1}{default} ({red}高度{default}: {red}{2}{default})"
+		"zho"		"{olive}猴子{default} {red}高處掉下騎了{default} {olive}{1}{default} ({red}高度{default}: {red}{2}{default})"
 	}
 	"DeathCharged"
 	{
@@ -185,7 +185,7 @@
 	"DeathChargedBot"
 	{
 		"#format"		"{1:N},{2:t},{3:i}"
-		"zho"		"{olive}Charger{default} {red}衝鋒{default} 造成 {olive}{1}{default} 死亡({2})({red}高度{default}: {red}{3}{default})"
+		"zho"		"{olive}牛{default} {red}衝鋒{default} 造成 {olive}{1}{default} 死亡({2})({red}高度{default}: {red}{3}{default})"
 	}
 	"Bowling"
 	{
@@ -235,19 +235,19 @@
 	}
 	"CalarmTouchedHunter"
 	{
-		"zho"		"{olive}Hunter{default} 讓 {olive}%N{default} 觸發警報."
+		"zho"		"{olive}獵人{default} 讓 {olive}%N{default} 觸發警報."
 	}
 	"CalarmTouchedJockey"
 	{
-		"zho"		"{olive}Jockey{default} 讓 {olive}%N{default} 觸發警報."
+		"zho"		"{olive}猴子{default} 讓 {olive}%N{default} 觸發警報."
 	}
 	"CalarmTouchedCharger"
 	{
-		"zho"		"{olive}Charger{default} 讓 {olive}%N{default} 觸發警報."
+		"zho"		"{olive}牛{default} 讓 {olive}%N{default} 觸發警報."
 	}
 	"CalarmTouchedInfected"
 	{
-		"zho"		"{olive}Bot infected{default} 讓 {olive}%N{default} 觸發警報."
+		"zho"		"{olive}特感機器人{default} 讓 {olive}%N{default} 觸發警報."
 	}
 	"CalarmTouchedBot"
 	{
@@ -260,11 +260,11 @@
 	"CalarmBoomer"
 	{
 		"#format"	"{1:N},{2:N}"
-		"zho"		"{olive}{1}{default} 殺了一隻 boomer {olive}{2}{default} 觸發了一輛警報車."
+		"zho"		"{olive}{1}{default} 殺了一隻胖子 {olive}{2}{default} 觸發了一輛警報車."
 	}
 	"CalarmBoomerBot"
 	{
-		"zho"		"{olive}%N{default} 殺了一隻 {olive}boomer{default}觸發了一輛警報車."
+		"zho"		"{olive}%N{default} 殺了一隻 {olive}胖子{default}觸發了一輛警報車."
 	}
 	"Calarm"
 	{

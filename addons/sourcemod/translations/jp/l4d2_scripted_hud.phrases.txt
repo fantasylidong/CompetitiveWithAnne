@@ -127,7 +127,7 @@
 		}
 		"L4D2ScriptedHUD_SurvHeader"
 		{
-			"jp"		"生存者状態[薬][蘇生]"
+			"jp"		"生存者状態[薬][蘇生回数]"
 		}
 		"L4D2ScriptedHUD_PillsYes"
 		{

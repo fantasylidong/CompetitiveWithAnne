@@ -2,7 +2,7 @@
 {
 	"InfectedControl_ICFailedObtainCrosshairHit"
 	{
-		"jp"		"{green}[IC]{default} は十字線のヒット ポイントを取得できませんでした。"
+		"jp"		"{green}[IC]{default} 十字線のヒット位置を取得できませんでした。"
 	}
 	"InfectedControl_ICNoNavAreaNearby"
 	{
@@ -10,35 +10,35 @@
 	}
 	"InfectedControl_ICNavidBucketCalculationReturn"
 	{
-		"jp"		"{green}[IC]{default} ナビッド=%d バケット=%d(計算) / %d(リターン) フラグ=%s"
+		"jp"		"{green}[IC]{default} navid=%d バケット=%d(計算) / %d(戻り) フラグ=%s"
 	}
 	"InfectedControl_ICNavidBucketReturnFlag"
 	{
-		"jp"		"{green}[IC]{default} ナビッド=%d バケット=N/A / %d(リターン) フラグ=%s"
+		"jp"		"{green}[IC]{default} navid=%d バケット=N/A / %d(戻り) フラグ=%s"
 	}
 	"InfectedControl_ICNavCanGenerateTotal"
 	{
-		"jp"		"{green}[IC]{default} ナビ %d {olive} は {default} を生成できます |合計スコア: {lightgreen}%.1f{default} |詳細についてはコンソールを参照してください"
+		"jp"		"{green}[IC]{default} Nav %d {olive}生成可能{default} | 合計スコア: {lightgreen}%.1f{default} | 詳細はコンソールを確認"
 	}
 	"InfectedControl_ICNavCannotGenerateSee"
 	{
-		"jp"		"{green}[IC]{default} ナビ %d {lightgreen} は {default} を生成できません |詳細についてはコンソールを参照してください"
+		"jp"		"{green}[IC]{default} Nav %d {lightgreen}生成不可{default} | 詳細はコンソールを確認"
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"jp"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
+		"jp"		"{green}[IC]{default} 使い方: !it でトレイター種類メニューを開く。!it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] で直接登録。"
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
-		"jp"		"Select traitor class"
+		"jp"		"トレイターの種類を選択"
 	}
 	"InfectedControl_TraitorMenuRandom"
 	{
-		"jp"		"Random enabled class"
+		"jp"		"有効な種類からランダム"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{
-		"jp"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
+		"jp"		"{green}[IC]{default} このラウンドのトレイター登録回数を使い切りました（%d）。"
 	}
 	"InfectedControl_TraitorClassLimitReached"
 	{
@@ -50,7 +50,7 @@
 	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
-		"jp"		"{green}[IC]{default} Traitor quota database is unavailable."
+		"jp"		"{green}[IC]{default} トレイター回数データベースを利用できません。"
 	}
 	"InfectedControl_TraitorPublicStatsUnavailable"
 	{
@@ -58,31 +58,31 @@
 	}
 	"InfectedControl_TraitorPublicScoreRequired"
 	{
-		"jp"		"{green}[IC]{default} 一般プレイヤーが内鬼に登録するには {olive}%d{default} ポイント以上必要です。現在は {olive}%d{default} ポイントです。"
+		"jp"		"{green}[IC]{default} 一般プレイヤーがトレイターに登録するには {olive}%d{default} ポイント以上必要です。現在は {olive}%d{default} ポイントです。"
 	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
-		"jp"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."
+		"jp"		"{green}[IC]{default} 本日のトレイター回数を使い切りました（{olive}%d{default}/{olive}%d{default}）。明日リセットされます。"
 	}
 	"InfectedControl_TraitorRootCvarOnly"
 	{
-		"jp"		"{green}[IC]{default} Only root admins may change {olive}%s{default}."
+		"jp"		"{green}[IC]{default} {olive}%s{default} を変更できるのは root 管理者だけです。"
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"jp"		"{green}[IC]{default} 次の特殊感染者ウェーブが解放されるまでに生存者へのダメージまたは有効な攻撃が記録されなかったため、内鬼の役割を解除しAIがこのSIを引き継ぎます。"
+		"jp"		"{green}[IC]{default} 次の特殊感染者ウェーブが解放されるまでに生存者へのダメージまたは有効な攻撃が記録されなかったため、トレイターの役割を解除し AI がこの SI を引き継ぎます。"
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"jp"		"{green}[IC]{default} 次の%d回の特殊感染者ウェーブでは内鬼になれません。"
+		"jp"		"{green}[IC]{default} 次の %d 回の特殊感染者ウェーブではトレイターになれません。"
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
-		"jp"		"{green}[IC]{default} 今回の内鬼で生存者に{olive}%d{default}ダメージを与えました。"
+		"jp"		"{green}[IC]{default} 今回のトレイターで生存者に {olive}%d{default} ダメージを与えました。"
 	}
 	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"jp"		"{green}[IC]{default} 前回の内鬼でダメージを与えなかったため、あと%d回の特殊感染者ウェーブが終わるまで内鬼になれません。"
+		"jp"		"{green}[IC]{default} 前回のトレイターでダメージを与えなかったため、あと %d 回の特殊感染者ウェーブが終わるまでトレイターになれません。"
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -90,87 +90,87 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"jp"		"{green}[IC]{default} できなければ役割を解除してAIが引き継ぎ、次の%d回の特殊感染者ウェーブでは内鬼になれません。"
+		"jp"		"{green}[IC]{default} できなければ役割を解除して AI が引き継ぎ、次の %d 回の特殊感染者ウェーブではトレイターになれません。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"jp"		"{green}[IC]{default} Tank警告：内鬼Tankは生存者に少なくとも{olive}%d{default}ダメージを与えてください。"
+		"jp"		"{green}[IC]{default} Tank 警告：トレイター Tank は生存者に少なくとも {olive}%d{default} ダメージを与えてください。"
 	}
 	"InfectedControl_TraitorPenaltyTankDamageBlock"
 	{
-		"jp"		"{green}[IC]{default} できなければTank内鬼は{olive}%d{default}日間無効です。"
+		"jp"		"{green}[IC]{default} できなければ Tank トレイターは {olive}%d{default} 日間無効です。"
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
-		"jp"		"{green}[IC]{default} Your Tank traitor is blocked for about {olive}%d{default} more minutes."
+		"jp"		"{green}[IC]{default} Tank トレイターはあと約 {olive}%d{default} 分ブロックされています。"
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"jp"		"{green}[IC]{default} 今回の内鬼Tankは生存者に{olive}%d{default}/{olive}%d{default}ダメージを与えました。"
+		"jp"		"{green}[IC]{default} 今回のトレイター Tank は生存者に {olive}%d{default}/{olive}%d{default} ダメージを与えました。"
 	}
 	"InfectedControl_TraitorTankBlockApplied"
 	{
-		"jp"		"{green}[IC]{default} Tank内鬼は{olive}%d{default}日間無効です。"
+		"jp"		"{green}[IC]{default} Tank トレイターは {olive}%d{default} 日間無効です。"
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{
-		"jp"		"{green}[IC]{default} Next wave traitor: {olive}%s{default} registered as {olive}%s{default}."
+		"jp"		"{green}[IC]{default} 次ウェーブのトレイター：{olive}%s{default} が {olive}%s{default} で登録しています。"
 	}
 	"InfectedControl_TraitorNextWaveNone"
 	{
-		"jp"		"{green}[IC]{default} No traitor is registered for the next wave."
+		"jp"		"{green}[IC]{default} 次ウェーブに登録されたトレイターはいません。"
 	}
 	"InfectedControl_TraitorBhopEnabled"
 	{
-		"jp"		"{green}[IC]{default} Auto-bhop is enabled for your traitor. Hold SPACE to jump continuously."
+		"jp"		"{green}[IC]{default} トレイターの自動連続ジャンプが有効です。SPACE を押し続けて連続ジャンプできます。"
 	}
 	"InfectedControl_TraitorDisabled"
 	{
-		"jp"		"{green}[IC]{default} Traitor mode is disabled."
+		"jp"		"{green}[IC]{default} トレイターモードは無効です。"
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"jp"		"{green}[IC]{default} 内鬼モードに登録できるのは観戦者または感染者チームのプレイヤーだけです。"
+		"jp"		"{green}[IC]{default} トレイターモードに登録できるのは観戦者または感染者チームのプレイヤーだけです。"
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
-		"jp"		"{green}[IC]{default} Unsupported traitor class."
+		"jp"		"{green}[IC]{default} 未対応のトレイター種類です。"
 	}
 	"InfectedControl_TraitorClassDisabled"
 	{
-		"jp"		"{green}[IC]{default} That infected class is disabled in the current spawn settings."
+		"jp"		"{green}[IC]{default} 現在のスポーン設定では、その特殊感染者は無効です。"
 	}
 	"InfectedControl_TraitorNoEnabledClass"
 	{
-		"jp"		"{green}[IC]{default} No enabled infected class is available for traitor mode."
+		"jp"		"{green}[IC]{default} トレイターに使える有効な特殊感染者がありません。"
 	}
 	"InfectedControl_TraitorWindowClosed"
 	{
-		"jp"		"{green}[IC]{default} Traitor registration is closed for this wave."
+		"jp"		"{green}[IC]{default} このウェーブのトレイター登録は締め切られました。"
 	}
 	"InfectedControl_TraitorAlreadyRegistered"
 	{
-		"jp"		"{green}[IC]{default} すでに内鬼を1種類登録しています。変更する場合は、先に現在の登録を取り消してください。"
+		"jp"		"{green}[IC]{default} すでにトレイターを 1 種類登録しています。変更する場合は、先に現在の登録を取り消してください。"
 	}
 	"InfectedControl_TraitorQueued"
 	{
-		"jp"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
+		"jp"		"{green}[IC]{default} トレイター {olive}%s{default} として登録しました。"
 	}
 	"InfectedControl_TraitorNextQueued"
 	{
-		"jp"		"{green}[IC]{default} 次回の内鬼として {olive}%s{default} を登録しました。現在の特殊感染者が死亡すると待機列に入ります。"
+		"jp"		"{green}[IC]{default} 次回のトレイターとして {olive}%s{default} を登録しました。現在の特殊感染者が死亡すると待機列に入ります。"
 	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"jp"		"{green}[IC]{default} 内鬼 {olive}%s{default} として待機中です（%d番目）。"
+		"jp"		"{green}[IC]{default} トレイター {olive}%s{default} として待機中です（%d番目）。"
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
-		"jp"		"{green}[IC]{default} A traitor slot opened. You are now queued as {olive}%s{default}."
+		"jp"		"{green}[IC]{default} トレイター枠が空きました。{olive}%s{default} として登録されました。"
 	}
 	"InfectedControl_TraitorPending"
 	{
-		"jp"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
+		"jp"		"{green}[IC]{default} ゴースト状態になりました。次の特殊感染者ウェーブ更新を待ってください。"
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
@@ -178,31 +178,31 @@
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
-		"jp"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
+		"jp"		"{green}[IC]{default} AI 特殊感染者は約 {olive}%d{default} 秒後に更新されます。"
 	}
 	"InfectedControl_TraitorWaveMayExtend"
 	{
-		"jp"		"{green}[IC]{default} Find a spawn position now. Survivor holding may delay this wave and your spawn unlock."
+		"jp"		"{green}[IC]{default} 今のうちに出現位置を探してください。生存者の停滞でこのウェーブと出現解除が遅れることがあります。"
 	}
 	"InfectedControl_TraitorReadyCountdown"
 	{
-		"jp"		"Earliest spawn: %d seconds (holding may extend)"
+		"jp"		"最短出現：%d 秒（停滞で延長される場合あり）"
 	}
 	"InfectedControl_TraitorWaveExtended"
 	{
-		"jp"		"{green}[IC]{default} Survivors are holding an advantageous position. Your spawn stays locked until the wave is released."
+		"jp"		"{green}[IC]{default} 生存者が有利な位置で停滞しています。ウェーブが解放されるまで出現できません。"
 	}
 	"InfectedControl_TraitorWaveExtendedHint"
 	{
-		"jp"		"Spawn delayed by survivor holding"
+		"jp"		"生存者の停滞により出現が遅延中"
 	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
-		"jp"		"{green}[IC]{default} The SI refresh point has arrived. You have {olive}%d{default} seconds to spawn yourself."
+		"jp"		"{green}[IC]{default} 特殊感染者の更新時点です。{olive}%d{default} 秒以内に自分で出現してください。"
 	}
 	"InfectedControl_TraitorSpawnCountdown"
 	{
-		"jp"		"Spawn now: %d seconds left"
+		"jp"		"今すぐ出現：残り %d 秒"
 	}
 	"InfectedControl_TraitorTankSpawnWindow"
 	{
@@ -214,51 +214,51 @@
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
-		"jp"		"{green}[IC]{default} You did not spawn in time. An AI special infected will take this slot."
+		"jp"		"{green}[IC]{default} 時間内に出現しなかったため、AI 特殊感染者がこの枠を使います。"
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{
-		"jp"		"{green}[IC]{default} Wait for the normal SI wave before spawning."
+		"jp"		"{green}[IC]{default} 通常の特殊感染者ウェーブを待ってから出現してください。"
 	}
 	"InfectedControl_TraitorSpawnAllowed"
 	{
-		"jp"		"{green}[IC]{default} You may now spawn using normal ghost rules."
+		"jp"		"{green}[IC]{default} 通常のゴースト規則で出現できます。"
 	}
 	"InfectedControl_TraitorReghostBlocked"
 	{
-		"jp"		"{green}[IC]{default} 内鬼は出現後、死亡するまで戦う必要があります。生存者から離れてゴースト状態に戻り、再出現することはできません。"
+		"jp"		"{green}[IC]{default} トレイターは出現後、死亡するまで戦う必要があります。生存者から離れてゴースト状態に戻り、再出現することはできません。"
 	}
 	"InfectedControl_TraitorNoSlot"
 	{
-		"jp"		"{green}[IC]{default} No traitor slot is available."
+		"jp"		"{green}[IC]{default} 利用できるトレイター枠がありません。"
 	}
 	"InfectedControl_TraitorNotQueued"
 	{
-		"jp"		"{green}[IC]{default} You are not queued as a traitor."
+		"jp"		"{green}[IC]{default} トレイターとして登録していません。"
 	}
 	"InfectedControl_TraitorCancelled"
 	{
-		"jp"		"{green}[IC]{default} Traitor queue cancelled."
+		"jp"		"{green}[IC]{default} トレイター登録を取り消しました。"
 	}
 	"InfectedControl_TraitorCancelledJoinedSurvivor"
 	{
-		"jp"		"{green}[IC]{default} 生存者チームに参加したため、内鬼モードの登録をキャンセルしました。"
+		"jp"		"{green}[IC]{default} 生存者チームに参加したため、トレイター登録をキャンセルしました。"
 	}
 	"InfectedControl_TraitorTankTookSlot"
 	{
-		"jp"		"{green}[IC]{default} Tank が共有内鬼スロットを使用しました。あなたの {olive}%s{default} は AI が引き継ぎ、消費済みの日次枠は返却されました。"
+		"jp"		"{green}[IC]{default} Tank が共有トレイター枠を使用しました。あなたの {olive}%s{default} は AI が引き継ぎ、消費済みの日次枠は返却されました。"
 	}
 	"InfectedControl_TraitorTankCancelledSlot"
 	{
-		"jp"		"{green}[IC]{default} Tank が共有内鬼スロットを使用しました。未出現の {olive}%s{default} 登録は取り消され、日次枠は消費されていません。"
+		"jp"		"{green}[IC]{default} Tank が共有トレイター枠を使用しました。未出現の {olive}%s{default} 登録は取り消され、日次枠は消費されていません。"
 	}
 	"InfectedControl_TraitorSpawned"
 	{
-		"jp"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
+		"jp"		"{green}[IC]{default} トレイター {olive}%s{default} として出現しました。"
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"jp"		"{green}[IC]{default} 内鬼の生成または操作権の移行に失敗しました。"
+		"jp"		"{green}[IC]{default} トレイターの生成または操作権の移行に失敗しました。"
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{
@@ -291,7 +291,7 @@
 
 	"InfectedControl_TraitorWaveStatusReserved"
 	{
-		"jp"		"{green}[IC]{default} Traitor reserved slots: %d"
+		"jp"		"{green}[IC]{default} トレイター予約枠: %d"
 	}
 	"InfectedControl_NavCacheRebuildStarted"
 	{
@@ -323,7 +323,7 @@
 	}
 	"InfectedControl_WaveStatusAntiBaitRelease"
 	{
-		"jp"		"  Anti-Bait: 解放"
+		"jp"		"  Anti-Bait: ウェーブ解放"
 	}
 	"InfectedControl_NavDebugNotCompiled"
 	{

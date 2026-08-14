@@ -8,7 +8,7 @@
 #include <colors>
 #include <anne_cvar_shield>
 
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.7"
 #define VOTE_TIME 20
 #define MENU_TIME MENU_TIME_FOREVER
 #define SPAWN_MENU_UNSET -999999
