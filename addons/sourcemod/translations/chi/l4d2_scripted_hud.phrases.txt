@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"chi"		"[团灭x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"chi"		"[{1}特{2}秒]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"chi"		"坦克伤害榜"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"chi"		"女巫距离预警"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"chi"		"下一波刷新队列"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"chi"		"（旁观/特感）"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"chi"		"场上 {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"chi"		"刷新队列"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"chi"		"空"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{

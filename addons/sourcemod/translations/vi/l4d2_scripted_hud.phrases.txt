@@ -198,6 +198,11 @@
 			"#format"	"{1:d}"
 			"vi"		"[Wipe x{1}]"
 		}
+		"L4D2ScriptedHUD_HUD2InfectedTiming"
+		{
+			"#format"	"{1:d},{2:d}"
+			"vi"		"[{1} SI / {2}s]"
+		}
 		"L4D2ScriptedHUD_SourceTankDmg"
 		{
 			"vi"		"Bảng sát thương Tank"
@@ -221,6 +226,14 @@
 		"L4D2ScriptedHUD_SourceWitch"
 		{
 			"vi"		"Cảnh báo khoảng cách Witch"
+		}
+		"L4D2ScriptedHUD_SourceQueue"
+		{
+			"vi"		"Hàng đợi SI tiếp theo"
+		}
+		"L4D2ScriptedHUD_SourceSpecSIOnly"
+		{
+			"vi"		" (khán giả/SI)"
 		}
 		"L4D2ScriptedHUD_TankDmgHeader"
 		{
@@ -296,6 +309,14 @@
 		{
 			"#format"	"{1:d}"
 			"vi"		"Sống {1}"
+		}
+		"L4D2ScriptedHUD_QueueHeader"
+		{
+			"vi"		"Hàng đợi"
+		}
+		"L4D2ScriptedHUD_QueueEmpty"
+		{
+			"vi"		"trống"
 		}
 		"L4D2ScriptedHUD_SpeedNone"
 		{

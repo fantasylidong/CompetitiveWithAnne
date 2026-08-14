@@ -12,6 +12,17 @@
 native float GetNextSpawnTime();
 
 /**
+ * @brief Copies the current special-infected spawn queue.
+ * @remarks Class ids match L4D2 zombie classes (1 smoker .. 6 charger).
+ *          The list is the remaining AI spawn order for the current/next wave.
+ *
+ * @param classes Output array of zombie class ids.
+ * @param maxlen  Maximum number of classes to copy.
+ * @return Number of classes written.
+ */
+native int InfectedControl_GetSpawnQueue(int[] classes, int maxlen);
+
+/**
  * @brief Returns whether a client must remain on infected for traitor mode.
  * @remarks False while traitor mode is disabled. Otherwise true for an armed Tank registrant and for spawn-locked, spawn-allowed, or alive traitor clients.
  *
@@ -84,6 +95,7 @@ public SharedPlugin __pl_infected_control =
 public void __pl_infected_control_SetNTVOptional()
 {
 	MarkNativeAsOptional("GetNextSpawnTime");
+	MarkNativeAsOptional("InfectedControl_GetSpawnQueue");
 	MarkNativeAsOptional("InfectedControl_IsTraitorClient");
 	MarkNativeAsOptional("InfectedControl_IsTraitorRegistered");
 	MarkNativeAsOptional("InfectedControl_IsTraitorModeEnabled");

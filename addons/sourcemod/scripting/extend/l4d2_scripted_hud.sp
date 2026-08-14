@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display text for all 15 scripted HUD slots on the screen"
-#define PLUGIN_VERSION                "1.4.1"
+#define PLUGIN_VERSION                "1.4.2"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -97,6 +97,9 @@ public Plugin myinfo =
 #define HUD_SLOT_DEFAULT_MASK         ((1 << HUD1) | (1 << HUD2))
 #define HUD_SLOT_ALL_MASK             ((1 << HUD_SLOT_COUNT) - 1)
 #define HUD_EXTRA_LINE_HEIGHT         0.026
+#define HUD_STACK_GAP                 0.008
+#define HUD_EXTRA_MAX_LINES           4
+#define HUD_FIXED_MAX_LINES           6
 #define HUD_PREFS_COOKIE_SIZE         100
 #define HUD_PREFS_MIGRATIONS          4
 
@@ -129,7 +132,8 @@ public Plugin myinfo =
 #define HUD_CONTENT_WITCH            10
 #define HUD_CONTENT_PROGRESS         11
 #define HUD_CONTENT_SERVER           12
-#define HUD_CONTENT_MAX               HUD_CONTENT_SERVER
+#define HUD_CONTENT_QUEUE            13
+#define HUD_CONTENT_MAX               HUD_CONTENT_QUEUE
 
 #define HUD_PANIC_WINDOW              60.0
 #define HUD_WITCH_NEAR_UNITS          600.0
@@ -165,6 +169,7 @@ public Plugin myinfo =
 #define HUD_Y_TOP_TO_BOTTOM           0
 #define HUD_Y_BOTTOM_TO_TOP           1
 
+#define TEAM_SPECTATOR                1
 #define TEAM_SURVIVOR                 2
 #define TEAM_INFECTED                 3
 
@@ -371,6 +376,8 @@ static int    g_iExtraHUDFlags = HUD_FLAG_TEXT | HUD_FLAG_NOBG | HUD_FLAG_ALIGN_
 static int    g_iClientSpecialKills[MAXPLAYERS + 1];
 static int    g_iClientCommonKills[MAXPLAYERS + 1];
 static int    g_iHUD2WipeCount;
+static int    g_iHUD2InfectedCount;
+static int    g_iHUD2SpawnInterval;
 static int    g_iTankDamage[MAXPLAYERS + 1];
 static int    g_iTankMaxHealth;
 static int    g_iTankLastHealth;
@@ -470,7 +477,8 @@ static const char g_sHUDSourcePhrases[][] =
     "L4D2ScriptedHUD_SourceRound",
     "L4D2ScriptedHUD_SourceWitch",
     "L4D2ScriptedHUD_SourceProgress",
-    "L4D2ScriptedHUD_SourceServer"
+    "L4D2ScriptedHUD_SourceServer",
+    "L4D2ScriptedHUD_SourceQueue"
 };
 
 static const char g_sHUDEngineNamePhrases[][] =
@@ -918,13 +926,77 @@ void GetLayoutExtraSlotRect(int layout, int hud, float &x, float &y, float &w)
     y = g_fLayoutExtraRightY0[layout] + float(index) * g_fLayoutExtraRightStep[layout];
 }
 
+int GetExtraSlotColumnFirst(int hud)
+{
+    return (hud <= HUD_MID_BOX) ? HUD_EXTRA_FIRST : HUD_SCORE_TITLE;
+}
+
+int GetHUDSlotMaxLines(int hud)
+{
+    if (hud >= HUD_EXTRA_FIRST)
+        return HUD_EXTRA_MAX_LINES;
+    if (hud == HUD3 || hud == HUD4)
+        return HUD_FIXED_MAX_LINES;
+    return 8;
+}
+
+int CountHUDTextLines(const char[] text)
+{
+    if (text[0] == '\0')
+        return 1;
+    return CountCharInString(text, '\n') + 1;
+}
+
+void TruncateHUDTextToLines(char[] text, int maxlen, int maxLines)
+{
+    if (maxLines <= 0)
+    {
+        text[0] = '\0';
+        return;
+    }
+
+    int lines = 1;
+    for (int i = 0; i < maxlen && text[i] != '\0'; i++)
+    {
+        if (text[i] != '\n')
+            continue;
+
+        lines++;
+        if (lines <= maxLines)
+            continue;
+
+        text[i] = '\0';
+        return;
+    }
+}
+
+float GetClientHUDSlotDisplayHeight(int client, int hud)
+{
+    int lines = CountHUDTextLines(g_sClientHUDText[client][hud]);
+    int maxLines = GetHUDSlotMaxLines(hud);
+    if (lines > maxLines)
+        lines = maxLines;
+    if (lines < 1)
+        lines = 1;
+    return GetHUDSlotLineHeight(hud) * float(lines);
+}
+
 void GetClientHUDSlotRect(int client, int hud, float &x, float &y, float &w)
 {
     int layout = GetHUDLayoutIndex(client);
 
     if (hud >= HUD_EXTRA_FIRST)
     {
-        GetLayoutExtraSlotRect(layout, hud, x, y, w);
+        int columnFirst = GetExtraSlotColumnFirst(hud);
+        GetLayoutExtraSlotRect(layout, columnFirst, x, y, w);
+        for (int slot = columnFirst; slot < hud; slot++)
+        {
+            if (!IsClientSlotVisible(client, slot))
+                continue;
+            y += GetClientHUDSlotDisplayHeight(client, slot) + HUD_STACK_GAP;
+        }
+        if (y > 0.92)
+            y = 0.92;
         return;
     }
 
@@ -990,6 +1062,20 @@ int GetClientHUDSource(int client, int hud)
     return g_iClientHUDSource[client][hud];
 }
 
+bool CanClientSeeInfectedIntel(int client)
+{
+    if (!IsValidClient(client))
+        return false;
+
+    int team = GetClientTeam(client);
+    return team == TEAM_SPECTATOR || team == TEAM_INFECTED;
+}
+
+bool IsInfectedIntelSource(int source)
+{
+    return source == HUD_CONTENT_SPECIALS || source == HUD_CONTENT_WAVE || source == HUD_CONTENT_QUEUE;
+}
+
 bool IsClientSlotVisible(int client, int hud)
 {
     if (!g_bCvar_Enabled || !IsValidClient(client) || IsFakeClient(client))
@@ -1001,8 +1087,19 @@ bool IsClientSlotVisible(int client, int hud)
     if ((g_iClientHUDMask[client] & (1 << hud)) == 0)
         return false;
 
-    if (hud >= HUD_EXTRA_FIRST && GetClientHUDSource(client, hud) == HUD_CONTENT_DEFAULT)
+    int source = GetClientHUDSource(client, hud);
+    if (hud >= HUD_EXTRA_FIRST && source == HUD_CONTENT_DEFAULT)
         return false;
+
+    if (IsInfectedIntelSource(source) && !CanClientSeeInfectedIntel(client))
+        return false;
+
+    if (hud == HUD2 && source == HUD_CONTENT_DEFAULT && !g_bData_HUD2_Text && !g_bCvar_HUD2_Text && !CanClientSeeInfectedIntel(client))
+    {
+        int visibleMask = g_iClientHUD2Mask[client] & ~HUD2_PART_INFECTED_TIMING;
+        if (visibleMask == 0)
+            return false;
+    }
 
     return true;
 }
@@ -2450,7 +2547,7 @@ Action ProxyHUDHeight(float &value, int hud, int client)
     if (g_sClientHUDText[client][hud][0] == '\0')
         return Plugin_Continue;
 
-    value = GetHUDSlotLineHeight(hud) * float(CountCharInString(g_sClientHUDText[client][hud], '\n') + 1);
+    value = GetClientHUDSlotDisplayHeight(client, hud);
     return Plugin_Changed;
 }
 
@@ -2487,6 +2584,9 @@ void BuildClientHUDTexts()
             BuildHUDSourceText(client, source, personalized, sizeof(personalized));
             FormatEx(g_sClientHUDText[client][hud], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
         }
+
+        for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
+            TruncateHUDTextToLines(g_sClientHUDText[client][hud], sizeof(g_sClientHUDText[][]), GetHUDSlotMaxLines(hud));
     }
 }
 
@@ -2509,6 +2609,7 @@ void BuildHUDSourceText(int client, int source, char[] output, int size)
         case HUD_CONTENT_WITCH:     BuildWitchWarnText(client, output, size);
         case HUD_CONTENT_PROGRESS:  GetHUD1_Text(output, size);
         case HUD_CONTENT_SERVER:    ComposeHUD2Text(output, size, g_iClientHUD2Mask[client], client);
+        case HUD_CONTENT_QUEUE:     BuildSpawnQueueText(client, output, size);
         default: output[0] = '\0';
     }
 }
@@ -2836,6 +2937,53 @@ void BuildWaveCountdownText(int client, char[] output, int size)
         Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_WaveAliveNoLimit", client, aliveSpecials);
 }
 
+void BuildSpawnQueueText(int client, char[] output, int size)
+{
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_QueueHeader", client);
+
+    if (!g_bInfectedControlAvailable || GetFeatureStatus(FeatureType_Native, "InfectedControl_GetSpawnQueue") != FeatureStatus_Available)
+    {
+        Format(output, size, "%s\n--", output);
+        return;
+    }
+
+    int classes[16];
+    int count = InfectedControl_GetSpawnQueue(classes, sizeof(classes));
+    if (count <= 0)
+    {
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_QueueEmpty", client);
+        return;
+    }
+
+    char line[96];
+    line[0] = '\0';
+    int shown;
+    for (int i = 0; i < count; i++)
+    {
+        int zclass = classes[i];
+        if (zclass < L4D2_ZOMBIECLASS_SMOKER || zclass > L4D2_ZOMBIECLASS_CHARGER)
+            continue;
+
+        char abbrev[16];
+        FormatEx(abbrev, sizeof(abbrev), "%T", GetZombieClassPhrase(zclass), client);
+        if (line[0] != 0)
+            StrCat(line, sizeof(line), " ");
+        StrCat(line, sizeof(line), abbrev);
+        shown++;
+
+        if (shown == 6 && i + 1 < count)
+        {
+            Format(output, size, "%s\n%s", output, line);
+            line[0] = '\0';
+        }
+    }
+
+    if (line[0] != 0)
+        Format(output, size, "%s\n%s", output, line);
+    else if (shown <= 0)
+        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_QueueEmpty", client);
+}
+
 void BuildSpeedText(int client, char[] output, int size)
 {
     int subject = GetHUDSpeedSubject(client);
@@ -3061,6 +3209,8 @@ void LoadBaseServerName()
 void RefreshHUD2Fragments()
 {
     RefreshHUDStatusCvars();
+    g_iHUD2InfectedCount = 0;
+    g_iHUD2SpawnInterval = -1;
 
     for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
         g_sHUD2Fragments[i][0] = '\0';
@@ -3115,7 +3265,10 @@ void RefreshHUD2Fragments()
         }
 
         if (infectedCount > 0 && spawnInterval >= 0)
-            FormatEx(g_sHUD2Fragments[5], sizeof(g_sHUD2Fragments[]), "[%d特%d秒]", infectedCount, spawnInterval);
+        {
+            g_iHUD2InfectedCount = infectedCount;
+            g_iHUD2SpawnInterval = spawnInterval;
+        }
     }
 
     int playerLimit = (g_hCvar_MaxPlayers == null) ? MaxClients : g_hCvar_MaxPlayers.IntValue;
@@ -3221,14 +3374,27 @@ bool IsHUDTeamFull(bool isAnne)
 
 void ComposeHUD2Text(char[] output, int size, int mask, int langTarget = LANG_SERVER)
 {
+    int effectiveMask = mask;
+    if (IsValidClient(langTarget) && !CanClientSeeInfectedIntel(langTarget))
+        effectiveMask &= ~HUD2_PART_INFECTED_TIMING;
+
     output[0] = '\0';
     for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
     {
-        if ((mask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
+        if (i == 5)
+            continue;
+        if ((effectiveMask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
             StrCat(output, size, g_sHUD2Fragments[i]);
     }
 
-    if ((mask & HUD2_PART_WIPE_COUNT) != 0 && g_iHUD2WipeCount > 0)
+    if ((effectiveMask & HUD2_PART_INFECTED_TIMING) != 0 && g_iHUD2InfectedCount > 0 && g_iHUD2SpawnInterval >= 0)
+    {
+        char timing[32];
+        FormatEx(timing, sizeof(timing), "%T", "L4D2ScriptedHUD_HUD2InfectedTiming", langTarget, g_iHUD2InfectedCount, g_iHUD2SpawnInterval);
+        StrCat(output, size, timing);
+    }
+
+    if ((effectiveMask & HUD2_PART_WIPE_COUNT) != 0 && g_iHUD2WipeCount > 0)
     {
         char wipes[32];
         FormatEx(wipes, sizeof(wipes), "%T", "L4D2ScriptedHUD_WipeCount", langTarget, g_iHUD2WipeCount);
@@ -3717,13 +3883,26 @@ public Action CmdHUDMenu(int client, int args)
     return Plugin_Handled;
 }
 
-void AddHUDToggleItem(Menu menu, int client, const char[] key, const char[] phrase, bool enabled)
+void AddHUDToggleItem(Menu menu, int client, const char[] key, const char[] phrase, bool enabled, bool specSIOnly = false)
 {
     char name[96];
-    char item[112];
-    FormatEx(name, sizeof(name), "%T", phrase, client);
+    char item[128];
+    if (specSIOnly)
+        FormatEx(name, sizeof(name), "%T%T", phrase, client, "L4D2ScriptedHUD_SourceSpecSIOnly", client);
+    else
+        FormatEx(name, sizeof(name), "%T", phrase, client);
     FormatEx(item, sizeof(item), "[%s] %s", enabled ? "X" : " ", name);
     menu.AddItem(key, item);
+}
+
+void FormatHUDSourceMenuName(int client, int hud, int source, char[] output, int size)
+{
+    char phrase[64];
+    GetHUDSourcePhrase(hud, source, phrase, sizeof(phrase));
+    if (IsInfectedIntelSource(source))
+        FormatEx(output, size, "%T%T", phrase, client, "L4D2ScriptedHUD_SourceSpecSIOnly", client);
+    else
+        FormatEx(output, size, "%T", phrase, client);
 }
 
 void OpenHUDPrefsMenu(int client)
@@ -3827,13 +4006,11 @@ void OpenHUDSlotListMenu(int client)
     {
         char key[16];
         char engineName[32];
-        char sourceName[64];
-        char sourcePhrase[64];
+        char sourceName[80];
         char item[192];
         FormatEx(key, sizeof(key), "slot%d", hud);
         FormatEx(engineName, sizeof(engineName), "%T", g_sHUDEngineNamePhrases[hud], client);
-        GetHUDSourcePhrase(hud, GetClientHUDSource(client, hud), sourcePhrase, sizeof(sourcePhrase));
-        FormatEx(sourceName, sizeof(sourceName), "%T", sourcePhrase, client);
+        FormatHUDSourceMenuName(client, hud, GetClientHUDSource(client, hud), sourceName, sizeof(sourceName));
         FormatEx(item, sizeof(item), "[%s] %T", IsClientSlotVisible(client, hud) ? "X" : " ", "L4D2ScriptedHUD_SlotItem", client, hud + 1, engineName, sourceName);
         menu.AddItem(key, item);
     }
@@ -3886,7 +4063,7 @@ void OpenHUDContentMenu(int client, int hud)
         FormatEx(key, sizeof(key), "src%d", source);
         char phrase[64];
         GetHUDSourcePhrase(hud, source, phrase, sizeof(phrase));
-        AddHUDToggleItem(menu, client, key, phrase, current == source);
+        AddHUDToggleItem(menu, client, key, phrase, current == source, IsInfectedIntelSource(source));
     }
     menu.Display(client, MENU_TIME_FOREVER);
 }
@@ -3994,7 +4171,7 @@ void OpenHUD2PartsMenu(int client)
     AddHUDToggleItem(menu, client, "part2", "L4D2ScriptedHUD_PartAIDifficulty", (g_iClientHUD2Mask[client] & HUD2_PART_AI_DIFFICULTY) != 0);
     AddHUDToggleItem(menu, client, "part3", "L4D2ScriptedHUD_PartMissingPlayers", (g_iClientHUD2Mask[client] & HUD2_PART_MISSING_PLAYERS) != 0);
     AddHUDToggleItem(menu, client, "part4", "L4D2ScriptedHUD_PartMod", (g_iClientHUD2Mask[client] & HUD2_PART_MOD) != 0);
-    AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0);
+    AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0, true);
     AddHUDToggleItem(menu, client, "part6", "L4D2ScriptedHUD_PartPlayerCount", (g_iClientHUD2Mask[client] & HUD2_PART_PLAYER_COUNT) != 0);
     AddHUDToggleItem(menu, client, "part7", "L4D2ScriptedHUD_PartWipeCount", (g_iClientHUD2Mask[client] & HUD2_PART_WIPE_COUNT) != 0);
     menu.Display(client, MENU_TIME_FOREVER);
