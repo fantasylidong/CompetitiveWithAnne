@@ -339,12 +339,12 @@ float Tactical_GetCandidateQuality(int zc, const float candidate[3], int targetC
             quality = 0.35 * rearQuality + 0.20 * flankQuality
                 + 0.45 * Tactical_Gaussian(centerDistance, 350.0, 160.0);
         case view_as<int>(SI_Hunter):
-            quality = 0.45 * bestAngle + 0.30 * rearQuality + 0.25 * edgeQuality;
+            quality = 0.55 * flankQuality + 0.40 * edgeQuality + 0.05 * rearQuality;
         case view_as<int>(SI_Spitter):
             quality = 0.25 * rearQuality + 0.20 * flankQuality
                 + 0.55 * Tactical_Gaussian(centerDistance, 550.0, 220.0);
         case view_as<int>(SI_Jockey):
-            quality = 0.45 * edgeQuality + 0.40 * flankQuality + 0.15 * rearQuality;
+            quality = 0.45 * edgeQuality + 0.55 * flankQuality;
         case view_as<int>(SI_Charger):
             quality = 0.55 * pushQuality + 0.25 * flankQuality + 0.20 * edgeQuality;
         default:
@@ -399,15 +399,19 @@ static bool Tactical_GetClassBandProfile(int zc, float &minRange,
         }
         case view_as<int>(SI_Hunter):
         {
-            minRange = 350.0; baseMax = 950.0;  finalMax = 2900.0;
+            minRange = 350.0; baseMax = 850.0;  finalMax = 2600.0;
         }
         case view_as<int>(SI_Spitter):
         {
             minRange = 300.0; baseMax = 800.0;  finalMax = 2300.0;
         }
-        case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
+        case view_as<int>(SI_Jockey):
         {
-            minRange = 250.0; baseMax = 700.0;  finalMax = 2200.0;
+            minRange = 250.0; baseMax = 550.0;  finalMax = 2000.0;
+        }
+        case view_as<int>(SI_Charger):
+        {
+            minRange = 250.0; baseMax = 600.0;  finalMax = 2000.0;
         }
         default:
         {

@@ -83,7 +83,7 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #define NAV_HIGH_GROUND_SMOKER_SCALE      1.5
 #define NAV_HIGH_GROUND_HUNTER_SCALE      1.15
 #define NAV_HIGH_GROUND_SMOKER_MAX     1000.0
-#define NAV_HIGH_GROUND_HUNTER_MAX      800.0
+#define NAV_HIGH_GROUND_HUNTER_MAX      450.0
 #define NAV_HIGH_GROUND_MAX_COMP       1000.0
 #define NAV_CANDIDATE_IDLE_INTERVAL      1.0
 #define NAV_CANDIDATE_WARM_INTERVAL      0.1
@@ -220,7 +220,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-13.6",
+    version     = "2026-08-13.11",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 

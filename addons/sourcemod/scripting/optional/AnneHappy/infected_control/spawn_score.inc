@@ -190,21 +190,44 @@ static float CalculateScore_DispersionWithScale(int sidx,
     return ClampFloat(score, 0.0, 100.0);
 }
 
-stock bool SpawnScore_ShouldRejectBehindFlow(int candBucket, int centerBucket)
+stock bool SpawnScore_IsCloseAssaultClass(int zc)
 {
-    if (candBucket < 0 || centerBucket < 0 || gCV.iScoreBehindRejectGap < 0)
-        return false;
-
-    return candBucket - centerBucket < -gCV.iScoreBehindRejectGap;
+    return zc == view_as<int>(SI_Hunter)
+        || zc == view_as<int>(SI_Jockey)
+        || zc == view_as<int>(SI_Charger);
 }
 
-static float ComputeBehindFlowPenalty(int deltaFlow)
+stock int SpawnScore_GetBehindRejectGap(int zc)
+{
+    if (gCV.iScoreBehindRejectGap < 0)
+        return -1;
+
+    if (SpawnScore_IsCloseAssaultClass(zc) && gCV.iScoreBehindRejectGapHjc >= 0)
+        return gCV.iScoreBehindRejectGapHjc;
+
+    return gCV.iScoreBehindRejectGap;
+}
+
+stock bool SpawnScore_ShouldRejectBehindFlow(int candBucket, int centerBucket, int zc = -1)
+{
+    int gap = SpawnScore_GetBehindRejectGap(zc);
+    if (candBucket < 0 || centerBucket < 0 || gap < 0)
+        return false;
+
+    return candBucket - centerBucket < -gap;
+}
+
+static float ComputeBehindFlowPenalty(int deltaFlow, int zc)
 {
     int bucketGap = -deltaFlow;
     if (bucketGap <= 0)
         return 0.0;
-    return FloatMin(gCV.fScoreBehindCap,
-        float(bucketGap) * gCV.fScoreBehindPerFlow);
+
+    float perFlow = gCV.fScoreBehindPerFlow;
+    if (SpawnScore_IsCloseAssaultClass(zc))
+        perFlow *= gCV.fScoreBehindHjcScale;
+
+    return FloatMin(gCV.fScoreBehindCap, float(bucketGap) * perFlow);
 }
 
 static float ComputeLowHeightPenalty(float candZ, float targetFootZ, int deltaFlow,
@@ -273,11 +296,11 @@ stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, f
     switch (zc)
     {
         case view_as<int>(SI_Boomer):  { sweet = min + 0.25 * span; width = 0.22 * span; }
-        case view_as<int>(SI_Hunter):  { sweet = min + 0.45 * span; width = 0.28 * span; }
+        case view_as<int>(SI_Hunter):  { sweet = min + 0.48 * span; width = 0.26 * span; }
         case view_as<int>(SI_Smoker):  { sweet = min + 0.60 * span; width = 0.30 * span; }
         case view_as<int>(SI_Spitter): { sweet = min + 0.40 * span; width = 0.25 * span; }
-        case view_as<int>(SI_Jockey):  { sweet = min + 0.35 * span; width = 0.24 * span; }
-        case view_as<int>(SI_Charger): { sweet = min + 0.38 * span; width = 0.26 * span; }
+        case view_as<int>(SI_Jockey):  { sweet = min + 0.28 * span; width = 0.22 * span; }
+        case view_as<int>(SI_Charger): { sweet = min + 0.30 * span; width = 0.24 * span; }
         default:                       { sweet = min + 0.40 * span; width = 0.25 * span; }
     }
 
@@ -294,9 +317,9 @@ static void GetClassFlowProfile(int zc, int &backAnchor, int &peakAnchor, int &f
         case view_as<int>(SI_Smoker),
              view_as<int>(SI_Spitter): { backAnchor = -12; peakAnchor = 4; frontAnchor = 20; }
         case view_as<int>(SI_Boomer):  { backAnchor = -8;  peakAnchor = 1; frontAnchor = 14; }
-        case view_as<int>(SI_Hunter):  { backAnchor = -10; peakAnchor = 3; frontAnchor = 18; }
+        case view_as<int>(SI_Hunter):  { backAnchor = -4;  peakAnchor = 3; frontAnchor = 18; }
         case view_as<int>(SI_Jockey),
-             view_as<int>(SI_Charger): { backAnchor = -9;  peakAnchor = 2; frontAnchor = 16; }
+             view_as<int>(SI_Charger): { backAnchor = -3;  peakAnchor = 2; frontAnchor = 16; }
         default:                       { backAnchor = -10; peakAnchor = 3; frontAnchor = 18; }
     }
 }
@@ -458,7 +481,7 @@ bool SpawnScore_BuildCandidate(int zc,
         sector, recentSectors, 1.0, kernelProximity);
     float dispScaled = CalculateScore_DispersionWithScale(
         sector, recentSectors, penK, kernelProximity);
-    float behindPenalty = ComputeBehindFlowPenalty(deltaFlow);
+    float behindPenalty = ComputeBehindFlowPenalty(deltaFlow, zc);
     float lowHeightDrop, lowHeightMultiplier;
     int lowHeightSteps;
     float lowHeightPenalty = ComputeLowHeightPenalty(
