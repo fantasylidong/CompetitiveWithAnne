@@ -897,7 +897,7 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
 
     int takeN[3];
     takeN[0] = 3;
-    takeN[1] = 2;
+    takeN[1] = 3;
     takeN[2] = 1;
     int binCursor[3];
     binCursor[0] = binStart[0];
@@ -1088,8 +1088,8 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 cursor.graphPageRankDistance[row] = pageRankDistance[row];
                 cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
             }
-            // 按当前档搜索环的路径距离三分位交错消费：近:中:远 = 3:2:1，
-            // 评分名额默认 6/4/2。非 ranked 时三分位内部仍可洗牌；
+            // 按当前档搜索环的路径距离三分位交错消费：近:中:远 = 3:3:1，
+            // 评分名额默认 6/5/1。非 ranked 时三分位内部仍可洗牌；
             // ranked 高点通道只做三分位交错，组内保序。
             SpawnSearch_PreparePageOrder(cursor, ranked);
             float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;

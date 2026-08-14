@@ -273,11 +273,11 @@ stock void GetClassDistanceProfile(int zc, float min, float max, float &sweet, f
     switch (zc)
     {
         case view_as<int>(SI_Boomer):  { sweet = min + 0.25 * span; width = 0.22 * span; }
-        case view_as<int>(SI_Hunter):  { sweet = min + 0.45 * span; width = 0.28 * span; }
+        case view_as<int>(SI_Hunter):  { sweet = min + 0.38 * span; width = 0.24 * span; }
         case view_as<int>(SI_Smoker):  { sweet = min + 0.60 * span; width = 0.30 * span; }
         case view_as<int>(SI_Spitter): { sweet = min + 0.40 * span; width = 0.25 * span; }
-        case view_as<int>(SI_Jockey):  { sweet = min + 0.35 * span; width = 0.24 * span; }
-        case view_as<int>(SI_Charger): { sweet = min + 0.38 * span; width = 0.26 * span; }
+        case view_as<int>(SI_Jockey):  { sweet = min + 0.28 * span; width = 0.22 * span; }
+        case view_as<int>(SI_Charger): { sweet = min + 0.30 * span; width = 0.24 * span; }
         default:                       { sweet = min + 0.40 * span; width = 0.25 * span; }
     }
 

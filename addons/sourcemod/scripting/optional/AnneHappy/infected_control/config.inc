@@ -445,9 +445,9 @@ enum struct Config
         this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.20 0.90 1.05 0.95 1.35 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
-        this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.35 1.60 1.15 1.00", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.10 1.60 0.75 0.65", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
         this.NavHighSortScale = CreateConVar(
-            "inf_nav_high_sort_scale", "0.85 1.00 0.90 1.00 1.00 1.00",
+            "inf_nav_high_sort_scale", "0.85 1.00 0.95 1.00 1.00 1.00",
             "有向候选排序的高点距离折减(S,B,H,P,J,C)；<1 时高于目标的候选按折减后距离前置，1.00=不折减",
             CVAR_FLAG);
         this.NavHighSortMinHeight = CreateConVar(
@@ -582,7 +582,7 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.SpawnSepRadius = CreateConVar(
-            "inf_spawn_sep_radius", "180.0",
+            "inf_spawn_sep_radius", "150.0",
             "最近实际刷出点的硬分散半径（会乘以特感上限缩放系数）；0=关闭。",
             CVAR_FLAG, true, 0.0, true, 500.0
         );
@@ -602,7 +602,7 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1000.0
         );
         this.SpawnKernelPoints = CreateConVar(
-            "inf_spawn_kernel_points", "40.0",
+            "inf_spawn_kernel_points", "30.0",
             "分散度核惩罚强度：扣分=该值*min(核密度和,1.5)。",
             CVAR_FLAG, true, 0.0, true, 100.0
         );
@@ -617,12 +617,12 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 24.0
         );
         this.SpawnBudgetMid = CreateConVar(
-            "inf_spawn_budget_mid", "4",
+            "inf_spawn_budget_mid", "5",
             "当前候选页中距三分位最多接受的评分名额。",
             CVAR_FLAG, true, 0.0, true, 24.0
         );
         this.SpawnBudgetFar = CreateConVar(
-            "inf_spawn_budget_far", "2",
+            "inf_spawn_budget_far", "1",
             "当前候选页远距三分位最多接受的评分名额。",
             CVAR_FLAG, true, 0.0, true, 24.0
         );
