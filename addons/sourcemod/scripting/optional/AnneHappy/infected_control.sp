@@ -71,7 +71,7 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 
 // Nav 找点按帧分片；候选数与昂贵精判数都有限制。
 #define NAV_RANDOM_POINT_TRIES    3
-#define NAV_SCAN_SCORE_BUDGET_CAP     8
+#define NAV_SCAN_SCORE_BUDGET_CAP     12
 #define NAV_CANDIDATE_PAGE_SIZE       256
 #define NAV_CANDIDATE_TEAM_EXCLUSION  250.0
 #define NAV_CANDIDATE_LANDING_MARGIN    16.0
@@ -113,10 +113,7 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #define SUPPORT_NEED_KILLERS      1
 
 // —— 分散度四件套参数 —— //
-#define SEP_TTL                   0.5    // 已确认实际生成点的硬分散保留秒数
-//#define SEP_MAX                   20     // 记录上限（防止无限增长）
-// === Dispersion tuning (lighter penalties) ===
-#define SEP_RADIUS                80.0
+// 硬分散半径/记忆时长已提升为 CVar：inf_spawn_sep_radius / inf_spawn_sep_ttl。
 #define NAV_CD_SECS               1.0    // 成功及普通实际校验失败后的同 Nav 冷却
 #define SECTORS_BASE              6       // 基准
 #define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
@@ -223,7 +220,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-13.2",
+    version     = "2026-08-13.6",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -753,6 +750,8 @@ static void StopAll()
     WaveDecider_OnRoundStart();
     if (lastSpawns != null) lastSpawns.Clear();
     recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
+    ResetWaveSectorSpawnCounts();
+    Tactical_ResetSupportGateWaiver();
 
     ResetDeathState();
     SurvivorFlow_ResetRoundCaches();

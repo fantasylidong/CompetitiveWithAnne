@@ -250,6 +250,8 @@ public Action Cmd_NavTest(int client, int args)
     Visibility_RefreshEyeSnapshot();
     float dTargetEye = GetVectorDistance(testPos, targetEye);
     float tacticalQuality = Tactical_GetCandidateQuality(zc, testPos, targetSur, targetEye);
+    SpawnMemory_RefreshKernelSnapshot();
+    float kernelProximity = SpawnMemory_GetKernelProximity(testPos);
     SpawnScoreDbg scoreDbg;
     bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye,
                                                    -1.0, -1.0, 0.0,
@@ -257,7 +259,7 @@ public Action Cmd_NavTest(int client, int args)
                                                    candPercent, centerBucket, rawBadFlow,
                                                    passFlow, refEyeZ, targetFootZ,
                                                    sidx, index,
-                                                   tacticalQuality, scoreDbg);
+                                                   tacticalQuality, kernelProximity, scoreDbg);
 
     PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)",
         scoreDbg.dist, scoreDbg.sweet, scoreDbg.width);
@@ -279,8 +281,8 @@ public Action Cmd_NavTest(int client, int args)
         PrintToConsole(client, "  Flow Score: %.1f (delta: %d)", scoreDbg.flow, scoreDbg.deltaFlow);
     }
 
-    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, sector: %d/%d)",
-        scoreDbg.dispRaw, scoreDbg.dispScaled, scoreDbg.penK, sidx, sectors);
+    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, kernel: %.2f, sector: %d/%d)",
+        scoreDbg.dispRaw, scoreDbg.dispScaled, scoreDbg.penK, scoreDbg.dispKernel, sidx, sectors);
 
     float totalScore = scoreDbg.total;
     PrintToConsole(client, "");
