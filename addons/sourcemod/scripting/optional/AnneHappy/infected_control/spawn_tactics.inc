@@ -22,12 +22,32 @@ static int Tactical_CountPressureSpawnedThisWave()
          + gST.siSpawnedThisWave[view_as<int>(SI_Charger) - 1];
 }
 
+// 每波按概率放宽支援闸门：偶尔允许 Boomer/Spitter 先于压制类出场，
+// 打破"每波必然杀手先、支援后"的固定顺序。
+static bool g_bSupportGateWaived = false;
+
+bool Tactical_IsSupportGateWaived()
+{
+    return g_bSupportGateWaived;
+}
+
+void Tactical_ResetSupportGateWaiver()
+{
+    g_bSupportGateWaived = false;
+}
+
 void Tactical_OnWaveStart()
 {
     gST.breachWaveActive = gST.breachWavePending;
     gST.breachWavePending = false;
     gST.waveEngaged = false;
     gST.firstPressureSpawnTime = 0.0;
+    // Breach 波保持压制类优先，不参与支援闸门放宽。
+    g_bSupportGateWaived = !gST.breachWaveActive
+        && gCV.fSupportWaiveProb > 0.0
+        && GetURandomFloat() < gCV.fSupportWaiveProb;
+    if (g_bSupportGateWaived)
+        Debug_Print("[SUPPORT GATE] waived for this wave (p=%.2f)", gCV.fSupportWaiveProb);
     for (int i = 0; i < SI_COUNT; i++)
     {
         gST.normalFallbackCycles[i] = 0;
@@ -149,6 +169,9 @@ void Tactical_OnClassSpawned(int zc)
 bool Tactical_CanReleaseSupport(int zc)
 {
     if (!IsSupportGateClassInt(zc))
+        return true;
+
+    if (Tactical_IsSupportGateWaived())
         return true;
 
     int need = GetSupportUnlockNeed();
@@ -357,63 +380,59 @@ float Tactical_GetHighGroundNavCompensation(int zc,
         maxCompensation);
 }
 
+// 每类三个锚点：最小距离 / 首选档上界(stage 0) / 最远档上界(最后一档)。
+// 固定 6 档：stage 0 保持完整首选区间，stage 1..5 在首选上界与最远
+// 上界之间线性扩圈。档数过细时单环只有一两百单位，再按页内三分位
+// 切近/中/远没有区分度；6 档让每一环宽到三分位有明确的距离含义。
+static bool Tactical_GetClassBandProfile(int zc, float &minRange,
+                                         float &baseMax, float &finalMax)
+{
+    switch (zc)
+    {
+        case view_as<int>(SI_Smoker):
+        {
+            minRange = 500.0; baseMax = 1200.0; finalMax = 3000.0;
+        }
+        case view_as<int>(SI_Boomer):
+        {
+            minRange = 250.0; baseMax = 550.0;  finalMax = 2300.0;
+        }
+        case view_as<int>(SI_Hunter):
+        {
+            minRange = 350.0; baseMax = 950.0;  finalMax = 2900.0;
+        }
+        case view_as<int>(SI_Spitter):
+        {
+            minRange = 300.0; baseMax = 800.0;  finalMax = 2300.0;
+        }
+        case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
+        {
+            minRange = 250.0; baseMax = 700.0;  finalMax = 2200.0;
+        }
+        default:
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
                               float &minRange, float &maxRange)
 {
     stage = ClampInt(stage, 0, TACTICAL_BAND_STAGES - 1);
 
-    switch (zc)
+    float baseMax, finalMax;
+    if (Tactical_GetClassBandProfile(zc, minRange, baseMax, finalMax))
     {
-        case view_as<int>(SI_Smoker):
-        {
-            if (stage == 0)      { minRange = 500.0; maxRange = 1200.0; }
-            else if (stage == 1) { minRange = 500.0; maxRange = 1500.0; }
-            else if (stage == 2) { minRange = 500.0; maxRange = 1800.0; }
-            else if (stage == 3) { minRange = 500.0; maxRange = 2100.0; }
-            else if (stage == 4) { minRange = 500.0; maxRange = 2550.0; }
-            else                 { minRange = 500.0; maxRange = 3000.0; }
-        }
-        case view_as<int>(SI_Boomer):
-        {
-            if (stage == 0)      { minRange = 250.0; maxRange = 550.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 750.0; }
-            else if (stage == 2) { minRange = 250.0; maxRange = 1000.0; }
-            else if (stage == 3) { minRange = 250.0; maxRange = 1400.0; }
-            else if (stage == 4) { minRange = 250.0; maxRange = 1850.0; }
-            else                 { minRange = 250.0; maxRange = 2300.0; }
-        }
-        case view_as<int>(SI_Hunter):
-        {
-            if (stage == 0)      { minRange = 350.0; maxRange = 950.0; }
-            else if (stage == 1) { minRange = 350.0; maxRange = 1250.0; }
-            else if (stage == 2) { minRange = 350.0; maxRange = 1500.0; }
-            else if (stage == 3) { minRange = 350.0; maxRange = 1750.0; }
-            else if (stage == 4) { minRange = 350.0; maxRange = 2300.0; }
-            else                 { minRange = 350.0; maxRange = 2900.0; }
-        }
-        case view_as<int>(SI_Spitter):
-        {
-            if (stage == 0)      { minRange = 300.0; maxRange = 800.0; }
-            else if (stage == 1) { minRange = 300.0; maxRange = 1050.0; }
-            else if (stage == 2) { minRange = 300.0; maxRange = 1250.0; }
-            else if (stage == 3) { minRange = 300.0; maxRange = 1450.0; }
-            else if (stage == 4) { minRange = 300.0; maxRange = 1850.0; }
-            else                 { minRange = 300.0; maxRange = 2300.0; }
-        }
-        case view_as<int>(SI_Jockey), view_as<int>(SI_Charger):
-        {
-            if (stage == 0)      { minRange = 250.0; maxRange = 700.0; }
-            else if (stage == 1) { minRange = 250.0; maxRange = 900.0; }
-            else if (stage == 2) { minRange = 250.0; maxRange = 1100.0; }
-            else if (stage == 3) { minRange = 250.0; maxRange = 1250.0; }
-            else if (stage == 4) { minRange = 250.0; maxRange = 1700.0; }
-            else                 { minRange = 250.0; maxRange = 2200.0; }
-        }
-        default:
-        {
-            minRange = NAV_CANDIDATE_TEAM_EXCLUSION;
-            maxRange = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
-        }
+        maxRange = baseMax
+            + (finalMax - baseMax) * float(stage)
+                / float(TACTICAL_BAND_STAGES - 1);
+    }
+    else
+    {
+        minRange = NAV_CANDIDATE_TEAM_EXCLUSION;
+        maxRange = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
     }
 
     minRange = FloatMax(minRange, NAV_CANDIDATE_TEAM_EXCLUSION);

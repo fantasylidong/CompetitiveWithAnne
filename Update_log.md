@@ -724,3 +724,15 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `server_name.smx` 升级到 1.4.8：`[AI:专家]` 这类房间名标签只在 `annehappy_dynamic_ai_difficulty.smx` 实际加载且已定档时显示。
 - 动态难度插件卸载后，SourceMod 会留下 `ah_ai_dynamic_current_level`；旧逻辑只要看到残留 1-6 档就会继续写进 `hostname` / `sn_main_name`。现在改为检测插件是否在跑，并清掉已经写进房间名的 `[AI:...]`。
 - `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。
+
+### 2026年8月13日 刷特分散度与职业多样性
+- `infected_control.smx` 升级到 2026-08-13.6：距离档位从 10 档收回 **6 档**（stage 0 仍是完整首选区间，其后 5 档在首选上界与最远上界之间线性扩圈）。10 档时单环只有一两百单位，再切近/中/远没有区分度；6 档让每一环宽到三分位有明确距离含义。近/中/远改为按**当前档搜索环**（本档 `scanMin..maxRange`）三等分，不再用当前页 min/max，避免第一页只覆盖环的近端时把“近”再切成近中远。扇区配额仍是前 2/3 档受限（0..3）、后 1/3 放开（4..5）。波次时序契约不变。
+- `infected_control.smx` 升级到 2026-08-13.5：评分名额由“每 tick 先到先得的 8 个合格点”改为当前候选页按路径距离三分位分配 **近 6 / 中 4 / 远 2**（合计 12）。页内按 3:2:1 交错消费，三分位满额后跳过昂贵可见/路径检查；某一档没有剩余候选时名额溢出到其它档，避免空档拖慢出特。`inf_spawn_nav_expensive_per_slice` 默认 16→24，给满额 12 个评分点留出精判次数。CVar：`inf_spawn_budget_near/mid/far`（全 0 关闭三分位，退回整页名额+洗牌）。ranked 高点通道组内仍保序，只做三分位交错。波次时序契约不变。
+- 距离档位由 6 档细分为 10 档：各职业首选档（stage 0，如 Smoker 500–1200）保持不切分，避免刷点整体更贴脸；失败后的扩圈在首选上界与最远上界之间线性插值（Smoker 每档 +200 至 3000），每次升档只多扫一小环，距离升级更平滑，单环候选也更容易被一页洗牌完整覆盖。扇区配额相应改为“前 2/3 档受限、后 1/3 放开”。
+- 有向候选分页读取后页内洗牌（`inf_spawn_candidate_shuffle`，默认开）：原实现按路径距离升序消费候选、每次尝试最多接受 8 个合格点，等于永远只在“最近的一小簇”里选优；洗牌后进入评分的候选覆盖整个距离带。ranked 高点通道不洗牌，保留其排序收益。
+- 硬分散参数 CVar 化并加强：`inf_spawn_sep_radius`（默认 180，原硬编码 80）与 `inf_spawn_sep_ttl`（默认 2.5 秒，原 0.5 秒），仍随特感上限缩放。
+- 分散度评分新增连续核密度惩罚：对存活特感与最近刷点按 exp(-d/r) 累加扣分（`inf_spawn_kernel_radius` 默认 280、`inf_spawn_kernel_points` 默认 40），弥补“只记最近 3 次扇区”的粗粒度记忆；扇区惩罚保留。
+- 新增波内扇区配额：单波单扇区落点数 ≤ ceil(特感上限/扇区数)+`inf_spawn_sector_quota_bonus`（默认 +1，设 -1 关闭）；只约束前四个距离带，远带与导演兜底不受限，狭长地形不会因配额刷不出特感。
+- 高点优先改走扩展 ranked 有向候选：重新启用 `inf_nav_high_sort_scale`（新默认 Smoker 0.85 / Hunter 0.90），高于目标 `inf_nav_high_sort_min_height`（默认 64）以上的候选按折减距离前置进入有限的评分名额，高位点不再只能靠评分在近地面簇里“事后加分”。
+- 职业多样性：选类稀缺度加入 ±`inf_class_scarcity_jitter`（默认 0.06）的小幅随机抖动，打散占用率接近的职业之间的固定轮转；支援闸门（Boomer/Spitter 需先刷压制类）每波按 `inf_support_gate_waive_prob`（默认 0.15）随机放宽一波，Breach 波不参与放宽。
+- `[SCORE-CHOSEN]` 调试日志与 `sm_navdebug` 评分演算输出新增核密度项（kern）。

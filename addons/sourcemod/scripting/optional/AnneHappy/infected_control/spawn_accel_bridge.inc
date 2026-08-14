@@ -17,6 +17,7 @@ bool g_bSpawnAccelGraphReady;
 bool g_bSpawnAccelGraphCandidatesAvailable;
 bool g_bSpawnAccelAvailabilityKnown;
 bool g_bSpawnAccelNativeSafetyAvailable;
+bool g_bSpawnAccelRankedNativesAvailable;
 Handle g_hSpawnAccelStartTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelTopologyRetryTimer = INVALID_HANDLE;
@@ -87,6 +88,12 @@ stock bool SpawnAccel_CanUseGraphCandidates()
         && g_bSpawnAccelGraphCandidatesAvailable;
 }
 
+stock bool SpawnAccel_CanUseRankedCandidates()
+{
+    return SpawnAccel_CanUseGraphCandidates()
+        && g_bSpawnAccelRankedNativesAvailable;
+}
+
 stock bool SpawnAccel_IsDynamicGraphPending()
 {
     return g_bSpawnAccel && g_bSpawnAccelDynamicRebuildPending;
@@ -144,6 +151,11 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
     }
     g_bSpawnAccelNativeSafetyAvailable = available
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_TestPointSafety")
+            == FeatureStatus_Available;
+    g_bSpawnAccelRankedNativesAvailable = available
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesPrepareRanked")
+            == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesCollectRanked")
             == FeatureStatus_Available;
     g_bSpawnAccelAvailabilityKnown = true;
 
