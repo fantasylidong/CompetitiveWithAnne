@@ -78,14 +78,379 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"jp"		"標準（16:9）"
+			"jp"		"16:9 ワイド（既定座標）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"jp"		"コンパクト（4:3）"
+			"jp"		"4:3 / 5:4 狭幅（右端の切れ防止）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"jp"		"ウルトラワイド安全領域"
+			"jp"		"21:9 ウルトラワイド（中央の安全領域）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"jp"		"16:10 モニター"
+		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"jp"		"HUD 3 表示内容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"jp"		"HUD 4 表示内容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"jp"		"HUD {1} 表示内容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"jp"		"サーバー既定"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"jp"		"生存者状態"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"jp"		"特殊感染者のHP"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"jp"		"キル統計"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"jp"		"プレイヤーのPing"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"jp"		"生存者状態[薬][蘇生]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"jp"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"jp"		"無"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"jp"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"jp"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"jp"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"jp"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"jp"		"スモ"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"jp"		"ブマ"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"jp"		"ハン"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"jp"		"スピ"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"jp"		"ジョ"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"jp"		"チャ"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"jp"		"キル [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"jp"		"Ping (ms)"
+		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"jp"		"全滅回数"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"jp"		"[全滅x{1}]"
+		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"jp"		"Tank ダメージ"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"jp"		"チームアイテム"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"jp"		"次の特殊感染"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"jp"		"速度 / 連跳"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"jp"		"ラウンド時間 / ホード"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"jp"		"Witch 距離警告"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"jp"		"Tank ダメ"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"jp"		"Tank 撃破"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"jp"		"Tank ダメ --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"jp"		"Tank なし"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"jp"		"アイテム"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"jp"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"jp"		"火"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"jp"		"パ"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"jp"		"バ"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"jp"		"キ"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"jp"		"除"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"jp"		"焼"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"jp"		"爆"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"jp"		"薬"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"jp"		"針"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"jp"		"次波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"jp"		"生存 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"jp"		"生存 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"jp"		"速度 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"jp"		"速度 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"jp"		"連跳 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"jp"		"連跳 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"jp"		"ラウンド {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"jp"		"ホード 発生中"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"jp"		"ホード {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"jp"		"ホード --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"jp"		"Witch なし"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"jp"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"jp"		"激怒"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"jp"		"近"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"jp"		"警戒"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"jp"		"静"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"jp"		"他{1}体"
+		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"jp"		"HUDスロット15個すべて"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"jp"		"HUDスロット（1-15）"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"jp"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"jp"		"HUD {1} 表示内容（キルフィードと共用）"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"jp"		"未使用（非表示）"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"jp"		"進行 / タンク / ウィッチ"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"jp"		"サーバー状態"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"jp"		"左上"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"jp"		"左下"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"jp"		"中央上"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"jp"		"中央下"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"jp"		"右上"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"jp"		"右下"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"jp"		"ティッカー"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"jp"		"最左"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"jp"		"最右"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"jp"		"中央枠"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"jp"		"スコア見出し"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"jp"		"スコア1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"jp"		"スコア2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"jp"		"スコア3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"jp"		"スコア4"
 		}
 	}

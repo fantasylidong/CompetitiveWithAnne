@@ -78,14 +78,379 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"zho"		"標準（16:9）"
+			"zho"		"16:9 寬螢幕（預設座標）"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"zho"		"緊湊（4:3）"
+			"zho"		"4:3 / 5:4 窄螢幕（收窄防右側裁切）"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"zho"		"超寬螢幕安全區"
+			"zho"		"21:9 超寬（收到中間安全區）"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"zho"		"16:10 顯示器"
+		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"zho"		"HUD 3 顯示內容"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"zho"		"HUD 4 顯示內容"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"zho"		"HUD {1} 顯示內容"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"zho"		"跟隨伺服器預設"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"zho"		"生還者狀態"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"zho"		"特感血量"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"zho"		"擊殺統計"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"zho"		"玩家延遲"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"zho"		"玩家狀態[藥][倒地]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"zho"		"有"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"zho"		"無"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"zho"		"特感 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"zho"		"特感 x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"zho"		"女巫x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"zho"		"坦克 {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"zho"		"舌"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"zho"		"胖"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"zho"		"獵"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"zho"		"口"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"zho"		"猴"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"zho"		"牛"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"zho"		"擊殺 [特感|普感]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"zho"		"延遲 (ms)"
+		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"zho"		"團滅次數"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"zho"		"[團滅x{1}]"
+		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"zho"		"坦克傷害榜"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"zho"		"隊伍道具"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"zho"		"下一波特感"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"zho"		"速度 / 連跳"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"zho"		"回合計時 / 屍潮"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"zho"		"女巫距離預警"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"zho"		"坦克傷害"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"zho"		"坦克已擊殺"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"zho"		"坦克傷害 --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"zho"		"目前無坦克"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"zho"		"道具"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"zho"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"zho"		"火"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"zho"		"管"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"zho"		"膽"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"zho"		"包"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"zho"		"電"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"zho"		"燃"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"zho"		"爆"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"zho"		"藥"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"zho"		"針"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"zho"		"下一波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"zho"		"場上 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"zho"		"場上 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"zho"		"速度 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"zho"		"速度 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"zho"		"連跳 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"zho"		"連跳 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"zho"		"回合 {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"zho"		"屍潮 進行中"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"zho"		"屍潮 {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"zho"		"屍潮 --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"zho"		"目前無女巫"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"zho"		"女巫 {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"zho"		"激怒"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"zho"		"近"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"zho"		"警覺"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"zho"		"靜"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"zho"		"另有{1}隻"
+		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"zho"		"全部 15 個 HUD 槽位"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"zho"		"HUD 槽位（1-15）"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"zho"		"HUD {1} {2}：{3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"zho"		"HUD {1} 顯示內容（與擊殺列表共用）"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"zho"		"未使用（隱藏）"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"zho"		"進度 / 坦克 / 女巫"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"zho"		"伺服器狀態"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"zho"		"左上"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"zho"		"左下"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"zho"		"中上"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"zho"		"中下"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"zho"		"右上"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"zho"		"右下"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"zho"		"滾動條"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"zho"		"最左"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"zho"		"最右"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"zho"		"中框"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"zho"		"計分標題"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"zho"		"計分1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"zho"		"計分2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"zho"		"計分3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"zho"		"計分4"
 		}
 	}

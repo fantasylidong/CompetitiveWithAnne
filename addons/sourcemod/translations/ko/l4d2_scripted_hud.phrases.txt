@@ -78,14 +78,379 @@
 		}
 		"L4D2ScriptedHUD_LayoutStandard"
 		{
-			"ko"		"표준 (16:9)"
+			"ko"		"16:9 와이드 (기본 좌표)"
 		}
 		"L4D2ScriptedHUD_Layout4x3"
 		{
-			"ko"		"컴팩트 (4:3)"
+			"ko"		"4:3 / 5:4 좁은 화면 (오른쪽 잘림 방지)"
 		}
 		"L4D2ScriptedHUD_LayoutUltrawide"
 		{
-			"ko"		"울트라와이드 안전 영역"
+			"ko"		"21:9 울트라와이드 (중앙 안전 영역)"
+		}
+		"L4D2ScriptedHUD_Layout16x10"
+		{
+			"ko"		"16:10 모니터"
+		}
+		"L4D2ScriptedHUD_HUD3Content"
+		{
+			"ko"		"HUD 3 표시 내용"
+		}
+		"L4D2ScriptedHUD_HUD4Content"
+		{
+			"ko"		"HUD 4 표시 내용"
+		}
+		"L4D2ScriptedHUD_ContentTitle"
+		{
+			"#format"	"{1:d}"
+			"ko"		"HUD {1} 표시 내용"
+		}
+		"L4D2ScriptedHUD_SourceDefault"
+		{
+			"ko"		"서버 기본값"
+		}
+		"L4D2ScriptedHUD_SourceSurvivors"
+		{
+			"ko"		"생존자 상태"
+		}
+		"L4D2ScriptedHUD_SourceSpecials"
+		{
+			"ko"		"특수 감염자 체력"
+		}
+		"L4D2ScriptedHUD_SourceKills"
+		{
+			"ko"		"킬 통계"
+		}
+		"L4D2ScriptedHUD_SourcePing"
+		{
+			"ko"		"플레이어 핑"
+		}
+		"L4D2ScriptedHUD_SurvHeader"
+		{
+			"ko"		"생존자 상태[약][소생]"
+		}
+		"L4D2ScriptedHUD_PillsYes"
+		{
+			"ko"		"유"
+		}
+		"L4D2ScriptedHUD_PillsNo"
+		{
+			"ko"		"무"
+		}
+		"L4D2ScriptedHUD_SpecialsHeader"
+		{
+			"#format"	"{1:d},{2:d}"
+			"ko"		"SI {1}/{2}"
+		}
+		"L4D2ScriptedHUD_SpecialsHeaderNoLimit"
+		{
+			"#format"	"{1:d}"
+			"ko"		"SI x{1}"
+		}
+		"L4D2ScriptedHUD_WitchCount"
+		{
+			"#format"	"{1:d}"
+			"ko"		"Witch x{1}"
+		}
+		"L4D2ScriptedHUD_TankLine"
+		{
+			"#format"	"{1:s}"
+			"ko"		"Tank {1}"
+		}
+		"L4D2ScriptedHUD_ClsSmoker"
+		{
+			"ko"		"스모"
+		}
+		"L4D2ScriptedHUD_ClsBoomer"
+		{
+			"ko"		"부머"
+		}
+		"L4D2ScriptedHUD_ClsHunter"
+		{
+			"ko"		"헌터"
+		}
+		"L4D2ScriptedHUD_ClsSpitter"
+		{
+			"ko"		"스핏"
+		}
+		"L4D2ScriptedHUD_ClsJockey"
+		{
+			"ko"		"자키"
+		}
+		"L4D2ScriptedHUD_ClsCharger"
+		{
+			"ko"		"차저"
+		}
+		"L4D2ScriptedHUD_KillsHeader"
+		{
+			"ko"		"킬 [SI|CI]"
+		}
+		"L4D2ScriptedHUD_PingHeader"
+		{
+			"ko"		"핑 (ms)"
+		}
+		"L4D2ScriptedHUD_PartWipeCount"
+		{
+			"ko"		"전멸 횟수"
+		}
+		"L4D2ScriptedHUD_WipeCount"
+		{
+			"#format"	"{1:d}"
+			"ko"		"[전멸x{1}]"
+		}
+		"L4D2ScriptedHUD_SourceTankDmg"
+		{
+			"ko"		"탱크 피해 순위"
+		}
+		"L4D2ScriptedHUD_SourceItems"
+		{
+			"ko"		"팀 아이템"
+		}
+		"L4D2ScriptedHUD_SourceWave"
+		{
+			"ko"		"다음 특수 감염자"
+		}
+		"L4D2ScriptedHUD_SourceSpeed"
+		{
+			"ko"		"속도 / 버니합"
+		}
+		"L4D2ScriptedHUD_SourceRound"
+		{
+			"ko"		"라운드 시간 / 호드"
+		}
+		"L4D2ScriptedHUD_SourceWitch"
+		{
+			"ko"		"Witch 거리 경고"
+		}
+		"L4D2ScriptedHUD_TankDmgHeader"
+		{
+			"ko"		"탱크 피해"
+		}
+		"L4D2ScriptedHUD_TankDmgDead"
+		{
+			"ko"		"탱크 처치"
+		}
+		"L4D2ScriptedHUD_TankDmgEmpty"
+		{
+			"ko"		"탱크 피해 --"
+		}
+		"L4D2ScriptedHUD_TankDmgNone"
+		{
+			"ko"		"탱크 없음"
+		}
+		"L4D2ScriptedHUD_ItemsHeader"
+		{
+			"ko"		"아이템"
+		}
+		"L4D2ScriptedHUD_ItemEmpty"
+		{
+			"ko"		"-"
+		}
+		"L4D2ScriptedHUD_ItemMolotov"
+		{
+			"ko"		"화"
+		}
+		"L4D2ScriptedHUD_ItemPipe"
+		{
+			"ko"		"관"
+		}
+		"L4D2ScriptedHUD_ItemBile"
+		{
+			"ko"		"담"
+		}
+		"L4D2ScriptedHUD_ItemKit"
+		{
+			"ko"		"킷"
+		}
+		"L4D2ScriptedHUD_ItemDefib"
+		{
+			"ko"		"제"
+		}
+		"L4D2ScriptedHUD_ItemIncendiary"
+		{
+			"ko"		"소"
+		}
+		"L4D2ScriptedHUD_ItemExplosive"
+		{
+			"ko"		"폭"
+		}
+		"L4D2ScriptedHUD_ItemPills"
+		{
+			"ko"		"약"
+		}
+		"L4D2ScriptedHUD_ItemAdrenaline"
+		{
+			"ko"		"주"
+		}
+		"L4D2ScriptedHUD_WaveHeader"
+		{
+			"#format"	"{1:s}"
+			"ko"		"다음 파 {1}"
+		}
+		"L4D2ScriptedHUD_WaveAlive"
+		{
+			"#format"	"{1:d},{2:d}"
+			"ko"		"생존 {1}/{2}"
+		}
+		"L4D2ScriptedHUD_WaveAliveNoLimit"
+		{
+			"#format"	"{1:d}"
+			"ko"		"생존 {1}"
+		}
+		"L4D2ScriptedHUD_SpeedNone"
+		{
+			"ko"		"속도 --"
+		}
+		"L4D2ScriptedHUD_SpeedLine"
+		{
+			"#format"	"{1:d}"
+			"ko"		"속도 {1}"
+		}
+		"L4D2ScriptedHUD_BhopLine"
+		{
+			"#format"	"{1:d}"
+			"ko"		"버니합 {1}"
+		}
+		"L4D2ScriptedHUD_BhopNone"
+		{
+			"ko"		"버니합 --"
+		}
+		"L4D2ScriptedHUD_RoundTimer"
+		{
+			"#format"	"{1:s}"
+			"ko"		"라운드 {1}"
+		}
+		"L4D2ScriptedHUD_HordeActive"
+		{
+			"ko"		"호드 진행 중"
+		}
+		"L4D2ScriptedHUD_HordeSoon"
+		{
+			"#format"	"{1:d}"
+			"ko"		"호드 {1}s"
+		}
+		"L4D2ScriptedHUD_HordeIdle"
+		{
+			"ko"		"호드 --"
+		}
+		"L4D2ScriptedHUD_WitchNone"
+		{
+			"ko"		"Witch 없음"
+		}
+		"L4D2ScriptedHUD_WitchLine"
+		{
+			"#format"	"{1:.1f},{2:s}"
+			"ko"		"Witch {1}m {2}"
+		}
+		"L4D2ScriptedHUD_WitchEnraged"
+		{
+			"ko"		"격노"
+		}
+		"L4D2ScriptedHUD_WitchNear"
+		{
+			"ko"		"근접"
+		}
+		"L4D2ScriptedHUD_WitchAlert"
+		{
+			"ko"		"경계"
+		}
+		"L4D2ScriptedHUD_WitchCalm"
+		{
+			"ko"		"평온"
+		}
+		"L4D2ScriptedHUD_WitchExtra"
+		{
+			"#format"	"{1:d}"
+			"ko"		"외 {1}마리"
+		}
+		"L4D2ScriptedHUD_SlotsMenu"
+		{
+			"ko"		"HUD 슬롯 15개 모두"
+		}
+		"L4D2ScriptedHUD_SlotsTitle"
+		{
+			"ko"		"HUD 슬롯 (1-15)"
+		}
+		"L4D2ScriptedHUD_SlotItem"
+		{
+			"#format"	"{1:d},{2:s},{3:s}"
+			"ko"		"HUD {1} {2}: {3}"
+		}
+		"L4D2ScriptedHUD_ContentTitleKillHud"
+		{
+			"#format"	"{1:d}"
+			"ko"		"HUD {1} 표시 내용 (킬 피드와 공유)"
+		}
+		"L4D2ScriptedHUD_SourceOff"
+		{
+			"ko"		"사용 안 함 (숨김)"
+		}
+		"L4D2ScriptedHUD_SourceProgress"
+		{
+			"ko"		"진행 / 탱크 / Witch"
+		}
+		"L4D2ScriptedHUD_SourceServer"
+		{
+			"ko"		"서버 상태"
+		}
+		"L4D2ScriptedHUD_SlotLeftTop"
+		{
+			"ko"		"좌상단"
+		}
+		"L4D2ScriptedHUD_SlotLeftBot"
+		{
+			"ko"		"좌하단"
+		}
+		"L4D2ScriptedHUD_SlotMidTop"
+		{
+			"ko"		"중앙 상단"
+		}
+		"L4D2ScriptedHUD_SlotMidBot"
+		{
+			"ko"		"중앙 하단"
+		}
+		"L4D2ScriptedHUD_SlotRightTop"
+		{
+			"ko"		"우상단"
+		}
+		"L4D2ScriptedHUD_SlotRightBot"
+		{
+			"ko"		"우하단"
+		}
+		"L4D2ScriptedHUD_SlotTicker"
+		{
+			"ko"		"티커"
+		}
+		"L4D2ScriptedHUD_SlotFarLeft"
+		{
+			"ko"		"맨 왼쪽"
+		}
+		"L4D2ScriptedHUD_SlotFarRight"
+		{
+			"ko"		"맨 오른쪽"
+		}
+		"L4D2ScriptedHUD_SlotMidBox"
+		{
+			"ko"		"중앙 상자"
+		}
+		"L4D2ScriptedHUD_SlotScoreTitle"
+		{
+			"ko"		"점수 제목"
+		}
+		"L4D2ScriptedHUD_SlotScore1"
+		{
+			"ko"		"점수1"
+		}
+		"L4D2ScriptedHUD_SlotScore2"
+		{
+			"ko"		"점수2"
+		}
+		"L4D2ScriptedHUD_SlotScore3"
+		{
+			"ko"		"점수3"
+		}
+		"L4D2ScriptedHUD_SlotScore4"
+		{
+			"ko"		"점수4"
 		}
 	}
