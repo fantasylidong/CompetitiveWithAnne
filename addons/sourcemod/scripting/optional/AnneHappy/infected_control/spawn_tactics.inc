@@ -399,7 +399,7 @@ static bool Tactical_GetClassBandProfile(int zc, float &minRange,
         }
         case view_as<int>(SI_Hunter):
         {
-            minRange = 350.0; baseMax = 750.0;  finalMax = 2600.0;
+            minRange = 350.0; baseMax = 850.0;  finalMax = 2600.0;
         }
         case view_as<int>(SI_Spitter):
         {
