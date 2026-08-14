@@ -582,12 +582,12 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.SpawnSepRadius = CreateConVar(
-            "inf_spawn_sep_radius", "150.0",
+            "inf_spawn_sep_radius", "120.0",
             "最近实际刷出点的硬分散半径（会乘以特感上限缩放系数）；0=关闭。",
             CVAR_FLAG, true, 0.0, true, 500.0
         );
         this.SpawnSepTtl = CreateConVar(
-            "inf_spawn_sep_ttl", "2.5",
+            "inf_spawn_sep_ttl", "1.5",
             "最近实际刷出点的硬分散记忆秒数。",
             CVAR_FLAG, true, 0.1, true, 10.0
         );
