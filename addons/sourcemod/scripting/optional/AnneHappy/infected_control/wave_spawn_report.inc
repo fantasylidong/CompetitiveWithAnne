@@ -201,7 +201,7 @@ static void WaveSpawnReport_BeginInternal(int wave, int plannedAi,
     g_WaveSpawnReport.configuredIntervalMs =
         DifficultyStrategy_GetConfiguredWaveDelay() * 1000.0;
     SpawnPerf_Log(
-        "[SpawnWave][Begin] wave=%d plannedAi=%d pendingAtStart=%d alive=%d cap=%d target=%d breach=%d configuredIntervalMs=%.1f killWindowMs=%.1f attemptsPerFrame=%d frameBudgetMs=%.2f navPerSlice=%d expensivePerSlice=%d navSliceBudgetMs=%.2f highSortScale=%.2f/%.2f/%.2f/%.2f/%.2f/%.2f highSortMinZ=%.1f highBonus=per50%.2f/cap%.2f lowHeight=footStart%.1f/per100=%.2f/behindX%.2f/cap%.2f behind=rejectGap%d/perFlow%.2f/cap%.2f",
+        "[SpawnWave][Begin] wave=%d plannedAi=%d pendingAtStart=%d alive=%d cap=%d target=%d breach=%d configuredIntervalMs=%.1f killWindowMs=%.1f attemptsPerFrame=%d frameBudgetMs=%.2f navPerSlice=%d expensivePerSlice=%d navSliceBudgetMs=%.2f highSortScale=%.2f/%.2f/%.2f/%.2f/%.2f/%.2f highSortMinZ=%.1f highBonus=per50%.2f/cap%.2f lowHeight=footStart%.1f/per100=%.2f/behindX%.2f/cap%.2f behind=rejectGap%d/hjc%d/perFlow%.2f/hjcX%.2f/cap%.2f",
         wave, plannedAi, pendingAtStart, gST.totalSI, gCV.iSiLimit,
         gST.targetSurvivor, gST.breachWaveActive ? 1 : 0,
         g_WaveSpawnReport.configuredIntervalMs,
@@ -220,7 +220,8 @@ static void WaveSpawnReport_BeginInternal(int wave, int plannedAi,
         gCV.fScoreHighHeightPer50, gCV.fScoreHighHeightCap,
         gCV.fScoreLowHeightStart, gCV.fScoreLowHeightPer100,
         gCV.fScoreLowHeightBehindMultiplier, gCV.fScoreLowHeightCap,
-        gCV.iScoreBehindRejectGap, gCV.fScoreBehindPerFlow,
+        gCV.iScoreBehindRejectGap, gCV.iScoreBehindRejectGapHjc,
+        gCV.fScoreBehindPerFlow, gCV.fScoreBehindHjcScale,
         gCV.fScoreBehindCap);
 }
 

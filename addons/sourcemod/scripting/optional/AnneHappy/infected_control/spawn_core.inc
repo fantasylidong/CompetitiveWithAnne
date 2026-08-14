@@ -195,9 +195,10 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     candidateBucket = ClampInt(candidateBucket, 0, 100);
     int scoringCenterBucket = centerBucket >= 0 ? centerBucket : candidateBucket;
 
-    // 3) dF=-8 仍参与评分，dF<-8 在随机点、trace/path 前直接淘汰。
+    // 3) 全局 dF=-8 仍参与评分，dF<-8 在随机点、trace/path 前直接淘汰。
+    //    Hunter/Jockey/Charger 默认更紧：dF=-5 仍评分，dF<-5 淘汰。
     if (candidateBucketKnown
-        && SpawnScore_ShouldRejectBehindFlow(candidateBucket, scoringCenterBucket))
+        && SpawnScore_ShouldRejectBehindFlow(candidateBucket, scoringCenterBucket, zc))
     {
         stats.behindFlow++;
         SpawnPerf_RecordFilterByBehindFlow();

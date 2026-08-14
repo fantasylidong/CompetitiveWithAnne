@@ -117,6 +117,8 @@ enum struct Config
     ConVar ScoreBehindPerFlow;
     ConVar ScoreBehindCap;
     ConVar ScoreBehindRejectGap;
+    ConVar ScoreBehindRejectGapHjc;
+    ConVar ScoreBehindHjcScale;
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
@@ -233,6 +235,8 @@ enum struct Config
     float fScoreBehindPerFlow;
     float fScoreBehindCap;
     int   iScoreBehindRejectGap;
+    int   iScoreBehindRejectGapHjc;
+    float fScoreBehindHjcScale;
 
     bool  bPathCacheEnable;
     float fPathCacheQuantize;
@@ -502,6 +506,14 @@ enum struct Config
             "inf_score_behind_reject_gap", "8",
             "候选Nav最多允许落后目标多少个Flow百分点；-1关闭硬拒绝，默认-8允许、-9拒绝",
             CVAR_FLAG, true, -1.0, true, 100.0);
+        this.ScoreBehindRejectGapHjc = CreateConVar(
+            "inf_score_behind_reject_gap_hjc", "5",
+            "Hunter/Jockey/Charger 后方硬拒绝缺口；默认-5允许、-6拒绝。-1沿用全局 inf_score_behind_reject_gap",
+            CVAR_FLAG, true, -1.0, true, 100.0);
+        this.ScoreBehindHjcScale = CreateConVar(
+            "inf_score_behind_hjc_scale", "2.0",
+            "Hunter/Jockey/Charger 的 Flow 后点梯度扣分倍率；1.0 与全局相同",
+            CVAR_FLAG, true, 1.0, true, 5.0);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -830,6 +842,8 @@ enum struct Config
         this.ScoreBehindPerFlow.AddChangeHook(OnCfgChanged);
         this.ScoreBehindCap.AddChangeHook(OnCfgChanged);
         this.ScoreBehindRejectGap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindRejectGapHjc.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindHjcScale.AddChangeHook(OnCfgChanged);
         this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
         this.FlowBucketShare.AddChangeHook(OnCfgChanged);
         this.SpawnSepRadius.AddChangeHook(OnCfgChanged);
@@ -1137,6 +1151,10 @@ enum struct Config
         this.fScoreBehindPerFlow = this.ScoreBehindPerFlow.FloatValue;
         this.fScoreBehindCap = this.ScoreBehindCap.FloatValue;
         this.iScoreBehindRejectGap = this.ScoreBehindRejectGap.IntValue;
+        this.iScoreBehindRejectGapHjc = this.ScoreBehindRejectGapHjc.IntValue;
+        this.fScoreBehindHjcScale = this.ScoreBehindHjcScale.FloatValue;
+        if (this.fScoreBehindHjcScale < 1.0) this.fScoreBehindHjcScale = 1.0;
+        if (this.fScoreBehindHjcScale > 5.0) this.fScoreBehindHjcScale = 5.0;
         this.iVisRayMode        = this.VisEyeRayMode.IntValue;
         this.fSpawnScoreFloor   = this.SpawnScoreFloor.FloatValue;
         this.fBucketSpawnRatio  = this.FlowBucketShare.FloatValue;

@@ -726,6 +726,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `annehappy_dynamic_ai_difficulty.smx` 升级到 2026.08.13.1：注册 `annehappy_dynamic_ai_difficulty` 库，卸载时把 `current_level` / `current_mode` / `current_ppm` / `current_locked` 清回 0，避免 HUD、`!xx` 和刷特策略继续读到旧档位。
 
 ### 2026年8月13日 刷特分散度与职业多样性
+- `infected_control.smx` 升级到 2026-08-13.10：继续压低 Hunter / Jockey / Charger 刷在生还者后方的几率。这三类后方硬拒绝从全局 -8 收到 **-5**（`inf_score_behind_reject_gap_hjc`），落后扣分按 `inf_score_behind_hjc_scale`（默认 **2.0**）加倍；Flow 曲线后锚从 -10/-9 收到 **-5/-4**，同进度点仍可评分。Hunter 战术质量减少 rear、改偏侧翼/边缘；Jockey rear 权重 0.15→0.05。Smoker / Spitter / Boomer 的全局后方规则不变。波次时序契约不变。
 - `infected_control.smx` 升级到 2026-08-13.9：硬分散再降一档。`inf_spawn_sep_radius` 150→**120**，`inf_spawn_sep_ttl` 2.5→**1.5**；同 Nav 冷却 `NAV_CD_SECS` 保持 **1.0** 秒。波次时序契约不变。
 - `infected_control.smx` 升级到 2026-08-13.8：Hunter 准备突袭距离略往外放。首选档 350–750 改为 **350–850**，距离甜点从环的 38%（约 500）改到 48%（约 **590**），仍落在中距带，不回到原来的 950 远点。牛 / Jockey 档位不变。波次时序契约不变。
 - `infected_control.smx` 升级到 2026-08-13.7：收一点分散度，避免牛 / Jockey / Hunter 经常落到过远的点。Hunter 首选档 350–950 收成 **350–750**，距离甜点从环的 45% 改到 38%（约 500），高点距离折减 0.90→0.95、高点补偿上限 800→450，减少“远处高台折算成中距”的远点。Jockey 首选档 250–700 收成 **250–550**，牛 **250–600**，甜点略前移；两者分散度权重 1.15/1.00→0.75/0.65。全局硬分散半径 180→150、核惩罚 40→30；评分名额近/中/远 6/4/2 改为 **6/5/1**。波次时序契约不变。
