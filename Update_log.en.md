@@ -179,3 +179,7 @@
 - High-ground priority now uses the extension's ranked directed candidates: `inf_nav_high_sort_scale` is re-enabled (new defaults Smoker 0.85 / Hunter 0.90). Candidates at least `inf_nav_high_sort_min_height` (64) above the target are front-loaded by discounted distance into the limited scoring budget, instead of relying on after-the-fact score bonuses inside the near-ground cluster.
 - Class variety: class scarcity picks now apply a small random jitter of ±`inf_class_scarcity_jitter` (default 0.06) to break the fixed per-wave rotation among similarly occupied classes, and the support gate (Boomer/Spitter unlocking after pressure classes) is randomly waived per wave with probability `inf_support_gate_waive_prob` (default 0.15); breach waves never waive it.
 - The `[SCORE-CHOSEN]` debug log and the `sm_navdebug` score breakdown now include the kernel term (kern).
+
+### August 14, 2026 Network Quality Reports Prefer Loss
+- Upgraded `network_quality_hint.smx` to 1.1.5. Website incidents now focus on packet loss: choke below `nqh_report_choke_limit` (default 20%) is no longer reported as an incident. Local chat warnings still use `nqh_choke_limit` (default 5%).
+- Incident reason codes: timeouts stay `timing_out`; otherwise prefer `loss`, then `ping`, and `choke` only when above the report threshold.
