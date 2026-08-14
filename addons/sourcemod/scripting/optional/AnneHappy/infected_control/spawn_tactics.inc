@@ -381,10 +381,9 @@ float Tactical_GetHighGroundNavCompensation(int zc,
 }
 
 // 每类三个锚点：最小距离 / 首选档上界(stage 0) / 最远档上界(最后一档)。
-// stage 0 保持完整首选区间不切分——逐档搜索是"哪档先找到点就用哪档"，
-// 切细首选档会让刷点整体更贴近目标并缩小页内洗牌的覆盖面。
-// stage 1..N-1 在首选上界与最远上界之间线性扩圈，失败升档时每次
-// 只多扫一小环，距离升级更平滑。
+// 固定 6 档：stage 0 保持完整首选区间，stage 1..5 在首选上界与最远
+// 上界之间线性扩圈。档数过细时单环只有一两百单位，再按页内三分位
+// 切近/中/远没有区分度；6 档让每一环宽到三分位有明确的距离含义。
 static bool Tactical_GetClassBandProfile(int zc, float &minRange,
                                          float &baseMax, float &finalMax)
 {

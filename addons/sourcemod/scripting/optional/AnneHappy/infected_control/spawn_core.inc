@@ -851,17 +851,17 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
         return;
     }
 
-    float lo = 1.0e20;
-    float hi = -1.0;
-    for (int row = 0; row < count; row++)
+    // 近/中/远按当前档搜索环切，不用页内 min/max：否则第一页若只覆盖
+    // 环的近端，三分位会缩成“近端里再切近中远”，和档位脱节。
+    float lo = cursor.graphScanMinRange > cursor.minRange
+        ? cursor.graphScanMinRange
+        : cursor.minRange;
+    float hi = cursor.maxRange;
+    if (hi < lo)
     {
-        float navDistance = cursor.graphPageNavDistance[row];
-        if (navDistance < 0.0)
-            continue;
-        if (navDistance < lo)
-            lo = navDistance;
-        if (navDistance > hi)
-            hi = navDistance;
+        float swapRange = lo;
+        lo = hi;
+        hi = swapRange;
     }
 
     int binIdx[NAV_CANDIDATE_PAGE_SIZE];
@@ -1088,7 +1088,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 cursor.graphPageRankDistance[row] = pageRankDistance[row];
                 cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
             }
-            // 页内按路径距离三分位交错消费：近:中:远 = 3:2:1，
+            // 按当前档搜索环的路径距离三分位交错消费：近:中:远 = 3:2:1，
             // 评分名额默认 6/4/2。非 ranked 时三分位内部仍可洗牌；
             // ranked 高点通道只做三分位交错，组内保序。
             SpawnSearch_PreparePageOrder(cursor, ranked);
@@ -1113,7 +1113,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         return SpawnSearch_Pending;
 
     // 扇区配额只约束前 2/3 的距离带；进入后 1/3 远带说明近处已找不到点，
-    // 此时优先保证按时刷出，不再限制方向。(10 档时为 0..6 受限、7..9 放开)
+    // 此时优先保证按时刷出，不再限制方向。(6 档时为 0..3 受限、4..5 放开)
     bool enforceSectorQuota = bandStage >= 0
         && bandStage < TACTICAL_BAND_STAGES - (TACTICAL_BAND_STAGES / 3);
 
