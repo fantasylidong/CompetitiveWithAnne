@@ -42,10 +42,18 @@
 	}
 	"Server_PromptsAlreadyBlackWhiteGive"
 	{
-		"en"		"[{olive}Notice{default}] {green}%N{default} is already {olive}black and white{default}. Protect and heal them first!"
+		"en"		"[{olive}Notice{default}] {green}%N{default} is already {olive}black and white{default} (another incap will kill them). Protect and heal them first!"
 	}
 	"Server_PromptBlackWhiteTreatSoon"
 	{
-		"en"		"[{olive}Notice{default}] You are now {green}black and white{default}. Heal as soon as possible!"
+		"en"		"[{olive}Notice{default}] You are now {green}black and white{default} (another incap will kill you). Heal as soon as possible!"
+	}
+	"Server_PromptBlackWhiteHintOther"
+	{
+		"en"		"%N is black and white (another incap will kill them)!"
+	}
+	"Server_PromptBlackWhiteHintSelf"
+	{
+		"en"		"You are black and white (another incap will kill you)!"
 	}
 }

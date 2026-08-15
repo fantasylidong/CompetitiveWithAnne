@@ -42,10 +42,18 @@
 	}
 	"Server_PromptsAlreadyBlackWhiteGive"
 	{
-		"jp"		"[{olive}は{default}を促します] {green}%N{default}すでに{olive}白黒{default}、保護と治療を優先してください！"
+		"jp"		"[{olive}通知{default}] {green}%N{default} はすでに {olive}白黒{default}（もう一度倒れると死亡）です。優先して守り、治療してください！"
 	}
 	"Server_PromptBlackWhiteTreatSoon"
 	{
-		"jp"		"【{olive}即発{default}】あなたは今、{green}白黒{default}です、できるだけ早く治療してください！"
+		"jp"		"[{olive}通知{default}] あなたは今 {green}白黒{default}（もう一度倒れると死亡）です。すぐに治療してください！"
+	}
+	"Server_PromptBlackWhiteHintOther"
+	{
+		"jp"		"%N は白黒です（もう一度倒れると死亡）！"
+	}
+	"Server_PromptBlackWhiteHintSelf"
+	{
+		"jp"		"あなたは白黒です（もう一度倒れると死亡）！"
 	}
 }

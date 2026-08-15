@@ -94,7 +94,7 @@
 	}
 	"Text_TankConsumeOn"
 	{
-		"ko"		"{lightgreen}Tank 소모{olive}[{green}켜짐{olive}]"
+		"ko"		"{lightgreen}Tank 스톨{olive}[{green}켜짐{olive}]"
 	}
 	"Text_SneakyTankOn"
 	{

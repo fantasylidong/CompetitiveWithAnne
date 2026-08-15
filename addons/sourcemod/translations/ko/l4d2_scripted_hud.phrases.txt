@@ -127,7 +127,7 @@
 		}
 		"L4D2ScriptedHUD_SurvHeader"
 		{
-			"ko"		"생존자 상태[약][소생]"
+			"ko"		"생존자 상태[약][소생 횟수]"
 		}
 		"L4D2ScriptedHUD_PillsYes"
 		{

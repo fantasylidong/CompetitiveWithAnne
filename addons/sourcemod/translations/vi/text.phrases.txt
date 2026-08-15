@@ -10,11 +10,11 @@
 	}
 	"Text_TraitorStatusEnabled"
 	{
-		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Bật{olive}] {lightgreen}Vị trí{olive}[{green}%d{olive}]"
+		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Bật{olive}] {lightgreen}Slot{olive}[{green}%d{olive}]"
 	}
 	"Text_TraitorStatusDisabled"
 	{
-		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Tắt{olive}] {lightgreen}Vị trí{olive}[{green}%d{olive}]"
+		"vi"		"{lightgreen}Chế độ nội gián{olive}[{green}Tắt{olive}] {lightgreen}Slot{olive}[{green}%d{olive}]"
 	}
 	"Text_TankBhopOn"
 	{
@@ -94,7 +94,7 @@
 	}
 	"Text_TankConsumeOn"
 	{
-		"vi"		"{lightgreen}Tank tiêu hao{olive}[{green}Bật{olive}]"
+		"vi"		"{lightgreen}Tank stall{olive}[{green}Bật{olive}]"
 	}
 	"Text_SneakyTankOn"
 	{

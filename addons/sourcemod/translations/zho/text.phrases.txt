@@ -78,7 +78,7 @@
 	}
 	"Text_SpecialInfected"
 	{
-		"zho"		"{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}電信服{olive}[{green}%s{olive}]"
+		"zho"		"{lightgreen}特感{olive}[{green}%s%i特%i秒{olive}] {lightgreen}版本{olive}[{green}%s{olive}]"
 	}
 	"Text_SpawnDistanceMin"
 	{

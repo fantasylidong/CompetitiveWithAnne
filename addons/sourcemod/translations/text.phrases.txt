@@ -90,11 +90,11 @@
 	}
 	"Text_ReturnBloodOn"
 	{
-		"en"		"{lightgreen}Return HP{olive}[{green}On{olive}]"
+		"en"		"{lightgreen}HP return{olive}[{green}On{olive}]"
 	}
 	"Text_TankConsumeOn"
 	{
-		"en"		"{lightgreen}Tank consume{olive}[{green}On{olive}]"
+		"en"		"{lightgreen}Tank stall{olive}[{green}On{olive}]"
 	}
 	"Text_SneakyTankOn"
 	{

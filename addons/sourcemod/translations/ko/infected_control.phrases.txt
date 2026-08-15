@@ -2,7 +2,7 @@
 {
 	"InfectedControl_ICFailedObtainCrosshairHit"
 	{
-		"ko"		"{green}[IC]{default}가 십자선 적중점을 획득하지 못했습니다."
+		"ko"		"{green}[IC]{default} 십자선 적중점을 얻지 못했습니다."
 	}
 	"InfectedControl_ICNoNavAreaNearby"
 	{
@@ -18,27 +18,27 @@
 	}
 	"InfectedControl_ICNavCanGenerateTotal"
 	{
-		"ko"		"{green}[IC]{default} Nav %d {olive}는 {default} | 총점: {lightgreen}%.1f{default} | 자세한 내용은 콘솔을 참조하세요."
+		"ko"		"{green}[IC]{default} Nav %d {olive}생성 가능{default} | 총점: {lightgreen}%.1f{default} | 자세한 내용은 콘솔을 확인하세요"
 	}
 	"InfectedControl_ICNavCannotGenerateSee"
 	{
-		"ko"		"{green}[IC]{default} Nav %d {lightgreen}는 {default}를 생성할 수 없습니다 | 자세한 내용은 콘솔을 참조하세요."
+		"ko"		"{green}[IC]{default} Nav %d {lightgreen}생성 불가{default} | 자세한 내용은 콘솔을 확인하세요"
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"ko"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
+		"ko"		"{green}[IC]{default} 사용법: !it 로 트레이터 종류 메뉴를 엽니다. !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] 로 바로 등록합니다."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
-		"ko"		"Select traitor class"
+		"ko"		"트레이터 종류 선택"
 	}
 	"InfectedControl_TraitorMenuRandom"
 	{
-		"ko"		"Random enabled class"
+		"ko"		"사용 가능한 종류 무작위"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{
-		"ko"		"{green}[IC]{default} You have used all traitor entries for this round (%d)."
+		"ko"		"{green}[IC]{default} 이번 라운드 트레이터 등록 횟수를 모두 사용했습니다(%d)."
 	}
 	"InfectedControl_TraitorClassLimitReached"
 	{
@@ -50,7 +50,7 @@
 	}
 	"InfectedControl_TraitorQuotaDbUnavailable"
 	{
-		"ko"		"{green}[IC]{default} Traitor quota database is unavailable."
+		"ko"		"{green}[IC]{default} 트레이터 횟수 데이터베이스를 사용할 수 없습니다."
 	}
 	"InfectedControl_TraitorPublicStatsUnavailable"
 	{
@@ -58,31 +58,31 @@
 	}
 	"InfectedControl_TraitorPublicScoreRequired"
 	{
-		"ko"		"{green}[IC]{default} 일반 플레이어가 내귀로 등록하려면 최소 {olive}%d{default}점이 필요합니다. 현재 점수는 {olive}%d{default}점입니다."
+		"ko"		"{green}[IC]{default} 일반 플레이어가 트레이터로 등록하려면 최소 {olive}%d{default}점이 필요합니다. 현재 점수는 {olive}%d{default}점입니다."
 	}
 	"InfectedControl_TraitorQuotaExhausted"
 	{
-		"ko"		"{green}[IC]{default} Your daily traitor quota is exhausted ({olive}%d{default}/{olive}%d{default}). It resets tomorrow."
+		"ko"		"{green}[IC]{default} 오늘의 트레이터 횟수를 모두 사용했습니다({olive}%d{default}/{olive}%d{default}). 내일 초기화됩니다."
 	}
 	"InfectedControl_TraitorRootCvarOnly"
 	{
-		"ko"		"{green}[IC]{default} Only root admins may change {olive}%s{default}."
+		"ko"		"{green}[IC]{default} {olive}%s{default} 는 root 관리자만 변경할 수 있습니다."
 	}
 	"InfectedControl_TraitorNoDamagePunished"
 	{
-		"ko"		"{green}[IC]{default} 다음 특수 감염자 웨이브가 시작될 때까지 생존자 피해나 유효한 공격이 기록되지 않아 내귀 역할이 해제되고 AI가 이 특수 감염자를 이어받습니다."
+		"ko"		"{green}[IC]{default} 다음 특수 감염자 웨이브가 시작될 때까지 생존자 피해나 유효한 공격이 기록되지 않아 트레이터 역할이 해제되고 AI가 이 특수 감염자를 이어받습니다."
 	}
 	"InfectedControl_TraitorNoDamageBlockApplied"
 	{
-		"ko"		"{green}[IC]{default} 다음 %d번의 특수 감염자 웨이브 동안 다시 내귀가 될 수 없습니다."
+		"ko"		"{green}[IC]{default} 다음 %d번의 특수 감염자 웨이브 동안 다시 트레이터가 될 수 없습니다."
 	}
 	"InfectedControl_TraitorDamageSummary"
 	{
-		"ko"		"{green}[IC]{default} 이번 내귀 플레이에서 생존자에게 {olive}%d{default}의 피해를 입혔습니다."
+		"ko"		"{green}[IC]{default} 이번 트레이터 플레이에서 생존자에게 {olive}%d{default}의 피해를 입혔습니다."
 	}
 	"InfectedControl_TraitorWaveBlockedNoDamage"
 	{
-		"ko"		"{green}[IC]{default} 지난 내귀 플레이에서 피해를 주지 않아 특수 감염자 웨이브가 %d번 더 지나야 다시 내귀가 될 수 있습니다."
+		"ko"		"{green}[IC]{default} 지난 트레이터 플레이에서 피해를 주지 않아 특수 감염자 웨이브가 %d번 더 지나야 다시 트레이터가 될 수 있습니다."
 	}
 	"InfectedControl_TraitorPenaltyNoDamageWarning"
 	{
@@ -90,87 +90,87 @@
 	}
 	"InfectedControl_TraitorPenaltyNoDamageBlock"
 	{
-		"ko"		"{green}[IC]{default} 그렇지 않으면 역할이 해제되고 AI가 이어받으며, 다음 %d번의 특수 감염자 웨이브 동안 내귀가 될 수 없습니다."
+		"ko"		"{green}[IC]{default} 그렇지 않으면 역할이 해제되고 AI가 이어받으며, 다음 %d번의 특수 감염자 웨이브 동안 트레이터가 될 수 없습니다."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageWarning"
 	{
-		"ko"		"{green}[IC]{default} Tank 경고: 내귀 Tank는 생존자에게 최소 {olive}%d{default} 피해를 입혀야 합니다."
+		"ko"		"{green}[IC]{default} Tank 경고: 트레이터 Tank는 생존자에게 최소 {olive}%d{default} 피해를 입혀야 합니다."
 	}
 	"InfectedControl_TraitorPenaltyTankDamageBlock"
 	{
-		"ko"		"{green}[IC]{default} 그렇지 않으면 Tank 내귀가 {olive}%d{default}일 동안 비활성화됩니다."
+		"ko"		"{green}[IC]{default} 그렇지 않으면 Tank 트레이터가 {olive}%d{default}일 동안 비활성화됩니다."
 	}
 	"InfectedControl_TraitorTankBlocked"
 	{
-		"ko"		"{green}[IC]{default} Your Tank traitor is blocked for about {olive}%d{default} more minutes."
+		"ko"		"{green}[IC]{default} Tank 트레이터는 약 {olive}%d{default}분 더 차단되어 있습니다."
 	}
 	"InfectedControl_TraitorTankDamagePunished"
 	{
-		"ko"		"{green}[IC]{default} 이번 내귀 Tank가 생존자에게 {olive}%d{default}/{olive}%d{default} 피해를 입혔습니다."
+		"ko"		"{green}[IC]{default} 이번 트레이터 Tank가 생존자에게 {olive}%d{default}/{olive}%d{default} 피해를 입혔습니다."
 	}
 	"InfectedControl_TraitorTankBlockApplied"
 	{
-		"ko"		"{green}[IC]{default} Tank 내귀가 {olive}%d{default}일 동안 비활성화됩니다."
+		"ko"		"{green}[IC]{default} Tank 트레이터가 {olive}%d{default}일 동안 비활성화됩니다."
 	}
 	"InfectedControl_TraitorNextWaveRegistered"
 	{
-		"ko"		"{green}[IC]{default} Next wave traitor: {olive}%s{default} registered as {olive}%s{default}."
+		"ko"		"{green}[IC]{default} 다음 웨이브 트레이터: {olive}%s{default} 가 {olive}%s{default} 로 등록했습니다."
 	}
 	"InfectedControl_TraitorNextWaveNone"
 	{
-		"ko"		"{green}[IC]{default} No traitor is registered for the next wave."
+		"ko"		"{green}[IC]{default} 다음 웨이브에 등록된 트레이터가 없습니다."
 	}
 	"InfectedControl_TraitorBhopEnabled"
 	{
-		"ko"		"{green}[IC]{default} Auto-bhop is enabled for your traitor. Hold SPACE to jump continuously."
+		"ko"		"{green}[IC]{default} 트레이터 자동 연속점프가 켜졌습니다. SPACE를 누르면 연속으로 점프합니다."
 	}
 	"InfectedControl_TraitorDisabled"
 	{
-		"ko"		"{green}[IC]{default} Traitor mode is disabled."
+		"ko"		"{green}[IC]{default} 트레이터 모드가 꺼져 있습니다."
 	}
 	"InfectedControl_TraitorSpectatorsOnly"
 	{
-		"ko"		"{green}[IC]{default} 관전자 또는 감염자 팀 플레이어만 내귀 모드에 등록할 수 있습니다."
+		"ko"		"{green}[IC]{default} 관전자 또는 감염자 팀 플레이어만 트레이터 모드에 등록할 수 있습니다."
 	}
 	"InfectedControl_TraitorUnsupportedClass"
 	{
-		"ko"		"{green}[IC]{default} Unsupported traitor class."
+		"ko"		"{green}[IC]{default} 지원하지 않는 트레이터 종류입니다."
 	}
 	"InfectedControl_TraitorClassDisabled"
 	{
-		"ko"		"{green}[IC]{default} That infected class is disabled in the current spawn settings."
+		"ko"		"{green}[IC]{default} 현재 스폰 설정에서 해당 특수 감염자는 비활성화되어 있습니다."
 	}
 	"InfectedControl_TraitorNoEnabledClass"
 	{
-		"ko"		"{green}[IC]{default} No enabled infected class is available for traitor mode."
+		"ko"		"{green}[IC]{default} 트레이터에 사용할 수 있는 특수 감염자가 없습니다."
 	}
 	"InfectedControl_TraitorWindowClosed"
 	{
-		"ko"		"{green}[IC]{default} Traitor registration is closed for this wave."
+		"ko"		"{green}[IC]{default} 이번 웨이브의 트레이터 등록이 마감되었습니다."
 	}
 	"InfectedControl_TraitorAlreadyRegistered"
 	{
-		"ko"		"{green}[IC]{default} 이미 한 종류의 배신자로 등록했습니다. 변경하려면 현재 등록을 먼저 취소하세요."
+		"ko"		"{green}[IC]{default} 이미 한 종류의 트레이터로 등록했습니다. 변경하려면 현재 등록을 먼저 취소하세요."
 	}
 	"InfectedControl_TraitorQueued"
 	{
-		"ko"		"{green}[IC]{default} You are queued as traitor {olive}%s{default}."
+		"ko"		"{green}[IC]{default} 트레이터 {olive}%s{default}(으)로 등록했습니다."
 	}
 	"InfectedControl_TraitorNextQueued"
 	{
-		"ko"		"{green}[IC]{default} 다음 내귀를 {olive}%s{default}(으)로 등록했습니다. 현재 특수 감염자가 죽으면 대기열에 들어갑니다."
+		"ko"		"{green}[IC]{default} 다음 트레이터를 {olive}%s{default}(으)로 등록했습니다. 현재 특수 감염자가 죽으면 대기열에 들어갑니다."
 	}
 	"InfectedControl_TraitorWaiting"
 	{
-		"ko"		"{green}[IC]{default} 내귀 {olive}%s{default}(으)로 대기 중입니다 (순번 %d)."
+		"ko"		"{green}[IC]{default} 트레이터 {olive}%s{default}(으)로 대기 중입니다 (순번 %d)."
 	}
 	"InfectedControl_TraitorWaitPromoted"
 	{
-		"ko"		"{green}[IC]{default} A traitor slot opened. You are now queued as {olive}%s{default}."
+		"ko"		"{green}[IC]{default} 트레이터 슬롯이 비었습니다. 이제 {olive}%s{default}(으)로 등록되었습니다."
 	}
 	"InfectedControl_TraitorPending"
 	{
-		"ko"		"{green}[IC]{default} You entered ghost mode. Wait for the next SI wave refresh."
+		"ko"		"{green}[IC]{default} 고스트 상태가 되었습니다. 다음 특수 감염자 웨이브 갱신을 기다리세요."
 	}
 	"InfectedControl_TraitorTankWatching"
 	{
@@ -178,31 +178,31 @@
 	}
 	"InfectedControl_TraitorWaveCountdown"
 	{
-		"ko"		"{green}[IC]{default} AI special infected will refresh in about {olive}%d{default} seconds."
+		"ko"		"{green}[IC]{default} AI 특수 감염자가 약 {olive}%d{default}초 후 갱신됩니다."
 	}
 	"InfectedControl_TraitorWaveMayExtend"
 	{
-		"ko"		"{green}[IC]{default} Find a spawn position now. Survivor holding may delay this wave and your spawn unlock."
+		"ko"		"{green}[IC]{default} 지금 스폰 위치를 찾으세요. 생존자가 정체하면 이번 웨이브와 스폰 해제가 늦어질 수 있습니다."
 	}
 	"InfectedControl_TraitorReadyCountdown"
 	{
-		"ko"		"Earliest spawn: %d seconds (holding may extend)"
+		"ko"		"가장 빠른 스폰: %d초 (정체 시 연장될 수 있음)"
 	}
 	"InfectedControl_TraitorWaveExtended"
 	{
-		"ko"		"{green}[IC]{default} Survivors are holding an advantageous position. Your spawn stays locked until the wave is released."
+		"ko"		"{green}[IC]{default} 생존자가 유리한 위치에서 정체 중입니다. 웨이브가 풀릴 때까지 스폰할 수 없습니다."
 	}
 	"InfectedControl_TraitorWaveExtendedHint"
 	{
-		"ko"		"Spawn delayed by survivor holding"
+		"ko"		"생존자 정체로 스폰이 지연됨"
 	}
 	"InfectedControl_TraitorSpawnWindow"
 	{
-		"ko"		"{green}[IC]{default} The SI refresh point has arrived. You have {olive}%d{default} seconds to spawn yourself."
+		"ko"		"{green}[IC]{default} 특수 감염자 갱신 시점입니다. {olive}%d{default}초 안에 직접 스폰하세요."
 	}
 	"InfectedControl_TraitorSpawnCountdown"
 	{
-		"ko"		"Spawn now: %d seconds left"
+		"ko"		"지금 스폰: %d초 남음"
 	}
 	"InfectedControl_TraitorTankSpawnWindow"
 	{
@@ -214,51 +214,51 @@
 	}
 	"InfectedControl_TraitorSpawnExpired"
 	{
-		"ko"		"{green}[IC]{default} You did not spawn in time. An AI special infected will take this slot."
+		"ko"		"{green}[IC]{default} 제때 스폰하지 않아 AI 특수 감염자가 이 슬롯을 사용합니다."
 	}
 	"InfectedControl_TraitorWaitForWave"
 	{
-		"ko"		"{green}[IC]{default} Wait for the normal SI wave before spawning."
+		"ko"		"{green}[IC]{default} 일반 특수 감염자 웨이브를 기다린 뒤 스폰하세요."
 	}
 	"InfectedControl_TraitorSpawnAllowed"
 	{
-		"ko"		"{green}[IC]{default} You may now spawn using normal ghost rules."
+		"ko"		"{green}[IC]{default} 이제 일반 고스트 규칙으로 스폰할 수 있습니다."
 	}
 	"InfectedControl_TraitorReghostBlocked"
 	{
-		"ko"		"{green}[IC]{default} 내귀는 생성된 후 죽을 때까지 싸워야 합니다. 생존자에게서 멀어져 고스트 상태로 돌아가 다시 생성할 수 없습니다."
+		"ko"		"{green}[IC]{default} 트레이터는 생성된 후 죽을 때까지 싸워야 합니다. 생존자에게서 멀어져 고스트 상태로 돌아가 다시 생성할 수 없습니다."
 	}
 	"InfectedControl_TraitorNoSlot"
 	{
-		"ko"		"{green}[IC]{default} No traitor slot is available."
+		"ko"		"{green}[IC]{default} 사용 가능한 트레이터 슬롯이 없습니다."
 	}
 	"InfectedControl_TraitorNotQueued"
 	{
-		"ko"		"{green}[IC]{default} You are not queued as a traitor."
+		"ko"		"{green}[IC]{default} 트레이터로 등록되어 있지 않습니다."
 	}
 	"InfectedControl_TraitorCancelled"
 	{
-		"ko"		"{green}[IC]{default} Traitor queue cancelled."
+		"ko"		"{green}[IC]{default} 트레이터 등록을 취소했습니다."
 	}
 	"InfectedControl_TraitorCancelledJoinedSurvivor"
 	{
-		"ko"		"{green}[IC]{default} 생존자 팀에 합류하여 배신자 등록이 취소되었습니다."
+		"ko"		"{green}[IC]{default} 생존자 팀에 합류하여 트레이터 등록이 취소되었습니다."
 	}
 	"InfectedControl_TraitorTankTookSlot"
 	{
-		"ko"		"{green}[IC]{default} Tank가 공유 배신자 슬롯을 사용했습니다. AI가 당신의 {olive}%s{default}를 인계받았고 사용된 일일 할당량은 반환되었습니다."
+		"ko"		"{green}[IC]{default} Tank가 공유 트레이터 슬롯을 사용했습니다. AI가 당신의 {olive}%s{default}를 인계받았고 사용된 일일 할당량은 반환되었습니다."
 	}
 	"InfectedControl_TraitorTankCancelledSlot"
 	{
-		"ko"		"{green}[IC]{default} Tank가 공유 배신자 슬롯을 사용했습니다. 아직 생성되지 않은 {olive}%s{default} 등록은 취소되었으며 일일 할당량은 차감되지 않았습니다."
+		"ko"		"{green}[IC]{default} Tank가 공유 트레이터 슬롯을 사용했습니다. 아직 생성되지 않은 {olive}%s{default} 등록은 취소되었으며 일일 할당량은 차감되지 않았습니다."
 	}
 	"InfectedControl_TraitorSpawned"
 	{
-		"ko"		"{green}[IC]{default} You spawned as traitor {olive}%s{default}."
+		"ko"		"{green}[IC]{default} 트레이터 {olive}%s{default}(으)로 스폰했습니다."
 	}
 	"InfectedControl_TraitorFailed"
 	{
-		"ko"		"{green}[IC]{default} 배신자 생성 또는 조종권 이전에 실패했습니다."
+		"ko"		"{green}[IC]{default} 트레이터 생성 또는 조종권 이전에 실패했습니다."
 	}
 	"InfectedControl_TraitorClassSmoker"
 	{
@@ -291,7 +291,7 @@
 
 	"InfectedControl_TraitorWaveStatusReserved"
 	{
-		"ko"		"{green}[IC]{default} Traitor reserved slots: %d"
+		"ko"		"{green}[IC]{default} 트레이터 예약 슬롯: %d"
 	}
 	"InfectedControl_NavCacheRebuildStarted"
 	{
@@ -323,7 +323,7 @@
 	}
 	"InfectedControl_WaveStatusAntiBaitRelease"
 	{
-		"ko"		"  Anti-Bait: 해제"
+		"ko"		"  Anti-Bait: 웨이브 해제"
 	}
 	"InfectedControl_NavDebugNotCompiled"
 	{

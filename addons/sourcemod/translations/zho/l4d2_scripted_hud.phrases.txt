@@ -127,7 +127,7 @@
 		}
 		"L4D2ScriptedHUD_SurvHeader"
 		{
-			"zho"		"玩家狀態[藥][倒地]"
+			"zho"		"玩家狀態[藥][倒地次數]"
 		}
 		"L4D2ScriptedHUD_PillsYes"
 		{

@@ -183,3 +183,9 @@
 ### August 14, 2026 Network Quality Reports Prefer Loss
 - Upgraded `network_quality_hint.smx` to 1.1.5. Website incidents now focus on packet loss: choke below `nqh_report_choke_limit` (default 20%) is no longer reported as an incident. Local chat warnings still use `nqh_choke_limit` (default 5%).
 - Incident reason codes: timeouts stay `timing_out`; otherwise prefer `loss`, then `ping`, and `choke` only when above the report threshold.
+
+### August 14, 2026 Player-facing text alignment
+- The last `!xx` status field is now "Version", not a telecom-line label. English Tank stall / HP return and Japanese Expert / bunnyhop wording now match the source meaning.
+- Traitor and Anti-Bait hints distinguish stalling, hold active, and wave released. Japanese, Korean, and Vietnamese fill in leftover English and use a single traitor name.
+- Default Scripted HUD survivor status is built in the client's language. The header now says revive count instead of a current-downed label.
+- Black-and-white hints use phrases and say the next down is death. The `!ht` menu adds Japanese, Korean, and Vietnamese. Chinese skill-detect class names now match traitor/stats wording.

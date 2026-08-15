@@ -42,10 +42,18 @@
 	}
 	"Server_PromptsAlreadyBlackWhiteGive"
 	{
-		"ko"		"[{olive} 프롬프트 {default}] {green}%N{default} 이미 {olive} 흑백 {default} 보호와 치료를 우선으로 해주세요!"
+		"ko"		"[{olive}알림{default}] {green}%N{default} 은(는) 이미 {olive}흑백{default}입니다(다시 쓰러지면 사망). 우선 보호하고 치료하세요!"
 	}
 	"Server_PromptBlackWhiteTreatSoon"
 	{
-		"ko"		"[{olive} 프롬프트 {default}] 당신은 이제 {green} 흑백 {default}입니다. 빨리 처리해주세요!"
+		"ko"		"[{olive}알림{default}] 당신은 지금 {green}흑백{default}입니다(다시 쓰러지면 사망). 빨리 치료하세요!"
+	}
+	"Server_PromptBlackWhiteHintOther"
+	{
+		"ko"		"%N 은(는) 흑백입니다(다시 쓰러지면 사망)!"
+	}
+	"Server_PromptBlackWhiteHintSelf"
+	{
+		"ko"		"당신은 흑백입니다(다시 쓰러지면 사망)!"
 	}
 }
