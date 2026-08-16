@@ -121,7 +121,8 @@ void ResetMatchState()
         if (IsCountedSpecial(i) && IsPlayerAlive(i) && !IsGhost(i)
             && !SpawnAttempts_IsTransientSpawnClient(i))
         {
-            gST.teleCount[i] = 0;
+            gST.teleInvisibleSeconds[i] = 0.0;
+            gST.teleLastSampleTime[i] = 0.0;
             // 收编的存活特感补一次出生时间戳，避免硬恢复/重开刷特后
             // g_LastSpawnTime 为 0 被传送监督当成“永久出生宽限”。
             TeleportState_StampSpawn(i, "match_reset");

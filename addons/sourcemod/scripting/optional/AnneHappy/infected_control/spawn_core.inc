@@ -452,7 +452,7 @@ enum struct SpawnSearchCursor
     float graphMaxNavDistance;
     float graphHighSortMinHeight;
     float graphHighSortScale;
-    int graphOffset;
+    int graphFetchOffset;
     int graphTotalInRange;
     int graphPage[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
@@ -460,7 +460,6 @@ enum struct SpawnSearchCursor
     int graphPageTertile[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageLen;
     int graphPageRow;
-    float graphPageExpiresAt;
     int inspected;
     float elapsedMs;
     SpawnFilterStats stats;
@@ -481,11 +480,10 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.graphMaxNavDistance = 0.0;
     cursor.graphHighSortMinHeight = 0.0;
     cursor.graphHighSortScale = 1.0;
-    cursor.graphOffset = 0;
+    cursor.graphFetchOffset = 0;
     cursor.graphTotalInRange = -1;
     cursor.graphPageLen = 0;
     cursor.graphPageRow = 0;
-    cursor.graphPageExpiresAt = 0.0;
     cursor.inspected = 0;
     cursor.elapsedMs = 0.0;
     cursor.stats.Reset();
@@ -968,9 +966,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
     {
         if (cursor.source == SpawnCandidate_Graph)
         {
-            float now = GetGameTime();
-            if (cursor.graphPageRow < cursor.graphPageLen
-                && now <= cursor.graphPageExpiresAt)
+            if (cursor.graphPageRow < cursor.graphPageLen)
             {
                 int pageRow = cursor.graphPageRow++;
                 areaIdx = cursor.graphPage[pageRow];
@@ -979,16 +975,16 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 candidateTertile = cursor.graphPageTertile[pageRow];
                 if (candidateTertile < SPAWN_TERTILE_NEAR || candidateTertile > SPAWN_TERTILE_FAR)
                     candidateTertile = SPAWN_TERTILE_NEAR;
-                cursor.graphOffset++;
                 TryGetBucketByAreaIdx(areaIdx, candidateBucket);
                 return SpawnCandidateRead_Found;
             }
 
-            // 未消费页只是一批 areaIdx，不是安全结论；超过 0.2 秒后重新取当前快照。
+            // 本地页已经复制完整，必须消费完才请求下一页。扩展快照的
+            // TTL 只限制 native collect 时的结果新鲜度，不得丢弃已重排的未读行。
             cursor.graphPageLen = 0;
             cursor.graphPageRow = 0;
             if (cursor.graphTotalInRange >= 0
-                && cursor.graphOffset >= cursor.graphTotalInRange)
+                && cursor.graphFetchOffset >= cursor.graphTotalInRange)
             {
                 return SpawnCandidateRead_Exhausted;
             }
@@ -1031,7 +1027,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                     NAV_CANDIDATE_RESULT_TTL,
                     cursor.graphHighSortMinHeight,
                     cursor.graphHighSortScale,
-                    cursor.graphOffset,
+                    cursor.graphFetchOffset,
                     page,
                     pageNavDistance,
                     pageRankDistance,
@@ -1049,7 +1045,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                     cursor.graphPathLimit,
                     FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin),
                     NAV_CANDIDATE_RESULT_TTL,
-                    cursor.graphOffset,
+                    cursor.graphFetchOffset,
                     page,
                     pageNavDistance,
                     NAV_CANDIDATE_PAGE_SIZE,
@@ -1071,7 +1067,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 return SpawnCandidateRead_Pending;
 
             cursor.graphTotalInRange = totalInRange;
-            if (count == 0 && totalInRange == 0 && cursor.graphOffset == 0)
+            if (count == 0 && totalInRange == 0 && cursor.graphFetchOffset == 0)
             {
                 Debug_Print("[SPAWN ACCEL] directed range exhausted target=%d nav=%d range=%.1f..%.1f; widening directed range",
                     cursor.graphTargetClient, cursor.graphTargetNavId,
@@ -1081,6 +1077,7 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             if (count <= 0)
                 return SpawnCandidateRead_Exhausted;
 
+            cursor.graphFetchOffset += count;
             cursor.graphPageLen = count;
             for (int row = 0; row < count; row++)
             {
@@ -1093,8 +1090,6 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             // 评分名额默认 6/5/1。非 ranked 时三分位内部仍可洗牌；
             // ranked 高点通道只做三分位交错，组内保序。
             SpawnSearch_PreparePageOrder(cursor, ranked);
-            float ttlRemaining = NAV_CANDIDATE_RESULT_TTL - resultAgeMs / 1000.0;
-            cursor.graphPageExpiresAt = now + FloatMax(0.001, ttlRemaining);
             continue;
         }
 

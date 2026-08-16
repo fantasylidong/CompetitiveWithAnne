@@ -8,10 +8,51 @@
 		{
 			"jp"		"HUD 表示設定"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"jp"		"設定を読み込み中です。しばらくしてから再度開いてください。"
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"jp"		"設定を読み込み中です。しばらくしてから再度開いてください。"
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"jp"		"有効"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"jp"		"無効"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"jp"		"個人 CS キル HUD：{1}（HUD 9-15 を使用）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"jp"		"基本 HUD（スロット 1-4）"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"jp"		"追加 HUD（スロット 5-8）"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"jp"		"拡張 HUD（スロット 9-15）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"jp"		"基本 HUD"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"jp"		"追加 HUD"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"jp"		"拡張 HUD"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"jp"		"このスロットを表示"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"jp"		"HUD 1：進行度 / Tank / Witch"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"jp"		"次波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"jp"		"撃破フェーズ"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"jp"		"Anti-Bait ホールド中"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

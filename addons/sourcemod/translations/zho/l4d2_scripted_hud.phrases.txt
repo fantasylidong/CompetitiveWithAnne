@@ -8,10 +8,51 @@
 		{
 			"zho"		"HUD 顯示設定"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"zho"		"偏好正在載入，請稍後重新開啟選單。"
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"zho"		"偏好正在載入，請稍後重新開啟選單。"
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"zho"		"開啟"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"zho"		"關閉"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"zho"		"個人 CS 擊殺 HUD：{1}（佔用 HUD 9-15）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"zho"		"核心 HUD（槽位 1-4）"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"zho"		"擴充 HUD（槽位 5-8）"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"zho"		"更多 HUD（槽位 9-15）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"zho"		"核心 HUD"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"zho"		"擴充 HUD"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"zho"		"更多 HUD"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"zho"		"顯示此槽位"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"zho"		"HUD 1：進度 / Tank / Witch"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"zho"		"下一波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"zho"		"擊殺階段"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"zho"		"Anti-Bait 攔截中"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

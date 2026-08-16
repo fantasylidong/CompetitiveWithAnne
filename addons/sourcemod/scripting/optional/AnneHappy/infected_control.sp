@@ -112,6 +112,15 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #define SUPPORT_SPAWN_DELAY_SECS  1.0
 #define SUPPORT_NEED_KILLERS      1
 
+// Public ABI values from include/infected_control.inc. Keep append-only.
+enum InfectedControlNativeWavePhase
+{
+    ICWavePhase_Inactive = 0,
+    ICWavePhase_Kill,
+    ICWavePhase_Countdown,
+    ICWavePhase_AntiBaitHold
+};
+
 // —— 分散度四件套参数 —— //
 // 硬分散半径/记忆时长已提升为 CVar：inf_spawn_sep_radius / inf_spawn_sep_ttl。
 #define NAV_CD_SECS               1.0    // 成功及普通实际校验失败后的同 Nav 冷却
@@ -220,7 +229,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-13.11",
+    version     = "2026-08-15.2",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -332,6 +341,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     g_hSpawnCommittedForward = CreateGlobalForward(
         "InfectedControl_OnSpawnCommitted", ET_Ignore, Param_Cell);
     CreateNative("GetNextSpawnTime", Native_GetNextSpawnTime);       // native：下一次刷特剩余秒数
+    CreateNative("InfectedControl_GetWaveStatus", Native_GetWaveStatus);
     CreateNative("InfectedControl_GetSpawnQueue", Native_GetSpawnQueue);
     CreateNative("InfectedControl_IsTraitorClient", Native_InfectedControlIsTraitorClient);
     CreateNative("InfectedControl_IsTraitorRegistered", Native_InfectedControlIsTraitorRegistered);
@@ -395,6 +405,36 @@ public int Native_GetSpawnQueue(Handle plugin, int numParams)
     if (count > 0)
         SetNativeArray(1, classes, count);
     return count;
+}
+
+public int Native_GetWaveStatus(Handle plugin, int numParams)
+{
+    float remaining = -1.0;
+    InfectedControlNativeWavePhase phase = ICWavePhase_Inactive;
+
+    if (gST.bLate)
+    {
+        switch (WaveDecider_GetState())
+        {
+            case WD_EarlyCheck:
+            {
+                phase = ICWavePhase_Kill;
+                remaining = WaveDecider_GetEarlyCheckRemaining();
+            }
+            case WD_TimerRunning:
+            {
+                phase = ICWavePhase_Countdown;
+                remaining = WaveDecider_GetReleaseEta();
+            }
+            case WD_IntensiveCheck:
+            {
+                phase = ICWavePhase_AntiBaitHold;
+            }
+        }
+    }
+
+    SetNativeCellRef(1, view_as<any>(remaining));
+    return view_as<int>(phase);
 }
 
 //native
@@ -1073,7 +1113,8 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
         if (gST.totalSI > 0) gST.totalSI--; else gST.totalSI = 0;
         InvalidateBucketShareCache();
     }
-    gST.teleCount[client] = 0;
+    gST.teleInvisibleSeconds[client] = 0.0;
+    gST.teleLastSampleTime[client] = 0.0;
     RecalcSiCapFromAlive(false);  // 保持：死亡后刷新剩余额度
 }
 
@@ -1125,6 +1166,7 @@ public void OnClientPutInServer(int client)
 {
     TeleportState_ClearClient(client);
     TraitorQuota_InvalidateClientCache(client);
+    Traitor_OnClientPutInServer(client);
     Traitor_InitializeClientDamage(client);
 }
 

@@ -15,7 +15,8 @@ void TeleportState_ClearClient(int client)
         return;
 
     g_LastSpawnTime[client] = 0.0;
-    gST.teleCount[client] = 0;
+    gST.teleInvisibleSeconds[client] = 0.0;
+    gST.teleLastSampleTime[client] = 0.0;
     gST.spitterSpitTime[client] = 0.0;
 }
 
@@ -26,7 +27,8 @@ void TeleportState_StampSpawn(int client, const char[] source)
 
     float now = GetGameTime();
     g_LastSpawnTime[client] = now;
-    gST.teleCount[client] = 0;
+    gST.teleInvisibleSeconds[client] = 0.0;
+    gST.teleLastSampleTime[client] = 0.0;
     if (IsClientInGame(client) && IsInfectedBot(client)
         && GetInfectedClass(client) == view_as<int>(SI_Spitter))
     {

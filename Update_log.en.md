@@ -158,7 +158,7 @@
 
 ### August 13, 2026 Scripted HUD uses all 15 engine slots
 - Upgraded `extend/l4d2_scripted_hud.smx` to 1.4.0. All 15 EMS HUD slots can be assigned a content source in `!hudmenu` → "All 15 HUD slots" (server default / unused / survivor status / SI HP / kills / ping / tank damage / team items / next wave / speed / round timer / Witch warning / progress-tank-witch / server status).
-- HUD 1-4 keep their old defaults. Slots 5-8 (engine 4-7) stay hidden until a source is chosen, then they appear in a left column. Slots 9-15 (engine 8-14) keep passing through the CS kill feed until you bind content to that slot, which then covers that kill line and moves it to the lower right so it does not sit on the crosshair.
+- HUD 1-4 keep their old defaults. Slots 5-8 (engine 4-7) stay hidden until a source is chosen, then they appear in a left column. Slots 9-15 (engine 8-14) keep passing through the engine kill list until you bind content to that slot, which then covers that kill line and moves it to the lower right so it does not sit on the crosshair.
 - Preferences are stored in the cookie and `scripted_hud_prefs` (`hud_mask` widened to smallint, new `slot_sources` column; old 6-field cookies and hud3/hud4 columns still load). Slot names and menus are translated in all six languages.
 - 1.4.1: Slot coordinates follow the screen aspect. `!hudmenu` → "Screen layout" offers 16:9 / 16:10 / 4:3 / 21:9. Extra slots sit in a left column (4-9) and a right column (10-14) with spacing that clears HUD 1-4, the kill feed, the crosshair, and the weapon tray. 4:3 narrows to avoid right-edge clipping; 21:9 pulls into a centered 16:9 safe area. Each player gets their own layout through SendProxy.
 - 1.4.2: SI HP, next-wave countdown, the next-wave spawn queue, and HUD 2's "SI count / interval" are shown only to spectators and infected; survivors hide the whole slot. The menu marks those sources with " (spec/SI)". New "Next SI queue" source reads `InfectedControl_GetSpawnQueue` from `infected_control` (older plugins show --). Extra slots in the same column stack by their real line count; extra slots cap at 4 lines and HUD 3/4 at 6 so long text no longer overlaps.
@@ -189,3 +189,23 @@
 - Traitor and Anti-Bait hints distinguish stalling, hold active, and wave released. Japanese, Korean, and Vietnamese fill in leftover English and use a single traitor name.
 - Default Scripted HUD survivor status is built in the client's language. The header now says revive count instead of a current-downed label.
 - Black-and-white hints use phrases and say the next down is death. The `!ht` menu adds Japanese, Korean, and Vietnamese. Chinese skill-detect class names now match traitor/stats wording.
+
+### August 15, 2026 Actions crash fix
+- Fixed `actions.ext` reinserting missing user-data keys while destroying Actions and never removing three Action-pointer caches. The Linux extension is now `3.7.6-anne.2` and erases user-data, identity-data, and actor cache entries on destruction.
+- Fixed Actions method propagation creating empty pre/post listener hash entries for every Action even when no listener existed, then retaining the outer Action-pointer key after destruction. Candidate Action pending markers are now cleaned up as well.
+- Updated `ai_charger3` to 1.0.1.7. `ChargerEvade` now defers `CommandABot(MOVE)` to the next frame instead of synchronously rebuilding the NextBot behavior tree inside an Actions `OnUpdate` callback.
+
+### August 15, 2026 New-player traitor state cleanup
+- Upgraded `infected_control.smx` to 2026-08-15.1. A player entering the server now explicitly clears traitor registration from the occupied client slot. Even if cleanup for the previous occupant did not finish, the new player starts as a non-traitor and `join.smx` can move an accidental infected-team assignment back to spectator. Registering as a traitor afterward is unaffected.
+
+### August 15, 2026 Scripted HUD next-wave state fix
+- Upgraded `infected_control.smx` to 2026-08-15.2 with a wave-status native that distinguishes the kill phase, independent base countdown, and Anti-Bait hold. The legacy ETA native remains compatible.
+- Upgraded Scripted HUD to 1.4.4. Exact seconds are shown only during the base countdown; the kill phase and Anti-Bait hold use explicit localized states. Version 2026-07 and older providers show `--` because they lack the state API, instead of exposing an estimate that can be off by about eight seconds.
+
+### August 15, 2026 Scripted HUD integrates the CS kill feed
+- Upgraded Scripted HUD to 1.5.0. Removed the standalone `l4d2_cs_kill_hud.smx` and its old kill-feed votes; the CS-style feed is now built in. It is off for each player by default and can be toggled independently in `!hudmenu`, without a server-wide enable switch.
+- For a player who enables it, SendProxy takes over engine slots 8-14 (shown as HUD 9-15 in menus) only for that recipient, and those slots disappear from that player's configurable-slot menu. Players who leave it off continue to receive the native kill list and keep their own slot preferences.
+- Reworked `!hudmenu` into CS kill feed, Core HUD (1-4), Extra HUD (5-8), Extended HUD (9-15), screen layout, and HUD 2 field groups. Kill-feed and slot preferences are stored per player.
+
+### August 15, 2026 Removed the corpse-dissolve vote
+- Removed the "dissolve corpses" vote from every mode menu and deleted `cfg/vote/dissolve_on.cfg` and `cfg/vote/dissolve_off.cfg`.

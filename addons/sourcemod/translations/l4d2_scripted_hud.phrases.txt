@@ -8,10 +8,51 @@
 		{
 			"en"		"HUD display settings"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"en"		"Preferences are loading. Reopen this menu shortly."
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"en"		"Preferences are loading. Reopen this menu shortly."
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"en"		"ON"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"en"		"OFF"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"en"		"Personal CS kill feed: {1} (uses HUD 9-15)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"en"		"Core HUD (slots 1-4)"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"en"		"Extra HUD (slots 5-8)"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"en"		"Extended HUD (slots 9-15)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"en"		"Core HUD"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"en"		"Extra HUD"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"en"		"Extended HUD"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"en"		"Display this slot"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"en"		"HUD 1: progress / Tank / Witch"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"en"		"Next SI {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"en"		"Kill phase"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"en"		"Anti-Bait hold"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

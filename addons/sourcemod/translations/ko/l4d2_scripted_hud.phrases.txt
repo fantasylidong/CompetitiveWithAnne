@@ -8,10 +8,51 @@
 		{
 			"ko"		"HUD 표시 설정"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"ko"		"설정을 불러오는 중입니다. 잠시 후 메뉴를 다시 여세요."
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"ko"		"설정을 불러오는 중입니다. 잠시 후 메뉴를 다시 여세요."
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"ko"		"켜짐"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"ko"		"꺼짐"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"ko"		"개인 CS 킬 HUD: {1} (HUD 9-15 사용)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"ko"		"기본 HUD (슬롯 1-4)"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"ko"		"추가 HUD (슬롯 5-8)"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"ko"		"확장 HUD (슬롯 9-15)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"ko"		"기본 HUD"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"ko"		"추가 HUD"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"ko"		"확장 HUD"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"ko"		"이 슬롯 표시"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"ko"		"HUD 1: 진행도 / Tank / Witch"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"ko"		"다음 파 {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"ko"		"처치 단계"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"ko"		"Anti-Bait 보류 중"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

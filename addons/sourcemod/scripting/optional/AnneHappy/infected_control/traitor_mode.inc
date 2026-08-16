@@ -1864,6 +1864,13 @@ static void Traitor_ClearClient(int client, bool preserveDamageLedger = false)
     Traitor_RefreshDamageHookDemand();
 }
 
+void Traitor_OnClientPutInServer(int client)
+{
+    // Client slots are reused. A new occupant must never inherit traitor
+    // registration from a disconnect whose cleanup did not finish.
+    Traitor_ClearClient(client);
+}
+
 static void Traitor_ClearNextRegistration(int client)
 {
     if (client < 1 || client > MaxClients)
@@ -2393,7 +2400,8 @@ static bool Traitor_QueueRefreshBot(int bot, int zc)
     if (gST.totalSI > 0)
         gST.totalSI--;
 
-    gST.teleCount[bot] = 0;
+    gST.teleInvisibleSeconds[bot] = 0.0;
+    gST.teleLastSampleTime[bot] = 0.0;
     g_LastSpawnTime[bot] = 0.0;
     InvalidateBucketShareCache();
 

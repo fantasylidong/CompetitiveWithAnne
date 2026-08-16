@@ -337,7 +337,7 @@ enum struct Config
         this.SpawnMin          = CreateConVar("inf_SpawnDistanceMin", "250.0", "特感复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
         this.TeleportSpawnMin  = CreateConVar("inf_TeleportDistanceMin", "400.0", "特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
         this.LegacyTeleportSpawnMin = CreateConVar("inf_TeleportDistance", "400.0", "兼容旧配置：特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
-        this.SpawnMax          = CreateConVar("inf_SpawnDistanceMax", "1500.0", "导演兜底的3D直线距离上限；有向Nav职业范围最多使用其2倍", CVAR_FLAG, true, this.SpawnMin.FloatValue);
+        this.SpawnMax          = CreateConVar("inf_SpawnDistanceMax", "1500.0", "有向Nav职业范围的基准上限，最远可使用其2倍；Director API兜底固定为2000的3D直线上限", CVAR_FLAG, true, this.SpawnMin.FloatValue);
         this.TeleportEnable    = CreateConVar("inf_TeleportSi", "1", "是否开启特感超时传送", CVAR_FLAG, true, 0.0, true, 1.0);
         this.TeleportCheckTime = CreateConVar("inf_TeleportCheckTime", "5", "特感几秒后没被看到开始传送", CVAR_FLAG, true, 0.0);
         this.EnableMask        = CreateConVar("inf_EnableSIoption", "63", "启用生成的特感类型位掩码 (1~63)", CVAR_FLAG, true, 0.0, true, 63.0);
@@ -1052,10 +1052,19 @@ enum struct Config
         this.bNavBucketMapInvalid   = this.NavBucketMapInvalid.BoolValue;
         this.fNavBucketAssignRadius = this.NavBucketAssignRadius.FloatValue;
         this.bNavCacheEnable = this.gCvarNavCacheEnable.BoolValue;
-        // 刷新评分系统权重。
+        // 刷新评分系统权重。先清除上一次解析的尾部值，
+        // 运行中把六项 CVar 缩短时，未提供的职业应回到默认权重。
         char buffer[256];
         char parts[SI_COUNT][16];
         int numParts;
+
+        for (int i = 1; i <= SI_COUNT; i++)
+        {
+            this.w_dist[i] = 1.0;
+            this.w_hght[i] = 1.0;
+            this.w_flow[i] = 1.0;
+            this.w_disp[i] = 1.0;
+        }
 
         this.Score_w_dist.GetString(buffer, sizeof(buffer));
         numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);

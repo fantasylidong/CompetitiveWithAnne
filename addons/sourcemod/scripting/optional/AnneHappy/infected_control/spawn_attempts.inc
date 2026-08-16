@@ -258,7 +258,6 @@ static bool g_bDirectedTargetTried[MAXPLAYERS + 1];
 static int g_iNormalDirectedRetargets[SI_COUNT];
 
 #define NORMAL_DIRECTED_RETARGET_LIMIT 3
-#define EXTENDED_DIRECTOR_MAX_SCALE 1.5
 
 static bool SpawnAttempts_HasReachedAliveLimit(int zc)
 {
@@ -830,8 +829,9 @@ void TryNormalSpawnOnce()
         return;
     }
 
-    minRange = gCV.fSpawnMin;
-    maxRange = gCV.fSpawnMax;
+    minRange = FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin)
+        + NAV_CANDIDATE_LANDING_MARGIN;
+    maxRange = DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE;
     bool targetPending;
     if (SpawnAttempts_TryAlternateDirectedTarget(want, false, false, targetPending)
         || targetPending)
@@ -845,11 +845,8 @@ void TryNormalSpawnOnce()
     bool fallbackFound;
     if (usedExtendedSamples)
     {
-        // The second fallback widens only the far edge. It never lowers the
-        // configured minimum, avoiding the old near/full-range explosion.
-        maxRange = FloatMin(
-            gCV.fSpawnMax * EXTENDED_DIRECTOR_MAX_SCALE,
-            gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE);
+        // 第二阶段只增加 Director API 内部尝试次数；安全范围仍固定
+        // 为全队最近直线距离 [minRange, 2000]。
         fallbackFound = FallbackDirectorPos(
             want, searchTarget, EXTENDED_DIRECTOR_TRIES, false, pt);
     }
@@ -1009,8 +1006,11 @@ void TryTeleportSpawnOnce()
         return;
     }
 
-    minRange = FloatMax(gCV.fSpawnMin, gCV.fTeleportSpawnMin);
-    maxRange = gCV.fSpawnMax;
+    minRange = FloatMax(
+        NAV_CANDIDATE_TEAM_EXCLUSION,
+        FloatMax(gCV.fSpawnMin, gCV.fTeleportSpawnMin))
+        + NAV_CANDIDATE_LANDING_MARGIN;
+    maxRange = DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE;
     bool targetPending;
     if (SpawnAttempts_TryAlternateDirectedTarget(want, true, false, targetPending)
         || targetPending)

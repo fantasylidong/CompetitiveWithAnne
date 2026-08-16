@@ -8,10 +8,51 @@
 		{
 			"vi"		"Cài đặt hiển thị HUD"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"vi"		"Đang tải tùy chọn. Hãy mở lại menu sau giây lát."
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"vi"		"Đang tải tùy chọn. Hãy mở lại menu sau giây lát."
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"vi"		"BẬT"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"vi"		"TẮT"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"vi"		"HUD hạ gục CS cá nhân: {1} (dùng HUD 9-15)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"vi"		"HUD chính (ô 1-4)"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"vi"		"HUD phụ (ô 5-8)"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"vi"		"HUD mở rộng (ô 9-15)"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"vi"		"HUD chính"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"vi"		"HUD phụ"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"vi"		"HUD mở rộng"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"vi"		"Hiển thị ô này"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"vi"		"HUD 1: tiến độ / Tank / Witch"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"vi"		"Đợt sau {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"vi"		"giai đoạn hạ SI"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"vi"		"Anti-Bait đang giữ"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

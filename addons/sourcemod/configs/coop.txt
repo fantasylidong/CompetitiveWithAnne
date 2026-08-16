@@ -163,22 +163,6 @@
 	}
 	"开关特殊插件"
 	{
-		"exec vote/killhud_on.cfg"
-		{
-			"message" "开启击杀HUD"
-		}
-		"exec vote/killhud_off.cfg"
-		{
-			"message" "关闭击杀HUD"
-		}
-		"exec vote/dissolve_on.cfg"
-		{
-			"message" "开启击杀溶解尸体"
-		}
-		"exec vote/dissolve_off.cfg"
-		{
-			"message" "关闭击杀溶解尸体"
-		}
 		"sm_cvar l4d2_scripted_hud_enable 1"
 		{
 			"message" "打开进度hud"

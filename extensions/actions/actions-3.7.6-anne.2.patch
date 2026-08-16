@@ -1,0 +1,562 @@
+diff --git a/AMBuildScript b/AMBuildScript
+index c984679..2598d94 100644
+--- a/AMBuildScript
++++ b/AMBuildScript
+@@ -260,7 +260,7 @@ class ExtensionConfig(object):
+ 
+   def configure_linux(self, cxx):
+     cxx.defines += ['_LINUX', 'POSIX']
+-    cxx.linkflags += ['-Wl,--exclude-libs,ALL', '-lm']
++    cxx.linkflags += ['-Wl,--exclude-libs,ALL', '-Wl,--build-id=sha1', '-lm']
+     if cxx.vendor == 'gcc':
+       cxx.linkflags += ['-static-libgcc']
+     elif cxx.vendor == 'clang':
+@@ -444,4 +444,4 @@ if builder.backend == 'amb2':
+     'PackageScript',
+   ]
+ 
+-builder.RunBuildScripts(BuildScripts, { 'Extension': Extension})
+\ No newline at end of file
++builder.RunBuildScripts(BuildScripts, { 'Extension': Extension})
+diff --git a/AMBuilder b/AMBuilder
+index 135f543..fa62728 100644
+--- a/AMBuilder
++++ b/AMBuilder
+@@ -85,7 +85,7 @@ for sdk_name in Extension.sdks:
+     compiler.cxxflags.append('/std:c++17')
+     compiler.linkflags.append('legacy_stdio_definitions.lib')
+   elif compiler.vendor == 'clang':
+-    compiler.cxxflags += [ '-Wno-reinterpret-base-class', '-Wno-infinite-recursion', '-Wno-expansion-to-defined', '-Wno-implicit-const-int-float-conversion', '-std=c++17', '-Wno-register', '-Wno-varargs', '-fexceptions' ]
++    compiler.cxxflags += [ '-Wno-reinterpret-base-class', '-Wno-infinite-recursion', '-Wno-expansion-to-defined', '-Wno-macro-redefined', '-std=c++17', '-Wno-register', '-Wno-varargs', '-fexceptions' ]
+     compiler.defines += [ 'HAVE_STRING_H', '_GLIBCXX_USE_CXX11_ABI=0' ]
+     compiler.linkflags += [ '-static-libstdc++' ]
+ 	
+diff --git a/source/actions_legacy.h b/source/actions_legacy.h
+index acdd319..43aef2c 100644
+--- a/source/actions_legacy.h
++++ b/source/actions_legacy.h
+@@ -17,6 +17,7 @@ cell_t NAT_action_Deallocate(IPluginContext* pContext, const cell_t* params)
+ 		return 0;
+ 	}
+ 
++	g_actionsManager.RemovePending(action);
+ 	delete action;
+ 	return 0;
+ }
+@@ -91,4 +92,4 @@ sp_nativeinfo_t g_actionsNativesLegacy[] =
+ 	{ "ActionsManager.Create", NAT_action_Create },
+ 
+ 	{ NULL, NULL }
+-};
+\ No newline at end of file
++};
+diff --git a/source/actions_manager.cpp b/source/actions_manager.cpp
+index a5f9096..07a7dc7 100644
+--- a/source/actions_manager.cpp
++++ b/source/actions_manager.cpp
+@@ -55,7 +55,9 @@ void ActionsManager::ClearUserDataIdentity(IPluginContext* ctx)
+ 
+ void ActionsManager::ClearUserData(nb_action_ptr action)
+ {
+-	m_actionsUserData[action].clear();
++	m_actionsUserData.erase(action);
++	m_actionsIndentityUserData.erase(action);
++	m_actionActor.erase(action);
+ }
+ 
+ cell_t ActionsManager::GetActionActorEntIndex(nb_action_ptr action)
+@@ -118,28 +120,24 @@ void ActionsManager::ProcessInitialContainedAction(const ResultType& pl, nb_acti
+ {
+ 	if (pl == Pl_Continue)
+ 	{
+-		if (oldaction)
+-		{
+-			if (parent)
+-				g_actionsManager.SetActionActor(oldaction, parent->GetActor());
+-
+-			Add(oldaction);
+-		}
+-
+ 		if (newaction && newaction != oldaction)
+ 		{
+ 			WarningSM("Tried to override initial action with Plugin_Continue: %s\n", newaction->GetName());
+-			delete newaction;
++			if (!IsTrackedAction(newaction))
++			{
++				RemovePending(newaction);
++				delete newaction;
++			}
+ 		}
+ 
+ 		return;
+ 	}
+ 
+-	if (newaction)
+-	{
+-		if (oldaction)
+-			delete oldaction;
++	if (oldaction && oldaction != newaction)
++		delete oldaction;
+ 
++	if (newaction && newaction != oldaction)
++	{
+ 		if (parent)
+ 			g_actionsManager.SetActionActor(newaction, parent->GetActor());
+ 		
+@@ -162,4 +160,4 @@ void ActionsManager::OnActionDestroyed(nb_action_ptr action)
+ 	StopActionProcessing(action);
+ 	RemovePending(action);
+ 	ClearUserData(action);
+-}
+\ No newline at end of file
++}
+diff --git a/source/actions_manager.h b/source/actions_manager.h
+index 5a35c1e..732254b 100644
+--- a/source/actions_manager.h
++++ b/source/actions_manager.h
+@@ -142,6 +142,7 @@ public:
+ 	cell_t GetActionActorEntIndex(nb_action_ptr action);
+ 
+ 	inline bool IsValidAction(nb_action_ptr action);
++	inline bool IsTrackedAction(nb_action_ptr action);
+ 	inline bool IsPending(nb_action_ptr action);
+ 
+ protected:
+@@ -177,6 +178,11 @@ inline bool ActionsManager::IsValidAction(nb_action_ptr action)
+ 	return m_actions.find(action).found();
+ }
+ 
++inline bool ActionsManager::IsTrackedAction(nb_action_ptr action)
++{
++	return action && m_actions.find(action).found();
++}
++
+ 
+ inline void ActionsManager::SetUserDataIdentity(nb_action_ptr action, const ActionUserDataIdentity& token, void* data)
+ {
+@@ -293,7 +299,8 @@ inline bool ActionsManager::IsPending(nb_action_ptr action)
+ 
+ inline void ActionsManager::AddPending(nb_action_ptr const action)
+ {
+-	m_actionsPending.insert(action);
++	if (action)
++		m_actionsPending.insert(action);
+ }
+ 
+ inline void ActionsManager::RemovePending(nb_action_ptr const action) noexcept
+diff --git a/source/actions_natives.h b/source/actions_natives.h
+index 64d987d..884ab33 100644
+--- a/source/actions_natives.h
++++ b/source/actions_natives.h
+@@ -746,7 +746,7 @@ cell_t NAT_actions_GetActionUserDataString(IPluginContext* pContext, const cell_
+ 	std::string data;
+ 	if (g_actionsManager.GetUserData(action, str, data))
+ 	{
+-		strcpy_s(out, params[4], data.c_str());
++		ke::SafeStrcpy(out, params[4], data.c_str());
+ 		return 1;
+ 	}
+ 
+@@ -783,7 +783,7 @@ cell_t NAT_actions_GetActionUserDataIdentityString(IPluginContext* pContext, con
+ 	std::string data;
+ 	if (g_actionsManager.GetUserDataIdentity(action, { pContext->GetIdentity(), str }, data))
+ 	{
+-		strcpy_s(out, params[4], data.c_str());
++		ke::SafeStrcpy(out, params[4], data.c_str());
+ 		return 1;
+ 	}
+ 
+diff --git a/source/actions_processor_shared.h b/source/actions_processor_shared.h
+index fb3680a..ed7cf34 100644
+--- a/source/actions_processor_shared.h
++++ b/source/actions_processor_shared.h
+@@ -90,6 +90,11 @@ static void ProcessResultTransition(T& desiredResult)
+ 	else if (desiredResult.m_action)
+ 	{
+ 		g_pSM->LogError(myself, "Trying to change action without result!");
++		const bool isTracked = g_actionsManager.IsTrackedAction(desiredResult.m_action);
++		g_actionsManager.RemovePending(desiredResult.m_action);
++		if (!isTracked)
++			delete desiredResult.m_action;
++		desiredResult.m_action = nullptr;
+ 	}
+ }
+ 
+@@ -116,7 +121,8 @@ handler_result<R> ProcessHandlerImpl(M&& handler, nb_action_ptr action, HashValu
+ 
+ 	if constexpr (is_action_result_v<R>)
+ 	{
+-		g_actionsManager.AddPending(newResult.m_action);
++		if (newResult.m_type == CHANGE_TO || newResult.m_type == SUSPEND_FOR)
++			g_actionsManager.AddPending(newResult.m_action);
+ 	}
+ 
+ 	plpost = g_actionsPropagationPost.ProcessMethod<R, Args...>(action, hash, &newResult, std::forward<Args>(args)...);
+diff --git a/source/actions_propagation.cpp b/source/actions_propagation.cpp
+index c1dad78..96e2c24 100644
+--- a/source/actions_propagation.cpp
++++ b/source/actions_propagation.cpp
+@@ -9,7 +9,7 @@
+ ActionPropagation g_actionsPropagationPre;
+ ActionPropagation g_actionsPropagationPost;
+ 
+-ActionPropagation::ActionPropagation() : m_isInExecution(false)
++ActionPropagation::ActionPropagation() : m_executionDepth(0)
+ {
+ }
+ 
+@@ -25,13 +25,19 @@ bool ActionPropagation::AddListener(nb_action_ptr action, HashValue hash, IPlugi
+ 		return false;
+ 	}
+ 
++	if (m_actionsPendingRemoval.find(action) != m_actionsPendingRemoval.end())
++	{
++		fn->GetParentRuntime()->GetDefaultContext()->ReportError("Attempt to hook action while an action at the same address is being destroyed");
++		return false;
++	}
++
+ 	auto& v = m_actionsListeners[action][hash];
+ 	auto listener = std::find_if(v.cbegin(), v.cend(), [fn](const ActionListener& listener) { return listener.fn == fn; });
+ 
+ 	if (listener != v.end())
+ 		return false;
+ 
+-	m_actionsListeners[action][hash].emplace_back(hash, fn);
++	v.emplace_back(hash, fn);
+ 	return true;
+ }
+ 
+@@ -43,44 +49,76 @@ bool ActionPropagation::RemoveListener(nb_action_ptr action, HashValue hash, IPl
+ 		return false;
+ 	}
+ 
+-	auto& v = m_actionsListeners[action][hash];
+-	auto listener = std::find_if(v.begin(), v.end(), [fn](const ActionListener& listener) { return listener.fn == fn; });
++	auto actionListeners = m_actionsListeners.find(action);
++	if (actionListeners == m_actionsListeners.end())
++		return false;
++
++	auto methodListeners = actionListeners->second.find(hash);
++	if (methodListeners == actionListeners->second.end())
++		return false;
++
++	auto& v = methodListeners->second;
++	auto listener = std::find_if(v.begin(), v.end(), [fn](const ActionListener& listener) { return !listener.removed && listener.fn == fn; });
+ 
+ 	if (listener == v.end())
+ 		return false;
+ 
+-	if (HandleRemoveProcess(&v, listener))
++	if (m_executionDepth > 0)
++	{
++		listener->removed = true;
+ 		return true;
++	}
+ 
+ 	v.erase(listener);
++	PruneEmptyListeners();
+ 	return true;
+ }
+ 
+ bool ActionPropagation::RemoveListener(nb_action_ptr action, HashValue hash, IPluginContext* ctx)
+ {
+-	auto& v = m_actionsListeners[action][hash];
++	auto actionListeners = m_actionsListeners.find(action);
++	if (actionListeners == m_actionsListeners.end())
++		return false;
++
++	auto methodListeners = actionListeners->second.find(hash);
++	if (methodListeners == actionListeners->second.end())
++		return false;
++
++	auto& v = methodListeners->second;
+ 	auto result = std::find_if(v.begin(), v.end(), [ctx](const ActionListener& listener)
+ 		{ 
+-			return ctx == listener.fn->GetParentRuntime()->GetDefaultContext(); 
++			return !listener.removed && ctx == listener.fn->GetParentRuntime()->GetDefaultContext();
+ 		});
+ 	
+ 	if (result == v.end())
+ 		return false;
+ 
+-	if (HandleRemoveProcess(&v, result))
++	if (m_executionDepth > 0)
++	{
++		result->removed = true;
+ 		return true;
++	}
+ 
+ 	v.erase(result);
++	PruneEmptyListeners();
+ 	return true;
+ }
+ 
+ ActionListener* ActionPropagation::HasListener(nb_action_ptr action, HashValue hash, IPluginFunction* fn)
+ {
+-	auto& list = m_actionsListeners[action][hash];
++	auto actionListeners = m_actionsListeners.find(action);
++	if (actionListeners == m_actionsListeners.end())
++		return nullptr;
++
++	auto methodListeners = actionListeners->second.find(hash);
++	if (methodListeners == actionListeners->second.end())
++		return nullptr;
++
++	auto& list = methodListeners->second;
+ 
+ 	for (auto iter = list.begin(); iter != list.end(); iter++)
+ 	{
+-		if (iter->fn == fn && iter->hash == hash)
++		if (!iter->removed && iter->fn == fn && iter->hash == hash)
+ 		{
+ 			return &(*iter);
+ 		}
+@@ -91,8 +129,10 @@ ActionListener* ActionPropagation::HasListener(nb_action_ptr action, HashValue h
+ 
+ void ActionPropagation::RemoveActionListeners(nb_action_ptr action)
+ {
+-	auto& list = m_actionsListeners[action];
+-	list.clear();
++	if (m_executionDepth > 0)
++		m_actionsPendingRemoval.insert(action);
++	else
++		m_actionsListeners.erase(action);
+ }
+ 
+ void ActionPropagation::RemoveListener(IPluginContext* ctx)
+@@ -104,10 +144,11 @@ void ActionPropagation::RemoveListener(IPluginContext* ctx)
+ 			auto& listener = list.second;
+ 			for (auto it = listener.begin(); it != listener.end();)
+ 			{
+-				if (it->fn->GetParentRuntime()->GetDefaultContext() == ctx)
++				if (!it->removed && it->fn->GetParentRuntime()->GetDefaultContext() == ctx)
+ 				{
+-					if (HandleRemoveProcess(&listener, it))
++					if (m_executionDepth > 0)
+ 					{
++						it->removed = true;
+ 						it++;
+ 					}
+ 					else
+@@ -122,4 +163,27 @@ void ActionPropagation::RemoveListener(IPluginContext* ctx)
+ 			}
+ 		}
+ 	}
+-}
+\ No newline at end of file
++
++	if (m_executionDepth == 0)
++		PruneEmptyListeners();
++}
++
++void ActionPropagation::PruneEmptyListeners()
++{
++	for (auto action = m_actionsListeners.begin(); action != m_actionsListeners.end();)
++	{
++		auto& methods = action->second;
++		for (auto method = methods.begin(); method != methods.end();)
++		{
++			if (method->second.empty())
++				method = methods.erase(method);
++			else
++				method++;
++		}
++
++		if (methods.empty())
++			action = m_actionsListeners.erase(action);
++		else
++			action++;
++	}
++}
+diff --git a/source/actions_propagation.h b/source/actions_propagation.h
+index bc1fca7..c80e131 100644
+--- a/source/actions_propagation.h
++++ b/source/actions_propagation.h
+@@ -10,6 +10,7 @@
+ #include "actions_manager.h"
+ 
+ #include <unordered_map>
++#include <unordered_set>
+ #include <vector>
+ #include <type_traits>
+ #include <list>
+@@ -44,13 +45,14 @@ struct handler_result
+ 
+ struct ActionListener
+ {
+-	ActionListener() = default;
+-	ActionListener(HashValue _hash, IPluginFunction* _fn) : hash(_hash), fn(_fn)
++	ActionListener() : removed(false) {}
++	ActionListener(HashValue _hash, IPluginFunction* _fn) : hash(_hash), fn(_fn), removed(false)
+ 	{
+ 	}
+ 
+ 	HashValue hash;
+ 	IPluginFunction* fn;
++	bool removed;
+ };
+ 
+ using MethodListeners = std::unordered_map<HashValue, std::list<ActionListener>>;
+@@ -72,20 +74,6 @@ inline bool is_result_same(const EventDesiredResult<CBaseEntity>& left, const Ev
+ 
+ class ActionPropagation
+ {
+-	struct runtime_deletor
+-	{
+-		using container_t = MethodListeners::mapped_type;
+-		using item_t = container_t::iterator;
+-
+-		runtime_deletor(container_t* data, const item_t& item)
+-			: data(data), item(item)
+-		{
+-		}
+-
+-		container_t* data;
+-		item_t item;
+-	};
+-
+ public:
+ 	ActionPropagation();
+ 	~ActionPropagation();
+@@ -134,18 +122,32 @@ public:
+ 	template<typename TReturn, typename ...Args>
+ 	ResultType ProcessMethod(nb_action_ptr action, HashValue hash, TReturn* result, Args&&... args)
+ 	{
+-		auto& listeners = m_actionsListeners[action][hash];
++		auto actionListeners = m_actionsListeners.find(action);
++		if (actionListeners == m_actionsListeners.end())
++			return Pl_Continue;
++
++		auto methodListeners = actionListeners->second.find(hash);
++		if (methodListeners == actionListeners->second.end())
++			return Pl_Continue;
++
++		auto& listeners = methodListeners->second;
+ 
+ 		ResultType returnResult, executeResult = Pl_Continue;
+ 
+ 		returnResult = executeResult;
+-		m_isInExecution = true;
++		m_executionDepth++;
++		nb_action_ptr previousRuntimeAction = g_actionsManager.GetRuntimeAction();
+ 		g_actionsManager.SetRuntimeAction(action);
+ 
+ 		for (auto it = listeners.begin(); it != listeners.end(); it++)
+ 		{
++			if (it->removed)
++				continue;
++
+ 			IPluginFunction* fn = it->fn;
+-			TReturn priorResult = *result;
++			TReturn priorResult = {};
++			if constexpr (!std::is_null_pointer_v<TReturn>)
++				priorResult = *result;
+ 
+ 			ProcessMethodArg<nb_action_ptr>(fn, std::forward<nb_action_ptr>(action));
+ 			(ProcessMethodArg<Args>(fn, std::forward<Args>(args)), ...);
+@@ -163,6 +165,12 @@ public:
+ 			}
+ 
+ 			fn->Execute((cell_t*)&executeResult);
++			if (m_actionsPendingRemoval.find(action) != m_actionsPendingRemoval.end())
++			{
++				if (executeResult > returnResult)
++					returnResult = executeResult;
++				break;
++			}
+ 
+ 			if constexpr (is_action_result_v<TReturn>)
+ 			{
+@@ -174,6 +182,7 @@ public:
+ 					// delete plugin's action and use prior as the most safest result
+ 					if (result->m_action && result->m_action != priorResult.m_action)
+ 					{
++						g_actionsManager.RemovePending(result->m_action);
+ 						delete result->m_action;
+ 						*result = priorResult;
+ 					}
+@@ -187,6 +196,7 @@ public:
+ 						MsgSM("%.3f:%i: DELETE ACTION %s ( 0x%X )", gpGlobals->curtime, g_actionsManager.GetActionActorEntIndex(action), priorResult.m_action->GetName(), priorResult.m_action);
+ 
+ 					// delete an outdated action
++					g_actionsManager.RemovePending(priorResult.m_action);
+ 					delete priorResult.m_action;
+ 					priorResult.m_action = nullptr;
+ 				}
+@@ -199,10 +209,11 @@ public:
+ 			}
+ 		}
+ 
+-		g_actionsManager.SetRuntimeAction(nullptr);
++		g_actionsManager.SetRuntimeAction(previousRuntimeAction);
+ 
+-		m_isInExecution = false;
+-		ProcessDeletors();
++		m_executionDepth--;
++		if (m_executionDepth == 0)
++			ProcessDeletors();
+ 
+ 		return returnResult;
+ 	}
+@@ -216,34 +227,33 @@ public:
+ 	ActionListener* HasListener(nb_action_ptr action, HashValue hash, IPluginFunction* fn);
+ 
+ private:
+-	inline bool HandleRemoveProcess(runtime_deletor::container_t* container, runtime_deletor::item_t& item);
+ 	inline void ProcessDeletors();
++	void PruneEmptyListeners();
+ 
+ protected:
+ 	ActionListeners m_actionsListeners;
+ 
+ private:
+-	std::vector<runtime_deletor> m_deletors;
+-	bool m_isInExecution;
++	std::unordered_set<nb_action_ptr> m_actionsPendingRemoval;
++	size_t m_executionDepth;
+ };
+ 
+-inline bool ActionPropagation::HandleRemoveProcess(runtime_deletor::container_t* container, runtime_deletor::item_t& item)
+-{
+-	if (!m_isInExecution)
+-		return false;
+-
+-	m_deletors.emplace_back(container, item);
+-	return true;
+-}
+-
+ inline void ActionPropagation::ProcessDeletors()
+ {
+-	for (auto& iter : m_deletors)
++	for (nb_action_ptr action : m_actionsPendingRemoval)
++		m_actionsListeners.erase(action);
++	m_actionsPendingRemoval.clear();
++
++	for (auto& action : m_actionsListeners)
+ 	{
+-		iter.data->erase(iter.item);
++		for (auto& method : action.second)
++		{
++			method.second.remove_if([](const ActionListener& listener)
++				{ return listener.removed; });
++		}
+ 	}
+ 
+-	m_deletors.clear();
++	PruneEmptyListeners();
+ }
+ 
+ extern ActionPropagation g_actionsPropagationPre;
+diff --git a/source/smsdk_config.h b/source/smsdk_config.h
+index 98c30cc..df83dd2 100644
+--- a/source/smsdk_config.h
++++ b/source/smsdk_config.h
+@@ -40,7 +40,7 @@
+ /* Basic information exposed publicly */
+ #define SMEXT_CONF_NAME			"Actions"
+ #define SMEXT_CONF_DESCRIPTION	"Nextbot action tree manager"
+-#define SMEXT_CONF_VERSION		"3.7.6"
++#define SMEXT_CONF_VERSION		"3.7.6-anne.2"
+ #define SMEXT_CONF_AUTHOR		"BHaType"
+ #define SMEXT_CONF_URL			"http://www.sourcemod.net/"
+ #define SMEXT_CONF_LOGTAG		"Actions"

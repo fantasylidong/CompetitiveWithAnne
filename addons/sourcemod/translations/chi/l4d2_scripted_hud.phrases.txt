@@ -8,10 +8,51 @@
 		{
 			"chi"		"HUD 显示设置"
 		}
-		"L4D2ScriptedHUD_PrefsLoading"
-		{
-			"chi"		"偏好正在加载，请稍后重新打开菜单。"
-		}
+			"L4D2ScriptedHUD_PrefsLoading"
+			{
+				"chi"		"偏好正在加载，请稍后重新打开菜单。"
+			}
+			"L4D2ScriptedHUD_KillFeedOn"
+			{
+				"chi"		"开启"
+			}
+			"L4D2ScriptedHUD_KillFeedOff"
+			{
+				"chi"		"关闭"
+			}
+			"L4D2ScriptedHUD_KillFeedMenu"
+			{
+				"#format"	"{1:s}"
+				"chi"		"个人 CS 击杀 HUD：{1}（占用 HUD 9-15）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryMenu"
+			{
+				"chi"		"核心 HUD（槽位 1-4）"
+			}
+			"L4D2ScriptedHUD_HUDExtraMenu"
+			{
+				"chi"		"扩展 HUD（槽位 5-8）"
+			}
+			"L4D2ScriptedHUD_HUDReservedMenu"
+			{
+				"chi"		"更多 HUD（槽位 9-15）"
+			}
+			"L4D2ScriptedHUD_HUDPrimaryTitle"
+			{
+				"chi"		"核心 HUD"
+			}
+			"L4D2ScriptedHUD_HUDExtraTitle"
+			{
+				"chi"		"扩展 HUD"
+			}
+			"L4D2ScriptedHUD_HUDReservedTitle"
+			{
+				"chi"		"更多 HUD"
+			}
+			"L4D2ScriptedHUD_SlotEnabled"
+			{
+				"chi"		"显示此槽位"
+			}
 		"L4D2ScriptedHUD_HUD1"
 		{
 			"chi"		"HUD 1：进度 / 坦克 / 女巫"
@@ -299,6 +340,14 @@
 		{
 			"#format"	"{1:s}"
 			"chi"		"下一波 {1}"
+		}
+		"L4D2ScriptedHUD_WaveKillPhase"
+		{
+			"chi"		"击杀阶段"
+		}
+		"L4D2ScriptedHUD_WaveAntiBaitHold"
+		{
+			"chi"		"Anti-Bait 拦截中"
 		}
 		"L4D2ScriptedHUD_WaveAlive"
 		{

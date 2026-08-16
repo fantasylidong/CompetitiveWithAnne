@@ -4,12 +4,34 @@
 #define _infected_control_included
 
 /**
- * @brief Get infected_control next SI spawn time
- * @remarks you must send alive smoker client index.
+ * @brief Returns the legacy estimate for the next SI wave.
+ * @remarks During the kill phase this is an upper-bound estimate. During an
+ *          Anti-Bait hold it returns 0. New UI consumers should use
+ *          InfectedControl_GetWaveStatus instead.
  *
- * @return next si spawn time
+ * @return Estimated seconds remaining, or -1 when unavailable.
  */
 native float GetNextSpawnTime();
+
+enum InfectedControlWavePhase
+{
+	InfectedControlWavePhase_Inactive = 0,
+	InfectedControlWavePhase_Kill,
+	InfectedControlWavePhase_Countdown,
+	InfectedControlWavePhase_AntiBaitHold
+};
+
+/**
+ * @brief Returns the current infected wave phase.
+ * @remarks Kill remaining is the maximum time left in the kill phase, not the
+ *          next-wave ETA. Countdown remaining is the independent base respawn
+ *          countdown. Inactive and AntiBaitHold have no finite deadline and
+ *          write -1.0.
+ *
+ * @param remaining Remaining seconds for the returned phase.
+ * @return Current public wave phase.
+ */
+native InfectedControlWavePhase InfectedControl_GetWaveStatus(float &remaining);
 
 /**
  * @brief Copies the current special-infected spawn queue.
@@ -95,6 +117,7 @@ public SharedPlugin __pl_infected_control =
 public void __pl_infected_control_SetNTVOptional()
 {
 	MarkNativeAsOptional("GetNextSpawnTime");
+	MarkNativeAsOptional("InfectedControl_GetWaveStatus");
 	MarkNativeAsOptional("InfectedControl_GetSpawnQueue");
 	MarkNativeAsOptional("InfectedControl_IsTraitorClient");
 	MarkNativeAsOptional("InfectedControl_IsTraitorRegistered");

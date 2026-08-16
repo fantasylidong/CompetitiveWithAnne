@@ -37,7 +37,6 @@ enum struct State
 
     int    totalSI;
     int    siQueueCount;
-    int    teleCount[MAXPLAYERS+1];
     int    siAlive[SI_COUNT];
     int    siCap[SI_COUNT];
     int    siSpawnedThisWave[SI_COUNT];
@@ -58,6 +57,8 @@ enum struct State
     float  unpauseDelay;
     float  lastWaveAvgFlow;
     float  spitterSpitTime[MAXPLAYERS+1];
+    float  teleInvisibleSeconds[MAXPLAYERS+1];
+    float  teleLastSampleTime[MAXPLAYERS+1];
     float  firstPressureSpawnTime;
 
     float  nextFrameThink;
@@ -97,7 +98,8 @@ enum struct State
         for (int i = 0; i <= MAXPLAYERS; i++)
         {
             this.spitterSpitTime[i] = 0.0;
-            this.teleCount[i]       = 0;
+            this.teleInvisibleSeconds[i] = 0.0;
+            this.teleLastSampleTime[i] = 0.0;
         }
         for (int i = 0; i < SI_COUNT; i++)
         {

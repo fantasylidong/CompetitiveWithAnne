@@ -306,26 +306,4 @@
 			"message" "关闭死门"
 		}
 	}
-	"开关击杀HUD"
-	{
-		"exec vote/killhud_on.cfg"
-		{
-			"message" "开启击杀HUD"
-		}
-		"exec vote/killhud_off.cfg"
-		{
-			"message" "关闭击杀HUD"
-		}
-	}
-	"开关击杀溶解尸体"
-	{
-		"exec vote/dissolve_on.cfg"
-		{
-			"message" "开启击杀溶解尸体"
-		}
-		"exec vote/dissolve_off.cfg"
-		{
-			"message" "关闭击杀溶解尸体"
-		}
-	}
 }

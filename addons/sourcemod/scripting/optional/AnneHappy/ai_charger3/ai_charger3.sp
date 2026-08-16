@@ -35,7 +35,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.6",
+	version 		= "1.0.1.7",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -511,6 +511,7 @@ stock bool getEvadeMoveDestination(int target, float movePos[3]) {
 
 stock void clearEvadeMoveCommandTracking(int client) {
 	g_AiChargers[client].m_bEvadeMoveCommandActive = false;
+	g_AiChargers[client].m_bEvadeMoveCommandPending = false;
 	g_AiChargers[client].m_flLastEvadeMoveToCheckTime = 0.0;
 	ZeroVector(g_AiChargers[client].m_vecEvadeMoveToPos);
 }
@@ -607,6 +608,9 @@ Action chargerEvade_OnUpdate(BehaviorAction action, int actor, float interval, A
 	if (!isAiCharger(actor)) {
 		return Plugin_Continue;
 	}
+	if (g_AiChargers[actor].m_bEvadeMoveCommandActive || g_AiChargers[actor].m_bEvadeMoveCommandPending)
+		return Plugin_Continue;
+
 	if (!g_cvAntiRetreat.BoolValue) {
 		clearEvadeMoveCommandTracking(actor);
 		return Plugin_Continue;
@@ -639,30 +643,53 @@ Action chargerEvade_OnUpdate(BehaviorAction action, int actor, float interval, A
 
 	g_AiChargers[actor].m_vecEvadeMoveToPos = movePos;
 	g_AiChargers[actor].m_flLastEvadeMoveToCheckTime = GetEngineTime();
+	g_AiChargers[actor].m_bEvadeMoveCommandPending = true;
+
+	// CommandABot 会同步重组 NextBot 行为树，不能在 actions.ext 的 OnUpdate 传播栈内执行。
+	RequestFrame(issueEvadeMoveCommandNextFrame, GetClientUserId(actor));
+	return Plugin_Continue;
+}
+
+void issueEvadeMoveCommandNextFrame(any userId) {
+	int actor = GetClientOfUserId(userId);
+	if (!isAiCharger(actor))
+		return;
+
+	if (!g_AiChargers[actor].m_bEvadeMoveCommandPending)
+		return;
+
+	g_AiChargers[actor].m_bEvadeMoveCommandPending = false;
+	if (!g_cvAntiRetreat.BoolValue ||
+		isChargerCharging(actor) ||
+		IsValidSurvivor(L4D2_GetQueuedPummelVictim(actor)) ||
+		IsValidSurvivor(L4D_GetVictimCharger(actor)) ||
+		IsValidSurvivor(L4D_GetVictimCarry(actor))
+	) {
+		clearEvadeMoveCommandTracking(actor);
+		return;
+	}
+
+	int target = GetClientOfUserId(g_AiChargers[actor].m_iTarget);
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target)) {
+		clearEvadeMoveCommandTracking(actor);
+		return;
+	}
+
 	g_AiChargers[actor].m_bEvadeMoveCommandActive = true;
 
 	/*
 	* accepted 大概率是 false, 不知道为什么, 使用 nb_debug BEHAVIOR 可以看到 BehaviorMoveTo << ChargerEvade << ChargerAttack
 	* 但是 actions 拓展的 OnActionCreated 却无法捕捉到 BehaviorMoveTo 的创建, 无论是 raw action 还是验证过的有效 action 都无法捕捉
 	*/
-	static bool accepted;
-	accepted = L4D2_CommandABot(actor, target, BOT_CMD_MOVE, movePos);
+	bool accepted = L4D2_CommandABot(actor, target, BOT_CMD_MOVE, g_AiChargers[actor].m_vecEvadeMoveToPos);
 	log.debugAll("[ChargerEvadeOnUpdate]: CommandABot MOVE acctpted: %d", accepted);
-
-	/*
-	* 不能在这里直接 action.Done(), 因为 CommandABot 这个 Action 创建成功之后, BehaviorMoveTo 应当暂停 ChargerEvade
-	* 如果直接 Done, 那么由 ChargerEvade 派生出来的 BehaviorMoveTo 也会被跟着 ChargerEvade 释放掉
-	*/
-	return Plugin_Changed;
 }
 
 void chargerEvade_OnEnd(BehaviorAction action, int actor, BehaviorAction nextAction, ActionResult result) {
 	if (!isAiCharger(actor))
 		return;
 
-	g_AiChargers[actor].m_bEvadeMoveCommandActive = false;
-	g_AiChargers[actor].m_flLastEvadeMoveToCheckTime = 0.0;
-	ZeroVector(g_AiChargers[actor].m_vecEvadeMoveToPos);
+	clearEvadeMoveCommandTracking(actor);
 }
 
 Action chargerChargeAtVictim_OnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {

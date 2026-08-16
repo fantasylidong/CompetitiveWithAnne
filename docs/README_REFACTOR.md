@@ -255,7 +255,10 @@ forward void OnDetectRushman(int client);
 
 ```sourcepawn
 native float GetNextSpawnTime();
+native InfectedControlWavePhase InfectedControl_GetWaveStatus(float &remaining);
 ```
+
+`GetNextSpawnTime()` 是兼容旧消费者的 ETA 估算：击杀阶段返回最晚上界，Anti-Bait 拦截时返回 `0.0`。新 UI 应使用 `InfectedControl_GetWaveStatus()` 区分 `Inactive`、`Kill`、`Countdown` 与 `AntiBaitHold`；只有 `Countdown` 的 `remaining` 才是下一波的有限精确倒计时。
 
 ## 5. 行为变化与兼容性
 
@@ -274,6 +277,8 @@ native float GetNextSpawnTime();
   - `infected_control`
 - native 保持：
   - `GetNextSpawnTime`
+- 新增可选 native：
+  - `InfectedControl_GetWaveStatus`
 - forward 保持：
   - `OnDetectRushman`
 
@@ -371,6 +376,8 @@ sourcemod/include/halflife.inc: CreateDialog is marked as deprecated
 
 - 插件能正常加载，`infected_control` library 注册正常。
 - `GetNextSpawnTime` native 返回值正常。
+- `InfectedControl_GetWaveStatus` 在击杀阶段、基础倒计时和 Anti-Bait 拦截中返回对应阶段；只有基础倒计时返回有限下一波秒数。
+- 切换到不提供状态 native 的旧版 `infected_control` 时，常驻消费者能通过 feature check 安全降级，不触发未绑定 native 错误。
 - `OnDetectRushman` forward 能在跑男检测触发时回调。
 - `sm_startspawn` 能重置刷特时钟并启动刷特。
 - `sm_stopspawn` 能停止刷特和清理 timer。

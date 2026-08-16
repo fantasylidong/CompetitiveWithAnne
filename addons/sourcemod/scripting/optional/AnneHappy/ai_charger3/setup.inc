@@ -165,6 +165,7 @@ enum struct AiCharger {
 	bool m_bHasAirBreaked;				// 在空中时是否急停过了
 	bool m_bBhopBeforeCharge;			// 冲锋之前是否进行了最后一次连跳
 	bool m_bEvadeMoveCommandActive;	// ChargerEvade 是否已经下发 BOT_CMD_MOVE 追击命令
+	bool m_bEvadeMoveCommandPending;	// 是否已经安排下一帧下发 BOT_CMD_MOVE
 	
 	float m_flLastHopSpeed;				// 上次起跳的速度
 	float m_flFinalBhopStartTime;		// 冲锋前最后一次连跳开始时间, 用于短暂等待落地/进入 commit range
@@ -198,6 +199,7 @@ enum struct AiCharger {
 		this.m_flLastVisibleTime = 0.0;
 		this.m_flNextBetterTargetCheck = 0.0;
 		this.m_bEvadeMoveCommandActive = false;
+		this.m_bEvadeMoveCommandPending = false;
 		this.m_flLastEvadeMoveToCheckTime = 0.0;
 		ZeroVector(this.m_vecEvadeMoveToPos);
 		this.m_flPathWaitStart = -1.0;

@@ -15,11 +15,38 @@ static void MakeBucketCachePath()
     BuildPath(Path_SM, g_sBucketCachePath, sizeof g_sBucketCachePath, "data/infd_buckets/%s.kv", map);
 }
 
+static void GetBucketCacheCommitPaths(
+    char[] tempPath, int tempPathLen,
+    char[] backupPath, int backupPathLen)
+{
+    Format(tempPath, tempPathLen, "%s.tmp", g_sBucketCachePath);
+    Format(backupPath, backupPathLen, "%s.bak", g_sBucketCachePath);
+}
+
+static bool BucketCache_HasRequiredAreaFields(KeyValues kv)
+{
+    return kv.GetDataType("bucket") != KvData_None
+        && kv.GetDataType("cx") != KvData_None
+        && kv.GetDataType("cy") != KvData_None
+        && kv.GetDataType("zCore") != KvData_None
+        && kv.GetDataType("zMin") != KvData_None
+        && kv.GetDataType("zMax") != KvData_None;
+}
+
 bool TryLoadBucketsFromCache()
 {
     if (!gCV.bNavCacheEnable) return false;
 
     MakeBucketCachePath();
+    char tempPath[PLATFORM_MAX_PATH];
+    char backupPath[PLATFORM_MAX_PATH];
+    GetBucketCacheCommitPaths(
+        tempPath, sizeof tempPath, backupPath, sizeof backupPath);
+    if (!FileExists(g_sBucketCachePath) && FileExists(backupPath))
+    {
+        if (!RenameFile(g_sBucketCachePath, backupPath))
+            LogError("[BUCKET] failed to restore cache backup: %s", backupPath);
+    }
     if (!FileExists(g_sBucketCachePath)) return false;
 
     KeyValues kv = new KeyValues("BucketsCache");
@@ -52,6 +79,12 @@ bool TryLoadBucketsFromCache()
 
     int areaCount = kv.GetNum("area_count", -1);
     if (areaCount <= 0 || areaCount != currentAreaCount)
+    {
+        delete kv;
+        return false;
+    }
+    int expectedMappedAreas = kv.GetNum("mapped_area_count", -1);
+    if (expectedMappedAreas <= 0 || expectedMappedAreas > areaCount)
     {
         delete kv;
         return false;
@@ -137,6 +170,7 @@ bool TryLoadBucketsFromCache()
             int areaIdx = GetAreaIndexByNavID_Int(navid);
             if (areaIdx < 0) continue;
 
+            if (!BucketCache_HasRequiredAreaFields(kv)) continue;
             int bucketIdx = kv.GetNum("bucket", -1);
             if (bucketIdx < 0 || bucketIdx > 100) continue;
 
@@ -165,11 +199,13 @@ bool TryLoadBucketsFromCache()
 
     delete kv;
 
-    // 元数据匹配但一个区域都没有成功入桶（残缺/损坏缓存）时，不能把空桶
-    // 当成可用缓存，否则整局刷点质量会静默退化。删除坏文件并走重建。
-    if (loadedAreas <= 0)
+    // 必须完整载入上次实际序列化的所有区域。area_count 是全 Nav 数，
+    // 会包含被 flags 过滤的区域，因此不能直接要求 loadedAreas == areaCount。
+    if (loadedAreas != expectedMappedAreas)
     {
-        LogError("[BUCKET] cache matched but contained no usable areas, rebuilding: %s", g_sBucketCachePath);
+        LogError(
+            "[BUCKET] incomplete cache: loaded=%d expected=%d, rebuilding: %s",
+            loadedAreas, expectedMappedAreas, g_sBucketCachePath);
         ClearNavBuckets();
         if (FileExists(g_sBucketCachePath))
             DeleteFile(g_sBucketCachePath);
@@ -216,6 +252,7 @@ void SaveBucketsToCache()
     kv.GoBack();
 
     kv.JumpToKey("areas", true);
+    int mappedAreaCount = 0;
     for (int areaIdx = 0; areaIdx < areaCount; areaIdx++)
     {
         int navid = GetNavIDByIndex(areaIdx);
@@ -235,20 +272,67 @@ void SaveBucketsToCache()
         kv.SetFloat("zMin", view_as<float>(g_AreaZMin.Get(areaIdx)));
         kv.SetFloat("zMax", view_as<float>(g_AreaZMax.Get(areaIdx)));
 
+        mappedAreaCount++;
         kv.GoBack();
     }
     kv.GoBack();
+    kv.SetNum("mapped_area_count", mappedAreaCount);
 
-    if (!kv.ExportToFile(g_sBucketCachePath))
+    if (mappedAreaCount <= 0)
     {
-        LogError("[BUCKET] failed to export cache: %s", g_sBucketCachePath);
-        // 导出中断可能留下半截文件；删掉它，避免下次按残缺缓存加载。
-        if (FileExists(g_sBucketCachePath))
-            DeleteFile(g_sBucketCachePath);
+        LogError("[BUCKET] refusing to save cache without mapped areas: %s", g_sBucketCachePath);
+        delete kv;
+        return;
+    }
+
+    char tempPath[PLATFORM_MAX_PATH];
+    char backupPath[PLATFORM_MAX_PATH];
+    GetBucketCacheCommitPaths(
+        tempPath, sizeof tempPath, backupPath, sizeof backupPath);
+    if (FileExists(tempPath) && !DeleteFile(tempPath))
+    {
+        LogError("[BUCKET] failed to remove stale cache temp file: %s", tempPath);
+        delete kv;
+        return;
+    }
+
+    if (!kv.ExportToFile(tempPath))
+    {
+        LogError("[BUCKET] failed to export cache temp file: %s", tempPath);
+        if (FileExists(tempPath))
+            DeleteFile(tempPath);
         delete kv;
         return;
     }
     delete kv;
+
+    if (FileExists(backupPath) && !DeleteFile(backupPath))
+    {
+        LogError("[BUCKET] failed to remove stale cache backup: %s", backupPath);
+        DeleteFile(tempPath);
+        return;
+    }
+
+    bool hadPreviousCache = FileExists(g_sBucketCachePath);
+    if (hadPreviousCache && !RenameFile(backupPath, g_sBucketCachePath))
+    {
+        LogError("[BUCKET] failed to back up cache: %s", g_sBucketCachePath);
+        DeleteFile(tempPath);
+        return;
+    }
+
+    if (!RenameFile(g_sBucketCachePath, tempPath))
+    {
+        LogError("[BUCKET] failed to install cache: %s", g_sBucketCachePath);
+        if (hadPreviousCache && !RenameFile(g_sBucketCachePath, backupPath))
+            LogError("[BUCKET] failed to restore cache backup: %s", backupPath);
+        if (FileExists(tempPath))
+            DeleteFile(tempPath);
+        return;
+    }
+
+    if (hadPreviousCache && FileExists(backupPath) && !DeleteFile(backupPath))
+        LogError("[BUCKET] failed to remove cache backup: %s", backupPath);
+
     Debug_Print("[BUCKET] saved to cache: %s", g_sBucketCachePath);
 }
-
