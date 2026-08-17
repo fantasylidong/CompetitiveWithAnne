@@ -50,8 +50,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     return APLRes_Success;
 }
 
-#define CVAR_FLAGS                    FCVAR_NOTIFY
-#define CVAR_FLAGS_PLUGIN_VERSION     FCVAR_NOTIFY|FCVAR_DONTRECORD|FCVAR_SPONLY
+#define CVAR_FLAGS                    FCVAR_NONE
+#define CVAR_FLAGS_PLUGIN_VERSION     FCVAR_NONE|FCVAR_DONTRECORD|FCVAR_SPONLY
 
 #define TEAM_SPECTATOR		1
 #define TEAM_SURVIVOR		2

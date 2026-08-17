@@ -96,7 +96,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define CVAR_FLAGS				FCVAR_NOTIFY
+#define CVAR_FLAGS				FCVAR_NONE
 #define DEBUG_TEST				0
 
 #define SF_PHYSPROP_PREVENT_PICKUP		(1 << 9)
@@ -189,7 +189,7 @@ public void OnPluginStart()
 	g_hCvarEquip = CreateConVar(			"attachments_api_equip",		"0.1",				"When weapons have attachments and a players model has changed, how long to drop the weapon before re-equipping to fix.", CVAR_FLAGS );
 	g_hCvarModels = CreateConVar(			"attachments_api_models",		sChk,				"0=Off, 1=Detect when a players model changes to fix attachments to players (required by plugins attaching stuff to players).", CVAR_FLAGS );
 	g_hCvarWeapons = CreateConVar(			"attachments_api_weapons",		sChk,				"0=Off, 1=Detect when a players model changes to fix attachments to weapons (required by plugins attaching stuff to weapons).", CVAR_FLAGS );
-	CreateConVar(							"attachments_api_version",		PLUGIN_VERSION,		"Attachments API plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(							"attachments_api_version",		PLUGIN_VERSION,		"Attachments API plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	AutoExecConfig(true, "attachments_api");
 
 	g_hCvarCheck.AddChangeHook(ConVarChanged_Cvars);

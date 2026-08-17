@@ -90,8 +90,8 @@ int GetRandomOffColor()
 
 public void OnPluginStart()
 {
-	g_cvStartDisabled = CreateConVar("l4d_equalise_alarm_start_disabled", "1", "Makes alarmed cars spawn disabled before game goes live.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_cvDebug = CreateConVar("l4d_equalise_alarm_debug", "0", "Debug info for alarm stuff.", FCVAR_HIDDEN|FCVAR_SPONLY|FCVAR_CHEAT|FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cvStartDisabled = CreateConVar("l4d_equalise_alarm_start_disabled", "1", "Makes alarmed cars spawn disabled before game goes live.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvDebug = CreateConVar("l4d_equalise_alarm_debug", "0", "Debug info for alarm stuff.", FCVAR_HIDDEN|FCVAR_SPONLY|FCVAR_CHEAT|FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	g_smCarNameMap = new StringMap();
 	g_aAlarmArray = new ArrayList(alarmArray_SIZE);

@@ -247,7 +247,7 @@ public void OnPluginStart() {
 	g_smMeleeTrans = new StringMap();
 	g_aMeleeScripts = new ArrayList(ByteCountToCells(64));
 
-	CreateConVar("rygive_version", PLUGIN_VERSION, "Give Item Menu plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("rygive_version", PLUGIN_VERSION, "Give Item Menu plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
 	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);

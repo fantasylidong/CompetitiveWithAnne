@@ -238,24 +238,24 @@ public void OnPluginStart()
     RegConsoleCmd("sm_blocklimit",Cmd_BlockLimit,"查看你的屏蔽上限");
     RegConsoleCmd("sm_blmenu",    Cmd_Menu,      "打开黑名单菜单");
 
-    gCvarEnable          = CreateConVar("sm_bl_enable",            "1",    "启用插件(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarDBSection       = CreateConVar("sm_bl_db_section",        g_sDBSection, "databases.cfg 区块名", FCVAR_NOTIFY);
-    gCvarTableName       = CreateConVar("sm_bl_table",             g_sTable,     "数据库表名", FCVAR_NOTIFY);
-    gCvarKickMsg         = CreateConVar("sm_bl_kick_msg",          g_sKickMsg,   "踢出提示（留空使用翻译短语）", FCVAR_NOTIFY);
-    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "3",   "普通玩家屏蔽上限", FCVAR_NOTIFY, true, 0.0);
-    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "10",  "管理员屏蔽上限", FCVAR_NOTIFY, true, 0.0);
-    gCvarAdminFlag       = CreateConVar("sm_bl_admin_flag",        "b",    "享管理员上限的 flag(留空=无)", FCVAR_NOTIFY);
-    gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "0",    "仅检查队伍2/3(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarEnable          = CreateConVar("sm_bl_enable",            "1",    "启用插件(1/0)", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarDBSection       = CreateConVar("sm_bl_db_section",        g_sDBSection, "databases.cfg 区块名", FCVAR_NONE);
+    gCvarTableName       = CreateConVar("sm_bl_table",             g_sTable,     "数据库表名", FCVAR_NONE);
+    gCvarKickMsg         = CreateConVar("sm_bl_kick_msg",          g_sKickMsg,   "踢出提示（留空使用翻译短语）", FCVAR_NONE);
+    gCvarLimitUser       = CreateConVar("sm_bl_limit_user",        "3",   "普通玩家屏蔽上限", FCVAR_NONE, true, 0.0);
+    gCvarLimitAdmin      = CreateConVar("sm_bl_limit_admin",       "10",  "管理员屏蔽上限", FCVAR_NONE, true, 0.0);
+    gCvarAdminFlag       = CreateConVar("sm_bl_admin_flag",        "b",    "享管理员上限的 flag(留空=无)", FCVAR_NONE);
+    gCvarConsiderTeams   = CreateConVar("sm_bl_consider_teams",    "0",    "仅检查队伍2/3(1/0)", FCVAR_NONE, true, 0.0, true, 1.0);
 
-    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "z",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NOTIFY);
-    gCvarQuiet           = CreateConVar("sm_bl_quiet",             "1",    "静音提示：不通知触发屏蔽的玩家(1=静默,0=通知)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarLogEnable       = CreateConVar("sm_bl_log",               "1",    "启用日志记录(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarLogFile         = CreateConVar("sm_bl_log_file",          g_sLogFile, "日志文件名(位于 logs/ 下)", FCVAR_NOTIFY);
-    gCvarExposeBlocker   = CreateConVar("sm_bl_expose_blocker",    "0",    "踢出提示是否包含屏蔽者信息(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarUseI18NKick     = CreateConVar("sm_bl_use_i18n_kick",     "1",    "踢出提示使用翻译短语(1)；否则优先使用 cvar 文本", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarImmuneFlag      = CreateConVar("sm_bl_immune_flag",       "z",    "加入免疫 flag(拥有则忽略屏蔽检查;留空=关闭)", FCVAR_NONE);
+    gCvarQuiet           = CreateConVar("sm_bl_quiet",             "1",    "静音提示：不通知触发屏蔽的玩家(1=静默,0=通知)", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarLogEnable       = CreateConVar("sm_bl_log",               "1",    "启用日志记录(1/0)", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarLogFile         = CreateConVar("sm_bl_log_file",          g_sLogFile, "日志文件名(位于 logs/ 下)", FCVAR_NONE);
+    gCvarExposeBlocker   = CreateConVar("sm_bl_expose_blocker",    "0",    "踢出提示是否包含屏蔽者信息(1/0)", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarUseI18NKick     = CreateConVar("sm_bl_use_i18n_kick",     "1",    "踢出提示使用翻译短语(1)；否则优先使用 cvar 文本", FCVAR_NONE, true, 0.0, true, 1.0);
 
     // 双向不共存：加入者若屏蔽了在场玩家，也禁止加入
-    gCvarMutual         = CreateConVar("sm_bl_mutual",            "1",    "启用双向不共存(1/0)：加入者若屏蔽了在场玩家也禁止加入", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarMutual         = CreateConVar("sm_bl_mutual",            "1",    "启用双向不共存(1/0)：加入者若屏蔽了在场玩家也禁止加入", FCVAR_NONE, true, 0.0, true, 1.0);
 
     AutoExecConfig(true, "l4d2_blocklist");
 

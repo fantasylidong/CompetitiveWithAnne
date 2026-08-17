@@ -474,8 +474,8 @@ public void OnPluginStart()
 	OnHookEvent();
 
 	// version cvar
-	CreateConVar("sm_skill_detect_version", PLUGIN_VERSION, "Skill detect plugin version.", FCVAR_NOTIFY | FCVAR_REPLICATED | FCVAR_DONTRECORD);
-	g_cvarDebug = CreateConVar("sm_skill_detect_debug", "0", "Enable debug messages.", FCVAR_NOTIFY | FCVAR_REPLICATED | FCVAR_DONTRECORD);
+	CreateConVar("sm_skill_detect_version", PLUGIN_VERSION, "Skill detect plugin version.", FCVAR_NONE | FCVAR_REPLICATED | FCVAR_DONTRECORD);
+	g_cvarDebug = CreateConVar("sm_skill_detect_debug", "0", "Enable debug messages.", FCVAR_NONE | FCVAR_REPLICATED | FCVAR_DONTRECORD);
 
 	// cvars: config
 	g_cvarReport			= CreateConVar("sm_skill_report_enable", "0", "Whether to report in chat.", FCVAR_NONE, true, 0.0, true, 1.0);

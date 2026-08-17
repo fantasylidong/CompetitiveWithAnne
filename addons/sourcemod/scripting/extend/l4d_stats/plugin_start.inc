@@ -43,7 +43,7 @@ public OnPluginStart()
 	}
 
 	// Plugin version public Cvar
-	CreateConVar("l4d_stats_version", PLUGIN_VERSION, "Custom Player Stats Version", 0|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d_stats_version", PLUGIN_VERSION, "Custom Player Stats Version", 0|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NONE|FCVAR_DONTRECORD);
 
 	// Disable setting Cvars
 	cvar_Difficulty = FindConVar("z_difficulty");

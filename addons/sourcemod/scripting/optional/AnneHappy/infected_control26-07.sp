@@ -41,7 +41,6 @@
 
 #include <sourcemod>
 #include <colors>
-#include <dbi>
 #include <sdktools>
 #include <sdkhooks>
 #include <sdktools_tempents>
@@ -51,6 +50,7 @@
 #include <si_target_limit>  // 可选
 #include <pause>            // 可选
 #include <l4dstats>         // 可选：普通玩家内鬼资格读取
+#include <anne_traitor_quota> // 可选：共享内鬼配额持久化
 
 // =========================
 // 常量/宏
@@ -291,10 +291,9 @@ public any Native_GetNextSpawnTime(Handle plugin, int numParams)
 // =========================
 public void OnPluginStart()
 {
-	LoadTranslations("infected_control.phrases");
+    LoadTranslations("infected_control.phrases");
     SpawnPerfConfig_Create();
     gCV.Create();
-    TraitorQuota_Init();
     ClassCapMirrors_Create();
     gQ.Create();
     gST.Reset();
@@ -359,7 +358,6 @@ public void OnPluginEnd()
     Traitor_ResetAll(true);
     // 插件结束时清理 Path 缓存
     ClearPathCache();
-    TraitorQuota_Close();
 }
 public void OnMapEnd()
 {
@@ -710,12 +708,14 @@ public void Event_PlayerDisconnect(Event event, const char[] name, bool dontBroa
 
 public void OnClientDisconnect(int client)
 {
+    TraitorQuota_InvalidateClientCache(client);
     Traitor_UnhookClientDamage(client);
     Traitor_OnClientDisconnect(client);
 }
 
 public void OnClientPutInServer(int client)
 {
+    TraitorQuota_InvalidateClientCache(client);
     Traitor_HookClientDamage(client);
 }
 
@@ -759,8 +759,6 @@ void OnCfgChanged(ConVar convar, const char[] ov, const char[] nv)
     bool traitorDisabled = convar == gCV.TraitorEnable && StringToInt(ov) != 0 && StringToInt(nv) == 0;
     gCV.Refresh();
     gCV.ApplyMaxZombieBound();
-    if (convar == gCV.TraitorDailyQuota)
-        TraitorQuota_InvalidateAdminQuotaCache();
 
     if (traitorDisabled)
     {

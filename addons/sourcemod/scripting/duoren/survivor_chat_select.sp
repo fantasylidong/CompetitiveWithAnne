@@ -100,10 +100,10 @@ public void OnPluginStart()
 	HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
 	HookEvent("player_bot_replace", Event_PlayerToBot, EventHookMode_Post);
 
-	convarAdminsOnly = CreateConVar("l4d_csm_admins_only", "0","Changes access to the sm_csm command. 1 = Admin access only.",FCVAR_NOTIFY,true, 0.0, true, 1.0);
-	convarZoey 		 = CreateConVar("l4d_scs_zoey", "1","Prop for Zoey. 0: Rochelle (windows), 1: Zoey (linux), 2: Nick (fakezoey)",FCVAR_NOTIFY,true, 0.0, true, 2.0);
-	convarSpawn		 = CreateConVar("l4d_scs_botschange", "0","Change new bots to least prevalent survivor? 1:Enable, 0:Disable",FCVAR_NOTIFY,true, 0.0, true, 1.0);
-	convarCookies	 = CreateConVar("l4d_scs_cookies", "0","Store player's survivor? 1:Enable, 0:Disable",FCVAR_NOTIFY,true, 0.0, true, 1.0);
+	convarAdminsOnly = CreateConVar("l4d_csm_admins_only", "0","Changes access to the sm_csm command. 1 = Admin access only.",FCVAR_NONE,true, 0.0, true, 1.0);
+	convarZoey 		 = CreateConVar("l4d_scs_zoey", "1","Prop for Zoey. 0: Rochelle (windows), 1: Zoey (linux), 2: Nick (fakezoey)",FCVAR_NONE,true, 0.0, true, 2.0);
+	convarSpawn		 = CreateConVar("l4d_scs_botschange", "0","Change new bots to least prevalent survivor? 1:Enable, 0:Disable",FCVAR_NONE,true, 0.0, true, 1.0);
+	convarCookies	 = CreateConVar("l4d_scs_cookies", "0","Store player's survivor? 1:Enable, 0:Disable",FCVAR_NONE,true, 0.0, true, 1.0);
 
 	AutoExecConfig(true, "l4dscs");
 

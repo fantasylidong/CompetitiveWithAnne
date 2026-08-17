@@ -84,23 +84,23 @@ public void OnPluginStart()
 {
     LoadTranslations("l4d2_ai_ladder_boost.phrases");
 
-    g_cvEnabled = CreateConVar("l4d2_ladder_boost_enabled", "1", "启用未被生还者看见时的AI特感爬梯加速 (0=禁用, 1=启用)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvSpeedMultiplier = CreateConVar("l4d2_ladder_boost_multiplier", "10.0", "未被看见时的爬梯速度倍数", FCVAR_NOTIFY, true, 1.0, true, 20.0);
-    g_cvDetectionMethod = CreateConVar("l4d2_ladder_boost_detection", "0", "检测方法 (0=威胁感知+射线, 1=传统FOV+射线)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvCooldownTime = CreateConVar("l4d2_ladder_boost_cooldown", "3.0", "被看见后禁用未视野加速的冷却时间(秒)", FCVAR_NOTIFY, true, 1.0, true, 10.0);
-    CreateConVar("l4d2_ladder_boost_use_sdkhook", "1", "兼容旧配置：已停用，AI特感固定使用Timer检测", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvDebugMode = CreateConVar("l4d2_ladder_boost_debug", "0", "调试模式 (0=关闭, 1=基本调试, 2=详细调试)", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    g_cvEnabled = CreateConVar("l4d2_ladder_boost_enabled", "1", "启用未被生还者看见时的AI特感爬梯加速 (0=禁用, 1=启用)", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvSpeedMultiplier = CreateConVar("l4d2_ladder_boost_multiplier", "10.0", "未被看见时的爬梯速度倍数", FCVAR_NONE, true, 1.0, true, 20.0);
+    g_cvDetectionMethod = CreateConVar("l4d2_ladder_boost_detection", "0", "检测方法 (0=威胁感知+射线, 1=传统FOV+射线)", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvCooldownTime = CreateConVar("l4d2_ladder_boost_cooldown", "3.0", "被看见后禁用未视野加速的冷却时间(秒)", FCVAR_NONE, true, 1.0, true, 10.0);
+    CreateConVar("l4d2_ladder_boost_use_sdkhook", "1", "兼容旧配置：已停用，AI特感固定使用Timer检测", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvDebugMode = CreateConVar("l4d2_ladder_boost_debug", "0", "调试模式 (0=关闭, 1=基本调试, 2=详细调试)", FCVAR_NONE, true, 0.0, true, 2.0);
 
     g_cvAiLadderBoost = CreateConVar("l4d2_ai_ladder_boost", "1", "兼容旧l4d2_si_ladder_booster：AI特感在梯子上固定加速", FCVAR_SPONLY, true, 0.0, true, 1.0);
     CreateConVar("l4d2_pz_ladder_boost", "0", "兼容旧l4d2_si_ladder_booster：已停用，真人特感不会获得加速", FCVAR_SPONLY, true, 0.0, true, 1.0);
     g_cvLegacyBoostMultiplier = CreateConVar("l4d2_boost_multiplier", "3.2", "兼容旧l4d2_si_ladder_booster：固定爬梯加速倍数", FCVAR_SPONLY, true, 1.0, true, 10.0);
-    g_cvTankLadderBoost = CreateConVar("l4d2_ladder_boost_tank", "1", "是否允许该通用插件加速Tank爬梯", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvClimbAnimBoost = CreateConVar("l4d2_climb_anim_boost", "1", "是否由该插件处理AI Tank翻越/爬小障碍动画加速", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_cvSiClimbAnimRate = CreateConVar("l4d2_si_climb_anim_rate", "3.2", "兼容旧配置：普通AI特感仅进行梯子移动加速，不再修改翻越动画速度", FCVAR_NOTIFY, true, 0.0);
-    g_cvTankClimbAnimRate = CreateConVar("l4d2_tank_climb_anim_rate", "3.5", "Tank 高翻越动画播放倍速（1.0=原速）", FCVAR_NOTIFY, true, 0.0);
-    g_cvTankLowClimbAnimRate = CreateConVar("l4d2_tank_low_climb_anim_rate", "2.5", "Tank 低翻越动画播放倍速（1.0=原速）", FCVAR_NOTIFY, true, 0.0);
-    g_cvTankLadderAnimRate = CreateConVar("l4d2_tank_ladder_anim_rate", "1.0", "Tank 梯子动画播放倍速；真实爬梯速度由 m_flLaggedMovementValue 控制", FCVAR_NOTIFY, true, 0.0);
-    g_cvClampExitSpeed = CreateConVar("l4d2_ladder_boost_clamp_exit_speed", "1", "特感离开梯子时将水平速度限制到当前走路速度，防止10倍速度带出", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_cvTankLadderBoost = CreateConVar("l4d2_ladder_boost_tank", "1", "是否允许该通用插件加速Tank爬梯", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvClimbAnimBoost = CreateConVar("l4d2_climb_anim_boost", "1", "是否由该插件处理AI Tank翻越/爬小障碍动画加速", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvSiClimbAnimRate = CreateConVar("l4d2_si_climb_anim_rate", "3.2", "兼容旧配置：普通AI特感仅进行梯子移动加速，不再修改翻越动画速度", FCVAR_NONE, true, 0.0);
+    g_cvTankClimbAnimRate = CreateConVar("l4d2_tank_climb_anim_rate", "3.5", "Tank 高翻越动画播放倍速（1.0=原速）", FCVAR_NONE, true, 0.0);
+    g_cvTankLowClimbAnimRate = CreateConVar("l4d2_tank_low_climb_anim_rate", "2.5", "Tank 低翻越动画播放倍速（1.0=原速）", FCVAR_NONE, true, 0.0);
+    g_cvTankLadderAnimRate = CreateConVar("l4d2_tank_ladder_anim_rate", "1.0", "Tank 梯子动画播放倍速；真实爬梯速度由 m_flLaggedMovementValue 控制", FCVAR_NONE, true, 0.0);
+    g_cvClampExitSpeed = CreateConVar("l4d2_ladder_boost_clamp_exit_speed", "1", "特感离开梯子时将水平速度限制到当前走路速度，防止10倍速度带出", FCVAR_NONE, true, 0.0, true, 1.0);
 
     AutoExecConfig(true, "l4d2_infected_ladder_speed");
 

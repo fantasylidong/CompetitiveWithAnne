@@ -1064,7 +1064,7 @@ public void OnPluginStart()
         "sm_dmg_allowed_flags",
         "",
         "Which admin flags are allowed to USE this plugin. Empty = everyone. Example: \"bc\"",
-        FCVAR_NOTIFY
+        FCVAR_NONE
     );
     Gate_UpdateFromCvar();
 

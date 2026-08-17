@@ -731,13 +731,13 @@ public void OnPluginStart()
 	// =========================
 	// CVARS
 	// =========================
-	ConVar hVersion = CreateConVar("left4dhooks_version", PLUGIN_VERSION,	"Left 4 DHooks Direct plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	ConVar hVersion = CreateConVar("left4dhooks_version", PLUGIN_VERSION,	"Left 4 DHooks Direct plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	hVersion.SetString(PLUGIN_VERSION); // Force version cvar to update if server updates the plugin but doesn't reboot, so it's reporting the current version in use
 
 	if( g_bLeft4Dead2 )
 	{
 		g_hCvar_VScriptBuffer = CreateConVar("l4d2_vscript_return", "", "Buffer used to return VScript values. Do not use.", FCVAR_DONTRECORD);
-		g_hCvar_AddonsEclipse = CreateConVar("l4d2_addons_eclipse", "-1", "Addons Manager (-1: use addonconfig; 0: disable addons; 1: enable addons.)", FCVAR_NOTIFY);
+		g_hCvar_AddonsEclipse = CreateConVar("l4d2_addons_eclipse", "-1", "Addons Manager (-1: use addonconfig; 0: disable addons; 1: enable addons.)", FCVAR_NONE);
 		AutoExecConfig(true, "left4dhooks");
 
 		g_hCvar_AddonsEclipse.AddChangeHook(ConVarChanged_Addons);

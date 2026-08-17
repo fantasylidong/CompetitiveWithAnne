@@ -30,13 +30,13 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_anne_thirdperson_fix_version", PLUGIN_VERSION, "Anne thirdperson shoulder fix version.", FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	g_cvEnabled = CreateConVar("l4d2_anne_thirdperson_fix_enabled", "1", "0=Off, 1=enable Anne thirdperson fixes when l4d_ready_cfg_name matches.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_cvCommands = CreateConVar("l4d2_anne_thirdperson_fix_commands", "1", "0=Off, 1=enable !tp/!third commands.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_cvSpoofGameMode = CreateConVar("l4d2_anne_thirdperson_fix_spoof_gamemode", "1", "0=Off, 1=spoof mp_gamemode before running thirdpersonshoulder for !tp.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_cvFakeGameMode = CreateConVar("l4d2_anne_thirdperson_fix_fake_gamemode", "coop", "mp_gamemode value sent only to the !tp client before enabling thirdpersonshoulder.", FCVAR_NOTIFY);
-	g_cvCfgNames = CreateConVar("l4d2_anne_thirdperson_fix_cfg_names", DEFAULT_CFG_NAMES, "Comma-separated l4d_ready_cfg_name fragments that enable this fix. Empty enables all configs.", FCVAR_NOTIFY);
-	g_cvDebug = CreateConVar("l4d2_anne_thirdperson_fix_debug", "0", "0=Off, 1=log client spoof/restore operations.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	CreateConVar("l4d2_anne_thirdperson_fix_version", PLUGIN_VERSION, "Anne thirdperson shoulder fix version.", FCVAR_NONE | FCVAR_DONTRECORD);
+	g_cvEnabled = CreateConVar("l4d2_anne_thirdperson_fix_enabled", "1", "0=Off, 1=enable Anne thirdperson fixes when l4d_ready_cfg_name matches.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvCommands = CreateConVar("l4d2_anne_thirdperson_fix_commands", "1", "0=Off, 1=enable !tp/!third commands.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvSpoofGameMode = CreateConVar("l4d2_anne_thirdperson_fix_spoof_gamemode", "1", "0=Off, 1=spoof mp_gamemode before running thirdpersonshoulder for !tp.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvFakeGameMode = CreateConVar("l4d2_anne_thirdperson_fix_fake_gamemode", "coop", "mp_gamemode value sent only to the !tp client before enabling thirdpersonshoulder.", FCVAR_NONE);
+	g_cvCfgNames = CreateConVar("l4d2_anne_thirdperson_fix_cfg_names", DEFAULT_CFG_NAMES, "Comma-separated l4d_ready_cfg_name fragments that enable this fix. Empty enables all configs.", FCVAR_NONE);
+	g_cvDebug = CreateConVar("l4d2_anne_thirdperson_fix_debug", "0", "0=Off, 1=log client spoof/restore operations.", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	g_cvMPGameMode = FindConVar("mp_gamemode");
 	g_cvReadyCfgName = FindConVar("l4d_ready_cfg_name");

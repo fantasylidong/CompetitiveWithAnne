@@ -34,7 +34,7 @@ public void OnPluginStart()
 {
 	InitGameData();
 
-	CreateConVar("l4d2_hunter_patch_version", VERSION, "Version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("l4d2_hunter_patch_version", VERSION, "Version", FCVAR_NONE | FCVAR_DONTRECORD);
 
 	g_cvPatchs[0] = CreateConVar("l4d2_hunter_patch_convert_leap", "0", "Whether convert leap to pounce.\n0=game default, 1=always, 2=never.", FCVAR_NONE);
 	g_cvPatchs[1] = CreateConVar("l4d2_hunter_patch_crouch_pounce", "0", "While on the ground, Whether need press crouch button to pounce.\n0=game default, 1=always, 2=never.", FCVAR_NONE);

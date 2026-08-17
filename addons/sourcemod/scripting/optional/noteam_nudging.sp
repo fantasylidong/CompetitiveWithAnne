@@ -20,7 +20,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("noteam_nudging_version", PLUGIN_VERSION, "", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("noteam_nudging_version", PLUGIN_VERSION, "", FCVAR_NONE|FCVAR_DONTRECORD);
 	CreateTimer(1.0, UpdateAvoid, _, TIMER_REPEAT);
 }
 

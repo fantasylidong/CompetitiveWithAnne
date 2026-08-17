@@ -59,7 +59,7 @@ public void OnPluginStart()
 	LoadTranslation(TRANSLATION_FILE);
 
 	CreateConVar("punch_angle_version", PLUGIN_VERSION, "Version of the Punch Angle plugin.",
-		FCVAR_NOTIFY | FCVAR_DEVELOPMENTONLY | FCVAR_DONTRECORD);
+		FCVAR_NONE | FCVAR_DEVELOPMENTONLY | FCVAR_DONTRECORD);
 
 	g_hCookie = new Cookie(COOKIE_NAME, "Toggles recoil on or off.", CookieAccess_Protected);
 	g_hCookie.SetPrefabMenu(CookieMenu_OnOff, "Punch Angle Toggle", CookieSelected, g_hCookie);

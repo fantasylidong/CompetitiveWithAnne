@@ -7,7 +7,7 @@
 #include <left4dhooks>
 #include <treeutil>
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define SPECIAL_JUMP_DIST 250.0
 #define BACK_JUMP_DIST 70.0
 #define FREEZE_MAX_TIME 0.8

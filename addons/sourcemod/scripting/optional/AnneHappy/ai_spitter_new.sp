@@ -32,12 +32,12 @@ bool g_bSpitterBhop, g_bInstantKill;
 public void OnPluginStart()
 {
 	// CreateConVar
-	g_hSpitterBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启Spitter连跳", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hSpitterBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "90.0", "Spitter连跳的速度", FCVAR_NOTIFY, true, 0.0);
-	g_hSpitterStartBhopDistance = CreateConVar("ai_SpitterBhopStartBhopDistance", "2000.0", "Spitter在什么距离开始连跳", FCVAR_NOTIFY, true, 0.0);
-	g_hSpitterTarget = CreateConVar("ai_SpitterTarget", "3", "Spitter的目标选择：1=默认目标选择，2=多人的地方优先，3=被扑，撞，拉者优先（无3则2）", FCVAR_NOTIFY, true, 1.0, true, 3.0);
-	g_hInstantKill = CreateConVar("ai_SpitterInstantKill", "0", "Spitter吐完痰之后是否处死", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hSpitterAirAngle = CreateConVar("ai_SpitterAirAngle", "55.0", "Spitter连跳时，其速度与到目标生还者向量方向超过这一角度，将会停止连跳", FCVAR_NOTIFY, true, 0.0);
+	g_hSpitterBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启Spitter连跳", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hSpitterBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "90.0", "Spitter连跳的速度", FCVAR_NONE, true, 0.0);
+	g_hSpitterStartBhopDistance = CreateConVar("ai_SpitterBhopStartBhopDistance", "2000.0", "Spitter在什么距离开始连跳", FCVAR_NONE, true, 0.0);
+	g_hSpitterTarget = CreateConVar("ai_SpitterTarget", "3", "Spitter的目标选择：1=默认目标选择，2=多人的地方优先，3=被扑，撞，拉者优先（无3则2）", FCVAR_NONE, true, 1.0, true, 3.0);
+	g_hInstantKill = CreateConVar("ai_SpitterInstantKill", "0", "Spitter吐完痰之后是否处死", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hSpitterAirAngle = CreateConVar("ai_SpitterAirAngle", "55.0", "Spitter连跳时，其速度与到目标生还者向量方向超过这一角度，将会停止连跳", FCVAR_NONE, true, 0.0);
 	// AddChangeHook
 	g_hSpitterBhop.AddChangeHook(ConVarChanged_Cvars);
 	g_hSpitterBhopSpeed.AddChangeHook(ConVarChanged_Cvars);

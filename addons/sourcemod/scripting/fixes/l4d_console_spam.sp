@@ -87,7 +87,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d_console_spam_version", PLUGIN_VERSION, "Console Spam Patches version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d_console_spam_version", PLUGIN_VERSION, "Console Spam Patches version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	char sPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, sPath, sizeof(sPath), "gamedata/%s.txt", GAMEDATA);

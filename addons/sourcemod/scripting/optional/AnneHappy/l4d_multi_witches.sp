@@ -7,7 +7,7 @@
 #include <sdktools>
 
 #define DEBUG 0
-#define CVAR_FLAGS	FCVAR_NOTIFY
+#define CVAR_FLAGS	FCVAR_NONE
 
 int countRoundWitch;
 int countAliveWitch;

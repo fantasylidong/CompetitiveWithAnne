@@ -34,8 +34,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	CreateConVar("ThirdPersonShoulder_Detect_Version", PLUGIN_VERSION, "Version Of Plugin", FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_DONTRECORD);
-	hCvar_AllowVersus = CreateConVar("thirdpersonshoulder_detect_allow_versus", "0", "0=force firstperson state in versus, 1=detect actual client thirdperson state in versus-based configs.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	CreateConVar("ThirdPersonShoulder_Detect_Version", PLUGIN_VERSION, "Version Of Plugin", FCVAR_NONE|FCVAR_SPONLY|FCVAR_DONTRECORD);
+	hCvar_AllowVersus = CreateConVar("thirdpersonshoulder_detect_allow_versus", "0", "0=force firstperson state in versus, 1=detect actual client thirdperson state in versus-based configs.", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	HookEvent("player_team", eTeamChange);
 	HookEvent("player_death", ePlayerDeath);

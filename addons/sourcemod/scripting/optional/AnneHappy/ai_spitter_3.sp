@@ -10,7 +10,7 @@
 #include "ai_path_snapshot.inc"
 #include "ai_path_movement.inc"
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define SPITTER_JUMP_DELAY 1.0
 #define CHECK_PINNED_TIME 1.0
 #define SPITTER_KILL_DELAY 10.0

@@ -39,9 +39,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	LoadTranslations("tpsblock.phrases");
-	CreateConVar("l4d_tpsblock_version", PLUGIN_VERSION, "Version of the Thirdpersonshoulder Block plugin", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("l4d_tpsblock_version", PLUGIN_VERSION, "Version of the Thirdpersonshoulder Block plugin", FCVAR_NONE | FCVAR_DONTRECORD);
 
-	cvar_enabled = CreateConVar("l4d_tpsblock_enabled", "1", "Enable Thirdpersonshoulder Block", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_enabled = CreateConVar("l4d_tpsblock_enabled", "1", "Enable Thirdpersonshoulder Block", FCVAR_NONE, true, 0.0, true, 1.0);
 	cvar_action = CreateConVar("l4d_tpsblock_action", "1", "What to do with a player if he has thirdperson enabled? 1 - move to spectators, 0 - kick from server", _, true, 0.0, true, 1.0);
 	CreateTimer(GetRandomFloat(2.5, 3.5), CheckClients, _, TIMER_REPEAT);
 }

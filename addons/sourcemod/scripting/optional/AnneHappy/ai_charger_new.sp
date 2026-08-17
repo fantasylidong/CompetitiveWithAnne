@@ -39,14 +39,14 @@ float g_fChargerBhopSpeed, g_fChargerAirAngles;
 public void OnPluginStart()
 {
 	// CreateConVar
-	g_hChargerCoolTime= CreateConVar("ai_ChargerCoolTime", "12", "Charger多少秒之后才能再次冲锋", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hChargerBhop = CreateConVar("ai_ChargerBhop", "1", "是否开启Charger连跳", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hChargerBhopSpeed = CreateConVar("ai_ChargerBhopSpeed", "90.0", "Charger连跳的速度", FCVAR_NOTIFY, true, 0.0);
-	g_hChargerTarget = CreateConVar("ai_ChargerTarget", "3", "Charger目标选择：1=自然目标选择，2=优先撞人多处，3=优先取最近目标", FCVAR_NOTIFY, true, 1.0, true, 2.0);
-	g_hStartChargeDistance = CreateConVar("ai_ChargerStartChargeDistance", "300", "Charger只能在与目标小于这一距离时冲锋", FCVAR_NOTIFY, true, 0.0);
-	g_hChargerAimOffset = CreateConVar("ai_ChargerAimOffset", "30", "目标的瞄准角度与Charger处于这一角度内，Charger将不会冲锋", FCVAR_NOTIFY, true, 0.0);
-	g_hHealthStartCharge = CreateConVar("ai_ChargerStartChargeHealth", "350", "Charger的生命值低于这一个值才会冲锋", FCVAR_NOTIFY, true, 0.0);
-	g_hChargerAirAngles = CreateConVar("ai_ChargerAirAngles", "60.0", "Charger在空中的速度向量与到生还者的方向向量夹角大于这个值停止连跳", FCVAR_NOTIFY, true, 0.0);
+	g_hChargerCoolTime= CreateConVar("ai_ChargerCoolTime", "12", "Charger多少秒之后才能再次冲锋", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hChargerBhop = CreateConVar("ai_ChargerBhop", "1", "是否开启Charger连跳", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hChargerBhopSpeed = CreateConVar("ai_ChargerBhopSpeed", "90.0", "Charger连跳的速度", FCVAR_NONE, true, 0.0);
+	g_hChargerTarget = CreateConVar("ai_ChargerTarget", "3", "Charger目标选择：1=自然目标选择，2=优先撞人多处，3=优先取最近目标", FCVAR_NONE, true, 1.0, true, 2.0);
+	g_hStartChargeDistance = CreateConVar("ai_ChargerStartChargeDistance", "300", "Charger只能在与目标小于这一距离时冲锋", FCVAR_NONE, true, 0.0);
+	g_hChargerAimOffset = CreateConVar("ai_ChargerAimOffset", "30", "目标的瞄准角度与Charger处于这一角度内，Charger将不会冲锋", FCVAR_NONE, true, 0.0);
+	g_hHealthStartCharge = CreateConVar("ai_ChargerStartChargeHealth", "350", "Charger的生命值低于这一个值才会冲锋", FCVAR_NONE, true, 0.0);
+	g_hChargerAirAngles = CreateConVar("ai_ChargerAirAngles", "60.0", "Charger在空中的速度向量与到生还者的方向向量夹角大于这个值停止连跳", FCVAR_NONE, true, 0.0);
 	// HookEvents
 	HookEvent("player_spawn", evt_PlayerSpawn);
 	HookEvent("charger_charge_start", evt_ChargerChargeStart);

@@ -193,23 +193,23 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	CreateConVar ("l4d2_door_lock_version", PLUGIN_VERSION, "L4D2 Door Lock", FCVAR_SPONLY | FCVAR_NOTIFY | FCVAR_DONTRECORD);
-	Cvar_DoorLock_AllowLock = CreateConVar("l4d2_doorlock_plugin_enable", "1", "如果为1，启用插件", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	Cvar_DoorLock_GameModes = CreateConVar("l4d2_doorlock_game_mode", "versus,coop", "在这些模式中启用插件，用英文逗号隔开 (无空格, 无内容 = 全模式).", FCVAR_NOTIFY);
-	Cvar_DoorLock_Countdown = CreateConVar("l4d2_doorlock_countdown", "0", "你想设置多长时间的倒计时来解锁安全区？ (秒)", FCVAR_NOTIFY);
-	Cvar_DoorLock_LoaderMax = CreateConVar("l4d2_doorlock_loaders_time", "40", "最多等待加载玩家多长时间 (秒)", FCVAR_NOTIFY);
-	Cvar_DoorLock_AllowGlow = CreateConVar("l4d2_doorlock_glow_enable", "1", "如果为1，为安全室的门设置发光轮毂", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	Cvar_DoorLock_GlowRange = CreateConVar("l4d2_doorlock_glow_range", "500", "设置安全门的发光范围", FCVAR_NOTIFY);
-	Cvar_DoorLock_LockColor = CreateConVar("l4d2_doorlock_lock_glow_color",	"255 0 0", "设置安全门的发光颜色, (0-255RGB) 用空格隔开.", FCVAR_NOTIFY);
-	Cvar_DoorLock_OpenColor = CreateConVar("l4d2_doorlock_unlock_glow_color", "0 255 0", "设置解锁安全门的发光颜色, (0-255) Separated By Spaces.", FCVAR_NOTIFY);
-	Cvar_DoorLock_EnableRdy = CreateConVar("l4d2_doorlock_enable_ready_mode", "0", "如果为1，启用准备功能.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	Cvar_DoorLock_UnrdyTime = CreateConVar("l4d2_doorlock_unready_counts", "2", "设置每轮允许玩家使用未准备的次数.", FCVAR_NOTIFY);
-	Cvar_DoorLock_RdyTimeUp = CreateConVar("l4d2_doorlock_readyup_time", "120", "插件对未准备好的团队等待多长时间才会强制开始 (秒)", FCVAR_NOTIFY);
-	Cvar_DoorLock_RdyPercnt = CreateConVar("l4d2_doorlock_readyup_percent", "75.0", "一方设置准备好开始游戏所需的最低百分比", FCVAR_NOTIFY);
-	Cvar_DoorLock_Announces = CreateConVar("l4d2_doorlock_readyup_notify", "1", "团队准备就绪时显示聊天文本", FCVAR_NOTIFY, true, 0.0, true, 3.0);
-	Cvar_DoorLock_LeaverMsg = CreateConVar("l4d2_doorlock_leavers_notify", "2", "在被传送时向离开者显示聊天文本（0=禁用，1=聊天，2=中心文本）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	Cvar_DoorLock_EnableCmd = CreateConVar("l4d2_doorlock_add_commands", "!map,!buy,!shop", "添加你想要的命令以防止干扰ReadyUp面板 (无空格)", FCVAR_NOTIFY);
-	Cvar_DoorLock_FreezeSurvivorBots = CreateConVar("l4d2_doorlock_freeze_survivor_bots", "1", "如果为1，锁门期或第一关真人离开前只冻结生还者Bot，真人接管后自动解冻；0=保留原本nb_player_stop停止全部Bot", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	CreateConVar ("l4d2_door_lock_version", PLUGIN_VERSION, "L4D2 Door Lock", FCVAR_SPONLY | FCVAR_NONE | FCVAR_DONTRECORD);
+	Cvar_DoorLock_AllowLock = CreateConVar("l4d2_doorlock_plugin_enable", "1", "如果为1，启用插件", FCVAR_NONE, true, 0.0, true, 1.0);
+	Cvar_DoorLock_GameModes = CreateConVar("l4d2_doorlock_game_mode", "versus,coop", "在这些模式中启用插件，用英文逗号隔开 (无空格, 无内容 = 全模式).", FCVAR_NONE);
+	Cvar_DoorLock_Countdown = CreateConVar("l4d2_doorlock_countdown", "0", "你想设置多长时间的倒计时来解锁安全区？ (秒)", FCVAR_NONE);
+	Cvar_DoorLock_LoaderMax = CreateConVar("l4d2_doorlock_loaders_time", "40", "最多等待加载玩家多长时间 (秒)", FCVAR_NONE);
+	Cvar_DoorLock_AllowGlow = CreateConVar("l4d2_doorlock_glow_enable", "1", "如果为1，为安全室的门设置发光轮毂", FCVAR_NONE, true, 0.0, true, 1.0);
+	Cvar_DoorLock_GlowRange = CreateConVar("l4d2_doorlock_glow_range", "500", "设置安全门的发光范围", FCVAR_NONE);
+	Cvar_DoorLock_LockColor = CreateConVar("l4d2_doorlock_lock_glow_color",	"255 0 0", "设置安全门的发光颜色, (0-255RGB) 用空格隔开.", FCVAR_NONE);
+	Cvar_DoorLock_OpenColor = CreateConVar("l4d2_doorlock_unlock_glow_color", "0 255 0", "设置解锁安全门的发光颜色, (0-255) Separated By Spaces.", FCVAR_NONE);
+	Cvar_DoorLock_EnableRdy = CreateConVar("l4d2_doorlock_enable_ready_mode", "0", "如果为1，启用准备功能.", FCVAR_NONE, true, 0.0, true, 1.0);
+	Cvar_DoorLock_UnrdyTime = CreateConVar("l4d2_doorlock_unready_counts", "2", "设置每轮允许玩家使用未准备的次数.", FCVAR_NONE);
+	Cvar_DoorLock_RdyTimeUp = CreateConVar("l4d2_doorlock_readyup_time", "120", "插件对未准备好的团队等待多长时间才会强制开始 (秒)", FCVAR_NONE);
+	Cvar_DoorLock_RdyPercnt = CreateConVar("l4d2_doorlock_readyup_percent", "75.0", "一方设置准备好开始游戏所需的最低百分比", FCVAR_NONE);
+	Cvar_DoorLock_Announces = CreateConVar("l4d2_doorlock_readyup_notify", "1", "团队准备就绪时显示聊天文本", FCVAR_NONE, true, 0.0, true, 3.0);
+	Cvar_DoorLock_LeaverMsg = CreateConVar("l4d2_doorlock_leavers_notify", "2", "在被传送时向离开者显示聊天文本（0=禁用，1=聊天，2=中心文本）", FCVAR_NONE, true, 0.0, true, 1.0);
+	Cvar_DoorLock_EnableCmd = CreateConVar("l4d2_doorlock_add_commands", "!map,!buy,!shop", "添加你想要的命令以防止干扰ReadyUp面板 (无空格)", FCVAR_NONE);
+	Cvar_DoorLock_FreezeSurvivorBots = CreateConVar("l4d2_doorlock_freeze_survivor_bots", "1", "如果为1，锁门期或第一关真人离开前只冻结生还者Bot，真人接管后自动解冻；0=保留原本nb_player_stop停止全部Bot", FCVAR_NONE, true, 0.0, true, 1.0);
 	//AutoExecConfig(true, "l4d2_door_lock");
 
 	Cvar_DoorLock_MPGameMod = FindConVar("mp_gamemode");

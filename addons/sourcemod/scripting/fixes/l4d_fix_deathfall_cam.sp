@@ -33,7 +33,7 @@ ArrayList g_aDeathFallClients;
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_fix_deathfall_cam_version", PLUGIN_VERSION, "Fix Deathfall Camera Version", FCVAR_DONTRECORD|FCVAR_NOTIFY|FCVAR_REPLICATED|FCVAR_SPONLY);
+	CreateConVar("l4d2_fix_deathfall_cam_version", PLUGIN_VERSION, "Fix Deathfall Camera Version", FCVAR_DONTRECORD|FCVAR_NONE|FCVAR_REPLICATED|FCVAR_SPONLY);
 	
 	g_aDeathFallClients = new ArrayList();
 	

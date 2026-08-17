@@ -110,7 +110,7 @@ public void OnPluginStart()
 		"l4d2_block_no_steam_logon_version",
 		PLUGIN_VERSION,
 		"Plugin version.",
-		FCVAR_NOTIFY | FCVAR_DONTRECORD
+		FCVAR_NONE | FCVAR_DONTRECORD
 	);
 
 	g_hCvar_Enable = CreateConVar(

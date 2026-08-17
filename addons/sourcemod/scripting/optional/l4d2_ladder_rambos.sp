@@ -114,42 +114,42 @@ public void OnPluginStart()
 								"1",
 								"Enable the Survivors to shoot from ladders?\n" ...
 								"1 to enable, 0 to disable.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 1.0);
 	Cvar_M2			= CreateConVar(
 								"cssladders_allow_m2",
 								"0",
 								"Allow shoving whilst on a ladder?\n" ...
 								"1 to allow, 0 to block.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 1.0);
 	Cvar_Reload		= CreateConVar(
 								"cssladders_allow_reload",
 								"1",
 								"Allow reloading whilst on a ladder?\n" ...
 								"1 to allow, 0 to block.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 1.0);
 	Cvar_SgReload	= CreateConVar(
 								"cssladders_allow_shotgun_reload",
 								"1",
 								"Allow shotgun reloading whilst on a ladder?\n" ...
 								"1 to allow, 0 to block.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 1.0);
 	Cvar_Switch		= CreateConVar(
 								"cssladders_allow_switch",
 								"1",
 								"Allow switching to other inventory whilst on a ladder?\n" ...
 								"2 to allow all, 1 to allow only between guns, 0 to block.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 2.0);
 	Cvar_Recoil		= CreateConVar(
 								"cssladders_reduce_recoil",
 								"0",
 								"Allow reducing recoil whilst shooting on a ladder?\n" ...
 								"1 to allow, 0 to block.",
-								FCVAR_NOTIFY|FCVAR_SPONLY,
+								FCVAR_NONE|FCVAR_SPONLY,
 								true, 0.0, true, 1.0);
 	
 	// Setup ConVars change hook

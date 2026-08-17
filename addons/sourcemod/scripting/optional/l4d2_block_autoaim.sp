@@ -39,7 +39,7 @@ public void OnPluginStart()
 		"l4d2_block_autoaim",
 		"1",
 		"Disable Auto-Aim",
-		FCVAR_NOTIFY,
+		FCVAR_NONE,
 		true, 0.0, true, 1.0
 	);
 	g_cvEnabled.AddChangeHook(OnEnabledChanged);

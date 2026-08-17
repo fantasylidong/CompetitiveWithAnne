@@ -8,7 +8,7 @@
 #include <colors>
 #include <treeutil>
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define INVALID_CLIENT -1
 /* 检测吃铁的时间间隔需要少于伤害统计输出时间间隔，否则 round_end 无法检测最后吃铁 */
 #define IRON_CHECK_INTERVAL 0.5

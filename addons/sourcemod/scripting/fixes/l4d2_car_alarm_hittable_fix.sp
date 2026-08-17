@@ -77,9 +77,9 @@ public void OnPluginStart()
 	// CONVARS
 	// =================================================================================================
 
-	g_hCarAlarmSettings = CreateConVar("l4d2_car_alarm_settings", "3", "Bitmask: 1-Trigger Alarm on Survivor Touch/ 2-Disable Alarm when a Hittable hits the Alarm Car", FCVAR_NOTIFY);
-	g_hCarTouchCapped   = CreateConVar("l4d2_car_alarm_touch_capped", "1", "Only add the additional car alarm trigger when the Survivor is capped by an Infected when touching the car? (Requires bitmask settings)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hCarAI            = CreateConVar("l4d2_car_alarm_touch_ai", "0", "Care about AI Survivors touching the car? (Default vanilla = 0) Requires bitmask settings", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hCarAlarmSettings = CreateConVar("l4d2_car_alarm_settings", "3", "Bitmask: 1-Trigger Alarm on Survivor Touch/ 2-Disable Alarm when a Hittable hits the Alarm Car", FCVAR_NONE);
+	g_hCarTouchCapped   = CreateConVar("l4d2_car_alarm_touch_capped", "1", "Only add the additional car alarm trigger when the Survivor is capped by an Infected when touching the car? (Requires bitmask settings)", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hCarAI            = CreateConVar("l4d2_car_alarm_touch_ai", "0", "Care about AI Survivors touching the car? (Default vanilla = 0) Requires bitmask settings", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	iFlags          = g_hCarAlarmSettings.IntValue;
 	bCarTouchCapped = g_hCarTouchCapped.BoolValue;

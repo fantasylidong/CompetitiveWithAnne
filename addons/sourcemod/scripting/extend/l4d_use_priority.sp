@@ -69,7 +69,7 @@
 #include <sdktools>
 #include <dhooks>
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 #define GAMEDATA			"l4d_use_priority"
 
 // bool g_bLeft4Dead2;
@@ -132,7 +132,7 @@ public void OnPluginStart()
 	// ====================================================================================================
 	// CVAR
 	// ====================================================================================================
-	CreateConVar("l4d_use_priority_version", PLUGIN_VERSION, "Use Priority Patch plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d_use_priority_version", PLUGIN_VERSION, "Use Priority Patch plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 }
 
 

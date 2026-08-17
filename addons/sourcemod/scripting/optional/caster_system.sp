@@ -51,7 +51,7 @@ public void OnPluginStart()
 	casterTrie = new StringMap();
 	allowedCastersTrie = new StringMap();
 	
-	g_hDisableAddons = CreateConVar("caster_disable_addons", "0", "Whether to disallow addons on casters", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hDisableAddons = CreateConVar("caster_disable_addons", "0", "Whether to disallow addons on casters", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_hDisableAddons.AddChangeHook(OnAddonsSettingChanged);
 	
 	// Caster Registration

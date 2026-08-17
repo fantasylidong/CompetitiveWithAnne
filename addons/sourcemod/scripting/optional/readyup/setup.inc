@@ -47,17 +47,17 @@ void SetupForwards()
 void SetupConVars()
 {
 	// basic
-	l4d_ready_enabled			= CreateConVar("l4d_ready_enabled", "1", "Enable this plugin. (Values: 0 = Disabled, 1 = Manual ready, 2 = Auto start, 3 = Team ready)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
-	l4d_ready_cfg_name			= CreateConVar("l4d_ready_cfg_name", "", "Configname to display on the ready-up panel", FCVAR_NOTIFY|FCVAR_PRINTABLEONLY);
-	l4d_ready_server_cvar		= CreateConVar("l4d_ready_server_cvar", "sn_main_name", "ConVar to retrieve the server name for displaying on the ready-up panel", FCVAR_NOTIFY|FCVAR_PRINTABLEONLY);
-	l4d_ready_max_players		= CreateConVar("l4d_ready_max_players", "12", "Maximum number of players to show on the ready-up panel.", FCVAR_NOTIFY, true, 0.0, true, MAXPLAYERS+1.0);
+	l4d_ready_enabled			= CreateConVar("l4d_ready_enabled", "1", "Enable this plugin. (Values: 0 = Disabled, 1 = Manual ready, 2 = Auto start, 3 = Team ready)", FCVAR_NONE, true, 0.0, true, 3.0);
+	l4d_ready_cfg_name			= CreateConVar("l4d_ready_cfg_name", "", "Configname to display on the ready-up panel", FCVAR_NONE|FCVAR_PRINTABLEONLY);
+	l4d_ready_server_cvar		= CreateConVar("l4d_ready_server_cvar", "sn_main_name", "ConVar to retrieve the server name for displaying on the ready-up panel", FCVAR_NONE|FCVAR_PRINTABLEONLY);
+	l4d_ready_max_players		= CreateConVar("l4d_ready_max_players", "12", "Maximum number of players to show on the ready-up panel.", FCVAR_NONE, true, 0.0, true, MAXPLAYERS+1.0);
 
 	// game
-	l4d_ready_disable_spawns	= CreateConVar("l4d_ready_disable_spawns", "0", "Prevent SI from having spawns during ready-up", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	l4d_ready_survivor_freeze	= CreateConVar("l4d_ready_survivor_freeze", "1", "Freeze the survivors during ready-up.  When unfrozen they are unable to leave the saferoom but can move freely inside", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	l4d_ready_disable_spawns	= CreateConVar("l4d_ready_disable_spawns", "0", "Prevent SI from having spawns during ready-up", FCVAR_NONE, true, 0.0, true, 1.0);
+	l4d_ready_survivor_freeze	= CreateConVar("l4d_ready_survivor_freeze", "1", "Freeze the survivors during ready-up.  When unfrozen they are unable to leave the saferoom but can move freely inside", FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	// sound
-	l4d_ready_enable_sound		= CreateConVar("l4d_ready_enable_sound", "1", "Enable sounds played to clients", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	l4d_ready_enable_sound		= CreateConVar("l4d_ready_enable_sound", "1", "Enable sounds played to clients", FCVAR_NONE, true, 0.0, true, 1.0);
 	l4d_ready_notify_sound		= CreateConVar("l4d_ready_notify_sound", DEFAULT_NOTIFY_SOUND, "The sound that plays when a round goes on countdown");	
 	l4d_ready_countdown_sound	= CreateConVar("l4d_ready_countdown_sound", DEFAULT_COUNTDOWN_SOUND, "The sound that plays when a round goes on countdown");	
 	l4d_ready_live_sound		= CreateConVar("l4d_ready_live_sound", DEFAULT_LIVE_SOUND, "The sound that plays when a round goes live");
@@ -66,15 +66,15 @@ void SetupConVars()
 	l4d_ready_secret			= CreateConVar("l4d_ready_secret", "1", "Play something good", _, true, 0.0, true, 1.0);
 	
 	// action
-	l4d_ready_delay				= CreateConVar("l4d_ready_delay", "3", "Number of seconds to count down before the round goes live.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_force_extra		= CreateConVar("l4d_ready_force_extra", "2", "Number of seconds added to the duration of live count down.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_autostart_delay	= CreateConVar("l4d_ready_autostart_delay", "5", "Number of seconds to count down before auto-start kicks in.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_autostart_wait	= CreateConVar("l4d_ready_autostart_wait", "20", "Number of seconds to wait for connecting players before auto-start is forced.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_autostart_min		= CreateConVar("l4d_ready_autostart_min", "0.25", "Percent of max players (Versus = 8) in game to allow auto-start to proceed.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	l4d_ready_unbalanced_start	= CreateConVar("l4d_ready_unbalanced_start", "0", "Allow game to go live when teams are not full.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	l4d_ready_unbalanced_min	= CreateConVar("l4d_ready_unbalanced_min", "2", "Minimum of players in each team to allow a unbalanced start.", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_autoready         = CreateConVar("l4d_ready_autoready", "0", "Automatically ready up a player after after <value> seconds if they are not afk (0 = disabled).", FCVAR_NOTIFY, true, 0.0);
-	l4d_ready_unready_limit		= CreateConVar("l4d_ready_unready_limit", "0", "Maximum times a player can cancel a live countdown by unreadiness per round. 0 disables the limit.", FCVAR_NOTIFY, true, 0.0);
+	l4d_ready_delay				= CreateConVar("l4d_ready_delay", "3", "Number of seconds to count down before the round goes live.", FCVAR_NONE, true, 0.0);
+	l4d_ready_force_extra		= CreateConVar("l4d_ready_force_extra", "2", "Number of seconds added to the duration of live count down.", FCVAR_NONE, true, 0.0);
+	l4d_ready_autostart_delay	= CreateConVar("l4d_ready_autostart_delay", "5", "Number of seconds to count down before auto-start kicks in.", FCVAR_NONE, true, 0.0);
+	l4d_ready_autostart_wait	= CreateConVar("l4d_ready_autostart_wait", "20", "Number of seconds to wait for connecting players before auto-start is forced.", FCVAR_NONE, true, 0.0);
+	l4d_ready_autostart_min		= CreateConVar("l4d_ready_autostart_min", "0.25", "Percent of max players (Versus = 8) in game to allow auto-start to proceed.", FCVAR_NONE, true, 0.0, true, 1.0);
+	l4d_ready_unbalanced_start	= CreateConVar("l4d_ready_unbalanced_start", "0", "Allow game to go live when teams are not full.", FCVAR_NONE, true, 0.0, true, 1.0);
+	l4d_ready_unbalanced_min	= CreateConVar("l4d_ready_unbalanced_min", "2", "Minimum of players in each team to allow a unbalanced start.", FCVAR_NONE, true, 0.0);
+	l4d_ready_autoready         = CreateConVar("l4d_ready_autoready", "0", "Automatically ready up a player after after <value> seconds if they are not afk (0 = disabled).", FCVAR_NONE, true, 0.0);
+	l4d_ready_unready_limit		= CreateConVar("l4d_ready_unready_limit", "0", "Maximum times a player can cancel a live countdown by unreadiness per round. 0 disables the limit.", FCVAR_NONE, true, 0.0);
 
 	// game convars
 	director_no_specials = FindConVar("director_no_specials");

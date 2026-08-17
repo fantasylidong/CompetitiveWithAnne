@@ -63,7 +63,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("survivor_afk_fix_ver", PLUGIN_VERSION, "", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("survivor_afk_fix_ver", PLUGIN_VERSION, "", FCVAR_NONE|FCVAR_DONTRECORD);
 	
 	Handle hGamedata = LoadGameConfigFile(GAMEDATA);
 	if(hGamedata == null) 

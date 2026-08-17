@@ -51,7 +51,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("sm_clientcommandlogging_version", DATA, "", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("sm_clientcommandlogging_version", DATA, "", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NONE);
 	
 	for(int i=0;;i++)
 	{

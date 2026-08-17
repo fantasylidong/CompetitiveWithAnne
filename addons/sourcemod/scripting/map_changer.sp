@@ -11,7 +11,7 @@
 #define PLUGIN_VERSION			"1.0.5"
 #define PLUGIN_URL				""
 
-#define CVAR_FLAGS				FCVAR_NOTIFY
+#define CVAR_FLAGS				FCVAR_NONE
 #define CONFIG_DATA				"data/map_changer.cfg"
 
 enum {
@@ -134,7 +134,7 @@ public void OnPluginStart() {
 	g_aRandomNextMap = new ArrayList(ByteCountToCells(64));
 	g_umDisconnectToLobby = GetUserMessageId("DisconnectToLobby");
 	HookUserMessage(GetUserMessageId("StatsCrawlMsg"), umStatsCrawlMsg, false, umStatsCrawlMsgPost);
-	CreateConVar("map_changer_version", PLUGIN_VERSION, "Map Changer plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("map_changer_version", PLUGIN_VERSION, "Map Changer plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	g_cvFinaleChangeType = 		CreateConVar("mapchanger_finale_change_type",		"8",	"0 - 终局不换地图(返回大厅); 1 - 救援载具离开时; 2 - 终局获胜时; 4 - 统计屏幕出现时; 8 - 统计屏幕结束时", CVAR_FLAGS);
 	g_cvFinaleFailureCount =	CreateConVar("mapchanger_finale_failure_count",		"3",	"终局团灭几次自动换到下一张图", CVAR_FLAGS);

@@ -192,7 +192,7 @@ public OnPluginStart()
 	CvarPort = FindConVar("hostport");
 	g_hServersWhiteList = CreateArray();
 
-	CreateConVar("sourcecomms_version", PLUGIN_VERSION, _, FCVAR_SPONLY | FCVAR_REPLICATED | FCVAR_NOTIFY);
+	CreateConVar("sourcecomms_version", PLUGIN_VERSION, _, FCVAR_SPONLY | FCVAR_REPLICATED | FCVAR_NONE);
 	AddCommandListener(CommandCallback, "sm_gag");
 	AddCommandListener(CommandCallback, "sm_mute");
 	AddCommandListener(CommandCallback, "sm_silence");

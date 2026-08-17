@@ -26,7 +26,7 @@ public Plugin myinfo =
 };
 
 // ===== 宏&常量 =====
-#define CVAR_FLAG               FCVAR_NOTIFY
+#define CVAR_FLAG               FCVAR_NONE
 #define LUNGE_LEFT              45.0
 #define LUNGE_RIGHT             315.0
 #define INVALID_CLIENT          -1

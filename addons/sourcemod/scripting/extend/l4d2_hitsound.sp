@@ -43,7 +43,7 @@
 #include <adminmenu>
 
 #define PLUGIN_VERSION "2.3.0"
-#define CVAR_FLAGS     FCVAR_NOTIFY
+#define CVAR_FLAGS     FCVAR_NONE
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 #define OVERLAY_CLEAN_INTERVAL 0.1
 

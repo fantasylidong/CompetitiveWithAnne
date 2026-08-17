@@ -23,7 +23,7 @@
 #define PLUGIN_VERSION          "2.4.1-door-threshold-fixed"
 #define TEAM_SURVIVOR           2
 #define TEAM_INFECTED           3
-#define CVAR_FLAGS              FCVAR_NOTIFY
+#define CVAR_FLAGS              FCVAR_NONE
 #define NAV_MESH_HEIGHT         20.0
 
 // 搜点参数

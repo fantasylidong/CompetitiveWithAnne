@@ -305,7 +305,7 @@
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 #define CONFIG_SPAWNS		"data/l4d_hats.cfg"
 #define	MAX_HATS			128
 
@@ -585,7 +585,7 @@ public void OnPluginStart()
 	g_hCvarSave = CreateConVar(			"l4d_hats_save",		"0", 			"0=Off, 1=Save the players selected hats and attach when they spawn or rejoin the server. Overrides the random setting.", CVAR_FLAGS, true, 0.0, true, 1.0 );
 	g_hCvarThird = CreateConVar(		"l4d_hats_third",		"1", 			"0=Off, 1=When a player is in third person view, display their hat. Hide when in first person view.", CVAR_FLAGS, true, 0.0, true, 1.0 );
 	g_hCvarWall = CreateConVar(			"l4d_hats_wall",		"1",			"0=Show hats glowing through walls, 1=Hide hats glowing when behind walls (creates 1 extra entity per hat).", CVAR_FLAGS, true, 0.0, true, 1.0 );
-	CreateConVar(						"l4d_hats_version",		PLUGIN_VERSION,	"Hats plugin version.",	FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(						"l4d_hats_version",		PLUGIN_VERSION,	"Hats plugin version.",	FCVAR_NONE|FCVAR_DONTRECORD);
 	//AutoExecConfig(true,				"l4d_hats");
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");

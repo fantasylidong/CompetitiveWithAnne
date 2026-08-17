@@ -90,7 +90,7 @@ public void OnPluginStart()
 	sv_hosting_lobby = FindConVar("sv_hosting_lobby");
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
 
-	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("l4d2_lobby_match_manager_version", VERSION, "version", FCVAR_NONE | FCVAR_DONTRECORD);
 	g_cvUnreserveType =			CreateConVar("l4d2_lmm_unreserve_type",				"0",	"Direct joins never create reservations. 0=Keep pre-existing reservation, 1=Anne mode: keep pre-existing reservation until the third player joins, 2=Unreserve when lobby full, 3=Clear stale reservation while empty.");
 	g_cvReserveModifyFlags =	CreateConVar("l4d2_lmm_reservation_modify_flags",	"7",	"Modify the lobby settings applied by the client to the server.\nSee RMFLAG_* (need cvar l4d2_lmm_unreserve_type != 1).");
 	

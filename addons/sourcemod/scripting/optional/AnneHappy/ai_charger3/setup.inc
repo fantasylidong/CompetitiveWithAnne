@@ -11,7 +11,7 @@
 // =========================================================================
 // Public Defines
 // =========================================================================
-#define CVAR_FLAGS							FCVAR_NOTIFY
+#define CVAR_FLAGS							FCVAR_NONE
 
 #define GAMEDATA 							"l4d2_ai_charger3"
 #define SIG_GET_RUN_TOP_SPEED 				"CTerrorPlayer::GetRunTopSpeed"

@@ -32,7 +32,7 @@ public void OnPluginStart()
 	sb_all_bot_game = FindConVar("sb_all_bot_game");
 
 	CreateConVar("l4d2_auto_restart_version", VERSION, "插件版本", FCVAR_NONE | FCVAR_DONTRECORD);
-	g_cvDelayTime = CreateConVar("l4d2_auto_restart_delay", "30.0", "Restart grace period (in sec.)", FCVAR_NOTIFY);
+	g_cvDelayTime = CreateConVar("l4d2_auto_restart_delay", "30.0", "Restart grace period (in sec.)", FCVAR_NONE);
 	g_fDelayTime = g_cvDelayTime.FloatValue;
 	g_cvDelayTime.AddChangeHook(OnConVarChanged);
 

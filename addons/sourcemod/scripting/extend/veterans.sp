@@ -108,7 +108,7 @@ public OnPluginStart()
 {
 	//AddServerTag2("Veterans");
 	LoadTranslations("veterans.phrases");	
-	CreateConVar("sm_veterans_version", PLUGIN_VERSION, "Veterans Only Version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("sm_veterans_version", PLUGIN_VERSION, "Veterans Only Version", FCVAR_NONE | FCVAR_DONTRECORD);
 	g_cvAPIkey = CreateConVar("l4d2_playtime_apikey", "C7B3FC46E6E6D5C87700963F0688FCB4", "Steam developer web API key", FCVAR_PROTECTED);
 	/*
 	cvar_url = CreateConVar(

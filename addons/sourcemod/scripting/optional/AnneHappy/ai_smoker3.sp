@@ -10,7 +10,7 @@
 #include <logger2>
 #include <actions>
 
-#define CVAR_FLAGS FCVAR_NOTIFY
+#define CVAR_FLAGS FCVAR_NONE
 // 将插件日志前缀改成自己插件的日志前缀
 #define PLUGIN_PREFIX "Ai-Smoker3"
 

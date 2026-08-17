@@ -8,7 +8,7 @@
 #include <left4dhooks>
 
 #define PLUGIN_VERSION "1.9"
-#define CVAR_FLAGS	FCVAR_NOTIFY
+#define CVAR_FLAGS	FCVAR_NONE
 
 #define UPDATESPEAKING_TIME_INTERVAL 0.5
 #define Model_Head "models/extras/info_speech.mdl"
@@ -51,9 +51,9 @@ public void OnPluginStart()
 	
 	hSV_VoiceEnable = FindConVar("sv_voiceenable");
 
-	g_hCvarHatEnable = 	CreateConVar( 		"show_mic_center_hat_enable", "0", 		"If 1, display hat on player's head if player is speaking", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hCvarAnnounceEnable = CreateConVar( 	"show_mic_center_text_enable", "1", 	"If 1, display player speaking message in center text", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	CreateConVar(						 	"show_mic_version",		PLUGIN_VERSION,	"Show Mic plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	g_hCvarHatEnable = 	CreateConVar( 		"show_mic_center_hat_enable", "0", 		"If 1, display hat on player's head if player is speaking", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hCvarAnnounceEnable = CreateConVar( 	"show_mic_center_text_enable", "1", 	"If 1, display player speaking message in center text", FCVAR_NONE, true, 0.0, true, 1.0);
+	CreateConVar(						 	"show_mic_version",		PLUGIN_VERSION,	"Show Mic plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 //	AutoExecConfig(true, "show_mic");
 
 	GetCvars();

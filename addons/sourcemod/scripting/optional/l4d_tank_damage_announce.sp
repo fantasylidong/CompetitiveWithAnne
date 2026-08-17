@@ -68,7 +68,7 @@ public void OnPluginStart()
 	HookEvent("round_end", Event_RoundEnd);
 	HookEvent("player_hurt", Event_PlayerHurt);
 
-	g_cvarEnabled       = CreateConVar("l4d_tankdamage_enabled", "1", "Announce damage done to tanks when enabled", FCVAR_NONE | FCVAR_SPONLY | FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cvarEnabled       = CreateConVar("l4d_tankdamage_enabled", "1", "Announce damage done to tanks when enabled", FCVAR_SPONLY, true, 0.0, true, 1.0);
 	g_cvarSurvivorLimit = FindConVar("survivor_limit");
 	g_cvarTankHealth    = FindConVar("z_tank_health");
 	g_cvarDifficulty    = FindConVar("z_difficulty");

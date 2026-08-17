@@ -603,11 +603,9 @@ stock void SetCvar(char[] cvarName, int value)
 	if (IntCvar == null)return;
 	
 	int flags = IntCvar.Flags;
-	flags &= ~FCVAR_NOTIFY;
-	IntCvar.Flags = flags;
+	IntCvar.Flags = flags & ~FCVAR_NOTIFY;
 	IntCvar.IntValue = value;
-	
-	flags |= FCVAR_NOTIFY;
+
 	IntCvar.Flags = flags;
 }
 
@@ -627,11 +625,9 @@ stock void SetCvarFloat(char[] cvarName, float value)
 	if (FloatCvar == null)return;
 	
 	int flags = FloatCvar.Flags;
-	flags &= ~FCVAR_NOTIFY;
-	FloatCvar.Flags = flags;
+	FloatCvar.Flags = flags & ~FCVAR_NOTIFY;
 	FloatCvar.FloatValue = value;
-	
-	flags |= FCVAR_NOTIFY;
+
 	FloatCvar.Flags = flags;
 }
 
@@ -651,11 +647,9 @@ stock void SetCvarString(char[] cvarName, char[] value)
 	if (StringCvar == null)return;
 	
 	int flags = StringCvar.Flags;
-	flags &= ~FCVAR_NOTIFY;
-	StringCvar.Flags = flags;
+	StringCvar.Flags = flags & ~FCVAR_NOTIFY;
 	StringCvar.SetString(value);
-	
-	flags |= FCVAR_NOTIFY;
+
 	StringCvar.Flags = flags;
 }
 

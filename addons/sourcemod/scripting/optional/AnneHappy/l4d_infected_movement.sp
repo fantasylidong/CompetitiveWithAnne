@@ -73,7 +73,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 
 
 ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarSmoker, g_hCvarType, g_hSpeedSmoke, g_hSpeedSpit, g_hSpeedTank, g_hSpeedSmokeDef, g_hSpeedSpitDef, g_hSpeedTankDef;
@@ -129,7 +129,7 @@ public void OnPluginStart()
 	if( g_bLeft4Dead2 )
 		g_hSpeedSpit =	CreateConVar(	"l4d_infected_movement_speed_spitter",	"250",			"How fast can Spitters move while using their ability.", CVAR_FLAGS );
 	g_hCvarType =		CreateConVar(	"l4d_infected_movement_type",			"2",			"These Special Infected players can use: 1=Smoker, 2=Spitter, 4=Tank, 7=All. Add numbers together.", CVAR_FLAGS );
-	CreateConVar(						"l4d_infected_movement_version",		PLUGIN_VERSION, "Ability Movement plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(						"l4d_infected_movement_version",		PLUGIN_VERSION, "Ability Movement plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	AutoExecConfig(true,				"l4d_infected_movement");
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");

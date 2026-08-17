@@ -67,12 +67,12 @@ public void OnPluginStart()
 	g_hCvarFooter	= CreateConVar(	"si_announce_ready_footer",
 									"1",
 									"Enable si class string be added to readyup panel as footer (if available).",
-									FCVAR_NOTIFY, true, 0.0, true, 1.0);
+									FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	g_hCvarPrint	= CreateConVar(	"si_announce_print",
 									"1",
 									"Decide where the plugin prints the announce. (0: Disable, 1: Chat, 2: Hint, 3: Chat and Hint)",
-									FCVAR_NOTIFY, true, 0.0, true, 3.0);
+									FCVAR_NONE, true, 0.0, true, 3.0);
 									
 	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 	HookEvent("round_end", Event_RoundEnd, EventHookMode_PostNoCopy);

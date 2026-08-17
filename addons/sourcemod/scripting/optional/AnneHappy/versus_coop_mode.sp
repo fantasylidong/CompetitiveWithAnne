@@ -53,7 +53,7 @@ any Native_IsMapTransitioning(Handle plugin, int numParams) {
 
 public void OnPluginStart() {
 	InitGameData();
-	CreateConVar("versus_coop_mode_version", PLUGIN_VERSION, "Versus Coop Mode plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("versus_coop_mode_version", PLUGIN_VERSION, "Versus Coop Mode plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	HookUserMessage(GetUserMessageId("VGUIMenu"), umVGUIMenu, true);
 	HookEvent("round_start",	Event_RoundStart,		EventHookMode_PostNoCopy);
 	HookEvent("map_transition", Event_MapTransition,	EventHookMode_Pre);

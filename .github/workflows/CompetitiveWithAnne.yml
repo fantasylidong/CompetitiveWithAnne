@@ -59,47 +59,78 @@ jobs:
             tar -czf "$GITHUB_WORKSPACE/$asset" -C "$STAGING/$variant" "$RELEASE_NAME"
           }
 
-          remove_anne_optional_plugin() {
+          plugin_count() {
+            find "$PLUGIN_DIR" -type f -name '*.smx' -printf '.' | wc -c | tr -d '[:space:]'
+          }
+
+          remove_plugin() {
             local plugin="$1"
-            rm -f "$PLUGIN_DIR/optional/AnneHappy/$plugin.smx"
+
+            if [ ! -f "$PLUGIN_DIR/$plugin.smx" ]; then
+              echo "::error::Expected packaged plugin not found: $plugin.smx"
+              exit 1
+            fi
+            rm -f "$PLUGIN_DIR/$plugin.smx"
             find "$PACKAGE_DIR/left4dead2/cfg" -type f -name '*.cfg' \
-              -exec sed -i "\|optional/AnneHappy/$plugin\\.smx|d" {} +
+              -exec sed -i "\|$plugin\\.smx|d" {} +
           }
 
           stage_package full
+          FULL_PLUGIN_COUNT="$(plugin_count)"
+          echo "full: $FULL_PLUGIN_COUNT plugins"
           archive_package full "$RELEASE_NAME.tar.gz"
 
           stage_package norank
           # Dynamic difficulty and traitor quota both depend on the removed ranking databases.
-          rm -f \
-            "$PLUGIN_DIR/extend/l4d_stats.smx" \
-            "$PLUGIN_DIR"/extend/sbpp_* \
-            "$PLUGIN_DIR/extend/lilac.smx"
-          remove_anne_optional_plugin annehappy_dynamic_ai_difficulty
-          remove_anne_optional_plugin anne_traitor_quota
+          NORANK_REMOVALS=(
+            extend/l4d_stats
+            extend/sbpp_admcfg
+            extend/sbpp_checker
+            extend/sbpp_comms
+            extend/sbpp_main
+            extend/sbpp_report
+            extend/sbpp_sleuth
+            extend/lilac
+            optional/AnneHappy/annehappy_dynamic_ai_difficulty
+            optional/AnneHappy/anne_traitor_quota
+          )
+          for plugin in "${NORANK_REMOVALS[@]}"; do
+            remove_plugin "$plugin"
+          done
+          NORANK_PLUGIN_COUNT="$(plugin_count)"
+          echo "norank: $NORANK_PLUGIN_COUNT plugins (${#NORANK_REMOVALS[@]} removed)"
           archive_package norank "$RELEASE_NAME-norank.tar.gz"
 
           stage_package nomysql
-          # Keep infected_control and spawn_vote_menu.  The former now treats quota
-          # persistence as optional; the latter defaults to SourceMod's local SQLite.
-          rm -f \
-            "$PLUGIN_DIR/chat-processor.smx" \
-            "$PLUGIN_DIR/extend/hextags.smx" \
-            "$PLUGIN_DIR/extend/l4d_stats.smx" \
-            "$PLUGIN_DIR"/extend/sbpp_* \
-            "$PLUGIN_DIR/extend/lilac.smx" \
-            "$PLUGIN_DIR/extend/rpg.smx" \
-            "$PLUGIN_DIR/extend/chatlog.smx" \
-            "$PLUGIN_DIR/extend/veterans.smx" \
-            "$PLUGIN_DIR/extend/l4d2_damage_show.smx" \
-            "$PLUGIN_DIR/extend/punch_angle.smx" \
-            "$PLUGIN_DIR/extend/l4d2_blacklist.smx" \
-            "$PLUGIN_DIR/extend/l4d2_hitsound.smx" \
-            "$PLUGIN_DIR/extend/global_chat.smx" \
-            "$PLUGIN_DIR/extend/l4d_player_count_unload_mode.smx"
-          remove_anne_optional_plugin annehappy_dynamic_ai_difficulty
-          remove_anne_optional_plugin anne_traitor_quota
+          # Keep local SQLite users l4d2_map_vote and spawn_vote_menu.  Both the
+          # active and 2026-07 infected_control builds tolerate a missing quota provider.
+          NOMYSQL_REMOVALS=(
+            extend/l4d_stats
+            extend/sbpp_admcfg
+            extend/sbpp_checker
+            extend/sbpp_comms
+            extend/sbpp_main
+            extend/sbpp_report
+            extend/sbpp_sleuth
+            extend/lilac
+            extend/chatlog
+            extend/veterans
+            extend/l4d2_damage_show
+            extend/l4d2_blacklist
+            extend/l4d2_hitsound
+            extend/l4d2_scripted_hud
+            extend/global_chat
+            extend/l4d_player_count_unload_mode
+            optional/AnneHappy/annehappy_dynamic_ai_difficulty
+            optional/AnneHappy/anne_traitor_quota
+          )
+          for plugin in "${NOMYSQL_REMOVALS[@]}"; do
+            remove_plugin "$plugin"
+          done
+          # Replace the MySQL-backed RPG build without removing its cfg load lines.
           cp -f "$PLUGIN_DIR/disabled/rpg.smx" "$PLUGIN_DIR/extend/rpg.smx"
+          NOMYSQL_PLUGIN_COUNT="$(plugin_count)"
+          echo "nomysql: $NOMYSQL_PLUGIN_COUNT plugins (${#NOMYSQL_REMOVALS[@]} removed; extend/rpg.smx replaced)"
           archive_package nomysql "$RELEASE_NAME-nomysql.tar.gz"
 
       - name: Update release

@@ -10,7 +10,7 @@
 #include "ai_path_snapshot.inc"
 #include "ai_path_movement.inc"
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define EYE_ANGLE_UP_HEIGHT 15.0
 #define NAV_MESH_HEIGHT 20.0
 #define FALL_DETECT_HEIGHT 120.0

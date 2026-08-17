@@ -74,7 +74,7 @@ public void OnPluginStart()
 {
 	LoadTranslations("vote.phrases");
 	char g_sBuffer[128];
-	g_hVoteFilelocation = CreateConVar("votecfgfile", VOTE_DEFAULT_CONFIG, "投票文件的位置(位于sourcemod/文件夹)", FCVAR_NOTIFY);
+	g_hVoteFilelocation = CreateConVar("votecfgfile", VOTE_DEFAULT_CONFIG, "投票文件的位置(位于sourcemod/文件夹)", FCVAR_NONE);
 	//GetGameFolderName(g_sBuffer, sizeof(g_sBuffer));
 	GetConVarString(g_hVoteFilelocation, g_sVoteFile, sizeof(g_sVoteFile));
 	RegConsoleCmd("sm_vote", VoteRequest);

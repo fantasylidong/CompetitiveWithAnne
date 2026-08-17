@@ -34,7 +34,7 @@ public OnPluginStart()
 {
 	LoadTranslations("l4d_blackandwhite.phrases");
 	//create version convar
-	CreateConVar("l4d_blackandwhite_version", PLUGIN_VERSION, "Version of L4D Black and White Notifier", FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("l4d_blackandwhite_version", PLUGIN_VERSION, "Version of L4D Black and White Notifier", FCVAR_REPLICATED|FCVAR_NONE);
 	
 	//hook some events
 	HookEvent("revive_success", EventReviveSuccess);

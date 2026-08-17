@@ -114,61 +114,61 @@ public OnPluginStart()
 	decl String:desc[256];
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_version");
-	CreateConVar("sm_srvcln_version", PLUGIN_VERSION, desc, FCVAR_NOTIFY|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("sm_srvcln_version", PLUGIN_VERSION, desc, FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_DONTRECORD);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_enable");
-	cvar_enable = CreateConVar("sm_srvcln_enable", "1", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_enable = CreateConVar("sm_srvcln_enable", "1", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_logging_mode");
-	cvar_logging = CreateConVar("sm_srvcln_logging_mode", "1", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_logging = CreateConVar("sm_srvcln_logging_mode", "1", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_logs");
-	cvar_type[LOG] = CreateConVar("sm_srvcln_logs", "1", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[LOG] = CreateConVar("sm_srvcln_logs", "1", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_smlogs");
-	cvar_type[SML] = CreateConVar("sm_srvcln_smlogs", "1", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[SML] = CreateConVar("sm_srvcln_smlogs", "1", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_demos");
-	cvar_type[DEM] = CreateConVar("sm_srvcln_demos", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[DEM] = CreateConVar("sm_srvcln_demos", "0", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_replays");
-	cvar_type[RPY] = CreateConVar("sm_srvcln_replays", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[RPY] = CreateConVar("sm_srvcln_replays", "0", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_replays_archives");
-	cvar_arch_replays = CreateConVar("sm_srvcln_replays_archives", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_arch_replays = CreateConVar("sm_srvcln_replays_archives", "0", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_roundbackups");
-	cvar_type[RND] = CreateConVar("sm_srvcln_roundbackups", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[RND] = CreateConVar("sm_srvcln_roundbackups", "0", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_demos_path");
-	cvar_demopath = CreateConVar("sm_srvcln_demos_path", "", desc, FCVAR_NOTIFY);
+	cvar_demopath = CreateConVar("sm_srvcln_demos_path", "", desc, FCVAR_NONE);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_sprays");
-	cvar_type[SPR] = CreateConVar("sm_srvcln_sprays", "1", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_type[SPR] = CreateConVar("sm_srvcln_sprays", "1", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_demos_archives");
-	cvar_arch_demos = CreateConVar("sm_srvcln_demos_archives", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	cvar_arch_demos = CreateConVar("sm_srvcln_demos_archives", "0", desc, FCVAR_NONE, true, 0.0, true, 1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_smlogs_type");
-	cvar_logtype = CreateConVar("sm_srvcln_smlogs_type", "0", desc, FCVAR_NOTIFY, true, 0.0, true, 2.0);
+	cvar_logtype = CreateConVar("sm_srvcln_smlogs_type", "0", desc, FCVAR_NONE, true, 0.0, true, 2.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_logs_time");
-	cvar_time[LOG] = CreateConVar("sm_srvcln_logs_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[LOG] = CreateConVar("sm_srvcln_logs_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_sprays_time");
-	cvar_time[SPR] = CreateConVar("sm_srvcln_sprays_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[SPR] = CreateConVar("sm_srvcln_sprays_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_smlogs_time");
-	cvar_time[SML] = CreateConVar("sm_srvcln_smlogs_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[SML] = CreateConVar("sm_srvcln_smlogs_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_demos_time");
-	cvar_time[DEM] = CreateConVar("sm_srvcln_demos_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[DEM] = CreateConVar("sm_srvcln_demos_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_replays_time");
-	cvar_time[RPY] = CreateConVar("sm_srvcln_replays_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[RPY] = CreateConVar("sm_srvcln_replays_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_roundbackups_time");
-	cvar_time[RND] = CreateConVar("sm_srvcln_roundbackups_time", "168", desc, FCVAR_NOTIFY, true, -1.0);
+	cvar_time[RND] = CreateConVar("sm_srvcln_roundbackups_time", "168", desc, FCVAR_NONE, true, -1.0);
 	
 	FormatEx(desc, sizeof(desc), "%t", "srvcln_now");
 	RegAdminCmd("sm_srvcln_now", CommandCleanNow, ADMFLAG_ROOT, desc);

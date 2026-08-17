@@ -9,7 +9,7 @@
 #define PLUGIN_VERSION			"1.0.0"
 #define PLUGIN_URL				""
 
-#define CVAR_FLAGS 				FCVAR_NOTIFY
+#define CVAR_FLAGS 				FCVAR_NONE
 
 ConVar
 	g_cRestartDelay;
@@ -26,7 +26,7 @@ public Plugin myinfo = {
 };
 
 public void OnPluginStart() {
-	CreateConVar("coop_round_restart_delay_version", PLUGIN_VERSION, "Coop Round Restart Delay plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("coop_round_restart_delay_version", PLUGIN_VERSION, "Coop Round Restart Delay plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	g_cRestartDelay = CreateConVar("coop_round_restart_delay", "2.0", "战役模式回合重开延迟时间", CVAR_FLAGS, true, 0.0);
 	g_cRestartDelay.AddChangeHook(CvarChanged);

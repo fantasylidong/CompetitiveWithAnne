@@ -71,7 +71,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_nativevote_version", VERSION, "version", FCVAR_NOTIFY);
+	CreateConVar("l4d2_nativevote_version", VERSION, "version", FCVAR_NONE);
 	g_cvInitiatorAutoVoteYes = CreateConVar("l4d2_nativevote_initiator_auto_voteyes", "1", "If 1, initiator will auto vote yes", FCVAR_NONE, true, 0.0, true, 1.0);
 	AddCommandListener(vote_Listener, "vote");
 }

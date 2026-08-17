@@ -72,8 +72,8 @@ void KillEntitySafe(int ent)
 // ======================
 public void OnPluginStart()
 {
-    gC_Enable      = CreateConVar("sr_medkit_enable", "1", "Enable saferoom medkit control (1=on, 0=off).", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gC_RemoveDelay = CreateConVar("sr_medkit_scan_delay", "1.5", "Delay after round_start before stripping saferoom medkits.", FCVAR_NOTIFY, true, 0.0, true, 10.0);
+    gC_Enable      = CreateConVar("sr_medkit_enable", "1", "Enable saferoom medkit control (1=on, 0=off).", FCVAR_NONE, true, 0.0, true, 1.0);
+    gC_RemoveDelay = CreateConVar("sr_medkit_scan_delay", "1.5", "Delay after round_start before stripping saferoom medkits.", FCVAR_NONE, true, 0.0, true, 10.0);
     gC_Debug       = CreateConVar("sr_medkit_debug", "0", "Debug logging.", FCVAR_NONE, true, 0.0, true, 1.0);
 
     AutoExecConfig(true, "sr_medkit_refill_kv");

@@ -71,7 +71,7 @@ public void OnPluginStart()
 	g_hPistolDelayDualies = CreateConVar( \
 		"l4d_pistol_delay_dualies", \
 		"0.1", "Minimum time (in seconds) between dual pistol shots", \
-		FCVAR_NOTIFY, \
+		FCVAR_NONE, \
 		true, MIN_RATE_OF_FIRE, true, MAX_RATE_OF_FIRE \
 	);
 
@@ -82,7 +82,7 @@ public void OnPluginStart()
 		"l4d_pistol_delay_single", \
 		sDefValue, \
 		"Minimum time (in seconds) between single pistol shots", \
-		FCVAR_NOTIFY,
+		FCVAR_NONE,
 		true, MIN_RATE_OF_FIRE, true, MAX_RATE_OF_FIRE \
 	);
 
@@ -93,7 +93,7 @@ public void OnPluginStart()
 		"l4d_automatic_pistol", \
 		"0", \
 		"Can the pistol fire non-stop while you hold down the IN_ATTACK key", \
-		FCVAR_NOTIFY,
+		FCVAR_NONE,
 		true, 0.0, true, 1.0 \
 	);
 
@@ -108,7 +108,7 @@ public void OnPluginStart()
 		"l4d_pistol_delay_incapped", \
 		sDefValue, \
 		"Minimum time (in seconds) between pistol shots while incapped" \
-		, FCVAR_NOTIFY, \
+		, FCVAR_NONE, \
 		true, MIN_RATE_OF_FIRE, true, MAX_RATE_OF_FIRE \
 	);*/
 

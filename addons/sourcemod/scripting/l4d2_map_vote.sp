@@ -106,21 +106,21 @@ public void OnPluginStart() {
     Init();
     g_smFirstMap = new StringMap();
 
-    CreateConVar("l4d2_map_vote_version", PLUGIN_VERSION, "L4D2 Map vote plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
-    g_cvNotifyMapNext =  CreateConVar("notify_map_next", "1", "终局开始后提示投票下一张地图的方式. \n0=不提示, 1=聊天栏, 2=屏幕中央, 4=弹出菜单.", FCVAR_NOTIFY);
+    CreateConVar("l4d2_map_vote_version", PLUGIN_VERSION, "L4D2 Map vote plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
+    g_cvNotifyMapNext =  CreateConVar("notify_map_next", "1", "终局开始后提示投票下一张地图的方式. \n0=不提示, 1=聊天栏, 2=屏幕中央, 4=弹出菜单.", FCVAR_NONE);
     g_cvAutoReloadMode = CreateConVar(
     "l4d2_mapvote_autoreload", "2",
     "输入 !mapvote 时是否自动刷新 VPK 与战役列表：0=关；1=仅管理员触发；2=所有人触发。",
-    FCVAR_NOTIFY);
+    FCVAR_NONE);
 
     g_cvAutoReloadCooldown = CreateConVar(
         "l4d2_mapvote_reload_cd", "10.0",
         "自动刷新冷却（秒），避免被频繁触发导致卡顿。",
-        FCVAR_NOTIFY);
+        FCVAR_NONE);
 	g_cvVersusFromCoop = CreateConVar(
 		"l4d2_mapvote_versus_from_coop", "1",
 		"给缺少 versus 的战役临时注入 modes/versus：0=关，1=仅 Anne 派生 cfg，2=所有 cfg。",
-		FCVAR_NOTIFY);
+		FCVAR_NONE);
     g_cvNotifyMapNext.AddChangeHook(CvarChanged);
     g_cvVersusFromCoop.AddChangeHook(CvarChanged_MissionKV);
 

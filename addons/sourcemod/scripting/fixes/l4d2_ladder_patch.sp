@@ -82,7 +82,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_ladder_patch_version", PLUGIN_VERSION, "Ladder Server Crash - Fix plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_ladder_patch_version", PLUGIN_VERSION, "Ladder Server Crash - Fix plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	char sPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, sPath, sizeof(sPath), "gamedata/%s.txt", GAMEDATA);

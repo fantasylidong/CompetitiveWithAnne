@@ -95,7 +95,7 @@ public void OnPluginStart()
 	
 	delete hGamedata;
 	
-	CreateConVar("defib_fix_version", PLUGIN_VERSION, "", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("defib_fix_version", PLUGIN_VERSION, "", FCVAR_NONE|FCVAR_DONTRECORD);
 }
 
 public void OnEntityCreated(int iEntity, const char[] sClassname)

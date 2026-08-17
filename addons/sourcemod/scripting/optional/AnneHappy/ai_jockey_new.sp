@@ -42,10 +42,10 @@ bool g_bHasBeenShoved[MAXPLAYERS + 1], g_bCanLeap[MAXPLAYERS + 1];
 
 public void OnPluginStart()
 {
-	g_hBhopSpeed = CreateConVar("ai_JockeyBhopSpeed", "80.0", "Jockey连跳的速度", FCVAR_NOTIFY, true, 0.0);
-	g_hStartHopDistance = CreateConVar("ai_JockeyStartHopDistance", "800.0", "Jockey距离生还者多少距离开始主动连跳", FCVAR_NOTIFY, true, 0.0);
-	g_hJockeyStumbleRadius = CreateConVar("ai_JockeyStumbleRadius", "50.0", "Jockey骑到人后会对多少范围内的生还者产生硬直效果", FCVAR_NOTIFY, true, 0.0);
-	g_hJockeyAirAngles = CreateConVar("ai_JockeyAirAngles", "60.0", "Jockey的速度方向与到目标的向量方向的距离大于这个角度，改变方向", FCVAR_NOTIFY, true, 0.0, true, 180.0);
+	g_hBhopSpeed = CreateConVar("ai_JockeyBhopSpeed", "80.0", "Jockey连跳的速度", FCVAR_NONE, true, 0.0);
+	g_hStartHopDistance = CreateConVar("ai_JockeyStartHopDistance", "800.0", "Jockey距离生还者多少距离开始主动连跳", FCVAR_NONE, true, 0.0);
+	g_hJockeyStumbleRadius = CreateConVar("ai_JockeyStumbleRadius", "50.0", "Jockey骑到人后会对多少范围内的生还者产生硬直效果", FCVAR_NONE, true, 0.0);
+	g_hJockeyAirAngles = CreateConVar("ai_JockeyAirAngles", "60.0", "Jockey的速度方向与到目标的向量方向的距离大于这个角度，改变方向", FCVAR_NONE, true, 0.0, true, 180.0);
 	g_hJockeyLeapRange =		FindConVar("z_jockey_leap_range");
 	g_hJockeyLeapAgain =		FindConVar("z_jockey_leap_again_timer");
 	g_hJockeyLeapTime =		FindConVar("z_jockey_leap_time");

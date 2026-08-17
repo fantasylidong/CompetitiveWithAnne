@@ -96,7 +96,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	LoadTranslations("network_quality_hint.phrases");
-	CreateConVar("nqh_version", PLUGIN_VERSION, "Network Quality Hint version.", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("nqh_version", PLUGIN_VERSION, "Network Quality Hint version.", FCVAR_NONE | FCVAR_DONTRECORD);
 
 	g_hEnable = CreateConVar("nqh_enable", "1", "Enable network quality checks.", _, true, 0.0, true, 1.0);
 	g_hCheckInterval = CreateConVar("nqh_check_interval", "5.0", "Seconds between local network samples. Samples are not uploaded individually.", _, true, 5.0, true, 300.0);

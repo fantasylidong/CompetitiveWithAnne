@@ -23,7 +23,7 @@
 // 版本：2025-10-20
 // =============================================
 
-#define CVAR_FLAGS                     FCVAR_NOTIFY
+#define CVAR_FLAGS                     FCVAR_NONE
 #define IsValidClient(%1)              (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 #define IsValidAliveClient(%1)         (IsValidClient(%1) && IsPlayerAlive(%1))
 #define AUTO_GIVE_ENTITY_RESERVE       64

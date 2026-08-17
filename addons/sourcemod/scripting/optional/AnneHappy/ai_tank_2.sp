@@ -10,7 +10,7 @@
 #undef REQUIRE_PLUGIN
 #include <infected_control>
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define NAV_MESH_HEIGHT 20.0								// 有效 Nav 位置高度
 #define WALL_DETECT_DIST 64.0								// 前方墙体检测距离
 #define FALL_DETECT_HEIGHT 120.0							// 向下坠落高度
@@ -122,7 +122,7 @@ public void OnPluginStart()
 	// 连跳相关
 	g_hAllowBhop = CreateConVar("ai_Tank_Bhop", "1", "是否开启坦克连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_TankBhopSpeed", "60", "坦克连跳速度", CVAR_FLAG, true, 0.0);
-	g_hTankStopDistance = CreateConVar("ai_Tank_StopDistance", "135", "Tank在距离目标多远位置停下连跳", FCVAR_NOTIFY, true, 0.0);
+	g_hTankStopDistance = CreateConVar("ai_Tank_StopDistance", "135", "Tank在距离目标多远位置停下连跳", FCVAR_NONE, true, 0.0);
 	// 消耗相关
 	g_hAllowConsume = CreateConVar("ai_TankConsume", "0", "是否开启坦克消耗", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hSneakTank = CreateConVar("ai_TankSneakTime", "0", "tank会消耗到下一波生成时间小于ai_TankSneakTime,0为关闭，消耗开启的时候不启用", CVAR_FLAG, true, 0.0, true, 28.0);

@@ -162,7 +162,7 @@ public void OnPluginStart()
 					"0",
 					"Decides how the spit should spread in saferoom area.\n"
 				...	"0 = No spread, 1 = Spread on intro start area, 2 = Spread on every map.",
-					FCVAR_NOTIFY|FCVAR_SPONLY,
+					FCVAR_NONE|FCVAR_SPONLY,
 					true, 0.0, true, 2.0,
 					CvarChange_SaferoomSpread);
 	
@@ -170,7 +170,7 @@ public void OnPluginStart()
 					"240.0",
 					"Decides the height the game trace will try to test for death spits.\n"
 				...	"240.0 = Default trace length.",
-					FCVAR_NOTIFY|FCVAR_SPONLY,
+					FCVAR_NONE|FCVAR_SPONLY,
 					true, 0.0, false, 0.0,
 					CvarChange_TraceHeight);
 	
@@ -178,7 +178,7 @@ public void OnPluginStart()
 					"10",
 					"Decides the max puddles a normal spit will create.\n"
 				...	"Minimum = 2, Game default = 10.",
-					FCVAR_NOTIFY|FCVAR_SPONLY,
+					FCVAR_NONE|FCVAR_SPONLY,
 					true, 2.0, false, 0.0,
 					CvarChange_MaxFlames);
 	
@@ -186,7 +186,7 @@ public void OnPluginStart()
 					"0",
 					"Decides whether the spit projectile will collide with water.\n"
 				...	"0 = No collision, 1 = Enable collision.",
-					FCVAR_NOTIFY|FCVAR_SPONLY,
+					FCVAR_NONE|FCVAR_SPONLY,
 					true, 0.0, true, 1.0,
 					CvarChange_WaterCollision);
 	
@@ -194,7 +194,7 @@ public void OnPluginStart()
 					"10.0",
 					"Amount of damage done to props that projectile bounces on.\n"
 				...	"0 = No damage.",
-					FCVAR_NOTIFY|FCVAR_SPONLY,
+					FCVAR_NONE|FCVAR_SPONLY,
 					true, 0.0, false, 0.0,
 					CvarChange_PropDamage);
 	

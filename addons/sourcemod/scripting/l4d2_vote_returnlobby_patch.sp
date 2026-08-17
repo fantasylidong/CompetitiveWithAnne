@@ -19,7 +19,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_vote_returnlobby_patch_version", VERSION, "version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
+	CreateConVar("l4d2_vote_returnlobby_patch_version", VERSION, "version", FCVAR_NONE | FCVAR_DONTRECORD);
 	ConVar cvar = CreateConVar("sv_vote_returnlobby_allowed", "0", "Can players vote to return lobby?");
 	OnConVarChanged(cvar, "", "");
 	cvar.AddChangeHook(OnConVarChanged);

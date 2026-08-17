@@ -28,8 +28,9 @@ Treat the following as a behavioral contract when changing `infected_control`:
 ## Infected control version rollover
 
 The active `infected_control.smx` release is 2026-08. The rollback release
-`infected_control26-07.smx` must stay reproducible from commit
-`82fb40a42a472debb220070956bc75ff5738e05e`.
+`infected_control26-07.smx` preserves the 2026-07 spawning behavior. Its
+database quota integration may use the current optional `anne_traitor_quota`
+provider as long as the archived spawning modules remain unchanged.
 
 When rolling the active infected-control version forward:
 

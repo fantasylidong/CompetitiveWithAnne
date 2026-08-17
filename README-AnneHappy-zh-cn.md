@@ -1,9 +1,9 @@
 # **AnneHappy 插件带上对抗插件包**
 * 为了保持插件包结构和上游一样方便同步，这个插件包将不会带有nav修改文件和跳舞插件的模型与声音，~~AnneHappy的Nav修改文件请到我的[anne项目](https://github.com/fantasylidong/anne)中下载~~ 新解决方案，到[release页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)下载整合插件包，里面有
 * 当前版本已经是进入stable模式，大部分核心插件更新可以通过join插件自动更新，不用那么频繁检测是否有更新了
-* 如果没有数据库，建议下[release页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)里的norank版本或者nomysql版本,nomysql有关数据库插件全部删除，norank版本只保留sourcebans插件，积分插件
-* norank版本是用电信服的rpg插件，只删除了排名，作弊检测和sourcebans插件，缺点就是每次进服务器需要自己设置出门近战，不想自己写了，有需求的写完可以pull request到我的项目里
-* nomysql版本是删除了所有和数据库相关的插件
+* 如果没有外部 MySQL 数据库，建议从 [Release 页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)下载 `norank` 或 `nomysql` 版本。`norank` 删除排名、作弊检测、SourceBans 及依赖排名数据的 Anne 功能；`nomysql` 进一步移除其他外部数据库插件
+* `norank` 仍使用电信服的 RPG 插件；由于排名数据已删除，每次进入服务器需要自行设置出门近战
+* `nomysql` 保留 SourceMod 本地 SQLite 功能，并使用无数据库版 RPG，不需要配置外部 MySQL
 
 ## **Accelerator 崩溃报告上传**
 
@@ -77,20 +77,42 @@
 * 小刀为TLS更新前的原版小刀，正常对抗模式将不再刷新小刀，只有药役模式才会刷新小刀
 * AnneHappy模式过关统计会把这一章节所有统计信息全部记录，因为对抗模式每回合不会清除统计信息（原来的方式不能正确载入对抗地图和对抗的梯子和nav）【我觉得这是Feature不是Bug，笑，反正普通信息mvp插件能够正常记录了，所以也不准备修改了】
 
-## **无数据库服务器安装问题:**
-> 由于我的数据库不会对外放开，所以有些插件你需要删除或者自建数据库[数据库脚本在项目内]
-- extend/l4d_stats.smx 积分插件，需要数据库，很多插件也依赖这个插件提供的积分，不过后面经过修改，这些依赖于这个积分插件的插件
-也能在无积分插件情况下运行了
-- extend/hextags_lite.smx 称号插件，已移除 chat-processor 依赖；无积分插件时也能运行，自定义称号请改 `configs/hextags_lite.cfg`
-- extend/lilac.smx 会保存检测记录到数据库l4d2_stats数据库
-- extend/sbpp_******.smx sourcebans插件，方便进行所有服务器封禁
-- extend/rpg.smx 商店插件，会自动检测依赖，没数据库也能用，或者你自己改用原来anne的，问题不大
-- extend/chatlog.smx 数据库聊天记录插件
-- extend/l4d_hats.smx 插件，最新帽子插件修改版，增加了数据库功能和forward处理，无积分插件也能使用，但是需要自己配置好l4d_hats配置
-- extend/l4d2_item_hint.smx 标点插件，禁用了一部分功能，增加了光圈标点的聊天栏提示，也需要积分功能搭配限制，无积分插件也能使用
-- disabled/specrate.smx 旁观30tick插件，更改后4人旁观数以内，30w积分的玩家也能100tick旁观，超过4人旁观，除管理员外其他旁观玩家一律30tick
-- extendd/veterans.smx 时长检测插件，部分依赖于l4d_stats.smx插件的时长信息，能够自定义想玩游戏玩家的时长限制，不满足时长的，只能旁观，join.smx插件依赖这个插件提供是否是steamm组成员的信息
-- extend/join.smx 玩家加入离开提示，换队作用，motd展示功能（不是组员会有提示，需要veterans插件作为前置）
+## **无外部数据库版本:**
+> Anne 的 MySQL 数据库不对外开放。自行部署时，请使用 `nomysql` 包，或者按项目内的 `database.sql` 和 Wiki 配置自己的数据库。
+
+重新检查非 `disabled/` 的已发布插件后，共有 **18 个 `.smx` 直接调用 SourceMod 数据库 API**。`nomysql` 的处理口径如下：
+
+* 保留 `l4d2_map_vote.smx` 和 `optional/AnneHappy/spawn_vote_menu.smx`：前者只用本地 SQLite，后者默认使用 `storage-local` SQLite
+* 使用 `disabled/rpg.smx` 覆盖 `extend/rpg.smx`：插件路径和 cfg 加载项不变，但换成无数据库构建
+* 删除其余 15 个直接访问外部数据库的插件，并额外删除 `sbpp_admcfg.smx`、`sbpp_report.smx` 和依赖积分时长数据的 `veterans.smx`
+* 当前版和 2026-07 回滚版 `infected_control` 都通过可选的 `anne_traitor_quota.smx` 保存配额；`nomysql` 删除 provider 后，两个版本都会跳过持久化资格门槛并继续运行
+
+因此，当前完整包共有 **423 个 `.smx`**；`norank` 删除 **10 个**，最终保留 **413 个**；`nomysql` 删除 **18 个**并替换 RPG 构建，最终保留 **405 个**。`disabled/` 下不会自动加载的 SourceMod SQL 管理插件不计入上述 18 个直接访问数据库的插件。
+
+`nomysql` 删除的插件为：
+
+```text
+extend/l4d_stats.smx
+extend/sbpp_admcfg.smx
+extend/sbpp_checker.smx
+extend/sbpp_comms.smx
+extend/sbpp_main.smx
+extend/sbpp_report.smx
+extend/sbpp_sleuth.smx
+extend/lilac.smx
+extend/chatlog.smx
+extend/veterans.smx
+extend/l4d2_damage_show.smx
+extend/l4d2_blacklist.smx
+extend/l4d2_hitsound.smx
+extend/l4d2_scripted_hud.smx
+extend/global_chat.smx
+extend/l4d_player_count_unload_mode.smx
+optional/AnneHappy/annehappy_dynamic_ai_difficulty.smx
+optional/AnneHappy/anne_traitor_quota.smx
+```
+
+`hextags_lite.smx`、`punch_angle.smx`、`l4d_hats.smx`、`l4d2_item_hint.smx` 和 `join.smx` 没有直接访问数据库，因此 `nomysql` 继续保留；其中依赖积分或 RPG 的附加功能以实际可用前置为准。
 
 ## **Issue 发起说明**
 请先阅读完README-AnneHappy-zh-cn.md后再发起任何issue

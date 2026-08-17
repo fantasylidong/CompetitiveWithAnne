@@ -3,8 +3,6 @@
 #endif
 #define _infected_control_config_included
 
-#define DEFAULT_TRAITOR_QUOTA_DB_CONFIG "l4dstats"
-
 static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0, 6.0 };
 static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10, 1.10 };
 static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50, 0.50 };
@@ -153,11 +151,7 @@ enum struct Config
     ConVar TraitorPlayerLimit;
     ConVar TraitorAdminLimit;
     ConVar TraitorClassMask;
-    ConVar TraitorDailyQuota;
     ConVar TraitorPublicMinScore;
-    ConVar TraitorPublicDailyQuota;
-    ConVar TraitorQuotaDb;
-    ConVar TraitorQuotaTable;
     bool   bAntiBaitEnable;
     float  fAntiBaitGrace;
     float  fAntiBaitWindow;
@@ -181,9 +175,7 @@ enum struct Config
     int    iTraitorPlayerLimit;
     int    iTraitorAdminLimit;
     int    iTraitorClassMask;
-    int    iTraitorDailyQuota;
     int    iTraitorPublicMinScore;
-    int    iTraitorPublicDailyQuota;
 
     // 缓存值
     float fFlowBadPenalty;
@@ -558,30 +550,10 @@ enum struct Config
             "Allowed traitor classes bitmask: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger, 64 tank. 0 = all.",
             CVAR_FLAG, true, 0.0, true, 127.0
         );
-        this.TraitorDailyQuota = CreateConVar(
-            "inf_traitor_daily_quota", "100",
-            "Base daily traitor quota for admins; each full year remaining before sb_admins.expires adds 50.",
-            CVAR_FLAG, true, 0.0, true, 10000.0
-        );
         this.TraitorPublicMinScore = CreateConVar(
             "inf_traitor_public_min_score", "100000",
             "Minimum l4d_stats total score required for a non-admin to register as traitor.",
             CVAR_FLAG, true, 0.0, true, 100000000.0
-        );
-        this.TraitorPublicDailyQuota = CreateConVar(
-            "inf_traitor_public_daily_quota", "20",
-            "Daily traitor quota available to eligible non-admin players.",
-            CVAR_FLAG, true, 0.0, true, 10000.0
-        );
-        this.TraitorQuotaDb = CreateConVar(
-            "inf_traitor_quota_db", DEFAULT_TRAITOR_QUOTA_DB_CONFIG,
-            "MySQL databases.cfg section for shared traitor daily quota storage; defaults to the l4d_stats database.",
-            CVAR_FLAG
-        );
-        this.TraitorQuotaTable = CreateConVar(
-            "inf_traitor_quota_table", "infected_control_traitor_quota",
-            "SQL table name for traitor daily quota storage.",
-            CVAR_FLAG
         );
 
         // 变更回调
@@ -624,9 +596,7 @@ enum struct Config
         this.TraitorPlayerLimit.AddChangeHook(OnCfgChanged);
         this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
         this.TraitorClassMask.AddChangeHook(OnCfgChanged);
-        this.TraitorDailyQuota.AddChangeHook(OnCfgChanged);
         this.TraitorPublicMinScore.AddChangeHook(OnCfgChanged);
-        this.TraitorPublicDailyQuota.AddChangeHook(OnCfgChanged);
 
         this.PathCacheEnable.AddChangeHook(OnCfgChanged);
         this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
@@ -738,15 +708,9 @@ enum struct Config
         this.iTraitorClassMask = this.TraitorClassMask.IntValue;
         if (this.iTraitorClassMask < 0) this.iTraitorClassMask = 0;
         if (this.iTraitorClassMask > 127) this.iTraitorClassMask = 127;
-        this.iTraitorDailyQuota = this.TraitorDailyQuota.IntValue;
-        if (this.iTraitorDailyQuota < 0) this.iTraitorDailyQuota = 0;
-        if (this.iTraitorDailyQuota > 10000) this.iTraitorDailyQuota = 10000;
         this.iTraitorPublicMinScore = this.TraitorPublicMinScore.IntValue;
         if (this.iTraitorPublicMinScore < 0) this.iTraitorPublicMinScore = 0;
         if (this.iTraitorPublicMinScore > 100000000) this.iTraitorPublicMinScore = 100000000;
-        this.iTraitorPublicDailyQuota = this.TraitorPublicDailyQuota.IntValue;
-        if (this.iTraitorPublicDailyQuota < 0) this.iTraitorPublicDailyQuota = 0;
-        if (this.iTraitorPublicDailyQuota > 10000) this.iTraitorPublicDailyQuota = 10000;
 
         this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
         this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);

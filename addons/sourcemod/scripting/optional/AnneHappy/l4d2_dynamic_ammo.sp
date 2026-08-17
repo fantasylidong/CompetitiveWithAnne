@@ -207,25 +207,25 @@ void RecalcAndApply(bool forceApply=false)
 // ———————————— 生命周期/事件 ————————————
 public void OnPluginStart()
 {
-    CreateConVar("l4d2_dynamic_ammo_version", "1.0.1", "dirspawn-only dynamic ammo", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+    CreateConVar("l4d2_dynamic_ammo_version", "1.0.1", "dirspawn-only dynamic ammo", FCVAR_NONE|FCVAR_DONTRECORD);
 
-    g_Enable     = CreateConVar("l4d2_dynamic_ammo_enable", "1", "启用(1/0)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_BaseSI     = CreateConVar("l4d2_dynamic_ammo_base_si", "4", "基准 SI", FCVAR_NOTIFY, true, 1.0);
-    g_BaseItv    = CreateConVar("l4d2_dynamic_ammo_base_interval", "35.0", "基准刷特间隔(秒)", FCVAR_NOTIFY, true, 1.0);
-    g_Alpha      = CreateConVar("l4d2_dynamic_ammo_alpha", "1.0", "SI 指数", FCVAR_NOTIFY, true, 0.0);
-    g_Beta       = CreateConVar("l4d2_dynamic_ammo_beta", "0.5", "间隔指数", FCVAR_NOTIFY, true, 0.0);
-    g_MinMult    = CreateConVar("l4d2_dynamic_ammo_min_mult", "1.0", "倍率下限", FCVAR_NOTIFY, true, 0.1);
-    g_MaxMult    = CreateConVar("l4d2_dynamic_ammo_max_mult", "6.0", "倍率上限", FCVAR_NOTIFY, true, 0.5);
-    g_RefillMode = CreateConVar("l4d2_dynamic_ammo_refill_mode", "1", "0仅限上限 1回满上限(默认) 2强制等于目标", FCVAR_NOTIFY, true, 0.0, true, 2.0);
-    g_AllowM60   = CreateConVar("l4d2_dynamic_ammo_allow_m60", "0", "是否处理 M60", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    g_Debug      = CreateConVar("l4d2_dynamic_ammo_debug", "0", "调试输出", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_Enable     = CreateConVar("l4d2_dynamic_ammo_enable", "1", "启用(1/0)", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_BaseSI     = CreateConVar("l4d2_dynamic_ammo_base_si", "4", "基准 SI", FCVAR_NONE, true, 1.0);
+    g_BaseItv    = CreateConVar("l4d2_dynamic_ammo_base_interval", "35.0", "基准刷特间隔(秒)", FCVAR_NONE, true, 1.0);
+    g_Alpha      = CreateConVar("l4d2_dynamic_ammo_alpha", "1.0", "SI 指数", FCVAR_NONE, true, 0.0);
+    g_Beta       = CreateConVar("l4d2_dynamic_ammo_beta", "0.5", "间隔指数", FCVAR_NONE, true, 0.0);
+    g_MinMult    = CreateConVar("l4d2_dynamic_ammo_min_mult", "1.0", "倍率下限", FCVAR_NONE, true, 0.1);
+    g_MaxMult    = CreateConVar("l4d2_dynamic_ammo_max_mult", "6.0", "倍率上限", FCVAR_NONE, true, 0.5);
+    g_RefillMode = CreateConVar("l4d2_dynamic_ammo_refill_mode", "1", "0仅限上限 1回满上限(默认) 2强制等于目标", FCVAR_NONE, true, 0.0, true, 2.0);
+    g_AllowM60   = CreateConVar("l4d2_dynamic_ammo_allow_m60", "0", "是否处理 M60", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_Debug      = CreateConVar("l4d2_dynamic_ammo_debug", "0", "调试输出", FCVAR_NONE, true, 0.0, true, 1.0);
 
-    g_BaseSMG    = CreateConVar("l4d2_dynamic_ammo_base_smg", "650", "SMG 基础预备弹", FCVAR_NOTIFY);
-    g_BaseRifle  = CreateConVar("l4d2_dynamic_ammo_base_rifle", "360", "步枪 基础预备弹", FCVAR_NOTIFY);
-    g_BasePump   = CreateConVar("l4d2_dynamic_ammo_base_pump", "72",  "泵动 基础预备弹", FCVAR_NOTIFY);
-    g_BaseAuto   = CreateConVar("l4d2_dynamic_ammo_base_auto", "90",  "连发 基础预备弹", FCVAR_NOTIFY);
-    g_BaseSniper = CreateConVar("l4d2_dynamic_ammo_base_sniper","180","狙击 基础预备弹", FCVAR_NOTIFY);
-    g_BaseGL     = CreateConVar("l4d2_dynamic_ammo_base_gl", "30",   "榴弹 基础预备弹", FCVAR_NOTIFY);
+    g_BaseSMG    = CreateConVar("l4d2_dynamic_ammo_base_smg", "650", "SMG 基础预备弹", FCVAR_NONE);
+    g_BaseRifle  = CreateConVar("l4d2_dynamic_ammo_base_rifle", "360", "步枪 基础预备弹", FCVAR_NONE);
+    g_BasePump   = CreateConVar("l4d2_dynamic_ammo_base_pump", "72",  "泵动 基础预备弹", FCVAR_NONE);
+    g_BaseAuto   = CreateConVar("l4d2_dynamic_ammo_base_auto", "90",  "连发 基础预备弹", FCVAR_NONE);
+    g_BaseSniper = CreateConVar("l4d2_dynamic_ammo_base_sniper","180","狙击 基础预备弹", FCVAR_NONE);
+    g_BaseGL     = CreateConVar("l4d2_dynamic_ammo_base_gl", "30",   "榴弹 基础预备弹", FCVAR_NONE);
 
     HookEvent("round_start",   E_RoundStart, EventHookMode_PostNoCopy);
     HookEvent("item_pickup",   E_ItemPickup);

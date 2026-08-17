@@ -7,7 +7,7 @@
 #include <left4dhooks>
 #include <treeutil>
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 
 public Plugin myinfo = 
 {

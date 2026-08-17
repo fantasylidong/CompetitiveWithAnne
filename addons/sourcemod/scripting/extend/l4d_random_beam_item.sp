@@ -61,8 +61,8 @@ public Plugin myinfo =
 // ====================================================================================================
 // Cvar Flags
 // ====================================================================================================
-#define CVAR_FLAGS                    FCVAR_NOTIFY
-#define CVAR_FLAGS_PLUGIN_VERSION     FCVAR_NOTIFY|FCVAR_DONTRECORD|FCVAR_SPONLY
+#define CVAR_FLAGS                    FCVAR_NONE
+#define CVAR_FLAGS_PLUGIN_VERSION     FCVAR_NONE|FCVAR_DONTRECORD|FCVAR_SPONLY
 
 // ====================================================================================================
 // Filenames

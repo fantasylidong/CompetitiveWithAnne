@@ -2362,6 +2362,10 @@ static bool Traitor_CheckRegistrationAccess(int client)
     if (Traitor_IsAdminClient(client))
         return true;
 
+    // 无配额 provider 代表无数据库构建；保留每局限制，跳过持久化资格门槛。
+    if (!TraitorQuota_IsProviderAvailable())
+        return true;
+
     bool statsAvailable = GetFeatureStatus(FeatureType_Native, "l4dstats_GetClientScore") == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "l4dstats_IsClientScoreReady") == FeatureStatus_Available;
     if (!statsAvailable || l4dstats_IsClientScoreReady(client) == 0)

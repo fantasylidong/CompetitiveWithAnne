@@ -87,7 +87,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 
 
 ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog;
@@ -134,7 +134,7 @@ public void OnPluginStart()
 	g_hCvarModes = CreateConVar(	"l4d_skip_intro_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff = CreateConVar(	"l4d_skip_intro_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesTog = CreateConVar(	"l4d_skip_intro_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
-	CreateConVar(					"l4d_skip_intro_version",		PLUGIN_VERSION,	"Skip Intro plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(					"l4d_skip_intro_version",		PLUGIN_VERSION,	"Skip Intro plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	AutoExecConfig(true,			"l4d_skip_intro");
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");

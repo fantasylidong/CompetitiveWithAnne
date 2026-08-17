@@ -730,19 +730,19 @@ public void  OnPluginStart()
 	HookEvent("player_afk", 	Event_PlayerAFK, 				EventHookMode_Pre);
 	HookEvent("player_team", 	Event_PlayerDisconnectOrAFK, 	EventHookMode_Post);
 	//HookEvent("player_team", 	Event_PlayerTeam, EventHookMode_Pre);
-	g_cShopEnable =  CreateConVar("shop_enable", "0", "是否打开商店购买", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	AllowBigGun = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hEnableGlow = CreateConVar("rpg_allow_glow", "1", "商店是否打开轮廓", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cShopEnable =  CreateConVar("shop_enable", "0", "是否打开商店购买", FCVAR_NONE, true, 0.0, true, 1.0);
+	AllowBigGun = CreateConVar("rpg_allow_biggun", "0", "商店是否允许购买大枪", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hEnableGlow = CreateConVar("rpg_allow_glow", "1", "商店是否打开轮廓", FCVAR_NONE, true, 0.0, true, 1.0);
 	// --- Admin Anti-Kick: ConVars ---
-	g_hAntiKickEnable       = CreateConVar("rpg_antikick_enable", "1", "是否启用管理员防踢（投票/命令）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hAntiKickBlockVote    = CreateConVar("rpg_antikick_block_votekick", "1", "禁止对受保护管理员发起投票踢", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hAntiKickBlockCmdKick = CreateConVar("rpg_antikick_block_cmdkick", "1", "低级/同级管理员是否禁止用 sm_kick 踢受保护管理员", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hAntiKickMinImmunity  = CreateConVar("rpg_antikick_min_immunity", "0", "受保护阈值：管理员免疫等级>=此值即保护；0=任意管理员都保护", FCVAR_NOTIFY, true, 0.0, true, 100.0);
-	g_hAntiKickEqualBlock   = CreateConVar("rpg_antikick_equal_block", "1", "同级免疫是否禁止互踢（仅对 sm_kick 生效）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hAntiKickEnable       = CreateConVar("rpg_antikick_enable", "1", "是否启用管理员防踢（投票/命令）", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hAntiKickBlockVote    = CreateConVar("rpg_antikick_block_votekick", "1", "禁止对受保护管理员发起投票踢", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hAntiKickBlockCmdKick = CreateConVar("rpg_antikick_block_cmdkick", "1", "低级/同级管理员是否禁止用 sm_kick 踢受保护管理员", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hAntiKickMinImmunity  = CreateConVar("rpg_antikick_min_immunity", "0", "受保护阈值：管理员免疫等级>=此值即保护；0=任意管理员都保护", FCVAR_NONE, true, 0.0, true, 100.0);
+	g_hAntiKickEqualBlock   = CreateConVar("rpg_antikick_equal_block", "1", "同级免疫是否禁止互踢（仅对 sm_kick 生效）", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_hAllowUseB = CreateConVar(
     "rpg_allow_UseB", "1",
     "是否允许消费B数（>0 价格的商品）。1=允许；0=禁止（仅允许 0B 商品）",
-    FCVAR_NOTIFY, true, 0.0, true, 1.0
+    FCVAR_NONE, true, 0.0, true, 1.0
 	);
 	g_bAllowUseB = g_hAllowUseB.BoolValue;
 	g_hAllowUseB.AddChangeHook(ConVarChanged_Cvars);

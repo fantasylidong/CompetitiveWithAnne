@@ -5,7 +5,7 @@
 #include <colors>
 #include <dbi>
 
-#define CVAR_FLAG FCVAR_NOTIFY
+#define CVAR_FLAG FCVAR_NONE
 #define DEFAULT_TRAITOR_QUOTA_DB_CONFIG "l4dstats"
 
 enum struct TraitorQuotaConfig

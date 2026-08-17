@@ -102,7 +102,7 @@ public void OnPluginStart()	{
 	// Convars.
 	ConVar hCvar = null;
 	
-	(hCvar = CreateConVar("sm_updater_version", PLUGIN_VERSION, "Updater - version", FCVAR_NOTIFY|FCVAR_DONTRECORD)).AddChangeHook(OnVersionChanged);
+	(hCvar = CreateConVar("sm_updater_version", PLUGIN_VERSION, "Updater - version", FCVAR_NONE|FCVAR_DONTRECORD)).AddChangeHook(OnVersionChanged);
 	OnVersionChanged(hCvar, "", "");
 	
 	(hCvar = CreateConVar("sm_updater", "2", "Updater - Determines update functionality. (1 = Notify, 2 = Download, 3 = Include source code)", _, true, 1.0, true, 3.0)).AddChangeHook(OnSettingsChanged);

@@ -113,7 +113,7 @@ public void OnPluginStart()
 		"specrates_force_spec",
 		"0",
 		"开启后：旁观均30tick；管理员/解说旁观为60tick；对局内不受影响",
-		FCVAR_NOTIFY, true, 0.0, true, 1.0
+		FCVAR_NONE, true, 0.0, true, 1.0
 	);
 	cv_forceSpec.AddChangeHook(OnForceSpecChanged);
 

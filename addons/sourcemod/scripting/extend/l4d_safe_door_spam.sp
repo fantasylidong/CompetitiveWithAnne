@@ -150,7 +150,7 @@
 #include <sdktools>
 #include <left4dhooks>
 
-#define CVAR_FLAGS				FCVAR_NOTIFY
+#define CVAR_FLAGS				FCVAR_NONE
 
 #define SOUND_BREAK1			"physics/metal/metal_box_break1.wav"
 #define SOUND_BREAK2			"physics/metal/metal_box_break2.wav"
@@ -268,7 +268,7 @@ public void OnPluginStart()
 	g_hCvarTimeOpen =	CreateConVar(	"l4d_safe_spam_time_open",		"0.0",			"How many seconds to block after opening the last saferoom door.", CVAR_FLAGS);
 	g_hCvarType =		CreateConVar(	"l4d_safe_spam_type",			"3",			"0=Off. When the last saferoom door is used enable the timeout on: 1=Open, 2=Close, 3=Both.", CVAR_FLAGS);
 
-	CreateConVar(						"l4d_safe_spam_version",		PLUGIN_VERSION,	"Saferoom Door Spam Protection plugin version",	FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(						"l4d_safe_spam_version",		PLUGIN_VERSION,	"Saferoom Door Spam Protection plugin version",	FCVAR_NONE|FCVAR_DONTRECORD);
 	AutoExecConfig(true, "l4d_safe_spam");
 
 	g_hCvarMPGameMode = FindConVar("mp_gamemode");

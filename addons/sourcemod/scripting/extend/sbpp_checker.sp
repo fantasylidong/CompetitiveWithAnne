@@ -51,7 +51,7 @@ public OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 
-	CreateConVar("sbchecker_version", VERSION, "", FCVAR_NOTIFY);
+	CreateConVar("sbchecker_version", VERSION, "", FCVAR_NONE);
 	RegAdminCmd("sm_listbans", OnListSourceBansCmd, ADMFLAG_BAN, LISTBANS_USAGE);
 	RegAdminCmd("sm_listcomms", OnListSourceCommsCmd, ADMFLAG_BAN, LISTCOMMS_USAGE);
 	RegAdminCmd("sb_reload", OnReloadCmd, ADMFLAG_RCON, "Reload sourcebans config and ban reason menu options");

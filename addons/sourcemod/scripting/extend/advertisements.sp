@@ -62,7 +62,7 @@ public void OnPluginStart()
 {
     LoadTranslations("advertisements.phrases");
 
-    CreateConVar("sm_advertisements_version", PL_VERSION, "Display advertisements", FCVAR_NOTIFY);
+    CreateConVar("sm_advertisements_version", PL_VERSION, "Display advertisements", FCVAR_NONE);
     g_hEnabled  = CreateConVar("sm_advertisements_enabled",  "1",                  "Enable/disable displaying advertisements.");
     g_hFile     = CreateConVar("sm_advertisements_file",     "advertisements.txt", "File to read the advertisements from.");
     g_hInterval = CreateConVar("sm_advertisements_interval", "30",                 "Number of seconds between advertisements.");

@@ -26,8 +26,8 @@ public void OnPluginStart()
 {
 	LoadTranslations("l4d2_tank_announce.phrases");
 	// CreateConVar
-	g_hPlaySound = CreateConVar("l4d2_tankannounce_playsound", "1", "是否在Tank生成时播放声音", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hMessageType = CreateConVar("l4d2_tankannounce_messagetype", "1", "Tank生成提示的类型：0=不提示，1=聊天框提示，2=中央提示框提示，3=中央文字提示", FCVAR_NOTIFY, true, 0.0, true, 3.0);
+	g_hPlaySound = CreateConVar("l4d2_tankannounce_playsound", "1", "是否在Tank生成时播放声音", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hMessageType = CreateConVar("l4d2_tankannounce_messagetype", "1", "Tank生成提示的类型：0=不提示，1=聊天框提示，2=中央提示框提示，3=中央文字提示", FCVAR_NONE, true, 0.0, true, 3.0);
 	// HookEvent
 	HookEvent("player_spawn", evt_PlayerSpawn);
 	// AddChangeHook

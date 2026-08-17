@@ -5,20 +5,19 @@ on:
     paths:
       - 'addons/sourcemod/scripting/**/*.sp'
       - 'addons/sourcemod/scripting/**/*.inc'
+      - 'scripts/check_convar_visibility.py'
+      - 'scripts/query_a2s_rules.py'
     branches:
       - master
   push:
     paths:
       - 'addons/sourcemod/scripting/**/*.sp'
       - 'addons/sourcemod/scripting/**/*.inc'
+      - 'scripts/check_convar_visibility.py'
+      - 'scripts/query_a2s_rules.py'
     branches:
       - master
   workflow_dispatch:
-    paths:
-      - 'addons/sourcemod/scripting/**/*.sp'
-      - 'addons/sourcemod/scripting/**/*.inc'
-    branches:
-      - master
 
 jobs:
   build:
@@ -36,6 +35,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+      - name: Check ConVar visibility policy and helper scripts
+        run: |
+          python3 -m py_compile scripts/check_convar_visibility.py scripts/query_a2s_rules.py
+          python3 scripts/check_convar_visibility.py
       - name: Set environment variables
         run: |
           echo "SCRIPTS_PATH=$GITHUB_WORKSPACE/addons/sourcemod/scripting" >> $GITHUB_ENV

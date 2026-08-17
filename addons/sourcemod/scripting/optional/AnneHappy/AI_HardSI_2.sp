@@ -77,7 +77,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	g_hPlayBackRate = CreateConVar("ai_TankSequencePlayBackRate", "3.0", "坦克攀爬动画加速速率", FCVAR_NOTIFY, true, 0.0);
+	g_hPlayBackRate = CreateConVar("ai_TankSequencePlayBackRate", "3.0", "坦克攀爬动画加速速率", FCVAR_NONE, true, 0.0);
 	g_hPlayBackRate.AddChangeHook(ConVarChanged_Cvars);
 	g_fPlayBackRate = g_hPlayBackRate.FloatValue;
 	HookEvent("round_start", evt_RoundStart, EventHookMode_Post);

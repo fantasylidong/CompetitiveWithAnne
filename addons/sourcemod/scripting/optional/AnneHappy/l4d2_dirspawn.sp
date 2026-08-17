@@ -1018,62 +1018,62 @@ public void OnPluginStart()
 {
 	LoadTranslations("l4d2_dirspawn.phrases");
     // 基础
-    gCvarEnable            = CreateConVar("dirspawn_enable", "1", "启用导演特感控制（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarCount             = CreateConVar("dirspawn_count", "4", "并发特感总数（cm_MaxSpecials）", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarInterval          = CreateConVar("dirspawn_interval", "35", "特感复活间隔 cm_SpecialRespawnInterval（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarDomLimit          = CreateConVar("dirspawn_dominator_limit", "-1", "DominatorLimit（-1=自动=dirspawn_count）", FCVAR_NOTIFY, true, -1.0, true, 30.0);
-    gCvarApplyOnRoundStart = CreateConVar("dirspawn_apply_on_roundstart", "1", "回合开始自动应用（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "回合开始首次应用延迟（秒）", FCVAR_NOTIFY, true, 0.1, true, 10.0);
-    gCvarKvEnable          = CreateConVar("dirspawn_kv_enable", "1", "是否使用KV设置每类上限（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "每类上限KV文件路径", FCVAR_NOTIFY);
-    gCvarLimitStyle        = CreateConVar("dirspawn_limit_style", "0", "每类上限分配：0=KV/均衡 1=Not0721 2=Not0721 community2", FCVAR_NOTIFY, true, 0.0, true, 2.0);
-    gCvarDpsSiLimit        = CreateConVar("dirspawn_dps_si_limit", "10", "Not0721 分配中 Spitter+Boomer 的数量限制", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "服务器日志详细（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "设置 ActiveChallenge/Aggressive/Assault 标志（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarEnable            = CreateConVar("dirspawn_enable", "1", "启用导演特感控制（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarCount             = CreateConVar("dirspawn_count", "4", "并发特感总数（cm_MaxSpecials）", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarInterval          = CreateConVar("dirspawn_interval", "35", "特感复活间隔 cm_SpecialRespawnInterval（秒）", FCVAR_NONE, true, 0.0, true, 120.0);
+    gCvarDomLimit          = CreateConVar("dirspawn_dominator_limit", "-1", "DominatorLimit（-1=自动=dirspawn_count）", FCVAR_NONE, true, -1.0, true, 30.0);
+    gCvarApplyOnRoundStart = CreateConVar("dirspawn_apply_on_roundstart", "1", "回合开始自动应用（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarApplyDelay        = CreateConVar("dirspawn_apply_delay", "1.0", "回合开始首次应用延迟（秒）", FCVAR_NONE, true, 0.1, true, 10.0);
+    gCvarKvEnable          = CreateConVar("dirspawn_kv_enable", "1", "是否使用KV设置每类上限（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarKvPath            = CreateConVar("dirspawn_kv_path", "cfg/sourcemod/dirspawn_si_limits.cfg", "每类上限KV文件路径", FCVAR_NONE);
+    gCvarLimitStyle        = CreateConVar("dirspawn_limit_style", "0", "每类上限分配：0=KV/均衡 1=Not0721 2=Not0721 community2", FCVAR_NONE, true, 0.0, true, 2.0);
+    gCvarDpsSiLimit        = CreateConVar("dirspawn_dps_si_limit", "10", "Not0721 分配中 Spitter+Boomer 的数量限制", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarVerbose           = CreateConVar("dirspawn_verbose", "1", "服务器日志详细（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarActiveChallenge   = CreateConVar("dirspawn_active_challenge", "1", "设置 ActiveChallenge/Aggressive/Assault 标志（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
 
     // MaxSpecial 解锁
-    gCvarUnlockMaxSpecial  = CreateConVar("dirspawn_unlock_maxspecial", "1", "解锁COOP 3特上限（需sourcescramble+gamedata）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarUnlockMaxSpecial  = CreateConVar("dirspawn_unlock_maxspecial", "1", "解锁COOP 3特上限（需sourcescramble+gamedata）", FCVAR_NONE, true, 0.0, true, 1.0);
 
     // better_mutations4
-    gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "坦克在场是否允许刷特（0=禁刷，1=允许并存）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxEnable       = CreateConVar("dirspawn_relax_enable", "1", "是否保留导演 Relax 阶段（0=按 Not0721 源服方式压掉 Relax）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxMin          = CreateConVar("dirspawn_relax_min", "30",  "Relax最小（秒）", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarRelaxMax          = CreateConVar("dirspawn_relax_max", "45", "Relax最大（秒）", FCVAR_NOTIFY, true, 0.0, true, 180.0);
-    gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "锁节奏（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxOffBattlefieldRespawn = CreateConVar("dirspawn_relax_off_battlefield_respawn", "2", "Relax 关闭时 director_special_battlefield_respawn_interval", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarRelaxOffInitialDelayMax = CreateConVar("dirspawn_relax_off_initial_delay_max", "1", "Relax 关闭时 director_special_initial_spawn_delay_max", FCVAR_NOTIFY, true, 0.0, true, 60.0);
-    gCvarRelaxOffInitialDelayMaxExtra = CreateConVar("dirspawn_relax_off_initial_delay_max_extra", "2", "Relax 关闭时 director_special_initial_spawn_delay_max_extra", FCVAR_NOTIFY, true, 0.0, true, 180.0);
-    gCvarRelaxOffInitialDelayMin = CreateConVar("dirspawn_relax_off_initial_delay_min", "0", "Relax 关闭时 director_special_initial_spawn_delay_min", FCVAR_NOTIFY, true, 0.0, true, 60.0);
-    gCvarRelaxOffFinaleOffer = CreateConVar("dirspawn_relax_off_finale_offer", "1", "Relax 关闭时 director_special_finale_offer_length", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarRelaxOffOriginalOffer = CreateConVar("dirspawn_relax_off_original_offer", "1", "Relax 关闭时 director_special_original_offer_length", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarAllowSIWithTank   = CreateConVar("dirspawn_allow_si_with_tank", "1", "坦克在场是否允许刷特（0=禁刷，1=允许并存）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarRelaxEnable       = CreateConVar("dirspawn_relax_enable", "1", "是否保留导演 Relax 阶段（0=按 Not0721 源服方式压掉 Relax）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarRelaxMin          = CreateConVar("dirspawn_relax_min", "30",  "Relax最小（秒）", FCVAR_NONE, true, 0.0, true, 120.0);
+    gCvarRelaxMax          = CreateConVar("dirspawn_relax_max", "45", "Relax最大（秒）", FCVAR_NONE, true, 0.0, true, 180.0);
+    gCvarLockTempo         = CreateConVar("dirspawn_lock_tempo", "0",  "锁节奏（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarRelaxOffBattlefieldRespawn = CreateConVar("dirspawn_relax_off_battlefield_respawn", "2", "Relax 关闭时 director_special_battlefield_respawn_interval", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarRelaxOffInitialDelayMax = CreateConVar("dirspawn_relax_off_initial_delay_max", "1", "Relax 关闭时 director_special_initial_spawn_delay_max", FCVAR_NONE, true, 0.0, true, 60.0);
+    gCvarRelaxOffInitialDelayMaxExtra = CreateConVar("dirspawn_relax_off_initial_delay_max_extra", "2", "Relax 关闭时 director_special_initial_spawn_delay_max_extra", FCVAR_NONE, true, 0.0, true, 180.0);
+    gCvarRelaxOffInitialDelayMin = CreateConVar("dirspawn_relax_off_initial_delay_min", "0", "Relax 关闭时 director_special_initial_spawn_delay_min", FCVAR_NONE, true, 0.0, true, 60.0);
+    gCvarRelaxOffFinaleOffer = CreateConVar("dirspawn_relax_off_finale_offer", "1", "Relax 关闭时 director_special_finale_offer_length", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarRelaxOffOriginalOffer = CreateConVar("dirspawn_relax_off_original_offer", "1", "Relax 关闭时 director_special_original_offer_length", FCVAR_NONE, true, 0.0, true, 60.0);
 
     // 首刷延迟
-    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "30", "首刷最小延迟（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
-    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "60", "首刷最大延迟（秒）", FCVAR_NOTIFY, true, 0.0, true, 60.0);
+    gCvarInitialMin        = CreateConVar("dirspawn_initial_min", "30", "首刷最小延迟（秒）", FCVAR_NONE, true, 0.0, true, 60.0);
+    gCvarInitialMax        = CreateConVar("dirspawn_initial_max", "60", "首刷最大延迟（秒）", FCVAR_NONE, true, 0.0, true, 60.0);
 
     // interval 联动
-    gCvarRelaxAuto          = CreateConVar("dirspawn_relax_auto", "0", "自动根据 interval 调整 Relax/Lock（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.75", "RelaxMin = kmin * interval", FCVAR_NOTIFY);
-    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "1.10", "RelaxMax = kmax * interval", FCVAR_NOTIFY);
-    gCvarRelaxFloor         = CreateConVar("dirspawn_relax_floor", "0", "RelaxMin 下限（秒）", FCVAR_NOTIFY);
-    gCvarRelaxCeil          = CreateConVar("dirspawn_relax_ceil", "120", "RelaxMax 上限（秒）", FCVAR_NOTIFY);
-    gCvarTempoLockThreshold = CreateConVar("dirspawn_lock_tempo_threshold", "6", "interval≤阈值时自动 LockTempo=1（秒）", FCVAR_NOTIFY);
+    gCvarRelaxAuto          = CreateConVar("dirspawn_relax_auto", "0", "自动根据 interval 调整 Relax/Lock（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarRelaxKMin          = CreateConVar("dirspawn_relax_kmin", "0.75", "RelaxMin = kmin * interval", FCVAR_NONE);
+    gCvarRelaxKMax          = CreateConVar("dirspawn_relax_kmax", "1.10", "RelaxMax = kmax * interval", FCVAR_NONE);
+    gCvarRelaxFloor         = CreateConVar("dirspawn_relax_floor", "0", "RelaxMin 下限（秒）", FCVAR_NONE);
+    gCvarRelaxCeil          = CreateConVar("dirspawn_relax_ceil", "120", "RelaxMax 上限（秒）", FCVAR_NONE);
+    gCvarTempoLockThreshold = CreateConVar("dirspawn_lock_tempo_threshold", "6", "interval≤阈值时自动 LockTempo=1（秒）", FCVAR_NONE);
 
-    gCvarInitAuto           = CreateConVar("dirspawn_initial_auto", "0", "自动根据 interval 调整首刷延迟（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "0.80", "首刷最小 = ikmin * interval", FCVAR_NOTIFY);
-    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "1.00", "首刷最大 = ikmax * interval", FCVAR_NOTIFY);
+    gCvarInitAuto           = CreateConVar("dirspawn_initial_auto", "0", "自动根据 interval 调整首刷延迟（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarInitKMin           = CreateConVar("dirspawn_initial_kmin", "0.80", "首刷最小 = ikmin * interval", FCVAR_NONE);
+    gCvarInitKMax           = CreateConVar("dirspawn_initial_kmax", "1.00", "首刷最大 = ikmax * interval", FCVAR_NONE);
 
     // 人数自适应（只改总数）
-    gCvarAutoEnable        = CreateConVar("dirspawn_auto_enable", "0", "启用人数自适应（只改总特）（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    gCvarAutoCountMode     = CreateConVar("dirspawn_auto_count_mode", "1", "计数模式：0=全部真人 1=仅生还 2=生还+感染（不含观察）", FCVAR_NOTIFY, true, 0.0, true, 2.0);
-    gCvarAutoBaseCount     = CreateConVar("dirspawn_auto_base_count", "6",  "4名真人时的基线总特", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarAutoPerAdd        = CreateConVar("dirspawn_auto_per_player_add", "1", "每多1名真人 +特", FCVAR_NOTIFY, true, 0.0, true, 6.0);
-    gCvarAutoMinCount      = CreateConVar("dirspawn_auto_min_count", "1",  "总特最小值", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarAutoMaxCount      = CreateConVar("dirspawn_auto_max_count", "30", "总特最大值", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarAutoBaseInterval  = CreateConVar("dirspawn_auto_base_interval", "35", "4名真人时的基线刷特间隔", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarAutoPerIntervalSub = CreateConVar("dirspawn_auto_per_player_interval_sub", "0", "每多1名真人减少的刷特间隔", FCVAR_NOTIFY, true, 0.0, true, 30.0);
-    gCvarAutoMinInterval   = CreateConVar("dirspawn_auto_min_interval", "0", "人数自适应刷特间隔下限", FCVAR_NOTIFY, true, 0.0, true, 120.0);
-    gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "0", "人数自适应变更时公告（0/1）", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    gCvarAutoEnable        = CreateConVar("dirspawn_auto_enable", "0", "启用人数自适应（只改总特）（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
+    gCvarAutoCountMode     = CreateConVar("dirspawn_auto_count_mode", "1", "计数模式：0=全部真人 1=仅生还 2=生还+感染（不含观察）", FCVAR_NONE, true, 0.0, true, 2.0);
+    gCvarAutoBaseCount     = CreateConVar("dirspawn_auto_base_count", "6",  "4名真人时的基线总特", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarAutoPerAdd        = CreateConVar("dirspawn_auto_per_player_add", "1", "每多1名真人 +特", FCVAR_NONE, true, 0.0, true, 6.0);
+    gCvarAutoMinCount      = CreateConVar("dirspawn_auto_min_count", "1",  "总特最小值", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarAutoMaxCount      = CreateConVar("dirspawn_auto_max_count", "30", "总特最大值", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarAutoBaseInterval  = CreateConVar("dirspawn_auto_base_interval", "35", "4名真人时的基线刷特间隔", FCVAR_NONE, true, 0.0, true, 120.0);
+    gCvarAutoPerIntervalSub = CreateConVar("dirspawn_auto_per_player_interval_sub", "0", "每多1名真人减少的刷特间隔", FCVAR_NONE, true, 0.0, true, 30.0);
+    gCvarAutoMinInterval   = CreateConVar("dirspawn_auto_min_interval", "0", "人数自适应刷特间隔下限", FCVAR_NONE, true, 0.0, true, 120.0);
+    gCvarAutoAnnounce      = CreateConVar("dirspawn_auto_announce", "0", "人数自适应变更时公告（0/1）", FCVAR_NONE, true, 0.0, true, 1.0);
 
     HookConVarChange(gCvarCount,             CvarChanged);
     HookConVarChange(gCvarInterval,          CvarChanged);

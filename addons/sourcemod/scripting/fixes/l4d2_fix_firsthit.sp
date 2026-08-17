@@ -40,7 +40,7 @@ public void OnPluginStart()
 							"0",
 							"Shuffle first hit classes. Affects only Scavenge mode.\n"
 						...	"Value: 1 = Shuffle every round, 2 = Shuffle every match, 0 = Disable.",
-							FCVAR_NOTIFY|FCVAR_SPONLY,
+							FCVAR_NONE|FCVAR_SPONLY,
 							true, 0.0, true, 2.0);
 
 	HookEvent("round_end", Event_RoundEnd);

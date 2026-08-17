@@ -57,10 +57,10 @@ public void OnPluginStart()
 	pain_pills_health_value = FindConVar("pain_pills_health_value");
 	pain_pills_health_value.GetString(buffer, sizeof(buffer));
 	
-	hCvarPillHot =			CreateConVar("l4d_pills_hot",				"0",	"Pills heal over time",				FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
-	hCvarPillInterval =		CreateConVar("l4d_pills_hot_interval",		"1.0",	"Interval for pills hot",			FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.00001);
-	hCvarPillIncrement =	CreateConVar("l4d_pills_hot_increment",		"10",	"Increment amount for pills hot",	FCVAR_NOTIFY|FCVAR_SPONLY, true, 1.0);
-	hCvarPillTotal =		CreateConVar("l4d_pills_hot_total",			buffer,	"Total amount for pills hot",		FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0);
+	hCvarPillHot =			CreateConVar("l4d_pills_hot",				"0",	"Pills heal over time",				FCVAR_NONE|FCVAR_SPONLY, true, 0.0, true, 1.0);
+	hCvarPillInterval =		CreateConVar("l4d_pills_hot_interval",		"1.0",	"Interval for pills hot",			FCVAR_NONE|FCVAR_SPONLY, true, 0.00001);
+	hCvarPillIncrement =	CreateConVar("l4d_pills_hot_increment",		"10",	"Increment amount for pills hot",	FCVAR_NONE|FCVAR_SPONLY, true, 1.0);
+	hCvarPillTotal =		CreateConVar("l4d_pills_hot_total",			buffer,	"Total amount for pills hot",		FCVAR_NONE|FCVAR_SPONLY, true, 0.0);
 	
 	if (hCvarPillHot.BoolValue) EnablePillHot();	
 	hCvarPillHot.AddChangeHook(PillHotChanged);
@@ -71,10 +71,10 @@ public void OnPluginStart()
 	adrenaline_health_buffer = FindConVar("adrenaline_health_buffer");
 	adrenaline_health_buffer.GetString(buffer, sizeof(buffer));
 	
-	hCvarAdrenHot = 		CreateConVar("l4d_adrenaline_hot",				"0",	"Adrenaline heals over time",			FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
-	hCvarAdrenInterval =	CreateConVar("l4d_adrenaline_hot_interval",		"1.0",	"Interval for adrenaline hot",			FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.00001);
-	hCvarAdrenIncrement =	CreateConVar("l4d_adrenaline_hot_increment",	"15",	"Increment amount for adrenaline hot",	FCVAR_NOTIFY|FCVAR_SPONLY, true, 1.0);
-	hCvarAdrenTotal =		CreateConVar("l4d_adrenaline_hot_total",		buffer,	"Total amount for adrenaline hot",		FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0);
+	hCvarAdrenHot = 		CreateConVar("l4d_adrenaline_hot",				"0",	"Adrenaline heals over time",			FCVAR_NONE|FCVAR_SPONLY, true, 0.0, true, 1.0);
+	hCvarAdrenInterval =	CreateConVar("l4d_adrenaline_hot_interval",		"1.0",	"Interval for adrenaline hot",			FCVAR_NONE|FCVAR_SPONLY, true, 0.00001);
+	hCvarAdrenIncrement =	CreateConVar("l4d_adrenaline_hot_increment",	"15",	"Increment amount for adrenaline hot",	FCVAR_NONE|FCVAR_SPONLY, true, 1.0);
+	hCvarAdrenTotal =		CreateConVar("l4d_adrenaline_hot_total",		buffer,	"Total amount for adrenaline hot",		FCVAR_NONE|FCVAR_SPONLY, true, 0.0);
 	
 	if (hCvarAdrenHot.BoolValue) EnableAdrenHot();
 	hCvarAdrenHot.AddChangeHook(AdrenHotChanged);

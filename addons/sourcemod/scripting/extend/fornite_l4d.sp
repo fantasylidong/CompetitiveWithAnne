@@ -33,7 +33,7 @@
 #define EF_PARENT_ANIMATES          (1 << 9)
 #define HIDEHUD_ALL                 (1 << 2)
 #define HIDEHUD_CROSSHAIR           (1 << 8)
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 
 
 ConVar g_cvHidePlayers;

@@ -45,8 +45,8 @@ public void OnPluginStart()
 	LoadTranslations("l4d_boss_vote.phrases");
 	g_forwardUpdateBosses = CreateGlobalForward("OnUpdateBosses", ET_Ignore, Param_Cell, Param_Cell);
 	
-	g_hCvarBossVoting = CreateConVar("l4d_boss_vote", "1", "Enable boss voting", FCVAR_NOTIFY, true, 0.0, true, 1.0); // Sets if boss voting is enabled or disabled
-	g_hCvarBossVotingLimit = CreateConVar("l4d_boss_vote_limit", "0", "Enable boss voting after limit round", FCVAR_NOTIFY, true, 0.0); 
+	g_hCvarBossVoting = CreateConVar("l4d_boss_vote", "1", "Enable boss voting", FCVAR_NONE, true, 0.0, true, 1.0); // Sets if boss voting is enabled or disabled
+	g_hCvarBossVotingLimit = CreateConVar("l4d_boss_vote_limit", "0", "Enable boss voting after limit round", FCVAR_NONE, true, 0.0);
 
 	HookEvent("map_transition", ResetRound, EventHookMode_PostNoCopy);
 	

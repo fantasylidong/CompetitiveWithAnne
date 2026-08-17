@@ -102,12 +102,12 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_character_manager_version", PLUGIN_VERSION, "l4d2_character_manager_version", FCVAR_DONTRECORD|FCVAR_NOTIFY);
-	hCvar_SurvivorSet = CreateConVar("l4d2_survivor_set", "3", "survivor set you wish to use, 0 = (use map default), 1 = (l4d1), 2 = (l4d2), 3 = (use both)", FCVAR_NOTIFY, true, 0.0, true, 3.0);
+	CreateConVar("l4d2_character_manager_version", PLUGIN_VERSION, "l4d2_character_manager_version", FCVAR_DONTRECORD|FCVAR_NONE);
+	hCvar_SurvivorSet = CreateConVar("l4d2_survivor_set", "3", "survivor set you wish to use, 0 = (use map default), 1 = (l4d1), 2 = (l4d2), 3 = (use both)", FCVAR_NONE, true, 0.0, true, 3.0);
 	HookConVarChange(hCvar_SurvivorSet, eConvarChanged);
-	hCvar_IdentityFix = CreateConVar("l4d2_identity_fix", "1", "Should enable identity fix for players(NOT BOTS) 0 = (disable) 1 = (enabled)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	hCvar_IdentityFix = CreateConVar("l4d2_identity_fix", "1", "Should enable identity fix for players(NOT BOTS) 0 = (disable) 1 = (enabled)", FCVAR_NONE, true, 0.0, true, 1.0);
 	HookConVarChange(hCvar_IdentityFix, eConvarChanged);
-	hCvar_ManagePeople = CreateConVar("l4d2_manage_people", "0", "Should manage people aswell as bots? 0 = (disable) 1 = (enabled) (Will overwrite identityfix when taking over a bot)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	hCvar_ManagePeople = CreateConVar("l4d2_manage_people", "0", "Should manage people aswell as bots? 0 = (disable) 1 = (enabled) (Will overwrite identityfix when taking over a bot)", FCVAR_NONE, true, 0.0, true, 1.0);
 	HookConVarChange(hCvar_ManagePeople, eConvarChanged);
 	AutoExecConfig(true, "l4d2_character_manager");
 	CvarsChanged();

@@ -31,7 +31,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	CreateConVar("l4d2_script_cmd_swap_version", PLUGIN_VERSION, "Script Cmd Swap version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("l4d2_script_cmd_swap_version", PLUGIN_VERSION, "Script Cmd Swap version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	AddCommandListener(CmdScript, "script");
 }
 

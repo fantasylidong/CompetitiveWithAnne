@@ -121,7 +121,7 @@
 #include <colors>
 #include <sdktools>
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 #define CHAT_TAG			"{green}[{olive}Gnome{green}] {default}"
 #define CONFIG_SPAWNS		"data/l4d2_gnome.cfg"
 
@@ -205,7 +205,7 @@ public void OnPluginStart()
 	g_hCvarFieldDuration =			CreateConVar(	"l4d2_gnome_healing_field_duration",			"1.0",			"How many seconds the healing field should last.", CVAR_FLAGS, true, 0.0 );
 	g_hCvarFieldWidth =				CreateConVar(	"l4d2_gnome_healing_field_width",				"3.0",			"Healing field width.", CVAR_FLAGS, true, 0.0 );
 	g_hCvarFieldAmplitude =			CreateConVar(	"l4d2_gnome_healing_field_amplitude",			"0.0",			"Healing field amplitude.", CVAR_FLAGS, true, 0.0 );
-	CreateConVar(									"l4d2_gnome_version",							PLUGIN_VERSION,	"Healing Gnome plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(									"l4d2_gnome_version",							PLUGIN_VERSION,	"Healing Gnome plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	//AutoExecConfig(true,							"l4d2_gnome");
 
 	// g_hCvarMaxHealth = FindConVar("first_aid_kit_max_heal");

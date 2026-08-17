@@ -60,7 +60,7 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 // =========================
 // 常量/宏
 // =========================
-#define CVAR_FLAG                 FCVAR_NOTIFY
+#define CVAR_FLAG                 FCVAR_NONE
 #define TEAM_SPECTATOR            1
 #define TEAM_SURVIVOR             2
 #define TEAM_INFECTED             3

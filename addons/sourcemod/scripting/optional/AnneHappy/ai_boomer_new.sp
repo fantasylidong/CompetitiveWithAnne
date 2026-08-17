@@ -38,9 +38,9 @@ Handle g_hVomitSurvivor;
 public void OnPluginStart()
 {
 	// CreateConVar
-	g_hBoomerBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启Boomer连跳", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hBoomerBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer连跳的速度", FCVAR_NOTIFY, true, 0.0);
-	g_hBoomerAirAngles = CreateConVar("ai_BoomerAirAngles", "60.0", "Boomer在空中的速度向量与到生还者的方向向量夹角大于这个值停止连跳", FCVAR_NOTIFY, true, 0.0);
+	g_hBoomerBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启Boomer连跳", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_hBoomerBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer连跳的速度", FCVAR_NONE, true, 0.0);
+	g_hBoomerAirAngles = CreateConVar("ai_BoomerAirAngles", "60.0", "Boomer在空中的速度向量与到生还者的方向向量夹角大于这个值停止连跳", FCVAR_NONE, true, 0.0);
 	g_hVomitRange = FindConVar("z_vomit_range");
 	// HookEvents
 	HookEvent("player_spawn", evt_PlayerSpawn);

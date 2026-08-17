@@ -53,7 +53,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("charger_collision_patch_version", PLUGIN_VERSION, "", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("charger_collision_patch_version", PLUGIN_VERSION, "", FCVAR_NONE|FCVAR_DONTRECORD);
 	
 	Handle hGamedata = LoadGameConfigFile(GAMEDATA);
 	if(hGamedata == null) 

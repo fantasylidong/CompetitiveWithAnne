@@ -113,7 +113,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("command_buffer_version", PLUGIN_VERSION, "Command and ConVar - Buffer Overflow Fixer plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("command_buffer_version", PLUGIN_VERSION, "Command and ConVar - Buffer Overflow Fixer plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 
 	g_aCommandList = new ArrayList(ByteCountToCells(ARGS_BUFFER_LENGTH));
 

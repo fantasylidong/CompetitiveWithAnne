@@ -25,7 +25,7 @@ public void OnPluginStart()
 		SetFailState("Plugin supports Left 4 Dead 2 only.");
 	}
 	
-	CreateConVar("nokits_version", PLUGIN_VERSION,"No Safe Room Medkits Version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("nokits_version", PLUGIN_VERSION,"No Safe Room Medkits Version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NONE);
 	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 }
 

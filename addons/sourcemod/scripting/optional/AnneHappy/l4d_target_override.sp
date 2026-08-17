@@ -227,7 +227,7 @@ float g_iBenchTicks;
 #endif
 
 
-#define CVAR_FLAGS			FCVAR_NOTIFY
+#define CVAR_FLAGS			FCVAR_NONE
 #define GAMEDATA			"l4d_target_override"
 #define CONFIG_DATA			"data/l4d_target_override.cfg"
 
@@ -432,7 +432,7 @@ public void OnPluginStart()
 		g_hCvarSpecials =	CreateConVar(	"l4d_target_override_specials",			"15",				"Override these Specials target function: 1=Smoker, 2=Boomer, 4=Hunter, 8=Tank. 15=All. Add numbers together.", CVAR_FLAGS );
 	g_hCvarTeam =			CreateConVar(	"l4d_target_override_team",				"2",				"Which Survivor teams should be targeted. 2=Default Survivors. 4=Holdout and Passing bots. 6=Both.", CVAR_FLAGS );
 	g_hCvarType =			CreateConVar(	"l4d_target_override_type",				"1",				"How should the plugin search through Survivors. 1=Nearest visible (defaults to games method on fail). 2=All Survivors from the nearest. 3=Nearest by flow distance (requires Left4DHooks plugin, defaults to type 2).", CVAR_FLAGS );
-	CreateConVar(							"l4d_target_override_version",			PLUGIN_VERSION,		"Target Override plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar(							"l4d_target_override_version",			PLUGIN_VERSION,		"Target Override plugin version.", FCVAR_NONE|FCVAR_DONTRECORD);
 	AutoExecConfig(true,					"l4d_target_override");
 
 	g_hCvarLimp = FindConVar("survivor_limp_health");

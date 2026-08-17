@@ -96,7 +96,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
     // find/create cvars, hook changes, cache current values
-    ConVar hCvarEnabled = CreateConVar("sm_aidmgfix_enable", "3", "Bit flag: Enables plugin features (add together): 1=Skeet pouncing AI, 2=Debuff charging AI, 3=all, 0=off", FCVAR_NONE|FCVAR_NOTIFY);
+    ConVar hCvarEnabled = CreateConVar("sm_aidmgfix_enable", "3", "Bit flag: Enables plugin features (add together): 1=Skeet pouncing AI, 2=Debuff charging AI, 3=all, 0=off", FCVAR_NONE);
     ConVar hCvarPounceInterrupt = FindConVar("z_pounce_damage_interrupt");
 
     hCvarEnabled.AddChangeHook(OnAIDamageFixEnableChanged);

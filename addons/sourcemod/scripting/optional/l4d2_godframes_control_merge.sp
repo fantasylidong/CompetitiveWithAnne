@@ -149,9 +149,9 @@ public void OnPluginStart()
 	g_hSpitFlags = CreateConVar("gfc_spit_zc_flags", "6", "Which classes will be affected by extra spit protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.", _, true, 0.0, true, 15.0);
 	g_hCommonFlags= CreateConVar("gfc_common_zc_flags", "0", "Which classes will be affected by extra common protection time. 1 - Hunter. 2 - Smoker. 4 - Jockey. 8 - Charger.", _, true, 0.0, true, 15.0);
 
-	g_hCvarEnable = CreateConVar("l4d2_undoff_enable", "7", "Bit flag: Enables plugin features (add together): 1=too close, 2=Charger carry, 4=guilty bots, 7=all, 0=off", FCVAR_NOTIFY);
-	g_hCvarBlockZeroDmg = CreateConVar("l4d2_undoff_blockzerodmg","7", "Bit flag: Block 0 damage friendly fire effects like recoil and vocalizations/stats (add together): 4=bot hits human block recoil, 2=block vocals/stats on ALL difficulties, 1=block vocals/stats on everything EXCEPT Easy (flag 2 has precedence), 0=off", FCVAR_NOTIFY);
-	g_hCvarPermDamageFraction = CreateConVar("l4d2_undoff_permdmgfrac", "1.0", "Minimum fraction of damage applied to permanent health", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hCvarEnable = CreateConVar("l4d2_undoff_enable", "7", "Bit flag: Enables plugin features (add together): 1=too close, 2=Charger carry, 4=guilty bots, 7=all, 0=off", FCVAR_NONE);
+	g_hCvarBlockZeroDmg = CreateConVar("l4d2_undoff_blockzerodmg","7", "Bit flag: Block 0 damage friendly fire effects like recoil and vocalizations/stats (add together): 4=bot hits human block recoil, 2=block vocals/stats on ALL difficulties, 1=block vocals/stats on everything EXCEPT Easy (flag 2 has precedence), 0=off", FCVAR_NONE);
+	g_hCvarPermDamageFraction = CreateConVar("l4d2_undoff_permdmgfrac", "1.0", "Minimum fraction of damage applied to permanent health", FCVAR_NONE, true, 0.0, true, 1.0);
 
 	g_hCvarEnableShotFF = CreateConVar("l4d2_shotgun_ff_enable", "1", "Enable Shotgun FF Module?", _, true, 0.0, true, 5.0);
 	g_hCvarModifier = CreateConVar("l4d2_shotgun_ff_multi", "0.5", "Shotgun FF damage modifier value", _, true, 0.0, true, 5.0);

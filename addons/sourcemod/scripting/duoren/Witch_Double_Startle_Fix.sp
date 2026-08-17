@@ -47,7 +47,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	CreateConVar("witch_double_start_fix", PLUGIN_VERSION, "", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("witch_double_start_fix", PLUGIN_VERSION, "", FCVAR_NONE|FCVAR_DONTRECORD);
 }
 
 public void OnEntityCreated(int iEntity, const char[] sClassname)

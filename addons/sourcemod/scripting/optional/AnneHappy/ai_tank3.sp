@@ -14,7 +14,7 @@
 #include "../../archive/AnneHappy/stocks.sp"
 
 // ===== 常量 / 宏 =====
-#define CVAR_FLAGS                 FCVAR_NOTIFY
+#define CVAR_FLAGS                 FCVAR_NONE
 #define PLUGIN_PREFIX              "Ai-Tank3"
 #define GAMEDATA                   "l4d2_ai_tank3"
 

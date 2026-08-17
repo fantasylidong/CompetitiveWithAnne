@@ -84,7 +84,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	LoadTranslations("Survivor_Legs.phrases");
-	CreateConVar("survivor_legs_version", PLUGIN_VERSION, "[L4D2]Survivor_Legs_version", FCVAR_SPONLY|FCVAR_DONTRECORD|FCVAR_NOTIFY);
+	CreateConVar("survivor_legs_version", PLUGIN_VERSION, "[L4D2]Survivor_Legs_version", FCVAR_SPONLY|FCVAR_DONTRECORD|FCVAR_NONE);
 	
 	HookEvent("player_death", ePlayerDeath, EventHookMode_Pre);
 	HookEvent("player_spawn", ePlayerSpawn);

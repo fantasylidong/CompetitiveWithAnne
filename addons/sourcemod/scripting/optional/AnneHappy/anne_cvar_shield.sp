@@ -117,17 +117,17 @@ public void OnPluginStart()
     g_hEnable = CreateConVar(
         "anne_cvar_shield_enable", "1",
         "Enable Anne SI limit cvar shield.",
-        FCVAR_NOTIFY, true, 0.0, true, 1.0
+        FCVAR_NONE, true, 0.0, true, 1.0
     );
     g_hDebug = CreateConVar(
         "anne_cvar_shield_debug", "0",
         "Log Anne CVar Shield actions.",
-        FCVAR_NOTIFY, true, 0.0, true, 1.0
+        FCVAR_NONE, true, 0.0, true, 1.0
     );
     g_hSyncVersus = CreateConVar(
         "anne_cvar_shield_sync_versus_limits", "1",
         "Mirror z_*_limit, z_versus_*_limit, and infected_control inf_*_limit targets for each SI class.",
-        FCVAR_NOTIFY, true, 0.0, true, 1.0
+        FCVAR_NONE, true, 0.0, true, 1.0
     );
 
     g_hEnable.AddChangeHook(OnControlCvarChanged);
