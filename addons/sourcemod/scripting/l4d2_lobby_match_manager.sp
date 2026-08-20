@@ -14,7 +14,7 @@
 #include <l4d2_source_keyvalues>	// https://github.com/fdxx/l4d2_source_keyvalues
 #include <l4d2_lobby_match_manager_policy>
 
-#define VERSION "0.14"
+#define VERSION "0.15"
 
 #define RMFLAG_NO_MODE_CHANGE			1
 #define RMFLAG_NO_DIFFICULTY_CHANGE		2
@@ -34,6 +34,8 @@ enum LobbyState
 ConVar
 	mp_gamemode,
 	z_difficulty,
+	survivor_limit,
+	z_max_player_zombies,
 	sv_allow_lobby_connect_only,
 	sv_hosting_lobby,
 	sv_reservation_timeout,
@@ -42,18 +44,23 @@ ConVar
 
 char
 	g_sGameMode[64],
-	g_sDifficulty[64];
+	g_sDifficulty[64],
+	g_sReservationGameMode[64];
 
 MemoryPatch
 	g_mBlockReserve;
 
 int
 	g_iUnreserveType,
-	g_iReserveModifyFlags;
+	g_iReserveModifyFlags,
+	g_iReservationMaxSlots;
 
 bool
 	g_bDependenciesReady,
 	g_bLobbyReservationObserved,
+	g_bReservationModeCaptured,
+	g_bCampaignLobbySwitchNoticeSent,
+	g_bCampaignLobbySwitchCheckQueued,
 	g_bHumanClient[MAXPLAYERS + 1];
 
 LobbyState
@@ -66,7 +73,8 @@ Address
 Handle
 	g_hSDKUpdateGameType,
 	g_hSDKGetGameModeInfo,
-	g_hSDKGetMapInfo;
+	g_hSDKGetMapInfo,
+	g_hCampaignLobbySwitchTimer;
 
 DynamicDetour
 	g_hApplyGameSettingsDetour,
@@ -86,6 +94,8 @@ public void OnPluginStart()
 
 	mp_gamemode = FindConVar("mp_gamemode");
 	z_difficulty = FindConVar("z_difficulty");
+	survivor_limit = FindConVar("survivor_limit");
+	z_max_player_zombies = FindConVar("z_max_player_zombies");
 	sv_allow_lobby_connect_only = FindConVar("sv_allow_lobby_connect_only");
 	sv_hosting_lobby = FindConVar("sv_hosting_lobby");
 	sv_reservation_timeout = FindConVar("sv_reservation_timeout");
@@ -96,8 +106,13 @@ public void OnPluginStart()
 	
 	mp_gamemode.AddChangeHook(OnConVarChanged);
 	z_difficulty.AddChangeHook(OnConVarChanged);
+	if (survivor_limit != null)
+		survivor_limit.AddChangeHook(OnConVarChanged);
+	if (z_max_player_zombies != null)
+		z_max_player_zombies.AddChangeHook(OnConVarChanged);
 	g_cvUnreserveType.AddChangeHook(OnConVarChanged);
 	g_cvReserveModifyFlags.AddChangeHook(OnConVarChanged);
+	LoadTranslations("l4d2_lobby_match_manager.phrases");
 
 	RegAdminCmd("sm_lobby_status", Cmd_Status, ADMFLAG_ROOT);
 	RegAdminCmd("sm_lobby_set", Cmd_Set, ADMFLAG_ROOT);
@@ -110,7 +125,7 @@ public void OnAllPluginsLoaded()
 	g_bDependenciesReady = true;
 	RefreshCachedConVars();
 	RebuildLobbyStateFromEngine("plugins_loaded");
-	EvaluateLobbyReleasePolicy();
+	EvaluateLobbyReleasePolicy(!g_bCampaignLobbySwitchCheckQueued);
 }
 
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -119,6 +134,8 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 		return;
 
 	RefreshCachedConVars();
+	if (convar == mp_gamemode || convar == survivor_limit || convar == z_max_player_zombies)
+		QueueCampaignLobbySwitchCheck();
 	ReconcileLobbyState("cvar_changed");
 	EvaluateLobbyReleasePolicy();
 }
@@ -136,7 +153,7 @@ public void OnConfigsExecuted()
 	sv_reservation_timeout.IntValue = 30;
 	RefreshCachedConVars();
 	ReconcileLobbyState("configs_executed");
-	EvaluateLobbyReleasePolicy();
+	EvaluateLobbyReleasePolicy(!g_bCampaignLobbySwitchCheckQueued);
 }
 
 public void OnMapStart()
@@ -150,7 +167,7 @@ void Frame_ReconcileLobbyState(any data)
 		return;
 
 	ReconcileLobbyState("map_start");
-	EvaluateLobbyReleasePolicy();
+	EvaluateLobbyReleasePolicy(!g_bCampaignLobbySwitchCheckQueued);
 }
 
 public void OnPluginEnd()
@@ -159,6 +176,8 @@ public void OnPluginEnd()
 		g_hApplyGameSettingsDetour.Disable(Hook_Pre, OnApplyGameSettingsPre);
 	if (g_hReplyReservationRequestDetour != null)
 		g_hReplyReservationRequestDetour.Disable(Hook_Post, OnReplyReservationRequestPost);
+	delete g_hCampaignLobbySwitchTimer;
+	g_bCampaignLobbySwitchCheckQueued = false;
 
 	g_mBlockReserve.Disable();
 }
@@ -214,6 +233,8 @@ MRESReturn OnReplyReservationRequestPost(Address pThis, DHookParam hParams)
 
 	if (!HasReservationCookie())
 		return MRES_Ignored;
+
+	CaptureReservationMode();
 
 	if (g_eLobbyState == LobbyState_IdleUnreserved && GetPlayerCount() == 0)
 	{
@@ -340,12 +361,43 @@ Action Timer_EvaluateLobbyRelease(Handle timer)
 	return Plugin_Stop;
 }
 
-void EvaluateLobbyReleasePolicy()
+Action Timer_CheckCampaignLobbySwitch(Handle timer)
+{
+	g_hCampaignLobbySwitchTimer = null;
+	g_bCampaignLobbySwitchCheckQueued = false;
+	EvaluateLobbyReleasePolicy(true);
+	return Plugin_Stop;
+}
+
+void QueueCampaignLobbySwitchCheck()
+{
+	g_bCampaignLobbySwitchCheckQueued = true;
+	delete g_hCampaignLobbySwitchTimer;
+	g_hCampaignLobbySwitchTimer = CreateTimer(1.0, Timer_CheckCampaignLobbySwitch);
+}
+
+void EvaluateLobbyReleasePolicy(bool checkCampaignLobbySwitch = false)
 {
 	ReconcileLobbyState("release_policy");
 
 	if (g_eLobbyState != LobbyState_MatchmakingReserved)
 		return;
+
+	if (checkCampaignLobbySwitch && LobbyPolicy_ShouldClearCampaignLobbyOnVersusSwitch(
+		g_iUnreserveType,
+		g_sReservationGameMode,
+		g_iReservationMaxSlots,
+		g_sGameMode,
+		GetConfiguredPlayerSlots(),
+		g_bCampaignLobbySwitchNoticeSent))
+	{
+		int configuredPlayerSlots = GetConfiguredPlayerSlots();
+		g_bCampaignLobbySwitchNoticeSent = true;
+		LogMessage("[LMM] releasing campaign lobby after switching to non-Anne versus: reservationMaxSlots=%d, configuredPlayerSlots=%d", g_iReservationMaxSlots, configuredPlayerSlots);
+		PrintToChatAll("%t", "LMM_CampaignLobbyReleased", configuredPlayerSlots);
+		TransitionLobbyState(LobbyState_Released, "campaign_lobby_versus_switch");
+		return;
+	}
 
 	int playerCount = GetPlayerCount();
 	if (LobbyPolicy_ShouldClearOnJoin(g_iUnreserveType, playerCount, GetMaxLobbySlots(g_sGameMode), false))
@@ -362,6 +414,7 @@ void RebuildLobbyStateFromEngine(const char[] reason)
 {
 	if (HasReservationCookie())
 	{
+		CaptureReservationMode();
 		TransitionLobbyState(LobbyState_MatchmakingReserved, reason);
 	}
 	else if (GetPlayerCount() > 0)
@@ -409,6 +462,9 @@ void ReconcileLobbyState(const char[] reason)
 
 void TransitionLobbyState(LobbyState nextState, const char[] reason)
 {
+	if (nextState == LobbyState_MatchmakingReserved)
+		CaptureReservationMode();
+
 	LobbyState previousState = g_eLobbyState;
 	g_eLobbyState = nextState;
 
@@ -481,7 +537,7 @@ Action Cmd_Status(int client, int args)
 	else 
 		FormatEx(sCookie, sizeof(sCookie), "%x", iCookie[0]);
 
-	ReplyToCommand(client, "state = %s, unreserveType = %i, players = %i, maxLobbySlots = %i, reservationObserved = %i, sv_hosting_lobby = %i, sv_allow_lobby_connect_only = %i, cookie = %s", stateName, g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_bLobbyReservationObserved, sv_hosting_lobby.IntValue, sv_allow_lobby_connect_only.IntValue, sCookie);
+	ReplyToCommand(client, "state = %s, unreserveType = %i, players = %i, maxLobbySlots = %i, reservationMode = %s, reservationMaxSlots = %i, configuredPlayerSlots = %i, reservationObserved = %i, sv_hosting_lobby = %i, sv_allow_lobby_connect_only = %i, cookie = %s", stateName, g_iUnreserveType, GetPlayerCount(), GetMaxLobbySlots(g_sGameMode), g_sReservationGameMode, g_iReservationMaxSlots, GetConfiguredPlayerSlots(), g_bLobbyReservationObserved, sv_hosting_lobby.IntValue, sv_allow_lobby_connect_only.IntValue, sCookie);
 	return Plugin_Handled;
 }
 
@@ -502,11 +558,14 @@ Action Cmd_Set(int client, int args)
 		return Plugin_Handled;
 	}
 
-	int iCookie[2];
+	int iCookie[2], oldCookie[2];
 	char sCookie[MAX_COOKIE_LENGTH];
 
 	GetCmdArg(1, sCookie, sizeof(sCookie));
 	StringToInt64(sCookie, iCookie, 16);
+	GetReservationCookie(oldCookie);
+	if (oldCookie[0] != iCookie[0] || oldCookie[1] != iCookie[1])
+		ResetReservationTracking();
 	StoreToAddress(g_pReservationCookie, iCookie[0], NumberType_Int32);
 	StoreToAddress(g_pReservationCookie + view_as<Address>(4), iCookie[1], NumberType_Int32);
 
@@ -536,12 +595,30 @@ int GetPlayerCount(int exclude = 0)
 	return iPlayers;
 }
 
-int GetMaxLobbySlots(const char[] mode)
+int GetConfiguredPlayerSlots()
+{
+	int survivorSlots = survivor_limit != null ? survivor_limit.IntValue : 4;
+	int infectedSlots = z_max_player_zombies != null ? z_max_player_zombies.IntValue : survivorSlots;
+	return survivorSlots + infectedSlots;
+}
+
+void CaptureReservationMode()
+{
+	if (g_bReservationModeCaptured || !HasReservationCookie())
+		return;
+
+	strcopy(g_sReservationGameMode, sizeof(g_sReservationGameMode), g_sGameMode);
+	g_iReservationMaxSlots = GetMaxLobbySlots(g_sGameMode, 0);
+	g_bReservationModeCaptured = true;
+	LogMessage("[LMM] captured reservation mode=%s, maxLobbySlots=%d", g_sReservationGameMode, g_iReservationMaxSlots);
+}
+
+int GetMaxLobbySlots(const char[] mode, int fallback = 4)
 {
 	SourceKeyValues kv = SDKCall(g_hSDKGetGameModeInfo, g_pMatchExtL4D, mode);
 	if (kv)
-		return kv.GetInt("maxplayers", 4);
-	return 4;
+		return kv.GetInt("maxplayers", fallback);
+	return fallback;
 }
 
 void GetReservationCookie(int cookie[2])
@@ -563,7 +640,17 @@ void SetReservationCookie(bool reservation, const int cookie[2]={0, 0})
 	StoreToAddress(g_pReservationCookie + view_as<Address>(4), cookie[1], NumberType_Int32);
 	sv_hosting_lobby.BoolValue = reservation;
 	g_bLobbyReservationObserved = reservation;
+	if (!reservation)
+		ResetReservationTracking();
 	SDKCall(g_hSDKUpdateGameType);
+}
+
+void ResetReservationTracking()
+{
+	g_bReservationModeCaptured = false;
+	g_bCampaignLobbySwitchNoticeSent = false;
+	g_sReservationGameMode[0] = '\0';
+	g_iReservationMaxSlots = 0;
 }
 
 void Init()

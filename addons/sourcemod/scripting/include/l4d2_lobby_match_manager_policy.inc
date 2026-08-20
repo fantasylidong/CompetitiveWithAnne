@@ -7,6 +7,7 @@
 #define UNRESERVE_WHEN_FULL 2
 #define UNRESERVE_DEFAULT_EMPTY 3
 #define ANNE_UNRESERVE_PLAYER_COUNT 3
+#define LOBBY_CAMPAIGN_SWITCH_MAX_SLOTS 4
 
 stock bool LobbyPolicy_IsLobbyFull(int playerCount, int maxLobbySlots)
 {
@@ -27,6 +28,18 @@ stock bool LobbyPolicy_ShouldClearOnJoin(int unreserveType, int playerCount, int
 		return LobbyPolicy_IsLobbyFull(playerCount, maxLobbySlots);
 
 	return false;
+}
+
+stock bool LobbyPolicy_ShouldClearCampaignLobbyOnVersusSwitch(int unreserveType, const char[] reservationMode, int reservationMaxSlots, const char[] currentMode, int configuredPlayerSlots, bool noticeSent)
+{
+	if (noticeSent || unreserveType == UNRESERVE_ANNE)
+		return false;
+
+	return (StrEqual(reservationMode, "coop", false) || StrEqual(reservationMode, "campaign", false))
+		&& reservationMaxSlots > 0
+		&& reservationMaxSlots <= LOBBY_CAMPAIGN_SWITCH_MAX_SLOTS
+		&& StrEqual(currentMode, "versus", false)
+		&& configuredPlayerSlots > LOBBY_CAMPAIGN_SWITCH_MAX_SLOTS;
 }
 
 stock bool LobbyPolicy_ShouldBlockReservePatch(int unreserveType, bool anneLobbyReleased)

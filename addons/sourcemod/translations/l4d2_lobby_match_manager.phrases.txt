@@ -1,0 +1,7 @@
+"Phrases"
+{
+	"LMM_CampaignLobbyReleased"
+	{
+		"en" "This lobby was created in Campaign mode, but the current non-Anne Versus configuration has %d player slots. The lobby reservation was removed to avoid the 4-player limit. Next time, create the lobby in Versus mode."
+	}
+}

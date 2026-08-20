@@ -1,0 +1,7 @@
+"Phrases"
+{
+	"LMM_CampaignLobbyReleased"
+	{
+		"vi" "Sảnh này được tạo ở chế độ Chiến dịch, nhưng cấu hình Đối kháng không phải Anne hiện có %d vị trí. Đã hủy đặt chỗ sảnh để tránh giới hạn 4 người khiến sảnh báo đầy. Lần sau hãy tạo sảnh ở chế độ Đối kháng."
+	}
+}
