@@ -966,11 +966,12 @@ public Extension __ext_actions =
 public void __ext_actions_SetNTVOptional()
 {
 	MarkNativeAsOptional("ActionComponent.ActionComponent");
-	MarkNativeAsOptional("ActionComponent.Update");
-	MarkNativeAsOptional("ActionComponent.Upkeep");
-	MarkNativeAsOptional("ActionComponent.Reset");
+	MarkNativeAsOptional("ActionComponent.Update.set");
+	MarkNativeAsOptional("ActionComponent.Upkeep.set");
+	MarkNativeAsOptional("ActionComponent.Reset.set");
 	MarkNativeAsOptional("ActionComponent.GetName");
 	MarkNativeAsOptional("ActionComponent.SetName");
+	MarkNativeAsOptional("ActionComponent.CurrentAction.get");
 	MarkNativeAsOptional("ActionComponent.Address");
 	MarkNativeAsOptional("ActionComponent.Actor");
 
@@ -993,9 +994,17 @@ public void __ext_actions_SetNTVOptional()
 	MarkNativeAsOptional("ActionsManager.GetAction");
 
 	MarkNativeAsOptional("ActionsManager.GetActionUserData");
+	MarkNativeAsOptional("ActionsManager.GetActionUserDataVector");
+	MarkNativeAsOptional("ActionsManager.GetActionUserDataString");
 	MarkNativeAsOptional("ActionsManager.SetActionUserData");
+	MarkNativeAsOptional("ActionsManager.SetActionUserDataVector");
+	MarkNativeAsOptional("ActionsManager.SetActionUserDataString");
 	MarkNativeAsOptional("ActionsManager.GetActionUserDataIdentity");
+	MarkNativeAsOptional("ActionsManager.GetActionUserDataIdentityVector");
+	MarkNativeAsOptional("ActionsManager.GetActionUserDataIdentityString");
 	MarkNativeAsOptional("ActionsManager.SetActionUserDataIdentity");
+	MarkNativeAsOptional("ActionsManager.SetActionUserDataIdentityVector");
+	MarkNativeAsOptional("ActionsManager.SetActionUserDataIdentityString");
 
 	MarkNativeAsOptional("BehaviorAction.Continue");
 	MarkNativeAsOptional("BehaviorAction.ChangeTo");
@@ -1027,4 +1036,4 @@ public void __ext_actions_SetNTVOptional()
 
 	__ext_actions_constructor_SetNTVOptional();
 }
-#endif 
+#endif

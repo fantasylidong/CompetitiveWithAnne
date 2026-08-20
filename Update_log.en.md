@@ -209,3 +209,25 @@
 
 ### August 15, 2026 Removed the corpse-dissolve vote
 - Removed the "dissolve corpses" vote from every mode menu and deleted `cfg/vote/dissolve_on.cfg` and `cfg/vote/dissolve_off.cfg`.
+
+### August 19, 2026 Anti-Bait pauses on low HP with no medkits
+- Upgraded `infected_control.smx` to 2026-08-19.1. Anti-Bait now enters `Paused` when every standing survivor has permanent health below `inf_antibait_lowhp` (default 40) and no living survivor is carrying a first-aid kit, defibrillator, pain pills, or adrenaline. Incap health is not permanent health. Set the threshold to 0 to disable this gate.
+
+### August 19, 2026 Scripted HUD restores survivor SI count/interval
+- Upgraded Scripted HUD to 1.5.1. Version 1.4.2 hid HUD2's special-infected count/interval together with live SI HP, next-wave countdown, and the spawn queue. `[N SI / M sec]` is public room config (the same tag as the hostname), not live intel. Survivors see that field again, and it coexists with the built-in CS kill feed, which still uses only that player's engine slots 8-14.
+- SI HP, next-wave countdown, and the next-wave queue remain spectator/infected only.
+
+### August 20, 2026 Hit-feedback ding set closer to old killsound
+- Upgraded `l4d2_hitsound.smx` to 2.6.0. Sound-set optional keys are down to three: `headshot_kill` (dedicated headshot-kill sound), `stack` (same-frame stack vs merge), and `apply_special_only` (write sound range on select). A kill plays one death-event sound only; no extra hurt ping for overkill. Playback is always `SNDCHAN_AUTO`. Fire, inferno, `DMG_DIRECT`, blast, and `weapon_id==0` filters are unchanged.
+- A sound package now sets four items together: headshot, hit, kill, and headshot-kill. Players may independently choose headshot-kill set `0..N` (0 falls back to the regular headshot sound). That set ID and playback mode are stored in the RPG table and migrate once from the old `SoundSelect.txt`. The redundant overlay quick toggle and `sm_hitui` were removed; icon set 0 already disables icons.
+- Set 9 "original ding vote plugin": ding on headshot hits, bell on headshot kills, silence otherwise; picking it sets the range to all infected.
+
+### August 20, 2026 Tank ride detection for embedded riders
+- Upgraded `ai_tank3` to 1.0.0.10. Riding still treats `m_hGroundEntity == Tank` as the first proof, so adjacent ledges and stairs are not counted as riding.
+- If the ground entity is not the Tank, riding now requires overlapping XY hulls plus a downward hull trace from the survivor's feet that actually hits the Tank. That covers riders stuck in the Tank model whose ground entity is still the world, without using a center ray that merely misses world as proof.
+
+### August 19, 2026 Tank head-ride and ladder drop
+- Upgraded `ai_tank3` to 1.0.0.9. Head-block is now two cases: a survivor standing on the Tank hull, and an unreachable overhead stall.
+- Riding no longer waits for a 2-second standstill and no longer blacklists the rider. A punch also `SweepFist`s upward at the rider; if they are still on the head after 3 seconds the Tank force-throws in place, without walking 250 units away. Close-range rocks aim straight at the target so the ballistic formula cannot divide by a near-zero horizontal distance. Jump-rocks are disabled while someone is riding.
+- Overhead stalls still use the 2-second movement window. If another survivor exists, the Tank switches (standing first, then pinned, then downed). With no alternative it throws in place and no longer `CommandABot RESET`s the same unreachable target, which was restarting the climb-and-fall loop. RESET is also skipped on or near ladders.
+- While on a ladder the Tank flattens pitch and locks yaw to `m_climbableNormal`, reducing the vanilla look-at-victim drop.

@@ -68,6 +68,7 @@
       color: var(--ink);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.9em;
+      overflow-wrap: anywhere;
     }
 
     h1, h2, h3, h4, p { margin: 0; }
@@ -375,14 +376,15 @@
     .class-detail { padding: 18px 0 18px 22px; }
     .class-title-row { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
     .class-role { color: var(--muted); font-size: 12px; }
-    .band-chart { position: relative; height: 118px; margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .band-axis { position: absolute; inset: 48px 0 auto; height: 2px; background: var(--line-strong); }
-    .band-block { position: absolute; top: 24px; height: 50px; border-radius: 4px; transition: left 220ms ease, width 220ms ease; }
-    .band-block.stage-5, .band-block.stage-4 { background: var(--amber-soft); border: 1px solid var(--amber); }
-    .band-block.stage-3, .band-block.stage-2 { background: var(--blue-soft); border: 1px solid var(--blue); }
-    .band-block.stage-1, .band-block.stage-0 { background: var(--teal-soft); border: 1px solid var(--teal); }
-    .band-block span { display: block; padding: 4px 6px; color: var(--ink); font-size: 10px; font-weight: 700; white-space: nowrap; }
-    .axis-labels { position: absolute; inset: 81px 0 auto; display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .band-chart { position: relative; margin-top: 18px; padding: 12px 0 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .band-stack { display: flex; flex-direction: column; gap: 3px; }
+    .band-row { position: relative; height: 17px; }
+    .band-row .band-fill { position: absolute; top: 0; height: 100%; border-radius: 3px; transition: left 200ms ease, width 200ms ease; }
+    .band-row.tone-near .band-fill { background: var(--teal-soft); border: 1px solid var(--teal); }
+    .band-row.tone-mid .band-fill { background: var(--blue-soft); border: 1px solid var(--blue); }
+    .band-row.tone-far .band-fill { background: var(--amber-soft); border: 1px solid var(--amber); }
+    .band-row .band-tag { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 6px; color: var(--ink); font-size: 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none; }
+    .axis-labels { display: flex; justify-content: space-between; margin-top: 6px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
     .class-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
     .class-fact { padding-top: 10px; border-top: 2px solid var(--line); }
     .class-fact span { color: var(--muted); font-size: 11px; }
@@ -791,9 +793,32 @@
       </div>
 
       <div class="rule-band">
-        <section><h3>Pressure 门槛</h3><p>持续采样下中位 Flow 与队形，但只在倒计时最后 4 秒进入 Pressure；至少两名有效生还者、无人脆弱、停滞 12 秒且抱团稳定 2 秒才可延长。</p></section>
-        <section><h3>无限延长与恢复</h3><p>16 秒到点仍满足条件便进入 IntensiveCheck，不设最长等待；推进 2%、队形拆组、出现孤立、间距达到 1500 或有人进入脆弱状态，连续 2 秒后立即放波。</p></section>
+        <section><h3>Pressure 门槛</h3><p>持续采样下中位 Flow 与队形，但只在倒计时最后 4 秒进入 Pressure；至少两名有效生还者、<strong>无人脆弱</strong>、停滞 12 秒且抱团稳定 2 秒才可延长。“脆弱”包含被控、倒地、挂边<strong>以及已阵亡</strong>——因此本局一旦有人阵亡，卡点无限延长整局不再生效（有意设计：队伍已减员时不再追加拦波压力）。</p></section>
+        <section><h3>无限延长与恢复</h3><p>16 秒到点仍满足条件便进入 IntensiveCheck，不设最长等待；下中位 Flow 推进 4%（或队伍质心位移 1000u）、队形拆组、出现孤立、间距达到 1500 或有人进入脆弱状态，连续 2 秒后立即放波。</p></section>
         <section><h3 class="red">保守边界</h3><p>Anti-Bait 不绕过距离、视线、卡位与路径硬过滤，也不增加单帧 Nav 预算。高点、瓶颈与 Nav 拓扑暂不作为无限延长硬门槛，避免坏 Nav 造成永久误锁。</p></section>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>事件压力旁路</h2><p>机关、尸潮和终局本身已经是压力，这时 Anti-Bait <strong>整体让位</strong>：<code>EventPressure_ShouldBypassAntiBait()</code> 成立会把状态机 Reset 到 Off，并立刻结束正在进行的无限延长。这一层优先于所有队形与停滞判断。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>触发源</th><th>检测方式</th><th>持续窗口</th></tr></thead>
+          <tbody>
+            <tr><td>地图机关 panic</td><td><code>CDirector::OnMapInvokedPanicEvent</code> detour；detour 不可用时退回 <code>create_panic_event</code></td><td>60 秒滚动窗口</td></tr>
+            <tr><td>警报车</td><td>同一 detour 的 <code>panic_event_reason_t == 1</code></td><td>10 秒</td></tr>
+            <tr><td>panic 游戏事件</td><td><code>create_panic_event</code> 刷新窗口，<code>panic_event_finished</code> 立即清除</td><td>60 秒，每次事件刷新</td></tr>
+            <tr><td>终局</td><td><code>finale_start</code> / <code>finale_radio_start</code> / <code>gauntlet_finale_start</code> / <code>trigger_finale.UseStart</code></td><td>本回合内持续有效</td></tr>
+            <tr><td>Holdout 守点</td><td><code>OnHoldOutBonusStart</code> / <code>OnHoldOutBonusEnd</code></td><td>守点全程</td></tr>
+            <tr><td>c5m2 公园脚本机关</td><td>hook <code>finale_start_trigger</code> 的 OnStartTouch 与 <code>finale_alarm_stop_button</code> 的 OnPressed；插件中途加载时用尸潮监视恢复</td><td>按下停止键后再 5 秒</td></tr>
+            <tr><td>有限尸潮联动</td><td><code>l4d2_horde_equaliser</code> 的 <code>L4D2HordeEqualiser_OnFiniteEventStateChanged</code>；一旦它声明了有限尸潮就成为唯一权威，上面的 panic/脚本兜底全部让路</td><td>由该插件决定</td></tr>
+            <tr><td>外部 horde 状态</td><td>兼容 <code>L4D2_HordeStatus</code> 转发（0 清除 / 1 无限 / 2 警报车 / 3 机关 / 4 终局）</td><td>随状态</td></tr>
+          </tbody>
+        </table>
+        <div class="rule-band">
+          <section><h3>暂停语义</h3><p>暂停期间事件窗口冻结：<code>EventPressure_GetTime()</code> 返回暂停起点，解除暂停时把暂停时长补回所有截止时间。WaveDecider 与 Anti-Bait 的波次时钟同样按暂停时长整体后移。</p></section>
+          <section><h3>延迟释放</h3><p>机关若在<strong>暂停中</strong>触发而当时正处于无限延长，释放会被记为 <code>eventReleasePending</code>，等解除暂停后立刻放波，而不是在暂停中改变波次状态。</p></section>
+          <section><h3>Tank 不是事件</h3><p>Tank 走另一条通道：<code>IsTankPressureActive()</code>（默认 1200u 内有 Tank）让 Anti-Bait 进入 <code>Paused</code>；远处的 Tank 不解除保持。</p></section>
+          <section><h3>残局低血无药</h3><p>所有站立生还者的实血都低于 <code>inf_antibait_lowhp</code>（默认 40），并且存活队员（含倒地）都没有医疗包、电击器、止痛药或针时，同样进入 <code>Paused</code>。倒地血不是实血。阈值设为 0 可关闭这条。</p></section>
+        </div>
       </div>
     </section>
 
@@ -809,7 +834,7 @@
       <div class="queue-workspace">
         <section class="class-selector">
           <h3>查看职业策略</h3>
-          <p>主区间失败后分五次逐步放宽，不再从近距离直接跳到最终上限。</p>
+          <p>共 10 档：主区间失败后分九次逐步放宽，每档只向远端多推一小环，职业最小距离全程不变。</p>
           <div class="class-buttons" id="class-buttons">
             <button class="class-button" type="button" data-class="smoker">Smoker<small>控制 / 远距离</small></button>
             <button class="class-button" type="button" data-class="boomer">Boomer<small>支援 / 后手</small></button>
@@ -824,21 +849,34 @@
           <div class="class-title-row"><h2 id="class-title">Smoker</h2><span class="class-role" id="class-role"></span></div>
           <p class="subtitle" id="class-copy"></p>
           <div class="band-chart" aria-label="职业距离带图">
-            <div class="band-axis"></div>
-            <div class="band-block stage-5" id="band-stage-5"><span></span></div>
-            <div class="band-block stage-4" id="band-stage-4"><span></span></div>
-            <div class="band-block stage-3" id="band-stage-3"><span></span></div>
-            <div class="band-block stage-2" id="band-stage-2"><span></span></div>
-            <div class="band-block stage-1" id="band-stage-1"><span></span></div>
-            <div class="band-block stage-0" id="band-stage-0"><span></span></div>
+            <div class="band-stack" id="band-stack"></div>
             <div class="axis-labels"><span>250</span><span>800</span><span>1350</span><span>1900</span><span>2450</span><span>3000</span></div>
           </div>
           <div class="class-facts">
             <div class="class-fact"><span>主区间</span><strong id="class-main-band"></strong></div>
+            <div class="class-fact"><span>扩圈环宽</span><strong id="class-ring"></strong></div>
             <div class="class-fact"><span>队列角色</span><strong id="class-gate"></strong></div>
             <div class="class-fact"><span>破点波处理</span><strong id="class-breach"></strong></div>
           </div>
         </section>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>选类不是纯确定性的</h2><p>纯稀缺度排序会让每波的出场顺序固定可背。当前实现在硬边界之上叠了三层随机，只打散“接近平局”的职业，不会让饱和职业插队。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>机制</th><th>CVar / 默认值</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td>稀缺度抖动</td><td><code>inf_class_scarcity_jitter</code> = 0.06</td><td>给每个职业的预计占用率加 ±0.06 噪声；只够翻转占用率相近的两个职业。</td></tr>
+            <tr><td>平局游标</td><td>每波随机起点，成功入队后推进一格</td><td>占用率完全相同时不再总是从 Smoker 开始轮转。</td></tr>
+            <tr><td>支援闸门随机放宽</td><td><code>inf_support_gate_waive_prob</code> = 0.15</td><td>每波 15% 概率整波取消 Boomer/Spitter 的后手门控，破点波除外。</td></tr>
+            <tr><td>开波杀手微倾斜</td><td>波龄 &lt; 1.0s 时杀手类占用率 −0.05</td><td>让第一只更可能是控制型，但不是硬规则。</td></tr>
+          </tbody>
+        </table>
+        <div class="rule-band">
+          <section><h3>支援门控本体</h3><p>需要 <code>floor(l4d_infected_limit × inf_support_unlock_ratio)</code>（6 特默认 = 2）个 Smoker/Hunter/Jockey/Charger 已存活或已入队，Boomer/Spitter 才解锁；<code>inf_support_unlock_grace</code> = 1.0 秒后强制放行，避免完全饿死。</p></section>
+          <section><h3>释放时机</h3><p>队首若是支援类，还要过 <code>Tactical_CanReleaseSupport</code>：本波压制类已刷够、或已发生交战、或首只压制类落位后 0.55 秒（破点波 0.75）、或波龄超过 0.90 秒（破点波 1.50）强制放行。</p></section>
+          <section><h3>死亡冷却双保险</h3><p>同类死亡后杀手 1.0s / 支援 2.0s 内不补位；但 <code>inf_DeathCooldown_BypassAfter</code>（1.5s 没成功刷出）或 <code>inf_DeathCooldown_Underfill</code>（场上不足上限的 50%）任一成立就整体放宽。</p></section>
+        </div>
       </div>
 
       <div class="queue-pipeline" aria-label="队列构建流程">
@@ -884,13 +922,58 @@
           <p id="nav-step-copy"></p>
           <div class="nav-metrics">
             <div><span>每切片 Nav 检查</span><strong>默认 512，可热调</strong></div>
-            <div><span>每切片昂贵检查</span><strong>默认 16，可热调</strong></div>
+            <div><span>每切片昂贵检查</span><strong>默认 24，可热调</strong></div>
             <div><span>切片软预算</span><strong>默认 2.0ms，可热调</strong></div>
             <div><span>快照热刷新</span><strong>0.1 秒</strong></div>
             <div><span>快照有效期</span><strong>0.2 秒</strong></div>
+            <div><span>评分名额</span><strong>默认 11（近 6 / 中 5 / 远 1）</strong></div>
+            <div><span>档内三分位</span><strong>环宽 ≥ 240u 才启用</strong></div>
           </div>
           <a class="deep-link" href="nav_spawn_pipeline.html">打开 Nav 专题动画与权重实验室</a>
         </aside>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>分散度是四层叠加，不是一条规则</h2><p>“别老在同一个地方刷”由几个互相独立的机制共同保证：一部分是硬拒绝（直接淘汰候选），一部分是软扣分（只影响排序）。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>层</th><th>类型</th><th>参数</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>同 Nav 冷却</td><td>硬拒绝</td><td><code>NAV_CD_SECS</code> = 1.0s</td><td>成功刷出、实际生成失败、导演兜底点都会给该 areaIdx 上 1 秒冷却；冷却中的 Nav 在取随机点之前就退出。</td></tr>
+            <tr><td>实际落点硬分散</td><td>硬拒绝</td><td><code>inf_spawn_sep_radius</code> = 120（按上限缩放），<code>inf_spawn_sep_ttl</code> = 1.5s</td><td>按<strong>实际出生坐标</strong>而非请求点记忆最近若干次刷出；新候选落在半径内直接淘汰。上限越高半径收得越小。</td></tr>
+            <tr><td>核密度扣分</td><td>软扣分</td><td><code>inf_spawn_kernel_radius</code> = 280，<code>inf_spawn_kernel_points</code> = 30</td><td>对存活特感（权重 1.0）和最近刷点（权重 0.5）按 exp(−d/r) 累加密度，扣分 = 30 × min(密度, 1.5)。连续量，没有扇区那样的台阶。</td></tr>
+            <tr><td>波内扇区配额</td><td>硬拒绝</td><td><code>inf_spawn_sector_quota_bonus</code> = 1，−1 关闭</td><td>以目标生还者为圆心分扇区（<code>GetCurrentSectors()</code>，6 特 = 4 个，动态 3～8），每扇区本波配额 = ceil(上限/扇区数)+1。<strong>只约束前 2/3 的距离档</strong>（10 档时 0–6），后 1/3 远档放开以保证按时刷出。</td></tr>
+            <tr><td>最近扇区扣分</td><td>软扣分</td><td>最近 3 次扇区 −70 / −45 / −25</td><td>再乘 <code>PenLimitScale</code>（上限越高惩罚越弱），避免高特上限时把方向锁死。</td></tr>
+            <tr><td>Flow 桶占用上限</td><td>硬拒绝</td><td><code>inf_spawn_bucket_ratio</code> = 0.50</td><td>同一 Flow 进度桶内同时存活的特感不得超过 ceil(上限 × 0.50)（6 特 = 3）；桶计数按 <code>inf_BucketCountCacheTTL</code> = 0.2s 缓存。</td></tr>
+            <tr><td>页内洗牌</td><td>顺序</td><td><code>inf_spawn_candidate_shuffle</code> = 1</td><td>有向候选分页读取后在档内洗牌，打散“永远先评估最近一簇”的偏置；ranked 高点通道保序不洗。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>高点：一个起点、一个参考面、可落下折算</h2><p>Smoker / Hunter 的高点偏好由三处机制表达。它们<strong>共用一个起点</strong>（<code>inf_nav_high_sort_min_height</code> = 64）和<strong>一个参考面</strong>（目标眼位），同层平地不再获得任何高度奖励。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>机制</th><th>作用</th><th>Smoker</th><th>Hunter</th></tr></thead>
+          <tbody>
+            <tr><td>Nav 距离折减</td><td>让高点在同一档距离带内也能被接受</td><td>×1.5，上限 1000u</td><td>×1.15，上限 450u</td></tr>
+            <tr><td>ranked 排序折减</td><td>把高点前置，确保它挤进有限的评分名额</td><td><code>inf_nav_high_sort_scale</code> 0.85</td><td>0.95</td></tr>
+            <tr><td>最终分高点奖励</td><td>同等安全的候选之间偏好高点</td><td colspan="2">每满 50u 加 <code>inf_score_high_height_per_50</code>=3 分，上限 <code>inf_score_high_height_cap</code>=20</td></tr>
+            <tr><td>可落下折算</td><td>「高但下不去」拿不到满额奖励</td><td>下不去保留 50%</td><td>下不去保留 25%</td></tr>
+          </tbody>
+        </table>
+        <div class="rule-band">
+          <section><h3>可落下质量怎么算</h3><p>从候选点向下 Trace 最多 480u 找可站落点，再取落点到最近生还者的距离：≥450u 记 0，落在人身上记 1，中间线性。屋顶下方 480u 内没有落点（例如高塔顶）直接记 0——这正是「太高反而没用」的表达。这次 Trace 每个候选只做一次，高度分和高点奖励共用同一份结果。</p></section>
+          <section><h3>为什么上限只有 20</h3><p>最终分会被钳到 100。历史默认是 6 分/50u、上限 100，导致高于目标 ~190u 的优秀候选、~590u 的<strong>较差</strong>候选全部并列 100 分，距离/Flow/分散/战术分被整体抹掉。3 分/50u、上限 20 让它退回「同等条件下的决胜项」，优秀与较差候选在任何高度都保持约 17 分差距。</p></section>
+          <section><h3>并列决胜</h3><p>候选择优用 <code>±0.01</code> 容差判断并列；最终分并列时改比 <code>weightedQuality</code>（未加高点奖励的四因子加权分），而不是取扫描顺序里的第一个。</p></section>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>落点预测：请求点通过不等于真的能刷</h2><p>ZombieManager 会把请求原点向下吸附（常见约 10u，边缘几何上更多）。因此安全检查都对<strong>预测落点</strong>再跑一遍，而不是只信请求点。</p></div>
+        <div class="rule-band">
+          <section><h3>可见性</h3><p><code>IsPredictedSpawnLandingVisible</code> 先固定检查 −10u；再向下 trace 求真实落地点；trace 拿不到稳定命中时补采样 −2 / −4 / −6u。任一样本可见即拒绝。</p></section>
+          <section><h3>伤害区域</h3><p><code>IsPredictedSpawnLandingInHurtTrigger</code> 用玩家 hull 与所有 <code>trigger_hurt</code> / <code>trigger_hurt_ghost</code> 做 AABB 相交，并额外探到 −40u；实体列表每秒刷新一次并跳过 <code>m_bDisabled</code>。</p></section>
+          <section><h3>卡位</h3><p><code>WillStuck</code> 用 16×16×71 的 hull 原地 trace；过滤器放行 blockType 1/2 的 <code>env_physics_blocker</code>（只挡生还者的隐形墙）。</p></section>
+        </div>
       </div>
     </section>
 
@@ -898,7 +981,7 @@
       <div class="section-head">
         <div>
           <div class="eyebrow">Failure handling</div>
-          <h2>有向 Nav 六档耗尽后，使用受限导演 API</h2>
+          <h2>有向 Nav 十档耗尽后，使用受限导演 API</h2>
           <p>选择场景查看失败游标。一个距离带处于 <code>Pending</code> 时不会误判失败、不会放宽；只有该带候选完整耗尽才进入下一带。</p>
         </div>
       </div>
@@ -910,20 +993,24 @@
       </div>
       <div class="fallback-ladder" id="fallback-ladder">
         <div class="fallback-step" data-fallback-step="0"><strong>职业主区间</strong><span>每个职业直接进入自己的最佳距离带</span></div>
-        <div class="fallback-step" data-fallback-step="1"><strong>放宽 1</strong><span>只扫描主区间上限之后的新 Nav</span></div>
-        <div class="fallback-step" data-fallback-step="2"><strong>放宽 2</strong><span>继续小步提高路径上限</span></div>
-        <div class="fallback-step" data-fallback-step="3"><strong>放宽 3</strong><span>仍不重复处理已失败近端</span></div>
-        <div class="fallback-step" data-fallback-step="4"><strong>放宽 4</strong><span>进入职业中远距离范围</span></div>
-        <div class="fallback-step" data-fallback-step="5"><strong>最终区间</strong><span>最小距离不变，上限受 SpawnMax × 2 约束</span></div>
-        <div class="fallback-step constrained" data-fallback-step="6"><strong>Director API × 7</strong><span>请求点距最近生还者不得超过 2000u</span></div>
-        <div class="fallback-step" data-fallback-step="7"><strong>Director API × 12</strong><span>首段无点时提高导演内部尝试数</span></div>
-        <div class="fallback-step" data-fallback-step="8"><strong>轮换目标</strong><span>改用其他生还者的目标 Nav 重新搜索</span></div>
-        <div class="fallback-step api" data-fallback-step="9"><strong>失败周期退避</strong><span>默认 0.10 秒后从主区间重试</span></div>
+        <div class="fallback-step" data-fallback-step="1"><strong>放宽 1</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="2"><strong>放宽 2</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="3"><strong>放宽 3</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="4"><strong>放宽 4</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="5"><strong>放宽 5</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="6"><strong>放宽 6</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="7"><strong>放宽 7</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="8"><strong>放宽 8</strong><span>只扫描上一档上界之后的新 Nav，不重复已失败的近端</span></div>
+        <div class="fallback-step" data-fallback-step="9"><strong>最终区间</strong><span>最小距离不变，上限受 SpawnMax × 2 约束</span></div>
+        <div class="fallback-step constrained" data-fallback-step="10"><strong>Director API × 7</strong><span>请求点距最近生还者不得超过 2000u</span></div>
+        <div class="fallback-step" data-fallback-step="11"><strong>Director API × 12</strong><span>连续 2 个失败周期后提高导演内部尝试数</span></div>
+        <div class="fallback-step" data-fallback-step="12"><strong>轮换目标</strong><span>改用其他生还者的目标 Nav 重新搜索（普通队列最多 3 次）</span></div>
+        <div class="fallback-step api" data-fallback-step="13"><strong>失败周期退避</strong><span>默认 0.10 秒后从主区间重试</span></div>
       </div>
 
       <div class="fallback-note">
-        <section><h3>API 距离契约</h3><p>Director 请求点距任一存活生还者的最近三维距离不得超过 2000u；仍不复核有向路径、职业距离、可见性、stuck、伤害区域或 250 直线下限。</p></section>
-        <section><h3>实体确认</h3><p>API 生成后确认职业、存活和短暂稳定存在，并按实际落点再次检查 2000u 上限。</p></section>
+        <section><h3>API 点的复核范围</h3><p>导演给的点<strong>会</strong>复核：距全队最近眼位 ≤ 2000u、≥ max(250, SpawnMin)+16（传送模式再取 TeleportMin）、硬分散半径、卡位、可见性、预测落点可见性、预测落点伤害区域。<strong>不</strong>复核：有向路径可达性、职业距离带、Flow 后点、Nav 冷却、Flow 桶占用与扇区配额——兜底的意义就是绕开这些质量约束。</p></section>
+        <section><h3>创建即提交</h3><p>当前刷特路径没有 pending 校验窗口：<code>L4D2_SpawnSpecial</code> 返回有效 index 即计入 siAlive/totalSI 并触发 <code>InfectedControl_OnSpawnCommitted</code>。2000u 上限只在<strong>请求点</strong>上判定，生成后不再按实际落点复核。</p></section>
         <section><h3>失败恢复</h3><p>两段 API 都无点时轮换目标；目标轮完后按默认 0.10 秒退避，再从职业主区间开始。</p></section>
       </div>
 
@@ -937,6 +1024,25 @@
           <section><span>05</span><h3>OnGameFrame 优先</h3><p><code>TryTeleportSpawnOnce</code> 先于普通队列执行，并应用 TeleportMin。</p></section>
           <section><span>06</span><h3>重新选目标</h3><p>每次 tick 结束更新目标生还者，避免长期绑定过期目标。</p></section>
         </div>
+
+        <div class="subsection-head" style="margin-top:22px"><h2>回收阈值一览</h2><p>“连续不可见秒数”是唯一的累加量；下表决定它何时归零、何时暂停累加，以及需要攒到多少。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>条件</th><th>对隐身计时的影响</th><th>参数</th></tr></thead>
+          <tbody>
+            <tr><td>被任一生还者看见</td><td><strong>归零</strong></td><td>倒地/挂边视线可按 <code>inf_IgnoreIncappedSurvivorSight</code> = 1 忽略</td></tr>
+            <tr><td>距最近生还者 &lt; SpawnMin</td><td><strong>归零</strong>（近距离交战不算落后）</td><td><code>inf_SpawnDistanceMin</code> = 250</td></tr>
+            <tr><td>已跑到队伍最高进度前方</td><td><strong>归零</strong></td><td>按 Flow 桶百分比判定</td></tr>
+            <tr><td>出生宽限期内</td><td><strong>归零</strong></td><td><code>inf_TeleportSpawnGrace</code> = 2.5s；出生时间未知按“早已出生”处理，避免永久免疫</td></tr>
+            <tr><td>正在控人</td><td><strong>暂停</strong>（保留已累计）</td><td>—</td></tr>
+            <tr><td>Spitter 刚喷酸</td><td><strong>暂停</strong></td><td><code>SPIT_INTERVAL</code> = 2.0s</td></tr>
+            <tr><td>Smoker 舌头未就绪</td><td><strong>继续累加但不踢</strong></td><td>需要 <code>ai_smoker_new</code>；技能就绪后立刻可传，不必重新攒</td></tr>
+            <tr><td>Tank / ghost / 待踢</td><td><strong>归零并跳过</strong></td><td>Tank 永不进入传送队列</td></tr>
+            <tr><td colspan="3"><strong>需要攒到的秒数</strong>：取以下最小值，且不低于 <code>MIN_TELEPORT_SECONDS</code> = 0.8s</td></tr>
+            <tr><td>常规</td><td><code>inf_TeleportCheckTime</code></td><td>默认 5 秒</td></tr>
+            <tr><td>跑男快通道</td><td><code>inf_TeleportRunnerFast</code></td><td>1.5 秒；仅在传送队列为空时生效</td></tr>
+            <tr><td>Anti-Bait 快传</td><td><code>inf_antibait_fast_tp</code></td><td>1.5 秒；需 <code>inf_antibait_action</code> = 2、已进入 Pressure、且已过基础刷新间隔</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -995,6 +1101,36 @@
         <section class="life-step"><span>05 · End / MapEnd</span><h3>关闭句柄</h3><p>停止 timers、搜索会话、路径缓存与数据库，避免跨图残留。</p></section>
       </div>
 
+      <div class="subsection">
+        <div class="subsection-head"><h2>运行时看门狗：刷特停摆会自愈</h2><p><code>RuntimeWatchdog</code> 挂在 <code>OnGameFrame</code> 上、每 1 秒跑一次。它不参与找位，只负责发现“本该在刷特却没在刷”的状态并纠正。排障时先看日志里的 <code>[IC][RECOVERY]</code> 与 <code>[IC][RUNTIME]</code>。</p></div>
+        <table class="budget-table">
+          <thead><tr><th>检测项</th><th>判据</th><th>动作</th></tr></thead>
+          <tbody>
+            <tr><td>首波丢失</td><td>生还者已出安全区但没有首波 timer</td><td>重新 <code>RequestStartSpawn</code></td></tr>
+            <tr><td>首波超时</td><td>首波 timer 挂了 5 秒还没触发</td><td>杀掉旧 timer 并重新排程</td></tr>
+            <tr><td>波状态 timer 失效</td><td>句柄无效，或心跳超过 3.5 秒没更新</td><td>重建 1 秒波 timer，<strong>不重置波次计时</strong></td></tr>
+            <tr><td>传送 monitor 失效</td><td>同上，且 <code>inf_TeleportSi</code> = 1</td><td>重建传送 monitor</td></tr>
+            <tr><td>队列越界</td><td>pending 预算为负、超过上限，或队列长度大于预算</td><td>钳回区间并裁剪队列</td></tr>
+            <tr><td>特感计数漂移</td><td>实际在场特感数与 <code>totalSI</code> 连续 2 tick 不一致</td><td><code>RecalcSiCapFromAlive</code> 全量重算</td></tr>
+            <tr><td>波状态整体失效</td><td>waveIndex ≤ 0、波起始时间为 0、或 WaveDecider 处于 Idle（且未暂停）</td><td>硬恢复：StopAll 后重新开波，10 秒冷却防抖</td></tr>
+          </tbody>
+        </table>
+        <div class="rule-band">
+          <section><h3>启动闸门</h3><p><code>RequestStartSpawn</code> 需要同时满足：回合活跃、地图未结束、未被 <code>sm_stopspawn</code> 抑制、回合已稳定 2 秒、且至少有一名可移动（未倒地）的生还者。被拦下时每秒最多打一条 <code>Start request blocked</code>。</p></section>
+          <section><h3>幂等清理</h3><p>所有 <code>TIMER_FLAG_NO_MAPCHANGE</code> 的 timer 都通过 <code>StopTrackedTimer</code> 先摘引用再 KillTimer，并在回调里比对自身句柄，因此地图切换时的重复清理是安全的。</p></section>
+          <section><h3>临时态实体</h3><p>已进入踢出队列的特感在任何全图清点里都被跳过（<code>SpawnAttempts_IsTransientSpawnClient</code>），否则传送回收的瞬间会被计两次、提前打满上限。</p></section>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head"><h2>职业上限镜像</h2><p>投票和管理员改职业上限时不直接写引擎 cvar，而是走一层镜像，避免和地图配置互相覆盖。这也是“我改了 <code>z_hunter_limit</code> 怎么没生效”的答案。</p></div>
+        <div class="rule-band">
+          <section><h3>镜像 CVar</h3><p><code>inf_smoker_limit</code> / <code>inf_boomer_limit</code> / <code>inf_hunter_limit</code> / <code>inf_spitter_limit</code> / <code>inf_jockey_limit</code> / <code>inf_charger_limit</code>，默认全部 <code>-1</code> = 跟随对应的 <code>z_*_limit</code>。</p></section>
+          <section><h3>命令监听</h3><p>插件监听 <code>sm_cvar z_*_limit &lt;n&gt;</code>，把值同步写进镜像。一旦某个职业的镜像被写成 ≥ 0，它就<strong>永久接管</strong>该职业上限，之后直接改引擎 cvar 不再生效，需要把镜像改回 <code>-1</code>。</p></section>
+          <section><h3>z_max_player_zombies</h3><p>插件按 <code>l4d_infected_limit</code>（内鬼 Tank 开启时 +1）设定它的上界并强制写值；每秒检查一次，被外部插件改大会被拉回。</p></section>
+        </div>
+      </div>
+
       <div class="perf-grid">
         <section>
           <div class="subsection-head"><h2>热路径预算</h2><p>高特上限时主要靠固定单帧预算稳定峰值，而不是靠降低刷特频率。</p></div>
@@ -1004,8 +1140,8 @@
               <tr><td>OnGameFrame 节流</td><td>活跃 / 空闲使用不同 think step</td><td>没有刷特工作时近似零成本。</td></tr>
               <tr><td>普通队列补位</td><td>缺口存在时最短 0.25 秒重试</td><td>避免每帧重新扫描职业容量。</td></tr>
               <tr><td>Nav 检查</td><td>每切片默认最多 512 个，可热调</td><td>大量便宜距离淘汰可以在同帧快速越过。</td></tr>
-              <tr><td>昂贵检查</td><td>每切片默认最多 16 个，并受默认 2.0ms 软预算限制</td><td>控制 hull、可见性和 path 峰值。</td></tr>
-              <tr><td>候选比较</td><td>当前 Tick 最多比较 8 个合格点</td><td>本帧选最高分，不跨 Tick 保存评分结果。</td></tr>
+              <tr><td>昂贵检查</td><td>每切片默认最多 24 个（<code>inf_spawn_nav_expensive_per_slice</code>），并受默认 2.0ms 软预算限制</td><td>控制 hull、可见性和 path 峰值。</td></tr>
+              <tr><td>候选比较</td><td><code>inf_spawn_candidate_budget</code> 12 + 难度档加成（<code>-3 -2 -1 0 0 0</code>），再由 <code>NAV_SCAN_SCORE_BUDGET_CAP</code> 封顶 12；默认回退档 3 = 11 个</td><td>本帧选最高分，不跨 Tick 保存评分结果。</td></tr>
               <tr><td>会话寿命</td><td>距离带完整耗尽前保存分页游标</td><td>预算到点返回 Pending，下一帧继续而不是提前放宽。</td></tr>
               <tr><td>眼位与朝向</td><td>每个实际刷特帧快照一次</td><td>距离、视线和战术评分同 Tick 复用。</td></tr>
               <tr><td>性能观测</td><td>6/8/10/12/14+ 分组分位数</td><td>区分候选构建、最大切片和最终 API。</td></tr>
@@ -1056,7 +1192,7 @@
     </section>
 
     <footer>
-      <span>实现依据：<code>optional/AnneHappy/infected_control.sp</code> 及其 <code>infected_control/*.inc</code> 模块</span>
+      <span>对照源码版本：<code>2026-08-18.1</code>（TACTICAL_BAND_STAGES = 10）。实现依据：<code>optional/AnneHappy/infected_control.sp</code> 及其 <code>infected_control/*.inc</code> 模块</span>
       <span>专题页：<a href="nav_spawn_pipeline.html">Nav 刷特管线、权重反馈与优化方案</a></span>
     </footer>
   </main>
@@ -1080,14 +1216,30 @@
         { channel: '事件回写通道', title: '冷却与位置记忆', copy: '当前实现不使用历史 Nav 权重重排。成功点写入短期 Nav 冷却和实际坐标分散记忆；pending 点先预留同 Nav 与邻近位置，防止同帧密集生成。', entry: '候选结果 / 实际实体确认', read: 'areaIdx、NavID、请求点、实际点、当前时间', write: 'Nav cooldown、pending reservation、lastSpawns、path cache', module: 'spawn_memory.inc / path_cache.inc' }
       ];
 
+      // 与 spawn_tactics.inc::Tactical_GetClassBandProfile 一一对应：只存三个
+      // 锚点(最小距离 / 主区间上界 / 最远上界)，各档上界由页面按
+      //   baseMax + (finalMax - baseMax) * stage / (BAND_STAGES - 1)
+      // 现算，改代码时只需要同步这三个数。上界再统一受 SpawnMax x 2 截断。
+      const BAND_STAGES = 10;              // TACTICAL_BAND_STAGES
+      const BAND_HARD_MAX = 3000;          // inf_SpawnDistanceMax(1500) * NAV_PATH_DISTANCE_SCALE(2)
       const classData = {
-        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', bands: [[500,1200],[500,1500],[500,1800],[500,2100],[500,2550],[500,3000]], copy: '高出目标眼位 32 后仍按 1.5 倍高度差折减有效 Nav 距离，最多 1000；另按目标脚高每满 50u 直接增加 6 个最终分。原始排序、职业 500 下限和直线 250 安全线不变。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
-        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', bands: [[250,550],[250,750],[250,1000],[250,1400],[250,1850],[250,2300]], copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
-        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', bands: [[350,950],[350,1250],[350,1500],[350,1750],[350,2300],[350,2900]], copy: '高出目标眼位 32 后仍按 1.15 倍高度差折减有效 Nav 距离，最多 800；另按目标脚高每满 50u 直接增加 6 个最终分。职业 350 下限不随放宽下降。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
-        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', bands: [[300,800],[300,1050],[300,1250],[300,1450],[300,1850],[300,2300]], copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下；职业 300 下限固定，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
-        jockey: { name: 'Jockey', role: '控制型 / 中近切割', bands: [[250,700],[250,900],[250,1100],[250,1250],[250,1700],[250,2200]], copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
-        charger: { name: 'Charger', role: '控制型 / 中近突破', bands: [[250,700],[250,900],[250,1100],[250,1250],[250,1700],[250,2200]], copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
+        smoker: { name: 'Smoker', role: '控制型 / 远距离切割', min: 500, base: 1200, final: 3000, copy: '高点三件套统一以「高于目标<b>眼位</b> inf_nav_high_sort_min_height(64)」为起点：① 按 1.5 倍高度差折减有效 Nav 距离，最多 1000；② inf_nav_high_sort_scale 0.85 把高点前置进有限的评分名额；③ 最终分每满 50u 加 3 分、上限 20，再乘可落下折算（下不去时保留 50%）。职业 500 下限和直线 250 安全线不变。', gate: '压力职业，优先解锁支援', breach: '前置，外拉与侧后方优先' },
+        boomer: { name: 'Boomer', role: '支援型 / 近距离后手', min: 250, base: 550, final: 2300, copy: '一打就死且开局枪线集中，不适合作为第一只落位；等待控制型特感或交战信号后再放行。不参与高点排序折减。', gate: '支援门控 + 强制超时', breach: '后置，不抢首批枪线' },
+        hunter: { name: 'Hunter', role: '控制型 / 中远突袭', min: 350, base: 850, final: 2600, copy: '同样以高于目标<b>眼位</b> 64 为起点：① 按 1.15 倍高度差折减有效 Nav 距离，最多 450；② inf_nav_high_sort_scale 0.95；③ 最终分每满 50u 加 3 分、上限 20，再乘可落下折算——Hunter 的价值几乎全在能不能扑下去，所以下不去时只保留 25%。职业 350 下限不随放宽下降。', gate: '压力职业，优先解锁支援', breach: '前置，侧后方优先' },
+        spitter: { name: 'Spitter', role: '支援型 / 中距离封路', min: 300, base: 800, final: 2300, copy: '和 Boomer 一样避免最开始独自暴露在集中枪线下；职业 300 下限固定，后手评分偏向抱团质心附近的范围覆盖。', gate: '支援门控 + 强制超时', breach: '后置，范围覆盖优先' },
+        jockey: { name: 'Jockey', role: '控制型 / 中近切割', min: 250, base: 550, final: 2000, copy: '偏近的 Nav 路径距离制造位移和队形破坏，破点波优先从抱团队伍边缘目标切入。后点硬拒绝比全局更紧：dF&lt;-4 即淘汰。', gate: '压力职业，优先解锁支援', breach: '前置，边缘目标优先' },
+        charger: { name: 'Charger', role: '控制型 / 中近突破', min: 250, base: 600, final: 2000, copy: '近中的 Nav 路径距离寻找直线突破机会，战术分偏向从队伍内侧把边缘目标推出队形。后点硬拒绝同样是 dF&lt;-4。', gate: '压力职业，优先解锁支援', breach: '前置，向外推离优先' }
       };
+
+      function classBands(item) {
+        const out = [];
+        for (let stage = 0; stage < BAND_STAGES; stage += 1) {
+          let hi = item.base + (item.final - item.base) * stage / (BAND_STAGES - 1);
+          hi = Math.min(Math.round(hi), BAND_HARD_MAX);
+          out.push([item.min, hi]);
+        }
+        return out;
+      }
 
       const stateData = {
         wave: {
@@ -1103,13 +1255,13 @@
           Observe: '持续采样下中位数 Flow、队伍扩散和跑男差距，确认是否真的停滞。',
           Pressure: '倒计时临近到点，停滞与队形条件稳定成立；到点可转入无限延长，并可准备破点策略。',
           Recover: '团队重新推进后的稳定观察期，避免单次 Flow 抖动频繁切换。',
-          Paused: 'Tank、游戏暂停或至少半数生还者倒地时冻结。解除后扣除暂停时长并恢复先前状态。'
+          Paused: 'Tank、游戏暂停或至少半数生还者倒地时冻结；全员低实血且无药是额外一条暂停条件。解除后扣除暂停时长并恢复先前状态。'
         }
       };
 
       const navData = [
         ['有向图快照', 'worker 从目标 Nav 反向遍历有向边并构建距离场；250 直线范围内的 Nav 可做路径中间节点，但不会作为候选返回。'],
-        ['原始路径分页', '扩展按 candidate → target 的原始有向路径距离升序返回候选。高点不会改变整张快照顺序；兼容日志中的 navRank 当前恒等于 navDistance。'],
+        ['原始路径分页', '扩展按 candidate → target 的有向路径距离升序返回候选。Smoker/Hunter 走 ranked 通道：<code>inf_nav_high_sort_scale</code>(默认 0.85 / 0.95) 会把高于目标 64u 以上的候选按折减后的距离前置，让高点挤进有限的评分名额；范围判定仍用原始路径距离。其余职业 scale = 1.00，navRank 恒等于 navDistance。'],
         ['跨帧页游标', '跨帧只保留 areaIdx、navDistance 的消费位置和诊断计数；随机点、安全结论与本帧最佳候选不会跨 tick。'],
         ['全队眼位快照', '每个实际刷特帧只读取一次眼位、左右视点和朝向；同 Tick 距离、视线与战术评分复用。'],
         ['Flags / Flow / 冷却 / 桶占用', '安全屋、救援等无效 flags、dF&lt;-8 的后点、最近使用 Nav 和已拥挤 Flow 桶在随机采样前退出。'],
@@ -1117,7 +1269,7 @@
         ['Nav 范围 / 高点补偿 / 直线 250', '职业硬边界使用有向 Nav 距离；Smoker/Hunter 高点按有限补偿后的有效距离判断上限，随机点仍执行全队三维直线 250 安全排除。'],
         ['Hull + 可见性', '候选先通过卡位检查，再用精确视线判断防止当面生成；当前实现没有 PVS 粗筛。'],
         ['Nav path', '只对前面全部通过的点构建路径；会话缓存目标起点，path cache 复用量化后的结果。'],
-        ['统一职业评分', '距离、高度、Flow、分散度先按职业权重归一为质量分，再混合 10% 战术分（破点波 18%）；之后 Smoker/Hunter 每高 50u 加 6 分，每落后 1% 扣 2 分，全职业每低 50u 扣 5 分且后点翻倍。']
+        ['统一职业评分', '距离、高度、Flow、分散度先按职业权重归一为质量分，再混合 10% 战术分（破点波 18%）；之后 Smoker/Hunter 自「高于目标眼位 64」起每满 50u 加 3 分、上限 20 并乘可落下折算，Flow 每落后 1% 扣 2 分（Hunter/Jockey/Charger ×2.5），每低于目标<b>脚部</b> 50u 扣 5 分且落后时翻倍（上限 100）。最终分 ≤ 0 一律拒绝；并列时比未加高点奖励的加权质量分。']
       ];
 
       const traitorData = [
@@ -1179,21 +1331,37 @@
 
       function renderClass(key) {
         const item = classData[key];
+        const bands = classBands(item);
         document.querySelectorAll('.class-button').forEach(button => button.setAttribute('aria-pressed', button.dataset.class === key ? 'true' : 'false'));
         document.getElementById('class-title').textContent = item.name;
         document.getElementById('class-role').textContent = item.role;
-        document.getElementById('class-copy').textContent = item.copy;
-        document.getElementById('class-main-band').textContent = `${item.bands[0][0]}–${item.bands[0][1]}`;
+        document.getElementById('class-copy').innerHTML = item.copy;
+        document.getElementById('class-main-band').textContent = `${bands[0][0]}–${bands[0][1]}`;
+        document.getElementById('class-ring').textContent =
+          `${Math.round((item.final - item.base) / (BAND_STAGES - 1))}u / 档`;
         document.getElementById('class-gate').textContent = item.gate;
         document.getElementById('class-breach').textContent = item.breach;
-        item.bands.forEach((band, index) => {
-          const el = document.getElementById(`band-stage-${index}`);
+
+        const stack = document.getElementById('band-stack');
+        stack.textContent = '';
+        bands.forEach((band, index) => {
+          const ratio = index / (BAND_STAGES - 1);
+          const row = document.createElement('div');
+          row.className = `band-row ${ratio < 0.34 ? 'tone-near' : ratio < 0.67 ? 'tone-mid' : 'tone-far'}`;
+          const fill = document.createElement('div');
+          fill.className = 'band-fill';
           const left = ((band[0] - 250) / 2750) * 100;
           const width = ((band[1] - band[0]) / 2750) * 100;
-          el.style.left = `${left}%`;
-          el.style.width = `${Math.max(width, 8)}%`;
-          const label = index === 0 ? '主' : index === item.bands.length - 1 ? '最终' : `放宽 ${index}`;
-          el.querySelector('span').textContent = `${label} ${band[0]}–${band[1]}`;
+          fill.style.left = `${left}%`;
+          fill.style.width = `${Math.max(width, 2)}%`;
+          const tag = document.createElement('div');
+          tag.className = 'band-tag';
+          tag.style.left = `${left}%`;
+          const label = index === 0 ? '主区间'
+            : index === BAND_STAGES - 1 ? '最终区间' : `放宽 ${index}`;
+          tag.textContent = `${label}  ${band[0]}–${band[1]}`;
+          row.append(fill, tag);
+          stack.append(row);
         });
       }
 
@@ -1207,7 +1375,7 @@
       }
 
       function renderFallback(scenario) {
-        const last = scenario === 'main' ? 0 : scenario === 'constrained' ? 6 : 9;
+        const last = scenario === 'main' ? 0 : scenario === 'constrained' ? 10 : 13;
         document.querySelectorAll('#fallback-controls button').forEach(button => button.setAttribute('aria-pressed', button.dataset.fallback === scenario ? 'true' : 'false'));
         document.querySelectorAll('.fallback-step').forEach(step => {
           const index = Number(step.dataset.fallbackStep);

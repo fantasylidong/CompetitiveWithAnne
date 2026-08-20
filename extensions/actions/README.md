@@ -18,6 +18,12 @@ the complete listener entry on destruction, defers cleanup safely across nested
 callbacks, prunes empty listener maps, and removes pending markers before directly
 deleting candidate Actions. The extension identifies itself as `3.7.6-anne.2`.
 
+The build explicitly defines `INCLUDE_ACTIONS_CONSTRUCTOR`. Without that define,
+the Linux build silently registers an empty `g_actionsNativesCaller` table, so all
+`ActionConstructor.*` natives are unavailable even though the constructor source
+files are compiled. `ai_smoker3` requires `ActionConstructor.SetupFromConf` and
+`ActionConstructor.Execute`.
+
 The Linux artifact is built as optimized i386 on Ubuntu 18.04 with Clang 6 and
 static libstdc++. It has a SHA-1 Build-ID and requires at most `GLIBC_2.27`.
 The SourceMod, Metamod:Source, and HL2SDK inputs used for the current artifact are:

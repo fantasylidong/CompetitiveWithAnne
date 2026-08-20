@@ -221,12 +221,8 @@ void RecalcSiCapFromAlive(bool log = false)
         gST.totalSI);
 }
 
-void ReadSiCap()
-{
-    ReadBaseClassCaps(gST.siCap);
-
-    ApplyForcedClassMode();
-
-    Debug_Print("[CAP] caps S=%d B=%d H=%d P=%d J=%d C=%d",
-        gST.siCap[0], gST.siCap[1], gST.siCap[2], gST.siCap[3], gST.siCap[4], gST.siCap[5]);
-}
+// 注意：gST.siCap[] 的唯一口径是“该职业还能再刷几只”（剩余额度），
+// 由 RecalcSiCapFromAlive 维护。历史上这里还有一个 ReadSiCap()，直接把
+// 职业总上限写进同一个数组，导致 GetClassTotalCap() = alive + siCap +
+// reserved 把上限虚增了 alive + reserved。任何需要“刷新额度”的地方都
+// 必须调用 RecalcSiCapFromAlive，不要再引入第二种口径。

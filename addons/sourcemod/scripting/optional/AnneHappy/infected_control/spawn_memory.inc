@@ -346,6 +346,11 @@ int GetCurrentSectors()
     return n;
 }
 
+// 注意这里的顺序是有意的，不是漏判：绝大多数 NavArea 完全没有属性位，
+// 救援关卡如果要求必须带 TERROR_NAV_FINALE 才能刷，整张图（含通往终局的
+// 路线）都会被拒绝。所以“无属性”一律放行，finale 限制只用来剔除那些
+// 带了别的属性、但明确不属于终局区域的 Nav。改这里等于改整个救援关卡的
+// 可刷范围，先确认这一点再动。
 bool IsValidFlags(int iFlags, bool bFinaleArea)
 {
     if (!iFlags)

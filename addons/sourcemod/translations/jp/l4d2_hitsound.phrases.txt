@@ -16,9 +16,9 @@
 	{
 		"jp"		"アイコン範囲: %s"
 	}
-	"L4D2Hitsound_HitsoundSoundEffectPackageThree"
+	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"jp"		"[Hitsound] 効果音パッケージ(3点)を%dに設定しました"
+		"jp"		"[Hitsound] 効果音パッケージ(4点)を%dに設定しました"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -116,13 +116,9 @@
 	{
 		"jp"		"キルアイコン: %dに設定"
 	}
-	"L4D2Hitsound_HeadKillSoundOn"
+	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"jp"		"ヘッドショットキル専用音：オン（セットに専用音が設定されていればヘッドショットキルで再生）"
-	}
-	"L4D2Hitsound_HeadKillSoundOff"
-	{
-		"jp"		"ヘッドショットキル専用音：オフ（ヘッドショットキルは通常のヘッドショット音にフォールバック）"
+		"jp"		"ヘッドショットキル音：%d に設定（0=通常のヘッドショット音）"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
@@ -135,5 +131,9 @@
 	"L4D2Hitsound_StackModeMerge"
 	{
 		"jp"		"効果音再生モード：強制マージ（1フレーム最大1音、キル＞ヘッドショット＞ヒットの優先順）"
+	}
+	"L4D2Hitsound_SetPlaybackPreset"
+	{
+		"jp"		"[Hitsound] このセットの効果音範囲を適用しました。"
 	}
 }

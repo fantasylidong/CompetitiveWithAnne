@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display scripted HUD slots and an optional CS-style kill feed"
-#define PLUGIN_VERSION                "1.5.0"
+#define PLUGIN_VERSION                "1.5.1"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -1127,13 +1127,6 @@ bool IsClientSlotVisible(int client, int hud)
 
     if (IsInfectedIntelSource(source) && !CanClientSeeInfectedIntel(client))
         return false;
-
-    if (hud == HUD2 && source == HUD_CONTENT_DEFAULT && !g_bData_HUD2_Text && !g_bCvar_HUD2_Text && !CanClientSeeInfectedIntel(client))
-    {
-        int visibleMask = g_iClientHUD2Mask[client] & ~HUD2_PART_INFECTED_TIMING;
-        if (visibleMask == 0)
-            return false;
-    }
 
     return true;
 }
@@ -3453,27 +3446,25 @@ bool IsHUDTeamFull(bool isAnne)
 
 void ComposeHUD2Text(char[] output, int size, int mask, int langTarget = LANG_SERVER)
 {
-    int effectiveMask = mask;
-    if (IsValidClient(langTarget) && !CanClientSeeInfectedIntel(langTarget))
-        effectiveMask &= ~HUD2_PART_INFECTED_TIMING;
-
+    // HUD2 timing is the public server config (same as hostname [N特M秒]),
+    // not live spawn intel. Keep SI HP / next-wave / queue spectator-only.
     output[0] = '\0';
     for (int i = 0; i < sizeof(g_sHUD2Fragments); i++)
     {
         if (i == 5)
             continue;
-        if ((effectiveMask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
+        if ((mask & (1 << i)) != 0 && g_sHUD2Fragments[i][0] != '\0')
             StrCat(output, size, g_sHUD2Fragments[i]);
     }
 
-    if ((effectiveMask & HUD2_PART_INFECTED_TIMING) != 0 && g_iHUD2InfectedCount > 0 && g_iHUD2SpawnInterval >= 0)
+    if ((mask & HUD2_PART_INFECTED_TIMING) != 0 && g_iHUD2InfectedCount > 0 && g_iHUD2SpawnInterval >= 0)
     {
         char timing[32];
         FormatEx(timing, sizeof(timing), "%T", "L4D2ScriptedHUD_HUD2InfectedTiming", langTarget, g_iHUD2InfectedCount, g_iHUD2SpawnInterval);
         StrCat(output, size, timing);
     }
 
-    if ((effectiveMask & HUD2_PART_WIPE_COUNT) != 0 && g_iHUD2WipeCount > 0)
+    if ((mask & HUD2_PART_WIPE_COUNT) != 0 && g_iHUD2WipeCount > 0)
     {
         char wipes[32];
         FormatEx(wipes, sizeof(wipes), "%T", "L4D2ScriptedHUD_WipeCount", langTarget, g_iHUD2WipeCount);
@@ -4362,7 +4353,7 @@ void OpenHUD2PartsMenu(int client)
     AddHUDToggleItem(menu, client, "part2", "L4D2ScriptedHUD_PartAIDifficulty", (g_iClientHUD2Mask[client] & HUD2_PART_AI_DIFFICULTY) != 0);
     AddHUDToggleItem(menu, client, "part3", "L4D2ScriptedHUD_PartMissingPlayers", (g_iClientHUD2Mask[client] & HUD2_PART_MISSING_PLAYERS) != 0);
     AddHUDToggleItem(menu, client, "part4", "L4D2ScriptedHUD_PartMod", (g_iClientHUD2Mask[client] & HUD2_PART_MOD) != 0);
-    AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0, true);
+    AddHUDToggleItem(menu, client, "part5", "L4D2ScriptedHUD_PartInfectedTiming", (g_iClientHUD2Mask[client] & HUD2_PART_INFECTED_TIMING) != 0);
     AddHUDToggleItem(menu, client, "part6", "L4D2ScriptedHUD_PartPlayerCount", (g_iClientHUD2Mask[client] & HUD2_PART_PLAYER_COUNT) != 0);
     AddHUDToggleItem(menu, client, "part7", "L4D2ScriptedHUD_PartWipeCount", (g_iClientHUD2Mask[client] & HUD2_PART_WIPE_COUNT) != 0);
     menu.Display(client, MENU_TIME_FOREVER);

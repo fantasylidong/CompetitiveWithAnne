@@ -6,9 +6,11 @@
 // 通用常量集中在这里，避免各模块各自维护魔法数字。
 #define SI_COUNT                  6
 #define ZC_TANK                   8
-#define MAX_SURVIVOR_SLOTS        MAXPLAYERS + 1
+#define MAX_SURVIVOR_SLOTS        (MAXPLAYERS + 1)
+// 队形统计只需要覆盖真实生还者槽位；用 MAXPLAYERS 会让
+// anti-bait 每秒在栈上分配一个 66x66 的邻接矩阵。
+#define MAX_FORMATION_SLOTS       16
 #define FINALE_STAGE_ESCAPE       18
-#define DIRECTOR_FALLBACK_TRIES   48
 #define MIN_TELEPORT_SECONDS      0.8
 #define FLOAT_EULER               2.71828182845904523536
 #define AI_DIFFICULTY_LEVELS      6

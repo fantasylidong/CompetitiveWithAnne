@@ -255,7 +255,7 @@ public Action Cmd_NavTest(int client, int args)
     SpawnScoreDbg scoreDbg;
     bool passScoreEval = SpawnScore_BuildCandidate(zc, testPos, dTargetEye,
                                                    -1.0, -1.0, 0.0,
-                                                   gCV.fSpawnMin, gCV.fSpawnMax, 0.0,
+                                                   gCV.fSpawnMin, gCV.fSpawnMax,
                                                    candPercent, centerBucket, rawBadFlow,
                                                    passFlow, refEyeZ, targetFootZ,
                                                    sidx, index,
@@ -265,8 +265,9 @@ public Action Cmd_NavTest(int client, int args)
         scoreDbg.dist, scoreDbg.sweet, scoreDbg.width);
     PrintToConsole(client, "  Height Score: %.1f (refZ: %.1f, candZ: %.1f, delta: %.1f)",
         scoreDbg.hght, refEyeZ, testPos[2], testPos[2] - refEyeZ);
-    PrintToConsole(client, "  High Bonus: %.1f (rise=%.1f steps=%d)",
-        scoreDbg.highHeightBonus, scoreDbg.highHeightRise, scoreDbg.highHeightSteps);
+    PrintToConsole(client, "  High Bonus: %.1f (rise=%.1f steps=%d dropQ=%.2f factor=%.2f)",
+        scoreDbg.highHeightBonus, scoreDbg.highHeightRise, scoreDbg.highHeightSteps,
+        scoreDbg.dropQuality, scoreDbg.highHeightDropFactor);
     PrintToConsole(client, "  Extra Penalty: %.1f (behind=%.1f lowHeight=%.1f footZ=%.1f drop=%.1f steps=%d x%.1f)",
         scoreDbg.extraPen, scoreDbg.behindPen, scoreDbg.lowHeightPen,
         scoreDbg.targetFootZ, scoreDbg.lowHeightDrop,

@@ -223,7 +223,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     // 5) 从这里开始才进入点位级成本。一个 NavArea 内可能同时跨过距离带边界；
     //    若随机点只在廉价检查阶段失败，少量重采样比丢掉整个区域后继续扫图更划算。
     float pos[3];
-    float slack = 0.0;
     float ringEff = searchRange;
     float dminEyeSq = 0.0;
     float directExclusion = FloatMax(
@@ -361,7 +360,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     if (!SpawnScore_BuildCandidate(
                                    zc, pos, dTargetEye, navDistance,
                                    navDistanceEffective, navHighGroundComp,
-                                   scoreMinRange, scoreMaxRange, slack,
+                                   scoreMinRange, scoreMaxRange,
                                    candidateBucket, scoringCenterBucket, rawBadFlow,
                                    candidateBucketKnown,
                                    refEyeZ, targetFootZ, sector, areaIdx,
@@ -458,6 +457,7 @@ enum struct SpawnSearchCursor
     float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageTertile[NAV_CANDIDATE_PAGE_SIZE];
+    bool tertileActive;
     int graphPageLen;
     int graphPageRow;
     int inspected;
@@ -484,6 +484,7 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.graphTotalInRange = -1;
     cursor.graphPageLen = 0;
     cursor.graphPageRow = 0;
+    cursor.tertileActive = false;
     cursor.inspected = 0;
     cursor.elapsedMs = 0.0;
     cursor.stats.Reset();
@@ -823,10 +824,21 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
     int count = cursor.graphPageLen;
     for (int row = 0; row < count; row++)
         cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
+    cursor.tertileActive = false;
     if (count <= 2)
         return;
 
-    bool tertileOn = SpawnSearch_TertileEnabled();
+    // 近/中/远按当前档搜索环切，所以档数越多单环越窄。10 档下扩圈环只有
+    // ~200u，再切三段没有距离含义（2026-08-13 那次 10 档回滚就是踩了这个
+    // 坑）。窄环直接退化为单池：整档评分名额一起用，顺序仍由洗牌打散。
+    float ringLo = cursor.graphScanMinRange > cursor.minRange
+        ? cursor.graphScanMinRange
+        : cursor.minRange;
+    float ringHi = cursor.maxRange;
+    bool wideEnoughRing =
+        (ringHi - ringLo) >= NAV_TERTILE_MIN_RING_WIDTH;
+
+    bool tertileOn = SpawnSearch_TertileEnabled() && wideEnoughRing;
     if (!tertileOn)
     {
         if (gCV.bCandidateShuffle && !ranked)
@@ -852,16 +864,16 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
 
     // 近/中/远按当前档搜索环切，不用页内 min/max：否则第一页若只覆盖
     // 环的近端，三分位会缩成“近端里再切近中远”，和档位脱节。
-    float lo = cursor.graphScanMinRange > cursor.minRange
-        ? cursor.graphScanMinRange
-        : cursor.minRange;
-    float hi = cursor.maxRange;
+    float lo = ringLo;
+    float hi = ringHi;
     if (hi < lo)
     {
         float swapRange = lo;
         lo = hi;
         hi = swapRange;
     }
+
+    cursor.tertileActive = true;
 
     int binIdx[NAV_CANDIDATE_PAGE_SIZE];
     int binLen[3];
@@ -1109,7 +1121,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         return SpawnSearch_Pending;
 
     // 扇区配额只约束前 2/3 的距离带；进入后 1/3 远带说明近处已找不到点，
-    // 此时优先保证按时刷出，不再限制方向。(6 档时为 0..3 受限、4..5 放开)
+    // 此时优先保证按时刷出，不再限制方向。(10 档时为 0..6 受限、7..9 放开)
     bool enforceSectorQuota = bandStage >= 0
         && bandStage < TACTICAL_BAND_STAGES - (TACTICAL_BAND_STAGES / 3);
 
@@ -1133,6 +1145,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     bool exhausted = false;
     bool foundThisTick = false;
     float bestScore = -1.0e9;
+    float bestQuality = -1.0e9;
     float now = GetGameTime();
     SpawnScoreDbg bestDbg;
     while (sliceInspected < gCV.iSpawnNavCandidatesPerSlice
@@ -1159,7 +1172,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 
         sliceInspected++;
         cursor.inspected++;
-        if (SpawnSearch_TertileEnabled())
+        if (cursor.tertileActive)
         {
             int unread[3];
             SpawnSearch_CountUnreadTertiles(cursor, unread);
@@ -1194,10 +1207,25 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         if (candidateTertile < 0 || candidateTertile > 2)
             candidateTertile = SPAWN_TERTILE_NEAR;
         tertileAccepted[candidateTertile]++;
-        if (!foundThisTick || candDbg.total > bestScore)
+        // 最终分会被钳到 100，高点候选很容易并列满分。严格 `>` 会退化成
+        // “ranked 顺序里第一个撞顶的点获胜”，让距离/Flow/分散/战术分全部
+        // 失效。并列时改用未加高点奖励的加权质量分决胜。
+        bool better;
+        if (!foundThisTick)
+            better = true;
+        else if (candDbg.total > bestScore + SPAWN_SCORE_TIE_EPSILON)
+            better = true;
+        else if (candDbg.total >= bestScore - SPAWN_SCORE_TIE_EPSILON
+            && candDbg.weightedQuality > bestQuality + SPAWN_SCORE_TIE_EPSILON)
+            better = true;
+        else
+            better = false;
+
+        if (better)
         {
             foundThisTick = true;
             bestScore = candDbg.total;
+            bestQuality = candDbg.weightedQuality;
             SpawnScore_CopyDbg(bestDbg, candDbg);
         }
         if (frame.firstFit && candDbg.total >= frame.firstFitScore)

@@ -137,7 +137,7 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
                                          int &groupCount,
                                          float center[3])
 {
-    int flowPcts[MAX_SURVIVOR_SLOTS];
+    int flowPcts[MAX_FORMATION_SLOTS];
     int n = 0;
     int flowN = 0;
     int flowSum = 0;
@@ -154,15 +154,19 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
     center[0] = 0.0;
     center[1] = 0.0;
     center[2] = 0.0;
-    float pos[MAX_SURVIVOR_SLOTS][3];
-    float nearest[MAX_SURVIVOR_SLOTS];
-    bool linked[MAX_SURVIVOR_SLOTS][MAX_SURVIVOR_SLOTS];
+    float pos[MAX_FORMATION_SLOTS][3];
+    float nearest[MAX_FORMATION_SLOTS];
+    bool linked[MAX_FORMATION_SLOTS][MAX_FORMATION_SLOTS];
 
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsValidSurvivor(i))
             continue;
 
+        // 有意设计：阵亡者同样计入 vulnerableCount。AntiBait_ShouldHoldWave
+        // 要求 vulnerableCount == 0，所以本局一旦有人阵亡，卡点无限延长就
+        // 整局不再生效——队伍已经减员时不再追加拦波压力。这不是漏判，
+        // 不要“修”成只统计存活但被控/倒地的人。
         if (!IsPlayerAlive(i) || L4D_IsPlayerIncapacitated(i)
             || IsSurvivorHangingFromLedge(i) || IsPinned(i))
         {
@@ -170,7 +174,7 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
             continue;
         }
 
-        if (n >= MAX_SURVIVOR_SLOTS)
+        if (n >= MAX_FORMATION_SLOTS)
             continue;
 
         // 行动能力正常的成员一律参与位置/队形统计。flow 读取失败（电梯、
@@ -240,8 +244,8 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
 
     if (gCV.fAntiBaitPairDist > 0.0)
     {
-        bool seen[MAX_SURVIVOR_SLOTS];
-        int stack[MAX_SURVIVOR_SLOTS];
+        bool seen[MAX_FORMATION_SLOTS];
+        int stack[MAX_FORMATION_SLOTS];
         for (int i = 0; i < n; i++)
             seen[i] = false;
 
@@ -290,6 +294,60 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
     return true;
 }
 
+#define ANTI_BAIT_KIT_SLOT  3
+#define ANTI_BAIT_PILL_SLOT 4
+
+static bool AntiBait_SlotHasHealItem(int client, int slot)
+{
+    int item = GetPlayerWeaponSlot(client, slot);
+    if (item <= MaxClients || !IsValidEntity(item))
+        return false;
+
+    char cls[32];
+    GetEntityClassname(item, cls, sizeof cls);
+    return StrEqual(cls, "weapon_first_aid_kit")
+        || StrEqual(cls, "weapon_defibrillator")
+        || StrEqual(cls, "weapon_pain_pills")
+        || StrEqual(cls, "weapon_adrenaline");
+}
+
+static bool AntiBait_SurvivorHasHealItem(int client)
+{
+    return AntiBait_SlotHasHealItem(client, ANTI_BAIT_KIT_SLOT)
+        || AntiBait_SlotHasHealItem(client, ANTI_BAIT_PILL_SLOT);
+}
+
+// 站着的人生还实血都低于阈值，且存活队员都没有药时关掉 Anti-Bait。
+// 药 = 医疗包 / 电击器 / 止痛药 / 针。threshold<=0 关闭本检查。
+// 倒地血不是实血，不参与阈值比较；倒地者身上的药仍算“队里有药”。
+static bool AntiBait_IsTeamLowHpNoMeds()
+{
+    int threshold = gCV.iAntiBaitLowHp;
+    if (threshold <= 0)
+        return false;
+
+    int standing = 0;
+    bool anyHealItem = false;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        if (AntiBait_SurvivorHasHealItem(i))
+            anyHealItem = true;
+
+        if (L4D_IsPlayerIncapacitated(i) || IsSurvivorHangingFromLedge(i))
+            continue;
+
+        standing++;
+        if (GetClientHealth(i) >= threshold)
+            return false;
+    }
+
+    return standing > 0 && !anyHealItem;
+}
+
 static bool AntiBait_IsEventBlocked()
 {
     if (!gCV.bAntiBaitEnable)
@@ -303,6 +361,9 @@ static bool AntiBait_IsEventBlocked()
     if (IsTankPressureActive() || AreAtLeastHalfSurvivorsDownOrDead())
         return true;
     if (gAB.allPinned)
+        return true;
+    // 额外一条：全员低实血且没药时也暂停。不替代 Tank / 半数倒地 / 全员被控。
+    if (AntiBait_IsTeamLowHpNoMeds())
         return true;
     return false;
 }
@@ -408,8 +469,8 @@ static bool AntiBait_IsPreferredTargetEligible(int client)
 static int AntiBait_SelectHoldingTarget()
 {
     float center[3];
-    float pos[MAX_SURVIVOR_SLOTS][3];
-    int clients[MAX_SURVIVOR_SLOTS];
+    float pos[MAX_FORMATION_SLOTS][3];
+    int clients[MAX_FORMATION_SLOTS];
     int count = 0;
 
     for (int client = 1; client <= MaxClients && count < sizeof(clients); client++)
@@ -654,11 +715,12 @@ void AntiBait_Update()
     {
         AntiBait_ClearRunner();
         if (gAB.state != AB_Paused)
-            AntiBait_Debug("blocked state=%s allPinned=%d scriptedEvent=%d tankPressure=%d",
+            AntiBait_Debug("blocked state=%s allPinned=%d scriptedEvent=%d tankPressure=%d lowHpNoMeds=%d",
                 g_sAntiBaitStateName[view_as<int>(gAB.state)],
                 gAB.allPinned,
                 EventPressure_ShouldBypassAntiBait(),
-                IsTankPressureActive());
+                IsTankPressureActive(),
+                AntiBait_IsTeamLowHpNoMeds());
         AntiBait_Pause(now);
         return;
     }

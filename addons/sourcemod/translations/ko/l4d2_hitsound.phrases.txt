@@ -16,9 +16,9 @@
 	{
 		"ko"		"아이콘 범위: %s"
 	}
-	"L4D2Hitsound_HitsoundSoundEffectPackageThree"
+	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"ko"		"[Hitsound] 음향 효과 패키지(3개 항목)가 다음으로 설정되었습니다: %d"
+		"ko"		"[Hitsound] 음향 효과 패키지(4개 항목)가 다음으로 설정되었습니다: %d"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -116,13 +116,9 @@
 	{
 		"ko"		"킬 아이콘: %d로 설정"
 	}
-	"L4D2Hitsound_HeadKillSoundOn"
+	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"ko"		"헤드샷 킬 전용음: 켜짐(세트에 전용음이 설정되어 있으면 헤드샷 킬에서 재생)"
-	}
-	"L4D2Hitsound_HeadKillSoundOff"
-	{
-		"ko"		"헤드샷 킬 전용음: 꺼짐(헤드샷 킬은 일반 헤드샷 사운드로 폴백)"
+		"ko"		"헤드샷 킬 사운드: %d로 설정(0=일반 헤드샷 사운드 사용)"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
@@ -135,5 +131,9 @@
 	"L4D2Hitsound_StackModeMerge"
 	{
 		"ko"		"사운드 재생 모드: 강제 병합(프레임당 최대 1개, 킬>헤드샷>타격 우선)"
+	}
+	"L4D2Hitsound_SetPlaybackPreset"
+	{
+		"ko"		"[Hitsound] 이 세트의 사운드 범위를 적용했습니다."
 	}
 }

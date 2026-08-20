@@ -240,6 +240,7 @@ Timer_TeleportTick
 - 统计团队进度。
 - 判断是否有人显著领先。
 - 记录跑男 index。
+- 站立生还实血都低于 `inf_antibait_lowhp` 且队里没有医疗包/电击器/止痛药/针时整机暂停。
 - 触发 `OnDetectRushman` forward。
 - 使用团队下中位 Flow 判断有效推进，避免单人前探重置全队停滞。
 - Pressure 不延迟基础波次；到点时准备控制型职业优先、侧后方 Nav 加权的破点波。

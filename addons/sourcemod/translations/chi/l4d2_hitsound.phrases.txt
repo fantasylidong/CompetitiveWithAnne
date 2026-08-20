@@ -16,9 +16,9 @@
 	{
 		"chi"		"图标范围：%s"
 	}
-	"L4D2Hitsound_HitsoundSoundEffectPackageThree"
+	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"chi"		"[Hitsound] 音效套装(三项)已设置为: %d"
+		"chi"		"[Hitsound] 音效套装(四项)已设置为: %d"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -116,13 +116,9 @@
 	{
 		"chi"		"击杀图标：已设置为 %d"
 	}
-	"L4D2Hitsound_HeadKillSoundOn"
+	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"chi"		"爆头击杀专用音：已开启（套装配置了专用音时，爆头击杀播放专用音）"
-	}
-	"L4D2Hitsound_HeadKillSoundOff"
-	{
-		"chi"		"爆头击杀专用音：已关闭（爆头击杀回退为普通爆头音）"
+		"chi"		"爆头击杀音效：已设置为 %d（0=使用普通爆头音）"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
@@ -135,5 +131,9 @@
 	"L4D2Hitsound_StackModeMerge"
 	{
 		"chi"		"音效播放模式：强制合并（同帧最多响一条，按 击杀>爆头>命中 优先）"
+	}
+	"L4D2Hitsound_SetPlaybackPreset"
+	{
+		"chi"		"[Hitsound] 已按该套装套用音效范围"
 	}
 }

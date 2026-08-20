@@ -367,23 +367,32 @@ float Tactical_GetHighGroundNavCompensation(int zc,
                                              float candidateZ,
                                              float targetEyeZ)
 {
+    // 起点与参考面由 HighGround_GetStartZ() 统一提供（见 spawn_score.inc）：
+    // 三处高点机制共用 inf_nav_high_sort_min_height，一律相对目标眼位。
     float maxCompensation = Tactical_GetMaxHighGroundNavCompensation(zc);
+    float startZ = HighGround_GetStartZ();
     float heightAbove = candidateZ - targetEyeZ;
-    if (maxCompensation <= 0.0 || heightAbove <= NAV_HIGH_GROUND_COMP_START_Z)
+    if (maxCompensation <= 0.0 || heightAbove <= startZ)
         return 0.0;
 
     float scale = zc == view_as<int>(SI_Hunter)
         ? NAV_HIGH_GROUND_HUNTER_SCALE
         : NAV_HIGH_GROUND_SMOKER_SCALE;
     return FloatMin(
-        (heightAbove - NAV_HIGH_GROUND_COMP_START_Z) * scale,
+        (heightAbove - startZ) * scale,
         maxCompensation);
 }
 
 // 每类三个锚点：最小距离 / 首选档上界(stage 0) / 最远档上界(最后一档)。
-// 固定 6 档：stage 0 保持完整首选区间，stage 1..5 在首选上界与最远
-// 上界之间线性扩圈。档数过细时单环只有一两百单位，再按页内三分位
-// 切近/中/远没有区分度；6 档让每一环宽到三分位有明确的距离含义。
+// 固定 TACTICAL_BAND_STAGES 档：stage 0 保持完整首选区间，其余档在首选
+// 上界与最远上界之间线性扩圈，第 N 档上界 =
+//   baseMax + (finalMax - baseMax) * N / (TACTICAL_BAND_STAGES - 1)
+// 职业最小距离在所有档位保持不变，扩圈只向远端推。
+//
+// 档数是精度与延迟的权衡：档越多，命中的那一档越贴近理想距离，但完整
+// 走完所有档需要更多帧。10 档下扩圈环约 200u，已经窄于
+// NAV_TERTILE_MIN_RING_WIDTH，档内近/中/远三分位会自动退化为单池
+// （见 spawn_core.inc::SpawnSearch_PreparePageOrder）。
 static bool Tactical_GetClassBandProfile(int zc, float &minRange,
                                          float &baseMax, float &finalMax)
 {

@@ -16,9 +16,9 @@
 	{
 		"vi"		"Phạm vi biểu tượng: %s"
 	}
-	"L4D2Hitsound_HitsoundSoundEffectPackageThree"
+	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"vi"		"[Hitsound] Gói hiệu ứng âm thanh (ba mục) đã được đặt thành: %d"
+		"vi"		"[Hitsound] Gói hiệu ứng âm thanh (bốn mục) đã được đặt thành: %d"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -116,13 +116,9 @@
 	{
 		"vi"		"Biểu tượng tiêu diệt: đặt thành %d"
 	}
-	"L4D2Hitsound_HeadKillSoundOn"
+	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"vi"		"Âm thanh riêng cho hạ gục bằng headshot: BẬT (phát âm thanh riêng của bộ nếu được cấu hình)"
-	}
-	"L4D2Hitsound_HeadKillSoundOff"
-	{
-		"vi"		"Âm thanh riêng cho hạ gục bằng headshot: TẮT (quay về âm thanh headshot thông thường)"
+		"vi"		"Âm thanh hạ gục bằng headshot: đặt thành %d (0=dùng âm thanh headshot thông thường)"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
@@ -135,5 +131,9 @@
 	"L4D2Hitsound_StackModeMerge"
 	{
 		"vi"		"Chế độ phát âm thanh: buộc gộp (tối đa một âm mỗi khung hình, ưu tiên hạ gục > headshot > trúng)"
+	}
+	"L4D2Hitsound_SetPlaybackPreset"
+	{
+		"vi"		"[Hitsound] Đã áp dụng phạm vi âm thanh của bộ này."
 	}
 }

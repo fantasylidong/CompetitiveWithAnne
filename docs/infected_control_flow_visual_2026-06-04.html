@@ -495,9 +495,21 @@
   </style>
 </head>
 <body>
+  <div style="background:#7f1d1d;color:#fff;padding:14px 0;font:600 14px/1.6 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif">
+    <div class="wrap" style="max-width:1180px;margin:0 auto;padding:0 24px">
+      ⚠ 本页为 2026-06-04 的历史快照，已不再反映当前实现，仅作版本对照保留。
+      页面中的评分权重表、<code>SUPPORT_EXPAND_MAX</code>、“扩圈每失败 +100”、<code>limitCost = min(ring×3, spawnmax×1.5)</code>、
+      <code>AntiBait_ShouldStartWaveByLatest()</code>、“普通补波 floor”以及“<code>IsSupportGateClassInt</code> 包含 Smoker”等描述，
+      在现行源码中均已不存在。
+      <br>请改看
+      <a href="./infected_control_refactor/infected_control_full_pipeline.html" style="color:#fecaca">infected_control 完整流程架构</a>
+      与
+      <a href="./infected_control_refactor/nav_spawn_pipeline.html" style="color:#fecaca">Nav 刷特管线</a>。
+    </div>
+  </div>
   <header>
     <div class="wrap">
-      <h1>infected_control 重构后刷特流程图</h1>
+      <h1>infected_control 重构后刷特流程图<span style="font-size:14px;color:#b91c1c;margin-left:10px">（已过时）</span></h1>
       <p class="subtitle">基于 2026-06-04 对 `infected_control.sp` 与 `infected_control/*.inc` 的重新审查。此页把插件流程、刷特流程、特感找位、评分权重、刷新喜好、anti-baiter、跑男，以及 6t16s 难度对比集中画出来。</p>
       <div class="meta">
         <span class="pill">插件版本：2025.10.26</span>
@@ -663,7 +675,7 @@
         <div class="state"><h3>Recover</h3><p>队伍推进或散开后进入恢复，默认 4 秒后回 Observe。</p></div>
       </div>
       <div class="grid-2" style="margin-top:16px">
-        <div class="ok"><strong>进入 Pressure 需要</strong><br>超过 grace + window、团队抱团、没有推进、场上有压力或已到可判定窗口。</div>
+        <div class="ok"><strong>进入 Pressure 需要</strong><br>超过 grace + window、团队抱团、没有推进、场上有压力或已到可判定窗口。低实血且无药只是额外一条暂停条件，不替代上面这些。</div>
         <div class="risk"><strong>不会绕过 floor</strong><br>`ShouldStartWaveEarly()` 要求 `DifficultyStrategy_CanStartNormalWave()`，所以它只是请求结束等待，不是新增无下限补波。</div>
       </div>
     </section>

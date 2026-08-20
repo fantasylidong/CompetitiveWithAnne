@@ -36,7 +36,9 @@ enum struct SpawnScoreDbg
     float lowHeightDrop;
     float lowHeightMultiplier;
     float highHeightBonus;
-    float highHeightRise;
+    float highHeightRise;        // 带符号：候选中心 - 目标眼位
+    float highHeightDropFactor;  // 高点奖励的可落下折算系数
+    float dropQuality;           // 0..1，直落落点离最近生还者的接近度
     float tacticalQuality;
 
     float dTargetEye;
@@ -46,7 +48,6 @@ enum struct SpawnScoreDbg
     float navHighSortScale;
     float navHighGroundComp;
     float ringEff;
-    float slack;
     float sweet;
     float width;
 

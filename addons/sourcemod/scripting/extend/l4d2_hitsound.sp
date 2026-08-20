@@ -2,24 +2,24 @@
  * l4d2_hitsound_plus.sp
  *
  * 本版要点：
- * - 仅使用 6 个数据库字段：hitsound_head/hit/kill、hiticon_head/hit/kill（0=关闭；>=1=套装编号）
+ * - 数据库保存音效四项、图标三项、两个范围开关及播放模式
  * - 非管理员：按“套装”选择音效/图标；“特定开关”里可把单项设为 0（关闭）
  * - 管理员：可将命中/击杀/爆头的音效或图标分别指定为任意套装
- * - KV fallback 同步为 6 键（保留对旧 KV 键 Snd/Overlay 的一次性继承；数据库旧列已彻底移除）
- * - 保留 FastDL、builtin=1 跳过、统一预缓存、RegPluginLibrary、sm_hitui 快捷开关等
+ * - KV fallback 保留对旧 KV 键 Snd/Overlay/SndHeadKill 的一次性继承
+ * - 保留 FastDL、builtin=1 跳过、统一预缓存、RegPluginLibrary
  *
  * 配置文件：
  *   addons/sourcemod/configs/hitsound_sets.cfg   （音效套装：headshot/hit/kill，支持 builtin）
  *   addons/sourcemod/configs/hiticon_sets.cfg    （图标套装：head/hit/kill，支持 builtin）
  *
- * 音效套装可选定制键（用于自定义“何时响”）：
- *   "headshot_kill"  爆头击杀专用音效；留空/缺省 = 沿用 headshot 音（旧行为）
- *   "stack"          1/缺省 = 每个命中/击杀事件立即独立播放（可同帧叠加，复刻老 killsound 手感）；
- *                    0 = 同帧按优先级合并为一条（击杀>爆头>命中）
+ * 音效套装可选定制键：
+ *   "headshot_kill"  爆头击杀专用音；留空/缺省 = 沿用 headshot 音
+ *   "stack"          1/缺省 = 每个事件立即播放；0 = 同帧合并为一条（击杀>爆头>命中）
+ *   "apply_special_only"  选中该套装时写入「仅特感」开关（0/1）；缺省 = 不改
  *
- * 玩家个人设置（存 KV data/SoundSelect.txt，不入数据库）：
- *   - 爆头击杀专用音 开/关（关闭时爆头击杀回退普通爆头音）
- *   - 音效播放模式：跟随套装 / 强制叠加 / 强制合并
+ * 玩家可为爆头击杀单独选择套装ID（0=回退普通爆头音），以及选择播放模式。
+ * 致死那发只由死亡事件播一声。hurt 不再为超杀补播。
+ * 播放一律 SNDCHAN_AUTO；能发就发，被引擎掐断也无所谓。
  *
  * 重要编号约定：
  *   - 套装ID：1..N，0 表示禁用
@@ -27,11 +27,10 @@
  *
  * SQL 字段由外部手动维护，表名默认 ConVar: sm_hitsound_db_table = RPG。
  * RPG 表需包含：hitsound_head/hit/kill、hiticon_head/hit/kill、
- * hitsound_si_only、hiticon_si_only。
+ * hitsound_si_only、hiticon_si_only、hitsound_stack_mode、hitsound_headkill。
  *
  * commands:
  *   !snd    -> 主菜单（音效/图标套装（玩家） + 特定开关 + 管理员单独设置）
- *   !hitui  -> 快速将覆盖图标三项在 禁用/套装1 之间切换（玩家一键）
  *   sm_hitsound_reload -> 重新从 DB/KV 读取所有在线玩家的偏好
  */
 
@@ -42,7 +41,7 @@
 #include <sdkhooks>
 #include <adminmenu>
 
-#define PLUGIN_VERSION "2.3.0"
+#define PLUGIN_VERSION "2.6.0"
 #define CVAR_FLAGS     FCVAR_NONE
 #define IsValidClient(%1) (1 <= %1 && %1 <= MaxClients && IsClientInGame(%1))
 #define OVERLAY_CLEAN_INTERVAL 0.1
@@ -83,10 +82,11 @@ enum SoundFeedbackPriority
 int  g_SndSuite [MAXPLAYERS + 1] = {0, ...}; // 最近一次“音效套装（玩家）”
 int  g_IcSuite  [MAXPLAYERS + 1] = {0, ...}; // 最近一次“图标套装（玩家）”
 
-// 六字段（真正用于表现/入库）：0=关闭；>=1=套装编号（与配置文件顺序一致）
+// 七字段（真正用于表现/入库）：0=关闭；>=1=套装编号（与配置文件顺序一致）
 int  g_SndHead  [MAXPLAYERS + 1] = {0, ...};
 int  g_SndHit   [MAXPLAYERS + 1] = {0, ...};
 int  g_SndKill  [MAXPLAYERS + 1] = {0, ...};
+int  g_SndHeadKill[MAXPLAYERS + 1] = {0, ...};
 
 int  g_IcHead   [MAXPLAYERS + 1] = {0, ...};
 int  g_IcHit    [MAXPLAYERS + 1] = {0, ...};
@@ -95,12 +95,8 @@ int  g_IcKill   [MAXPLAYERS + 1] = {0, ...};
 bool g_SndSpecialOnly[MAXPLAYERS + 1] = { false, ... };
 bool g_IcSpecialOnly [MAXPLAYERS + 1] = { false, ... };
 
-// 个人播放定制（仅 KV 持久化，不入数据库）
-// 播放模式：0=跟随套装 stack 设置；1=强制叠加（逐事件）；2=强制合并（同帧一条）
+// 0=跟随套装 stack；1=强制叠加；2=强制合并
 int  g_SndStackMode [MAXPLAYERS + 1] = { 0, ... };
-// 爆头击杀专用音（套装 headshot_kill）：true=启用；false=回退普通爆头音
-bool g_SndHeadKillOn[MAXPLAYERS + 1] = { true, ... };
-
 bool g_PrefsLoaded[MAXPLAYERS + 1] = { false, ... };
 bool g_PrefsDirty [MAXPLAYERS + 1] = { false, ... };
 bool g_DBLoadInFlight[MAXPLAYERS + 1] = { false, ... };
@@ -133,6 +129,7 @@ Handle g_SetHit      = INVALID_HANDLE;
 Handle g_SetKill     = INVALID_HANDLE;
 Handle g_SetHeadKill = INVALID_HANDLE; // 爆头击杀专用音（可选；空 = 回退 headshot）
 Handle g_SetStack    = INVALID_HANDLE; // 1 = 逐事件立即播放（不做同帧合并去重；缺省 1）
+Handle g_SetApplySpecialOnly = INVALID_HANDLE; // -1=不套用；0/1
 int    g_SetCount    = 0; // 套装总数（音效），套装ID有效范围：1..g_SetCount
 
 // --------------------- Overlay icon sets（玩家自选） ---------------------
@@ -307,7 +304,6 @@ static bool IsStackSet(int setId)
     return GetArrayCell(g_SetStack, setId - 1) != 0;
 }
 
-// 玩家最终是否逐事件叠加播放：个人强制设置优先，否则跟随套装 stack
 static bool ShouldStackFeedback(int client, int setId)
 {
     if (g_SndStackMode[client] == 1) return true;
@@ -315,18 +311,39 @@ static bool ShouldStackFeedback(int client, int setId)
     return IsStackSet(setId);
 }
 
-// 击杀事件取样本：爆头击杀优先套装的 headshot_kill（玩家可关闭），未配置/关闭则回退 headshot
+static int ParseOptionalPrefInt(const char[] s, int minVal, int maxVal)
+{
+    if (s[0] == '\0') return -1;
+    int v = StringToInt(s);
+    if (v < minVal || v > maxVal) return -1;
+    return v;
+}
+
+static bool ApplySoundSetPersonalDefaults(int client, int setId)
+{
+    if (setId <= 0 || setId > g_SetCount) return false;
+
+    int v = GetArrayCell(g_SetApplySpecialOnly, setId - 1);
+    if (v < 0) return false;
+
+    g_SndSpecialOnly[client] = (v != 0);
+    return true;
+}
+
+// 击杀事件取样本：爆头击杀优先套装的 headshot_kill，未配置则回退 headshot
 static bool GetKillSoundSample(int attacker, bool headshot, char[] out, int maxlen, int &setId)
 {
+    if (headshot && g_SndHeadKill[attacker] > 0)
+    {
+        setId = g_SndHeadKill[attacker];
+        if (GetSoundPath_BySet(setId, 3, out, maxlen)) return true;
+        return GetSoundPath_BySet(setId, 0, out, maxlen);
+    }
+
     setId = headshot ? g_SndHead[attacker] : g_SndKill[attacker];
     if (setId <= 0) { out[0] = '\0'; return false; }
 
-    if (headshot)
-    {
-        if (g_SndHeadKillOn[attacker] && GetSoundPath_BySet(setId, 3, out, maxlen)) return true;
-        return GetSoundPath_BySet(setId, 0, out, maxlen);
-    }
-    return GetSoundPath_BySet(setId, 2, out, maxlen);
+    return GetSoundPath_BySet(setId, headshot ? 0 : 2, out, maxlen);
 }
 
 static void ResetPendingSoundFeedback(int client)
@@ -509,6 +526,7 @@ public void OnPluginStart()
     g_SetKill     = CreateArray(PLATFORM_MAX_PATH);
     g_SetHeadKill = CreateArray(PLATFORM_MAX_PATH);
     g_SetStack    = CreateArray(1);
+    g_SetApplySpecialOnly = CreateArray(1);
 
     g_OvNames = CreateArray(64);
     g_OvHead  = CreateArray(PLATFORM_MAX_PATH);
@@ -522,7 +540,6 @@ public void OnPluginStart()
         PrecacheAllAssets();
 
     RegConsoleCmd("sm_snd",   Cmd_MenuMain, "主菜单：音效/图标套装（玩家）+ 特定开关 + 管理员单独设置");
-    RegConsoleCmd("sm_hitui", Cmd_ToggleUI,  "快速在禁用与套装1间切换覆盖图三项");
     RegAdminCmd ("sm_hitsound_reload", Cmd_ReloadAll, ADMFLAG_ROOT, "重新从 DB/KV 读取所有在线玩家的偏好");
 
     AutoExecConfig(true, "l4d2_hitsound_plus");
@@ -587,6 +604,7 @@ void LoadHitSoundSets()
     ClearArray(g_SetKill);
     ClearArray(g_SetHeadKill);
     ClearArray(g_SetStack);
+    ClearArray(g_SetApplySpecialOnly);
     g_SetCount = 0;
 
     Handle kv = CreateKeyValues("HitSoundSets");
@@ -604,6 +622,7 @@ void LoadHitSoundSets()
         do {
             char name[64];
             char sh[PLATFORM_MAX_PATH], hi[PLATFORM_MAX_PATH], ki[PLATFORM_MAX_PATH], hk[PLATFORM_MAX_PATH];
+            char applySpecial[8];
             int  isbuiltin = 0;
             int  stack = 0;
 
@@ -614,6 +633,7 @@ void LoadHitSoundSets()
             KvGetString(kv, "headshot_kill", hk, sizeof(hk), "");
             isbuiltin = KvGetNum(kv, "builtin", 0);
             stack     = KvGetNum(kv, "stack", 1); // 缺省叠加播放；显式 "stack 0" 才启用同帧合并
+            KvGetString(kv, "apply_special_only", applySpecial, sizeof(applySpecial), "");
             DBG("SoundSet #%d '%s' builtin=%d stack=%d hs='%s' hit='%s' kill='%s' hskill='%s'",
                 g_SetCount+1, name, isbuiltin, stack, sh, hi, ki, hk);
 
@@ -623,6 +643,7 @@ void LoadHitSoundSets()
             PushArrayString(g_SetKill, ki);
             PushArrayString(g_SetHeadKill, hk);
             PushArrayCell(g_SetStack, stack != 0 ? 1 : 0);
+            PushArrayCell(g_SetApplySpecialOnly, ParseOptionalPrefInt(applySpecial, 0, 1));
             g_SetCount++;
 
             if (!isbuiltin)
@@ -772,6 +793,7 @@ public void OnClientPutInServer(int client)
     g_SndHead[client] = 0;
     g_SndHit [client] = 0;
     g_SndKill[client] = 0;
+    g_SndHeadKill[client] = 0;
 
     if (g_IcSuite[client] >= 1) {
         g_IcHead[client] = g_IcSuite[client];
@@ -783,10 +805,8 @@ public void OnClientPutInServer(int client)
 
     g_SndSpecialOnly[client] = false;
     g_IcSpecialOnly [client] = false;
-
     g_SndStackMode [client] = 0;
-    g_SndHeadKillOn[client] = true;
-    KV_LoadExtraPrefs(client); // 个人播放定制只存 KV，进服时同步读取（与 DB 路径无关）
+    KV_LoadExtraPrefs(client);
 
     g_PrefsLoaded[client] = false;
     g_PrefsDirty [client] = false;
@@ -902,7 +922,8 @@ public void DB_RequestLoadPlayer(int client, const char[] sid)
         "SELECT \
            hitsound_head, hitsound_hit, hitsound_kill, \
            hiticon_head,  hiticon_hit,  hiticon_kill, \
-           hitsound_si_only, hiticon_si_only \
+           hitsound_si_only, hiticon_si_only, \
+           hitsound_stack_mode, hitsound_headkill \
          FROM `%!s` \
          WHERE steamid='%s' \
          LIMIT 1;",
@@ -922,6 +943,9 @@ public void ReloadAllPlayersPrefs()
     {
         if (!IsClientInGame(i) || IsFakeClient(i))
             continue;
+
+        // 兼容插件晚加载：在新 DB 列首次回写前先取得旧 KV 个人偏好。
+        KV_LoadExtraPrefs(i);
 
         if (GetConVarBool(cv_db_enable) && g_hDB != INVALID_HANDLE)
         {
@@ -985,6 +1009,12 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any d
         int ic_kill = SafeFetchInt(hndl, 5);
         int snd_si_only = SafeFetchInt(hndl, 6);
         int ic_si_only  = SafeFetchInt(hndl, 7);
+        bool migrateStackMode = SQL_IsFieldNull(hndl, 8);
+        bool migrateHeadKill = SQL_IsFieldNull(hndl, 9);
+        int stackMode = migrateStackMode ? g_SndStackMode[client] : SafeFetchInt(hndl, 8);
+        int headKillSet = migrateHeadKill ? g_SndHeadKill[client] : SafeFetchInt(hndl, 9);
+        if (stackMode < 0 || stackMode > 2) stackMode = 0;
+        ClampSetSnd(headKillSet);
 
         ClampSetSnd(hs_head); ClampSetSnd(hs_hit); ClampSetSnd(hs_kill);
         ClampSetIc (ic_head); ClampSetIc (ic_hit); ClampSetIc (ic_kill);
@@ -999,6 +1029,8 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any d
 
         g_SndSpecialOnly[client] = (snd_si_only != 0);
         g_IcSpecialOnly [client] = (ic_si_only != 0);
+        g_SndStackMode [client] = stackMode;
+        g_SndHeadKill[client] = headKillSet;
 
         // 推断最近套装（三项相同才记录）
         if (g_SndHead[client]>0 && g_SndHead[client]==g_SndHit[client] && g_SndHead[client]==g_SndKill[client])
@@ -1008,6 +1040,14 @@ public void SQL_OnLoadPrefs(Handle owner, Handle hndl, const char[] error, any d
 
         g_PrefsLoaded[client] = true;
         g_PrefsDirty [client] = false;
+
+        // NULL 表示列刚迁移：保留旧 KV 偏好并回写数据库。
+        if (migrateStackMode || migrateHeadKill)
+        {
+            g_PrefsDirty[client] = true;
+            g_DBSavePending[client] = true;
+            DB_SavePlayerPrefs(client);
+        }
     }
     else
     {
@@ -1041,15 +1081,18 @@ void DB_SavePlayerPrefs(int client)
     int ic_head = g_IcHead [client], ic_hit = g_IcHit [client], ic_kill = g_IcKill[client];
     int snd_si_only = g_SndSpecialOnly[client] ? 1 : 0;
     int ic_si_only  = g_IcSpecialOnly [client] ? 1 : 0;
+    int stack_mode  = g_SndStackMode [client];
+    int headkill_set = g_SndHeadKill[client];
 
     char q[1536];
     SQL_FormatQuery(g_hDB, q, sizeof(q),
         "INSERT INTO `%!s` ( \
             steamid, hitsound_head, hitsound_hit, hitsound_kill, \
             hiticon_head, hiticon_hit, hiticon_kill, \
-            hitsound_si_only, hiticon_si_only \
+            hitsound_si_only, hiticon_si_only, \
+            hitsound_stack_mode, hitsound_headkill \
         ) \
-        VALUES ('%s', %d, %d, %d, %d, %d, %d, %d, %d) \
+        VALUES ('%s', %d, %d, %d, %d, %d, %d, %d, %d, %d, %d) \
         ON DUPLICATE KEY UPDATE \
             hitsound_head=VALUES(hitsound_head), \
             hitsound_hit =VALUES(hitsound_hit), \
@@ -1058,8 +1101,11 @@ void DB_SavePlayerPrefs(int client)
             hiticon_hit  =VALUES(hiticon_hit), \
             hiticon_kill =VALUES(hiticon_kill), \
             hitsound_si_only=VALUES(hitsound_si_only), \
-            hiticon_si_only =VALUES(hiticon_si_only);",
-        table, sid, hs_head, hs_hit, hs_kill, ic_head, ic_hit, ic_kill, snd_si_only, ic_si_only);
+            hiticon_si_only =VALUES(hiticon_si_only), \
+            hitsound_stack_mode=VALUES(hitsound_stack_mode), \
+            hitsound_headkill=VALUES(hitsound_headkill);",
+        table, sid, hs_head, hs_hit, hs_kill, ic_head, ic_hit, ic_kill,
+        snd_si_only, ic_si_only, stack_mode, headkill_set);
 
     DataPack pack = new DataPack();
     pack.WriteCell(GetClientUserId(client));
@@ -1120,16 +1166,15 @@ void KV_SavePlayer(int client)
 
     KvSetNum(g_SoundStore, "SndSpecialOnly", g_SndSpecialOnly[client] ? 1 : 0);
     KvSetNum(g_SoundStore, "IcSpecialOnly",  g_IcSpecialOnly [client] ? 1 : 0);
-
-    KvSetNum(g_SoundStore, "SndStackMode", g_SndStackMode [client]);
-    KvSetNum(g_SoundStore, "SndHeadKill",  g_SndHeadKillOn[client] ? 1 : 0);
+    KvSetNum(g_SoundStore, "SndStackMode", g_SndStackMode[client]);
+    KvSetNum(g_SoundStore, "SndHeadKillSet", g_SndHeadKill[client]);
+    KvSetNum(g_SoundStore, "SndHeadKill", g_SndHeadKill[client] > 0 ? 1 : 0); // 兼容旧版回滚
 
     KvGoBack(g_SoundStore);
     KvRewind(g_SoundStore);
     KeyValuesToFile(g_SoundStore, g_SavePath);
 }
 
-// 仅读取个人播放定制两项（KV 专属字段，DB 加载路径也要调用）
 void KV_LoadExtraPrefs(int client)
 {
     char uid[128] = "";
@@ -1140,8 +1185,16 @@ void KV_LoadExtraPrefs(int client)
     {
         int mode = KvGetNum(g_SoundStore, "SndStackMode", 0);
         if (mode < 0 || mode > 2) mode = 0;
-        g_SndStackMode [client] = mode;
-        g_SndHeadKillOn[client] = (KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0);
+        g_SndStackMode[client] = mode;
+
+        int headKillSet = KvGetNum(g_SoundStore, "SndHeadKillSet", -1);
+        if (headKillSet < 0)
+        {
+            bool legacyEnabled = (KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0);
+            headKillSet = legacyEnabled ? KvGetNum(g_SoundStore, "SndHead", KvGetNum(g_SoundStore, "SndSuite", 0)) : 0;
+        }
+        ClampSetSnd(headKillSet);
+        g_SndHeadKill[client] = headKillSet;
         KvGoBack(g_SoundStore);
     }
     KvRewind(g_SoundStore);
@@ -1171,8 +1224,12 @@ void KV_LoadPlayer(int client)
 
     int stackMode = KvGetNum(g_SoundStore, "SndStackMode", 0);
     if (stackMode < 0 || stackMode > 2) stackMode = 0;
-    g_SndStackMode [client] = stackMode;
-    g_SndHeadKillOn[client] = (KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0);
+    g_SndStackMode[client] = stackMode;
+    int headKillSet = KvGetNum(g_SoundStore, "SndHeadKillSet", -1);
+    if (headKillSet < 0)
+        headKillSet = KvGetNum(g_SoundStore, "SndHeadKill", 1) != 0 ? g_SndHead[client] : 0;
+    ClampSetSnd(headKillSet);
+    g_SndHeadKill[client] = headKillSet;
 
     // 兼容旧 KV 键：若音效三项全0，尝试旧 Snd
     if (g_SndHead[client]==0 && g_SndHit[client]==0 && g_SndKill[client]==0) {
@@ -1241,7 +1298,7 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
             if (setId > 0) ShowOverlayBySet(attacker, setId, headshot ? 0 : 2);
         }
 
-        // 音效（按项）
+        // 音效（按项）：致死只在这里播一声
         if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
         {
             char s[PLATFORM_MAX_PATH];
@@ -1275,14 +1332,14 @@ public Action Event_PlayerHurt(Handle event, const char[] name, bool dontBroadca
 
         if (!g_IsVictimDeadPlayer[victim])
         {
-            // 图标：爆头/命中
+            // 图标：爆头/命中（致死帧走击杀覆盖图）
             if (GetConVarInt(cv_pic_enable) == 1 && ShouldShowIconFeedback(attacker, specialTarget))
             {
                 int setId = headshot ? g_IcHead[attacker] : g_IcHit[attacker];
                 if (setId > 0) ShowOverlayBySet(attacker, setId, headshot ? 0 : 1);
             }
 
-            // 音效：爆头/命中
+            // 音效：爆头/命中。致死由死亡事件播一声；火/燃烧弹过滤保持不变
             if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
             {
                 char weapon[64];
@@ -1360,15 +1417,13 @@ public Action Event_InfectedHurt(Handle event, const char[] name, bool dontBroad
                 if (setId > 0) ShowOverlayBySet(attacker, setId, headshot ? 0 : 1);
             }
 
-            // 音效：爆头/命中
+            // 音效：爆头/命中。致死由死亡事件播一声
             if (GetConVarInt(cv_sound_enable) == 1 && ShouldPlaySoundFeedback(attacker, specialTarget))
             {
                 char s2[PLATFORM_MAX_PATH];
                 int setId = headshot ? g_SndHead[attacker] : g_SndHit[attacker];
                 if (setId > 0 && GetSoundPath_BySet(setId, headshot ? 0 : 1, s2, sizeof(s2)))
-                {
                     QueueSoundFeedback(attacker, setId, s2, headshot ? SOUND_FEEDBACK_HEADSHOT : SOUND_FEEDBACK_HIT);
-                }
             }
         }
     }
@@ -1465,28 +1520,6 @@ static void PrecacheAllAssets()
 // ========================================================
 // Commands & Menus
 // ========================================================
-public Action Cmd_ToggleUI(int client, int args)
-{
-    if (client <= 0 || !IsClientInGame(client)) return Plugin_Handled;
-
-    // 在 0 与 套装1（若存在）之间切换图标三项
-    if (g_OvCount >= 1)
-    {
-        bool turnOn = (g_IcHead[client]==0 && g_IcHit[client]==0 && g_IcKill[client]==0);
-        int v = turnOn ? 1 : 0;
-        g_IcSuite[client] = turnOn ? 1 : 0;
-        g_IcHead[client]  = v;
-        g_IcHit[client]   = v;
-        g_IcKill[client]  = v;
-        PrintToChat(client, "%t", "L4D2Hitsound_OverlayIcon", turnOn ? "开启" : "关闭", turnOn ? "套装1" : "禁用");
-        MarkDirtyAndSave(client);
-    }
-    else
-    {
-        PrintToChat(client, "%t", "L4D2Hitsound_CurrentlyNoIconSetsAvailable");
-    }
-    return Plugin_Handled;
-}
 
 public Action Cmd_ReloadAll(int client, int args)
 {
@@ -1512,13 +1545,14 @@ public Action Cmd_MenuMain(int client, int args)
     Handle menu = CreateMenu(MenuHandler_Main);
     char title[256];
 
-    char sndHead[8], sndHit[8], sndKill[8];
+    char sndHead[8], sndHit[8], sndKill[8], sndHeadKill[8];
     char icHead[8],  icHit[8],  icKill[8];
     char sndScope[16], icScope[16];
 
     FormatMenuSetValue(g_SndHead[client], g_SetCount, sndHead, sizeof(sndHead));
     FormatMenuSetValue(g_SndHit [client], g_SetCount, sndHit,  sizeof(sndHit ));
     FormatMenuSetValue(g_SndKill[client], g_SetCount, sndKill, sizeof(sndKill));
+    FormatMenuSetValue(g_SndHeadKill[client], g_SetCount, sndHeadKill, sizeof(sndHeadKill));
 
     FormatMenuSetValue(g_IcHead[client], g_OvCount, icHead, sizeof(icHead));
     FormatMenuSetValue(g_IcHit [client], g_OvCount, icHit,  sizeof(icHit ));
@@ -1528,31 +1562,24 @@ public Action Cmd_MenuMain(int client, int args)
     strcopy(icScope,  sizeof(icScope),  g_IcSpecialOnly [client] ? "仅特感" : "全部");
 
     Format(title, sizeof(title),
-        "命中反馈设置\n音效(爆头/命中/击杀): %s/%s/%s [%s]\n图标(爆头/命中/击杀): %s/%s/%s [%s]",
-        sndHead, sndHit, sndKill, sndScope, icHead, icHit, icKill, icScope);
+        "命中反馈设置\n音效(爆头/命中/击杀/爆头击杀): %s/%s/%s/%s [%s]\n图标(爆头/命中/击杀): %s/%s/%s [%s]",
+        sndHead, sndHit, sndKill, sndHeadKill, sndScope, icHead, icHit, icKill, icScope);
     SetMenuTitle(menu, title);
 
     // 玩家：按套装设置
     AddMenuItem(menu, "sound_sets", "音效套装（玩家）");
     AddMenuItem(menu, "icon_sets",  "图标套装（玩家）");
 
-    // 快捷：一键开关图标三项（0 <-> 套装1）
-    AddMenuItem(menu, "overlay_quick", "覆盖图标一键开关（玩家）");
-
-    // 特定开关（非管理员也可用）：三项在 0 与 最近套装ID 之间切
-    AddMenuItem(menu, "snd_toggle_each", "特定音效开关（命中/击杀/爆头）");
+    // 特定开关/选择（非管理员也可用）
+    AddMenuItem(menu, "snd_toggle_each", "特定音效设置（含爆头击杀）");
     AddMenuItem(menu, "ico_toggle_each", "特定图标开关（命中/击杀/爆头）");
 
-    // 个人播放定制（非管理员可用）
-    char headKillLabel[128], stackLabel[160];
-    Format(headKillLabel, sizeof(headKillLabel), "爆头击杀专用音：%s（关=回退普通爆头音）",
-        g_SndHeadKillOn[client] ? "开" : "关");
+    char stackLabel[160];
     char modeName[16];
     if (g_SndStackMode[client] == 1)      strcopy(modeName, sizeof(modeName), "强制叠加");
     else if (g_SndStackMode[client] == 2) strcopy(modeName, sizeof(modeName), "强制合并");
     else                                  strcopy(modeName, sizeof(modeName), "跟随套装");
     Format(stackLabel, sizeof(stackLabel), "音效播放模式：%s（点击切换）", modeName);
-    AddMenuItem(menu, "snd_headkill",   headKillLabel);
     AddMenuItem(menu, "snd_stack_mode", stackLabel);
     AddMenuItem(menu, "snd_special_only", g_SndSpecialOnly[client] ? "音效范围：仅特感/Tank" : "音效范围：全部感染者");
     AddMenuItem(menu, "ico_special_only", g_IcSpecialOnly [client] ? "图标范围：仅特感/Tank" : "图标范围：全部感染者");
@@ -1591,12 +1618,6 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
             OpenIconSetMenu_Player(client);
             return 0;
         }
-        if (StrEqual(info, "overlay_quick"))
-        {
-            Cmd_ToggleUI(client, 0);
-            Cmd_MenuMain(client, 0);
-            return 0;
-        }
         if (StrEqual(info, "snd_toggle_each"))
         {
             OpenToggleEachMenu(client, true);
@@ -1605,14 +1626,6 @@ public int MenuHandler_Main(Handle menu, MenuAction action, int client, int item
         if (StrEqual(info, "ico_toggle_each"))
         {
             OpenToggleEachMenu(client, false);
-            return 0;
-        }
-        if (StrEqual(info, "snd_headkill"))
-        {
-            g_SndHeadKillOn[client] = !g_SndHeadKillOn[client];
-            PrintToChat(client, "%t", g_SndHeadKillOn[client] ? "L4D2Hitsound_HeadKillSoundOn" : "L4D2Hitsound_HeadKillSoundOff");
-            MarkDirtyAndSave(client);
-            Cmd_MenuMain(client, 0);
             return 0;
         }
         if (StrEqual(info, "snd_stack_mode"))
@@ -1667,7 +1680,7 @@ static void OpenSoundSetMenu_Player(int client)
     Format(title, sizeof(title), "选择音效套装（玩家，当前: %s）", cur);
     SetMenuTitle(m, title);
 
-    AddMenuItem(m, "snd_0", "0 - 关闭三项音效");
+    AddMenuItem(m, "snd_0", "0 - 关闭四项音效");
     for (int i = 1; i <= g_SetCount; i++)
     {
         char key[16], name[64], label[96];
@@ -1700,12 +1713,63 @@ public int MenuHandler_SndSets_Player(Handle menu, MenuAction action, int client
             if (val > g_SetCount) val = 0;
 
             g_SndSuite[client] = val; // 记住最近套装（非管理员开关用）
-            g_SndHead[client] = g_SndHit[client] = g_SndKill[client] = val;
+            g_SndHead[client] = g_SndHit[client] = g_SndKill[client] = g_SndHeadKill[client] = val;
 
-            PrintToChat(client, "%t", "L4D2Hitsound_HitsoundSoundEffectPackageThree", val);
+            PrintToChat(client, "%t", "L4D2Hitsound_HitsoundSoundEffectPackageFour", val);
+            if (ApplySoundSetPersonalDefaults(client, val))
+                PrintToChat(client, "%t", "L4D2Hitsound_SetPlaybackPreset");
             MarkDirtyAndSave(client);
 
             OpenSoundSetMenu_Player(client);
+        }
+    }
+    return 0;
+}
+
+static void OpenHeadKillSetMenu(int client)
+{
+    Handle m = CreateMenu(MenuHandler_HeadKillSet);
+    char current[16];
+    FormatMenuSetValue(g_SndHeadKill[client], g_SetCount, current, sizeof(current));
+
+    char title[128];
+    Format(title, sizeof(title), "爆头击杀音效（当前: %s，0=回退普通爆头音）", current);
+    SetMenuTitle(m, title);
+    AddMenuItem(m, "hksnd_0", "0 - 不使用爆头击杀专用音");
+
+    for (int i = 1; i <= g_SetCount; i++)
+    {
+        char key[16], name[64], label[96];
+        Format(key, sizeof(key), "hksnd_%d", i);
+        GetArrayString(g_SetNames, i - 1, name, sizeof(name));
+        Format(label, sizeof(label), "%d - %s", i, name);
+        AddMenuItem(m, key, label);
+    }
+
+    SetMenuExitBackButton(m, true);
+    DisplayMenu(m, client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HeadKillSet(Handle menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End) { CloseHandle(menu); }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack)
+    {
+        OpenToggleEachMenu(client, true);
+        return 0;
+    }
+    if (action == MenuAction_Select)
+    {
+        char info[16]; GetMenuItem(menu, item, info, sizeof(info));
+        if (StrContains(info, "hksnd_", false) == 0)
+        {
+            ReplaceString(info, sizeof(info), "hksnd_", "");
+            int setId = StringToInt(info);
+            ClampSetSnd(setId);
+            g_SndHeadKill[client] = setId;
+            PrintToChat(client, "%t", "L4D2Hitsound_HeadKillSoundSet", setId);
+            MarkDirtyAndSave(client);
+            OpenHeadKillSetMenu(client);
         }
     }
     return 0;
@@ -1772,11 +1836,18 @@ public int MenuHandler_OvSets_Player(Handle menu, MenuAction action, int client,
 static void OpenToggleEachMenu(int client, bool sound)
 {
     Handle m = CreateMenu(MenuHandler_ToggleEach);
-    SetMenuTitle(m, sound ? "特定音效开关" : "特定图标开关");
+    SetMenuTitle(m, sound ? "特定音效设置" : "特定图标开关");
 
     AddMenuItem(m, sound ? "tgsnd_hit"  : "tgico_hit",      sound ? "命中音效 开/关" : "命中图标 开/关");
     AddMenuItem(m, sound ? "tgsnd_kill" : "tgico_kill",     sound ? "击杀音效 开/关" : "击杀图标 开/关");
     AddMenuItem(m, sound ? "tgsnd_head" : "tgico_head",     sound ? "爆头音效 开/关" : "爆头图标 开/关");
+    if (sound)
+    {
+        char current[16], label[96];
+        FormatMenuSetValue(g_SndHeadKill[client], g_SetCount, current, sizeof(current));
+        Format(label, sizeof(label), "爆头击杀音效 选择套装（当前: %s）", current);
+        AddMenuItem(m, "tgsnd_headkill", label);
+    }
 
     SetMenuExitBackButton(m, true);
     DisplayMenu(m, client, MENU_TIME_FOREVER);
@@ -1826,6 +1897,11 @@ public int MenuHandler_ToggleEach(Handle menu, MenuAction action, int client, in
                 g_SndHead[client] = 0; PrintToChat(client, "%t", "L4D2Hitsound_HeadshotSoundEffectTurnedOff"); MarkDirtyAndSave(client);
             }
             OpenToggleEachMenu(client, true);
+            return 0;
+        }
+        if (StrEqual(info, "tgsnd_headkill"))
+        {
+            OpenHeadKillSetMenu(client);
             return 0;
         }
 

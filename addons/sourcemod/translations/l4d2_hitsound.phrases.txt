@@ -16,9 +16,9 @@
 	{
 		"en"		"Icon range: %s"
 	}
-	"L4D2Hitsound_HitsoundSoundEffectPackageThree"
+	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"en"		"[Hitsound] Sound effect package (three items) has been set to: %d"
+		"en"		"[Hitsound] Sound effect package (four items) has been set to: %d"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -116,13 +116,9 @@
 	{
 		"en"		"Kill icon: set to %d"
 	}
-	"L4D2Hitsound_HeadKillSoundOn"
+	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"en"		"Headshot-kill sound: ON (headshot kills play the set's dedicated sound when configured)"
-	}
-	"L4D2Hitsound_HeadKillSoundOff"
-	{
-		"en"		"Headshot-kill sound: OFF (headshot kills fall back to the normal headshot sound)"
+		"en"		"Headshot-kill sound: set to %d (0 uses the regular headshot sound)"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
@@ -135,5 +131,9 @@
 	"L4D2Hitsound_StackModeMerge"
 	{
 		"en"		"Sound playback mode: force merging (at most one sound per frame, priority kill > headshot > hit)"
+	}
+	"L4D2Hitsound_SetPlaybackPreset"
+	{
+		"en"		"[Hitsound] Applied this set's sound range."
 	}
 }

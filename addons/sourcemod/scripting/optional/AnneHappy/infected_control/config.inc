@@ -184,6 +184,7 @@ enum struct Config
     ConVar AntiBaitPairDist;
     ConVar AntiBaitIsolateDist;
     ConVar AntiBaitTankPressureDist;
+    ConVar AntiBaitLowHp;
     ConVar AntiBaitDebug;
     ConVar TraitorEnable;
     ConVar TraitorMaxSlots;
@@ -214,6 +215,7 @@ enum struct Config
     float  fAntiBaitPairDist;
     float  fAntiBaitIsolateDist;
     float  fAntiBaitTankPressureDist;
+    int    iAntiBaitLowHp;
     bool   bAntiBaitDebug;
     bool   bTraitorEnable;
     int    iTraitorMaxSlots;
@@ -454,9 +456,11 @@ enum struct Config
             "inf_nav_high_sort_scale", "0.85 1.00 0.95 1.00 1.00 1.00",
             "有向候选排序的高点距离折减(S,B,H,P,J,C)；<1 时高于目标的候选按折减后距离前置，1.00=不折减",
             CVAR_FLAG);
+        // 高点判定的统一起点：ranked 排序折减、Nav 距离折减和最终分高点
+        // 奖励三处共用这一个阈值，参考面统一为目标眼位。
         this.NavHighSortMinHeight = CreateConVar(
             "inf_nav_high_sort_min_height", "64.0",
-            "候选中心高于目标眼位多少单位后才参与高点排序折减",
+            "高点统一起点：候选中心高于目标眼位多少单位后才算高点（同时作用于排序折减、Nav距离折减和最终分高点奖励）",
             CVAR_FLAG, true, 0.0, true, 1000.0);
         this.ScoreLowHeightStart = CreateConVar(
             "inf_score_low_height_start", "50.0",
@@ -482,12 +486,15 @@ enum struct Config
             "inf_score_low_height_behind_multiplier", "2.0",
             "候选Nav进度落后目标时，低点扣分倍率",
             CVAR_FLAG, true, 1.0, true, 10.0);
+        // 奖励要能偏好高点，但不能大到把最终分顶到 100 的钳位上——那样所有
+        // 高台候选会并列满分，距离/Flow/分散/战术分全部失效。3 分/50u、
+        // 上限 20 让它退回“决胜项”的定位。
         this.ScoreHighHeightPer50 = CreateConVar(
-            "inf_score_high_height_per_50", "6.0",
-            "Smoker/Hunter候选点每高于目标脚部满50u增加的最终评分",
+            "inf_score_high_height_per_50", "3.0",
+            "Smoker/Hunter候选点自高点起点起每满50u增加的最终评分（再按可落下质量折算）",
             CVAR_FLAG, true, 0.0, true, 100.0);
         this.ScoreHighHeightCap = CreateConVar(
-            "inf_score_high_height_cap", "100.0",
+            "inf_score_high_height_cap", "20.0",
             "Smoker/Hunter高点最终评分奖励上限；0关闭",
             CVAR_FLAG, true, 0.0, true, 100.0);
         this.ScoreBehindPerFlow = CreateConVar(
@@ -781,6 +788,11 @@ enum struct Config
             "Tank distance to any living survivor that clears an anti-bait hold; 0 restores any-active-Tank behavior",
             CVAR_FLAG, true, 0.0, true, 5000.0
         );
+        this.AntiBaitLowHp = CreateConVar(
+            "inf_antibait_lowhp", "40",
+            "Pause anti-bait when every standing survivor has permanent HP below this and nobody alive carries a kit, defib, pills, or adrenaline; 0 disables",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
         this.AntiBaitDebug = CreateConVar(
             "inf_antibait_debug", "0",
             "Log anti-bait state transitions even when inf_DebugMode is off",
@@ -881,6 +893,7 @@ enum struct Config
         this.AntiBaitPairDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitIsolateDist.AddChangeHook(OnCfgChanged);
         this.AntiBaitTankPressureDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitLowHp.AddChangeHook(OnCfgChanged);
         this.AntiBaitDebug.AddChangeHook(OnCfgChanged);
         this.TraitorEnable.AddChangeHook(OnCfgChanged);
         this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
@@ -1232,6 +1245,7 @@ enum struct Config
         this.fAntiBaitPairDist = this.AntiBaitPairDist.FloatValue;
         this.fAntiBaitIsolateDist = this.AntiBaitIsolateDist.FloatValue;
         this.fAntiBaitTankPressureDist = this.AntiBaitTankPressureDist.FloatValue;
+        this.iAntiBaitLowHp = this.AntiBaitLowHp.IntValue;
         this.bAntiBaitDebug = this.AntiBaitDebug.BoolValue;
         if (this.fAntiBaitMinSiRatio < 0.0) this.fAntiBaitMinSiRatio = 0.0;
         if (this.fAntiBaitMinSiRatio > 1.0) this.fAntiBaitMinSiRatio = 1.0;
@@ -1246,6 +1260,7 @@ enum struct Config
         if (this.fAntiBaitPairDist < 0.0) this.fAntiBaitPairDist = 0.0;
         if (this.fAntiBaitIsolateDist < 0.0) this.fAntiBaitIsolateDist = 0.0;
         if (this.fAntiBaitTankPressureDist < 0.0) this.fAntiBaitTankPressureDist = 0.0;
+        if (this.iAntiBaitLowHp < 0) this.iAntiBaitLowHp = 0;
     }
 
     int GetMaxPlayerZombieBound()

@@ -161,7 +161,10 @@ static int PickEligibleKillerClass()
     for (int tries = 0; tries < 8; tries++)
     {
         int k = ks[GetRandomInt(0, 3)];
-        if (!CheckClassEnabled(k) || HasReachedLimit(k))
+        // 用 CanQueueClass 而不是 HasReachedLimit：后者只看活体额度，
+        // 会挑出一个“已经排满队”的职业，入队后立刻被 TryNormalSpawnOnce
+        // 丢弃，白白空转一轮补位。
+        if (!CheckClassEnabled(k) || !CanQueueClass(k))
             continue;
         if (!relax && !PassDeathCooldown(k))
             continue;
@@ -174,7 +177,7 @@ static int PickEligibleKillerClass()
     for (int i = 0; i < 4; i++)
     {
         int k = ks[i];
-        if (CheckClassEnabled(k) && !HasReachedLimit(k) && (relax || PassDeathCooldown(k))
+        if (CheckClassEnabled(k) && CanQueueClass(k) && (relax || PassDeathCooldown(k))
             && (!supportLocked || !IsSupportGateClassInt(k)))
             return k;
     }

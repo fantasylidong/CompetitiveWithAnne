@@ -4,9 +4,19 @@
 #define _infected_control_spawn_score_included
 
 #define SPAWN_SCORE_FIRST_FIT       80.0
+// 最终分并列的判定容差（见 spawn_core.inc 的候选择优）。
+#define SPAWN_SCORE_TIE_EPSILON      0.01
 #define SPAWN_SCORE_TACTICAL_BLEND_NORMAL  0.10
 #define SPAWN_SCORE_TACTICAL_BLEND_BREACH  0.18
 #define SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS  50.0
+#define SPAWN_SCORE_HIGH_HEIGHT_STEP_UNITS 50.0
+// 从高点直落后，落点距最近生还者多远仍算“扑得到”。
+#define SPAWN_SCORE_DROP_USEFUL_RANGE     450.0
+#define SPAWN_SCORE_DROP_BONUS_POINTS      18.0
+// “高但下不去”时保留的高点奖励比例。Smoker 在高处即使不下来也有拉人
+// 视野，所以底比 Hunter 高；Hunter 的价值几乎全在能不能扑下去。
+#define SPAWN_SCORE_HIGH_DROP_FLOOR_SMOKER  0.50
+#define SPAWN_SCORE_HIGH_DROP_FLOOR_HUNTER  0.25
 
 static float SpawnScore_ExpF(float x)
 {
@@ -17,6 +27,17 @@ static float SpawnScore_SmoothStep(float value)
 {
     float t = ClampFloat(value, 0.0, 1.0);
     return t * t * (3.0 - 2.0 * t);
+}
+
+// 高点判定的唯一起点与唯一参考面。
+// 三处机制——Nav 距离折减(spawn_tactics.inc)、ranked 排序折减(扩展侧)、
+// 最终分高点奖励——全部以“候选中心高于【目标眼位】多少”为口径，并共用
+// inf_nav_high_sort_min_height 这一个阈值。历史版本里它们分别用
+// 眼位+32 / 眼位+64 / 脚部+50 三个起点和两个参考面，导致同层平地也能拿
+// 高点奖励，且三者互相错位。
+stock float HighGround_GetStartZ()
+{
+    return FloatMax(0.0, gCV.fNavHighSortMinHeight);
 }
 
 float GetMinDistToAnySurvivor(const float p[3])
@@ -118,7 +139,28 @@ static void GetClassHeightScoreRange(int zc, float &scoreMin, float &scoreMax)
     }
 }
 
-stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
+// 0..1 的“能不能真的扑/落下去”。1 = 直下落点就在生还者脚边；
+// 0 = 480u 内没有可站落点（例如太高的屋顶），或落点离所有人都超过 450u。
+// 每个候选只计算一次：内部有一次向下 Trace 和一次 nearest-nav，属于昂贵
+// 操作，高度分和高点奖励共用同一份结果。
+static float SpawnScore_GetDropQuality(int zc, const float p[3])
+{
+    if (!SpawnScore_IsHighGroundClass(zc))
+        return 0.0;
+
+    float land[3];
+    if (!FindDropLanding(p, land))
+        return 0.0;
+
+    float distance = GetMinDistToAnySurvivor(land);
+    if (distance >= SPAWN_SCORE_DROP_USEFUL_RANGE)
+        return 0.0;
+
+    return 1.0 - distance / SPAWN_SCORE_DROP_USEFUL_RANGE;
+}
+
+stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ,
+                                  float dropQuality)
 {
     float zRel = p[2] - refEyeZ;
     float score;
@@ -153,16 +195,7 @@ stock float CalculateScore_Height(int zc, const float p[3], float refEyeZ)
         }
     }
 
-    if (zc == view_as<int>(SI_Hunter) || zc == view_as<int>(SI_Smoker))
-    {
-        float land[3];
-        if (FindDropLanding(p, land))
-        {
-            float d = GetMinDistToAnySurvivor(land);
-            if (d < 450.0)
-                score += 18.0 * (1.0 - d / 450.0);
-        }
-    }
+    score += SPAWN_SCORE_DROP_BONUS_POINTS * ClampFloat(dropQuality, 0.0, 1.0);
 
     float scoreMin, scoreMax;
     GetClassHeightScoreRange(zc, scoreMin, scoreMax);
@@ -258,21 +291,41 @@ static bool SpawnScore_IsHighGroundClass(int zc)
         || zc == view_as<int>(SI_Hunter);
 }
 
-static float ComputeHighHeightBonus(int zc, float candZ, float targetFootZ,
-                                    float &rise, int &steps)
+static float SpawnScore_GetHighDropFloor(int zc)
 {
-    rise = FloatMax(0.0, candZ - targetFootZ);
+    return zc == view_as<int>(SI_Smoker)
+        ? SPAWN_SCORE_HIGH_DROP_FLOOR_SMOKER
+        : SPAWN_SCORE_HIGH_DROP_FLOOR_HUNTER;
+}
+
+// rise 为带符号的“高于目标眼位”，低于 HighGround_GetStartZ() 一律 0 分：
+// 同层平地不再有任何高度奖励。奖励再按 dropQuality 折算，让“高但下不去”
+// 的点只拿到 SPAWN_SCORE_HIGH_DROP_FLOOR_* 那一档。
+static float ComputeHighHeightBonus(int zc, float candZ, float refEyeZ,
+                                    float dropQuality,
+                                    float &rise, int &steps, float &dropFactor)
+{
+    rise = candZ - refEyeZ;
     steps = 0;
+    dropFactor = 0.0;
+
+    float startZ = HighGround_GetStartZ();
     if (!SpawnScore_IsHighGroundClass(zc)
         || gCV.fScoreHighHeightCap <= 0.0
-        || rise < SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS)
+        || rise < startZ)
     {
         return 0.0;
     }
 
-    steps = RoundToFloor(rise / SPAWN_SCORE_LOW_HEIGHT_STEP_UNITS);
+    steps = RoundToFloor(
+        (rise - startZ) / SPAWN_SCORE_HIGH_HEIGHT_STEP_UNITS) + 1;
+
+    float dropFloor = SpawnScore_GetHighDropFloor(zc);
+    dropFactor = dropFloor
+        + (1.0 - dropFloor) * ClampFloat(dropQuality, 0.0, 1.0);
+
     return FloatMin(gCV.fScoreHighHeightCap,
-        float(steps) * gCV.fScoreHighHeightPer50);
+        float(steps) * gCV.fScoreHighHeightPer50) * dropFactor;
 }
 
 stock float ComputeFFThreshold()
@@ -416,6 +469,8 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.lowHeightMultiplier = src.lowHeightMultiplier;
     dest.highHeightBonus = src.highHeightBonus;
     dest.highHeightRise = src.highHeightRise;
+    dest.highHeightDropFactor = src.highHeightDropFactor;
+    dest.dropQuality = src.dropQuality;
     dest.tacticalQuality = src.tacticalQuality;
     dest.dTargetEye = src.dTargetEye;
     dest.navDistance = src.navDistance;
@@ -424,7 +479,6 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.navHighSortScale = src.navHighSortScale;
     dest.navHighGroundComp = src.navHighGroundComp;
     dest.ringEff = src.ringEff;
-    dest.slack = src.slack;
     dest.sweet = src.sweet;
     dest.width = src.width;
     dest.candBucket = src.candBucket;
@@ -447,7 +501,6 @@ bool SpawnScore_BuildCandidate(int zc,
                                       float navHighGroundComp,
                                       float minRange,
                                       float ringEff,
-                                      float slack,
                                       int candBucket,
                                       int centerBucket,
                                       bool rawBadFlow,
@@ -469,7 +522,8 @@ bool SpawnScore_BuildCandidate(int zc,
     float scoreDistance = navDistanceEffective >= 0.0
         ? navDistanceEffective : dTargetEye;
     float scoreDist = ScoreDistSmooth(scoreDistance, sweet, width);
-    float scoreHeight = CalculateScore_Height(zc, pos, refEyeZ);
+    float dropQuality = SpawnScore_GetDropQuality(zc, pos);
+    float scoreHeight = CalculateScore_Height(zc, pos, refEyeZ, dropQuality);
 
     int deltaFlow = candBucket - centerBucket;
     float flowBase = ScoreFlowSmooth(zc, deltaFlow);
@@ -490,8 +544,10 @@ bool SpawnScore_BuildCandidate(int zc,
     float extraPenalty = behindPenalty + lowHeightPenalty;
     float highHeightRise;
     int highHeightSteps;
+    float highHeightDropFactor;
     float highHeightBonus = ComputeHighHeightBonus(
-        zc, pos[2], targetFootZ, highHeightRise, highHeightSteps);
+        zc, pos[2], refEyeZ, dropQuality,
+        highHeightRise, highHeightSteps, highHeightDropFactor);
 
     float weightedQuality = SpawnScore_WeightedAverage(
         zc, scoreDist, scoreHeight, scoreFlow, dispScaled);
@@ -525,12 +581,13 @@ bool SpawnScore_BuildCandidate(int zc,
     dbg.highHeightBonus = highHeightBonus;
     dbg.highHeightRise = highHeightRise;
     dbg.highHeightSteps = highHeightSteps;
+    dbg.highHeightDropFactor = highHeightDropFactor;
+    dbg.dropQuality = dropQuality;
     dbg.dTargetEye = dTargetEye;
     dbg.navDistance = navDistance;
     dbg.navDistanceEffective = navDistanceEffective;
     dbg.navHighGroundComp = navHighGroundComp;
     dbg.ringEff = ringEff;
-    dbg.slack = slack;
     dbg.sweet = sweet;
     dbg.width = width;
     dbg.candBucket = candBucket;
@@ -554,17 +611,18 @@ void LogChosenSpawnScore(int zc, const SpawnScoreDbg dbg)
     if (IsValidSurvivor(fb))
         TryGetClientFlowPercentSafe(fb, surReal);
 
-    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f quality=%.1f tacticalQ=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f kern=%.2f) highBonus=%.1f(rise=%.1f steps=%d) extraPen=%.1f(back=%.1f low=%.1f) lowGeom=foot%.1f/drop%.1f/steps%d/x%.1f | dTargetEye=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f highSort=%.2f highComp=%.1f navRangeMax=%.1f slack=%.1f | bkt=%d ctr=%d dF=%d known=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
+    Debug_Print("[SCORE-CHOSEN] %s pos=(%.1f,%.1f,%.1f) area=%d | tot=%.1f quality=%.1f tacticalQ=%.1f | dist=%.1f h=%.1f flow=%.1f disp=%.1f->%.1f(pK=%.2f kern=%.2f) highBonus=%.1f(rise=%.1f steps=%d dropQ=%.2f x%.2f) extraPen=%.1f(back=%.1f low=%.1f) lowGeom=foot%.1f/drop%.1f/steps%d/x%.1f | dTargetEye=%.1f navDistance=%.1f navRank=%.1f navEffective=%.1f highSort=%.2f highComp=%.1f navRangeMax=%.1f | bkt=%d ctr=%d dF=%d known=%d sec=%d | REAL: cand=%d%% sur=%d%% delta=%d%%",
         g_sInfectedClassNames[zc], dbg.pos[0], dbg.pos[1], dbg.pos[2], dbg.areaIdx,
         dbg.total, dbg.weightedQuality, dbg.tacticalQuality,
         dbg.dist, dbg.hght, dbg.flow, dbg.dispRaw, dbg.dispScaled, dbg.penK, dbg.dispKernel,
         dbg.highHeightBonus, dbg.highHeightRise, dbg.highHeightSteps,
+        dbg.dropQuality, dbg.highHeightDropFactor,
         dbg.extraPen, dbg.behindPen, dbg.lowHeightPen,
         dbg.targetFootZ, dbg.lowHeightDrop, dbg.lowHeightSteps,
         dbg.lowHeightMultiplier,
         dbg.dTargetEye, dbg.navDistance, dbg.navRankDistance,
         dbg.navDistanceEffective, dbg.navHighSortScale,
-        dbg.navHighGroundComp, dbg.ringEff, dbg.slack,
+        dbg.navHighGroundComp, dbg.ringEff,
         dbg.candBucket, dbg.centerBucket, dbg.deltaFlow,
         dbg.flowBucketKnown ? 1 : 0, dbg.sector,
         candReal, surReal, candReal - surReal);

@@ -543,6 +543,8 @@ CREATE TABLE `RPG` (
   `hiticon_kill` tinyint(4) NOT NULL DEFAULT '0',
   `hitsound_si_only` tinyint(4) NOT NULL DEFAULT '0',
   `hiticon_si_only` tinyint(4) NOT NULL DEFAULT '0',
+  `hitsound_stack_mode` tinyint(4) DEFAULT NULL,
+  `hitsound_headkill` tinyint(4) DEFAULT NULL,
   PRIMARY KEY (`steamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

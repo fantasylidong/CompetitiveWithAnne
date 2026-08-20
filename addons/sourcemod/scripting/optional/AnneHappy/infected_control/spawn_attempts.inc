@@ -124,21 +124,16 @@ static int GetAreaIndexForSpawnPoint(const float pos[3])
     return GetAreaIndexByNavID_Int(L4D_GetNavAreaID(nav));
 }
 
-static void RecordDirectorSpawnResult(const float pos[3], bool success)
+// 导演兜底点无论成功还是失败都短冷却同一个 NavArea：成功是为了分散，
+// 失败是为了下一档不要立刻再撞同一片区域。两种情况用同一个时长，因此
+// 这里不再接收 success 参数（历史版本的 if/else 两个分支完全相同）。
+static void RecordDirectorSpawnResult(const float pos[3])
 {
     int areaIdx = GetAreaIndexForSpawnPoint(pos);
     if (areaIdx < 0)
         return;
 
-    float now = GetGameTime();
-    if (success)
-    {
-        TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
-    }
-    else
-    {
-        TouchNavCooldown(areaIdx, now, NAV_CD_SECS);
-    }
+    TouchNavCooldown(areaIdx, GetGameTime(), NAV_CD_SECS);
 }
 
 #define ASSAULT_BURST_FOLLOWUP_DELAY 0.25
@@ -329,7 +324,7 @@ static void SpawnAttempts_CommitSpawn(
         WaveSpawnReport_RecordFallback(
             zc, client, mode, spawnCallMs, requestedPos,
             minRange, maxRange, targetSurvivor);
-        RecordDirectorSpawnResult(requestedPos, true);
+        RecordDirectorSpawnResult(requestedPos);
     }
     else
     {
@@ -878,7 +873,7 @@ void TryNormalSpawnOnce()
     }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound && !fallbackSpawned)
-        RecordDirectorSpawnResult(pt, fallbackSpawned);
+        RecordDirectorSpawnResult(pt);
 
     if (fallbackSpawned)
         return;
@@ -1053,7 +1048,7 @@ void TryTeleportSpawnOnce()
     }
     bool fallbackSpawned = (fallbackClient > 0);
     if (fallbackFound && !fallbackSpawned)
-        RecordDirectorSpawnResult(pt, fallbackSpawned);
+        RecordDirectorSpawnResult(pt);
 
     if (fallbackSpawned)
         return;

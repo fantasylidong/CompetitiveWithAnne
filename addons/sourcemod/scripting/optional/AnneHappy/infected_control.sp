@@ -79,7 +79,6 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #define NAV_UNSAFE_GEOMETRY_CD_SECS      30.0
 #define NAV_CANDIDATE_RANGE_SLACK      128.0
 #define NAV_PATH_DISTANCE_SCALE          2.0
-#define NAV_HIGH_GROUND_COMP_START_Z     32.0
 #define NAV_HIGH_GROUND_SMOKER_SCALE      1.5
 #define NAV_HIGH_GROUND_HUNTER_SCALE      1.15
 #define NAV_HIGH_GROUND_SMOKER_MAX     1000.0
@@ -89,7 +88,11 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 #define NAV_CANDIDATE_WARM_INTERVAL      0.1
 #define NAV_CANDIDATE_RESULT_TTL         0.2
 #define NAV_CANDIDATE_WARMUP_LEAD         1.0
-#define TACTICAL_BAND_STAGES      6
+// 档内近/中/远三分位需要足够宽的搜索环才有距离含义；窄于该宽度的
+// 环退化为单池，直接使用整档评分名额，避免 10 档下把 ~200u 的环
+// 再切成 3 段无区分度的伪三分位。
+#define NAV_TERTILE_MIN_RING_WIDTH     240.0
+#define TACTICAL_BAND_STAGES      10
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
 #define DIRECTOR_BASE_API_TRIES      7
@@ -229,7 +232,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-15.2",
+    version     = "2026-08-19.1",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -940,7 +943,9 @@ static void RequestStartSpawn(const char[] source)
     ResetMatchState();
     g_hFirstWaveTimer = CreateTimer(0.1, Timer_SpawnFirstWave, _, TIMER_FLAG_NO_MAPCHANGE);
     g_fFirstWaveRequestedAt = GetGameTime();
-    ReadSiCap();
+    // 必须用 RecalcSiCapFromAlive：gST.siCap[] 的口径是“剩余额度”，
+    // 而不是职业总上限。
+    RecalcSiCapFromAlive(true);
 }
 
 static Action Timer_SpawnFirstWave(Handle timer)
