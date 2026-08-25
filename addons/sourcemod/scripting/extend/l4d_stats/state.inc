@@ -309,7 +309,7 @@ new bool:g_bMapTimingGlobalBroadcastSent = false;
 new bool:g_bMapTimingNoFastestPromptSent = false;
 new bool:g_bMapRecordsTablesReady = false;
 
-// When an admin calls for clear database, the client id is stored here for a period of time.
+// When an admin calls for clear database, the admin userid is stored here for a period of time.
 // The admin must then call the clear command again to confirm the call. After the second call
 // the database is cleared. The confirm must be done in the time set by CLEAR_DATABASE_CONFIRMTIME.
 new ClearDatabaseCaller = -1;

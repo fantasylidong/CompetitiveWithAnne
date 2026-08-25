@@ -452,7 +452,7 @@
 | `extend/l4d2_door_lock.smx` | `sm_unlock` | 管理员 | ADMFLAG_GENERIC | Force Saferoom To Be Unlocked | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `extend/l4d2_door_lock.smx` | `sm_unready` | 玩家/控制台 | - | Set Player's Status To Unready | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `extend/l4d2_hitsound.smx` | `sm_hitsound_reload` | 管理员 | ADMFLAG_ROOT | 重新从 DB/KV 读取所有在线玩家的偏好 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
-| `extend/l4d2_hitsound.smx` | `sm_snd` | 玩家/控制台 | - | 主菜单：音效/图标套装（玩家）+ 特定开关 + 管理员单独设置 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
+| `extend/l4d2_hitsound.smx` | `sm_snd` | 玩家 | - | 打开音效预设、四类公共音效任选试听、图标与播放范围设置菜单 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/punch_angle.smx` | `sm_punch` | 玩家/控制台 | - | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/punch_angle.smx` | `sm_recoil` | 玩家/控制台 | - | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `fixes/l4d2_blackscreen_fix.smx` | `sm_get_restricted_strings` | 管理员 | ADMFLAG_ROOT | Get strings from restrict_strings | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |

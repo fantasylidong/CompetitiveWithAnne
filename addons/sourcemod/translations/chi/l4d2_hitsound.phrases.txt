@@ -18,7 +18,7 @@
 	}
 	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"chi"		"[Hitsound] 音效套装(四项)已设置为: %d"
+		"chi"		"[Hitsound] 已应用音效预设 %d；预设中缺失的音效已自动关闭"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -90,15 +90,15 @@
 	}
 	"L4D2Hitsound_HeadshotSoundEffectSet"
 	{
-		"chi"		"爆头音效：已设置为 %d"
+		"chi"		"爆头音效：已设置为 %s"
 	}
 	"L4D2Hitsound_HitSoundEffectSet"
 	{
-		"chi"		"命中音效：已设置为 %d"
+		"chi"		"命中音效：已设置为 %s"
 	}
 	"L4D2Hitsound_KillSoundEffectSet"
 	{
-		"chi"		"击杀音效：已设置为 %d"
+		"chi"		"击杀音效：已设置为 %s"
 	}
 	"L4D2Hitsound_ThreeIconsAllClosed"
 	{
@@ -118,11 +118,15 @@
 	}
 	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"chi"		"爆头击杀音效：已设置为 %d（0=使用普通爆头音）"
+		"chi"		"爆头击杀音效：已设置为 %s"
+	}
+	"L4D2Hitsound_HeadKillSoundFollow"
+	{
+		"chi"		"爆头击杀音效：跟随普通爆头音"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
-		"chi"		"音效播放模式：跟随套装（是否叠加由音效套装自身决定）"
+		"chi"		"音效播放模式：跟随来源（是否叠加由每项声音的来源决定）"
 	}
 	"L4D2Hitsound_StackModeStack"
 	{
@@ -135,5 +139,29 @@
 	"L4D2Hitsound_SetPlaybackPreset"
 	{
 		"chi"		"[Hitsound] 已按该套装套用音效范围"
+	}
+	"L4D2Hitsound_SoundEffectRangeSpecial"
+	{
+		"chi"		"音效范围：仅特感/Tank"
+	}
+	"L4D2Hitsound_SoundEffectRangeAll"
+	{
+		"chi"		"音效范围：全部感染者"
+	}
+	"L4D2Hitsound_IconRangeSpecial"
+	{
+		"chi"		"图标范围：仅特感/Tank"
+	}
+	"L4D2Hitsound_IconRangeAll"
+	{
+		"chi"		"图标范围：全部感染者"
+	}
+	"L4D2Hitsound_PreferencesLoading"
+	{
+		"chi"		"[Hitsound] 个人设置仍在加载，请稍后再试。"
+	}
+	"L4D2Hitsound_ReloadRequested"
+	{
+		"chi"		"[Hitsound] 已请求重新加载所有在线玩家的设置。"
 	}
 }

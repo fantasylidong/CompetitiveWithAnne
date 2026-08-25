@@ -18,7 +18,7 @@
 	}
 	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"jp"		"[Hitsound] 効果音パッケージ(4点)を%dに設定しました"
+		"jp"		"[Hitsound] 効果音プリセット %d を適用し、存在しない種類は無効にしました。"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -90,15 +90,15 @@
 	}
 	"L4D2Hitsound_HeadshotSoundEffectSet"
 	{
-		"jp"		"ヘッドショット効果音：%dに設定"
+		"jp"		"ヘッドショット効果音：%sに設定"
 	}
 	"L4D2Hitsound_HitSoundEffectSet"
 	{
-		"jp"		"ヒット音：%dに設定"
+		"jp"		"ヒット音：%sに設定"
 	}
 	"L4D2Hitsound_KillSoundEffectSet"
 	{
-		"jp"		"キル効果音：%dに設定"
+		"jp"		"キル効果音：%sに設定"
 	}
 	"L4D2Hitsound_ThreeIconsAllClosed"
 	{
@@ -118,11 +118,15 @@
 	}
 	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"jp"		"ヘッドショットキル音：%d に設定（0=通常のヘッドショット音）"
+		"jp"		"ヘッドショットキル音：%s に設定"
+	}
+	"L4D2Hitsound_HeadKillSoundFollow"
+	{
+		"jp"		"ヘッドショットキル音：通常のヘッドショット音に追従"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
-		"jp"		"効果音再生モード：セットに従う（重ねるかどうかはサウンドセット側の設定で決定）"
+		"jp"		"効果音再生モード：音源に従う（重ねるかどうかは各効果音の音源設定で決定）"
 	}
 	"L4D2Hitsound_StackModeStack"
 	{
@@ -135,5 +139,29 @@
 	"L4D2Hitsound_SetPlaybackPreset"
 	{
 		"jp"		"[Hitsound] このセットの効果音範囲を適用しました。"
+	}
+	"L4D2Hitsound_SoundEffectRangeSpecial"
+	{
+		"jp"		"効果音範囲：特殊感染者/Tankのみ"
+	}
+	"L4D2Hitsound_SoundEffectRangeAll"
+	{
+		"jp"		"効果音範囲：すべての感染者"
+	}
+	"L4D2Hitsound_IconRangeSpecial"
+	{
+		"jp"		"アイコン範囲：特殊感染者/Tankのみ"
+	}
+	"L4D2Hitsound_IconRangeAll"
+	{
+		"jp"		"アイコン範囲：すべての感染者"
+	}
+	"L4D2Hitsound_PreferencesLoading"
+	{
+		"jp"		"[Hitsound] 個人設定を読み込み中です。少し待ってから再試行してください。"
+	}
+	"L4D2Hitsound_ReloadRequested"
+	{
+		"jp"		"[Hitsound] オンラインプレイヤー全員の設定を再読み込みします。"
 	}
 }

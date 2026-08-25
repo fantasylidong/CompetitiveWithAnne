@@ -39,6 +39,8 @@
 #define GETBOTINTERVAL 3.0
 #define DONATE_CONFIG_FILE "configs/anne_donate.cfg"
 #define DONATE_MAX_OPTIONS 16
+#define DONATE_REMIND_DELAY 60.0
+#define DONATE_HTTP_TIMEOUT_MS 30000
 #define JOIN_MOTD_DELAY 4.0
 #define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
 #define TEAM_SPECTATOR 1
@@ -70,7 +72,8 @@ bool
 	g_bGroupSystemAvailable = false,
 	g_bInfectedControlAvailable = false,
 	g_bAutoUpdaterRegistered = false,
-	g_bAutoUpdaterInitialCheckRequested = false;
+	g_bAutoUpdaterInitialCheckRequested = false,
+	g_bDonateHttpPending[MAXPLAYERS + 1] = { false };
 
 char
 	g_sDonateAmount[MAXPLAYERS + 1][16],
@@ -79,6 +82,12 @@ char
 	g_sDonateOptionAmount[DONATE_MAX_OPTIONS][16],
 	g_sDonateOptionDisplay[DONATE_MAX_OPTIONS][64],
 	g_sAutoUpdaterUrl[AUTOUPDATE_URL_LENGTH];
+
+Handle
+	g_hDonateRemindTimer[MAXPLAYERS + 1];
+
+Menu
+	g_hDonateRemindMenu[MAXPLAYERS + 1];
 
 int
 	g_iDonateOptionCount = 0,
@@ -646,9 +655,7 @@ public void OnClientDisconnect(int client)
 {
 	if(1 <= client <= MaxClients)
 	{
-		g_sDonateAmount[client][0] = '\0';
-		g_sDonateMethod[client][0] = '\0';
-		g_sDonateNote[client][0] = '\0';
+		ResetDonateClientState(client);
 	}
 }
 
@@ -963,6 +970,12 @@ public Action DonateServer(int client, int args)
 	if(!IsValidClient(client) || IsFakeClient(client))
 		return Plugin_Handled;
 
+	if(IsDonateHttpPending(client))
+		return Plugin_Handled;
+
+	CancelDonateRemindTimer(client);
+	CancelDonateRemindMenu(client);
+
 	if(args >= 2)
 	{
 		char amount[16], method[16], note[128];
@@ -972,6 +985,10 @@ public Action DonateServer(int client, int args)
 		if(!IsDonateMethodAllowed(method))
 		{
 			CPrintToChat(client, "%t", "Join_AnneDonatePaymentMethodOnly");
+			strcopy(g_sDonateAmount[client], sizeof(g_sDonateAmount[]), amount);
+			g_sDonateMethod[client][0] = '\0';
+			g_sDonateNote[client][0] = '\0';
+			CancelDonateRemindTimer(client);
 			ShowDonateMethodMenu(client);
 			return Plugin_Handled;
 		}
@@ -983,7 +1000,6 @@ public Action DonateServer(int client, int args)
 		strcopy(g_sDonateMethod[client], sizeof(g_sDonateMethod[]), method);
 		strcopy(g_sDonateNote[client], sizeof(g_sDonateNote[]), note);
 		ShowDonateWebToPlayer(client, amount, method);
-		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
 		return Plugin_Handled;
 	}
 
@@ -1002,27 +1018,8 @@ public Action FinishDonatePayment(int client, int args)
 	{
 		GetCmdArg(1, email, sizeof(email));
 	}
-	TrimString(email);
 
-	if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
-	{
-		CPrintToChat(client, "%t", "Join_AnneDonateSponsorshipConfirmedNot");
-		ShowDonateAmountMenu(client);
-		return Plugin_Handled;
-	}
-	if(email[0] == '\0')
-	{
-		CPrintToChat(client, "%t", "Join_AnneDonateEmailRequired");
-		return Plugin_Handled;
-	}
-	if(!IsDonateEmailValid(email))
-	{
-		CPrintToChat(client, "%t", "Join_AnneDonateEmailInvalid");
-		return Plugin_Handled;
-	}
-
-	SubmitDonateFinishRequest(client, g_sDonateAmount[client], g_sDonateMethod[client], g_sDonateNote[client], email);
-	CPrintToChat(client, "%t", "Join_AnneDonateRecordingPaymentCompletion");
+	TrySubmitDonateFinish(client, email);
 	return Plugin_Handled;
 }
 
@@ -1198,6 +1195,164 @@ void AppendUrlParam(char[] url, int maxlen, const char[] key, const char[] value
 	strcopy(url, maxlen, nextUrl);
 }
 
+void CancelDonateRemindTimer(int client)
+{
+	if(!(1 <= client <= MaxClients))
+		return;
+
+	delete g_hDonateRemindTimer[client];
+	g_hDonateRemindTimer[client] = null;
+}
+
+void CancelDonateRemindMenu(int client)
+{
+	if(!(1 <= client <= MaxClients) || g_hDonateRemindMenu[client] == null)
+		return;
+
+	g_hDonateRemindMenu[client] = null;
+	if(IsClientInGame(client))
+		CancelClientMenu(client, true);
+}
+
+void ClearDonatePending(int client)
+{
+	if(!(1 <= client <= MaxClients))
+		return;
+
+	g_sDonateAmount[client][0] = '\0';
+	g_sDonateMethod[client][0] = '\0';
+	g_sDonateNote[client][0] = '\0';
+}
+
+void ResetDonateClientState(int client)
+{
+	ClearDonatePending(client);
+	CancelDonateRemindTimer(client);
+	CancelDonateRemindMenu(client);
+	if(1 <= client <= MaxClients)
+		g_bDonateHttpPending[client] = false;
+}
+
+void RestartDonateRemindTimer(int client)
+{
+	CancelDonateRemindTimer(client);
+	if(!IsValidClient(client) || IsFakeClient(client))
+		return;
+
+	g_hDonateRemindTimer[client] = CreateTimer(DONATE_REMIND_DELAY, Timer_DonateRemind, GetClientUserId(client));
+}
+
+bool IsDonateHttpPending(int client)
+{
+	if(!(1 <= client <= MaxClients) || !g_bDonateHttpPending[client])
+		return false;
+
+	CPrintToChat(client, "%t", "Join_AnneDonatePaymentSubmitInProgress");
+	return true;
+}
+
+void TrySubmitDonateFinish(int client, const char[] email)
+{
+	if(IsDonateHttpPending(client))
+		return;
+
+	if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
+	{
+		CPrintToChat(client, "%t", "Join_AnneDonateSponsorshipConfirmedNot");
+		ShowDonateAmountMenu(client);
+		return;
+	}
+
+	char emailCopy[128];
+	strcopy(emailCopy, sizeof(emailCopy), email);
+	TrimString(emailCopy);
+	if(emailCopy[0] != '\0' && !IsDonateEmailValid(emailCopy))
+	{
+		CPrintToChat(client, "%t", "Join_AnneDonateEmailInvalid");
+		return;
+	}
+
+	SubmitDonateFinishRequest(client, g_sDonateAmount[client], g_sDonateMethod[client], g_sDonateNote[client], emailCopy);
+}
+
+public Action Timer_DonateRemind(Handle timer, int userid)
+{
+	int client = GetClientOfUserId(userid);
+	if(1 <= client <= MaxClients)
+		g_hDonateRemindTimer[client] = null;
+
+	if(!IsValidClient(client) || IsFakeClient(client))
+		return Plugin_Stop;
+
+	if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
+		return Plugin_Stop;
+
+	if(g_bDonateHttpPending[client])
+		return Plugin_Stop;
+
+	ShowDonateRemindMenu(client);
+	return Plugin_Stop;
+}
+
+void ShowDonateRemindMenu(int client)
+{
+	char title[128], paid[64], reopen[64], later[64];
+	Format(title, sizeof(title), "%T", "Join_AnneDonateRemindMenuTitle", client);
+	Format(paid, sizeof(paid), "%T", "Join_AnneDonateRemindMenuPaid", client);
+	Format(reopen, sizeof(reopen), "%T", "Join_AnneDonateRemindMenuReopen", client);
+	Format(later, sizeof(later), "%T", "Join_AnneDonateRemindMenuLater", client);
+
+	Menu menu = new Menu(DonateRemindMenuHandler);
+	menu.SetTitle(title);
+	menu.AddItem("paid", paid);
+	menu.AddItem("reopen", reopen);
+	menu.AddItem("later", later);
+	menu.ExitButton = true;
+	g_hDonateRemindMenu[client] = menu;
+	if(!menu.Display(client, MENU_TIME_FOREVER))
+	{
+		g_hDonateRemindMenu[client] = null;
+		delete menu;
+	}
+}
+
+public int DonateRemindMenuHandler(Menu menu, MenuAction action, int client, int item)
+{
+	if(action == MenuAction_Select)
+	{
+		char info[16];
+		menu.GetItem(item, info, sizeof(info));
+		if(StrEqual(info, "paid"))
+		{
+			TrySubmitDonateFinish(client, "");
+		}
+		else if(StrEqual(info, "reopen"))
+		{
+			if(IsDonateHttpPending(client))
+				return 0;
+
+			if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
+			{
+				CPrintToChat(client, "%t", "Join_AnneDonateSponsorshipConfirmedNot");
+				ShowDonateAmountMenu(client);
+				return 0;
+			}
+
+			ShowDonateWebToPlayer(client, g_sDonateAmount[client], g_sDonateMethod[client]);
+		}
+	}
+	else if(action == MenuAction_End)
+	{
+		for(int i = 1; i <= MaxClients; i++)
+		{
+			if(g_hDonateRemindMenu[i] == menu)
+				g_hDonateRemindMenu[i] = null;
+		}
+		delete menu;
+	}
+	return 0;
+}
+
 void ShowDonateWebToPlayer(int client, const char[] amount, const char[] method)
 {
 	char steam64[32], name[MAX_NAME_LENGTH], encodedName[MAX_NAME_LENGTH * 3 + 1], encodedAmount[48], encodedMethod[48];
@@ -1228,17 +1383,27 @@ void ShowDonateWebToPlayer(int client, const char[] amount, const char[] method)
 
 	PrintToConsole(client, "[AnneDonate] Open donate url: %s", url);
 	ShowMOTDPanel(client, title, url, MOTDPANEL_TYPE_URL);
+
+	if(amount[0] != '\0' && method[0] != '\0')
+	{
+		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
+		RestartDonateRemindTimer(client);
+	}
 }
 
 void ShowDonateAmountMenu(int client)
 {
+	char title[64], webOnly[64];
+	Format(title, sizeof(title), "%T", "Join_AnneDonateAmountMenuTitle", client);
+	Format(webOnly, sizeof(webOnly), "%T", "Join_AnneDonateAmountMenuWebOnly", client);
+
 	Menu menu = new Menu(DonateAmountMenuHandler);
-	menu.SetTitle("请选择赞助金额：");
+	menu.SetTitle(title);
 	for(int i = 0; i < g_iDonateOptionCount; i++)
 	{
 		menu.AddItem(g_sDonateOptionAmount[i], g_sDonateOptionDisplay[i]);
 	}
-	menu.AddItem("web", "只打开赞助网页");
+	menu.AddItem("web", webOnly);
 	menu.ExitButton = true;
 	menu.Display(client, 20);
 }
@@ -1247,13 +1412,16 @@ public int DonateAmountMenuHandler(Menu menu, MenuAction action, int client, int
 {
 	if(action == MenuAction_Select)
 	{
+		if(IsDonateHttpPending(client))
+			return 0;
+
 		char amount[16];
 		menu.GetItem(item, amount, sizeof(amount));
 		if(StrEqual(amount, "web"))
 		{
-			g_sDonateAmount[client][0] = '\0';
-			g_sDonateMethod[client][0] = '\0';
-			g_sDonateNote[client][0] = '\0';
+			ClearDonatePending(client);
+			CancelDonateRemindTimer(client);
+			CancelDonateRemindMenu(client);
 			ShowDonateWebToPlayer(client, "", "");
 		}
 		else
@@ -1261,6 +1429,7 @@ public int DonateAmountMenuHandler(Menu menu, MenuAction action, int client, int
 			strcopy(g_sDonateAmount[client], sizeof(g_sDonateAmount[]), amount);
 			g_sDonateMethod[client][0] = '\0';
 			g_sDonateNote[client][0] = '\0';
+			CancelDonateRemindTimer(client);
 			ShowDonateMethodMenu(client);
 		}
 	}
@@ -1273,10 +1442,15 @@ public int DonateAmountMenuHandler(Menu menu, MenuAction action, int client, int
 
 void ShowDonateMethodMenu(int client)
 {
+	char title[64], wechat[32], alipay[32];
+	Format(title, sizeof(title), "%T", "Join_AnneDonateMethodMenuTitle", client);
+	Format(wechat, sizeof(wechat), "%T", "Join_AnneDonateMethodWeChat", client);
+	Format(alipay, sizeof(alipay), "%T", "Join_AnneDonateMethodAlipay", client);
+
 	Menu menu = new Menu(DonateMethodMenuHandler);
-	menu.SetTitle("请选择支付方式：");
-	menu.AddItem("wechat", "微信支付");
-	menu.AddItem("alipay", "支付宝");
+	menu.SetTitle(title);
+	menu.AddItem("wechat", wechat);
+	menu.AddItem("alipay", alipay);
 	menu.ExitButton = true;
 	menu.Display(client, 20);
 }
@@ -1316,11 +1490,13 @@ public int DonateMethodMenuHandler(Menu menu, MenuAction action, int client, int
 {
 	if(action == MenuAction_Select)
 	{
+		if(IsDonateHttpPending(client))
+			return 0;
+
 		char method[16];
 		menu.GetItem(item, method, sizeof(method));
 		strcopy(g_sDonateMethod[client], sizeof(g_sDonateMethod[]), method);
 		ShowDonateWebToPlayer(client, g_sDonateAmount[client], method);
-		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
 	}
 	else if(action == MenuAction_End)
 	{
@@ -1331,6 +1507,9 @@ public int DonateMethodMenuHandler(Menu menu, MenuAction action, int client, int
 
 void SubmitDonateFinishRequest(int client, const char[] amount, const char[] method, const char[] note, const char[] email)
 {
+	if(IsDonateHttpPending(client))
+		return;
+
 	char baseUrl[192], steam64[32], name[MAX_NAME_LENGTH];
 	GetDonateBaseUrl(baseUrl, sizeof(baseUrl));
 	GetClientName(client, name, sizeof(name));
@@ -1354,6 +1533,7 @@ void SubmitDonateFinishRequest(int client, const char[] amount, const char[] met
 		return;
 	}
 
+	SteamWorks_SetHTTPRequestAbsoluteTimeoutMS(request, DONATE_HTTP_TIMEOUT_MS);
 	SteamWorks_SetHTTPRequestGetOrPostParameter(request, "direct_steam_id", steam64);
 	SteamWorks_SetHTTPRequestGetOrPostParameter(request, "direct_name", name);
 	SteamWorks_SetHTTPRequestGetOrPostParameter(request, "amount", amount);
@@ -1366,27 +1546,43 @@ void SubmitDonateFinishRequest(int client, const char[] amount, const char[] met
 	SteamWorks_SetHTTPRequestContextValue(request, GetClientUserId(client));
 	SteamWorks_SetHTTPCallbacks(request, DonateFinishCompleted);
 
+	g_bDonateHttpPending[client] = true;
 	if(!SteamWorks_SendHTTPRequest(request))
 	{
+		g_bDonateHttpPending[client] = false;
 		delete request;
 		CPrintToChat(client, "%t", "Join_AnneDonatePaymentCompletionPrompt");
 		return;
 	}
+
+	CancelDonateRemindTimer(client);
+	CPrintToChat(client, "%t", "Join_AnneDonateRecordingPaymentCompletion");
 }
 
 public void DonateFinishCompleted(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, any userid)
 {
 	int client = GetClientOfUserId(userid);
+	bool httpFailed = failure || !requestSuccessful || statusCode < k_EHTTPStatusCode200OK || statusCode >= k_EHTTPStatusCode300MultipleChoices;
+
+	if(1 <= client <= MaxClients)
+	{
+		g_bDonateHttpPending[client] = false;
+		if(!httpFailed)
+		{
+			ClearDonatePending(client);
+			CancelDonateRemindTimer(client);
+			CancelDonateRemindMenu(client);
+		}
+		else if(IsValidClient(client) && !IsFakeClient(client))
+			RestartDonateRemindTimer(client);
+	}
+
 	if(IsValidClient(client) && !IsFakeClient(client))
 	{
-		if(failure || !requestSuccessful || statusCode < k_EHTTPStatusCode200OK || statusCode >= k_EHTTPStatusCode300MultipleChoices)
-		{
+		if(httpFailed)
 			CPrintToChat(client, "%t", "Join_AnneDonatePaymentCompletionPrompts", statusCode);
-		}
 		else
-		{
 			CPrintToChat(client, "%t", "Join_AnneDonatePaymentCompletionPromptSynchronized");
-		}
 	}
 	delete request;
 }

@@ -18,7 +18,7 @@
 	}
 	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"en"		"[Hitsound] Sound effect package (four items) has been set to: %d"
+		"en"		"[Hitsound] Sound preset %d applied; unavailable sound types were turned off."
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -90,15 +90,15 @@
 	}
 	"L4D2Hitsound_HeadshotSoundEffectSet"
 	{
-		"en"		"Headshot sound effect: set to %d"
+		"en"		"Headshot sound effect: set to %s"
 	}
 	"L4D2Hitsound_HitSoundEffectSet"
 	{
-		"en"		"Hit sound effect: set to %d"
+		"en"		"Hit sound effect: set to %s"
 	}
 	"L4D2Hitsound_KillSoundEffectSet"
 	{
-		"en"		"Kill sound effect: set to %d"
+		"en"		"Kill sound effect: set to %s"
 	}
 	"L4D2Hitsound_ThreeIconsAllClosed"
 	{
@@ -118,11 +118,15 @@
 	}
 	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"en"		"Headshot-kill sound: set to %d (0 uses the regular headshot sound)"
+		"en"		"Headshot-kill sound: set to %s"
+	}
+	"L4D2Hitsound_HeadKillSoundFollow"
+	{
+		"en"		"Headshot-kill sound: follows the regular headshot sound"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
-		"en"		"Sound playback mode: follow set (the sound set decides whether feedback stacks)"
+		"en"		"Sound playback mode: follow source (each selected sound source decides whether feedback stacks)"
 	}
 	"L4D2Hitsound_StackModeStack"
 	{
@@ -135,5 +139,29 @@
 	"L4D2Hitsound_SetPlaybackPreset"
 	{
 		"en"		"[Hitsound] Applied this set's sound range."
+	}
+	"L4D2Hitsound_SoundEffectRangeSpecial"
+	{
+		"en"		"Sound effect range: Special Infected/Tank only"
+	}
+	"L4D2Hitsound_SoundEffectRangeAll"
+	{
+		"en"		"Sound effect range: all infected"
+	}
+	"L4D2Hitsound_IconRangeSpecial"
+	{
+		"en"		"Icon range: Special Infected/Tank only"
+	}
+	"L4D2Hitsound_IconRangeAll"
+	{
+		"en"		"Icon range: all infected"
+	}
+	"L4D2Hitsound_PreferencesLoading"
+	{
+		"en"		"[Hitsound] Your preferences are still loading. Please try again shortly."
+	}
+	"L4D2Hitsound_ReloadRequested"
+	{
+		"en"		"[Hitsound] Reloading preferences for all online players."
 	}
 }

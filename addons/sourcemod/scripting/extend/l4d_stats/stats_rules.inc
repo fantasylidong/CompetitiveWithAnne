@@ -451,7 +451,7 @@ public StartRankChangeCheck(Client)
 	RankChangeFirstCheck[Client] = true;
 	QuarterRankChangeFirstCheck[Client] = true;
 	DoShowRankChange(Client);
-	TimerRankChangeCheck[Client] = CreateTimer(GetConVarFloat(cvar_AnnounceRankChangeIVal), timer_ShowRankChange, Client, TIMER_REPEAT);
+	TimerRankChangeCheck[Client] = CreateTimer(GetConVarFloat(cvar_AnnounceRankChangeIVal), timer_ShowRankChange, GetClientUserId(Client), TIMER_REPEAT);
 }
 
 StatsDisabled(bool:MapCheck = false)
@@ -1570,7 +1570,7 @@ SurvivorHurt(Attacker, Victim, Damage, AttackerInfType = -1, Handle:event = INVA
 	else if (AttackerInfType == INF_ID_CHARGER_L4D2)
 		ChargerDamageCounter[Attacker] += Damage;
 
-	TimerInfectedDamageCheck[Attacker] = CreateTimer(5.0, timer_InfectedDamageCheck, Attacker);
+	TimerInfectedDamageCheck[Attacker] = CreateTimer(5.0, timer_InfectedDamageCheck, GetClientUserId(Attacker));
 }
 
 // Survivor was hurt by normal infected while being blinded and/or paralyzed.

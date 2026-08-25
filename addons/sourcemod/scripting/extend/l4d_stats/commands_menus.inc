@@ -310,9 +310,12 @@ public Action:cmd_ClearRank(client, args)
 	if (client == 0)
 	{
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseServerDisabled");
-		
 		return Plugin_Handled;
 	}
+
+	new userid = GetClientUserId(client);
+	if (userid <= 0)
+		return Plugin_Handled;
 
 	if (ClearDatabaseTimer != INVALID_HANDLE)
 	{
@@ -321,7 +324,7 @@ public Action:cmd_ClearRank(client, args)
 
 	ClearDatabaseTimer = INVALID_HANDLE;
 
-	if (ClearDatabaseCaller == client)
+	if (ClearDatabaseCaller == userid)
 	{
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseStarted");
 		ClearDatabaseCaller = -1;
@@ -332,7 +335,7 @@ public Action:cmd_ClearRank(client, args)
 	}
 
 	StatsPrintToConsolePhrase(client, "L4DStats_ClearDatabaseConfirm", CLEAR_DATABASE_CONFIRMTIME);
-	ClearDatabaseCaller = client;
+	ClearDatabaseCaller = userid;
 
 	ClearDatabaseTimer = CreateTimer(CLEAR_DATABASE_CONFIRMTIME, timer_ClearDatabase);
 
@@ -349,7 +352,7 @@ public ClearStatsMaps(client)
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT * FROM %smaps WHERE 1 = 2", DbPrefix);
 
-	SQL_TQuery(db, ClearStatsMapsHandler, query, client);
+	SQL_TQuery(db, ClearStatsMapsHandler, query, GetClientUserId(client));
 }
 
 public ClearStatsAll(client)
@@ -381,7 +384,7 @@ public ClearStatsAll(client)
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT * FROM %smaps WHERE 1 = 2", DbPrefix);
 
-	SQL_TQuery(db, ClearStatsMapsHandler, query, client);
+	SQL_TQuery(db, ClearStatsMapsHandler, query, GetClientUserId(client));
 }
 
 public ClearStatsPlayers(client)
@@ -404,8 +407,12 @@ public ClearStatsPlayers(client)
 	}
 }
 
-public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], any:client)
+public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		client = 0;
+
 	if (hndl == INVALID_HANDLE)
 	{
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearQueryFailed", error);
@@ -581,24 +588,23 @@ public Action:cmd_ShowRank(client, args)
 }
 
 // Generate client's point total.
-public GetClientPointsPlayerJoined(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientPointsPlayerJoined(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	GetClientPointsWorker(owner, hndl, error, client, GetClientRankPlayerJoined);
+	GetClientPointsWorker(owner, hndl, error, userid, GetClientRankPlayerJoined);
 }
 
 // Generate client's point total.
-public GetClientPointsRankChange(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientPointsRankChange(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	GetClientPointsWorker(owner, hndl, error, client, GetClientRankRankChange);
+	GetClientPointsWorker(owner, hndl, error, userid, GetClientRankRankChange);
 }
 
 // Generate client's current-quarter point total before checking quarter rank changes.
-public GetClientQuarterPointsRankChange(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientQuarterPointsRankChange(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
-	{
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
-	}
 
 	if (hndl == INVALID_HANDLE)
 	{
@@ -606,17 +612,16 @@ public GetClientQuarterPointsRankChange(Handle:owner, Handle:hndl, const String:
 		return;
 	}
 
-	QuarterRank_GetClientPoints(owner, hndl, error, client);
+	QuarterRank_GetClientPoints(owner, hndl, error, userid);
 	QuarterRank_QueryClientRank(client, GetClientQuarterRankRankChange);
 }
 
 // Generate client's point total.
-GetClientPointsWorker(Handle:owner, Handle:hndl, const String:error[], any:client, SQLTCallback:callback=INVALID_FUNCTION)
+GetClientPointsWorker(Handle:owner, Handle:hndl, const String:error[], any:userid, SQLTCallback:callback=INVALID_FUNCTION)
 {
-	if (!client)
-	{
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
-	}
 	
 	if (callback == INVALID_FUNCTION)
 	{
@@ -630,14 +635,15 @@ GetClientPointsWorker(Handle:owner, Handle:hndl, const String:error[], any:clien
 		return;
 	}
 
-	GetClientPoints(owner, hndl, error, client);
+	GetClientPoints(owner, hndl, error, userid);
 	QueryClientRank(client, callback);
 }
 
 // Generate client's point total.
-public GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -654,9 +660,10 @@ public GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:clie
 }
 
 // Generate client's gamemode point total.
-public GetClientGameModePoints(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientGameModePoints(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -678,9 +685,10 @@ public GetClientGameModePoints(Handle:owner, Handle:hndl, const String:error[], 
 }
 
 // Generate client's next rank.
-public DisplayClientNextRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayClientNextRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -689,15 +697,16 @@ public DisplayClientNextRank(Handle:owner, Handle:hndl, const String:error[], an
 		return;
 	}
 
-	GetClientNextRank(owner, hndl, error, client);
+	GetClientNextRank(owner, hndl, error, userid);
 
 	DisplayNextRank(client);
 }
 
 // Generate client's next rank.
-public GetClientNextRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientNextRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -713,9 +722,10 @@ public GetClientNextRank(Handle:owner, Handle:hndl, const String:error[], any:cl
 }
 
 // Generate client's rank.
-public GetClientRankRankChange(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientRankRankChange(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -724,7 +734,7 @@ public GetClientRankRankChange(Handle:owner, Handle:hndl, const String:error[], 
 		return;
 	}
 
-	GetClientRank(owner, hndl, error, client);
+	GetClientRank(owner, hndl, error, userid);
 
 	if (RankChangeLastRank[client] != ClientRank[client])
 	{
@@ -759,12 +769,11 @@ public GetClientRankRankChange(Handle:owner, Handle:hndl, const String:error[], 
 }
 
 // Generate client's current-quarter rank and announce quarter rank changes.
-public GetClientQuarterRankRankChange(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientQuarterRankRankChange(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
-	{
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
-	}
 
 	if (hndl == INVALID_HANDLE)
 	{
@@ -772,7 +781,7 @@ public GetClientQuarterRankRankChange(Handle:owner, Handle:hndl, const String:er
 		return;
 	}
 
-	QuarterRank_GetClientRank(owner, hndl, error, client);
+	QuarterRank_GetClientRank(owner, hndl, error, userid);
 
 	new CurrentRank = ClientQuarterRank[client];
 	new LastRank = QuarterRankChangeLastRank[client];
@@ -881,12 +890,11 @@ QueryClientStatsDP_PlayerJoined(Client, const String:SteamID[])
 }
 
 // Generate client's rank.
-public GetClientRankPlayerJoined(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientRankPlayerJoined(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
-	{
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
-	}
 
 	if (hndl == INVALID_HANDLE)
 	{
@@ -894,7 +902,7 @@ public GetClientRankPlayerJoined(Handle:owner, Handle:hndl, const String:error[]
 		return;
 	}
 
-	GetClientRank(owner, hndl, error, client);
+	GetClientRank(owner, hndl, error, userid);
 
 	decl String:userName[MAX_LINE_WIDTH];
 	GetClientName(client, userName, sizeof(userName));
@@ -910,9 +918,10 @@ public GetClientRankPlayerJoined(Handle:owner, Handle:hndl, const String:error[]
 }
 
 // Generate client's rank.
-public GetClientRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -926,9 +935,10 @@ public GetClientRank(Handle:owner, Handle:hndl, const String:error[], any:client
 }
 
 // Generate client's rank.
-public GetClientGameModeRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientGameModeRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -996,9 +1006,10 @@ public DisplayNextRank(client)
 }
 
 // Send the NEXTRANK panel to the client's display.
-public DisplayNextRankFull(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayNextRankFull(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -1044,9 +1055,10 @@ public DisplayNextRankFull(Handle:owner, Handle:hndl, const String:error[], any:
 }
 
 // Send the RANK panel to the client's display.
-public DisplayRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -1152,9 +1164,10 @@ public DisplayRank(Handle:owner, Handle:hndl, const String:error[], any:client)
 
 // Send a read-only RANK panel for another player's SteamID.
 // This path intentionally does not write ClientPoints/ClientRank/ClientQuarter* for the viewer.
-public DisplayRankSnapshot(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayRankSnapshot(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!Stats_IsValidHumanClient(client))
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -1428,7 +1441,7 @@ public Action:cmd_TimedMaps(client, args)
 
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT DISTINCT tm.gamemode, tm.mutation FROM %stimedmaps AS tm INNER JOIN %splayers AS p ON tm.steamid = p.steamid", DbPrefix, DbPrefix);
-	SQL_TQuery(db, CreateTimedMapsMenu, query, client);
+	SQL_TQuery(db, CreateTimedMapsMenu, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1500,7 +1513,7 @@ public Action:cmd_ShowPPMs(client, args)
 
 	StrCat(query, sizeof(query), "ORDER BY ppm DESC");
 
-	SQL_TQuery(db, CreatePPMMenu, query, client);
+	SQL_TQuery(db, CreatePPMMenu, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1545,7 +1558,7 @@ public Action:cmd_ShowRanks(client, args)
 
 	StrCat(query, sizeof(query), "ORDER BY totalpoints DESC");
 
-	SQL_TQuery(db, CreateRanksMenu, query, client);
+	SQL_TQuery(db, CreateRanksMenu, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1561,7 +1574,7 @@ public Action:cmd_ShowTop10PPM(client, args)
 	SQL_TQuery(db, GetRankTotal, query);
 
 	Format(query, sizeof(query), "SELECT name, (%s) / (%s) AS ppm FROM %splayers WHERE (%s) >= %i ORDER BY ppm DESC, (%s) DESC LIMIT 10", DB_PLAYERS_TOTALPOINTS, DB_PLAYERS_TOTALPLAYTIME, DbPrefix, DB_PLAYERS_TOTALPLAYTIME, GetConVarInt(cvar_Top10PPMMin), DB_PLAYERS_TOTALPLAYTIME);
-	SQL_TQuery(db, DisplayTop10PPM, query, client);
+	SQL_TQuery(db, DisplayTop10PPM, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1586,7 +1599,7 @@ public Action:cmd_ShowTop10(client, args)
 	SQL_TQuery(db, GetRankTotal, query);
 
 	Format(query, sizeof(query), "SELECT name FROM %splayers ORDER BY %s DESC LIMIT 10", DbPrefix, DB_PLAYERS_TOTALPOINTS);
-	SQL_TQuery(db, DisplayTop10, query, client);
+	SQL_TQuery(db, DisplayTop10, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1607,7 +1620,7 @@ public Action:cmd_ShowQuarterTop10(client, args)
 
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT p.name, q.points FROM `%sscore_quarter` AS q INNER JOIN %splayers AS p ON q.steamid = p.steamid WHERE q.quarter_key = %i AND q.points > 0 ORDER BY q.points DESC LIMIT 10", DbPrefix, DbPrefix, QuarterRank_GetCurrentQuarter());
-	SQL_TQuery(db, DisplayQuarterTop10, query, client);
+	SQL_TQuery(db, DisplayQuarterTop10, query, GetClientUserId(client));
 
 	return Plugin_Handled;
 }
@@ -1617,7 +1630,7 @@ public GetClientFromTop10(client, rank)
 {
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT (%s) as totalpoints, steamid FROM %splayers ORDER BY totalpoints DESC LIMIT %i,1", DB_PLAYERS_TOTALPOINTS, DbPrefix, rank);
-	SQL_TQuery(db, GetClientTop10, query, client);
+	SQL_TQuery(db, GetClientTop10, query, GetClientUserId(client));
 }
 
 // Find a player from quarterly Top 10 ranking.
@@ -1625,7 +1638,7 @@ public GetClientFromQuarterTop10(client, rank)
 {
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT q.points AS totalpoints, q.steamid FROM `%sscore_quarter` AS q WHERE q.quarter_key = %i AND q.points > 0 ORDER BY q.points DESC LIMIT %i,1", DbPrefix, QuarterRank_GetCurrentQuarter(), rank);
-	SQL_TQuery(db, GetClientTop10, query, client);
+	SQL_TQuery(db, GetClientTop10, query, GetClientUserId(client));
 }
 
 // Find a player from Top 10 PPM ranking.
@@ -1633,13 +1646,17 @@ public GetClientFromTop10PPM(client, rank)
 {
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT (%s) AS totalpoints, steamid, (%s) AS totalplaytime FROM %splayers WHERE (%s) >= %i ORDER BY (totalpoints / totalplaytime) DESC, totalplaytime DESC LIMIT %i,1", DB_PLAYERS_TOTALPOINTS, DB_PLAYERS_TOTALPLAYTIME, DbPrefix, DB_PLAYERS_TOTALPLAYTIME, GetConVarInt(cvar_Top10PPMMin), rank);
-	SQL_TQuery(db, GetClientTop10, query, client);
+	SQL_TQuery(db, GetClientTop10, query, GetClientUserId(client));
 }
 
 // Send the Top 10 player's info to the client.
-public GetClientTop10(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientTop10(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("GetClientTop10 failed! Reason: %s", error);
 		return;
@@ -1825,9 +1842,13 @@ public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:d
 	CloseHandle(hndl);
 }
 
-public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreateRanksMenu failed! Reason: %s", error);
 		return;
@@ -1861,9 +1882,13 @@ public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:clie
 	DisplayMenu(menu, client, 30);
 }
 
-public CreateTimedMapsMenu(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreateTimedMapsMenu(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreateTimedMapsMenu failed! Reason: %s", error);
 		return;
@@ -1995,12 +2020,16 @@ public DisplayTimedMapsMenu2(client, Gamemode)
 {
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT DISTINCT tm.gamemode, tm.map FROM %stimedmaps AS tm INNER JOIN %splayers AS p ON tm.steamid = p.steamid WHERE tm.gamemode = %i ORDER BY tm.map ASC", DbPrefix, DbPrefix, Gamemode);
-	SQL_TQuery(db, CreateTimedMapsMenu2, query, client);
+	SQL_TQuery(db, CreateTimedMapsMenu2, query, GetClientUserId(client));
 }
 
-public CreateTimedMapsMenu2(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreateTimedMapsMenu2(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreateTimedMapsMenu2 failed! Reason: %s", error);
 		return;
@@ -2097,7 +2126,7 @@ public DisplayTimedMapsMenu3(client, Gamemode, const String:Map[])
 {
 	new Handle:dp = CreateDataPack();
 
-	WritePackCell(dp, client);
+	WritePackCell(dp, GetClientUserId(client));
 	WritePackCell(dp, Gamemode);
 	WritePackString(dp, Map);
 
@@ -2122,12 +2151,16 @@ public DisplayTimedMapsMenu3_2(Handle:owner, Handle:hndl, const String:error[], 
 
 	ResetPack(dp);
 
-	new client = ReadPackCell(dp);
+	new userid = ReadPackCell(dp);
 	new Gamemode = ReadPackCell(dp);
 	decl String:Map[MAX_LINE_WIDTH];
 	ReadPackString(dp, Map, sizeof(Map));
 
 	CloseHandle(dp);
+
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
 
 	if (SQL_FetchRow(hndl))
 		ClientMapTime[client] = SQL_FetchFloat(hndl, 0);
@@ -2136,12 +2169,16 @@ public DisplayTimedMapsMenu3_2(Handle:owner, Handle:hndl, const String:error[], 
 
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT DISTINCT tm.gamemode, tm.map, tm.time FROM %stimedmaps AS tm INNER JOIN %splayers AS p ON tm.steamid = p.steamid WHERE tm.gamemode = %i AND tm.map = '%s' ORDER BY tm.time %s", DbPrefix, DbPrefix, Gamemode, Map, (Gamemode == GAMEMODE_SURVIVAL ? "DESC" : "ASC"));
-	SQL_TQuery(db, CreateTimedMapsMenu3, query, client);
+	SQL_TQuery(db, CreateTimedMapsMenu3, query, userid);
 }
 
-public CreateTimedMapsMenu3(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreateTimedMapsMenu3(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreateTimedMapsMenu3 failed! Reason: %s", error);
 		return;
@@ -2252,12 +2289,16 @@ public DisplayTimedMapsMenu4(client, Gamemode, const String:Map[], Float:MapTime
 {
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT tm.steamid, p.name FROM %stimedmaps AS tm INNER JOIN %splayers AS p ON tm.steamid = p.steamid WHERE tm.gamemode = %i AND tm.map = '%s' AND tm.time = %f ORDER BY p.name ASC", DbPrefix, DbPrefix, Gamemode, Map, MapTime);
-	SQL_TQuery(db, CreateTimedMapsMenu4, query, client);
+	SQL_TQuery(db, CreateTimedMapsMenu4, query, GetClientUserId(client));
 }
 
-public CreateTimedMapsMenu4(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreateTimedMapsMenu4(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreateTimedMapsMenu4 failed! Reason: %s", error);
 		return;
@@ -2316,9 +2357,13 @@ public Menu_CreateTimedMapsMenu4Hndl(Handle:menu, MenuAction:action, param1, par
 	QueryClientStatsSteamID(param1, SteamID, CM_RANK);
 }
 
-public CreatePPMMenu(Handle:owner, Handle:hndl, const String:error[], any:client)
+public CreatePPMMenu(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("CreatePPMMenu failed! Reason: %s", error);
 		return;
@@ -2437,9 +2482,13 @@ public DisplaySettingsPanel(client)
 
 
 // Send the TOP10 panel to the client's display.
-public DisplayTop10(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayTop10(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("DisplayTop10 failed! Reason: %s", error);
 		return;
@@ -2468,13 +2517,16 @@ public DisplayTop10(Handle:owner, Handle:hndl, const String:error[], any:client)
 }
 
 // Send the quarterly TOP10 panel to the client's display.
-public DisplayQuarterTop10(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayQuarterTop10(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("DisplayQuarterTop10 failed! Reason: %s", error);
-		if (Stats_IsValidHumanClient(client))
-			StatsPrintToChat(client, "L4DStats_QuarterRankingQueryFailed");
+		StatsPrintToChat(client, "L4DStats_QuarterRankingQueryFailed");
 		return;
 	}
 
@@ -2504,9 +2556,13 @@ public DisplayQuarterTop10(Handle:owner, Handle:hndl, const String:error[], any:
 }
 
 // Send the TOP10PPM panel to the client's display.
-public DisplayTop10PPM(Handle:owner, Handle:hndl, const String:error[], any:client)
+public DisplayTop10PPM(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client || hndl == INVALID_HANDLE)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
+	if (hndl == INVALID_HANDLE)
 	{
 		LogError("DisplayTop10PPM failed! Reason: %s", error);
 		return;
@@ -2866,17 +2922,18 @@ DisplayClearPanel(client, delay=30)
 
 	new Handle:ClearPlayerMenu = CreateMenu(DisplayClearPanelHandler);
 	new maxplayers = MaxClients;
-	decl String:id[3], String:Name[32];
+	decl String:SteamID[MAX_LINE_WIDTH], String:Name[32];
 
 	for (new i = 1; i <= maxplayers; i++)
 	{
 		if (IsClientBot(i) || !IsClientConnected(i) || !IsClientInGame(i))
 			continue;
 
-		GetClientName(i, Name, sizeof(Name));
-		IntToString(i, id, sizeof(id));
+		if (!GetClientRankAuthString(i, SteamID, sizeof(SteamID)))
+			continue;
 
-		AddMenuItem(ClearPlayerMenu, id, Name);
+		GetClientName(i, Name, sizeof(Name));
+		AddMenuItem(ClearPlayerMenu, SteamID, Name);
 	}
 
 	StatsSetMenuTitle(ClearPlayerMenu, client, "L4DStats_ClearPlayerStatsTitle");
@@ -2895,31 +2952,30 @@ public DisplayClearPanelHandler(Handle:menu, MenuAction:action, param1, param2)
 	if (action != MenuAction_Select || param1 <= 0 || IsClientBot(param1))
 		return;
 
-	decl String:id[3];
-	new bool:found = GetMenuItem(menu, param2, id, sizeof(id));
+	decl String:SteamID[MAX_LINE_WIDTH], String:Name[32];
+	new style;
+	new bool:found = GetMenuItem(menu, param2, SteamID, sizeof(SteamID), style, Name, sizeof(Name));
 
-	if (!found)
+	if (!found || Stats_IsInvalidRankAuthString(SteamID))
 		return;
 
-	new client = StringToInt(id);
-
-	decl String:SteamID[MAX_LINE_WIDTH];
-	GetClientRankAuthString(client, SteamID, sizeof(SteamID));
+	new client = Stats_FindHumanClientBySteamID(SteamID);
 
 	if (DoFastQuery(param1, "DELETE FROM %splayers WHERE steamid = '%s'", DbPrefix, SteamID))
 	{
 		DoFastQuery(param1, "DELETE FROM %stimedmaps WHERE steamid = '%s'", DbPrefix, SteamID);
 		DoFastQuery(param1, "DELETE FROM `%stimedmap_runs` WHERE steamid = '%s'", DbPrefix, SteamID);
 
-		ClientPoints[client] = 0;
-		ClientRank[client] = 0;
-		ClientScoreReady[client] = true;
+		if (client)
+		{
+			ClientPoints[client] = 0;
+			ClientRank[client] = 0;
+			ClientScoreReady[client] = true;
+			GetClientName(client, Name, sizeof(Name));
+			StatsPrintToChatPreFormatted(client, "L4DStats_OwnStatsCleared");
+		}
 
-		decl String:Name[32];
-		GetClientName(client, Name, sizeof(Name));
-
-		StatsPrintToChatPreFormatted(client, "L4DStats_OwnStatsCleared");
-		if (client != param1)
+		if (!client || client != param1)
 			StatsPrintToChat(param1, "L4DStats_PlayerStatsCleared", Name);
 	}
 	else

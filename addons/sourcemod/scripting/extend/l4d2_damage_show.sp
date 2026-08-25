@@ -162,11 +162,16 @@ bool          g_PendingSave[MAXPLAYERS + 1];
 bool          g_SettingsDirty[MAXPLAYERS + 1];
 int           g_SettingsRevision[MAXPLAYERS + 1];
 int           g_SaveRevision[MAXPLAYERS + 1];
+PlayerSetData g_SaveSnapshot[MAXPLAYERS + 1];
 
 static void ResetClientState(int client)
 {
-    // 槽位复用期间始终保持关闭，直到 Cookie/DB 明确加载完偏好。
-    g_Plr[client].enable = false;
+    // 槽位复用后必须回到明确默认值，避免上一名玩家的偏好/快照污染新连接。
+    g_Plr[client].wpn_id = 0;
+    g_Plr[client].wpn_type = 0;
+    g_Plr[client].last_set_time = 0.0;
+    Settings_Default(client);
+    g_SaveSnapshot[client] = g_Plr[client];
     g_LoadState[client] = LS_None;
     g_HaveCookie[client] = false;
     g_CookieRaw[client][0] = '\0';
@@ -175,7 +180,6 @@ static void ResetClientState(int client)
     g_SettingsRevision[client] = 0;
     g_SaveRevision[client] = 0;
 }
-PlayerSetData g_SaveSnapshot[MAXPLAYERS + 1];
 
 static void Settings_MarkDirty(int client)
 {
@@ -724,13 +728,40 @@ static void DB_Load(int client)
         "SELECT enable,see_others,share_scope,size,gap,alpha,xoff,yoff,showdist,summode,sg_merge FROM rpgdamage WHERE steamid='%s' LIMIT 1", sid2);
 
     LogInfo("[Load] DB_Load SQL: %s", q);
-    SQL_TQuery(g_DB, SQLCB_Load, q, GetClientUserId(client));
+
+    DataPack pack = new DataPack();
+    pack.WriteCell(GetClientUserId(client));
+    pack.WriteString(sid2);
+    SQL_TQuery(g_DB, SQLCB_Load, q, pack);
 }
 
 public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
 {
-    int client = GetClientOfUserId(data);
-    if (!IsValidClient(client)) return;
+    DataPack pack = view_as<DataPack>(data);
+    int userid = 0;
+    char querySid2[64];
+    querySid2[0] = '\0';
+    if (pack != null)
+    {
+        pack.Reset();
+        userid = pack.ReadCell();
+        pack.ReadString(querySid2, sizeof querySid2);
+        delete pack;
+    }
+
+    int client = GetClientOfUserId(userid);
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return;
+
+    char sid2[64];
+    if (!GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2)
+        || StrEqual(sid2, "BOT")
+        || !StrEqual(sid2, querySid2))
+    {
+        LogInfo("[Load] Ignore load callback for userid %d client %d: steam2 mismatch or unavailable.",
+            userid, client);
+        return;
+    }
 
     if (error[0])
     {
@@ -780,9 +811,6 @@ public void SQLCB_Load(Handle owner, Handle hndl, const char[] error, any data)
             fromCookie = ApplyCookieRawString(client, g_CookieRaw[client]);
         if (!fromCookie)
             Settings_Default(client);
-
-        char sid2[64];
-        GetClientAuthId(client, AuthId_Steam2, sid2, sizeof sid2);
 
         char q[1024]; q[0]='\0';
         SQL_FormatQuery(g_DB, q, sizeof q,

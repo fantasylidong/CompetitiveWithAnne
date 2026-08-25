@@ -340,13 +340,11 @@ public Action Command_GlobalChat(int client, int args)
 	}
 
 	char steamId[32];
-	if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)))
+	if (!GetPlayerSteam2Id(client, steamId, sizeof(steamId)))
 	{
 		ReplyToCommand(client, "[全服] 无法获取你的 SteamID，请稍后再试。");
 		return Plugin_Handled;
 	}
-	
-	NormalizeSteamId(steamId);
 
 	char steamId64[32];
 	if (!GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64), true))
@@ -397,13 +395,11 @@ public Action Command_LFG(int client, int args)
 	}
 
 	char steamId[32];
-	if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)))
+	if (!GetPlayerSteam2Id(client, steamId, sizeof(steamId)))
 	{
 		ReplyToCommand(client, "[全服] 无法获取你的 SteamID，请稍后再试。");
 		return Plugin_Handled;
 	}
-	
-	NormalizeSteamId(steamId);
 
 	char steamId64[32];
 	if (!GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64), true))
@@ -1637,10 +1633,8 @@ public void OnClientPostAdminCheck(int client)
 		return;
 
 	char steamId[32];
-	if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId)))
+	if (!GetPlayerSteam2Id(client, steamId, sizeof(steamId)))
 		return;
-	
-	NormalizeSteamId(steamId);
 
 	char steamId64[32];
 	if (!GetClientAuthId(client, AuthId_SteamID64, steamId64, sizeof(steamId64), true))
@@ -1700,12 +1694,74 @@ public void SQL_OnCheckLoginTitle(Database database, DBResultSet results, const 
 	}
 }
 
+bool GetPlayerSteam2Id(int client, char[] steamId, int maxlen)
+{
+	if (maxlen > 0)
+		steamId[0] = '\0';
+
+	if (client <= 0 || client > MaxClients || maxlen <= 1)
+		return false;
+
+	if (!IsClientConnected(client) || IsFakeClient(client))
+		return false;
+
+	if (!GetClientAuthId(client, AuthId_Steam2, steamId, maxlen, true)
+		|| !IsValidPlayerSteam2Id(steamId))
+	{
+		steamId[0] = '\0';
+		return false;
+	}
+
+	NormalizeSteamId(steamId);
+	if (!IsValidPlayerSteam2Id(steamId))
+	{
+		steamId[0] = '\0';
+		return false;
+	}
+
+	return true;
+}
+
+bool IsValidPlayerSteam2Id(const char[] steamId)
+{
+	if (steamId[0] == '\0'
+		|| StrEqual(steamId, "BOT", false)
+		|| StrEqual(steamId, "STEAM_ID_PENDING", false)
+		|| StrEqual(steamId, "STEAM_ID_STOP_IGNORING_RETVALS", false)
+		|| StrEqual(steamId, "STEAM_ID_LAN", false))
+	{
+		return false;
+	}
+
+	// STEAM_X:Y:Z。X 为 universe，Y 为 account-auth-server 位，Z 为账号数字。
+	if (strncmp(steamId, "STEAM_", 6) != 0)
+		return false;
+
+	if (steamId[6] < '0' || steamId[6] > '9' || steamId[7] != ':')
+		return false;
+
+	if (steamId[8] != '0' && steamId[8] != '1')
+		return false;
+
+	if (steamId[9] != ':')
+		return false;
+
+	if (steamId[10] < '0' || steamId[10] > '9')
+		return false;
+
+	for (int i = 11; steamId[i] != '\0'; i++)
+	{
+		if (steamId[i] < '0' || steamId[i] > '9')
+			return false;
+	}
+
+	return true;
+}
+
 void NormalizeSteamId(char[] steamId)
 {
-	// 规范化 SteamID，强制将前缀统一替换为 STEAM_0:1:
-	if (StrContains(steamId, "STEAM_") == 0)
-	{
-		steamId[6] = '0';
-		steamId[8] = '1';
-	}
+	if (!IsValidPlayerSteam2Id(steamId))
+		return;
+
+	steamId[6] = '0';
 }

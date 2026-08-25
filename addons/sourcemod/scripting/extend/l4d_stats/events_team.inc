@@ -245,7 +245,7 @@ public Action:event_PlayerBlind(Handle:event, const String:name[], bool:dontBroa
 		TimerBoomerPerfectCheck[Attacker] = INVALID_HANDLE;
 	}
 
-	TimerBoomerPerfectCheck[Attacker] = CreateTimer(6.0, timer_BoomerBlindnessCheck, Attacker);
+	TimerBoomerPerfectCheck[Attacker] = CreateTimer(6.0, timer_BoomerBlindnessCheck, GetClientUserId(Attacker));
 }
 
 // Boomer Mob Survival with no Incaps code. Points are given to all players.
@@ -266,7 +266,7 @@ public Action:event_PlayerBlindEnd(Handle:event, const String:name[], bool:dontB
 		return;
 
 	if (Player > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndBoomerBlinded, Player);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndBoomerBlinded, GetClientUserId(Player));
 
 	new Mode = GetConVarInt(cvar_AnnounceMode);
 
@@ -431,7 +431,7 @@ public Action:event_PounceSave(Handle:event, const String:name[], bool:dontBroad
 	new Victim = GetClientOfUserId(GetEventInt(event, "Victim"));
 
 	if (Victim > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndHunterLunged, Victim);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndHunterLunged, GetClientUserId(Victim));
 
 	HunterSmokerSave(Savior, Victim, GetConVarInt(cvar_ChokePounce), 2, 3, INF_ID_HUNTER, "award_hunter");
 }
@@ -670,7 +670,7 @@ public Action:event_PlayerHurt(Handle:event, const String:name[], bool:dontBroad
 
 				WritePackCell(dp, OldHumanDamage);
 				WritePackCell(dp, OldBotDamage);
-					WritePackCell(dp, Attacker);
+					WritePackCell(dp, GetClientUserId(Attacker));
 					WritePackString(dp, AttackerID);
 					WritePackString(dp, AttackerName);
 					WritePackCell(dp, CurrentPoints[Attacker]);
@@ -824,7 +824,7 @@ public Action:event_JockeyRelease(Handle:event, const String:name[], bool:dontBr
 	UpdateJockeyRideLength(Jockey, RideLength);
 
 	if (Victim > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndJockeyRide, Victim);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndJockeyRide, GetClientUserId(Victim));
 }
 
 public Action:event_JockeyKilled(Handle:event, const String:name[], bool:dontBroadcast)
@@ -840,7 +840,7 @@ public Action:event_JockeyKilled(Handle:event, const String:name[], bool:dontBro
 	new Victim = GetClientOfUserId(GetEventInt(event, "victim"));
 
 	if (Victim > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndJockeyRide, Victim);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndJockeyRide, GetClientUserId(Victim));
 }
 
 // Charger events.
@@ -978,7 +978,7 @@ public Action:event_ChargerCarryRelease(Handle:event, const String:name[], bool:
 	//}
 
 	if (Victim > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndChargerCarry, Victim);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndChargerCarry, GetClientUserId(Victim));
 }
 
 public Action:event_ChargerImpact(Handle:event, const String:name[], bool:dontBroadcast)
@@ -1000,7 +1000,7 @@ IncrementImpactCounter(client)
 	if (ChargerImpactCounterTimer[client] != INVALID_HANDLE)
 		CloseHandle(ChargerImpactCounterTimer[client]);
 
-	ChargerImpactCounterTimer[client] = CreateTimer(3.0, timer_EndCharge, client);
+	ChargerImpactCounterTimer[client] = CreateTimer(3.0, timer_EndCharge, GetClientUserId(client));
 
 	ChargerImpactCounter[client]++;
 }
@@ -1043,7 +1043,7 @@ public Action:event_ChargerPummelRelease(Handle:event, const String:name[], bool
 	}
 
 	if (Victim > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndChargerPlummel, Victim);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndChargerPlummel, GetClientUserId(Victim));
 }
 
 // Hunter events.
@@ -1056,7 +1056,7 @@ public Action:event_HunterRelease(Handle:event, const String:name[], bool:dontBr
 	new Player = GetClientOfUserId(GetEventInt(event, "victim"));
 
 	if (Player > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndHunterLunged, Player);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndHunterLunged, GetClientUserId(Player));
 }
 
 // Smoker events.
@@ -1069,7 +1069,7 @@ public Action:event_SmokerRelease(Handle:event, const String:name[], bool:dontBr
 	new Player = GetClientOfUserId(GetEventInt(event, "victim"));
 
 	if (Player > 0)
-		CreateTimer(INF_WEAROFF_TIME, timer_EndSmokerParalyzed, Player);
+		CreateTimer(INF_WEAROFF_TIME, timer_EndSmokerParalyzed, GetClientUserId(Player));
 }
 
 // L4D2 ammo upgrade deployed event.

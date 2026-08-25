@@ -43,7 +43,9 @@
 #define RIDE_CHECK_CACHE           0.10   // 骑头判定缓存，避免每帧 hull trace
 #define RIDE_AABB_SLACK            8.0    // 水平投影重叠的外扩，吸收网络抖动
 #define LADDER_LOOK_ALIGN_DEG      8.0    // 爬梯朝向已足够接近时不再改视角
-#define FORCE_ROCK_CLOSE_AIM_DIST  24.0   // 水平距小于该值时投石直接瞄向目标，不用弹道公式
+#define FORCE_ROCK_RETREAT_INTERVAL 0.50  // 强制投石撤离命令刷新间隔
+#define FORCE_ROCK_RETREAT_MARGIN  48.0   // 撤离目标点越过最小投石距离的余量
+#define FORCE_ROCK_MIN_HORIZONTAL  96.0   // 防止配置为 0 后重新尝试无效的原地上抛
 
 // ===== ConVar =====
 ConVar g_cvPluginName, g_cvLogLevel;
@@ -155,7 +157,7 @@ enum struct AiTank
     float forcedTargetUntil;    // 临时目标锁截止时间
     float forceRockUntil;       // 强制投石尝试截止时间
     int   forceRockTarget;      // 强制投石目标(userId)
-    bool  forceRockInPlace;     // true=不要求拉开水平距离
+    float lastForceRockRetreatTime; // 上次刷新撤离目标时间
     int   forceRockAimTarget;   // 出手后仍用于瞄准的目标(userId)
     bool  forceRockPending;     // 已提交攻击2，等待投石动画释放
     float ridingStart;          // 当前骑头开始时间
@@ -184,7 +186,7 @@ enum struct AiTank
         this.forcedTargetUntil = 0.0;
         this.forceRockUntil = 0.0;
         this.forceRockTarget = -1;
-        this.forceRockInPlace = false;
+        this.lastForceRockRetreatTime = 0.0;
         this.forceRockAimTarget = -1;
         this.forceRockPending = false;
         this.ridingStart = 0.0;
@@ -281,14 +283,14 @@ public void OnPluginStart()
     g_cvHeadBlockIgnoreTime    = CreateConVar("ai_tank3_head_block_ignore_time", "10.0", "判定恶意卡位后屏蔽该生还者的时间（秒）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockSwitchCooldown= CreateConVar("ai_tank3_head_block_switch_cooldown", "0.75", "头顶卡目标被屏蔽后，强制换目标命令的最小间隔（秒）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockTime = CreateConVar("ai_tank3_head_block_force_rock_time", "20.0", "强制投石尝试的最长时间（秒）", CVAR_FLAGS, true, 0.0);
-    g_cvHeadBlockForceRockRange= CreateConVar("ai_tank3_head_block_force_rock_range", "250.0", "非原地投石时 Tank 需要与目标拉开的最小水平距离（单位）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockForceRockRange= CreateConVar("ai_tank3_head_block_force_rock_range", "250.0", "强制投石前 Tank 需要与目标拉开的最小水平距离（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseHoriz = CreateConVar("ai_tank3_head_block_force_rock_release_h", "400", "强制投石期间目标离开多远（水平距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockForceRockReleaseVert  = CreateConVar("ai_tank3_head_block_force_rock_release_v", "250", "强制投石期间目标离开多远（垂直距离，单位）将立即清除强制状态（<=0 不检测）", CVAR_FLAGS, true, 0.0);
-    g_cvHeadBlockRideEnable    = CreateConVar("ai_tank3_head_block_ride_enable", "1", "是否把站在 Tank 碰撞体上的生还者按骑头处理（上挥/原地投石）", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvHeadBlockRideEnable    = CreateConVar("ai_tank3_head_block_ride_enable", "1", "是否把 Tank 正上方的生还者按骑头处理（能命中则上挥，否则撤离投石）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvHeadBlockRideHorizontal= CreateConVar("ai_tank3_head_block_ride_horizontal", "40.0", "骑头判定的水平距离上限（单位）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockRideVerticalMin = CreateConVar("ai_tank3_head_block_ride_vertical_min", "40.0", "骑头判定的最小垂直差（单位，脚站在 Tank 上时可被 GroundEntity 短路）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockRideVerticalMax = CreateConVar("ai_tank3_head_block_ride_vertical_max", "100.0", "骑头判定的最大垂直差（单位，超过视为高台而非骑头）", CVAR_FLAGS, true, 0.0);
-    g_cvHeadBlockRideRockTime  = CreateConVar("ai_tank3_head_block_ride_rock_time", "3.0", "持续骑头多久后改为原地强制投石（秒）", CVAR_FLAGS, true, 0.0);
+    g_cvHeadBlockRideRockTime  = CreateConVar("ai_tank3_head_block_ride_rock_time", "3.0", "拳打不到的骑头目标持续多久后开始撤离投石（秒）", CVAR_FLAGS, true, 0.0);
     g_cvHeadBlockUpSwing       = CreateConVar("ai_tank3_head_block_up_swing", "1", "挥拳时对骑头生还者额外向上 SweepFist", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvLadderLookLock         = CreateConVar("ai_tank3_ladder_look_lock", "1", "Tank 在梯子上时把视角锁到梯子朝向，避免抬头看人掉梯", CVAR_FLAGS, true, 0.0, true, 1.0);
 
@@ -515,9 +517,15 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
         clearRidingState(client);
     }
 
-    // 梯子上不投石，避免松手；梯边仍允许原地投石
-    if (!onLadder && handleForceRock(client, buttons, pos) == Plugin_Changed)
+    // 梯子上不投石，避免松手
+    bool forceRockRetreating = false;
+    if (!onLadder && handleForceRock(client, buttons, pos, forceRockRetreating) == Plugin_Changed)
         result = Plugin_Changed;
+    if (forceRockRetreating)
+    {
+        resetTankMovementOverrides(client);
+        return result;
+    }
 
     if (!validTarget)
     {
@@ -547,7 +555,8 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
                 commandTankAttackTarget(client, target, "refreshing route to overhead target");
             }
             resetTankMovementOverrides(client);
-            if (!onLadder && handleForceRock(client, buttons, pos) == Plugin_Changed)
+            bool retreating = false;
+            if (!onLadder && handleForceRock(client, buttons, pos, retreating) == Plugin_Changed)
                 result = Plugin_Changed;
             return result;
         }
@@ -750,7 +759,7 @@ void clearTankForceRock(int tank, bool keepAim = false)
     {
         g_AiTanks[tank].forceRockUntil = 0.0;
         g_AiTanks[tank].forceRockTarget = -1;
-        g_AiTanks[tank].forceRockInPlace = false;
+        g_AiTanks[tank].lastForceRockRetreatTime = 0.0;
     }
     if (!keepAim)
     {
@@ -890,17 +899,13 @@ void armForceRock(int tank, int survivor)
 
     float now = GetEngineTime();
     if (g_AiTanks[tank].forceRockTarget == uid && g_AiTanks[tank].forceRockUntil > now)
-    {
-        g_AiTanks[tank].forceRockInPlace = isSurvivorRidingTank(tank, survivor);
         return;
-    }
 
     g_AiTanks[tank].forceRockTarget = uid;
     g_AiTanks[tank].forceRockUntil = now + g_cvHeadBlockForceRockTime.FloatValue;
-    g_AiTanks[tank].forceRockInPlace = isSurvivorRidingTank(tank, survivor);
+    g_AiTanks[tank].lastForceRockRetreatTime = 0.0;
     if (log != null)
-        log.debugAll("%N armed %s rock at %N", tank,
-            g_AiTanks[tank].forceRockInPlace ? "in-place" : "distance-gated", survivor);
+        log.debugAll("%N armed retreat rock at %N", tank, survivor);
 }
 
 void updateRidingForceRock(int tank, int rider)
@@ -1067,8 +1072,62 @@ bool handleHeadBlock(int tank, int target, const float tankPos[3], const float t
     return true;
 }
 
-Action handleForceRock(int tank, int& buttons, const float tankPos[3])
+void commandTankRetreatForRock(int tank, const float tankPos[3], const float targetPos[3], float horizontal, float needDistance)
 {
+    float now = GetEngineTime();
+    if (now - g_AiTanks[tank].lastForceRockRetreatTime < FORCE_ROCK_RETREAT_INTERVAL)
+        return;
+
+    float away[3];
+    away[0] = tankPos[0] - targetPos[0];
+    away[1] = tankPos[1] - targetPos[1];
+    away[2] = 0.0;
+    if (GetVectorLength(away) < 1.0)
+    {
+        float angles[3], forwardVec[3];
+        GetClientEyeAngles(tank, angles);
+        angles[0] = 0.0;
+        angles[2] = 0.0;
+        GetAngleVectors(angles, forwardVec, NULL_VECTOR, NULL_VECTOR);
+        away[0] = -forwardVec[0];
+        away[1] = -forwardVec[1];
+        away[2] = 0.0;
+    }
+    NormalizeVector(away, away);
+
+    float retreatPos[3];
+    float retreatDistance = needDistance - horizontal + FORCE_ROCK_RETREAT_MARGIN;
+    retreatPos[0] = tankPos[0] + away[0] * retreatDistance;
+    retreatPos[1] = tankPos[1] + away[1] * retreatDistance;
+    retreatPos[2] = tankPos[2];
+
+    if (GetFeatureStatus(FeatureType_Native, "L4D_GetNearestNavArea") == FeatureStatus_Available &&
+        GetFeatureStatus(FeatureType_Native, "L4D_GetNavAreaCenter") == FeatureStatus_Available)
+    {
+        Address area = L4D_GetNearestNavArea(retreatPos, 160.0, false, false, true, TEAM_INFECTED);
+        if (area != Address_Null)
+        {
+            float navCenter[3];
+            L4D_GetNavAreaCenter(area, navCenter);
+            if (getVectorDistance2D(navCenter, targetPos) > horizontal + 16.0)
+                retreatPos = navCenter;
+        }
+    }
+
+    int tankUserId = GetClientUserId(tank);
+    if (tankUserId <= 0)
+        return;
+
+    Logic_RunScript(COMMANDABOT_RESET, tankUserId);
+    Logic_RunScript(COMMANDABOT_MOVE, retreatPos[0], retreatPos[1], retreatPos[2], tankUserId);
+    g_AiTanks[tank].lastForceRockRetreatTime = now;
+    if (log != null)
+        log.debugAll("%N retreating %.1f units before rock", tank, needDistance - horizontal);
+}
+
+Action handleForceRock(int tank, int& buttons, const float tankPos[3], bool &retreating)
+{
+    retreating = false;
     if (!g_cvHeadBlockEnable.BoolValue)
         return Plugin_Continue;
     if (g_AiTanks[tank].forceRockUntil <= 0.0 && g_AiTanks[tank].forceRockTarget <= 0 &&
@@ -1106,17 +1165,23 @@ Action handleForceRock(int tank, int& buttons, const float tankPos[3])
         return Plugin_Continue;
     }
 
-    float needDistance = g_AiTanks[tank].forceRockInPlace ? 0.0 : g_cvHeadBlockForceRockRange.FloatValue;
+    float needDistance = g_cvHeadBlockForceRockRange.FloatValue;
+    if (needDistance < FORCE_ROCK_MIN_HORIZONTAL)
+        needDistance = FORCE_ROCK_MIN_HORIZONTAL;
     if (horizontal < needDistance)
-        return Plugin_Continue;
+    {
+        int oldButtons = buttons;
+        buttons &= ~(IN_ATTACK | IN_ATTACK2);
+        retreating = true;
+        commandTankRetreatForRock(tank, tankPos, blockedPos, horizontal, needDistance);
+        return (buttons != oldButtons) ? Plugin_Changed : Plugin_Continue;
+    }
 
     float throwMax = g_cvThrowMaxDist.FloatValue;
     if (throwMax > 0.0 && GetVectorDistance(tankPos, blockedPos) > throwMax)
         return Plugin_Continue;
 
-    bool visible = g_AiTanks[tank].forceRockInPlace && isSurvivorRidingTank(tank, rockTarget);
-    if (!visible)
-        visible = clientIsVisibleToClient(tank, rockTarget);
+    bool visible = clientIsVisibleToClient(tank, rockTarget);
     if (!visible)
     {
         float eyeTarget[3];
@@ -2128,7 +2193,7 @@ Action tankAnimHookPostCb(int tank, int &sequence)
             // 出手已经开始，停止继续按攻击2，但保留瞄准目标到 OnRelease
             g_AiTanks[tank].forceRockUntil = 0.0;
             g_AiTanks[tank].forceRockTarget = -1;
-            g_AiTanks[tank].forceRockInPlace = false;
+            g_AiTanks[tank].lastForceRockRetreatTime = 0.0;
             if (g_cvJumpRock.BoolValue)
                 makeTankJumpRock(tank);
             g_AiTanks[tank].wasThrowing = true;
@@ -2258,26 +2323,6 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
     }
 
     int aimTarget = IsValidSurvivor(newRockTarget) ? newRockTarget : target;
-
-    float tankPos[3], aimPos[3];
-    GetClientAbsOrigin(tank, tankPos);
-    GetClientAbsOrigin(aimTarget, aimPos);
-    if (getVectorDistance2D(tankPos, aimPos) < FORCE_ROCK_CLOSE_AIM_DIST)
-    {
-        float dir[3];
-        aimPos[2] += PLAYER_CHEST;
-        MakeVectorFromPoints(vecPos, aimPos, dir);
-        if (GetVectorLength(dir) < 8.0)
-        {
-            dir[0] = 0.0;
-            dir[1] = 0.0;
-            dir[2] = 1.0;
-        }
-        NormalizeVector(dir, dir);
-        ScaleVector(dir, throwSpeed);
-        vecVel = dir;
-        return Plugin_Changed;
-    }
 
     // 计算上抬角
     float rockGravityScale = GetEntPropFloat(rock, Prop_Data, "m_flGravity");

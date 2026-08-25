@@ -14,7 +14,47 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"zho"		"{green}[AnneDonate]{default} 掃碼支付完成後，請輸入 {olive}!wc 郵箱{default} / {olive}!wanchen 郵箱{default} / {olive}!finish 郵箱{default} 提醒管理者核實。"
+		"zho"		"{green}[AnneDonate]{default} 付款完成後請返回遊戲，輸入 {olive}!wc user@example.com{default}。"
+	}
+	"Join_AnneDonatePaymentSubmitInProgress"
+	{
+		"zho"		"{green}[AnneDonate]{default} 正在提交付款完成提示，請稍候，不要重複提交或重新選擇檔位。"
+	}
+	"Join_AnneDonateRemindMenuTitle"
+	{
+		"zho"		"請用 !wc user@example.com 提交"
+	}
+	"Join_AnneDonateRemindMenuPaid"
+	{
+		"zho"		"我已完成付款"
+	}
+	"Join_AnneDonateRemindMenuReopen"
+	{
+		"zho"		"重新打開付款頁"
+	}
+	"Join_AnneDonateRemindMenuLater"
+	{
+		"zho"		"稍後處理"
+	}
+	"Join_AnneDonateAmountMenuTitle"
+	{
+		"zho"		"請選擇贊助金額："
+	}
+	"Join_AnneDonateAmountMenuWebOnly"
+	{
+		"zho"		"只開啟贊助網頁"
+	}
+	"Join_AnneDonateMethodMenuTitle"
+	{
+		"zho"		"請選擇付款方式："
+	}
+	"Join_AnneDonateMethodWeChat"
+	{
+		"zho"		"微信支付"
+	}
+	"Join_AnneDonateMethodAlipay"
+	{
+		"zho"		"支付寶"
 	}
 	"Join_AnneDonateEmailRequired"
 	{

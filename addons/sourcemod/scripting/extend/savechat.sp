@@ -28,6 +28,22 @@ static const char
 		"go_away_from_keyboard"
 	};
 
+static const char
+	g_sSponsorCommands[][] =
+	{
+		"sm_donate",
+		"sm_wc",
+		"sm_wanchen",
+		"sm_finish"
+	},
+	g_sSponsorChatTriggers[][] =
+	{
+		"!donate", "/donate", "!sm_donate", "/sm_donate",
+		"!wc", "/wc", "!sm_wc", "/sm_wc",
+		"!wanchen", "/wanchen", "!sm_wanchen", "/sm_wanchen",
+		"!finish", "/finish", "!sm_finish", "/sm_finish"
+	};
+
 public Plugin myinfo = 
 {
 	name = "SaveChat",
@@ -83,9 +99,41 @@ Action CommandListener(int client, char[] command, int argc)
 	GetCmdArgString(sMessage, sizeof sMessage);
 	StripQuotes(sMessage);
 
-	Format(sMessage, sizeof sMessage, "[%s] [%s] %N: %s %s", sTime, sTeamName, client, command, sMessage);
+	if(IsSponsorCommand(command))
+	{
+		Format(sMessage, sizeof sMessage, "[%s] [%s] %N: %s", sTime, sTeamName, client, command);
+	}
+	else
+	{
+		SanitizeSponsorChatMessage(sMessage);
+		Format(sMessage, sizeof sMessage, "[%s] [%s] %N: %s %s", sTime, sTeamName, client, command, sMessage);
+	}
 	vSaveMessage(sMessage);
 	return Plugin_Continue;
+}
+
+bool IsSponsorCommand(const char[] command)
+{
+	for(int i; i < sizeof g_sSponsorCommands; i++)
+	{
+		if(StrEqual(command, g_sSponsorCommands[i], false))
+			return true;
+	}
+	return false;
+}
+
+void SanitizeSponsorChatMessage(char[] message)
+{
+	for(int i; i < sizeof g_sSponsorChatTriggers; i++)
+	{
+		int triggerLength = strlen(g_sSponsorChatTriggers[i]);
+		if(strncmp(message, g_sSponsorChatTriggers[i], triggerLength, false) == 0
+			&& (message[triggerLength] == '\0' || message[triggerLength] == ' ' || message[triggerLength] == '\t'))
+		{
+			message[triggerLength] = '\0';
+			return;
+		}
+	}
 }
 
 public void OnMapEnd()

@@ -7,32 +7,48 @@
 
 // End blinded state.
 
-public Action:timer_EndBoomerBlinded(Handle:timer, any:data)
+public Action:timer_EndBoomerBlinded(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	PlayerBlinded[data][0] = 0;
 	PlayerBlinded[data][1] = 0;
 }
 
 // End blinded state.
 
-public Action:timer_EndSmokerParalyzed(Handle:timer, any:data)
+public Action:timer_EndSmokerParalyzed(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	PlayerParalyzed[data][0] = 0;
 	PlayerParalyzed[data][1] = 0;
 }
 
 // End lunging state.
 
-public Action:timer_EndHunterLunged(Handle:timer, any:data)
+public Action:timer_EndHunterLunged(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	PlayerLunged[data][0] = 0;
 	PlayerLunged[data][1] = 0;
 }
 
 // End plummel state.
 
-public Action:timer_EndChargerPlummel(Handle:timer, any:data)
+public Action:timer_EndChargerPlummel(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	ChargerPlummelVictim[PlayerPlummeled[data][1]] = 0;
 	PlayerPlummeled[data][0] = 0;
 	PlayerPlummeled[data][1] = 0;
@@ -40,8 +56,12 @@ public Action:timer_EndChargerPlummel(Handle:timer, any:data)
 
 // End charge impact counter state.
 
-public Action:timer_EndCharge(Handle:timer, any:data)
+public Action:timer_EndCharge(Handle:timer, any:userid)
 {
+	new data;
+	if (!Stats_ResolveHumanQueryUserId(userid, data))
+		return;
+
 	ChargerImpactCounterTimer[data] = INVALID_HANDLE;
 	new Counter = ChargerImpactCounter[data];
 	ChargerImpactCounter[data] = 0;
@@ -89,8 +109,12 @@ public Action:timer_EndCharge(Handle:timer, any:data)
 
 // End carried state.
 
-public Action:timer_EndChargerCarry(Handle:timer, any:data)
+public Action:timer_EndChargerCarry(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	ChargerCarryVictim[PlayerCarried[data][1]] = 0;
 	PlayerCarried[data][0] = 0;
 	PlayerCarried[data][1] = 0;
@@ -98,8 +122,12 @@ public Action:timer_EndChargerCarry(Handle:timer, any:data)
 
 // End jockey ride state.
 
-public Action:timer_EndJockeyRide(Handle:timer, any:data)
+public Action:timer_EndJockeyRide(Handle:timer, any:userid)
 {
+	new data = GetClientOfUserId(userid);
+	if (data <= 0)
+		return;
+
 	JockeyVictim[PlayerCarried[data][1]] = 0;
 	PlayerJockied[data][0] = 0;
 	PlayerJockied[data][1] = 0;
@@ -113,7 +141,8 @@ public Action:timer_FriendlyFireDamageEnd(Handle:timer, any:dp)
 
 	new HumanDamage = ReadPackCell(dp);
 	new BotDamage = ReadPackCell(dp);
-	new Attacker = ReadPackCell(dp);
+	new AttackerUserId = ReadPackCell(dp);
+	new Attacker = GetClientOfUserId(AttackerUserId);
 
 	decl String:AttackerID[MAX_LINE_WIDTH];
 	ReadPackString(dp, AttackerID, sizeof(AttackerID));
@@ -247,14 +276,30 @@ public Action:timer_RankVote(Handle:timer, any:data)
 
 public Action:timer_FriendlyFireCooldownEnd(Handle:timer, any:data)
 {
-	FriendlyFireCooldown[FriendlyFirePrm[data][0]][FriendlyFirePrm[data][1]] = false;
-	FriendlyFireTimer[FriendlyFirePrm[data][0]][FriendlyFirePrm[data][1]] = INVALID_HANDLE;
+	new attacker = GetClientOfUserId(FriendlyFirePrm[data][0]);
+	if (attacker <= 0)
+		return;
+
+	new target = 0;
+	if (FriendlyFirePrm[data][1])
+	{
+		target = GetClientOfUserId(FriendlyFirePrm[data][1]);
+		if (target <= 0)
+			return;
+	}
+
+	FriendlyFireCooldown[attacker][target] = false;
+	FriendlyFireTimer[attacker][target] = INVALID_HANDLE;
 }
 
 // End friendly fire cooldown.
 
-public Action:timer_MeleeKill(Handle:timer, any:data)
+public Action:timer_MeleeKill(Handle:timer, any:userid)
 {
+	new data;
+	if (!Stats_ResolveHumanQueryUserId(userid, data))
+		return;
+
 	MeleeKillTimer[data] = INVALID_HANDLE;
 	new Counter = MeleeKillCounter[data];
 	MeleeKillCounter[data] = 0;
@@ -303,8 +348,12 @@ public Action:timer_UpdatePlayers(Handle:timer, Handle:hndl)
 
 // Display rank change.
 
-public Action:timer_ShowRankChange(Handle:timer, any:client)
+public Action:timer_ShowRankChange(Handle:timer, any:userid)
 {
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
 	DoShowRankChange(client);
 }
 
@@ -326,8 +375,12 @@ public DoShowRankChange(Client)
 
 // Display player rank.
 
-public Action:timer_ShowPlayerJoined(Handle:timer, any:client)
+public Action:timer_ShowPlayerJoined(Handle:timer, any:userid)
 {
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
+		return;
+
 	DoShowPlayerJoined(client);
 }
 
@@ -362,8 +415,8 @@ public GetBasicInf(Handle:owner, Handle:hndl, const String:error[], any:userid)
 		return;
 	}
 
-	new client = GetClientOfUserId(userid);
-	if (client < 1 || !IsClientInGame(client) || IsFakeClient(client))
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (SQL_FetchRow(hndl))

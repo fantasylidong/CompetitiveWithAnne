@@ -14,16 +14,24 @@
 #include <l4d_hats>
 #include <godframecontrol>
 #include <readyup>
-#define PLUGIN_VERSION "2.0.1"
+#define PLUGIN_VERSION "2.1.0"
 #define MAX_LINE_WIDTH 64
 #define DB_CONF_NAME  "rpg"
 #define RPG_DB_LOAD_RETRY_DELAY 2.0
+#define RPG_AUTH_LOAD_RETRY_DELAY 1.0
+#define RPG_AUTH_LOAD_RETRY_MAX 10
 #define RPG_HAT_FIRST -2
 
 // 进行 MySQL 连接相关变量
 Handle db = INVALID_HANDLE;
 int g_iDbLoadRetryCount[MAXPLAYERS + 1];
+int g_iAuthLoadRetryCount[MAXPLAYERS + 1];
+int g_iDbLoadUserId[MAXPLAYERS + 1];
+bool g_bDbLoadInFlight[MAXPLAYERS + 1];
+bool g_bAuthLoadRetryPending[MAXPLAYERS + 1];
+bool g_bLateLoad = false;
 bool g_bGuidePreferenceColumnAvailable = false;
+bool g_bHatPrefColumnAvailable = false;
 enum struct PlayerStruct{
 	int ClientPoints;
 	int ClientBlood;
@@ -33,6 +41,7 @@ enum struct PlayerStruct{
 	int GlowType;
 	int SkinType;
 	int AnneGuidePrompt;
+	int HatPrefs;
 	bool ClientFirstBuy;
 	bool Check;
 	bool CanBuy;
@@ -47,6 +56,13 @@ bool g_bEnableGlow = true;
 bool  g_bAllowUseB = true;
 bool g_bPendingGlowRetry[MAXPLAYERS + 1];
 bool g_bHatDirty[MAXPLAYERS + 1];
+bool g_bHatPrefDirty[MAXPLAYERS + 1];
+bool g_bApplyingHatPrefs[MAXPLAYERS + 1];
+bool g_bHatPrefsReady[MAXPLAYERS + 1];
+bool g_bHatPrefMigrationPending[MAXPLAYERS + 1];
+bool g_bHatTypeMysqlReady[MAXPLAYERS + 1];
+bool g_bHatTypeCookieMigrationPending[MAXPLAYERS + 1];
+bool g_bHatRowCreatePending[MAXPLAYERS + 1];
 bool g_bPendingCosmeticRetry[MAXPLAYERS + 1];
 ConVar g_hAllowUseB = null;
 ConVar GaoJiRenJi, AllowBigGun, g_cShopEnable, g_hEnableGlow, g_hInfectedLimit = null;
@@ -122,6 +138,7 @@ Handle IsValid, IsUseBuy;
 // rpg.sp —— 在 AskPluginLoad2 里注册 Native（和你现有的三个一起）
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
+    g_bLateLoad = late;
     RegPluginLibrary("rpg");
     IsValid = CreateGlobalForward("OnValidValveChange", ET_Ignore, Param_Cell);
     IsUseBuy = CreateGlobalForward("OnBuyValveChange", ET_Ignore, Param_Cell);
@@ -148,6 +165,8 @@ public any Native_SetValue(Handle plugin, int numParams)
         return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
     if (!IsClientConnected(client))
         return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+    if (!player[client].DataLoaded)
+        return -1;
 
     switch (view_as<TARGET_VALUE_INDEX>(option))
     {
@@ -172,6 +191,14 @@ public any Native_GetValue(Handle plugin, int numParams)
 	if (!IsClientConnected(client))
 	{
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	}
+	if (!player[client].DataLoaded)
+	{
+		switch (view_as<TARGET_VALUE_INDEX>(option))
+		{
+			case INDEX_BLOOD, INDEX_MELEE, INDEX_HAT, INDEX_GLOW, INDEX_SKIN, INDEX_RECOIL:
+				return -1;
+		}
 	}
 	//Debug_Print("GetClientTargetNum Native called");
 	switch( view_as<TARGET_VALUE_INDEX>(option) )
@@ -326,10 +353,207 @@ static bool HasBasicGlowAccess(int client)
 		|| CheckCommandAccess(client, "", ADMFLAG_SLAY);
 }
 
+static bool TryGetRpgSteamId(int client, char[] steamid, int maxlen)
+{
+	if (maxlen > 0)
+		steamid[0] = '\0';
+
+	if (client < 1 || client > MaxClients || !IsClientConnected(client) || IsFakeClient(client))
+		return false;
+
+	if (!GetClientAuthId(client, AuthId_Steam2, steamid, maxlen, true))
+	{
+		if (maxlen > 0)
+			steamid[0] = '\0';
+		return false;
+	}
+
+	if (steamid[0] == '\0'
+		|| StrEqual(steamid, "BOT", false)
+		|| StrEqual(steamid, "STEAM_ID_PENDING", false)
+		|| StrEqual(steamid, "STEAM_ID_STOP_IGNORING_RETVALS", false)
+		|| StrEqual(steamid, "STEAM_ID_LAN", false))
+	{
+		steamid[0] = '\0';
+		return false;
+	}
+
+	return true;
+}
+
+static void ResetRpgClient(int client)
+{
+	if (client < 1 || client > MAXPLAYERS)
+		return;
+
+	player[client].ClientPoints = 500;
+	player[client].ClientBlood = 0;
+	player[client].ClientMelee = 0;
+	player[client].ClientHat = 0;
+	player[client].ClientRecoil = 1;
+	player[client].GlowType = 0;
+	player[client].SkinType = 0;
+	player[client].AnneGuidePrompt = 1;
+	player[client].HatPrefs = HATS_PREF_DEFAULT;
+	player[client].ClientFirstBuy = !IsStart;
+	player[client].Check = false;
+	player[client].CanBuy = true;
+	player[client].DataLoaded = false;
+	player[client].tags.ChatTag = NULL_STRING;
+
+	g_iDbLoadRetryCount[client] = 0;
+	g_iAuthLoadRetryCount[client] = 0;
+	g_iDbLoadUserId[client] = 0;
+	g_bDbLoadInFlight[client] = false;
+	g_bAuthLoadRetryPending[client] = false;
+	g_bPendingGlowRetry[client] = false;
+	g_bHatDirty[client] = false;
+	g_bHatPrefDirty[client] = false;
+	g_bApplyingHatPrefs[client] = false;
+	g_bHatPrefsReady[client] = false;
+	g_bHatPrefMigrationPending[client] = false;
+	g_bHatTypeMysqlReady[client] = false;
+	g_bHatTypeCookieMigrationPending[client] = false;
+	g_bHatRowCreatePending[client] = false;
+	g_bPendingCosmeticRetry[client] = false;
+	g_bPendingCustomTagApply[client] = false;
+}
+
+static bool IsSameRpgLoadQuery(int client, int userid)
+{
+	return client > 0 && client <= MAXPLAYERS && userid > 0
+		&& g_bDbLoadInFlight[client] && g_iDbLoadUserId[client] == userid;
+}
+
+static bool BeginRpgClientLoad(int client)
+{
+	if (!g_bMysqlSystemAvailable || !IsValidClient(client) || IsFakeClient(client) || player[client].DataLoaded)
+		return false;
+
+	int userid = GetClientUserId(client);
+	if (userid <= 0)
+		return false;
+	if (g_bDbLoadInFlight[client] && g_iDbLoadUserId[client] == userid)
+		return false;
+
+	char steamid[64];
+	if (!TryGetRpgSteamId(client, steamid, sizeof(steamid)))
+		return false;
+	if (db == INVALID_HANDLE && !ConnectDB())
+		return false;
+
+	char query[768];
+	if (g_bGuidePreferenceColumnAvailable && g_bHatPrefColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG,ANNE_GUIDE_PROMPT,HAT_ENABLED,HAT_VIEW_FIRST,HAT_VIEW_THIRD,HAT_SHOW_OTHERS FROM RPG WHERE steamid = '%s'", steamid);
+	}
+	else if (g_bGuidePreferenceColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG,ANNE_GUIDE_PROMPT FROM RPG WHERE steamid = '%s'", steamid);
+	}
+	else if (g_bHatPrefColumnAvailable)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG,HAT_ENABLED,HAT_VIEW_FIRST,HAT_VIEW_THIRD,HAT_SHOW_OTHERS FROM RPG WHERE steamid = '%s'", steamid);
+	}
+	else
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG FROM RPG WHERE steamid = '%s'", steamid);
+	}
+
+	g_bDbLoadInFlight[client] = true;
+	g_iDbLoadUserId[client] = userid;
+	SQL_TQuery(db, ShowMelee, query, userid);
+	return true;
+}
+
+static void ScheduleRpgAuthLoadRetry(int client)
+{
+	if (client < 1 || client > MAXPLAYERS || !g_bMysqlSystemAvailable || player[client].DataLoaded)
+		return;
+	if (g_bDbLoadInFlight[client] || g_bAuthLoadRetryPending[client])
+		return;
+	if (g_iAuthLoadRetryCount[client] >= RPG_AUTH_LOAD_RETRY_MAX)
+		return;
+
+	int userid = GetClientUserId(client);
+	if (userid <= 0)
+		return;
+
+	g_iAuthLoadRetryCount[client]++;
+	g_bAuthLoadRetryPending[client] = true;
+	CreateTimer(RPG_AUTH_LOAD_RETRY_DELAY, Timer_RetryAuthLoad, userid, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+static void RpgStartHumanClient(int client)
+{
+	if (client < 1 || client > MaxClients || !IsClientConnected(client) || IsFakeClient(client))
+		return;
+
+	player[client].ClientFirstBuy = !IsStart;
+	if (!g_bMysqlSystemAvailable)
+	{
+		player[client].DataLoaded = true;
+		return;
+	}
+
+	player[client].DataLoaded = false;
+	if (!BeginRpgClientLoad(client))
+		ScheduleRpgAuthLoadRetry(client);
+}
+
+static void RpgScheduleJoinTimers(int client)
+{
+	if (!IsClientInGame(client) || IsFakeClient(client))
+		return;
+
+	CreateTimer(3.0, CheckPlayer, GetClientUserId(client));
+	CreateTimer(10.0, SetClientTag, GetClientUserId(client));
+}
+
+static bool ShouldPreserveRpgLoad(int client)
+{
+	if (client < 1 || client > MAXPLAYERS || !IsClientConnected(client))
+		return false;
+
+	int userid = GetClientUserId(client);
+	return userid > 0 && g_bDbLoadInFlight[client] && g_iDbLoadUserId[client] == userid;
+}
+
+static void RpgInitOnlineClients()
+{
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		if (!IsClientConnected(client) || IsFakeClient(client))
+			continue;
+
+		ResetRpgClient(client);
+		RpgStartHumanClient(client);
+		RpgScheduleJoinTimers(client);
+	}
+}
+
+public Action Timer_RetryAuthLoad(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (client > 0 && client <= MAXPLAYERS)
+		g_bAuthLoadRetryPending[client] = false;
+
+	if (client <= 0 || !IsClientConnected(client) || IsFakeClient(client))
+		return Plugin_Stop;
+	if (player[client].DataLoaded || !g_bMysqlSystemAvailable)
+		return Plugin_Stop;
+	if (g_bDbLoadInFlight[client] && g_iDbLoadUserId[client] == userid)
+		return Plugin_Stop;
+	if (!BeginRpgClientLoad(client))
+		ScheduleRpgAuthLoadRetry(client);
+	return Plugin_Stop;
+}
+
 static bool IsCustomGlowOwner(int client, int glowType)
 {
 	char steamid[32];
-	GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
+	if (!TryGetRpgSteamId(client, steamid, sizeof(steamid)))
+		return false;
 
 	switch (glowType)
 	{
@@ -427,14 +651,70 @@ static int HatIndexToStored(int index)
 	return index;
 }
 
+static int HatsGetPrefsSafe(int client)
+{
+	if (g_bHatSystemAvailable && GetFeatureStatus(FeatureType_Native, "Hats_GetClientPrefs") == FeatureStatus_Available)
+		return Hats_GetClientPrefs(client);
+	return HATS_PREF_DEFAULT;
+}
+
+static bool HatsArePrefsReadySafe(int client)
+{
+	return g_bHatSystemAvailable
+		&& GetFeatureStatus(FeatureType_Native, "Hats_AreClientPrefsReady") == FeatureStatus_Available
+		&& Hats_AreClientPrefsReady(client);
+}
+
+static void HatsUnpackPrefs(int flags, int &enabled, int &viewFirst, int &viewThird, int &showOthers)
+{
+	enabled = (flags & HATS_PREF_ENABLED) ? 1 : 0;
+	viewFirst = (flags & HATS_PREF_VIEW_FIRST) ? 1 : 0;
+	viewThird = (flags & HATS_PREF_VIEW_THIRD) ? 1 : 0;
+	showOthers = (flags & HATS_PREF_SHOW_OTHERS) ? 1 : 0;
+}
+
+static int HatsPackPrefValues(int enabled, int viewFirst, int viewThird, int showOthers)
+{
+	int flags = 0;
+	if (enabled)
+		flags |= HATS_PREF_ENABLED;
+	if (viewFirst)
+		flags |= HATS_PREF_VIEW_FIRST;
+	if (viewThird)
+		flags |= HATS_PREF_VIEW_THIRD;
+	if (showOthers)
+		flags |= HATS_PREF_SHOW_OTHERS;
+	return flags;
+}
+
+static void ApplyClientHatPrefs(int client)
+{
+	if (!g_bHatPrefsReady[client])
+		return;
+	if (!g_bHatSystemAvailable || !g_bMysqlSystemAvailable || !g_bHatPrefColumnAvailable)
+		return;
+	if (GetFeatureStatus(FeatureType_Native, "Hats_SetClientPrefs") != FeatureStatus_Available)
+		return;
+
+	g_bApplyingHatPrefs[client] = true;
+	Hats_SetClientPrefs(client, player[client].HatPrefs);
+	g_bApplyingHatPrefs[client] = false;
+}
+
 static void ApplyClientHat(int client)
 {
-	if (!g_bHatSystemAvailable)
+	if (!g_bHatSystemAvailable || !g_bMysqlSystemAvailable || !player[client].DataLoaded || !g_bHatTypeMysqlReady[client])
 		return;
+
+	ApplyClientHatPrefs(client);
 
 	int index = StoredHatToIndex(player[client].ClientHat);
 	if (index < 0)
+	{
+		if (GetFeatureStatus(FeatureType_Native, "Hats_SetClientHat") == FeatureStatus_Available)
+			Hats_SetClientHat(client, -1);
 		return;
+	}
 
 	if (!CanClientUseHat(client))
 	{
@@ -630,7 +910,15 @@ public void OnAllPluginsLoaded()
 public void OnLibraryAdded(const char[] name)
 {
     if (StrEqual(name, "l4d2_godframes_control_merge")) { g_bGodFrameSystemAvailable = true; }
-    else if (StrEqual(name, "l4d_hats")) { g_bHatSystemAvailable = true; }
+    else if (StrEqual(name, "l4d_hats"))
+	{
+		g_bHatSystemAvailable = true;
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (player[i].DataLoaded)
+				ApplyClientHat(i);
+		}
+	}
     else if (StrEqual(name, "l4d_stats")) { g_bl4dstatsSystemAvailable = true; }
     else if (StrEqual(name, "hextags"))
 	{
@@ -692,13 +980,73 @@ public void L4D_OnHatLoadSave(int client, int index)
 		return;
 
 	player[client].ClientHat = HatIndexToStored(index);
+	g_bHatTypeCookieMigrationPending[client] = false;
 	if (!player[client].DataLoaded)
 	{
 		g_bHatDirty[client] = true;
 		return;
 	}
 
-	ClientSaveToFileSave(client);
+	ClientHatTypeSaveToFile(client);
+}
+
+public void L4D_OnHatPrefsChanged(int client, int flags)
+{
+	if (!IsValidClient(client) || IsFakeClient(client) || g_bApplyingHatPrefs[client])
+		return;
+
+	player[client].HatPrefs = flags;
+	g_bHatPrefsReady[client] = g_bHatPrefColumnAvailable;
+	g_bHatPrefMigrationPending[client] = false;
+	if (!player[client].DataLoaded)
+	{
+		g_bHatPrefDirty[client] = true;
+		return;
+	}
+
+	ClientHatPrefsSaveToFile(client);
+}
+
+public void L4D_OnHatPrefsReady(int client, int flags)
+{
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return;
+
+	if (g_bHatTypeCookieMigrationPending[client])
+	{
+		player[client].ClientHat = HatIndexToStored(Hats_GetClientHat(client));
+		g_bHatTypeCookieMigrationPending[client] = false;
+		if (player[client].DataLoaded && g_bHatTypeMysqlReady[client])
+		{
+			ClientHatTypeSaveToFile(client);
+			ApplyClientHat(client);
+		}
+	}
+
+	if (!g_bHatPrefMigrationPending[client])
+		return;
+
+	if (!g_bHatPrefDirty[client])
+		player[client].HatPrefs = flags;
+
+	g_bHatPrefMigrationPending[client] = false;
+	g_bHatPrefsReady[client] = g_bHatPrefColumnAvailable;
+	if (player[client].DataLoaded && g_bHatPrefsReady[client])
+	{
+		g_bHatPrefDirty[client] = false;
+		ApplyClientHatPrefs(client);
+		CreateTimer(0.2, Timer_SaveReadyHatPrefs, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	}
+}
+
+public Action Timer_SaveReadyHatPrefs(Handle timer, any userid)
+{
+	int client = GetClientOfUserId(userid);
+	if (!client || !IsClientInGame(client) || !g_bHatPrefsReady[client])
+		return Plugin_Stop;
+
+	ClientHatPrefsSaveToFile(client);
+	return Plugin_Stop;
 }
 
 //载入事件
@@ -782,13 +1130,8 @@ public void  OnPluginStart()
 	RegAdminCmd("sm_rpgglowdebug", RpgGlowDebug, ADMFLAG_ROOT, "输出RPG轮廓权限调试信息");
 	//RegAdminCmd("sm_skintest", Tryskin, ADMFLAG_ROOT ,"测试皮肤rgb值");
 	//RegAdminCmd("sm_aruatest", Tryskin, ADMFLAG_ROOT ,"测试轮廓rgb值");
-	for(int i=1;i<MaxClients;i++){
-			player[i].ClientPoints=500;
-			player[i].ClientFirstBuy=false;
-			player[i].CanBuy=true;
-			player[i].AnneGuidePrompt=1;
-			player[i].DataLoaded=false;
-	}
+	for (int i = 1; i <= MAXPLAYERS; i++)
+		ResetRpgClient(i);
 }
 
 public void OnMapEnd()
@@ -808,10 +1151,16 @@ public void OnConfigsExecuted()
 	{
 		g_bMysqlSystemAvailable = false;
 		//SetFailState("Connecting to database failed. Read error log for further details.");
-		return;
-	}else
+	}
+	else
 	{
 		g_bMysqlSystemAvailable = true;
+	}
+
+	if (g_bLateLoad)
+	{
+		RpgInitOnlineClients();
+		g_bLateLoad = false;
 	}
 }
 
@@ -854,23 +1203,8 @@ public void Event_PlayerDisconnectOrAFK( Event hEvent, const char[] sName, bool 
 	if(IsValidClient(client) && (team == 3 || disconnect)){
 		DisableGlow(client);
 	}
-	if(IsValidClient(client) && disconnect){
-		player[client].ClientMelee = 0;
-		player[client].ClientBlood = 0;
-		player[client].ClientHat = 0;
-		player[client].GlowType = 0;
-		player[client].SkinType = 0;
-		player[client].ClientFirstBuy = false;
-		player[client].ClientRecoil = 1;
-		player[client].CanBuy=true;
-		player[client].ClientPoints = 500;
-		player[client].Check = false;
-		player[client].AnneGuidePrompt = 1;
-		player[client].DataLoaded = false;
-		player[client].tags.ChatTag = NULL_STRING;
-		g_bHatDirty[client] = false;
-		g_bPendingCosmeticRetry[client] = false;
-	}
+	if (client > 0 && disconnect)
+		ResetRpgClient(client);
 
 }
 
@@ -1030,6 +1364,12 @@ public bool ConnectDB()
 		{
 			LogError("[RPG] ANNE_GUIDE_PROMPT is unavailable; guide prompts remain enabled without persistence.");
 		}
+
+		g_bHatPrefColumnAvailable = EnsureHatPreferenceColumns();
+		if (!g_bHatPrefColumnAvailable)
+		{
+			LogError("[RPG] Hat preference columns are unavailable; wear/view/visibility stay on clientprefs.");
+		}
 	}
 	else
 	{
@@ -1076,6 +1416,59 @@ bool EnsureAnneGuidePromptColumn()
 	return true;
 }
 
+bool EnsureRpgNullableTinyintColumn(const char[] column, const char[] alterSql)
+{
+	if (db == INVALID_HANDLE)
+	{
+		return false;
+	}
+
+	char inspect[192];
+	FormatEx(inspect, sizeof(inspect), "SHOW COLUMNS FROM `RPG` LIKE '%s'", column);
+	Handle result = SQL_Query(db, inspect);
+	if (result == INVALID_HANDLE || result == null)
+	{
+		char error[256];
+		SQL_GetError(db, error, sizeof(error));
+		LogError("[RPG] Failed to inspect %s: %s", column, error);
+		return false;
+	}
+
+	bool exists = SQL_GetRowCount(result) > 0;
+	delete result;
+	if (exists)
+	{
+		return true;
+	}
+
+	if (!SQL_FastQuery(db, alterSql))
+	{
+		char error[256];
+		SQL_GetError(db, error, sizeof(error));
+		if (StrContains(error, "Duplicate column", false) != -1)
+			return true;
+		LogError("[RPG] Failed to add %s: %s", column, error);
+		return false;
+	}
+
+	return true;
+}
+
+bool EnsureHatPreferenceColumns()
+{
+	if (db == INVALID_HANDLE)
+	{
+		return false;
+	}
+
+	bool ok = true;
+	ok = EnsureRpgNullableTinyintColumn("HAT_ENABLED", "ALTER TABLE `RPG` ADD COLUMN `HAT_ENABLED` TINYINT NULL DEFAULT NULL AFTER `HAT`") && ok;
+	ok = EnsureRpgNullableTinyintColumn("HAT_VIEW_FIRST", "ALTER TABLE `RPG` ADD COLUMN `HAT_VIEW_FIRST` TINYINT NULL DEFAULT NULL AFTER `HAT_ENABLED`") && ok;
+	ok = EnsureRpgNullableTinyintColumn("HAT_VIEW_THIRD", "ALTER TABLE `RPG` ADD COLUMN `HAT_VIEW_THIRD` TINYINT NULL DEFAULT NULL AFTER `HAT_VIEW_FIRST`") && ok;
+	ok = EnsureRpgNullableTinyintColumn("HAT_SHOW_OTHERS", "ALTER TABLE `RPG` ADD COLUMN `HAT_SHOW_OTHERS` TINYINT NULL DEFAULT NULL AFTER `HAT_VIEW_THIRD`") && ok;
+	return ok;
+}
+
 bool IsDbConnectionLostError(const char[] error)
 {
 	return StrContains(error, "Lost connection", false) != -1
@@ -1091,6 +1484,7 @@ void CloseDbConnection()
 		db = INVALID_HANDLE;
 	}
 	g_bGuidePreferenceColumnAvailable = false;
+	g_bHatPrefColumnAvailable = false;
 }
 
 public void SendSQLUpdate(char []query)
@@ -1111,48 +1505,35 @@ public void SQLErrorCheckCallback(Handle owner, Handle hndl, const char []error,
 }
 
 
+public void OnClientConnected(int client)
+{
+	ResetRpgClient(client);
+}
+
+public void OnClientAuthorized(int client, const char[] auth)
+{
+	if (client < 1 || client > MaxClients || IsFakeClient(client))
+		return;
+	if (!g_bMysqlSystemAvailable || player[client].DataLoaded)
+		return;
+	if (!BeginRpgClientLoad(client))
+		ScheduleRpgAuthLoadRetry(client);
+}
+
 public void OnClientPostAdminCheck(int client)
 {
-	if(!IsValidClient(client) || IsFakeClient(client))
+	if (!ShouldPreserveRpgLoad(client))
+		ResetRpgClient(client);
+	if (!IsValidClient(client) || IsFakeClient(client))
 		return;
-	if(IsStart)
-		player[client].ClientFirstBuy = false;
-	else
-		player[client].ClientFirstBuy = true;
-	player[client].ClientRecoil = 1;
-	player[client].CanBuy=true;
-	player[client].ClientPoints = 500;
-	player[client].Check = false;
-	player[client].AnneGuidePrompt = 1;
-	player[client].DataLoaded = !g_bMysqlSystemAvailable;
-	g_iDbLoadRetryCount[client] = 0;
-	if(g_bMysqlSystemAvailable)
-	{
-		player[client].ClientMelee = 0;
-		player[client].ClientBlood = 0;
-		player[client].ClientHat = 0;
-		player[client].GlowType = 0;
-		player[client].SkinType = 0;
-		player[client].AnneGuidePrompt = 1;
-		player[client].DataLoaded = false;
-		player[client].tags.ChatTag = NULL_STRING;
-		g_bHatDirty[client] = false;
-		g_bPendingCosmeticRetry[client] = false;
-		ClientSaveToFileLoad(client);
-	}
-	CreateTimer(3.0, CheckPlayer, GetClientUserId(client));
-	CreateTimer(10.0, SetClientTag, client);
+
+	RpgStartHumanClient(client);
+	RpgScheduleJoinTimers(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-	g_iDbLoadRetryCount[client] = 0;
-	g_bPendingCustomTagApply[client] = false;
-	g_bPendingGlowRetry[client] = false;
-	g_bPendingCosmeticRetry[client] = false;
-	g_bHatDirty[client] = false;
-	player[client].AnneGuidePrompt = 1;
-	player[client].DataLoaded = false;
+	ResetRpgClient(client);
 }
 
 public Action RpgGlowDebug(int client, int args)
@@ -1210,8 +1591,18 @@ public Action RpgGlowDebug(int client, int args)
 	return Plugin_Handled;
 }
 
-public Action SetClientTag(Handle timer, int client)
+public Action SetClientTag(Handle timer, int userid)
 {
+	int client = GetClientOfUserId(userid);
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return Plugin_Stop;
+	if (!player[client].DataLoaded)
+	{
+		if (!BeginRpgClientLoad(client))
+			ScheduleRpgAuthLoadRetry(client);
+		return Plugin_Stop;
+	}
+
 	ApplyCustomTagIfReady(client);
 	return Plugin_Stop;
 }
@@ -1253,11 +1644,18 @@ public Action CheckPlayer(Handle timer, any userid)
 {
 	int client = GetClientOfUserId(userid);
 	if(!IsValidClient(client))
-		return Plugin_Handled;
+		return Plugin_Stop;
+	if (!player[client].DataLoaded)
+	{
+		if (!BeginRpgClientLoad(client))
+			ScheduleRpgAuthLoadRetry(client);
+		return Plugin_Stop;
+	}
+
 	ApplyClientCosmetics(client);
 	if(g_bl4dstatsSystemAvailable && l4dstats_GetClientScore(client) < 500000 && !(CheckCommandAccess(client, "", ADMFLAG_SLAY)))
 		player[client].tags.ChatTag = NULL_STRING;
-	return Plugin_Continue;
+	return Plugin_Stop;
 }
 
 public void SetPlayer(int client)
@@ -1273,8 +1671,12 @@ public void BypassAndExecuteCommand(int client, char []strCommand, char []strPar
 	SetCommandFlags(strCommand, flags);
 }
 
-public Action Timer_AutoGive(Handle timer, any client)
+public Action Timer_AutoGive(Handle timer, any userid)
 {
+	int client = GetClientOfUserId(userid);
+	if (!IsSurvivor(client) || !player[client].DataLoaded)
+		return Plugin_Stop;
+
 	int temp = player[client].ClientMelee;
 	if(temp == 14) temp = GetRandomInt(1,13);
 	if (temp == 1)
@@ -1329,67 +1731,87 @@ public Action Timer_AutoGive(Handle timer, any client)
 	{
 		BypassAndExecuteCommand(client, "give", "cricket_bat");
 	}	
-	return Plugin_Continue;
+	return Plugin_Stop;
 }
 
 public void ClientSaveToFileLoad(int Client)
 {
-	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
-		return;
-	if (db == INVALID_HANDLE && !ConnectDB())
-	{
-		return;
-	}
-	char query[512];
-	char SteamID[64];
-	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
-	if(StrEqual(SteamID,"BOT"))return;
-	if (g_bGuidePreferenceColumnAvailable)
-	{
-		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG,ANNE_GUIDE_PROMPT FROM RPG WHERE steamid = '%s'", SteamID);
-	}
-	else
-	{
-		SQL_FormatQuery(db, query, sizeof(query), "SELECT MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,CHATTAG FROM RPG WHERE steamid = '%s'", SteamID);
-	}
-	SQL_TQuery(db, ShowMelee, query, GetClientUserId(Client));
-	return;
+	BeginRpgClientLoad(Client);
 }
 
 public void ClientSaveToFileCreate(int Client)
 {
-	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
-	return;
+	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
+		return;
 	if (db == INVALID_HANDLE && !ConnectDB())
 		return;
 
-	char query[512];
+	char query[768];
 	char SteamID[64];
-	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
-	if(StrEqual(SteamID,"BOT"))return;
-	if (g_bGuidePreferenceColumnAvailable)
+	if (!TryGetRpgSteamId(Client, SteamID, sizeof(SteamID)))
+		return;
+	g_bHatRowCreatePending[Client] = true;
+	bool includeHatPrefs = g_bHatPrefColumnAvailable && g_bHatPrefsReady[Client];
+	int hatEnabled, hatViewFirst, hatViewThird, hatShowOthers;
+	HatsUnpackPrefs(player[Client].HatPrefs, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers);
+	if (g_bGuidePreferenceColumnAvailable && includeHatPrefs)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,ANNE_GUIDE_PROMPT,HAT_ENABLED,HAT_VIEW_FIRST,HAT_VIEW_THIRD,HAT_SHOW_OTHERS) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers);
+	}
+	else if (g_bGuidePreferenceColumnAvailable)
 	{
 		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,ANNE_GUIDE_PROMPT) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt);
+	}
+	else if (includeHatPrefs)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL,HAT_ENABLED,HAT_VIEW_FIRST,HAT_VIEW_THIRD,HAT_SHOW_OTHERS) VALUES ('%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers);
 	}
 	else
 	{
 		SQL_FormatQuery(db, query, sizeof(query), "INSERT INTO RPG (steamid,MELEE_DATA,BLOOD_DATA,HAT,GLOW,SKIN,RECOIL) VALUES ('%s',%d,%d,%d,%d,%d,%d)", SteamID, player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil);
 	}
-	SendSQLUpdate(query);
+	SQL_TQuery(db, ClientSaveCreateCallback, query, GetClientUserId(Client));
 	return;
+}
+
+public void ClientSaveCreateCallback(Handle owner, Handle hndl, const char[] error, any userid)
+{
+	if (hndl == INVALID_HANDLE || hndl == null || error[0] != '\0')
+	{
+		LogError("[RPG] Failed to create player row: %s", error);
+		return;
+	}
+
+	int client = GetClientOfUserId(userid);
+	if (!client || !IsClientInGame(client) || !g_bHatRowCreatePending[client])
+		return;
+
+	g_bHatRowCreatePending[client] = false;
+	g_bHatTypeMysqlReady[client] = true;
+	if (g_bHatTypeCookieMigrationPending[client] && HatsArePrefsReadySafe(client))
+	{
+		player[client].ClientHat = HatIndexToStored(Hats_GetClientHat(client));
+		g_bHatTypeCookieMigrationPending[client] = false;
+	}
+	if (!g_bHatTypeCookieMigrationPending[client])
+		ClientHatTypeSaveToFile(client);
+	if (g_bHatPrefsReady[client])
+		ClientHatPrefsSaveToFile(client);
+	if (!g_bHatTypeCookieMigrationPending[client])
+		ApplyClientHat(client);
 }
 
 public void ClientTagsSaveToFileSave(int Client)
 {
-    if (!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
+    if (!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
         return;
 
 	if (db == INVALID_HANDLE && !ConnectDB())
 		return;
 
     char SteamID[64];
-    GetClientAuthId(Client, AuthId_Steam2, SteamID, sizeof(SteamID));
-    if (StrEqual(SteamID, "BOT")) return;
+	if (!TryGetRpgSteamId(Client, SteamID, sizeof(SteamID)))
+		return;
 
     if (player[Client].tags.ChatTag[0] == '\0')
         CPrintToChat(Client, "%t", "RPG_TitleUnset");
@@ -1401,20 +1823,68 @@ public void ClientTagsSaveToFileSave(int Client)
     SendSQLUpdate(query);
 }
 
-public void ClientSaveToFileSave(int Client)
+void ClientHatTypeSaveToFile(int client)
 {
-	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable)
+	if (!IsValidClient(client) || IsFakeClient(client) || !g_bMysqlSystemAvailable || !player[client].DataLoaded)
 		return;
 	if (db == INVALID_HANDLE && !ConnectDB())
 		return;
 
-	char query[512];
+	char steamId[64];
+	if (!TryGetRpgSteamId(client, steamId, sizeof(steamId)))
+		return;
+
+	char query[192];
+	SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET HAT=%d WHERE steamid = '%s'", player[client].ClientHat, steamId);
+	SendSQLUpdate(query);
+}
+
+void ClientHatPrefsSaveToFile(int client)
+{
+	if (!IsValidClient(client) || IsFakeClient(client) || !g_bMysqlSystemAvailable
+		|| !player[client].DataLoaded || !g_bHatPrefColumnAvailable || !g_bHatPrefsReady[client])
+	{
+		return;
+	}
+	if (db == INVALID_HANDLE && !ConnectDB())
+		return;
+
+	char steamId[64];
+	if (!TryGetRpgSteamId(client, steamId, sizeof(steamId)))
+		return;
+
+	int enabled, viewFirst, viewThird, showOthers;
+	HatsUnpackPrefs(player[client].HatPrefs, enabled, viewFirst, viewThird, showOthers);
+	char query[256];
+	SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET HAT_ENABLED=%d,HAT_VIEW_FIRST=%d,HAT_VIEW_THIRD=%d,HAT_SHOW_OTHERS=%d WHERE steamid = '%s'", enabled, viewFirst, viewThird, showOthers, steamId);
+	SendSQLUpdate(query);
+}
+
+public void ClientSaveToFileSave(int Client)
+{
+	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
+		return;
+	if (db == INVALID_HANDLE && !ConnectDB())
+		return;
+
+	char query[768];
 	char SteamID[64];
-	GetClientAuthId(Client, AuthId_Steam2,SteamID, sizeof(SteamID));
-	if(StrEqual(SteamID,"BOT"))return;
-	if (g_bGuidePreferenceColumnAvailable)
+	if (!TryGetRpgSteamId(Client, SteamID, sizeof(SteamID)))
+		return;
+	bool includeHatPrefs = g_bHatPrefColumnAvailable && g_bHatPrefsReady[Client];
+	int hatEnabled, hatViewFirst, hatViewThird, hatShowOthers;
+	HatsUnpackPrefs(player[Client].HatPrefs, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers);
+	if (g_bGuidePreferenceColumnAvailable && includeHatPrefs)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d,ANNE_GUIDE_PROMPT=%d,HAT_ENABLED=%d,HAT_VIEW_FIRST=%d,HAT_VIEW_THIRD=%d,HAT_SHOW_OTHERS=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers, SteamID);
+	}
+	else if (g_bGuidePreferenceColumnAvailable)
 	{
 		SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d,ANNE_GUIDE_PROMPT=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, player[Client].AnneGuidePrompt, SteamID);
+	}
+	else if (includeHatPrefs)
+	{
+		SQL_FormatQuery(db, query, sizeof(query), "UPDATE RPG SET MELEE_DATA=%d,BLOOD_DATA=%d,HAT=%d,GLOW=%d,SKIN=%d,RECOIL=%d,HAT_ENABLED=%d,HAT_VIEW_FIRST=%d,HAT_VIEW_THIRD=%d,HAT_SHOW_OTHERS=%d WHERE steamid = '%s'", player[Client].ClientMelee, player[Client].ClientBlood, player[Client].ClientHat, player[Client].GlowType, player[Client].SkinType, player[Client].ClientRecoil, hatEnabled, hatViewFirst, hatViewThird, hatShowOthers, SteamID);
 	}
 	else
 	{
@@ -1438,7 +1908,7 @@ public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
 		for(int i=1;i<MaxClients;i++){
 			if(IsSurvivor(i))
 			{
-				CreateTimer(0.5, Timer_AutoGive, i, TIMER_FLAG_NO_MAPCHANGE);
+				CreateTimer(0.5, Timer_AutoGive, GetClientUserId(i), TIMER_FLAG_NO_MAPCHANGE);
 			}
 			player[i].ClientFirstBuy = false;
 		}
@@ -1755,10 +2225,14 @@ public void SetTags(int client, char[] tagsname)
 }
 
 
-public Action ResetBuy(Handle timer, int client)
+public Action ResetBuy(Handle timer, int userid)
 {
+	int client = GetClientOfUserId(userid);
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return Plugin_Stop;
+
 	player[client].CanBuy = true;
-	return Plugin_Continue;
+	return Plugin_Stop;
 }
 
 static bool CanSpendB(int client, int costpoints)
@@ -1802,7 +2276,7 @@ public bool RemovePoints(int client, int costpoints,char bitem[64])
 		GiveItems(client,bitem);
 		player[client].ClientPoints=player[client].ClientPoints - costpoints;
 		player[client].CanBuy = false;
-		CreateTimer(15.0, ResetBuy, client, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(15.0, ResetBuy, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 		return true;
 	}
 	else
@@ -1817,8 +2291,18 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 {
     int client = GetClientOfUserId(data);
 
-    if (!client || !IsClientInGame(client) || IsFakeClient(client))
+	if (!client || IsFakeClient(client) || !IsSameRpgLoadQuery(client, data))
         return;
+	if (!IsClientInGame(client))
+	{
+		g_bDbLoadInFlight[client] = false;
+		g_iDbLoadUserId[client] = 0;
+		ScheduleRpgAuthLoadRetry(client);
+		return;
+	}
+
+	g_bDbLoadInFlight[client] = false;
+	g_iDbLoadUserId[client] = 0;
 
 	if (hndl == INVALID_HANDLE || hndl == null || error[0] != '\0')
 	{
@@ -1833,13 +2317,26 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 
 		player[client].AnneGuidePrompt = 1;
 		player[client].DataLoaded = true;
+		if (g_bHatDirty[client])
+		{
+			ClientHatTypeSaveToFile(client);
+			g_bHatDirty[client] = false;
+		}
+		if (g_bHatPrefDirty[client] && g_bHatPrefColumnAvailable)
+		{
+			g_bHatPrefsReady[client] = true;
+			g_bHatPrefMigrationPending[client] = false;
+			ClientHatPrefsSaveToFile(client);
+			g_bHatPrefDirty[client] = false;
+		}
 		return;
 	}
 
 	g_iDbLoadRetryCount[client] = 0;
 
-    if (SQL_FetchRow(hndl))
-	{
+	    if (SQL_FetchRow(hndl))
+	    {
+		g_bHatTypeMysqlReady[client] = true;
  		player[client].ClientMelee = SQL_FetchInt(hndl, 0);
  		player[client].ClientBlood = SQL_FetchInt(hndl, 1);
 		int storedHat = SQL_FetchInt(hndl, 2);
@@ -1851,10 +2348,54 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 		FakeClientCommand(client, "sm_recoil %d", player[client].ClientRecoil);
 		SQL_FetchString(hndl, 6, player[client].tags.ChatTag, 24);
 		player[client].AnneGuidePrompt = g_bGuidePreferenceColumnAvailable ? SQL_FetchInt(hndl, 7) : 1;
+
+		bool needPrefSave = false;
+		int prefCol = -1;
+		if (g_bHatPrefColumnAvailable)
+			prefCol = g_bGuidePreferenceColumnAvailable ? 8 : 7;
+		if (prefCol >= 0 && g_bHatPrefDirty[client])
+		{
+			g_bHatPrefsReady[client] = true;
+			g_bHatPrefMigrationPending[client] = false;
+		}
+		else if (prefCol >= 0)
+		{
+			bool migrate = SQL_IsFieldNull(hndl, prefCol)
+				|| SQL_IsFieldNull(hndl, prefCol + 1)
+				|| SQL_IsFieldNull(hndl, prefCol + 2)
+				|| SQL_IsFieldNull(hndl, prefCol + 3);
+			if (migrate)
+			{
+				if (HatsArePrefsReadySafe(client))
+				{
+					player[client].HatPrefs = HatsGetPrefsSafe(client);
+					g_bHatPrefsReady[client] = true;
+					g_bHatPrefMigrationPending[client] = false;
+					needPrefSave = true;
+				}
+				else
+				{
+					g_bHatPrefsReady[client] = false;
+					g_bHatPrefMigrationPending[client] = true;
+				}
+			}
+			else
+			{
+				player[client].HatPrefs = HatsPackPrefValues(
+					SQL_FetchInt(hndl, prefCol),
+					SQL_FetchInt(hndl, prefCol + 1),
+					SQL_FetchInt(hndl, prefCol + 2),
+					SQL_FetchInt(hndl, prefCol + 3));
+				g_bHatPrefsReady[client] = true;
+				g_bHatPrefMigrationPending[client] = false;
+			}
+		}
+
 		player[client].DataLoaded = true;
-		if (g_bHatDirty[client])
+		if (g_bHatDirty[client] || g_bHatPrefDirty[client] || needPrefSave)
 			ClientSaveToFileSave(client);
 		g_bHatDirty[client] = false;
+		g_bHatPrefDirty[client] = false;
 		ApplyCustomTagIfReady(client);
 		ApplyClientCosmetics(client);
 	}
@@ -1862,9 +2403,30 @@ public void ShowMelee(Handle owner, Handle hndl, const char []error, any data)
 	{
 		CPrintToChat(client, "%t", "RPG_NewUserCreatingDatabase");
 		player[client].AnneGuidePrompt = 1;
+		g_bHatTypeMysqlReady[client] = false;
+		if (!g_bHatDirty[client])
+		{
+			if (HatsArePrefsReadySafe(client))
+				player[client].ClientHat = HatIndexToStored(Hats_GetClientHat(client));
+			else if (g_bHatSystemAvailable)
+				g_bHatTypeCookieMigrationPending[client] = true;
+		}
+		if (g_bHatPrefColumnAvailable && (g_bHatPrefDirty[client] || HatsArePrefsReadySafe(client)))
+		{
+			if (!g_bHatPrefDirty[client])
+				player[client].HatPrefs = HatsGetPrefsSafe(client);
+			g_bHatPrefsReady[client] = true;
+			g_bHatPrefMigrationPending[client] = false;
+		}
+		else if (g_bHatPrefColumnAvailable && g_bHatSystemAvailable)
+		{
+			g_bHatPrefsReady[client] = false;
+			g_bHatPrefMigrationPending[client] = true;
+		}
 		player[client].DataLoaded = true;
 		ClientSaveToFileCreate(client);
 		g_bHatDirty[client] = false;
+		g_bHatPrefDirty[client] = false;
 		ApplyClientCosmetics(client);
 	}
 }
@@ -1875,12 +2437,8 @@ public Action Timer_RetryClientLoad(Handle timer, any userid)
 	if (!client || !IsClientInGame(client) || IsFakeClient(client))
 		return Plugin_Stop;
 
-	if (db == INVALID_HANDLE && !ConnectDB())
-	{
-		return Plugin_Stop;
-	}
-
-	ClientSaveToFileLoad(client);
+	if (!player[client].DataLoaded && !BeginRpgClientLoad(client))
+		ScheduleRpgAuthLoadRetry(client);
 	return Plugin_Stop;
 }
 //实现给予物品
@@ -2281,7 +2839,8 @@ public void Survivor_skin(int client)
 				menu.AddItem("option16", "透明色", player[client].SkinType == 16 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			//个人定制皮肤部分
 			char steamid[32];
-			GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
+			if (!TryGetRpgSteamId(client, steamid, sizeof(steamid)))
+				steamid[0] = '\0';
 			if(StrContains(steamid, "632322128", false) != -1 || StrContains(steamid, "121430603", false) != -1 ){
 				//760308896 定制
 				menu.AddItem("option17", "定制皮肤1", player[client].SkinType == 17 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);

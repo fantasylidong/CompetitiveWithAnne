@@ -528,7 +528,7 @@ IncrementMeleeKills(client)
 		CloseHandle(MeleeKillTimer[client]);
 
 	MeleeKillCounter[client]++;
-	MeleeKillTimer[client] = CreateTimer(5.0, timer_MeleeKill, client);
+	MeleeKillTimer[client] = CreateTimer(5.0, timer_MeleeKill, GetClientUserId(client));
 }
 
 // Tank death code. Points are given to all players.
@@ -1350,8 +1350,8 @@ public Action:event_FriendlyFire(Handle:event, const String:name[], bool:dontBro
 			if (FriendlyFirePrmCounter >= MAXPLAYERS)
 				FriendlyFirePrmCounter = 0;
 
-			FriendlyFirePrm[FriendlyFirePrmCounter][0] = Attacker;
-			FriendlyFirePrm[FriendlyFirePrmCounter][1] = Target;
+			FriendlyFirePrm[FriendlyFirePrmCounter][0] = GetClientUserId(Attacker);
+			FriendlyFirePrm[FriendlyFirePrmCounter][1] = Target ? GetClientUserId(Target) : 0;
 			FriendlyFireTimer[Attacker][Target] = CreateTimer(GetConVarFloat(cvar_FriendlyFireCooldown), timer_FriendlyFireCooldownEnd, FriendlyFirePrmCounter++);
 		}
 	}

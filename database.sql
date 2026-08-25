@@ -1,134 +1,24 @@
--- Adminer 4.8.1 MySQL 5.7.44-log dump
+-- AnneHappy current MySQL schema bootstrap (MySQL 5.7+).
+-- This file only creates shared tables required by the current plugins and NewAnneWeb.
+-- NewAnneWeb-owned tables are initialized by NewAnneWeb/database/init.php.
+-- SourceBans++ owns its own `sourcebans` database and is intentionally excluded.
 
-SET NAMES utf8;
+SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 
+CREATE DATABASE IF NOT EXISTS `Anne` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `chat` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `l4d2stats` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 USE `Anne`;
 
-SET NAMES utf8mb4;
-
-DROP TABLE IF EXISTS `AnneServer`;
-CREATE TABLE `AnneServer` (
-  `AnneIP` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `AnneNAME` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `AnneTICK` int(10) NOT NULL,
-  PRIMARY KEY (`AnneIP`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `cdk`;
-CREATE TABLE `cdk` (
-  `Type` int(11) NOT NULL,
-  `Denomination` int(11) NOT NULL,
-  `Uuid` text NOT NULL,
-  `IsUsed` tinyint(1) NOT NULL,
-  `CreateTime` datetime NOT NULL,
-  `UsedTime` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-DROP TABLE IF EXISTS `infected`;
-CREATE TABLE `infected` (
-  `number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `health` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `speed` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `slowspeed` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `damage1` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `damage2` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `bhop` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `teleport` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `anneset` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`number`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `l4d2`;
-CREATE TABLE `l4d2` (
-  `steam_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `steam_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `LELVEL_DATA` int(10) NOT NULL,
-  `EXPERIENCE_DATA` int(10) NOT NULL,
-  `MELEE_DATA` int(10) NOT NULL,
-  `BLOOD_DATA` int(10) NOT NULL,
-  `INFECTED_DATA` int(10) NOT NULL,
-  `MONEY_DATA` int(10) NOT NULL,
-  `STATUS` int(11) NOT NULL DEFAULT '0',
-  `Str_DATA` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `End_DATA` int(11) NOT NULL,
-  `Health_DATA` int(11) NOT NULL,
-  `Agi_DATA` int(11) NOT NULL,
-  `StatusPoint_DATA` int(11) NOT NULL,
-  PRIMARY KEY (`steam_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-DROP TABLE IF EXISTS `l4d3`;
-CREATE TABLE `l4d3` (
-  `steam_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `steam_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `LELVEL_DATA` int(10) NOT NULL,
-  `EXPERIENCE_DATA` int(10) NOT NULL,
-  `MELEE_DATA` int(10) NOT NULL,
-  `BLOOD_DATA` int(10) NOT NULL,
-  `INFECTED_DATA` int(10) NOT NULL,
-  `MONEY_DATA` int(10) NOT NULL,
-  `STATUS` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`steam_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-DROP TABLE IF EXISTS `ServerIP`;
-CREATE TABLE `ServerIP` (
-  `AnneIP` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `AnneNAME` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `AnneTICK` int(10) NOT NULL,
-  `Version` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`AnneIP`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `stats_presistence`;
-CREATE TABLE `stats_presistence` (
-  `steam_id` bigint(20) NOT NULL,
-  `exp` int(11) NOT NULL,
-  `level` int(11) NOT NULL,
-  `currency` int(11) NOT NULL,
-  `heal_when_kill` int(11) NOT NULL,
-  `common` int(11) NOT NULL,
-  `smoker` int(11) NOT NULL,
-  `boomer` int(11) NOT NULL,
-  `hunter` int(11) NOT NULL,
-  `spitter` int(11) NOT NULL,
-  `jockey` int(11) NOT NULL,
-  `charger` int(11) NOT NULL,
-  `witch` int(11) NOT NULL,
-  `tank` int(11) NOT NULL,
-  `help` int(11) NOT NULL,
-  PRIMARY KEY (`steam_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-DROP TABLE IF EXISTS `weapon`;
-CREATE TABLE `weapon` (
-  `number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `weapon` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `damage` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `scatterpitch` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `scatteryaw` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `spreadpershot` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `maxmovespread` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `rangemod` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `reloadtime` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`number`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
+-- The current plugins do not own any Anne-specific tables. The schema remains
+-- available for SourceMod's default database alias and external admin tooling.
 
 USE `chat`;
 
-DROP TABLE IF EXISTS `anne_global_chat`;
-CREATE TABLE `anne_global_chat` (
+CREATE TABLE IF NOT EXISTS `anne_global_chat` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `created_at` datetime NOT NULL,
   `server` varchar(126) NOT NULL,
@@ -141,16 +31,14 @@ CREATE TABLE `anne_global_chat` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `anne_global_chat_titles`;
-CREATE TABLE `anne_global_chat_titles` (
+CREATE TABLE IF NOT EXISTS `anne_global_chat_titles` (
   `steamid` varchar(32) NOT NULL,
   `title` varchar(64) NOT NULL,
   PRIMARY KEY (`steamid`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `anne_global_chat_usage`;
-CREATE TABLE `anne_global_chat_usage` (
+CREATE TABLE IF NOT EXISTS `anne_global_chat_usage` (
   `steamid` varchar(32) NOT NULL,
   `usage_date` date NOT NULL,
   `used_count` int(10) unsigned NOT NULL DEFAULT '0',
@@ -160,8 +48,7 @@ CREATE TABLE `anne_global_chat_usage` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `anne_lfg_chat_usage`;
-CREATE TABLE `anne_lfg_chat_usage` (
+CREATE TABLE IF NOT EXISTS `anne_lfg_chat_usage` (
   `steamid` varchar(32) NOT NULL,
   `usage_date` date NOT NULL,
   `used_count` int(10) unsigned NOT NULL DEFAULT '0',
@@ -171,8 +58,7 @@ CREATE TABLE `anne_lfg_chat_usage` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `chat_log`;
-CREATE TABLE `chat_log` (
+CREATE TABLE IF NOT EXISTS `chat_log` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `date` datetime DEFAULT NULL,
   `map` varchar(128) NOT NULL,
@@ -189,8 +75,7 @@ CREATE TABLE `chat_log` (
 
 USE `l4d2stats`;
 
-DROP TABLE IF EXISTS `ai_dynamic_ppm_thresholds`;
-CREATE TABLE `ai_dynamic_ppm_thresholds` (
+CREATE TABLE IF NOT EXISTS `ai_dynamic_ppm_thresholds` (
   `id` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `source` varchar(32) NOT NULL DEFAULT 'daily',
   `sample_count` int(11) NOT NULL DEFAULT '0',
@@ -203,45 +88,7 @@ CREATE TABLE `ai_dynamic_ppm_thresholds` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `ip2country`;
-CREATE TABLE `ip2country` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `begin_ip_num` int(11) unsigned NOT NULL,
-  `end_ip_num` int(11) unsigned NOT NULL,
-  `country_code` varchar(4) NOT NULL,
-  `country_name` varchar(128) NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `begin_ip_num` (`begin_ip_num`,`end_ip_num`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `ip2country_blocks`;
-CREATE TABLE `ip2country_blocks` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `begin_ip_num` int(11) unsigned NOT NULL,
-  `end_ip_num` int(11) unsigned NOT NULL,
-  `loc_id` int(11) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `beginend` (`begin_ip_num`,`end_ip_num`) USING BTREE,
-  KEY `loc_id` (`loc_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `ip2country_locations`;
-CREATE TABLE `ip2country_locations` (
-  `loc_id` int(11) unsigned NOT NULL,
-  `country_code` varchar(4) NOT NULL,
-  `loc_region` varchar(128) NOT NULL,
-  `loc_city` tinyblob NOT NULL,
-  `latitude` double NOT NULL,
-  `longitude` double NOT NULL,
-  PRIMARY KEY (`loc_id`),
-  KEY `country_code` (`country_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-DROP TABLE IF EXISTS `l4d_peak_state`;
-CREATE TABLE `l4d_peak_state` (
+CREATE TABLE IF NOT EXISTS `l4d_peak_state` (
   `state_key` varchar(64) NOT NULL,
   `hold_until` int(11) NOT NULL DEFAULT '0',
   `updated_at` int(11) NOT NULL DEFAULT '0',
@@ -249,8 +96,7 @@ CREATE TABLE `l4d_peak_state` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `l4d_server_status`;
-CREATE TABLE `l4d_server_status` (
+CREATE TABLE IF NOT EXISTS `l4d_server_status` (
   `address_key` varchar(160) NOT NULL,
   `server_id` varchar(128) NOT NULL,
   `hostname` varchar(128) NOT NULL DEFAULT '',
@@ -266,8 +112,7 @@ CREATE TABLE `l4d_server_status` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `lilac_detections`;
-CREATE TABLE `lilac_detections` (
+CREATE TABLE IF NOT EXISTS `lilac_detections` (
   `name` varchar(128) CHARACTER SET utf8mb4 NOT NULL,
   `steamid` varchar(32) CHARACTER SET utf8mb4 NOT NULL,
   `ip` varchar(16) CHARACTER SET utf8mb4 NOT NULL,
@@ -294,11 +139,10 @@ CREATE TABLE `lilac_detections` (
   `connection_ticktime` float NOT NULL,
   `game_ticktime` float NOT NULL,
   `lilac_version` varchar(20) CHARACTER SET utf8mb4 NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `maps`;
-CREATE TABLE `maps` (
+CREATE TABLE IF NOT EXISTS `maps` (
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   `gamemode` int(1) NOT NULL DEFAULT '0',
   `custom` bit(1) NOT NULL DEFAULT b'0',
@@ -391,11 +235,10 @@ CREATE TABLE `maps` (
   `charger_impacts_exp` int(11) NOT NULL DEFAULT '0',
   `mutation` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`name`,`gamemode`,`mutation`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `players`;
-CREATE TABLE `players` (
+CREATE TABLE IF NOT EXISTS `players` (
   `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `name` tinyblob NOT NULL,
   `lastontime` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
@@ -494,11 +337,10 @@ CREATE TABLE `players` (
   KEY `idx_lastontime` (`lastontime`),
   KEY `idx_players_totalpoints` (`totalpoints`),
   KEY `idx_players_totalplaytime` (`totalplaytime`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `player_blocks`;
-CREATE TABLE `player_blocks` (
+CREATE TABLE IF NOT EXISTS `player_blocks` (
   `blocker` varchar(32) NOT NULL,
   `blocked` varchar(32) NOT NULL,
   `created_at` int(11) NOT NULL,
@@ -506,8 +348,7 @@ CREATE TABLE `player_blocks` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `player_mode_stats`;
-CREATE TABLE `player_mode_stats` (
+CREATE TABLE IF NOT EXISTS `player_mode_stats` (
   `steamid` varchar(64) NOT NULL,
   `mode_id` tinyint(4) NOT NULL,
   `anne_mode` tinyint(4) NOT NULL DEFAULT '0',
@@ -522,12 +363,15 @@ CREATE TABLE `player_mode_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `RPG`;
-CREATE TABLE `RPG` (
+CREATE TABLE IF NOT EXISTS `RPG` (
   `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `MELEE_DATA` int(10) NOT NULL DEFAULT '0',
   `BLOOD_DATA` int(10) NOT NULL DEFAULT '0',
   `HAT` int(10) NOT NULL DEFAULT '0',
+  `HAT_ENABLED` tinyint(4) DEFAULT NULL,
+  `HAT_VIEW_FIRST` tinyint(4) DEFAULT NULL,
+  `HAT_VIEW_THIRD` tinyint(4) DEFAULT NULL,
+  `HAT_SHOW_OTHERS` tinyint(4) DEFAULT NULL,
   `GLOW` int(10) NOT NULL DEFAULT '0',
   `SKIN` int(10) NOT NULL DEFAULT '0',
   `RECOIL` int(10) NOT NULL DEFAULT '0',
@@ -546,11 +390,10 @@ CREATE TABLE `RPG` (
   `hitsound_stack_mode` tinyint(4) DEFAULT NULL,
   `hitsound_headkill` tinyint(4) DEFAULT NULL,
   PRIMARY KEY (`steamid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `rpgdamage`;
-CREATE TABLE `rpgdamage` (
+CREATE TABLE IF NOT EXISTS `rpgdamage` (
   `steamid` varchar(255) NOT NULL,
   `enable` tinyint(4) NOT NULL DEFAULT '0',
   `see_others` tinyint(4) NOT NULL DEFAULT '1',
@@ -567,20 +410,34 @@ CREATE TABLE `rpgdamage` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `scripted_hud_prefs`;
-CREATE TABLE `scripted_hud_prefs` (
+CREATE TABLE IF NOT EXISTS `infected_control_traitor_quota` (
+  `auth_id` varchar(64) NOT NULL,
+  `total_count` int NOT NULL DEFAULT '100',
+  `used_count` int NOT NULL DEFAULT '0',
+  `quota_day` int NOT NULL DEFAULT '0',
+  `tank_block_until` int NOT NULL DEFAULT '0',
+  `last_name` varchar(64) NOT NULL DEFAULT '',
+  `updated_at` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`auth_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `scripted_hud_prefs` (
   `steamid` varchar(64) NOT NULL,
-  `hud_mask` tinyint unsigned NOT NULL DEFAULT '3',
-  `hud2_mask` tinyint unsigned NOT NULL DEFAULT '127',
+  `hud_mask` smallint unsigned NOT NULL DEFAULT '3',
+  `hud2_mask` tinyint unsigned NOT NULL DEFAULT '255',
   `layout_preset` tinyint unsigned NOT NULL DEFAULT '0',
+  `hud3_source` tinyint unsigned NOT NULL DEFAULT '0',
+  `hud4_source` tinyint unsigned NOT NULL DEFAULT '0',
+  `slot_sources` varchar(80) NOT NULL DEFAULT '',
+  `kill_feed_enabled` tinyint unsigned DEFAULT NULL,
   `revision` int unsigned NOT NULL DEFAULT '0',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`steamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `score_log`;
-CREATE TABLE `score_log` (
+CREATE TABLE IF NOT EXISTS `score_log` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `created` int(11) NOT NULL,
   `steamid` varchar(64) NOT NULL,
@@ -605,8 +462,7 @@ CREATE TABLE `score_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `score_quarter`;
-CREATE TABLE `score_quarter` (
+CREATE TABLE IF NOT EXISTS `score_quarter` (
   `steamid` varchar(64) NOT NULL,
   `quarter_key` int(8) NOT NULL DEFAULT '0',
   `points` int(11) NOT NULL DEFAULT '0',
@@ -651,10 +507,9 @@ CREATE TABLE `score_quarter` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `score_quarter_history`;
-CREATE TABLE `score_quarter_history` (
+CREATE TABLE IF NOT EXISTS `score_quarter_history` (
   `quarter_key` int(10) unsigned NOT NULL,
-  `rank_num` smallint(5) unsigned NOT NULL,
+  `rank_num` int(10) unsigned NOT NULL,
   `steamid` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `points` int(11) NOT NULL DEFAULT '0',
@@ -699,24 +554,21 @@ CREATE TABLE `score_quarter_history` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-DROP TABLE IF EXISTS `server_settings`;
-CREATE TABLE `server_settings` (
+CREATE TABLE IF NOT EXISTS `server_settings` (
   `sname` varchar(64) CHARACTER SET utf8mb4 NOT NULL,
   `svalue` blob,
   PRIMARY KEY (`sname`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `settings`;
-CREATE TABLE `settings` (
+CREATE TABLE IF NOT EXISTS `settings` (
   `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `mute` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`steamid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `timedmaps`;
-CREATE TABLE `timedmaps` (
+CREATE TABLE IF NOT EXISTS `timedmaps` (
   `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `gamemode` int(1) unsigned NOT NULL,
   `difficulty` int(1) unsigned NOT NULL,
@@ -737,11 +589,10 @@ CREATE TABLE `timedmaps` (
   KEY `idx_steamid` (`steamid`),
   KEY `idx_timedmaps_filter_time` (`anneversion`,`sinum`,`sitime`,`usebuy`,`auto`,`mode`,`time`),
   KEY `idx_timedmaps_filter_players_time` (`anneversion`,`sinum`,`sitime`,`usebuy`,`auto`,`mode`,`players`,`time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `timedmap_runs`;
-CREATE TABLE `timedmap_runs` (
+CREATE TABLE IF NOT EXISTS `timedmap_runs` (
   `run_id` varchar(64) NOT NULL,
   `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `gamemode` int(1) unsigned NOT NULL,
@@ -761,11 +612,10 @@ CREATE TABLE `timedmap_runs` (
   PRIMARY KEY (`run_id`,`steamid`),
   KEY `idx_timedmap_runs_filter_time` (`map`,`mode`,`difficulty`,`sinum`,`sitime`,`usebuy`,`anneversion`,`time`),
   KEY `idx_timedmap_runs_steamid` (`steamid`,`modified`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `map_runs`;
-CREATE TABLE `map_runs` (
+CREATE TABLE IF NOT EXISTS `map_runs` (
   `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
   `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `gamemode` tinyint unsigned NOT NULL,
@@ -797,8 +647,7 @@ CREATE TABLE `map_runs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `map_run_players`;
-CREATE TABLE `map_run_players` (
+CREATE TABLE IF NOT EXISTS `map_run_players` (
   `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
   `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `team` tinyint unsigned NOT NULL DEFAULT '2',
@@ -810,8 +659,7 @@ CREATE TABLE `map_run_players` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `legacy_map_bests`;
-CREATE TABLE `legacy_map_bests` (
+CREATE TABLE IF NOT EXISTS `legacy_map_bests` (
   `source_hash` char(64) CHARACTER SET ascii NOT NULL,
   `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
   `gamemode` tinyint unsigned NOT NULL,
@@ -836,3 +684,5 @@ CREATE TABLE `legacy_map_bests` (
   KEY `idx_legacy_map_bests_filter` (`ruleset_key`,`map`,`difficulty`,`best_duration_ms`),
   KEY `idx_legacy_map_bests_steamid` (`steamid`,`modified`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET foreign_key_checks = 1;

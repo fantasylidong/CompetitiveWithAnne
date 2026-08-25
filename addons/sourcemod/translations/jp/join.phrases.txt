@@ -14,7 +14,47 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"jp"		"{green}[AnneDonate]{default} 支払い後、{olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default} と入力して管理者に確認を依頼してください。"
+		"jp"		"{green}[AnneDonate]{default} 支払い後はゲームに戻り、{olive}!wc user@example.com{default} と入力してください。"
+	}
+	"Join_AnneDonatePaymentSubmitInProgress"
+	{
+		"jp"		"{green}[AnneDonate]{default} 支払い完了の通知を送信中です。重複送信や金額の再選択はしないでください。"
+	}
+	"Join_AnneDonateRemindMenuTitle"
+	{
+		"jp"		"!wc user@example.com で送信"
+	}
+	"Join_AnneDonateRemindMenuPaid"
+	{
+		"jp"		"支払い完了"
+	}
+	"Join_AnneDonateRemindMenuReopen"
+	{
+		"jp"		"支払いページを再度開く"
+	}
+	"Join_AnneDonateRemindMenuLater"
+	{
+		"jp"		"後で処理する"
+	}
+	"Join_AnneDonateAmountMenuTitle"
+	{
+		"jp"		"スポンサー金額を選択："
+	}
+	"Join_AnneDonateAmountMenuWebOnly"
+	{
+		"jp"		"スポンサーページのみ開く"
+	}
+	"Join_AnneDonateMethodMenuTitle"
+	{
+		"jp"		"支払い方法を選択："
+	}
+	"Join_AnneDonateMethodWeChat"
+	{
+		"jp"		"WeChat Pay"
+	}
+	"Join_AnneDonateMethodAlipay"
+	{
+		"jp"		"Alipay"
 	}
 	"Join_AnneDonateEmailRequired"
 	{

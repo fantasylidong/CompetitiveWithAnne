@@ -18,7 +18,7 @@
 	}
 	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"zho"		"[Hitsound] 音效組(四項)已設定為: %d"
+		"zho"		"[Hitsound] 已套用音效預設 %d；預設中缺少的音效已自動關閉"
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -90,15 +90,15 @@
 	}
 	"L4D2Hitsound_HeadshotSoundEffectSet"
 	{
-		"zho"		"爆頭音效：已設定為 %d"
+		"zho"		"爆頭音效：已設定為 %s"
 	}
 	"L4D2Hitsound_HitSoundEffectSet"
 	{
-		"zho"		"命中音效：已設定為 %d"
+		"zho"		"命中音效：已設定為 %s"
 	}
 	"L4D2Hitsound_KillSoundEffectSet"
 	{
-		"zho"		"擊殺音效：已設定為 %d"
+		"zho"		"擊殺音效：已設定為 %s"
 	}
 	"L4D2Hitsound_ThreeIconsAllClosed"
 	{
@@ -118,11 +118,15 @@
 	}
 	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"zho"		"爆頭擊殺音效：已設定為 %d（0=使用普通爆頭音）"
+		"zho"		"爆頭擊殺音效：已設定為 %s"
+	}
+	"L4D2Hitsound_HeadKillSoundFollow"
+	{
+		"zho"		"爆頭擊殺音效：跟隨普通爆頭音"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
-		"zho"		"音效播放模式：跟隨套裝（是否疊加由音效套裝自身決定）"
+		"zho"		"音效播放模式：跟隨來源（是否疊加由每項聲音的來源決定）"
 	}
 	"L4D2Hitsound_StackModeStack"
 	{
@@ -135,5 +139,29 @@
 	"L4D2Hitsound_SetPlaybackPreset"
 	{
 		"zho"		"[Hitsound] 已按該套裝套用音效範圍"
+	}
+	"L4D2Hitsound_SoundEffectRangeSpecial"
+	{
+		"zho"		"音效範圍：僅特殊感染者/Tank"
+	}
+	"L4D2Hitsound_SoundEffectRangeAll"
+	{
+		"zho"		"音效範圍：全部感染者"
+	}
+	"L4D2Hitsound_IconRangeSpecial"
+	{
+		"zho"		"圖示範圍：僅特殊感染者/Tank"
+	}
+	"L4D2Hitsound_IconRangeAll"
+	{
+		"zho"		"圖示範圍：全部感染者"
+	}
+	"L4D2Hitsound_PreferencesLoading"
+	{
+		"zho"		"[Hitsound] 個人設定仍在載入，請稍後再試。"
+	}
+	"L4D2Hitsound_ReloadRequested"
+	{
+		"zho"		"[Hitsound] 已要求重新載入所有線上玩家的設定。"
 	}
 }

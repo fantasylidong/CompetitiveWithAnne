@@ -27,6 +27,10 @@ public void OnPluginStart()
 {
 	chatlog_clearTable = CreateConVar("sm_chatlog_cleartable_enabled", "1", "Enable/Disable clearing table (1/0)", 0, true, 0.0, true, 1.0);
 	chatlog_clearTableDuration = CreateConVar("sm_chatlog_cleartable_duration", "12 MONTH", "How often will table restart\n(TIME FUNCTIONS: https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html)");
+	AddCommandListener(Command_SponsorLog, "sm_donate");
+	AddCommandListener(Command_SponsorLog, "sm_wc");
+	AddCommandListener(Command_SponsorLog, "sm_wanchen");
+	AddCommandListener(Command_SponsorLog, "sm_finish");
 
 	AutoExecConfig(true, "chatlog");
 }
@@ -170,41 +174,38 @@ public void OnPluginEnd()
 
 public Action OnClientSayCommand(int client, const char[] command, const char[] szArgs)
 {
-	if (g_bFullyConnected && client > 0 && IsClientInGame(client) && !IsFakeClient(client))
-	{
-		if (strlen(szArgs) > 0 && szArgs[0]!='!' && szArgs[0]!='/')
-		{
-			int iMsgStyle, iServerPort;
-			int iTimeTmp = GetTime();
-			char szQuery[512], szTime[512], szMap[128], szSteamID[21], szServerName[64];
-
-			if (StrContains(command, "_", false) != -1)
-			{
-				iMsgStyle = 1; //Team chat
-			}
-
-			else
-			{
-				iMsgStyle = 0; //General chat
-			}
-
-			FormatTime(szTime, sizeof(szTime), "%Y-%m-%d %T", iTimeTmp);
-			GetCurrentMap(szMap, sizeof(szMap));
-			
-
-			if(!GetClientAuthId(client, AuthId_Steam2, szSteamID, sizeof(szSteamID)))
-			{
-				return Plugin_Continue;
-			}
-			iServerPort = GetConVarInt( FindConVar( "hostport" ) );
-			GetConVarString(FindConVar("hostname"), szServerName, sizeof(szServerName));
-
-			g_hDatabase.Format(szQuery, sizeof(szQuery), "INSERT INTO chat_log (date, map, steamid, name, message_style, message, server, port) VALUES ('%s', '%s', '%s', '%N', '%d', '%s', '%s', '%d')", szTime, szMap, szSteamID, client, iMsgStyle, szArgs, szServerName, iServerPort);
-			g_hDatabase.Query(SQL_Error, szQuery);
-		}
-	}
+	if (strlen(szArgs) > 0 && szArgs[0] != '!' && szArgs[0] != '/')
+		WriteChatLog(client, command, szArgs);
 
 	return Plugin_Continue;
+}
+
+public Action Command_SponsorLog(int client, const char[] command, int argc)
+{
+	char message[16];
+	FormatEx(message, sizeof(message), "!%s", command[3]);
+	WriteChatLog(client, "say", message);
+	return Plugin_Continue;
+}
+
+void WriteChatLog(int client, const char[] command, const char[] message)
+{
+	if (!g_bFullyConnected || client <= 0 || !IsClientInGame(client) || IsFakeClient(client))
+		return;
+
+	int iMsgStyle = StrContains(command, "_", false) != -1 ? 1 : 0;
+	int iServerPort;
+	char szQuery[512], szTime[512], szMap[128], szSteamID[21], szServerName[64];
+	FormatTime(szTime, sizeof(szTime), "%Y-%m-%d %T", GetTime());
+	GetCurrentMap(szMap, sizeof(szMap));
+
+	if(!GetClientAuthId(client, AuthId_Steam2, szSteamID, sizeof(szSteamID)))
+		return;
+
+	iServerPort = GetConVarInt(FindConVar("hostport"));
+	GetConVarString(FindConVar("hostname"), szServerName, sizeof(szServerName));
+	g_hDatabase.Format(szQuery, sizeof(szQuery), "INSERT INTO chat_log (date, map, steamid, name, message_style, message, server, port) VALUES ('%s', '%s', '%s', '%N', '%d', '%s', '%s', '%d')", szTime, szMap, szSteamID, client, iMsgStyle, message, szServerName, iServerPort);
+	g_hDatabase.Query(SQL_Error, szQuery);
 }
 
 public void SQL_Error(Database datavas, DBResultSet results, const char[] error, int data)

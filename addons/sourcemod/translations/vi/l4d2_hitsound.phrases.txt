@@ -18,7 +18,7 @@
 	}
 	"L4D2Hitsound_HitsoundSoundEffectPackageFour"
 	{
-		"vi"		"[Hitsound] Gói hiệu ứng âm thanh (bốn mục) đã được đặt thành: %d"
+		"vi"		"[Hitsound] Đã áp dụng mẫu âm thanh %d; các loại âm thanh không có sẵn đã được tắt."
 	}
 	"L4D2Hitsound_HitsoundIconSetThreeItems"
 	{
@@ -90,15 +90,15 @@
 	}
 	"L4D2Hitsound_HeadshotSoundEffectSet"
 	{
-		"vi"		"Hiệu ứng âm thanh headshot: đặt thành %d"
+		"vi"		"Hiệu ứng âm thanh headshot: đặt thành %s"
 	}
 	"L4D2Hitsound_HitSoundEffectSet"
 	{
-		"vi"		"Hiệu ứng âm thanh nhấn: đặt thành %d"
+		"vi"		"Hiệu ứng âm thanh nhấn: đặt thành %s"
 	}
 	"L4D2Hitsound_KillSoundEffectSet"
 	{
-		"vi"		"Hiệu ứng âm thanh tiêu diệt: đặt thành %d"
+		"vi"		"Hiệu ứng âm thanh tiêu diệt: đặt thành %s"
 	}
 	"L4D2Hitsound_ThreeIconsAllClosed"
 	{
@@ -118,11 +118,15 @@
 	}
 	"L4D2Hitsound_HeadKillSoundSet"
 	{
-		"vi"		"Âm thanh hạ gục bằng headshot: đặt thành %d (0=dùng âm thanh headshot thông thường)"
+		"vi"		"Âm thanh hạ gục bằng headshot: đặt thành %s"
+	}
+	"L4D2Hitsound_HeadKillSoundFollow"
+	{
+		"vi"		"Âm thanh hạ gục bằng headshot: dùng âm thanh headshot thông thường"
 	}
 	"L4D2Hitsound_StackModeFollow"
 	{
-		"vi"		"Chế độ phát âm thanh: theo bộ (bộ âm thanh tự quyết định có chồng tiếng hay không)"
+		"vi"		"Chế độ phát âm thanh: theo nguồn (nguồn của từng âm thanh quyết định có chồng tiếng hay không)"
 	}
 	"L4D2Hitsound_StackModeStack"
 	{
@@ -135,5 +139,29 @@
 	"L4D2Hitsound_SetPlaybackPreset"
 	{
 		"vi"		"[Hitsound] Đã áp dụng phạm vi âm thanh của bộ này."
+	}
+	"L4D2Hitsound_SoundEffectRangeSpecial"
+	{
+		"vi"		"Phạm vi âm thanh: chỉ Special Infected/Tank"
+	}
+	"L4D2Hitsound_SoundEffectRangeAll"
+	{
+		"vi"		"Phạm vi âm thanh: tất cả infected"
+	}
+	"L4D2Hitsound_IconRangeSpecial"
+	{
+		"vi"		"Phạm vi biểu tượng: chỉ Special Infected/Tank"
+	}
+	"L4D2Hitsound_IconRangeAll"
+	{
+		"vi"		"Phạm vi biểu tượng: tất cả infected"
+	}
+	"L4D2Hitsound_PreferencesLoading"
+	{
+		"vi"		"[Hitsound] Tùy chọn của bạn vẫn đang tải. Vui lòng thử lại sau."
+	}
+	"L4D2Hitsound_ReloadRequested"
+	{
+		"vi"		"[Hitsound] Đang tải lại tùy chọn của tất cả người chơi trực tuyến."
 	}
 }

@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.46.1"
+#define PLUGIN_VERSION 		"1.47.0"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,13 @@
 
 ========================================================================================
 	Change Log:
+
+1.47.0 (23-Aug-2026)
+	- All five player settings persist: hat type, wear toggle, first-person view, third-person view, and other-players visibility.
+	- clientprefs cookies always mirror those settings and load even when l4d_hats_save is 0.
+	- Added preference natives/forwards, including a cookie-ready handshake for safe MySQL migration.
+	- Hats_SetClientHat no longer forces wearing back on, so a saved "hat off" survives restore.
+	- Hook_SetTransmit stays on every hat entity; hiding other hats is no longer lost after round rebuild.
 
 1.46.1 (13-Aug-2026)
 	- Added natives "Hats_SetClientHat" and "Hats_GetClientHat" so other plugins can restore hats without going through sm_hatclient.
@@ -308,13 +315,17 @@
 #define CVAR_FLAGS			FCVAR_NONE
 #define CONFIG_SPAWNS		"data/l4d_hats.cfg"
 #define	MAX_HATS			128
+#define HATS_PREF_ENABLED      (1 << 0)
+#define HATS_PREF_VIEW_FIRST   (1 << 1)
+#define HATS_PREF_VIEW_THIRD   (1 << 2)
+#define HATS_PREF_SHOW_OTHERS  (1 << 3)
 
 
 
 //////////////////////////////////
 // Updated by pan0s
 // #include <pan0s>
-Handle g_hCookie_ThirdView, g_hCookie_FirstView;
+Handle g_hCookie_ThirdView, g_hCookie_FirstView, g_hCookie_Wear;
 bool g_bIsThirdPerson[MAXPLAYERS+1];	// View on TP
 bool g_bHatViewTP[MAXPLAYERS+1];		// View on TP
 //////////////////////////////////
@@ -347,10 +358,17 @@ bool g_bExternalProp[MAXPLAYERS+1];		// If thirdperson view was detected (netpro
 bool g_bExternalState[MAXPLAYERS+1];	// If thirdperson view was detected
 bool g_bExternalChange[MAXPLAYERS+1];	// When changing hats, show in 3rd person
 bool g_bCookieAuth[MAXPLAYERS+1];		// When cookies cached and client is authorized
+bool g_bHatTypeExternal[MAXPLAYERS+1];	// Hat type restored by Hats_SetClientHat; ignore late cookies
+bool g_bHatPrefsExternal[MAXPLAYERS+1];	// Prefs restored by Hats_SetClientPrefs; ignore late cookies
+bool g_bHatCookiesReady[MAXPLAYERS+1];	// clientprefs resolved for this connection
+bool g_bHatTypeDirtyLocal[MAXPLAYERS+1];	// Player/admin changed type before cookies resolved
+bool g_bHatPrefsDirtyLocal[MAXPLAYERS+1];	// Player/admin changed prefs before cookies resolved
 Handle g_hTimerView[MAXPLAYERS+1];		// Thirdperson view when selecting hat
 Handle g_hTimerDetect;
 
 GlobalForward g_hForwardLoadSave;
+GlobalForward g_hForwardPrefsChanged;
+GlobalForward g_hForwardPrefsReady;
 
 // ReadyUP plugin
 native bool ToggleReadyPanel(bool show, int target = 0);
@@ -392,8 +410,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	RegPluginLibrary("l4d_hats");
 
 	g_hForwardLoadSave = new GlobalForward("L4D_OnHatLoadSave", ET_Ignore, Param_Cell, Param_Cell);
+	g_hForwardPrefsChanged = new GlobalForward("L4D_OnHatPrefsChanged", ET_Ignore, Param_Cell, Param_Cell);
+	g_hForwardPrefsReady = new GlobalForward("L4D_OnHatPrefsReady", ET_Ignore, Param_Cell, Param_Cell);
 	CreateNative("Hats_SetClientHat", Native_SetClientHat);
 	CreateNative("Hats_GetClientHat", Native_GetClientHat);
+	CreateNative("Hats_GetClientPrefs", Native_GetClientPrefs);
+	CreateNative("Hats_SetClientPrefs", Native_SetClientPrefs);
+	CreateNative("Hats_AreClientPrefsReady", Native_AreClientPrefsReady);
 
 	MarkNativeAsOptional("ToggleReadyPanel");
 
@@ -406,6 +429,192 @@ void FireHatLoadSave(int client, int index)
 	Call_PushCell(client);
 	Call_PushCell(index);
 	Call_Finish();
+}
+
+void FireHatPrefsChanged(int client)
+{
+	Call_StartForward(g_hForwardPrefsChanged);
+	Call_PushCell(client);
+	Call_PushCell(HatsPackPrefs(client));
+	Call_Finish();
+}
+
+void FireHatPrefsReady(int client)
+{
+	Call_StartForward(g_hForwardPrefsReady);
+	Call_PushCell(client);
+	Call_PushCell(HatsPackPrefs(client));
+	Call_Finish();
+}
+
+int HatsPackPrefs(int client)
+{
+	int flags = 0;
+	if( !g_bHatOff[client] )
+		flags |= HATS_PREF_ENABLED;
+	if( g_bHatView[client] )
+		flags |= HATS_PREF_VIEW_FIRST;
+	if( g_bHatViewTP[client] )
+		flags |= HATS_PREF_VIEW_THIRD;
+	if( g_bHatAll[client] )
+		flags |= HATS_PREF_SHOW_OTHERS;
+	return flags;
+}
+
+void HatsResetClientState(int client)
+{
+	g_iType[client] = 0;
+	g_iSelected[client] = 0;
+	g_iTarget[client] = 0;
+	g_iHatIndex[client] = 0;
+	g_iHatWalls[client] = 0;
+	g_bHatAll[client] = true;
+	g_bHatViewTP[client] = true;
+	g_bHatView[client] = false;
+	g_bHatOff[client] = false;
+	g_bHatTypeExternal[client] = false;
+	g_bHatPrefsExternal[client] = false;
+	g_bHatCookiesReady[client] = false;
+	g_bHatTypeDirtyLocal[client] = false;
+	g_bHatPrefsDirtyLocal[client] = false;
+}
+
+bool HatsCanUseCookies(int client)
+{
+	return client > 0 && client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client) && AreClientCookiesCached(client);
+}
+
+bool HatsClientPrefsReady(int client)
+{
+	return client > 0 && client <= MaxClients && IsClientInGame(client) && (IsFakeClient(client) || g_bHatCookiesReady[client]);
+}
+
+void HatsWriteHatTypeCookie(int client)
+{
+	if( !HatsCanUseCookies(client) )
+		return;
+
+	char sNum[8];
+	IntToString(g_iType[client], sNum, sizeof(sNum));
+	SetClientCookie(client, g_hCookie_Hat, sNum);
+}
+
+void HatsWritePrefCookies(int client)
+{
+	if( !HatsCanUseCookies(client) )
+		return;
+
+	SetClientCookie(client, g_hCookie_Wear, g_bHatOff[client] ? "0" : "1");
+	SetClientCookie(client, g_hCookie_FirstView, g_bHatView[client] ? "1" : "0");
+	SetClientCookie(client, g_hCookie_ThirdView, g_bHatViewTP[client] ? "1" : "0");
+	SetClientCookie(client, g_hCookie_All, g_bHatAll[client] ? "1" : "0");
+}
+
+void HatsCommitPrefs(int client, bool notify)
+{
+	g_bHatPrefsDirtyLocal[client] = true;
+	HatsWritePrefCookies(client);
+	if( notify )
+		FireHatPrefsChanged(client);
+}
+
+void HatsCommitHatType(int client, int index)
+{
+	g_iType[client] = index < 0 ? -1 : index + 1;
+	g_bHatTypeDirtyLocal[client] = true;
+	HatsWriteHatTypeCookie(client);
+	FireHatLoadSave(client, index);
+}
+
+void HatsEnableWear(int client)
+{
+	if( !g_bHatOff[client] )
+		return;
+
+	g_bHatOff[client] = false;
+	HatsCommitPrefs(client, true);
+}
+
+void HatsApplyPrefFlags(int client, int flags, bool recreate)
+{
+	bool wantOn = (flags & HATS_PREF_ENABLED) != 0;
+	bool wasOff = g_bHatOff[client];
+
+	g_bHatOff[client] = !wantOn;
+	g_bHatView[client] = (flags & HATS_PREF_VIEW_FIRST) != 0;
+	g_bHatViewTP[client] = (flags & HATS_PREF_VIEW_THIRD) != 0;
+	g_bHatAll[client] = (flags & HATS_PREF_SHOW_OTHERS) != 0;
+
+	if( !wantOn )
+	{
+		RemoveHat(client);
+	}
+	else if( recreate && wasOff && g_iType[client] > 0 )
+	{
+		CreateHat(client, g_iType[client] - 1, false);
+	}
+}
+
+bool HatsShouldShowOwnHat(int client)
+{
+	if( g_bExternalChange[client] )
+		return true;
+	if( g_bIsThirdPerson[client] || g_bExternalProp[client] || g_bExternalCvar[client] )
+		return g_bHatViewTP[client];
+	return g_bHatView[client];
+}
+
+void HatsLoadCookies(int client)
+{
+	if( client < 1 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client) || !AreClientCookiesCached(client) )
+		return;
+	if( g_bHatCookiesReady[client] )
+		return;
+
+	char sCookie[8];
+
+	if( !g_bHatPrefsExternal[client] && !g_bHatPrefsDirtyLocal[client] )
+	{
+		GetClientCookie(client, g_hCookie_All, sCookie, sizeof(sCookie));
+		if( sCookie[0] != 0 )
+			g_bHatAll[client] = StringToInt(sCookie) == 1;
+
+		GetClientCookie(client, g_hCookie_FirstView, sCookie, sizeof(sCookie));
+		if( sCookie[0] != 0 )
+			g_bHatView[client] = StringToInt(sCookie) == 1;
+
+		GetClientCookie(client, g_hCookie_ThirdView, sCookie, sizeof(sCookie));
+		if( sCookie[0] != 0 )
+			g_bHatViewTP[client] = StringToInt(sCookie) == 1;
+
+		GetClientCookie(client, g_hCookie_Wear, sCookie, sizeof(sCookie));
+		if( sCookie[0] != 0 )
+			g_bHatOff[client] = StringToInt(sCookie) != 1;
+	}
+
+	if( !g_bHatTypeExternal[client] && !g_bHatTypeDirtyLocal[client] )
+	{
+		GetClientCookie(client, g_hCookie_Hat, sCookie, sizeof(sCookie));
+		if( sCookie[0] == 0 )
+			g_iType[client] = 0;
+		else
+			g_iType[client] = StringToInt(sCookie);
+	}
+
+	g_bHatCookiesReady[client] = true;
+	if( g_bHatPrefsExternal[client] || g_bHatPrefsDirtyLocal[client] )
+		HatsWritePrefCookies(client);
+	if( g_bHatTypeExternal[client] || g_bHatTypeDirtyLocal[client] )
+		HatsWriteHatTypeCookie(client);
+
+	CookieAuthTest(client);
+	FireHatPrefsReady(client);
+
+	if( IsClientInGame(client) && GetClientTeam(client) == 2 && IsPlayerAlive(client) )
+	{
+		RemoveHat(client);
+		CreateTimer(0.1, TimerDelayCreate, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	}
 }
 
 bool HatsRankDataReady(int client)
@@ -444,17 +653,24 @@ any Native_SetClientHat(Handle plugin, int numParams)
 	if( client < 1 || client > MaxClients || !IsClientInGame(client) )
 		return false;
 
-	g_bHatOff[client] = false;
+	g_bHatTypeExternal[client] = true;
 	RemoveHat(client);
 
 	if( index < 0 )
 	{
 		g_iType[client] = -1;
+		HatsWriteHatTypeCookie(client);
 		return true;
 	}
 
 	if( index >= g_iCount )
 		return false;
+
+	g_iType[client] = index + 1;
+	HatsWriteHatTypeCookie(client);
+
+	if( g_bHatOff[client] || g_bBlocked[client] )
+		return true;
 
 	return CreateHat(client, index, false);
 }
@@ -467,6 +683,33 @@ any Native_GetClientHat(Handle plugin, int numParams)
 	if( g_iType[client] <= 0 )
 		return -1;
 	return g_iType[client] - 1;
+}
+
+any Native_GetClientPrefs(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if( client < 1 || client > MaxClients )
+		return 0;
+	return HatsPackPrefs(client);
+}
+
+any Native_SetClientPrefs(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	int flags = GetNativeCell(2);
+	if( client < 1 || client > MaxClients || !IsClientInGame(client) )
+		return false;
+
+	g_bHatPrefsExternal[client] = true;
+	HatsApplyPrefFlags(client, flags, false);
+	HatsWritePrefCookies(client);
+	return true;
+}
+
+any Native_AreClientPrefsReady(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	return client > 0 && client <= MaxClients && g_bHatCookiesReady[client];
 }
 
 public void OnAllPluginsLoaded()
@@ -633,6 +876,7 @@ public void OnPluginStart()
 
 	g_hCookie_Hat = RegClientCookie("l4d_hats", "Hat Type", CookieAccess_Protected);
 	g_hCookie_All = RegClientCookie("l4d_hats_all", "General Hats Visibility", CookieAccess_Protected);
+	g_hCookie_Wear = RegClientCookie("l4d_hats_wear", "Hats Wear Enabled", CookieAccess_Protected);
 
 	// Updated by pan0s
 	g_hCookie_FirstView = RegClientCookie("l4d_hats_fv", "Hats First person View", CookieAccess_Protected);
@@ -698,30 +942,24 @@ void IsAllowed()
 
 		for( int i = 1; i <= MaxClients; i++ )
 		{
-			g_bHatView[i] = false;
 			g_iSelected[i] = GetRandomInt(0, g_iCount -1);
 		}
 
-		if( g_iCvarRand || g_iCvarSave )
+		int clientID;
+		for( int i = 1; i <= MaxClients; i++ )
 		{
-			int clientID;
+			if( !IsClientInGame(i) || GetClientTeam(i) != 2 )
+				continue;
 
-			for( int i = 1; i <= MaxClients; i++ )
+			clientID = GetClientUserId(i);
+			if( !IsFakeClient(i) )
 			{
-				if( IsClientInGame(i) && GetClientTeam(i) == 2 )
-				{
-					clientID = GetClientUserId(i);
-
-					if( g_iCvarSave && !IsFakeClient(i) )
-					{
-						OnClientCookiesCached(i);
-						CreateTimer(0.3, TimerDelayCreate, clientID);
-					}
-					else if( g_iCvarRand )
-					{
-						CreateTimer(0.3, TimerDelayCreate, clientID);
-					}
-				}
+				HatsLoadCookies(i);
+				CreateTimer(0.3, TimerDelayCreate, clientID);
+			}
+			else if( g_iCvarRand )
+			{
+				CreateTimer(0.3, TimerDelayCreate, clientID);
 			}
 		}
 
@@ -888,9 +1126,9 @@ public void OnMapEnd()
 public void OnClientPutInServer(int client)
 {
 	g_iMenuType[client] = 0;
-	g_bHatAll[client] = true;
-	g_bHatViewTP[client] = true;
-	g_bHatView[client] = false;
+	HatsResetClientState(client);
+	if( AreClientCookiesCached(client) )
+		HatsLoadCookies(client);
 }
 
 public void OnClientAuthorized(int client, const char[] sSteamID)
@@ -916,50 +1154,10 @@ public void OnClientPostAdminCheck(int client)
 
 public void OnClientCookiesCached(int client)
 {
-	if( g_bCvarAllow && g_iCvarSave && !IsFakeClient(client) )
-	{
-		char sCookie[4];
+	if( client < 1 || client > MaxClients || !IsClientInGame(client) || IsFakeClient(client) )
+		return;
 
-		GetClientCookie(client, g_hCookie_All, sCookie, sizeof(sCookie));
-		if( sCookie[0] != 0 )
-		{
-			g_bHatAll[client] = StringToInt(sCookie) == 1;
-		}
-
-		//////////////////////////////////
-		// Updated by pan0s
-		char s1On[2], s3On[2];
-		GetClientCookie(client, g_hCookie_FirstView, s1On, sizeof(s1On));
-		if( s1On[0] != 0 )
-		{
-			g_bHatView[client] = StringToInt(s1On) == 1;
-		}
-
-		GetClientCookie(client, g_hCookie_ThirdView, s3On, sizeof(s3On));
-		if( s3On[0] != 0 )
-		{
-			g_bHatViewTP[client] = StringToInt(s3On) == 1;
-		}
-		//////////////////////////////////
-
-		// Get client cookies, set type if available or default.
-		GetClientCookie(client, g_hCookie_Hat, sCookie, sizeof(sCookie));
-
-		int type;
-
-		if( sCookie[0] == 0 )
-		{
-			g_iType[client] = 0;
-		}
-		else
-		{
-			type = StringToInt(sCookie);
-			g_iType[client] = type;
-		}
-
-		// Can use cookies?
-		CookieAuthTest(client);
-	}
+	HatsLoadCookies(client);
 }
 
 void CookieAuthTest(int client)
@@ -976,7 +1174,9 @@ void CookieAuthTest(int client)
 
 		g_iType[client] = 0;
 		RemoveHat(client);
-		SetClientCookie(client, g_hCookie_Hat, "0");
+		g_bHatTypeDirtyLocal[client] = true;
+		HatsWriteHatTypeCookie(client);
+		FireHatLoadSave(client, -1);
 	} else {
 		g_bCookieAuth[client] = true;
 	}
@@ -984,11 +1184,13 @@ void CookieAuthTest(int client)
 
 public void OnClientDisconnect(int client)
 {
+	RemoveHat(client);
 	g_bExternalProp[client] = false;
 	g_bIsThirdPerson[client] = false;
 	g_bExternalCvar[client] = false;
 	g_bExternalChange[client] = false;
 	g_bCookieAuth[client] = false;
+	HatsResetClientState(client);
 	delete g_hTimerView[client];
 }
 
@@ -1027,7 +1229,7 @@ void GetHatName(char sTemp[64], int index)
 
 bool HatsValidClient(int client)
 {
-	if( client && IsClientInGame(client) && GetClientTeam(client) == 2 && IsPlayerAlive(client) )
+	if( HatsClientPrefsReady(client) && GetClientTeam(client) == 2 && IsPlayerAlive(client) )
 		return true;
 	return false;
 }
@@ -1192,16 +1394,13 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
-	if( g_iCvarRand == 2 || g_iCvarSave )
-	{
-		int clientID = event.GetInt("userid");
-		int client = GetClientOfUserId(clientID);
+	int clientID = event.GetInt("userid");
+	int client = GetClientOfUserId(clientID);
 
-		if( client )
-		{
-			RemoveHat(client);
-			CreateTimer(0.5, TimerDelayCreate, clientID);
-		}
+	if( client && (g_iCvarRand == 2 || g_iCvarSave || !IsFakeClient(client)) )
+	{
+		RemoveHat(client);
+		CreateTimer(0.5, TimerDelayCreate, clientID);
 	}
 
 	SpectatorHatHooks();
@@ -1215,7 +1414,7 @@ void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 	RemoveHat(client);
 	SpectatorHatHooks();
 
-	if( g_iCvarRand )
+	if( client && (g_iCvarRand || !IsFakeClient(client)) )
 		CreateTimer(0.1, TimerDelayCreate, clientID);
 }
 
@@ -1233,7 +1432,7 @@ Action TimerDelayCreate(Handle timer, any client)
 
 		if( g_iCvarRand == 2 )
 			CreateHat(client, -2);
-		else if( g_iCvarSave && !fake )
+		else if( !fake )
 		{
 			if( !HatsClientHasMenuAccess(client) && HatsRankDataReady(client) )
 				return Plugin_Continue;
@@ -1280,6 +1479,7 @@ void EventView(int client, bool bIsThirdPerson)
 {
 	if( HatsValidClient(client) )
 	{
+		g_bIsThirdPerson[client] = bIsThirdPerson;
 		SetHatView(client, bIsThirdPerson);
 	}
 }
@@ -1363,22 +1563,12 @@ public void TP_OnThirdPersonChanged(int client, bool bIsThirdPerson)
 
 void SetHatView(int client, bool bShowHat)
 {
+	// Own-hat and other-players visibility are both decided in Hook_SetTransmit.
+	// Do not unhook that shared filter; round rebuild must keep it attached.
 	if( bShowHat && !g_bExternalState[client] )
-	{
 		g_bExternalState[client] = true;
-
-		int entity = g_iHatIndex[client];
-		if( entity && (entity = EntRefToEntIndex(entity)) != INVALID_ENT_REFERENCE )
-			SDKUnhook(entity, SDKHook_SetTransmit, Hook_SetTransmit);
-	}
-	else if( !bShowHat && g_bExternalState[client] && !g_bExternalChange[client] && ((!g_bHatView[client] && !g_bIsThirdPerson[client]) || (!g_bHatViewTP[client] && g_bIsThirdPerson[client])) )
-	{
+	else if( !bShowHat && g_bExternalState[client] && !g_bExternalChange[client] && !HatsShouldShowOwnHat(client) )
 		g_bExternalState[client] = false;
-
-		int entity = g_iHatIndex[client];
-		if( entity && (entity = EntRefToEntIndex(entity)) != INVALID_ENT_REFERENCE )
-			SDKHook(entity, SDKHook_SetTransmit, Hook_SetTransmit);
-	}
 }
 
 
@@ -1432,11 +1622,8 @@ void OnFrameHooks(DataPack dPack)
 
 Action Hook_SetSpecTransmit(int entity, int client)
 {
-	if( !g_bHatAll[client] )
-	{
-		return Plugin_Handled;
-	}
-
+	// Hook_SetTransmit owns per-viewer visibility. This hook only handles
+	// first-person spectators, otherwise it could also hide their own hat.
 	if( !IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_iObserverMode") == 4 )
 	{
 		int target = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
@@ -1570,23 +1757,21 @@ Action CmdHat(int client, int args)
 
 				if( index == 0 )
 				{
-					if( g_iCvarSave && !IsFakeClient(client) )
-					{
-						SetClientCookie(client, g_hCookie_Hat, "-1");
-						g_iType[client] = -1;
-					}
-					FireHatLoadSave(client, -1);
+					HatsCommitHatType(client, -1);
 
 					CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Off", client);
 				}
-				else if( CreateHat(client, index - 1) )
+				else
 				{
-					ExternalView(client);
+					HatsEnableWear(client);
+					if( CreateHat(client, index - 1) )
+						ExternalView(client);
 				}
 			}
 		}
 		else if( strncmp(sTemp, "rand", 4, false) == 0 )
 		{
+			HatsEnableWear(client);
 			RemoveHat(client);
 
 			if( CreateHat(client, GetRandomInt(1, g_iCount) - 1) )
@@ -1603,6 +1788,7 @@ Action CmdHat(int client, int args)
 			{
 				if( StrContains(g_sModels[i], sTemp) != -1 || StrContains(g_sNames[i], sTemp) != -1 )
 				{
+					HatsEnableWear(client);
 					RemoveHat(client);
 
 					if( CreateHat(client, i) )
@@ -1635,7 +1821,8 @@ int HatMenuHandler(Menu menu, MenuAction action, int client, int index)
 	else if( action == MenuAction_Select )
 	{
 		int target = g_iTarget[client];
-		g_bHatOff[client] = false;
+		if( !target && index != 0 )
+			HatsEnableWear(client);
 
 		if( target )
 		{
@@ -1648,9 +1835,15 @@ int HatMenuHandler(Menu menu, MenuAction action, int client, int index)
 				CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Changed", client, name);
 				RemoveHat(target);
 
-				if( index != 0 && CreateHat(target, index - 1) )
+				if( index == 0 )
 				{
-					ExternalView(target);
+					HatsCommitHatType(target, -1);
+				}
+				else
+				{
+					HatsEnableWear(target);
+					if( CreateHat(target, index - 1) )
+						ExternalView(target);
 				}
 
 				ShowMenu(client);
@@ -1670,14 +1863,7 @@ int HatMenuHandler(Menu menu, MenuAction action, int client, int index)
 
 			if( index == 0 )
 			{
-				if( g_iCvarSave && !IsFakeClient(client) )
-				{
-					SetClientCookie(client, g_hCookie_Hat, "-1");
-					g_iType[client] = -1;
-
-				}
-
-				FireHatLoadSave(client, -1);
+				HatsCommitHatType(client, -1);
 				CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Off", client);
 			}
 			else if( CreateHat(client, index - 1) )
@@ -1760,7 +1946,7 @@ void ShowMenu(int client)
 // ====================================================================================================
 Action CmdHatOff(int client, int args)
 {
-	if( !g_bCvarAllow || g_bBlocked[client] )
+	if( !g_bCvarAllow || g_bBlocked[client] || !HatsClientPrefsReady(client) )
 	{
 		CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "HAT_NOT_RIGHT_NOW", client);
 		return Plugin_Handled;
@@ -1769,7 +1955,15 @@ Action CmdHatOff(int client, int args)
 	g_bHatOff[client] = !g_bHatOff[client];
 
 	if( g_bHatOff[client] )
+	{
 		RemoveHat(client);
+	}
+	else if( g_iType[client] > 0 )
+	{
+		CreateHat(client, g_iType[client] - 1, false);
+	}
+
+	HatsCommitPrefs(client, true);
 
 	char sTemp[64];
 	FormatEx(sTemp, sizeof(sTemp), "%T", g_bHatOff[client] ? "Hat_Off" : "Hat_On", client);
@@ -1783,6 +1977,9 @@ Action CmdHatOff(int client, int args)
 // ====================================================================================================
 Action CmdHatShowOn(int client, int args)
 {
+	if( !HatsClientPrefsReady(client) )
+		return CmdHatShow(client, args);
+
 	g_bHatView[client] = false;
 	CmdHatShow(client, args);
 	return Plugin_Handled;
@@ -1790,6 +1987,9 @@ Action CmdHatShowOn(int client, int args)
 
 Action CmdHatShowOff(int client, int args)
 {
+	if( !HatsClientPrefsReady(client) )
+		return CmdHatShow(client, args);
+
 	g_bHatView[client] = true;
 	CmdHatShow(client, args);
 	return Plugin_Handled;
@@ -1797,16 +1997,9 @@ Action CmdHatShowOff(int client, int args)
 
 Action CmdHatShow(int client, int args)
 {
-	if( !g_bCvarAllow || g_bBlocked[client] )
+	if( !g_bCvarAllow || g_bBlocked[client] || !HatsClientPrefsReady(client) )
 	{
 		CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "HAT_NOT_RIGHT_NOW", client);
-		return Plugin_Handled;
-	}
-
-	int entity = g_iHatIndex[client];
-	if( entity == 0 || (entity = EntRefToEntIndex(entity)) == INVALID_ENT_REFERENCE )
-	{
-		CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Missing", client);
 		return Plugin_Handled;
 	}
 
@@ -1829,8 +2022,7 @@ Action CmdHatShow(int client, int args)
 					SetHatView(client, true);
 			}
 
-			IntToString(g_bHatViewTP[client], sVar, sizeof(sVar));
-			SetClientCookie(client, g_hCookie_ThirdView, sVar);
+			HatsCommitPrefs(client, true);
 
 			char sTemp[64];
 			Format(sTemp, sizeof(sTemp), "%T", g_bHatViewTP[client] ? "Hat_On" : "Hat_Off", client);
@@ -1848,10 +2040,9 @@ Action CmdHatShow(int client, int args)
 	else if( g_bHatView[client] && (!g_bIsThirdPerson[client] || g_bHatViewTP[client]) )
 		SetHatView(client, true);
 
-	char sTemp[64];
-	IntToString(g_bHatView[client], sTemp, sizeof(sTemp));
-	SetClientCookie(client, g_hCookie_FirstView, sTemp);
+	HatsCommitPrefs(client, true);
 
+	char sTemp[64];
 	FormatEx(sTemp, sizeof(sTemp), "%T", g_bHatView[client] ? "Hat_On" : "Hat_Off", client);
 	CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_View", client, sTemp);
 
@@ -1863,7 +2054,7 @@ Action CmdHatShow(int client, int args)
 // ====================================================================================================
 Action CmdHatsToggle(int client, int args)
 {
-	if( !g_bCvarAllow )
+	if( !g_bCvarAllow || !HatsClientPrefsReady(client) )
 	{
 		CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "HAT_NOT_RIGHT_NOW", client);
 		return Plugin_Handled;
@@ -1871,12 +2062,11 @@ Action CmdHatsToggle(int client, int args)
 
 	g_bHatAll[client] = !g_bHatAll[client];
 
+	HatsCommitPrefs(client, true);
+
 	char sTemp[64];
 	FormatEx(sTemp, sizeof(sTemp), "%T", g_bHatAll[client] ? "Hat_On" : "Hat_Off", client);
 	CPrintToChat(client, "%T%T", "HAT_SYSTEM", client, "Hat_Visibility_Set", client, sTemp);
-
-	// Save hat visibility
-	SetClientCookie(client, g_hCookie_All, g_bHatAll[client] ? "1" : "0");
 
 	return Plugin_Handled;
 }
@@ -1972,6 +2162,7 @@ Action CmdHatClient(int client, int args)
 	{
 		if( GetClientTeam(target_list[i]) == 2 )
 		{
+			HatsEnableWear(target_list[i]);
 			RemoveHat(target_list[i]);
 			CreateHat(target_list[i], index);
 			ReplyToCommand(client, "[Hat] Set '%N' to '%s'", target_list[i], g_sNames[index]);
@@ -2108,7 +2299,14 @@ int PlayerListMenu(Menu menu, MenuAction action, int client, int index)
 			}
 			case 3:
 			{
+				if( !HatsClientPrefsReady(target) )
+				{
+					ShowPlayerList(client);
+					return 0;
+				}
+
 				g_bHatAll[target] = !g_bHatAll[target];
+				HatsCommitPrefs(target, true);
 
 				if( HatsValidClient(target) )
 				{
@@ -2679,6 +2877,8 @@ int SizeMenuHandler(Menu menu, MenuAction action, int client, int index)
 // ===================================================================================================
 void RemoveHat(int client)
 {
+	g_bExternalState[client] = false;
+
 	// Hat entity
 	int entity = g_iHatIndex[client];
 	g_iHatIndex[client] = 0;
@@ -2759,24 +2959,13 @@ bool CreateHat(int client, int index = -1, bool notify = true)
 		g_iType[client] = index + 1;
 	}
 	if( notify && requested >= 0 )
-		FireHatLoadSave(client, g_iType[client] - 1);
-
-	if( g_iCvarSave && !IsFakeClient(client) )
 	{
-		char sNum[4];
-		IntToString(index + 1, sNum, sizeof(sNum));
-		SetClientCookie(client, g_hCookie_Hat, sNum);
-
-		///////////////////////////////////////////
-		// Updated by pan0s
-		char s1On[2];
-		char s3On[2];
-		IntToString(g_bHatView[client], s1On, sizeof(s1On));
-		SetClientCookie(client, g_hCookie_FirstView, s1On);
-		IntToString(g_bHatViewTP[client], s3On, sizeof(s3On));
-		SetClientCookie(client, g_hCookie_ThirdView, s3On);
-		///////////////////////////////////////////
+		g_bHatTypeDirtyLocal[client] = true;
+		FireHatLoadSave(client, g_iType[client] - 1);
 	}
+
+	HatsWriteHatTypeCookie(client);
+	HatsWritePrefCookies(client);
 
 	// Fix showing glow through walls, break glow inheritance by attaching hats to info_target.
 	// Method by "Marttt": https://forums.alliedmods.net/showpost.php?p=2737781&postcount=21
@@ -2838,16 +3027,8 @@ bool CreateHat(int client, int index = -1, bool notify = true)
 
 		g_iSelected[client] = index;
 		g_iHatIndex[client] = EntIndexToEntRef(entity);
-
-		if( !g_bHatView[client] && (!g_bIsThirdPerson[client] || !g_bHatViewTP[client]) )
-		{
-			g_bExternalState[client] = true;
-			SetHatView(client, false);
-		}
-		else if( g_bHatView[client] && (!g_bIsThirdPerson[client] || g_bHatViewTP[client]) )
-		{
-			SetHatView(client, true);
-		}
+		SDKHook(entity, SDKHook_SetTransmit, Hook_SetTransmit);
+		g_bExternalState[client] = HatsShouldShowOwnHat(client);
 
 		TranslateHatName(client, index);
 
@@ -2891,8 +3072,15 @@ Action TimerEventView(Handle timer, any client)
 
 Action Hook_SetTransmit(int entity, int client)
 {
-	if( !g_bHatAll[client] || EntIndexToEntRef(entity) == g_iHatIndex[client] )
+	if( client < 1 || client > MaxClients )
+		return Plugin_Continue;
+
+	if( EntIndexToEntRef(entity) == g_iHatIndex[client] )
+		return HatsShouldShowOwnHat(client) ? Plugin_Continue : Plugin_Handled;
+
+	if( !g_bHatAll[client] )
 		return Plugin_Handled;
+
 	return Plugin_Continue;
 }
 

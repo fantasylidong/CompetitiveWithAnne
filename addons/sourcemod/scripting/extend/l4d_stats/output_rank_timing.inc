@@ -440,7 +440,7 @@ bool StopMapTimingWithOptions(bool:WriteLegacy, bool:Completed)
 							WritePackCell(dp, StatsGamemodeID);
 							WritePackString(dp, ClientID);
 							WritePackFloat(dp, TotalTime);
-							WritePackCell(dp, i);
+							WritePackCell(dp, GetClientUserId(i));
 							WritePackCell(dp, PlayerCounter);
 							WritePackCell(dp, GameDifficulty);
 							WritePackString(dp, CurrentMutation);
@@ -637,7 +637,7 @@ public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:
 	GamemodeID = ReadPackCell(dp);
 	ReadPackString(dp, ClientID, sizeof(ClientID));
 	TotalTime = ReadPackFloat(dp);
-	Client = ReadPackCell(dp);
+	new ClientUserId = ReadPackCell(dp);
 	PlayerCounter = ReadPackCell(dp);
 	GameDifficulty = ReadPackCell(dp);
 	ReadPackString(dp, Mutation, sizeof(Mutation));
@@ -651,8 +651,7 @@ public UpdateMapTimingStat(Handle:owner, Handle:hndl, const String:error[], any:
 
 	CloseHandle(dp);
 
-	// Return if client is not a human player
-	if (IsClientBot(Client) || !IsClientInGame(Client))
+	if (!Stats_ResolveHumanQueryAuth(ClientUserId, ClientID, Client))
 		return;
 
 	new Mode = GetConVarInt(cvar_AnnounceMode);

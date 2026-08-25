@@ -14,7 +14,47 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"vi"		"{green}[AnneDonate]{default} Sau khi thanh toán, nhập {olive}!wc email{default} / {olive}!wanchen email{default} / {olive}!finish email{default} để nhắc quản trị viên xác minh."
+		"vi"		"{green}[AnneDonate]{default} Sau khi thanh toán, quay lại trò chơi và nhập {olive}!wc user@example.com{default}."
+	}
+	"Join_AnneDonatePaymentSubmitInProgress"
+	{
+		"vi"		"{green}[AnneDonate]{default} Đang gửi thông báo hoàn tất thanh toán. Vui lòng đợi, đừng gửi lại hoặc chọn lại mức tài trợ."
+	}
+	"Join_AnneDonateRemindMenuTitle"
+	{
+		"vi"		"Gửi bằng !wc user@example.com"
+	}
+	"Join_AnneDonateRemindMenuPaid"
+	{
+		"vi"		"Tôi đã thanh toán"
+	}
+	"Join_AnneDonateRemindMenuReopen"
+	{
+		"vi"		"Mở lại trang thanh toán"
+	}
+	"Join_AnneDonateRemindMenuLater"
+	{
+		"vi"		"Xử lý sau"
+	}
+	"Join_AnneDonateAmountMenuTitle"
+	{
+		"vi"		"Chọn số tiền tài trợ:"
+	}
+	"Join_AnneDonateAmountMenuWebOnly"
+	{
+		"vi"		"Chỉ mở trang tài trợ"
+	}
+	"Join_AnneDonateMethodMenuTitle"
+	{
+		"vi"		"Chọn phương thức thanh toán:"
+	}
+	"Join_AnneDonateMethodWeChat"
+	{
+		"vi"		"WeChat Pay"
+	}
+	"Join_AnneDonateMethodAlipay"
+	{
+		"vi"		"Alipay"
 	}
 	"Join_AnneDonateEmailRequired"
 	{

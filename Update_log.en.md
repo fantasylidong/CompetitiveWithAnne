@@ -222,6 +222,21 @@
 - A sound package now sets four items together: headshot, hit, kill, and headshot-kill. Players may independently choose headshot-kill set `0..N` (0 falls back to the regular headshot sound). That set ID and playback mode are stored in the RPG table and migrate once from the old `SoundSelect.txt`. The redundant overlay quick toggle and `sm_hitui` were removed; icon set 0 already disables icons.
 - Set 9 "original ding vote plugin": ding on headshot hits, bell on headshot kills, silence otherwise; picking it sets the range to all infected.
 
+### August 23, 2026 Per-sound hit-feedback refactor
+- Upgraded `l4d2_hitsound.smx` to 2.7.0. Sound sets are now presets that apply only members with real samples; missing members are turned off. Set 9 therefore explicitly enables headshot and dedicated headshot-kill sounds while leaving hit/kill off.
+- Players can independently choose the actual source for headshot, hit, kill, and headshot-kill sounds. Each picker lists only sources that provide that sound and previews it immediately. Headshot-kill value `0` still follows the regular headshot sound.
+- Fixed the pre-damage `infected_hurt` fatal-shot check, the admin single-item close action clearing all three items, preference writes before initial DB load, authorization timing, out-of-order rapid saves, and the ineffective dynamic master switch. Existing DB/KV values are normalized on load. This refactor adds no columns; databases still missing `hitsound_stack_mode` / `hitsound_headkill` must run the existing idempotent `20260820_hitsound_personal_prefs.sql` migration once.
+
+### August 23, 2026 Shared sound catalog and unrestricted per-event choices
+- Upgraded `l4d2_hitsound.smx` to 2.8.0. The 25 non-empty preset references are deduplicated by path into 22 stable shared sounds `S01..S22`; the three duplicate samples in presets 1 and 3 are stored once. Downloads and precaching now also run once per unique sound.
+- The headshot, hit, kill, and headshot-kill pickers all show the complete shared catalog, so any sound can be assigned to any event and previewed immediately. Preset labels expose their exact mapping; preset 9 is `[head:S21 hit:off kill:off head-kill:S22]`.
+- Existing positive DB/KV preset-source values require no data migration. New shared choices use `-1..-127`, so the four sound columns must be signed integers. The repository schema already is signed; the idempotent `20260823_hitsound_sound_catalog.sql` fixes production tables that were created as `UNSIGNED`.
+
+### August 23, 2026 Dual-layer hat preference persistence
+- Upgraded `l4d_hats.smx` to 1.47.0. Hat type, wear toggle, first-person self view, third-person self view, and visibility of other players' hats are all stored in clientprefs cookies and load even when `l4d_hats_save` is `0`.
+- Upgraded `rpg.smx` to 2.1.0. When the `rpg` MySQL entry exists in `databases.cfg`, the four toggles use the `RPG` table as primary storage; unavailable MySQL or failed column migration falls back to clientprefs SQLite. Existing accounts migrate `NULL` columns only after cookies are ready, preventing defaults from overwriting saved choices.
+- Every rebuilt hat entity keeps its per-viewer `SetTransmit` filter, so hiding other players' hats remains effective across rounds. Added the idempotent `20260823_hat_preferences.sql` migration; the plugin can also add the same columns automatically.
+
 ### August 20, 2026 Tank ride detection for embedded riders
 - Upgraded `ai_tank3` to 1.0.0.10. Riding still treats `m_hGroundEntity == Tank` as the first proof, so adjacent ledges and stairs are not counted as riding.
 - If the ground entity is not the Tank, riding now requires overlapping XY hulls plus a downward hull trace from the survivor's feet that actually hits the Tank. That covers riders stuck in the Tank model whose ground entity is still the world, without using a center ray that merely misses world as proof.

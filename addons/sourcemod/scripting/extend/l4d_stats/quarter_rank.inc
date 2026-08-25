@@ -375,11 +375,15 @@ stock QuarterRank_QueryClientPointsSteamID(Client, const String:SteamID[], SQLTC
 
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT points, playtime FROM `%sscore_quarter` WHERE steamid = '%s' AND quarter_key = %i", DbPrefix, EscSteamID, g_iQuarterRankKey);
-	SQL_TQuery(db, callback, query, Client);
+	SQL_TQuery(db, callback, query, GetClientUserId(Client));
 }
 
 stock QuarterRank_QueryClientPointsDP(Handle:dp, SQLTCallback:callback)
 {
+	new client;
+	if (!Stats_ResolvePackedQueryClient(dp, client))
+		return;
+
 	QuarterRank_EnsureCurrentQuarter();
 	if (!QuarterRank_Enabled())
 	{
@@ -400,9 +404,10 @@ stock QuarterRank_QueryClientPointsDP(Handle:dp, SQLTCallback:callback)
 	SQL_TQuery(db, callback, query, dp);
 }
 
-public QuarterRank_GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:client)
+public QuarterRank_GetClientPoints(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -433,20 +438,21 @@ stock QuarterRank_QueryClientRank(Client, SQLTCallback:callback=INVALID_FUNCTION
 	else
 		Format(query, sizeof(query), "SELECT COUNT(*) FROM `%sscore_quarter` WHERE quarter_key = %i AND points >= %i AND points > 0", DbPrefix, g_iQuarterRankKey, ClientQuarterPoints[Client]);
 
-	SQL_TQuery(db, callback, query, Client);
+	SQL_TQuery(db, callback, query, GetClientUserId(Client));
 }
 
 stock QuarterRank_QueryClientRankDP(Handle:dp, SQLTCallback:callback)
 {
+	new Client;
+	if (!Stats_ResolvePackedQueryClient(dp, Client))
+		return;
+
 	QuarterRank_EnsureCurrentQuarter();
 	if (!QuarterRank_Enabled())
 	{
 		SQL_TQuery(db, callback, "SELECT 0", dp);
 		return;
 	}
-
-	ResetPack(dp);
-	new Client = ReadPackCell(dp);
 
 	decl String:query[512];
 	if (ClientQuarterPoints[Client] <= 0)
@@ -457,9 +463,10 @@ stock QuarterRank_QueryClientRankDP(Handle:dp, SQLTCallback:callback)
 	SQL_TQuery(db, callback, query, dp);
 }
 
-public QuarterRank_GetClientRank(Handle:owner, Handle:hndl, const String:error[], any:client)
+public QuarterRank_GetClientRank(Handle:owner, Handle:hndl, const String:error[], any:userid)
 {
-	if (!client)
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(userid, client))
 		return;
 
 	if (hndl == INVALID_HANDLE)
@@ -487,6 +494,10 @@ stock QuarterRank_QueryTotal(SQLTCallback:callback=INVALID_FUNCTION, any:data=0)
 
 stock QuarterRank_QueryTotalDP(Handle:dp, SQLTCallback:callback)
 {
+	new client;
+	if (!Stats_ResolvePackedQueryClient(dp, client))
+		return;
+
 	QuarterRank_EnsureCurrentQuarter();
 	if (!QuarterRank_Enabled())
 	{

@@ -141,8 +141,12 @@ public Action:timer_ProtectedFriendly(Handle:timer, any:data)
 }
 // Team infected damage score
 
-public Action:timer_InfectedDamageCheck(Handle:timer, any:data)
+public Action:timer_InfectedDamageCheck(Handle:timer, any:userid)
 {
+	new data;
+	if (!Stats_ResolveHumanQueryUserId(userid, data))
+		return;
+
 	TimerInfectedDamageCheck[data] = INVALID_HANDLE;
 
 	if (data == 0 || IsClientBot(data))
@@ -214,8 +218,12 @@ GetBoomerPoints(VictimCount)
 
 // Calculate Boomer vomit hits and check Boomer Perfect Blindness award
 
-public Action:timer_BoomerBlindnessCheck(Handle:timer, any:data)
+public Action:timer_BoomerBlindnessCheck(Handle:timer, any:userid)
 {
+	new data;
+	if (!Stats_ResolveHumanQueryUserId(userid, data))
+		return;
+
 	TimerBoomerPerfectCheck[data] = INVALID_HANDLE;
 
 	if (data > 0 && !IsClientBot(data) && IsClientInGame(data) && GetClientTeam(data) == TEAM_INFECTED && BoomerHitCounter[data] > 0)
@@ -329,15 +337,18 @@ QueryClientPointsSteamID(Client, const String:SteamID[], SQLTCallback:callback=I
 
 	Format(query, sizeof(query), "SELECT %s FROM %splayers WHERE steamid = '%s'", DB_PLAYERS_TOTALPOINTS, DbPrefix, SteamID);
 
-	SQL_TQuery(db, callback, query, Client);
+	SQL_TQuery(db, callback, query, GetClientUserId(Client));
 }
 
 QueryClientPointsDP(Handle:dp, SQLTCallback:callback)
 {
 	decl String:query[1024], String:SteamID[MAX_LINE_WIDTH];
+	new client;
+
+	if (!Stats_ResolvePackedQueryClient(dp, client))
+		return;
 
 	ResetPack(dp);
-
 	ReadPackCell(dp);
 	ReadPackString(dp, SteamID, sizeof(SteamID));
 
@@ -355,16 +366,16 @@ QueryClientRank(Client, SQLTCallback:callback=INVALID_FUNCTION)
 
 	Format(query, sizeof(query), "SELECT COUNT(*) FROM %splayers WHERE %s >= %i", DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client]);
 
-	SQL_TQuery(db, callback, query, Client);
+	SQL_TQuery(db, callback, query, GetClientUserId(Client));
 }
 
 QueryClientRankDP(Handle:dp, SQLTCallback:callback)
 {
 	decl String:query[256];
+	new Client;
 
-	ResetPack(dp);
-
-	new Client = ReadPackCell(dp);
+	if (!Stats_ResolvePackedQueryClient(dp, Client))
+		return;
 
 	Format(query, sizeof(query), "SELECT COUNT(*) FROM %splayers WHERE %s >= %i", DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client]);
 
@@ -373,14 +384,17 @@ QueryClientRankDP(Handle:dp, SQLTCallback:callback)
 
 QueryClientGameModeRankDP(Handle:dp, SQLTCallback:callback)
 {
-	if (!InvalidGameMode())
+	new Client;
+	if (!Stats_ResolvePackedQueryClient(dp, Client))
+		return;
+
+	decl String:query[1024];
+	if (InvalidGameMode())
 	{
-		decl String:query[1024];
-
-		ResetPack(dp);
-
-		new Client = ReadPackCell(dp);
-
+		Format(query, sizeof(query), "SELECT 0");
+	}
+	else
+	{
 		switch (Stats_GetCurrentStatsGamemodeID())
 		{
 			case GAMEMODE_VERSUS:
@@ -412,9 +426,9 @@ QueryClientGameModeRankDP(Handle:dp, SQLTCallback:callback)
 				Format(query, sizeof(query), "SELECT COUNT(*) FROM %splayers WHERE playtime > 0 AND points >= %i", DbPrefix, ClientGameModePoints[Client][GAMEMODE_COOP]);
 			}
 		}
-
-		SQL_TQuery(db, callback, query, dp);
 	}
+
+	SQL_TQuery(db, callback, query, dp);
 }
 /*
 QueryClientGameModePoints(Client, SQLTCallback:callback=INVALID_FUNCTION)
@@ -440,9 +454,12 @@ QueryClientGameModePointsStmID(Client, const String:SteamID[], SQLTCallback:call
 QueryClientGameModePointsDP(Handle:dp, SQLTCallback:callback)
 {
 	decl String:query[1024], String:SteamID[MAX_LINE_WIDTH];
+	new client;
+
+	if (!Stats_ResolvePackedQueryClient(dp, client))
+		return;
 
 	ResetPack(dp);
-
 	ReadPackCell(dp);
 	ReadPackString(dp, SteamID, sizeof(SteamID));
 
@@ -628,7 +645,7 @@ QueryReadOnlyRankDisplaySteamID(Client, const String:SteamID[])
 
 	decl String:query[4096];
 	Format(query, sizeof(query), "SELECT p.name, p.%s, p.%s, p.kills, p.versus_kills_survivors + p.scavenge_kills_survivors + p.realism_kills_survivors + p.mutations_kills_survivors, p.headshots, (SELECT COUNT(*) FROM %splayers AS rp WHERE rp.%s >= p.%s), (SELECT COUNT(*) FROM %splayers), %s, %s, %s FROM %splayers AS p %s WHERE p.steamid = '%s'", DB_PLAYERS_TOTALPLAYTIME, DB_PLAYERS_TOTALPOINTS, DbPrefix, DB_PLAYERS_TOTALPOINTS, DB_PLAYERS_TOTALPOINTS, DbPrefix, ModeRankSQL, ModeTotalSQL, QuarterFieldsSQL, DbPrefix, QuarterJoinSQL, EscSteamID);
-	SQL_TQuery(db, DisplayRankSnapshot, query, Client);
+	SQL_TQuery(db, DisplayRankSnapshot, query, GetClientUserId(Client));
 }
 
 QueryClientStatsSteamID(Client, const String:SteamID[], CallingMethod=CM_UNKNOWN)
@@ -641,7 +658,7 @@ QueryClientStatsSteamID(Client, const String:SteamID[], CallingMethod=CM_UNKNOWN
 
 	new Handle:dp = CreateDataPack();
 
-	WritePackCell(dp, Client);
+	WritePackCell(dp, GetClientUserId(Client));
 	WritePackString(dp, SteamID);
 	WritePackCell(dp, CallingMethod);
 
@@ -655,121 +672,88 @@ QueryClientStatsDP(Handle:dp)
 
 public QueryClientStatsDP_1(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("QueryClientStatsDP_1 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_1"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetClientGameModePoints(owner, hndl, error, ReadPackCell(dp));
+	GetClientGameModePoints(owner, hndl, error, GetClientUserId(client));
 
 	QueryClientPointsDP(dp, QueryClientStatsDP_2);
 }
 
 public QueryClientStatsDP_2(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("QueryClientStatsDP_2 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_2"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetClientPoints(owner, hndl, error, ReadPackCell(dp));
+	GetClientPoints(owner, hndl, error, GetClientUserId(client));
 
 	QueryClientGameModeRankDP(dp, QueryClientStatsDP_3);
 }
 
 public QueryClientStatsDP_3(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("QueryClientStatsDP_3 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_3"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetClientGameModeRank(owner, hndl, error, ReadPackCell(dp));
+	GetClientGameModeRank(owner, hndl, error, GetClientUserId(client));
 
 	QueryClientRankDP(dp, QueryClientStatsDP_4);
 }
 
 public QueryClientStatsDP_4(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("QueryClientStatsDP_4 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_4"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetClientRank(owner, hndl, error, ReadPackCell(dp));
+	GetClientRank(owner, hndl, error, GetClientUserId(client));
 
 	QueryRank_1(dp, QueryClientStatsDP_5);
 }
 
 public QueryClientStatsDP_5(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("QueryClientStatsDP_5 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_5"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetRankTotal(owner, hndl, error, ReadPackCell(dp));
+	GetRankTotal(owner, hndl, error, GetClientUserId(client));
 
 	QueryRank_2(dp, QueryClientStatsDP_6);
 }
 
 public QueryClientStatsDP_6(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		if (dp != INVALID_HANDLE)
-			CloseHandle(dp);
-
-		LogError("QueryClientStatsDP_6 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_6"))
 		return;
-	}
 
-	ResetPack(dp);
-	GetGameModeRankTotal(owner, hndl, error, ReadPackCell(dp));
+	GetGameModeRankTotal(owner, hndl, error, GetClientUserId(client));
 
 	QuarterRank_QueryClientPointsDP(dp, QueryClientStatsDP_7);
 }
 
 public QueryClientStatsDP_7(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		if (dp != INVALID_HANDLE)
-			CloseHandle(dp);
-
-		LogError("QueryClientStatsDP_7 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_7"))
 		return;
-	}
 
-	ResetPack(dp);
-	QuarterRank_GetClientPoints(owner, hndl, error, ReadPackCell(dp));
+	QuarterRank_GetClientPoints(owner, hndl, error, GetClientUserId(client));
 
 	QuarterRank_QueryClientRankDP(dp, QueryClientStatsDP_8);
 }
 
 public QueryClientStatsDP_8(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (hndl == INVALID_HANDLE)
-	{
-		if (dp != INVALID_HANDLE)
-			CloseHandle(dp);
-
-		LogError("QueryClientStatsDP_8 Query failed: %s", error);
+	new client;
+	if (!Stats_BeginPackedClientQuery(dp, client, hndl, error, "QueryClientStatsDP_8"))
 		return;
-	}
 
-	ResetPack(dp);
-	QuarterRank_GetClientRank(owner, hndl, error, ReadPackCell(dp));
+	QuarterRank_GetClientRank(owner, hndl, error, GetClientUserId(client));
 
 	QuarterRank_QueryTotalDP(dp, QueryClientStatsDP_9);
 }
@@ -778,22 +762,30 @@ public QueryClientStatsDP_9(Handle:owner, Handle:hndl, const String:error[], any
 {
 	if (hndl == INVALID_HANDLE)
 	{
-		if (dp != INVALID_HANDLE)
-			CloseHandle(dp);
-
+		Stats_CloseQueryData(dp);
 		LogError("QueryClientStatsDP_9 Query failed: %s", error);
 		return;
 	}
+
+	if (dp == INVALID_HANDLE)
+		return;
 
 	decl String:SteamID[MAX_LINE_WIDTH];
 
 	ResetPack(dp);
 
-	new Client = ReadPackCell(dp);
+	new userid = ReadPackCell(dp);
 	ReadPackString(dp, SteamID, sizeof(SteamID));
 	new CallingMethod = ReadPackCell(dp);
 
-	QuarterRank_GetTotal(owner, hndl, error, Client);
+	CloseHandle(dp);
+	dp = INVALID_HANDLE;
+
+	new Client;
+	if (!Stats_ResolveHumanQueryUserId(userid, Client))
+		return;
+
+	QuarterRank_GetTotal(owner, hndl, error, GetClientUserId(Client));
 
 	// Callback
 	if (CallingMethod == CM_RANK)
@@ -816,31 +808,27 @@ public QueryClientStatsDP_9(Handle:owner, Handle:hndl, const String:error[], any
 	{
 		QueryClientStatsDP_PlayerJoined(Client, SteamID);
 	}
-
-	// Clean your mess up
-	CloseHandle(dp);
-	dp = INVALID_HANDLE;
 }
 
 QueryClientStatsDP_Rank(Client, const String:SteamID[])
 {
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT name, %s, %s, kills, versus_kills_survivors + scavenge_kills_survivors + realism_kills_survivors + mutations_kills_survivors, headshots FROM %splayers WHERE steamid = '%s'", DB_PLAYERS_TOTALPLAYTIME, DB_PLAYERS_TOTALPOINTS, DbPrefix, SteamID);
-	SQL_TQuery(db, DisplayRank, query, Client);
+	SQL_TQuery(db, DisplayRank, query, GetClientUserId(Client));
 }
 
 QueryClientStatsDP_Top10(Client, const String:SteamID[])
 {
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT name, %s, %s, kills, versus_kills_survivors + scavenge_kills_survivors + realism_kills_survivors + mutations_kills_survivors, headshots FROM %splayers WHERE steamid = '%s'", DB_PLAYERS_TOTALPLAYTIME, DB_PLAYERS_TOTALPOINTS, DbPrefix, SteamID);
-	SQL_TQuery(db, DisplayRank, query, Client);
+	SQL_TQuery(db, DisplayRank, query, GetClientUserId(Client));
 }
 
 QueryClientStatsDP_NextRank(Client, const String:SteamID[])
 {
 	decl String:query[1024];
 	Format(query, sizeof(query), "SELECT (%s + 1) - %i FROM %splayers WHERE (%s) >= %i AND steamid <> '%s' ORDER BY (%s) ASC LIMIT 1", DB_PLAYERS_TOTALPOINTS, ClientPoints[Client], DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client], SteamID, DB_PLAYERS_TOTALPOINTS);
-	SQL_TQuery(db, DisplayClientNextRank, query, Client);
+	SQL_TQuery(db, DisplayClientNextRank, query, GetClientUserId(Client));
 
 	if (TimerRankChangeCheck[Client] != INVALID_HANDLE)
 		TriggerTimer(TimerRankChangeCheck[Client], true);
@@ -850,14 +838,14 @@ QueryClientStatsDP_NextRankFull(Client, const String:SteamID[])
 {
 	decl String:query[2048];
 	Format(query, sizeof(query), "SELECT (%s + 1) - %i FROM %splayers WHERE (%s) >= %i AND steamid <> '%s' ORDER BY (%s) ASC LIMIT 1", DB_PLAYERS_TOTALPOINTS, ClientPoints[Client], DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client], SteamID, DB_PLAYERS_TOTALPOINTS);
-	SQL_TQuery(db, GetClientNextRank, query, Client);
+	SQL_TQuery(db, GetClientNextRank, query, GetClientUserId(Client));
 
 	decl String:query1[1024], String:query2[256], String:query3[1024];
 	Format(query1, sizeof(query1), "SELECT name, (%s) AS totalpoints FROM %splayers WHERE (%s) >= %i AND steamid <> '%s' ORDER BY totalpoints ASC LIMIT 3", DB_PLAYERS_TOTALPOINTS, DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client], SteamID);
 	Format(query2, sizeof(query2), "SELECT name, %i AS totalpoints FROM %splayers WHERE steamid = '%s'", ClientPoints[Client], DbPrefix, SteamID);
 	Format(query3, sizeof(query3), "SELECT name, (%s) as totalpoints FROM %splayers WHERE (%s) < %i ORDER BY totalpoints DESC LIMIT 3", DB_PLAYERS_TOTALPOINTS, DbPrefix, DB_PLAYERS_TOTALPOINTS, ClientPoints[Client]);
 	Format(query, sizeof(query), "(%s) UNION (%s) UNION (%s) ORDER BY totalpoints DESC", query1, query2, query3);
-	SQL_TQuery(db, DisplayNextRankFull, query, Client);
+	SQL_TQuery(db, DisplayNextRankFull, query, GetClientUserId(Client));
 
 	if (TimerRankChangeCheck[Client] != INVALID_HANDLE)
 		TriggerTimer(TimerRankChangeCheck[Client], true);
@@ -922,7 +910,7 @@ CheckPlayerDB(client)
 
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT steamid FROM %splayers WHERE steamid = '%s'", DbPrefix, SteamID);
-	SQL_TQuery(db, InsertPlayerDB, query, client);
+	SQL_TQuery(db, InsertPlayerDB, query, Stats_CreateClientIdentityPack(client, SteamID));
 
 	ReadClientRankMuteSteamID(client, SteamID);
 }
@@ -943,17 +931,24 @@ ReadClientRankMuteSteamID(Client, const String:SteamID[])
 
 	decl String:query[512];
 	Format(query, sizeof(query), "SELECT mute FROM %ssettings WHERE steamid = '%s'", DbPrefix, SteamID);
-	SQL_TQuery(db, GetClientRankMute, query, Client);
+	SQL_TQuery(db, GetClientRankMute, query, Stats_CreateClientIdentityPack(Client, SteamID));
 }
 
 // Insert a player into the database if they do not already exist.
 
-public InsertPlayerDB(Handle:owner, Handle:hndl, const String:error[], any:client)
+public InsertPlayerDB(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (db == INVALID_HANDLE || IsClientBot(client))
-	{
+	if (dp == INVALID_HANDLE)
 		return;
-	}
+
+	ResetPack(dp);
+	new userid = ReadPackCell(dp);
+	decl String:SteamID[MAX_LINE_WIDTH];
+	ReadPackString(dp, SteamID, sizeof(SteamID));
+	CloseHandle(dp);
+
+	if (db == INVALID_HANDLE)
+		return;
 
 	if (hndl == INVALID_HANDLE)
 	{
@@ -962,85 +957,124 @@ public InsertPlayerDB(Handle:owner, Handle:hndl, const String:error[], any:clien
 	}
 
 	if (StatsDisabled())
-	{
 		return;
-	}
 
-	if (!SQL_GetRowCount(hndl))
+	if (!SQL_GetRowCount(hndl) && !Stats_IsInvalidRankAuthString(SteamID))
 	{
-		new String:SteamID[MAX_LINE_WIDTH];
-		GetClientRankAuthString(client, SteamID, sizeof(SteamID));
-
 		new String:query[512];
 		Format(query, sizeof(query), "INSERT IGNORE INTO %splayers SET steamid = '%s'", DbPrefix, SteamID);
 		SQL_TQuery(db, SQLErrorCheckCallback, query);
 	}
 
-	UpdatePlayer(client);
+	new client;
+	if (Stats_ResolveHumanQueryAuth(userid, SteamID, client))
+		UpdatePlayer(client);
 }
 
 // Insert a player into the settings database if they do not already exist.
 
-public SetClientRankMute(Handle:owner, Handle:hndl, const String:error[], any:client)
+public SetClientRankMute(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (db == INVALID_HANDLE || IsClientBot(client))
+	if (dp == INVALID_HANDLE)
 		return;
+
+	ResetPack(dp);
+	new userid = ReadPackCell(dp);
+	decl String:SteamID[MAX_LINE_WIDTH];
+	ReadPackString(dp, SteamID, sizeof(SteamID));
+
+	if (db == INVALID_HANDLE)
+	{
+		CloseHandle(dp);
+		return;
+	}
 
 	if (hndl == INVALID_HANDLE)
 	{
+		CloseHandle(dp);
 		LogError("SetClientRankMute failed! Reason: %s", error);
 		return;
 	}
 
 	if (StatsDisabled())
-		return;
-
-	if (SQL_GetAffectedRows(owner) == 0)
 	{
-		// Something went wrong!
-		ClientRankMute[client] = false;
+		CloseHandle(dp);
 		return;
 	}
 
-	ReadClientRankMute(client);
+	new client;
+	new bool:IdentityMatches = Stats_ResolveHumanQueryAuth(userid, SteamID, client);
+
+	if (SQL_GetAffectedRows(owner) == 0)
+	{
+		if (IdentityMatches)
+			ClientRankMute[client] = false;
+
+		CloseHandle(dp);
+		return;
+	}
+
+	CloseHandle(dp);
+
+	if (IdentityMatches)
+		ReadClientRankMute(client);
 }
 
 // Insert a player into the settings database if they do not already exist.
 
-public GetClientRankMute(Handle:owner, Handle:hndl, const String:error[], any:client)
+public GetClientRankMute(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (db == INVALID_HANDLE || IsClientBot(client))
+	if (dp == INVALID_HANDLE)
+		return;
+
+	ResetPack(dp);
+	new userid = ReadPackCell(dp);
+	decl String:SteamID[MAX_LINE_WIDTH];
+	ReadPackString(dp, SteamID, sizeof(SteamID));
+
+	if (db == INVALID_HANDLE)
 	{
+		CloseHandle(dp);
 		return;
 	}
 
 	if (hndl == INVALID_HANDLE)
 	{
+		CloseHandle(dp);
 		LogError("GetClientRankMute failed! Reason: %s", error);
 		return;
 	}
 
 	if (StatsDisabled())
 	{
+		CloseHandle(dp);
 		return;
 	}
 
 	if (!SQL_GetRowCount(hndl))
 	{
-		new String:SteamID[MAX_LINE_WIDTH];
-		GetClientRankAuthString(client, SteamID, sizeof(SteamID));
+		if (Stats_IsInvalidRankAuthString(SteamID))
+		{
+			CloseHandle(dp);
+			return;
+		}
 
 		new String:query[512];
 		Format(query, sizeof(query), "INSERT IGNORE INTO %ssettings SET steamid = '%s'", DbPrefix, SteamID);
-		SQL_TQuery(db, SetClientRankMute, query, client);
+		SQL_TQuery(db, SetClientRankMute, query, dp);
+		return;
 	}
-	else
+
+	new client;
+	if (Stats_ResolveHumanQueryAuth(userid, SteamID, client))
 	{
 		while (SQL_FetchRow(hndl))
 		{
 			ClientRankMute[client] = (SQL_FetchInt(hndl, 0) != 0);
 		}
 	}
+
+	CloseHandle(dp);
 }
 
 // Run a SQL query, used for UPDATE's only.
@@ -1202,7 +1236,10 @@ public UpdatePlayerFull(Client, const String:SteamID[], const String:Name[])
 	else
 		Format(query, sizeof(query), "UPDATE %splayers SET lastontime = UNIX_TIMESTAMP(), %s = %s + 1, lastannemode = %i, lastgamemode = %i, name = '%s', ip = '%s'%s WHERE steamid = '%s'", DbPrefix, Playtime, Playtime, mode, CurrentGamemodeID, Name, IP, ServerNameSet, SteamID);
 
-	SQL_TQuery(db, UpdatePlayerCallback, query, Client);
+	new Handle:dp = CreateDataPack();
+	WritePackCell(dp, Client > 0 ? GetClientUserId(Client) : 0);
+	WritePackString(dp, SteamID);
+	SQL_TQuery(db, UpdatePlayerCallback, query, dp);
 	if (CountPlaytime)
 	{
 		ModeStats_RecordPlaytime(Client, 1);
@@ -1212,22 +1249,25 @@ public UpdatePlayerFull(Client, const String:SteamID[], const String:Name[])
 
 // Report error on sql query;
 
-public UpdatePlayerCallback(Handle:owner, Handle:hndl, const String:error[], any:client)
+public UpdatePlayerCallback(Handle:owner, Handle:hndl, const String:error[], any:dp)
 {
-	if (db == INVALID_HANDLE)
-	{
+	if (dp == INVALID_HANDLE)
 		return;
-	}
+
+	ResetPack(dp);
+	new userid = ReadPackCell(dp);
+	decl String:SteamID[MAX_LINE_WIDTH];
+	ReadPackString(dp, SteamID, sizeof(SteamID));
+	CloseHandle(dp);
+
+	if (db == INVALID_HANDLE)
+		return;
 
 	if (!StrEqual("", error))
 	{
-		if (client > 0)
+		if (userid > 0 && !Stats_IsInvalidRankAuthString(SteamID))
 		{
-			decl String:SteamID[MAX_LINE_WIDTH];
-			GetClientRankAuthString(client, SteamID, sizeof(SteamID));
-
 			UpdatePlayerFull(0, SteamID, "INVALID_CHARACTERS");
-
 			return;
 		}
 
