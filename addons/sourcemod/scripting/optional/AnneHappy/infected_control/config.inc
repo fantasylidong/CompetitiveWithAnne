@@ -45,6 +45,7 @@ enum struct Config
     ConVar SiInterval;
     ConVar DebugMode;
     ConVar SpawnAccelNativeSafety;
+    ConVar NavTeamNearest;
 
     ConVar MaxPlayerZombies;
     ConVar VsBossFlowBuffer;
@@ -119,6 +120,9 @@ enum struct Config
     ConVar ScoreBehindRejectGap;
     ConVar ScoreBehindRejectGapHjc;
     ConVar ScoreBehindHjcScale;
+    ConVar ScoreBehindSoftPct;
+    ConVar SpawnBehindEvalBudget;
+    ConVar SpawnNavBandTimeout;
 
     ConVar PathCacheEnable;
     ConVar PathCacheQuantize;
@@ -238,6 +242,9 @@ enum struct Config
     float fScoreBehindCap;
     int   iScoreBehindRejectGap;
     int   iScoreBehindRejectGapHjc;
+    int   iScoreBehindSoftPct;
+    int   iSpawnBehindEvalBudget;
+    float fSpawnNavBandTimeout;
     float fScoreBehindHjcScale;
 
     bool  bPathCacheEnable;
@@ -285,6 +292,7 @@ enum struct Config
     int   iTeleportCheckTime;
     int   iDebugMode;
     bool  bSpawnAccelNativeSafety;
+    bool  bNavTeamNearest;
     bool  bTeleport;
     bool  bAutoSpawn;
     bool  bIgnoreIncapSight;
@@ -350,10 +358,15 @@ enum struct Config
         this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
         this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
         this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
-        this.DebugMode         = CreateConVar("inf_DebugMode", "1","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.DebugMode         = CreateConVar("inf_DebugMode", "0","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
         this.SpawnAccelNativeSafety = CreateConVar(
             "inf_spawn_accel_native_safety", "0",
             "Use anne_spawn_accel native stuck/visibility traces (0=SourcePawn fallback, 1=native)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.NavTeamNearest = CreateConVar(
+            "inf_nav_team_nearest", "1",
+            "Directed Nav candidate search uses team-nearest distance/owner (0=legacy single-target)",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
 
@@ -521,6 +534,18 @@ enum struct Config
             "inf_score_behind_hjc_scale", "2.5",
             "Hunter/Jockey/Charger 的 Flow 后点梯度扣分倍率；1.0 与全局相同",
             CVAR_FLAG, true, 1.0, true, 5.0);
+        this.ScoreBehindSoftPct = CreateConVar(
+            "inf_score_behind_soft_pct", "90",
+            "owner Flow 进度达到该百分比后，落后 gap 的候选不再硬拒绝、只做评分扣分；101=永远硬拒绝",
+            CVAR_FLAG, true, 0.0, true, 101.0);
+        this.SpawnBehindEvalBudget = CreateConVar(
+            "inf_spawn_behind_eval_budget", "32",
+            "尾段软化生效时，每个距离层最多评估的后方候选数（超出直接跳过，保证按时轮到 Director 兜底）；0=不限制",
+            CVAR_FLAG, true, 0.0, true, 512.0);
+        this.SpawnNavBandTimeout = CreateConVar(
+            "inf_spawn_nav_band_timeout", "3.0",
+            "单个搜索周期内有向 Nav 分层搜索的最长耗时（秒），超时直接进入 Director 兜底档；0=关闭",
+            CVAR_FLAG, true, 0.0, true, 30.0);
         this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
             "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
         this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
@@ -596,8 +621,8 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 100.0
         );
         this.FlowBucketShare = CreateConVar(
-            "inf_spawn_bucket_ratio", "0.50",
-            "同一 Flow 桶中允许同时存在的特感占比（相对 l4d_infected_limit）；0=关闭。",
+            "inf_spawn_bucket_ratio", "0",
+            "同一 Flow 桶中允许同时存在的特感占比（相对 l4d_infected_limit）；默认 0=关闭。",
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.SpawnSepRadius = CreateConVar(
@@ -856,6 +881,9 @@ enum struct Config
         this.ScoreBehindRejectGap.AddChangeHook(OnCfgChanged);
         this.ScoreBehindRejectGapHjc.AddChangeHook(OnCfgChanged);
         this.ScoreBehindHjcScale.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindSoftPct.AddChangeHook(OnCfgChanged);
+        this.SpawnBehindEvalBudget.AddChangeHook(OnCfgChanged);
+        this.SpawnNavBandTimeout.AddChangeHook(OnCfgChanged);
         this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
         this.FlowBucketShare.AddChangeHook(OnCfgChanged);
         this.SpawnSepRadius.AddChangeHook(OnCfgChanged);
@@ -964,6 +992,7 @@ enum struct Config
         this.SiLimit.AddChangeHook(OnSiLimitChanged);
         this.DebugMode.AddChangeHook(OnCfgChanged);
         this.SpawnAccelNativeSafety.AddChangeHook(OnCfgChanged);
+        this.NavTeamNearest.AddChangeHook(OnCfgChanged);
 
         // Nav 分桶
         this.NavBucketEnable.AddChangeHook(OnCfgChanged);
@@ -1001,6 +1030,7 @@ enum struct Config
         this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
         this.iDebugMode         = this.DebugMode.IntValue;
         this.bSpawnAccelNativeSafety = this.SpawnAccelNativeSafety.BoolValue;
+        this.bNavTeamNearest = this.NavTeamNearest.BoolValue;
         this.bTraitorEnable     = this.TraitorEnable.BoolValue;
         this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
         int maxTraitorSlots = this.iSiLimit;
@@ -1174,6 +1204,9 @@ enum struct Config
         this.fScoreBehindCap = this.ScoreBehindCap.FloatValue;
         this.iScoreBehindRejectGap = this.ScoreBehindRejectGap.IntValue;
         this.iScoreBehindRejectGapHjc = this.ScoreBehindRejectGapHjc.IntValue;
+        this.iScoreBehindSoftPct = this.ScoreBehindSoftPct.IntValue;
+        this.iSpawnBehindEvalBudget = this.SpawnBehindEvalBudget.IntValue;
+        this.fSpawnNavBandTimeout = this.SpawnNavBandTimeout.FloatValue;
         this.fScoreBehindHjcScale = this.ScoreBehindHjcScale.FloatValue;
         if (this.fScoreBehindHjcScale < 1.0) this.fScoreBehindHjcScale = 1.0;
         if (this.fScoreBehindHjcScale > 5.0) this.fScoreBehindHjcScale = 5.0;

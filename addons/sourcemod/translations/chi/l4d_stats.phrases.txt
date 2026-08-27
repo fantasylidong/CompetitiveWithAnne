@@ -148,10 +148,6 @@
 	{
 		"chi"		"显示其他玩家 PPM"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"chi"		"投票按 PPM 重新分队"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"chi"		"显示所有地图时间记录"
@@ -440,14 +436,6 @@
 	{
 		"chi"		"当前地图时间: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"chi"		"当前无法随机重组队伍。"
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"chi"		"正在随机重组队伍..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"chi"		"已禁用从服务器控制台清除数据库。"
@@ -543,38 +531,6 @@
 	"L4DStats_RankMuteUsage"
 	{
 		"chi"		"用法: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"chi"		"是否启用玩家排名?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"chi"		"Rank 投票已通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"chi"		"Rank 投票未通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"chi"		"插件已禁用，无法发起 Rank 投票。"
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"chi"		"当前游戏模式已禁用 Rank 投票。"
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"chi"		"已有 Rank 投票正在进行。"
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"chi"		"Rank 投票设置失败：缺少所需的 gamedata。"
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"chi"		"Rank 投票已禁用。"
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -708,14 +664,6 @@
 	{
 		"chi"		"季度榜单查询失败，请稍后再试。"
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"chi"		"{olive}%s{default} 加入了 {lightgreen}幸存者{default} 阵营!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"chi"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 阵营!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"chi"		"已清除所有玩家统计!"
@@ -800,69 +748,9 @@
 	{
 		"chi"		"清除玩家游玩记录失败!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}: 插件设置失败。"
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}。"
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"chi"		"观众无法发起 {green}Rank 投票{default}。"
-	}
 	"L4DStats_NotImplemented"
 	{
 		"chi"		"{olive}此功能尚未实现。"
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"chi"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"chi"		"插件已关闭，无法发起 Rank 投票!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"chi"		"{green}Rank 投票{default}已在 {lightgreen}对抗{default} 模式中启用!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"chi"		"{green}Rank 投票{default}已在{lightgreen}对抗{default}、{lightgreen}写实对抗{default}和{lightgreen}清道夫{default}模式中启用!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"chi"		"每张地图只能发起一次 {green}Rank 投票{default}!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"chi"		"{olive}%s{default} 发起了 {green}Rank 投票{default}!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"chi"		"服务器控制台发起了 {green}Rank 投票{default}!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"chi"		"管理员已执行队伍随机重组。"
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"chi"		"队伍随机重组因错误失败。"
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"chi"		"按玩家 PPM 随机重组队伍{lightgreen}完成{default}。"
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"chi"		"队伍已按玩家 PPM 达到平衡。"
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"chi"		"队伍随机重组失败: {lightgreen}玩家不足{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

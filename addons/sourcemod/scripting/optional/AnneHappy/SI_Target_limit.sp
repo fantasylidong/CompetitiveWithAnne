@@ -25,7 +25,7 @@ char sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/SITargetLimit.txt";
 #include <l4d_target_override>
 
 
-#define PLUGIN_VERSION "1.4"
+#define PLUGIN_VERSION "1.6"
 ConVar	
 	g_hPluginEnable,
 	g_hSI_enable_option,
@@ -40,11 +40,16 @@ int
 	g_iSI_enable_option = 0,
 	g_iLimit_auto = 0,
 	g_iLimit_manual = 0,
-	g_iSILimit = 0;
+	g_iSILimit = 0,
+	g_iFlowLeader = -1;
 enum struct PlayerStruct{
 	int targetLimit;
 	void PlayerStruct(){
 		if(g_iLimit_auto){
+			if(g_hSILimit == null){
+				this.targetLimit = 0;
+				return;
+			}
 			int temp = GetMobileSurvivorNum();
 			if(temp < 1) temp = 1;
 			this.targetLimit = (g_iSILimit / temp) + 1;
@@ -57,6 +62,10 @@ enum struct PlayerStruct{
 	}
 	void SetTargetLimit(int number){
 		if(g_iLimit_auto){
+			if(g_hSILimit == null){
+				this.targetLimit = 0;
+				return;
+			}
 			if(g_bDetectRushMan){
 				this.targetLimit = g_iSILimit;
 			}else{
@@ -71,6 +80,8 @@ enum struct PlayerStruct{
 		}
 	}
 	void target_override_set(int num){
+		if(!TargetOverrideSetAvailable())
+			return;
 		for(int i = 0; i < 7; i++){
 			if(CheckSIOption(i)){
 				L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED, num);
@@ -96,6 +107,12 @@ public Plugin myinfo =
 }
 /*
 Changelog
+2026.8.26
+1.6 队首（Flow 最高的可动生还者）目标上限 ×2：GetClientTargetLimit 返回有效上限，
+    并通过 L4D_TargetOverride_SetTargetedCap 同步给目标分配，让刷特容量口径和
+    AI 实际锁定口径一致；可选依赖晚加载/卸载时安全停用并自动重绑
+2026.8.25
+1.5 提供当前玩家目标上限 Native，供刷特插件计算生成容量
 2022.9.20
 1.4 适配infected_control的跑男针对
 1.3 适配l4d_target_override
@@ -111,7 +128,7 @@ public void OnDetectRushman(int DetectRushman){
 		for(int i = 0; i < MAXPLAYERS +1; i++)
 		{
 			player[i].SetTargetLimit(g_iSILimit);
-		}	
+		}
 	}else
 	{
 		g_bDetectRushMan = false;
@@ -130,7 +147,6 @@ public void  OnPluginStart()
 	g_hSI_enable_option = CreateConVar("SI_enable_option", "22", "控制不同特感是否开启此项功能（1smoker，2boomer，4hunter，……，总共7个，把这些值相加的最终结果）.", 0, true, 0.0, true, 127.0);//1,2,4,8,16,32,64 add to enable different SI enable option
 	g_hLimit_auto = CreateConVar("SI_target_limit_auto", "1", "服务器是否自动根据特感数量限定值来限制最大目标数量[Auto = (max / 正常生还者数量)向下取整 +1].", 0, true, 0.0, true, 1.0);//Auto Set target limit
 	g_hLimit_manual = CreateConVar("SI_target_limit_manual", "3", "服务器不自动情况下手动限制最大目标的值.", 0, false, 0.0, false, 0.0);//If Auto disable, use manual value to control target limit
-	g_hSILimit = FindConVar("l4d_infected_limit");
 	BuildPath(Path_SM, g_sLogPath, sizeof(g_sLogPath), "logs/SI_Target_limit.log");
 	
 	// HookEvents
@@ -146,18 +162,25 @@ public void  OnPluginStart()
 	g_hLimit_manual.AddChangeHook(ConVarChanged_Cvars);
 	g_hSI_enable_option.AddChangeHook(ConVarChanged_Cvars);
 	g_hPluginEnable.AddChangeHook(ConVarChanged_Cvars);
-	g_hSILimit.AddChangeHook(ConVarChanged_Cvars);
 	
+	BindSILimitConVar();
 	GetCvars();
 	StructInit();
+	//队首上限×2：每秒刷新一次队首归属并同步目标分配侧的按玩家上限
+	CreateTimer(1.0, Timer_UpdateFlowLeader, _, TIMER_REPEAT);
 	//AutoExecConfig(true, "RestrictedGameModes");
 }
 
 public void OnPluginEnd(){
+	if(g_iFlowLeader > 0){
+		PushTargetedCap(g_iFlowLeader, 0);
+	}
 	clear_target_option();
 }
 
 public void clear_target_option(){
+		if(!TargetOverrideSetAvailable())
+			return;
 		for(int i = 0; i < 7; i++){
 			L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED, 0);
 			//Debug_Print("所有不启用特感target值更改为 %d", L4D_TargetOverride_GetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED));
@@ -172,8 +195,65 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	
 	CreateNative("GetClientTargetNum", Native_GetClientTargetNum);
 	CreateNative("IsClientReachLimit", Native_IsClientReachLimit);
+	CreateNative("GetClientTargetLimit", Native_GetClientTargetLimit);
 	
 	return APLRes_Success;
+}
+
+public void OnAllPluginsLoaded()
+{
+	RebindDependencies();
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+	if(StrEqual(name, "infected_control") || StrEqual(name, "l4d_target_override"))
+		RequestFrame(Frame_RebindDependencies);
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	if(StrEqual(name, "infected_control"))
+	{
+		g_hSILimit = null;
+		g_iSILimit = 0;
+	}
+}
+
+public void Frame_RebindDependencies(any data)
+{
+	RebindDependencies();
+}
+
+void RebindDependencies()
+{
+	BindSILimitConVar();
+	GetCvars();
+	StructInit();
+}
+
+bool BindSILimitConVar()
+{
+	if(g_hSILimit != null)
+		return true;
+
+	ConVar siLimit = FindConVar("l4d_infected_limit");
+	if(siLimit == null)
+		return false;
+
+	g_hSILimit = siLimit;
+	g_hSILimit.AddChangeHook(ConVarChanged_Cvars);
+	return true;
+}
+
+bool TargetOverrideSetAvailable()
+{
+	return GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_SetOption") == FeatureStatus_Available;
+}
+
+bool TargetOverrideGetAvailable()
+{
+	return GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_GetValue") == FeatureStatus_Available;
 }
 
 
@@ -193,6 +273,8 @@ public int Native_GetClientTargetNum(Handle plugin, int numParams)
 	}
 	//Debug_Print("GetClientTargetNum Native called");
 	
+	if(!TargetOverrideGetAvailable())
+		return 0;
 	return L4D_TargetOverride_GetValue(client, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL));
 }
 
@@ -211,6 +293,88 @@ public int Native_IsClientReachLimit(Handle plugin, int numParams)
 	//Debug_Print("IsClientReachLimit Native被调用");
 	//Debug_Print("IsClientReachLimit Native called");
 	return IsReachLimit(client);
+}
+
+public int Native_GetClientTargetLimit(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if (client < 1 || client > MaxClients)
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+	}
+	if (!IsClientConnected(client))
+	{
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	}
+	return GetEffectiveTargetLimit(client);
+}
+
+//有效目标上限：队首（Flow 最高的可动生还者）×2。跑男模式下所有人的
+//上限已经抬到特感总上限，不再叠加。
+int GetEffectiveTargetLimit(int client)
+{
+	int limit = player[client].targetLimit;
+	if (limit > 0 && !g_bDetectRushMan && client == g_iFlowLeader)
+	{
+		limit *= 2;
+	}
+	return limit;
+}
+
+public Action Timer_UpdateFlowLeader(Handle timer)
+{
+	UpdateFlowLeader();
+	return Plugin_Continue;
+}
+
+void UpdateFlowLeader()
+{
+	int leader = -1;
+	float best = -1.0;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientConnected(i) || !IsClientInGame(i) || GetClientTeam(i) != 2
+			|| !IsPlayerAlive(i) || L4D_IsPlayerIncapacitated(i))
+		{
+			continue;
+		}
+		float d = L4D2Direct_GetFlowDistance(i);
+		if (d < 0.0)
+			continue;
+		if (d > best)
+		{
+			best = d;
+			leader = i;
+		}
+	}
+
+	if (leader != g_iFlowLeader)
+	{
+		int old = g_iFlowLeader;
+		g_iFlowLeader = leader;
+		if (old > 0)
+		{
+			PushTargetedCap(old, 0);
+		}
+	}
+	//有效上限会随 limit 重算而变化，统一每秒同步一次
+	if (g_iFlowLeader > 0)
+	{
+		PushTargetedCap(g_iFlowLeader, GetEffectiveTargetLimit(g_iFlowLeader));
+	}
+}
+
+//把按玩家的 targeted 上限推给 l4d_target_override（native 不存在时静默跳过）
+void PushTargetedCap(int client, int cap)
+{
+	if (client < 1 || client > MaxClients || !IsClientConnected(client))
+		return;
+	if (GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_SetTargetedCap")
+		!= FeatureStatus_Available)
+	{
+		return;
+	}
+	L4D_TargetOverride_SetTargetedCap(client, cap);
 }
 
 // 事件 event
@@ -232,7 +396,7 @@ public void evt_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 			int normalSur = (g_iSILimit / temp) + 1;
 			for(int i = 0; i < MAXPLAYERS +1; i++){
 				player[i].SetTargetLimit(normalSur);
-			}	
+			}
 		}
 		if(GetClientTeam(client) == 3 && infected[client]){
 			infected[client] = false;
@@ -335,10 +499,20 @@ public int CheckSIOption(int iZombieClass){
 void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	GetCvars();
+	if(g_iLimit_auto && g_hSILimit == null)
+		return;
+	int temp = GetMobileSurvivorNum();
+	if(temp < 1) temp = 1;
+	int normalSur = (g_iSILimit / temp) + 1;
+	for(int i = 0; i < MAXPLAYERS +1; i++){
+		player[i].SetTargetLimit(normalSur);
+	}
 }
 
 //Init Struct
 public void StructInit(){
+	if(g_iLimit_auto && g_hSILimit == null)
+		return;
 	for(int i = 0; i < MAXPLAYERS + 1; i++)
 	{
 		player[i].PlayerStruct();
@@ -355,8 +529,7 @@ public void OnMapEnd()
 
 public void OnMapStart()
 {
-	//GetCvars();
-	StructInit();
+	RebindDependencies();
 }
 public Action L4D_OnFirstSurvivorLeftSafeArea(int client){
 	//GetCvars();
@@ -545,7 +718,7 @@ void GetCvars()
 	g_iSI_enable_option = GetConVarInt(g_hSI_enable_option);
 	g_iLimit_auto = GetConVarInt(g_hLimit_auto);
 	g_iLimit_manual = GetConVarInt(g_hLimit_manual);
-	g_iSILimit = GetConVarInt(g_hSILimit);
+	g_iSILimit = g_hSILimit == null ? 0 : GetConVarInt(g_hSILimit);
 }
 
 
@@ -562,8 +735,9 @@ stock bool IsValidClient(int client)
 	}
 }
 stock bool IsReachLimit(int client){
-		return L4D_TargetOverride_GetValue(client, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL)) >= player[client].targetLimit;
-	}
+			return player[client].targetLimit > 0 && TargetOverrideGetAvailable()
+				&& L4D_TargetOverride_GetValue(client, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL)) >= player[client].targetLimit;
+		}
 
 stock void Debug_Print(char[] format, any ...)
 {

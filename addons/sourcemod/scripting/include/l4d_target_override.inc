@@ -40,6 +40,8 @@ public void __pl_target_override_SetNTVOptional()
 	MarkNativeAsOptional("L4D_TargetOverride_GetOption");
 	MarkNativeAsOptional("L4D_TargetOverride_SetOption");
 	MarkNativeAsOptional("L4D_TargetOverride_GetValue");
+	MarkNativeAsOptional("L4D_TargetOverride_GetTargetedCap");
+	MarkNativeAsOptional("L4D_TargetOverride_SetTargetedCap");
 }
 #endif
 
@@ -135,3 +137,28 @@ native any L4D_TargetOverride_GetOption(TARGET_SI_INDEX index, TARGET_OPTION_IND
 * @noreturn
 */
 native void L4D_TargetOverride_SetOption(TARGET_SI_INDEX index, TARGET_OPTION_INDEX option, any value);
+
+
+
+/**
+* @brief Returns the per-survivor "targeted" cap override
+*
+* @param	client			The survivor to query
+*
+* @return	Current override cap (0 = the class "targeted" option value is used)
+*/
+native int L4D_TargetOverride_GetTargetedCap(int client);
+
+
+
+/**
+* @brief Sets a per-survivor "targeted" cap override
+* @notes Only applies while the class "targeted" option is non-zero; 0 restores the class option value.
+* @notes Cleared automatically when the client disconnects.
+*
+* @param	client			The survivor to affect
+* @param	cap				Maximum number of Special Infected allowed to target this survivor (0 = use class option)
+*
+* @noreturn
+*/
+native void L4D_TargetOverride_SetTargetedCap(int client, int cap);

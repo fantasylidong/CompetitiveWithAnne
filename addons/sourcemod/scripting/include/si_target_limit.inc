@@ -20,6 +20,12 @@ native int GetClientTargetNum(int client);
  */
 native int IsClientReachLimit(int client);
 
+/**
+ * Current configured SI target capacity for this survivor.
+ * @param client    A player index.
+ */
+native int GetClientTargetLimit(int client);
+
 public SharedPlugin __pl_SI_Target_limit =
 {
 	name = "SI_Target_limit",
@@ -36,5 +42,6 @@ public void __pl_SI_Target_limit_SetNTVOptional()
 {
 	MarkNativeAsOptional("GetClientTargetNum");
 	MarkNativeAsOptional("IsClientReachLimit");
+	MarkNativeAsOptional("GetClientTargetLimit");
 }
 #endif

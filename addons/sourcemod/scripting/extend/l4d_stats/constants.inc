@@ -59,7 +59,6 @@
 #define CM_NEXTRANKFULL 3
 #define CM_PLAYERJOINED 4
 
-#define SOUND_RANKVOTE "items/suitchargeok1.wav"
 #define SOUND_MAPTIME_START_L4D1 "UI/Beep23.wav"
 #define SOUND_MAPTIME_START_L4D2 "level/countdown.wav"
 #define SOUND_MAPTIME_IMPROVE_L4D1 "UI/Pickup_Secret01.wav"
@@ -73,7 +72,3 @@
 #define SOUND_TANK_BULLDOZER_L4D1 "player/tank/voice/yell/hulk_yell_8.wav"
 #define SOUND_TANK_BULLDOZER_L4D2 "player/tank/voice/yell/tank_throw_11.wav"
 #define SOUND_CHARGER_RAM "player/charger/voice/alert/charger_alert_02.wav"
-
-#define RANKVOTE_NOVOTE -1
-#define RANKVOTE_NO 0
-#define RANKVOTE_YES 1

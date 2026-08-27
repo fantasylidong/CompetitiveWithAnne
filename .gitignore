@@ -108,3 +108,12 @@ addons/sourcemod/translations/zho/anne_server_redirect.phrases.txt
 addons/sourcemod/translations/chi/anne_server_redirect.phrases.txt
 addons/sourcemod/translations/anne_server_redirect.phrases.txt
 /docs/infected_control_refactor/test_results
+test_results/20260826_every5_cloud3_fabel_latest/results.jsonl
+test_results/20260826_every5_cloud3_fabel_latest/results.csv
+test_results/20260826_every5_cloud3_fabel_latest/raw_logs.tar.gz
+test_results/20260826_every5_cloud2_owner_skip_tail_soft/results.jsonl
+test_results/20260826_every5_cloud2_owner_skip_tail_soft/results.csv
+test_results/20260826_every5_cloud2_owner_skip_tail_soft/raw_logs.tar.gz
+test_results/20260826_every5_cloud1_team_nearest/results.jsonl
+test_results/20260826_every5_cloud1_team_nearest/results.csv
+test_results/20260826_every5_cloud1_team_nearest/raw_logs.tar.gz

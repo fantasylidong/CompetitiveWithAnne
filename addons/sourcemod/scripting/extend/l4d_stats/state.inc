@@ -10,8 +10,6 @@ new String:TM_MENU_CURRENT[4] = " <<";
 new String:DB_PLAYERS_TOTALPOINTS[1024] = "totalpoints";
 new String:DB_PLAYERS_TOTALPLAYTIME[1024] = "totalplaytime";
 
-new String:RANKVOTE_QUESTION[128] = "L4DStats_RankVoteQuestion";
-
 // Message of the day
 new String:MessageOfTheDay[1024];
 
@@ -20,7 +18,6 @@ new bool:DEBUG = true;
 
 new bool:CommandsRegistered = false;
 // Sounds
-new bool:EnableSounds_Rankvote = true;
 new bool:EnableSounds_Maptime_Start = true;
 new bool:EnableSounds_Maptime_Improve = true;
 new bool:EnableSounds_Rankmenu_Show = true;
@@ -63,7 +60,6 @@ new Handle:cvar_Cheats = INVALID_HANDLE;
 new Handle:cvar_Hostname = INVALID_HANDLE;
 
 new Handle:cvar_SurvivorLimit = INVALID_HANDLE;
-new Handle:cvar_InfectedLimit = INVALID_HANDLE;
 
 // Game event booleans
 new bool:PlayerVomited = false;
@@ -81,7 +77,6 @@ new TankCount = 0;
 new bool:ClientRankMute[MAXPLAYERS + 1];
 
 // Cvar handles
-new Handle:cvar_EnableRankVote = INVALID_HANDLE;
 new Handle:cvar_HumansNeeded = INVALID_HANDLE;
 new Handle:cvar_UpdateRate = INVALID_HANDLE;
 //new Handle:cvar_AnnounceRankMinChange = INVALID_HANDLE;
@@ -332,19 +327,9 @@ bool g_brpgAvailable = false;
 new Handle:cvar_AdminPlayerCleanLastOnTime = INVALID_HANDLE;
 new Handle:cvar_AdminPlayerCleanPlatime = INVALID_HANDLE;
 
-// Players can request a vote for team shuffle based on the player ranks ONCE PER MAP
-new PlayerRankVote[MAXPLAYERS + 1];
-new Handle:RankVoteTimer = INVALID_HANDLE;
-new Handle:PlayerRankVoteTrie = INVALID_HANDLE; // Survivors at the beginning of the map
-new Handle:cvar_RankVoteTime = INVALID_HANDLE;
-
 new Handle:cvar_Top10PPMMin = INVALID_HANDLE;
 
 new bool:SurvivalStarted = false;
-
-new Handle:L4DStatsConf = INVALID_HANDLE;
-new Handle:L4DStatsSHS = INVALID_HANDLE;
-new Handle:L4DStatsTOB = INVALID_HANDLE;
 
 new Float:ClientMapTime[MAXPLAYERS + 1];
 

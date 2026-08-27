@@ -148,10 +148,6 @@
 	{
 		"vi"		"Xem PPM người chơi khác"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"vi"		"Bỏ phiếu chia lại đội theo PPM"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"vi"		"Xem mọi kỷ lục bản đồ"
@@ -440,14 +436,6 @@
 	{
 		"vi"		"Thời gian bản đồ hiện tại: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"vi"		"Hiện không thể xáo trộn đội."
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"vi"		"Đang xáo trộn đội..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"vi"		"Tính năng xóa cơ sở dữ liệu từ bảng điều khiển máy chủ đã bị tắt."
@@ -543,38 +531,6 @@
 	"L4DStats_RankMuteUsage"
 	{
 		"vi"		"Cách dùng: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"vi"		"Bật xếp hạng người chơi?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"vi"		"Bỏ phiếu xếp hạng đã thông qua ({green}%i{default} có, {green}%i{default} không)."
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"vi"		"Bỏ phiếu xếp hạng không thông qua ({green}%i{default} có, {green}%i{default} không)."
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"vi"		"Không thể bắt đầu bỏ phiếu xếp hạng khi plugin đang tắt."
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"vi"		"Bỏ phiếu xếp hạng bị tắt trong chế độ này."
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"vi"		"Cuộc bỏ phiếu xếp hạng đang diễn ra."
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"vi"		"Thiết lập bỏ phiếu xếp hạng thất bại: thiếu gamedata cần thiết."
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"vi"		"Bỏ phiếu xếp hạng đang tắt."
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -708,14 +664,6 @@
 	{
 		"vi"		"Truy vấn bảng xếp hạng quý thất bại. Vui lòng thử lại sau."
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Người sống sót{default}!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Nhiễm bệnh{default}!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"vi"		"Đã xóa toàn bộ thống kê người chơi!"
@@ -800,69 +748,9 @@
 	{
 		"vi"		"Xóa thống kê chơi thất bại!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã {lightgreen}tắt{default}: thiết lập plugin thất bại."
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đang {lightgreen}tắt{default}."
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"vi"		"Khán giả không thể bắt đầu {green}bỏ phiếu xếp hạng{default}."
-	}
 	"L4DStats_NotImplemented"
 	{
 		"vi"		"{olive}Chưa được triển khai."
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"vi"		"{olive}%s{default} đã bỏ phiếu. {green}%i/%i{default} người đã bỏ phiếu."
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"vi"		"Không thể bắt đầu bỏ phiếu khi plugin đang tắt!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong chế độ {lightgreen}Versus{default}!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong {lightgreen}Versus{default}, {lightgreen}Realism Versus{default} và {lightgreen}Scavenge{default}!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"vi"		"Bạn chỉ có thể bắt đầu {green}bỏ phiếu xếp hạng{default} một lần mỗi bản đồ!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"vi"		"{olive}%s{default} đã bắt đầu {green}bỏ phiếu xếp hạng{default}!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã được bắt đầu từ bảng điều khiển máy chủ!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"vi"		"Quản trị viên đã xáo trộn đội."
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"vi"		"Xáo trộn đội thất bại do lỗi."
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"vi"		"Xáo trộn đội theo PPM người chơi đã {lightgreen}hoàn tất{default}."
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"vi"		"Các đội đã cân bằng theo PPM người chơi."
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"vi"		"Xáo trộn đội thất bại: {lightgreen}không đủ người chơi{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

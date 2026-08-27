@@ -3,7 +3,7 @@
 #endif
 #define _l4d_stats_timers_included
 
-// 状态结束、友伤统计、洗牌投票和周期更新定时器。
+// 状态结束、友伤统计和周期更新定时器。
 
 // End blinded state.
 
@@ -204,71 +204,6 @@ public Action:timer_FriendlyFireDamageEnd(Handle:timer, any:dp)
 			StatsPrintToChat(Attacker, "L4DStats_FriendlyFirePenaltySelf", HumanDamage + BotDamage, Score);
 		else if (Mode == 3)
 			StatsPrintToChatAll("L4DStats_FriendlyFirePenaltyAll", AttackerName, HumanDamage + BotDamage, Score);
-	}
-}
-
-// Start team shuffle.
-
-public Action:timer_ShuffleTeams(Handle:timer, any:data)
-{
-	if (CheckHumans())
-		return;
-
-	decl String:query[1024];
-	Format(query, sizeof(query), "SELECT steamid FROM %splayers WHERE ", DbPrefix);
-
-	new maxplayers = MaxClients;
-	decl String:SteamID[MAX_LINE_WIDTH], String:where[512];
-	new counter = 0, team;
-
-	for (new i = 1; i <= maxplayers; i++)
-	{
-		if (IsClientBot(i) || !IsClientConnected(i) || !IsClientInGame(i))
-			continue;
-
-		team = GetClientTeam(i);
-
-		if (team != TEAM_SURVIVORS && team != TEAM_INFECTED)
-			continue;
-
-		if (counter++ > 0)
-			StrCat(query, sizeof(query), "OR ");
-
-		GetClientRankAuthString(i, SteamID, sizeof(SteamID));
-		Format(where, sizeof(where), "steamid = '%s' ", SteamID);
-		StrCat(query, sizeof(query), where);
-	}
-
-	if (counter <= 1)
-	{
-		StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleNotEnoughPlayers");
-		return;
-	}
-
-	Format(where, sizeof(where), "ORDER BY (%s) / (%s) DESC", DB_PLAYERS_TOTALPOINTS, DB_PLAYERS_TOTALPLAYTIME);
-	StrCat(query, sizeof(query), where);
-
-	SQL_TQuery(db, ExecuteTeamShuffle, query);
-}
-
-// End of RANKVOTE.
-
-public Action:timer_RankVote(Handle:timer, any:data)
-{
-	RankVoteTimer = INVALID_HANDLE;
-
-	if (!CheckHumans())
-	{
-		new humans = 0, votes = 0, yesvotes = 0, novotes = 0, WinningVoteCount = 0;
-
-		CheckRankVotes(humans, votes, yesvotes, novotes, WinningVoteCount);
-
-		StatsPrintToChatAll2(true, yesvotes > novotes ? "L4DStats_RankVotePassed" : "L4DStats_RankVoteFailed", yesvotes, novotes);
-
-		if (yesvotes > novotes)
-		{
-			CreateTimer(3.0, timer_ShuffleTeams);
-		}
 	}
 }
 

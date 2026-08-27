@@ -333,15 +333,6 @@
 		"ko"		"다른 플레이어 PPM"
 		"vi"		"Xem PPM người chơi khác"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"en"		"Vote to shuffle teams by PPM"
-		"chi"		"投票按 PPM 重新分队"
-		"zho"		"投票按 PPM 重新分隊"
-		"jp"		"PPMでチーム分けを投票"
-		"ko"		"PPM 기준 팀 재편성 투표"
-		"vi"		"Bỏ phiếu chia lại đội theo PPM"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"en"		"Show all map records"
@@ -990,24 +981,6 @@
 		"ko"		"현재 맵 시간: %s"
 		"vi"		"Thời gian bản đồ hiện tại: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"en"		"Team shuffle is currently unavailable."
-		"chi"		"当前无法随机重组队伍。"
-		"zho"		"目前無法隨機重組隊伍。"
-		"jp"		"現在チームシャッフルは使用できません。"
-		"ko"		"현재 팀 섞기를 사용할 수 없습니다."
-		"vi"		"Hiện không thể xáo trộn đội."
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"en"		"Shuffling teams..."
-		"chi"		"正在随机重组队伍..."
-		"zho"		"正在隨機重組隊伍..."
-		"jp"		"チームをシャッフルしています..."
-		"ko"		"팀을 섞는 중..."
-		"vi"		"Đang xáo trộn đội..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"en"		"Database clearing from the server console is disabled."
@@ -1223,78 +1196,6 @@
 		"jp"		"使い方: sm_rankmute [0/1]"
 		"ko"		"사용법: sm_rankmute [0/1]"
 		"vi"		"Cách dùng: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"en"		"Enable player ranking?"
-		"chi"		"是否启用玩家排名?"
-		"zho"		"是否啟用玩家排名?"
-		"jp"		"プレイヤーランキングを有効にしますか?"
-		"ko"		"플레이어 랭킹을 활성화할까요?"
-		"vi"		"Bật xếp hạng người chơi?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"en"		"Rank vote passed ({green}%i{default} yes, {green}%i{default} no)."
-		"chi"		"Rank 投票已通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
-		"zho"		"Rank 投票已通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
-		"jp"		"ランク投票が可決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
-		"ko"		"랭킹 투표가 가결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
-		"vi"		"Bỏ phiếu xếp hạng đã thông qua ({green}%i{default} có, {green}%i{default} không)."
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"en"		"Rank vote failed ({green}%i{default} yes, {green}%i{default} no)."
-		"chi"		"Rank 投票未通过（{green}%i{default} 赞成，{green}%i{default} 反对）。"
-		"zho"		"Rank 投票未通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
-		"jp"		"ランク投票は否決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
-		"ko"		"랭킹 투표가 부결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
-		"vi"		"Bỏ phiếu xếp hạng không thông qua ({green}%i{default} có, {green}%i{default} không)."
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"en"		"Cannot start a rank vote while the plugin is disabled."
-		"chi"		"插件已禁用，无法发起 Rank 投票。"
-		"zho"		"插件已停用，無法發起 Rank 投票。"
-		"jp"		"プラグインが無効のためランク投票を開始できません。"
-		"ko"		"플러그인이 비활성화된 동안 랭킹 투표를 시작할 수 없습니다."
-		"vi"		"Không thể bắt đầu bỏ phiếu xếp hạng khi plugin đang tắt."
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"en"		"Rank voting is disabled in this game mode."
-		"chi"		"当前游戏模式已禁用 Rank 投票。"
-		"zho"		"目前遊戲模式已停用 Rank 投票。"
-		"jp"		"このゲームモードではランク投票が無効です。"
-		"ko"		"이 게임 모드에서는 랭킹 투표가 비활성화됩니다."
-		"vi"		"Bỏ phiếu xếp hạng bị tắt trong chế độ này."
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"en"		"A rank vote is already in progress."
-		"chi"		"已有 Rank 投票正在进行。"
-		"zho"		"已有 Rank 投票正在進行。"
-		"jp"		"ランク投票はすでに進行中です。"
-		"ko"		"랭킹 투표가 이미 진행 중입니다."
-		"vi"		"Cuộc bỏ phiếu xếp hạng đang diễn ra."
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"en"		"Rank vote setup failed: required gamedata is missing."
-		"chi"		"Rank 投票设置失败：缺少所需的 gamedata。"
-		"zho"		"Rank 投票設定失敗：缺少所需的 gamedata。"
-		"jp"		"ランク投票の設定に失敗: 必要なgamedataがありません。"
-		"ko"		"랭킹 투표 설정 실패: 필요한 gamedata가 없습니다."
-		"vi"		"Thiết lập bỏ phiếu xếp hạng thất bại: thiếu gamedata cần thiết."
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"en"		"Rank voting is disabled."
-		"chi"		"Rank 投票已禁用。"
-		"zho"		"Rank 投票已停用。"
-		"jp"		"ランク投票は無効です。"
-		"ko"		"랭킹 투표가 비활성화되었습니다."
-		"vi"		"Bỏ phiếu xếp hạng đang tắt."
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -1611,24 +1512,6 @@
 		"ko"		"분기 랭킹 조회에 실패했습니다. 나중에 다시 시도하세요."
 		"vi"		"Truy vấn bảng xếp hạng quý thất bại. Vui lòng thử lại sau."
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"en"		"{olive}%s{default} joined the {lightgreen}Survivors{default}!"
-		"chi"		"{olive}%s{default} 加入了 {lightgreen}幸存者{default} 阵营!"
-		"zho"		"{olive}%s{default} 加入了 {lightgreen}生還者{default} 陣營!"
-		"jp"		"{olive}%s{default} が {lightgreen}生存者{default} チームに参加!"
-		"ko"		"{olive}%s{default}님이 {lightgreen}생존자{default} 팀에 합류했습니다!"
-		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Người sống sót{default}!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"en"		"{olive}%s{default} joined the {lightgreen}Infected{default}!"
-		"chi"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 阵营!"
-		"zho"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 陣營!"
-		"jp"		"{olive}%s{default} が {lightgreen}感染者{default} チームに参加!"
-		"ko"		"{olive}%s{default}님이 {lightgreen}감염자{default} 팀에 합류했습니다!"
-		"vi"		"{olive}%s{default} đã vào phe {lightgreen}Nhiễm bệnh{default}!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"en"		"All player statistics cleared!"
@@ -1818,33 +1701,6 @@
 		"ko"		"플레이어 플레이 통계 삭제 실패!"
 		"vi"		"Xóa thống kê chơi thất bại!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"en"		"{green}Rank voting{default} is {lightgreen}disabled{default}: plugin setup failed."
-		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}: 插件设置失败。"
-		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}: 插件設定失敗。"
-		"jp"		"プラグイン設定に失敗したため、{green}ランク投票{default}は{lightgreen}無効{default}です。"
-		"ko"		"플러그인 설정 실패로 {green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã {lightgreen}tắt{default}: thiết lập plugin thất bại."
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"en"		"{green}Rank voting{default} is {lightgreen}disabled{default}."
-		"chi"		"{green}Rank 投票{default}已{lightgreen}关闭{default}。"
-		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}。"
-		"jp"		"{green}ランク投票{default}は{lightgreen}無効{default}です。"
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đang {lightgreen}tắt{default}."
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"en"		"Spectators cannot start a {green}rank vote{default}."
-		"chi"		"观众无法发起 {green}Rank 投票{default}。"
-		"zho"		"觀眾無法發起 {green}Rank 投票{default}。"
-		"jp"		"観戦者は {green}ランク投票{default} を開始できません。"
-		"ko"		"관전자는 {green}랭킹 투표{default}를 시작할 수 없습니다."
-		"vi"		"Khán giả không thể bắt đầu {green}bỏ phiếu xếp hạng{default}."
-	}
 	"L4DStats_NotImplemented"
 	{
 		"en"		"{olive}Not implemented yet."
@@ -1853,114 +1709,6 @@
 		"jp"		"{olive}まだ実装されていません。"
 		"ko"		"{olive}아직 구현되지 않았습니다."
 		"vi"		"{olive}Chưa được triển khai."
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"en"		"{olive}%s{default} voted. {green}%i/%i{default} players have voted."
-		"chi"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
-		"zho"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
-		"jp"		"{olive}%s{default} が投票しました。{green}%i/%i{default}人が投票済みです。"
-		"ko"		"{olive}%s{default}님이 투표했습니다. {green}%i/%i{default}명이 투표했습니다."
-		"vi"		"{olive}%s{default} đã bỏ phiếu. {green}%i/%i{default} người đã bỏ phiếu."
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"en"		"Cannot start a rank vote while the plugin is disabled!"
-		"chi"		"插件已关闭，无法发起 Rank 投票!"
-		"zho"		"插件已關閉，無法發起 Rank 投票!"
-		"jp"		"プラグインが無効のためランク投票を開始できません!"
-		"ko"		"플러그인이 비활성화되어 랭킹 투표를 시작할 수 없습니다!"
-		"vi"		"Không thể bắt đầu bỏ phiếu khi plugin đang tắt!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"en"		"{green}Rank voting{default} is enabled in {lightgreen}Versus{default} mode!"
-		"chi"		"{green}Rank 投票{default}已在 {lightgreen}对抗{default} 模式中启用!"
-		"zho"		"{green}Rank 投票{default}已在 {lightgreen}對抗{default} 模式中啟用!"
-		"jp"		"{green}ランク投票{default}は {lightgreen}対戦{default} モードで有効です!"
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default} 모드에서 활성화됩니다!"
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong chế độ {lightgreen}Versus{default}!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"en"		"{green}Rank voting{default} is enabled in {lightgreen}Versus{default}, {lightgreen}Realism Versus{default}, and {lightgreen}Scavenge{default}!"
-		"chi"		"{green}Rank 投票{default}已在{lightgreen}对抗{default}、{lightgreen}写实对抗{default}和{lightgreen}清道夫{default}模式中启用!"
-		"zho"		"{green}Rank 投票{default}已在{lightgreen}對抗{default}、{lightgreen}寫實對抗{default}和{lightgreen}清道夫{default}模式中啟用!"
-		"jp"		"{green}ランク投票{default}は{lightgreen}対戦{default}、{lightgreen}リアリズム対戦{default}、{lightgreen}スカベンジ{default}で有効です!"
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default}, {lightgreen}리얼리즘 대전{default}, {lightgreen}스캐빈지{default} 모드에서 활성화됩니다!"
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} được bật trong {lightgreen}Versus{default}, {lightgreen}Realism Versus{default} và {lightgreen}Scavenge{default}!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"en"		"You can start a {green}rank vote{default} only once per map!"
-		"chi"		"每张地图只能发起一次 {green}Rank 投票{default}!"
-		"zho"		"每張地圖只能發起一次 {green}Rank 投票{default}!"
-		"jp"		"{green}ランク投票{default}は各マップ1回だけ開始できます!"
-		"ko"		"{green}랭킹 투표{default}는 맵당 한 번만 시작할 수 있습니다!"
-		"vi"		"Bạn chỉ có thể bắt đầu {green}bỏ phiếu xếp hạng{default} một lần mỗi bản đồ!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"en"		"{green}Rank voting{default} was started by {olive}%s{default}!"
-		"chi"		"{olive}%s{default} 发起了 {green}Rank 投票{default}!"
-		"zho"		"{olive}%s{default} 發起了 {green}Rank 投票{default}!"
-		"jp"		"{olive}%s{default} が {green}ランク投票{default} を開始しました!"
-		"ko"		"{olive}%s{default}님이 {green}랭킹 투표{default}를 시작했습니다!"
-		"vi"		"{olive}%s{default} đã bắt đầu {green}bỏ phiếu xếp hạng{default}!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"en"		"{green}Rank voting{default} was started from the server console!"
-		"chi"		"服务器控制台发起了 {green}Rank 投票{default}!"
-		"zho"		"伺服器控制台發起了 {green}Rank 投票{default}!"
-		"jp"		"サーバーコンソールから {green}ランク投票{default} が開始されました!"
-		"ko"		"서버 콘솔에서 {green}랭킹 투표{default}를 시작했습니다!"
-		"vi"		"{green}Bỏ phiếu xếp hạng{default} đã được bắt đầu từ bảng điều khiển máy chủ!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"en"		"Team shuffle was started by an administrator."
-		"chi"		"管理员已执行队伍随机重组。"
-		"zho"		"管理員已執行隊伍隨機重組。"
-		"jp"		"管理者がチームシャッフルを実行しました。"
-		"ko"		"관리자가 팀 섞기를 실행했습니다."
-		"vi"		"Quản trị viên đã xáo trộn đội."
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"en"		"Team shuffle failed due to an error."
-		"chi"		"队伍随机重组因错误失败。"
-		"zho"		"隊伍隨機重組因錯誤失敗。"
-		"jp"		"エラーによりチームシャッフルに失敗しました。"
-		"ko"		"오류로 팀 섞기에 실패했습니다."
-		"vi"		"Xáo trộn đội thất bại do lỗi."
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"en"		"Team shuffle by player PPM {lightgreen}complete{default}."
-		"chi"		"按玩家 PPM 随机重组队伍{lightgreen}完成{default}。"
-		"zho"		"按玩家 PPM 隨機重組隊伍{lightgreen}完成{default}。"
-		"jp"		"プレイヤーPPMによるチームシャッフルが{lightgreen}完了{default}しました。"
-		"ko"		"플레이어 PPM 기준 팀 섞기가 {lightgreen}완료{default}되었습니다."
-		"vi"		"Xáo trộn đội theo PPM người chơi đã {lightgreen}hoàn tất{default}."
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"en"		"Teams are already balanced by player PPM."
-		"chi"		"队伍已按玩家 PPM 达到平衡。"
-		"zho"		"隊伍已按玩家 PPM 達到平衡。"
-		"jp"		"チームはすでにプレイヤーPPMで均等です。"
-		"ko"		"팀이 이미 플레이어 PPM 기준으로 균형 잡혀 있습니다."
-		"vi"		"Các đội đã cân bằng theo PPM người chơi."
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"en"		"Team shuffle failed: {lightgreen}not enough players{default}!"
-		"chi"		"队伍随机重组失败: {lightgreen}玩家不足{default}!"
-		"zho"		"隊伍隨機重組失敗: {lightgreen}玩家不足{default}!"
-		"jp"		"チームシャッフルに失敗: {lightgreen}プレイヤーが足りません{default}!"
-		"ko"		"팀 섞기 실패: {lightgreen}플레이어 부족{default}!"
-		"vi"		"Xáo trộn đội thất bại: {lightgreen}không đủ người chơi{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

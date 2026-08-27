@@ -350,7 +350,6 @@ public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client){
 ResetVars()
 {
 	ClearTrie(FriendlyFireDamageTrie);
-	ClearTrie(PlayerRankVoteTrie);
 
 	PlayerVomited = false;
 	PlayerVomitedIncap = false;

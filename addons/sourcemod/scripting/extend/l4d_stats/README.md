@@ -12,12 +12,12 @@
 - `lifecycle.inc`：地图启动、玩家连接/断开、ConVar 变化回调。
 - `rounds.inc`：回合开始/结束、游戏模式显示名。
 - `persistence.inc`：数据库连接、玩家/地图插入、基础查询、持久化更新。
-- `timers.inc`：周期更新、状态结束、友伤统计、洗牌投票定时器。
+- `timers.inc`：周期更新、状态结束、友伤统计定时器。
 - `events_players.inc`：个人事件，比如击杀、治疗、倒地、友伤、物品使用。
 - `events_team.inc`：团队事件，比如过关、团灭、控人、Witch、成就、L4D2 特有事件。
 - `commands_menus.inc`：聊天命令、控制台命令、排行榜和地图时间菜单。
 - `stats_rules.inc`：计分规则、模式判断、结算、状态重置、感染者/幸存者辅助。
-- `output_rank_timing.inc`：聊天输出、地图计时、队伍洗牌工具、MOTD 和 Anne 模式辅助。
+- `output_rank_timing.inc`：聊天输出、地图计时、MOTD 和 Anne 模式辅助。
 - `stats_players.inc`：统一人类玩家/队伍判断。
 - `stats_score.inc`：统一按模式选择积分列并给玩家发分。
 - `new_player_bonus.inc`：带新人完成关卡奖励。

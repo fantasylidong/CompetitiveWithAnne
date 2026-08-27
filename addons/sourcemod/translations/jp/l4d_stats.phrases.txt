@@ -148,10 +148,6 @@
 	{
 		"jp"		"他のプレイヤーのPPM"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"jp"		"PPMでチーム分けを投票"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"jp"		"すべてのマップ記録"
@@ -440,14 +436,6 @@
 	{
 		"jp"		"現在のマップタイム: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"jp"		"現在チームシャッフルは使用できません。"
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"jp"		"チームをシャッフルしています..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"jp"		"サーバーコンソールからのデータベース消去は無効です。"
@@ -543,38 +531,6 @@
 	"L4DStats_RankMuteUsage"
 	{
 		"jp"		"使い方: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"jp"		"プレイヤーランキングを有効にしますか?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"jp"		"ランク投票が可決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"jp"		"ランク投票は否決されました（賛成 {green}%i{default}、反対 {green}%i{default}）。"
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"jp"		"プラグインが無効のためランク投票を開始できません。"
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"jp"		"このゲームモードではランク投票が無効です。"
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"jp"		"ランク投票はすでに進行中です。"
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"jp"		"ランク投票の設定に失敗: 必要なgamedataがありません。"
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"jp"		"ランク投票は無効です。"
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -708,14 +664,6 @@
 	{
 		"jp"		"四半期ランキングの取得に失敗しました。後で再試行してください。"
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"jp"		"{olive}%s{default} が {lightgreen}生存者{default} チームに参加!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"jp"		"{olive}%s{default} が {lightgreen}感染者{default} チームに参加!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"jp"		"すべてのプレイヤー統計を消去しました!"
@@ -800,69 +748,9 @@
 	{
 		"jp"		"プレイヤーのプレイ統計消去に失敗!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"jp"		"プラグイン設定に失敗したため、{green}ランク投票{default}は{lightgreen}無効{default}です。"
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"jp"		"{green}ランク投票{default}は{lightgreen}無効{default}です。"
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"jp"		"観戦者は {green}ランク投票{default} を開始できません。"
-	}
 	"L4DStats_NotImplemented"
 	{
 		"jp"		"{olive}まだ実装されていません。"
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"jp"		"{olive}%s{default} が投票しました。{green}%i/%i{default}人が投票済みです。"
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"jp"		"プラグインが無効のためランク投票を開始できません!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"jp"		"{green}ランク投票{default}は {lightgreen}対戦{default} モードで有効です!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"jp"		"{green}ランク投票{default}は{lightgreen}対戦{default}、{lightgreen}リアリズム対戦{default}、{lightgreen}スカベンジ{default}で有効です!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"jp"		"{green}ランク投票{default}は各マップ1回だけ開始できます!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"jp"		"{olive}%s{default} が {green}ランク投票{default} を開始しました!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"jp"		"サーバーコンソールから {green}ランク投票{default} が開始されました!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"jp"		"管理者がチームシャッフルを実行しました。"
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"jp"		"エラーによりチームシャッフルに失敗しました。"
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"jp"		"プレイヤーPPMによるチームシャッフルが{lightgreen}完了{default}しました。"
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"jp"		"チームはすでにプレイヤーPPMで均等です。"
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"jp"		"チームシャッフルに失敗: {lightgreen}プレイヤーが足りません{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

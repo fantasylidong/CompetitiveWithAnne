@@ -8,6 +8,10 @@
 	{
 		"chi"		"[{olive}Readyup{default}] 准备面板已 {blue}开启{default}"
 	}
+	"PanelCommands"
+	{
+		"chi"		"▸ 指令:"
+	}
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"

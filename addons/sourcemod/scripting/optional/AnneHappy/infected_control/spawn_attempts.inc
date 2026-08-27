@@ -243,6 +243,11 @@ static Action Timer_LogSpawnedSIState(Handle timer, any userid)
 
 static int g_iNormalSearchBand[SI_COUNT];
 static int g_iTeleportSearchBand[SI_COUNT];
+// 有向 Nav 分层搜索周期的起始时间（0=未开始）。超过
+// inf_spawn_nav_band_timeout 直接跳到 Director 兜底档，防止尾段软化后
+// 海量后方候选把兜底拖到永远轮不上（如 c2m4_barns@90/95）。
+static float g_fNormalBandWalkStart[SI_COUNT];
+static float g_fTeleportBandWalkStart[SI_COUNT];
 static float g_fNormalRetryAfter[SI_COUNT];
 static float g_fTeleportRetryAfter[SI_COUNT];
 static int g_iNormalRetryTargetNav[SI_COUNT];
@@ -347,6 +352,9 @@ static void SpawnAttempts_CommitSpawn(
     TeleportState_StampSpawn(client, "spawn_commit");
     g_LastSpawnOkTime = now;
     InvalidateBucketShareCache();
+    // 刷出会改变 owner 容量与参与集合，让容量缓存与参与集合缓存立即失效
+    SpawnTarget_InvalidateCapacityCache();
+    SpawnAccel_InvalidateTeamTargetsCache();
     gST.siAlive[zc - 1]++;
     gST.totalSI++;
 
@@ -522,7 +530,7 @@ static bool SpawnAttempts_TryAlternateDirectedTarget(int zc,
             ? g_bDirectedTargetTried[client]
             : g_bNormalDirectedTargetTried[idx][client];
         if (targetTried || !IsEligibleSpawnTarget(client)
-            || (g_bTargetLimitLib && IsClientReachLimit(client)))
+            || SpawnTarget_IsAtCapacity(client))
         {
             continue;
         }
@@ -604,6 +612,7 @@ static void SpawnAttempts_ResetNormalProgress(int zc)
         return;
 
     g_iNormalSearchBand[idx] = 0;
+    g_fNormalBandWalkStart[idx] = 0.0;
     g_fNormalRetryAfter[idx] = 0.0;
     g_iNormalRetryTargetNav[idx] = -1;
     SpawnSearch_ResetClass(zc, false);
@@ -616,9 +625,66 @@ static void SpawnAttempts_ResetTeleportProgress(int zc)
         return;
 
     g_iTeleportSearchBand[idx] = 0;
+    g_fTeleportBandWalkStart[idx] = 0.0;
     g_fTeleportRetryAfter[idx] = 0.0;
     g_iTeleportRetryTargetNav[idx] = -1;
     SpawnSearch_ResetClass(zc, true);
+}
+
+// 兜底时钟：本搜索周期从第一次尝试起计时；超时且仍停留在 Nav 分层档时，
+// 直接推进到 Director 兜底档。周期在成功刷出/完整重试调度时重置。
+static void SpawnAttempts_ApplyBandWalkTimeout(int zc, bool teleportMode, int &band)
+{
+    if (gCV.fSpawnNavBandTimeout <= 0.0)
+        return;
+    int idx = zc - 1;
+    if (idx < 0 || idx >= SI_COUNT || band >= TACTICAL_BAND_STAGES)
+        return;
+
+    float now = GetGameTime();
+    float start = teleportMode
+        ? g_fTeleportBandWalkStart[idx] : g_fNormalBandWalkStart[idx];
+    if (start <= 0.0 || start > now)
+    {
+        if (teleportMode)
+            g_fTeleportBandWalkStart[idx] = now;
+        else
+            g_fNormalBandWalkStart[idx] = now;
+        return;
+    }
+
+    if (now - start > gCV.fSpawnNavBandTimeout)
+    {
+        Debug_Print("[SPAWN TIMEOUT] class=%s mode=%s band-walk %.2fs > %.2fs at band=%d; jump to Director fallback stage",
+                    g_sInfectedClassNames[zc], teleportMode ? "teleport" : "normal",
+                    now - start, gCV.fSpawnNavBandTimeout, band);
+        band = TACTICAL_BAND_STAGES;
+        SpawnSearch_ResetClass(zc, teleportMode);
+    }
+}
+
+static bool SpawnAttempts_AdvanceToUsableBand(int zc, bool teleportMode, int &band)
+{
+    while (band < TACTICAL_BAND_STAGES)
+    {
+        float minRange;
+        float maxRange;
+        Tactical_GetDistanceBand(zc, band, teleportMode, minRange, maxRange);
+        if (maxRange > minRange + 0.01)
+            return true;
+        band++;
+    }
+    return false;
+}
+
+static int SpawnAttempts_ResolveCommitTarget(int searchTarget, const SpawnScoreDbg score)
+{
+    if (score.ownerClient > 0 && IsEligibleSpawnTarget(score.ownerClient)
+        && !SpawnTarget_IsAtCapacity(score.ownerClient))
+    {
+        return score.ownerClient;
+    }
+    return searchTarget;
 }
 
 static int SpawnAttempts_GetSearchTarget(int zc, bool teleportMode)
@@ -689,6 +755,7 @@ static void SpawnAttempts_ScheduleFullRetry(int zc, bool teleportMode)
     if (teleportMode)
     {
         g_iTeleportSearchBand[idx] = 0;
+        g_fTeleportBandWalkStart[idx] = 0.0;
         g_fTeleportRetryAfter[idx] = retryAfter;
         g_iTeleportRetryTargetNav[idx] = targetNavId;
         SpawnSearch_ResetClass(zc, true);
@@ -696,6 +763,7 @@ static void SpawnAttempts_ScheduleFullRetry(int zc, bool teleportMode)
     else
     {
         g_iNormalSearchBand[idx] = 0;
+        g_fNormalBandWalkStart[idx] = 0.0;
         g_fNormalRetryAfter[idx] = retryAfter;
         g_iNormalRetryTargetNav[idx] = targetNavId;
         SpawnSearch_ResetClass(zc, false);
@@ -769,6 +837,8 @@ void TryNormalSpawnOnce()
 
     float minRange;
     float maxRange;
+    SpawnAttempts_AdvanceToUsableBand(want, false, g_iNormalSearchBand[searchIdx]);
+    SpawnAttempts_ApplyBandWalkTimeout(want, false, g_iNormalSearchBand[searchIdx]);
     if (g_iNormalSearchBand[searchIdx] < TACTICAL_BAND_STAGES)
     {
         int band = g_iNormalSearchBand[searchIdx];
@@ -806,7 +876,8 @@ void TryNormalSpawnOnce()
         {
             WaveSpawnReport_RecordScored(
                 want, 0, WaveSpawn_NormalNav, spawnCallMs,
-                pos, minRange, maxRange, bestDbg, searchTarget);
+                pos, minRange, maxRange, bestDbg,
+                SpawnAttempts_ResolveCommitTarget(searchTarget, bestDbg));
             // 实际生成失败时短冷却该 NavArea，下一档不会立即重复命中同一区域。
             if (areaIdx >= 0)
             {
@@ -820,7 +891,8 @@ void TryNormalSpawnOnce()
         SpawnAttempts_CommitSpawn(
             spawnedClient, want, false, false,
             WaveSpawn_NormalNav, spawnCallMs, pos,
-            searchTarget, minRange, maxRange, areaIdx, bestDbg);
+            SpawnAttempts_ResolveCommitTarget(searchTarget, bestDbg),
+            minRange, maxRange, areaIdx, bestDbg);
         return;
     }
 
@@ -828,8 +900,9 @@ void TryNormalSpawnOnce()
         + NAV_CANDIDATE_LANDING_MARGIN;
     maxRange = DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE;
     bool targetPending;
-    if (SpawnAttempts_TryAlternateDirectedTarget(want, false, false, targetPending)
-        || targetPending)
+    if (!SpawnAccel_CanUseTeamCandidates()
+        && (SpawnAttempts_TryAlternateDirectedTarget(want, false, false, targetPending)
+            || targetPending))
     {
         SpawnAttempts_RotatePendingNormalClass(want);
         return;
@@ -894,9 +967,10 @@ void TryNormalSpawnOnce()
     if (usedExtendedSamples)
     {
         bool retryTargetPending;
-        if (SpawnAttempts_TryAlternateDirectedTarget(
-                want, false, true, retryTargetPending)
-            || retryTargetPending)
+        if (!SpawnAccel_CanUseTeamCandidates()
+            && (SpawnAttempts_TryAlternateDirectedTarget(
+                    want, false, true, retryTargetPending)
+                || retryTargetPending))
         {
             SpawnAttempts_RotatePendingNormalClass(want);
             return;
@@ -948,6 +1022,8 @@ void TryTeleportSpawnOnce()
 
     float minRange;
     float maxRange;
+    SpawnAttempts_AdvanceToUsableBand(want, true, g_iTeleportSearchBand[searchIdx]);
+    SpawnAttempts_ApplyBandWalkTimeout(want, true, g_iTeleportSearchBand[searchIdx]);
     if (g_iTeleportSearchBand[searchIdx] < TACTICAL_BAND_STAGES)
     {
         int band = g_iTeleportSearchBand[searchIdx];
@@ -984,7 +1060,8 @@ void TryTeleportSpawnOnce()
         {
             WaveSpawnReport_RecordScored(
                 want, 0, WaveSpawn_TeleportNav, spawnCallMs,
-                pos, minRange, maxRange, bestDbg, teleportTarget);
+                pos, minRange, maxRange, bestDbg,
+                SpawnAttempts_ResolveCommitTarget(teleportTarget, bestDbg));
             if (areaIdx >= 0)
             {
                 float now = GetGameTime();
@@ -997,7 +1074,8 @@ void TryTeleportSpawnOnce()
         SpawnAttempts_CommitSpawn(
             spawnedClient, want, true, false,
             WaveSpawn_TeleportNav, spawnCallMs, pos,
-            teleportTarget, minRange, maxRange, areaIdx, bestDbg);
+            SpawnAttempts_ResolveCommitTarget(teleportTarget, bestDbg),
+            minRange, maxRange, areaIdx, bestDbg);
         return;
     }
 
@@ -1007,8 +1085,9 @@ void TryTeleportSpawnOnce()
         + NAV_CANDIDATE_LANDING_MARGIN;
     maxRange = DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE;
     bool targetPending;
-    if (SpawnAttempts_TryAlternateDirectedTarget(want, true, false, targetPending)
-        || targetPending)
+    if (!SpawnAccel_CanUseTeamCandidates()
+        && (SpawnAttempts_TryAlternateDirectedTarget(want, true, false, targetPending)
+            || targetPending))
     {
         SpawnAttempts_RotatePendingTeleportClass(want);
         return;

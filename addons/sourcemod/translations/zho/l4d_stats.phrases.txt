@@ -148,10 +148,6 @@
 	{
 		"zho"		"顯示其他玩家 PPM"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"zho"		"投票按 PPM 重新分隊"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"zho"		"顯示所有地圖時間記錄"
@@ -440,14 +436,6 @@
 	{
 		"zho"		"目前地圖時間: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"zho"		"目前無法隨機重組隊伍。"
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"zho"		"正在隨機重組隊伍..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"zho"		"已停用從伺服器控制台清除資料庫。"
@@ -543,38 +531,6 @@
 	"L4DStats_RankMuteUsage"
 	{
 		"zho"		"用法: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"zho"		"是否啟用玩家排名?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"zho"		"Rank 投票已通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"zho"		"Rank 投票未通過（{green}%i{default} 贊成，{green}%i{default} 反對）。"
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"zho"		"插件已停用，無法發起 Rank 投票。"
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"zho"		"目前遊戲模式已停用 Rank 投票。"
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"zho"		"已有 Rank 投票正在進行。"
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"zho"		"Rank 投票設定失敗：缺少所需的 gamedata。"
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"zho"		"Rank 投票已停用。"
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -708,14 +664,6 @@
 	{
 		"zho"		"季度榜單查詢失敗，請稍後再試。"
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"zho"		"{olive}%s{default} 加入了 {lightgreen}生還者{default} 陣營!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"zho"		"{olive}%s{default} 加入了 {lightgreen}感染者{default} 陣營!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"zho"		"已清除所有玩家統計!"
@@ -800,69 +748,9 @@
 	{
 		"zho"		"清除玩家遊玩紀錄失敗!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}: 插件設定失敗。"
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"zho"		"{green}Rank 投票{default}已{lightgreen}關閉{default}。"
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"zho"		"觀眾無法發起 {green}Rank 投票{default}。"
-	}
 	"L4DStats_NotImplemented"
 	{
 		"zho"		"{olive}此功能尚未實作。"
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"zho"		"{olive}%s{default} 已投票。已有 {green}%i/%i{default} 名玩家投票。"
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"zho"		"插件已關閉，無法發起 Rank 投票!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"zho"		"{green}Rank 投票{default}已在 {lightgreen}對抗{default} 模式中啟用!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"zho"		"{green}Rank 投票{default}已在{lightgreen}對抗{default}、{lightgreen}寫實對抗{default}和{lightgreen}清道夫{default}模式中啟用!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"zho"		"每張地圖只能發起一次 {green}Rank 投票{default}!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"zho"		"{olive}%s{default} 發起了 {green}Rank 投票{default}!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"zho"		"伺服器控制台發起了 {green}Rank 投票{default}!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"zho"		"管理員已執行隊伍隨機重組。"
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"zho"		"隊伍隨機重組因錯誤失敗。"
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"zho"		"按玩家 PPM 隨機重組隊伍{lightgreen}完成{default}。"
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"zho"		"隊伍已按玩家 PPM 達到平衡。"
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"zho"		"隊伍隨機重組失敗: {lightgreen}玩家不足{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

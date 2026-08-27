@@ -463,7 +463,7 @@ stock void AntiBait_GetHoldMetrics(int &activeCount, int &vulnerableCount,
 static bool AntiBait_IsPreferredTargetEligible(int client)
 {
     return IsEligibleSpawnTarget(client)
-        && (!g_bTargetLimitLib || !IsClientReachLimit(client));
+        && !SpawnTarget_IsAtCapacity(client);
 }
 
 static int AntiBait_SelectHoldingTarget()

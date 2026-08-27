@@ -101,6 +101,126 @@ void TestCandidateOrderUsesDirectedPath()
     assert(candidatePathDistances[0] < candidatePathDistances[2]);
 }
 
+void TestMultiSourceDistanceAndOwnerEqualsMinSingleSource()
+{
+    AnneNavGraphMetadata metadata;
+    metadata.mapName = "multi_source_distance_owner_test";
+    metadata.navIds = {1, 2, 3, 4, 5};
+    metadata.centers = {
+        0.0f, 0.0f, 0.0f,
+        200.0f, 0.0f, 0.0f,
+        400.0f, 0.0f, 0.0f,
+        200.0f, 200.0f, 0.0f,
+        800.0f, 0.0f, 0.0f,
+    };
+    metadata.flowDistances = {0.0f, 200.0f, 400.0f, 200.0f, 800.0f};
+    metadata.maxFlowDistance = 800.0f;
+    std::vector<AnneNavGraphInputEdge> edges = {
+        {0, 1, AnneNavEdgeType::Floor},
+        {1, 0, AnneNavEdgeType::Floor},
+        {1, 2, AnneNavEdgeType::Floor},
+        {2, 1, AnneNavEdgeType::Floor},
+        {0, 3, AnneNavEdgeType::Floor},
+        {3, 0, AnneNavEdgeType::Floor},
+        {2, 3, AnneNavEdgeType::Floor},
+        {3, 2, AnneNavEdgeType::Floor},
+        {2, 4, AnneNavEdgeType::Floor},
+        {4, 2, AnneNavEdgeType::Floor},
+    };
+    std::string error;
+    std::shared_ptr<AnneNavGraph> graph =
+        AnneBuildNavGraph(metadata, std::move(edges), true, error);
+    assert(graph && error.empty());
+
+    std::vector<std::uint8_t> blocked(5, 0);
+    std::vector<float> fromA;
+    std::vector<float> fromB;
+    std::vector<std::uint8_t> special;
+    assert(graph->BuildReverseReachability(0, 2000.0f, blocked, fromA, special));
+    assert(graph->BuildReverseReachability(2, 2000.0f, blocked, fromB, special));
+
+    std::vector<AnneNavSearchTarget> targets = {{0, 2}, {2, 5}};
+    std::vector<float> teamDistances;
+    std::vector<int> owners;
+    assert(graph->BuildReverseReachability(targets, 2000.0f, blocked,
+                                           teamDistances, special, owners));
+    assert(teamDistances.size() == 5);
+    for (std::uint32_t index = 0; index < 5; ++index)
+    {
+        float expected = std::min(fromA[index], fromB[index]);
+        if (!std::isfinite(expected))
+        {
+            assert(!std::isfinite(teamDistances[index]));
+            assert(owners[index] == 0);
+            continue;
+        }
+        assert(std::fabs(teamDistances[index] - expected) <= 0.01f);
+        bool aBest = std::fabs(fromA[index] - expected) <= 0.01f;
+        bool bBest = std::fabs(fromB[index] - expected) <= 0.01f;
+        if (aBest && bBest)
+            assert(owners[index] == 2);
+        else if (aBest)
+            assert(owners[index] == 2);
+        else
+            assert(owners[index] == 5);
+    }
+    assert(owners[1] == 2);
+    assert(owners[3] == 2);
+    assert(owners[4] == 5);
+
+    std::vector<AnneNavSearchTarget> onlyA = {{0, 2}};
+    std::vector<float> afterRemoval;
+    std::vector<int> ownersAfterRemoval;
+    assert(graph->BuildReverseReachability(onlyA, 2000.0f, blocked, afterRemoval,
+                                           special, ownersAfterRemoval));
+    for (std::uint32_t index = 0; index < 5; ++index)
+    {
+        if (!std::isfinite(fromA[index]))
+        {
+            assert(!std::isfinite(afterRemoval[index]));
+            continue;
+        }
+        assert(std::fabs(afterRemoval[index] - fromA[index]) <= 0.01f);
+        assert(ownersAfterRemoval[index] == 2);
+    }
+
+    std::vector<float> survivorEyes = {
+        0.0f, 0.0f, 64.0f,
+        400.0f, 0.0f, 64.0f,
+        800.0f, 0.0f, 64.0f,
+    };
+    std::vector<std::uint32_t> candidates;
+    std::vector<float> candidateDistances;
+    std::vector<int> candidateOwners;
+    std::vector<float> allDistances;
+    assert(AnneBuildTeamNavCandidateSnapshot(
+        *graph, targets, 2000.0f, blocked, survivorEyes, 250.0f,
+        candidates, candidateDistances, candidateOwners, allDistances, special));
+    assert(!candidates.empty());
+    assert(candidates.size() == candidateDistances.size());
+    assert(candidates.size() == candidateOwners.size());
+    assert(std::is_sorted(candidateDistances.begin(), candidateDistances.end()));
+    bool sawExcludedFullSurvivorNav = false;
+    for (std::size_t row = 0; row < candidates.size(); ++row)
+    {
+        assert(candidateOwners[row] == 2 || candidateOwners[row] == 5);
+        assert(std::fabs(candidateDistances[row] - allDistances[candidates[row]]) <= 0.01f);
+        if (candidates[row] == 4)
+            sawExcludedFullSurvivorNav = true;
+    }
+    assert(!sawExcludedFullSurvivorNav);
+
+    AnneNavSearchTarget tieLeft{0, 7};
+    AnneNavSearchTarget tieRight{2, 3};
+    std::vector<AnneNavSearchTarget> reversed = {tieLeft, tieRight};
+    std::vector<float> tieDistances;
+    std::vector<int> tieOwners;
+    assert(graph->BuildReverseReachability(reversed, 2000.0f, blocked,
+                                           tieDistances, special, tieOwners));
+    assert(std::fabs(fromA[1] - fromB[1]) <= 0.01f);
+    assert(tieOwners[1] == 3);
+}
+
 void TestCandidateOrderUsesHighGroundRank()
 {
     AnneNavGraphMetadata metadata;
@@ -387,6 +507,7 @@ int main()
     TestPackedBlockedBits();
     TestDirectedReachability();
     TestCandidateOrderUsesDirectedPath();
+    TestMultiSourceDistanceAndOwnerEqualsMinSingleSource();
     TestCandidateOrderUsesHighGroundRank();
     TestTopologyIssueCompletenessAndCache();
     TestGenericTopologyVariantCachesCoexist();

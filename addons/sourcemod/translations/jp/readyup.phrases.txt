@@ -11,6 +11,11 @@
 		"jp"		"[{olive}Readyup{default}] パネルを{blue}オン{default}にします。"
 	}
 
+	"PanelCommands"
+	{
+		"jp"		"▸ コマンド:"
+	}
+
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"

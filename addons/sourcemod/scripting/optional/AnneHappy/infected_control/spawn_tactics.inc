@@ -121,7 +121,7 @@ int Tactical_ResolveWaveTarget()
 {
     if (Tactical_IsBreachWave()
         && IsEligibleSpawnTarget(gST.breachTarget)
-        && (!g_bTargetLimitLib || !IsClientReachLimit(gST.breachTarget)))
+        && !SpawnTarget_IsAtCapacity(gST.breachTarget))
         return gST.breachTarget;
 
     gST.breachTarget = -1;
@@ -132,13 +132,13 @@ int Tactical_ResolveRuntimeTarget()
 {
     int preferred = AntiBait_GetPreferredTarget();
     if (preferred > 0 && IsEligibleSpawnTarget(preferred)
-        && (!g_bTargetLimitLib || !IsClientReachLimit(preferred)))
+        && !SpawnTarget_IsAtCapacity(preferred))
     {
         return preferred;
     }
 
     if (gST.bPickRushMan && IsEligibleSpawnTarget(gST.rushManIndex)
-        && (!g_bTargetLimitLib || !IsClientReachLimit(gST.rushManIndex)))
+        && !SpawnTarget_IsAtCapacity(gST.rushManIndex))
     {
         return gST.rushManIndex;
     }
@@ -146,7 +146,7 @@ int Tactical_ResolveRuntimeTarget()
     // 普通波内保持目标稳定。每秒随机换人会让某职业在 A 目标推进的距离带
     // 继续套到 B 目标，并反复丢弃有向候选游标。
     if (IsEligibleSpawnTarget(gST.targetSurvivor)
-        && (!g_bTargetLimitLib || !IsClientReachLimit(gST.targetSurvivor)))
+        && !SpawnTarget_IsAtCapacity(gST.targetSurvivor))
     {
         return gST.targetSurvivor;
     }
@@ -430,9 +430,55 @@ static bool Tactical_GetClassBandProfile(int zc, float &minRange,
     return true;
 }
 
+stock float Tactical_GetClassPathCap(int zc)
+{
+    float classMin;
+    float baseMax;
+    float finalMax;
+    if (!Tactical_GetClassBandProfile(zc, classMin, baseMax, finalMax))
+        return gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
+    return FloatMin(finalMax, gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE);
+}
+
+static const float TEAM_NAV_LAYER_EDGES[TEAM_NAV_LAYER_COUNT + 1] = {
+    250.0, 350.0, 500.0, 700.0, 900.0, 1150.0,
+    1400.0, 1700.0, 2000.0, 2400.0, 3000.0
+};
+
+stock bool Tactical_IsTeamNearestSearch()
+{
+    return SpawnAccel_CanUseTeamCandidates();
+}
+
+static void Tactical_GetTeamLayerBand(int zc, int stage,
+                                      float &minRange, float &maxRange)
+{
+    stage = ClampInt(stage, 0, TEAM_NAV_LAYER_COUNT - 1);
+    float layerLo = TEAM_NAV_LAYER_EDGES[stage];
+    float layerHi = TEAM_NAV_LAYER_EDGES[stage + 1];
+    float classMin;
+    float baseMax;
+    float finalMax;
+    if (!Tactical_GetClassBandProfile(zc, classMin, baseMax, finalMax))
+    {
+        classMin = NAV_CANDIDATE_TEAM_EXCLUSION;
+        finalMax = gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE;
+    }
+    classMin = FloatMax(classMin, NAV_CANDIDATE_TEAM_EXCLUSION);
+    finalMax = FloatMin(finalMax, gCV.fSpawnMax * NAV_PATH_DISTANCE_SCALE);
+    minRange = FloatMax(layerLo, classMin);
+    maxRange = FloatMin(layerHi, finalMax);
+}
+
 void Tactical_GetDistanceBand(int zc, int stage, bool teleportMode,
                               float &minRange, float &maxRange)
 {
+    if (Tactical_IsTeamNearestSearch())
+    {
+        Tactical_GetTeamLayerBand(zc, stage, minRange, maxRange);
+        return;
+    }
+
     stage = ClampInt(stage, 0, TACTICAL_BAND_STAGES - 1);
 
     float baseMax, finalMax;
@@ -471,7 +517,7 @@ float Tactical_GetDistanceBandScanMin(int zc, int stage, bool teleportMode)
     float minRange;
     float maxRange;
     Tactical_GetDistanceBand(zc, stage, teleportMode, minRange, maxRange);
-    if (stage == 0)
+    if (Tactical_IsTeamNearestSearch() || stage == 0)
         return minRange;
 
     float previousMinRange;

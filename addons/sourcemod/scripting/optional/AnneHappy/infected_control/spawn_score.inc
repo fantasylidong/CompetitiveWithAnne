@@ -244,9 +244,27 @@ stock int SpawnScore_GetBehindRejectGap(int zc)
 stock bool SpawnScore_ShouldRejectBehindFlow(int candBucket, int centerBucket, int zc = -1)
 {
     int gap = SpawnScore_GetBehindRejectGap(zc);
+    if (candBucket < 0 || centerBucket < 0 || gap < 0
+        || centerBucket >= gCV.iScoreBehindSoftPct)
+    {
+        return false;
+    }
+
+    return candBucket - centerBucket < -gap;
+}
+
+// 尾段软化是否对该 owner 生效（生效时后方候选只扣分、不硬拒绝）。
+stock bool SpawnScore_IsBehindSoftened(int centerBucket)
+{
+    return centerBucket >= 0 && centerBucket >= gCV.iScoreBehindSoftPct;
+}
+
+// 该候选是否属于"若无尾段软化本应被硬拒绝"的后方候选。
+stock bool SpawnScore_IsBehindBeyondGap(int candBucket, int centerBucket, int zc)
+{
+    int gap = SpawnScore_GetBehindRejectGap(zc);
     if (candBucket < 0 || centerBucket < 0 || gap < 0)
         return false;
-
     return candBucket - centerBucket < -gap;
 }
 
@@ -488,6 +506,7 @@ void SpawnScore_CopyDbg(SpawnScoreDbg dest, const SpawnScoreDbg src)
     dest.highHeightSteps = src.highHeightSteps;
     dest.sector = src.sector;
     dest.areaIdx = src.areaIdx;
+    dest.ownerClient = src.ownerClient;
     dest.rawBadFlow = src.rawBadFlow;
     dest.flowBucketKnown = src.flowBucketKnown;
     SpawnScore_CopyPos(dest.pos, src.pos);

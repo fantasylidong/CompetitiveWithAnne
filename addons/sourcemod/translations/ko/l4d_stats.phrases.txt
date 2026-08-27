@@ -148,10 +148,6 @@
 	{
 		"ko"		"다른 플레이어 PPM"
 	}
-	"L4DStats_MenuRankVote"
-	{
-		"ko"		"PPM 기준 팀 재편성 투표"
-	}
 	"L4DStats_MenuAllMapTimes"
 	{
 		"ko"		"모든 맵 기록 보기"
@@ -440,14 +436,6 @@
 	{
 		"ko"		"현재 맵 시간: %s"
 	}
-	"L4DStats_TeamShuffleUnavailable"
-	{
-		"ko"		"현재 팀 섞기를 사용할 수 없습니다."
-	}
-	"L4DStats_TeamShuffleExecuting"
-	{
-		"ko"		"팀을 섞는 중..."
-	}
 	"L4DStats_ClearDatabaseServerDisabled"
 	{
 		"ko"		"서버 콘솔에서의 데이터베이스 삭제가 비활성화되었습니다."
@@ -543,38 +531,6 @@
 	"L4DStats_RankMuteUsage"
 	{
 		"ko"		"사용법: sm_rankmute [0/1]"
-	}
-	"L4DStats_RankVoteQuestion"
-	{
-		"ko"		"플레이어 랭킹을 활성화할까요?"
-	}
-	"L4DStats_RankVotePassed"
-	{
-		"ko"		"랭킹 투표가 가결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
-	}
-	"L4DStats_RankVoteFailed"
-	{
-		"ko"		"랭킹 투표가 부결되었습니다(찬성 {green}%i{default}, 반대 {green}%i{default})."
-	}
-	"L4DStats_RankVotePluginDisabledConsole"
-	{
-		"ko"		"플러그인이 비활성화된 동안 랭킹 투표를 시작할 수 없습니다."
-	}
-	"L4DStats_RankVoteGamemodeDisabledConsole"
-	{
-		"ko"		"이 게임 모드에서는 랭킹 투표가 비활성화됩니다."
-	}
-	"L4DStats_RankVoteAlreadyStartedConsole"
-	{
-		"ko"		"랭킹 투표가 이미 진행 중입니다."
-	}
-	"L4DStats_RankVoteGamedataMissingConsole"
-	{
-		"ko"		"랭킹 투표 설정 실패: 필요한 gamedata가 없습니다."
-	}
-	"L4DStats_RankVoteDisabledConsole"
-	{
-		"ko"		"랭킹 투표가 비활성화되었습니다."
 	}
 	"L4DStats_MotdCreateFailed"
 	{
@@ -708,14 +664,6 @@
 	{
 		"ko"		"분기 랭킹 조회에 실패했습니다. 나중에 다시 시도하세요."
 	}
-	"L4DStats_PlayerJoinedSurvivors"
-	{
-		"ko"		"{olive}%s{default}님이 {lightgreen}생존자{default} 팀에 합류했습니다!"
-	}
-	"L4DStats_PlayerJoinedInfected"
-	{
-		"ko"		"{olive}%s{default}님이 {lightgreen}감염자{default} 팀에 합류했습니다!"
-	}
 	"L4DStats_AllPlayerStatsCleared"
 	{
 		"ko"		"모든 플레이어 통계를 삭제했습니다!"
@@ -800,69 +748,9 @@
 	{
 		"ko"		"플레이어 플레이 통계 삭제 실패!"
 	}
-	"L4DStats_RankVoteSettingsFailed"
-	{
-		"ko"		"플러그인 설정 실패로 {green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
-	}
-	"L4DStats_RankVoteDisabledChat"
-	{
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}비활성화{default}되었습니다."
-	}
-	"L4DStats_RankVoteSpectatorDenied"
-	{
-		"ko"		"관전자는 {green}랭킹 투표{default}를 시작할 수 없습니다."
-	}
 	"L4DStats_NotImplemented"
 	{
 		"ko"		"{olive}아직 구현되지 않았습니다."
-	}
-	"L4DStats_RankVoteProgress"
-	{
-		"ko"		"{olive}%s{default}님이 투표했습니다. {green}%i/%i{default}명이 투표했습니다."
-	}
-	"L4DStats_RankVotePluginDisabledChat"
-	{
-		"ko"		"플러그인이 비활성화되어 랭킹 투표를 시작할 수 없습니다!"
-	}
-	"L4DStats_RankVoteVersusOnly"
-	{
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default} 모드에서 활성화됩니다!"
-	}
-	"L4DStats_RankVoteCompetitiveModes"
-	{
-		"ko"		"{green}랭킹 투표{default}가 {lightgreen}대전{default}, {lightgreen}리얼리즘 대전{default}, {lightgreen}스캐빈지{default} 모드에서 활성화됩니다!"
-	}
-	"L4DStats_RankVoteOncePerMap"
-	{
-		"ko"		"{green}랭킹 투표{default}는 맵당 한 번만 시작할 수 있습니다!"
-	}
-	"L4DStats_RankVoteInitiated"
-	{
-		"ko"		"{olive}%s{default}님이 {green}랭킹 투표{default}를 시작했습니다!"
-	}
-	"L4DStats_RankVoteInitiatedConsole"
-	{
-		"ko"		"서버 콘솔에서 {green}랭킹 투표{default}를 시작했습니다!"
-	}
-	"L4DStats_TeamShuffleAdminExecuted"
-	{
-		"ko"		"관리자가 팀 섞기를 실행했습니다."
-	}
-	"L4DStats_TeamShuffleFailed"
-	{
-		"ko"		"오류로 팀 섞기에 실패했습니다."
-	}
-	"L4DStats_TeamShuffleDone"
-	{
-		"ko"		"플레이어 PPM 기준 팀 섞기가 {lightgreen}완료{default}되었습니다."
-	}
-	"L4DStats_TeamsAlreadyEven"
-	{
-		"ko"		"팀이 이미 플레이어 PPM 기준으로 균형 잡혀 있습니다."
-	}
-	"L4DStats_TeamShuffleNotEnoughPlayers"
-	{
-		"ko"		"팀 섞기 실패: {lightgreen}플레이어 부족{default}!"
 	}
 	"L4DStats_RankDisabledNotEnoughPlayers"
 	{

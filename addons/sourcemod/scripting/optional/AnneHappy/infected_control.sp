@@ -93,6 +93,8 @@ native int L4D2HordeEqualiser_GetFiniteEventLimit();
 // 再切成 3 段无区分度的伪三分位。
 #define NAV_TERTILE_MIN_RING_WIDTH     240.0
 #define TACTICAL_BAND_STAGES      10
+#define TEAM_NAV_TARGET_MAX       16
+#define TEAM_NAV_LAYER_COUNT      10
 #define SUPPORT_RELEASE_GRACE     0.55
 #define SUPPORT_RELEASE_FORCE     0.90
 #define DIRECTOR_BASE_API_TRIES      7
@@ -320,6 +322,9 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_NavCandidatesCollect");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepareRanked");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectRanked");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepareTeam");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectTeam");
+    MarkNativeAsOptional("GetClientTargetLimit");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesGetPerf");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesResetPerf");
     MarkNativeAsOptional("AnneSpawn_NavGraphGetAreaCount");

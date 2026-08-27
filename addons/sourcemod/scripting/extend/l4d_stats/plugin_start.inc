@@ -59,14 +59,12 @@ public OnPluginStart()
 	HookConVarChange(cvar_Lan, action_LanChanged);
 
 	cvar_SurvivorLimit = FindConVar("survivor_limit");
-	cvar_InfectedLimit = FindConVar("z_max_player_zombies");
 
 	// Administrative Cvars
 	cvar_AdminPlayerCleanLastOnTime = CreateConVar("l4d_stats_adm_cleanoldplayers", "0", "How many months old players (last online time) will be cleaned. 0 = Disabled", 0, true, 0.0);
 	cvar_AdminPlayerCleanPlatime = CreateConVar("l4d_stats_adm_cleanplaytime", "10", "How many minutes of playtime to not get cleaned from stats. 0 = Disabled", 0, true, 0.0);
 
 	// Config/control Cvars
-	cvar_EnableRankVote = CreateConVar("l4d_stats_enablerankvote", "1", "Enable voting of team shuffle by player PPM (Points Per Minute)", 0, true, 0.0, true, 1.0);
 	cvar_HumansNeeded = CreateConVar("l4d_stats_minhumans", "1", "Minimum Human players before stats will be enabled", 0, true, 1.0, true, 4.0);
 	cvar_UpdateRate = CreateConVar("l4d_stats_updaterate", "90", "Number of seconds between Common Infected point earn announcement/update", 0, true, 30.0);
 	//cvar_AnnounceRankMinChange = CreateConVar("l4d_stats_announcerankminpoint", "500", "Minimum change to points before rank change announcement", 0, true, 0.0);
@@ -209,7 +207,6 @@ public OnPluginStart()
 
 	// Other Cvars
 	cvar_Top10PPMMin = CreateConVar("l4d_stats_top10ppmplaytime", "30", "Minimum playtime (minutes) to show in top10 ppm list", 0, true, 1.0);
-	cvar_RankVoteTime = CreateConVar("l4d_stats_rankvotetime", "20", "Time to wait people to vote", 0, true, 10.0);
 
 	cvar_SoundsEnabled = CreateConVar("l4d_stats_soundsenabled", "1", "Play sounds on certain events", 0, true, 0.0, true, 1.0);
 	NewPlayerBonus_CreateCvars();
@@ -341,49 +338,13 @@ public OnPluginStart()
 	MapTimingSurvivors = CreateTrie();
 	MapTimingInfected = CreateTrie();
 	FriendlyFireDamageTrie = CreateTrie();
-	PlayerRankVoteTrie = CreateTrie();
 	ConnectAnnounceTrie = CreateTrie();
 
 	new Handle:topmenu;
 	if (LibraryExists("adminmenu") && ((topmenu = GetAdminTopMenu()) != INVALID_HANDLE))
 		OnAdminMenuReady(topmenu);
 
-	if (FileExists("addons/sourcemod/gamedata/l4d_stats.txt"))
-	{
-		// SDK handles for team shuffle
-		L4DStatsConf = LoadGameConfigFile("l4d_stats");
-		if (L4DStatsConf == INVALID_HANDLE)
-		{
-			LogError("Could not load gamedata/l4d_stats.txt");
-		}
-		else
-		{
-			StartPrepSDKCall(SDKCall_Player);
-			PrepSDKCall_SetFromConf(L4DStatsConf, SDKConf_Signature, "SetHumanSpec");
-			PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-			L4DStatsSHS = EndPrepSDKCall();
-
-			StartPrepSDKCall(SDKCall_Player);
-			PrepSDKCall_SetFromConf(L4DStatsConf, SDKConf_Signature, "TakeOverBot");
-			PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-			L4DStatsTOB = EndPrepSDKCall();
-		}
-	}
-	else
-	{
-		LogMessage("Rank Vote is disabled because could not load gamedata/l4d_stats.txt");
-	}
-
 	// Sounds
-	if (EnableSounds_Rankvote)
-	{
-		EnableSounds_Rankvote = PrecacheSound(SOUND_RANKVOTE); // Sound from rankvote team switch
-	}
-	else
-	{
-		EnableSounds_Rankvote = true;
-	}
-
 	if (EnableSounds_Maptime_Start)
 	{
 		EnableSounds_Maptime_Start = PrecacheSound(StatsSound_MapTime_Start); // Sound map timer start
@@ -453,7 +414,6 @@ public OnPluginStart()
 	{
 		EnableSounds_Charger_Ram = false;
 	}
-	delete L4DStatsConf;
 }
 
 
@@ -496,7 +456,6 @@ public OnConfigsExecuted()
 	RegConsoleCmd("sm_showtimer", cmd_ShowTimedMapsTimer);
 	RegConsoleCmd("sm_showrank", cmd_ShowRanks);
 	RegConsoleCmd("sm_showppm", cmd_ShowPPMs);
-	RegConsoleCmd("sm_rankvote", cmd_RankVote);
 	RegConsoleCmd("sm_timedmaps", cmd_TimedMaps);
 	RegConsoleCmd("sm_maptimes", cmd_MapTimes);
 	RegConsoleCmd("sm_showmaptimes", cmd_ShowMapTimes);
@@ -510,7 +469,6 @@ public OnConfigsExecuted()
 	// Register administrator command for clearing all stats (BE CAREFUL)
 	//RegAdminCmd("sm_rank_admin", cmd_RankAdmin, ADMFLAG_ROOT, "Display admin panel for Rank");
 	//RegAdminCmd("sm_rank_clear", cmd_ClearRank, ADMFLAG_ROOT, "Clear all stats from database (asks a confirmation before clearing the database)");
-	//RegAdminCmd("sm_rank_shuffle", cmd_ShuffleTeams, ADMFLAG_KICK, "Shuffle teams by player PPM (Points Per Minute)");
 	RegAdminCmd("sm_rank_motd", cmd_SetMotd, ADMFLAG_GENERIC, "Set Message Of The Day");
 	
 	// Read the settings etc from the database.

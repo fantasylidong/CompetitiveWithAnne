@@ -8,6 +8,10 @@
 	{
 		"vi"		"[{olive}Readyup{default}] Bảng chuẩn bị đã được mở {blue}{default}"
 	}
+	"PanelCommands"
+	{
+		"vi"		"▸ Lệnh:"
+	}
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"

@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"2.24"
+#define PLUGIN_VERSION 		"2.25"
 #define DEBUG_BENCHMARK		0			// 0=Off. 1=Benchmark only (for command). 2=Benchmark (displays on server). 3=PrintToServer various data.
 
 /*======================================================================================
@@ -32,6 +32,11 @@
 
 ========================================================================================
 	Change Log:
+
+2.25 (26-Aug-2026)
+	- Added natives "L4D_TargetOverride_SetTargetedCap" and "L4D_TargetOverride_GetTargetedCap" for a per-survivor
+	  "targeted" cap override (0 = use the class "targeted" option). Requested by "morzlee" so the flow leader can
+	  carry a doubled cap while everyone else keeps the base value.
 
 2.24 (24-Nov-2022)
 	- Fixed plugin not accounting for idle or disconnected players being replaced by bots. Thanks to "HarryPotter" for help.
@@ -267,6 +272,7 @@ float g_fOptionLast[MAX_SPECIAL];
 float g_fOptionWait[MAX_SPECIAL];
 
 #define MAX_PLAY		MAXPLAYERS+1
+int g_iTargetedCapClient[MAX_PLAY];		// Per-survivor "targeted" cap override; 0 = use the class option value
 float g_fLastSwitch[MAX_PLAY];
 float g_fLastAttack[MAX_PLAY];
 int g_iLastAttacker[MAX_PLAY];
@@ -334,6 +340,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("L4D_TargetOverride_GetValue", Native_GetValue);
 	CreateNative("L4D_TargetOverride_GetOption", Native_GetOption);
 	CreateNative("L4D_TargetOverride_SetOption", Native_SetOption);
+	CreateNative("L4D_TargetOverride_GetTargetedCap", Native_GetTargetedCap);
+	CreateNative("L4D_TargetOverride_SetTargetedCap", Native_SetTargetedCap);
 
 	g_hForward = CreateGlobalForward("L4D_OnTargetOverride", ET_Hook, Param_Cell, Param_CellByRef, Param_Cell);
 
@@ -770,6 +778,8 @@ void OnGamemode(const char[] output, int caller, int activator, float delay)
 // ====================================================================================================
 public void OnClientDisconnect(int client)
 {
+	g_iTargetedCapClient[client] = 0;
+
 	// Remove disconnected client from being targeted
 	for( int i = 1; i <= MaxClients; i++ )
 	{
@@ -1300,6 +1310,11 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 					// Already targeted test
 					if( g_iOptionTarg[class] )
 					{
+						// Per-survivor cap override (e.g. flow leader carrying a doubled cap)
+						int targetedCap = g_iOptionTarg[class];
+						if( victim <= MaxClients && g_iTargetedCapClient[victim] > 0 )
+							targetedCap = g_iTargetedCapClient[victim];
+
 						total = 0;
 
 						for( int x = 1; x <= MaxClients; x++ )
@@ -1309,7 +1324,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 								if( IsClientInGame(x) )
 								{
 									total++;
-									if( total >= g_iOptionTarg[class] )
+									if( total >= targetedCap )
 									{
 										#if DEBUG_BENCHMARK == 3
 										if( IsClientInGame(x) )
@@ -2189,6 +2204,28 @@ int Native_SetOption(Handle plugin, int numParams)
 		case INDEX_TARGETED:	g_iOptionTarg[index] = value;
 	}
 
+	return 0;
+}
+
+int Native_GetTargetedCap(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	if( client < 1 || client > MaxClients )
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+
+	return g_iTargetedCapClient[client];
+}
+
+int Native_SetTargetedCap(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+	int cap = GetNativeCell(2);
+	if( client < 1 || client > MaxClients )
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid client index (%d)", client);
+	if( cap < 0 )
+		cap = 0;
+
+	g_iTargetedCapClient[client] = cap;
 	return 0;
 }
 

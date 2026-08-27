@@ -58,6 +58,7 @@ enum struct SpawnScoreDbg
     int highHeightSteps;
     int sector;
     int areaIdx;
+    int ownerClient;
     bool rawBadFlow;
     bool flowBucketKnown;
 

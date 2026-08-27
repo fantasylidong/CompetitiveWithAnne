@@ -102,6 +102,9 @@ TEST_CVARS = {
     "inf_score_behind_reject_gap": "8",
     "inf_score_behind_reject_gap_hjc": "4",
     "inf_score_behind_hjc_scale": "2.5",
+    "inf_score_behind_soft_pct": "90",
+    "inf_spawn_behind_eval_budget": "32",
+    "inf_spawn_nav_band_timeout": "3.0",
     "versus_special_respawn_interval": "16.0",
     "l4d_infected_limit": "12",
     "z_smoker_limit": "2",
@@ -142,6 +145,9 @@ PRODUCTION_RESTORE_CVARS = {
     "inf_score_behind_reject_gap": "8",
     "inf_score_behind_reject_gap_hjc": "4",
     "inf_score_behind_hjc_scale": "2.5",
+    "inf_score_behind_soft_pct": "90",
+    "inf_spawn_behind_eval_budget": "32",
+    "inf_spawn_nav_band_timeout": "3.0",
 }
 
 PLUGIN_PATHS = (
@@ -689,6 +695,16 @@ class MatrixRunner:
                 for class_name, counts in sorted(director_api_by_class.items())
             },
         }
+        filter_lines = [
+            line for line in lines
+            if "[SpawnPerf][12SI] filters " in line
+        ]
+        filter_stats = {}
+        if filter_lines:
+            filter_stats = {
+                key: int(value)
+                for key, value in re.findall(r"\b(\w+)=(-?\d+)", filter_lines[-1])
+            }
         graph_lines = [line for line in lines if "[SpawnPerf][Graph]" in line]
         summary_lines = [line for line in lines if "[SpawnWave][Summary]" in line
                          and (first_wave is None or f"wave={first_wave} " in line)]
@@ -735,6 +751,7 @@ class MatrixRunner:
             "classes": dict(sorted(classes.items())),
             "class_metrics": class_metrics,
             "director_api": director_api,
+            "filter_stats": filter_stats,
             "begin": first_begin,
             "summary": first_summary,
             "begin_values": begin_values,
@@ -972,7 +989,7 @@ def write_csv(path: Path, results: list[dict]) -> None:
         "last_spawn_ms", "server_wave_ms", "within_nominal_target",
         "observer_wall_ms", "distance_metrics", "classes", "class_metrics",
         "probe_distance_metrics", "probe_classes", "probe_class_metrics",
-        "director_api", "error",
+        "director_api", "filter_stats", "error",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
@@ -992,6 +1009,8 @@ def write_csv(path: Path, results: list[dict]) -> None:
                 row.get("probe_class_metrics", {}), ensure_ascii=False, sort_keys=True)
             row["director_api"] = json.dumps(
                 row.get("director_api", {}), ensure_ascii=False, sort_keys=True)
+            row["filter_stats"] = json.dumps(
+                row.get("filter_stats", {}), ensure_ascii=False, sort_keys=True)
             writer.writerow(row)
 
 

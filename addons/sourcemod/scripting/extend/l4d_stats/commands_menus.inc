@@ -110,13 +110,6 @@ public Action:HandleCommands(client, const String:Text[])
 			return Plugin_Handled;
 	}
 
-	else if (strcmp(Text, "rankvote", false) == 0)
-	{
-		cmd_RankVote(client, 0);
-		if (GetConVarBool(cvar_SilenceChat))
-			return Plugin_Handled;
-	}
-
 	else if (strcmp(Text, "rankmutetoggle", false) == 0)
 	{
 		cmd_ToggleClientRankMute(client, 0);
@@ -252,44 +245,6 @@ DisplayYesNoPanel(client, const String:title[], MenuHandler:handler, delay=30)
 
 	SendPanelToClient(panel, client, handler, delay);
 	CloseHandle(panel);
-}
-
-public bool:IsTeamGamemode()
-{
-	return IsGamemode("versus") ||
-				 IsGamemode("realismversus") ||
-				 IsGamemode("scavenge") ||
-				 IsGamemode("mutation11") ||	// Healthpackalypse!
-				 IsGamemode("mutation12") ||	// Realism Versus
-				 IsGamemode("mutation13") ||	// Follow the Liter
-				 IsGamemode("mutation15") ||	// Versus Survival
-				 IsGamemode("mutation18") ||	// Bleed Out Versus
-				 IsGamemode("mutation19") ||	// Taaannnkk!
-				 IsGamemode("community3") ||	// Riding My Survivor
-				 IsGamemode("community6");		// Confogl
-}
-
-// Run Team Shuffle.
-public Action:cmd_ShuffleTeams(client, args)
-{
-	if (!IsTeamGamemode())
-	{
-		StatsPrintToConsolePhrase(client, "L4DStats_TeamShuffleUnavailable");
-		return Plugin_Handled;
-	}
-
-	if (RankVoteTimer != INVALID_HANDLE)
-	{
-		CloseHandle(RankVoteTimer);
-		RankVoteTimer = INVALID_HANDLE;
-
-		StatsPrintToChatAllPreFormatted("L4DStats_TeamShuffleAdminExecuted");
-	}
-
-	StatsPrintToConsolePhrase(client, "L4DStats_TeamShuffleExecuting");
-	CreateTimer(1.0, timer_ShuffleTeams);
-
-	return Plugin_Handled;
 }
 
 // Set Message Of The Day.
@@ -536,10 +491,6 @@ public DisplayRankMenu(client)
 	StatsAddMenuItem(menu, "showtimer", client, "L4DStats_MenuCurrentMapTime");
 	StatsAddMenuItem(menu, "showrank", client, "L4DStats_MenuOtherPlayerRank");
 	StatsAddMenuItem(menu, "showppm", client, "L4DStats_MenuOtherPlayerPPM");
-	if (GetConVarBool(cvar_EnableRankVote) && IsTeamGamemode())
-	{
-		StatsAddMenuItem(menu, "rankvote", client, "L4DStats_MenuRankVote");
-	}
 	StatsAddMenuItem(menu, "timedmaps", client, "L4DStats_MenuAllMapTimes");
 	if (IsSingleTeamGamemode())
 	{
@@ -1294,38 +1245,6 @@ public DisplayRankSnapshot(Handle:owner, Handle:hndl, const String:error[], any:
 	CloseHandle(RankPanel);
 }
 
-public StartRankVote(client)
-{
-	if (L4DStatsConf == INVALID_HANDLE)
-	{
-		if (client > 0)
-		{
-			StatsPrintToChatPreFormatted(client, "L4DStats_RankVoteSettingsFailed");
-		}
-		else
-		{
-			StatsPrintToConsolePhrase(0, "L4DStats_RankVoteGamedataMissingConsole");
-		}
-	}
-
-	else if (!GetConVarBool(cvar_EnableRankVote))
-	{
-		if (client > 0)
-		{
-			StatsPrintToChatPreFormatted(client, "L4DStats_RankVoteDisabledChat");
-		}
-		else
-		{
-			StatsPrintToConsolePhrase(0, "L4DStats_RankVoteDisabledConsole");
-		}
-	}
-
-	else
-	{
-		InitializeRankVote(client);
-	}
-}
-
 // Toggle client rank mute.
 public Action:cmd_ToggleClientRankMute(client, args)
 {
@@ -1401,36 +1320,6 @@ public Action:cmd_ClientRankMute(client, args)
 AnnounceClientRankMute(client)
 {
 	StatsPrintToChat2(client, true, ClientRankMute[client] ? "L4DStats_RankMessagesMuted" : "L4DStats_RankMessagesUnmuted");
-}
-
-// Start RANKVOTE.
-public Action:cmd_RankVote(client, args)
-{
-	if (client == 0)
-	{
-		StartRankVote(client);
-		return Plugin_Handled;
-	}
-
-	if (!IsClientConnected(client) && !IsClientInGame(client) && IsClientBot(client))
-	{
-		return Plugin_Handled;
-	}
-
-	new ClientFlags = GetUserFlagBits(client);
-	new bool:IsAdmin = ((ClientFlags & ADMFLAG_GENERIC) == ADMFLAG_GENERIC);
-
-	new ClientTeam = GetClientTeam(client);
-
-	if (!IsAdmin && ClientTeam != TEAM_SURVIVORS && ClientTeam != TEAM_INFECTED)
-	{
-		StatsPrintToChatPreFormatted2(client, true, "L4DStats_RankVoteSpectatorDenied");
-		return Plugin_Handled;
-	}
-
-	StartRankVote(client);
-
-	return Plugin_Handled;
 }
 
 // Generate the TIMEDMAPS display menu.
@@ -1670,176 +1559,6 @@ public GetClientTop10(Handle:owner, Handle:hndl, const String:error[], any:useri
 
 		QueryClientStatsSteamID(client, SteamID, CM_TOP10);
 	}
-}
-
-public ExecuteTeamShuffle(Handle:owner, Handle:hndl, const String:error[], any:data)
-{
-	if (hndl == INVALID_HANDLE)
-	{
-		LogError("ExecuteTeamShuffle failed! Reason: %s", error);
-		return;
-	}
-
-	decl String:SteamID[MAX_LINE_WIDTH];
-	new i, team, maxplayers = MaxClients, client, topteam;
-	new SurvivorsLimit = GetConVarInt(cvar_SurvivorLimit), InfectedLimit = GetConVarInt(cvar_InfectedLimit);
-	new Handle:PlayersTrie = CreateTrie();
-	new Handle:InfectedArray = CreateArray();
-	new Handle:SurvivorArray = CreateArray();
-
-	for (i = 1; i <= maxplayers; i++)
-	{
-		if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
-		{
-			GetClientRankAuthString(i, SteamID, sizeof(SteamID));
-
-			if (!SetTrieValue(PlayersTrie, SteamID, i, false))
-			{
-				LogError("ExecuteTeamShuffle failed! Reason: Duplicate SteamID while generating shuffled teams.");
-				StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleFailed");
-
-				SetConVarBool(cvar_EnableRankVote, false);
-
-				ClearTrie(PlayersTrie);
-				CloseHandle(PlayersTrie);
-
-				CloseHandle(hndl);
-
-				return;
-			}
-
-			switch (GetClientTeam(i))
-			{
-				case TEAM_SURVIVORS:
-					PushArrayCell(SurvivorArray, i);
-				case TEAM_INFECTED:
-					PushArrayCell(InfectedArray, i);
-			}
-		}
-	}
-
-	new SurvivorCounter = GetArraySize(SurvivorArray);
-	new InfectedCounter = GetArraySize(InfectedArray);
-
-	i = 0;
-	topteam = 0;
-
-	while (SQL_FetchRow(hndl))
-	{
-		SQL_FetchString(hndl, 0, SteamID, sizeof(SteamID));
-
-		if (GetTrieValue(PlayersTrie, SteamID, client))
-		{
-			team = GetClientTeam(client);
-
-			if (i == 0)
-			{
-				if (team == TEAM_SURVIVORS)
-				{
-					RemoveFromArray(SurvivorArray, FindValueInArray(SurvivorArray, client));
-				}
-				else
-				{
-					RemoveFromArray(InfectedArray, FindValueInArray(InfectedArray, client));
-				}
-
-				topteam = team;
-				i++;
-
-				continue;
-			}
-
-			if (i++ % 2)
-			{
-				if (topteam == TEAM_SURVIVORS && team == TEAM_INFECTED)
-				{
-					RemoveFromArray(InfectedArray, FindValueInArray(InfectedArray, client));
-				}
-				else if (topteam == TEAM_INFECTED && team == TEAM_SURVIVORS)
-				{
-					RemoveFromArray(SurvivorArray, FindValueInArray(SurvivorArray, client));
-				}
-			}
-			else
-			{
-				if (topteam == TEAM_SURVIVORS && team == TEAM_SURVIVORS)
-				{
-					RemoveFromArray(SurvivorArray, FindValueInArray(SurvivorArray, client));
-				}
-				else if (topteam == TEAM_INFECTED && team == TEAM_INFECTED)
-				{
-					RemoveFromArray(InfectedArray, FindValueInArray(InfectedArray, client));
-				}
-			}
-		}
-	}
-
-	if (GetArraySize(SurvivorArray) > 0 || GetArraySize(InfectedArray) > 0)
-	{
-		new NewSurvivorCounter = SurvivorCounter - GetArraySize(SurvivorArray) + GetArraySize(InfectedArray);
-		new NewInfectedCounter = InfectedCounter - GetArraySize(InfectedArray) + GetArraySize(SurvivorArray);
-
-		if (NewSurvivorCounter > SurvivorsLimit || NewInfectedCounter > InfectedLimit)
-		{
-			LogError("ExecuteTeamShuffle failed! Reason: Team size limits block Rank Vote functionality. (Survivors Limit = %i [%i] / Infected Limit = %i [%i])", SurvivorsLimit, NewSurvivorCounter, InfectedLimit, NewInfectedCounter);
-			StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleFailed");
-
-			SetConVarBool(cvar_EnableRankVote, false);
-		}
-		else
-		{
-			CampaignOver = true;
-
-			decl String:Name[32];
-
-			// Change Survivors team to Spectators (TEMPORARILY)
-			for (i = 0; i < GetArraySize(SurvivorArray); i++)
-			{
-				ChangeRankPlayerTeam(GetArrayCell(SurvivorArray, i), TEAM_SPECTATORS);
-			}
-
-			// Change Infected team to Survivors
-			for (i = 0; i < GetArraySize(InfectedArray); i++)
-			{
-				client = GetArrayCell(InfectedArray, i);
-				GetClientName(client, Name, sizeof(Name));
-
-				ChangeRankPlayerTeam(client, TEAM_SURVIVORS);
-
-				StatsPrintToChatAll2(true, "L4DStats_PlayerJoinedSurvivors", Name);
-			}
-
-			// Change Spectators (TEMPORARILY) team to Infected
-			for (i = 0; i < GetArraySize(SurvivorArray); i++)
-			{
-				client = GetArrayCell(SurvivorArray, i);
-				GetClientName(client, Name, sizeof(Name));
-
-				ChangeRankPlayerTeam(client, TEAM_INFECTED);
-
-				StatsPrintToChatAll2(true, "L4DStats_PlayerJoinedInfected", Name);
-			}
-
-			StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamShuffleDone");
-
-			if (EnableSounds_Rankvote && GetConVarBool(cvar_SoundsEnabled))
-				EmitSoundToAll(SOUND_RANKVOTE);
-		}
-	}
-	else
-	{
-		StatsPrintToChatAllPreFormatted2(true, "L4DStats_TeamsAlreadyEven");
-	}
-
-	ClearArray(SurvivorArray);
-	ClearArray(InfectedArray);
-	ClearTrie(PlayersTrie);
-
-	CloseHandle(SurvivorArray);
-	CloseHandle(InfectedArray);
-	CloseHandle(PlayersTrie);
-
-	CloseHandle(hndl);
 }
 
 public CreateRanksMenu(Handle:owner, Handle:hndl, const String:error[], any:userid)
@@ -2823,90 +2542,6 @@ public ClearTMMutationsPanelHandler(Handle:menu, MenuAction:action, param1, para
 	}
 	//else if (param2 == 2)
 	//	cmd_RankAdmin(param1, 0);
-}
-
-// Handler for RANKVOTE panel.
-public RankVotePanelHandler(Handle:menu, MenuAction:action, param1, param2)
-{
-	if (action != MenuAction_Select || RankVoteTimer == INVALID_HANDLE || param1 <= 0 || IsClientBot(param1))
-		return;
-
-	if (param2 == 1 || param2 == 2)
-	{
-		new team = GetClientTeam(param1);
-
-		if (team != TEAM_SURVIVORS && team != TEAM_INFECTED)
-			return;
-
-		new OldPlayerRankVote = PlayerRankVote[param1];
-
-		if (param2 == 1)
-			PlayerRankVote[param1] = RANKVOTE_YES;
-		else if (param2 == 2)
-			PlayerRankVote[param1] = RANKVOTE_NO;
-
-		new humans = 0, votes = 0, yesvotes = 0, novotes = 0, WinningVoteCount = 0;
-
-		CheckRankVotes(humans, votes, yesvotes, novotes, WinningVoteCount);
-
-		if (yesvotes >= WinningVoteCount || novotes >= WinningVoteCount)
-		{
-			if (RankVoteTimer != INVALID_HANDLE)
-			{
-				CloseHandle(RankVoteTimer);
-				RankVoteTimer = INVALID_HANDLE;
-			}
-
-			StatsPrintToChatAll(yesvotes >= WinningVoteCount ? "L4DStats_RankVotePassed" : "L4DStats_RankVoteFailed", yesvotes, novotes);
-
-			if (yesvotes >= WinningVoteCount)
-				CreateTimer(2.0, timer_ShuffleTeams);
-		}
-
-		if (OldPlayerRankVote != RANKVOTE_NOVOTE)
-			return;
-
-		decl String:Name[32];
-		GetClientName(param1, Name, sizeof(Name));
-
-		StatsPrintToChatAll("L4DStats_RankVoteProgress", Name, votes, humans);
-	}
-}
-
-CheckRankVotes(&Humans, &Votes, &YesVotes, &NoVotes, &WinningVoteCount)
-{
-	Humans = 0;
-	Votes = 0;
-	YesVotes = 0;
-	NoVotes = 0;
-	WinningVoteCount = 0;
-
-	new i, team, maxplayers = MaxClients;
-
-	for (i = 1; i <= maxplayers; i++)
-	{
-		if (IsClientConnected(i) && IsClientInGame(i) && !IsClientBot(i))
-		{
-			team = GetClientTeam(i);
-
-			if (team == TEAM_SURVIVORS || team == TEAM_INFECTED)
-			{
-				Humans++;
-
-				if (PlayerRankVote[i] != RANKVOTE_NOVOTE)
-				{
-					Votes++;
-
-					if (PlayerRankVote[i] == RANKVOTE_YES)
-						YesVotes++;
-				}
-			}
-		}
-	}
-
-	// More than half of the players are needed to vot YES for rankvote pass
-	WinningVoteCount = RoundToNearest(float(Humans) / 2) + 1 - (Humans % 2);
-	NoVotes = Votes - YesVotes;
 }
 
 DisplayClearPanel(client, delay=30)

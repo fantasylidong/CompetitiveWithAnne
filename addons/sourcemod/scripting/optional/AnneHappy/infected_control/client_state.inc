@@ -139,6 +139,55 @@ bool IsEligibleSpawnTarget(int client)
         && !L4D_IsPlayerIncapacitated(client);
 }
 
+// 容量判断在候选热路径上逐行调用。native 可用性与逐人结果按 tick 缓存，
+// 避免每个候选都做字符串查找和跨插件调用；刷出成功时显式失效。
+// 队首 ×2 的有效上限由 SI_Target_limit 1.6 的 GetClientTargetLimit 直接返回。
+static float g_TargetCapCacheTime = -1.0;
+static bool g_TargetCapNativeOk = false;
+static int g_TargetCapState[MAXPLAYERS + 1];
+
+void SpawnTarget_InvalidateCapacityCache()
+{
+    g_TargetCapCacheTime = -1.0;
+}
+
+static void SpawnTarget_EnsureCapacityCache()
+{
+    float now = GetGameTime();
+    if (g_TargetCapCacheTime == now)
+        return;
+    g_TargetCapCacheTime = now;
+    g_TargetCapNativeOk = GetFeatureStatus(FeatureType_Native, "GetClientTargetLimit")
+        == FeatureStatus_Available;
+    for (int i = 0; i <= MaxClients; i++)
+        g_TargetCapState[i] = -1;
+}
+
+stock bool SpawnTarget_IsAtCapacity(int client)
+{
+    if (!g_bTargetLimitLib || !IsValidSurvivor(client))
+        return false;
+
+    SpawnTarget_EnsureCapacityCache();
+    if (g_TargetCapState[client] < 0)
+    {
+        bool atCap;
+        if (g_TargetCapNativeOk)
+        {
+            int limit = GetClientTargetLimit(client);
+            atCap = limit > 0
+                ? GetClientTargetNum(client) >= limit
+                : IsClientReachLimit(client) != 0;
+        }
+        else
+        {
+            atCap = IsClientReachLimit(client) != 0;
+        }
+        g_TargetCapState[client] = atCap ? 1 : 0;
+    }
+    return g_TargetCapState[client] == 1;
+}
+
 bool IsPinningSomeone(int client)
 {
     if (!IsInfectedBot(client)) return false;

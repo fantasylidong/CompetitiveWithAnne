@@ -13,7 +13,7 @@
 // ==================== 性能统计 ====================
 #define SPAWN_PERF_GROUP_COUNT       5
 #define SPAWN_PERF_TIMING_COUNT      3
-#define SPAWN_PERF_FILTER_COUNT      12
+#define SPAWN_PERF_FILTER_COUNT      15
 #define SPAWN_PERF_SAMPLE_CAP        256
 
 stock void SpawnPerf_Log(const char[] format, any ...)
@@ -48,7 +48,10 @@ enum SpawnPerfFilterKind
     SpawnPerfFilter_Path,
     SpawnPerfFilter_Position,
     SpawnPerfFilter_Score,
-    SpawnPerfFilter_Bucket
+    SpawnPerfFilter_Bucket,
+    SpawnPerfFilter_OwnerInvalid,
+    SpawnPerfFilter_OwnerCapacity,
+    SpawnPerfFilter_BehindBudget
 }
 
 // 热路径只做定长数组写入；排序和百分位计算仅发生在显式打印统计时。
@@ -178,7 +181,7 @@ static void SpawnPerf_PrintGroupedStats()
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_MaxSlice, "maxSliceMs");
         SpawnPerf_PrintTiming(group, SpawnPerfTiming_FallbackApi, "fallbackApiMs");
 
-        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d flags=%d flow=%d behindFlow=%d distance=%d separation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d",
+        SpawnPerf_Log("[SpawnPerf][%s] filters cooldown=%d flags=%d flow=%d behindFlow=%d distance=%d separation=%d stuck=%d visibility=%d path=%d position=%d score=%d bucket=%d ownerInvalid=%d ownerCapacity=%d behindBudget=%d",
             groupLabel,
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Cooldown],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Flags],
@@ -191,7 +194,10 @@ static void SpawnPerf_PrintGroupedStats()
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Path],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Position],
             g_SpawnPerfFilterHits[group][SpawnPerfFilter_Score],
-            g_SpawnPerfFilterHits[group][SpawnPerfFilter_Bucket]);
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_Bucket],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_OwnerInvalid],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_OwnerCapacity],
+            g_SpawnPerfFilterHits[group][SpawnPerfFilter_BehindBudget]);
 
         SpawnPerf_Log("[SpawnPerf][%s] fallbackApi hit/call smoker=%d/%d boomer=%d/%d hunter=%d/%d spitter=%d/%d jockey=%d/%d charger=%d/%d",
             groupLabel,
@@ -376,6 +382,24 @@ stock void SpawnPerf_RecordFilterByScore()
 {
     if (!SpawnPerfConfig_ShowStats()) return;
     SpawnPerf_RecordFilter(SpawnPerfFilter_Score);
+}
+
+stock void SpawnPerf_RecordFilterByOwnerInvalid()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_OwnerInvalid);
+}
+
+stock void SpawnPerf_RecordFilterByOwnerCapacity()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_OwnerCapacity);
+}
+
+stock void SpawnPerf_RecordFilterByBehindBudget()
+{
+    if (!SpawnPerfConfig_ShowStats()) return;
+    SpawnPerf_RecordFilter(SpawnPerfFilter_BehindBudget);
 }
 
 stock void SpawnPerf_RecordFullEvaluation()

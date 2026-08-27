@@ -8,6 +8,10 @@
 	{
 		"zho"		"[{olive}Readyup{default}] 準備面板已 {blue}開啟{default}"
 	}
+	"PanelCommands"
+	{
+		"zho"		"▸ 指令:"
+	}
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"

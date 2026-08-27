@@ -157,7 +157,6 @@ public OnPluginEnd()
 	delete MapTimingSurvivors;
 	delete MapTimingInfected;
 	delete FriendlyFireDamageTrie;
-	delete PlayerRankVoteTrie;
 	delete ConnectAnnounceTrie;
 }
 
@@ -234,7 +233,6 @@ stock Stats_ClearClientSlotCaches(client)
 	CurrentPoints[client] = 0;
 	ClientMapTime[client] = 0.0;
 	MapTimingMenuInfo[client][0] = '\0';
-	PlayerRankVote[client] = RANKVOTE_NOVOTE;
 	AnnounceCounter[client] = 0;
 	PostAdminCheckRetryCounter[client] = 0;
 	RankChangeLastRank[client] = 0;
@@ -383,12 +381,6 @@ public OnClientDisconnect(client)
 
 	// If we get this far, ALL HUMAN PLAYERS LEFT THE SERVER
 	CampaignOver = true;
-
-	if (RankVoteTimer != INVALID_HANDLE)
-	{
-		CloseHandle(RankVoteTimer);
-		RankVoteTimer = INVALID_HANDLE;
-	}
 }
 
 public action_LanChanged(Handle:convar, const String:oldValue[], const String:newValue[])

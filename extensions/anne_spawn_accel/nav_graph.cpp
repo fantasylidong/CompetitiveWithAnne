@@ -349,26 +349,27 @@ bool AnneNavGraph::FindIndex(std::uint32_t navId, std::uint32_t &index) const
 }
 
 bool AnneNavGraph::BuildReverseReachability(
-    std::uint32_t targetIndex, float maxDistance,
+    const std::vector<AnneNavSearchTarget> &targets, float maxDistance,
     const std::vector<std::uint8_t> &blocked,
     std::vector<float> &distances,
-    std::vector<std::uint8_t> &usesSpecialEdge) const
+    std::vector<std::uint8_t> &usesSpecialEdge,
+    std::vector<int> &owners) const
 {
     std::size_t count = navIds.size();
-    if (targetIndex >= count || blocked.size() != count)
+    if (targets.empty() || blocked.size() != count)
         return false;
 
     float infinity = std::numeric_limits<float>::infinity();
     distances.assign(count, infinity);
     usesSpecialEdge.assign(count, 0);
-    if (blocked[targetIndex])
-        return true;
+    owners.assign(count, 0);
 
     struct QueueEntry
     {
         float distance;
         std::uint32_t index;
         std::uint8_t special;
+        int owner;
     };
     struct FurtherFirst
     {
@@ -381,16 +382,48 @@ bool AnneNavGraph::BuildReverseReachability(
     };
 
     std::priority_queue<QueueEntry, std::vector<QueueEntry>, FurtherFirst> open;
-    distances[targetIndex] = 0.0f;
-    open.push({0.0f, targetIndex, 0});
+    bool anySource = false;
+    for (const AnneNavSearchTarget &target : targets)
+    {
+        if (target.index >= count || blocked[target.index])
+            continue;
+
+        int owner = target.client;
+        bool betterOwner = std::fabs(distances[target.index]) <= 0.01f &&
+                           (owners[target.index] == 0 ||
+                            (owner != 0 && owner < owners[target.index]));
+        if (distances[target.index] != 0.0f)
+        {
+            distances[target.index] = 0.0f;
+            usesSpecialEdge[target.index] = 0;
+            owners[target.index] = owner;
+            open.push({0.0f, target.index, 0, owner});
+            anySource = true;
+        }
+        else if (betterOwner)
+        {
+            owners[target.index] = owner;
+            open.push({0.0f, target.index, 0, owner});
+            anySource = true;
+        }
+        else
+        {
+            anySource = true;
+        }
+    }
+    if (!anySource)
+        return true;
 
     while (!open.empty())
     {
         QueueEntry current = open.top();
         open.pop();
         if (current.distance > distances[current.index] + 0.01f ||
-            current.special != usesSpecialEdge[current.index])
+            current.special != usesSpecialEdge[current.index] ||
+            current.owner != owners[current.index])
+        {
             continue;
+        }
 
         for (std::uint32_t row = reverseOffsets[current.index];
              row < reverseOffsets[current.index + 1]; ++row)
@@ -405,17 +438,35 @@ bool AnneNavGraph::BuildReverseReachability(
                 continue;
             std::uint8_t nextSpecial = current.special || EdgeType(edge) != AnneNavEdgeType::Floor;
             bool betterDistance = nextDistance + 0.01f < distances[previous];
-            bool betterType = std::fabs(nextDistance - distances[previous]) <= 0.01f &&
-                              nextSpecial < usesSpecialEdge[previous];
-            if (!betterDistance && !betterType)
+            bool equalDistance = std::fabs(nextDistance - distances[previous]) <= 0.01f;
+            bool betterType = equalDistance && nextSpecial < usesSpecialEdge[previous];
+            bool betterOwner = equalDistance && nextSpecial == usesSpecialEdge[previous] &&
+                               current.owner != 0 &&
+                               (owners[previous] == 0 || current.owner < owners[previous]);
+            if (!betterDistance && !betterType && !betterOwner)
                 continue;
 
             distances[previous] = nextDistance;
             usesSpecialEdge[previous] = nextSpecial;
-            open.push({nextDistance, previous, nextSpecial});
+            owners[previous] = current.owner;
+            open.push({nextDistance, previous, nextSpecial, current.owner});
         }
     }
     return true;
+}
+
+bool AnneNavGraph::BuildReverseReachability(
+    std::uint32_t targetIndex, float maxDistance,
+    const std::vector<std::uint8_t> &blocked,
+    std::vector<float> &distances,
+    std::vector<std::uint8_t> &usesSpecialEdge) const
+{
+    std::vector<int> owners;
+    AnneNavSearchTarget target;
+    target.index = targetIndex;
+    return BuildReverseReachability(std::vector<AnneNavSearchTarget>{target},
+                                    maxDistance, blocked, distances,
+                                    usesSpecialEdge, owners);
 }
 
 bool AnneBuildNavCandidateSnapshot(
@@ -521,6 +572,88 @@ bool AnneBuildRankedNavCandidateSnapshot(
         areaIndices[row] = candidates[row].index;
         candidatePathDistances[row] = candidates[row].pathDistance;
         candidateRankDistances[row] = candidates[row].rankDistance;
+    }
+    return true;
+}
+
+bool AnneBuildTeamNavCandidateSnapshot(
+    const AnneNavGraph &graph,
+    const std::vector<AnneNavSearchTarget> &targets,
+    float maxPathDistance,
+    const std::vector<std::uint8_t> &blocked,
+    const std::vector<float> &survivorEyes,
+    float minSurvivorDistance,
+    std::vector<std::uint32_t> &areaIndices,
+    std::vector<float> &candidatePathDistances,
+    std::vector<int> &candidateOwners,
+    std::vector<float> &pathDistances,
+    std::vector<std::uint8_t> &usesSpecialEdge)
+{
+    std::size_t survivorCount = survivorEyes.size() / 3;
+    if (survivorEyes.size() % 3 != 0 || survivorCount == 0 || targets.empty() ||
+        maxPathDistance <= 0.0f || minSurvivorDistance < 0.0f)
+    {
+        return false;
+    }
+    for (const AnneNavSearchTarget &target : targets)
+    {
+        if (target.index >= graph.navIds.size() || target.client <= 0)
+            return false;
+    }
+
+    std::vector<int> owners;
+    if (!graph.BuildReverseReachability(targets, maxPathDistance, blocked,
+                                        pathDistances, usesSpecialEdge, owners))
+    {
+        return false;
+    }
+
+    struct Candidate
+    {
+        float pathDistance;
+        std::uint32_t index;
+        int owner;
+    };
+    std::vector<Candidate> candidates;
+    candidates.reserve(graph.navIds.size());
+    float minSurvivorDistanceSquared = minSurvivorDistance * minSurvivorDistance;
+
+    for (std::uint32_t index = 0; index < graph.navIds.size(); ++index)
+    {
+        if (!std::isfinite(pathDistances[index]))
+            continue;
+
+        const float *center = &graph.centers[static_cast<std::size_t>(index) * 3];
+        float nearestSquared = std::numeric_limits<float>::infinity();
+        for (std::size_t survivor = 0; survivor < survivorCount; ++survivor)
+        {
+            const float *eye = &survivorEyes[survivor * 3];
+            float dx = center[0] - eye[0];
+            float dy = center[1] - eye[1];
+            float dz = center[2] - eye[2];
+            nearestSquared = std::min(nearestSquared, dx * dx + dy * dy + dz * dz);
+        }
+        if (nearestSquared < minSurvivorDistanceSquared)
+            continue;
+
+        candidates.push_back({pathDistances[index], index, owners[index]});
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate &left, const Candidate &right) {
+                  if (left.pathDistance != right.pathDistance)
+                      return left.pathDistance < right.pathDistance;
+                  return left.index < right.index;
+              });
+
+    areaIndices.resize(candidates.size());
+    candidatePathDistances.resize(candidates.size());
+    candidateOwners.resize(candidates.size());
+    for (std::size_t row = 0; row < candidates.size(); ++row)
+    {
+        areaIndices[row] = candidates[row].index;
+        candidatePathDistances[row] = candidates[row].pathDistance;
+        candidateOwners[row] = candidates[row].owner;
     }
     return true;
 }

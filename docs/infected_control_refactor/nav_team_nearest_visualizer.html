@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>刷特 Nav 选择逻辑可视化 — 全队最近距离模式（2026-08-26 工作区）</title>
+<style>
+  :root {
+    --bg: #12151c;
+    --panel: #1a1f2a;
+    --panel2: #202636;
+    --line: #2c3448;
+    --text: #d8dee9;
+    --dim: #8892a6;
+    --accent: #5aa9e6;
+    --ok: #55c47a;
+    --warn: #e6b455;
+    --bad: #e05f5f;
+    --purple: #a98ce6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px;
+    background: var(--bg); color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.6;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 24px 0 8px; color: var(--accent); }
+  .sub { color: var(--dim); font-size: 12.5px; margin-bottom: 14px; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;
+  }
+  .toolbar .group { display: flex; gap: 6px; align-items: center; padding-right: 10px; border-right: 1px solid var(--line); }
+  .toolbar .group:last-child { border-right: none; }
+  .toolbar label { color: var(--dim); font-size: 12.5px; }
+  button, select {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 5px 12px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: #23486b; border-color: var(--accent); }
+  button.active { background: #23486b; border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  .stage { display: flex; gap: 10px; align-items: flex-start; }
+  .canvas-holder {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px; flex: 1 1 auto; min-width: 0;
+  }
+  canvas { display: block; width: 100%; height: auto; border-radius: 6px; }
+  .side {
+    width: 320px; flex: 0 0 320px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 13.5px; color: var(--accent); }
+  #log {
+    height: 300px; overflow-y: auto; font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; line-height: 1.5; white-space: pre-wrap;
+    background: #10131a; border-radius: 6px; padding: 8px; color: #aeb8cc;
+  }
+  #log .ok { color: var(--ok); }
+  #log .bad { color: var(--bad); }
+  #log .warn { color: var(--warn); }
+  #log .hd { color: var(--accent); font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  table.params { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.params th, table.params td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+  table.params th { background: var(--panel2); color: var(--accent); font-weight: 600; }
+  table.params td:first-child { font-family: Menlo, Consolas, monospace; font-size: 12px; color: var(--warn); white-space: nowrap; }
+  .pipeline { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 8px 0; }
+  .pipeline .step {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 12.5px; flex: 1 1 150px; min-width: 150px; position: relative;
+  }
+  .pipeline .step b { color: var(--accent); display: block; font-size: 12.5px; margin-bottom: 3px; }
+  .pipeline .step.hard { border-left: 3px solid var(--bad); }
+  .pipeline .step.soft { border-left: 3px solid var(--warn); }
+  .pipeline .step.io { border-left: 3px solid var(--purple); }
+  .pipeline .step.pick { border-left: 3px solid var(--ok); }
+  .surv-list { display: flex; flex-direction: column; gap: 6px; }
+  .surv-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .surv-row .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 12px; }
+  .surv-row .name { width: 46px; }
+  .surv-row .cap { color: var(--dim); font-family: Menlo, monospace; font-size: 11.5px; width: 64px; }
+  .surv-row button {
+    padding: 1px 7px; font-size: 11.5px; border-radius: 5px;
+  }
+  .surv-row button.on { background: #5b2f33; border-color: var(--bad); color: #f0b9b9; }
+  .note { font-size: 12.5px; color: var(--dim); }
+  .kbd { font-family: Menlo, monospace; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  .statline { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--dim); }
+  .statline b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>刷特 Nav 选择逻辑可视化 · 全队最近距离模式</h1>
+  <div class="sub">
+    对应 2026-08-26 工作区（<span class="kbd">inf_nav_team_nearest 1</span>）：扩展做一次多源反向 Dijkstra，
+    每个 Nav 区域记录「到最近可用生还者的路径距离 + 归属 owner」；插件按 10 个固定距离层由近到远搜索，
+    层内按 Flow 从前到后消费。灰墙 = 不可走区域，可以直观看到“路径距离 ≠ 直线距离”。
+    生还者可以<b>直接拖动</b>；拖动后按当前状态重算距离场。
+  </div>
+
+  <div class="toolbar">
+    <div class="group">
+      <label>场景</label>
+      <button data-scene="normal" class="scene-btn">正常队形</button>
+      <button data-scene="rush" class="scene-btn">跑男领先</button>
+      <button data-scene="down" class="scene-btn">有人倒地</button>
+      <button data-scene="tail" class="scene-btn">地图末端(≥90%)</button>
+    </div>
+    <div class="group">
+      <label>职业</label>
+      <select id="classSel">
+        <option value="smoker">Smoker（min 500 / cap 3000）</option>
+        <option value="boomer">Boomer（min 250 / cap 2300）</option>
+        <option value="hunter" selected>Hunter（min 350 / cap 2600 / 后方缺口 4）</option>
+        <option value="spitter">Spitter（min 300 / cap 2300）</option>
+        <option value="jockey">Jockey（min 250 / cap 2000 / 后方缺口 4）</option>
+        <option value="charger">Charger（min 250 / cap 2000 / 后方缺口 4）</option>
+      </select>
+    </div>
+    <div class="group">
+      <button id="playBtn" class="primary">▶ 播放搜索</button>
+      <button id="stepBtn">单步</button>
+      <button id="spawnWaveBtn">连刷一波(12只)</button>
+      <button id="resetBtn">重置波次</button>
+    </div>
+    <div class="group">
+      <label>速度</label>
+      <select id="speedSel">
+        <option value="1">慢</option>
+        <option value="6" selected>中</option>
+        <option value="30">快</option>
+      </select>
+    </div>
+    <div class="group">
+      <label><input type="checkbox" id="showField" checked> 距离场着色</label>
+      <label><input type="checkbox" id="showOwner"> owner 归属着色</label>
+      <label><input type="checkbox" id="showLos" checked> 可见性判定</label>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-holder">
+      <canvas id="cv" width="1240" height="560"></canvas>
+      <div class="legend" style="margin-top:8px">
+        <span><span class="sw" style="background:#39414f"></span> 墙 / 不可走</span>
+        <span><span class="sw" style="background:#4b2e34"></span> 距离 &lt; 250u 排除圈</span>
+        <span><span class="sw" style="background:#2b4a68"></span> 当前搜索层（半开区间）</span>
+        <span><span class="sw" style="background:#e6b455"></span> 正在评估的候选</span>
+        <span><span class="sw" style="background:#e05f5f"></span> 被过滤（原因见日志）</span>
+        <span><span class="sw" style="background:#55c47a"></span> 被接受进评分池</span>
+        <span><span class="sw" style="background:#a98ce6"></span> 最终刷点 → 连线指向 owner</span>
+      </div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <h3>生还者状态（点击开关，可拖动位置）</h3>
+        <div class="surv-list" id="survList"></div>
+        <div class="note" style="margin-top:6px">
+          「上限」= SI_Target_limit 的 targetLimit（(特感上限/可动人数)+1）。
+          队首（Flow 最高者）判定容量时上限 ×2。达到上限后退出参与集合，
+          距离场按剩余成员重算（对应插件里的指纹重置 + 快照重建）。
+        </div>
+      </div>
+      <div class="card">
+        <h3>本次搜索状态</h3>
+        <div class="statline" id="stat">
+          <span>层: <b id="stBand">-</b></span>
+          <span>已检: <b id="stInspected">0</b></span>
+          <span>评分池: <b id="stAccepted">0</b>/8</span>
+          <span>已刷: <b id="stSpawned">0</b></span>
+        </div>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>搜索日志（对应 [FIND]/[SpawnPerf] 口径）</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>一次普通刷特尝试的完整流程（team-nearest 分支）</h2>
+  <div class="pipeline">
+    <div class="step io"><b>0. 参与集合</b>遍历生还者：存活、未被控、未倒地、未达目标容量（队首上限×2）→ (client, navId) 列表。任何成员移动/容量变化都会改变指纹 → 重置游标并重建快照。</div>
+    <div class="step io"><b>1. 扩展快照</b>worker 线程一次多源反向 Dijkstra（AnneBuildTeamNavCandidateSnapshot）：每个 Nav 得到「min 路径距离 + owner」；剔除距任意生还者 &lt;250u 直线的区域；全体候选按 Flow 降序建 flowOrder。</div>
+    <div class="step io"><b>2. 距离分层</b>10 层固定边界 250/350/500/700/900/1150/1400/1700/2000/2400/3000，与职业 min/finalMax 相交后半开取层；空层直接跳过（AdvanceToUsableBand）。</div>
+    <div class="step hard"><b>3. owner 检查</b>层内按 Flow 从前往后取候选：owner 已失效 → ownerInvalid++ 跳过；owner 已达容量 → ownerCapacity++ 跳过（不再重置游标）。然后把评估帧绑定到 owner（眼位/脚位/扇区中心/进度桶）。</div>
+    <div class="step hard"><b>4. 硬过滤</b>Nav flags → 后方硬拒绝（cand−owner &lt; −8，HJC −4；owner≥90% 时豁免）→ 冷却 → 同桶上限(默认关) → 随机点：分散/距离/排除圈 → 卡壳 → 可见性 → 路径可达。</div>
+    <div class="step soft"><b>5. 评分</b>距离带契合、Flow 前后梯度（后方软扣分，HJC ×2.5）、高度、核密度、扇区历史 → 总分≤0 淘汰。</div>
+    <div class="step pick"><b>6. 选优刷出</b>评分池收满 8 个或本层耗尽 → 最高分刷出，commit 记到 owner；全部层耗尽 → Director Range 兜底（2000u 直线上限）。</div>
+  </div>
+
+  <h2>本页与真实实现的对应关系 / 简化说明</h2>
+  <table class="params">
+    <tr><th>真实实现</th><th>本页演示</th></tr>
+    <tr><td>AnneSpawn_NavCandidatesPrepareTeam / CollectTeam（多源 Dijkstra，owner=实现最短路的生还者，平距取小编号）</td><td>网格 8 向 Dijkstra，逐格记录 dist+owner，平距取小编号；1 格 = 50u</td></tr>
+    <tr><td>TEAM_NAV_LAYER_EDGES 10 层 ∩ 职业 [classMin, min(finalMax, inf_SpawnDistanceMax×2)]，半开区间、末层闭区间</td><td>完全一致（按所选职业裁剪，空层跳过）</td></tr>
+    <tr><td>层内 flowOrder：Flow 降序（前方优先），team 模式不做三分位交错、不洗牌</td><td>一致（Flow=横向进度）</td></tr>
+    <tr><td>距任意生还者直线 &lt;max(250, inf_SpawnDistanceMin) 排除；可见性 trace；卡壳；路径复核</td><td>排除圈 + 网格视线（Bresenham 过墙判定）；卡壳/路径复核省略</td></tr>
+    <tr><td>inf_score_behind_reject_gap 8 / _hjc 4；owner 进度≥90 只扣分不硬拒</td><td>一致</td></tr>
+    <tr><td>SpawnScore_BuildCandidate 多因子评分 + 8 个候选预算选优</td><td>简化为「前方奖励 − 后方梯度 − 距离偏离」示意，预算 8 选优</td></tr>
+    <tr><td>SI_Target_limit: limit=(上限/可动人数)+1，队首×2（仅刷特容量口径）</td><td>一致；每刷 1 只 owner 计数 +1，达限后退出参与集合并重算距离场</td></tr>
+    <tr><td>层耗尽 → Director Range（DIRECTOR_FALLBACK_MAX_TEAM_DISTANCE=2000 直线）兜底</td><td>提示性标注（随机可行远点）</td></tr>
+    <tr><td>扇区配额 / 核密度 / Nav 冷却 / 传送监督</td><td>冷却做了（刷过的格子短期不复用），其余省略</td></tr>
+  </table>
+
+  <div class="note" style="margin-top:10px">
+    与旧模式（inf_nav_team_nearest 0）的区别：旧模式每个职业锁定单一目标生还者，从该目标出发做单源距离场，
+    距离带按职业线性扩圈，层内做近/中/远三分位交错 + 洗牌；新模式全队一张距离场，owner 由最短路自然产生，
+    距离层全职业统一，层内改为“前方优先”。
+  </div>
+</div>
+
+<script>
+(() => {
+  // ============ 网格与地图 ============
+  const CELL = 50;            // 1 格 = 50u
+  const W = 84, H = 36;       // 4200u × 1800u
+  const PX = 14.7, PY = 14.7; // 画布像素/格
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+
+  // 墙体（矩形，格子坐标）：制造走廊与房间，展示路径绕行
+  const walls = [];
+  function addWall(x, y, w, h) { walls.push({x, y, w, h}); }
+  // 外框
+  addWall(0, 0, W, 1); addWall(0, H-1, W, 1); addWall(0, 0, 1, H); addWall(W-1, 0, 1, H);
+  // 中段长墙（留缺口）
+  addWall(26, 1, 2, 14);         // 上半墙
+  addWall(26, 21, 2, 14);        // 下半墙（中间 14~21 是缺口）
+  // 一个房间（后方口袋）
+  addWall(8, 8, 12, 2); addWall(8, 8, 2, 12); addWall(8, 18, 12, 2); addWall(18, 8, 2, 5);
+  // 前方峡谷
+  addWall(48, 1, 2, 22);
+  addWall(60, 12, 2, 23);
+  // 小柱子
+  addWall(38, 26, 4, 3); addWall(70, 6, 3, 4);
+
+  const blocked = new Uint8Array(W * H);
+  for (const r of walls)
+    for (let y = r.y; y < r.y + r.h; y++)
+      for (let x = r.x; x < r.x + r.w; x++)
+        if (x >= 0 && x < W && y >= 0 && y < H) blocked[y * W + x] = 1;
+
+  const idx = (x, y) => y * W + x;
+  const flowPct = x => Math.round(x / (W - 2) * 100);
+
+  // ============ 职业参数（与 spawn_tactics.inc 一致） ============
+  const CLASSES = {
+    smoker:  { name: 'Smoker',  min: 500, finalMax: 3000, hjc: false },
+    boomer:  { name: 'Boomer',  min: 250, finalMax: 2300, hjc: false },
+    hunter:  { name: 'Hunter',  min: 350, finalMax: 2600, hjc: true },
+    spitter: { name: 'Spitter', min: 300, finalMax: 2300, hjc: false },
+    jockey:  { name: 'Jockey',  min: 250, finalMax: 2000, hjc: true },
+    charger: { name: 'Charger', min: 250, finalMax: 2000, hjc: true },
+  };
+  const LAYERS = [250, 350, 500, 700, 900, 1150, 1400, 1700, 2000, 2400, 3000];
+  const SPAWN_MAX_X2 = 3000;   // inf_SpawnDistanceMax 1500 × NAV_PATH_DISTANCE_SCALE 2
+  const EXCLUSION = 250;       // max(NAV_CANDIDATE_TEAM_EXCLUSION, inf_SpawnDistanceMin)
+  const BUDGET = 8;            // inf_spawn_candidate_budget
+  const BEHIND_GAP = 8, BEHIND_GAP_HJC = 4, TAIL_SOFT_PCT = 90;
+  const SI_LIMIT = 12;         // l4d_infected_limit（演示值）
+
+  // ============ 生还者 ============
+  const SURV_COLORS = ['#5aa9e6', '#55c47a', '#e6b455', '#e078c8'];
+  const SURV_NAMES = ['S1', 'S2', 'S3', 'S4'];
+  let survivors = [];
+  function makeSurv(x, y) {
+    return { x, y, alive: true, incap: false, pinned: false, targeted: 0 };
+  }
+  const SCENES = {
+    normal: () => [makeSurv(33, 17), makeSurv(31, 20), makeSurv(30, 14), makeSurv(29, 18)],
+    rush:   () => [makeSurv(56, 25), makeSurv(31, 18), makeSurv(30, 14), makeSurv(29, 20)],
+    down:   () => { const s = [makeSurv(34, 17), makeSurv(32, 20), makeSurv(31, 14), makeSurv(30, 18)]; s[2].incap = true; return s; },
+    tail:   () => [makeSurv(78, 17), makeSurv(76, 20), makeSurv(75, 25), makeSurv(74, 18)],
+  };
+  survivors = SCENES.normal();
+
+  function mobileCount() {
+    return survivors.filter(s => s.alive && !s.incap).length || 1;
+  }
+  function targetLimitOf() {
+    return Math.floor(SI_LIMIT / mobileCount()) + 1;
+  }
+  function leaderIndex() {
+    let best = -1, bx = -1;
+    survivors.forEach((s, i) => {
+      if (s.alive && !s.incap && s.x > bx) { bx = s.x; best = i; }
+    });
+    return best;
+  }
+  function capOf(i) {
+    const base = targetLimitOf();
+    return i === leaderIndex() ? base * 2 : base;
+  }
+  function atCapacity(i) { return survivors[i].targeted >= capOf(i); }
+  function eligible(i) {
+    const s = survivors[i];
+    return s.alive && !s.incap && !s.pinned && !atCapacity(i);
+  }
+
+  // ============ 多源 Dijkstra（模拟扩展的 BuildReverseReachability） ============
+  let dist = new Float32Array(W * H);
+  let owner = new Int8Array(W * H);
+  let excluded = new Uint8Array(W * H);
+
+  function rebuildField() {
+    dist.fill(Infinity); owner.fill(-1); excluded.fill(0);
+    // 排除圈：距任意存活生还者（含倒地）直线 < 250u
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      for (const s of survivors) {
+        if (!s.alive) continue;
+        const d = Math.hypot(x - s.x, y - s.y) * CELL;
+        if (d < EXCLUSION) { excluded[idx(x, y)] = 1; break; }
+      }
+    }
+    // 多源：仅 eligible 成员为源；平距 owner 取小编号
+    const heap = [];
+    const push = (d, x, y, o) => { heap.push({d, x, y, o}); heap.sort((a, b) => a.d - b.d || a.o - b.o); };
+    survivors.forEach((s, i) => {
+      if (!eligible(i)) return;
+      const ii = idx(s.x, s.y);
+      if (blocked[ii]) return;
+      if (dist[ii] > 0 || owner[ii] === -1 || i < owner[ii]) {
+        dist[ii] = 0; owner[ii] = i; push(0, s.x, s.y, i);
+      }
+    });
+    const DIRS = [[1,0,CELL],[-1,0,CELL],[0,1,CELL],[0,-1,CELL],
+                  [1,1,CELL*1.414],[1,-1,CELL*1.414],[-1,1,CELL*1.414],[-1,-1,CELL*1.414]];
+    while (heap.length) {
+      const cur = heap.shift();
+      const ci = idx(cur.x, cur.y);
+      if (cur.d > dist[ci] + 0.01 || (Math.abs(cur.d - dist[ci]) <= 0.01 && cur.o !== owner[ci])) continue;
+      for (const [dx, dy, c] of DIRS) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+        const ni = idx(nx, ny);
+        if (blocked[ni]) continue;
+        const nd = cur.d + c;
+        if (nd > SPAWN_MAX_X2 + 400) continue; // maxPathDistance 剪枝
+        const better = nd + 0.01 < dist[ni];
+        const tie = Math.abs(nd - dist[ni]) <= 0.01 && cur.o < owner[ni];
+        if (!better && !tie) continue;
+        dist[ni] = nd; owner[ni] = cur.o;
+        push(nd, nx, ny, cur.o);
+      }
+    }
+  }
+
+  // 视线（Bresenham），墙阻挡
+  function hasLos(x0, y0, x1, y1) {
+    let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+    let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy, x = x0, y = y0;
+    while (true) {
+      if (blocked[idx(x, y)] && !(x === x0 && y === y0)) return false;
+      if (x === x1 && y === y1) return true;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  }
+  function visibleToAnySurvivor(x, y) {
+    for (const s of survivors) {
+      if (!s.alive) continue;
+      if (Math.hypot(x - s.x, y - s.y) * CELL > 1800) continue; // 远处不算
+      if (hasLos(s.x, s.y, x, y)) return true;
+    }
+    return false;
+  }
+
+  // ============ 搜索状态机 ============
+  const cooldown = new Map();  // 格子 -> 到期帧
+  let spawned = [];            // {x,y,owner}
+  let sim = null;              // 当前搜索
+  let frame = 0;
+  let playTimer = null;
+  let waveMode = false;
+  let waveRemaining = 0;
+
+  function classInfo() { return CLASSES[document.getElementById('classSel').value]; }
+
+  function usableLayers() {
+    const c = classInfo();
+    const cap = Math.min(c.finalMax, SPAWN_MAX_X2);
+    const out = [];
+    for (let i = 0; i < LAYERS.length - 1; i++) {
+      const lo = Math.max(LAYERS[i], c.min);
+      const hi = Math.min(LAYERS[i + 1], cap);
+      if (hi > lo + 0.01) out.push({ band: i, lo, hi, inclusive: Math.abs(hi - cap) < 0.01 });
+    }
+    return out;
+  }
+
+  function collectLayerCandidates(lo, hi, inclusive) {
+    const rows = [];
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const i = idx(x, y);
+      if (blocked[i] || excluded[i] || owner[i] < 0) continue;
+      const d = dist[i];
+      if (d < lo || (inclusive ? d > hi : d >= hi)) continue;
+      if ((cooldown.get(i) || 0) > frame) continue;
+      rows.push({ x, y, i, d, o: owner[i] });
+    }
+    rows.sort((a, b) => b.x - a.x || a.d - b.d); // Flow 降序（前方优先）
+    return rows;
+  }
+
+  function newSearch() {
+    rebuildField();
+    const layers = usableLayers();
+    sim = {
+      layers, layerPos: 0, rows: null, rowPos: 0,
+      inspected: 0, accepted: [], done: false, result: null,
+      counters: { behind: 0, vis: 0, score: 0, ownerCap: 0, ownerInvalid: 0 },
+      fingerprint: survivors.map((s, i) => eligible(i) ? `${i}:${s.x},${s.y}` : '').join('|'),
+    };
+    logLine(`<span class="hd">[FIND] class=${classInfo().name} 参与=${survivors.map((s,i)=>eligible(i)?SURV_NAMES[i]:null).filter(Boolean).join(',')||'无'} 层数=${layers.length}</span>`);
+    if (!layers.length || survivors.every((_, i) => !eligible(i))) {
+      logLine(`<span class="bad">[FIND] 无可用参与目标/层 → 直接 Director 兜底</span>`);
+      sim.done = true;
+      sim.result = 'director';
+    }
+    updateStat();
+  }
+
+  function evalCandidate(row) {
+    const c = classInfo();
+    sim.inspected++;
+    // owner 检查（对应 ownerInvalid / ownerCapacity 跳过，不重置游标）
+    if (!survivors[row.o] || !survivors[row.o].alive || survivors[row.o].incap || survivors[row.o].pinned) {
+      sim.counters.ownerInvalid++;
+      return { pass: false, why: 'ownerInvalid' };
+    }
+    if (atCapacity(row.o)) {
+      sim.counters.ownerCap++;
+      return { pass: false, why: 'ownerCapacity' };
+    }
+    const ownerPct = flowPct(survivors[row.o].x);
+    const candPct = flowPct(row.x);
+    const gap = c.hjc ? BEHIND_GAP_HJC : BEHIND_GAP;
+    const delta = candPct - ownerPct;
+    // 后方硬拒绝（owner ≥90% 豁免）
+    if (ownerPct < TAIL_SOFT_PCT && delta < -gap) {
+      sim.counters.behind++;
+      return { pass: false, why: `behindFlow Δ=${delta}` };
+    }
+    // 可见性
+    if (document.getElementById('showLos').checked && visibleToAnySurvivor(row.x, row.y)) {
+      sim.counters.vis++;
+      return { pass: false, why: 'visible' };
+    }
+    // 简化评分：前方奖励 + 距离带贴合 − 后方梯度（HJC ×2.5）
+    let score = 60;
+    if (delta > 0) score += Math.min(20, delta * 1.5);
+    if (delta < 0) score -= Math.min(50, -delta * (c.hjc ? 2.5 : 1.0) * 2.0);
+    score -= Math.abs(row.d - (sim.layers[sim.layerPos].lo + sim.layers[sim.layerPos].hi) / 2) / 60;
+    if (score <= 0) {
+      sim.counters.score++;
+      return { pass: false, why: `score=${score.toFixed(0)}` };
+    }
+    return { pass: true, score, delta };
+  }
+
+  function commitSpawn(best) {
+    spawned.push({ x: best.row.x, y: best.row.y, o: best.row.o });
+    survivors[best.row.o].targeted++;
+    cooldown.set(best.row.i, frame + 600);
+    logLine(`<span class="ok">[SPAWN] ${classInfo().name} @(${best.row.x},${best.row.y}) 路径距离=${best.row.d.toFixed(0)}u owner=${SURV_NAMES[best.row.o]} Δflow=${best.delta > 0 ? '+' : ''}${best.delta} 分=${best.score.toFixed(0)}（owner 目标数 ${survivors[best.row.o].targeted}/${capOf(best.row.o)}）</span>`);
+    if (atCapacity(best.row.o)) {
+      logLine(`<span class="warn">[TARGET] ${SURV_NAMES[best.row.o]} 达到容量 → 退出参与集合，指纹变化 → 快照重建</span>`);
+    }
+    sim.done = true; sim.result = 'spawned';
+    renderSurvList();
+  }
+
+  // 单步推进：返回 false = 本次搜索结束
+  function stepOnce() {
+    if (!sim || sim.done) return false;
+    // 指纹检查（成员被拖动/状态切换 → 游标重置）
+    const fp = survivors.map((s, i) => eligible(i) ? `${i}:${s.x},${s.y}` : '').join('|');
+    if (fp !== sim.fingerprint) {
+      logLine(`<span class="warn">[CURSOR] 参与集合/位置变化 → 指纹不匹配，游标重置 + 快照重建</span>`);
+      newSearch();
+      return !sim.done;
+    }
+    if (sim.rows === null) {
+      if (sim.layerPos >= sim.layers.length) {
+        // 层耗尽 → 选优或 Director
+        if (sim.accepted.length) {
+          commitSpawn(sim.accepted.reduce((a, b) => a.score >= b.score ? a : b));
+        } else {
+          logLine(`<span class="bad">[FIND FAIL] 全部层耗尽 inspected=${sim.inspected} behind=${sim.counters.behind} vis=${sim.counters.vis} score=${sim.counters.score} ownerCap=${sim.counters.ownerCap} → Director Range 兜底(2000u 直线)</span>`);
+          sim.done = true; sim.result = 'director';
+        }
+        updateStat();
+        return false;
+      }
+      const L = sim.layers[sim.layerPos];
+      sim.rows = collectLayerCandidates(L.lo, L.hi, L.inclusive);
+      sim.rowPos = 0;
+      logLine(`[BAND ${L.band}] ${L.lo.toFixed(0)}~${L.hi.toFixed(0)}${L.inclusive ? '] (末层闭)' : ')'} 候选=${sim.rows.length}（Flow 降序）`);
+      updateStat();
+      if (!sim.rows.length) { sim.rows = null; sim.layerPos++; return true; }
+      return true;
+    }
+    if (sim.rowPos >= sim.rows.length) {
+      // 本层读完：有合格者 → 选优；否则下一层
+      if (sim.accepted.length) {
+        commitSpawn(sim.accepted.reduce((a, b) => a.score >= b.score ? a : b));
+        updateStat();
+        return false;
+      }
+      sim.rows = null; sim.layerPos++;
+      return true;
+    }
+    const row = sim.rows[sim.rowPos++];
+    const res = evalCandidate(row);
+    sim.current = { row, res };
+    if (res.pass) {
+      sim.accepted.push({ row, score: res.score, delta: res.delta });
+      if (sim.accepted.length >= BUDGET) {
+        commitSpawn(sim.accepted.reduce((a, b) => a.score >= b.score ? a : b));
+        updateStat();
+        return false;
+      }
+    }
+    updateStat();
+    return true;
+  }
+
+  // ============ 渲染 ============
+  function fieldColor(d) {
+    // 距离 → 蓝绿渐变
+    const t = Math.min(1, d / 3000);
+    const r = Math.round(24 + t * 30);
+    const g = Math.round(60 + (1 - t) * 60);
+    const b = Math.round(90 + (1 - t) * 70);
+    return `rgb(${r},${g},${b})`;
+  }
+  function render() {
+    ctx.fillStyle = '#151922';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    const showField = document.getElementById('showField').checked;
+    const showOwner = document.getElementById('showOwner').checked;
+    const L = sim && !sim.done && sim.layerPos < sim.layers.length ? sim.layers[sim.layerPos] : null;
+
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = idx(x, y);
+      let color = '#1b202b';
+      if (blocked[i]) color = '#39414f';
+      else if (excluded[i]) color = '#4b2e34';
+      else if (owner[i] >= 0) {
+        if (showOwner) {
+          const base = SURV_COLORS[owner[i]];
+          color = base + '38';
+          ctx.fillStyle = '#1b202b';
+          ctx.fillRect(x * PX, y * PY, PX, PY);
+          ctx.fillStyle = color;
+          ctx.fillRect(x * PX, y * PY, PX, PY);
+          // 当前层高亮叠加
+          if (L) {
+            const d = dist[i];
+            const inLayer = d >= L.lo && (L.inclusive ? d <= L.hi : d < L.hi);
+            if (inLayer) { ctx.fillStyle = '#2b4a6880'; ctx.fillRect(x * PX, y * PY, PX, PY); }
+          }
+          continue;
+        }
+        if (showField) color = fieldColor(dist[i]);
+        if (L) {
+          const d = dist[i];
+          const inLayer = d >= L.lo && (L.inclusive ? d <= L.hi : d < L.hi);
+          if (inLayer) color = '#2b4a68';
+        }
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(x * PX, y * PY, PX, PY);
+    }
+
+    // Flow 轴刻度
+    ctx.fillStyle = '#5b657a'; ctx.font = '10px Menlo';
+    for (let p = 0; p <= 100; p += 10) {
+      const x = p / 100 * (W - 2) + 1;
+      ctx.fillText(p + '%', x * PX - 6, cv.height - 4);
+    }
+
+    // 评分池 & 当前候选
+    if (sim) {
+      for (const a of sim.accepted) {
+        ctx.fillStyle = '#55c47a';
+        ctx.fillRect(a.row.x * PX + 2, a.row.y * PY + 2, PX - 4, PY - 4);
+      }
+      if (sim.current && !sim.done) {
+        const { row, res } = sim.current;
+        ctx.fillStyle = res.pass ? '#55c47a' : '#e05f5f';
+        ctx.fillRect(row.x * PX, row.y * PY, PX, PY);
+        ctx.strokeStyle = '#e6b455'; ctx.lineWidth = 2;
+        ctx.strokeRect(row.x * PX - 1, row.y * PY - 1, PX + 2, PY + 2);
+        // 拒因标签
+        if (!res.pass) {
+          ctx.fillStyle = '#e05f5f'; ctx.font = '10px Menlo';
+          ctx.fillText(res.why, row.x * PX + PX + 3, row.y * PY + 9);
+        }
+      }
+    }
+
+    // 已刷特感
+    for (const sp of spawned) {
+      ctx.fillStyle = '#a98ce6';
+      ctx.beginPath();
+      ctx.arc(sp.x * PX + PX / 2, sp.y * PY + PY / 2, 5.2, 0, 7);
+      ctx.fill();
+      ctx.strokeStyle = '#a98ce655'; ctx.lineWidth = 1;
+      const t = survivors[sp.o];
+      ctx.beginPath();
+      ctx.moveTo(sp.x * PX + PX / 2, sp.y * PY + PY / 2);
+      ctx.lineTo(t.x * PX + PX / 2, t.y * PY + PY / 2);
+      ctx.stroke();
+    }
+
+    // 生还者
+    survivors.forEach((s, i) => {
+      const cx = s.x * PX + PX / 2, cy = s.y * PY + PY / 2;
+      ctx.beginPath();
+      ctx.fillStyle = eligible(i) ? SURV_COLORS[i] : '#555e70';
+      ctx.arc(cx, cy, 8, 0, 7);
+      ctx.fill();
+      if (i === leaderIndex()) {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, 11, 0, 7); ctx.stroke();
+      }
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Menlo';
+      ctx.fillText(SURV_NAMES[i], cx - 6, cy + 3.5);
+      // 状态标注
+      const tags = [];
+      if (!s.alive) tags.push('死亡'); else {
+        if (s.incap) tags.push('倒地');
+        if (s.pinned) tags.push('被控');
+        if (atCapacity(i)) tags.push('满容量');
+      }
+      if (tags.length) {
+        ctx.fillStyle = '#e05f5f'; ctx.font = '10px sans-serif';
+        ctx.fillText(tags.join('/'), cx - 12, cy - 13);
+      }
+    });
+  }
+
+  // ============ UI ============
+  const logEl = document.getElementById('log');
+  function logLine(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    logEl.appendChild(div);
+    while (logEl.childNodes.length > 400) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function updateStat() {
+    document.getElementById('stBand').textContent =
+      sim && sim.layerPos < sim.layers.length && !sim.done
+        ? `${sim.layers[sim.layerPos].band}（${sim.layers[sim.layerPos].lo.toFixed(0)}~${sim.layers[sim.layerPos].hi.toFixed(0)}）`
+        : '-';
+    document.getElementById('stInspected').textContent = sim ? sim.inspected : 0;
+    document.getElementById('stAccepted').textContent = sim ? sim.accepted.length : 0;
+    document.getElementById('stSpawned').textContent = spawned.length;
+  }
+  function renderSurvList() {
+    const el = document.getElementById('survList');
+    el.innerHTML = '';
+    survivors.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'surv-row';
+      const lead = i === leaderIndex() ? '👑' : '';
+      row.innerHTML = `
+        <span class="dot" style="background:${SURV_COLORS[i]}"></span>
+        <span class="name">${SURV_NAMES[i]}${lead}</span>
+        <span class="cap">${s.targeted}/${capOf(i)} 目标</span>
+        <button data-i="${i}" data-k="incap" class="${s.incap ? 'on' : ''}">倒地</button>
+        <button data-i="${i}" data-k="pinned" class="${s.pinned ? 'on' : ''}">被控</button>
+        <button data-i="${i}" data-k="full" class="${atCapacity(i) ? 'on' : ''}">灌满</button>`;
+      el.appendChild(row);
+    });
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const i = +b.dataset.i, k = b.dataset.k;
+      if (k === 'full') survivors[i].targeted = atCapacity(i) ? 0 : capOf(i);
+      else survivors[i][k] = !survivors[i][k];
+      rebuildField(); renderSurvList(); render();
+    }));
+  }
+
+  function stopPlay() {
+    if (playTimer) { clearInterval(playTimer); playTimer = null; }
+    waveMode = false;
+    document.getElementById('playBtn').textContent = '▶ 播放搜索';
+  }
+  function startPlay() {
+    if (!sim || sim.done) newSearch();
+    stopPlay();
+    document.getElementById('playBtn').textContent = '⏸ 暂停';
+    playTimer = setInterval(() => {
+      const steps = +document.getElementById('speedSel').value;
+      let more = true;
+      for (let k = 0; k < steps && more; k++) {
+        frame++;
+        more = stepOnce();
+      }
+      render();
+      if (!more) {
+        if (waveMode && spawned.length < waveRemaining && sim.result === 'spawned') {
+          newSearch();
+        } else {
+          stopPlay();
+          renderSurvList();
+        }
+      }
+    }, 30);
+  }
+
+  document.getElementById('playBtn').addEventListener('click', () => {
+    if (playTimer) stopPlay(); else startPlay();
+  });
+  document.getElementById('stepBtn').addEventListener('click', () => {
+    stopPlay();
+    if (!sim || sim.done) newSearch();
+    frame++;
+    stepOnce();
+    render(); renderSurvList();
+  });
+  document.getElementById('spawnWaveBtn').addEventListener('click', () => {
+    stopPlay();
+    waveMode = true; waveRemaining = spawned.length + SI_LIMIT;
+    newSearch();
+    startPlay(); waveMode = true;
+  });
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    stopPlay();
+    spawned = []; cooldown.clear();
+    survivors.forEach(s => s.targeted = 0);
+    sim = null;
+    logEl.innerHTML = '';
+    rebuildField(); renderSurvList(); render(); updateStat();
+    logLine('[RESET] 波次已重置');
+  });
+  document.querySelectorAll('.scene-btn').forEach(b => b.addEventListener('click', () => {
+    stopPlay();
+    survivors = SCENES[b.dataset.scene]();
+    spawned = []; cooldown.clear(); sim = null;
+    rebuildField(); renderSurvList(); render(); updateStat();
+    logLine(`[SCENE] 切换场景：${b.textContent}`);
+  }));
+  document.getElementById('classSel').addEventListener('change', () => {
+    stopPlay(); sim = null;
+    render(); updateStat();
+    const c = classInfo();
+    logLine(`[CLASS] ${c.name}：classMin=${c.min} pathCap=${Math.min(c.finalMax, SPAWN_MAX_X2)} 后方缺口=${c.hjc ? 4 : 8}`);
+  });
+  ['showField', 'showOwner', 'showLos'].forEach(id =>
+    document.getElementById(id).addEventListener('change', render));
+
+  // 拖动生还者
+  let dragging = -1;
+  cv.addEventListener('mousedown', e => {
+    const r = cv.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (cv.width / r.width) / PX;
+    const my = (e.clientY - r.top) * (cv.height / r.height) / PY;
+    survivors.forEach((s, i) => {
+      if (Math.hypot(mx - s.x - .5, my - s.y - .5) < 1.6) dragging = i;
+    });
+  });
+  cv.addEventListener('mousemove', e => {
+    if (dragging < 0) return;
+    const r = cv.getBoundingClientRect();
+    const x = Math.round((e.clientX - r.left) * (cv.width / r.width) / PX - .5);
+    const y = Math.round((e.clientY - r.top) * (cv.height / r.height) / PY - .5);
+    if (x > 0 && x < W - 1 && y > 0 && y < H - 1 && !blocked[idx(x, y)]) {
+      survivors[dragging].x = x; survivors[dragging].y = y;
+      rebuildField(); render(); renderSurvList();
+    }
+  });
+  window.addEventListener('mouseup', () => { dragging = -1; });
+
+  // 初始化
+  rebuildField();
+  renderSurvList();
+  render();
+  updateStat();
+  logLine('[INIT] 拖动生还者或点右侧状态按钮，然后「播放搜索」看逐层扫描；「连刷一波」演示容量轮转。');
+})();
+</script>
+</body>
+</html>

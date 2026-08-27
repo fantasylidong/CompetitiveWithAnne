@@ -10,6 +10,11 @@
 	{
 		"es"		"[{olive}Readyup{default}] El panel esta ahora {blue}encendido{default}"
 	}
+
+	"PanelCommands"
+	{
+		"es"		"▸ Comandos:"
+	}
 	
 	"ForceStartAdmin"
 	{

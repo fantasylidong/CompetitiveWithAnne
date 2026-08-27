@@ -203,7 +203,7 @@ int ChooseTargetSurvivor()
     {
         if (IsEligibleSpawnTarget(i))
         {
-            if (g_bTargetLimitLib && IsClientReachLimit(i))
+            if (SpawnTarget_IsAtCapacity(i))
             {
                 LogMsg("[TARGET] skip %N: reach limit", i);
                 continue;

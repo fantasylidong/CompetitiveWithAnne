@@ -18,6 +18,7 @@ bool g_bSpawnAccelGraphCandidatesAvailable;
 bool g_bSpawnAccelAvailabilityKnown;
 bool g_bSpawnAccelNativeSafetyAvailable;
 bool g_bSpawnAccelRankedNativesAvailable;
+bool g_bSpawnAccelTeamNativesAvailable;
 Handle g_hSpawnAccelStartTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelTopologyRetryTimer = INVALID_HANDLE;
@@ -94,6 +95,13 @@ stock bool SpawnAccel_CanUseRankedCandidates()
         && g_bSpawnAccelRankedNativesAvailable;
 }
 
+stock bool SpawnAccel_CanUseTeamCandidates()
+{
+    return gCV.bNavTeamNearest
+        && SpawnAccel_CanUseGraphCandidates()
+        && g_bSpawnAccelTeamNativesAvailable;
+}
+
 stock bool SpawnAccel_IsDynamicGraphPending()
 {
     return g_bSpawnAccel && g_bSpawnAccelDynamicRebuildPending;
@@ -156,6 +164,11 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesPrepareRanked")
             == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesCollectRanked")
+            == FeatureStatus_Available;
+    g_bSpawnAccelTeamNativesAvailable = available
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesPrepareTeam")
+            == FeatureStatus_Available
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesCollectTeam")
             == FeatureStatus_Available;
     g_bSpawnAccelAvailabilityKnown = true;
 
@@ -406,6 +419,113 @@ stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
     return status;
 }
 
+// 参与集合带 TTL 缓存：成员集合（人+容量）没变时，TTL 内沿用上次的 navId
+// 快照。否则生还者每跨一个 NavArea 指纹就变、游标清零并重建扩展快照，
+// 真实对局里等于搜索不停从头再来（冻结 bot 矩阵测不出这种抖动）。
+// 成员集合一旦变化（倒地/被控/达到容量/复活）立即全量重收集。
+static float g_TeamCollectCacheTime = -1.0;
+static int g_TeamCollectCacheCount = 0;
+static int g_TeamCollectCacheClients[TEAM_NAV_TARGET_MAX];
+static int g_TeamCollectCacheNavIds[TEAM_NAV_TARGET_MAX];
+
+void SpawnAccel_InvalidateTeamTargetsCache()
+{
+    g_TeamCollectCacheTime = -1.0;
+}
+
+static bool SpawnAccel_TeamMembersMatchCache(int maxCount)
+{
+    int n = 0;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsEligibleSpawnTarget(client) || SpawnTarget_IsAtCapacity(client))
+            continue;
+        if (n >= g_TeamCollectCacheCount || g_TeamCollectCacheClients[n] != client)
+            return false;
+        n++;
+        if (n >= maxCount)
+            break;
+    }
+    return n == g_TeamCollectCacheCount;
+}
+
+stock int SpawnAccel_CollectEligibleTeamTargets(int[] clients, int[] navIds, int maxCount)
+{
+    int count = 0;
+    if (maxCount <= 0)
+        return 0;
+
+    float now = GetGameTime();
+    float age = now - g_TeamCollectCacheTime;
+    if (g_TeamCollectCacheTime >= 0.0
+        && age >= 0.0 && age <= NAV_CANDIDATE_RESULT_TTL
+        && g_TeamCollectCacheCount <= maxCount
+        && SpawnAccel_TeamMembersMatchCache(maxCount))
+    {
+        for (int i = 0; i < g_TeamCollectCacheCount; i++)
+        {
+            clients[i] = g_TeamCollectCacheClients[i];
+            navIds[i] = g_TeamCollectCacheNavIds[i];
+        }
+        return g_TeamCollectCacheCount;
+    }
+
+    for (int client = 1; client <= MaxClients && count < maxCount; client++)
+    {
+        if (!IsEligibleSpawnTarget(client) || SpawnTarget_IsAtCapacity(client))
+            continue;
+        int navId;
+        if (!SpawnAccel_GetClientNavId(client, navId))
+            continue;
+        clients[count] = client;
+        navIds[count] = navId;
+        count++;
+    }
+
+    if (count <= TEAM_NAV_TARGET_MAX)
+    {
+        g_TeamCollectCacheTime = now;
+        g_TeamCollectCacheCount = count;
+        for (int i = 0; i < count; i++)
+        {
+            g_TeamCollectCacheClients[i] = clients[i];
+            g_TeamCollectCacheNavIds[i] = navIds[i];
+        }
+    }
+    return count;
+}
+
+stock int SpawnAccel_TeamTargetFingerprint(const int[] clients, const int[] navIds, int count)
+{
+    int hash = count;
+    for (int i = 0; i < count; i++)
+    {
+        hash = hash * 16777619 ^ clients[i];
+        hash = hash * 16777619 ^ navIds[i];
+    }
+    return hash;
+}
+
+stock int SpawnAccel_PrepareTeamCandidates(
+    const int[] clients, const int[] navIds, int count, float maxAge)
+{
+    if (!SpawnAccel_CanUseTeamCandidates())
+        return ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE;
+    if (count <= 0)
+        return ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE;
+
+    int status = AnneSpawn_NavCandidatesPrepareTeam(
+        clients, navIds, count, SpawnAccel_GetCandidatePathLimit(),
+        FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin), maxAge);
+    if (status > 0)
+        g_iSpawnAccelCandidatePrepareReady++;
+    else if (status == 0 || status == ANNE_SPAWN_NAV_CANDIDATE_PENDING)
+        g_iSpawnAccelCandidatePreparePending++;
+    else
+        g_iSpawnAccelCandidatePrepareUnavailable++;
+    return status;
+}
+
 stock int SpawnAccel_PrepareTargetCandidatesRanked(
     int target, float maxAge, float highGroundMinHeight,
     float highGroundDistanceScale)
@@ -501,19 +621,42 @@ stock void SpawnAccel_UpdateCandidateSnapshots(float now, bool warm)
 
     Visibility_EnsureCurrentEyeSnapshot();
     float maxAge = interval * 0.75;
-    for (int client = 1; client <= MaxClients; client++)
+    if (SpawnAccel_CanUseTeamCandidates())
     {
-        if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
-            continue;
-        int status = SpawnAccel_PrepareTargetCandidates(client, maxAge);
-        if (status == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+        int clients[TEAM_NAV_TARGET_MAX];
+        int navIds[TEAM_NAV_TARGET_MAX];
+        int count = SpawnAccel_CollectEligibleTeamTargets(
+            clients, navIds, sizeof(clients));
+        if (count > 0)
         {
-            g_bSpawnAccelGraphCandidatesAvailable = false;
-            char diagnostics[256];
-            SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
-            Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; directed search disabled and Director fallback remains available; diagnostics=(%s)",
-                        diagnostics);
-            break;
+            int status = SpawnAccel_PrepareTeamCandidates(
+                clients, navIds, count, maxAge);
+            if (status == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+            {
+                g_bSpawnAccelGraphCandidatesAvailable = false;
+                char diagnostics[256];
+                SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
+                Debug_Print("[SPAWN ACCEL] team directed candidate snapshot unavailable; directed search disabled and Director fallback remains available; diagnostics=(%s)",
+                            diagnostics);
+            }
+        }
+    }
+    else
+    {
+        for (int client = 1; client <= MaxClients; client++)
+        {
+            if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+                continue;
+            int status = SpawnAccel_PrepareTargetCandidates(client, maxAge);
+            if (status == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
+            {
+                g_bSpawnAccelGraphCandidatesAvailable = false;
+                char diagnostics[256];
+                SpawnAccel_GetGraphDiagnostics(diagnostics, sizeof diagnostics);
+                Debug_Print("[SPAWN ACCEL] directed candidate snapshots unavailable; directed search disabled and Director fallback remains available; diagnostics=(%s)",
+                            diagnostics);
+                break;
+            }
         }
     }
 

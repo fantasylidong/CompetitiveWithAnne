@@ -11,6 +11,11 @@
 		"ko"		"[{olive}Readyup{default}] 패널이 {blue}켜짐{default}"
 	}
 
+	"PanelCommands"
+	{
+		"ko"		"▸ 명령어:"
+	}
+
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"

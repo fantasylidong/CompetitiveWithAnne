@@ -943,7 +943,7 @@
             <tr><td>核密度扣分</td><td>软扣分</td><td><code>inf_spawn_kernel_radius</code> = 280，<code>inf_spawn_kernel_points</code> = 30</td><td>对存活特感（权重 1.0）和最近刷点（权重 0.5）按 exp(−d/r) 累加密度，扣分 = 30 × min(密度, 1.5)。连续量，没有扇区那样的台阶。</td></tr>
             <tr><td>波内扇区配额</td><td>硬拒绝</td><td><code>inf_spawn_sector_quota_bonus</code> = 1，−1 关闭</td><td>以目标生还者为圆心分扇区（<code>GetCurrentSectors()</code>，6 特 = 4 个，动态 3～8），每扇区本波配额 = ceil(上限/扇区数)+1。<strong>只约束前 2/3 的距离档</strong>（10 档时 0–6），后 1/3 远档放开以保证按时刷出。</td></tr>
             <tr><td>最近扇区扣分</td><td>软扣分</td><td>最近 3 次扇区 −70 / −45 / −25</td><td>再乘 <code>PenLimitScale</code>（上限越高惩罚越弱），避免高特上限时把方向锁死。</td></tr>
-            <tr><td>Flow 桶占用上限</td><td>硬拒绝</td><td><code>inf_spawn_bucket_ratio</code> = 0.50</td><td>同一 Flow 进度桶内同时存活的特感不得超过 ceil(上限 × 0.50)（6 特 = 3）；桶计数按 <code>inf_BucketCountCacheTTL</code> = 0.2s 缓存。</td></tr>
+            <tr><td>Flow 桶占用上限</td><td>默认关闭</td><td><code>inf_spawn_bucket_ratio</code> = 0</td><td>默认不限制同一 Flow 进度桶内同时存活的特感；如显式设置为正数，仍按 ceil(上限 × 比例) 启用硬上限。</td></tr>
             <tr><td>页内洗牌</td><td>顺序</td><td><code>inf_spawn_candidate_shuffle</code> = 1</td><td>有向候选分页读取后在档内洗牌，打散“永远先评估最近一簇”的偏置；ranked 高点通道保序不洗。</td></tr>
           </tbody>
         </table>

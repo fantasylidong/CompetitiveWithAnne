@@ -17,6 +17,9 @@ enum struct SpawnFilterStats
     int position;
     int score;
     int bucket;
+    int ownerInvalid;
+    int ownerCapacity;
+    int behindBudget;
 
     void Reset()
     {
@@ -32,6 +35,9 @@ enum struct SpawnFilterStats
         this.position = 0;
         this.score = 0;
         this.bucket = 0;
+        this.ownerInvalid = 0;
+        this.ownerCapacity = 0;
+        this.behindBudget = 0;
     }
 }
 
@@ -195,8 +201,8 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     candidateBucket = ClampInt(candidateBucket, 0, 100);
     int scoringCenterBucket = centerBucket >= 0 ? centerBucket : candidateBucket;
 
-    // 3) 全局 dF=-8 仍参与评分，dF<-8 在随机点、trace/path 前直接淘汰。
-    //    Hunter/Jockey/Charger 默认更紧：dF=-4 仍评分，dF<-4 淘汰。
+    // 3) owner 进度低于 90% 时保留后方硬边界；达到 90% 后只做评分扣分，
+    //    避免地图末端因前方 Nav 不足而过早进入 Director 回退。
     if (candidateBucketKnown
         && SpawnScore_ShouldRejectBehindFlow(candidateBucket, scoringCenterBucket, zc))
     {
@@ -373,6 +379,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     candDbg.navRankDistance = navRankDistance;
     candDbg.navHighSortScale = (zc >= 1 && zc <= SI_COUNT)
         ? gCV.fNavHighSortScale[zc] : 1.0;
+    candDbg.ownerClient = targetSurvivor;
 
     // 公式结果低于 0 时最终分钳制为 0；0 分候选不具备生成资格。
     // 正数 floor 仍作为额外实验门槛，等于 floor 的候选允许参与选择。
@@ -446,6 +453,13 @@ enum struct SpawnSearchCursor
     SpawnCandidateSource source;
     int graphTargetClient;
     int graphTargetNavId;
+    bool graphTeamMode;
+    bool graphMaxInclusive;
+    int teamTargetCount;
+    int teamTargetClients[TEAM_NAV_TARGET_MAX];
+    int teamTargetNavIds[TEAM_NAV_TARGET_MAX];
+    int teamFingerprint;
+    int behindBudgetUsed;
     float graphPathLimit;
     float graphMinNavDistance;
     float graphMaxNavDistance;
@@ -456,6 +470,7 @@ enum struct SpawnSearchCursor
     int graphPage[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
     float graphPageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
+    int graphPageOwner[NAV_CANDIDATE_PAGE_SIZE];
     int graphPageTertile[NAV_CANDIDATE_PAGE_SIZE];
     bool tertileActive;
     int graphPageLen;
@@ -474,6 +489,11 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.source = SpawnCandidate_None;
     cursor.graphTargetClient = -1;
     cursor.graphTargetNavId = -1;
+    cursor.graphTeamMode = false;
+    cursor.graphMaxInclusive = true;
+    cursor.teamTargetCount = 0;
+    cursor.teamFingerprint = 0;
+    cursor.behindBudgetUsed = 0;
     cursor.graphPathLimit = 0.0;
     cursor.graphScanMinRange = 0.0;
     cursor.graphMinNavDistance = 0.0;
@@ -514,17 +534,25 @@ void SpawnSearch_ResetClass(int zc, bool teleportMode)
 static bool SpawnSearch_Matches(SpawnSearchCursor cursor,
                                 int zc, int targetSurvivor, float minRange,
                                 float maxRange, float graphScanMinRange,
-                                bool teleportMode)
+                                bool teleportMode, bool teamMode,
+                                int teamFingerprint, bool maxInclusive)
 {
     if (!cursor.active || cursor.zc != zc
-        || cursor.targetSurvivor != targetSurvivor
         || cursor.minRange != minRange || cursor.maxRange != maxRange
         || cursor.graphScanMinRange != graphScanMinRange
-        || cursor.teleportMode != teleportMode)
+        || cursor.teleportMode != teleportMode
+        || cursor.graphTeamMode != teamMode)
     {
         return false;
     }
+    if (teamMode)
+    {
+        return cursor.teamFingerprint == teamFingerprint
+            && cursor.graphMaxInclusive == maxInclusive;
+    }
 
+    if (cursor.targetSurvivor != targetSurvivor)
+        return false;
     int userid = (targetSurvivor >= 1 && targetSurvivor <= MaxClients
         && IsClientInGame(targetSurvivor)) ? GetClientUserId(targetSurvivor) : 0;
     return userid == cursor.targetUserid;
@@ -666,11 +694,25 @@ static float SpawnSearch_WantedHighSortScale(int zc)
     return ClampFloat(gCV.fNavHighSortScale[zc], 0.50, 1.0);
 }
 
+static void SpawnSearch_CopyTeamTargets(SpawnSearchCursor cursor,
+                                        const int[] clients, const int[] navIds,
+                                        int count)
+{
+    cursor.teamTargetCount = count;
+    for (int i = 0; i < count; i++)
+    {
+        cursor.teamTargetClients[i] = clients[i];
+        cursor.teamTargetNavIds[i] = navIds[i];
+    }
+}
+
 static void SpawnSearch_ConfigureCursor(
     SpawnSearchCursor cursor, int zc, int targetSurvivor,
     float minRange, float maxRange, float graphScanMinRange,
     bool teleportMode,
-    int graphTargetClient, int graphTargetNavId)
+    int graphTargetClient, int graphTargetNavId,
+    bool teamMode, const int[] teamClients, const int[] teamNavIds,
+    int teamCount, bool maxInclusive)
 {
     SpawnSearch_ResetCursor(cursor);
     cursor.zc = zc;
@@ -681,18 +723,36 @@ static void SpawnSearch_ConfigureCursor(
     cursor.maxRange = maxRange;
     cursor.graphScanMinRange = graphScanMinRange;
     cursor.teleportMode = teleportMode;
+    cursor.graphTeamMode = teamMode;
+    cursor.graphMaxInclusive = maxInclusive;
     cursor.graphTargetClient = graphTargetClient;
     cursor.graphTargetNavId = graphTargetNavId;
+    if (teamMode)
+    {
+        SpawnSearch_CopyTeamTargets(cursor, teamClients, teamNavIds, teamCount);
+        cursor.teamFingerprint = SpawnAccel_TeamTargetFingerprint(
+            teamClients, teamNavIds, teamCount);
+    }
     cursor.graphPathLimit = SpawnAccel_GetCandidatePathLimit();
-    cursor.graphMinNavDistance = graphScanMinRange > minRange
-        ? graphScanMinRange
-        : FloatMax(0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
-    cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK
-        + Tactical_GetMaxHighGroundNavCompensation(zc);
+    if (teamMode)
+    {
+        cursor.graphMinNavDistance = minRange;
+        cursor.graphMaxNavDistance = maxRange;
+    }
+    else
+    {
+        cursor.graphMinNavDistance = graphScanMinRange > minRange
+            ? graphScanMinRange
+            : FloatMax(0.0, minRange - NAV_CANDIDATE_RANGE_SLACK);
+        cursor.graphMaxNavDistance = maxRange + NAV_CANDIDATE_RANGE_SLACK
+            + Tactical_GetMaxHighGroundNavCompensation(zc);
+    }
     cursor.graphHighSortMinHeight = gCV.fNavHighSortMinHeight;
-    cursor.graphHighSortScale = SpawnSearch_WantedHighSortScale(zc);
-    cursor.source = (graphTargetClient > 0 && graphTargetNavId > 0
-        && SpawnAccel_CanUseGraphCandidates())
+    cursor.graphHighSortScale = teamMode ? 1.0 : SpawnSearch_WantedHighSortScale(zc);
+    bool haveGraphTarget = teamMode
+        ? (teamCount > 0)
+        : (graphTargetClient > 0 && graphTargetNavId > 0);
+    cursor.source = (haveGraphTarget && SpawnAccel_CanUseGraphCandidates())
         ? SpawnCandidate_Graph : SpawnCandidate_None;
     cursor.active = true;
 }
@@ -703,16 +763,36 @@ static void SpawnSearch_EnsureCursor(
     bool teleportMode,
     int graphTargetClient, int graphTargetNavId)
 {
+    int teamClients[TEAM_NAV_TARGET_MAX];
+    int teamNavIds[TEAM_NAV_TARGET_MAX];
+    int teamCount = 0;
+    bool teamMode = SpawnAccel_CanUseTeamCandidates();
+    bool maxInclusive = true;
+    if (teamMode)
+    {
+        teamCount = SpawnAccel_CollectEligibleTeamTargets(
+            teamClients, teamNavIds, sizeof(teamClients));
+        maxInclusive = maxRange + 0.01 >= Tactical_GetClassPathCap(zc);
+    }
+    int teamFingerprint = teamMode
+        ? SpawnAccel_TeamTargetFingerprint(teamClients, teamNavIds, teamCount)
+        : 0;
     bool matches = SpawnSearch_Matches(
         cursor, zc, targetSurvivor, minRange, maxRange,
-        graphScanMinRange, teleportMode);
-    SpawnCandidateSource wantedSource = graphTargetClient > 0 && graphTargetNavId > 0
-        && SpawnAccel_CanUseGraphCandidates()
-        ? SpawnCandidate_Graph : SpawnCandidate_None;
-    bool graphTargetMoved = wantedSource == SpawnCandidate_Graph
+        graphScanMinRange, teleportMode, teamMode, teamFingerprint,
+        maxInclusive);
+    SpawnCandidateSource wantedSource;
+    if (teamMode)
+        wantedSource = (teamCount > 0 && SpawnAccel_CanUseGraphCandidates())
+            ? SpawnCandidate_Graph : SpawnCandidate_None;
+    else
+        wantedSource = graphTargetClient > 0 && graphTargetNavId > 0
+            && SpawnAccel_CanUseGraphCandidates()
+            ? SpawnCandidate_Graph : SpawnCandidate_None;
+    bool graphTargetMoved = !teamMode && wantedSource == SpawnCandidate_Graph
         && (cursor.graphTargetClient != graphTargetClient
             || cursor.graphTargetNavId != graphTargetNavId);
-    bool rankedParamsChanged = wantedSource == SpawnCandidate_Graph
+    bool rankedParamsChanged = !teamMode && wantedSource == SpawnCandidate_Graph
         && (cursor.graphHighSortScale != SpawnSearch_WantedHighSortScale(zc)
             || cursor.graphHighSortMinHeight != gCV.fNavHighSortMinHeight);
     if (!matches
@@ -722,7 +802,9 @@ static void SpawnSearch_EnsureCursor(
         SpawnSearch_ConfigureCursor(
             cursor, zc, targetSurvivor, minRange, maxRange,
             graphScanMinRange, teleportMode,
-            graphTargetClient, graphTargetNavId);
+            graphTargetClient, graphTargetNavId,
+            teamMode, teamClients, teamNavIds, teamCount,
+            maxInclusive);
     }
 }
 
@@ -825,7 +907,7 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
     for (int row = 0; row < count; row++)
         cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
     cursor.tertileActive = false;
-    if (count <= 2)
+    if (cursor.graphTeamMode || count <= 2)
         return;
 
     // 近/中/远按当前档搜索环切，所以档数越多单环越窄。10 档下扩圈环只有
@@ -967,13 +1049,14 @@ static void SpawnSearch_PreparePageOrder(SpawnSearchCursor cursor, bool ranked)
 static SpawnCandidateReadResult SpawnSearch_NextCandidate(
     SpawnSearchCursor cursor, int &areaIdx, int &candidateBucket,
     float &navDistance, float &navRankDistance, int &candidateTertile,
-    bool &rejectBadFlow)
+    bool &rejectBadFlow, int &ownerClient)
 {
     candidateBucket = -1;
     navDistance = -1.0;
     navRankDistance = -1.0;
     candidateTertile = SPAWN_TERTILE_NEAR;
     rejectBadFlow = false;
+    ownerClient = cursor.targetSurvivor;
     while (cursor.source != SpawnCandidate_None)
     {
         if (cursor.source == SpawnCandidate_Graph)
@@ -985,6 +1068,8 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 navDistance = cursor.graphPageNavDistance[pageRow];
                 navRankDistance = cursor.graphPageRankDistance[pageRow];
                 candidateTertile = cursor.graphPageTertile[pageRow];
+                ownerClient = cursor.graphTeamMode
+                    ? cursor.graphPageOwner[pageRow] : cursor.targetSurvivor;
                 if (candidateTertile < SPAWN_TERTILE_NEAR || candidateTertile > SPAWN_TERTILE_FAR)
                     candidateTertile = SPAWN_TERTILE_NEAR;
                 TryGetBucketByAreaIdx(areaIdx, candidateBucket);
@@ -1001,14 +1086,27 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 return SpawnCandidateRead_Exhausted;
             }
 
-            bool ranked = cursor.graphHighSortScale < 0.999
+            bool teamMode = cursor.graphTeamMode && SpawnAccel_CanUseTeamCandidates();
+            bool ranked = !teamMode && cursor.graphHighSortScale < 0.999
                 && SpawnAccel_CanUseRankedCandidates();
-            int prepareStatus = ranked
-                ? SpawnAccel_PrepareTargetCandidatesRanked(
-                    cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL,
-                    cursor.graphHighSortMinHeight, cursor.graphHighSortScale)
-                : SpawnAccel_PrepareTargetCandidates(
-                    cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL);
+            int prepareStatus;
+            if (teamMode)
+            {
+                if (cursor.teamTargetCount <= 0)
+                    return SpawnCandidateRead_Exhausted;
+                prepareStatus = SpawnAccel_PrepareTeamCandidates(
+                    cursor.teamTargetClients, cursor.teamTargetNavIds,
+                    cursor.teamTargetCount, NAV_CANDIDATE_RESULT_TTL);
+            }
+            else
+            {
+                prepareStatus = ranked
+                    ? SpawnAccel_PrepareTargetCandidatesRanked(
+                        cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL,
+                        cursor.graphHighSortMinHeight, cursor.graphHighSortScale)
+                    : SpawnAccel_PrepareTargetCandidates(
+                        cursor.graphTargetClient, NAV_CANDIDATE_RESULT_TTL);
+            }
             if (prepareStatus == ANNE_SPAWN_NAV_CANDIDATE_UNAVAILABLE)
             {
                 if (SpawnAccel_IsDynamicGraphPending())
@@ -1026,8 +1124,31 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             int page[NAV_CANDIDATE_PAGE_SIZE];
             float pageNavDistance[NAV_CANDIDATE_PAGE_SIZE];
             float pageRankDistance[NAV_CANDIDATE_PAGE_SIZE];
+            int pageOwner[NAV_CANDIDATE_PAGE_SIZE];
             int count;
-            if (ranked)
+            if (teamMode)
+            {
+                count = AnneSpawn_NavCandidatesCollectTeam(
+                    cursor.teamTargetClients,
+                    cursor.teamTargetNavIds,
+                    cursor.teamTargetCount,
+                    cursor.graphMinNavDistance,
+                    cursor.graphMaxNavDistance,
+                    cursor.graphPathLimit,
+                    FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin),
+                    NAV_CANDIDATE_RESULT_TTL,
+                    cursor.graphMaxInclusive,
+                    cursor.graphFetchOffset,
+                    page,
+                    pageNavDistance,
+                    pageOwner,
+                    NAV_CANDIDATE_PAGE_SIZE,
+                    resultAgeMs,
+                    totalInRange);
+                for (int row = 0; row < count; row++)
+                    pageRankDistance[row] = pageNavDistance[row];
+            }
+            else if (ranked)
             {
                 count = AnneSpawn_NavCandidatesCollectRanked(
                     cursor.graphTargetClient,
@@ -1096,6 +1217,8 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                 cursor.graphPage[row] = page[row];
                 cursor.graphPageNavDistance[row] = pageNavDistance[row];
                 cursor.graphPageRankDistance[row] = pageRankDistance[row];
+                cursor.graphPageOwner[row] = teamMode
+                    ? pageOwner[row] : cursor.targetSurvivor;
                 cursor.graphPageTertile[row] = SPAWN_TERTILE_NEAR;
             }
             // 按当前档搜索环的路径距离三分位交错消费：近:中:远 = 3:3:1，
@@ -1108,6 +1231,32 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
         return SpawnCandidateRead_Exhausted;
     }
     return SpawnCandidateRead_Exhausted;
+}
+
+static bool SpawnSearch_BindOwnerFrame(int owner, SpawnFrameContext frame)
+{
+    if (!IsEligibleSpawnTarget(owner))
+        return false;
+
+    GetClientEyePosition(owner, frame.targetPoint);
+    frame.refEyeZ = frame.targetPoint[2];
+    float origin[3];
+    GetClientAbsOrigin(owner, origin);
+    frame.targetFootZ = origin[2];
+    frame.navStartClient = owner;
+    frame.navStart = L4D2Direct_GetTerrorNavArea(origin);
+    if (frame.navStart == Address_Null)
+    {
+        frame.navStart = L4D_GetNearestNavArea(
+            origin, 120.0, false, false, false, TEAM_INFECTED);
+    }
+    if (frame.navStart == Address_Null)
+        return false;
+    frame.navStartId = L4D_GetNavAreaID(frame.navStart);
+    SpawnCore_TryGetTargetBucket(owner, frame.centerBucket);
+    frame.positionCheckBucket = frame.centerBucket;
+    GetSectorCenter(frame.center, owner);
+    return true;
 }
 
 static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
@@ -1125,6 +1274,19 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     bool enforceSectorQuota = bandStage >= 0
         && bandStage < TACTICAL_BAND_STAGES - (TACTICAL_BAND_STAGES / 3);
 
+    if (SpawnAccel_CanUseTeamCandidates())
+    {
+        int teamClients[TEAM_NAV_TARGET_MAX];
+        int teamNavIds[TEAM_NAV_TARGET_MAX];
+        if (SpawnAccel_CollectEligibleTeamTargets(
+                teamClients, teamNavIds, sizeof(teamClients)) <= 0)
+        {
+            SpawnSearch_ResetCursor(cursor);
+            SpawnPerf_RecordAttempt(0.0, false);
+            return SpawnSearch_Exhausted;
+        }
+    }
+
     SpawnFrameContext frame;
     if (!SpawnSearch_BuildFrameContext(targetSurvivor, frame))
     {
@@ -1135,11 +1297,18 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     SpawnSearch_EnsureCursor(
         cursor, zc, targetSurvivor, minRange, maxRange, graphScanMinRange,
         teleportMode, frame.navStartClient, frame.navStartId);
+    if (cursor.graphTeamMode && cursor.teamTargetCount <= 0)
+    {
+        SpawnSearch_ResetCursor(cursor);
+        SpawnPerf_RecordAttempt(0.0, false);
+        return SpawnSearch_Exhausted;
+    }
 
     float sliceStart = GetEngineTime();
     int sliceInspected = 0;
     int sliceExpensive = 0;
     int acceptedHits = 0;
+    int boundOwner = -1;
     int tertileAccepted[3];
     tertileAccepted[0] = tertileAccepted[1] = tertileAccepted[2] = 0;
     bool exhausted = false;
@@ -1159,9 +1328,10 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         float navRankDistance;
         int candidateTertile;
         bool rejectBadFlow;
+        int ownerClient;
         SpawnCandidateReadResult readResult = SpawnSearch_NextCandidate(
             cursor, areaIdx, candidateBucket, navDistance,
-            navRankDistance, candidateTertile, rejectBadFlow);
+            navRankDistance, candidateTertile, rejectBadFlow, ownerClient);
         if (readResult == SpawnCandidateRead_Pending)
             break;
         if (readResult == SpawnCandidateRead_Exhausted)
@@ -1172,6 +1342,52 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 
         sliceInspected++;
         cursor.inspected++;
+
+        int evalTarget = targetSurvivor;
+        if (cursor.graphTeamMode)
+        {
+            if (!IsEligibleSpawnTarget(ownerClient))
+            {
+                cursor.stats.ownerInvalid++;
+                SpawnPerf_RecordFilterByOwnerInvalid();
+                continue;
+            }
+            if (SpawnTarget_IsAtCapacity(ownerClient))
+            {
+                cursor.stats.ownerCapacity++;
+                SpawnPerf_RecordFilterByOwnerCapacity();
+                continue;
+            }
+            // 连续候选常属于同一 owner；只有 owner 变化时才重绑评估帧，
+            // 避免每行重复做眼位/NavArea/扇区中心查询。
+            if (ownerClient != boundOwner)
+            {
+                if (!SpawnSearch_BindOwnerFrame(ownerClient, frame))
+                {
+                    boundOwner = -1;
+                    continue;
+                }
+                boundOwner = ownerClient;
+            }
+            evalTarget = ownerClient;
+        }
+
+        // 尾段软化会让大量后方候选涌入评估管线，每个都要做昂贵的可见性
+        // 检查，把 Director 兜底拖到永远轮不上。每个距离层只评估有限个
+        // "本应被后方硬拒绝"的候选，超出预算直接跳过。
+        if (gCV.iSpawnBehindEvalBudget > 0
+            && SpawnScore_IsBehindSoftened(frame.centerBucket)
+            && SpawnScore_IsBehindBeyondGap(candidateBucket, frame.centerBucket, zc))
+        {
+            if (cursor.behindBudgetUsed >= gCV.iSpawnBehindEvalBudget)
+            {
+                cursor.stats.behindBudget++;
+                SpawnPerf_RecordFilterByBehindBudget();
+                continue;
+            }
+            cursor.behindBudgetUsed++;
+        }
+
         if (cursor.tertileActive)
         {
             int unread[3];
@@ -1186,7 +1402,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         bool usedExpensive;
         SpawnScoreDbg candDbg;
         bool accepted = SpawnCore_EvaluateNavCandidate(
-            zc, targetSurvivor,
+            zc, evalTarget,
             frame.targetPoint, minRange,
             maxRange, teleportMode,
             enforceSectorQuota,
@@ -1253,7 +1469,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     if (!exhausted)
         return SpawnSearch_Pending;
 
-    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,behindFlow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d",
+    Debug_Print("[FIND FAIL] navRange=%.1f..%.1f graphScanMin=%.1f inspected=%d. Filters: cd=%d,flag=%d,flow=%d,behindFlow=%d,dist=%d,sep=%d,stuck=%d,vis=%d,path=%d,pos=%d,score=%d,bkt=%d,ownerInvalid=%d,ownerCapacity=%d,behindBudget=%d",
                 cursor.minRange, cursor.maxRange, cursor.graphScanMinRange,
                 cursor.inspected,
                 cursor.stats.cooldown, cursor.stats.flags,
@@ -1263,7 +1479,8 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
                 cursor.stats.stuck,
                 cursor.stats.visibility, cursor.stats.path,
                 cursor.stats.position, cursor.stats.score,
-                cursor.stats.bucket);
+                cursor.stats.bucket, cursor.stats.ownerInvalid,
+                cursor.stats.ownerCapacity, cursor.stats.behindBudget);
     SpawnPerf_RecordAttempt(cursor.elapsedMs, false);
     SpawnSearch_ResetCursor(cursor);
     return SpawnSearch_Exhausted;

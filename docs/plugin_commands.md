@@ -157,7 +157,6 @@
 | `extend/l4d_stats.smx` | `sm_rankmenu` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/l4d_stats.smx` | `sm_rankmute` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/l4d_stats.smx` | `sm_rankmutetoggle` | 玩家/控制台 | - | - | 34 个模式 |
-| `extend/l4d_stats.smx` | `sm_rankvote` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/l4d_stats.smx` | `sm_resetscore` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/l4d_stats.smx` | `sm_showmaptimes` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/l4d_stats.smx` | `sm_showmotd` | 玩家/控制台 | - | - | 34 个模式 |

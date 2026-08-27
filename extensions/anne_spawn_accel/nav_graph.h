@@ -57,6 +57,12 @@ struct AnneNavGraphInputEdge
     AnneNavEdgeType type = AnneNavEdgeType::Floor;
 };
 
+struct AnneNavSearchTarget
+{
+    std::uint32_t index = 0;
+    int client = 0;
+};
+
 class AnneNavGraph final
 {
 public:
@@ -85,6 +91,12 @@ public:
                                   const std::vector<std::uint8_t> &blocked,
                                   std::vector<float> &distances,
                                   std::vector<std::uint8_t> &usesSpecialEdge) const;
+    bool BuildReverseReachability(
+        const std::vector<AnneNavSearchTarget> &targets, float maxDistance,
+        const std::vector<std::uint8_t> &blocked,
+        std::vector<float> &distances,
+        std::vector<std::uint8_t> &usesSpecialEdge,
+        std::vector<int> &owners) const;
 
     static std::uint32_t PackEdge(std::uint32_t target, AnneNavEdgeType type);
     static std::uint32_t EdgeTarget(std::uint32_t edge);
@@ -126,6 +138,19 @@ bool AnneBuildRankedNavCandidateSnapshot(
     std::vector<std::uint32_t> &areaIndices,
     std::vector<float> &candidatePathDistances,
     std::vector<float> &candidateRankDistances,
+    std::vector<float> &pathDistances,
+    std::vector<std::uint8_t> &usesSpecialEdge);
+
+bool AnneBuildTeamNavCandidateSnapshot(
+    const AnneNavGraph &graph,
+    const std::vector<AnneNavSearchTarget> &targets,
+    float maxPathDistance,
+    const std::vector<std::uint8_t> &blocked,
+    const std::vector<float> &survivorEyes,
+    float minSurvivorDistance,
+    std::vector<std::uint32_t> &areaIndices,
+    std::vector<float> &candidatePathDistances,
+    std::vector<int> &candidateOwners,
     std::vector<float> &pathDistances,
     std::vector<std::uint8_t> &usesSpecialEdge);
 

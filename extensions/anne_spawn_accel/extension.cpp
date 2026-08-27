@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -51,6 +52,7 @@ constexpr std::size_t kBlockedSnapshotSanityMinAreas = 128;
 constexpr float kCandidateSpatialQuantum = 32.0f;
 constexpr float kCandidateRankHeightQuantum = 8.0f;
 constexpr std::size_t kCandidateCacheLimit = 8;
+constexpr std::size_t kMaxTeamTargets = 16;
 constexpr std::size_t kCandidatePerfSampleCap = 256;
 constexpr int kCandidatePending = -1;
 constexpr int kCandidateUnavailable = -2;
@@ -189,17 +191,22 @@ struct NavCandidateResult
     std::uint64_t survivorSpatialKey = 0;
     int targetClient = 0;
     std::uint32_t targetId = 0;
+    std::vector<int> targetClients;
+    std::vector<std::uint32_t> targetNavIds;
     float maxPathDistance = 0.0f;
     float minSurvivorDistance = 0.0f;
     float targetEyeZ = 0.0f;
     float highGroundMinHeight = 0.0f;
     float highGroundDistanceScale = 1.0f;
+    bool teamSnapshot = false;
     int blockedEpoch = -1;
     double completedAt = 0.0;
     float buildMs = 0.0f;
     std::vector<std::uint32_t> areaIndices;
     std::vector<float> pathDistances;
     std::vector<float> rankDistances;
+    std::vector<int> ownerClients;
+    std::vector<std::uint32_t> flowOrder;
 };
 
 struct NavCandidateRequest
@@ -209,11 +216,14 @@ struct NavCandidateRequest
     std::uint64_t survivorSpatialKey = 0;
     int targetClient = 0;
     std::uint32_t targetId = 0;
+    std::vector<int> targetClients;
+    std::vector<std::uint32_t> targetNavIds;
     float maxPathDistance = 0.0f;
     float minSurvivorDistance = 0.0f;
     float targetEyeZ = 0.0f;
     float highGroundMinHeight = 0.0f;
     float highGroundDistanceScale = 1.0f;
+    bool teamSnapshot = false;
     int blockedEpoch = -1;
 };
 
@@ -434,15 +444,66 @@ bool GetCandidateTargetEyeZ(int targetClient, float highGroundDistanceScale,
     return false;
 }
 
+float TeamCandidateFlow(const AnneNavGraph &graph, std::uint32_t index)
+{
+    if (index < graph.resolvedFlowDistances.size())
+        return graph.resolvedFlowDistances[index];
+    if (index < graph.flowDistances.size())
+        return graph.flowDistances[index];
+    return -1.0f;
+}
+
+bool CanonicalizeTeamTargets(std::vector<int> &clients,
+                             std::vector<std::uint32_t> &navIds)
+{
+    if (clients.size() != navIds.size() || clients.empty() ||
+        clients.size() > kMaxTeamTargets)
+    {
+        return false;
+    }
+    std::vector<std::size_t> order(clients.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+        if (clients[left] != clients[right])
+            return clients[left] < clients[right];
+        return navIds[left] < navIds[right];
+    });
+    std::vector<int> sortedClients;
+    std::vector<std::uint32_t> sortedNavIds;
+    sortedClients.reserve(clients.size());
+    sortedNavIds.reserve(navIds.size());
+    for (std::size_t row : order)
+    {
+        if (clients[row] <= 0 || navIds[row] == 0)
+            return false;
+        sortedClients.push_back(clients[row]);
+        sortedNavIds.push_back(navIds[row]);
+    }
+    clients.swap(sortedClients);
+    navIds.swap(sortedNavIds);
+    return true;
+}
+
+bool TeamTargetsEqual(const std::vector<int> &leftClients,
+                      const std::vector<std::uint32_t> &leftNavIds,
+                      const std::vector<int> &rightClients,
+                      const std::vector<std::uint32_t> &rightNavIds)
+{
+    return leftClients == rightClients && leftNavIds == rightNavIds;
+}
+
 bool NavCandidateMatches(const NavCandidateResult &result,
-                         int targetClient, std::uint32_t targetId,
+                         const std::vector<int> &targetClients,
+                         const std::vector<std::uint32_t> &targetNavIds,
                          float maxPathDistance, float minSurvivorDistance,
                          float targetEyeZ, float highGroundMinHeight,
-                         float highGroundDistanceScale,
+                         float highGroundDistanceScale, bool teamSnapshot,
                          std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
     return result.generation == g_NavGraphGeneration.load() &&
-           result.targetClient == targetClient && result.targetId == targetId &&
+           result.teamSnapshot == teamSnapshot &&
+           TeamTargetsEqual(result.targetClients, result.targetNavIds,
+                            targetClients, targetNavIds) &&
            result.maxPathDistance + 0.01f >= maxPathDistance &&
            std::fabs(result.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
            std::fabs(result.targetEyeZ - targetEyeZ) <= 0.01f &&
@@ -452,15 +513,31 @@ bool NavCandidateMatches(const NavCandidateResult &result,
            result.blockedEpoch == blockedEpoch;
 }
 
+bool NavCandidateMatches(const NavCandidateResult &result,
+                         int targetClient, std::uint32_t targetId,
+                         float maxPathDistance, float minSurvivorDistance,
+                         float targetEyeZ, float highGroundMinHeight,
+                         float highGroundDistanceScale,
+                         std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    return NavCandidateMatches(result, {targetClient}, {targetId},
+                               maxPathDistance, minSurvivorDistance, targetEyeZ,
+                               highGroundMinHeight, highGroundDistanceScale,
+                               false, survivorSpatialKey, blockedEpoch);
+}
+
 bool NavCandidateRequestMatches(const NavCandidateRequest &request,
-                                int targetClient, std::uint32_t targetId,
+                                const std::vector<int> &targetClients,
+                                const std::vector<std::uint32_t> &targetNavIds,
                                 float maxPathDistance, float minSurvivorDistance,
                                 float targetEyeZ, float highGroundMinHeight,
-                                float highGroundDistanceScale,
+                                float highGroundDistanceScale, bool teamSnapshot,
                                 std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
     return request.generation == g_NavGraphGeneration.load() &&
-           request.targetClient == targetClient && request.targetId == targetId &&
+           request.teamSnapshot == teamSnapshot &&
+           TeamTargetsEqual(request.targetClients, request.targetNavIds,
+                            targetClients, targetNavIds) &&
            request.maxPathDistance + 0.01f >= maxPathDistance &&
            std::fabs(request.minSurvivorDistance - minSurvivorDistance) <= 0.01f &&
            std::fabs(request.targetEyeZ - targetEyeZ) <= 0.01f &&
@@ -470,6 +547,42 @@ bool NavCandidateRequestMatches(const NavCandidateRequest &request,
            request.blockedEpoch == blockedEpoch;
 }
 
+bool NavCandidateRequestMatches(const NavCandidateRequest &request,
+                                int targetClient, std::uint32_t targetId,
+                                float maxPathDistance, float minSurvivorDistance,
+                                float targetEyeZ, float highGroundMinHeight,
+                                float highGroundDistanceScale,
+                                std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    return NavCandidateRequestMatches(
+        request, {targetClient}, {targetId}, maxPathDistance, minSurvivorDistance,
+        targetEyeZ, highGroundMinHeight, highGroundDistanceScale, false,
+        survivorSpatialKey, blockedEpoch);
+}
+
+std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
+    const std::vector<int> &targetClients,
+    const std::vector<std::uint32_t> &targetNavIds,
+    float maxPathDistance, float minSurvivorDistance,
+    float targetEyeZ, float highGroundMinHeight,
+    float highGroundDistanceScale, bool teamSnapshot,
+    std::uint64_t survivorSpatialKey, int blockedEpoch)
+{
+    for (auto iterator = g_NavCandidateCache.rbegin();
+         iterator != g_NavCandidateCache.rend(); ++iterator)
+    {
+        if (NavCandidateMatches(**iterator, targetClients, targetNavIds,
+                                maxPathDistance, minSurvivorDistance,
+                                targetEyeZ, highGroundMinHeight,
+                                highGroundDistanceScale, teamSnapshot,
+                                survivorSpatialKey, blockedEpoch))
+        {
+            return *iterator;
+        }
+    }
+    return nullptr;
+}
+
 std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
     int targetClient, std::uint32_t targetId,
     float maxPathDistance, float minSurvivorDistance,
@@ -477,19 +590,10 @@ std::shared_ptr<NavCandidateResult> FindNavCandidateLocked(
     float highGroundDistanceScale,
     std::uint64_t survivorSpatialKey, int blockedEpoch)
 {
-    for (auto iterator = g_NavCandidateCache.rbegin();
-         iterator != g_NavCandidateCache.rend(); ++iterator)
-    {
-        if (NavCandidateMatches(**iterator, targetClient, targetId,
-                                maxPathDistance, minSurvivorDistance,
-                                targetEyeZ, highGroundMinHeight,
-                                highGroundDistanceScale,
-                                survivorSpatialKey, blockedEpoch))
-        {
-            return *iterator;
-        }
-    }
-    return nullptr;
+    return FindNavCandidateLocked(
+        {targetClient}, {targetId}, maxPathDistance, minSurvivorDistance,
+        targetEyeZ, highGroundMinHeight, highGroundDistanceScale, false,
+        survivorSpatialKey, blockedEpoch);
 }
 
 template <std::size_t Size>
@@ -1399,8 +1503,11 @@ void PublishPendingResults()
         g_NavCandidateCache.erase(
             std::remove_if(g_NavCandidateCache.begin(), g_NavCandidateCache.end(),
                            [&result](const std::shared_ptr<NavCandidateResult> &cached) {
-                               return cached->targetClient == result->targetClient &&
-                                      cached->targetId == result->targetId &&
+                               return cached->teamSnapshot == result->teamSnapshot &&
+                                      TeamTargetsEqual(cached->targetClients,
+                                                       cached->targetNavIds,
+                                                       result->targetClients,
+                                                       result->targetNavIds) &&
                                       cached->survivorSpatialKey == result->survivorSpatialKey &&
                                       cached->blockedEpoch == result->blockedEpoch &&
                                       cached->minSurvivorDistance == result->minSurvivorDistance &&
@@ -1903,11 +2010,14 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
     request.survivorSpatialKey = survivorSpatialKey;
     request.targetClient = targetClient;
     request.targetId = targetId;
+    request.targetClients = {targetClient};
+    request.targetNavIds = {targetId};
     request.maxPathDistance = maxPathDistance;
     request.minSurvivorDistance = minSurvivorDistance;
     request.targetEyeZ = targetEyeZ;
     request.highGroundMinHeight = highGroundMinHeight;
     request.highGroundDistanceScale = highGroundDistanceScale;
+    request.teamSnapshot = false;
     request.blockedEpoch = blockedEpoch;
     {
         std::lock_guard<std::mutex> lock(g_GraphMutex);
@@ -1924,11 +2034,14 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
             result->survivorSpatialKey = request.survivorSpatialKey;
             result->targetClient = request.targetClient;
             result->targetId = request.targetId;
+            result->targetClients = request.targetClients;
+            result->targetNavIds = request.targetNavIds;
             result->maxPathDistance = request.maxPathDistance;
             result->minSurvivorDistance = request.minSurvivorDistance;
             result->targetEyeZ = request.targetEyeZ;
             result->highGroundMinHeight = request.highGroundMinHeight;
             result->highGroundDistanceScale = request.highGroundDistanceScale;
+            result->teamSnapshot = request.teamSnapshot;
             result->blockedEpoch = request.blockedEpoch;
 
             std::vector<float> allPathDistances;
@@ -1946,6 +2059,190 @@ int PrepareNavCandidates(int targetClient, std::uint32_t targetId,
                 result->areaIndices.clear();
                 result->pathDistances.clear();
                 result->rankDistances.clear();
+            }
+
+            result->completedAt = SteadySeconds();
+            result->buildMs = static_cast<float>(
+                (result->completedAt - buildStart) * 1000.0);
+
+            std::lock_guard<std::mutex> lock(g_GraphMutex);
+            g_PendingNavCandidates.push_back(std::move(result));
+        });
+    if (!queued)
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavCandidateInFlight.erase(
+            std::remove_if(g_NavCandidateInFlight.begin(), g_NavCandidateInFlight.end(),
+                           [serial](const NavCandidateRequest &pending) {
+                               return pending.serial == serial;
+                           }),
+            g_NavCandidateInFlight.end());
+        return kCandidatePending;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        ++g_NavCandidatePerf.queued;
+    }
+    return 0;
+}
+
+int PrepareTeamNavCandidates(std::vector<int> targetClients,
+                             std::vector<std::uint32_t> targetNavIds,
+                             float maxPathDistance, float minSurvivorDistance,
+                             float maxSnapshotAge)
+{
+    PumpNavGraph();
+    if (g_NavGraphState.load() != kNavGraphReady || maxPathDistance <= 0.0f ||
+        minSurvivorDistance < 0.0f || maxSnapshotAge < 0.0f ||
+        !CanonicalizeTeamTargets(targetClients, targetNavIds))
+    {
+        return kCandidateUnavailable;
+    }
+
+    std::shared_ptr<AnneNavGraph> graph;
+    std::shared_ptr<AnneNavGraphMetadata> metadata;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        graph = g_NavGraph;
+        metadata = g_NavMetadata;
+    }
+    if (!graph || !graph->complete || !metadata ||
+        metadata->areaPointers.size() != graph->navIds.size())
+    {
+        return kCandidateUnavailable;
+    }
+
+    std::vector<AnneNavSearchTarget> targets;
+    targets.reserve(targetClients.size());
+    for (std::size_t row = 0; row < targetClients.size(); ++row)
+    {
+        std::uint32_t targetIndex = 0;
+        if (!graph->FindIndex(targetNavIds[row], targetIndex))
+            return kCandidateUnavailable;
+        targets.push_back({targetIndex, targetClients[row]});
+    }
+
+    if (!RefreshBlockedSnapshot(*graph, *metadata, kTeamInfected, false))
+        return kCandidateUnavailable;
+    int blockedEpoch = CurrentBlockedEpoch();
+    std::uint64_t survivorSpatialKey = g_SurvivorSpatialKey;
+    std::vector<float> survivorEyes;
+    survivorEyes.reserve(g_SurvivorCount * 3);
+    for (std::size_t i = 0; i < g_SurvivorCount; ++i)
+    {
+        survivorEyes.push_back(g_Survivors[i].eyes.x);
+        survivorEyes.push_back(g_Survivors[i].eyes.y);
+        survivorEyes.push_back(g_Survivors[i].eyes.z);
+    }
+    if (survivorEyes.empty())
+        return kCandidatePending;
+
+    double now = SteadySeconds();
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        std::shared_ptr<NavCandidateResult> cached = FindNavCandidateLocked(
+            targetClients, targetNavIds, maxPathDistance, minSurvivorDistance,
+            0.0f, 0.0f, 1.0f, true, survivorSpatialKey, blockedEpoch);
+        if (cached && now - cached->completedAt <= maxSnapshotAge)
+        {
+            ++g_NavCandidatePerf.cacheHits;
+            return 1;
+        }
+        for (const NavCandidateRequest &request : g_NavCandidateInFlight)
+        {
+            if (NavCandidateRequestMatches(
+                    request, targetClients, targetNavIds, maxPathDistance,
+                    minSurvivorDistance, 0.0f, 0.0f, 1.0f, true,
+                    survivorSpatialKey, blockedEpoch))
+            {
+                ++g_NavCandidatePerf.coalesced;
+                return 0;
+            }
+        }
+    }
+
+    std::vector<std::uint8_t> blocked = g_BlockedSnapshot;
+    std::uint64_t generation = g_NavGraphGeneration.load();
+    std::uint64_t serial = g_NavCandidateSerial.fetch_add(1) + 1;
+    NavCandidateRequest request;
+    request.serial = serial;
+    request.generation = generation;
+    request.survivorSpatialKey = survivorSpatialKey;
+    request.targetClient = targetClients.front();
+    request.targetId = targetNavIds.front();
+    request.targetClients = targetClients;
+    request.targetNavIds = targetNavIds;
+    request.maxPathDistance = maxPathDistance;
+    request.minSurvivorDistance = minSurvivorDistance;
+    request.targetEyeZ = 0.0f;
+    request.highGroundMinHeight = 0.0f;
+    request.highGroundDistanceScale = 1.0f;
+    request.teamSnapshot = true;
+    request.blockedEpoch = blockedEpoch;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        g_NavCandidateInFlight.push_back(request);
+    }
+
+    bool queued = g_Workers.Enqueue(
+        [graph = std::move(graph), blocked = std::move(blocked),
+         targets = std::move(targets), survivorEyes = std::move(survivorEyes),
+         request]() mutable {
+            double buildStart = SteadySeconds();
+            auto result = std::make_shared<NavCandidateResult>();
+            result->generation = request.generation;
+            result->serial = request.serial;
+            result->survivorSpatialKey = request.survivorSpatialKey;
+            result->targetClient = request.targetClient;
+            result->targetId = request.targetId;
+            result->targetClients = request.targetClients;
+            result->targetNavIds = request.targetNavIds;
+            result->maxPathDistance = request.maxPathDistance;
+            result->minSurvivorDistance = request.minSurvivorDistance;
+            result->targetEyeZ = request.targetEyeZ;
+            result->highGroundMinHeight = request.highGroundMinHeight;
+            result->highGroundDistanceScale = request.highGroundDistanceScale;
+            result->teamSnapshot = true;
+            result->blockedEpoch = request.blockedEpoch;
+
+            std::vector<float> allPathDistances;
+            std::vector<std::uint8_t> specialEdges;
+            bool built = AnneBuildTeamNavCandidateSnapshot(
+                *graph, targets, request.maxPathDistance, blocked, survivorEyes,
+                request.minSurvivorDistance, result->areaIndices,
+                result->pathDistances, result->ownerClients, allPathDistances,
+                specialEdges);
+            if (!built)
+            {
+                result->areaIndices.clear();
+                result->pathDistances.clear();
+                result->rankDistances.clear();
+                result->ownerClients.clear();
+                result->flowOrder.clear();
+            }
+            else
+            {
+                result->rankDistances = result->pathDistances;
+                result->flowOrder.resize(result->areaIndices.size());
+                std::iota(result->flowOrder.begin(), result->flowOrder.end(), 0u);
+                std::sort(
+                    result->flowOrder.begin(), result->flowOrder.end(),
+                    [&graph, &result](std::uint32_t left, std::uint32_t right) {
+                        float leftFlow = TeamCandidateFlow(
+                            *graph, result->areaIndices[left]);
+                        float rightFlow = TeamCandidateFlow(
+                            *graph, result->areaIndices[right]);
+                        bool leftValid = std::isfinite(leftFlow);
+                        bool rightValid = std::isfinite(rightFlow);
+                        if (leftValid != rightValid)
+                            return leftValid && !rightValid;
+                        if (leftValid && leftFlow != rightFlow)
+                            return leftFlow > rightFlow;
+                        if (result->pathDistances[left] != result->pathDistances[right])
+                            return result->pathDistances[left]
+                                < result->pathDistances[right];
+                        return result->areaIndices[left] < result->areaIndices[right];
+                    });
             }
 
             result->completedAt = SteadySeconds();
@@ -2588,6 +2885,173 @@ cell_t Native_NavCandidatesCollectRanked(IPluginContext *context, const cell_t *
     totalOutput[0] = total;
     g_NavCandidatePerf.lastRangeCandidateCount = total;
     ageOutput[0] = sp_ftoc(ageMs);
+    RecordCandidatePerfSample(
+        g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
+        g_NavCandidatePerf.ageCount, ageMs);
+    ++g_NavCandidatePerf.collectHits;
+    return count;
+}
+
+bool ReadTeamTargetArrays(IPluginContext *context, cell_t clientsAddr,
+                          cell_t navIdsAddr, int count,
+                          std::vector<int> &clients,
+                          std::vector<std::uint32_t> &navIds)
+{
+    if (count <= 0 || count > static_cast<int>(kMaxTeamTargets))
+        return false;
+    cell_t *clientCells = nullptr;
+    cell_t *navCells = nullptr;
+    if (!GetCells(context, clientsAddr, clientCells) ||
+        !GetCells(context, navIdsAddr, navCells))
+    {
+        return false;
+    }
+    clients.resize(static_cast<std::size_t>(count));
+    navIds.resize(static_cast<std::size_t>(count));
+    for (int row = 0; row < count; ++row)
+    {
+        clients[static_cast<std::size_t>(row)] = clientCells[row];
+        navIds[static_cast<std::size_t>(row)] =
+            static_cast<std::uint32_t>(navCells[row]);
+    }
+    return CanonicalizeTeamTargets(clients, navIds);
+}
+
+cell_t Native_NavCandidatesPrepareTeam(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 6)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavCandidatesPrepareTeam expects 6 parameters");
+    int targetCount = params[3];
+    float maxPathDistance = sp_ctof(params[4]);
+    float minSurvivorDistance = sp_ctof(params[5]);
+    float maxSnapshotAge = sp_ctof(params[6]);
+    if (!std::isfinite(maxPathDistance) || !std::isfinite(minSurvivorDistance) ||
+        !std::isfinite(maxSnapshotAge))
+    {
+        return context->ThrowNativeError("Invalid team Nav candidate prepare request");
+    }
+    std::vector<int> targetClients;
+    std::vector<std::uint32_t> targetNavIds;
+    if (!ReadTeamTargetArrays(context, params[1], params[2], targetCount,
+                              targetClients, targetNavIds))
+    {
+        return kCandidateUnavailable;
+    }
+    return PrepareTeamNavCandidates(std::move(targetClients), std::move(targetNavIds),
+                                    maxPathDistance, minSurvivorDistance,
+                                    maxSnapshotAge);
+}
+
+cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 16)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavCandidatesCollectTeam expects 16 parameters");
+
+    int targetCount = params[3];
+    float minNavDistance = std::max(0.0f, sp_ctof(params[4]));
+    float maxNavDistance = sp_ctof(params[5]);
+    float maxPathDistance = sp_ctof(params[6]);
+    float minSurvivorDistance = sp_ctof(params[7]);
+    float maxSnapshotAge = sp_ctof(params[8]);
+    bool maxInclusive = params[9] != 0;
+    int startOffset = params[10];
+    int maxResults = params[14];
+    if (!std::isfinite(maxNavDistance) || !std::isfinite(maxPathDistance) ||
+        !std::isfinite(minSurvivorDistance) || !std::isfinite(maxSnapshotAge) ||
+        maxNavDistance < minNavDistance || maxPathDistance <= 0.0f ||
+        minSurvivorDistance < 0.0f ||
+        maxSnapshotAge < 0.0f || startOffset < 0 || maxResults < 0 ||
+        maxResults > kMaxSpatialPoints)
+    {
+        return context->ThrowNativeError("Invalid team Nav candidate collect request");
+    }
+    cell_t *output = nullptr;
+    cell_t *distanceOutput = nullptr;
+    cell_t *ownerOutput = nullptr;
+    cell_t *ageOutput = nullptr;
+    cell_t *totalOutput = nullptr;
+    if ((maxResults > 0 && !GetCells(context, params[11], output)) ||
+        (maxResults > 0 && !GetCells(context, params[12], distanceOutput)) ||
+        (maxResults > 0 && !GetCells(context, params[13], ownerOutput)) ||
+        !GetCells(context, params[15], ageOutput) ||
+        !GetCells(context, params[16], totalOutput))
+    {
+        return context->ThrowNativeError("Invalid team Nav candidate collect output");
+    }
+    ageOutput[0] = sp_ftoc(0.0f);
+    totalOutput[0] = 0;
+
+    std::vector<int> targetClients;
+    std::vector<std::uint32_t> targetNavIds;
+    if (!ReadTeamTargetArrays(context, params[1], params[2], targetCount,
+                              targetClients, targetNavIds))
+    {
+        return kCandidateUnavailable;
+    }
+
+    PumpNavGraph();
+    std::shared_ptr<NavCandidateResult> result;
+    {
+        std::lock_guard<std::mutex> lock(g_GraphMutex);
+        if (!g_NavGraph || !g_NavGraph->complete ||
+            g_NavGraphState.load() != kNavGraphReady)
+        {
+            ++g_NavCandidatePerf.collectUnavailable;
+            return kCandidateUnavailable;
+        }
+        result = FindNavCandidateLocked(
+            targetClients, targetNavIds, maxPathDistance, minSurvivorDistance,
+            0.0f, 0.0f, 1.0f, true, g_SurvivorSpatialKey,
+            g_BlockedStateVersion);
+    }
+    if (!result)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+
+    float ageMs = static_cast<float>((SteadySeconds() - result->completedAt) * 1000.0);
+    if (ageMs > maxSnapshotAge * 1000.0f + 0.01f)
+    {
+        ++g_NavCandidatePerf.collectPending;
+        return kCandidatePending;
+    }
+    if (result->areaIndices.size() != result->pathDistances.size() ||
+        result->areaIndices.size() != result->ownerClients.size() ||
+        result->areaIndices.size() != result->flowOrder.size())
+    {
+        ++g_NavCandidatePerf.collectUnavailable;
+        return kCandidateUnavailable;
+    }
+
+    std::size_t offset = static_cast<std::size_t>(startOffset);
+    std::size_t total = 0;
+    int count = 0;
+    for (std::uint32_t source : result->flowOrder)
+    {
+        float distance = result->pathDistances[source];
+        if (distance < minNavDistance ||
+            (maxInclusive ? distance > maxNavDistance
+                          : distance >= maxNavDistance))
+            continue;
+        if (total >= offset && count < maxResults)
+        {
+            output[count] = static_cast<cell_t>(result->areaIndices[source]);
+            distanceOutput[count] = sp_ftoc(distance);
+            ownerOutput[count] = static_cast<cell_t>(result->ownerClients[source]);
+            count++;
+        }
+        total++;
+    }
+
+    totalOutput[0] = static_cast<cell_t>(
+        std::min<std::size_t>(total,
+                              static_cast<std::size_t>(std::numeric_limits<cell_t>::max())));
+    g_NavCandidatePerf.lastRangeCandidateCount = totalOutput[0];
+    ageOutput[0] = sp_ftoc(ageMs);
+
     RecordCandidatePerfSample(
         g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
         g_NavCandidatePerf.ageCount, ageMs);
@@ -3296,6 +3760,8 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavCandidatesCollect", Native_NavCandidatesCollect},
     {"AnneSpawn_NavCandidatesPrepareRanked", Native_NavCandidatesPrepareRanked},
     {"AnneSpawn_NavCandidatesCollectRanked", Native_NavCandidatesCollectRanked},
+    {"AnneSpawn_NavCandidatesPrepareTeam", Native_NavCandidatesPrepareTeam},
+    {"AnneSpawn_NavCandidatesCollectTeam", Native_NavCandidatesCollectTeam},
     {"AnneSpawn_NavCandidatesGetPerf", Native_NavCandidatesGetPerf},
     {"AnneSpawn_NavCandidatesResetPerf", Native_NavCandidatesResetPerf},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},

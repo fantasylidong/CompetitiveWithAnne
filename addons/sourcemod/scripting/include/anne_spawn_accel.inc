@@ -169,6 +169,39 @@ native int AnneSpawn_NavCandidatesCollectRanked(
     int &totalInRange
 );
 
+// Team snapshot: one reverse multi-source field. Distance is the minimum
+// directed path to any supplied target; owner is the client that realizes it.
+// Collect ranges are half-open unless maxInclusive is true (last layer).
+// Within a range, higher candidate flow is visited first, so candidates ahead
+// of the leading survivor naturally precede same/rear candidates.
+native int AnneSpawn_NavCandidatesPrepareTeam(
+    const int[] targetClients,
+    const int[] targetNavIds,
+    int targetCount,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge
+);
+
+native int AnneSpawn_NavCandidatesCollectTeam(
+    const int[] targetClients,
+    const int[] targetNavIds,
+    int targetCount,
+    float minNavDistance,
+    float maxNavDistance,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge,
+    bool maxInclusive,
+    int startOffset,
+    int[] outputAreaIndices,
+    float[] outputNavDistances,
+    int[] outputOwnerClients,
+    int maxResults,
+    float &resultAgeMs,
+    int &totalInRange
+);
+
 native bool AnneSpawn_NavCandidatesGetPerf(
     float[] timings,
     int timingCount,

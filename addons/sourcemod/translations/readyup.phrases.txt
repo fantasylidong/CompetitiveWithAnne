@@ -8,6 +8,10 @@
 	{
 		"en"		"[{olive}Readyup{default}] Panel is now {blue}on{default}"
 	}
+	"PanelCommands"
+	{
+		"en"		"▸ Commands:"
+	}
 	"ForceStartAdmin"
 	{
 		"#format"	"{1:N}"
