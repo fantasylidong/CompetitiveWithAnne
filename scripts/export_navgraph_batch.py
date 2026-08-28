@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""在服务器主机上批量导出官图 Nav 图 v2（含实体层，容器 anne4）。"""
+"""在服务器主机上批量导出官图 Nav 图 v2（含实体/机关层）。
+
+必须先 sm_fm annehappy：空服默认没进比赛模式，l4d_ready_cfg_name
+都不存在；已进其他模式时 sm_fm 会直接忽略，改走 sm_fchmatch。
+"""
+import argparse
 import re
 import socket
 import struct
@@ -12,6 +17,7 @@ RCON_HOST, RCON_PORT = "172.16.0.60", 18924
 L4D2_DIR = "/home/louis/l4d2/left4dead2"
 SM_DIR = L4D2_DIR + "/addons/sourcemod"
 OUT_DIR = SM_DIR + "/data/anne_navgraph"
+TARGET_MODE = "annehappy"
 
 MAPS = [
     "c1m1_hotel", "c1m2_streets", "c1m3_mall", "c1m4_atrium",
@@ -109,7 +115,7 @@ def human_count(rcon) -> int:
 
 def export_file_ok(map_name: str) -> bool:
     out = docker("sh", "-c",
-                 f"test -s {OUT_DIR}/{map_name}.json && grep -q '\"ents\"' {OUT_DIR}/{map_name}.json && echo OK || echo NO",
+                 f"test -s {OUT_DIR}/{map_name}.json && grep -q '\"map\":\"{map_name}\"' {OUT_DIR}/{map_name}.json && grep -q '\"ents\"' {OUT_DIR}/{map_name}.json && echo OK || echo NO",
                  check=False)
     return "OK" in out
 
@@ -120,9 +126,83 @@ def bot_count(rcon) -> int:
     return int(match.group(1)) if match else 0
 
 
+def ready_cfg_name(rcon) -> str:
+    try:
+        raw = rcon.command("sm_cvar l4d_ready_cfg_name")
+    except RuntimeError:
+        return ""
+    if "无法找到" in raw or "Unknown command" in raw or "not found" in raw.lower():
+        return ""
+    match = re.search(r'"l4d_ready_cfg_name"\s*=\s*"([^"]*)"', raw)
+    if match:
+        return match.group(1)
+    match = re.search(r'值:\s*"([^"]+)"', raw)
+    if match:
+        return match.group(1)
+    match = re.search(r'=\s*"([^"]+)"', raw)
+    return match.group(1) if match else ""
+
+
+def is_annehappy(name: str) -> bool:
+    return "annehappy" in name.lower().replace(" ", "").replace("_", "")
+
+
+def ensure_annehappy(rcon) -> str:
+    """空服先 sm_fm；已进其他模式则 sm_fchmatch。返回切换前的模式名。"""
+    original = ready_cfg_name(rcon)
+    print(f"[batch] current mode={original or '(none)'}", flush=True)
+    if is_annehappy(original):
+        print("[batch] already annehappy", flush=True)
+        return original
+    if original:
+        print(f"[batch] sm_fchmatch {TARGET_MODE} (sm_fm ignored while match loaded)", flush=True)
+        try:
+            reply = rcon.command(f"sm_fchmatch {TARGET_MODE}")
+            print(f"[batch] fchmatch: {reply.strip()[:160]}", flush=True)
+        except RuntimeError as error:
+            print(f"[batch] WARN fchmatch: {error}", flush=True)
+    else:
+        print(f"[batch] sm_fm {TARGET_MODE}", flush=True)
+        try:
+            reply = rcon.command(f"sm_fm {TARGET_MODE}")
+            print(f"[batch] fm: {reply.strip()[:160]}", flush=True)
+        except RuntimeError as error:
+            print(f"[batch] WARN fm: {error}", flush=True)
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        time.sleep(4)
+        try:
+            current = ready_cfg_name(rcon)
+        except RuntimeError:
+            continue
+        if is_annehappy(current):
+            print(f"[batch] mode now {current}", flush=True)
+            return original
+    print("[batch] WARN annehappy not confirmed, continuing anyway", flush=True)
+    return original
+
+
+def wait_annehappy(rcon, timeout=90) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if is_annehappy(ready_cfg_name(rcon)):
+                return True
+        except RuntimeError:
+            pass
+        time.sleep(3)
+    return False
+
+
 def ensure_environment(rcon):
     """srcds 被监督进程自动重启后，手动加载的插件与运行时 cvar 会全部
-    丢失（矩阵 runner 同款场景）。每图开工前检测并自愈。"""
+    丢失（矩阵 runner 同款场景）。每图开工前检测并自愈。
+    切图时 AnneHappy 会短暂卸掉，先等它自己回来，不要再 sm_fm 一轮。"""
+    if not is_annehappy(ready_cfg_name(rcon)):
+        if wait_annehappy(rcon, 90):
+            print("[batch] annehappy came back after map change", flush=True)
+        else:
+            print("[batch] WARN annehappy still missing; not calling sm_fm again", flush=True)
     probe = rcon.command("sm_navmatrix_status")
     if "[NavMatrix]" not in probe:
         print("[batch] environment lost (srcds restart?), re-bootstrapping", flush=True)
@@ -137,7 +217,27 @@ def ensure_environment(rcon):
     rcon.command("sb_stop 1")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Export official navgraphs on an empty Anne server")
+    parser.add_argument("--container", default=CONTAINER)
+    parser.add_argument("--host", default=RCON_HOST)
+    parser.add_argument("--port", type=int, default=RCON_PORT)
+    parser.add_argument("--maps", nargs="*")
+    parser.add_argument("--skip-mode-switch", action="store_true",
+                        help="不要 sm_fm（空服 unload_all 会触发监督重启）")
+    return parser.parse_args()
+
+
 def main():
+    global CONTAINER, RCON_HOST, RCON_PORT, MAPS
+    args = parse_args()
+    CONTAINER = args.container
+    RCON_HOST = args.host
+    RCON_PORT = args.port
+    if args.maps:
+        MAPS = args.maps
+    print(f"[batch] target {CONTAINER} {RCON_HOST}:{RCON_PORT} maps={len(MAPS)}", flush=True)
+
     password = rcon_password()
     rcon = SourceRcon(RCON_HOST, RCON_PORT, password)
 
@@ -147,6 +247,11 @@ def main():
 
     initial_map = current_map(rcon) or "c2m1_highway"
     print(f"[batch] initial map={initial_map}", flush=True)
+    if args.skip_mode_switch:
+        original_mode = ready_cfg_name(rcon)
+        print(f"[batch] skip mode switch, current={original_mode or '(none)'}", flush=True)
+    else:
+        original_mode = ensure_annehappy(rcon)
 
     rcon.command("sm plugins load_unlock")
     load_reply = rcon.command("sm plugins load anne_navgraph_export")
@@ -164,8 +269,7 @@ def main():
     rcon.command("sb_all_bot_game 1")
     rcon.command("sb_stop 1")
 
-    # 实体层要求 Anne 模式的 stripper 生效（比赛模式在导出场景下不可用，
-    # 等效做法：切 stripper 路径，changelevel 时按该路径应用）。
+    # annehappy 会带 zonemod_anne stripper；这里再写一次，防 srcds 重启丢路径。
     stripper_raw = rcon.command("stripper_cfg_path")
     stripper_match = re.search(r'"stripper_cfg_path"\s*=\s*"([^"]*)"', stripper_raw)
     initial_stripper = stripper_match.group(1) if stripper_match else "cfg/stripper"
@@ -186,14 +290,14 @@ def main():
             # stripper 路径）。activate 报 Unknown command 即为该信号：
             # 原地自愈并重跑本图，避免带病导出。
             for attempt in range(3):
-                try:
-                    ensure_environment(rcon)
-                except RuntimeError as error:
-                    print(f"[batch] WARN ensure_environment: {error}", flush=True)
                 print(f"[batch] ({index}/{len(MAPS)}) changelevel {map_name}"
                       + (f" (retry {attempt})" if attempt else ""), flush=True)
                 # 删除旧文件，防止把上一轮的坏数据误判为本轮成功
                 docker("rm", "-f", f"{OUT_DIR}/{map_name}.json", check=False)
+                try:
+                    rcon.command("stripper_cfg_path cfg/stripper/zonemod_anne")
+                except RuntimeError:
+                    pass
                 try:
                     rcon.command(f"changelevel {map_name}")
                 except RuntimeError:
@@ -211,6 +315,10 @@ def main():
                 if not loaded:
                     reason = "load timeout"
                     continue
+                try:
+                    ensure_environment(rcon)
+                except RuntimeError as error:
+                    print(f"[batch] WARN ensure_environment: {error}", flush=True)
 
                 # 探针创建 4 名冻结生还者并合成 round_start（触发 director
                 # 物品放置）。成功判据与矩阵 runner 相同："[NavMatrix] active"。
@@ -240,6 +348,15 @@ def main():
                     time.sleep(6)  # director populate + 回合稳定
 
                 time.sleep(5)
+                try:
+                    if current_map(rcon) != map_name:
+                        print(f"[batch] WARN {map_name}: map drifted to {current_map(rcon)}, retrying", flush=True)
+                        reason = "map drifted"
+                        continue
+                except RuntimeError as error:
+                    print(f"[batch] WARN {map_name}: map check failed: {error}", flush=True)
+                    reason = "map check failed"
+                    continue
                 reply = ""
                 for _ in range(4):
                     try:
@@ -277,6 +394,9 @@ def main():
             rcon.command("sv_cheats 0")
             rcon.command("sm plugins unload anne_navgraph_export")
             rcon.command("sm plugins load_lock")
+            if original_mode and not is_annehappy(original_mode):
+                print(f"[batch] restore mode via sm_fchmatch {original_mode}", flush=True)
+                rcon.command(f"sm_fchmatch {original_mode}")
             rcon.command(f"changelevel {initial_map}")
         except RuntimeError as error:
             print(f"[batch] RESTORE WARNING: {error}", flush=True)

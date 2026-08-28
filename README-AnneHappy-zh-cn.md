@@ -1,9 +1,8 @@
 # **AnneHappy 插件带上对抗插件包**
 * 为了保持插件包结构和上游一样方便同步，这个插件包将不会带有nav修改文件和跳舞插件的模型与声音，~~AnneHappy的Nav修改文件请到我的[anne项目](https://github.com/fantasylidong/anne)中下载~~ 新解决方案，到[release页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)下载整合插件包，里面有
 * 当前版本已经是进入stable模式，大部分核心插件更新可以通过join插件自动更新，不用那么频繁检测是否有更新了
-* 如果没有外部 MySQL 数据库，建议从 [Release 页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)下载 `norank` 或 `nomysql` 版本。`norank` 删除排名、作弊检测、SourceBans 及依赖排名数据的 Anne 功能；`nomysql` 进一步移除其他外部数据库插件
-* `norank` 仍使用电信服的 RPG 插件；由于排名数据已删除，每次进入服务器需要自行设置出门近战
-* `nomysql` 保留 SourceMod 本地 SQLite 功能，并使用无数据库版 RPG，不需要配置外部 MySQL
+* Release 只提供两种整合包：默认完整包需要外部 MySQL，`nomysql` 包不需要外部 MySQL
+* 没有数据库时保持 `join_autoupdate=1`，只更新无数据库插件；自行配置好数据库后改为 `2`，白名单内的 Anne 私用服会自动额外更新隐藏插件
 
 ## **Accelerator 崩溃报告上传**
 
@@ -87,7 +86,7 @@
 * 删除其余 15 个直接访问外部数据库的插件，并额外删除 `sbpp_admcfg.smx`、`sbpp_report.smx` 和依赖积分时长数据的 `veterans.smx`
 * 当前版和 2026-07 回滚版 `infected_control` 都通过可选的 `anne_traitor_quota.smx` 保存配额；`nomysql` 删除 provider 后，两个版本都会跳过持久化资格门槛并继续运行
 
-因此，当前完整包共有 **423 个 `.smx`**；`norank` 删除 **10 个**，最终保留 **413 个**；`nomysql` 删除 **18 个**并替换 RPG 构建，最终保留 **405 个**。`disabled/` 下不会自动加载的 SourceMod SQL 管理插件不计入上述 18 个直接访问数据库的插件。
+因此，发布 workflow 只生成完整数据库包与 `nomysql` 包；当前完整包共有 **423 个 `.smx`**，`nomysql` 删除 **18 个**并替换 RPG 构建，最终保留 **405 个**。`disabled/` 下不会自动加载的 SourceMod SQL 管理插件不计入上述 18 个直接访问数据库的插件。
 
 `nomysql` 删除的插件为：
 

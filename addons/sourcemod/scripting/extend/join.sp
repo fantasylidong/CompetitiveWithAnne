@@ -52,15 +52,15 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.6",
+	version = "1.7",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 #define AUTOUPDATE_URL_LENGTH 256
-#define UPDATE_URL_PUBLIC "http://anne.trygek.com/plugin_update/Anne_Updater_All.txt"
+#define UPDATE_URL_PUBLIC "http://anne.trygek.com/plugin_update/Anne_Updater_NoDatabase.txt"
 #define UPDATE_URL_PRIVATE "http://anne.trygek.com/plugin_update/private/Anne_Updater_Private.txt"
 #define AUTOUPDATE_DISABLED 0
-#define AUTOUPDATE_PUBLIC 1
-#define AUTOUPDATE_PRIVATE 2
+#define AUTOUPDATE_NO_DATABASE 1
+#define AUTOUPDATE_DATABASE 2
 #define AUTOUPDATE_RESTORE_FILE "data/join_autoupdate.restore"
 #define CORE_RELOAD_PENDING_FILE "data/join_core_reload.pending"
 #define INFECTED_CONTROL_PLUGIN "optional/AnneHappy/infected_control.smx"
@@ -118,10 +118,10 @@ public void OnPluginStart()
 	LoadTranslations("join.phrases");
 	hCvarEnableInf = CreateConVar("join_enable_inf", "1", "是否可以开启加入特感", _, true, 0.0, true, 1.0);
 	hCvarKickFamilyAccount = CreateConVar("join_enable_kickfamilyaccount", "1", "是否开启踢出家庭共享账户", _, true, 0.0, true, 1.0);
-	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "是否开启AnneHappy核心插件自动更新：0关闭，1公开核心清单，2私用清单（包含公开更新）", _, true, 0.0, true, 2.0);
+	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "1", "AnneHappy自动更新：0关闭，1无数据库插件，2含数据库插件（白名单服务器额外含隐藏插件）", _, true, 0.0, true, 2.0);
 	g_iAutoUpdateModeBeforeConfigs = hCvarEnableAutoupdate.IntValue;
-	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的公开核心更新清单URL");
-	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的私用更新清单URL");
+	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的无数据库更新清单URL");
+	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的数据库更新清单URL，白名单服务器额外包含隐藏插件");
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
 	hCvarMotdUrl = CreateConVar("sm_cfgmotd_url", "http://anne.trygek.com/l4d2/");  // 主页以后更换为数据库控制
 	hCvarMotdLanguageRedirect = CreateConVar("sm_cfgmotd_language_redirect", "1", "是否根据客户端语言为!web/MOTD添加lang参数或使用语言专用URL", _, true, 0.0, true, 1.0);
@@ -137,8 +137,8 @@ public void OnPluginStart()
 	hCvarAutoupdatePublicUrl.AddChangeHook(UpdateStatuChange);
 	hCvarAutoupdatePrivateUrl.AddChangeHook(UpdateStatuChange);
 	AutoExecConfig(true, "join");
-	if (g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_PUBLIC
-		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_PRIVATE)
+	if (g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_NO_DATABASE
+		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_DATABASE)
 	{
 		CreateTimer(AUTOUPDATE_RESTORE_DELAY, Timer_RestoreAutoUpdateMode, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
@@ -198,8 +198,8 @@ void TryRestoreAutoUpdateMode()
 {
 	bool restored = RestorePendingAutoUpdateMode();
 	if (!restored
-		&& g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_PUBLIC
-		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_PRIVATE)
+		&& g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_NO_DATABASE
+		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_DATABASE)
 	{
 		hCvarEnableAutoupdate.SetInt(g_iAutoUpdateModeBeforeConfigs);
 	}
@@ -251,11 +251,11 @@ bool GetAutoUpdateUrl(char[] updateUrl, int maxLength)
 
 	switch (hCvarEnableAutoupdate.IntValue)
 	{
-		case AUTOUPDATE_PUBLIC:
+		case AUTOUPDATE_NO_DATABASE:
 		{
 			hCvarAutoupdatePublicUrl.GetString(updateUrl, maxLength);
 		}
-		case AUTOUPDATE_PRIVATE:
+		case AUTOUPDATE_DATABASE:
 		{
 			hCvarAutoupdatePrivateUrl.GetString(updateUrl, maxLength);
 		}
@@ -387,7 +387,7 @@ bool IsCurrentInfectedControlRunning()
 
 bool SavePendingAutoUpdateMode(int mode)
 {
-	if (mode < AUTOUPDATE_PUBLIC || mode > AUTOUPDATE_PRIVATE)
+	if (mode < AUTOUPDATE_NO_DATABASE || mode > AUTOUPDATE_DATABASE)
 	{
 		return false;
 	}
@@ -429,7 +429,7 @@ bool RestorePendingAutoUpdateMode()
 	DeleteFile(path);
 
 	int mode = StringToInt(value);
-	if (mode < AUTOUPDATE_PUBLIC || mode > AUTOUPDATE_PRIVATE)
+	if (mode < AUTOUPDATE_NO_DATABASE || mode > AUTOUPDATE_DATABASE)
 	{
 		LogError("Invalid pending join_autoupdate value: %d", mode);
 		return false;

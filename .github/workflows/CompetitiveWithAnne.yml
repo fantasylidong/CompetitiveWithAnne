@@ -34,7 +34,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
-      - name: Build full, norank, and nomysql archives
+      - name: Build database and no-database archives
         run: |
           set -euo pipefail
 
@@ -75,31 +75,10 @@ jobs:
               -exec sed -i "\|$plugin\\.smx|d" {} +
           }
 
-          stage_package full
-          FULL_PLUGIN_COUNT="$(plugin_count)"
-          echo "full: $FULL_PLUGIN_COUNT plugins"
-          archive_package full "$RELEASE_NAME.tar.gz"
-
-          stage_package norank
-          # Dynamic difficulty and traitor quota both depend on the removed ranking databases.
-          NORANK_REMOVALS=(
-            extend/l4d_stats
-            extend/sbpp_admcfg
-            extend/sbpp_checker
-            extend/sbpp_comms
-            extend/sbpp_main
-            extend/sbpp_report
-            extend/sbpp_sleuth
-            extend/lilac
-            optional/AnneHappy/annehappy_dynamic_ai_difficulty
-            optional/AnneHappy/anne_traitor_quota
-          )
-          for plugin in "${NORANK_REMOVALS[@]}"; do
-            remove_plugin "$plugin"
-          done
-          NORANK_PLUGIN_COUNT="$(plugin_count)"
-          echo "norank: $NORANK_PLUGIN_COUNT plugins (${#NORANK_REMOVALS[@]} removed)"
-          archive_package norank "$RELEASE_NAME-norank.tar.gz"
+          stage_package database
+          DATABASE_PLUGIN_COUNT="$(plugin_count)"
+          echo "database: $DATABASE_PLUGIN_COUNT plugins"
+          archive_package database "$RELEASE_NAME.tar.gz"
 
           stage_package nomysql
           # Keep local SQLite users l4d2_map_vote and spawn_vote_menu.  Both the
@@ -140,6 +119,5 @@ jobs:
         with:
           files: |
             CompetitiveWithAnne-${{ steps.date.outputs.date }}.tar.gz
-            CompetitiveWithAnne-${{ steps.date.outputs.date }}-norank.tar.gz
             CompetitiveWithAnne-${{ steps.date.outputs.date }}-nomysql.tar.gz
           tag_name: CompetitiveWithAnne-stable-release-${{ steps.date.outputs.date }}

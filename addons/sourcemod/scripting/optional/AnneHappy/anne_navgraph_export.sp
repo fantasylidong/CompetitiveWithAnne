@@ -222,8 +222,21 @@ static bool IsSolidClassname(const char[] cls)
 		|| strcmp(cls, "prop_wall_breakable") == 0
 		|| strcmp(cls, "prop_dynamic") == 0
 		|| strcmp(cls, "prop_dynamic_override") == 0
-		|| strcmp(cls, "prop_physics") == 0
-		|| strcmp(cls, "prop_car_alarm") == 0;
+		|| strcmp(cls, "prop_physics") == 0;
+}
+
+// 警报车 / 按钮 / 救援触发 / 加油口 / 机枪台。不扫 trigger_once/multiple、logic_relay。
+static bool IsEventClassname(const char[] cls)
+{
+	return strcmp(cls, "prop_car_alarm") == 0
+		|| strcmp(cls, "func_button") == 0
+		|| strcmp(cls, "func_button_timed") == 0
+		|| strcmp(cls, "trigger_finale") == 0
+		|| strcmp(cls, "trigger_escape") == 0
+		|| strcmp(cls, "point_prop_use_target") == 0
+		|| strcmp(cls, "prop_minigun") == 0
+		|| strcmp(cls, "prop_minigun_l4d1") == 0
+		|| strcmp(cls, "prop_mounted_machine_gun") == 0;
 }
 
 static int ExportEntities(File file)
@@ -241,7 +254,8 @@ static int ExportEntities(File file)
 
 		bool item = IsItemClassname(cls);
 		bool solid = !item && IsSolidClassname(cls);
-		if (!item && !solid)
+		bool event = !item && !solid && IsEventClassname(cls);
+		if (!item && !solid && !event)
 			continue;
 		if (item && IsCarriedItem(entity))
 			continue;
@@ -254,7 +268,7 @@ static int ExportEntities(File file)
 		float maxs[3];
 		mins = NULL_VECTOR;
 		maxs = NULL_VECTOR;
-		if (solid)
+		if (solid || event)
 		{
 			if (HasEntProp(entity, Prop_Data, "m_angRotation"))
 			{
