@@ -4,7 +4,7 @@
 // + MaxSpecial Unlock (sourcescramble + gamedata)
 // + Auto-tune: Relax / LockTempo / InitialSpawnDelay 跟随 dirspawn_interval
 // + 人数自适应（只改“总特”）
-// + 三方图导演脚本兜底（回合开始/开跑后的短期守护，反复覆盖 SessionOptions）
+// + 三方图导演脚本兜底（回合开始/开跑后的短期守护，反复覆盖 DirectorOptions）
 //
 // 需求：SourceMod 1.11+，Left4DHooks；可选 sourcescramble 扩展；
 //       gamedata/infected_control.txt（含 "CDirector::GetMaxPlayerZombies"）
@@ -22,7 +22,7 @@
 #tryinclude <sourcescramble> // 未装也能编译，仅无法打补丁
 
 #define PLUGIN_NAME        "L4D2 DirSpawn + MaxSpecial Unlock"
-#define PLUGIN_VERSION     "1.6.1"
+#define PLUGIN_VERSION     "1.6.2"
 #define PLUGIN_AUTHOR      "morzlee"
 #define PLUGIN_URL         "https://github.com/fantasylidong/CompetitiveWithAnne"
 
@@ -128,7 +128,7 @@ static const SIClass g_Not0721DistributeOrder[SI_Count] =
 Handle g_hApplyTimer = null;        // round_start 第一枪
 Handle g_hApplyLateTimer = null;    // round_start 第二枪（2.0秒兜底）
 
-// 守护：短时间内反复覆盖，抵消三方图脚本迟到写入
+// 守护：短时间内反复覆盖 DirectorOptions，抵消三方图脚本迟到写入
 Handle g_hScriptGuardTimer = null;
 int    g_ScriptGuardRemain = 0;
 float  g_ScriptGuardStep   = 0.5;
@@ -138,6 +138,7 @@ Handle g_hAutoTimer  = null;
 bool   g_bInternalSet = false;
 bool   g_bAnnouncedThisRound = false;
 bool   g_bTriedUnlock = false;
+bool   g_bLoggedApplyFailure = false;
 
 #if defined _sourcescramble_included
 MemoryPatch g_MPMaxZombies;
@@ -164,39 +165,57 @@ stock void LogMsg(const char[] fmt, any ...)
     }
 }
 
+#define VS_DIR_SENTINEL -12345678
+
+// 同时更新当前生效表与基础表；导演脚本未就绪时静默等待守护重试。
+stock void VS_ExecDirectorOp(const char[] currentStmt, const char[] baseStmt)
+{
+    char code[768];
+    Format(code, sizeof(code),
+        "if((\"DirectorScript\" in getroottable())&&::DirectorScript!=null&&(\"GetDirectorOptions\" in ::DirectorScript)){local d=::DirectorScript;local t=d.GetDirectorOptions();if(t!=null){%s;if((\"DirectorOptions\" in d)&&d.DirectorOptions!=null){%s}}}",
+        currentStmt, baseStmt);
+    L4D2_ExecVScriptCode(code);
+}
+
 stock void VS_RawSetInt(const char[] key, int value)
 {
-    char code[96];
-    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %d)", key, value);
-    L4D2_ExecVScriptCode(code);
+    char currentStmt[96];
+    char baseStmt[128];
+    Format(currentStmt, sizeof(currentStmt), "t.rawset(\"%s\", %d)", key, value);
+    Format(baseStmt, sizeof(baseStmt), "d.DirectorOptions.rawset(\"%s\", %d)", key, value);
+    VS_ExecDirectorOp(currentStmt, baseStmt);
 }
 
 stock void VS_RawSetBool(const char[] key, bool value)
 {
-    char code[96];
-    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %s)", key, value ? "true" : "false");
-    L4D2_ExecVScriptCode(code);
+    char currentStmt[96];
+    char baseStmt[128];
+    Format(currentStmt, sizeof(currentStmt), "t.rawset(\"%s\", %s)", key, value ? "true" : "false");
+    Format(baseStmt, sizeof(baseStmt), "d.DirectorOptions.rawset(\"%s\", %s)", key, value ? "true" : "false");
+    VS_ExecDirectorOp(currentStmt, baseStmt);
 }
 
 stock void VS_RawSetFloat(const char[] key, float value)
 {
-    char code[128];
-    Format(code, sizeof(code), "::SessionOptions.rawset(\"%s\", %.3f)", key, value);
-    L4D2_ExecVScriptCode(code);
+    char currentStmt[96];
+    char baseStmt[128];
+    Format(currentStmt, sizeof(currentStmt), "t.rawset(\"%s\", %.3f)", key, value);
+    Format(baseStmt, sizeof(baseStmt), "d.DirectorOptions.rawset(\"%s\", %.3f)", key, value);
+    VS_ExecDirectorOp(currentStmt, baseStmt);
 }
 
 stock void VS_RawDelete(const char[] key)
 {
-    char code[96];
-    Format(code, sizeof(code), "::SessionOptions.rawdelete(\"%s\")", key);
-    L4D2_ExecVScriptCode(code);
+    char currentStmt[160];
+    char baseStmt[192];
+    Format(currentStmt, sizeof(currentStmt), "if(t.rawin(\"%s\"))t.rawdelete(\"%s\")", key, key);
+    Format(baseStmt, sizeof(baseStmt), "if(d.DirectorOptions.rawin(\"%s\"))d.DirectorOptions.rawdelete(\"%s\")", key, key);
+    VS_ExecDirectorOp(currentStmt, baseStmt);
 }
 
 stock void VS_RawDeleteIfExists(const char[] key)
 {
-    char code[160];
-    Format(code, sizeof(code), "if (::SessionOptions.rawin(\"%s\")) ::SessionOptions.rawdelete(\"%s\")", key, key);
-    L4D2_ExecVScriptCode(code);
+    VS_RawDelete(key);
 }
 
 stock void VS_SetDirectorConVar(const char[] key, int value)
@@ -482,16 +501,18 @@ stock void AutoTuneTempoFromInterval(int interval)
 }
 
 // ---------------------------- Apply Core --------------------------------
-stock void ApplyByVScript(int total, int interval)
+stock bool ApplyByVScript(int total, int interval)
 {
     VS_EnsureBaseFlags();
 
+    VS_RawSetInt("MaxSpecials", total);
     VS_RawSetInt("cm_MaxSpecials", total);
 
     int dom = gCvarDomLimit.IntValue;
     if (dom < 0) dom = total;
     VS_RawSetInt("DominatorLimit", dom);
 
+    VS_RawSetInt("SpecialRespawnInterval", interval);
     VS_RawSetInt("cm_SpecialRespawnInterval", interval);
 
     int caps[SI_Count];
@@ -516,10 +537,25 @@ stock void ApplyByVScript(int total, int interval)
     ApplyInitialSpawnDelayByVScript();
     ApplyRelaxDisableByVScript();
 
+    int gotMax = L4D2_GetScriptValueInt("MaxSpecials", VS_DIR_SENTINEL);
+    int gotInterval = L4D2_GetScriptValueInt("SpecialRespawnInterval", VS_DIR_SENTINEL);
+    if (gotMax != total || gotInterval != interval)
+    {
+        if (!g_bLoggedApplyFailure)
+        {
+            LogMsg("DirectorOptions 尚未就绪/回读不匹配（目标 %d/%d，实际 %d/%d），将由守护重试。",
+                   total, interval, gotMax, gotInterval);
+            g_bLoggedApplyFailure = true;
+        }
+        return false;
+    }
+
+    g_bLoggedApplyFailure = false;
     LogMsg("Applied: total=%d, dom=%d, interval=%d, caps=%s | M4: allow=%d relax=[%d..%d] lock=%d | init=[%d..%d]",
            total, dom, interval, capSource,
            gCvarAllowSIWithTank.IntValue, gCvarRelaxMin.IntValue, gCvarRelaxMax.IntValue, gCvarLockTempo.IntValue,
            gCvarInitialMin.IntValue, gCvarInitialMax.IntValue);
+    return true;
 }
 
 // 防重复刷屏：仅在总数/间隔变化时播报
@@ -536,12 +572,12 @@ stock bool ShouldAnnounceApply(int total, int interval)
     return true;
 }
 
-stock void ApplyDirectorSettings(bool announceToChat=false)
+stock bool ApplyDirectorSettings(bool announceToChat=false)
 {
     if (!gCvarEnable.BoolValue)
     {
         LogMsg("dirspawn_enable=0: 跳过应用。");
-        return;
+        return false;
     }
 
     int total    = gCvarCount.IntValue;
@@ -549,7 +585,8 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
     if (total < 0) total = 0;
     if (interval < 0) interval = 0;
 
-    ApplyByVScript(total, interval);
+    if (!ApplyByVScript(total, interval))
+        return false;
 
     if (announceToChat && ShouldAnnounceApply(total, interval))
     {
@@ -572,12 +609,15 @@ stock void ApplyDirectorSettings(bool announceToChat=false)
             gCvarInitialMin.IntValue, gCvarInitialMax.IntValue
         );
     }
+    return true;
 }
 
 stock void ShutdownVScript()
 {
+    VS_RawDelete("MaxSpecials");
     VS_RawDelete("cm_MaxSpecials");
     VS_RawDelete("DominatorLimit");
+    VS_RawDelete("SpecialRespawnInterval");
     VS_RawDelete("cm_SpecialRespawnInterval");
     for (int i = 0; i < kSIClassCount; i++)
         VS_RawDelete(g_SIKeys[i]);
@@ -812,6 +852,7 @@ public Action Cmd_GenKV(int client, int args)
 public Action EVT_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
     g_bAnnouncedThisRound = false;
+    g_bLoggedApplyFailure = false;
 
     // 自动伸缩先算一次（让第一枪带上最新总特）
     if (gCvarAutoEnable != null && gCvarAutoEnable.BoolValue)

@@ -523,4 +523,35 @@
 		{
 			"ko"		"점수4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"ko"		"표시 팀: {1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"ko"		"HUD {1} 표시 팀"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"ko"		"관전"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"ko"		"생존자"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"ko"		"감염자"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"ko"		"모든 팀"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"ko"		" ({1} 전용)"
+		}
 	}

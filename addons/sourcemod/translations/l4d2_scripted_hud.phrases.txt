@@ -523,4 +523,35 @@
 		{
 			"en"		"SCORE_4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"en"		"Show for team: {1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"en"		"HUD {1}: show while on team"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"en"		"Spectator"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"en"		"Survivor"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"en"		"Infected"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"en"		"All teams"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"en"		" ({1} only)"
+		}
 	}

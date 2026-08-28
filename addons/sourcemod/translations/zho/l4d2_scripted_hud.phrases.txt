@@ -523,4 +523,35 @@
 		{
 			"zho"		"計分4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"zho"		"顯示隊伍：{1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"zho"		"HUD {1} 顯示隊伍"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"zho"		"旁觀"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"zho"		"生還"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"zho"		"特感"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"zho"		"全部隊伍"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"zho"		"（僅{1}）"
+		}
 	}

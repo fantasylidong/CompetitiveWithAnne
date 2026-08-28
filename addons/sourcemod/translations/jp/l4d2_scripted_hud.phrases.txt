@@ -523,4 +523,35 @@
 		{
 			"jp"		"スコア4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"jp"		"表示チーム：{1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"jp"		"HUD {1} の表示チーム"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"jp"		"観戦"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"jp"		"生存者"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"jp"		"感染者"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"jp"		"全チーム"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"jp"		"（{1}のみ）"
+		}
 	}

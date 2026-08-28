@@ -523,4 +523,35 @@
 		{
 			"vi"		"ĐIỂM 4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"vi"		"Hiển thị cho đội: {1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"vi"		"HUD {1}: đội được hiển thị"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"vi"		"Khán giả"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"vi"		"Sinh tồn"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"vi"		"Nhiễm bệnh"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"vi"		"Tất cả các đội"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"vi"		" (chỉ {1})"
+		}
 	}

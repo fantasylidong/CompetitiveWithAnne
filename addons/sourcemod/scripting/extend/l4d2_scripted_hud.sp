@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display scripted HUD slots and an optional CS-style kill feed"
-#define PLUGIN_VERSION                "1.5.1"
+#define PLUGIN_VERSION                "1.6.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -101,7 +101,7 @@ public Plugin myinfo =
 #define HUD_EXTRA_MAX_LINES           4
 #define HUD_FIXED_MAX_LINES           6
 #define HUD_PREFS_COOKIE_SIZE         100
-#define HUD_PREFS_MIGRATIONS          5
+#define HUD_PREFS_MIGRATIONS          6
 
 #define HUD2_PART_SERVER_NAME         (1 << 0)
 #define HUD2_PART_MODE                (1 << 1)
@@ -164,6 +164,12 @@ public Plugin myinfo =
 #define HUD_TEAM_SURVIVOR             1
 #define HUD_TEAM_INFECTED             2
 
+// Per-team visibility bits: 1 << (game team - 1)
+#define HUD_TEAMBIT_SPECTATOR         (1 << 0)
+#define HUD_TEAMBIT_SURVIVOR          (1 << 1)
+#define HUD_TEAMBIT_INFECTED          (1 << 2)
+#define HUD_TEAMBIT_ALL               7
+
 #define HUD_TEXT_ALIGN_LEFT           1
 #define HUD_TEXT_ALIGN_CENTER         2
 #define HUD_TEXT_ALIGN_RIGHT          3
@@ -196,6 +202,7 @@ static ConVar g_hCvar_pain_pills_decay_rate;
 // ====================================================================================================
 static ConVar g_hCvar_Enabled;
 static ConVar g_hCvar_UpdateInterval;
+static ConVar g_hCvar_SourceTeams;
 ConVar g_hVsBossBuffer;
 static ConVar g_hCvar_HUD1_Text;
 static ConVar g_hCvar_HUD1_TextAlign;
@@ -375,6 +382,8 @@ static int    g_iClientHUD2Mask[MAXPLAYERS + 1];
 static int    g_iClientHUDLayout[MAXPLAYERS + 1];
 static int    g_iClientHUDRevision[MAXPLAYERS + 1];
 static int    g_iClientHUDSource[MAXPLAYERS + 1][HUD_SLOT_COUNT];
+static int    g_iClientHUDTeamMask[MAXPLAYERS + 1][HUD_SLOT_COUNT];
+static int    g_iHUDSourceAllowedTeams[HUD_CONTENT_MAX + 1];
 static int    g_iHUDMenuSlot[MAXPLAYERS + 1];
 static int    g_iHUDMenuGroup[MAXPLAYERS + 1];
 static int    g_iHUDPrefsMigrationsLeft;
@@ -668,6 +677,7 @@ public void OnPluginStart()
     CreateConVar("l4d2_scripted_hud_version", PLUGIN_VERSION, PLUGIN_DESCRIPTION, CVAR_FLAGS_PLUGIN_VERSION);
     g_hCvar_Enabled          = CreateConVar("l4d2_scripted_hud_enable", "1", "Enable/Disable the plugin.\n0 = Disable, 1 = Enable.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_UpdateInterval   = CreateConVar("l4d2_scripted_hud_update_interval", "0.1", "Interval in seconds to update the HUD.", CVAR_FLAGS, true, 0.1);
+    g_hCvar_SourceTeams      = CreateConVar("l4d2_scripted_hud_source_teams", "2:5,7:5,13:5", "Per-content-source team whitelist, format \"source:teammask,...\".\nTeam mask bits: 1 = SPECTATOR, 2 = SURVIVOR, 4 = INFECTED (7 = everyone, 0 = nobody).\nSources not listed default to 7. Source ids: 1 = survivors, 2 = SI HP, 3 = kills, 4 = ping, 5 = tank dmg, 6 = items, 7 = SI wave, 8 = speed, 9 = round, 10 = witch, 11 = progress, 12 = server, 13 = SI queue.", CVAR_FLAGS);
     g_hCvar_HUD1_Text        = CreateConVar("l4d2_scripted_hud_hud1_text", "", "The text you want to display in the HUD.\nNote: When cvar is empty \"\", plugin will use the predefined HUD text set in the code, check GetHUD*_Text functions.", CVAR_FLAGS);
     g_hCvar_HUD1_TextAlign   = CreateConVar("l4d2_scripted_hud_hud1_text_align", "1", "Aligns the text horizontally.\n1 = LEFT, 2 = CENTER, 3 = RIGHT.", CVAR_FLAGS, true, 1.0, true, 3.0);
     g_hCvar_HUD1_BlinkTank   = CreateConVar("l4d2_scripted_hud_hud1_blink_tank", "1", "Makes the text blink from white to red while a tank is alive.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -760,6 +770,7 @@ public void OnPluginStart()
     g_hCvar_pain_pills_decay_rate.AddChangeHook(Event_ConVarChanged);
     g_hCvar_Enabled.AddChangeHook(Event_ConVarChanged);
     g_hCvar_UpdateInterval.AddChangeHook(Event_ConVarChanged);
+    g_hCvar_SourceTeams.AddChangeHook(Event_ConVarChanged);
     g_hCvar_HUD1_Text.AddChangeHook(Event_ConVarChanged);
     g_hCvar_HUD1_TextAlign.AddChangeHook(Event_ConVarChanged);
     g_hCvar_HUD1_BlinkTank.AddChangeHook(Event_ConVarChanged);
@@ -855,6 +866,8 @@ public void OnPluginStart()
     RegConsoleCmd("sm_spechudoff", offSpecHud, "打开spechud");
     RegConsoleCmd("sm_hudmenu", CmdHUDMenu, "Open the scripted HUD settings menu.");
     RegConsoleCmd("sm_hud", CmdHUDMenu, "Open the scripted HUD settings menu.");
+
+    ParseHUDSourceTeams();
 
     if (g_bLateLoad)
     {
@@ -1093,18 +1106,55 @@ int GetClientHUDSource(int client, int hud)
     return g_iClientHUDSource[client][hud];
 }
 
-bool CanClientSeeInfectedIntel(int client)
+// Team bit of the client's current game team (0 when unassigned).
+int GetClientHUDTeamBit(int client)
 {
-    if (!IsValidClient(client))
-        return false;
-
     int team = GetClientTeam(client);
-    return team == TEAM_SPECTATOR || team == TEAM_INFECTED;
+    if (team < TEAM_SPECTATOR || team > TEAM_INFECTED)
+        return 0;
+
+    return 1 << (team - 1);
 }
 
-bool IsInfectedIntelSource(int source)
+// Server-side whitelist: which teams may see a given content source.
+int GetHUDSourceAllowedTeams(int source)
 {
-    return source == HUD_CONTENT_SPECIALS || source == HUD_CONTENT_WAVE || source == HUD_CONTENT_QUEUE;
+    if (source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
+        return HUD_TEAMBIT_ALL;
+
+    return g_iHUDSourceAllowedTeams[source];
+}
+
+void ParseHUDSourceTeams()
+{
+    for (int source = HUD_CONTENT_DEFAULT; source <= HUD_CONTENT_MAX; source++)
+        g_iHUDSourceAllowedTeams[source] = HUD_TEAMBIT_ALL;
+
+    if (g_hCvar_SourceTeams == null)
+        return;
+
+    char value[256];
+    g_hCvar_SourceTeams.GetString(value, sizeof(value));
+    if (value[0] == '\0')
+        return;
+
+    char pairs[HUD_CONTENT_MAX + 1][16];
+    int count = ExplodeString(value, ",", pairs, sizeof(pairs), sizeof(pairs[]));
+    for (int i = 0; i < count; i++)
+    {
+        char kv[2][8];
+        if (ExplodeString(pairs[i], ":", kv, sizeof(kv), sizeof(kv[])) != 2)
+            continue;
+
+        int source = StringToInt(kv[0]);
+        int mask = StringToInt(kv[1]);
+        if (source < HUD_CONTENT_DEFAULT || source > HUD_CONTENT_MAX)
+            continue;
+        if (mask < 0 || mask > HUD_TEAMBIT_ALL)
+            continue;
+
+        g_iHUDSourceAllowedTeams[source] = mask;
+    }
 }
 
 bool IsClientSlotVisible(int client, int hud)
@@ -1125,7 +1175,17 @@ bool IsClientSlotVisible(int client, int hud)
     if (hud >= HUD_EXTRA_FIRST && source == HUD_CONTENT_DEFAULT)
         return false;
 
-    if (IsInfectedIntelSource(source) && !CanClientSeeInfectedIntel(client))
+    int teamBit = GetClientHUDTeamBit(client);
+
+    // Player preference: show this slot only while on the selected teams.
+    // Unassigned clients (teamBit 0) are not gated by the personal mask.
+    if (teamBit != 0 && (g_iClientHUDTeamMask[client][hud] & teamBit) == 0)
+        return false;
+
+    // Server policy: restricted sources stay hidden for non-whitelisted teams
+    // (and for unassigned clients, matching the old infected-intel behavior).
+    int allowed = GetHUDSourceAllowedTeams(source);
+    if (allowed != HUD_TEAMBIT_ALL && (allowed & teamBit) == 0)
         return false;
 
     return true;
@@ -1365,6 +1425,7 @@ void GetCvars()
 
     g_bCvar_Enabled = g_hCvar_Enabled.BoolValue;
     g_fCvar_UpdateInterval = g_hCvar_UpdateInterval.FloatValue;
+    ParseHUDSourceTeams();
 
     g_hCvar_HUD1_Text.GetString(g_sCvar_HUD1_Text, sizeof(g_sCvar_HUD1_Text));
     g_bCvar_HUD1_Text = (g_sCvar_HUD1_Text[0] != 0);
@@ -1642,6 +1703,7 @@ public void HookEvents()
         HookEvent("round_start", Event_RoundStart);
         HookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
         HookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
+        HookEvent("player_team", Event_PlayerTeam, EventHookMode_PostNoCopy);
         return;
     }
 
@@ -1657,6 +1719,7 @@ public void HookEvents()
         UnhookEvent("round_start", Event_RoundStart);
         UnhookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
         UnhookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
+        UnhookEvent("player_team", Event_PlayerTeam, EventHookMode_PostNoCopy);
         return;
     }
 }
@@ -1666,6 +1729,14 @@ public void HookEvents()
 public void Event_PlayerDeathPre(Event event, const char[] name, bool dontBroadcast)
 {
     KillFeed_EventPlayerDeathPre(event, dontBroadcast);
+}
+
+// Refresh immediately so team-gated slots switch without waiting for the
+// next update tick.
+public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
+{
+    if (g_bCvar_Enabled)
+        UpdateHUD();
 }
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -2644,6 +2715,14 @@ void BuildClientHUDTexts()
             if ((g_iClientHUDMask[client] & (1 << hud)) == 0)
                 continue;
 
+            // Team-gated slots must not even transmit their text, so restricted
+            // intel never reaches clients whose team is not whitelisted.
+            if (!IsClientSlotVisible(client, hud))
+            {
+                g_sClientHUDText[client][hud][0] = '\0';
+                continue;
+            }
+
             BuildHUDSourceText(client, source, personalized, sizeof(personalized));
             FormatEx(g_sClientHUDText[client][hud], sizeof(g_sClientHUDText[][]), "%s%s", personalized, g_sSpaces);
         }
@@ -3493,6 +3572,7 @@ void ResetHUDPrefsClient(int client)
     for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
     {
         g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
+        g_iClientHUDTeamMask[client][slot] = HUD_TEAMBIT_ALL;
         g_sClientHUDText[client][slot][0] = '\0';
     }
 }
@@ -3605,9 +3685,50 @@ void ParsePackedSlotSources(const char[] packed, int sources[HUD_SLOT_COUNT])
     }
 }
 
-bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision, int &layout, int sources[HUD_SLOT_COUNT])
+void ClearHUDTeamMasks(int masks[HUD_SLOT_COUNT])
+{
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        masks[slot] = HUD_TEAMBIT_ALL;
+}
+
+void ApplyHUDTeamMasks(int client, const int masks[HUD_SLOT_COUNT])
+{
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        g_iClientHUDTeamMask[client][slot] = masks[slot];
+}
+
+void PackSlotTeamMasks(const int masks[HUD_SLOT_COUNT], char[] output, int size)
+{
+    output[0] = '\0';
+    for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+    {
+        char piece[8];
+        FormatEx(piece, sizeof(piece), "%s%d", (slot == 0) ? "" : ",", masks[slot]);
+        StrCat(output, size, piece);
+    }
+}
+
+void ParsePackedSlotTeamMasks(const char[] packed, int masks[HUD_SLOT_COUNT])
+{
+    ClearHUDTeamMasks(masks);
+    if (packed[0] == '\0')
+        return;
+
+    char bits[HUD_SLOT_COUNT][8];
+    int count = ExplodeString(packed, ",", bits, sizeof(bits), sizeof(bits[]));
+    for (int slot = 0; slot < count && slot < HUD_SLOT_COUNT; slot++)
+    {
+        int mask = StringToInt(bits[slot]);
+        if (mask < 1 || mask > HUD_TEAMBIT_ALL)
+            mask = HUD_TEAMBIT_ALL;
+        masks[slot] = mask;
+    }
+}
+
+bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision, int &layout, int sources[HUD_SLOT_COUNT], int teamMasks[HUD_SLOT_COUNT])
 {
     ClearHUDSources(sources);
+    ClearHUDTeamMasks(teamMasks);
     if (!g_bClientHasCookie[client])
         return false;
 
@@ -3644,8 +3765,18 @@ bool ParseHUDPrefsCookie(int client, int &hudMask, int &hud2Mask, int &revision,
             return false;
     }
 
-    if (count == 5 && StrContains(parts[4], ",") != -1)
+    if (count >= 5 && StrContains(parts[4], ",") != -1)
+    {
         ParsePackedSlotSources(parts[4], sources);
+
+        // Segment 6 (current format): packed per-slot team visibility masks.
+        if (count >= 6)
+        {
+            if (StrContains(parts[5], ",") == -1)
+                return false;
+            ParsePackedSlotTeamMasks(parts[5], teamMasks);
+        }
+    }
     else if (count >= 5)
     {
         int source;
@@ -3673,7 +3804,8 @@ bool ApplyHUDPrefsCookie(int client)
     int revision;
     int layout;
     int sources[HUD_SLOT_COUNT];
-    if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, revision, layout, sources))
+    int teamMasks[HUD_SLOT_COUNT];
+    if (!ParseHUDPrefsCookie(client, hudMask, hud2Mask, revision, layout, sources, teamMasks))
         return false;
 
     g_iClientHUDMask[client] = hudMask;
@@ -3681,6 +3813,7 @@ bool ApplyHUDPrefsCookie(int client)
     g_iClientHUDLayout[client] = layout;
     g_iClientHUDRevision[client] = revision;
     ApplyHUDSources(client, sources);
+    ApplyHUDTeamMasks(client, teamMasks);
     return true;
 }
 
@@ -3690,9 +3823,11 @@ void SaveHUDPrefsCookie(int client)
         return;
 
     char packed[80];
+    char teamPacked[48];
     char value[HUD_PREFS_COOKIE_SIZE];
     PackSlotSources(g_iClientHUDSource[client], packed, sizeof(packed));
-    FormatEx(value, sizeof(value), "%d|%d|%d|%d|%s", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client], g_iClientHUDLayout[client], packed);
+    PackSlotTeamMasks(g_iClientHUDTeamMask[client], teamPacked, sizeof(teamPacked));
+    FormatEx(value, sizeof(value), "%d|%d|%d|%d|%s|%s", g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDRevision[client], g_iClientHUDLayout[client], packed, teamPacked);
     g_hHUDPrefsCookie.Set(client, value);
 }
 
@@ -3734,6 +3869,7 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
         ... "`hud3_source` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`hud4_source` tinyint unsigned NOT NULL DEFAULT 0,"
         ... "`slot_sources` varchar(80) NOT NULL DEFAULT '',"
+        ... "`slot_team_masks` varchar(80) NOT NULL DEFAULT '',"
         ... "`kill_feed_enabled` tinyint unsigned NULL DEFAULT NULL,"
         ... "`revision` int unsigned NOT NULL DEFAULT 0,"
         ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
@@ -3767,6 +3903,8 @@ public void SQLCB_CreateHUDPrefsTable(Handle owner, Handle results, const char[]
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `slot_sources` varchar(80) NOT NULL DEFAULT ''", HUD_PREFS_DB_TABLE);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `kill_feed_enabled` tinyint unsigned NULL DEFAULT NULL", HUD_PREFS_DB_TABLE);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
+    FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `slot_team_masks` varchar(80) NOT NULL DEFAULT ''", HUD_PREFS_DB_TABLE);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
 }
 
@@ -3827,9 +3965,9 @@ void LoadHUDPrefs(int client)
         return;
     }
 
-    char query[400];
+    char query[512];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source`,`slot_sources`,`kill_feed_enabled` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
+        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source`,`slot_sources`,`kill_feed_enabled`,`slot_team_masks` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
     g_eHUDPrefsLoadState[client] = HUDPrefs_DatabasePending;
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_LoadHUDPrefs, query, GetClientUserId(client));
 }
@@ -3867,6 +4005,15 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
             if (packed[0] != '\0')
                 ParsePackedSlotSources(packed, databaseSources);
         }
+        int databaseTeamMasks[HUD_SLOT_COUNT];
+        ClearHUDTeamMasks(databaseTeamMasks);
+        if (SQL_GetFieldCount(results) > 8)
+        {
+            char packedTeams[80];
+            SQL_FetchString(results, 8, packedTeams, sizeof(packedTeams));
+            if (packedTeams[0] != '\0')
+                ParsePackedSlotTeamMasks(packedTeams, databaseTeamMasks);
+        }
         bool databaseKillFeedStored = SQL_GetFieldCount(results) > 7 && !SQL_IsFieldNull(results, 7);
         bool killFeedCookieNewer = KillFeed_HasClientCookie(client)
             && KillFeed_GetClientCookieRevision(client) > databaseRevision;
@@ -3883,8 +4030,9 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         int cookieRevision;
         int cookieLayout;
         int cookieSources[HUD_SLOT_COUNT];
+        int cookieTeamMasks[HUD_SLOT_COUNT];
 
-        if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision, cookieLayout, cookieSources) && cookieRevision > databaseRevision)
+        if (ParseHUDPrefsCookie(client, cookieHUDMask, cookieHUD2Mask, cookieRevision, cookieLayout, cookieSources, cookieTeamMasks) && cookieRevision > databaseRevision)
         {
             g_iClientHUDMask[client] = cookieHUDMask;
             g_iClientHUD2Mask[client] = cookieHUD2Mask;
@@ -3894,6 +4042,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
                 g_iClientHUDRevision[client] = KillFeed_GetClientCookieRevision(client);
             KillFeed_SetClientEnabled(client, databaseKillFeedEnabled);
             ApplyHUDSources(client, cookieSources);
+            ApplyHUDTeamMasks(client, cookieTeamMasks);
             g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
             SaveHUDPrefs(client, false);
             return;
@@ -3907,6 +4056,7 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
             g_iClientHUDRevision[client] = KillFeed_GetClientCookieRevision(client);
         KillFeed_SetClientEnabled(client, databaseKillFeedEnabled);
         ApplyHUDSources(client, databaseSources);
+        ApplyHUDTeamMasks(client, databaseTeamMasks);
         g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
         if (databaseKillFeedStored && !killFeedCookieNewer)
         {
@@ -3940,6 +4090,8 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
     {
         if (g_iClientHUDSource[client][slot] < HUD_CONTENT_DEFAULT || g_iClientHUDSource[client][slot] > HUD_CONTENT_MAX)
             g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
+        if (g_iClientHUDTeamMask[client][slot] < 1 || g_iClientHUDTeamMask[client][slot] > HUD_TEAMBIT_ALL)
+            g_iClientHUDTeamMask[client][slot] = HUD_TEAMBIT_ALL;
     }
     if (bumpRevision && g_iClientHUDRevision[client] < 2147483647)
         g_iClientHUDRevision[client]++;
@@ -3954,11 +4106,13 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
         return;
 
     char packed[80];
+    char teamPacked[48];
     PackSlotSources(g_iClientHUDSource[client], packed, sizeof(packed));
+    PackSlotTeamMasks(g_iClientHUDTeamMask[client], teamPacked, sizeof(teamPacked));
 
-    char query[1400];
+    char query[1600];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`slot_sources`,`kill_feed_enabled`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,'%s',%d,%d) "
+        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`slot_sources`,`slot_team_masks`,`kill_feed_enabled`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,'%s','%s',%d,%d) "
         ... "ON DUPLICATE KEY UPDATE "
         ... "`hud_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud_mask`),`hud_mask`),"
         ... "`hud2_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud2_mask`),`hud2_mask`),"
@@ -3966,9 +4120,10 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
         ... "`hud3_source`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud3_source`),`hud3_source`),"
         ... "`hud4_source`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud4_source`),`hud4_source`),"
         ... "`slot_sources`=IF(VALUES(`revision`)>=`revision`,VALUES(`slot_sources`),`slot_sources`),"
+        ... "`slot_team_masks`=IF(VALUES(`revision`)>=`revision`,VALUES(`slot_team_masks`),`slot_team_masks`),"
         ... "`kill_feed_enabled`=IF(VALUES(`revision`)>=`revision`,VALUES(`kill_feed_enabled`),`kill_feed_enabled`),"
         ... "`revision`=GREATEST(`revision`,VALUES(`revision`))",
-        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][HUD3], g_iClientHUDSource[client][HUD4], packed, KillFeed_ClientIsEnabled(client) ? 1 : 0, g_iClientHUDRevision[client]);
+        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][HUD3], g_iClientHUDSource[client][HUD4], packed, teamPacked, KillFeed_ClientIsEnabled(client) ? 1 : 0, g_iClientHUDRevision[client]);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_SaveHUDPrefs, query);
 }
 
@@ -3987,26 +4142,57 @@ public Action CmdHUDMenu(int client, int args)
     return Plugin_Handled;
 }
 
-void AddHUDToggleItem(Menu menu, int client, const char[] key, const char[] phrase, bool enabled, bool specSIOnly = false, int draw = ITEMDRAW_DEFAULT)
+void AddHUDToggleItem(Menu menu, int client, const char[] key, const char[] phrase, bool enabled, const char[] suffix = "", int draw = ITEMDRAW_DEFAULT)
 {
     char name[96];
     char item[128];
-    if (specSIOnly)
-        FormatEx(name, sizeof(name), "%T%T", phrase, client, "L4D2ScriptedHUD_SourceSpecSIOnly", client);
-    else
-        FormatEx(name, sizeof(name), "%T", phrase, client);
+    FormatEx(name, sizeof(name), "%T%s", phrase, client, suffix);
     FormatEx(item, sizeof(item), "[%s] %s", enabled ? "X" : " ", name);
     menu.AddItem(key, item, draw);
+}
+
+// Joins the localized names of the teams present in the mask, e.g. "SURV/SPEC".
+void FormatHUDTeamMaskNames(int client, int mask, char[] output, int size)
+{
+    if (mask == HUD_TEAMBIT_ALL)
+    {
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_TeamsAll", client);
+        return;
+    }
+
+    output[0] = '\0';
+    if ((mask & HUD_TEAMBIT_SURVIVOR) != 0)
+        Format(output, size, "%T", "L4D2ScriptedHUD_TeamSurvivor", client);
+    if ((mask & HUD_TEAMBIT_SPECTATOR) != 0)
+        Format(output, size, "%s%s%T", output, (output[0] != '\0') ? "/" : "", "L4D2ScriptedHUD_TeamSpectator", client);
+    if ((mask & HUD_TEAMBIT_INFECTED) != 0)
+        Format(output, size, "%s%s%T", output, (output[0] != '\0') ? "/" : "", "L4D2ScriptedHUD_TeamInfected", client);
+    if (output[0] == '\0')
+        strcopy(output, size, "-");
+}
+
+// Menu tag showing which teams the server allows to see a content source.
+// Empty when the source is unrestricted.
+void FormatHUDSourceTeamTag(int client, int source, char[] output, int size)
+{
+    output[0] = '\0';
+
+    int allowed = GetHUDSourceAllowedTeams(source);
+    if (allowed == HUD_TEAMBIT_ALL)
+        return;
+
+    char names[64];
+    FormatHUDTeamMaskNames(client, allowed, names, sizeof(names));
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_SourceTeamTag", client, names);
 }
 
 void FormatHUDSourceMenuName(int client, int hud, int source, char[] output, int size)
 {
     char phrase[64];
+    char tag[80];
     GetHUDSourcePhrase(hud, source, phrase, sizeof(phrase));
-    if (IsInfectedIntelSource(source))
-        FormatEx(output, size, "%T%T", phrase, client, "L4D2ScriptedHUD_SourceSpecSIOnly", client);
-    else
-        FormatEx(output, size, "%T", phrase, client);
+    FormatHUDSourceTeamTag(client, source, tag, sizeof(tag));
+    FormatEx(output, size, "%T%s", phrase, client, tag);
 }
 
 void AddKillFeedMenuItem(Menu menu, int client)
@@ -4107,7 +4293,10 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
         g_iClientHUD2Mask[client] = HUD2_PART_ALL_MASK;
         g_iClientHUDLayout[client] = HUD_LAYOUT_STANDARD;
         for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
+        {
             g_iClientHUDSource[client][slot] = HUD_CONTENT_DEFAULT;
+            g_iClientHUDTeamMask[client][slot] = HUD_TEAMBIT_ALL;
+        }
     }
     SaveHUDPrefs(client);
     OpenHUDPrefsMenu(client);
@@ -4172,11 +4361,22 @@ void OpenHUDSlotGroupMenu(int client, int group)
     {
         char key[16];
         char engineName[32];
-        char sourceName[80];
+        char sourceName[128];
         char item[192];
         FormatEx(key, sizeof(key), "slot%d", hud);
         FormatEx(engineName, sizeof(engineName), "%T", g_sHUDEngineNamePhrases[hud], client);
         FormatHUDSourceMenuName(client, hud, GetClientHUDSource(client, hud), sourceName, sizeof(sourceName));
+
+        // Show the player's own per-team visibility choice when narrowed.
+        if (g_iClientHUDTeamMask[client][hud] != HUD_TEAMBIT_ALL)
+        {
+            char names[64];
+            char tag[80];
+            FormatHUDTeamMaskNames(client, g_iClientHUDTeamMask[client][hud], names, sizeof(names));
+            FormatEx(tag, sizeof(tag), "%T", "L4D2ScriptedHUD_SourceTeamTag", client, names);
+            StrCat(sourceName, sizeof(sourceName), tag);
+        }
+
         FormatEx(item, sizeof(item), "[%s] %T", IsHUDSlotConfigured(client, hud) ? "X" : " ", "L4D2ScriptedHUD_SlotItem", client, hud + 1, engineName, sourceName);
         menu.AddItem(key, item);
     }
@@ -4227,14 +4427,22 @@ void OpenHUDContentMenu(int client, int hud)
 
     int current = GetClientHUDSource(client, hud);
     bool canToggle = hud < HUD_EXTRA_FIRST || current != HUD_CONTENT_DEFAULT;
-    AddHUDToggleItem(menu, client, "toggle", "L4D2ScriptedHUD_SlotEnabled", IsHUDSlotConfigured(client, hud), false, canToggle ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+    AddHUDToggleItem(menu, client, "toggle", "L4D2ScriptedHUD_SlotEnabled", IsHUDSlotConfigured(client, hud), "", canToggle ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+
+    char teamNames[64];
+    FormatHUDTeamMaskNames(client, g_iClientHUDTeamMask[client][hud], teamNames, sizeof(teamNames));
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_SlotTeams", client, teamNames);
+    menu.AddItem("teams", text);
+
     char key[16];
     for (int source = HUD_CONTENT_DEFAULT; source <= HUD_CONTENT_MAX; source++)
     {
         FormatEx(key, sizeof(key), "src%d", source);
         char phrase[64];
+        char tag[80];
         GetHUDSourcePhrase(hud, source, phrase, sizeof(phrase));
-        AddHUDToggleItem(menu, client, key, phrase, current == source, IsInfectedIntelSource(source));
+        FormatHUDSourceTeamTag(client, source, tag, sizeof(tag));
+        AddHUDToggleItem(menu, client, key, phrase, current == source, tag);
     }
     menu.Display(client, MENU_TIME_FOREVER);
 }
@@ -4273,6 +4481,11 @@ int HandleHUDContentMenu(Menu menu, MenuAction action, int client, int item, int
 
     char key[16];
     menu.GetItem(item, key, sizeof(key));
+    if (StrEqual(key, "teams"))
+    {
+        OpenHUDTeamMenu(client, hud);
+        return 0;
+    }
     if (StrEqual(key, "toggle"))
     {
         if (hud < HUD_EXTRA_FIRST || GetClientHUDSource(client, hud) != HUD_CONTENT_DEFAULT)
@@ -4293,6 +4506,72 @@ int HandleHUDContentMenu(Menu menu, MenuAction action, int client, int item, int
 
     SaveHUDPrefs(client);
     OpenHUDContentMenu(client, hud);
+    return 0;
+}
+
+void OpenHUDTeamMenu(int client, int hud)
+{
+    if (!IsHUDSlotConfigurableForClient(client, hud))
+    {
+        OpenHUDPrefsMenu(client);
+        return;
+    }
+
+    g_iHUDMenuSlot[client] = hud;
+    Menu menu = new Menu(MenuHandler_HUDTeams);
+    char text[192];
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_SlotTeamsTitle", client, hud + 1);
+    menu.SetTitle(text);
+    menu.ExitBackButton = true;
+
+    int mask = g_iClientHUDTeamMask[client][hud];
+    AddHUDToggleItem(menu, client, "team2", "L4D2ScriptedHUD_TeamSurvivor", (mask & HUD_TEAMBIT_SURVIVOR) != 0);
+    AddHUDToggleItem(menu, client, "team1", "L4D2ScriptedHUD_TeamSpectator", (mask & HUD_TEAMBIT_SPECTATOR) != 0);
+    AddHUDToggleItem(menu, client, "team4", "L4D2ScriptedHUD_TeamInfected", (mask & HUD_TEAMBIT_INFECTED) != 0);
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUDTeams(Menu menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsValidClient(client))
+    {
+        OpenHUDContentMenu(client, g_iHUDMenuSlot[client]);
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    int hud = g_iHUDMenuSlot[client];
+    if (hud < HUD1 || hud >= HUD_SLOT_COUNT || !IsHUDSlotConfigurableForClient(client, hud))
+    {
+        OpenHUDPrefsMenu(client);
+        return 0;
+    }
+
+    char key[16];
+    menu.GetItem(item, key, sizeof(key));
+    if (strncmp(key, "team", 4) == 0)
+    {
+        int bit = StringToInt(key[4]);
+        if (bit == HUD_TEAMBIT_SPECTATOR || bit == HUD_TEAMBIT_SURVIVOR || bit == HUD_TEAMBIT_INFECTED)
+        {
+            // Keep at least one team selected so the slot can never become
+            // permanently invisible through this menu.
+            int newMask = g_iClientHUDTeamMask[client][hud] ^ bit;
+            if (newMask != 0)
+            {
+                g_iClientHUDTeamMask[client][hud] = newMask;
+                SaveHUDPrefs(client);
+            }
+        }
+    }
+
+    OpenHUDTeamMenu(client, hud);
     return 0;
 }
 
@@ -4413,6 +4692,9 @@ public Action CmdPrintCvars(int client, int args)
     PrintToConsole(client, "l4d2_scripted_hud_version : %s", PLUGIN_VERSION);
     PrintToConsole(client, "l4d2_scripted_hud_enable : %b (%s)", g_bCvar_Enabled, g_bCvar_Enabled ? "true" : "false");
     PrintToConsole(client, "l4d2_scripted_hud_update_interval : %.1f", g_fCvar_UpdateInterval);
+    char sourceTeams[256];
+    g_hCvar_SourceTeams.GetString(sourceTeams, sizeof(sourceTeams));
+    PrintToConsole(client, "l4d2_scripted_hud_source_teams : \"%s\"", sourceTeams);
     KillFeed_PrintCvars(client);
     PrintToConsole(client, "l4d2_scripted_hud_hud1_text : \"%s\"", g_sCvar_HUD1_Text);
     PrintToConsole(client, "l4d2_scripted_hud_hud1_text_align : %i (%s)", g_iCvar_HUD1_TextAlign, g_iCvar_HUD1_TextAlign == HUD_TEXT_ALIGN_LEFT ? "LEFT" : g_iCvar_HUD1_TextAlign == HUD_TEXT_ALIGN_CENTER ? "CENTER" : "RIGHT");

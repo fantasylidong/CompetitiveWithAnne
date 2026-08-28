@@ -523,4 +523,35 @@
 		{
 			"chi"		"计分4"
 		}
+		"L4D2ScriptedHUD_SlotTeams"
+		{
+			"#format"	"{1:s}"
+			"chi"		"显示队伍：{1}"
+		}
+		"L4D2ScriptedHUD_SlotTeamsTitle"
+		{
+			"#format"	"{1:d}"
+			"chi"		"HUD {1} 显示队伍"
+		}
+		"L4D2ScriptedHUD_TeamSpectator"
+		{
+			"chi"		"旁观"
+		}
+		"L4D2ScriptedHUD_TeamSurvivor"
+		{
+			"chi"		"生还"
+		}
+		"L4D2ScriptedHUD_TeamInfected"
+		{
+			"chi"		"特感"
+		}
+		"L4D2ScriptedHUD_TeamsAll"
+		{
+			"chi"		"全部队伍"
+		}
+		"L4D2ScriptedHUD_SourceTeamTag"
+		{
+			"#format"	"{1:s}"
+			"chi"		"（仅{1}）"
+		}
 	}

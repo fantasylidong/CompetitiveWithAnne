@@ -8,7 +8,7 @@
 #include <SteamWorks>
 #define REQUIRE_EXTENSIONS
 
-#define PLUGIN_VERSION "1.1.5"
+#define PLUGIN_VERSION "1.1.6"
 #define CHAT_TAG "{green}[网络]{default}"
 #define MAX_REPORT_SAMPLES 128
 
@@ -445,6 +445,10 @@ void SendQualityReport(int client, const char[] eventKind, const char[] disconne
 	}
 
 	CacheClientIdentity(client);
+	if (g_sPlayerIp[client][0] == '\0') {
+		ResetReportWindow(client, now);
+		return;
+	}
 	Handle request = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, g_sReportUrl);
 	if (request == null) {
 		LogReportFailure("unable to create SteamWorks HTTP request");
