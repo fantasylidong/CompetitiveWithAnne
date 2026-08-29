@@ -1,20 +1,15 @@
 -- AnneHappy current MySQL schema bootstrap (MySQL 5.7+).
 -- This file only creates shared tables required by the current plugins and NewAnneWeb.
 -- NewAnneWeb-owned tables are initialized by NewAnneWeb/database/init.php.
--- SourceBans++ owns its own `sourcebans` database and is intentionally excluded.
+-- Unused databases are excluded: `Anne` (deleted live 2026-08), `sourcebans`, `mycaiwu_prod`.
+-- Organized 2026-08-29 against live primary (cwa-mysql57-cloud) SHOW CREATE TABLE.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 
-CREATE DATABASE IF NOT EXISTS `Anne` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS `chat` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS `l4d2stats` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE `Anne`;
-
--- The current plugins do not own any Anne-specific tables. The schema remains
--- available for SourceMod's default database alias and external admin tooling.
 
 USE `chat`;
 
@@ -88,6 +83,18 @@ CREATE TABLE IF NOT EXISTS `ai_dynamic_ppm_thresholds` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+CREATE TABLE IF NOT EXISTS `ai_dynamic_ppm_quarter_samples` (
+  `quarter_key` int(10) unsigned NOT NULL,
+  `steamid` varchar(64) NOT NULL,
+  `points` int(11) NOT NULL DEFAULT '0',
+  `playtime` int(11) NOT NULL DEFAULT '0',
+  `updated` int(11) NOT NULL DEFAULT '0',
+  `captured_at` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`quarter_key`,`steamid`),
+  KEY `quarter_ppm` (`quarter_key`,`playtime`,`points`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE TABLE IF NOT EXISTS `l4d_peak_state` (
   `state_key` varchar(64) NOT NULL,
   `hold_until` int(11) NOT NULL DEFAULT '0',
@@ -97,7 +104,7 @@ CREATE TABLE IF NOT EXISTS `l4d_peak_state` (
 
 
 CREATE TABLE IF NOT EXISTS `l4d_server_status` (
-  `address_key` varchar(160) NOT NULL,
+  `address_key` varchar(160) NOT NULL DEFAULT '',
   `server_id` varchar(128) NOT NULL,
   `hostname` varchar(128) NOT NULL DEFAULT '',
   `ip` varchar(64) NOT NULL DEFAULT '',
@@ -107,9 +114,22 @@ CREATE TABLE IF NOT EXISTS `l4d_server_status` (
   `enabled` tinyint(4) NOT NULL DEFAULT '1',
   `is_good_server` tinyint(4) NOT NULL DEFAULT '0',
   PRIMARY KEY (`address_key`),
-  KEY `server_id` (`server_id`),
-  KEY `updated_at` (`updated_at`)
+  KEY `updated_at` (`updated_at`),
+  KEY `server_id` (`server_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `l4d_online_player_history` (
+  `sampled_at` int(10) unsigned NOT NULL,
+  `total_players` int(10) unsigned NOT NULL DEFAULT '0',
+  `active_servers` int(10) unsigned NOT NULL DEFAULT '0',
+  `total_servers` int(10) unsigned NOT NULL DEFAULT '0',
+  `source_rows` int(10) unsigned NOT NULL DEFAULT '0',
+  `max_status_age` int(10) unsigned NOT NULL DEFAULT '0',
+  `created_at` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`sampled_at`),
+  KEY `total_players` (`total_players`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE IF NOT EXISTS `lilac_detections` (
@@ -412,27 +432,28 @@ CREATE TABLE IF NOT EXISTS `rpgdamage` (
 
 CREATE TABLE IF NOT EXISTS `infected_control_traitor_quota` (
   `auth_id` varchar(64) NOT NULL,
-  `total_count` int NOT NULL DEFAULT '100',
-  `used_count` int NOT NULL DEFAULT '0',
-  `quota_day` int NOT NULL DEFAULT '0',
-  `tank_block_until` int NOT NULL DEFAULT '0',
+  `total_count` int(11) NOT NULL DEFAULT '100',
+  `used_count` int(11) NOT NULL DEFAULT '0',
+  `quota_day` int(11) NOT NULL DEFAULT '0',
+  `tank_block_until` int(11) NOT NULL DEFAULT '0',
   `last_name` varchar(64) NOT NULL DEFAULT '',
-  `updated_at` int NOT NULL DEFAULT '0',
+  `updated_at` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`auth_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 CREATE TABLE IF NOT EXISTS `scripted_hud_prefs` (
   `steamid` varchar(64) NOT NULL,
-  `hud_mask` smallint unsigned NOT NULL DEFAULT '3',
-  `hud2_mask` tinyint unsigned NOT NULL DEFAULT '255',
-  `layout_preset` tinyint unsigned NOT NULL DEFAULT '0',
-  `hud3_source` tinyint unsigned NOT NULL DEFAULT '0',
-  `hud4_source` tinyint unsigned NOT NULL DEFAULT '0',
-  `slot_sources` varchar(80) NOT NULL DEFAULT '',
-  `kill_feed_enabled` tinyint unsigned DEFAULT NULL,
-  `revision` int unsigned NOT NULL DEFAULT '0',
+  `hud_mask` smallint(5) unsigned NOT NULL DEFAULT '3',
+  `hud2_mask` tinyint(3) unsigned NOT NULL DEFAULT '127',
+  `layout_preset` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `revision` int(10) unsigned NOT NULL DEFAULT '0',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `hud3_source` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `hud4_source` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `slot_sources` varchar(80) NOT NULL DEFAULT '',
+  `kill_feed_enabled` tinyint(3) unsigned DEFAULT NULL,
+  `slot_team_masks` varchar(80) NOT NULL DEFAULT '',
   PRIMARY KEY (`steamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -458,7 +479,8 @@ CREATE TABLE IF NOT EXISTS `score_log` (
   KEY `steamid_created` (`steamid`,`created`),
   KEY `reason_created` (`reason`,`created`),
   KEY `map_created` (`map`,`created`),
-  KEY `score_created` (`score`,`created`)
+  KEY `score_created` (`score`,`created`),
+  KEY `score_log_created_id` (`created`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -617,26 +639,26 @@ CREATE TABLE IF NOT EXISTS `timedmap_runs` (
 
 CREATE TABLE IF NOT EXISTS `map_runs` (
   `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
-  `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-  `gamemode` tinyint unsigned NOT NULL,
-  `mutation` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `map` varchar(255) NOT NULL,
+  `gamemode` tinyint(3) unsigned NOT NULL,
+  `mutation` varchar(64) NOT NULL DEFAULT '',
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
-  `ruleset_version` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
-  `record_policy` tinyint unsigned NOT NULL DEFAULT '2',
+  `ruleset_version` varchar(64) NOT NULL DEFAULT '',
+  `record_policy` tinyint(3) unsigned NOT NULL DEFAULT '2',
   `timing_profile` varchar(24) CHARACTER SET ascii NOT NULL DEFAULT 'completion',
   `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'game',
-  `difficulty` tinyint unsigned NOT NULL DEFAULT '0',
-  `duration_ms` bigint unsigned NOT NULL,
-  `survivor_count` smallint unsigned NOT NULL DEFAULT '0',
-  `infected_count` smallint unsigned NOT NULL DEFAULT '0',
-  `si_count` smallint unsigned NOT NULL DEFAULT '0',
-  `si_spawn_time` smallint unsigned NOT NULL DEFAULT '0',
-  `usebuy` tinyint unsigned NOT NULL DEFAULT '0',
-  `auto` tinyint unsigned NOT NULL DEFAULT '0',
-  `legacy_mode` tinyint unsigned NOT NULL DEFAULT '0',
-  `completed` tinyint unsigned NOT NULL DEFAULT '1',
-  `valid` tinyint unsigned NOT NULL DEFAULT '1',
-  `server_name` varchar(128) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `duration_ms` bigint(20) unsigned NOT NULL,
+  `survivor_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `infected_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `usebuy` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `auto` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `legacy_mode` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `completed` tinyint(3) unsigned NOT NULL DEFAULT '1',
+  `valid` tinyint(3) unsigned NOT NULL DEFAULT '1',
+  `server_name` varchar(128) NOT NULL DEFAULT '',
   `source` varchar(32) CHARACTER SET ascii NOT NULL DEFAULT 'native',
   `created` datetime NOT NULL,
   `modified` datetime NOT NULL,
@@ -649,9 +671,9 @@ CREATE TABLE IF NOT EXISTS `map_runs` (
 
 CREATE TABLE IF NOT EXISTS `map_run_players` (
   `run_id` varchar(64) CHARACTER SET ascii NOT NULL,
-  `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-  `team` tinyint unsigned NOT NULL DEFAULT '2',
-  `completed` tinyint unsigned NOT NULL DEFAULT '1',
+  `steamid` varchar(255) NOT NULL,
+  `team` tinyint(3) unsigned NOT NULL DEFAULT '2',
+  `completed` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `created` datetime NOT NULL,
   PRIMARY KEY (`run_id`,`steamid`),
   KEY `idx_map_run_players_steamid` (`steamid`,`created`),
@@ -661,28 +683,29 @@ CREATE TABLE IF NOT EXISTS `map_run_players` (
 
 CREATE TABLE IF NOT EXISTS `legacy_map_bests` (
   `source_hash` char(64) CHARACTER SET ascii NOT NULL,
-  `map` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-  `gamemode` tinyint unsigned NOT NULL,
-  `mutation` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `map` varchar(255) NOT NULL,
+  `gamemode` tinyint(3) unsigned NOT NULL,
+  `mutation` varchar(64) NOT NULL DEFAULT '',
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
-  `ruleset_version` varchar(64) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
+  `ruleset_version` varchar(64) NOT NULL DEFAULT '',
   `timing_profile` varchar(24) CHARACTER SET ascii NOT NULL DEFAULT 'completion',
   `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'game',
-  `difficulty` tinyint unsigned NOT NULL DEFAULT '0',
-  `steamid` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-  `plays` int unsigned NOT NULL DEFAULT '0',
-  `best_duration_ms` bigint unsigned NOT NULL,
-  `player_count` smallint unsigned NOT NULL DEFAULT '0',
-  `si_count` smallint unsigned NOT NULL DEFAULT '0',
-  `si_spawn_time` smallint unsigned NOT NULL DEFAULT '0',
-  `usebuy` tinyint unsigned NOT NULL DEFAULT '0',
-  `auto` tinyint unsigned NOT NULL DEFAULT '0',
-  `legacy_mode` tinyint unsigned NOT NULL DEFAULT '0',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `steamid` varchar(255) NOT NULL,
+  `plays` int(10) unsigned NOT NULL DEFAULT '0',
+  `best_duration_ms` bigint(20) unsigned NOT NULL,
+  `player_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `usebuy` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `auto` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `legacy_mode` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `created` date NOT NULL,
   `modified` datetime NOT NULL,
   PRIMARY KEY (`source_hash`),
   KEY `idx_legacy_map_bests_filter` (`ruleset_key`,`map`,`difficulty`,`best_duration_ms`),
   KEY `idx_legacy_map_bests_steamid` (`steamid`,`modified`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 SET foreign_key_checks = 1;
