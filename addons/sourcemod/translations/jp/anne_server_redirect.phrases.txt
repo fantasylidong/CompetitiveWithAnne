@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"jp"		"[Anne] この入口サーバーは接続の振り分け専用です。F1 を押して実際のゲームサーバーへ移動してください：%s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"jp"		"[Anne] F1 が反応しない場合はコンソールで実行してください：bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"jp"		"F1 を押して実際のゲームサーバーへ接続"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"jp"		"[Anne] モバイル回線でなければ、実際のゲームサーバーへ直接接続することをおすすめします：%s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"jp"		"モバイル回線でなければ直接接続を推奨、F1 で確定"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"jp"		"[AnneRedirect] 転送先の再読み込みを要求しました。"
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"jp"		"[AnneRedirect] このコマンドはゲーム内の人間クライアントから実行してください。"
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"jp"		"[AnneRedirect] 転送先の準備がまだできていません。"
+	}
+}

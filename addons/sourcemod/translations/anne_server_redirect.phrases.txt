@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"en"		"[Anne] This entry server is only for joining. Press F1 to move to the real game server: %s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"en"		"[Anne] If F1 does not accept it, run: bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"en"		"Press F1 to connect to the real game server"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"en"		"[Anne] If you are not on a mobile/entry connection, connect directly to the real game server: %s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"en"		"Not on mobile? Connect directly with F1"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"en"		"[AnneRedirect] Target reload requested."
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"en"		"[AnneRedirect] This command must be used by an in-game human client."
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"en"		"[AnneRedirect] Redirect target is not ready."
+	}
+}

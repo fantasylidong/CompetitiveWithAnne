@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"vi"		"{green}[AnneDonate]{default} Sau khi thanh toán, quay lại trò chơi và nhập {olive}!wc user@example.com{default}."
+		"vi"		"{green}[AnneDonate]{default} {olive}KHOẢN TÀI TRỢ CHƯA ĐƯỢC GHI NHẬN.{default} Quay lại trò chơi và nhập {olive}!wc user@example.com{default}, nếu không quản trị viên sẽ không nhận được bản ghi."
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"vi"		"Đã thanh toán: !wc user@example.com | Mở nhầm: !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"vi"		"{green}[AnneDonate]{default} Đang gửi thông báo hoàn tất thanh toán. Vui lòng đợi, đừng gửi lại hoặc chọn lại mức tài trợ."
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"vi"		"Gửi bằng !wc user@example.com"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"vi"		"Tôi đã thanh toán"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"vi"		"Mở lại trang thanh toán"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"vi"		"Xử lý sau"
+		"vi"		"{green}[AnneDonate]{default} Đã hủy quy trình tài trợ do thao tác nhầm. Không có bản ghi tài trợ nào được gửi."
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"ko"		"{green}[IC]{default} 사용법: !it 로 트레이터 종류 메뉴를 엽니다. !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] 로 바로 등록합니다."
+		"ko"		"{green}[IC]{default} 사용법: !it 로 트레이터 종류 메뉴를 엽니다. !it [random|smoker|boomer|hunter|spitter|jockey|charger] 로 바로 등록합니다. !itcancel 로 웨이브 해제 전에 취소합니다."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -35,6 +35,10 @@
 	"InfectedControl_TraitorMenuRandom"
 	{
 		"ko"		"사용 가능한 종류 무작위"
+	}
+	"InfectedControl_TraitorMenuCancel"
+	{
+		"ko"		"등록 취소"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{

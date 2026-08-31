@@ -34,14 +34,16 @@ static const char
 		"sm_donate",
 		"sm_wc",
 		"sm_wanchen",
-		"sm_finish"
+		"sm_finish",
+		"sm_wccancel"
 	},
 	g_sSponsorChatTriggers[][] =
 	{
 		"!donate", "/donate", "!sm_donate", "/sm_donate",
 		"!wc", "/wc", "!sm_wc", "/sm_wc",
 		"!wanchen", "/wanchen", "!sm_wanchen", "/sm_wanchen",
-		"!finish", "/finish", "!sm_finish", "/sm_finish"
+		"!finish", "/finish", "!sm_finish", "/sm_finish",
+		"!wccancel", "/wccancel", "!sm_wccancel", "/sm_wccancel"
 	};
 
 public Plugin myinfo = 

@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"vi"		"{green}[IC]{default} Cách dùng: !it mở menu loại nội gián; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] đăng ký trực tiếp."
+		"vi"		"{green}[IC]{default} Cách dùng: !it mở menu loại nội gián; !it [random|smoker|boomer|hunter|spitter|jockey|charger] đăng ký trực tiếp; !itcancel hủy trước khi đợt được thả."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -35,6 +35,10 @@
 	"InfectedControl_TraitorMenuRandom"
 	{
 		"vi"		"Ngẫu nhiên loại đang bật"
+	}
+	"InfectedControl_TraitorMenuCancel"
+	{
+		"vi"		"Hủy đăng ký"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{

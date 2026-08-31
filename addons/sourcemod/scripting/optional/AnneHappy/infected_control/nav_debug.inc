@@ -206,9 +206,11 @@ public Action Cmd_NavTest(int client, int args)
 
     // 6. 分散度
     bool passSeparation = PassMinSeparation(testPos);
-    PrintToConsole(client, "[6] Dispersion Check: %s | Min Sep: %s ",
-        (passSeparation ) ? "PASS" : "FAIL",
-        passSeparation ? "OK" : "FAIL");
+    PrintToConsole(client, "[6] Dispersion Check: %s | sepRadius=%.1f kernelRadius=%.1f penK=%.2f",
+        passSeparation ? "PASS" : "FAIL",
+        SpawnMemory_GetEffectiveSepRadius(),
+        SpawnMemory_GetEffectiveKernelRadius(),
+        ComputePenScaleByLimit(gCV.iSiLimit));
 
     // 7. 卡壳
     bool passStuck = !WillStuck(testPos);
@@ -228,14 +230,14 @@ public Action Cmd_NavTest(int client, int args)
     PrintToConsole(client, "--- Score Breakdown (as Smoker) ---");
 
     int zc = view_as<int>(SI_Smoker);
-    float center[3]; GetSectorCenter(center, targetSur);
-    int sectors = GetCurrentSectors();
-    int sidx = ComputeSectorIndex(center, testPos, sectors);
-
     // 高度“偏好”分（独立正向项，不是扣分器）
+    // 目标生还者不可用时退回锚点（最高进度生还者），不要拿候选点跟自己比高度
+    float anchorPos[3];
+    GetTargetAnchorPos(anchorPos, targetSur);
     float refEyeZ = 0.0;
-    float targetFootZ = center[2];
+    float targetFootZ = anchorPos[2];
     float targetEye[3];
+    targetEye = anchorPos;
     if (IsValidSurvivor(targetSur) && IsPlayerAlive(targetSur))
     {
         GetClientEyePosition(targetSur, targetEye);
@@ -258,7 +260,7 @@ public Action Cmd_NavTest(int client, int args)
                                                    gCV.fSpawnMin, gCV.fSpawnMax,
                                                    candPercent, centerBucket, rawBadFlow,
                                                    passFlow, refEyeZ, targetFootZ,
-                                                   sidx, index,
+                                                   index,
                                                    tacticalQuality, kernelProximity, scoreDbg);
 
     PrintToConsole(client, "  Distance Score: %.1f (sweet: %.1f, width: %.1f)",
@@ -282,8 +284,8 @@ public Action Cmd_NavTest(int client, int args)
         PrintToConsole(client, "  Flow Score: %.1f (delta: %d)", scoreDbg.flow, scoreDbg.deltaFlow);
     }
 
-    PrintToConsole(client, "  Dispersion Score: %.1f -> %.1f (penK: %.2f, kernel: %.2f, sector: %d/%d)",
-        scoreDbg.dispRaw, scoreDbg.dispScaled, scoreDbg.penK, scoreDbg.dispKernel, sidx, sectors);
+    PrintToConsole(client, "  Dispersion Score: %.1f (penK: %.2f, kernelSum: %.2f)",
+        scoreDbg.dispScaled, scoreDbg.penK, scoreDbg.dispKernel);
 
     float totalScore = scoreDbg.total;
     PrintToConsole(client, "");

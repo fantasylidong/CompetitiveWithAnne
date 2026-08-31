@@ -25,7 +25,7 @@ char sLogFile[PLATFORM_MAX_PATH] = "addons/sourcemod/logs/SITargetLimit.txt";
 #include <l4d_target_override>
 
 
-#define PLUGIN_VERSION "1.6"
+#define PLUGIN_VERSION "1.8"
 ConVar	
 	g_hPluginEnable,
 	g_hSI_enable_option,
@@ -42,6 +42,8 @@ int
 	g_iLimit_manual = 0,
 	g_iSILimit = 0,
 	g_iFlowLeader = -1;
+ConVar
+	g_hClassLimitCvars[8];
 enum struct PlayerStruct{
 	int targetLimit;
 	void PlayerStruct(){
@@ -50,9 +52,7 @@ enum struct PlayerStruct{
 				this.targetLimit = 0;
 				return;
 			}
-			int temp = GetMobileSurvivorNum();
-			if(temp < 1) temp = 1;
-			this.targetLimit = (g_iSILimit / temp) + 1;
+			this.targetLimit = ComputeBaseTargetLimit();
 			this.target_override_set(this.targetLimit);
 		}
 			
@@ -85,11 +85,11 @@ enum struct PlayerStruct{
 		for(int i = 0; i < 7; i++){
 			if(CheckSIOption(i)){
 				L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED, num);
-				//Debug_Print("所有启用特感target值更改为 %d", L4D_TargetOverride_GetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED));
+				L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED_MASK, g_iSI_enable_option);
 			}	
 			else{
 				L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED, 0);
-				//Debug_Print("所有不启用特感target值更改为 %d", L4D_TargetOverride_GetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED));
+				L4D_TargetOverride_SetOption(view_as<TARGET_SI_INDEX>(i), INDEX_TARGETED_MASK, 0);
 			}
 		}
 	}
@@ -107,6 +107,14 @@ public Plugin myinfo =
 }
 /*
 Changelog
+2026.8.29
+1.8 账本统一：新增 IsClassTargetLimited native，供各特感 AI 插件在
+    L4D2_OnChooseVictim 改靶前判断该职业是否受控制类上限约束；配合
+    l4d_target_override 2.27 的 SetLastVictim，两条改靶通道共用同一份
+    per-survivor 锁定计数。新增 sm_targetlimit_status 管理员调试命令。
+1.7 控制类特感（舌头/猎人/猴子/牛）共用独立上限：控制类预算 / 可动生还 + 1。
+    预算取已启用控制职业的 z_ / inf_ 上限之和，并钳在 l4d_infected_limit 内。
+    Boomer/Spitter/Tank 不占这个池；计数只统计控制类锁定。
 2026.8.26
 1.6 队首（Flow 最高的可动生还者）目标上限 ×2：GetClientTargetLimit 返回有效上限，
     并通过 L4D_TargetOverride_SetTargetedCap 同步给目标分配，让刷特容量口径和
@@ -132,9 +140,7 @@ public void OnDetectRushman(int DetectRushman){
 	}else
 	{
 		g_bDetectRushMan = false;
-		int temp = GetMobileSurvivorNum();
-		if(temp < 1) temp = 1;
-		int normalSur = (g_iSILimit / temp) + 1;
+		int normalSur = ComputeBaseTargetLimit();
 		for(int i = 0; i < MAXPLAYERS +1; i++){
 			player[i].SetTargetLimit(normalSur);
 		}
@@ -144,8 +150,8 @@ public void OnDetectRushman(int DetectRushman){
 public void  OnPluginStart()
 {
 	g_hPluginEnable = CreateConVar("SI_target_enable", "1", "是否开启插件", 0, true, 0.0, true, 1.0);//Plugin Enable
-	g_hSI_enable_option = CreateConVar("SI_enable_option", "22", "控制不同特感是否开启此项功能（1smoker，2boomer，4hunter，……，总共7个，把这些值相加的最终结果）.", 0, true, 0.0, true, 127.0);//1,2,4,8,16,32,64 add to enable different SI enable option
-	g_hLimit_auto = CreateConVar("SI_target_limit_auto", "1", "服务器是否自动根据特感数量限定值来限制最大目标数量[Auto = (max / 正常生还者数量)向下取整 +1].", 0, true, 0.0, true, 1.0);//Auto Set target limit
+	g_hSI_enable_option = CreateConVar("SI_enable_option", "53", "控制类特感掩码（1舌头，2Boomer，4猎人，8Spitter，16猴子，32牛，64Tank）。默认53=舌头+猎人+猴子+牛，共用控制类上限。", 0, true, 0.0, true, 127.0);
+	g_hLimit_auto = CreateConVar("SI_target_limit_auto", "1", "自动上限：已启用控制类职业预算 / 可动生还者 + 1。预算为对应 z_*/inf_* 上限之和，并钳在 l4d_infected_limit 内。", 0, true, 0.0, true, 1.0);
 	g_hLimit_manual = CreateConVar("SI_target_limit_manual", "3", "服务器不自动情况下手动限制最大目标的值.", 0, false, 0.0, false, 0.0);//If Auto disable, use manual value to control target limit
 	BuildPath(Path_SM, g_sLogPath, sizeof(g_sLogPath), "logs/SI_Target_limit.log");
 	
@@ -169,6 +175,8 @@ public void  OnPluginStart()
 	//队首上限×2：每秒刷新一次队首归属并同步目标分配侧的按玩家上限
 	CreateTimer(1.0, Timer_UpdateFlowLeader, _, TIMER_REPEAT);
 	//AutoExecConfig(true, "RestrictedGameModes");
+
+	RegAdminCmd("sm_targetlimit_status", Cmd_TargetLimitStatus, ADMFLAG_GENERIC, "Show per-survivor SI target counts and limits");
 }
 
 public void OnPluginEnd(){
@@ -196,6 +204,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("GetClientTargetNum", Native_GetClientTargetNum);
 	CreateNative("IsClientReachLimit", Native_IsClientReachLimit);
 	CreateNative("GetClientTargetLimit", Native_GetClientTargetLimit);
+	CreateNative("IsClassTargetLimited", Native_IsClassTargetLimited);
 	
 	return APLRes_Success;
 }
@@ -228,6 +237,7 @@ public void Frame_RebindDependencies(any data)
 void RebindDependencies()
 {
 	BindSILimitConVar();
+	BindClassLimitCvars();
 	GetCvars();
 	StructInit();
 }
@@ -307,6 +317,49 @@ public int Native_GetClientTargetLimit(Handle plugin, int numParams)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 	}
 	return GetEffectiveTargetLimit(client);
+}
+
+//该职业是否受控制类目标上限约束（供 AI 插件在改靶前判断口径）
+public int Native_IsClassTargetLimited(Handle plugin, int numParams)
+{
+	int zombieClass = GetNativeCell(1);
+	if (!g_hPluginEnable.BoolValue)
+		return 0;
+	return CheckSIOption(zombieClass) != 0 ? 1 : 0;
+}
+
+public Action Cmd_TargetLimitStatus(int client, int args)
+{
+	ReplyToCommand(client, "[SI_Target_limit] budget=%d mobile=%d base=%d rushman=%d leader=%d",
+		GetControlSIBudget(), GetMobileSurvivorNum(), ComputeBaseTargetLimit(),
+		g_bDetectRushMan ? 1 : 0, g_iFlowLeader);
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsValidClient(i) || GetClientTeam(i) != 2 || !IsPlayerAlive(i))
+			continue;
+		int total = TargetOverrideGetAvailable()
+			? L4D_TargetOverride_GetValue(i, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL)) : -1;
+		ReplyToCommand(client, "  %N: targeted=%d limit=%d%s%s", i, total,
+			GetEffectiveTargetLimit(i),
+			i == g_iFlowLeader ? " [leader]" : "",
+			L4D_IsPlayerIncapacitated(i) ? " [incap]" : "");
+	}
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsValidClient(i) || GetClientTeam(i) != 3 || !IsPlayerAlive(i))
+			continue;
+		int victim = TargetOverrideGetAvailable()
+			? L4D_TargetOverride_GetValue(i, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_VICTIM)) : 0;
+		int zc = GetEntProp(i, Prop_Send, "m_zombieClass");
+		char victimName[64] = "none";
+		if (victim >= 1 && victim <= MaxClients && IsClientInGame(victim))
+			GetClientName(victim, victimName, sizeof(victimName));
+		ReplyToCommand(client, "  SI %N (class %d%s): victim=%s", i, zc,
+			CheckSIOption(zc) ? "*" : "", victimName);
+	}
+	return Plugin_Handled;
 }
 
 //有效目标上限：队首（Flow 最高的可动生还者）×2。跑男模式下所有人的
@@ -391,9 +444,7 @@ public void evt_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(IsValidClient(client) ){
 		if(GetClientTeam(client) == 2){
-			int temp = GetMobileSurvivorNum();
-			if(temp < 1) temp = 1;
-			int normalSur = (g_iSILimit / temp) + 1;
+			int normalSur = ComputeBaseTargetLimit();
 			for(int i = 0; i < MAXPLAYERS +1; i++){
 				player[i].SetTargetLimit(normalSur);
 			}
@@ -430,9 +481,7 @@ public void evt_PlayerRevive(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("subject"));
 	if(IsValidClient(client) && GetClientTeam(client) == 2){
-		int temp = GetMobileSurvivorNum();
-		if(temp < 1) temp = 1;
-		int normalSur = (g_iSILimit / temp) + 1;
+		int normalSur = ComputeBaseTargetLimit();
 		for(int i = 0; i < MAXPLAYERS +1; i++){
 			player[i].SetTargetLimit(normalSur);
 		}
@@ -443,9 +492,7 @@ public void evt_PlayerIncap(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if(IsValidClient(client) && GetClientTeam(client) == 2){
-		int temp = GetMobileSurvivorNum();
-		if(temp < 1) temp = 1;
-		int normalSur = (g_iSILimit / temp) + 1;
+		int normalSur = ComputeBaseTargetLimit();
 		for(int i = 0; i < MAXPLAYERS +1; i++){
 			player[i].SetTargetLimit(normalSur);
 		}
@@ -501,9 +548,7 @@ void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newV
 	GetCvars();
 	if(g_iLimit_auto && g_hSILimit == null)
 		return;
-	int temp = GetMobileSurvivorNum();
-	if(temp < 1) temp = 1;
-	int normalSur = (g_iSILimit / temp) + 1;
+	int normalSur = ComputeBaseTargetLimit();
 	for(int i = 0; i < MAXPLAYERS +1; i++){
 		player[i].SetTargetLimit(normalSur);
 	}
@@ -734,9 +779,62 @@ stock bool IsValidClient(int client)
 		return false;
 	}
 }
+int ReadClassCap(const char[] infName, const char[] zName)
+{
+	ConVar inf = FindConVar(infName);
+	if(inf != null && inf.IntValue >= 0)
+		return inf.IntValue;
+	ConVar z = FindConVar(zName);
+	return z == null ? 0 : z.IntValue;
+}
+
+int GetControlSIBudget()
+{
+	int n = 0;
+	if(g_iSI_enable_option & ENABLE_SMOKER)
+		n += ReadClassCap("inf_smoker_limit", "z_smoker_limit");
+	if(g_iSI_enable_option & ENABLE_HUNTER)
+		n += ReadClassCap("inf_hunter_limit", "z_hunter_limit");
+	if(g_iSI_enable_option & ENABLE_JOCKEY)
+		n += ReadClassCap("inf_jockey_limit", "z_jockey_limit");
+	if(g_iSI_enable_option & ENABLE_CHARGER)
+		n += ReadClassCap("inf_charger_limit", "z_charger_limit");
+	if(n < 1)
+		n = g_iSILimit;
+	if(g_iSILimit > 0 && n > g_iSILimit)
+		n = g_iSILimit;
+	return n;
+}
+
+int ComputeBaseTargetLimit()
+{
+	if(!g_iLimit_auto)
+		return g_iLimit_manual;
+	int temp = GetMobileSurvivorNum();
+	if(temp < 1) temp = 1;
+	return (GetControlSIBudget() / temp) + 1;
+}
+
+void BindClassLimitCvars()
+{
+	static const char names[][] = {
+		"z_smoker_limit", "z_hunter_limit", "z_jockey_limit", "z_charger_limit",
+		"inf_smoker_limit", "inf_hunter_limit", "inf_jockey_limit", "inf_charger_limit"
+	};
+	for(int i = 0; i < 8; i++)
+	{
+		ConVar c = FindConVar(names[i]);
+		if(c == null || c == g_hClassLimitCvars[i])
+			continue;
+		g_hClassLimitCvars[i] = c;
+		c.AddChangeHook(ConVarChanged_Cvars);
+	}
+}
+
 stock bool IsReachLimit(int client){
-			return player[client].targetLimit > 0 && TargetOverrideGetAvailable()
-				&& L4D_TargetOverride_GetValue(client, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL)) >= player[client].targetLimit;
+			int limit = GetEffectiveTargetLimit(client);
+			return limit > 0 && TargetOverrideGetAvailable()
+				&& L4D_TargetOverride_GetValue(client, view_as<VALUE_OPTION_INDEX>(VALUE_INDEX_TOTAL)) >= limit;
 		}
 
 stock void Debug_Print(char[] format, any ...)

@@ -49,14 +49,23 @@ stock void CleanupLastSpawns(float now)
         lastSpawns.Erase(0);
 }
 
+// 硬防叠：固定半径，不再叠特感上限缩放和波内占用放宽。
+// 这一条只回答"能不能刷在这"，方向和聚集程度交给核密度评分。
+stock float SpawnMemory_GetEffectiveSepRadius()
+{
+    return (gCV.fSepRadius <= 0.0) ? 0.0 : gCV.fSepRadius;
+}
+
 stock bool PassMinSeparation(const float pos[3])
 {
     if (lastSpawns == null || lastSpawns.Length == 0) return true;
     if (gCV.fSepRadius <= 0.0) return true;
 
     float now = GetGameTime();
-    float k = PenLimitScale();
-    float sepRadiusEff = gCV.fSepRadius * k;
+    CleanupLastSpawns(now);
+    if (lastSpawns.Length == 0) return true;
+
+    float sepRadiusEff = SpawnMemory_GetEffectiveSepRadius();
     float sep2 = sepRadiusEff * sepRadiusEff;
 
     for (int i = lastSpawns.Length - 1; i >= 0; i--)
@@ -81,7 +90,8 @@ stock bool PassMinSeparation(const float pos[3])
     return true;
 }
 
-// —— 分散度核惩罚：对存活特感与最近刷点做距离衰减累加 —— //
+// —— 分散度核惩罚：对仍在接近途中的特感与最近刷点做距离衰减累加 —— //
+// 已贴脸交战的存活特感不计入：他们挤在生还者身边，若当核源会把后半波往外推。
 // 快照按 game tick 节流，一个 tick 内多次刷特尝试共用同一份来源列表。
 #define KERNEL_SOURCE_MAX 64
 #define KERNEL_SPAWN_MEMORY_WEIGHT 0.5
@@ -112,6 +122,9 @@ void SpawnMemory_RefreshKernelSnapshot()
             continue;
 
         GetClientAbsOrigin(i, pos);
+        if (GetMinDistToAnySurvivor(pos) < KERNEL_LIVE_COMBAT_EXCLUDE)
+            continue;
+
         g_KernelSources[g_KernelSourceCount][0] = pos[0];
         g_KernelSources[g_KernelSourceCount][1] = pos[1];
         g_KernelSources[g_KernelSourceCount][2] = pos[2];
@@ -137,6 +150,15 @@ void SpawnMemory_RefreshKernelSnapshot()
     }
 }
 
+// 核半径随特感上限收缩：低特时推得开（分散），高特时只防叠（允许成团）。
+// 上限缩放放在半径而不是强度上，否则高特时整条曲线一起变平、失去区分度。
+stock float SpawnMemory_GetEffectiveKernelRadius()
+{
+    if (gCV.fKernelRadius <= 0.0)
+        return 0.0;
+    return gCV.fKernelRadius * ComputePenScaleByLimit(gCV.iSiLimit);
+}
+
 // 返回候选点周边的核密度和（Σ weight*exp(-d/r)），仅用于评分排序。
 float SpawnMemory_GetKernelProximity(const float pos[3])
 {
@@ -146,6 +168,10 @@ float SpawnMemory_GetKernelProximity(const float pos[3])
         return 0.0;
     }
 
+    float kernelRadiusEff = SpawnMemory_GetEffectiveKernelRadius();
+    if (kernelRadiusEff <= 0.0)
+        return 0.0;
+
     float sum = 0.0;
     float src[3];
     for (int i = 0; i < g_KernelSourceCount; i++)
@@ -154,42 +180,9 @@ float SpawnMemory_GetKernelProximity(const float pos[3])
         src[1] = g_KernelSources[i][1];
         src[2] = g_KernelSources[i][2];
         float d = GetVectorDistance(pos, src);
-        sum += g_KernelSources[i][3] * Pow(FLOAT_EULER, -d / gCV.fKernelRadius);
+        sum += g_KernelSources[i][3] * Pow(FLOAT_EULER, -d / kernelRadiusEff);
     }
     return sum;
-}
-
-// —— 波内扇区落点配额 —— //
-// 目标:阻止同一波在同一方向连续落点;搜索后段(远带)与导演兜底不受限,
-// 确保狭长地形不会因为配额而把刷特推迟到下一波。
-static int g_WaveSectorSpawnCounts[SECTORS_MAX];
-
-void ResetWaveSectorSpawnCounts()
-{
-    for (int i = 0; i < SECTORS_MAX; i++)
-        g_WaveSectorSpawnCounts[i] = 0;
-}
-
-bool PassWaveSectorQuota(int sector)
-{
-    int bonus = gCV.iSectorQuotaBonus;
-    if (bonus < 0)
-        return true;
-    if (sector < 0 || sector >= SECTORS_MAX)
-        return true;
-
-    int sectors = GetCurrentSectors();
-    int quota = RoundToCeil(float(gCV.iSiLimit) / float(sectors)) + bonus;
-    if (quota < 1)
-        quota = 1;
-    return g_WaveSectorSpawnCounts[sector] < quota;
-}
-
-void MarkWaveSectorSpawned(int sector)
-{
-    if (sector < 0 || sector >= SECTORS_MAX)
-        return;
-    g_WaveSectorSpawnCounts[sector]++;
 }
 
 stock bool PassRealPositionCheck(float candPos[3], int targetSur)
@@ -277,32 +270,20 @@ stock int GetNavIDByIndex(int idx)
     return L4D_GetNavAreaID(area);
 }
 
-stock int ComputeSectorIndex(const float center[3], const float pt[3], int sectors)
-{
-    float dx = pt[0] - center[0];
-    float dy = pt[1] - center[1];
-    float ang = ArcTangent2(dy, dx);
-    if (ang < 0.0) ang += 2.0 * FLOAT_PI;
-
-    float w = (2.0 * FLOAT_PI) / float(sectors);
-    int idx = RoundToFloor(ang / w);
-    if (idx < 0) idx = 0;
-    if (idx >= sectors) idx = sectors - 1;
-    return idx;
-}
-
-stock void GetSectorCenter(float outCenter[3], int targetSur)
+// 目标锚点：优先目标生还者，其次最高进度生还者，最后任意存活生还者。
+// 用作目标不可用时的 targetPoint / targetFootZ 兜底。
+stock void GetTargetAnchorPos(float outPos[3], int targetSur)
 {
     if (IsValidSurvivor(targetSur))
     {
-        GetClientAbsOrigin(targetSur, outCenter);
+        GetClientAbsOrigin(targetSur, outPos);
         return;
     }
 
     int fb = GetHighestFlowSurvivorSafe();
     if (IsValidSurvivor(fb))
     {
-        GetClientAbsOrigin(fb, outCenter);
+        GetClientAbsOrigin(fb, outPos);
         return;
     }
 
@@ -310,15 +291,15 @@ stock void GetSectorCenter(float outCenter[3], int targetSur)
     {
         if (IsValidSurvivor(i) && IsPlayerAlive(i))
         {
-            GetClientAbsOrigin(i, outCenter);
+            GetClientAbsOrigin(i, outPos);
             return;
         }
     }
 
-    outCenter[0] = outCenter[1] = outCenter[2] = 0.0;
+    outPos[0] = outPos[1] = outPos[2] = 0.0;
 }
 
-stock void RememberSpawn(const float pos[3], const float center[3])
+stock void RememberSpawn(const float pos[3])
 {
     float now = GetGameTime();
     CleanupLastSpawns(now);
@@ -329,21 +310,6 @@ stock void RememberSpawn(const float pos[3], const float center[3])
     rec[2] = pos[2];
     rec[3] = now;
     lastSpawns.PushArray(rec);
-
-    int sectors = GetCurrentSectors();
-    int s = ComputeSectorIndex(center, pos, sectors);
-    recentSectors[2] = recentSectors[1];
-    recentSectors[1] = recentSectors[0];
-    recentSectors[0] = s;
-}
-
-int GetCurrentSectors()
-{
-    int T = gCV.iSiLimit;
-    int n = (T <= 2) ? 2 : (RoundToCeil(float(T) / 2.0) + 1);
-    if (n < DYN_SECTORS_MIN) n = DYN_SECTORS_MIN;
-    if (n > SECTORS_MAX)     n = SECTORS_MAX;
-    return n;
 }
 
 // 注意这里的顺序是有意的，不是漏判：绝大多数 NavArea 完全没有属性位，

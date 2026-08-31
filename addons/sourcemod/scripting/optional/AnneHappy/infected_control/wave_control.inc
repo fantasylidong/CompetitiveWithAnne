@@ -13,7 +13,6 @@ void StartWave()
     ClearPathCache();
     RecalcSiCapFromAlive(true);
     ResetWaveClassSpawnCounts();
-    ResetWaveSectorSpawnCounts();
     Tactical_OnWaveStart();
 
     gST.survCount = 0;

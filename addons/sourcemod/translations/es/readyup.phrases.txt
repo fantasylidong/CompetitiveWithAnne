@@ -110,4 +110,29 @@
 	{
 		"es"		"Se requieren mas jugadores..."
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"es"		"->{1}. Supervivientes{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"es"		"->{1}. Infectados{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"es"		"->{1}. Comentaristas"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"es"		"->{1}. Espectadores"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"es"		"**Muchos** ({1})"
+	}
 }

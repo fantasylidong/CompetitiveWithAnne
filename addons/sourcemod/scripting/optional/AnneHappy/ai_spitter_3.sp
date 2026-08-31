@@ -9,6 +9,9 @@
 #include <anne_nextbot>
 #include "ai_path_snapshot.inc"
 #include "ai_path_movement.inc"
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 
 #define CVAR_FLAG FCVAR_NONE
 #define SPITTER_JUMP_DELAY 1.0
@@ -20,13 +23,14 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.4",
+		version 		= "3.0.6",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopMaxSpeed,
 	g_hBhopStartDistance,
 	g_hPathBhop,
 	g_hPathLookAheadDepth,
@@ -56,6 +60,8 @@ public void OnPluginStart()
 {
 	g_hAllowBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启 Spitter 连跳功能", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳的速度", CVAR_FLAG, true, 0.0);
+	// 默认值与 Charger 上限(ai_charger3_bhop_max_speed 默认 800)保持 +200 的关系, 动态难度每档同样按 charger+200 配置
+	g_hBhopMaxSpeed = CreateConVar("ai_SpitterBhopMaxSpeed", "1000.0", "Spitter 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_SpitterBhopStartDistance", "2500.0", "Spitter 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hPathBhop = CreateConVar("ai_spitter3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hPathLookAheadDepth = CreateConVar("ai_spitter3_path_lookahead_depth", "6", "路径连跳最大前视节点数", CVAR_FLAG, true, 1.0, true, 16.0);
@@ -191,10 +197,14 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	buttons |= IN_DUCK;
 	float proposedVelocity[3], pushVelocity[3];
 	GetAngleVectors(eyeAngle, pushVelocity, NULL_VECTOR, NULL_VECTOR);
-	NormalizeVector(pushVelocity, pushVelocity);
-	ScaleVector(pushVelocity, g_hBhopSpeed.FloatValue);
+	// 推力只保留水平分量, 防止沿视线俯仰方向向上/向下加速；
+	// 俯仰 ±90 时水平分量为零, 归一化会退化成纯垂直向量, 此时不加推力
+	if (AIPathMovement_NormalizeHorizontal(pushVelocity))
+		ScaleVector(pushVelocity, g_hBhopSpeed.FloatValue);
 	GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", proposedVelocity);
 	AddVectors(proposedVelocity, pushVelocity, proposedVelocity);
+	// 起跳前限速, 保证安全检查使用的速度与实际推出的速度一致
+	AIPathMovement_ClampHorizontalSpeed(proposedVelocity, g_hBhopMaxSpeed.FloatValue);
 	bool hasSight = view_as<bool>(GetEntProp(spitter, Prop_Send, "m_hasVisibleThreats"));
 	if (!AIPathMovement_IsJumpRouteSafe(
 		spitter,
@@ -214,7 +224,7 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		float pathVelocity[3];
 		GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", pathVelocity);
 		AIPathMovement_AlignFacing(pathVelocity, angles);
-		AIPathMovement_BeginPathHop(spitter, pathGoal, AIPathMovement_GetHorizontalSpeed(pathVelocity));
+		AIPathMovement_BeginPathHop(spitter, pathGoal, AIPathMovement_GetHorizontalSpeed(pathVelocity), g_hBhopMaxSpeed.FloatValue);
 	}
 	return Plugin_Changed;
 }
@@ -242,6 +252,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 			newTarget = GetClosetSurvivor(specialInfected);
 			if (!IsValidSurvivor(newTarget) || !IsPlayerAlive(newTarget)) { return Plugin_Continue; }
 			curTarget = newTarget;
+			SITL_CommitVictim(specialInfected, newTarget);
 			return Plugin_Changed;
 		}
 		case PINNED_TARGET:
@@ -251,6 +262,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 				GetEntPropVector(pinnedTarget, Prop_Send, "m_vecOrigin", targetPos);
 				if (GetVectorDistance(selfPos, targetPos) > g_hSpitRange.FloatValue) { return Plugin_Continue; }
 				curTarget = pinnedTarget;
+				SITL_CommitVictim(specialInfected, pinnedTarget);
 				return Plugin_Changed;
 			}
 		}
@@ -261,6 +273,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 				GetEntPropVector(crowdedTarget, Prop_Send, "m_vecOrigin", targetPos);
 				if (GetVectorDistance(selfPos, targetPos) > g_hSpitRange.FloatValue) { return Plugin_Continue; }
 				curTarget = crowdedTarget;
+				SITL_CommitVictim(specialInfected, crowdedTarget);
 				return Plugin_Changed;
 			}
 		}
@@ -283,10 +296,14 @@ void clientPush(int client, float eyeAngle[3], float force)
 {
 	static float eyeAngleVec[3], velVec[3];
 	GetAngleVectors(eyeAngle, eyeAngleVec, NULL_VECTOR, NULL_VECTOR);
-	NormalizeVector(eyeAngleVec, eyeAngleVec);
-	ScaleVector(eyeAngleVec, force);
+	// 推力只保留水平分量, 垂直高度交给跳跃本身；
+	// 俯仰 ±90 时水平分量为零, 归一化会退化成纯垂直向量, 此时不加推力
+	if (AIPathMovement_NormalizeHorizontal(eyeAngleVec))
+		ScaleVector(eyeAngleVec, force);
 	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velVec);
 	AddVectors(velVec, eyeAngleVec, velVec);
+	// 叠加式推速必须封顶, 否则连续连跳会无限累积出“飞天大跳”
+	AIPathMovement_ClampHorizontalSpeed(velVec, g_hBhopMaxSpeed.FloatValue);
 	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, velVec);
 }
 

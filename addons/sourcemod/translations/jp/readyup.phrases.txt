@@ -113,4 +113,29 @@
 	{
 		"jp"		"[{olive}Readyup{default}] このラウンドで準備をキャンセルできるのは最大 {blue}%d{default} 回です。"
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"jp"		"->{1}. 生存者{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"jp"		"->{1}. 感染者{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"jp"		"->{1}. 実況者"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"jp"		"->{1}. 観戦者"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"jp"		"**多数** ({1})"
+	}
 }

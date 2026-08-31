@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"en"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] queues directly."
+		"en"		"{green}[IC]{default} Usage: !it opens the traitor class menu; !it [random|smoker|boomer|hunter|spitter|jockey|charger] queues directly; !itcancel cancels before wave release."
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -35,6 +35,10 @@
 	"InfectedControl_TraitorMenuRandom"
 	{
 		"en"		"Random enabled class"
+	}
+	"InfectedControl_TraitorMenuCancel"
+	{
+		"en"		"Cancel registration"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{

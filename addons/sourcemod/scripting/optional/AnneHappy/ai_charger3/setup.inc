@@ -27,6 +27,7 @@
 
 #define DEFAULT_CHARGE_SPEED 				500.0
 #define DEFAULT_MELEE_RANGE 				70.0
+#define DEFAULT_CHARGER_CLAW_RANGE			70.0
 #define DEFAULT_MELEE_DMG_CHARGER 			390
 #define DEFAULT_GRAVITY 					800.0
 #define DEFAULT_SURVIVOR_SPEED 				220.0
@@ -187,6 +188,9 @@ enum struct AiCharger {
 
 	float m_flPathWaitStart;			// Charger 开始等待下一次 RePath 的时间
 	float m_flLastPathInvalidateTime;	// Charger 上次 Path 人为失效时间
+	int m_iBaitClawSwings;				// 持枪博弈中已挥出的锤击次数
+	float m_flLastClawNextAttack;		// 上次读到的爪击 m_flNextPrimaryAttack, 用于检测新挥击
+	float m_flBaitClawStart;			// 开始尝试锤击的时间, 超时则改为冲锋
 
 	void init() {
 		this.m_iTarget = -1;
@@ -204,6 +208,9 @@ enum struct AiCharger {
 		ZeroVector(this.m_vecEvadeMoveToPos);
 		this.m_flPathWaitStart = -1.0;
 		this.m_flLastPathInvalidateTime = -1.0;
+		this.m_iBaitClawSwings = 0;
+		this.m_flLastClawNextAttack = 0.0;
+		this.m_flBaitClawStart = 0.0;
 		this.m_bPathSnapshotComplete = false;
 		this.m_bPathInvalidatePending = false;
 		this.m_PathSegment.init();

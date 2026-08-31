@@ -6,6 +6,9 @@
 #include <sdktools>
 #include <left4dhooks>
 #include <treeutil>
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 
 #define CVAR_FLAG FCVAR_NONE
 #define SPECIAL_JUMP_DIST 250.0
@@ -34,12 +37,12 @@ public Plugin myinfo =
 	name 			= "Ai_Jockey 2.0 版本",
 	author 			= "Breezy，High Cookie，Standalone，Newteee，cravenge，Harry，Sorallll，PaimonQwQ，夜羽真白",
 	description 	= "觉得Ai猴子太弱了？ Try this！",
-	version 		= "2023.01.02",
+	version 		= "2026.08.29",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 // ConVars
-ConVar g_hBhopSpeed, g_hStartHopDistance, g_hJockeyStumbleRadius, g_hJockeyLeapTime,
+ConVar g_hBhopSpeed, g_hStartHopDistance, g_hJockeyStumbleRadius, g_hShovedCooldown,
 		g_hSpecialJumpAngle, g_hSpecialJumpChance, g_hActionChance, g_hAllowInterControl, g_hBackVision;
 // Ints
 int g_iState[MAXPLAYERS + 1][8], g_iActionArray[ACTION_COUNT];
@@ -47,7 +50,6 @@ int g_iState[MAXPLAYERS + 1][8], g_iActionArray[ACTION_COUNT];
 float g_fShovedTime[MAXPLAYERS + 1] = {0.0}, g_fNoActionTime[MAXPLAYERS + 1][2], g_fPlayerShovedTime[MAXPLAYERS + 1] = {0.0};
 // Bools
 bool
-	g_bHasBeenShoved[MAXPLAYERS + 1],
 	g_bCanAttackPinned[MAXPLAYERS + 1] = { false },
 	g_bCanBackVision[MAXPLAYERS + 1] = { false };
 // StringMap
@@ -64,7 +66,7 @@ public void OnPluginStart()
 	g_hActionChance = CreateConVar("ai_jockeyNoActionChance", "20,20,60", "Jockey 执行以下行为的概率（冻结行动 [时间 0 - FREEZE_MAX_TIME 秒随机]，向后跳，高跳）逗号分割", CVAR_FLAG, true, 0.0, true, 100.0);
 	g_hAllowInterControl = CreateConVar("ai_JockeyAllowInterControl", "0", "Jockey 优先找被这些特感控制的生还者，抢控或补控（不想要这个功能可以设置为 0）", CVAR_FLAG);
 	g_hBackVision = CreateConVar("ai_JockeyBackVision", "50", "Jockey 在空中时将会以这个概率向当前视角反方向看", CVAR_FLAG, true, 0.0, true, 100.0);
-	g_hJockeyLeapTime =	FindConVar("z_jockey_leap_time");
+	g_hShovedCooldown = CreateConVar("ai_JockeyShovedCooldown", "3.0", "Jockey 被推后多少秒内禁止再次扑跳（对齐对抗规则中被推 Jockey 的 jumpcap 封锁标准时长）", CVAR_FLAG, true, 0.0);
 	// HookEvent
 	HookEvent("player_spawn", evt_PlayerSpawn, EventHookMode_Pre);
 	HookEvent("player_shoved", evt_PlayerShoved);
@@ -100,9 +102,21 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 		buttons &= ~IN_DUCK;
 		return Plugin_Changed;
 	}
-	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey)
-		|| g_bHasBeenShoved[jockey]
-		|| !view_as<bool>(GetEntProp(jockey, Prop_Send, "m_hasVisibleThreats")))
+	if (L4D_IsPlayerStaggering(jockey) || IsPinningSurvivor(jockey))
+	{
+		return Plugin_Continue;
+	}
+	// 被推抑制期内：不做任何增强，并压制原生 AI 的 leap，防止硬直一结束就二次扑
+	if (IsShoveSuppressed(jockey))
+	{
+		if (buttons & IN_ATTACK)
+		{
+			buttons &= ~IN_ATTACK;
+			return Plugin_Changed;
+		}
+		return Plugin_Continue;
+	}
+	if (!view_as<bool>(GetEntProp(jockey, Prop_Send, "m_hasVisibleThreats")))
 	{
 		return Plugin_Continue;
 	}
@@ -139,7 +153,10 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 				return Plugin_Changed;
 			}
 			// 如果目标正在看着 Jockey 而且正在两次推之间，直接骑乘
-			if (GetGameTime() - g_fPlayerShovedTime[iTarget] < SHOVE_INTERVAL && !L4D_IsPlayerStaggering(jockey))
+			// 门槛：目标最近这一推如果推中的是 Jockey 自己（时间戳落在同一窗口内），不算“浪费推”，不触发惩罚
+			if (GetGameTime() - g_fPlayerShovedTime[iTarget] < SHOVE_INTERVAL
+				&& GetGameTime() - g_fShovedTime[jockey] >= SHOVE_INTERVAL
+				&& !L4D_IsPlayerStaggering(jockey))
 			{
 				#if DEBUG_ALL
 					PrintToConsoleAll("[Ai-Jockey]：目标：%N 正在推的 cd 内，直接进行攻击", iTarget);
@@ -287,8 +304,11 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 		{
 			IntToString(GetClientPinnedInfectedType(i), interControlName, sizeof(interControlName));
 			if (!interControlMap.ContainsKey(interControlName)) { continue; }
+			// 该生还者已达到控制类锁定上限时跳过，找下一个可抢控目标
+			if (SITL_TargetCapBlocks(specialInfected, i)) { continue; }
 			curTarget = i;
 			g_bCanAttackPinned[specialInfected] = true;
+			SITL_CommitVictim(specialInfected, i);
 			return Plugin_Changed;
 		}
 	}
@@ -323,16 +343,8 @@ public Action evt_PlayerShoved(Event event, const char[] name, bool dontBroadcas
 	int iShovedPlayer = GetClientOfUserId(event.GetInt("userid"));
 	if (IsAiJockey(iShovedPlayer))
 	{
-		g_bHasBeenShoved[iShovedPlayer] = true;
 		g_fShovedTime[iShovedPlayer] = GetGameTime();
-		CreateTimer(g_hJockeyLeapTime.FloatValue, Timer_LeapTimeCoolDown, iShovedPlayer, TIMER_FLAG_NO_MAPCHANGE);
 	}
-	return Plugin_Continue;
-}
-
-public Action Timer_LeapTimeCoolDown(Handle timer, int jockey)
-{
-	g_bHasBeenShoved[jockey] = false;
 	return Plugin_Continue;
 }
 
@@ -340,7 +352,7 @@ public Action evt_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 {
 	int iSpawnPlayer = GetClientOfUserId(event.GetInt("userid"));
 	if (!IsAiJockey(iSpawnPlayer)) { return Plugin_Continue; }
-	g_bHasBeenShoved[iSpawnPlayer] = g_bCanAttackPinned[iSpawnPlayer] = false;
+	g_bCanAttackPinned[iSpawnPlayer] = false;
 	g_fShovedTime[iSpawnPlayer] = g_fNoActionTime[iSpawnPlayer][0] = g_fNoActionTime[iSpawnPlayer][1] = 0.0;
 	SetState(iSpawnPlayer, 0, IN_JUMP);
 	return Plugin_Continue;
@@ -358,7 +370,7 @@ public void evt_JockeyRide(Event event, const char[] name, bool dontBroadcast)
 		}
 		g_fNoActionTime[attacker][0] = g_fNoActionTime[attacker][1] = 0.0;
 		g_bCanBackVision[attacker] = false;
-		g_bHasBeenShoved[attacker] = false;
+		g_fShovedTime[attacker] = 0.0;
 	}
 	if (IsCoop() && attacker > 0 && victim > 0)
 	{
@@ -456,14 +468,16 @@ float CapJockeyBhopBaseSpeed(float speed)
 	return speed > MAX_BHOP_BASE_SPEED ? MAX_BHOP_BASE_SPEED : speed;
 }
 
+// 被推抑制期：被推后 ai_JockeyShovedCooldown 秒内不允许再次扑跳（对齐对抗规则的 jumpcap 封锁时长）
+bool IsShoveSuppressed(int client)
+{
+	return g_fShovedTime[client] > 0.0
+		&& GetGameTime() - g_fShovedTime[client] < g_hShovedCooldown.FloatValue;
+}
+
 bool jockeyDoBhop(int client, int &buttons, float ang[3], float vec[3])
 {
-	float leapCooldown = (g_hJockeyLeapTime != null) ? g_hJockeyLeapTime.FloatValue : 1.0;
-	if (leapCooldown <= 0.0)
-	{
-		leapCooldown = 0.35;
-	}
-	if (g_fShovedTime[client] > 0.0 && GetGameTime() - g_fShovedTime[client] < leapCooldown)
+	if (IsShoveSuppressed(client))
 	{
 		buttons &= ~IN_JUMP;
 		return false;

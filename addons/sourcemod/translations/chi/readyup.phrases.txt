@@ -92,4 +92,29 @@
 	{
 		"chi"		"[{olive}Readyup{default}] 本回合你最多只能取消准备 {blue}%d{default} 次。"
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"chi"		"->{1}. 生还者{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"chi"		"->{1}. 感染者{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"chi"		"->{1}. 解说"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"chi"		"->{1}. 旁观者"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"chi"		"**更多旁观者** ({1})"
+	}
 }

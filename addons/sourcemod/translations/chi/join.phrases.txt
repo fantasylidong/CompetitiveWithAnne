@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"chi"		"{green}[AnneDonate]{default} 支付完成后请返回游戏，输入 {olive}!wc user@example.com{default}。"
+		"chi"		"{green}[AnneDonate]{default} {olive}【赞助尚未登记】{default}支付后必须回游戏输入 {olive}!wc 你的邮箱{default}，否则管理员收不到赞助记录。"
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"chi"		"支付后输入 !wc 你的邮箱；误触输入 !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"chi"		"{green}[AnneDonate]{default} 正在提交支付完成提示，请稍候，不要重复提交或重新选择档位。"
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"chi"		"请用 !wc user@example.com 提交"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"chi"		"我已完成支付"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"chi"		"重新打开支付页"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"chi"		"稍后处理"
+		"chi"		"{green}[AnneDonate]{default} 已取消本次误触的赞助操作，没有提交赞助记录。"
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

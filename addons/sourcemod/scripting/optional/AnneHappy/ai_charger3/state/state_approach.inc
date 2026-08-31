@@ -569,7 +569,7 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
     // 保存起跳速度, 防止空中速度衰减
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
-    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiChargers[client].m_flLastHopSpeed);
+    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiChargers[client].m_flLastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
 
     stateLog.debugAll("Charger(%N) Path Ground Bhop, speed: %.2f, target dist: %.2f, air correction dist: %.2f, strafe type: %d",
         client, g_AiChargers[client].m_flLastHopSpeed, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
@@ -618,7 +618,7 @@ stock Action performDirectGrounBhop(int client, float targetDist, const float po
 
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
-    AIPathMovement_BeginPathHop(client, targetPos, g_AiChargers[client].m_flLastHopSpeed);
+    AIPathMovement_BeginPathHop(client, targetPos, g_AiChargers[client].m_flLastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
 
     stateLog.debugAll("Charger(%N) Direct Ground Bhop, speed: %.2f, target dist: %.2f, air correction dist: %.2f, strafe type: %d",
         client, g_AiChargers[client].m_flLastHopSpeed, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);

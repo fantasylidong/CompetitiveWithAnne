@@ -60,7 +60,6 @@ static bool g_ITDamageSummaryPending[MAXPLAYERS + 1];
 static bool g_ITDamagePenaltyPending[MAXPLAYERS + 1];
 static float g_ITDamageFinalizeAfter[MAXPLAYERS + 1];
 static bool g_ITDamageHooked[MAXPLAYERS + 1];
-static bool g_ITAutoBhopHooked[MAXPLAYERS + 1];
 static float g_ITNextReghostNoticeAt[MAXPLAYERS + 1];
 static bool g_ITDamageTrackingNeeded;
 static bool g_ITDamageUnhookPending;
@@ -1008,28 +1007,9 @@ static bool Traitor_IsReservedState(TraitorState state)
     return state == Traitor_SpawnLocked || state == Traitor_SpawnAllowed;
 }
 
-static void Traitor_RefreshAutoBhopHook(int client)
-{
-    if (client < 1 || client > MaxClients)
-        return;
-
-    bool shouldHook = IsClientInGame(client) && !IsFakeClient(client)
-        && (g_ITState[client] == Traitor_Alive
-            || Traitor_IsReservedState(g_ITState[client]));
-    if (shouldHook == g_ITAutoBhopHooked[client])
-        return;
-
-    if (shouldHook)
-        SDKHook(client, SDKHook_PreThink, Traitor_OnAutoBhopPreThink);
-    else
-        SDKUnhook(client, SDKHook_PreThink, Traitor_OnAutoBhopPreThink);
-    g_ITAutoBhopHooked[client] = shouldHook;
-}
-
 static void Traitor_SetState(int client, TraitorState state)
 {
     g_ITState[client] = state;
-    Traitor_RefreshAutoBhopHook(client);
 }
 
 static bool Traitor_IsSlotState(TraitorState state)
@@ -1541,9 +1521,22 @@ static int Traitor_GetClassBit(int zc)
     return 0;
 }
 
+static bool Traitor_IsSpawnerClassEnabled(int zc)
+{
+    if (zc < 1 || zc > SI_COUNT || !CheckClassEnabled(zc))
+        return false;
+
+    if (gCV.AllCharger.BoolValue)
+        return zc == view_as<int>(SI_Charger);
+    if (gCV.AllHunter.BoolValue)
+        return zc == view_as<int>(SI_Hunter);
+
+    return true;
+}
+
 static bool Traitor_IsClassSelectable(int zc)
 {
-    if (!Traitor_IsSupportedClass(zc))
+    if (!Traitor_IsSupportedClass(zc) || !Traitor_IsSpawnerClassEnabled(zc))
         return false;
 
     int bit = Traitor_GetClassBit(zc);
@@ -1760,6 +1753,9 @@ static bool Traitor_CheckUseLimit(int client, int zc = 0)
 
 static bool Traitor_CheckQueuedEligibility(int client, int zc)
 {
+    if (gCV.iTraitorMaxSlots <= 0)
+        return false;
+
     if (!Traitor_CheckRegistrationAccess(client))
         return false;
 
@@ -2596,6 +2592,12 @@ static bool Traitor_QueueClient(int client, int zc)
     if (!Traitor_CheckRegistrationAccess(client))
         return false;
 
+    if (g_ITState[client] == Traitor_SpawnAllowed)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorWindowClosed");
+        return false;
+    }
+
     if (gCV.iTraitorMaxSlots <= 0)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorNoSlot");
@@ -2654,6 +2656,19 @@ static bool Traitor_QueueClient(int client, int zc)
     return true;
 }
 
+static bool Traitor_HasCancellableRegistration(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return false;
+
+    if (g_ITState[client] == Traitor_Alive)
+        return g_ITDeferredClass[client] != 0;
+
+    return g_ITState[client] == Traitor_Waiting
+        || g_ITState[client] == Traitor_Armed
+        || g_ITState[client] == Traitor_SpawnLocked;
+}
+
 static void Traitor_AddClassMenuItem(Menu menu, int zc, int client)
 {
     char info[8];
@@ -2678,17 +2693,24 @@ static void Traitor_ShowClassMenu(int client)
     if (!Traitor_RequireRegistrationTeam(client))
         return;
 
-    if (!Traitor_CheckRegistrationAccess(client))
+    bool canCancel = Traitor_HasCancellableRegistration(client);
+    if (!canCancel && g_ITState[client] == Traitor_SpawnAllowed)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorWindowClosed");
+        return;
+    }
+
+    if (!canCancel && !Traitor_CheckRegistrationAccess(client))
         return;
 
-    if (gCV.iTraitorMaxSlots <= 0)
+    if (!canCancel && gCV.iTraitorMaxSlots <= 0)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorNoSlot");
         return;
     }
 
-    int selectableClasses = Traitor_CountSelectableClasses(client);
-    if (selectableClasses <= 0)
+    int selectableClasses = canCancel ? 0 : Traitor_CountSelectableClasses(client);
+    if (!canCancel && selectableClasses <= 0)
     {
         CPrintToChat(client, "%t", "InfectedControl_TraitorNoEnabledClass");
         return;
@@ -2697,6 +2719,16 @@ static void Traitor_ShowClassMenu(int client)
     Menu menu = new Menu(Traitor_MenuHandler);
     menu.SetTitle("%T", "InfectedControl_TraitorMenuTitle", client);
     menu.ExitButton = true;
+
+    if (canCancel)
+    {
+        char cancelText[64];
+        Format(cancelText, sizeof(cancelText), "%T", "InfectedControl_TraitorMenuCancel", client);
+        menu.AddItem("cancel", cancelText);
+        if (!menu.Display(client, MENU_TIME_FOREVER))
+            delete menu;
+        return;
+    }
 
     char randomText[64];
     Format(randomText, sizeof(randomText), "%T", "InfectedControl_TraitorMenuRandom", client);
@@ -2734,6 +2766,12 @@ public int Traitor_MenuHandler(Menu menu, MenuAction action, int client, int ite
     char info[16];
     if (!menu.GetItem(item, info, sizeof(info)))
         return 0;
+
+    if (StrEqual(info, "cancel", false))
+    {
+        Cmd_TraitorCancel(client, 0);
+        return 0;
+    }
 
     int zc = 0;
     if (StrEqual(info, "random", false))
@@ -2836,18 +2874,16 @@ static void Traitor_BroadcastNextWaveStatus(int releaseWave)
     }
 }
 
-public void Traitor_OnAutoBhopPreThink(int client)
+Action Traitor_OnPlayerRunCmd(int client, int &buttons)
 {
-    int buttons = GetClientButtons(client);
     if (!(buttons & IN_JUMP) || client < 1 || client > MaxClients)
-        return;
+        return Plugin_Continue;
 
     TraitorState state = g_ITState[client];
     if (state != Traitor_Alive && !Traitor_IsReservedState(state))
-        return;
+        return Plugin_Continue;
 
-    if (Traitor_TryAutoBhop(client, buttons) == Plugin_Changed)
-        SetEntProp(client, Prop_Data, "m_nButtons", buttons);
+    return Traitor_TryAutoBhop(client, buttons);
 }
 
 static bool Traitor_CanAutoBhop(int client)
@@ -3091,6 +3127,13 @@ public Action Cmd_TraitorCancel(int client, int args)
 
         Traitor_ClearNextRegistration(client);
         CPrintToChat(client, "%t", "InfectedControl_TraitorCancelled");
+        Debug_Print("[TRAITOR] %N cancelled deferred registration", client);
+        return Plugin_Handled;
+    }
+
+    if (g_ITState[client] == Traitor_SpawnAllowed)
+    {
+        CPrintToChat(client, "%t", "InfectedControl_TraitorWindowClosed");
         return Plugin_Handled;
     }
 
@@ -3100,8 +3143,8 @@ public Action Cmd_TraitorCancel(int client, int args)
         return Plugin_Handled;
     }
 
-    if (Traitor_IsReservedState(g_ITState[client]) && g_ITClass[client] != TRAITOR_CLASS_TANK)
-        Traitor_ReplaceExpiredSlotWithAI(client);
+    Debug_Print("[TRAITOR] %N cancelled registration before release state=%d releaseWave=%d",
+        client, view_as<int>(g_ITState[client]), g_ITReleaseWave[client]);
     Traitor_ClearClient(client);
     Traitor_ReturnClientToSpectator(client);
     CPrintToChat(client, "%t", "InfectedControl_TraitorCancelled");

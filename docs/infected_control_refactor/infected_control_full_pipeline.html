@@ -934,15 +934,15 @@
       </div>
 
       <div class="subsection">
-        <div class="subsection-head"><h2>分散度是四层叠加，不是一条规则</h2><p>“别老在同一个地方刷”由几个互相独立的机制共同保证：一部分是硬拒绝（直接淘汰候选），一部分是软扣分（只影响排序）。</p></div>
+        <div class="subsection-head"><h2>分散度是多层叠加，不是一条规则</h2><p>“别老在同一个地方刷”由几个互相独立的机制共同保证：一部分是硬拒绝（直接淘汰候选），一部分是软扣分（只影响排序）。扇区量化层（波内扇区配额、最近扇区扣分）已于 2026-08-30 整套移除，方向偏好改由连续的战术几何分表达，分散度评分只剩核密度一项。</p></div>
         <table class="budget-table">
           <thead><tr><th>层</th><th>类型</th><th>参数</th><th>说明</th></tr></thead>
           <tbody>
             <tr><td>同 Nav 冷却</td><td>硬拒绝</td><td><code>NAV_CD_SECS</code> = 1.0s</td><td>成功刷出、实际生成失败、导演兜底点都会给该 areaIdx 上 1 秒冷却；冷却中的 Nav 在取随机点之前就退出。</td></tr>
-            <tr><td>实际落点硬分散</td><td>硬拒绝</td><td><code>inf_spawn_sep_radius</code> = 120（按上限缩放），<code>inf_spawn_sep_ttl</code> = 1.5s</td><td>按<strong>实际出生坐标</strong>而非请求点记忆最近若干次刷出；新候选落在半径内直接淘汰。上限越高半径收得越小。</td></tr>
-            <tr><td>核密度扣分</td><td>软扣分</td><td><code>inf_spawn_kernel_radius</code> = 280，<code>inf_spawn_kernel_points</code> = 30</td><td>对存活特感（权重 1.0）和最近刷点（权重 0.5）按 exp(−d/r) 累加密度，扣分 = 30 × min(密度, 1.5)。连续量，没有扇区那样的台阶。</td></tr>
-            <tr><td>波内扇区配额</td><td>硬拒绝</td><td><code>inf_spawn_sector_quota_bonus</code> = 1，−1 关闭</td><td>以目标生还者为圆心分扇区（<code>GetCurrentSectors()</code>，6 特 = 4 个，动态 3～8），每扇区本波配额 = ceil(上限/扇区数)+1。<strong>只约束前 2/3 的距离档</strong>（10 档时 0–6），后 1/3 远档放开以保证按时刷出。</td></tr>
-            <tr><td>最近扇区扣分</td><td>软扣分</td><td>最近 3 次扇区 −70 / −45 / −25</td><td>再乘 <code>PenLimitScale</code>（上限越高惩罚越弱），避免高特上限时把方向锁死。</td></tr>
+            <tr><td>实际落点硬防叠</td><td>硬拒绝</td><td><code>inf_spawn_sep_radius</code> = 100（固定值），<code>inf_spawn_sep_ttl</code> = 1.5s</td><td>按<strong>实际出生坐标</strong>而非请求点记忆最近若干次刷出；新候选落在半径内直接淘汰。半径是固定值，<strong>不随特感上限或波内占用缩放</strong>——这一层只回答“能不能刷在这”，方向和聚集程度交给核密度层。</td></tr>
+            <tr><td>核密度扣分</td><td>软扣分</td><td><code>inf_spawn_kernel_radius</code> = 280（基准），<code>inf_spawn_kernel_points</code> = 50</td><td>对仍在接近途中的存活特感（权重 1.0）和最近刷点（权重 0.5）按 exp(−d/r) 累加密度，扣分 = 50 × min(密度, 1.5)。<strong>距任意生还者不足 400 的存活特感已算作贴脸交战，不计入核源</strong>，否则会把后半波往外推。特感上限缩放作用在半径上（r = 280 × <code>ComputePenScaleByLimit</code>，L=1 取满、L≥16 减半）而不是分值上：低特推得开、高特只防叠，避免整条曲线一起压平失去区分度。连续量，没有扇区那样的台阶。</td></tr>
+            <tr><td><s>波内扇区配额</s></td><td>已移除</td><td><s><code>inf_spawn_sector_quota_bonus</code></s></td><td>2026-08-30 移除。扇区把连续方向量化成台阶，与战术几何分职责重叠，且在狭长地形上会把刷点推到远带。CVar 一并删除。</td></tr>
+            <tr><td><s>最近扇区扣分</s></td><td>已移除</td><td>—</td><td>2026-08-30 随 <code>recentSectors</code> 一起移除；方向偏好统一由连续战术几何分表达。</td></tr>
             <tr><td>Flow 桶占用上限</td><td>默认关闭</td><td><code>inf_spawn_bucket_ratio</code> = 0</td><td>默认不限制同一 Flow 进度桶内同时存活的特感；如显式设置为正数，仍按 ceil(上限 × 比例) 启用硬上限。</td></tr>
             <tr><td>页内洗牌</td><td>顺序</td><td><code>inf_spawn_candidate_shuffle</code> = 1</td><td>有向候选分页读取后在档内洗牌，打散“永远先评估最近一簇”的偏置；ranked 高点通道保序不洗。</td></tr>
           </tbody>

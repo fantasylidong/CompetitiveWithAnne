@@ -156,6 +156,39 @@ stock bool isChargerCharging(int client) {
     return view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
 }
 
+// 武器属性表在每次 level init 时重建, 缓存必须随换图失效:
+// 否则首次调用若早于武器脚本装载, 兜底值会被锁死到进程结束。
+static bool g_bClawRangeCached = false;
+static float g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+
+stock void resetChargerClawRangeCache() {
+    g_bClawRangeCached = false;
+    g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+}
+
+stock float getChargerClawRange() {
+    if (g_bClawRangeCached)
+        return g_flClawRange;
+
+    float range = L4D2_GetFloatWeaponAttribute("weapon_charger_claw", L4D2FWA_Range);
+    if (range < 40.0 || range > 90.0)
+        return DEFAULT_CHARGER_CLAW_RANGE;  // 表还没装载好, 这次先用兜底值, 不写缓存
+
+    g_flClawRange = range;
+    g_bClawRangeCached = true;
+    return g_flClawRange;
+}
+
+stock bool isChargerClawInRange(int client, int target) {
+    if (!isAiCharger(client) || !IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+
+    static float pos[3], targetPos[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+    return GetVectorDistance(pos, targetPos) <= getChargerClawRange();
+}
+
 /**
 * 检查 Charger 冲撞能力是否就绪
 * @param client 客户端索引

@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"vi"		"[Anne] Máy chủ cổng vào này chỉ dùng để phân luồng kết nối. Nhấn F1 để chuyển sang máy chủ trò chơi thật: %s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"vi"		"[Anne] Nếu F1 không phản hồi, hãy nhập vào console: bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"vi"		"Nhấn F1 để kết nối tới máy chủ trò chơi thật"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"vi"		"[Anne] Nếu bạn không dùng mạng di động, nên kết nối thẳng tới máy chủ trò chơi thật: %s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"vi"		"Không dùng mạng di động thì nên kết nối thẳng, nhấn F1 để xác nhận"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"vi"		"[AnneRedirect] Đã yêu cầu tải lại máy chủ đích."
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"vi"		"[AnneRedirect] Lệnh này phải được chạy từ client người chơi thật trong game."
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"vi"		"[AnneRedirect] Máy chủ đích chưa sẵn sàng."
+	}
+}

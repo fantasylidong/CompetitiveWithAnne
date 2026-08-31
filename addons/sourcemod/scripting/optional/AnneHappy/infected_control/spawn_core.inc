@@ -119,7 +119,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            float minRange,
                                            float searchRange,
                                            bool teleportMode,
-                                           bool enforceSectorQuota,
                                            int areaIdx,
                                            float navDistance,
                                            float navRankDistance,
@@ -127,8 +126,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                            bool rejectBadFlow,
                                            float mapMaxFlowDist,
                                            bool finaleArea,
-                                           const float center[3],
-                                           int sectors,
                                            int centerBucket,
                                            float refEyeZ,
                                            float targetFootZ,
@@ -242,7 +239,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
     float dTargetEye = 0.0;
     float navDistanceEffective = navDistance;
     float navHighGroundComp = 0.0;
-    int sector = 0;
+    int discardSector = 0;
     float targetEye[3];
     if (!Visibility_GetClientEyeSnapshot(targetSurvivor, targetEye))
         SpawnCore_CopyPos(targetEye, targetPoint);
@@ -261,9 +258,17 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
 
         // 7) 当前职业范围是硬边界；Smoker/Hunter 的正高度差只折减 Nav
         //    上限判定，原始距离和全队三维安全距离保持不变。
+        //
+        //    这个 native 的第 2/3 参数（center、sectors）和第 7 个出参（sector）
+        //    只服务已删除的扇区分散轴，本插件不再消费。为了不改扩展的公共签名
+        //    （改了就得两个平台重编 .so/.dll 并强制同步部署），这里传占位值：
+        //    center 复用 targetEye，sectors 传 1（扩展内部有 max(1,sectors) 兜底，
+        //    结果恒为 0）。我们真正要的 dminEyeSq 来自生还者快照、dTargetEye 来自
+        //    targetEye，两者都与 center/sectors 无关。改这里前先看 extension.cpp
+        //    的 ComputeGeometry。
         geometryReady = g_bSpawnAccel
-            && AnneSpawn_ComputePointGeometry(pos, center, sectors, targetEye,
-                                               dminEyeSq, dTargetEye, sector);
+            && AnneSpawn_ComputePointGeometry(pos, targetEye, 1, targetEye,
+                                               dminEyeSq, dTargetEye, discardSector);
         if (!geometryReady)
         {
             dminEyeSq = GetMinEyeDistSquaredToAnySurvivor(pos);
@@ -294,17 +299,6 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
 
     if (!haveCheapCandidate)
         return false;
-
-    // 7.5) 波内扇区配额：便宜的角度/计数判断，放在昂贵检查之前。
-    //      后 1/3 远带搜索不受限，避免狭长地形因配额而完全找不到点。
-    if (!geometryReady)
-        sector = ComputeSectorIndex(center, pos, sectors);
-    if (enforceSectorQuota && !PassWaveSectorQuota(sector))
-    {
-        stats.separation++;
-        SpawnPerf_RecordFilterBySeparation();
-        return false;
-    }
 
     // 8) 有向图已经按 candidate -> survivor 路径距离筛出连通候选。
     //    Flow 已在廉价阶段执行 dF<-8 硬拒绝；允许范围内继续参与评分。
@@ -369,7 +363,7 @@ static bool SpawnCore_EvaluateNavCandidate(int zc,
                                    scoreMinRange, scoreMaxRange,
                                    candidateBucket, scoringCenterBucket, rawBadFlow,
                                    candidateBucketKnown,
-                                   refEyeZ, targetFootZ, sector, areaIdx,
+                                   refEyeZ, targetFootZ, areaIdx,
                                    tacticalQuality, kernelProximity, candDbg))
     {
         stats.flow++;
@@ -421,7 +415,6 @@ enum struct SpawnFrameContext
     float mapMaxFlowDist;
     bool finaleArea;
     float center[3];
-    int sectors;
     float allMaxZ;
     int centerBucket;
     int positionCheckBucket;
@@ -582,9 +575,7 @@ static bool SpawnSearch_BuildFrameContext(
     frame.mapMaxFlowDist = L4D2Direct_GetMapMaxFlowDistance();
     frame.finaleArea = L4D_IsMissionFinalMap()
         && L4D2_GetCurrentFinaleStage() < FINALE_STAGE_ESCAPE;
-    GetSectorCenter(frame.center, targetSurvivor);
-    frame.sectors = GetCurrentSectors();
-
+    GetTargetAnchorPos(frame.center, targetSurvivor);
     frame.allMaxZ = -1.0e9;
     SurPosData data;
     for (int i = 0; i < g_iSurPosDataLen; i++)
@@ -1255,24 +1246,19 @@ static bool SpawnSearch_BindOwnerFrame(int owner, SpawnFrameContext frame)
     frame.navStartId = L4D_GetNavAreaID(frame.navStart);
     SpawnCore_TryGetTargetBucket(owner, frame.centerBucket);
     frame.positionCheckBucket = frame.centerBucket;
-    GetSectorCenter(frame.center, owner);
+    GetTargetAnchorPos(frame.center, owner);
     return true;
 }
 
 static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     SpawnSearchCursor cursor,
     int zc, int targetSurvivor, float minRange, float maxRange,
-    float graphScanMinRange, bool teleportMode, int bandStage,
+    float graphScanMinRange, bool teleportMode,
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     outAreaIdx = -1;
     if (SpawnAccel_ShouldWaitForGraph())
         return SpawnSearch_Pending;
-
-    // 扇区配额只约束前 2/3 的距离带；进入后 1/3 远带说明近处已找不到点，
-    // 此时优先保证按时刷出，不再限制方向。(10 档时为 0..6 受限、7..9 放开)
-    bool enforceSectorQuota = bandStage >= 0
-        && bandStage < TACTICAL_BAND_STAGES - (TACTICAL_BAND_STAGES / 3);
 
     if (SpawnAccel_CanUseTeamCandidates())
     {
@@ -1405,11 +1391,9 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
             zc, evalTarget,
             frame.targetPoint, minRange,
             maxRange, teleportMode,
-            enforceSectorQuota,
             areaIdx, navDistance, navRankDistance,
             candidateBucket, rejectBadFlow,
             frame.mapMaxFlowDist, frame.finaleArea,
-            frame.center, frame.sectors,
             frame.centerBucket, frame.refEyeZ, frame.targetFootZ,
             frame.navStart, frame.visibilityRayMode,
             frame.minScore, now, candDbg,
@@ -1488,7 +1472,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
 
 SpawnSearchResult FindSpawnPosViaNavAreaStep(
     int zc, int targetSurvivor, float minRange, float maxRange,
-    float graphScanMinRange, bool teleportMode, int bandStage,
+    float graphScanMinRange, bool teleportMode,
     float outPos[3], int &outAreaIdx, SpawnScoreDbg dbgOut)
 {
     int idx = zc - 1;
@@ -1499,13 +1483,13 @@ SpawnSearchResult FindSpawnPosViaNavAreaStep(
     {
         return FindSpawnPosViaNavAreaStepForCursor(
             g_TeleportSpawnSearchCursors[idx], zc, targetSurvivor,
-            minRange, maxRange, graphScanMinRange, true, bandStage,
+            minRange, maxRange, graphScanMinRange, true,
             outPos, outAreaIdx, dbgOut);
     }
 
     return FindSpawnPosViaNavAreaStepForCursor(
         g_NormalSpawnSearchCursors[idx], zc, targetSurvivor,
-        minRange, maxRange, graphScanMinRange, false, bandStage,
+        minRange, maxRange, graphScanMinRange, false,
         outPos, outAreaIdx, dbgOut);
 }
 

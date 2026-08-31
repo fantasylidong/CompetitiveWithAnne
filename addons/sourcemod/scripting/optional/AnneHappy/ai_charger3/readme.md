@@ -6,7 +6,7 @@
 
 - Charger 连跳接近目标 (支持连跳时方向左右偏移以规避生还者枪线、连跳时空中速度方向修正)
 - 面对近战目标时的博弈行为 (设置近战博弈区 <b>(melee_range + _ai_charger3_melee_bait_minrange, melee_range + _ai_charger3_melee_bait_maxrange)</b>、若与目标距离小于近战危险区 <b>(melee_range + _ai_charger3_melee_bait_minrange)</b> 则向后移动规避伤害)
-- 面对持枪目标时的概率冲锋 (设置博弈区, 与目标距离小于 <b>ai_charger3_bhop_min_dist</b> 时进入博弈状态, 停止连跳, 博弈状态下以一定概率发动冲锋)
+- 面对持枪目标时的贴脸博弈 (设置博弈区, 与目标距离小于 <b>ai_charger3_bhop_min_dist</b> 时进入博弈状态, 停止连跳; 该距离内视为保命中, 不再概率等待——爪击距离内两锤之内目标跑不掉就先锤两下再撞, 锤不到 / 对方正在后撤 / 锤击超时则直接冲)
 - 落地时检测更优冲锋目标并立即切换 (无法躲避冲锋的目标优先)
 - 阻止 Charger 无技能时逃跑 (强制追击目标生还者)
 
@@ -485,6 +485,8 @@ Charger 最终将视角转向 $\vec{p}_{pred}$ 方向后发动冲锋, 使冲锋�
 
 对应 `stocks.inc` 的 `stock bool isTargetVulnerable(...)` 函数，支持自定义，只需要在里面增加新的判断逻辑即可； Charger 在 BAIT 博弈状态中每帧调用 `isTargetVulnerable` 判断目标是否产生破绽, 一旦返回 `true` 则立即转换为 LOCKED 状态发动冲锋, 函数按优先级依次检查以下条件, 任意一条满足即认为目标存在破绽:
 
+> 注意：破绽判定只在**近战**博弈分支使用。自 1.0.1.9 起持枪目标进入 `ai_charger3_bhop_min_dist` 后一律视为保命中，走「先锤后撞」流程，不再做破绽/概率判定。
+
 **条件 1 — 目标手中无武器**
 
 目标的 `m_hActiveWeapon` 属性无效, 此时目标无法进行任何攻击或推开, 直接冲锋
@@ -552,7 +554,7 @@ T_{bait} > T_{max\_bait}
      高差超过阈值则认为携带目标冲下去即使 Charger 被击杀, 目标的行动仍然可以受到阻碍 (如再次回到冲锋前原来位置需要绕路等), 直接冲锋
    - 若落点实体为 `trigger_hurt` (伤害触发区) → 直接冲锋
 
-若以上 8 个条件均不满足, 则认为目标当前没有破绽, Charger 继续在 BAIT 状态中等待进行概率冲锋
+若以上 8 个条件均不满足, 则认为目标当前没有破绽, Charger 继续在 BAIT 状态中与近战目标保持博弈距离
 
 ## Charger 状态行为说明
 
@@ -588,13 +590,12 @@ Charger 在近距离与目标周旋, 等待最佳冲锋时机。
 
 **行为:**
 - 面对近战目标: 若与目标距离小于近战危险区范围 (melee_range + _ai_charger3_melee_bait_minrange) 时, 向后移动以规避伤害, 等待目标产生破绽以冲锋
-- 面对持枪目标: 目标正在注视 Charger 时立即冲锋; 否则每隔 `ai_charger3_prob_charge_chk_dur` 秒以 `ai_charger3_prob_charge_prob` 的概率发动冲锋, 若目标产生破绽也会立即冲锋
+- 面对持枪目标: 进入 `ai_charger3_bhop_min_dist` (默认 100) 即视为保命中, 不再概率等待。此时若在爪击距离内、且按目标后撤速度推算两锤之内跑不出爪击距离, 先锤 2 下再撞; 锤不到、对方正在后撤、或锤击尝试超过 2.5 秒, 直接冲锋。霰弹目标进入该距离立即冲锋
 - 博弈状态持续超过 `ai_charger3_bait_max_duration` 秒后强制转换为 **LOCKED** 锁定状态以进行冲锋, 防止无限博弈
 
 **状态转换条件:**
 - 检测到目标漏洞窗口 (近战攻击 CD 时、换弹时、切换武器时、进入右键推 CD 时等) → 转换为 **LOCKED**
-- 普通持枪目标正在注视 Charger → 转换为 **LOCKED**
-- 概率冲锋触发 → 转换为 **LOCKED**
+- 持枪目标进入 `ai_charger3_bhop_min_dist` 保命中区, 且锤不到 / 两锤打不完 / 锤满 2 下 / 锤击超时 → 转换为 **LOCKED**
 - 博弈超时 → 转换为 **LOCKED**
 
 ### LOCKED — 锁定状态

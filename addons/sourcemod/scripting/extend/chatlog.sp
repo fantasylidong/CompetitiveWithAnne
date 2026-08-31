@@ -31,6 +31,7 @@ public void OnPluginStart()
 	AddCommandListener(Command_SponsorLog, "sm_wc");
 	AddCommandListener(Command_SponsorLog, "sm_wanchen");
 	AddCommandListener(Command_SponsorLog, "sm_finish");
+	AddCommandListener(Command_SponsorLog, "sm_wccancel");
 
 	AutoExecConfig(true, "chatlog");
 }

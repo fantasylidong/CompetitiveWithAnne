@@ -247,7 +247,73 @@
 - Overhead stalls still use the 2-second movement window. If another survivor exists, the Tank switches (standing first, then pinned, then downed). With no alternative it throws in place and no longer `CommandABot RESET`s the same unreachable target, which was restarting the climb-and-fall loop. RESET is also skipped on or near ladders.
 - While on a ladder the Tank flattens pitch and locks yaw to `m_climbableNormal`, reducing the vanilla look-at-victim drop.
 
+### August 29, 2026 Independent control-SI target cap
+- Upgraded `SI_Target_limit.smx` to 1.7. Smoker / Hunter / Jockey / Charger now share one lock cap: control-SI budget / mobile survivors + 1. The budget is the sum of enabled control-class `z_*` / `inf_*` limits, clamped to `l4d_infected_limit`. Boomer / Spitter / Tank do not occupy this pool.
+- Upgraded `l4d_target_override.smx` to 2.26 with `targeted_mask`, so only control SI count toward the cap. Flow-leader ×2 and rushman uncapping keep their previous meaning.
+- Anne mode `shared_settings.cfg` files now pin `SI_enable_option 53`.
+- Upgraded `l4d_target_override.smx` to 2.27: added `L4D_TargetOverride_SetLastVictim` so AI plugins that rewrite targets through the `L4D2_OnChooseVictim` channel register their choice in the same targeted ledger; also fixed the ledger not syncing when the `L4D_OnTargetOverride` forward rewrites the victim.
+- Upgraded `SI_Target_limit.smx` to 1.8: added the `IsClassTargetLimited` native and the `sm_targetlimit_status` admin debug command; fixed a 1.7 changelog comment that terminated early and broke compilation.
+- Unified the ledger across SI AI plugins: `ai_hunter_2` / `ai_jockey_2` / `ai_charger3` now respect the control-SI cap before retargeting (no switch when the new target is full), while `ai_spitter_3` / `ai_boomer_3` / `ai_tank3` register their rewrites; `ai_smoker3` never rewrites targets so it needs no hookup.
+- Player-count adaptive: the formula scales across 4-player, 5-8 player multiplayer and solo endgames — total capacity is always "control-SI budget + mobile survivors", strictly greater than the control SI on the field; with one or few survivors the cap relaxes automatically, so SI never lack a legal target.
+- Version rollback configs `Anne25-11` / `Anne25-10` / `Anne24-5` / `Anne23-1` now reload `SI_Target_limit.smx` (previously `unloadall.cfg` unloaded it and these versions silently lost the target cap).
+
 ### August 28, 2026 Per-team HUD slot visibility
 - Upgraded Scripted HUD to 1.6.0. Every slot in `!hudmenu` gains a "show for team" submenu accepting any combination of survivor/spectator/infected (at least one must stay selected), so a slot can, for example, appear only while spectating. Choices persist to cookies and the database (new `slot_team_masks` column, migrated automatically); old preferences default to all teams.
 - The team whitelist for sensitive content sources moved from hard-coded rules to the `l4d2_scripted_hud_source_teams` cvar (`source:teammask` pairs; bits 1=spectator, 2=survivor, 4=infected). The default `2:5,7:5,13:5` matches the old behavior—SI HP, next-wave countdown, and the spawn queue remain spectator/infected only—while `13:1` style entries narrow a source to spectators. Menu tags like "(spec/SI)" are now generated from the live configuration, with all six languages updated.
 - Slots hidden by team gating no longer transmit their text to the client at all (previously the string still traveled over the network and was merely not rendered). Team changes refresh visibility immediately.
+
+### August 29, 2026 AI Jockey post-shove suppression fix
+- Upgraded `ai_jockey_2.smx` to 2026.08.29. Fixed the loophole where shoving the Jockey away was exactly what armed its punish branch: if the survivor's latest swing is the one that shoved the Jockey itself, the "instant leap during shove cooldown" punish no longer fires. The punish still applies to genuinely wasted shoves (whiffs or shoves spent on other SI).
+- The post-shove suppression no longer reuses `z_jockey_leap_time` (0.4s in Anne configs). A new dedicated cvar `ai_JockeyShovedCooldown` (default 3.0s, matching the competitive-standard jumpcap block window for shoved Jockeys) governs it. During suppression the plugin applies no bhop/leap enhancements and strips the native AI's leap button, so the Jockey can no longer re-pounce mid-air the moment its 0.9s stagger ends; it can still move and retreat normally. The jumpcap patch's AI exemption and the stagger cvars are untouched.
+
+### August 30, 2026 Jockey post-shove suppression scaled by AI difficulty
+- `ai_JockeyShovedCooldown` is now driven by the dynamic AI difficulty system: the six tiers in `dynamic_ai_difficulty.cfg` use Easy `3.0`, Normal `2.5`, Hard `2.0`, Expert `1.5`, and Extreme/Neri `1.0` seconds. `annehappy_dynamic_ai_difficulty.smx` applies the value per tier and restores the baseline on tier changes, so nothing lingers.
+- The plugin default of `3.0` equals the Easy tier, so modes that do not run the dynamic difficulty plugin automatically get the most lenient setting.
+
+### August 29, 2026 AI SI path-bhop "sky-launch mega jump" fix
+- Fixed path bhop occasionally producing a single absurdly long, flying-looking jump. Three root causes: `ai_spitter_3` / `ai_boomer_3` applied their hop impulse additively onto the current velocity with no cap at all, so on long open stretches the speed snowballed by +100/+150 every hop; the shared air correction kept the recorded hop speed as a floor for the entire airborne phase and even restored the spike after the engine slowed the SI on a wall clip; and the push vector carried a vertical component (Boomer toward elevated path goals, Spitter along its eye pitch), which stacked on top of the jump's own Z velocity into a literal sky launch.
+- Upgraded `ai_spitter_3` to 3.0.6 with the new `ai_SpitterBhopMaxSpeed` and `ai_boomer_3` to 3.0.8 with the new `ai_BoomerBhopMaxSpeed`. The additive push is now clamped to that horizontal cap, the push vector keeps only its horizontal component (vertical height stays the jump's job), and the pre-jump safety check now traces with the same velocity that actually gets applied.
+- Both new caps follow a "Charger cap +200" rule: the plugin default is 1000 (= `ai_charger3_bhop_max_speed` default 800 + 200), and the six dynamic AI difficulty tiers in `dynamic_ai_difficulty.cfg` are set to 600 / 600 / 700 / 800 / 1000 / 1000 (matching the Charger tiers 400 / 400 / 500 / 600 / 800 / 800).
+- Shared module `ai_path_movement.inc`: `AIPathMovement_BeginPathHop` gained a max-speed argument, so the air correction never sustains more than each SI's own bhop cap and externally induced speed spikes are no longer preserved through the whole airborne phase.
+- Upgraded `ai_smoker3` to 1.0.1.3 and `ai_tank3` to 1.0.0.11: the takeoff frame is now clamped by `ai_smoker3_bhop_max_speed` / `ai_tank3_bhop_max_speed` too (previously only airborne frames were clamped, so the takeoff instant could exceed the limit). Upgraded `ai_charger3` to 1.0.1.8; its ground/direct bhop already had a cap, and it now registers that cap with the shared air correction.
+- Recompiled: `ai_smoker3.smx`, `ai_boomer_3.smx`, `ai_spitter_3.smx`, `ai_tank3.smx`, `ai_charger3.smx`. The Jockey already caps each hop at 400+80 and the Hunter has no bhop logic, so neither needed changes.
+
+### August 30, 2026 Tank bhop cap lowered per difficulty
+- Lowered `ai_tank3_bhop_max_speed` by 200 across the dynamic AI difficulty tiers with an 800 ceiling: Easy 500, Normal 600, Hard 700, Expert 800, Extreme 800 (850 hit the ceiling); the Neri tier stays at 1000. Config-only change (`dynamic_ai_difficulty.cfg`), no recompile needed; the plugin default (used without dynamic difficulty) remains 1000.
+
+### August 30, 2026 Cancellable traitor registration; traitor Tank removed
+- Upgraded `infected_control.smx` to 2026-08-30. Added `!itcancel` (alias of `!neiguicancel`): a traitor registration can be cancelled any time before its wave releases, and while a registration exists `!it` opens a menu with a single "cancel registration" entry; a cancelled slot is no longer immediately backfilled with an AI. Once the release window opens (SpawnAllowed), cancelling is refused with a "window closed" hint.
+- Removed the Tank from traitor classes: selectable classes are now decided by the active spawn pool and the Tank can no longer be registered. The `inf_traitor_class_mask` default and ceiling stay at 127 (bit 64 is kept only for rollback compatibility and never takes effect), and `z_max_player_zombies` no longer reserves an extra slot for a traitor Tank.
+- Selectable traitor classes now intersect with the active spawn pool: classes disabled via `inf_*_limit 0` cannot be queued, and the allcharger / allhunter modes only allow Charger / Hunter respectively.
+- The effective `inf_traitor_max_slots` is clamped to `l4d_infected_limit - 1`, keeping at least one AI spawn budget per wave. Traitor auto-bhop moved to the OnPlayerRunCmd channel (internal refactor, same behavior). Usage and menu texts updated in all six languages.
+- Version rollback configs `Anne26-07` / `Anne25-11` / `Anne25-10` now reload `smart_ai_rock.smx` (previously `unloadall.cfg` unloaded it and rollback versions silently lost smart Tank rock throws).
+
+### August 30, 2026 Charger gun-range bait: two claws then charge
+- Upgraded `ai_charger3` to 1.0.1.9. After hopping into `ai_charger3_bhop_min_dist` (default 100), a gun target is treated as a guaranteed hit: no more probabilistic waiting, and the charge window is no longer clamped to 36–95.
+- If two claws can land before the target leaves claw range, the Charger punches twice then charges; if claws cannot connect, the target is backing out, or clawing takes more than 2.5 seconds, it charges immediately. Shotguns still charge as soon as they enter 100. Melee bait is unchanged.
+- Recompiled: `ai_charger3.smx`.
+
+### August 30, 2026 Loosen high-SI post-spawn repulsion
+- Upgraded `infected_control.smx` to 2026-08-30.1. At high SI counts the back half of a wave was being pushed out of the near band by post-placement repulsion: the kernel treated SI already in the survivors' faces as occupancy and ignored the SI-limit scale, while hard separation scaled down with the cap and so tightened exactly when it should have loosened.
+- Live SI closer than 400 to any survivor are no longer kernel sources. The SI-limit scale moved off the penalty value and onto the kernel radius (`inf_spawn_kernel_radius` × scale): at low SI it pushes candidates apart, at high SI it only prevents stacking, instead of flattening the whole curve and losing resolution. The `inf_spawn_kernel_points` default rose from 30 to 50.
+- The sector dispersion axis was removed entirely (`recentSectors`, the per-wave sector quota, and `inf_spawn_sector_quota_bonus`); directional preference is now expressed solely by the continuous tactical-geometry score, leaving kernel density as the only dispersion term.
+- Hard separation is now a fixed radius that no longer scales with the SI cap or with wave occupancy — it only answers "may we spawn here". The `inf_spawn_sep_radius` default dropped from 120 to 100. Wave timing is unchanged.
+
+### 2026-08-30 Uniform AI reaction time across all tiers
+
+- In `dynamic_ai_difficulty.cfg`, `z_acquire_far_time` / `z_acquire_near_time` changed from `5.0 / 0.5` to `0.0 / 0.0` for Easy through Expert, matching Extreme/Neri which were already `0.0 / 0.0`. Target-acquisition delay is no longer a difficulty axis; every tier difference now comes from per-class behaviour cvars.
+- Config-only change, no recompile needed. The "reaction time" row in `docs/annehappy_dynamic_ai_difficulty.md` was updated to match.
+
+### 2026-08-31 Pre-commit review fixes
+
+- Rebuilt `ai_charger3.smx`. The shipped binary was still 1.0.1.8, so none of 1.0.1.9 made it in: the claw-combo-then-charge flow, the guaranteed-hit band in `resolveChargeCommitDist`, the control-SI target-cap gate, and the bhop speed cap registration. It was still running the probabilistic charge that the source had already deleted.
+- Fixed a divide-by-zero in the `ai_boomer_3` / `ai_spitter_3` push normalisation. When the horizontal component is zero (target directly overhead or below, view pitch at ±90) normalising degenerates into a pure vertical vector, which launches the SI straight up — the very "flying" behaviour this batch set out to fix, reached by another path. Added a shared `AIPathMovement_NormalizeHorizontal()` that skips the push on a zero vector.
+- `getChargerClawRange()` now invalidates its cache on map change and refuses to cache an out-of-range read. The previous function-local `static` cached forever, so a first call before the weapon scripts loaded would pin the 70.0 fallback for the life of the process.
+- `spechud`'s `FillTankInfo` uses a fixed-size array, dropping the `new int[MaxClients]` heap allocation from every panel build on the HUD draw path.
+- `sm_navtest` falls back to `GetTargetAnchorPos` when the target survivor is unusable, instead of comparing the candidate's height against itself (which always scored 0). Also fixes an uninitialised `targetEye`.
+- Five SI AI plugins restore `#define REQUIRE_PLUGIN` after `#include <si_target_limit>`, matching `ai_tank3.sp`, so the optional dependency is scoped to that one include.
+- `si_target_limit.inc` preserves the caller's `REQUIRE_PLUGIN` state when transitively including `l4d_target_override`, so third-party plugins are not silently given a hard dependency.
+- Removed the five unreferenced macros left in `infected_control.sp` after the sector system was deleted, and corrected the `PEN_LIMIT_SCALE_LO` comment.
+- Deduplicated `.gitignore` and dropped the nine explicit paths already covered by `/test_results`.
+- Added the missing jp / ko / vi translations for `anne_server_redirect`, matching the six-language coverage of the other Anne plugins.
+- Documentation corrections: the two dispersion bullets in `README_SPAWN_ARCHITECTURE.md`; the reaction-time row, Tank row and the two new bhop-cap cvars in `annehappy_dynamic_ai_difficulty.md`; and the four places in `ai_charger3/readme.md` still describing the probabilistic charge. Also corrected the Charger bhop speeds in the tier table (the doc said 45/60/75/90/150; the config is 40/50/60/70/100).

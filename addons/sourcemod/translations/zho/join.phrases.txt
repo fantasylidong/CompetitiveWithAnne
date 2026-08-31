@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"zho"		"{green}[AnneDonate]{default} 付款完成後請返回遊戲，輸入 {olive}!wc user@example.com{default}。"
+		"zho"		"{green}[AnneDonate]{default} {olive}【贊助尚未登記】{default}付款後必須回遊戲輸入 {olive}!wc 你的信箱{default}，否則管理員收不到贊助記錄。"
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"zho"		"付款後輸入 !wc 你的信箱；誤觸輸入 !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"zho"		"{green}[AnneDonate]{default} 正在提交付款完成提示，請稍候，不要重複提交或重新選擇檔位。"
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"zho"		"請用 !wc user@example.com 提交"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"zho"		"我已完成付款"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"zho"		"重新打開付款頁"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"zho"		"稍後處理"
+		"zho"		"{green}[AnneDonate]{default} 已取消本次誤觸的贊助操作，沒有提交贊助記錄。"
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

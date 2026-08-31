@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"chi"		"{green}[IC]{default} 用法: !it 打开内鬼类型菜单；!it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] 直接登记。"
+		"chi"		"{green}[IC]{default} 用法: !it 打开内鬼类型菜单；!it [random|smoker|boomer|hunter|spitter|jockey|charger] 直接登记；!itcancel 可在波次释放前取消。"
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -35,6 +35,10 @@
 	"InfectedControl_TraitorMenuRandom"
 	{
 		"chi"		"随机可用类型"
+	}
+	"InfectedControl_TraitorMenuCancel"
+	{
+		"chi"		"取消内鬼登记"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{

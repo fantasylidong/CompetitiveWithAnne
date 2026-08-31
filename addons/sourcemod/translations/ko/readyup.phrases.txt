@@ -113,4 +113,29 @@
 	{
 		"ko"		"[{olive}Readyup{default}] 이번 라운드에 최대 {blue}%d{default}만큼만 준비를 취소할 수 있습니다."
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"ko"		"->{1}. 생존자{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"ko"		"->{1}. 감염자{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"ko"		"->{1}. 중계자"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"ko"		"->{1}. 관전자"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"ko"		"**다수** ({1})"
+	}
 }

@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"zho"		"[Anne] 這個入口服只負責進服分流，請按 F1 轉到真實遊戲服：%s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"zho"		"[Anne] 如果 F1 沒反應，請在控制台輸入：bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"zho"		"按 F1 轉到真實遊戲服"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"zho"		"[Anne] 如果你不是移動用戶，建議直接連接真實遊戲服：%s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"zho"		"非移動用戶建議直接連接，按 F1 確認"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"zho"		"[AnneRedirect] 已請求重新載入目標伺服器。"
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"zho"		"[AnneRedirect] 這個命令需要在遊戲內真人客戶端執行。"
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"zho"		"[AnneRedirect] 轉服目標尚未準備好。"
+	}
+}

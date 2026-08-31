@@ -39,7 +39,8 @@
 #define GETBOTINTERVAL 3.0
 #define DONATE_CONFIG_FILE "configs/anne_donate.cfg"
 #define DONATE_MAX_OPTIONS 16
-#define DONATE_REMIND_DELAY 60.0
+#define DONATE_HINT_INTERVAL 4.0
+#define DONATE_CHAT_REMIND_TICKS 15
 #define DONATE_HTTP_TIMEOUT_MS 30000
 #define JOIN_MOTD_DELAY 4.0
 #define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
@@ -86,12 +87,10 @@ char
 Handle
 	g_hDonateRemindTimer[MAXPLAYERS + 1];
 
-Menu
-	g_hDonateRemindMenu[MAXPLAYERS + 1];
-
 int
 	g_iDonateOptionCount = 0,
-	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED;
+	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED,
+	g_iDonateRemindTicks[MAXPLAYERS + 1] = { 0 };
 
 ConVar
 	hCvarMotdTitle,
@@ -160,6 +159,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_wc", FinishDonatePayment);
 	RegConsoleCmd("sm_wanchen", FinishDonatePayment);
 	RegConsoleCmd("sm_finish", FinishDonatePayment);
+	RegConsoleCmd("sm_wccancel", CancelDonatePayment);
 	RegAdminCmd("sm_donate_reload", ReloadDonateConfig, ADMFLAG_CONFIG, "Reload donate amount config");
 
 	AddCommandListener(Command_Setinfo, "jointeam");
@@ -974,7 +974,6 @@ public Action DonateServer(int client, int args)
 		return Plugin_Handled;
 
 	CancelDonateRemindTimer(client);
-	CancelDonateRemindMenu(client);
 
 	if(args >= 2)
 	{
@@ -1014,12 +1013,37 @@ public Action FinishDonatePayment(int client, int args)
 
 	char email[128];
 	email[0] = '\0';
-	if(args >= 1)
+	if(args < 1)
 	{
-		GetCmdArg(1, email, sizeof(email));
+		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
+		return Plugin_Handled;
+	}
+
+	GetCmdArg(1, email, sizeof(email));
+	TrimString(email);
+	if(email[0] == '\0')
+	{
+		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
+		return Plugin_Handled;
 	}
 
 	TrySubmitDonateFinish(client, email);
+	return Plugin_Handled;
+}
+
+public Action CancelDonatePayment(int client, int args)
+{
+	if(!IsValidClient(client) || IsFakeClient(client))
+		return Plugin_Handled;
+
+	if(IsDonateHttpPending(client))
+		return Plugin_Handled;
+
+	ClearDonatePending(client);
+	CancelDonateRemindTimer(client);
+	CancelClientMenu(client, true);
+	PrintHintText(client, " ");
+	CPrintToChat(client, "%t", "Join_AnneDonateCancelled");
 	return Plugin_Handled;
 }
 
@@ -1204,16 +1228,6 @@ void CancelDonateRemindTimer(int client)
 	g_hDonateRemindTimer[client] = null;
 }
 
-void CancelDonateRemindMenu(int client)
-{
-	if(!(1 <= client <= MaxClients) || g_hDonateRemindMenu[client] == null)
-		return;
-
-	g_hDonateRemindMenu[client] = null;
-	if(IsClientInGame(client))
-		CancelClientMenu(client, true);
-}
-
 void ClearDonatePending(int client)
 {
 	if(!(1 <= client <= MaxClients))
@@ -1228,7 +1242,6 @@ void ResetDonateClientState(int client)
 {
 	ClearDonatePending(client);
 	CancelDonateRemindTimer(client);
-	CancelDonateRemindMenu(client);
 	if(1 <= client <= MaxClients)
 		g_bDonateHttpPending[client] = false;
 }
@@ -1239,7 +1252,9 @@ void RestartDonateRemindTimer(int client)
 	if(!IsValidClient(client) || IsFakeClient(client))
 		return;
 
-	g_hDonateRemindTimer[client] = CreateTimer(DONATE_REMIND_DELAY, Timer_DonateRemind, GetClientUserId(client));
+	g_iDonateRemindTicks[client] = 0;
+	PrintHintText(client, "%T", "Join_AnneDonateCompletionHint", client);
+	g_hDonateRemindTimer[client] = CreateTimer(DONATE_HINT_INTERVAL, Timer_DonateRemind, GetClientUserId(client), TIMER_REPEAT);
 }
 
 bool IsDonateHttpPending(int client)
@@ -1278,79 +1293,31 @@ void TrySubmitDonateFinish(int client, const char[] email)
 public Action Timer_DonateRemind(Handle timer, int userid)
 {
 	int client = GetClientOfUserId(userid);
-	if(1 <= client <= MaxClients)
-		g_hDonateRemindTimer[client] = null;
-
-	if(!IsValidClient(client) || IsFakeClient(client))
+	if(client == 0)
 		return Plugin_Stop;
 
-	if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
+	if(!IsClientInGame(client))
+		return Plugin_Continue;
+
+	if(IsFakeClient(client) || g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
+	{
+		if(g_hDonateRemindTimer[client] == timer)
+			g_hDonateRemindTimer[client] = null;
 		return Plugin_Stop;
+	}
 
 	if(g_bDonateHttpPending[client])
-		return Plugin_Stop;
+		return Plugin_Continue;
 
-	ShowDonateRemindMenu(client);
-	return Plugin_Stop;
-}
-
-void ShowDonateRemindMenu(int client)
-{
-	char title[128], paid[64], reopen[64], later[64];
-	Format(title, sizeof(title), "%T", "Join_AnneDonateRemindMenuTitle", client);
-	Format(paid, sizeof(paid), "%T", "Join_AnneDonateRemindMenuPaid", client);
-	Format(reopen, sizeof(reopen), "%T", "Join_AnneDonateRemindMenuReopen", client);
-	Format(later, sizeof(later), "%T", "Join_AnneDonateRemindMenuLater", client);
-
-	Menu menu = new Menu(DonateRemindMenuHandler);
-	menu.SetTitle(title);
-	menu.AddItem("paid", paid);
-	menu.AddItem("reopen", reopen);
-	menu.AddItem("later", later);
-	menu.ExitButton = true;
-	g_hDonateRemindMenu[client] = menu;
-	if(!menu.Display(client, MENU_TIME_FOREVER))
+	PrintHintText(client, "%T", "Join_AnneDonateCompletionHint", client);
+	g_iDonateRemindTicks[client]++;
+	if(g_iDonateRemindTicks[client] >= DONATE_CHAT_REMIND_TICKS)
 	{
-		g_hDonateRemindMenu[client] = null;
-		delete menu;
+		g_iDonateRemindTicks[client] = 0;
+		CPrintToChat(client, "%t", "Join_FinishRemindsAdministratorVerify");
 	}
-}
 
-public int DonateRemindMenuHandler(Menu menu, MenuAction action, int client, int item)
-{
-	if(action == MenuAction_Select)
-	{
-		char info[16];
-		menu.GetItem(item, info, sizeof(info));
-		if(StrEqual(info, "paid"))
-		{
-			TrySubmitDonateFinish(client, "");
-		}
-		else if(StrEqual(info, "reopen"))
-		{
-			if(IsDonateHttpPending(client))
-				return 0;
-
-			if(g_sDonateAmount[client][0] == '\0' || g_sDonateMethod[client][0] == '\0')
-			{
-				CPrintToChat(client, "%t", "Join_AnneDonateSponsorshipConfirmedNot");
-				ShowDonateAmountMenu(client);
-				return 0;
-			}
-
-			ShowDonateWebToPlayer(client, g_sDonateAmount[client], g_sDonateMethod[client]);
-		}
-	}
-	else if(action == MenuAction_End)
-	{
-		for(int i = 1; i <= MaxClients; i++)
-		{
-			if(g_hDonateRemindMenu[i] == menu)
-				g_hDonateRemindMenu[i] = null;
-		}
-		delete menu;
-	}
-	return 0;
+	return Plugin_Continue;
 }
 
 void ShowDonateWebToPlayer(int client, const char[] amount, const char[] method)
@@ -1421,7 +1388,6 @@ public int DonateAmountMenuHandler(Menu menu, MenuAction action, int client, int
 		{
 			ClearDonatePending(client);
 			CancelDonateRemindTimer(client);
-			CancelDonateRemindMenu(client);
 			ShowDonateWebToPlayer(client, "", "");
 		}
 		else
@@ -1571,7 +1537,6 @@ public void DonateFinishCompleted(Handle request, bool failure, bool requestSucc
 		{
 			ClearDonatePending(client);
 			CancelDonateRemindTimer(client);
-			CancelDonateRemindMenu(client);
 		}
 		else if(IsValidClient(client) && !IsFakeClient(client))
 			RestartDonateRemindTimer(client);

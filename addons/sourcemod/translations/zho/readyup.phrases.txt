@@ -92,4 +92,29 @@
 	{
 		"zho"		"[{olive}Readyup{default}] 本回合你最多隻能取消準備 {blue}%d{default} 次。"
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"zho"		"->{1}. 生還者{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"zho"		"->{1}. 感染者{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"zho"		"->{1}. 解說"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"zho"		"->{1}. 旁觀者"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"zho"		"**更多旁觀者** ({1})"
+	}
 }

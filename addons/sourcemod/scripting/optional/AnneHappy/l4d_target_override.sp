@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"2.25"
+#define PLUGIN_VERSION 		"2.27"
 #define DEBUG_BENCHMARK		0			// 0=Off. 1=Benchmark only (for command). 2=Benchmark (displays on server). 3=PrintToServer various data.
 
 /*======================================================================================
@@ -32,6 +32,16 @@
 
 ========================================================================================
 	Change Log:
+
+2.27 (29-Aug-2026)
+	- Added native "L4D_TargetOverride_SetLastVictim" so 3rd party AI plugins that rewrite targets through the
+	  Left4DHooks "L4D2_OnChooseVictim" forward can register their choice in the "targeted" ledger. Keeps the
+	  per-survivor targeted counting consistent across both targeting channels. Requested by "morzlee".
+	- Fixed the "L4D_OnTargetOverride" forward not syncing the ledger when a plugin returns Plugin_Changed.
+
+2.26 (29-Aug-2026)
+	- Added option "targeted_mask" (INDEX_TARGETED_MASK) so only selected SI classes count toward the "targeted"
+	  cap. 0 = count all SI (old behavior). Used by SI_Target_limit for a shared control-SI pool.
 
 2.25 (26-Aug-2026)
 	- Added natives "L4D_TargetOverride_SetTargetedCap" and "L4D_TargetOverride_GetTargetedCap" for a per-survivor
@@ -266,6 +276,7 @@ int g_iOptionVoms[MAX_SPECIAL];
 int g_iOptionVoms2[MAX_SPECIAL];
 int g_iOptionSafe[MAX_SPECIAL];
 int g_iOptionTarg[MAX_SPECIAL];
+int g_iOptionTargMask[MAX_SPECIAL];
 float g_fOptionRange[MAX_SPECIAL];
 float g_fOptionDist[MAX_SPECIAL];
 float g_fOptionLast[MAX_SPECIAL];
@@ -342,6 +353,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("L4D_TargetOverride_SetOption", Native_SetOption);
 	CreateNative("L4D_TargetOverride_GetTargetedCap", Native_GetTargetedCap);
 	CreateNative("L4D_TargetOverride_SetTargetedCap", Native_SetTargetedCap);
+	CreateNative("L4D_TargetOverride_SetLastVictim", Native_SetLastVictim);
 
 	g_hForward = CreateGlobalForward("L4D_OnTargetOverride", ET_Hook, Param_Cell, Param_CellByRef, Param_Cell);
 
@@ -1315,36 +1327,14 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 						if( victim <= MaxClients && g_iTargetedCapClient[victim] > 0 )
 							targetedCap = g_iTargetedCapClient[victim];
 
-						total = 0;
-
-						for( int x = 1; x <= MaxClients; x++ )
+						total = CountTargetedOnVictim(victim, attacker, g_iOptionTargMask[class]);
+						if( total >= targetedCap )
 						{
-							if( x != attacker && g_iLastVictim[x] == victim )
-							{
-								if( IsClientInGame(x) )
-								{
-									total++;
-									if( total >= targetedCap )
-									{
-										#if DEBUG_BENCHMARK == 3
-										if( IsClientInGame(x) )
-										{
-											PrintToServer("{\"%N\"} is ignoring {\"%N\"} already targeted by {\"%N\"}", attacker, victim, x);
-										}
-										#endif
-
-										victim = 0;
-										break;
-									}
-								}
-								else
-								{
-									g_iLastVictim[x] = 0;
-								}
-							}
+							#if DEBUG_BENCHMARK == 3
+							PrintToServer("{\"%N\"} is ignoring {\"%N\"} already at targeted cap %d/%d", attacker, victim, total, targetedCap);
+							#endif
+							continue;
 						}
-
-						if( victim == 0 ) continue;
 					}
 
 					if( type == 3 )
@@ -2143,17 +2133,13 @@ any Native_GetValue(Handle plugin, int numParams)
 		case VALUE_INDEX_ORDER:			return g_iLastOrders[client];
 		case VALUE_INDEX_TOTAL:
 		{
-			int total;
-
-			for( int i = 1; i <= MaxClients; i++ )
+			int mask;
+			for( int i = 0; i < MAX_SPECIAL; i++ )
 			{
-				if( g_iLastVictim[i] == client )
-				{
-					total++;
-				}
+				if( g_iOptionTarg[i] > 0 )
+					mask |= g_iOptionTargMask[i];
 			}
-
-			return total;
+			return CountTargetedOnVictim(client, 0, mask);
 		}
 	}
 
@@ -2176,8 +2162,9 @@ any Native_GetOption(Handle plugin, int numParams)
 		case INDEX_WAIT:		return g_fOptionWait[index];
 		case INDEX_LAST:		return g_iOptionLast[index];
 		case INDEX_TIME:		return g_fOptionLast[index];
-		case INDEX_SAFE:		return g_iOptionSafe[index];
-		case INDEX_TARGETED:	return g_iOptionTarg[index];
+		case INDEX_SAFE:			return g_iOptionSafe[index];
+		case INDEX_TARGETED:		return g_iOptionTarg[index];
+		case INDEX_TARGETED_MASK:	return g_iOptionTargMask[index];
 	}
 
 	return -1;
@@ -2200,8 +2187,9 @@ int Native_SetOption(Handle plugin, int numParams)
 		case INDEX_WAIT:		g_fOptionWait[index] = value;
 		case INDEX_LAST:		g_iOptionLast[index] = value;
 		case INDEX_TIME:		g_fOptionLast[index] = value;
-		case INDEX_SAFE:		g_iOptionSafe[index] = value;
-		case INDEX_TARGETED:	g_iOptionTarg[index] = value;
+		case INDEX_SAFE:			g_iOptionSafe[index] = value;
+		case INDEX_TARGETED:		g_iOptionTarg[index] = value;
+		case INDEX_TARGETED_MASK:	g_iOptionTargMask[index] = value;
 	}
 
 	return 0;
@@ -2229,6 +2217,19 @@ int Native_SetTargetedCap(Handle plugin, int numParams)
 	return 0;
 }
 
+int Native_SetLastVictim(Handle plugin, int numParams)
+{
+	int attacker = GetNativeCell(1);
+	int victim = GetNativeCell(2);
+	if( attacker < 1 || attacker > MaxClients )
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid attacker index (%d)", attacker);
+	if( victim < 0 || victim > MaxClients )
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid victim index (%d)", victim);
+
+	g_iLastVictim[attacker] = victim;
+	return 0;
+}
+
 Action SendForward(int attacker, int &victim, int order)
 {
 	if( g_bCvarForward )
@@ -2243,7 +2244,11 @@ Action SendForward(int attacker, int &victim, int order)
 		Call_PushCell(order);
 		Call_Finish(aResult);
 
-		if( aResult == Plugin_Changed ) victim = victim2;
+		if( aResult == Plugin_Changed && victim2 >= 0 && victim2 <= MaxClients )
+		{
+			victim = victim2;
+			g_iLastVictim[attacker] = victim2; // Keep the targeted ledger in sync with 3rd party rewrites
+		}
 
 		return aResult;
 	}
@@ -2261,6 +2266,33 @@ float GetTempHealth(int client)
 	float fHealth = GetEntPropFloat(client, Prop_Send, "m_healthBuffer");
 	fHealth -= (GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * g_fDecayDecay;
 	return fHealth < 0.0 ? 0.0 : fHealth;
+}
+
+int GetSpecialBit(int client)
+{
+	int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
+	if( zc == g_iClassTank ) return 64;
+	if( zc >= 1 && zc <= 6 ) return 1 << (zc - 1);
+	return 0;
+}
+
+int CountTargetedOnVictim(int victim, int attacker, int countMask)
+{
+	int total;
+	for( int x = 1; x <= MaxClients; x++ )
+	{
+		if( x == attacker || g_iLastVictim[x] != victim )
+			continue;
+		if( !IsClientInGame(x) )
+		{
+			g_iLastVictim[x] = 0;
+			continue;
+		}
+		if( countMask && !(GetSpecialBit(x) & countMask) )
+			continue;
+		total++;
+	}
+	return total;
 }
 
 int ValidateTeam(int client)

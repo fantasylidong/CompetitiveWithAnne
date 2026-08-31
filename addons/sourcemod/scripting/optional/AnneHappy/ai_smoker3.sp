@@ -104,7 +104,7 @@ public Plugin myinfo =
 	name 			= "Ai-Smoker 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai-Smoker 增强 3.0 版本",
-	version 		= "1.0.1.2",
+	version 		= "1.0.1.3",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -433,12 +433,14 @@ Action checkeEnableBhop(int client, int target, int& buttons, const float pos[3]
 				NormalizeVector(vFwd, vFwd);
 				ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
 				AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+				clampBhopHorizontalSpeed(vAbsVelVec);
 				TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
 			} else {
 				// 有生还者视野, 向前时, 直接使用原来已经计算好的前向向量替换当前速度向量, 达到轨迹左右摆动效果
 				NormalizeVector(vFwd, vFwd);
 				ScaleVector(vFwd, (speed + g_cvBhopImpulse.FloatValue));
 				AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+				clampBhopHorizontalSpeed(vFwd);
 				TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
 			}
 		} else if (backOnly && (vecVel[0] > 0.0 && vecVel[1] > 0.0)) {
@@ -448,6 +450,7 @@ Action checkeEnableBhop(int client, int target, int& buttons, const float pos[3]
 			NormalizeVector(vFwd, vFwd);
 			ScaleVector(vFwd, g_cvBhopImpulse.FloatValue);
 			AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+			clampBhopHorizontalSpeed(vAbsVelVec);
 			// 向后连跳, 使用当前速度方向作为加速度方向
 			TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
 		} else {
@@ -471,6 +474,7 @@ Action checkeEnableBhop(int client, int target, int& buttons, const float pos[3]
 			if (rightOnly ^ leftOnly) {
 				ScaleVector(vRight, g_cvBhopImpulse.FloatValue * (rightOnly ? 1.0 : -1.0));
 				AddVectors(vAbsVelVec, vRight, vAbsVelVec);
+				clampBhopHorizontalSpeed(vAbsVelVec);
 				TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
 			}
 		}
@@ -518,6 +522,24 @@ Action checkeEnableBhop(int client, int target, int& buttons, const float pos[3]
 	}
 
 	return Plugin_Continue;
+}
+
+/**
+* 起跳帧限速: 只压水平分量到 g_cvBhopMaxSpeed, 保留 Z 速度。
+* 原来只在空中帧限速, 起跳那一帧可以超限, 造成单跳距离异常。
+*/
+stock void clampBhopHorizontalSpeed(float vel[3]) {
+	static float maxSpeed, hSpeed;
+	maxSpeed = g_cvBhopMaxSpeed.FloatValue;
+	if (maxSpeed <= 0.0)
+		return;
+
+	hSpeed = SquareRoot(vel[0] * vel[0] + vel[1] * vel[1]);
+	if (hSpeed <= maxSpeed)
+		return;
+
+	vel[0] *= maxSpeed / hSpeed;
+	vel[1] *= maxSpeed / hSpeed;
 }
 
 stock bool nextTickPosCheck(int client, bool visible) {

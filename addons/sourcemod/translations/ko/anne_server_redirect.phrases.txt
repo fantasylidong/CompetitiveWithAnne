@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"ko"		"[Anne] 이 입구 서버는 접속 분배 전용입니다. F1 을 눌러 실제 게임 서버로 이동하세요: %s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"ko"		"[Anne] F1 이 반응하지 않으면 콘솔에 입력하세요: bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"ko"		"F1 을 눌러 실제 게임 서버로 접속"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"ko"		"[Anne] 모바일 회선이 아니라면 실제 게임 서버로 직접 접속하는 것을 권장합니다: %s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"ko"		"모바일이 아니면 직접 접속 권장, F1 로 확인"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"ko"		"[AnneRedirect] 대상 서버 다시 불러오기를 요청했습니다."
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"ko"		"[AnneRedirect] 이 명령은 게임 내 실제 플레이어 클라이언트에서 실행해야 합니다."
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"ko"		"[AnneRedirect] 전송 대상이 아직 준비되지 않았습니다."
+	}
+}

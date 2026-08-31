@@ -17,6 +17,9 @@
 #include "../ai_path_movement.inc"
 #include "./stocks.inc"
 #include "./state/state.inc"
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 
 // 将插件日志前缀改成自己插件的日志前缀
 #define PLUGIN_PREFIX "AI-Charger3"
@@ -35,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.7",
+	version 		= "1.0.1.9",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -279,10 +282,11 @@ void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 
 public void OnMapStart() {
 	GetVectorShowSprite();
+	resetChargerClawRangeCache();
 }
 
 public void OnMapEnd() {
-
+	resetChargerClawRangeCache();
 }
 
 public Action L4D2_OnChooseVictim(int client, int &curTarget) {
@@ -290,10 +294,14 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget) {
 		return Plugin_Continue;
 
 	int selected = selectLegacyCompatibleTarget(client, curTarget);
+	// 新目标已达到控制类锁定上限时放弃改写，保持引擎/底层分配结果
+	if (selected > 0 && selected != curTarget && SITL_TargetCapBlocks(client, selected))
+		selected = 0;
 	if (selected > 0 && selected != curTarget)
 	{
 		curTarget = selected;
 		g_AiChargers[client].m_iTarget = GetClientUserId(selected);
+		SITL_CommitVictim(client, selected);
 		return Plugin_Changed;
 	}
 

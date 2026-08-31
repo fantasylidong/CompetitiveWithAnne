@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"jp"		"{green}[AnneDonate]{default} 支払い後はゲームに戻り、{olive}!wc user@example.com{default} と入力してください。"
+		"jp"		"{green}[AnneDonate]{default} {olive}【スポンサー記録は未完了です】{default}ゲームに戻り、{olive}!wc user@example.com{default} と入力してください。入力しないと管理者に記録が届きません。"
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"jp"		"支払い後: !wc user@example.com | 誤操作: !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"jp"		"{green}[AnneDonate]{default} 支払い完了の通知を送信中です。重複送信や金額の再選択はしないでください。"
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"jp"		"!wc user@example.com で送信"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"jp"		"支払い完了"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"jp"		"支払いページを再度開く"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"jp"		"後で処理する"
+		"jp"		"{green}[AnneDonate]{default} 誤操作によるスポンサー手続きをキャンセルしました。記録は送信されていません。"
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

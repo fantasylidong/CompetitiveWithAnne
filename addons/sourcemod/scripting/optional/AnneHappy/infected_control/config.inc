@@ -143,7 +143,6 @@ enum struct Config
     // === 刷点分散度强化 ===
     ConVar SpawnSepRadius;       // 最近实际刷出点硬分散半径
     ConVar SpawnSepTtl;          // 硬分散记忆秒数
-    ConVar SectorQuotaBonus;     // 波内单扇区配额加成(-1 关闭)
     ConVar SpawnKernelRadius;    // 核密度惩罚衰减距离(0 关闭)
     ConVar SpawnKernelPoints;    // 核密度惩罚强度
     ConVar SpawnCandidateShuffle;// 有向候选页内洗牌
@@ -322,7 +321,6 @@ enum struct Config
     int   iBucketMaxPerFlow;
     float fSepRadius;
     float fSepTtl;
-    int   iSectorQuotaBonus;
     float fKernelRadius;
     float fKernelPoints;
     bool  bCandidateShuffle;
@@ -626,8 +624,8 @@ enum struct Config
             CVAR_FLAG, true, 0.0, true, 1.0
         );
         this.SpawnSepRadius = CreateConVar(
-            "inf_spawn_sep_radius", "120.0",
-            "最近实际刷出点的硬分散半径（会乘以特感上限缩放系数）；0=关闭。",
+            "inf_spawn_sep_radius", "100.0",
+            "最近实际刷出点的硬防叠半径（固定值，不再随特感上限或波内占用缩放）；0=关闭。",
             CVAR_FLAG, true, 0.0, true, 500.0
         );
         this.SpawnSepTtl = CreateConVar(
@@ -635,19 +633,15 @@ enum struct Config
             "最近实际刷出点的硬分散记忆秒数。",
             CVAR_FLAG, true, 0.1, true, 10.0
         );
-        this.SectorQuotaBonus = CreateConVar(
-            "inf_spawn_sector_quota_bonus", "1",
-            "波内单扇区落点配额=ceil(上限/扇区数)+该值；-1=关闭扇区配额。",
-            CVAR_FLAG, true, -1.0, true, 8.0
-        );
         this.SpawnKernelRadius = CreateConVar(
             "inf_spawn_kernel_radius", "280.0",
-            "分散度核惩罚的距离衰减常数（对存活特感与最近刷点按 exp(-d/r) 累加）；0=关闭。",
+            "分散度核惩罚的距离衰减常数基准（对仍在接近途中的特感与最近刷点按 exp(-d/r) 累加；已贴脸交战的存活特感不计入）。实际半径=该值*特感上限缩放系数：低特推得开、高特只防叠；0=关闭。",
             CVAR_FLAG, true, 0.0, true, 1000.0
         );
         this.SpawnKernelPoints = CreateConVar(
-            "inf_spawn_kernel_points", "30.0",
-            "分散度核惩罚强度：扣分=该值*min(核密度和,1.5)。",
+            "inf_spawn_kernel_points", "50.0",
+            "分散度核惩罚强度：扣分=该值*min(核密度和,1.5)。上限缩放已作用在半径上，此处不再二次缩放。"
+            ... "取值需保证 该值*1.5 < 100，否则密集处 disp 会压到 0 而失去梯度（70 实测会让紧凑图刷点外推）。",
             CVAR_FLAG, true, 0.0, true, 100.0
         );
         this.SpawnCandidateShuffle = CreateConVar(
@@ -830,7 +824,7 @@ enum struct Config
         );
         this.TraitorMaxSlots = CreateConVar(
             "inf_traitor_max_slots", "1",
-            "Shared max active/reserved traitor slots; a waiting Tank starts using one only after takeover.",
+            "Shared max active/reserved traitor slots; effective value is always below l4d_infected_limit.",
             CVAR_FLAG, true, 0.0, true, float(MAXPLAYERS)
         );
         this.TraitorPlayerLimit = CreateConVar(
@@ -845,7 +839,7 @@ enum struct Config
         );
         this.TraitorClassMask = CreateConVar(
             "inf_traitor_class_mask", "127",
-            "Allowed traitor classes bitmask: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger, 64 tank. 0 = all.",
+            "Additional traitor class mask, intersected with the active spawn pool: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger; 64 tank is retained for rollback compatibility. 0 = all active classes.",
             CVAR_FLAG, true, 0.0, true, 127.0
         );
         this.TraitorPublicMinScore = CreateConVar(
@@ -888,7 +882,6 @@ enum struct Config
         this.FlowBucketShare.AddChangeHook(OnCfgChanged);
         this.SpawnSepRadius.AddChangeHook(OnCfgChanged);
         this.SpawnSepTtl.AddChangeHook(OnCfgChanged);
-        this.SectorQuotaBonus.AddChangeHook(OnCfgChanged);
         this.SpawnKernelRadius.AddChangeHook(OnCfgChanged);
         this.SpawnKernelPoints.AddChangeHook(OnCfgChanged);
         this.SpawnCandidateShuffle.AddChangeHook(OnCfgChanged);
@@ -1033,12 +1026,12 @@ enum struct Config
         this.bNavTeamNearest = this.NavTeamNearest.BoolValue;
         this.bTraitorEnable     = this.TraitorEnable.BoolValue;
         this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
-        int maxTraitorSlots = this.iSiLimit;
+        int maxTraitorSlots = this.iSiLimit - 1;
         if (maxTraitorSlots < 0)
             maxTraitorSlots = 0;
         if (maxTraitorSlots > MAXPLAYERS)
             maxTraitorSlots = MAXPLAYERS;
-        SetConVarBounds(this.TraitorMaxSlots, ConVarBound_Upper, true, float(maxTraitorSlots));
+        SetConVarBounds(this.TraitorMaxSlots, ConVarBound_Upper, true, float(MAXPLAYERS));
         if (this.iTraitorMaxSlots < 0) this.iTraitorMaxSlots = 0;
         if (this.iTraitorMaxSlots > maxTraitorSlots) this.iTraitorMaxSlots = maxTraitorSlots;
         this.iTraitorPlayerLimit = this.TraitorPlayerLimit.IntValue;
@@ -1230,8 +1223,6 @@ enum struct Config
         if (this.fSepRadius < 0.0) this.fSepRadius = 0.0;
         this.fSepTtl = this.SpawnSepTtl.FloatValue;
         if (this.fSepTtl < 0.1) this.fSepTtl = 0.1;
-        this.iSectorQuotaBonus = this.SectorQuotaBonus.IntValue;
-        if (this.iSectorQuotaBonus < -1) this.iSectorQuotaBonus = -1;
         this.fKernelRadius = this.SpawnKernelRadius.FloatValue;
         if (this.fKernelRadius < 0.0) this.fKernelRadius = 0.0;
         this.fKernelPoints = this.SpawnKernelPoints.FloatValue;
@@ -1298,17 +1289,7 @@ enum struct Config
 
     int GetMaxPlayerZombieBound()
     {
-        int maxZombies = this.iSiLimit;
-
-        // z_max_player_zombies also limits human infected slots.  Reserve
-        // one additional slot for the optional traitor Tank; ordinary SI
-        // spawning still uses iSiLimit as its independent cap.
-        bool tankEnabled = this.bTraitorEnable
-            && (this.iTraitorClassMask == 0 || (this.iTraitorClassMask & (1 << SI_COUNT)) != 0);
-        if (tankEnabled)
-            maxZombies++;
-
-        return maxZombies;
+        return this.iSiLimit;
     }
 
     void ApplyMaxZombieBound()

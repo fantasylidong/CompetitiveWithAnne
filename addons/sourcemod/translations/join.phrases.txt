@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"en"		"{green}[AnneDonate]{default} After paying, return to the game and enter {olive}!wc user@example.com{default}."
+		"en"		"{green}[AnneDonate]{default} {olive}PAYMENT IS NOT RECORDED YET.{default} Return to the game and enter {olive}!wc user@example.com{default}, or the admin will not receive your sponsorship record."
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"en"		"After paying: !wc user@example.com | Opened by mistake: !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"en"		"{green}[AnneDonate]{default} Your payment completion notice is already being submitted. Please wait; do not submit again or change the amount."
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"en"		"Submit with !wc user@example.com"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"en"		"I have completed payment"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"en"		"Reopen the payment page"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"en"		"Handle later"
+		"en"		"{green}[AnneDonate]{default} This sponsorship flow has been cancelled. No sponsorship record was submitted."
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

@@ -6,6 +6,9 @@
 #include <sdktools>
 #include <left4dhooks>
 #include <treeutil>
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 
 // ===== 兼容常量（若环境里已有则不会重复定义）=====
 #if !defined TEAM_SURVIVOR
@@ -511,13 +514,15 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
     if (!L4D2_IsVisibleToPlayer(specialInfected, TEAM_INFECTED, curTarget, INVALID_NAV_AREA, targetPos))
     {
         int newTarget = getClosestSurvivor(specialInfected);
-        if (!IsValidSurvivor(newTarget))
+        // 新目标已达到控制类锁定上限时不换靶，保持引擎/底层分配结果
+        if (!IsValidSurvivor(newTarget) || SITL_TargetCapBlocks(specialInfected, newTarget))
         {
             hunterCurrentTarget[specialInfected] = curTarget;
             return Plugin_Continue;
         }
         hunterCurrentTarget[specialInfected] = newTarget;
         curTarget = newTarget;
+        SITL_CommitVictim(specialInfected, newTarget);
         return Plugin_Changed;
     }
 

@@ -92,4 +92,29 @@
 	{
 		"en"		"[{olive}Readyup{default}] You can only unready {blue}%d{default} times this round."
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"en"		"->{1}. Survivors{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"en"		"->{1}. Infected{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"en"		"->{1}. Caster{2}"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"en"		"->{1}. Spectator{2}"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"en"		"**Many** ({1})"
+	}
 }

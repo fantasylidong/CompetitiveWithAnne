@@ -92,4 +92,29 @@
 	{
 		"vi"		"[{olive}Readyup{default}] Bạn chỉ có thể hủy việc chuẩn bị tối đa {blue}%d{default} lần trong vòng này."
 	}
+	"PanelSurvivors"
+	{
+		"#format"	"{1:d},{2:s}"
+		"vi"		"->{1}. Người sống sót{2}"
+	}
+	"PanelInfected"
+	{
+		"#format"	"{1:d},{2:s}"
+		"vi"		"->{1}. Người nhiễm{2}"
+	}
+	"PanelCaster"
+	{
+		"#format"	"{1:d},{2:s}"
+		"vi"		"->{1}. Bình luận viên"
+	}
+	"PanelSpectator"
+	{
+		"#format"	"{1:d},{2:s}"
+		"vi"		"->{1}. Khán giả"
+	}
+	"PanelMany"
+	{
+		"#format"	"{1:d}"
+		"vi"		"**Nhiều người** ({1})"
+	}
 }

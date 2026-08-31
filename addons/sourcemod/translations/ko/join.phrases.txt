@@ -14,27 +14,19 @@
 	}
 	"Join_FinishRemindsAdministratorVerify"
 	{
-		"ko"		"{green}[AnneDonate]{default} 결제 후 게임으로 돌아가 {olive}!wc user@example.com{default} 을 입력하세요."
+		"ko"		"{green}[AnneDonate]{default} {olive}【후원 기록이 아직 완료되지 않았습니다】{default}게임으로 돌아가 {olive}!wc user@example.com{default} 을 입력하세요. 입력하지 않으면 관리자에게 기록이 전달되지 않습니다."
+	}
+	"Join_AnneDonateCompletionHint"
+	{
+		"ko"		"결제 후: !wc user@example.com | 실수로 열었을 때: !wccancel"
 	}
 	"Join_AnneDonatePaymentSubmitInProgress"
 	{
 		"ko"		"{green}[AnneDonate]{default} 결제 완료 알림을 제출 중입니다. 다시 제출하거나 금액을 다시 선택하지 마세요."
 	}
-	"Join_AnneDonateRemindMenuTitle"
+	"Join_AnneDonateCancelled"
 	{
-		"ko"		"!wc user@example.com 로 제출"
-	}
-	"Join_AnneDonateRemindMenuPaid"
-	{
-		"ko"		"결제 완료"
-	}
-	"Join_AnneDonateRemindMenuReopen"
-	{
-		"ko"		"결제 페이지 다시 열기"
-	}
-	"Join_AnneDonateRemindMenuLater"
-	{
-		"ko"		"나중에 처리"
+		"ko"		"{green}[AnneDonate]{default} 실수로 시작한 후원 절차를 취소했습니다. 후원 기록은 제출되지 않았습니다."
 	}
 	"Join_AnneDonateAmountMenuTitle"
 	{

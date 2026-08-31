@@ -10,6 +10,9 @@
 #include <logger2>
 #include <anne_nextbot>
 #include "ai_path_movement.inc"
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 // 你自己的公共方法、工具函数（判定AI Tank / 可见性 / 贴图等）都在这里
 #include "../../archive/AnneHappy/stocks.sp"
 
@@ -220,7 +223,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳、骑头反制等）",
-    version     = "1.0.0.10",
+    version     = "1.0.0.11",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -1421,6 +1424,7 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget)
         if (curTarget != forcedTarget)
         {
             curTarget = forcedTarget;
+            SITL_CommitVictim(client, forcedTarget);
             return Plugin_Changed;
         }
         return Plugin_Continue;
@@ -1439,6 +1443,7 @@ public Action L4D2_OnChooseVictim(int client, int &curTarget)
         if (getTankForcedTarget(client, switchedTarget) && switchedTarget != curTarget)
         {
             curTarget = switchedTarget;
+            SITL_CommitVictim(client, switchedTarget);
             return Plugin_Changed;
         }
     }
@@ -1730,9 +1735,12 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
             }
         }
 
+        // 起跳帧同样受最大连跳速度约束, 原来只在空中帧限速, 起跳那一帧可以超限
+        AIPathMovement_ClampHorizontalSpeed(vAbsVelVec, g_cvBhopMaxSpeed.FloatValue);
+
         // 记录起跳水平速度（空中修正用）
         g_AiTanks[client].lastHopSpeed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
-        AIPathMovement_BeginPathHop(client, targetPos, g_AiTanks[client].lastHopSpeed);
+        AIPathMovement_BeginPathHop(client, targetPos, g_AiTanks[client].lastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
         TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
         return Plugin_Changed;
     }
@@ -1838,7 +1846,7 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
     g_AiTanks[client].bhopType = TankBhopType_Path;
     g_AiTanks[client].airCorrGoal = lookAheadPos;
     g_AiTanks[client].lastHopSpeed = getVectorLength2D(vFwd);
-    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiTanks[client].lastHopSpeed);
+    AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiTanks[client].lastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
     return Plugin_Changed;
 }

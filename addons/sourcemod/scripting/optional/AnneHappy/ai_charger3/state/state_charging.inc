@@ -18,7 +18,7 @@
 #define CHARGE_DIST_TOLERANCE                   10.0    // 开始冲锋距离容差, 500 速度冲锋目标无法躲避距离大概是 36 左右, 有点小, 导致 charger 一直连跳无法冲锋, 增加一点容差
 
 #define CHARGE_COMMIT_MIN_DIST                   36.0   // 按照 500 速度冲锋时, 允许冲锋的最小距离
-#define CHARGE_COMMIT_MAX_DIST                   95.0   // 按照 500 速度冲锋时, 允许冲锋的最大距离
+#define CHARGE_COMMIT_MAX_DIST                   95.0   // 近战目标运动学模型允许冲锋的最大距离; 持枪目标另用 bhop_min_dist 保命中区
 #define CHARGE_HIT_WIDTH                         16.0   // 冲锋命中宽度, 目标左右水平移动不超过这个范围可以被冲锋命中
 #define CHARGE_SIDE_SPEED_MIN                    80.0   // 生还者横向移动速度假设的最小值 (由于计算 commitDist 时需要使用横向速度做除法, 防止除零异常, 设置一个最小值)
 #define CHARGE_SPEED_EFFECTIVE_FACTOR            0.75   // 计算有效冲锋速度的因子 effective charge speed = max charge speed * factor
@@ -191,7 +191,7 @@ stock Action StateCharging_OnUpdate(int client, int& buttons, float vel[3], floa
     * 如果阈值无法计算返回 false, 推迟冲锋, 暂时不切回 Approach 状态, 避免状态抖动
     */
     static float commitDist;
-    if (!getChargeCommitDist(pos, targetPos, targetAbsVel, chargeSpeed, commitDist)) {
+    if (!resolveChargeCommitDist(pos, targetPos, targetAbsVel, chargeSpeed, threatType, dist, commitDist)) {
         stateLog.debugAll("Charger (%N) failed to calculate reliable charge commit distance for target (%N), wait in CHARGING STATE", client, target);
         buttons &= ~IN_ATTACK;
         buttons &= ~IN_ATTACK2;
@@ -510,6 +510,32 @@ stock bool getChargeCommitDist(const float pos[3], const float targetPos[3], con
     }
 
     return true;
+}
+
+stock bool resolveChargeCommitDist(const float pos[3], const float targetPos[3], const float targetVel[3],
+    float chargeSpeed, TargetThreatType threatType, float dist, float& commitDist)
+{
+    static bool motionOk;
+    motionOk = getChargeCommitDist(pos, targetPos, targetVel, chargeSpeed, commitDist);
+    if (threatType == Threat_Melee)
+        return motionOk;
+
+    /*
+    * 持枪/霰弹在 bhop_min_dist (默认 100) 内视为保命中: 500 速度冲锋这段距离基本躲不开
+    * 运动学模型把上限压在 95, 再叠加横向速度后经常只有 36-85, 会在贴脸后反复退回 Approach
+    */
+    static float guaranteedDist;
+    guaranteedDist = g_cvBhopMinDist.FloatValue;
+    if (motionOk) {
+        if (commitDist < guaranteedDist)
+            commitDist = guaranteedDist;
+        return true;
+    }
+    if (dist <= guaranteedDist && isChargeHeightReachable(pos, targetPos)) {
+        commitDist = guaranteedDist;
+        return true;
+    }
+    return false;
 }
 
 /**

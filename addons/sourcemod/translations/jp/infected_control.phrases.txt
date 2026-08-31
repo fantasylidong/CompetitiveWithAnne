@@ -26,7 +26,7 @@
 	}
 	"InfectedControl_TraitorUsage"
 	{
-		"jp"		"{green}[IC]{default} 使い方: !it でトレイター種類メニューを開く。!it [random|smoker|boomer|hunter|spitter|jockey|charger|tank] で直接登録。"
+		"jp"		"{green}[IC]{default} 使い方: !it でトレイター種類メニューを開く。!it [random|smoker|boomer|hunter|spitter|jockey|charger] で直接登録。!itcancel でウェーブ解放前に取り消せます。"
 	}
 	"InfectedControl_TraitorMenuTitle"
 	{
@@ -35,6 +35,10 @@
 	"InfectedControl_TraitorMenuRandom"
 	{
 		"jp"		"有効な種類からランダム"
+	}
+	"InfectedControl_TraitorMenuCancel"
+	{
+		"jp"		"登録を取り消す"
 	}
 	"InfectedControl_TraitorLimitReached"
 	{

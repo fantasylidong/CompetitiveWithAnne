@@ -25,7 +25,6 @@ enum struct SpawnScoreDbg
     float flow;
     float flowBase;
     float flowPenalty;
-    float dispRaw;
     float dispScaled;
     float dispKernel;
     float penK;
@@ -56,7 +55,6 @@ enum struct SpawnScoreDbg
     int deltaFlow;
     int lowHeightSteps;
     int highHeightSteps;
-    int sector;
     int areaIdx;
     int ownerClient;
     bool rawBadFlow;

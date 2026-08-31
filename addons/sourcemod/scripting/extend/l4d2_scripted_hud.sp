@@ -98,7 +98,7 @@ public Plugin myinfo =
 #define HUD_SLOT_ALL_MASK             ((1 << HUD_SLOT_COUNT) - 1)
 #define HUD_EXTRA_LINE_HEIGHT         0.026
 #define HUD_STACK_GAP                 0.008
-#define HUD_EXTRA_MAX_LINES           4
+#define HUD_EXTRA_MAX_LINES           5
 #define HUD_FIXED_MAX_LINES           6
 #define HUD_PREFS_COOKIE_SIZE         100
 #define HUD_PREFS_MIGRATIONS          6
@@ -918,7 +918,7 @@ void PlaceOwnedExtraHUDSlots()
 
         GetLayoutExtraSlotRect(HUD_LAYOUT_STANDARD, slot, x, y, w);
         HUDSetLayout(slot, flags, " ");
-        HUDPlace(slot, x, y, w, HUD_EXTRA_LINE_HEIGHT * 4.0);
+        HUDPlace(slot, x, y, w, HUD_EXTRA_LINE_HEIGHT * float(HUD_EXTRA_MAX_LINES));
     }
 }
 

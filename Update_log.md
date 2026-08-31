@@ -831,7 +831,73 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 高台停滞仍用 2 秒位移窗口。立案后有其他人则换目标（站着的优先，其次被控，再次倒地）；没有替代目标时原地投石，不再对同一人 `CommandABot RESET`（这是爬同一架梯子再掉下来的主因之一）。梯子附近禁止 RESET。
 - Tank 在梯子上时把俯仰拉平，并按 `m_climbableNormal` 把朝向锁到梯子，减轻原版“爬梯时抬头看人然后掉下来”的循环。
 
+### 2026年8月29日 控制类特感独立目标上限
+- `SI_Target_limit.smx` 升级到 1.7：舌头 / 猎人 / 猴子 / 牛共用独立锁定上限，公式为「控制类预算 / 可动生还 + 1」。预算取已启用控制职业的 `z_*` / `inf_*` 上限之和，并钳在 `l4d_infected_limit` 内。Boomer / Spitter / Tank 不占这个池。
+- `l4d_target_override.smx` 升级到 2.26：新增 `targeted_mask`，计数只统计控制类锁定，避免 Boomer 占坑。队首 ×2 与跑男放开上限保持原语义。
+- Anne 各模式 `shared_settings.cfg` 显式写入 `SI_enable_option 53`。
+- `l4d_target_override.smx` 升级到 2.27：新增 `L4D_TargetOverride_SetLastVictim`，供各特感 AI 插件把 `L4D2_OnChooseVictim` 通道的改靶结果登记进同一份锁定计数；并修复 `L4D_OnTargetOverride` forward 改写目标后计数不同步的问题。
+- `SI_Target_limit.smx` 升级到 1.8：新增 `IsClassTargetLimited` native 与 `sm_targetlimit_status` 管理员调试命令；修复 1.7 源码更新注释提前闭合导致无法编译的问题。
+- 账本统一接入特感 AI：`ai_hunter_2` / `ai_jockey_2` / `ai_charger3` 改靶前尊重控制类上限（新目标已锁满则不换靶），`ai_spitter_3` / `ai_boomer_3` / `ai_tank3` 改靶后登记账本；`ai_smoker3` 不改写目标无需接入。
+- 人数自适应：公式在 4 人、5-8 人多人和单人残局下自动缩放——总容量恒为「控制类预算 + 可动生还人数」，永远大于场上控制类特感数；单人或少人时上限自动放开，不会出现特感找不到合法目标。
+- 版本回滚配置 `Anne25-11` / `Anne25-10` / `Anne24-5` / `Anne23-1` 补回 `SI_Target_limit.smx` 加载（此前 `unloadall.cfg` 卸载后这些版本不再加载它，目标上限静默失效）。
+
 ### 2026年8月28日 Scripted HUD 槽位按队伍显示
 - Scripted HUD 升级到 1.6.0。`!hudmenu` 每个槽位新增「显示队伍」子菜单，可任选生还/旁观/特感组合（至少保留一个），比如把某个槽位设成只在旁观时显示。选择随 Cookie 与数据库保存（`scripted_hud_prefs` 新增 `slot_team_masks` 列，自动迁移），旧偏好默认全部队伍显示。
 - 敏感内容源的队伍白名单从硬编码改为 cvar `l4d2_scripted_hud_source_teams`（格式 `源:队伍掩码`，位 1=旁观 2=生还 4=特感）。默认 `2:5,7:5,13:5` 与旧行为一致——特感血量、下一波倒计时、刷新队列仅旁观/特感可见；改成 `13:1` 之类即可收紧为仅旁观。菜单里的「（旁观/特感）」标签改为按实际配置动态生成，六语翻译同步补齐。
 - 被队伍限制隐藏的槽位不再向客户端下发文本（此前只是不渲染，字符串仍随网络数据传输）；换队即时刷新可见性。
+
+### 2026年8月29日 AI Jockey 被推抑制修复
+- `ai_jockey_2.smx` 升级到 2026.08.29。修复「推开猴子这一下反而武装惩罚分支」的漏洞：生还者最近一次挥推如果推中的是猴子自己，不再触发「推 CD 内直接扑」的惩罚加速；该机制只对真正浪费推（推空、推到其他特感）的生还者生效。
+- 被推抑制时长不再复用 `z_jockey_leap_time`（Anne 配置为 0.4 秒），新增独立 cvar `ai_JockeyShovedCooldown`（默认 3.0 秒，对齐对抗规则中被推 Jockey 的 jumpcap 封锁标准时长）。抑制期内插件不做任何连跳/扑跳增强，并压制原生 AI 的扑技能按键，防止 0.9 秒硬直一结束就空中二次扑；猴子仍可正常移动逃跑。jumpcap 补丁的 AI 豁免与硬直配置维持不变。
+
+### 2026年8月30日 Jockey 被推抑制按 AI 难度分档
+- `ai_JockeyShovedCooldown` 接入动态 AI 难度：`dynamic_ai_difficulty.cfg` 六档分别为简单 `3.0`、普通 `2.5`、困难 `2.0`、专家 `1.5`、极限/音理 `1.0` 秒。切档由 `annehappy_dynamic_ai_difficulty.smx` 统一应用并在换档时恢复基线，不会残留。
+- 插件默认值 `3.0` 即简单档强度，未加载动态难度插件的模式自动落在最宽松档。
+
+### 2026年8月29日 AI 特感 path 连跳「飞天大跳」修复
+- 修复 path 连跳偶发单跳飞出极远距离、像飞天一样的问题。根因有三：`ai_spitter_3` / `ai_boomer_3` 的起跳推速是「叠加到当前速度」且完全没有上限，长直路连跳时每跳 +100/+150 无限滚雪球；共享空中修正以起跳速度为下限整段滞空保速，撞墙被引擎减速后还会拉回尖峰值；推力向量带垂直分量（Boomer 朝高处路径点、Spitter 沿视线俯仰），叠加跳跃本身的 Z 速度形成「飞天」。
+- `ai_spitter_3` 升级到 3.0.6，新增 `ai_SpitterBhopMaxSpeed`；`ai_boomer_3` 升级到 3.0.8，新增 `ai_BoomerBhopMaxSpeed`。叠加推速后按水平速度封顶，推力向量只保留水平分量，垂直高度交给跳跃本身；起跳安全检查使用的速度与实际推出的速度保持一致。
+- 两个新上限遵循「Charger 上限 +200」的规则：插件默认值 1000（= `ai_charger3_bhop_max_speed` 默认 800 + 200）；动态 AI 难度 `dynamic_ai_difficulty.cfg` 六档分别写入 600 / 600 / 700 / 800 / 1000 / 1000（对应 Charger 每档 400 / 400 / 500 / 600 / 800 / 800）。
+- 共享模块 `ai_path_movement.inc`：`AIPathMovement_BeginPathHop` 新增最大速度参数，空中修正维持的速度不再超过各特感自己的连跳上限，外力推出的速度尖峰不会被整段滞空保持。
+- `ai_smoker3` 升级到 1.0.1.3、`ai_tank3` 升级到 1.0.0.11：起跳那一帧同样按 `ai_smoker3_bhop_max_speed` / `ai_tank3_bhop_max_speed` 限速（原来只在空中帧限速，起跳瞬间可超限）。`ai_charger3` 升级到 1.0.1.8，其地面/Direct 连跳原本已有封顶，本次把上限登记进共享空中修正。
+- 重新编译：`ai_smoker3.smx`、`ai_boomer_3.smx`、`ai_spitter_3.smx`、`ai_tank3.smx`、`ai_charger3.smx`。Jockey 每跳本就有 400+80 封顶、Hunter 无连跳逻辑，无需改动。
+
+### 2026年8月30日 Tank 各难度连跳上限下调
+- 动态 AI 难度中 `ai_tank3_bhop_max_speed` 各档整体下调 200 并封顶 800：简单 500、普通 600、困难 700、专家 800、极限 800（850 触顶）；音理档保持 1000。纯配置调整（`dynamic_ai_difficulty.cfg`），无需重编译；插件默认值（不走动态难度时）维持 1000。
+
+### 2026年8月30日 内鬼登记可取消与内鬼 Tank 移除
+- `infected_control.smx` 升级到 2026-08-30。新增 `!itcancel`（等价 `!neiguicancel`）：波次释放前可随时取消内鬼登记；已有登记时再开 `!it` 菜单只显示「取消内鬼登记」项；取消后不再立即用 AI 补发该槽位。释放窗口已开启（SpawnAllowed）后不可取消，会提示登记窗口已关闭。
+- 内鬼类型移除 Tank：可选类型改由当前刷特池决定，Tank 不再可登记；`inf_traitor_class_mask` 的默认值与上限仍是 127（bit 64 保留只为回滚兼容，实际不会生效），`z_max_player_zombies` 不再为内鬼 Tank 预留额外槽位。
+- 内鬼可选类型改为与当前刷特池取交集：被 `inf_*_limit 0` 关闭的职业不可登记；allcharger / allhunter 模式下只能登记 Charger / Hunter。
+- `inf_traitor_max_slots` 生效值钳制为 `l4d_infected_limit - 1`，保证每波至少留一个 AI 刷特预算。内鬼自动连跳改由 OnPlayerRunCmd 通道处理（内部重构，行为不变）。usage 与菜单文案六语翻译同步更新。
+- 版本回滚配置 `Anne26-07` / `Anne25-11` / `Anne25-10` 补回 `smart_ai_rock.smx` 加载（此前 `unloadall.cfg` 卸载后回滚版本缺失 Tank 智能投石）。
+
+### 2026年8月30日 Charger 持枪贴脸先锤后撞
+- `ai_charger3` 升级到 1.0.1.9。连跳进 `ai_charger3_bhop_min_dist`（默认 100）后，持枪目标视为保命中：不再概率等待，冲锋窗口也不再被压到 36–95。
+- 若爪击距离内两锤之内目标跑不掉，先锤两下再撞；锤不到、对方正在后撤、或锤击超过 2.5 秒，改为直接冲。霰弹仍是进 100 立刻撞。近战博弈不变。
+- 重新编译：`ai_charger3.smx`。
+
+### 2026年8月30日 高特刷点排斥放宽
+- `infected_control.smx` 升级到 2026-08-30.1。高特时后半波容易被「生成后排斥」挤出近带：核密度把已经贴脸的存活特感也当成排斥源，且不随特感上限缩放；硬分散半径又按上限缩放，高特时反而收得更紧。
+- 距任意生还者不足 400 的存活特感不再计入核密度。特感上限缩放从分值挪到核半径上（`inf_spawn_kernel_radius` × 缩放系数）：低特推得开、高特只防叠，避免高特时整条曲线一起压平而失去区分度；`inf_spawn_kernel_points` 默认从 30 提到 50。
+- 扇区分散轴整套删除（`recentSectors`、波内扇区配额、`inf_spawn_sector_quota_bonus`），方向偏好统一由连续战术几何分表达，分散度分只剩核密度一项。
+- 硬分散改为固定半径，不再随特感上限或波内占用缩放——这一条只回答「能不能刷在这」；`inf_spawn_sep_radius` 默认从 120 降到 100。波次时序契约不变。
+
+### 2026年8月30日 AI 反应时间六档统一
+
+- `dynamic_ai_difficulty.cfg` 里 `z_acquire_far_time` / `z_acquire_near_time` 从简单到专家四档的 `5.0 / 0.5` 改为 `0.0 / 0.0`，与本来就是 `0.0 / 0.0` 的极限 / 音理档一致。目标锁定延迟不再作为难度轴，难度差异全部由各职业行为 cvar 表达。
+- 纯配置调整，无需重编译。`docs/annehappy_dynamic_ai_difficulty.md` 的「反应时间」行同步更新。
+
+### 2026年8月31日 提交前审核修复
+
+- 补编译 `ai_charger3.smx`：此前产物停在 1.0.1.8，1.0.1.9 的「先锤后撞」、持枪保命中区 `resolveChargeCommitDist`、控制类上限改靶闸和连跳上限登记都没进二进制，跑的仍是已经删掉的概率冲锋逻辑。
+- 修 `ai_boomer_3` / `ai_spitter_3` 推力归一化的除零：水平分量为零时（目标正上 / 正下方、视角俯仰 ±90）归一化会退化成纯垂直向量，等于把特感直接推上天——正是本次要修的「飞天」的另一条触发路径。新增共享的 `AIPathMovement_NormalizeHorizontal()`，零向量时跳过本次推力。
+- `getChargerClawRange()` 的缓存改为随换图失效，且读到越界值时不写缓存：原实现用函数内 `static` 永久缓存，若首次调用早于武器脚本装载，70.0 兜底值会被锁死到进程结束。
+- `spechud` 的 `FillTankInfo` 改用定长数组，去掉 HUD 绘制路径上每次构建面板都做的 `new int[MaxClients]` 堆分配。
+- `sm_navtest` 在目标生还者不可用时改用 `GetTargetAnchorPos` 兜底，不再拿候选点跟自己比高度（高度分恒为 0），顺带修掉 `targetEye` 未初始化。
+- 五个特感 AI 插件在 `#include <si_target_limit>` 之后补回 `#define REQUIRE_PLUGIN`，与 `ai_tank3.sp` 一致，把可选依赖限制在这一条 include 上。
+- `si_target_limit.inc` 传递包含 `l4d_target_override` 时保持调用方的 `REQUIRE_PLUGIN` 状态，避免第三方插件被静默塞进一条硬依赖。
+- 清理 `infected_control.sp` 中扇区系统删除后残留的 5 个无引用宏，并订正 `PEN_LIMIT_SCALE_LO` 的注释。
+- `.gitignore` 去重，并删掉已被 `/test_results` 覆盖的 9 条具体路径。
+- 补齐 `anne_server_redirect` 的 jp / ko / vi 三语翻译，与其余 Anne 插件的六语覆盖对齐。
+- 文档订正：`README_SPAWN_ARCHITECTURE.md` 的分散度两条、`annehappy_dynamic_ai_difficulty.md` 的反应时间行 / Tank 行 / 新增的两个连跳上限 cvar、`ai_charger3/readme.md` 里仍在描述概率冲锋的四处。顺带修正五档表里 Charger 连跳速度（旧文档写 45/60/75/90/150，配置实际是 40/50/60/70/100）。

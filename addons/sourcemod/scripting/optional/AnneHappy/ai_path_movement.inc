@@ -17,6 +17,7 @@ enum struct AIPathMovementState
     bool active;
     float goal[3];
     float hopSpeed;
+    float maxSpeed;
     float lastCorrectionTime;
 
     void Reset()
@@ -24,6 +25,7 @@ enum struct AIPathMovementState
         this.active = false;
         this.goal = NULL_VECTOR;
         this.hopSpeed = 0.0;
+        this.maxSpeed = 0.0;
         this.lastCorrectionTime = 0.0;
     }
 }
@@ -70,14 +72,23 @@ stock void AIPathMovement_Reset(int client)
     g_AIPathMovementState[client].Reset();
 }
 
-stock void AIPathMovement_BeginPathHop(int client, const float goal[3], float hopSpeed)
+/**
+* 记录一次连跳的空中保速状态。
+* maxSpeed > 0 时作为本次滞空期间的水平速度硬上限：
+* 起跳速度尖峰（叠加式推速、外部冲量）不会被空中修正长期保持，防止“飞天大跳”。
+*/
+stock void AIPathMovement_BeginPathHop(int client, const float goal[3], float hopSpeed, float maxSpeed = 0.0)
 {
     if (client < 1 || client > MaxClients)
         return;
 
+    if (maxSpeed > 0.0 && hopSpeed > maxSpeed)
+        hopSpeed = maxSpeed;
+
     g_AIPathMovementState[client].active = true;
     g_AIPathMovementState[client].goal = goal;
     g_AIPathMovementState[client].hopSpeed = hopSpeed;
+    g_AIPathMovementState[client].maxSpeed = maxSpeed;
     g_AIPathMovementState[client].lastCorrectionTime = GetEngineTime();
 }
 
@@ -97,6 +108,44 @@ stock bool AIPathMovement_IsPathHopActive(int client)
 stock float AIPathMovement_GetHorizontalSpeed(const float velocity[3])
 {
     return SquareRoot(velocity[0] * velocity[0] + velocity[1] * velocity[1]);
+}
+
+/**
+* 只压水平分量的限速，保留 Z 速度（跳跃/重力交给引擎）。
+* maxSpeed <= 0 表示不限速。
+*/
+stock void AIPathMovement_ClampHorizontalSpeed(float velocity[3], float maxSpeed)
+{
+    if (maxSpeed <= 0.0)
+        return;
+
+    float speed = AIPathMovement_GetHorizontalSpeed(velocity);
+    if (speed <= maxSpeed)
+        return;
+
+    float scale = maxSpeed / speed;
+    velocity[0] *= scale;
+    velocity[1] *= scale;
+}
+
+/**
+* 只保留水平分量并归一化。水平分量为零时（目标正上/正下方、视角俯仰 ±90）
+* 归一化会除零，Valve 的 VectorNormalize 退化成 (0,0,1)，等于把特感直接推上天。
+* 这种情况输出零向量并返回 false，由调用方跳过本次推力。
+*/
+stock bool AIPathMovement_NormalizeHorizontal(float velocity[3])
+{
+    velocity[2] = 0.0;
+    if (AIPathMovement_GetHorizontalSpeed(velocity) <= 0.0)
+    {
+        velocity[0] = 0.0;
+        velocity[1] = 0.0;
+        return false;
+    }
+
+    NormalizeVector(velocity, velocity);
+    velocity[2] = 0.0;
+    return true;
 }
 
 stock float AIPathMovement_GetDistance2D(const float first[3], const float second[3])
@@ -410,6 +459,10 @@ stock bool AIPathMovement_ComputeAirCorrectionToward(
     float speed = AIPathMovement_GetHorizontalSpeed(currentVelocity);
     if (speed < g_AIPathMovementState[client].hopSpeed)
         speed = g_AIPathMovementState[client].hopSpeed;
+    // 空中修正只维持不超过上限的速度，被外力推出的尖峰速度不再被保持
+    float maxSpeed = g_AIPathMovementState[client].maxSpeed;
+    if (maxSpeed > 0.0 && speed > maxSpeed)
+        speed = maxSpeed;
     AIPathMovement_BuildAirCorrectionVelocity(
         currentVelocity,
         desiredDirection,

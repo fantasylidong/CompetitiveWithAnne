@@ -186,10 +186,10 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 从简单到极限逐步增强，但非极限档尽量保持同一套基础行为，不再用大量开关差异制造难度。
 
 - Tank：默认所有档都保留 AITank3 连跳和无视野连跳；Alone 通过 `ah_ai_dynamic_tank_bhop_override 0` 强制关闭 Tank 连跳。无视野连跳角度按各模式 `shared_settings.cfg` 的普通强度基准恢复为 `57.0`，不参与动态难度分档。主要区分停跳距离、连跳加速度、最大速度、空中修正角度和攀爬倍速。`ai_TankSneakTime` 和旧的 `ai_TankAirAngleRestrict` 不属于当前 `ai_tank3.smx`，已经从配置移除。
-- Boomer：所有档都开启连跳和转视角，主要区分连跳速度与转视角帧数；专家保持 15 帧，极限为 10 帧。`ai_BoomerJumpVomit` 默认关闭，仅音理档开启：原连跳照常执行，不额外强制起跳；只让已经处于空中的 Boomer 也能按原来的距离条件喷吐，地面喷吐保持不变。
-- Charger：所有档都开启连跳，主要区分 `ai_ChagrerBhopSpeed`。
-- Spitter：所有档都开启连跳，主要区分 `ai_SpitterBhopSpeed`。
-- Jockey：所有档都开启连跳，连跳启动距离统一为 `600`，骗推行为概率统一为冻结/后跳/高跳 `40/10/50`。`ai_JockeyAllowInterControl` 全档固定为 `0`，抢控目标由 `target_override` 控制。
+- Boomer：所有档都开启连跳和转视角，主要区分连跳速度与转视角帧数；`ai_BoomerBhopMaxSpeed` 按「Charger 上限 +200」逐档给出水平速度封顶，防止叠加式推速滚雪球；专家保持 15 帧，极限为 10 帧。`ai_BoomerJumpVomit` 默认关闭，仅音理档开启：原连跳照常执行，不额外强制起跳；只让已经处于空中的 Boomer 也能按原来的距离条件喷吐，地面喷吐保持不变。
+- Charger：所有档都开启连跳，主要区分 `ai_ChagrerBhopSpeed` 与 `ai_charger3_bhop_max_speed`。
+- Spitter：所有档都开启连跳，主要区分 `ai_SpitterBhopSpeed`；`ai_SpitterBhopMaxSpeed` 按「Charger 上限 +200」逐档给出水平速度封顶，防止叠加式推速滚雪球。
+- Jockey：所有档都开启连跳，连跳启动距离统一为 `600`，骗推行为概率统一为冻结/后跳/高跳 `40/10/50`。`ai_JockeyAllowInterControl` 全档固定为 `0`，抢控目标由 `target_override` 控制。被推抑制 `ai_JockeyShovedCooldown` 按档递减：简单 `3.0`、普通 `2.5`、困难 `2.0`、专家 `1.5`、极限/音理 `1.0`；抑制期内插件不做扑跳增强并压制原生 leap 按键，插件默认值 `3.0` 即简单档，未跑动态难度的模式自动落在最宽松档。
 - Hunter：主要区分基础飞扑空速和低飞角度。简单档垂直角度更大，Hunter 更容易飞高，给玩家更多空爆窗口；越难越低飞。极限档额外启用 `l4d2_hunter_patch_convert_leap 1` + `l4d2_hunter_patch_crouch_pounce 2`，等同原 `crouch_on` 强化。
 - Smoker：所有档都开启连跳和无视野连跳，主要区分连跳速度、左右偏角、无视野角度和空中速度修正角度。越难空中修正阈值越小，修正更早介入。`ai_smoker3_jump_pull` 默认关闭，仅音理档开启。原连跳照常执行，不额外强制起跳或延迟地面秒拉；已经处于空中时，技能就绪且进入射程便可正常出舌。
 
@@ -232,18 +232,20 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 ## 五档对比
 
+> 反应时间 `z_acquire_far_time` / `z_acquire_near_time` 现在六档统一为 `0.0 / 0.0`：AI 的目标锁定延迟不再作为难度轴，难度差异全部由各职业行为 cvar 表达。
+
 | 属性组 | 简单 `<30.89` | 普通 `30.89-43.23` | 困难 `43.23-63.70` | 专家 `63.70-77.57` | 极限 `>=77.57` |
 | --- | --- | --- | --- | --- | --- |
-| 反应时间 | 远距 5.0 / 近距 0.5 | 5.0 / 0.5 | 5.0 / 0.5 | 5.0 / 0.5 | 0.0 / 0.0 |
+| 反应时间 | 远距 0.0 / 近距 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
 | Hunter/Jockey 空速 | 700 / 700 | 750 / 750 | 800 / 800 | 850 / 850 | 900 / 900 |
 | Hunter 垂直角度 | 12，更容易飞高 | 10 | 8 | 7 | 6 |
 | Hunter patch | 关闭 | 关闭 | 关闭 | 关闭 | `convert_leap=1`，`crouch_pounce=2` |
 | Smoker 连跳 | 开启，速度 70，修正角 70 | 速度 90，修正角 60 | 速度 105，修正角 55 | 速度 120，修正角 50 | 速度 150，修正角 45 |
-| Jockey | 速度 50，距离 600，骗推 40/10/50 | 速度 60，距离 600，骗推 40/10/50 | 速度 70，距离 600，骗推 40/10/50 | 速度 80，距离 600，骗推 40/10/50 | 速度 150，距离 600，骗推 40/10/50，背视角 100% |
-| Spitter | 连跳速度 45 | 65 | 85 | 100 | 250 |
-| Charger | 连跳速度 45 | 60 | 75 | 90 | 150 |
-| Boomer | 速度 70，30 帧转目标 | 95，25 帧 | 125，20 帧 | 150，15 帧 | 250，10 帧，喷吐距离 300，疲劳 1500；尸潮基准仍由 `confogl_plugins.cfg` 初始化 |
-| Tank | 无视野 57，220 / 650 / 60 | 57，190 / 720 / 55 | 57，170 / 820 / 50 | 57，150 / 920 / 45 | 57，135 / 980 / 45 |
+| Jockey | 速度 50，距离 600，骗推 40/10/50，被推抑制 3.0s | 速度 60，距离 600，骗推 40/10/50，被推抑制 2.5s | 速度 70，距离 600，骗推 40/10/50，被推抑制 2.0s | 速度 80，距离 600，骗推 40/10/50，被推抑制 1.5s | 速度 150，距离 600，骗推 40/10/50，背视角 100%，被推抑制 1.0s |
+| Spitter | 连跳速度 45，上限 600 | 65，上限 600 | 85，上限 700 | 100，上限 800 | 250，上限 1000 |
+| Charger | 连跳速度 40，上限 400 | 50，上限 400 | 60，上限 500 | 70，上限 600 | 100，上限 800 |
+| Boomer | 速度 70，上限 600，30 帧转目标 | 95，上限 600，25 帧 | 125，上限 700，20 帧 | 150，上限 800，15 帧 | 250，上限 1000，10 帧，喷吐距离 300，疲劳 1500；尸潮基准仍由 `confogl_plugins.cfg` 初始化 |
+| Tank | 无视野 57，停跳 220 / 上限 500 / 加速度 40 | 57，190 / 600 / 48 | 57，160 / 700 / 55 | 57，135 / 800 / 60 | 57，120 / 800 / 65 |
 
 ## confogl_plugins.cfg 中 AI 和 Hunter Patch 的 ConVar
 
@@ -261,11 +263,11 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 ### `ai_jockey_2.smx`
 
-`ai_JockeyBhopSpeed`, `ai_JockeyStartHopDistance`, `ai_JockeyStumbleRadius`, `ai_JockeySpecialJumpAngle`, `ai_JockeySpecialJumpChance`, `ai_jockeyNoActionChance`, `ai_JockeyAllowInterControl`, `ai_JockeyBackVision`
+`ai_JockeyBhopSpeed`, `ai_JockeyStartHopDistance`, `ai_JockeyStumbleRadius`, `ai_JockeySpecialJumpAngle`, `ai_JockeySpecialJumpChance`, `ai_jockeyNoActionChance`, `ai_JockeyAllowInterControl`, `ai_JockeyBackVision`, `ai_JockeyShovedCooldown`
 
 ### `ai_spitter_2.smx`
 
-`ai_SpitterBhop`, `ai_SpitterBhopSpeed`, `ai_SpitterTarget`, `ai_SpitterPinnedPr`, `ai_SpiiterDieAfterSpit`
+`ai_SpitterBhop`, `ai_SpitterBhopSpeed`, `ai_SpitterBhopMaxSpeed`, `ai_SpitterTarget`, `ai_SpitterPinnedPr`, `ai_SpiiterDieAfterSpit`
 
 ### `ai_charger_2.smx`
 
@@ -273,7 +275,7 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 
 ### `ai_boomer_2.smx`
 
-`ai_BoomerBhop`, `ai_BoomerBhopSpeed`, `ai_BoomerUpVision`, `ai_BoomerTurnVision`, `ai_BoomerForceBile`, `ai_BoomerBileFindRange`, `ai_BoomerTurnInterval`, `ai_BoomerDegreeForceBile`, `ai_BoomerAutoFrame`
+`ai_BoomerBhop`, `ai_BoomerBhopSpeed`, `ai_BoomerBhopMaxSpeed`, `ai_BoomerUpVision`, `ai_BoomerTurnVision`, `ai_BoomerForceBile`, `ai_BoomerBileFindRange`, `ai_BoomerTurnInterval`, `ai_BoomerDegreeForceBile`, `ai_BoomerAutoFrame`
 
 `ai_BoomerUpVision 1` 只接管喷吐瞄准的垂直补偿；首次瞄准和喷中后转向其他目标时均至少保留 5 度仰角，避免优先选择倒地/被控目标时朝地面喷吐。该补偿不改变连跳速度、喷吐距离、喷吐间隔或空中喷吐补丁状态。
 

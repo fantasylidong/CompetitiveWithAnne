@@ -9,6 +9,9 @@
 #include <anne_nextbot>
 #include "ai_path_snapshot.inc"
 #include "ai_path_movement.inc"
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
 
 #define CVAR_FLAG FCVAR_NONE
 #define EYE_ANGLE_UP_HEIGHT 15.0
@@ -31,13 +34,14 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.6",
+		version 		= "3.0.8",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopMaxSpeed,
 	g_hBhopStartDistance,
 	g_hJumpVomit,
 	g_hPathBhop,
@@ -93,6 +97,8 @@ public void OnPluginStart()
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳速度", CVAR_FLAG, true, 0.0);
+	// 默认值与 Charger 上限(ai_charger3_bhop_max_speed 默认 800)保持 +200 的关系, 动态难度每档同样按 charger+200 配置
+	g_hBhopMaxSpeed = CreateConVar("ai_BoomerBhopMaxSpeed", "1000.0", "Boomer 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_BoomerBhopStartDistance", "2500.0", "Boomer 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hJumpVomit = CreateConVar("ai_BoomerJumpVomit", "0", "是否允许 Boomer 已在空中时主动喷吐；不额外强制起跳，原连跳逻辑照常", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hPathBhop = CreateConVar("ai_boomer3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -492,7 +498,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				float pathVelocity[3];
 				GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", pathVelocity);
 				AIPathMovement_AlignFacing(pathVelocity, angles);
-				AIPathMovement_BeginPathHop(client, bhopTarget, AIPathMovement_GetHorizontalSpeed(pathVelocity));
+				AIPathMovement_BeginPathHop(client, bhopTarget, AIPathMovement_GetHorizontalSpeed(pathVelocity), g_hBhopMaxSpeed.FloatValue);
 			}
 			return Plugin_Changed;
 		}
@@ -584,6 +590,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 					{
 						delete hTrace;
 						curTarget = i;
+						SITL_CommitVictim(specialInfected, i);
 						return Plugin_Changed;
 					}
 					delete hTrace;
@@ -637,12 +644,14 @@ bool IsBoomer(int client)
 	return view_as<bool>(GetInfectedClass(client) == view_as<int>(ZC_BOOMER) && IsFakeClient(client));
 }
 
-// 计算与目标之间的向量
+// 计算与目标之间的向量（只取水平方向, 垂直高度交给跳跃本身, 防止向高处目标起跳时被向上推出“飞天”）
 float[] CalculateVel(float self_pos[3], float target_pos[3], float force)
 {
 	float vecbuffer[3] = {0.0};
 	SubtractVectors(target_pos, self_pos, vecbuffer);
-	NormalizeVector(vecbuffer, vecbuffer);
+	// 目标恰好在正上/正下方时水平分量为零, 归一化会退化成纯垂直向量, 这里直接放弃本次推力
+	if (!AIPathMovement_NormalizeHorizontal(vecbuffer))
+		return vecbuffer;
 	ScaleVector(vecbuffer, force);
 	return vecbuffer;
 }
@@ -735,6 +744,8 @@ bool ClientPush(int client, float vec[3])
 	float curvel[3] = {0.0};
 	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", curvel);
 	AddVectors(curvel, vec, curvel);
+	// 叠加式推速必须封顶, 否则连续连跳会无限累积出“飞天大跳”；先限速再做撞墙/坠落检查, 保证检查与实际速度一致
+	AIPathMovement_ClampHorizontalSpeed(curvel, g_hBhopMaxSpeed.FloatValue);
 	if (Dont_HitWall_Or_Fall(client, curvel))
 	{
 		if (GetVectorLength(curvel) <= 250.0)

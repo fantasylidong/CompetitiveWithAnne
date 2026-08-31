@@ -126,24 +126,18 @@ enum InfectedControlNativeWavePhase
     ICWavePhase_AntiBaitHold
 };
 
-// —— 分散度四件套参数 —— //
+// —— 分散度参数 —— //
 // 硬分散半径/记忆时长已提升为 CVar：inf_spawn_sep_radius / inf_spawn_sep_ttl。
 #define NAV_CD_SECS               1.0    // 成功及普通实际校验失败后的同 Nav 冷却
-#define SECTORS_BASE              6       // 基准
-#define SECTORS_MAX               8       // 动态上限（建议 6~8 之间）
-#define DYN_SECTORS_MIN           3       // 动态下限
 // 可调参数（想热调也能做成 CVar，这里先给常量）
-#define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：正向惩罚略强一点
-#define PEN_LIMIT_SCALE_LO        0.50   // L=20 时：正向惩罚明显减弱
+// 特感上限缩放系数，目前只作用在核密度半径上（见 SpawnMemory_GetEffectiveKernelRadius）。
+// 硬分散半径是固定值，不参与缩放。
+#define PEN_LIMIT_SCALE_HI        1.00   // L=1 时：核半径取满，低特推得开
+#define PEN_LIMIT_SCALE_LO        0.50   // L=16 时：核半径减半，高特只防叠
 #define PEN_LIMIT_MINL            1
 #define PEN_LIMIT_MAXL            16
-
-// === Dispersion tuning (penalties at BASE=4) ===
-#define SECTOR_PREF_BONUS_BASE   -8.0
-#define SECTOR_OFF_PENALTY_BASE   4.0
-#define RECENT_PENALTY_0_BASE     3.6
-#define RECENT_PENALTY_1_BASE     2.4
-#define RECENT_PENALTY_2_BASE     2.0
+// 距任意生还者近于该值的存活特感视为已交战，不再作为核密度源把新刷点往外推。
+#define KERNEL_LIVE_COMBAT_EXCLUDE 400.0
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
@@ -183,7 +177,6 @@ bool g_bTargetLimitLib = false;
 bool g_bInfectedControlStarted = false;
 
 // —— 分散度：最近扇区 & 最近刷点 —— //
-int recentSectors[3] = { -1, -1, -1 };   // 最近 3 次使用的扇区
 ArrayList lastSpawns = null;             // 每条记录 [x,y,z,time]
 
 // —— 死亡CD时间戳 & 最近一次成功刷出 —— //
@@ -234,7 +227,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-19.1",
+    version     = "2026-08-30.1",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -506,7 +499,6 @@ public void OnPluginStart()
 
     // 分散度：初始化
     lastSpawns = new ArrayList(4);
-    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
     // 初始化 Path 缓存
     PathCache_Init();
 
@@ -526,6 +518,7 @@ public void OnPluginStart()
     RegConsoleCmd("sm_neigui", Cmd_Traitor, "进入内鬼刷特队列: sm_neigui [class]");
     RegConsoleCmd("sm_it", Cmd_Traitor, "进入内鬼刷特队列: sm_it [class]");
     RegConsoleCmd("sm_neiguicancel", Cmd_TraitorCancel, "取消内鬼刷特队列");
+    RegConsoleCmd("sm_itcancel", Cmd_TraitorCancel, "取消内鬼刷特队列");
     AddCommandListener(InfectedControl_OnTraitorCvarCommand, "sm_cvar");
 
     RegisterSpawnPerfCommands();
@@ -599,7 +592,6 @@ public void OnMapEnd()
     SpawnAttempts_ResetSearchProgress();
     if (g_NavCooldownUntil != null) g_NavCooldownUntil.Clear();
     if (lastSpawns != null) lastSpawns.Clear();
-    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
 
     g_LastSpawnOkTime = 0.0;
     g_SupportShortageStart = 0.0;
@@ -811,8 +803,6 @@ static void StopAll()
     AntiBait_OnRoundStart();
     WaveDecider_OnRoundStart();
     if (lastSpawns != null) lastSpawns.Clear();
-    recentSectors[0] = recentSectors[1] = recentSectors[2] = -1;
-    ResetWaveSectorSpawnCounts();
     Tactical_ResetSupportGateWaiver();
 
     ResetDeathState();
@@ -1189,6 +1179,11 @@ public void OnEntityCreated(int entity, const char[] classname)
 public void OnEntityDestroyed(int entity)
 {
     Traitor_OnEntityDestroyed(entity);
+}
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
+{
+    return Traitor_OnPlayerRunCmd(client, buttons);
 }
 
 static Action Timer_KickBot(Handle timer, int userid)

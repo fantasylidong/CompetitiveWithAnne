@@ -17,7 +17,10 @@
 #define TARGET_RETREAT_FACTOR   0.5       // 面对手持近战目标 Charger 后跳时, 此时目标若远离 Charger 移动, Charger 后跳速度的减速倍数
 #define MELEE_PRESS_MIN_SPEED   50.0      // 目标朝 Charger 移动速度超过该值时, 视为主动进入近战危险区
 #define MELEE_EMERGENCY_BUFFER  20.0      // 目标距离 Charger 小于 (meleeRange + 这个值) 时, 视为非常危险, 无论目标速度如何都尝试后跳
-#define BAIT_LOST_SIGHT_GRACE   3.0       // 连续丢失目标视野超过该时间才退出 Bait
+#define BAIT_LOST_SIGHT_GRACE           3.0    // 连续丢失目标视野超过该时间才退出 Bait
+#define BAIT_CLAW_HITS_BEFORE_CHARGE    2      // 持枪目标锤得到时, 先锤这么多次再冲锋
+#define BAIT_CLAW_SWING_INTERVAL        0.85   // 单次爪击大约耗时, 用于判断能否连锤两下
+#define BAIT_CLAW_GIVEUP_TIME           2.5    // 锤击尝试超时后改为冲锋, 避免被推打断后一直站着挥空
 
 // =========================================================================
 // State Bait 接近目标时的博弈状态 (dist < g_cvBhopMinDist.FloatValue 时进入 BAIT_STATE)
@@ -37,6 +40,7 @@ stock void RegisterState_Bait() {
 // ============================================================
 stock void StateBait_OnEnter(int client) {
     g_AiChargers[client].m_flLastVisibleTime = GetGameTime();
+    resetBaitClawTracking(client);
     stateLog.debugAll("\n========== Charger (%N) State Bait On Enter ===========", client);
 }
 
@@ -103,11 +107,9 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     // ============================================================
     // 进入博弈状态, 说明距离正常威胁目标距离小于 g_cvBhopMinDist.FloatValue
     // 距离手持近战目标距离小于 melee_range + g_cvMeleeBaitZoneMaxRange.FloatValue
-    // 这时候先阻止冲锋, 并尝试右键挥拳, 若后续满足冲锋条件, 转换到冲锋状态
+    // 先阻止引擎自行冲锋; 持枪目标的锤/撞由后面的威胁处理决定, 不要默认按 IN_ATTACK2
     // ============================================================
-    if (isOnGround)
-        buttons |= IN_ATTACK2;
-    else
+    if (!isOnGround)
         buttons &= ~(IN_ATTACK | IN_ATTACK2);
     setChargerAbilityCooldown(client, 1.0);
 
@@ -157,7 +159,11 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     // 中止转换到 CHARGING STATE, 停留在 BAIT 状态, 持续对目标挥拳
     // ============================================================
     if (isSurvivorPinned(target)) {
-        // stateLog.debugAll("Charger (%N)'s target (%N) is pinned! Suspending charge, melee to it", client, target);
+        if (isOnGround) {
+            buttons |= IN_ATTACK;
+            buttons &= ~IN_ATTACK2;
+            return Plugin_Changed;
+        }
         return Plugin_Continue;
     }
 
@@ -188,7 +194,7 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     } else if (threatType == Threat_Shotgun) {
         resAction = handleShotgunThreat(client, target, dist, visible);
     } else {
-        resAction = handleNonMeleeThreat(client, target, dist, visible);
+        resAction = handleNonMeleeThreat(client, target, dist, visible, buttons, ang);
     }
 
     if (resAction != Plugin_Continue)
@@ -572,56 +578,127 @@ Action handleShotgunThreat(int client, int target, float dist, bool visible) {
 
     stateLog.debugAll("Charger (%N) handling shotgun threat, charging to target (%N), transition to LOCKED STATE", client, target);
     g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
-    return Plugin_Continue;
+    return Plugin_Changed;
 }
 
 /**
-* Charger 面对手持非近战, 非霰弹枪的目标的处理逻辑
-* 1. 目标看着 Charger 时, 直接冲锋
-* 2. 目标处于易受攻击状态, 直接冲锋
-* 3. 目标没有看着 Charger 时, 若血量大于近战斩杀线, 概率冲锋, 小于则直接冲锋
-* @param client 客户端索引
-* @param target 目标索引
-* @param dist 距离
-* @param visible 是否可见目标
-* @return Action
+* Charger 面对手持非近战、非霰弹枪的目标:
+* 100 单位内视为保命中, 不再概率等待。
+* 若当前锤得到、且两锤之内目标还跑不出爪击距离, 先锤两下再撞; 锤不到或两锤来不及, 直接冲。
 **/
-Action handleNonMeleeThreat(int client, int target, float dist, bool visible) {
-    // 能力未准备就绪, 不允许冲锋
+Action handleNonMeleeThreat(int client, int target, float dist, bool visible, int& buttons, float ang[3]) {
     if (!isChargeAbilityReady(client))
         return Plugin_Continue;
-    // 无目标视野, 或距离大于最小连跳允许距离, 不允许冲锋
     if (!visible || dist > g_cvBhopMinDist.FloatValue)
         return Plugin_Continue;
-    // 能力未就绪, 不允许冲锋
-    if (!isChargeAbilityReady(client))
+
+    if (g_AiChargers[client].m_iBaitClawSwings >= BAIT_CLAW_HITS_BEFORE_CHARGE)
+        return beginNonMeleeCharge(client, target, dist, "claw combo finished");
+
+    if (g_AiChargers[client].m_flBaitClawStart > 0.0 &&
+        GetGameTime() - g_AiChargers[client].m_flBaitClawStart >= BAIT_CLAW_GIVEUP_TIME
+    ) {
+        return beginNonMeleeCharge(client, target, dist, "claw combo timed out");
+    }
+
+    static bool inClawRange, canLandTwo;
+    inClawRange = isChargerClawInRange(client, target);
+    canLandTwo = canLandTwoChargerClaws(client, target, dist);
+
+    if (IsClientOnGround(client) &&
+        !L4D_IsPlayerStaggering(client) &&
+        (canLandTwo || (g_AiChargers[client].m_iBaitClawSwings > 0 && inClawRange))
+    ) {
+        return performBaitClaw(client, target, buttons, ang);
+    }
+
+    if (L4D_IsPlayerStaggering(client))
         return Plugin_Continue;
 
-    // 目标转头看到 Charger 时立即冲锋, 避免继续停留在概率博弈。
-    if (isTargetWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue)) {
-        stateLog.debugAll("Charger (%N) handling non-melee threat: target (%N) is watching, charging", client, target);
-        g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
-        return Plugin_Continue;
+    return beginNonMeleeCharge(client, target, dist, "non-melee guaranteed range");
+}
+
+void resetBaitClawTracking(int client) {
+    g_AiChargers[client].m_iBaitClawSwings = 0;
+    g_AiChargers[client].m_flBaitClawStart = 0.0;
+
+    static int claw;
+    claw = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+    if (claw > 0 && IsValidEdict(claw) && HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack"))
+        g_AiChargers[client].m_flLastClawNextAttack = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
+    else
+        g_AiChargers[client].m_flLastClawNextAttack = 0.0;
+}
+
+bool canLandTwoChargerClaws(int client, int target, float dist) {
+    if (!IsClientOnGround(client) || L4D_IsPlayerStaggering(client))
+        return false;
+    if (!isChargerClawInRange(client, target))
+        return false;
+
+    static float pos[3], targetPos[3], targetVel[3], awayDir[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+    GetEntPropVector(target, Prop_Data, "m_vecAbsVelocity", targetVel);
+    targetVel[2] = 0.0;
+
+    MakeVectorFromPoints(pos, targetPos, awayDir);
+    awayDir[2] = 0.0;
+    if (NormalizeVector(awayDir, awayDir) <= 0.0)
+        return true;
+
+    static float fleeSpeed, predictedDist;
+    fleeSpeed = GetVectorDotProduct(targetVel, awayDir);
+    if (fleeSpeed < 0.0)
+        fleeSpeed = 0.0;
+
+    predictedDist = dist + fleeSpeed * (BAIT_CLAW_SWING_INTERVAL * float(BAIT_CLAW_HITS_BEFORE_CHARGE));
+    return predictedDist <= getChargerClawRange();
+}
+
+void noteBaitClawSwing(int client) {
+    static int claw;
+    claw = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+    if (claw <= 0 || !IsValidEdict(claw) || !HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack"))
+        return;
+
+    static float nextAttack, last;
+    nextAttack = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
+    last = g_AiChargers[client].m_flLastClawNextAttack;
+    if (last > 0.0 && nextAttack > last + 0.05) {
+        g_AiChargers[client].m_iBaitClawSwings++;
+        stateLog.debugAll("Charger (%N) bait claw swing %d/%d",
+            client, g_AiChargers[client].m_iBaitClawSwings, BAIT_CLAW_HITS_BEFORE_CHARGE);
+    }
+    g_AiChargers[client].m_flLastClawNextAttack = nextAttack;
+}
+
+Action performBaitClaw(int client, int target, int& buttons, float ang[3]) {
+    if (g_AiChargers[client].m_flBaitClawStart <= 0.0)
+        g_AiChargers[client].m_flBaitClawStart = GetGameTime();
+
+    static float pos[3], targetPos[3], dir[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+    MakeVectorFromPoints(pos, targetPos, dir);
+    dir[2] = 0.0;
+    if (NormalizeVector(dir, dir) > 0.0) {
+        GetVectorAngles(dir, ang);
+        TeleportEntity(client, NULL_VECTOR, ang, NULL_VECTOR);
     }
 
-    // 如果目标处于易受攻击状态, 直接冲锋
-    if (isTargetVulnerable(client, target)) {
-        stateLog.debugAll("Charger (%N) handling non-melee threat: target (%N) vulnerable, charging", client, target);
-        g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
-        return Plugin_Continue;
-    }
-    // 血量条件
-    static int health, meleeDamageCharger;
-    health = GetEntProp(client, Prop_Data, "m_iHealth");
-    meleeDamageCharger = getLegacyMeleeDamage();
-    if (health > meleeDamageCharger && isChargerProbCharge(client)) {
-        stateLog.debugAll("Charger (%N) handling non-melee: health %d > melee damage charger %d, probabilistic charge to (%N)", client, health, meleeDamageCharger, target);
-        g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
-    } else if (health <= meleeDamageCharger) {
-        stateLog.debugAll("Charger (%N) handling non-melee: health %d <= melee damage charger %d, instant charge to (%N)", client, health, meleeDamageCharger, target);
-        g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
-    }
-    return Plugin_Continue;
+    buttons |= IN_ATTACK;
+    buttons &= ~IN_ATTACK2;
+    setChargerAbilityCooldown(client, 1.0);
+    noteBaitClawSwing(client);
+    return Plugin_Changed;
+}
+
+Action beginNonMeleeCharge(int client, int target, float dist, const char[] reason) {
+    stateLog.debugAll("Charger (%N) %s, charging (%N) dist %.2f, transition to LOCKED STATE",
+        client, reason, target, dist);
+    g_ChargerStateContext[client].transitionTo(CH_STATE_LOCKED);
+    return Plugin_Changed;
 }
 
 // ============================================================

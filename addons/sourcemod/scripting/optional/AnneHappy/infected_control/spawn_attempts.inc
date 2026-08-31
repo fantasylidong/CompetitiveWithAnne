@@ -347,8 +347,7 @@ static void SpawnAttempts_CommitSpawn(
     actualPos[2] = requestedPos[2];
     GetClientAbsOrigin(client, actualPos);
 
-    SpawnAttempts_RememberActualSpawn(
-        client, requestedPos, targetSurvivor);
+    SpawnAttempts_RememberActualSpawn(client, requestedPos);
     TeleportState_StampSpawn(client, "spawn_commit");
     g_LastSpawnOkTime = now;
     InvalidateBucketShareCache();
@@ -397,8 +396,7 @@ static void SpawnAttempts_CommitSpawn(
 }
 
 static void SpawnAttempts_RememberActualSpawn(int client,
-                                              const float requestedPos[3],
-                                              int targetSurvivor)
+                                              const float requestedPos[3])
 {
     float actualPos[3];
     actualPos[0] = requestedPos[0];
@@ -407,13 +405,7 @@ static void SpawnAttempts_RememberActualSpawn(int client,
     if (client > 0 && client <= MaxClients && IsClientInGame(client))
         GetClientAbsOrigin(client, actualPos);
 
-    float center[3];
-    GetSectorCenter(center, targetSurvivor);
-    RememberSpawn(actualPos, center);
-    // 波内扇区配额按实际落点统计；导演兜底路径也计入，
-    // 避免兜底刷出绕过方向配额。
-    MarkWaveSectorSpawned(
-        ComputeSectorIndex(center, actualPos, GetCurrentSectors()));
+    RememberSpawn(actualPos);
 }
 
 static bool SelectTacticalNormalQueueHead(int &want)
@@ -851,7 +843,7 @@ void TryNormalSpawnOnce()
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, searchTarget, minRange, maxRange,
-            graphScanMinRange, false, band, pos, areaIdx, bestDbg);
+            graphScanMinRange, false, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingNormalClass(want);
@@ -1036,7 +1028,7 @@ void TryTeleportSpawnOnce()
         SpawnScoreDbg bestDbg;
         SpawnSearchResult searchResult = FindSpawnPosViaNavAreaStep(
             want, teleportTarget, minRange, maxRange,
-            graphScanMinRange, true, band, pos, areaIdx, bestDbg);
+            graphScanMinRange, true, pos, areaIdx, bestDbg);
         if (searchResult == SpawnSearch_Pending)
         {
             SpawnAttempts_RotatePendingTeleportClass(want);

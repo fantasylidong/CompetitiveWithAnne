@@ -223,6 +223,10 @@ native bool SteamWorks_IsConnected();
 native bool SteamWorks_SetRule(const char[] sKey, const char[] sValue);
 native bool SteamWorks_ClearRules();
 native bool SteamWorks_ForceHeartbeat();
+/* Anne addition: toggle Steam master server advertisement
+ * (ISteamGameServer::EnableHeartbeats). Requires the Anne build of
+ * SteamWorks.ext.so; probe with GetFeatureStatus before relying on it. */
+native bool SteamWorks_SetServerListed(bool listed);
 native bool SteamWorks_GetUserGroupStatus(int client, int groupid);
 native bool SteamWorks_GetUserGroupStatusAuthID(int authid, int groupid);
 
@@ -338,6 +342,7 @@ public void __ext_SteamWorks_SetNTVOptional()
 	MarkNativeAsOptional("SteamWorks_SetRule");
 	MarkNativeAsOptional("SteamWorks_ClearRules");
 	MarkNativeAsOptional("SteamWorks_ForceHeartbeat");
+	MarkNativeAsOptional("SteamWorks_SetServerListed");
 	MarkNativeAsOptional("SteamWorks_GetUserGroupStatus");
 	MarkNativeAsOptional("SteamWorks_GetUserGroupStatusAuthID");
 

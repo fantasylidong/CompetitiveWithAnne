@@ -1,0 +1,35 @@
+"Phrases"
+{
+	"AnneRedirect_ChatPrompt"
+	{
+		"chi"		"[Anne] 这个入口服只负责进服分流，请按 F1 转到真实游戏服：%s"
+	}
+	"AnneRedirect_ChatBindHint"
+	{
+		"chi"		"[Anne] 如果 F1 没反应，请在控制台输入：bind F1 \"askconnect_accept; Vote Yes\""
+	}
+	"AnneRedirect_HintPrompt"
+	{
+		"chi"		"按 F1 转到真实游戏服"
+	}
+	"AnneRedirect_ChatPromptDirect"
+	{
+		"chi"		"[Anne] 如果你不是移动用户，建议直接连接真实游戏服：%s"
+	}
+	"AnneRedirect_HintPromptDirect"
+	{
+		"chi"		"非移动用户建议直接连接，按 F1 确认"
+	}
+	"AnneRedirect_ReloadRequested"
+	{
+		"chi"		"[AnneRedirect] 已请求重新加载目标服务器。"
+	}
+	"AnneRedirect_ClientOnly"
+	{
+		"chi"		"[AnneRedirect] 这个命令需要在游戏内真人客户端执行。"
+	}
+	"AnneRedirect_TargetNotReady"
+	{
+		"chi"		"[AnneRedirect] 转服目标尚未准备好。"
+	}
+}

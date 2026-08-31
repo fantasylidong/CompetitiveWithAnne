@@ -42,6 +42,7 @@ public void __pl_target_override_SetNTVOptional()
 	MarkNativeAsOptional("L4D_TargetOverride_GetValue");
 	MarkNativeAsOptional("L4D_TargetOverride_GetTargetedCap");
 	MarkNativeAsOptional("L4D_TargetOverride_SetTargetedCap");
+	MarkNativeAsOptional("L4D_TargetOverride_SetLastVictim");
 }
 #endif
 
@@ -82,8 +83,9 @@ enum TARGET_OPTION_INDEX
 	INDEX_WAIT		= 6,	// (float)	- "wait"
 	INDEX_LAST		= 7,	// (int)	- "last"
 	INDEX_TIME		= 8,	// (float)	- "time"
-	INDEX_SAFE		= 9,	// (int)	- "safe"
-	INDEX_TARGETED	= 10,	// (int)	- "targeted"
+	INDEX_SAFE			= 9,	// (int)	- "safe"
+	INDEX_TARGETED		= 10,	// (int)	- "targeted"
+	INDEX_TARGETED_MASK	= 11,	// (int)	- bit mask of SI classes counted toward "targeted" (0 = all)
 }
 
 
@@ -162,3 +164,17 @@ native int L4D_TargetOverride_GetTargetedCap(int client);
 * @noreturn
 */
 native void L4D_TargetOverride_SetTargetedCap(int client, int cap);
+
+
+
+/**
+* @brief Registers a Special Infected's current victim in the "targeted" ledger
+* @notes For AI plugins that rewrite targets through the Left4DHooks "L4D2_OnChooseVictim" forward,
+*        so both targeting channels share one consistent per-survivor targeted count.
+*
+* @param	attacker		The Special Infected client index
+* @param	victim			The chosen Survivor client index (0 = clear)
+*
+* @noreturn
+*/
+native void L4D_TargetOverride_SetLastVictim(int attacker, int victim);
