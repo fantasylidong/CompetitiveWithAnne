@@ -477,7 +477,7 @@ Action ToggleTankHudCmd(int client, int args)
 	if (!IsValidClientIndex(client) || !IsClientInGame(client))
 		return Plugin_Handled;
 	
-	if (GetClientTeam(client) == L4D2Team_Survivor && !bVersusCoopMode)
+	if (GetClientTeam(client) == L4D2Team_Survivor)
 		return Plugin_Handled;
 	
 	bTankHudActive[client] = !bTankHudActive[client];
@@ -526,12 +526,6 @@ Action HudDrawTimer(Handle hTimer)
 				if (bTankHudActive[i])
 					tankHud_clients[tankHud_total++] = i;
 			}
-			case L4D2Team_Survivor:
-			{
-				if (bVersusCoopMode && bTankHudActive[i])
-					tankHud_clients[tankHud_total++] = i;
-			}
-
 		}
 	}
 	
