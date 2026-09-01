@@ -160,8 +160,9 @@ stock Action StateBait_OnUpdate(int client, int& buttons, float vel[3], float an
     // ============================================================
     if (isSurvivorPinned(target)) {
         if (isOnGround) {
-            buttons |= IN_ATTACK;
-            buttons &= ~IN_ATTACK2;
+            // Charger 挥拳是 IN_ATTACK2, IN_ATTACK 是冲锋能力
+            buttons |= IN_ATTACK2;
+            buttons &= ~IN_ATTACK;
             return Plugin_Changed;
         }
         return Plugin_Continue;
@@ -566,14 +567,9 @@ Action performBackwardBhop(int client, int target, bool visible, int& buttons, f
 * @return Action
 **/
 Action handleShotgunThreat(int client, int target, float dist, bool visible) {
-    // 能力未就绪, 不允许冲锋
     if (!isChargeAbilityReady(client))
         return Plugin_Continue;
-    // 无目标视野, 或者距离大于 bhopMinDist, 不允许冲锋
     if (!visible || dist > g_cvBhopMinDist.FloatValue)
-        return Plugin_Continue;
-    // 能力未就绪, 不允许冲锋
-    if (!isChargeAbilityReady(client))
         return Plugin_Continue;
 
     stateLog.debugAll("Charger (%N) handling shotgun threat, charging to target (%N), transition to LOCKED STATE", client, target);
@@ -583,8 +579,9 @@ Action handleShotgunThreat(int client, int target, float dist, bool visible) {
 
 /**
 * Charger 面对手持非近战、非霰弹枪的目标:
-* 100 单位内视为保命中, 不再概率等待。
-* 若当前锤得到、且两锤之内目标还跑不出爪击距离, 先锤两下再撞; 锤不到或两锤来不及, 直接冲。
+* 进入 bhopMinDist 后不再概率等待。
+* 正面被盯着、残血、或目标出现换弹/推 CD 窗口时直接冲;
+* 否则爪击距离内、且下一锤之内目标还跑不掉, 先锤两下再撞。
 **/
 Action handleNonMeleeThreat(int client, int target, float dist, bool visible, int& buttons, float ang[3]) {
     if (!isChargeAbilityReady(client))
@@ -601,21 +598,54 @@ Action handleNonMeleeThreat(int client, int target, float dist, bool visible, in
         return beginNonMeleeCharge(client, target, dist, "claw combo timed out");
     }
 
-    static bool inClawRange, canLandTwo;
+    static bool inClawRange, midCombo, onGround, staggering;
     inClawRange = isChargerClawInRange(client, target);
-    canLandTwo = canLandTwoChargerClaws(client, target, dist);
+    midCombo = g_AiChargers[client].m_iBaitClawSwings > 0;
+    onGround = IsClientOnGround(client);
+    staggering = L4D_IsPlayerStaggering(client);
 
-    if (IsClientOnGround(client) &&
-        !L4D_IsPlayerStaggering(client) &&
-        (canLandTwo || (g_AiChargers[client].m_iBaitClawSwings > 0 && inClawRange))
-    ) {
+    // 已经挥出第一锤则打完组合, 不被注视/残血门槛打断
+    if (onGround && !staggering && midCombo && inClawRange)
         return performBaitClaw(client, target, buttons, ang);
+
+    if (!midCombo) {
+        if (isTargetWatchingCharger(client, target, g_cvTargetWatchMaxDeg.FloatValue))
+            return beginNonMeleeCharge(client, target, dist, "target watching");
+
+        if (GetEntProp(client, Prop_Data, "m_iHealth") <= getLegacyMeleeDamage())
+            return beginNonMeleeCharge(client, target, dist, "low health");
+
+        if (hasNonMeleeChargeWindow(target))
+            return beginNonMeleeCharge(client, target, dist, "target window");
     }
 
-    if (L4D_IsPlayerStaggering(client))
+    if (onGround && !staggering && canLandTwoChargerClaws(client, target, dist, getChargerClawRange()))
+        return performBaitClaw(client, target, buttons, ang);
+
+    if (staggering)
         return Plugin_Continue;
 
     return beginNonMeleeCharge(client, target, dist, "non-melee guaranteed range");
+}
+
+bool hasNonMeleeChargeWindow(int target) {
+    static int weapon;
+    weapon = GetEntPropEnt(target, Prop_Send, "m_hActiveWeapon");
+    if (!IsValidEntity(weapon))
+        return true;
+
+    if (HasEntProp(weapon, Prop_Send, "m_bInReload") &&
+        view_as<bool>(GetEntProp(weapon, Prop_Send, "m_bInReload")))
+        return true;
+
+    static float now;
+    now = GetGameTime();
+    if (GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack") > now + 0.5)
+        return true;
+    if (GetEntPropFloat(target, Prop_Send, "m_flNextShoveTime") > now + 0.5)
+        return true;
+
+    return false;
 }
 
 void resetBaitClawTracking(int client) {
@@ -624,21 +654,25 @@ void resetBaitClawTracking(int client) {
 
     static int claw;
     claw = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-    if (claw > 0 && IsValidEdict(claw) && HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack"))
+    if (claw > 0 && IsValidEdict(claw) && HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack")) {
         g_AiChargers[client].m_flLastClawNextAttack = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
-    else
+        g_AiChargers[client].m_bBaitClawBaselineValid = true;
+    } else {
         g_AiChargers[client].m_flLastClawNextAttack = 0.0;
+        g_AiChargers[client].m_bBaitClawBaselineValid = false;
+    }
 }
 
-bool canLandTwoChargerClaws(int client, int target, float dist) {
+bool canLandTwoChargerClaws(int client, int target, float dist, float clawRange) {
     if (!IsClientOnGround(client) || L4D_IsPlayerStaggering(client))
-        return false;
-    if (!isChargerClawInRange(client, target))
         return false;
 
     static float pos[3], targetPos[3], targetVel[3], awayDir[3];
     GetClientAbsOrigin(client, pos);
     GetClientAbsOrigin(target, targetPos);
+    if (GetVectorDistance(pos, targetPos) > clawRange)
+        return false;
+
     GetEntPropVector(target, Prop_Data, "m_vecAbsVelocity", targetVel);
     targetVel[2] = 0.0;
 
@@ -647,30 +681,37 @@ bool canLandTwoChargerClaws(int client, int target, float dist) {
     if (NormalizeVector(awayDir, awayDir) <= 0.0)
         return true;
 
-    static float fleeSpeed, predictedDist;
+    static float fleeSpeed, predictedDist, waitTime;
     fleeSpeed = GetVectorDotProduct(targetVel, awayDir);
     if (fleeSpeed < 0.0)
         fleeSpeed = 0.0;
 
-    predictedDist = dist + fleeSpeed * (BAIT_CLAW_SWING_INTERVAL * float(BAIT_CLAW_HITS_BEFORE_CHARGE));
-    return predictedDist <= getChargerClawRange();
+    // 第一锤立刻出手, 只预测打完剩余锤所需时间
+    waitTime = BAIT_CLAW_SWING_INTERVAL * float(BAIT_CLAW_HITS_BEFORE_CHARGE - 1);
+    if (waitTime < 0.0)
+        waitTime = 0.0;
+    predictedDist = dist + fleeSpeed * waitTime;
+    return predictedDist <= clawRange;
 }
 
 void noteBaitClawSwing(int client) {
     static int claw;
     claw = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-    if (claw <= 0 || !IsValidEdict(claw) || !HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack"))
+    if (claw <= 0 || !IsValidEdict(claw) || !HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack")) {
+        g_AiChargers[client].m_bBaitClawBaselineValid = false;
         return;
+    }
 
     static float nextAttack, last;
     nextAttack = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
     last = g_AiChargers[client].m_flLastClawNextAttack;
-    if (last > 0.0 && nextAttack > last + 0.05) {
+    if (g_AiChargers[client].m_bBaitClawBaselineValid && nextAttack > last + 0.05) {
         g_AiChargers[client].m_iBaitClawSwings++;
         stateLog.debugAll("Charger (%N) bait claw swing %d/%d",
             client, g_AiChargers[client].m_iBaitClawSwings, BAIT_CLAW_HITS_BEFORE_CHARGE);
     }
     g_AiChargers[client].m_flLastClawNextAttack = nextAttack;
+    g_AiChargers[client].m_bBaitClawBaselineValid = true;
 }
 
 Action performBaitClaw(int client, int target, int& buttons, float ang[3]) {
@@ -687,8 +728,8 @@ Action performBaitClaw(int client, int target, int& buttons, float ang[3]) {
         TeleportEntity(client, NULL_VECTOR, ang, NULL_VECTOR);
     }
 
-    buttons |= IN_ATTACK;
-    buttons &= ~IN_ATTACK2;
+    buttons |= IN_ATTACK2;
+    buttons &= ~IN_ATTACK;
     setChargerAbilityCooldown(client, 1.0);
     noteBaitClawSwing(client);
     return Plugin_Changed;

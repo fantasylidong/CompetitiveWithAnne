@@ -97,7 +97,7 @@ public void OnPluginStart()
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳速度", CVAR_FLAG, true, 0.0);
-	// 默认值与 Charger 上限(ai_charger3_bhop_max_speed 默认 800)保持 +200 的关系, 动态难度每档同样按 charger+200 配置
+	// Boomer 使用独立的水平速度上限；动态难度按本职业六档值配置，不再与 Charger 上限联动
 	g_hBhopMaxSpeed = CreateConVar("ai_BoomerBhopMaxSpeed", "1000.0", "Boomer 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_BoomerBhopStartDistance", "2500.0", "Boomer 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hJumpVomit = CreateConVar("ai_BoomerJumpVomit", "0", "是否允许 Boomer 已在空中时主动喷吐；不额外强制起跳，原连跳逻辑照常", CVAR_FLAG, true, 0.0, true, 1.0);

@@ -18,7 +18,9 @@
 #define CHARGE_DIST_TOLERANCE                   10.0    // 开始冲锋距离容差, 500 速度冲锋目标无法躲避距离大概是 36 左右, 有点小, 导致 charger 一直连跳无法冲锋, 增加一点容差
 
 #define CHARGE_COMMIT_MIN_DIST                   36.0   // 按照 500 速度冲锋时, 允许冲锋的最小距离
-#define CHARGE_COMMIT_MAX_DIST                   95.0   // 近战目标运动学模型允许冲锋的最大距离; 持枪目标另用 bhop_min_dist 保命中区
+#define CHARGE_COMMIT_MAX_DIST                   95.0   // 近战目标运动学模型允许冲锋的最大距离; 持枪目标另用保命中下限
+#define CHARGE_GUARANTEED_MAX_DIST              110.0   // 持枪保命中下限上限, 避免 bhop_min_dist 被调大后在 200+ 开冲
+#define CHARGE_GUARANTEED_SIDE_MAX              150.0   // 横向速度超过该值时不再抬保命中下限, 避免侧移目标被 100 距离硬撞落空
 #define CHARGE_HIT_WIDTH                         16.0   // 冲锋命中宽度, 目标左右水平移动不超过这个范围可以被冲锋命中
 #define CHARGE_SIDE_SPEED_MIN                    80.0   // 生还者横向移动速度假设的最小值 (由于计算 commitDist 时需要使用横向速度做除法, 防止除零异常, 设置一个最小值)
 #define CHARGE_SPEED_EFFECTIVE_FACTOR            0.75   // 计算有效冲锋速度的因子 effective charge speed = max charge speed * factor
@@ -521,21 +523,40 @@ stock bool resolveChargeCommitDist(const float pos[3], const float targetPos[3],
         return motionOk;
 
     /*
-    * 持枪/霰弹在 bhop_min_dist (默认 100) 内视为保命中: 500 速度冲锋这段距离基本躲不开
-    * 运动学模型把上限压在 95, 再叠加横向速度后经常只有 36-85, 会在贴脸后反复退回 Approach
+    * 持枪/霰弹贴脸后, 运动学模型常把 commit 压到 36-85, 而 Bait 在 bhop_min_dist 就锁定,
+    * 两边标准不一致会反复退回 Approach。只在横向逃逸不快时抬下限;
+    * 高速侧移仍走模型距离, 避免 100 单位硬撞落空。
     */
-    static float guaranteedDist;
+    static float guaranteedDist, absSideSpeed;
     guaranteedDist = g_cvBhopMinDist.FloatValue;
+    if (guaranteedDist > CHARGE_GUARANTEED_MAX_DIST)
+        guaranteedDist = CHARGE_GUARANTEED_MAX_DIST;
+
     if (motionOk) {
-        if (commitDist < guaranteedDist)
+        absSideSpeed = getChargeAbsSideSpeed(pos, targetPos, targetVel);
+        if (commitDist < guaranteedDist && absSideSpeed < CHARGE_GUARANTEED_SIDE_MAX)
             commitDist = guaranteedDist;
         return true;
     }
-    if (dist <= guaranteedDist && isChargeHeightReachable(pos, targetPos)) {
-        commitDist = guaranteedDist;
+
+    // 运动学失败且几乎贴脸时才兜底, 目标正在高速逃逸时不要硬冲
+    if (dist <= CHARGE_DIR_EPSILON && isChargeHeightReachable(pos, targetPos)) {
+        commitDist = CHARGE_COMMIT_MIN_DIST;
         return true;
     }
     return false;
+}
+
+stock float getChargeAbsSideSpeed(const float pos[3], const float targetPos[3], const float targetVel[3]) {
+    static float forwardDir[3], sideDir[3];
+    MakeVectorFromPoints(pos, targetPos, forwardDir);
+    forwardDir[2] = 0.0;
+    if (NormalizeVector(forwardDir, forwardDir) <= 0.0)
+        return 0.0;
+
+    GetVectorCrossProduct(forwardDir, {0.0, 0.0, 1.0}, sideDir);
+    NormalizeVector(sideDir, sideDir);
+    return FloatAbs(targetVel[0] * sideDir[0] + targetVel[1] * sideDir[1]);
 }
 
 /**

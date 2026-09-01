@@ -23,7 +23,7 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.6",
+		version 		= "3.0.7",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -38,6 +38,7 @@ ConVar
 	g_hTargetPolicy,
 	g_hPinnedPriority,
 	g_hKilledAfterSpit,
+	g_hAirSpit,
 	g_hSpitRange;
 float
 	clientDelay[MAXPLAYERS + 1][8];
@@ -60,7 +61,6 @@ public void OnPluginStart()
 {
 	g_hAllowBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启 Spitter 连跳功能", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳的速度", CVAR_FLAG, true, 0.0);
-	// 默认值与 Charger 上限(ai_charger3_bhop_max_speed 默认 800)保持 +200 的关系, 动态难度每档同样按 charger+200 配置
 	g_hBhopMaxSpeed = CreateConVar("ai_SpitterBhopMaxSpeed", "1000.0", "Spitter 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_SpitterBhopStartDistance", "2500.0", "Spitter 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hPathBhop = CreateConVar("ai_spitter3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -69,6 +69,7 @@ public void OnPluginStart()
 	g_hTargetPolicy = CreateConVar("ai_SpitterTarget", "3", "Spitter 目标选择：1=默认 2=最近 3=被控优先，否则第一个生还 4=人多处", CVAR_FLAG, true, 1.0, true, 4.0);
 	g_hPinnedPriority = CreateConVar("ai_SpitterPinnedPr", "6,3,1,5", "被控目标优先级（被控特感编号，逗号分隔）", CVAR_FLAG);
 	g_hKilledAfterSpit = CreateConVar("ai_SpiiterDieAfterSpit", "0", "是否开启 Spitter 吐完痰后处死功能", CVAR_FLAG, true, 0.0, true, 1.0);
+	g_hAirSpit = CreateConVar("ai_spitter3_air_spit", "0", "是否允许 AI Spitter 空中吐痰, 0=禁止, 1=允许", CVAR_FLAG, true, 0.0, true, 1.0);
 	// HookEvent
 	HookEvent("ability_use", abilityUseHandler);
 	// AddChangeHook
@@ -135,21 +136,36 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	targetDist = GetClosetSurvivorDistance(spitter);
 	if (buttons & (IN_ATTACK | IN_ATTACK2))
 		AIPathMovement_Reset(spitter);
+	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
 	if (GetEntityMoveType(spitter) & MOVETYPE_LADDER)
 	{
 		AIPathMovement_Reset(spitter);
 		buttons &= ~IN_JUMP;
 		buttons &= ~IN_DUCK;
+		if (!g_hAirSpit.BoolValue && !onGround && (buttons & IN_ATTACK))
+			buttons &= ~IN_ATTACK;
 		return Plugin_Changed;
 	}
-	if ((buttons & IN_ATTACK) && delayExpired(spitter, 0, SPITTER_JUMP_DELAY))
+	if (buttons & IN_ATTACK)
 	{
-		AIPathMovement_Reset(spitter);
-		delayStart(spitter, 0);
-		buttons |= IN_JUMP;
-		return Plugin_Changed;
+		if (!g_hAirSpit.BoolValue)
+		{
+			if (!onGround)
+			{
+				buttons &= ~IN_ATTACK;
+				return Plugin_Changed;
+			}
+			buttons &= ~(IN_JUMP | IN_DUCK);
+			return Plugin_Changed;
+		}
+		if (delayExpired(spitter, 0, SPITTER_JUMP_DELAY))
+		{
+			AIPathMovement_Reset(spitter);
+			delayStart(spitter, 0);
+			buttons |= IN_JUMP;
+			return Plugin_Changed;
+		}
 	}
-	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
 	if (!onGround)
 	{
 		if (AIPathMovement_IsPathHopActive(spitter))

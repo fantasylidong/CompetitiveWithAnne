@@ -67,6 +67,7 @@ ConVar
 	g_cvAirVecModifyInterval,	// 空中平滑转向达到配置插值强度的基准时间
 	g_cvAirVecModifyLerp,		// 空中速度修正转向插值因子
 	g_cvAirTurnSpeedLoss,		// 空中实际转向 90 度时损失的水平速度比例
+	g_cvAirSpeedFloorRatio,		// 空中方向修正使用的起跳保存速度下限比例
 	g_cvBaitMaxDuration,		// charger 进入博弈状态的最长时间
 	g_cvProbChargeChkDur,		// 概率冲锋时的检测间隔
 	g_cvProbChargeProb,			// 概率冲锋的概率到达这个数值可冲锋
@@ -189,6 +190,7 @@ enum struct AiCharger {
 	float m_flPathWaitStart;			// Charger 开始等待下一次 RePath 的时间
 	float m_flLastPathInvalidateTime;	// Charger 上次 Path 人为失效时间
 	int m_iBaitClawSwings;				// 持枪博弈中已挥出的锤击次数
+	bool m_bBaitClawBaselineValid;		// 是否已经取得有效的爪击时间基线
 	float m_flLastClawNextAttack;		// 上次读到的爪击 m_flNextPrimaryAttack, 用于检测新挥击
 	float m_flBaitClawStart;			// 开始尝试锤击的时间, 超时则改为冲锋
 
@@ -209,6 +211,7 @@ enum struct AiCharger {
 		this.m_flPathWaitStart = -1.0;
 		this.m_flLastPathInvalidateTime = -1.0;
 		this.m_iBaitClawSwings = 0;
+		this.m_bBaitClawBaselineValid = false;
 		this.m_flLastClawNextAttack = 0.0;
 		this.m_flBaitClawStart = 0.0;
 		this.m_bPathSnapshotComplete = false;

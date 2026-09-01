@@ -160,19 +160,30 @@ stock bool isChargerCharging(int client) {
 // 否则首次调用若早于武器脚本装载, 兜底值会被锁死到进程结束。
 static bool g_bClawRangeCached = false;
 static float g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+static int g_iClawRangeRetries = 0;
+static float g_flNextClawRangeRetry = 0.0;
 
 stock void resetChargerClawRangeCache() {
     g_bClawRangeCached = false;
     g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+    g_iClawRangeRetries = 0;
+    g_flNextClawRangeRetry = 0.0;
 }
 
 stock float getChargerClawRange() {
     if (g_bClawRangeCached)
         return g_flClawRange;
 
+    float now = GetGameTime();
+    if (g_iClawRangeRetries >= 3 || now < g_flNextClawRangeRetry)
+        return DEFAULT_CHARGER_CLAW_RANGE;
+
     float range = L4D2_GetFloatWeaponAttribute("weapon_charger_claw", L4D2FWA_Range);
-    if (range < 40.0 || range > 90.0)
-        return DEFAULT_CHARGER_CLAW_RANGE;  // 表还没装载好, 这次先用兜底值, 不写缓存
+    if (range <= 0.0) {
+        g_iClawRangeRetries++;
+        g_flNextClawRangeRetry = now + 1.0;
+        return DEFAULT_CHARGER_CLAW_RANGE;
+    }
 
     g_flClawRange = range;
     g_bClawRangeCached = true;

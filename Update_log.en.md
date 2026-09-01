@@ -317,3 +317,18 @@
 - Deduplicated `.gitignore` and dropped the nine explicit paths already covered by `/test_results`.
 - Added the missing jp / ko / vi translations for `anne_server_redirect`, matching the six-language coverage of the other Anne plugins.
 - Documentation corrections: the two dispersion bullets in `README_SPAWN_ARCHITECTURE.md`; the reaction-time row, Tank row and the two new bhop-cap cvars in `annehappy_dynamic_ai_difficulty.md`; and the four places in `ai_charger3/readme.md` still describing the probabilistic charge. Also corrected the Charger bhop speeds in the tier table (the doc said 45/60/75/90/150; the config is 40/50/60/70/100).
+
+### 2026-09-01 2026-08 AI balance adjustments
+
+- Upgraded `ai_charger3` to 1.0.1.10. Added the Charger-only cvar `ai_charger3_air_speed_floor_ratio` (default 0.50): Path / Direct takeoff now registers air-correction hopSpeed as actual takeoff speed times this ratio, while `m_flLastHopSpeed` still stores the real takeoff speed.
+- Nerfed Charger across the six dynamic AI difficulty tiers: impulse 30/40/50/60/80/100, cap 400/400/400/500/700/700, air lerp 0.10/0.15/0.20/0.25/0.30/0.40, turn speed loss 0.50/0.39/0.325/0.26/0.195/0.13, speed-floor ratio 0.50/0.60/0.65/0.70/0.80/0.80. Easy uses the existing hard cap of 0.50 for turn speed loss.
+- Upgraded `ai_spitter_3` to 3.0.7. Added `ai_spitter3_air_spit` (default 0): only Extreme and Neri set it to 1, allowing AI Spitters to spit in the air. Easy through Expert forbid airborne spits; ground spits still work and are not hopped by the plugin. Player Spitters are not restricted.
+- Smoker `tongue_fly_speed` is now explicitly 1000 on all six tiers (Extreme/Neri lowered from 1200).
+- Recompiled: `ai_charger3.smx`, `ai_spitter_3.smx`.
+
+### 2026-09-01 Charger claw-combo button and bait fixes
+- Upgraded `ai_charger3` to 1.0.1.11. Close-range claws and punching a pinned victim now use `IN_ATTACK2` again (primary attack is the charge ability). The previous `IN_ATTACK` press left the Charger idle for up to 2.5 seconds without landing a hit.
+- The gun-target claw combo now starts only when the survivor is not looking at the Charger, the Charger is above the melee-kill health line, and the survivor is not reloading or on shove cooldown, so a 500-HP Charger no longer stands still in front of a gun.
+- Two-hit prediction now uses only the 0.85s window for the second swing. The guaranteed charge floor is capped at 110 and is not raised when lateral speed is ≥ 150.
+- Claw counting now tracks whether a valid `m_flNextPrimaryAttack` baseline exists, so an initial value of 0 or a temporarily unavailable claw weapon no longer loses the first swing. Failed claw-range loads retry at most three times per map with a delay, avoiding per-frame native calls and Left4DHooks error-log spam.
+- Recompiled: `ai_charger3.smx`.

@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.9",
+	version 		= "1.0.1.11",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -90,6 +90,7 @@ public void OnPluginStart() {
 	g_cvAirVecModifyLerp = CreateConVar("_ai_charger3_airvec_modify_lerp", "0.3", "空中速度方向修正的修正插值因子, 0.1~1.0, 越小转向越平滑, 但是需要更多的帧数, 越大转向越锐利, 需要较少的帧数就可以完成空中转向", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// Horizontal speed loss per 90 degrees of actual in-air turning
 	g_cvAirTurnSpeedLoss = CreateConVar("ai_charger3_air_turn_speed_loss", "0.12", "空中实际转向 90 度时损失的水平速度比例", CVAR_FLAGS, true, 0.0, true, 0.5);
+	g_cvAirSpeedFloorRatio = CreateConVar("ai_charger3_air_speed_floor_ratio", "0.50", "空中方向修正使用的起跳保存速度下限比例", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// the maximum allowed duration (in seconds) for charger to stay in the bait state
 	g_cvBaitMaxDuration = CreateConVar("ai_charger3_bait_max_duration", "7.0", "Charger 进入博弈状态的最大允许时间", CVAR_FLAGS, true, 0.0);
 	// the detection interval (in seconds) for charger's probabilistic charge when in the bait state

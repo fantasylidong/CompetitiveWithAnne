@@ -901,3 +901,18 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `.gitignore` 去重，并删掉已被 `/test_results` 覆盖的 9 条具体路径。
 - 补齐 `anne_server_redirect` 的 jp / ko / vi 三语翻译，与其余 Anne 插件的六语覆盖对齐。
 - 文档订正：`README_SPAWN_ARCHITECTURE.md` 的分散度两条、`annehappy_dynamic_ai_difficulty.md` 的反应时间行 / Tank 行 / 新增的两个连跳上限 cvar、`ai_charger3/readme.md` 里仍在描述概率冲锋的四处。顺带修正五档表里 Charger 连跳速度（旧文档写 45/60/75/90/150，配置实际是 40/50/60/70/100）。
+
+### 2026年9月1日 2026-08 AI 平衡调整
+
+- `ai_charger3` 升级到 1.0.1.10。新增 Charger 专用 CVar `ai_charger3_air_speed_floor_ratio`（默认 0.50）：Path / Direct 起跳时把空中方向修正登记的 hopSpeed 改为实际起跳速度乘此比例，`m_flLastHopSpeed` 仍保留真实起跳速度。
+- 动态难度六档削弱 Charger：加速度 30/40/50/60/80/100，上限 400/400/400/500/700/700，空中插值 0.10/0.15/0.20/0.25/0.30/0.40，转向损速 0.50/0.39/0.325/0.26/0.195/0.13，保速下限 0.50/0.60/0.65/0.70/0.80/0.80。简单档损速取现有硬上限 0.50。
+- `ai_spitter_3` 升级到 3.0.7。新增 `ai_spitter3_air_spit`（默认 0）：仅极限与音理档为 1，允许 AI Spitter 空中吐痰；简单到专家禁止空中吐痰，地面吐痰照常且不会被插件带起跳。不限制玩家 Spitter。
+- Smoker `tongue_fly_speed` 六档全部显式为 1000（极限/音理由 1200 下调）。
+- 重新编译：`ai_charger3.smx`、`ai_spitter_3.smx`。
+
+### 2026年9月1日 Charger 先锤后撞按键与博弈修复
+- `ai_charger3` 升级到 1.0.1.11。持枪贴脸挥爪和围殴被控目标改回 `IN_ATTACK2`（左键是冲锋能力），原先按 `IN_ATTACK` 会罚站 2.5 秒一拳不出。
+- 持枪组合技只在目标没盯着自己、Charger 血量高于近战斩杀线、且对方没有换弹/推 CD 时才开锤，避免 500 血贴脸站桩挨枪。
+- 两锤预测改为只计算第二锤的 0.85 秒后撤；保命中冲锋下限钳在 110，横向速度 ≥ 150 时不再抬高 commit 距离。
+- 挥拳计数新增有效基线标志，`m_flNextPrimaryAttack` 初值为 0 或爪武器短暂不可用时也不会漏记第一拳；爪距属性装载失败时每图最多间隔重试 3 次，避免每帧重复 native 查询和刷 Left4DHooks 错误日志。
+- 重新编译：`ai_charger3.smx`。
