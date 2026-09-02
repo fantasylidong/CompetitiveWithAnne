@@ -223,7 +223,7 @@ AI 难度插件本身只负责定档和应用 AI/Tank 行为 cvar；刷特插件
 | Jockey | `ai_JockeySpecialJumpRange` | 无此 ConVar | 400 | 未合并 | 当前 `ai_jockey_2.smx` 源码没有定义，写入不会生效 |
 | Spitter | `l4d2_spit_dmg` / `l4d2_spit_alternate_dmg` | 基础 2 / 3 | 3 / 2 | 3 / 2 | 主 tick 更疼，交替 tick 稍低 |
 | Smoker | `smoker_tongue_delay` | 0.0 | 0.1 | 0.0 | 当前基础值更快，极限档显式保留 0.0 |
-| Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1000 | 3 / 800 / 1000 | 舌头失败冷却、距离进入极限档；六档 `tongue_fly_speed` 全部显式为 1000（极限/音理由 1200 下调） |
+| Smoker | `tongue_miss_delay` / `tongue_range` / `tongue_fly_speed` | 未在极限档设置 | 3 / 800 / 1000 | 3 / 800 / 1000 | 拉空冷却、距离进入极限档；六档 `tongue_fly_speed` 全部显式为 1000（极限/音理由 1200 下调）。命中后被生还者速清独立为 4 秒（Tank 速清 1 秒，Anne 系模式下调，Zonemod 上游为 8 秒），正常命中后松舌仍使用 `tongue_hit_delay 13` |
 | Smoker | `ai_smoker3_jump_pull` | 默认 0 | 音理 1 | 1 | 仅解除音理档空中吐舌限制，不主动起跳 |
 | Boomer | `z_vomit_fatigue` / `z_vomit_range` / `z_vomit_maxdamagedist` | 未在极限档设置 | 专家疲劳一半 / 专家距离 / 保持极限原值 | 1500 / 300 / 500 | 喷吐距离回专家基线，只降低疲劳到专家值的一半；最大伤害距离不改 |
 | Boomer | `boomer_horde_amount` 基准值 | 12 / 13 / 10 / 10 | 保持专家基准 | 12 / 13 / 10 / 10 | 基准已迁到 Anne 三套 `confogl_plugins.cfg` 的插件加载后，只初始化一次；极限覆盖值按专家值 + `5 * 被喷人数` 计算为 17 / 23 / 25 / 30 |

@@ -332,3 +332,9 @@
 - 2 撃予測は 2 撃目の 0.85 秒だけを見るように変更。確定突進の下限は 110 で上限し、横移動速度 ≥ 150 のときは commit 距離を引き上げません。
 - 爪攻撃カウントに有効な `m_flNextPrimaryAttack` 基準値の状態を追加し、初期値が 0、または爪武器が一時的に取得できない場合でも初撃を数え落とさないようにしました。爪距離属性の取得失敗はマップごとに間隔を空けて最大 3 回だけ再試行し、毎フレームの native 呼び出しと Left4DHooks のエラーログ連打を防ぎます。
 - 再コンパイル：`ai_charger3.smx`。
+
+### 2026年9月1日 AI Smoker の即時解除クールダウンと退避修正
+- `ai_smoker3` を 1.0.1.4 へ更新。命中した舌が切断/即時解除された場合、Actions 拡張が残留した `SmokerTongueVictim` を終了し、原生の `SmokerRetreatToCover` を維持したまま、Action コールバック外で被害者から離れる Nav 移動を指示します。舌が使用可能になると原生 AI へ戻ります。イベントは 1 フレーム待って `m_tongueVictim` が空であることを確認するため、通常の絞め移行を即時解除と誤判定しません。
+- Anne、Hardcore、Shotgun、Alone で Zonemod の `l4d2_tongue_timer.smx` を再び読み込みます。生存者による即時解除は最低 4 秒。Tank ダメージによる解除は Anne 系設定では 1 秒に引き下げ（上流の Zonemod は 8 秒のまま）、AI Tank のパンチや岩が味方 Smoker を重く罰しないようにしました。空振りは `tongue_miss_delay` のままで Easy～Expert は 7 秒、Extreme/Neri は 3 秒、通常命中後の解放は `tongue_hit_delay 13` のままです。
+- `l4d2_tongue_timer` を 1.3-anne.1 へ更新。被害者ごとに実際に引いている Smoker を記録するため、Tank の即時解除で先頭の Smoker に誤って 8 秒を与えません。舌の解放も対応する組だけを消去し、複数 Smoker の同時プルに対応します。
+- 再コンパイル：`ai_smoker3.smx`、`l4d2_tongue_timer.smx`。

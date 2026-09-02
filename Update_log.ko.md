@@ -332,3 +332,9 @@
 - 두 대 예측은 두 번째 타격의 0.85초만 계산합니다. 확정 돌진 하한은 110으로 제한하고, 횡이동 속도 ≥ 150이면 commit 거리를 올리지 않습니다.
 - 발톱 공격 카운트에 유효한 `m_flNextPrimaryAttack` 기준값 상태를 추가해 초기값이 0이거나 발톱 무기를 잠시 찾지 못해도 첫 타격을 놓치지 않습니다. 발톱 사거리 속성 로드 실패는 맵마다 간격을 두고 최대 3회만 재시도해 매 프레임 native 호출과 Left4DHooks 오류 로그 반복을 막습니다.
 - 재컴파일: `ai_charger3.smx`.
+
+### 2026년 9월 1일 AI Smoker 즉시 해제 쿨다운 및 후퇴 수정
+- `ai_smoker3`를 1.0.1.4로 올렸습니다. 적중한 혀가 잘리거나 즉시 해제되면 Actions 확장이 남아 있는 `SmokerTongueVictim`을 끝내고 원래의 `SmokerRetreatToCover`를 유지한 채, Action 콜백 스택 밖에서 피해자 반대 방향의 Nav 이동 명령을 내립니다. 혀가 준비되면 원래 AI로 돌아갑니다. 이벤트는 한 프레임 뒤 `m_tongueVictim`이 비었는지 확인하므로 정상 조르기 전환을 즉시 해제로 오인하지 않습니다.
+- Anne, Hardcore, Shotgun, Alone 모드에서 Zonemod의 `l4d2_tongue_timer.smx`를 다시 로드합니다. 생존자 즉시 해제는 최소 4초입니다. Tank 피해 해제는 Anne 계열 설정에서 1초로 낮췄으며(상류 Zonemod은 8초 유지), AI Tank의 주먹이나 바위가 아군 Smoker를 크게 벌하지 않도록 했습니다. 빗나감은 계속 `tongue_miss_delay`를 사용해 쉬움~전문가 7초, 극한/음리 3초이며, 정상 적중 후 놓기는 `tongue_hit_delay 13`을 그대로 사용합니다.
+- `l4d2_tongue_timer`를 1.3-anne.1로 올렸습니다. 피해자마다 실제로 당기는 Smoker를 기록하므로 Tank 즉시 해제의 8초 쿨다운이 첫 번째 Smoker에게 잘못 적용되지 않습니다. 혀 하나가 풀릴 때도 해당 연결만 지워 여러 Smoker의 동시 당기기를 지원합니다.
+- 재컴파일: `ai_smoker3.smx`, `l4d2_tongue_timer.smx`.

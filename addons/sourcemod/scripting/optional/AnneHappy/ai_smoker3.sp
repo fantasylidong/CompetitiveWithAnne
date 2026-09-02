@@ -23,6 +23,9 @@
 #define ACT_NAME_MOVETO								"BehaviorMoveTo"
 
 #define DEFAULT_TONGUE_RANGE						750.0
+#define TONGUE_CUT_RETREAT_DISTANCE				450.0
+#define TONGUE_CUT_RETREAT_MIN_TIME				0.25
+#define TONGUE_CUT_RETREAT_TIMEOUT				10.0
 
 ConVar
 	g_cvPluginName,
@@ -72,6 +75,13 @@ enum struct AiSmoker {
 	bool	m_bIsVisible2Target;		// 当前目标是否可见
 	bool 	m_bToggleSide;				// 连跳时方向是否向左偏移, 若向左偏移, 则下次连跳向右偏移
 	float	m_flLastAtkBtnPressTime;	// 上次按下攻击键的时间, 用于判断是否可以进行攻击
+	int		m_iTongueCutVictim;		// 舌头速清目标的 userId
+	bool	m_bTongueCutCheckPending;	// 等待下一帧确认舌头是否真的被清除
+	bool	m_bTongueCutRetreat;		// 速清后强制执行逃跑行为
+	bool	m_bTongueCutMovePending;	// 等待在 Actions 回调栈外下发 BOT_CMD_MOVE
+	bool	m_bTongueCutMoveActive;	// 已下发速清逃跑 BOT_CMD_MOVE
+	float	m_flTongueCutRetreatStart;
+	float	m_vecTongueCutRetreatPos[3];
 
 	void initData() {
 		this.m_iTarget = -1;
@@ -82,6 +92,13 @@ enum struct AiSmoker {
 		this.m_bIsVisible2Target = false;
 		this.m_bToggleSide = false;
 		this.m_flLastAtkBtnPressTime = 0.0;
+		this.m_iTongueCutVictim = 0;
+		this.m_bTongueCutCheckPending = false;
+		this.m_bTongueCutRetreat = false;
+		this.m_bTongueCutMovePending = false;
+		this.m_bTongueCutMoveActive = false;
+		this.m_flTongueCutRetreatStart = 0.0;
+		this.m_vecTongueCutRetreatPos = NULL_VECTOR;
 	}
 }
 AiSmoker g_AiSmokers[MAXPLAYERS + 1];
@@ -104,7 +121,7 @@ public Plugin myinfo =
 	name 			= "Ai-Smoker 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai-Smoker 增强 3.0 版本",
-	version 		= "1.0.1.3",
+	version 		= "1.0.1.4",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -152,6 +169,7 @@ public void OnPluginStart() {
 	g_cvLogLevel = CreateConVar(cvName, "32", "日志记录级别, 1=关闭, 2=控制台输出, 4=log文件输出, 8=聊天框输出, 16=服务器控制台输出, 32=error文件输出, 数字相加", CVAR_FLAGS);
 
 	HookEvent("player_spawn", evtPlayerSpawn);
+	HookEvent("tongue_pull_stopped", evtTonguePullStopped);
 
 	log = new Logger(PLUGIN_PREFIX, g_cvLogLevel.IntValue);
 
@@ -207,6 +225,10 @@ public void OnConfigsExecuted() {
 }
 
 public void OnPluginEnd() {
+	for (int client = 1; client <= MaxClients; client++) {
+		if (IsClientInGame(client) && (g_AiSmokers[client].m_bTongueCutMoveActive || g_AiSmokers[client].m_bTongueCutMovePending))
+			L4D2_CommandABot(client, 0, BOT_CMD_RESET);
+	}
 	delete log;
 	delete g_hSdkGetRunTopSpeed;
 }
@@ -216,8 +238,143 @@ void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 	client = GetClientOfUserId(event.GetInt("userid"));
 	if (!isAiSmoker(client))
 		return;
-	
+
+	if (g_AiSmokers[client].m_bTongueCutMoveActive || g_AiSmokers[client].m_bTongueCutMovePending)
+		L4D2_CommandABot(client, 0, BOT_CMD_RESET);
 	g_AiSmokers[client].initData();
+}
+
+void evtTonguePullStopped(Event event, const char[] name, bool dontBroadcast) {
+	int smoker = GetClientOfUserId(event.GetInt("smoker"));
+	int victim = GetClientOfUserId(event.GetInt("victim"));
+	if (!isAiSmoker(smoker) || !IsValidSurvivor(victim))
+		return;
+
+	g_AiSmokers[smoker].m_iTongueCutVictim = GetClientUserId(victim);
+	g_AiSmokers[smoker].m_bTongueCutCheckPending = true;
+	RequestFrame(confirmTongueCutNextFrame, GetClientUserId(smoker));
+}
+
+void confirmTongueCutNextFrame(any userId) {
+	int smoker = GetClientOfUserId(userId);
+	if (!isAiSmoker(smoker) || !g_AiSmokers[smoker].m_bTongueCutCheckPending)
+		return;
+
+	g_AiSmokers[smoker].m_bTongueCutCheckPending = false;
+	if (GetEntPropEnt(smoker, Prop_Send, "m_tongueVictim") > 0) {
+		g_AiSmokers[smoker].m_iTongueCutVictim = 0;
+		return;
+	}
+
+	int victim = GetClientOfUserId(g_AiSmokers[smoker].m_iTongueCutVictim);
+	if (!IsValidSurvivor(victim) || !IsPlayerAlive(victim))
+		victim = getClosestSurvivorAndValid(smoker);
+	if (!IsValidSurvivor(victim) || !IsPlayerAlive(victim)) {
+		g_AiSmokers[smoker].m_iTongueCutVictim = 0;
+		return;
+	}
+
+	if (!getTongueCutRetreatDestination(smoker, victim, g_AiSmokers[smoker].m_vecTongueCutRetreatPos)) {
+		g_AiSmokers[smoker].m_iTongueCutVictim = 0;
+		return;
+	}
+
+	g_AiSmokers[smoker].m_bTongueCutRetreat = true;
+	g_AiSmokers[smoker].m_bTongueCutMovePending = true;
+	g_AiSmokers[smoker].m_flTongueCutRetreatStart = GetGameTime();
+	RequestFrame(issueTongueCutRetreatMoveNextFrame, userId);
+}
+
+void issueTongueCutRetreatMoveNextFrame(any userId) {
+	int smoker = GetClientOfUserId(userId);
+	if (!isAiSmoker(smoker) || !g_AiSmokers[smoker].m_bTongueCutRetreat || !g_AiSmokers[smoker].m_bTongueCutMovePending)
+		return;
+
+	g_AiSmokers[smoker].m_bTongueCutMovePending = false;
+	g_AiSmokers[smoker].m_bTongueCutMoveActive = true;
+	bool accepted = L4D2_CommandABot(smoker, 0, BOT_CMD_MOVE, g_AiSmokers[smoker].m_vecTongueCutRetreatPos);
+	log.debugAll("Tongue cut retreat, Smoker(%N) move command accepted: %d", smoker, accepted);
+}
+
+stock bool getTongueCutRetreatDestination(int smoker, int victim, float movePos[3]) {
+	static const float yawOffsets[] = {0.0, 45.0, -45.0, 90.0, -90.0};
+	float smokerPos[3], victimPos[3], away[3], awayAngles[3];
+	GetClientAbsOrigin(smoker, smokerPos);
+	GetClientAbsOrigin(victim, victimPos);
+	MakeVectorFromPoints(victimPos, smokerPos, away);
+	away[2] = 0.0;
+	if (NormalizeVector(away, away) <= 0.01) {
+		GetClientEyeAngles(smoker, awayAngles);
+		awayAngles[0] = 0.0;
+		awayAngles[1] += 180.0;
+		GetAngleVectors(awayAngles, away, NULL_VECTOR, NULL_VECTOR);
+	}
+	GetVectorAngles(away, awayAngles);
+
+	bool found;
+	float bestVictimDist = -1.0;
+	for (int i = 0; i < sizeof(yawOffsets); i++) {
+		float sampleAngles[3], direction[3], queryPos[3], navCenter[3];
+		sampleAngles = awayAngles;
+		sampleAngles[1] += yawOffsets[i];
+		GetAngleVectors(sampleAngles, direction, NULL_VECTOR, NULL_VECTOR);
+		queryPos = smokerPos;
+		queryPos[0] += direction[0] * TONGUE_CUT_RETREAT_DISTANCE;
+		queryPos[1] += direction[1] * TONGUE_CUT_RETREAT_DISTANCE;
+		queryPos[2] += 20.0;
+
+		Address navArea = L4D_GetNearestNavArea(queryPos, 250.0, false, false, true, TEAM_INFECTED);
+		if (!navArea)
+			continue;
+		L4D_GetNavAreaCenter(navArea, navCenter);
+		if (GetVectorDistance(smokerPos, navCenter) < 64.0)
+			continue;
+
+		float victimDist = GetVectorDistance(victimPos, navCenter);
+		if (!found || victimDist > bestVictimDist) {
+			movePos = navCenter;
+			bestVictimDist = victimDist;
+			found = true;
+		}
+	}
+
+	return found;
+}
+
+stock void stopTongueCutRetreat(int smoker, const char[] reason) {
+	if (g_AiSmokers[smoker].m_bTongueCutMoveActive || g_AiSmokers[smoker].m_bTongueCutMovePending)
+		L4D2_CommandABot(smoker, 0, BOT_CMD_RESET);
+
+	log.debugAll("Tongue cut retreat ended, Smoker(%N), reason: %s", smoker, reason);
+	g_AiSmokers[smoker].m_iTongueCutVictim = 0;
+	g_AiSmokers[smoker].m_bTongueCutCheckPending = false;
+	g_AiSmokers[smoker].m_bTongueCutRetreat = false;
+	g_AiSmokers[smoker].m_bTongueCutMovePending = false;
+	g_AiSmokers[smoker].m_bTongueCutMoveActive = false;
+	g_AiSmokers[smoker].m_flTongueCutRetreatStart = 0.0;
+	g_AiSmokers[smoker].m_vecTongueCutRetreatPos = NULL_VECTOR;
+}
+
+stock bool maintainTongueCutRetreat(int smoker) {
+	if (!g_AiSmokers[smoker].m_bTongueCutRetreat)
+		return false;
+
+	if (GetEntPropEnt(smoker, Prop_Send, "m_tongueVictim") > 0) {
+		stopTongueCutRetreat(smoker, "pulling another victim");
+		return false;
+	}
+
+	float elapsed = GetGameTime() - g_AiSmokers[smoker].m_flTongueCutRetreatStart;
+	if (elapsed >= TONGUE_CUT_RETREAT_TIMEOUT) {
+		stopTongueCutRetreat(smoker, "timeout");
+		return false;
+	}
+	if (elapsed >= TONGUE_CUT_RETREAT_MIN_TIME && isSmokerReadyToAttack(smoker)) {
+		stopTongueCutRetreat(smoker, "tongue ready");
+		return false;
+	}
+
+	return true;
 }
 
 Action sndHookSmokerWarn(int clients[MAXPLAYERS], int& numClients, char sample[PLATFORM_MAX_PATH], int& entity,
@@ -240,6 +397,8 @@ void cvTongueRangeChangeHook(ConVar convar, const char[] oldValue, const char[] 
 // ============================================================
 public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3], float angles[3], int& weapon) {
 	if (!isAiSmoker(client))
+		return Plugin_Continue;
+	if (maintainTongueCutRetreat(client))
 		return Plugin_Continue;
 
 	static int target;
@@ -646,15 +805,19 @@ public void OnActionCreated(BehaviorAction action, int actor, const char[] name)
 		action.OnUpdate = onSmokerTongueVictimOnUpdate;
 	}
 
-	if (g_cvAntiRetreat.BoolValue) {
-		// Smoker 正在逃跑的时候, hook OnUpdate 每帧更新函数
-		// 需要检测能力 timestamp 因为 Smoker 拉人的时候也是 RetreatToCover 状态, 去除 tongueVictim 检测, 因为 tongueVictim 不会在舌头一断立即无效
-		if (strcmp(name, ACT_NAME_RETREAT, false) == 0 && !isSmokerReadyToAttack(actor)) {
+	if (strcmp(name, ACT_NAME_RETREAT, false) == 0 && !isSmokerReadyToAttack(actor)) {
+		if (g_AiSmokers[actor].m_bTongueCutCheckPending || g_AiSmokers[actor].m_bTongueCutRetreat) {
+			action.OnUpdate = onSmokerTongueCutRetreatOnUpdate;
+		} else if (g_cvAntiRetreat.BoolValue) {
+			// 普通无技能状态才改为追击；舌头被速清后必须保留原生逃跑行为。
 			action.OnUpdate = onSmokerRetreatOnUpdate;
 		}
+	}
+
+	if (g_cvAntiRetreat.BoolValue) {
 		// 移动到目标位置过程中检测每帧调用的 OnUpdate 函数
 		// 如果不 hook BehaviorMovrTo 状态, 因为目标位置在生还者的脚底下, Smoker 无法到达, 就会一直抠人, 舌头 CD 好了也不会放技能, 要手动取消 MoveTo 状态
-		if (strcmp(name, ACT_NAME_MOVETO, false) == 0) {
+		if (!g_AiSmokers[actor].m_bTongueCutCheckPending && !g_AiSmokers[actor].m_bTongueCutRetreat && strcmp(name, ACT_NAME_MOVETO, false) == 0) {
 			action.OnUpdate = onMove2Change2Attack;
 		}
 	}
@@ -675,8 +838,19 @@ Action onSmokerTongueVictimOnUpdate(BehaviorAction action, int actor, float inte
 
 	// 如果舌头技能未冷却完毕, 且没有在拉人, 这时候如果处于 TongueVictim 行为则会令舌头卡住, 结束这个行为
 	if (!isSmokerReadyToAttack(actor) && !isPullingSomeone(actor)) {
-		action.Done();
+		action.Done((g_AiSmokers[actor].m_bTongueCutCheckPending || g_AiSmokers[actor].m_bTongueCutRetreat) ? "Tongue cut, retreat" : "Tongue unavailable");
 		return Plugin_Changed;
+	}
+	return Plugin_Continue;
+}
+
+Action onSmokerTongueCutRetreatOnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
+	if (!isAiSmoker(actor) || !g_AiSmokers[actor].m_bTongueCutRetreat)
+		return Plugin_Continue;
+
+	if (!g_AiSmokers[actor].m_bTongueCutMoveActive && !g_AiSmokers[actor].m_bTongueCutMovePending) {
+		g_AiSmokers[actor].m_bTongueCutMovePending = true;
+		RequestFrame(issueTongueCutRetreatMoveNextFrame, GetClientUserId(actor));
 	}
 	return Plugin_Continue;
 }
@@ -693,6 +867,8 @@ Action onSmokerTongueVictimOnUpdate(BehaviorAction action, int actor, float inte
 **/
 Action onSmokerRetreatOnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
 	if (!isAiSmoker(actor))
+		return Plugin_Continue;
+	if (g_AiSmokers[actor].m_bTongueCutCheckPending || g_AiSmokers[actor].m_bTongueCutRetreat)
 		return Plugin_Continue;
 
 	static int target;
@@ -730,6 +906,8 @@ Action onSmokerRetreatOnUpdate(BehaviorAction action, int actor, float interval,
 **/
 Action onMove2Change2Attack(BehaviorAction action, int actor, float interval, ActionResult result) {
 	if (!isAiSmoker(actor))
+		return Plugin_Continue;
+	if (g_AiSmokers[actor].m_bTongueCutCheckPending || g_AiSmokers[actor].m_bTongueCutRetreat)
 		return Plugin_Continue;
 
 	static int target, nearestTar;

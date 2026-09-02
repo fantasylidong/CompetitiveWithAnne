@@ -332,3 +332,9 @@
 - Two-hit prediction now uses only the 0.85s window for the second swing. The guaranteed charge floor is capped at 110 and is not raised when lateral speed is ≥ 150.
 - Claw counting now tracks whether a valid `m_flNextPrimaryAttack` baseline exists, so an initial value of 0 or a temporarily unavailable claw weapon no longer loses the first swing. Failed claw-range loads retry at most three times per map with a delay, avoiding per-frame native calls and Left4DHooks error-log spam.
 - Recompiled: `ai_charger3.smx`.
+
+### 2026-09-01 AI Smoker instant-clear cooldown and retreat fix
+- Upgraded `ai_smoker3` to 1.0.1.4. When a landed tongue is cut or instantly cleared, the Actions extension ends the stale `SmokerTongueVictim`, preserves native `SmokerRetreatToCover`, and issues a Nav move away from the victim outside the action callback stack; control returns to native AI when the tongue is ready. The event waits one frame and verifies that `m_tongueVictim` is clear, so transition into a normal choke is not mistaken for an instant clear.
+- Anne, Hardcore, Shotgun, and Alone now load Zonemod's `l4d2_tongue_timer.smx`. Survivor instant clears use at least 4 seconds. Tank-damage clears are lowered to 1 second on the Anne-family configs (upstream Zonemod keeps 8 seconds) so an AI Tank's punch or rock no longer heavily penalises its own Smoker. Misses still use `tongue_miss_delay`: 7 seconds from Easy through Expert and 3 seconds on Extreme/Neri; a normal landed release still uses `tongue_hit_delay 13`.
+- Upgraded `l4d2_tongue_timer` to 1.3-anne.1. It now records the actual pulling Smoker per victim, so Tank instant clears no longer assign the 8-second cooldown to the first Smoker found; releasing one tongue clears only its own pair, supporting concurrent pulls by multiple Smokers.
+- Recompiled: `ai_smoker3.smx`, `l4d2_tongue_timer.smx`.

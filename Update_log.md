@@ -916,3 +916,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 两锤预测改为只计算第二锤的 0.85 秒后撤；保命中冲锋下限钳在 110，横向速度 ≥ 150 时不再抬高 commit 距离。
 - 挥拳计数新增有效基线标志，`m_flNextPrimaryAttack` 初值为 0 或爪武器短暂不可用时也不会漏记第一拳；爪距属性装载失败时每图最多间隔重试 3 次，避免每帧重复 native 查询和刷 Left4DHooks 错误日志。
 - 重新编译：`ai_charger3.smx`。
+
+### 2026年9月1日 AI Smoker 速清冷却与逃跑修复
+- `ai_smoker3` 升级到 1.0.1.4。舌头命中后被砍断/速清时，Actions 扩展会结束残留的 `SmokerTongueVictim`，保留原生 `SmokerRetreatToCover`，并在回调栈外下达一个远离受害者的 Nav 移动命令；技能恢复后 RESET 回原生 AI。事件延后一帧确认 `m_tongueVictim` 已清空，不会把拉到面前转绞杀误判为速清。
+- Anne、硬核、喷子和 Alone 模式恢复加载 Zonemod 的 `l4d2_tongue_timer.smx`。生还者速清后的冷却至少 4 秒；Tank 伤害速清 Anne 系模式下调为 1 秒（Zonemod 上游仍为 8 秒），避免 AI Tank 的拳/石头误伤反而重罚自家 Smoker；拉空仍按 `tongue_miss_delay`，简单到专家 7 秒、极限/音理 3 秒，正常命中松舌仍为 `tongue_hit_delay 13`。
+- `l4d2_tongue_timer` 升级到 1.3-anne.1：按受害者记录实际拉人的 Smoker，Tank 速清不再误把 8 秒冷却加给场上第一只 Smoker；任一舌头松开也只清理对应关系，支持多 Smoker 同时拉人。
+- 重新编译：`ai_smoker3.smx`、`l4d2_tongue_timer.smx`。
