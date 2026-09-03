@@ -26,4 +26,90 @@
 	{
 		"ko"		"<{olive}HUD{default}> 채팅에 {green}!tankhud{default}를 입력하여 {red}탱크 HUD를 전환하세요."
 	}
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"ko"		"{1} :: 탱크 HUD"
+	}
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"ko"		"탱크 #{1}"
+	}
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"ko"		"조종: {1} ({2})"
+	}
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"ko"		"조종: AI ({1})"
+	}
+	"TankHUD_Pass_Native"
+	{
+		"ko"		"기본"
+	}
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"ko"		"{1}번째 패스"
+	}
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"ko"		"HP: {1} / {2} ({3}%%)"
+	}
+	"TankHUD_HP_Dead"
+	{
+		"ko"		"HP: 사망"
+	}
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"ko"		"분노: {1}%%"
+	}
+	"TankHUD_Frust_AI"
+	{
+		"ko"		"분노: AI"
+	}
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"ko"		"네트워크: {1}ms / {2}"
+	}
+	"TankHUD_Net_AI"
+	{
+		"ko"		"네트워크: AI"
+	}
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"ko"		"화염: {1}초 남음"
+	}
+	"TankHUD_Target_Searching"
+	{
+		"ko"		"대상: 탐색 중..."
+	}
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"ko"		"대상: {1} [{2}HP/{3}] 거리 {4}"
+	}
+	"TankHUD_State_Hang"
+	{
+		"ko"		"매달림"
+	}
+	"TankHUD_State_Down"
+	{
+		"ko"		"다운"
+	}
+	"TankHUD_State_Pinned"
+	{
+		"ko"		"제압됨"
+	}
+	"TankHUD_State_Up"
+	{
+		"ko"		"생존"
+	}
 }

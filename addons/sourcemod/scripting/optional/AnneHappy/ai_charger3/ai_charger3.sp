@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.11",
+	version 		= "1.0.1.12",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -53,8 +53,8 @@ public void OnPluginStart() {
 	g_cvBhopMinDist = CreateConVar("ai_charger3_bhop_min_dist", "100.0", "禁止连跳的最小距离, 小于这个距离转换为博弈状态", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxDist = CreateConVar("ai_charger3_bhop_max_dist", "9999.0", "允许连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	g_cvDirectBhopDist = CreateConVar("ai_charger3_bhop_direct_dist", "400.0", "Charger 在接近状态中切换到朝目标方向直线连跳的距离阈值", CVAR_FLAGS, true, 0.0);
-	// the bhop impulse, when charger is allowed to bhop, each time it jumps up from the ground, it will gain a speed impulse with the value of ai_charger3_bhop_impulse
-	g_cvBhopImpulse = CreateConVar("ai_charger3_bhop_impulse", "100.0", "连跳的加速度", CVAR_FLAGS, true, 0.0);
+	// the bhop impulse, added only when charger re-jumps right after landing from a previous hop; the first hop taken straight from running keeps its run speed
+	g_cvBhopImpulse = CreateConVar("ai_charger3_bhop_impulse", "100.0", "连跳的加速度, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAGS, true, 0.0);
 	// when charger's speed is greater than 'ai_charger3_bhop_min_speed', it is allowed to bhop, and its max bhop speed will not greater than 'ai_charger3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_charger3_bhop_min_speed", "200", "允许连跳的最小速度", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxSpeed = CreateConVar("ai_charger3_bhop_max_speed", "800", "连跳的最大限制速度", CVAR_FLAGS, true, 0.0);
@@ -214,6 +214,10 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
 	beginChargerVisibilityMemo(client);
 
+	// 地面/梯子登记必须每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份加速度
+	if (IsClientOnGround(client) || GetEntityMoveType(client) == MOVETYPE_LADDER)
+		AIPathMovement_NotifyGrounded(client);
+
 	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
 	maintainEvadeMoveCommand(client);
 
@@ -244,6 +248,7 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	if (g_ChargerStateContext[client].userId != GetClientUserId(client)) {
 		g_AiChargers[client].init();
 		AIPathMovement_Reset(client);
+		AIPathMovement_ResetHopChain(client);
 		clearPathSnapshot(client);
 		// 目标变化, 重置状态
 		g_ChargerStateContext[client].init(client);
@@ -276,6 +281,7 @@ void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 	// 新的 charger, 重置状态
 	g_AiChargers[client].init();
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
 	clearPathSnapshot(client);
 	g_ChargerStateContext[client].init(client);
 	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);

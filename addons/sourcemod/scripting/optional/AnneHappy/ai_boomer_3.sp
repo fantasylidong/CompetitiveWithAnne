@@ -34,7 +34,7 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.8",
+		version 		= "3.0.9",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -96,7 +96,7 @@ public void OnPluginStart()
 {
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
-	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳速度", CVAR_FLAG, true, 0.0);
+	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAG, true, 0.0);
 	// Boomer 使用独立的水平速度上限；动态难度按本职业六档值配置，不再与 Charger 上限联动
 	g_hBhopMaxSpeed = CreateConVar("ai_BoomerBhopMaxSpeed", "1000.0", "Boomer 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_BoomerBhopStartDistance", "2500.0", "Boomer 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
@@ -160,6 +160,7 @@ public void OnPluginEnd()
 public void OnClientDisconnect(int client)
 {
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
 }
 
 public void AnneNextBot_OnBoomerPathSnapshotUpdated(int client)
@@ -196,6 +197,7 @@ public void evt_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 	can_bile[client] = true;
 	in_bile_interval[client] = false;
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
 	bile_frame[client][0] = bile_frame[client][1] = 0;
 	// Build ArrayList
 	if (targetList[client] != null) { targetList[client].Clear(); }
@@ -238,8 +240,12 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	cur_speed = SquareRoot(Pow(vec_speed[0], 2.0) + Pow(vec_speed[1], 2.0));
 	bool onGround = (flags & FL_ONGROUND) != 0;
 	bool onLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
+	// 地面/梯子登记要每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
 	if (onGround || onLadder)
+	{
+		AIPathMovement_NotifyGrounded(client);
 		AIPathMovement_Reset(client);
+	}
 	else if (isAbilityUsing || (buttons & (IN_ATTACK | IN_ATTACK2)))
 		AIPathMovement_Reset(client);
 	bool pathAirFacing = AIPathMovement_IsPathHopActive(client) && !onGround && !onLadder;
@@ -465,9 +471,14 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			float laneOffset = AIPathSnapshot_GetSuggestedLateralOffset(client, g_hPathLaneOffset.FloatValue);
 			pathGuided = AIPathSnapshot_GetLookAheadGoal(client, maxEstimateDist, laneOffset, bhopTarget, g_hPathLookAheadDepth.IntValue);
 		}
-		vel_buffer = CalculateVel(self_pos, bhopTarget, g_hBhopSpeed.FloatValue);
+		// 从跑动直接起跳的第一跳不加推力, 推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
+		float hopImpulse = AIPathMovement_GetHopImpulse(client, g_hBhopSpeed.FloatValue);
+		vel_buffer = CalculateVel(self_pos, bhopTarget, hopImpulse);
+		float proposedVelocity[3];
+		BuildBhopVelocity(client, vel_buffer, hopImpulse > 0.0, proposedVelocity);
 		float airTime = AIPathMovement_GetJumpAirTime();
-		if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, has_sight, 89.0))
+		// 路线检查使用起跳后的实际速度而不是单独的推力向量, 第一跳没有推力时才能检查到真正的落点
+		if (!AIPathMovement_IsJumpRouteSafe(client, proposedVelocity, airTime, 56.0, has_sight, 89.0))
 		{
 			if (!pathGuided || !has_sight)
 			{
@@ -476,9 +487,10 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			}
 
 			bhopTarget = targetPos;
-			vel_buffer = CalculateVel(self_pos, bhopTarget, g_hBhopSpeed.FloatValue);
+			vel_buffer = CalculateVel(self_pos, bhopTarget, hopImpulse);
+			BuildBhopVelocity(client, vel_buffer, hopImpulse > 0.0, proposedVelocity);
 			pathGuided = false;
-			if (!AIPathMovement_IsJumpRouteSafe(client, vel_buffer, airTime, 56.0, true, 89.0))
+			if (!AIPathMovement_IsJumpRouteSafe(client, proposedVelocity, airTime, 56.0, true, 89.0))
 			{
 				AIPathMovement_MarkRouteCheckFailure(client);
 				return pathAirFacing ? Plugin_Changed : Plugin_Continue;
@@ -491,14 +503,14 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		}
 		buttons |= IN_JUMP;
 		buttons |= IN_DUCK;
-		if (Do_Bhop(client, buttons, vel_buffer))
+		if (Do_Bhop(client, buttons, proposedVelocity))
 		{
+			// 消费掉本次落地推力授权, 引擎拒跳时下一帧不会重复领取
+			AIPathMovement_MarkHopStart(client);
 			if (pathGuided)
 			{
-				float pathVelocity[3];
-				GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", pathVelocity);
-				AIPathMovement_AlignFacing(pathVelocity, angles);
-				AIPathMovement_BeginPathHop(client, bhopTarget, AIPathMovement_GetHorizontalSpeed(pathVelocity), g_hBhopMaxSpeed.FloatValue);
+				AIPathMovement_AlignFacing(proposedVelocity, angles);
+				AIPathMovement_BeginPathHop(client, bhopTarget, AIPathMovement_GetHorizontalSpeed(proposedVelocity), g_hBhopMaxSpeed.FloatValue);
 			}
 			return Plugin_Changed;
 		}
@@ -732,28 +744,35 @@ bool TR_EntityFilter(int entity, int mask)
 	return true;
 }
 
-// 胖子连跳
-bool Do_Bhop(int client, int &buttons, float vec[3])
+// 由当前速度与本次推力构造起跳速度, 路线检查与实际 Teleport 使用同一份速度
+void BuildBhopVelocity(int client, const float push[3], bool applyMinSpeed, float outVelocity[3])
 {
-	if (buttons & IN_FORWARD || buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT) { if (ClientPush(client, vec)) { return true; } }
+	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", outVelocity);
+	AddVectors(outVelocity, push, outVelocity);
+	// 叠加式推速必须封顶, 否则连续连跳会无限累积出“飞天大跳”
+	AIPathMovement_ClampHorizontalSpeed(outVelocity, g_hBhopMaxSpeed.FloatValue);
+	// 连跳最低速度只在真正追加推力的那一跳兜底; 第一跳保持跑动速度起跳, 不能借这里偷偷加速
+	if (applyMinSpeed && GetVectorLength(outVelocity) <= 250.0)
+	{
+		NormalizeVector(outVelocity, outVelocity);
+		ScaleVector(outVelocity, 251.0);
+	}
+}
+
+// 胖子连跳
+bool Do_Bhop(int client, int &buttons, const float velocity[3])
+{
+	if (buttons & IN_FORWARD || buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT) { if (ClientPush(client, velocity)) { return true; } }
 	return false;
 }
 
-bool ClientPush(int client, float vec[3])
+bool ClientPush(int client, const float velocity[3])
 {
-	float curvel[3] = {0.0};
-	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", curvel);
-	AddVectors(curvel, vec, curvel);
-	// 叠加式推速必须封顶, 否则连续连跳会无限累积出“飞天大跳”；先限速再做撞墙/坠落检查, 保证检查与实际速度一致
-	AIPathMovement_ClampHorizontalSpeed(curvel, g_hBhopMaxSpeed.FloatValue);
-	if (Dont_HitWall_Or_Fall(client, curvel))
+	float vel[3];
+	vel = velocity;
+	if (Dont_HitWall_Or_Fall(client, vel))
 	{
-		if (GetVectorLength(curvel) <= 250.0)
-		{
-			NormalizeVector(curvel, curvel);
-			ScaleVector(curvel, 251.0);
-		}
-		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, curvel);
+		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vel);
 		return true;
 	}
 	return false;

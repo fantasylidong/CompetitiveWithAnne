@@ -8,6 +8,54 @@
 	{
 		"ko"		"{green}%N {olive}가 게임에서 나갔습니다. - 이유: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"ko"		"연결이 거부됨"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"ko"		"시간 초과"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"ko"		"콘솔에 의해 추방됨"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"ko"		"사용자가 직접 접속 종료"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"ko"		"핑이 너무 높음"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"ko"		"No Steam logon / Steam 인증 실패"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"ko"		"Steam 계정이 다른 곳에서 사용 중"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"ko"		"Steam 연결이 끊김"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"ko"		"이 Steam 계정은 이 게임을 보유하고 있지 않음"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"ko"		"인증 거부됨"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"ko"		"Certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"ko"		"Pure 서버 검사 실패"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"ko"		"{green}[AnneDonate]{default} 결제 수단은 wechat 또는 alipay만 지원합니다. 다시 선택해 주세요."

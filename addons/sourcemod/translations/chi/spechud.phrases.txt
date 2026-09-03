@@ -31,4 +31,109 @@
 	{
 		"chi"		"<{olive}HUD{default}> 聊天输入 {green}!tankhud{default} 切换 {red}Tank 面板开关"
 	}
+	
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"chi"		"{1} :: 坦克面板"
+	}
+	
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"chi"		"坦克 #{1}"
+	}
+	
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"chi"		"控制: {1} ({2})"
+	}
+	
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"chi"		"控制: AI ({1})"
+	}
+	
+	"TankHUD_Pass_Native"
+	{
+		"chi"		"原生"
+	}
+	
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"chi"		"第 {1} 传"
+	}
+	
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"chi"		"血量: {1} / {2} ({3}%%)"
+	}
+	
+	"TankHUD_HP_Dead"
+	{
+		"chi"		"血量: 死亡"
+	}
+	
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"chi"		"怒气: {1}%%"
+	}
+	
+	"TankHUD_Frust_AI"
+	{
+		"chi"		"怒气: AI"
+	}
+	
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"chi"		"网络: {1}ms / {2}"
+	}
+	
+	"TankHUD_Net_AI"
+	{
+		"chi"		"网络: AI"
+	}
+	
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"chi"		"燃烧: 剩余 {1} 秒"
+	}
+	
+	"TankHUD_Target_Searching"
+	{
+		"chi"		"目标: 搜索中..."
+	}
+	
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"chi"		"目标: {1} [{2}HP/{3}] 距离 {4}"
+	}
+	
+	"TankHUD_State_Hang"
+	{
+		"chi"		"挂边"
+	}
+	
+	"TankHUD_State_Down"
+	{
+		"chi"		"倒地"
+	}
+	
+	"TankHUD_State_Pinned"
+	{
+		"chi"		"被控"
+	}
+	
+	"TankHUD_State_Up"
+	{
+		"chi"		"站立"
+	}
 }

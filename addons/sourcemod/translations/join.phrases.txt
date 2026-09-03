@@ -8,6 +8,54 @@
 	{
 		"en"		"{green}%N {olive} left the game - Reason: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"en"		"Connection rejected"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"en"		"Timed out"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"en"		"Kicked by console"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"en"		"Disconnected by user"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"en"		"Ping is too high"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"en"		"No Steam logon / Steam authentication failed"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"en"		"Steam account is being used elsewhere"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"en"		"Steam connection lost"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"en"		"This Steam account does not own this game"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"en"		"Validation rejected"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"en"		"Certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"en"		"Pure server check failed"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"en"		"{green}[AnneDonate]{default} The payment method only supports wechat or alipay, please select again."

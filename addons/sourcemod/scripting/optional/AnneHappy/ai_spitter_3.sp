@@ -23,7 +23,7 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.7",
+		version 		= "3.0.8",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -60,7 +60,7 @@ enum
 public void OnPluginStart()
 {
 	g_hAllowBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启 Spitter 连跳功能", CVAR_FLAG, true, 0.0, true, 1.0);
-	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳的速度", CVAR_FLAG, true, 0.0);
+	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAG, true, 0.0);
 	g_hBhopMaxSpeed = CreateConVar("ai_SpitterBhopMaxSpeed", "1000.0", "Spitter 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_SpitterBhopStartDistance", "2500.0", "Spitter 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hPathBhop = CreateConVar("ai_spitter3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -137,7 +137,11 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	if (buttons & (IN_ATTACK | IN_ATTACK2))
 		AIPathMovement_Reset(spitter);
 	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
-	if (GetEntityMoveType(spitter) & MOVETYPE_LADDER)
+	bool onLadder = GetEntityMoveType(spitter) == MOVETYPE_LADDER;
+	// 地面/梯子登记要每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
+	if (onGround || onLadder)
+		AIPathMovement_NotifyGrounded(spitter);
+	if (onLadder)
 	{
 		AIPathMovement_Reset(spitter);
 		buttons &= ~IN_JUMP;
@@ -213,10 +217,12 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	buttons |= IN_DUCK;
 	float proposedVelocity[3], pushVelocity[3];
 	GetAngleVectors(eyeAngle, pushVelocity, NULL_VECTOR, NULL_VECTOR);
+	// 从跑动直接起跳的第一跳不加推力, 推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
+	float hopImpulse = AIPathMovement_GetHopImpulse(spitter, g_hBhopSpeed.FloatValue);
 	// 推力只保留水平分量, 防止沿视线俯仰方向向上/向下加速；
 	// 俯仰 ±90 时水平分量为零, 归一化会退化成纯垂直向量, 此时不加推力
 	if (AIPathMovement_NormalizeHorizontal(pushVelocity))
-		ScaleVector(pushVelocity, g_hBhopSpeed.FloatValue);
+		ScaleVector(pushVelocity, hopImpulse);
 	GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", proposedVelocity);
 	AddVectors(proposedVelocity, pushVelocity, proposedVelocity);
 	// 起跳前限速, 保证安全检查使用的速度与实际推出的速度一致
@@ -234,13 +240,16 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		AIPathMovement_MarkRouteCheckFailure(spitter);
 		return Plugin_Continue;
 	}
-	bool hopped = spitterDoBhop(spitter, buttons, eyeAngle);
-	if (pathGuided && hopped)
+	bool hopped = spitterDoBhop(spitter, buttons, proposedVelocity);
+	if (hopped)
 	{
-		float pathVelocity[3];
-		GetEntPropVector(spitter, Prop_Data, "m_vecAbsVelocity", pathVelocity);
-		AIPathMovement_AlignFacing(pathVelocity, angles);
-		AIPathMovement_BeginPathHop(spitter, pathGoal, AIPathMovement_GetHorizontalSpeed(pathVelocity), g_hBhopMaxSpeed.FloatValue);
+		// 消费掉本次落地推力授权, 引擎拒跳时下一帧不会重复领取
+		AIPathMovement_MarkHopStart(spitter);
+		if (pathGuided)
+		{
+			AIPathMovement_AlignFacing(proposedVelocity, angles);
+			AIPathMovement_BeginPathHop(spitter, pathGoal, AIPathMovement_GetHorizontalSpeed(proposedVelocity), g_hBhopMaxSpeed.FloatValue);
+		}
 	}
 	return Plugin_Changed;
 }
@@ -248,11 +257,13 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 public void OnClientDisconnect(int client)
 {
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
 }
 
 public void OnClientPutInServer(int client)
 {
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
 }
 
 public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
@@ -298,29 +309,17 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 }
 
 // 方法
-bool spitterDoBhop(int client, int& buttons, float eyeAngle[3])
+// 起跳速度已在调用方按推力、限速构造并通过路线检查, 这里只负责写回, 保证检查与实际速度一致
+bool spitterDoBhop(int client, int& buttons, const float velocity[3])
 {
 	if ((buttons & IN_FORWARD) || (buttons & IN_MOVELEFT) || (buttons & IN_MOVERIGHT))
 	{
-		clientPush(client, eyeAngle, g_hBhopSpeed.FloatValue);
+		static float velVec[3];
+		velVec = velocity;
+		TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, velVec);
 		return true;
 	}
 	return false;
-}
-
-void clientPush(int client, float eyeAngle[3], float force)
-{
-	static float eyeAngleVec[3], velVec[3];
-	GetAngleVectors(eyeAngle, eyeAngleVec, NULL_VECTOR, NULL_VECTOR);
-	// 推力只保留水平分量, 垂直高度交给跳跃本身；
-	// 俯仰 ±90 时水平分量为零, 归一化会退化成纯垂直向量, 此时不加推力
-	if (AIPathMovement_NormalizeHorizontal(eyeAngleVec))
-		ScaleVector(eyeAngleVec, force);
-	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velVec);
-	AddVectors(velVec, eyeAngleVec, velVec);
-	// 叠加式推速必须封顶, 否则连续连跳会无限累积出“飞天大跳”
-	AIPathMovement_ClampHorizontalSpeed(velVec, g_hBhopMaxSpeed.FloatValue);
-	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, velVec);
 }
 
 bool isAiSpitter(int client)

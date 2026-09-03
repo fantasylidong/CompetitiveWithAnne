@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Compiles a SourcePawn plugin on a Linux x86-64 host.
+#
+# Backends (pick with SPCOMP_BACKEND, default "ssh"):
+#   ssh    - run spcomp64 natively on $SPCOMP_SSH_HOST (default: pve-yma).
+#   docker - run inside ubuntu:22.04 through the current docker context.
+#
+# Either way the scripting tree is streamed to the remote side over stdin (tar)
+# and the compiled .smx comes back over stdout, so no shared filesystem or bind
+# mount is required. This matters because our docker context usually points at
+# a remote daemon whose bind mounts would refer to *its* filesystem, not this
+# checkout.
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 scripting_dir="addons/sourcemod/scripting"
-compiler="/work/$scripting_dir/sourcemod/spcomp64"
+backend="${SPCOMP_BACKEND:-ssh}"
+ssh_host="${SPCOMP_SSH_HOST:-pve-yma}"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: scripts/spcomp-docker.sh <plugin.sp> [output.smx]" >&2
@@ -50,34 +63,29 @@ default_plugin_rel_for_source() {
   printf '%s.smx\n' "${source_path%.sp}"
 }
 
-container_output_for_arg() {
+local_output_for_arg() {
   local output_path="$1"
 
-  if [[ "$output_path" == /work/* ]]; then
+  if [[ "$output_path" = /* ]]; then
     printf '%s\n' "$output_path"
-  elif [[ "$output_path" == "$repo_root/"* ]]; then
-    printf '/work/%s\n' "${output_path#"$repo_root"/}"
-  elif [[ "$output_path" = /* ]]; then
-    echo "Output path must be inside the repository when using Docker: $output_path" >&2
-    return 2
   elif [[ "$output_path" == ./* ]]; then
-    printf '/work/%s\n' "${output_path#./}"
+    printf '%s/%s\n' "$repo_root" "${output_path#./}"
   elif [[ "$output_path" == addons/* || "$output_path" == cfg/* || "$output_path" == scripts/* ]]; then
-    printf '/work/%s\n' "$output_path"
+    printf '%s/%s\n' "$repo_root" "$output_path"
   else
-    printf '/work/%s/%s\n' "$scripting_dir" "$output_path"
+    printf '%s/%s/%s\n' "$repo_root" "$scripting_dir" "$output_path"
   fi
 }
 
 if [[ $# -ge 2 ]]; then
-  output="$(container_output_for_arg "$2")"
+  output="$(local_output_for_arg "$2")"
 else
-  output="/work/addons/sourcemod/plugins/$(default_plugin_rel_for_source "$source_in_scripting" "$plugin_name")"
+  output="$repo_root/addons/sourcemod/plugins/$(default_plugin_rel_for_source "$source_in_scripting" "$plugin_name")"
 fi
 
-source_dir="/work/$scripting_dir"
+container_source_dir="/work/$scripting_dir"
 if [[ "$source_dir_in_scripting" != "." ]]; then
-  source_dir="$source_dir/$source_dir_in_scripting"
+  container_source_dir="$container_source_dir/$source_dir_in_scripting"
 fi
 
 include_args=(
@@ -95,20 +103,62 @@ include_args=(
   -i/work/$scripting_dir/include/ripext
 )
 
-docker run --rm --platform linux/amd64 \
-  -v "$repo_root:/work" \
-  -w "/work/$scripting_dir" \
-  ubuntu:22.04 \
-  bash -lc '
-    set -euo pipefail
-    compiler="$0"
-    output="$1"
-    source_dir="$2"
-    source_file="$3"
-    shift 3
+mkdir -p "$(dirname "$output")"
+tmp_output="$(mktemp "${TMPDIR:-/tmp}/spcomp.XXXXXX.smx")"
+trap 'rm -f "$tmp_output"' EXIT
 
-    mkdir -p "$(dirname "$output")"
-    chmod +x "$compiler"
-    cd "$source_dir"
-    "$compiler" "$source_file" "$@" -o"$output"
-  ' "$compiler" "$output" "$source_dir" "$source_file" "${include_args[@]}"
+# Runs on the remote side with the scripting tarball on stdin. Extracts into a
+# throwaway dir that is bind-independent: paths are rewritten so "/work" in the
+# include args resolves inside it. Compiler chatter goes to stderr; stdout
+# carries the binary .smx back.
+remote_script='
+set -euo pipefail
+source_dir="$1"
+source_file="$2"
+shift 2
+
+work="$(mktemp -d /tmp/spcomp.XXXXXX)"
+trap "rm -rf \"$work\"" EXIT
+tar xf - -C "$work" 2>/dev/null
+
+args=()
+for a in "$@"; do args+=("${a//\/work\//$work/}"); done
+source_dir="${source_dir//\/work\//$work/}"
+
+chmod +x "$work/'"$scripting_dir"'/sourcemod/spcomp64"
+cd "$source_dir"
+"$work/'"$scripting_dir"'/sourcemod/spcomp64" "$source_file" "${args[@]}" -o"$work/plugin.smx" 1>&2
+cat "$work/plugin.smx"
+'
+
+remote_cmd=(bash -c "$remote_script" _ "$container_source_dir" "$source_file" "${include_args[@]}")
+
+case "$backend" in
+  ssh)
+    # ssh flattens argv into one remote command line, so quote each word.
+    quoted=""
+    for w in "${remote_cmd[@]}"; do quoted+=" $(printf '%q' "$w")"; done
+    runner=(ssh -o BatchMode=yes "$ssh_host" "$quoted")
+    ;;
+  docker)
+    runner=(docker run --rm -i --platform linux/amd64 ubuntu:22.04 "${remote_cmd[@]}")
+    ;;
+  *)
+    echo "Unknown SPCOMP_BACKEND: $backend (expected ssh or docker)" >&2
+    exit 2
+    ;;
+esac
+
+# COPYFILE_DISABLE stops macOS bsdtar from emitting AppleDouble/xattr entries
+# that GNU tar on the remote side would warn about.
+COPYFILE_DISABLE=1 tar -C "$repo_root" -cf - "$scripting_dir" | "${runner[@]}" > "$tmp_output"
+
+if [[ ! -s "$tmp_output" ]]; then
+  echo "Compile produced no output: $source_rel" >&2
+  exit 1
+fi
+
+chmod 644 "$tmp_output"
+mv "$tmp_output" "$output"
+trap - EXIT
+echo "Wrote $output" >&2

@@ -338,3 +338,41 @@
 - Anne, Hardcore, Shotgun, Alone 모드에서 Zonemod의 `l4d2_tongue_timer.smx`를 다시 로드합니다. 생존자 즉시 해제는 최소 4초입니다. Tank 피해 해제는 Anne 계열 설정에서 1초로 낮췄으며(상류 Zonemod은 8초 유지), AI Tank의 주먹이나 바위가 아군 Smoker를 크게 벌하지 않도록 했습니다. 빗나감은 계속 `tongue_miss_delay`를 사용해 쉬움~전문가 7초, 극한/음리 3초이며, 정상 적중 후 놓기는 `tongue_hit_delay 13`을 그대로 사용합니다.
 - `l4d2_tongue_timer`를 1.3-anne.1로 올렸습니다. 피해자마다 실제로 당기는 Smoker를 기록하므로 Tank 즉시 해제의 8초 쿨다운이 첫 번째 Smoker에게 잘못 적용되지 않습니다. 혀 하나가 풀릴 때도 해당 연결만 지워 여러 Smoker의 동시 당기기를 지원합니다.
 - 재컴파일: `ai_smoker3.smx`, `l4d2_tongue_timer.smx`.
+
+### 2026년 9월 2일 Scripted HUD 표시 언어 메뉴
+
+- `l4d2_scripted_hud`를 1.7.0으로 올렸습니다. `!hud` 메뉴에 「언어」 항목이 추가되었고 `!lang` / `!hudlang`으로 바로 열 수도 있습니다. 게임 언어 따르기, English, 간체 중국어, 번체 중국어, 일본어, 한국어, 베트남어 사이를 전환합니다. `languages.cfg`에서 서버가 실제로 아는 언어만 표시하므로, 골라도 아무 일도 일어나지 않는 항목은 나오지 않습니다.
+- 선택 값은 SteamID별로 `scripted_hud_prefs`의 새 `lang_code` 열과 별도 쿠키 `l4d2_scripted_hud_lang_v1`에 저장하며, 다른 HUD 설정과 같은 revision 병합 규칙을 사용해 서버 이동·재접속·데이터베이스 일시 중단 뒤에도 유지됩니다.
+- 언어는 `SetClientLanguage`로 적용하므로 HUD와 HUD 메뉴는 물론, 다른 플러그인이 해당 플레이어에게 보내는 채팅 번역도 함께 바뀝니다. SourceMod는 클라이언트가 설정을 바꿀 때마다 `cl_language`를 다시 읽으므로, 해당 플레이어의 HUD를 만들 때마다 이 덮어쓰기 값을 확인하고 다시 적용합니다.
+- `!hud`의 「기본값으로 되돌리기」는 언어를 일부러 초기화하지 않습니다. 메뉴 자체가 어떤 언어로 보일지 정하는 설정이라 지워지면 되돌리는 길을 읽지 못할 수 있기 때문입니다. 되돌리려면 언어 메뉴의 「게임 언어 따르기」를 고르세요.
+- 알려진 제한: HUD2의 모드 태그(`[普通药役]` 등)와 AI 난이도 이름은 여전히 전역 공유 하드코딩 중국어라 이 설정을 따르지 않습니다.
+- `docs/plugin_commands.md`에 `sm_hudlang` / `sm_lang`을 추가했습니다.
+- 재컴파일: `l4d2_scripted_hud.smx`.
+
+### 2026년 9월 2일 spechud 탱크 패널 수정
+
+- `spechud`를 3.10.1로 업데이트. 탱크 HUD 패널은 관전자와 감염자 플레이어에게만 전송하며, 이전에 versus_coop용으로 추가했던 생존자 수신 분기를 제거. 팀 변경 시 `CancelClientMenu`로 패널을 회수하려던 코드도 제거했다——이 SourceMod 함수는 서버 측 상태만 지우고 클라이언트에는 아무것도 보내지 않아 radio 패널은 3초 타임아웃까지 그대로 남으므로 실제 효과가 없었다.
+- AI 탱크 대상이 항상 "탐색 중"으로 표시되던 문제 수정. 기존에는 `l4d_target_override`가 기록한 피해자만 읽었지만, 탱크의 타겟 변경은 실제로 Left4DHooks의 `L4D2_OnChooseVictim`(`ai_tank3`, `SI_Target_limit`가 사용)을 통하므로 기록이 비어 있는 경우가 많았다. 이제 spechud가 직접 `L4D2_OnChooseVictim`을 수신해 각 탱크의 최근 대상을 userid로 캐시하며, target_override에 기록이 있으면 그쪽을 우선한다.
+- 탱크 패널 문구를 모두 번역 파일로 옮기고 수신자별 클라이언트 언어로 패널을 생성. 서버 기본 언어가 `chi`라서 일치하는 언어가 없는 플레이어에게는 중국어가 표시된다. en/chi/zho/jp/ko/vi/es 7개 `spechud.phrases.txt`에 구문 추가.
+- `scripts/spcomp-docker.sh`를 bind mount 의존에서 tar 스트리밍 방식(소스는 stdin으로 전송, .smx는 stdout으로 수신)으로 변경. 기본적으로 SSH를 통해 `pve-yma` 호스트에서 spcomp64를 네이티브 실행하며(`SPCOMP_SSH_HOST`로 변경), `SPCOMP_BACKEND=docker`로 컨테이너 실행 전환 가능. 로컬 Docker 데몬이 없는 Mac에서도 컴파일된다.
+- 재컴파일: `spechud.smx`.
+
+### 2026년 9월 2일 특수 감염자 타겟 상한 연동 수정 (infected_control / SI_Target_limit / l4d_target_override)
+
+- `infected_control.smx`를 2026-09-02.1로 업데이트. 러너(단독 질주) 상태가 켜질 때만 외부에 알리던 회귀를 수정: 해제 시(팀 복귀, 웨이브/라운드 리셋, 기믹 이벤트)에도 `OnDetectRushman(0)`을 보내므로 `SI_Target_limit`가 한 번의 감지 후 맵이 끝날 때까지 "전원 상한 해제" 상태에 머무르지 않는다. 해제에는 확인 창을 두었다: 새 cvar `inf_antibait_runner_off_confirm`(기본 2.3초)로, 러너가 판정 임계값 안으로 돌아온 것만으로는(격차 축소, 팀원이 따라붙음) 그 시간 동안 지속되어야 해제되어 팀원이 잠깐 따라붙고 다시 벌어질 때 타겟 상한이 반복적으로 켜졌다 꺼지는 것을 막는다. 러너의 사망/기절/구속/접속 종료는 여전히 즉시 해제. 웨이브 리셋이 `gAB.runner`만 지우고 `gST.bPickRushMan`을 남기는 일도 없어져 두 러너 상태가 일치한다.
+- 스폰 측 용량 판정을 "남은 자리" 기준으로 변경: 아직 ChooseVictim을 거치지 않은 새 스폰은 유도 대상에 예약 자리를 기록(장부에 등록되거나 2.5초 후 해제)하여 같은 프레임의 연속 스폰이 전부 한 생존자에게 향하지 않는다. 무작위 대상 선택은 남은 자리로 가중치를 두어 선두 플레이어의 ×2 상한이 자연스럽게 더 많은 압박을 받는다.
+- 텔레포트 보충 클래스가 생존 자리를 모두 소진한 경우(일반 큐나 내통자 예약이 먼저 차지) 자리가 남은 클래스로 대체. 모든 클래스가 가득 차면 1초 백오프하고 매 프레임 헛돌지 않는다.
+- `SI_Target_limit.smx`를 1.9로 업데이트. 새 cvar `SI_target_rushman_scope`(기본 1): 러너 감지 중에는 러너 본인의 개인 상한만 해제(`SetTargetedCap`)하고 나머지 생존자는 정상 보호를 유지. 0이면 예전 동작(전원을 SI 총 상한까지 올림). `SI_target_enable`이 실제로 동작함(끄면 target_override의 targeted 옵션을 비우고 모든 native가 "제한 없음"을 반환). 재계산은 한 번 계산·한 번 전송으로 바꿔 클래스 단위 옵션을 66개 슬롯마다 보내지 않음. 수동 모드도 초기화 시 전송. `survivor_rescued` / `defibrillator_used` / `player_team` / 생존자 `player_spawn` 트리거를 추가하고 매초 검증하여 가동 인원 변화나 target_override 설정 재로드(`sm_to_reload`는 targeted를 0으로 되돌림)로 생긴 어긋남을 자동 보정. infected_control 재로드 후 `l4d_infected_limit`를 이중 훅하지 않음. `si_target_limit.inc`의 라이브러리 이름을 `RegPluginLibrary`와 같은 소문자로 통일.
+- `l4d_target_override.smx`를 2.28로 업데이트. ChooseVictim에 post detour 추가: pre 단계가 결정을 게임에 맡긴 경우(type=1에서 시야 내 대상 없음, 클래스가 오버라이드 대상 아님, forward가 Handled 반환)에도 엔진이 고른 피해자를 targeted 장부에 등록하여 `GetValue(VALUE_INDEX_TOTAL)`의 상시 과소 보고를 해소. `SetLastVictim`으로 등록한 대상은 wait/dist 의미를 유지하고 다음 호출에서 버리고 다시 고르지 않음. forward가 Plugin_Handled를 반환할 때의 ArrayList 핸들 누수 수정.
+- 재컴파일: `infected_control.smx`, `SI_Target_limit.smx`, `l4d_target_override.smx`.
+
+### 2026년 9월 3일 특수 감염자 연속 점프: 첫 점프에서 가속하지 않음
+
+- 원인 파악: 공유 공중 보정 `ai_path_movement.inc` 자체는 절대 가속하지 않는다(속도를 이륙 속도 이하로만 받쳐 주고, 회전 시에는 오히려 감속). 네 종류 특수 감염자에서 "첫 점프가 공중에서 갑자기 빨라진다"고 보인 것은 전부 이륙 프레임 때문이었다: Path / Direct 이륙이 속도를 `달리기 속도 + 가속도 한 번분`으로 그대로 바꿔 넣었다(Charger 250→350, +40%; Boomer 175→325, +86%, 게다가 `ClientPush`가 250 이하의 속도를 251까지 강제로 끌어올림). 사람의 버니합처럼 착지 때 늘어나는 방식이 아니었다.
+- `ai_path_movement.inc`에 연속 점프 체인 추적 추가: `AIPathMovement_NotifyGrounded`를 지상(또는 사다리) 프레임마다 가능한 한 빨리 호출하고, 지면을 떠난 뒤 0.1초 이상 지나 다시 닿은 시점을 착지로 등록한다. 플러그인 점프, 엔진 점프, 경로를 따라 낙차를 걸어 내려온 경우를 구분하지 않으며 높은 곳에서의 낙하도 착지로 치고 체공 시간 상한은 두지 않는다——낙하로 얻은 속도는 그대로 유지되고 착지 점프에서 가속도가 추가된다. `AIPathMovement_GetHopImpulse`는 "착지 후 0.15초 이내에 다시 점프"할 때만 가속도를 온전히 돌려주고, 지면에서 바로 뛴 첫 점프에는 0을 돌려주어 방향만 바꾼다. `AIPathMovement_MarkHopStart`는 이륙마다 착지 허가를 소비한다(`BeginPathHop` 내부에서 자동 호출). 엔진이 점프를 거부하면 다음 프레임에도 지면에 서 있고 한 번도 떠나지 않았으므로 착지로 치지 않아 제자리 재시도가 매 프레임 가속도를 받는 일이 없다. 사다리는 지면으로 취급하여 사다리를 오른 뒤 첫 점프는 가속하지 않는다.
+- `ai_charger3`를 1.0.1.12로 업데이트: Path / Direct 지상 이륙을 착지 가속으로 변경, 돌격 전 마지막 점프도 이륙으로 등록해 접근 상태로 돌아간 뒤 체인이 이어진다. 새 Charger / 리스폰 시 체인 리셋. 디버그 로그에 지상 속도와 착지 점프 여부 추가.
+- `ai_tank3`를 1.0.0.12로 업데이트: 일반 점프(전/후/측면 임펄스)와 Path 선행 점프 모두 착지 가속으로 변경. 라운드 시작과 접속 시 체인 리셋.
+- `ai_boomer_3`를 3.0.9로 업데이트: 추진력을 착지 시에만 추가. 이륙 속도를 먼저 구성해 경로 검사와 Teleport에서 같은 값을 사용(기존 경로 검사는 추진력 벡터만 보았기 때문에 추진력 없는 첫 점프에서는 길이 0 검사로 퇴화했을 것). 최저 점프 속도 251은 실제로 추진력을 더하는 점프에서만 적용되어 첫 점프에 몰래 속도를 더하지 않는다.
+- `ai_spitter_3`를 3.0.8로 업데이트: 추진력을 착지 시에만 추가. `spitterDoBhop`은 경로 검사를 통과한 이륙 속도를 그대로 써 넣고 Teleport 전에 다시 계산하지 않는다.
+- 네 플러그인의 가속도 cvar 설명을 "착지 직후 재점프에서 추가, 달리기에서 바로 뛴 첫 점프에는 없음"으로 통일. 가속 체인이 한 단계 뒤로 밀리는 것뿐이며 상한, 공중 보정, 회전 감속 로직은 변경 없음.
+- 재컴파일: `ai_charger3.smx`, `ai_tank3.smx`, `ai_boomer_3.smx`, `ai_spitter_3.smx`.

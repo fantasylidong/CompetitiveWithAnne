@@ -179,6 +179,7 @@ enum struct Config
     ConVar AntiBaitAction;
     ConVar AntiBaitRunnerGapPct;
     ConVar AntiBaitRunnerNearDist;
+    ConVar AntiBaitRunnerOffConfirm;
     ConVar AntiBaitFastTeleport;
     ConVar AntiBaitLatestBaseScale;
     ConVar AntiBaitLatestScaleStep;
@@ -210,6 +211,7 @@ enum struct Config
     int    iAntiBaitAction;
     int    iAntiBaitRunnerGapPct;
     float  fAntiBaitRunnerNearDist;
+    float  fAntiBaitRunnerOffConfirm;
     float  fAntiBaitFastTeleport;
     float  fAntiBaitLatestBaseScale;
     float  fAntiBaitLatestScaleStep;
@@ -767,6 +769,11 @@ enum struct Config
             "Runner is ignored when another survivor is within this world distance",
             CVAR_FLAG, true, 0.0, true, 5000.0
         );
+        this.AntiBaitRunnerOffConfirm = CreateConVar(
+            "inf_antibait_runner_off_confirm", "2.3",
+            "Seconds the runner must keep failing the runner checks (gap/near distance) before runner state is cleared; death/incap clears immediately",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
         this.AntiBaitFastTeleport = CreateConVar(
             "inf_antibait_fast_tp", "1.5",
             "Invisible seconds needed for anti-bait fast teleport; still respects spawn grace",
@@ -906,6 +913,7 @@ enum struct Config
         this.AntiBaitAction.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerGapPct.AddChangeHook(OnCfgChanged);
         this.AntiBaitRunnerNearDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitRunnerOffConfirm.AddChangeHook(OnCfgChanged);
         this.AntiBaitFastTeleport.AddChangeHook(OnCfgChanged);
         this.AntiBaitLatestBaseScale.AddChangeHook(OnCfgChanged);
         this.AntiBaitLatestScaleStep.AddChangeHook(OnCfgChanged);
@@ -1261,6 +1269,7 @@ enum struct Config
         this.iAntiBaitAction = this.AntiBaitAction.IntValue;
         this.iAntiBaitRunnerGapPct = this.AntiBaitRunnerGapPct.IntValue;
         this.fAntiBaitRunnerNearDist = this.AntiBaitRunnerNearDist.FloatValue;
+        this.fAntiBaitRunnerOffConfirm = this.AntiBaitRunnerOffConfirm.FloatValue;
         this.fAntiBaitFastTeleport = this.AntiBaitFastTeleport.FloatValue;
         this.fAntiBaitLatestBaseScale = this.AntiBaitLatestBaseScale.FloatValue;
         this.fAntiBaitLatestScaleStep = this.AntiBaitLatestScaleStep.FloatValue;

@@ -8,6 +8,54 @@
 	{
 		"chi"		"{green}%N {olive}离开了游戏 - 理由: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"chi"		"连接被拒绝"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"chi"		"超时"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"chi"		"控制台退出"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"chi"		"自己主动断开连接"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"chi"		"ping 太高了"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"chi"		"no steam logon/ steam验证失败"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"chi"		"steam账号被顶"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"chi"		"steam断线"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"chi"		"没有这款游戏"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"chi"		"验证失败"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"chi"		"certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"chi"		"纯净服务器"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"chi"		"{green}[AnneDonate]{default} 支付方式只支持 wechat 或 alipay，请重新选择。"

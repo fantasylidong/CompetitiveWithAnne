@@ -8,6 +8,54 @@
 	{
 		"vi"		"{green}%N {olive} đã rời khỏi trò chơi - Lý do: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"vi"		"Kết nối bị từ chối"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"vi"		"Hết thời gian chờ"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"vi"		"Bị console ngắt kết nối"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"vi"		"Người chơi tự ngắt kết nối"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"vi"		"Ping quá cao"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"vi"		"No Steam logon / Xác thực Steam thất bại"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"vi"		"Tài khoản Steam đang được dùng ở nơi khác"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"vi"		"Mất kết nối Steam"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"vi"		"Tài khoản Steam không sở hữu trò chơi này"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"vi"		"Xác thực bị từ chối"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"vi"		"Certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"vi"		"Không qua kiểm tra pure server"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"vi"		"{green}[AnneDonate]{default} Phương thức thanh toán chỉ hỗ trợ wechat hoặc alipay, vui lòng chọn lại."

@@ -573,7 +573,7 @@ CHARGING (冲锋) : 冲锋结束后 ──────────> APPROACH (�
 Charger 通过连跳快速接近目标生还者, 是持续时间最长的状态, Charger 生成后首先进入这个状态
 
 **连跳行为:**
-- 起跳时每跳施加 `ai_charger3_bhop_impulse` 的加速度, 速度上限由 `ai_charger3_bhop_max_speed` 控制
+- `ai_charger3_bhop_impulse` 的加速度只在「落地后紧接着 (0.15 秒内) 再起跳」时追加, 从地面直接起跳的第一跳保持跑速、只改方向, 避免离地瞬间凭空多出一整份速度像在空中突然加速。落地 = 离开地面至少 0.1 秒后重新踩地, 不区分插件起跳、引擎跳跃还是沿路径走下落差, 高处坠落同样算落地且不设滞空上限; 引擎拒跳后仍站在原地中间没有离地, 不算落地; 梯子按地面处理。速度上限由 `ai_charger3_bhop_max_speed` 控制。落地/起跳登记由共享的 `ai_path_movement.inc` (`AIPathMovement_NotifyGrounded` / `MarkHopStart` / `GetHopImpulse`) 维护, Tank / Boomer / Spitter 3.0 使用同一套节奏
 - 若目标正在看着 Charger (视角夹角小于 `ai_charger3_target_watch_maxdeg`), 连跳方向会在基准方向左右随机偏移 `[ai_charger3_bhop_strafe_mindeg, ai_charger3_bhop_strafe_maxdeg]` 度, 实现 Z 字形规避 (侧向连跳), 开启侧向连跳时若与目标距离小于 `ai_charger3_bhop_strafe_mindist` 时, 禁止侧向连跳以防止 Charger 连跳过头
 - 无目标视野时若速度方向与视角方向夹角在 `ai_charger3_bhop_nvis_maxang` 范围内, 仍允许连跳 (寻路连跳)
 - 每次离地时固定本跳的路径目标, 身体朝向始终跟随实际运动方向；空中以短步长平滑转向, 不会在一跳内反复切换路径节点或倒着滑行

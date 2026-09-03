@@ -24,6 +24,7 @@ enum struct AntiBaitRuntime
     int lastMaxPct;
     int lastMedianPct;
     int runner;
+    float runnerLostSince;     // 跑男开始不满足判定的时间；0=仍满足。持续超过 fAntiBaitRunnerOffConfirm 才解除
     int holdingTarget;
     int activeCount;
     int vulnerableCount;
@@ -57,6 +58,7 @@ enum struct AntiBaitRuntime
         this.lastMaxPct = -1;
         this.lastMedianPct = -1;
         this.runner = -1;
+        this.runnerLostSince = 0.0;
         this.holdingTarget = -1;
         this.activeCount = 0;
         this.vulnerableCount = 0;
@@ -535,6 +537,8 @@ static void AntiBait_Resume(float now)
             gAB.pressureSince += pausedFor;
         if (gAB.spreadSince > 0.0)
             gAB.spreadSince += pausedFor;
+        if (gAB.runnerLostSince > 0.0)
+            gAB.runnerLostSince += pausedFor;
     }
 
     AntiBaitState resume = gAB.resumeState;
@@ -577,10 +581,12 @@ static void AntiBait_UpdateRunner(int highestClient, int maxPct, int medianPct)
 {
     bool oldOn = gST.bPickRushMan;
     int oldRunner = gST.rushManIndex;
+    float now = GetGameTime();
 
     if (AntiBait_IsRunnerCandidate(highestClient, maxPct, medianPct))
     {
         gAB.runner = highestClient;
+        gAB.runnerLostSince = 0.0;
         gST.bPickRushMan = true;
         gST.rushManIndex = highestClient;
 
@@ -589,30 +595,66 @@ static void AntiBait_UpdateRunner(int highestClient, int maxPct, int medianPct)
             LogMsg("Runner state ON: %N", highestClient);
             EmitRushmanForward(highestClient);
         }
+        return;
     }
-    else
+
+    if (!oldOn)
     {
-        gAB.runner = -1;
-        gST.bPickRushMan = false;
-        gST.rushManIndex = -1;
-        if (oldOn)
-            LogMsg("Runner state OFF");
+        gAB.runnerLostSince = 0.0;
+        return;
     }
+
+    // 跑男死亡/掉线/倒地/被控立即解除；只是回到判定阈值以内（差距缩小、
+    // 队友靠近）需要持续 fAntiBaitRunnerOffConfirm 秒才解除，避免队友短暂
+    // 追上又拉开时目标上限反复开关。
+    bool runnerDown = !IsValidSurvivor(oldRunner) || !IsPlayerAlive(oldRunner)
+        || IsPinned(oldRunner) || L4D_IsPlayerIncapacitated(oldRunner);
+    if (runnerDown || gCV.fAntiBaitRunnerOffConfirm <= 0.0)
+    {
+        AntiBait_ClearRunner();
+        return;
+    }
+
+    if (gAB.runnerLostSince <= 0.0)
+    {
+        gAB.runnerLostSince = now;
+        AntiBait_Debug("runner %N below threshold, off-confirm started (%.1fs)",
+            oldRunner, gCV.fAntiBaitRunnerOffConfirm);
+        return;
+    }
+
+    if ((now - gAB.runnerLostSince) >= gCV.fAntiBaitRunnerOffConfirm)
+        AntiBait_ClearRunner();
 }
 
-static void AntiBait_ClearRunner()
+// 跑男状态解除必须通知外部（SI_Target_limit 依赖 OnDetectRushman(0) 恢复目标上限），
+// 否则对方会一直停留在“跑男放开”状态直到下一回合。
+void AntiBait_ClearRunner()
 {
-    if (gST.bPickRushMan)
-        LogMsg("Runner state OFF");
+    bool wasOn = gST.bPickRushMan;
 
     gAB.runner = -1;
+    gAB.runnerLostSince = 0.0;
     gST.bPickRushMan = false;
     gST.rushManIndex = -1;
+
+    if (wasOn)
+    {
+        LogMsg("Runner state OFF");
+        EmitRushmanForward(0);
+    }
 }
 
 static void AntiBait_StartFresh(float now, const char[] reason)
 {
+    // 跑男状态由 AntiBait_UpdateRunner 每秒独立维护；波次重置不应把 gAB.runner
+    // 单独清掉而留下 gST.bPickRushMan，否则 Tactical_ResolveRuntimeTarget 与
+    // AntiBait_GetPreferredTarget 在下一次 UpdateRunner 之前会看到两套状态。
+    int runner = gAB.runner;
+    float runnerLostSince = gAB.runnerLostSince;
     gAB.Reset();
+    gAB.runner = gST.bPickRushMan ? runner : -1;
+    gAB.runnerLostSince = gST.bPickRushMan ? runnerLostSince : 0.0;
     gAB.state = gCV.bAntiBaitEnable ? AB_Grace : AB_Off;
     gAB.stateSince = now;
     gAB.lastProgressTime = now;

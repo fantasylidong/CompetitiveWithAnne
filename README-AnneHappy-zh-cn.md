@@ -2,7 +2,7 @@
 * 为了保持插件包结构和上游一样方便同步，这个插件包将不会带有nav修改文件和跳舞插件的模型与声音，~~AnneHappy的Nav修改文件请到我的[anne项目](https://github.com/fantasylidong/anne)中下载~~ 新解决方案，到[release页面](https://github.com/fantasylidong/CompetitiveWithAnne/releases)下载整合插件包，里面有
 * 当前版本已经是进入stable模式，大部分核心插件更新可以通过join插件自动更新，不用那么频繁检测是否有更新了
 * Release 只提供两种整合包：默认完整包需要外部 MySQL，`nomysql` 包不需要外部 MySQL
-* 没有数据库时保持 `join_autoupdate=1`，只更新无数据库插件；自行配置好数据库后改为 `2`，白名单内的 Anne 私用服会自动额外更新隐藏插件
+* `join` 不生成独立 cfg；在各模式的 `shared_settings.cfg` 中，没有数据库时保持 `join_autoupdate=1`，配置好数据库后改为 `2`，白名单内的 Anne 私用服会自动额外更新隐藏插件
 
 ## **Accelerator 崩溃报告上传**
 

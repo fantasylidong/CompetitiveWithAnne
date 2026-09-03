@@ -197,22 +197,41 @@ int ChooseTargetSurvivor()
     if (gST.bPickRushMan && IsEligibleSpawnTarget(gST.rushManIndex))
         return gST.rushManIndex;
 
+    // 按剩余可锁定名额加权：名额越多越容易被选为本波导向目标，让压力分布跟
+    // SI_Target_limit 的上限口径一致（队首 ×2 自然拿到更高权重）。无上限信息时
+    // 退化为等权随机。
     int cand[MAX_SURVIVOR_SLOTS];
+    int weight[MAX_SURVIVOR_SLOTS];
     int n = 0;
+    int totalWeight = 0;
     for (int i = 1; i <= MaxClients; i++)
     {
         if (IsEligibleSpawnTarget(i))
         {
-            if (SpawnTarget_IsAtCapacity(i))
+            int headroom = SpawnTarget_GetHeadroom(i);
+            if (headroom == 0)
             {
                 LogMsg("[TARGET] skip %N: reach limit", i);
                 continue;
             }
-            cand[n++] = i;
+            cand[n] = i;
+            weight[n] = (headroom > 0) ? headroom : 1;
+            totalWeight += weight[n];
+            n++;
             if (n >= sizeof(cand)) break;
         }
     }
-    if (n > 0) return cand[GetRandomInt(0, n-1)];
+    if (n > 0)
+    {
+        int roll = GetRandomInt(0, totalWeight - 1);
+        for (int k = 0; k < n; k++)
+        {
+            roll -= weight[k];
+            if (roll < 0)
+                return cand[k];
+        }
+        return cand[n - 1];
+    }
     int fb = GetHighestFlowSurvivorSafe();
     if (fb > 0 && fb <= MaxClients && IsClientInGame(fb))
         LogMsg("[TARGET] fallback to highest-flow %N", fb);

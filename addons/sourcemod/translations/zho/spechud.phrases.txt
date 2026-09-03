@@ -26,4 +26,90 @@
 	{
 		"zho"		"<{olive}HUD{default}> 在聊天中輸入 {green}!tankhud{default} 切換{red}坦克 HUD"
 	}
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"zho"		"{1} :: 坦克面板"
+	}
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"zho"		"坦克 #{1}"
+	}
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"zho"		"控制: {1} ({2})"
+	}
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"zho"		"控制: AI ({1})"
+	}
+	"TankHUD_Pass_Native"
+	{
+		"zho"		"原生"
+	}
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"zho"		"第 {1} 傳"
+	}
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"zho"		"血量: {1} / {2} ({3}%%)"
+	}
+	"TankHUD_HP_Dead"
+	{
+		"zho"		"血量: 死亡"
+	}
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"zho"		"怒氣: {1}%%"
+	}
+	"TankHUD_Frust_AI"
+	{
+		"zho"		"怒氣: AI"
+	}
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"zho"		"網路: {1}ms / {2}"
+	}
+	"TankHUD_Net_AI"
+	{
+		"zho"		"網路: AI"
+	}
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"zho"		"燃燒: 剩餘 {1} 秒"
+	}
+	"TankHUD_Target_Searching"
+	{
+		"zho"		"目標: 搜索中..."
+	}
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"zho"		"目標: {1} [{2}HP/{3}] 距離 {4}"
+	}
+	"TankHUD_State_Hang"
+	{
+		"zho"		"掛邊"
+	}
+	"TankHUD_State_Down"
+	{
+		"zho"		"倒地"
+	}
+	"TankHUD_State_Pinned"
+	{
+		"zho"		"被控"
+	}
+	"TankHUD_State_Up"
+	{
+		"zho"		"站立"
+	}
 }

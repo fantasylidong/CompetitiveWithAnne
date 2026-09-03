@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"ko"		" ({1} 전용)"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"ko"		"언어: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"ko"		"표시 언어"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"ko"		"게임 언어 따르기"
+		}
 	}

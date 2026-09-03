@@ -31,4 +31,109 @@
 	{
 		"es"		"<{olive}HUD{default}> Escribe {green}!tankhud{default} en el chat para cambiar el {red}HUD de tanque"
 	}
+	
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"es"		"{1} :: HUD de tanque"
+	}
+	
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"es"		"Tanque #{1}"
+	}
+	
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"es"		"Control: {1} ({2})"
+	}
+	
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"es"		"Control: IA ({1})"
+	}
+	
+	"TankHUD_Pass_Native"
+	{
+		"es"		"nativo"
+	}
+	
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"es"		"pase #{1}"
+	}
+	
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"es"		"HP: {1} / {2} ({3}%%)"
+	}
+	
+	"TankHUD_HP_Dead"
+	{
+		"es"		"HP: Muerto"
+	}
+	
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"es"		"Frustración: {1}%%"
+	}
+	
+	"TankHUD_Frust_AI"
+	{
+		"es"		"Frustración: IA"
+	}
+	
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"es"		"Red: {1}ms / {2}"
+	}
+	
+	"TankHUD_Net_AI"
+	{
+		"es"		"Red: IA"
+	}
+	
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"es"		"Fuego: {1}s"
+	}
+	
+	"TankHUD_Target_Searching"
+	{
+		"es"		"Objetivo: Buscando"
+	}
+	
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"es"		"Objetivo: {1} [{2}HP/{3}] {4}u"
+	}
+	
+	"TankHUD_State_Hang"
+	{
+		"es"		"Colgado"
+	}
+	
+	"TankHUD_State_Down"
+	{
+		"es"		"Caído"
+	}
+	
+	"TankHUD_State_Pinned"
+	{
+		"es"		"Atrapado"
+	}
+	
+	"TankHUD_State_Up"
+	{
+		"es"		"De pie"
+	}
 }

@@ -88,9 +88,11 @@ stock void SITL_CommitVictim(int attacker, int victim)
 		L4D_TargetOverride_SetLastVictim(attacker, victim);
 }
 
+// name 必须与插件里 RegPluginLibrary("si_target_limit") 完全一致（大小写敏感），
+// 否则以硬依赖方式引用时会报 "Could not find required plugin"。
 public SharedPlugin __pl_SI_Target_limit =
 {
-	name = "SI_Target_limit",
+	name = "si_target_limit",
 	file = "SI_Target_limit.smx",
 #if defined REQUIRE_PLUGIN
 	required = 1,

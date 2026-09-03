@@ -11,6 +11,8 @@
 #define AI_PATH_MOVEMENT_GROUND_TRACE_MARGIN 10.0
 #define AI_PATH_MOVEMENT_MIN_GROUND_NORMAL_Z 0.20
 #define AI_PATH_MOVEMENT_ROUTE_FAIL_RETRY 0.1
+#define AI_PATH_MOVEMENT_MIN_HOP_AIR_TIME 0.1
+#define AI_PATH_MOVEMENT_LANDING_IMPULSE_WINDOW 0.15
 
 enum struct AIPathMovementState
 {
@@ -32,7 +34,91 @@ enum struct AIPathMovementState
 
 AIPathMovementState g_AIPathMovementState[MAXPLAYERS + 1];
 float g_AIPathMovementRouteFailTime[MAXPLAYERS + 1];
+float g_AIPathMovementLastGroundTime[MAXPLAYERS + 1];
+float g_AIPathMovementLandingTime[MAXPLAYERS + 1];
 ConVar g_AIPathMovementGravityCvar;
+
+/**
+* 连跳加速节奏。
+* 从地面直接起跳的第一跳只改方向不加速，加速度只在“落地后紧接着再起跳”的那一跳追加，
+* 否则第一跳会在离地瞬间凭空多出一整份加速度，看起来像空中突然加速。
+*
+* 落地 = 离开地面至少 AI_PATH_MOVEMENT_MIN_HOP_AIR_TIME 后重新踩地，不区分是插件起跳、
+* 引擎跳跃还是沿路径走下落差；高处坠落同样算落地，落地那一跳照常追加加速度，滞空不设上限。
+* 起跳被引擎拒绝时下一帧仍在地面、中间没有离地，不算落地，原地反复起跳不会每帧领加速度。
+* 梯子按地面处理，爬完梯子之后的第一跳不加速。
+*
+* 用法：每帧在地面或梯子上时尽早调用 AIPathMovement_NotifyGrounded；
+* 每次起跳（Teleport 出起跳速度）后调用 AIPathMovement_MarkHopStart 消费掉本次落地授权
+* （AIPathMovement_BeginPathHop 内已自动调用）；
+* 起跳前用 AIPathMovement_GetHopImpulse 决定本跳能追加多少加速度。
+* 这组状态独立于 AIPathMovement_Reset，地面每帧 Reset 空中修正状态不会打断连跳链。
+*/
+stock void AIPathMovement_ResetHopChain(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_AIPathMovementLastGroundTime[client] = 0.0;
+    g_AIPathMovementLandingTime[client] = 0.0;
+}
+
+stock void AIPathMovement_MarkHopStart(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    // 起跳后落地授权立即作废，同一次落地不会被连续两帧的起跳重复使用
+    g_AIPathMovementLandingTime[client] = 0.0;
+}
+
+stock void AIPathMovement_NotifyGrounded(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    float now = GetGameTime();
+    float lastGround = g_AIPathMovementLastGroundTime[client];
+    g_AIPathMovementLastGroundTime[client] = now;
+
+    // 首次登记 / 换图后 GameTime 回卷
+    if (lastGround <= 0.0 || lastGround > now)
+        return;
+
+    // 上一帧也在地面（含引擎拒跳后仍站在原地）不算落地
+    if (now - lastGround < AI_PATH_MOVEMENT_MIN_HOP_AIR_TIME)
+        return;
+
+    g_AIPathMovementLandingTime[client] = now;
+}
+
+stock bool AIPathMovement_IsLandingHop(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return false;
+
+    float landing = g_AIPathMovementLandingTime[client];
+    if (landing <= 0.0)
+        return false;
+
+    float now = GetGameTime();
+    if (landing > now)
+    {
+        g_AIPathMovementLandingTime[client] = 0.0;
+        return false;
+    }
+    return now - landing <= AI_PATH_MOVEMENT_LANDING_IMPULSE_WINDOW;
+}
+
+/**
+* 本次起跳可追加的加速度：落地后紧接着的起跳返回完整 impulse，从地面直接起跳返回 0。
+*/
+stock float AIPathMovement_GetHopImpulse(int client, float impulse)
+{
+    if (impulse <= 0.0)
+        return 0.0;
+    return AIPathMovement_IsLandingHop(client) ? impulse : 0.0;
+}
 
 /**
 * 起跳路线安全检查的失败节流。
@@ -76,6 +162,7 @@ stock void AIPathMovement_Reset(int client)
 * 记录一次连跳的空中保速状态。
 * maxSpeed > 0 时作为本次滞空期间的水平速度硬上限：
 * 起跳速度尖峰（叠加式推速、外部冲量）不会被空中修正长期保持，防止“飞天大跳”。
+* 同时消费掉本次落地加速授权。
 */
 stock void AIPathMovement_BeginPathHop(int client, const float goal[3], float hopSpeed, float maxSpeed = 0.0)
 {
@@ -90,6 +177,7 @@ stock void AIPathMovement_BeginPathHop(int client, const float goal[3], float ho
     g_AIPathMovementState[client].hopSpeed = hopSpeed;
     g_AIPathMovementState[client].maxSpeed = maxSpeed;
     g_AIPathMovementState[client].lastCorrectionTime = GetEngineTime();
+    AIPathMovement_MarkHopStart(client);
 }
 
 stock void AIPathMovement_UpdateGoal(int client, const float goal[3])

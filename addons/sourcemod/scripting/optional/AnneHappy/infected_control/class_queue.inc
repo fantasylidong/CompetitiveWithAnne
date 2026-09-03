@@ -489,6 +489,41 @@ bool HasReachedLimit(int zc)
     return (gST.siAlive[idx] + reserved) >= cap;
 }
 
+// 传送补位：原职业的活体额度被占满（普通队列先刷了同职业 / 内鬼预留 /
+// 上限下调）时，按“活体+预留占用率”挑一个还有活体额度的替代职业。
+// 传送补位不受本波普通预算约束，所以这里只看 HasReachedLimit 而不是 CanQueueClass。
+int ClassQueue_PickTeleportReplacement(int blockedClass)
+{
+    float bestRatio = 9999.0;
+    int best = 0;
+    bool relax = ShouldRelaxDeathCD();
+    bool supportLocked = SupportRestrictionActive();
+
+    for (int zc = 1; zc <= SI_COUNT; zc++)
+    {
+        if (zc == blockedClass || !CheckClassEnabled(zc) || HasReachedLimit(zc))
+            continue;
+        if (!relax && !PassDeathCooldown(zc))
+            continue;
+        if (supportLocked && IsSupportGateClassInt(zc))
+            continue;
+
+        int capTotal = GetClassTotalCap(zc);
+        if (capTotal <= 0)
+            continue;
+
+        int idx = zc - 1;
+        float ratio = float(gST.siAlive[idx] + Traitor_CountReservedClassSlots(zc))
+            / float(capTotal);
+        if (ratio < bestRatio)
+        {
+            bestRatio = ratio;
+            best = zc;
+        }
+    }
+    return best;
+}
+
 // 统计 spawn 队列中某类的数量（不含 teleport 队列）
 static int CountQueuedOfClass(int zc)
 {

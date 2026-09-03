@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"jp"		"（{1}のみ）"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"jp"		"言語: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"jp"		"表示言語"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"jp"		"ゲームの言語に従う"
+		}
 	}

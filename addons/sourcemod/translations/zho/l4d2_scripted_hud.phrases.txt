@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"zho"		"（僅{1}）"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"zho"		"語言: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"zho"		"顯示語言"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"zho"		"跟隨遊戲語言"
+		}
 	}

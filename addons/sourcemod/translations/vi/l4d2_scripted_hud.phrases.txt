@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"vi"		" (chỉ {1})"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"vi"		"Ngôn ngữ: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"vi"		"Ngôn ngữ hiển thị"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"vi"		"Theo ngôn ngữ trò chơi"
+		}
 	}

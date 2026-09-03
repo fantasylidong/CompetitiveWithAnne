@@ -256,12 +256,21 @@ static int g_iNormalDirectedTarget[SI_COUNT];
 static bool g_bNormalDirectedTargetTried[SI_COUNT][MAXPLAYERS + 1];
 static bool g_bDirectedTargetTried[MAXPLAYERS + 1];
 static int g_iNormalDirectedRetargets[SI_COUNT];
+// 传送队列所有职业都没有活体额度时的整体退避截止时间：在此之前不再
+// 逐帧 peek/rotate 传送队列，避免 hasSpawnWork 常驻 true 把帧循环空转。
+static float g_fTeleportQueueBlockedUntil = 0.0;
 
 #define NORMAL_DIRECTED_RETARGET_LIMIT 3
+#define TELEPORT_QUEUE_BLOCKED_RETRY   1.0
 
 static bool SpawnAttempts_HasReachedAliveLimit(int zc)
 {
     return HasReachedLimit(zc);
+}
+
+bool SpawnAttempts_IsTeleportQueueBlocked(float now)
+{
+    return g_fTeleportQueueBlockedUntil > 0.0 && now < g_fTeleportQueueBlockedUntil;
 }
 
 // “临时态”客户端：已被拒绝等待踢出，或已进入踢出队列（传送/内鬼刷新踢出）。
@@ -351,7 +360,9 @@ static void SpawnAttempts_CommitSpawn(
     TeleportState_StampSpawn(client, "spawn_commit");
     g_LastSpawnOkTime = now;
     InvalidateBucketShareCache();
-    // 刷出会改变 owner 容量与参与集合，让容量缓存与参与集合缓存立即失效
+    // 刷出会改变 owner 容量与参与集合：先给导向目标记一笔待锁定预留，再让
+    // 容量缓存与参与集合缓存立即失效，同一帧内后续刷出才能看到新的剩余名额。
+    SpawnTarget_ReserveFor(client, targetSurvivor);
     SpawnTarget_InvalidateCapacityCache();
     SpawnAccel_InvalidateTeamTargetsCache();
     gST.siAlive[zc - 1]++;
@@ -438,6 +449,7 @@ void SpawnAttempts_ResetSearchProgress()
         g_iNormalRetryTargetNav[i] = -1;
         g_iTeleportRetryTargetNav[i] = -1;
     }
+    g_fTeleportQueueBlockedUntil = 0.0;
     SpawnSearch_Reset();
 }
 
@@ -992,11 +1004,25 @@ void TryTeleportSpawnOnce()
 
         if (SpawnAttempts_HasReachedAliveLimit(want))
         {
-            TeleportQueue_DropHead(want);
-            TeleportQueue_Push(want);
+            // 原职业的活体额度已被普通队列/内鬼预留占满：换成还有额度的职业继续
+            // 补位；所有职业都满时整体退避，不再逐帧旋转。
+            int replacement = ClassQueue_PickTeleportReplacement(want);
             gST.teleportFallbackCycles[want - 1] = 0;
             SpawnAttempts_ResetTeleportProgress(want);
-            Debug_Print("[TP QUEUE ROTATE] %s reached alive-cap, rotate to tail", g_sInfectedClassNames[want]);
+            if (replacement > 0)
+            {
+                TeleportQueue_DropHead(want);
+                TeleportQueue_Push(replacement);
+                Debug_Print("[TP QUEUE SUBSTITUTE] %s reached alive-cap -> %s",
+                    g_sInfectedClassNames[want], g_sInfectedClassNames[replacement]);
+                return;
+            }
+
+            TeleportQueue_DropHead(want);
+            TeleportQueue_Push(want);
+            g_fTeleportQueueBlockedUntil = GetGameTime() + TELEPORT_QUEUE_BLOCKED_RETRY;
+            Debug_Print("[TP QUEUE BLOCKED] %s reached alive-cap and no class has room; back off %.1fs",
+                g_sInfectedClassNames[want], TELEPORT_QUEUE_BLOCKED_RETRY);
             return;
         }
     }

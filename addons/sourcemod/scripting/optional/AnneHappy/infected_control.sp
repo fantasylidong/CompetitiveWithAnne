@@ -227,7 +227,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-08-30.1",
+    version     = "2026-09-02.1",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -797,6 +797,9 @@ static void StopAll()
 
     gQ.Clear();
     Queue_SyncSizes();
+    // 先于 gST.Reset()：让外部（SI_Target_limit）收到跑男解除通知。
+    AntiBait_ClearRunner();
+    SpawnTarget_ClearPendingReservations();
     gST.Reset();
     Traitor_ResetAll(true);
     Traitor_ShutdownDamageHooks();
@@ -1408,9 +1411,11 @@ public void OnGameFrame()
     float now = GetGameTime();
     RuntimeWatchdog(now);
 
+    bool teleportWork = TeleportQueue_Length() > 0
+        && !SpawnAttempts_IsTeleportQueueBlocked(now);
     bool hasSpawnWork = (gST.bLate && (Traitor_HasSpawnWork()
         || (gST.totalSI < gCV.iSiLimit
-            && (TeleportQueue_Length() > 0 || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
+            && (teleportWork || gST.siQueueCount > 0 || SpawnQueue_Length() > 0))));
     float releaseEta = WaveDecider_GetReleaseEta();
     bool candidateWarm = hasSpawnWork
         || gST.hSpawn != INVALID_HANDLE
@@ -1458,7 +1463,8 @@ public void OnGameFrame()
         && gST.totalSI < gCV.iSiLimit)
     {
         bool attempted = false;
-        if (TeleportQueue_Length() > 0)
+        if (TeleportQueue_Length() > 0
+            && !SpawnAttempts_IsTeleportQueueBlocked(now))
         {
             TryTeleportSpawnOnce();
             attempted = true;

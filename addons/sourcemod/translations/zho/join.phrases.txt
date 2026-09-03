@@ -8,6 +8,54 @@
 	{
 		"zho"		"{green}%N {olive}離開了遊戲 - 理由: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"zho"		"連線被拒絕"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"zho"		"逾時"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"zho"		"主控台踢出"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"zho"		"自行中斷連線"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"zho"		"ping 太高了"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"zho"		"no steam logon/ Steam 驗證失敗"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"zho"		"Steam 帳號在他處登入"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"zho"		"Steam 連線中斷"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"zho"		"未擁有本遊戲"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"zho"		"驗證失敗"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"zho"		"certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"zho"		"純淨伺服器檢查未通過"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"zho"		"{green}[AnneDonate]{default} 付款方式只支援 wechat 或 alipay，請重新選擇。"

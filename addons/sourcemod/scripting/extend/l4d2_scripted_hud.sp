@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display scripted HUD slots and an optional CS-style kill feed"
-#define PLUGIN_VERSION                "1.6.0"
+#define PLUGIN_VERSION                "1.7.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -101,7 +101,9 @@ public Plugin myinfo =
 #define HUD_EXTRA_MAX_LINES           5
 #define HUD_FIXED_MAX_LINES           6
 #define HUD_PREFS_COOKIE_SIZE         100
-#define HUD_PREFS_MIGRATIONS          6
+#define HUD_PREFS_MIGRATIONS          7
+#define HUD_LANG_CODE_SIZE            8
+#define HUD_LANG_COUNT                6
 
 #define HUD2_PART_SERVER_NAME         (1 << 0)
 #define HUD2_PART_MODE                (1 << 1)
@@ -117,6 +119,7 @@ public Plugin myinfo =
 #define HUD_PREFS_DB_CONFIG           "rpg"
 #define HUD_PREFS_DB_TABLE            "scripted_hud_prefs"
 #define HUD_PREFS_COOKIE              "l4d2_scripted_hud_prefs_v1"
+#define HUD_LANG_COOKIE               "l4d2_scripted_hud_lang_v1"
 
 // Player-selectable content sources for HUD slots
 #define HUD_CONTENT_DEFAULT           0
@@ -349,6 +352,7 @@ static bool g_bHUDResetPending[HUD_SLOT_COUNT];
 static bool g_bHUDPrefsDatabaseReady;
 static bool g_bHUDPrefsDatabaseConnecting;
 static bool g_bClientHasCookie[MAXPLAYERS + 1];
+static bool g_bClientHasLangCookie[MAXPLAYERS + 1];
 
 // ====================================================================================================
 // int - Plugin Variables
@@ -386,6 +390,9 @@ static int    g_iClientHUDTeamMask[MAXPLAYERS + 1][HUD_SLOT_COUNT];
 static int    g_iHUDSourceAllowedTeams[HUD_CONTENT_MAX + 1];
 static int    g_iHUDMenuSlot[MAXPLAYERS + 1];
 static int    g_iHUDMenuGroup[MAXPLAYERS + 1];
+static int    g_iClientHUDLangIndex[MAXPLAYERS + 1];
+static int    g_iClientLangCookieRevision[MAXPLAYERS + 1];
+static int    g_iHUDLangOptionIndex[HUD_LANG_COUNT];
 static int    g_iHUDPrefsMigrationsLeft;
 static int    g_iExtraHUDFlags = HUD_FLAG_TEXT | HUD_FLAG_NOBG | HUD_FLAG_ALIGN_LEFT;
 static int    g_iClientSpecialKills[MAXPLAYERS + 1];
@@ -475,6 +482,7 @@ static char   g_sBuffer[128];
 static char   g_sSpaces[128] = "                                                                                                                               ";
 static char   g_sClientHUDText[MAXPLAYERS + 1][HUD_SLOT_COUNT][128];
 static char   g_sClientHUDCookie[MAXPLAYERS + 1][HUD_PREFS_COOKIE_SIZE];
+static char   g_sClientHUDLang[MAXPLAYERS + 1][HUD_LANG_CODE_SIZE];
 static char   g_sHUD2Fragments[7][64];
 static char   g_sBaseServerName[64];
 
@@ -494,6 +502,28 @@ static const char g_sHUDSourcePhrases[][] =
     "L4D2ScriptedHUD_SourceProgress",
     "L4D2ScriptedHUD_SourceServer",
     "L4D2ScriptedHUD_SourceQueue"
+};
+
+// Languages this plugin ships phrase files for. The names stay in their own
+// script so the menu is readable whatever language the player currently sees.
+static const char g_sHUDLangCodes[HUD_LANG_COUNT][] =
+{
+    "en",
+    "chi",
+    "zho",
+    "jp",
+    "ko",
+    "vi"
+};
+
+static const char g_sHUDLangNames[HUD_LANG_COUNT][] =
+{
+    "English",
+    "简体中文",
+    "繁體中文",
+    "日本語",
+    "한국어",
+    "Tiếng Việt"
 };
 
 static const char g_sHUDEngineNamePhrases[][] =
@@ -602,6 +632,7 @@ enum HUDPrefsLoadState
 
 static HUDPrefsLoadState g_eHUDPrefsLoadState[MAXPLAYERS + 1];
 static Cookie g_hHUDPrefsCookie;
+static Cookie g_hHUDLangCookie;
 static Handle g_hHUDPrefsDatabase = INVALID_HANDLE;
 static MemoryPatch g_hEMSHUDPatch1;
 static MemoryPatch g_hEMSHUDPatch2;
@@ -670,6 +701,8 @@ public void OnPluginStart()
     ApplyEMSHUDPatches();
 
     g_hHUDPrefsCookie = new Cookie(HUD_PREFS_COOKIE, "Scripted HUD per-client preferences", CookieAccess_Protected);
+    g_hHUDLangCookie = new Cookie(HUD_LANG_COOKIE, "Scripted HUD display language", CookieAccess_Protected);
+    BuildHUDLanguageOptions();
     ConnectHUDPrefsDatabase();
 
     g_hCvar_pain_pills_decay_rate = FindConVar("pain_pills_decay_rate");
@@ -866,6 +899,8 @@ public void OnPluginStart()
     RegConsoleCmd("sm_spechudoff", offSpecHud, "打开spechud");
     RegConsoleCmd("sm_hudmenu", CmdHUDMenu, "Open the scripted HUD settings menu.");
     RegConsoleCmd("sm_hud", CmdHUDMenu, "Open the scripted HUD settings menu.");
+    RegConsoleCmd("sm_hudlang", CmdHUDLanguage, "Open the display language menu.");
+    RegConsoleCmd("sm_lang", CmdHUDLanguage, "Open the display language menu.");
 
     ParseHUDSourceTeams();
 
@@ -2687,6 +2722,8 @@ void BuildClientHUDTexts()
         if (!IsClientInGame(client) || IsFakeClient(client))
             continue;
 
+        ApplyClientHUDLanguage(client);
+
         for (int hud = HUD1; hud < HUD_SLOT_COUNT; hud++)
             g_sClientHUDText[client][hud][0] = '\0';
 
@@ -3561,6 +3598,10 @@ void ResetHUDPrefsClient(int client)
     g_eHUDPrefsLoadState[client] = HUDPrefs_None;
     g_bClientHasCookie[client] = false;
     g_sClientHUDCookie[client][0] = '\0';
+    g_bClientHasLangCookie[client] = false;
+    g_iClientLangCookieRevision[client] = 0;
+    g_iClientHUDLangIndex[client] = -1;
+    g_sClientHUDLang[client][0] = '\0';
     g_iClientSpecialKills[client] = 0;
     g_iClientCommonKills[client] = 0;
     g_iTankDamage[client] = 0;
@@ -3591,6 +3632,7 @@ void InitializeHUDPrefsClient(int client)
     {
         ReadHUDPrefsCookie(client);
         KillFeed_LoadClientCookie(client);
+        LoadHUDLangCookie(client);
         LoadHUDPrefs(client);
     }
     else
@@ -3616,6 +3658,7 @@ public void OnClientCookiesCached(int client)
 
     ReadHUDPrefsCookie(client);
     KillFeed_LoadClientCookie(client);
+    LoadHUDLangCookie(client);
     if (g_eHUDPrefsLoadState[client] == HUDPrefs_WaitingForCookie)
         LoadHUDPrefs(client);
     else if (!g_bHUDPrefsDatabaseReady && g_eHUDPrefsLoadState[client] == HUDPrefs_Ready)
@@ -3831,6 +3874,134 @@ void SaveHUDPrefsCookie(int client)
     g_hHUDPrefsCookie.Set(client, value);
 }
 
+// ====================================================================================================
+// Display language
+// ====================================================================================================
+// languages.cfg decides what the server can actually translate to, so options
+// the server does not know about are dropped from the menu instead of failing
+// silently at selection time.
+void BuildHUDLanguageOptions()
+{
+    for (int i = 0; i < HUD_LANG_COUNT; i++)
+        g_iHUDLangOptionIndex[i] = GetLanguageByCode(g_sHUDLangCodes[i]);
+}
+
+int FindHUDLangOption(const char[] code)
+{
+    if (code[0] == '\0')
+        return -1;
+
+    for (int i = 0; i < HUD_LANG_COUNT; i++)
+    {
+        if (g_iHUDLangOptionIndex[i] != -1 && StrEqual(g_sHUDLangCodes[i], code, false))
+            return i;
+    }
+    return -1;
+}
+
+void GetClientHUDLangName(int client, char[] output, int size)
+{
+    int option = FindHUDLangOption(g_sClientHUDLang[client]);
+    if (option != -1)
+    {
+        strcopy(output, size, g_sHUDLangNames[option]);
+        return;
+    }
+
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_LanguageAuto", client);
+}
+
+// An unknown or empty code means "follow the game client", which is the
+// language SourceMod picked from cl_language when the player connected.
+void SetClientHUDLanguage(int client, const char[] code)
+{
+    char wanted[HUD_LANG_CODE_SIZE];
+    strcopy(wanted, sizeof(wanted), code);
+
+    int option = FindHUDLangOption(wanted);
+    if (option == -1)
+    {
+        g_sClientHUDLang[client][0] = '\0';
+        g_iClientHUDLangIndex[client] = -1;
+        if (IsClientInGame(client) && !IsFakeClient(client))
+            SetClientLanguage(client, GetClientOriginalLanguage(client));
+        return;
+    }
+
+    strcopy(g_sClientHUDLang[client], sizeof(g_sClientHUDLang[]), g_sHUDLangCodes[option]);
+    g_iClientHUDLangIndex[client] = g_iHUDLangOptionIndex[option];
+    ApplyClientHUDLanguage(client);
+}
+
+// SourceMod re-reads cl_language whenever a client changes its settings, so the
+// override is re-asserted from the HUD build loop instead of being set once.
+void ApplyClientHUDLanguage(int client)
+{
+    if (g_iClientHUDLangIndex[client] < 0)
+        return;
+
+    if (!IsClientInGame(client) || IsFakeClient(client))
+        return;
+
+    if (GetClientLanguage(client) != g_iClientHUDLangIndex[client])
+        SetClientLanguage(client, g_iClientHUDLangIndex[client]);
+}
+
+void LoadHUDLangCookie(int client)
+{
+    if (client < 1 || client > MaxClients || IsFakeClient(client)
+        || g_hHUDLangCookie == null || !AreClientCookiesCached(client))
+        return;
+
+    char value[32];
+    g_hHUDLangCookie.Get(client, value, sizeof(value));
+    if (value[0] == '\0')
+        return;
+
+    char parts[2][16];
+    int count = ExplodeString(value, "|", parts, sizeof(parts), sizeof(parts[]));
+    if (count < 1)
+        return;
+
+    g_bClientHasLangCookie[client] = true;
+    g_iClientLangCookieRevision[client] = 0;
+    if (count >= 2)
+    {
+        int revision;
+        int consumed = StringToIntEx(parts[1], revision);
+        if (consumed > 0 && consumed == strlen(parts[1]) && revision >= 0)
+            g_iClientLangCookieRevision[client] = revision;
+    }
+
+    SetClientHUDLanguage(client, parts[0]);
+}
+
+void SaveHUDLangCookie(int client, int revision)
+{
+    if (client < 1 || client > MaxClients || IsFakeClient(client)
+        || g_hHUDLangCookie == null || !AreClientCookiesCached(client))
+        return;
+
+    char value[32];
+    FormatEx(value, sizeof(value), "%s|%d", g_sClientHUDLang[client], revision);
+    g_hHUDLangCookie.Set(client, value);
+    g_bClientHasLangCookie[client] = true;
+    g_iClientLangCookieRevision[client] = revision;
+}
+
+bool HasHUDLangCookie(int client)
+{
+    return client >= 1 && client <= MaxClients && g_bClientHasLangCookie[client];
+}
+
+int GetHUDLangCookieRevision(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return 0;
+
+    return g_iClientLangCookieRevision[client];
+}
+
 void ConnectHUDPrefsDatabase()
 {
     if (g_bHUDPrefsDatabaseConnecting || g_bHUDPrefsDatabaseReady)
@@ -3871,6 +4042,7 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
         ... "`slot_sources` varchar(80) NOT NULL DEFAULT '',"
         ... "`slot_team_masks` varchar(80) NOT NULL DEFAULT '',"
         ... "`kill_feed_enabled` tinyint unsigned NULL DEFAULT NULL,"
+        ... "`lang_code` varchar(16) NULL DEFAULT NULL,"
         ... "`revision` int unsigned NOT NULL DEFAULT 0,"
         ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
         ... "PRIMARY KEY (`steamid`)"
@@ -3905,6 +4077,8 @@ public void SQLCB_CreateHUDPrefsTable(Handle owner, Handle results, const char[]
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `kill_feed_enabled` tinyint unsigned NULL DEFAULT NULL", HUD_PREFS_DB_TABLE);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
     FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `slot_team_masks` varchar(80) NOT NULL DEFAULT ''", HUD_PREFS_DB_TABLE);
+    SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
+    FormatEx(query, sizeof(query), "ALTER TABLE `%s` ADD COLUMN `lang_code` varchar(16) NULL DEFAULT NULL", HUD_PREFS_DB_TABLE);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_MigrateHUDPrefsColumn, query);
 }
 
@@ -3967,7 +4141,7 @@ void LoadHUDPrefs(int client)
 
     char query[512];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source`,`slot_sources`,`kill_feed_enabled`,`slot_team_masks` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
+        "SELECT `hud_mask`,`hud2_mask`,`layout_preset`,`revision`,`hud3_source`,`hud4_source`,`slot_sources`,`kill_feed_enabled`,`slot_team_masks`,`lang_code` FROM `%s` WHERE `steamid`='%s' LIMIT 1", HUD_PREFS_DB_TABLE, steamId);
     g_eHUDPrefsLoadState[client] = HUDPrefs_DatabasePending;
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_LoadHUDPrefs, query, GetClientUserId(client));
 }
@@ -4020,6 +4194,14 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         bool databaseKillFeedEnabled = (!databaseKillFeedStored || killFeedCookieNewer)
             ? KillFeed_ClientIsEnabled(client)
             : SQL_FetchInt(results, 7) != 0;
+        bool databaseLangStored = SQL_GetFieldCount(results) > 9 && !SQL_IsFieldNull(results, 9);
+        bool langCookieNewer = HasHUDLangCookie(client)
+            && GetHUDLangCookieRevision(client) > databaseRevision;
+        char databaseLang[HUD_LANG_CODE_SIZE];
+        if (!databaseLangStored || langCookieNewer)
+            strcopy(databaseLang, sizeof(databaseLang), g_sClientHUDLang[client]);
+        else
+            SQL_FetchString(results, 9, databaseLang, sizeof(databaseLang));
         for (int slot = 0; slot < HUD_SLOT_COUNT; slot++)
         {
             if (databaseSources[slot] < HUD_CONTENT_DEFAULT || databaseSources[slot] > HUD_CONTENT_MAX)
@@ -4040,7 +4222,10 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
             g_iClientHUDRevision[client] = cookieRevision;
             if (killFeedCookieNewer && KillFeed_GetClientCookieRevision(client) > g_iClientHUDRevision[client])
                 g_iClientHUDRevision[client] = KillFeed_GetClientCookieRevision(client);
+            if (langCookieNewer && GetHUDLangCookieRevision(client) > g_iClientHUDRevision[client])
+                g_iClientHUDRevision[client] = GetHUDLangCookieRevision(client);
             KillFeed_SetClientEnabled(client, databaseKillFeedEnabled);
+            SetClientHUDLanguage(client, databaseLang);
             ApplyHUDSources(client, cookieSources);
             ApplyHUDTeamMasks(client, cookieTeamMasks);
             g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
@@ -4054,14 +4239,18 @@ public void SQLCB_LoadHUDPrefs(Handle owner, Handle results, const char[] error,
         g_iClientHUDRevision[client] = databaseRevision;
         if (killFeedCookieNewer)
             g_iClientHUDRevision[client] = KillFeed_GetClientCookieRevision(client);
+        if (langCookieNewer && GetHUDLangCookieRevision(client) > g_iClientHUDRevision[client])
+            g_iClientHUDRevision[client] = GetHUDLangCookieRevision(client);
         KillFeed_SetClientEnabled(client, databaseKillFeedEnabled);
+        SetClientHUDLanguage(client, databaseLang);
         ApplyHUDSources(client, databaseSources);
         ApplyHUDTeamMasks(client, databaseTeamMasks);
         g_eHUDPrefsLoadState[client] = HUDPrefs_Ready;
-        if (databaseKillFeedStored && !killFeedCookieNewer)
+        if (databaseKillFeedStored && !killFeedCookieNewer && databaseLangStored && !langCookieNewer)
         {
             SaveHUDPrefsCookie(client);
             KillFeed_SaveClientCookie(client, g_iClientHUDRevision[client]);
+            SaveHUDLangCookie(client, g_iClientHUDRevision[client]);
         }
         else
         {
@@ -4097,6 +4286,7 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
         g_iClientHUDRevision[client]++;
     SaveHUDPrefsCookie(client);
     KillFeed_SaveClientCookie(client, g_iClientHUDRevision[client]);
+    SaveHUDLangCookie(client, g_iClientHUDRevision[client]);
 
     if (!g_bHUDPrefsDatabaseReady || g_hHUDPrefsDatabase == INVALID_HANDLE || g_eHUDPrefsLoadState[client] != HUDPrefs_Ready)
         return;
@@ -4110,9 +4300,9 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
     PackSlotSources(g_iClientHUDSource[client], packed, sizeof(packed));
     PackSlotTeamMasks(g_iClientHUDTeamMask[client], teamPacked, sizeof(teamPacked));
 
-    char query[1600];
+    char query[1900];
     SQL_FormatQuery(g_hHUDPrefsDatabase, query, sizeof(query),
-        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`slot_sources`,`slot_team_masks`,`kill_feed_enabled`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,'%s','%s',%d,%d) "
+        "INSERT INTO `%s` (`steamid`,`hud_mask`,`hud2_mask`,`layout_preset`,`hud3_source`,`hud4_source`,`slot_sources`,`slot_team_masks`,`kill_feed_enabled`,`lang_code`,`revision`) VALUES ('%s',%d,%d,%d,%d,%d,'%s','%s',%d,'%s',%d) "
         ... "ON DUPLICATE KEY UPDATE "
         ... "`hud_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud_mask`),`hud_mask`),"
         ... "`hud2_mask`=IF(VALUES(`revision`)>=`revision`,VALUES(`hud2_mask`),`hud2_mask`),"
@@ -4122,8 +4312,9 @@ void SaveHUDPrefs(int client, bool bumpRevision = true)
         ... "`slot_sources`=IF(VALUES(`revision`)>=`revision`,VALUES(`slot_sources`),`slot_sources`),"
         ... "`slot_team_masks`=IF(VALUES(`revision`)>=`revision`,VALUES(`slot_team_masks`),`slot_team_masks`),"
         ... "`kill_feed_enabled`=IF(VALUES(`revision`)>=`revision`,VALUES(`kill_feed_enabled`),`kill_feed_enabled`),"
+        ... "`lang_code`=IF(VALUES(`revision`)>=`revision`,VALUES(`lang_code`),`lang_code`),"
         ... "`revision`=GREATEST(`revision`,VALUES(`revision`))",
-        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][HUD3], g_iClientHUDSource[client][HUD4], packed, teamPacked, KillFeed_ClientIsEnabled(client) ? 1 : 0, g_iClientHUDRevision[client]);
+        HUD_PREFS_DB_TABLE, steamId, g_iClientHUDMask[client], g_iClientHUD2Mask[client], g_iClientHUDLayout[client], g_iClientHUDSource[client][HUD3], g_iClientHUDSource[client][HUD4], packed, teamPacked, KillFeed_ClientIsEnabled(client) ? 1 : 0, g_sClientHUDLang[client], g_iClientHUDRevision[client]);
     SQL_TQuery(g_hHUDPrefsDatabase, SQLCB_SaveHUDPrefs, query);
 }
 
@@ -4139,6 +4330,15 @@ public Action CmdHUDMenu(int client, int args)
         return Plugin_Handled;
 
     OpenHUDPrefsMenu(client);
+    return Plugin_Handled;
+}
+
+public Action CmdHUDLanguage(int client, int args)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Handled;
+
+    OpenHUDLanguageMenu(client);
     return Plugin_Handled;
 }
 
@@ -4238,6 +4438,7 @@ void OpenHUDPrefsMenu(int client)
     menu.AddItem("layout", text);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_HUD2Parts", client);
     menu.AddItem("hud2_parts", text);
+    AddHUDLanguageMenuItem(menu, client);
     FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_Reset", client);
     menu.AddItem("reset", text);
     menu.Display(client, MENU_TIME_FOREVER);
@@ -4264,6 +4465,11 @@ public int MenuHandler_HUDPrefs(Menu menu, MenuAction action, int client, int it
     if (StrEqual(key, "hud2_parts"))
     {
         OpenHUD2PartsMenu(client);
+        return 0;
+    }
+    if (StrEqual(key, "language"))
+    {
+        OpenHUDLanguageMenu(client);
         return 0;
     }
     if (StrEqual(key, "kill_feed"))
@@ -4616,6 +4822,72 @@ public int MenuHandler_HUDLayout(Menu menu, MenuAction action, int client, int i
 
     SaveHUDPrefs(client);
     OpenHUDLayoutMenu(client);
+    return 0;
+}
+
+void AddHUDLanguageMenuItem(Menu menu, int client)
+{
+    char name[32];
+    char text[128];
+    GetClientHUDLangName(client, name, sizeof(name));
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_LanguageMenu", client, name);
+    menu.AddItem("language", text);
+}
+
+void OpenHUDLanguageMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_HUDLanguage);
+    char text[128];
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_LanguageTitle", client);
+    menu.SetTitle(text);
+    menu.ExitBackButton = true;
+
+    char key[16];
+    char item[96];
+    bool follow = (FindHUDLangOption(g_sClientHUDLang[client]) == -1);
+
+    FormatEx(text, sizeof(text), "%T", "L4D2ScriptedHUD_LanguageAuto", client);
+    FormatEx(item, sizeof(item), "[%s] %s", follow ? "X" : " ", text);
+    menu.AddItem("lang_auto", item);
+
+    for (int i = 0; i < HUD_LANG_COUNT; i++)
+    {
+        if (g_iHUDLangOptionIndex[i] == -1)
+            continue;
+
+        bool picked = !follow && StrEqual(g_sClientHUDLang[client], g_sHUDLangCodes[i], false);
+        FormatEx(key, sizeof(key), "lang_%s", g_sHUDLangCodes[i]);
+        FormatEx(item, sizeof(item), "[%s] %s", picked ? "X" : " ", g_sHUDLangNames[i]);
+        menu.AddItem(key, item);
+    }
+
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_HUDLanguage(Menu menu, MenuAction action, int client, int item)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+        return 0;
+    }
+    if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsValidClient(client))
+    {
+        OpenHUDPrefsMenu(client);
+        return 0;
+    }
+    if (action != MenuAction_Select || !IsValidClient(client))
+        return 0;
+
+    char key[16];
+    menu.GetItem(item, key, sizeof(key));
+    if (StrEqual(key, "lang_auto"))
+        SetClientHUDLanguage(client, "");
+    else if (strncmp(key, "lang_", 5) == 0)
+        SetClientHUDLanguage(client, key[5]);
+
+    SaveHUDPrefs(client);
+    OpenHUDLanguageMenu(client);
     return 0;
 }
 

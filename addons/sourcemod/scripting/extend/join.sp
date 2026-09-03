@@ -59,13 +59,11 @@ public Plugin myinfo =
 #define AUTOUPDATE_URL_LENGTH 256
 #define UPDATE_URL_PUBLIC "http://anne.trygek.com/plugin_update/Anne_Updater_NoDatabase.txt"
 #define UPDATE_URL_PRIVATE "http://anne.trygek.com/plugin_update/private/Anne_Updater_Private.txt"
-#define AUTOUPDATE_DISABLED 0
 #define AUTOUPDATE_NO_DATABASE 1
 #define AUTOUPDATE_DATABASE 2
 #define AUTOUPDATE_RESTORE_FILE "data/join_autoupdate.restore"
 #define CORE_RELOAD_PENDING_FILE "data/join_core_reload.pending"
 #define INFECTED_CONTROL_PLUGIN "optional/AnneHappy/infected_control.smx"
-#define AUTOUPDATE_RESTORE_DELAY 1.0
 
 bool  
 	g_bEnableGetbotCommand[MAXPLAYERS + 1] = { false },
@@ -89,7 +87,6 @@ Handle
 
 int
 	g_iDonateOptionCount = 0,
-	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED,
 	g_iDonateRemindTicks[MAXPLAYERS + 1] = { 0 };
 
 ConVar
@@ -117,8 +114,7 @@ public void OnPluginStart()
 	LoadTranslations("join.phrases");
 	hCvarEnableInf = CreateConVar("join_enable_inf", "1", "是否可以开启加入特感", _, true, 0.0, true, 1.0);
 	hCvarKickFamilyAccount = CreateConVar("join_enable_kickfamilyaccount", "1", "是否开启踢出家庭共享账户", _, true, 0.0, true, 1.0);
-	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "1", "AnneHappy自动更新：0关闭，1无数据库插件，2含数据库插件（白名单服务器额外含隐藏插件）", _, true, 0.0, true, 2.0);
-	g_iAutoUpdateModeBeforeConfigs = hCvarEnableAutoupdate.IntValue;
+	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "AnneHappy自动更新：0关闭，1无数据库插件，2含数据库插件（白名单服务器额外含隐藏插件）", _, true, 0.0, true, 2.0);
 	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的无数据库更新清单URL");
 	hCvarAutoupdatePrivateUrl = CreateConVar("join_autoupdate_private_url", UPDATE_URL_PRIVATE, "join_autoupdate为2时使用的数据库更新清单URL，白名单服务器额外包含隐藏插件");
 	hCvarMotdTitle = CreateConVar("sm_cfgmotd_title", "AnneHappy电信服");
@@ -135,12 +131,7 @@ public void OnPluginStart()
 	hCvarEnableAutoupdate.AddChangeHook(UpdateStatuChange);
 	hCvarAutoupdatePublicUrl.AddChangeHook(UpdateStatuChange);
 	hCvarAutoupdatePrivateUrl.AddChangeHook(UpdateStatuChange);
-	AutoExecConfig(true, "join");
-	if (g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_NO_DATABASE
-		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_DATABASE)
-	{
-		CreateTimer(AUTOUPDATE_RESTORE_DELAY, Timer_RestoreAutoUpdateMode, _, TIMER_FLAG_NO_MAPCHANGE);
-	}
+	RestorePendingAutoUpdateMode();
 	RegConsoleCmd("sm_away", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_afk", AFKTurnClientToSpe);
 	RegConsoleCmd("sm_spec", AFKTurnClientToSpe);
@@ -181,29 +172,6 @@ public void OnPluginStart()
 public void UpdateStatuChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	RefreshAutoUpdater(true);
-}
-
-public void OnConfigsExecuted()
-{
-	TryRestoreAutoUpdateMode();
-}
-
-public Action Timer_RestoreAutoUpdateMode(Handle timer)
-{
-	TryRestoreAutoUpdateMode();
-	return Plugin_Stop;
-}
-
-void TryRestoreAutoUpdateMode()
-{
-	bool restored = RestorePendingAutoUpdateMode();
-	if (!restored
-		&& g_iAutoUpdateModeBeforeConfigs >= AUTOUPDATE_NO_DATABASE
-		&& g_iAutoUpdateModeBeforeConfigs <= AUTOUPDATE_DATABASE)
-	{
-		hCvarEnableAutoupdate.SetInt(g_iAutoUpdateModeBeforeConfigs);
-	}
-	g_iAutoUpdateModeBeforeConfigs = AUTOUPDATE_DISABLED;
 }
 
 void RefreshAutoUpdater(bool requestInitialCheck = false)
@@ -501,63 +469,76 @@ public Action PlayerDisconnect_Event(Handle event, const char[] name, bool dontB
     if (IsFakeClient(client))
         return Plugin_Handled;
 
-    char reason[64], message[64];
+    char reason[64], phrase[64], message[128];
     GetEventString(event, "reason", reason, sizeof(reason));
 
     if(StrContains(reason, "connection rejected", false) != -1)
     {
-        Format(message,sizeof(message),"连接被拒绝");
+        phrase = "Join_ReasonConnectionRejected";
     }
     else if(StrContains(reason, "timed out", false) != -1)
     {
-        Format(message,sizeof(message),"超时");
+        phrase = "Join_ReasonTimedOut";
     }
     else if(StrContains(reason, "by console", false) != -1)
     {
-        Format(message,sizeof(message),"控制台退出");
+        phrase = "Join_ReasonKickedByConsole";
     }
     else if(StrContains(reason, "by user", false) != -1)
     {
-        Format(message,sizeof(message),"自己主动断开连接");
+        phrase = "Join_ReasonDisconnectByUser";
     }
     else if(StrContains(reason, "ping is too high", false) != -1)
     {
-        Format(message,sizeof(message),"ping 太高了");
+        phrase = "Join_ReasonPingTooHigh";
     }
     else if(StrContains(reason, "No Steam logon", false) != -1)
     {
-        Format(message,sizeof(message),"no steam logon/ steam验证失败");
+        phrase = "Join_ReasonNoSteamLogon";
     }
     else if(StrContains(reason, "Steam account is being used in another", false) != -1)
     {
-        Format(message,sizeof(message),"steam账号被顶");
+        phrase = "Join_ReasonSteamAccountInUse";
     }
     else if(StrContains(reason, "Steam Connection lost", false) != -1)
     {
-        Format(message,sizeof(message),"steam断线");
+        phrase = "Join_ReasonSteamConnectionLost";
     }
     else if(StrContains(reason, "This Steam account does not own this game", false) != -1)
     {
-        Format(message,sizeof(message),"没有这款游戏");
+        phrase = "Join_ReasonGameNotOwned";
     }
     else if(StrContains(reason, "Validation Rejected", false) != -1)
     {
-        Format(message,sizeof(message),"验证失败");
+        phrase = "Join_ReasonValidationRejected";
     }
     else if(StrContains(reason, "Certificate Length", false) != -1)
     {
-        Format(message,sizeof(message),"certificate length");
+        phrase = "Join_ReasonCertificateLength";
     }
     else if(StrContains(reason, "Pure server", false) != -1)
     {
-        Format(message,sizeof(message),"纯净服务器");
+        phrase = "Join_ReasonPureServer";
     }
     else
     {
-        message = reason;
+        phrase[0] = '\0';
     }
 
-    CPrintToChatAll("%t", "Join_LeftGameReason", client, message);
+    // 断线原因需要按每个玩家的语言翻译，所以不能用 CPrintToChatAll 统一格式化
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if(!IsClientInGame(i) || IsFakeClient(i))
+            continue;
+
+        if(phrase[0] != '\0')
+            FormatEx(message, sizeof(message), "%T", phrase, i);
+        else
+            strcopy(message, sizeof(message), reason);
+
+        CPrintToChat(i, "%t", "Join_LeftGameReason", client, message);
+    }
+
     return Plugin_Handled;
 } 
 

@@ -20,7 +20,7 @@
 #include <lerpmonitor>
 #include <witch_and_tankifier>
 
-#define PLUGIN_VERSION "3.10.0"
+#define PLUGIN_VERSION "3.10.1"
 
 public Plugin myinfo =
 {
@@ -83,6 +83,11 @@ bool bStaticTank, bStaticWitch;
 bool bSpecHudActive[MAXPLAYERS+1], bTankHudActive[MAXPLAYERS+1];
 bool bSpecHudHintShown[MAXPLAYERS+1], bTankHudHintShown[MAXPLAYERS+1];
 
+// AI tank victim cache (userid), fed by L4D2_OnChooseVictim.
+// l4d_target_override's own record can stay empty when third-party AI plugins
+// rewrite targets through the Left4DHooks forward, so we track it ourselves.
+int iTankVictim[MAXPLAYERS+1];
+
 /**********************************************************************************************/
 
 // ======================================================================
@@ -120,6 +125,7 @@ public void OnPluginStart()
 		bSpecHudHintShown[i] = false;
 		bTankHudActive[i] = true;
 		bTankHudHintShown[i] = false;
+		iTankVictim[i] = 0;
 	}
 	
 	CreateTimer(SPECHUD_DRAW_INTERVAL, HudDrawTimer, _, TIMER_REPEAT);
@@ -325,6 +331,17 @@ public void OnClientDisconnect(int client)
 {
 	bSpecHudHintShown[client] = false;
 	bTankHudHintShown[client] = false;
+	iTankVictim[client] = 0;
+}
+
+public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
+{
+	if (curTarget > 0 && curTarget <= MaxClients
+		&& GetInfectedClass(specialInfected) == L4D2Infected_Tank)
+	{
+		iTankVictim[specialInfected] = GetClientUserId(curTarget);
+	}
+	return Plugin_Continue;
 }
 
 Action Timer_RespectateSpecs(Handle hTimer)
@@ -413,6 +430,9 @@ public void OnRoundIsLive()
 void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
 	bRoundLive = false;
+	
+	for (int i = 1; i <= MaxClients; ++i)
+		iTankVictim[i] = 0;
 }
 
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -512,6 +532,9 @@ Action HudDrawTimer(Handle hTimer)
 			continue;
 		}
 		
+		if (IsFakeClient(i))
+			continue;
+		
 		switch (GetClientTeam(i))
 		{
 			case L4D2Team_Spectator:
@@ -526,6 +549,7 @@ Action HudDrawTimer(Handle hTimer)
 				if (bTankHudActive[i])
 					tankHud_clients[tankHud_total++] = i;
 			}
+			// Survivors are never recipients of either HUD.
 		}
 	}
 	
@@ -561,28 +585,33 @@ Action HudDrawTimer(Handle hTimer)
 	
 	if (!tankHud_total) return Plugin_Continue;
 	
-	Panel tankHud = new Panel();
-	if (FillTankInfo(tankHud, true)) // No tank -- no HUD
+	// Built per client so panel text follows each recipient's language.
+	for (int i = 0; i < tankHud_total; ++i)
 	{
-		for (int i = 0; i < tankHud_total; ++i)
+		int client = tankHud_clients[i];
+		
+		switch (GetClientMenu(client))
 		{
-			int client = tankHud_clients[i];
-			
-			switch (GetClientMenu(client))
-			{
-				case MenuSource_External, MenuSource_Normal: continue;
-			}
-			
-			tankHud.Send(client, DummyTankHudHandler, 3);
-			if (!bTankHudHintShown[client])
-			{
-				bTankHudHintShown[client] = true;
-				CPrintToChat(client, "%t", "Notify_TankhudUsage");
-			}
+			case MenuSource_External, MenuSource_Normal: continue;
+		}
+		
+		Panel tankHud = new Panel();
+		if (!FillTankInfo(tankHud, true, client)) // No tank -- no HUD
+		{
+			delete tankHud;
+			break;
+		}
+		
+		tankHud.Send(client, DummyTankHudHandler, 3);
+		delete tankHud;
+		
+		if (!bTankHudHintShown[client])
+		{
+			bTankHudHintShown[client] = true;
+			CPrintToChat(client, "%t", "Notify_TankhudUsage");
 		}
 	}
 	
-	delete tankHud;
 	return Plugin_Continue;
 }
 
@@ -1050,7 +1079,7 @@ void FillInfectedInfo(Panel hSpecHud)
 	}
 }
 
-bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
+bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false, int langclient = LANG_SERVER)
 {
 	int tankCount;
 	int tanks[MAXPLAYERS + 1];
@@ -1067,7 +1096,7 @@ bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
 
 	if (bTankHUD)
 	{
-		FormatEx(info, sizeof(info), "%s :: Tank HUD%s", sReadyCfgName, (tankCount > 1 ? "s" : ""));
+		FormatEx(info, sizeof(info), "%T", "TankHUD_Header", langclient, sReadyCfgName);
 		ValvePanel_ShiftInvalidString(info, sizeof(info));
 		DrawPanelText(hSpecHud, info);
 		
@@ -1088,40 +1117,41 @@ bool FillTankInfo(Panel hSpecHud, bool bTankHUD = false)
 		{
 			if (i > 0)
 				DrawPanelText(hSpecHud, " ");
-			FormatEx(info, sizeof(info), "Tank #%i", i + 1);
+			FormatEx(info, sizeof(info), "%T", "TankHUD_TankNum", langclient, i + 1);
 			DrawPanelText(hSpecHud, info);
 		}
 
-		FillSingleTankInfo(hSpecHud, tanks[i]);
+		FillSingleTankInfo(hSpecHud, tanks[i], langclient);
 	}
 
 	return true;
 }
 
-void FillSingleTankInfo(Panel hSpecHud, int tank)
+void FillSingleTankInfo(Panel hSpecHud, int tank, int langclient = LANG_SERVER)
 {
 	static char info[80];
+	static char buffer[32];
 	static char name[MAX_NAME_LENGTH];
 
 	// Draw owner & pass counter
 	int passCount = L4D2Direct_GetTankPassedCount();
-	switch (passCount)
+	if (passCount == 0)
 	{
-		case 0: FormatEx(info, sizeof(info), "native");
-		case 1: FormatEx(info, sizeof(info), "%ist", passCount);
-		case 2: FormatEx(info, sizeof(info), "%ind", passCount);
-		case 3: FormatEx(info, sizeof(info), "%ird", passCount);
-		default: FormatEx(info, sizeof(info), "%ith", passCount);
+		FormatEx(buffer, sizeof(buffer), "%T", "TankHUD_Pass_Native", langclient);
+	}
+	else
+	{
+		FormatEx(buffer, sizeof(buffer), "%T", "TankHUD_Pass_Count", langclient, passCount);
 	}
 
 	if (!IsFakeClient(tank))
 	{
 		GetClientFixedName(tank, name, sizeof(name));
-		Format(info, sizeof(info), "Ctrl: %s (%s)", name, info);
+		FormatEx(info, sizeof(info), "%T", "TankHUD_Ctrl", langclient, name, buffer);
 	}
 	else
 	{
-		Format(info, sizeof(info), "Ctrl: AI (%s)", info);
+		FormatEx(info, sizeof(info), "%T", "TankHUD_Ctrl_AI", langclient, buffer);
 	}
 	DrawPanelText(hSpecHud, info);
 
@@ -1133,39 +1163,39 @@ void FillSingleTankInfo(Panel hSpecHud, int tank)
 	
 	if (health <= 0 || isIncapacitated)
 	{
-		info = "HP: Dead";
+		FormatEx(info, sizeof(info), "%T", "TankHUD_HP_Dead", langclient);
 	}
 	else
 	{
-		FormatEx(info, sizeof(info), "HP: %i / %i (%i%%)", health, maxhealth, L4D2Util_GetMax(1, RoundFloat(healthPercent)));
+		FormatEx(info, sizeof(info), "%T", "TankHUD_HP", langclient, health, maxhealth, L4D2Util_GetMax(1, RoundFloat(healthPercent)));
 	}
 	DrawPanelText(hSpecHud, info);
 
 	if (IsFakeClient(tank) && bVersusCoopMode)
 	{
-		FillCoopTankTargetInfo(hSpecHud, tank);
+		FillCoopTankTargetInfo(hSpecHud, tank, langclient);
 	}
 	else
 	{
 		// Draw frustration
 		if (!IsFakeClient(tank))
 		{
-			FormatEx(info, sizeof(info), "Frust: %d%%", GetTankFrustration(tank));
+			FormatEx(info, sizeof(info), "%T", "TankHUD_Frust", langclient, GetTankFrustration(tank));
 		}
 		else
 		{
-			info = "Frust: AI";
+			FormatEx(info, sizeof(info), "%T", "TankHUD_Frust_AI", langclient);
 		}
 		DrawPanelText(hSpecHud, info);
 
 		// Draw network
 		if (!IsFakeClient(tank))
 		{
-			FormatEx(info, sizeof(info), "Net: %ims / %.1f", RoundToNearest(GetClientAvgLatency(tank, NetFlow_Both) * 1000.0), LM_GetLerpTime(tank) * 1000.0);
+			FormatEx(info, sizeof(info), "%T", "TankHUD_Net", langclient, RoundToNearest(GetClientAvgLatency(tank, NetFlow_Both) * 1000.0), LM_GetLerpTime(tank) * 1000.0);
 		}
 		else
 		{
-			info = "Net: AI";
+			FormatEx(info, sizeof(info), "%T", "TankHUD_Net_AI", langclient);
 		}
 		DrawPanelText(hSpecHud, info);
 	}
@@ -1174,35 +1204,41 @@ void FillSingleTankInfo(Panel hSpecHud, int tank)
 	if (!isIncapacitated && GetEntityFlags(tank) & FL_ONFIRE)
 	{
 		int timeleft = RoundToCeil(healthPercent / 100.0 * fTankBurnDuration);
-		FormatEx(info, sizeof(info), "Fire: %is", timeleft);
+		FormatEx(info, sizeof(info), "%T", "TankHUD_Fire", langclient, timeleft);
 		DrawPanelText(hSpecHud, info);
 	}
 }
 
-void FillCoopTankTargetInfo(Panel hSpecHud, int tank)
+void FillCoopTankTargetInfo(Panel hSpecHud, int tank, int langclient = LANG_SERVER)
 {
 	static char info[80];
+	static char state[32];
 	static char name[MAX_NAME_LENGTH];
 
 	int target;
 	if (GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_GetValue") == FeatureStatus_Available)
 		target = L4D_TargetOverride_GetValue(tank, VALUE_INDEX_VICTIM);
 
+	// target_override has no record when other AI plugins rewrite the target
+	// through L4D2_OnChooseVictim, so fall back to our own cache.
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+		target = GetClientOfUserId(iTankVictim[tank]);
+
 	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
 	{
-		DrawPanelText(hSpecHud, "Target: Searching");
+		FormatEx(info, sizeof(info), "%T", "TankHUD_Target_Searching", langclient);
+		DrawPanelText(hSpecHud, info);
 		return;
 	}
 
-	char state[8];
 	if (IsHangingFromLedge(target))
-		state = "Hang";
+		FormatEx(state, sizeof(state), "%T", "TankHUD_State_Hang", langclient);
 	else if (IsIncapacitated(target))
-		state = "Down";
+		FormatEx(state, sizeof(state), "%T", "TankHUD_State_Down", langclient);
 	else if (IsSurvivorAttacked(target))
-		state = "Pinned";
+		FormatEx(state, sizeof(state), "%T", "TankHUD_State_Pinned", langclient);
 	else
-		state = "Up";
+		FormatEx(state, sizeof(state), "%T", "TankHUD_State_Up", langclient);
 
 	int health = GetClientHealth(target);
 	if (!IsIncapacitated(target))
@@ -1213,7 +1249,7 @@ void FillCoopTankTargetInfo(Panel hSpecHud, int tank)
 	GetClientAbsOrigin(target, targetPos);
 
 	GetClientFixedName(target, name, sizeof(name));
-	FormatEx(info, sizeof(info), "Target: %s [%iHP/%s] %iu", name, health, state, RoundToNearest(GetVectorDistance(tankPos, targetPos)));
+	FormatEx(info, sizeof(info), "%T", "TankHUD_Target", langclient, name, health, state, RoundToNearest(GetVectorDistance(tankPos, targetPos)));
 	DrawPanelText(hSpecHud, info);
 }
 

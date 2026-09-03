@@ -686,6 +686,8 @@ stock Action performFinalBhopBeforeCharge(int client, const float pos[3], const 
     g_AiChargers[client].m_flFinalBhopStartTime = GetGameTime();
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(dir);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
+    // 消费掉本次落地加速授权, 引擎拒跳时下一帧不会重复领取
+    AIPathMovement_MarkHopStart(client);
 
     stateLog.debugAll(
         "Charger (%N) performed final bunnyhop before charge, dist %.2f, commitDist %.2f, requiredSpeed %.2f, maxHopSpeed %.2f",

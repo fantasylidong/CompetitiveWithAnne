@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"en"		" ({1} only)"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"en"		"Language: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"en"		"Display language"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"en"		"Follow game language"
+		}
 	}

@@ -26,4 +26,90 @@
 	{
 		"vi"		"<{olive}HUD{default}> Đầu vào trò chuyện {green}!tankhud{default} Công tắc {red}Tank Công tắc bảng"
 	}
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"vi"		"{1} :: Tank HUD"
+	}
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"vi"		"Tank #{1}"
+	}
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"vi"		"Điều khiển: {1} ({2})"
+	}
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"vi"		"Điều khiển: AI ({1})"
+	}
+	"TankHUD_Pass_Native"
+	{
+		"vi"		"gốc"
+	}
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"vi"		"lượt chuyền {1}"
+	}
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"vi"		"HP: {1} / {2} ({3}%%)"
+	}
+	"TankHUD_HP_Dead"
+	{
+		"vi"		"HP: Đã chết"
+	}
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"vi"		"Nộ khí: {1}%%"
+	}
+	"TankHUD_Frust_AI"
+	{
+		"vi"		"Nộ khí: AI"
+	}
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"vi"		"Mạng: {1}ms / {2}"
+	}
+	"TankHUD_Net_AI"
+	{
+		"vi"		"Mạng: AI"
+	}
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"vi"		"Cháy: còn {1} giây"
+	}
+	"TankHUD_Target_Searching"
+	{
+		"vi"		"Mục tiêu: Đang tìm..."
+	}
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"vi"		"Mục tiêu: {1} [{2}HP/{3}] cách {4}"
+	}
+	"TankHUD_State_Hang"
+	{
+		"vi"		"Bám vách"
+	}
+	"TankHUD_State_Down"
+	{
+		"vi"		"Gục"
+	}
+	"TankHUD_State_Pinned"
+	{
+		"vi"		"Bị khống chế"
+	}
+	"TankHUD_State_Up"
+	{
+		"vi"		"Đứng"
+	}
 }

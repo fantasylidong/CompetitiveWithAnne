@@ -26,4 +26,90 @@
 	{
 		"jp"		"<{olive}HUD{default}> チャット入力 {green}!tankhud{default} スイッチ {red}Tank パネルスイッチ"
 	}
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"jp"		"{1} :: タンク HUD"
+	}
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"jp"		"タンク #{1}"
+	}
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"jp"		"操作: {1} ({2})"
+	}
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"jp"		"操作: AI ({1})"
+	}
+	"TankHUD_Pass_Native"
+	{
+		"jp"		"ネイティブ"
+	}
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"jp"		"パス {1} 回目"
+	}
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"jp"		"HP: {1} / {2} ({3}%%)"
+	}
+	"TankHUD_HP_Dead"
+	{
+		"jp"		"HP: 死亡"
+	}
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"jp"		"フラスト: {1}%%"
+	}
+	"TankHUD_Frust_AI"
+	{
+		"jp"		"フラスト: AI"
+	}
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"jp"		"回線: {1}ms / {2}"
+	}
+	"TankHUD_Net_AI"
+	{
+		"jp"		"回線: AI"
+	}
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"jp"		"炎上: 残り {1} 秒"
+	}
+	"TankHUD_Target_Searching"
+	{
+		"jp"		"ターゲット: 索敵中..."
+	}
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"jp"		"ターゲット: {1} [{2}HP/{3}] 距離 {4}"
+	}
+	"TankHUD_State_Hang"
+	{
+		"jp"		"崖掴まり"
+	}
+	"TankHUD_State_Down"
+	{
+		"jp"		"ダウン"
+	}
+	"TankHUD_State_Pinned"
+	{
+		"jp"		"拘束中"
+	}
+	"TankHUD_State_Up"
+	{
+		"jp"		"健在"
+	}
 }

@@ -171,6 +171,8 @@ native void L4D_TargetOverride_SetTargetedCap(int client, int cap);
 * @brief Registers a Special Infected's current victim in the "targeted" ledger
 * @notes For AI plugins that rewrite targets through the Left4DHooks "L4D2_OnChooseVictim" forward,
 *        so both targeting channels share one consistent per-survivor targeted count.
+* @notes Since 2.28 the game's own choice is mirrored automatically when this plugin does not override
+*        the call, and a registered victim is kept for the class "wait" duration like any other target.
 *
 * @param	attacker		The Special Infected client index
 * @param	victim			The chosen Survivor client index (0 = clear)

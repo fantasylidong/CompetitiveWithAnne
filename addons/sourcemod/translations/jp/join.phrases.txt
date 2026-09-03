@@ -8,6 +8,54 @@
 	{
 		"jp"		"{green}%N {olive} がゲームから退出しました - 理由: [{green}%s{olive}]"
 	}
+	"Join_ReasonConnectionRejected"
+	{
+		"jp"		"接続が拒否されました"
+	}
+	"Join_ReasonTimedOut"
+	{
+		"jp"		"タイムアウト"
+	}
+	"Join_ReasonKickedByConsole"
+	{
+		"jp"		"コンソールによりキックされました"
+	}
+	"Join_ReasonDisconnectByUser"
+	{
+		"jp"		"自分で切断しました"
+	}
+	"Join_ReasonPingTooHigh"
+	{
+		"jp"		"Ping が高すぎます"
+	}
+	"Join_ReasonNoSteamLogon"
+	{
+		"jp"		"No Steam logon / Steam 認証に失敗"
+	}
+	"Join_ReasonSteamAccountInUse"
+	{
+		"jp"		"Steam アカウントが別の場所で使用されています"
+	}
+	"Join_ReasonSteamConnectionLost"
+	{
+		"jp"		"Steam 接続が切断されました"
+	}
+	"Join_ReasonGameNotOwned"
+	{
+		"jp"		"この Steam アカウントはこのゲームを所有していません"
+	}
+	"Join_ReasonValidationRejected"
+	{
+		"jp"		"検証が拒否されました"
+	}
+	"Join_ReasonCertificateLength"
+	{
+		"jp"		"Certificate length"
+	}
+	"Join_ReasonPureServer"
+	{
+		"jp"		"Pure サーバー検査に失敗"
+	}
 	"Join_AnneDonatePaymentMethodOnly"
 	{
 		"jp"		"{green}[AnneDonate]{default} 支払い方法はwechatまたはalipayのみをサポートしています。再度選択してください。"

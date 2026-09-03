@@ -15,8 +15,8 @@
 ## 统计
 
 - 当前模式配置引用插件：328 个。
-- 主表已抽取命令/监听入口：450 条。
-- 对抗通用：384 条。
+- 主表已抽取命令/监听入口：452 条。
+- 对抗通用：386 条。
 - Anne 模式专用：66 条。
 - 启用目录存在但当前模式配置未加载的插件命令：70 条。
 - 未找到源码的未加载启用目录插件：16 个。
@@ -25,7 +25,7 @@
 
 ## 对抗通用命令
 
-共 386 条命令/监听入口。
+共 388 条命令/监听入口。
 
 | 插件 | 命令 | 类型 | 权限 | 说明 | 出现模式 |
 | --- | --- | --- | --- | --- | --- |
@@ -175,7 +175,9 @@
 | `extend/l4d2_scripted_hud.smx` | `sm_l4d2_scripted_hud_reload_data` | 管理员 | ADMFLAG_ROOT | Reload the HUD texts set in the data file. | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_print_cvars_l4d2_scripted_hud` | 管理员 | ADMFLAG_ROOT | Print the plugin related cvars and their respective values to the console. | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_hud` | 玩家 | - | 打开个人 HUD 显示设置菜单 | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_hudlang` | 玩家 | - | 打开显示语言菜单 | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_hudmenu` | 玩家 | - | 打开个人 HUD 显示设置菜单 | 34 个模式 |
+| `extend/l4d2_scripted_hud.smx` | `sm_lang` | 玩家 | - | 打开显示语言菜单（等同 sm_hudlang） | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_spechudoff` | 玩家/控制台 | - | 玩家关闭个人 HUD3；控制台关闭全局 HUD3 | 34 个模式 |
 | `extend/l4d2_scripted_hud.smx` | `sm_spechudon` | 玩家/控制台 | - | 玩家打开个人 HUD3；控制台打开全局 HUD3 | 34 个模式 |
 | `extend/rpg.smx` | `sm_ammo` | 玩家/控制台 | - | 快速买子弹 | 34 个模式 |

@@ -922,3 +922,41 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - Anne、硬核、喷子和 Alone 模式恢复加载 Zonemod 的 `l4d2_tongue_timer.smx`。生还者速清后的冷却至少 4 秒；Tank 伤害速清 Anne 系模式下调为 1 秒（Zonemod 上游仍为 8 秒），避免 AI Tank 的拳/石头误伤反而重罚自家 Smoker；拉空仍按 `tongue_miss_delay`，简单到专家 7 秒、极限/音理 3 秒，正常命中松舌仍为 `tongue_hit_delay 13`。
 - `l4d2_tongue_timer` 升级到 1.3-anne.1：按受害者记录实际拉人的 Smoker，Tank 速清不再误把 8 秒冷却加给场上第一只 Smoker；任一舌头松开也只清理对应关系，支持多 Smoker 同时拉人。
 - 重新编译：`ai_smoker3.smx`、`l4d2_tongue_timer.smx`。
+
+### 2026年9月2日 Scripted HUD 显示语言菜单
+
+- `l4d2_scripted_hud` 升级到 1.7.0。`!hud` 菜单新增「语言」项，也可以直接用 `!lang` / `!hudlang` 打开，在「跟随游戏语言」、English、简体中文、繁體中文、日本語、한국어、Tiếng Việt 之间切换。菜单只列出 `languages.cfg` 里服务器真正认识的语言，缺的条目直接不显示，而不是选了没反应。
+- 选择按 SteamID 存进 `scripted_hud_prefs` 新列 `lang_code`，同时写一份独立 Cookie `l4d2_scripted_hud_lang_v1`，沿用其余 HUD 偏好那套 revision 合并规则，换服、重连、数据库暂时不可用都能接上。
+- 语言通过 `SetClientLanguage` 生效，所以 HUD、HUD 菜单，以及其他插件发给这名玩家的聊天翻译会一起切过去。SourceMod 在客户端改设置时会重新读一次 `cl_language`，因此每次构建该玩家的 HUD 时会顺带校验并重新写回这个覆盖值。
+- `!hud` 里的「恢复默认设置」不会重置语言——那一项决定的是菜单本身用什么语言显示，重置掉会让人读不回来；要还原用语言菜单里的「跟随游戏语言」。
+- 已知限制：HUD2 的模式标签（`[普通药役]` 等）和 AI 难度名仍是全局共享的硬编码中文，不随这个设置切换。
+- `docs/plugin_commands.md` 补上 `sm_hudlang` / `sm_lang` 两条。
+- 重新编译：`l4d2_scripted_hud.smx`。
+
+### 2026年9月2日 spechud 坦克面板修复
+
+- `spechud` 升级到 3.10.1。坦克面板（tankhud）只发给旁观者和特感玩家，撤掉之前为 versus_coop 加的生还者接收分支；也去掉了试图用 `CancelClientMenu` 在转队时收回面板的代码——SourceMod 这个函数只清服务端状态、不会给客户端发包，radio 面板还是要等 3 秒超时自己消失，那段代码没有实际效果。
+- 修复 AI 坦克目标一直显示「搜索中」：原先只读 `l4d_target_override` 记录的受害者，但坦克实际改靶走的是 left4dhooks 的 `L4D2_OnChooseVictim`（`ai_tank3`、`SI_Target_limit` 都在这条通道上），target_override 里经常是空的。现在 spechud 自己监听 `L4D2_OnChooseVictim` 按 userid 缓存每只坦克最近选中的目标，target_override 有记录时仍然优先。
+- 坦克面板文案全部改走翻译文件，并按每个接收人的客户端语言逐个构建；服务器默认语言为 `chi`，未匹配语言的玩家看到中文。新增短语补齐 en/chi/zho/jp/ko/vi/es 七份 `spechud.phrases.txt`。
+- `scripts/spcomp-docker.sh` 改为 tar 流式把源码送到远端、smx 从 stdout 传回本地，不再依赖 bind mount。默认通过 SSH 在 `pve-yma` 主机上原生运行 spcomp64（`SPCOMP_SSH_HOST` 可改主机），`SPCOMP_BACKEND=docker` 切回 docker 容器；本地 Mac 无 docker daemon 也能编译。
+- 重新编译：`spechud.smx`。
+
+### 2026年9月2日 特感目标上限联动修复（infected_control / SI_Target_limit / l4d_target_override）
+
+- `infected_control.smx` 升级到 2026-09-02.1。修复跑男状态只在开启时通知外部的回归：跑男解除（归队、波次/回合重置、机关事件）时现在会发 `OnDetectRushman(0)`，`SI_Target_limit` 不再在一次跑男之后整张图停留在「全体放开目标上限」。解除带确认窗口：新增 `inf_antibait_runner_off_confirm`（默认 2.3 秒），跑男只是回到判定阈值以内（差距缩小、队友靠近）需要持续满足这么久才解除，避免队友短暂追上又拉开时目标上限反复开关；跑男死亡/倒地/被控/掉线仍立即解除。波次重置不再单独清掉 `gAB.runner` 而留下 `gST.bPickRushMan`，两处跑男状态保持一致。
+- 刷特侧容量口径升级为「剩余名额」：刚刷出、还没跑过 ChooseVictim 的特感会按导向目标记一笔待锁定预留（账本登记或 2.5 秒后释放），同一帧连刷多只不再全部导向同一个人；随机选目标改为按剩余名额加权，队首 ×2 自然拿到更高权重。
+- 传送补位队列的职业若活体额度已被普通队列/内鬼预留占满，改为换成还有额度的职业继续补位；所有职业都满时整体退避 1 秒，不再逐帧空转。
+- `SI_Target_limit.smx` 升级到 1.9。新增 `SI_target_rushman_scope`（默认 1）：跑男时只放开跑男本人的按人上限（`SetTargetedCap`），其余生还者保持正常保护；0 为旧行为（全体抬到特感总上限）。`SI_target_enable` 现在真正生效（关闭时清空 target_override 的 targeted 选项，所有 native 返回不限制）。上限重算改为算一次、推一次，不再对 66 个槽位各推一遍职业级选项；手动模式初始化也会推送。补齐 `survivor_rescued` / `defibrillator_used` / `player_team` / 生还者 `player_spawn` 触发点，并每秒校验一次：可动人数变化或 target_override 重载配置（`sm_to_reload` 会把 targeted 归零）导致的漂移自动纠正。infected_control 重载后不再重复挂钩 `l4d_infected_limit`；`si_target_limit.inc` 里的库名改为与 `RegPluginLibrary` 一致的小写。
+- `l4d_target_override.smx` 升级到 2.28。新增 ChooseVictim 的 post detour：pre 阶段把决定交回游戏时（type=1 视野内没人、职业未启用覆盖、forward 返回 Handled）也把引擎选中的受害者登记进 targeted 账本，`GetValue(VALUE_INDEX_TOTAL)` 不再系统性低估；`SetLastVictim` 登记的目标会保留 wait/dist 语义而不是下一次调用就丢掉重选；修复 forward 返回 Plugin_Handled 时 ArrayList 句柄泄漏。
+- 重新编译：`infected_control.smx`、`SI_Target_limit.smx`、`l4d_target_override.smx`。
+
+### 2026年9月3日 特感连跳第一跳不再加速
+
+- 定位：共享空中修正 `ai_path_movement.inc` 本身从不加速（只把速度托底到不高于起跳速度、转向还扣速），四只特感看起来「第一跳在空中突然提速」全部来自离地那一帧：Path / Direct 起跳直接把速度替换成 `跑速 + 整份加速度`（Charger 250→350，+40%；Boomer 175→325，+86%，且 `ClientPush` 还会把 ≤250 的速度硬抬到 251），而不是像人类连跳那样落地才涨。
+- `ai_path_movement.inc` 新增连跳链跟踪：`AIPathMovement_NotifyGrounded` 在地面或梯子上每帧尽早登记，离开地面至少 0.1 秒后重新踩地即记为一次落地——不区分插件起跳、引擎跳跃还是沿路径走下落差，高处坠落同样算落地且不设滞空上限，落下来带着的速度照常保留并在落地那跳追加加速度；`AIPathMovement_GetHopImpulse` 只在「落地后 0.15 秒内再起跳」时返回完整加速度，从地面直接起跳的第一跳返回 0，只改方向不加速；`AIPathMovement_MarkHopStart` 在每次起跳时消费掉落地授权（`BeginPathHop` 内自动调用），引擎拒跳后下一帧仍站在原地中间没有离地，不算落地，原地反复尝试起跳不会每帧白拿加速度。梯子按地面处理，爬完梯子之后的第一跳不加速。
+- `ai_charger3` 升级到 1.0.1.12：Path 与 Direct 地面起跳改用落地加速，冲锋前最后一跳登记起跳以便回到接近状态后接上链；新 Charger / 重生时重置连跳链。调试日志补上地面速度与是否落地跳。
+- `ai_tank3` 升级到 1.0.0.12：普通连跳（前/后/侧向冲量）与 Path 前瞻连跳同样改为落地加速；回合开始与进服时重置连跳链。
+- `ai_boomer_3` 升级到 3.0.9：推力改为落地追加；起跳速度先构造再统一用于路线检查与 Teleport（原来路线检查只看单独的推力向量，第一跳没有推力时会退化成零长度检查）；251 最低连跳速度只在真正追加推力的那一跳兜底，不再借它给第一跳偷偷加速。
+- `ai_spitter_3` 升级到 3.0.8：推力改为落地追加，`spitterDoBhop` 直接写回已通过路线检查的起跳速度，不再在 Teleport 前重新算一份。
+- 四个插件的加速度 cvar 描述同步改为「落地后紧接着再起跳时追加，从跑动直接起跳的第一跳不加」。整条加速链只是整体后移一跳，上限、空中修正与转向损速逻辑不变。
+- 重新编译：`ai_charger3.smx`、`ai_tank3.smx`、`ai_boomer_3.smx`、`ai_spitter_3.smx`。

@@ -554,4 +554,17 @@
 			"#format"	"{1:s}"
 			"chi"		"（仅{1}）"
 		}
+		"L4D2ScriptedHUD_LanguageMenu"
+		{
+			"#format"	"{1:s}"
+			"chi"		"语言: {1}"
+		}
+		"L4D2ScriptedHUD_LanguageTitle"
+		{
+			"chi"		"显示语言"
+		}
+		"L4D2ScriptedHUD_LanguageAuto"
+		{
+			"chi"		"跟随游戏语言"
+		}
 	}

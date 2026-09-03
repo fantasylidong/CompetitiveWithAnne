@@ -18,6 +18,7 @@ void TeleportState_ClearClient(int client)
     gST.teleInvisibleSeconds[client] = 0.0;
     gST.teleLastSampleTime[client] = 0.0;
     gST.spitterSpitTime[client] = 0.0;
+    SpawnTarget_ReleaseReservation(client);
 }
 
 void TeleportState_StampSpawn(int client, const char[] source)
@@ -141,14 +142,57 @@ bool IsEligibleSpawnTarget(int client)
 
 // 容量判断在候选热路径上逐行调用。native 可用性与逐人结果按 tick 缓存，
 // 避免每个候选都做字符串查找和跨插件调用；刷出成功时显式失效。
-// 队首 ×2 的有效上限由 SI_Target_limit 1.6 的 GetClientTargetLimit 直接返回。
+// 队首 ×2 / 跑男放开的有效上限由 SI_Target_limit 的 GetClientTargetLimit 直接返回。
+#define SPAWN_TARGET_HEADROOM_UNLIMITED   -1
+#define SPAWN_TARGET_HEADROOM_UNCOMPUTED  -2
+// 刚刷出的特感要等 ChooseVictim 跑过才进 l4d_target_override 的账本；同一帧
+// burst 内后续刷出的特感看到的容量与第一只完全一样。这里按“导向目标”记一笔
+// 短期预留：账本里出现该特感、或超时、或该特感消失后自动释放。
+#define SPAWN_TARGET_RESERVE_TTL           2.5
+
 static float g_TargetCapCacheTime = -1.0;
 static bool g_TargetCapNativeOk = false;
+static bool g_TargetLedgerNativeOk = false;
 static int g_TargetCapState[MAXPLAYERS + 1];
+static int g_iPendingReserveTarget[MAXPLAYERS + 1];   // 按特感 client 索引：导向的生还者
+static float g_fPendingReserveUntil[MAXPLAYERS + 1];
 
 void SpawnTarget_InvalidateCapacityCache()
 {
     g_TargetCapCacheTime = -1.0;
+}
+
+void SpawnTarget_ReserveFor(int siClient, int target)
+{
+    if (siClient <= 0 || siClient > MaxClients)
+        return;
+    if (target <= 0 || target > MaxClients)
+    {
+        SpawnTarget_ReleaseReservation(siClient);
+        return;
+    }
+
+    g_iPendingReserveTarget[siClient] = target;
+    g_fPendingReserveUntil[siClient] = GetGameTime() + SPAWN_TARGET_RESERVE_TTL;
+}
+
+void SpawnTarget_ReleaseReservation(int siClient)
+{
+    if (siClient <= 0 || siClient > MaxClients)
+        return;
+
+    g_iPendingReserveTarget[siClient] = 0;
+    g_fPendingReserveUntil[siClient] = 0.0;
+}
+
+void SpawnTarget_ClearPendingReservations()
+{
+    for (int i = 0; i <= MAXPLAYERS; i++)
+    {
+        g_iPendingReserveTarget[i] = 0;
+        g_fPendingReserveUntil[i] = 0.0;
+    }
+    SpawnTarget_InvalidateCapacityCache();
 }
 
 static void SpawnTarget_EnsureCapacityCache()
@@ -159,33 +203,76 @@ static void SpawnTarget_EnsureCapacityCache()
     g_TargetCapCacheTime = now;
     g_TargetCapNativeOk = GetFeatureStatus(FeatureType_Native, "GetClientTargetLimit")
         == FeatureStatus_Available;
+    g_TargetLedgerNativeOk = GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_GetValue")
+        == FeatureStatus_Available;
     for (int i = 0; i <= MaxClients; i++)
-        g_TargetCapState[i] = -1;
+        g_TargetCapState[i] = SPAWN_TARGET_HEADROOM_UNCOMPUTED;
+}
+
+// 账本已经登记（无论登记到谁）就不再算预留，避免和 GetClientTargetNum 重复计数。
+static bool SpawnTarget_IsReservationSettled(int siClient)
+{
+    if (!g_TargetLedgerNativeOk)
+        return false;
+    return L4D_TargetOverride_GetValue(siClient, VALUE_INDEX_VICTIM) > 0;
+}
+
+static int SpawnTarget_CountPending(int target, float now)
+{
+    int pending = 0;
+    for (int si = 1; si <= MaxClients; si++)
+    {
+        if (g_iPendingReserveTarget[si] != target)
+            continue;
+
+        if (now >= g_fPendingReserveUntil[si]
+            || !IsClientInGame(si) || !IsPlayerAlive(si)
+            || SpawnTarget_IsReservationSettled(si))
+        {
+            g_iPendingReserveTarget[si] = 0;
+            g_fPendingReserveUntil[si] = 0.0;
+            continue;
+        }
+        pending++;
+    }
+    return pending;
+}
+
+// 剩余可锁定名额：SPAWN_TARGET_HEADROOM_UNLIMITED = 无上限/不可用；0 = 已满；
+// >0 = 还能再导向几只控制类特感（含待锁定预留）。
+int SpawnTarget_GetHeadroom(int client)
+{
+    if (!g_bTargetLimitLib || !IsValidSurvivor(client))
+        return SPAWN_TARGET_HEADROOM_UNLIMITED;
+
+    SpawnTarget_EnsureCapacityCache();
+    if (g_TargetCapState[client] == SPAWN_TARGET_HEADROOM_UNCOMPUTED)
+    {
+        int headroom = SPAWN_TARGET_HEADROOM_UNLIMITED;
+        if (g_TargetCapNativeOk)
+        {
+            int limit = GetClientTargetLimit(client);
+            if (limit > 0)
+            {
+                int used = GetClientTargetNum(client)
+                    + SpawnTarget_CountPending(client, g_TargetCapCacheTime);
+                headroom = limit - used;
+                if (headroom < 0)
+                    headroom = 0;
+            }
+        }
+        else if (IsClientReachLimit(client) != 0)
+        {
+            headroom = 0;
+        }
+        g_TargetCapState[client] = headroom;
+    }
+    return g_TargetCapState[client];
 }
 
 stock bool SpawnTarget_IsAtCapacity(int client)
 {
-    if (!g_bTargetLimitLib || !IsValidSurvivor(client))
-        return false;
-
-    SpawnTarget_EnsureCapacityCache();
-    if (g_TargetCapState[client] < 0)
-    {
-        bool atCap;
-        if (g_TargetCapNativeOk)
-        {
-            int limit = GetClientTargetLimit(client);
-            atCap = limit > 0
-                ? GetClientTargetNum(client) >= limit
-                : IsClientReachLimit(client) != 0;
-        }
-        else
-        {
-            atCap = IsClientReachLimit(client) != 0;
-        }
-        g_TargetCapState[client] = atCap ? 1 : 0;
-    }
-    return g_TargetCapState[client] == 1;
+    return SpawnTarget_GetHeadroom(client) == 0;
 }
 
 bool IsPinningSomeone(int client)

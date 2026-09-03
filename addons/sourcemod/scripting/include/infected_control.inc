@@ -95,10 +95,13 @@ enum InfectedControlTankOfferResult
 native InfectedControlTankOfferResult InfectedControl_HandleTraitorTankOffer(int client);
 
 /**
- * @brief When a RushMan be detected
- * @remarks you must send alive Player client index.
- * @para DetectRushMan the rush man client index
- * 
+ * @brief Fired when the rush-man (runner) state changes.
+ * @remarks Fired with the survivor client index when a runner is detected or the
+ *          runner changes to another survivor, and fired with 0 when the runner
+ *          state is cleared (runner rejoined the team, wave/runtime reset, event
+ *          pressure, etc). Consumers must treat 0 as "no runner".
+ *
+ * @param DetectRushMan Runner survivor client index, or 0 when cleared.
  */
 forward void OnDetectRushman(int DetectRushMan);
 

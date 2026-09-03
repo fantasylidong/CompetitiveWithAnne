@@ -26,4 +26,90 @@
 	{
 		"en"		"<{olive}HUD{default}> Type {green}!tankhud{default} into chat to toggle the {red}Tank HUD"
 	}
+	"TankHUD_Header"
+	{
+		"#format"	"{1:s}"
+		"en"		"{1} :: Tank HUD"
+	}
+	"TankHUD_TankNum"
+	{
+		"#format"	"{1:i}"
+		"en"		"Tank #{1}"
+	}
+	"TankHUD_Ctrl"
+	{
+		"#format"	"{1:s},{2:s}"
+		"en"		"Ctrl: {1} ({2})"
+	}
+	"TankHUD_Ctrl_AI"
+	{
+		"#format"	"{1:s}"
+		"en"		"Ctrl: AI ({1})"
+	}
+	"TankHUD_Pass_Native"
+	{
+		"en"		"native"
+	}
+	"TankHUD_Pass_Count"
+	{
+		"#format"	"{1:i}"
+		"en"		"pass #{1}"
+	}
+	"TankHUD_HP"
+	{
+		"#format"	"{1:i},{2:i},{3:i}"
+		"en"		"HP: {1} / {2} ({3}%%)"
+	}
+	"TankHUD_HP_Dead"
+	{
+		"en"		"HP: Dead"
+	}
+	"TankHUD_Frust"
+	{
+		"#format"	"{1:i}"
+		"en"		"Frust: {1}%%"
+	}
+	"TankHUD_Frust_AI"
+	{
+		"en"		"Frust: AI"
+	}
+	"TankHUD_Net"
+	{
+		"#format"	"{1:i},{2:.1f}"
+		"en"		"Net: {1}ms / {2}"
+	}
+	"TankHUD_Net_AI"
+	{
+		"en"		"Net: AI"
+	}
+	"TankHUD_Fire"
+	{
+		"#format"	"{1:i}"
+		"en"		"Fire: {1}s"
+	}
+	"TankHUD_Target_Searching"
+	{
+		"en"		"Target: Searching"
+	}
+	"TankHUD_Target"
+	{
+		"#format"	"{1:s},{2:i},{3:s},{4:i}"
+		"en"		"Target: {1} [{2}HP/{3}] {4}u"
+	}
+	"TankHUD_State_Hang"
+	{
+		"en"		"Hang"
+	}
+	"TankHUD_State_Down"
+	{
+		"en"		"Down"
+	}
+	"TankHUD_State_Pinned"
+	{
+		"en"		"Pinned"
+	}
+	"TankHUD_State_Up"
+	{
+		"en"		"Up"
+	}
 }

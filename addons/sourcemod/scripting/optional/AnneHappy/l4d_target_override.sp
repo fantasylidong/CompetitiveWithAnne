@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"2.27"
+#define PLUGIN_VERSION 		"2.28"
 #define DEBUG_BENCHMARK		0			// 0=Off. 1=Benchmark only (for command). 2=Benchmark (displays on server). 3=PrintToServer various data.
 
 /*======================================================================================
@@ -32,6 +32,18 @@
 
 ========================================================================================
 	Change Log:
+
+2.28 (02-Sep-2026)
+	- Added a post detour on "BossZombiePlayerBot::ChooseVictim" that registers the game's own victim in the
+	  "targeted" ledger whenever the pre detour left the decision to the game (no visible candidates with
+	  search type 1, class not overridden, forward returned Plugin_Handled...). Previously those Special
+	  Infected never counted toward anyone's "targeted" cap and "L4D_TargetOverride_GetValue(VALUE_INDEX_TOTAL)"
+	  under-reported. Requested by "morzlee".
+	- "L4D_TargetOverride_SetLastVictim" now also resets the stored order and arms the "wait" timer, and the
+	  last-victim re-validation accepts externally registered victims, so "wait"/"dist" apply to them instead
+	  of dropping and re-picking the ledger entry every call.
+	- Fixed an ArrayList handle leak when a "L4D_OnTargetOverride" listener returned Plugin_Handled for a
+	  freshly selected victim.
 
 2.27 (29-Aug-2026)
 	- Added native "L4D_TargetOverride_SetLastVictim" so 3rd party AI plugins that rewrite targets through the
@@ -284,6 +296,7 @@ float g_fOptionWait[MAX_SPECIAL];
 
 #define MAX_PLAY		MAXPLAYERS+1
 int g_iTargetedCapClient[MAX_PLAY];		// Per-survivor "targeted" cap override; 0 = use the class option value
+bool g_bPreSuperceded[MAX_PLAY];		// Pre detour overrode this call; post detour must not touch the ledger
 float g_fLastSwitch[MAX_PLAY];
 float g_fLastAttack[MAX_PLAY];
 int g_iLastAttacker[MAX_PLAY];
@@ -1071,6 +1084,8 @@ void DetourAddress(bool patch)
 	{
 		if( !DHookEnableDetour(g_hDetour, false, ChooseVictim) )
 			SetFailState("Failed to detour \"BossZombiePlayerBot::ChooseVictim\".");
+		if( !DHookEnableDetour(g_hDetour, true, ChooseVictim_Post) )
+			SetFailState("Failed to detour \"BossZombiePlayerBot::ChooseVictim\" (post).");
 
 		patched = true;
 	}
@@ -1078,9 +1093,44 @@ void DetourAddress(bool patch)
 	{
 		if( !DHookDisableDetour(g_hDetour, false, ChooseVictim) )
 			SetFailState("Failed to disable detour \"BossZombiePlayerBot::ChooseVictim\".");
+		if( !DHookDisableDetour(g_hDetour, true, ChooseVictim_Post) )
+			SetFailState("Failed to disable detour \"BossZombiePlayerBot::ChooseVictim\" (post).");
 
 		patched = false;
 	}
+}
+
+// Runs after the game (or the pre detour) picked a victim. When the pre detour left the decision to the
+// game, mirror the result into the "targeted" ledger so every Special Infected counts toward the cap,
+// not only the ones this plugin overrode. AI plugins rewriting the result through Left4DHooks'
+// "L4D2_OnChooseVictim" still register their own choice with "L4D_TargetOverride_SetLastVictim".
+MRESReturn ChooseVictim_Post(int attacker, Handle hReturn)
+{
+	if( attacker < 1 || attacker > MaxClients )
+		return MRES_Ignored;
+
+	if( g_bPreSuperceded[attacker] )
+	{
+		g_bPreSuperceded[attacker] = false;
+		return MRES_Ignored;
+	}
+
+	int victim = DHookGetReturn(hReturn);
+	if( victim >= 1 && victim <= MaxClients && victim != attacker && IsClientInGame(victim) && IsPlayerAlive(victim) && ValidateTeam(victim) == 2 )
+	{
+		if( g_iLastVictim[attacker] != victim )
+		{
+			g_iLastVictim[attacker] = victim;
+			g_iLastOrders[attacker] = 0;
+		}
+	}
+	else
+	{
+		g_iLastVictim[attacker] = 0;
+		g_iLastOrders[attacker] = 0;
+	}
+
+	return MRES_Ignored;
 }
 
 MRESReturn ChooseVictim(int attacker, Handle hReturn)
@@ -1094,6 +1144,9 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 	PrintToServer("");
 	PrintToServer("CHOOSER {%d - \"%N\"}", attacker, attacker);
 	#endif
+
+	if( attacker >= 1 && attacker <= MaxClients )
+		g_bPreSuperceded[attacker] = false;
 
 
 
@@ -1143,7 +1196,16 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 			PrintToServer("=== Test Last: Order: %d. newVictim {%d - \"%N\"}", g_iLastOrders[attacker], lastVictim, lastVictim);
 			#endif
 
-			newVictim = OrderTest(attacker, lastVictim, ValidateTeam(lastVictim), class, g_iLastOrders[attacker]);
+			if( g_iLastOrders[attacker] )
+			{
+				newVictim = OrderTest(attacker, lastVictim, ValidateTeam(lastVictim), class, g_iLastOrders[attacker]);
+			}
+			else if( lastVictim != attacker && ValidateTeam(lastVictim) == 2 )
+			{
+				// Registered externally (game result mirrored by the post detour, or "L4D_TargetOverride_SetLastVictim"):
+				// there is no order to re-test, keep it while alive so "wait"/"dist" apply like any other target.
+				newVictim = lastVictim;
+			}
 
 			#if DEBUG_BENCHMARK == 3
 			PrintToServer("=== Test Last: newVictim {%d - \"%N\"}", lastVictim, lastVictim);
@@ -1175,6 +1237,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 			if( aResult == Plugin_Handled ) return MRES_Ignored;
 
 			DHookSetReturn(hReturn, newVictim);
+			g_bPreSuperceded[attacker] = true;
 			return MRES_Supercede;
 		}
 		else
@@ -1199,6 +1262,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 					if( aResult == Plugin_Handled ) return MRES_Ignored;
 
 					DHookSetReturn(hReturn, newVictim);
+					g_bPreSuperceded[attacker] = true;
 					return MRES_Supercede;
 				}
 			}
@@ -1746,9 +1810,14 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 	if( newVictim )
 	{
 		Action aResult = SendForward(attacker, newVictim, g_iLastOrders[attacker]);
-		if( aResult == Plugin_Handled ) return MRES_Ignored;
+		if( aResult == Plugin_Handled )
+		{
+			delete aTargets;
+			return MRES_Ignored;
+		}
 
 		DHookSetReturn(hReturn, newVictim);
+		g_bPreSuperceded[attacker] = true;
 
 		#if DEBUG_BENCHMARK == 1 || DEBUG_BENCHMARK == 2
 		StopProfiling(g_Prof);
@@ -2226,7 +2295,15 @@ int Native_SetLastVictim(Handle plugin, int numParams)
 	if( victim < 0 || victim > MaxClients )
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid victim index (%d)", victim);
 
-	g_iLastVictim[attacker] = victim;
+	if( g_iLastVictim[attacker] != victim )
+	{
+		g_iLastVictim[attacker] = victim;
+		// No plugin order backs this choice; arm the class "wait" so the next ChooseVictim keeps it
+		// instead of dropping the ledger entry and re-picking immediately.
+		g_iLastOrders[attacker] = 0;
+		int class = GetClassIndex(attacker);
+		g_fLastSwitch[attacker] = (victim && class >= 0) ? GetGameTime() + g_fOptionWait[class] : 0.0;
+	}
 	return 0;
 }
 
@@ -2274,6 +2351,18 @@ int GetSpecialBit(int client)
 	if( zc == g_iClassTank ) return 64;
 	if( zc >= 1 && zc <= 6 ) return 1 << (zc - 1);
 	return 0;
+}
+
+// Option array index (INDEX_TANK..INDEX_CHARGER) for a Special Infected client, -1 when not applicable
+int GetClassIndex(int client)
+{
+	if( !IsClientInGame(client) || GetClientTeam(client) != 3 )
+		return -1;
+
+	int zc = GetEntProp(client, Prop_Send, "m_zombieClass");
+	if( zc == g_iClassTank ) return INDEX_TANK;
+	if( zc >= 1 && zc <= (g_bLeft4Dead2 ? 6 : 3) ) return zc;
+	return -1;
 }
 
 int CountTargetedOnVictim(int victim, int attacker, int countMask)
