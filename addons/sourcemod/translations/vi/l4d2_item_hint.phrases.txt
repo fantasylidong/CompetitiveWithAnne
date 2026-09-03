@@ -2,14 +2,26 @@
 {
 	"L4D2ItemHint_MarkingSystemPointsLess5W"
 	{
-		"vi"		"{default}[{green} hệ thống chấm điểm {default}] Điểm của bạn dưới 5w nên không thể sử dụng hệ thống chấm điểm"
+		"vi"		"{default}[{green}Hệ thống đánh dấu{default}] Điểm của bạn dưới 50000 nên không thể sử dụng hệ thống đánh dấu"
 	}
 	"L4D2ItemHint_PlayerMarkedItem"
 	{
-		"vi"		"{default}[{green} hệ thống đánh dấu {default}] {olive}%N{default}: %s"
+		"vi"		"{default}[{green}Hệ thống đánh dấu{default}] {olive}%N{default}: %s"
 	}
 	"L4D2ItemHint_PlayerMarkedItemHighlighted"
 	{
-		"vi"		"{default}[{green} hệ thống đánh dấu {default}] {olive}%N{default}: {green}%s"
+		"vi"		"{default}[{green}Hệ thống đánh dấu{default}] {olive}%N{default}: {green}%s"
+	}
+	"L4D2ItemHint_PlayerMarkedSpot"
+	{
+		"vi"		"{default}[{green}Hệ thống đánh dấu{default}] {olive}%N{default}: {green}đã đánh dấu một vị trí"
+	}
+	"L4D2ItemHint_HintPlayerMarkedItem"
+	{
+		"vi"		"[Hệ thống đánh dấu] %N: %s"
+	}
+	"L4D2ItemHint_HintPlayerMarkedSpot"
+	{
+		"vi"		"[Hệ thống đánh dấu] %N: đã đánh dấu một vị trí"
 	}
 }

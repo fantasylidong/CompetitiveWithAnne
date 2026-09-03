@@ -890,7 +890,8 @@ bool CreateInfectedMarker(int client, int infected, bool bIsWitch = false)
 	
 	static char sItemName[64];
 	StringToLowerCase(sModelName);
-	g_smModelToName.GetString(sModelName, sItemName, sizeof(sItemName));
+	if (!g_smModelToName.GetString(sModelName, sItemName, sizeof(sItemName)))
+		sItemName[0] = '\0';    // unknown (custom) infected model, don't announce the previously cached name
 	NotifyMessage(client, sItemName, view_as<EHintType>(eInfectedMaker));
 	
 	return true;
@@ -1060,7 +1061,7 @@ void CreateSpotMarker(int client, int clientAim = 0, bool bIsAimInfeced)
 			CreateTimer(0.1, TimerMoveSprite, EntIndexToEntRef(sprite), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 		}
 	}
-	NotifyMessage(client, "标记了一个位置", view_as<EHintType>(eSpotMarker));
+	NotifyMessage(client, "", view_as<EHintType>(eSpotMarker));
 }
 
 public Action TimerField(Handle timer, DataPack pack)
@@ -1203,105 +1204,54 @@ void StringToLowerCase(char[] input)
 
 void NotifyMessage(int client, const char[] sItemName, EHintType eType)
 {
+	int  iAnnounceType;
+	bool bWithItemName = true;
+	char sChatPhrase[48], sHintPhrase[48];
+
 	if (eType == view_as<EHintType>(eItemHint))
 	{
-		switch(g_iItemAnnounceType)
-		{
-			case 0: {/*nothing*/}
-			case 1: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						CPrintToChat(i, "%t", "L4D2ItemHint_PlayerMarkedItem", client, sItemName);
-					}
-				}
-			}
-			case 2: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintHintText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: %s", client, sItemName);
-					}
-				}
-			}
-			case 3: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintCenterText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: %s", client, sItemName);
-					}
-				}
-			}
-		}
+		iAnnounceType = g_iItemAnnounceType;
+		strcopy(sChatPhrase, sizeof sChatPhrase, "L4D2ItemHint_PlayerMarkedItem");
+		strcopy(sHintPhrase, sizeof sHintPhrase, "L4D2ItemHint_HintPlayerMarkedItem");
 	}
 	else if (eType == view_as<EHintType>(eInfectedMaker))
 	{
-		switch(g_iInfectedMarkAnnounceType)
-		{
-			case 0: {/*nothing*/}
-			case 1: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						CPrintToChat(i, "%t", "L4D2ItemHint_PlayerMarkedItemHighlighted", client, sItemName);
-					}
-				}
-			}
-			case 2: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintHintText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: {green}%s", client, sItemName);
-					}
-				}
-			}
-			case 3: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintCenterText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: {green}%s", client, sItemName);
-					}
-				}
-			}
-		}	
+		iAnnounceType = g_iInfectedMarkAnnounceType;
+		strcopy(sChatPhrase, sizeof sChatPhrase, "L4D2ItemHint_PlayerMarkedItemHighlighted");
+		strcopy(sHintPhrase, sizeof sHintPhrase, "L4D2ItemHint_HintPlayerMarkedItem");
 	}
 	else if (eType == view_as<EHintType>(eSpotMarker))
 	{
-		switch(g_iSpotAnnounceType)
+		iAnnounceType = g_iSpotAnnounceType;
+		strcopy(sChatPhrase, sizeof sChatPhrase, "L4D2ItemHint_PlayerMarkedSpot");
+		strcopy(sHintPhrase, sizeof sHintPhrase, "L4D2ItemHint_HintPlayerMarkedSpot");
+		bWithItemName = false;    // a marked spot has no item name, the phrase itself describes it
+	}
+	else return;
+
+	if (iAnnounceType == 0) return; //0: Disable
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsFakeClient(i) || GetClientTeam(i) == TEAM_INFECTED)
+			continue;
+
+		switch (iAnnounceType)
 		{
-			case 0: {/*nothing*/}
-			case 1: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						CPrintToChat(i, "%t", "L4D2ItemHint_PlayerMarkedItemHighlighted", client, sItemName);
-					}
-				}
+			case 1: //In chat
+			{
+				if (bWithItemName) CPrintToChat(i, "%t", sChatPhrase, client, sItemName);
+				else               CPrintToChat(i, "%t", sChatPhrase, client);
 			}
-			case 2: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintHintText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: {green}%s", client, sItemName);
-					}
-				}
+			case 2: //In Hint Box
+			{
+				if (bWithItemName) PrintHintText(i, "%T", sHintPhrase, i, client, sItemName);
+				else               PrintHintText(i, "%T", sHintPhrase, i, client);
 			}
-			case 3: {
-				for (int i=1; i <= MaxClients; i++)
-				{
-					if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) != TEAM_INFECTED)
-					{
-						PrintCenterText(i, "{default}[{green}标记系统{default}] {olive}%N{default}: {green}%s", client, sItemName);
-					}
-				}
+			case 3: //In center text
+			{
+				if (bWithItemName) PrintCenterText(i, "%T", sHintPhrase, i, client, sItemName);
+				else               PrintCenterText(i, "%T", sHintPhrase, i, client);
 			}
 		}
 	}

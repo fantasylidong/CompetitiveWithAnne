@@ -2,14 +2,26 @@
 {
 	"L4D2ItemHint_MarkingSystemPointsLess5W"
 	{
-		"en"		"{default}[{green} marking system {default}] Your points are less than 5w, so you cannot use the marking system"
+		"en"		"{default}[{green}Marking System{default}] Your score is below 50000, you cannot use the marking system"
 	}
 	"L4D2ItemHint_PlayerMarkedItem"
 	{
-		"en"		"{default}[{green} marking system {default}] {olive}%N{default}: %s"
+		"en"		"{default}[{green}Marking System{default}] {olive}%N{default}: %s"
 	}
 	"L4D2ItemHint_PlayerMarkedItemHighlighted"
 	{
-		"en"		"{default}[{green}Tagging system{default}] {olive}%N{default}: {green}%s"
+		"en"		"{default}[{green}Marking System{default}] {olive}%N{default}: {green}%s"
+	}
+	"L4D2ItemHint_PlayerMarkedSpot"
+	{
+		"en"		"{default}[{green}Marking System{default}] {olive}%N{default}: {green}marked a spot"
+	}
+	"L4D2ItemHint_HintPlayerMarkedItem"
+	{
+		"en"		"[Marking System] %N: %s"
+	}
+	"L4D2ItemHint_HintPlayerMarkedSpot"
+	{
+		"en"		"[Marking System] %N: marked a spot"
 	}
 }

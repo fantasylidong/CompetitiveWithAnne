@@ -12,4 +12,16 @@
 	{
 		"zho"		"{default}[{green}標記系統{default}] {olive}%N{default}: {green}%s"
 	}
+	"L4D2ItemHint_PlayerMarkedSpot"
+	{
+		"zho"		"{default}[{green}標記系統{default}] {olive}%N{default}: {green}標記了一個位置"
+	}
+	"L4D2ItemHint_HintPlayerMarkedItem"
+	{
+		"zho"		"[標記系統] %N: %s"
+	}
+	"L4D2ItemHint_HintPlayerMarkedSpot"
+	{
+		"zho"		"[標記系統] %N: 標記了一個位置"
+	}
 }
