@@ -587,7 +587,8 @@ bool AnneBuildTeamNavCandidateSnapshot(
     std::vector<float> &candidatePathDistances,
     std::vector<int> &candidateOwners,
     std::vector<float> &pathDistances,
-    std::vector<std::uint8_t> &usesSpecialEdge)
+    std::vector<std::uint8_t> &usesSpecialEdge,
+    std::vector<float> *perTargetDistances)
 {
     std::size_t survivorCount = survivorEyes.size() / 3;
     if (survivorEyes.size() % 3 != 0 || survivorCount == 0 || targets.empty() ||
@@ -606,6 +607,24 @@ bool AnneBuildTeamNavCandidateSnapshot(
                                         pathDistances, usesSpecialEdge, owners))
     {
         return false;
+    }
+
+    // Per-target layers: one bounded single-source field per target. They share
+    // the same blocked snapshot and distance cap as the multi-source field, so
+    // min over any subset of layers reproduces the field for that subset.
+    std::vector<std::vector<float>> layers;
+    if (perTargetDistances != nullptr)
+    {
+        layers.resize(targets.size());
+        std::vector<std::uint8_t> layerSpecial;
+        for (std::size_t t = 0; t < targets.size(); ++t)
+        {
+            if (!graph.BuildReverseReachability(targets[t].index, maxPathDistance,
+                                                blocked, layers[t], layerSpecial))
+            {
+                return false;
+            }
+        }
     }
 
     struct Candidate
@@ -655,7 +674,58 @@ bool AnneBuildTeamNavCandidateSnapshot(
         candidatePathDistances[row] = candidates[row].pathDistance;
         candidateOwners[row] = candidates[row].owner;
     }
+
+    if (perTargetDistances != nullptr)
+    {
+        std::size_t targetCount = targets.size();
+        perTargetDistances->assign(candidates.size() * targetCount,
+                                   std::numeric_limits<float>::infinity());
+        for (std::size_t row = 0; row < candidates.size(); ++row)
+        {
+            std::uint32_t index = candidates[row].index;
+            for (std::size_t t = 0; t < targetCount; ++t)
+            {
+                if (index < layers[t].size())
+                    (*perTargetDistances)[row * targetCount + t] = layers[t][index];
+            }
+        }
+    }
     return true;
+}
+
+bool AnneResolveTeamCandidateForActiveTargets(
+    const std::vector<float> &perTargetDistances,
+    const std::vector<int> &targetClients,
+    const std::vector<std::uint8_t> &activeTargets,
+    std::size_t row,
+    float &distance,
+    int &owner)
+{
+    std::size_t targetCount = targetClients.size();
+    if (targetCount == 0 || activeTargets.size() != targetCount ||
+        (row + 1) * targetCount > perTargetDistances.size())
+    {
+        return false;
+    }
+
+    distance = std::numeric_limits<float>::infinity();
+    owner = 0;
+    for (std::size_t t = 0; t < targetCount; ++t)
+    {
+        if (!activeTargets[t])
+            continue;
+        float layerDistance = perTargetDistances[row * targetCount + t];
+        if (!std::isfinite(layerDistance))
+            continue;
+        bool better = layerDistance + 0.01f < distance;
+        bool tie = std::fabs(layerDistance - distance) <= 0.01f;
+        if (better || (tie && (owner == 0 || targetClients[t] < owner)))
+        {
+            distance = layerDistance;
+            owner = targetClients[t];
+        }
+    }
+    return std::isfinite(distance) && owner > 0;
 }
 
 std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(

@@ -360,11 +360,11 @@ static void SpawnAttempts_CommitSpawn(
     TeleportState_StampSpawn(client, "spawn_commit");
     g_LastSpawnOkTime = now;
     InvalidateBucketShareCache();
-    // 刷出会改变 owner 容量与参与集合：先给导向目标记一笔待锁定预留，再让
-    // 容量缓存与参与集合缓存立即失效，同一帧内后续刷出才能看到新的剩余名额。
-    SpawnTarget_ReserveFor(client, targetSurvivor);
+    // 刷出会改变 owner 的剩余名额：先给导向目标记一笔待锁定预留，再让容量缓存
+    // 失效，同一帧内后续刷出才能看到新的剩余名额。团队参与集合只看存活/可动，
+    // 与容量无关，这里不需要让它失效（否则每次 commit 都重收集、抖动快照指纹）。
+    SpawnTarget_ReserveFor(client, zc, targetSurvivor);
     SpawnTarget_InvalidateCapacityCache();
-    SpawnAccel_InvalidateTeamTargetsCache();
     gST.siAlive[zc - 1]++;
     gST.totalSI++;
 

@@ -36,6 +36,7 @@ AIPathMovementState g_AIPathMovementState[MAXPLAYERS + 1];
 float g_AIPathMovementRouteFailTime[MAXPLAYERS + 1];
 float g_AIPathMovementLastGroundTime[MAXPLAYERS + 1];
 float g_AIPathMovementLandingTime[MAXPLAYERS + 1];
+bool g_AIPathMovementLastGroundWasLadder[MAXPLAYERS + 1];
 ConVar g_AIPathMovementGravityCvar;
 
 /**
@@ -46,9 +47,10 @@ ConVar g_AIPathMovementGravityCvar;
 * 落地 = 离开地面至少 AI_PATH_MOVEMENT_MIN_HOP_AIR_TIME 后重新踩地，不区分是插件起跳、
 * 引擎跳跃还是沿路径走下落差；高处坠落同样算落地，落地那一跳照常追加加速度，滞空不设上限。
 * 起跳被引擎拒绝时下一帧仍在地面、中间没有离地，不算落地，原地反复起跳不会每帧领加速度。
-* 梯子按地面处理，爬完梯子之后的第一跳不加速。
+* 梯子按地面处理；爬到梯顶时引擎会做一小段 dismount（既不在梯子上也不在地面），
+* 这段之后的踩地不算落地，爬完梯子之后的第一跳不加速。
 *
-* 用法：每帧在地面或梯子上时尽早调用 AIPathMovement_NotifyGrounded；
+* 用法：每帧在地面或梯子上时尽早调用 AIPathMovement_NotifyGrounded(client, onLadder)；
 * 每次起跳（Teleport 出起跳速度）后调用 AIPathMovement_MarkHopStart 消费掉本次落地授权
 * （AIPathMovement_BeginPathHop 内已自动调用）；
 * 起跳前用 AIPathMovement_GetHopImpulse 决定本跳能追加多少加速度。
@@ -61,6 +63,7 @@ stock void AIPathMovement_ResetHopChain(int client)
 
     g_AIPathMovementLastGroundTime[client] = 0.0;
     g_AIPathMovementLandingTime[client] = 0.0;
+    g_AIPathMovementLastGroundWasLadder[client] = false;
 }
 
 stock void AIPathMovement_MarkHopStart(int client)
@@ -72,14 +75,16 @@ stock void AIPathMovement_MarkHopStart(int client)
     g_AIPathMovementLandingTime[client] = 0.0;
 }
 
-stock void AIPathMovement_NotifyGrounded(int client)
+stock void AIPathMovement_NotifyGrounded(int client, bool onLadder = false)
 {
     if (client < 1 || client > MaxClients)
         return;
 
     float now = GetGameTime();
     float lastGround = g_AIPathMovementLastGroundTime[client];
+    bool lastWasLadder = g_AIPathMovementLastGroundWasLadder[client];
     g_AIPathMovementLastGroundTime[client] = now;
+    g_AIPathMovementLastGroundWasLadder[client] = onLadder;
 
     // 首次登记 / 换图后 GameTime 回卷
     if (lastGround <= 0.0 || lastGround > now)
@@ -87,6 +92,10 @@ stock void AIPathMovement_NotifyGrounded(int client)
 
     // 上一帧也在地面（含引擎拒跳后仍站在原地）不算落地
     if (now - lastGround < AI_PATH_MOVEMENT_MIN_HOP_AIR_TIME)
+        return;
+
+    // 上一次登记在梯子上：中间的离地是梯顶 dismount 而不是连跳，不算落地
+    if (lastWasLadder)
         return;
 
     g_AIPathMovementLandingTime[client] = now;
@@ -111,13 +120,21 @@ stock bool AIPathMovement_IsLandingHop(int client)
 }
 
 /**
-* 本次起跳可追加的加速度：落地后紧接着的起跳返回完整 impulse，从地面直接起跳返回 0。
+* 本次起跳可追加的加速度：落地后紧接着的起跳返回完整 impulse，
+* 从地面直接起跳的第一跳返回 impulse * firstHopRatio（0.0 = 不加速，1.0 = 与落地跳相同，即旧行为）。
+* 比例只影响第一跳，后续落地跳始终拿完整 impulse，所以用它按难度补偿“第一跳不加速”不会改变连跳上限。
 */
-stock float AIPathMovement_GetHopImpulse(int client, float impulse)
+stock float AIPathMovement_GetHopImpulse(int client, float impulse, float firstHopRatio = 0.0)
 {
     if (impulse <= 0.0)
         return 0.0;
-    return AIPathMovement_IsLandingHop(client) ? impulse : 0.0;
+    if (AIPathMovement_IsLandingHop(client))
+        return impulse;
+    if (firstHopRatio <= 0.0)
+        return 0.0;
+    if (firstHopRatio > 1.0)
+        firstHopRatio = 1.0;
+    return impulse * firstHopRatio;
 }
 
 /**

@@ -553,6 +553,7 @@ Action performBackwardBhop(int client, int target, bool visible, int& buttons, f
     buttons &= ~(IN_ATTACK | IN_ATTACK2);
     alignChargerFacingWithMovement(client, vBack, ang);
     TeleportEntity(client, NULL_VECTOR, ang, vBack);
+    AIPathMovement_MarkHopStart(client);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
     return Plugin_Changed;
 }

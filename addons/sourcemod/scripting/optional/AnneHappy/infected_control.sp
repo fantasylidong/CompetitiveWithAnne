@@ -227,7 +227,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-09-02.1",
+    version     = "2026-09-04.1",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 
@@ -317,6 +317,7 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
     MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectRanked");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesPrepareTeam");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectTeam");
+    MarkNativeAsOptional("AnneSpawn_NavCandidatesCollectTeamEx");
     MarkNativeAsOptional("GetClientTargetLimit");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesGetPerf");
     MarkNativeAsOptional("AnneSpawn_NavCandidatesResetPerf");

@@ -61,6 +61,7 @@ ConVar
     g_cvBhopMinSpeed,
     g_cvBhopMaxSpeed,
     g_cvBhopImpulse,
+    g_cvBhopFirstHopRatio,
     g_cvBhopNoVision,
     g_cvBhopPathFallbackDist,
     g_cvPathLookAheadMaxDepth,
@@ -223,7 +224,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白",
     description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳、骑头反制等）",
-    version     = "1.0.0.12",
+    version     = "1.0.0.13",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -254,7 +255,8 @@ public void OnPluginStart()
     g_cvBhopMaxDist= CreateConVar("ai_tank3_bhop_max_dist", "9999", "开始连跳的最大距离", CVAR_FLAGS, true, 0.0);
     g_cvBhopMinSpeed=CreateConVar("ai_tank3_bhop_min_speed", "200", "连跳的最小速度", CVAR_FLAGS, true, 0.0);
     g_cvBhopMaxSpeed=CreateConVar("ai_tank3_bhop_max_speed", "1000", "连跳的最大速度", CVAR_FLAGS, true, 0.0);
-    g_cvBhopImpulse =CreateConVar("ai_tank3_bhop_impulse", "60", "连跳的加速度（落地后紧接着再起跳时追加，从跑动直接起跳的第一跳不加）", CVAR_FLAGS, true, 0.0);
+    g_cvBhopImpulse =CreateConVar("ai_tank3_bhop_impulse", "60", "连跳的加速度（落地后紧接着再起跳时追加，从跑动直接起跳的第一跳按 ai_tank3_bhop_first_hop_ratio 折算）", CVAR_FLAGS, true, 0.0);
+    g_cvBhopFirstHopRatio=CreateConVar("ai_tank3_bhop_first_hop_ratio", "1.0", "从跑动直接起跳的第一跳可拿到的加速度比例，0.0=不加速只改方向，1.0=与落地跳相同（旧行为）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBhopNoVision=CreateConVar("ai_tank3_bhop_no_vision", "1", "无视野是否允许连跳", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无视野时速度向量与视角前向向量阈值（度）", CVAR_FLAGS, true, 0.0);
     g_cvBhopPathFallbackDist = CreateConVar("ai_tank3_bhop_path_fallback_dist", "500.0", "Tank 无视野且距离大于该值时使用 Path 前瞻连跳；有视野或近于该值时回退当前连跳", CVAR_FLAGS, true, 0.0);
@@ -501,8 +503,9 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
     bool onLadder = (GetEntityMoveType(client) == MOVETYPE_LADDER);
 
     // 地面/梯子登记必须每帧、在任何提前返回之前完成，否则站在地上的帧漏登记会被误判成滞空落地，让停顿后的第一跳白拿一份加速度
+    // 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
     if (onLadder || IsClientOnGround(client))
-        AIPathMovement_NotifyGrounded(client);
+        AIPathMovement_NotifyGrounded(client, onLadder);
     bool nearLadder = isTankNearLadder(client, pos);
 
     if (onLadder && lockTankLadderLook(client, angles))
@@ -1679,8 +1682,8 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
         g_AiTanks[client].bhopType = TankBhopType_Normal;
         g_AiTanks[client].airCorrGoal = NULL_VECTOR;
 
-        // 从跑动直接起跳的第一跳不追加加速度, 加速度留到落地再起跳时追加
-        float hopImpulse = AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue);
+        // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 不加), 完整加速度留到落地再起跳时追加
+        float hopImpulse = AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue);
 
         if (!visible)
         {
@@ -1750,6 +1753,7 @@ Action checkEnableBhop(int client, int target, int& buttons, const float pos[3],
         g_AiTanks[client].lastHopSpeed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
         AIPathMovement_BeginPathHop(client, targetPos, g_AiTanks[client].lastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
         TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
+        AIPathMovement_MarkHopStart(client);
         return Plugin_Changed;
     }
 
@@ -1826,8 +1830,8 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
     MakeVectorFromPoints(pos, lookAheadPos, vFwd);
     vFwd[2] = 0.0;
     NormalizeVector(vFwd, vFwd);
-    // 从跑动直接起跳的第一跳只改方向, 加速度留到落地再起跳时追加
-    ScaleVector(vFwd, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue));
+    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加
+    ScaleVector(vFwd, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue));
 
     if (!AIPathMovement_IsJumpRouteSafe(
         client,
@@ -1857,6 +1861,7 @@ Action tryPathGroundBhop(int client, int& buttons, const float pos[3], float spe
     g_AiTanks[client].lastHopSpeed = getVectorLength2D(vFwd);
     AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiTanks[client].lastHopSpeed, g_cvBhopMaxSpeed.FloatValue);
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
+    AIPathMovement_MarkHopStart(client);
     return Plugin_Changed;
 }
 

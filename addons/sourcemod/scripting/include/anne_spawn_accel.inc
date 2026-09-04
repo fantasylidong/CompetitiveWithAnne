@@ -202,6 +202,32 @@ native int AnneSpawn_NavCandidatesCollectTeam(
     int &totalInRange
 );
 
+// 与 CollectTeam 相同，但 excludedClients 里的生还者不参与“最近目标”计算：
+// 每一行的距离改为到其余目标的最小有向路径距离，owner 为实现该距离的人，
+// 只被排除者可达的行会被跳过。快照本身仍按完整目标集合构建并缓存，因此
+// 排除集合变化不会触发重建（扩展 >= 1.5.0；旧扩展不导出此 native）。
+// 所有目标都被排除时按“无排除”处理，保证调用方仍能拿到候选。
+native int AnneSpawn_NavCandidatesCollectTeamEx(
+    const int[] targetClients,
+    const int[] targetNavIds,
+    int targetCount,
+    float minNavDistance,
+    float maxNavDistance,
+    float maxPathDistance,
+    float minSurvivorDistance,
+    float maxSnapshotAge,
+    bool maxInclusive,
+    int startOffset,
+    int[] outputAreaIndices,
+    float[] outputNavDistances,
+    int[] outputOwnerClients,
+    int maxResults,
+    float &resultAgeMs,
+    int &totalInRange,
+    const int[] excludedClients,
+    int excludedCount
+);
+
 native bool AnneSpawn_NavCandidatesGetPerf(
     float[] timings,
     int timingCount,

@@ -154,6 +154,16 @@ PLUGIN_PATHS = (
     "optional/AnneHappy/infected_control.smx",
 )
 
+# Production plugins infected_control couples with (SI target caps). They are not
+# managed by the matrix, but a supervised SRCDS restart unloads them together
+# with everything else; if they were running when the matrix started they must be
+# brought back in load order before infected_control, otherwise the recovered
+# cases silently run without the target-limit stack.
+COMPANION_PLUGIN_PATHS = (
+    "optional/AnneHappy/l4d_target_override.smx",
+    "optional/AnneHappy/SI_Target_limit.smx",
+)
+
 
 def rcon_packet(request_id: int, packet_type: int, body: str) -> bytes:
     payload = struct.pack("<ii", request_id, packet_type) + body.encode() + b"\0\0"
@@ -308,7 +318,7 @@ class MatrixRunner:
     def capture_state(self) -> None:
         self.initial_map = self.current_map()
         self.initial_plugins = {
-            path: self.plugin_running(path) for path in PLUGIN_PATHS
+            path: self.plugin_running(path) for path in PLUGIN_PATHS + COMPANION_PLUGIN_PATHS
         }
         for name in TEST_CVARS:
             value = self.query_cvar(name)
@@ -343,6 +353,11 @@ class MatrixRunner:
         if self.plugin_running(matrix_plugin):
             commands.append(f"sm plugins unload {matrix_plugin}")
         commands.append(f"sm plugins load {matrix_plugin}")
+        # Companion target-limit plugins that were running at matrix start must be
+        # back before infected_control so their natives/library are visible to it.
+        for companion in COMPANION_PLUGIN_PATHS:
+            if self.initial_plugins.get(companion, False) and not self.plugin_running(companion):
+                commands.append(f"sm plugins load {companion}")
         commands.append(
             f"sm plugins {'reload' if self.plugin_running(production_plugin) else 'load'} "
             f"{production_plugin}")
@@ -383,8 +398,12 @@ class MatrixRunner:
         # production SI limit.
         probe = self.rcon.command("sm_navmatrix_status")
         production_plugin = PLUGIN_PATHS[2]
+        companions_missing = any(
+            self.initial_plugins.get(companion, False) and not self.plugin_running(companion)
+            for companion in COMPANION_PLUGIN_PATHS)
         if ("[NavMatrix] status" not in probe
-                or not self.plugin_running(production_plugin)):
+                or not self.plugin_running(production_plugin)
+                or companions_missing):
             self.bootstrap_plugins()
         if self.args.isolation_password:
             self.rcon.command(

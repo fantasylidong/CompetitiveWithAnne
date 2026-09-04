@@ -52,6 +52,7 @@ ConVar
 	g_cvBhopMaxSpeed,			// 连跳的最大速度
 	g_cvBhopBeforeCharge,		// 冲锋前是否允许进行接近连跳
 	g_cvBhopImpulse,			// 连跳加速度
+	g_cvBhopFirstHopRatio,		// 从跑动直接起跳的第一跳可拿到的加速度比例
 	g_cvBhopNoVision,			// 是否允许无视野连跳
 	g_cvBhopNoVisionMaxAng,		// 无视野时自身速度方向与视角方向夹角小于这个值允许连跳
 	g_cvTargetWatchMaxDeg,		// 目标视角向量与到 charger 的位置向量夹角小于这个值时认为目标正在看着 charger, 用于控制侧向连跳等

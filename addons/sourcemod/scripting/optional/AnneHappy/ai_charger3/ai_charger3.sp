@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.12",
+	version 		= "1.0.1.13",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -54,7 +54,9 @@ public void OnPluginStart() {
 	g_cvBhopMaxDist = CreateConVar("ai_charger3_bhop_max_dist", "9999.0", "允许连跳的最大距离", CVAR_FLAGS, true, 0.0);
 	g_cvDirectBhopDist = CreateConVar("ai_charger3_bhop_direct_dist", "400.0", "Charger 在接近状态中切换到朝目标方向直线连跳的距离阈值", CVAR_FLAGS, true, 0.0);
 	// the bhop impulse, added only when charger re-jumps right after landing from a previous hop; the first hop taken straight from running keeps its run speed
-	g_cvBhopImpulse = CreateConVar("ai_charger3_bhop_impulse", "100.0", "连跳的加速度, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAGS, true, 0.0);
+	g_cvBhopImpulse = CreateConVar("ai_charger3_bhop_impulse", "100.0", "连跳的加速度, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳按 ai_charger3_bhop_first_hop_ratio 折算", CVAR_FLAGS, true, 0.0);
+	// the fraction of bhop impulse granted to the first hop taken straight from running (0.0 = none, 1.0 = same as a landing hop / legacy behavior)
+	g_cvBhopFirstHopRatio = CreateConVar("ai_charger3_bhop_first_hop_ratio", "0.8", "从跑动直接起跳的第一跳可拿到的加速度比例, 0.0=不加速只改方向, 1.0=与落地跳相同 (旧行为)", CVAR_FLAGS, true, 0.0, true, 1.0);
 	// when charger's speed is greater than 'ai_charger3_bhop_min_speed', it is allowed to bhop, and its max bhop speed will not greater than 'ai_charger3_bhop_max_speed'
 	g_cvBhopMinSpeed = CreateConVar("ai_charger3_bhop_min_speed", "200", "允许连跳的最小速度", CVAR_FLAGS, true, 0.0);
 	g_cvBhopMaxSpeed = CreateConVar("ai_charger3_bhop_max_speed", "800", "连跳的最大限制速度", CVAR_FLAGS, true, 0.0);
@@ -215,8 +217,10 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	beginChargerVisibilityMemo(client);
 
 	// 地面/梯子登记必须每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份加速度
-	if (IsClientOnGround(client) || GetEntityMoveType(client) == MOVETYPE_LADDER)
-		AIPathMovement_NotifyGrounded(client);
+	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
+	bool groundedOnLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
+	if (groundedOnLadder || IsClientOnGround(client))
+		AIPathMovement_NotifyGrounded(client, groundedOnLadder);
 
 	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
 	maintainEvadeMoveCommand(client);

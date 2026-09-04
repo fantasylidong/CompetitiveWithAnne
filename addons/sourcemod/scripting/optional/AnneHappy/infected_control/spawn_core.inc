@@ -452,6 +452,11 @@ enum struct SpawnSearchCursor
     int teamTargetClients[TEAM_NAV_TARGET_MAX];
     int teamTargetNavIds[TEAM_NAV_TARGET_MAX];
     int teamFingerprint;
+    // 已达目标上限、在 collect 阶段被排除出“最近目标”计算的成员。排除集合
+    // 变化只重新分页，不重建扩展快照。
+    int teamExcludedCount;
+    int teamExcludedClients[TEAM_NAV_TARGET_MAX];
+    int teamExclusionKey;
     int behindBudgetUsed;
     float graphPathLimit;
     float graphMinNavDistance;
@@ -486,6 +491,8 @@ static void SpawnSearch_ResetCursor(SpawnSearchCursor cursor)
     cursor.graphMaxInclusive = true;
     cursor.teamTargetCount = 0;
     cursor.teamFingerprint = 0;
+    cursor.teamExcludedCount = 0;
+    cursor.teamExclusionKey = 0;
     cursor.behindBudgetUsed = 0;
     cursor.graphPathLimit = 0.0;
     cursor.graphScanMinRange = 0.0;
@@ -748,6 +755,61 @@ static void SpawnSearch_ConfigureCursor(
     cursor.active = true;
 }
 
+static int g_iTeamExclusionApplied = 0;
+
+// 排除集合变化：同一份扩展快照下重新分页即可（扩展按剩余成员重算每行的最近
+// 目标），不需要重建快照，也不重置档位/统计。
+static void SpawnSearch_ApplyTeamExclusions(
+    SpawnSearchCursor cursor, const int[] excluded, int excludedCount, int key)
+{
+    if (cursor.teamExclusionKey == key && cursor.teamExcludedCount == excludedCount)
+        return;
+
+    cursor.teamExcludedCount = excludedCount;
+    for (int i = 0; i < excludedCount; i++)
+        cursor.teamExcludedClients[i] = excluded[i];
+    cursor.teamExclusionKey = key;
+    cursor.graphFetchOffset = 0;
+    cursor.graphTotalInRange = -1;
+    cursor.graphPageLen = 0;
+    cursor.graphPageRow = 0;
+    cursor.tertileActive = false;
+
+    // 扩展 1.5.0 下被排除 owner 的候选会在 native 里改归属，热循环的
+    // ownerCapacity 永远是 0；这里单独记一笔，否则线上看不出排除是否发生过。
+    if (excludedCount > 0)
+    {
+        g_iTeamExclusionApplied++;
+        Debug_Print("[TEAM EXCLUDE] class=%s excluded=%d first=%d total=%d",
+            (cursor.zc >= 1 && cursor.zc <= SI_COUNT) ? g_sInfectedClassNames[cursor.zc] : "?",
+            excludedCount, excluded[0], g_iTeamExclusionApplied);
+    }
+}
+
+static bool SpawnSearch_IsOwnerExcluded(SpawnSearchCursor cursor, int ownerClient)
+{
+    return SpawnAccel_IsTeamExcluded(
+        cursor.teamExcludedClients, cursor.teamExcludedCount, ownerClient);
+}
+
+// 搜索还没进候选循环就返回 Exhausted 的早退路径以前完全没有日志，只能靠
+// PerfStats 的失败次数减 [FIND FAIL] 条数反推。这里按秒节流打一条，并记进
+// 总计数，方便矩阵/线上直接看到“为什么连搜都没搜就去了 Director”。
+static int g_iSpawnSearchEarlyExhausted = 0;
+static float g_fSpawnSearchEarlyExhaustedLogAt = 0.0;
+
+static void SpawnSearch_LogEarlyExhausted(int zc, const char[] reason)
+{
+    g_iSpawnSearchEarlyExhausted++;
+    float now = GetGameTime();
+    if (now < g_fSpawnSearchEarlyExhaustedLogAt)
+        return;
+    g_fSpawnSearchEarlyExhaustedLogAt = now + 1.0;
+    Debug_Print("[FIND EARLY-EXHAUSTED] class=%s reason=%s total=%d",
+        (zc >= 1 && zc <= SI_COUNT) ? g_sInfectedClassNames[zc] : "?",
+        reason, g_iSpawnSearchEarlyExhausted);
+}
+
 static void SpawnSearch_EnsureCursor(
     SpawnSearchCursor cursor, int zc, int targetSurvivor,
     float minRange, float maxRange, float graphScanMinRange,
@@ -756,13 +818,19 @@ static void SpawnSearch_EnsureCursor(
 {
     int teamClients[TEAM_NAV_TARGET_MAX];
     int teamNavIds[TEAM_NAV_TARGET_MAX];
+    int teamExcluded[TEAM_NAV_TARGET_MAX];
     int teamCount = 0;
+    int teamExcludedCount = 0;
+    int teamExclusionKey = 0;
     bool teamMode = SpawnAccel_CanUseTeamCandidates();
     bool maxInclusive = true;
     if (teamMode)
     {
         teamCount = SpawnAccel_CollectEligibleTeamTargets(
             teamClients, teamNavIds, sizeof(teamClients));
+        teamExcludedCount = SpawnAccel_CollectTeamExclusions(
+            teamClients, teamCount, teamExcluded, sizeof(teamExcluded));
+        teamExclusionKey = SpawnAccel_TeamExclusionKey(teamExcluded, teamExcludedCount);
         maxInclusive = maxRange + 0.01 >= Tactical_GetClassPathCap(zc);
     }
     int teamFingerprint = teamMode
@@ -797,6 +865,9 @@ static void SpawnSearch_EnsureCursor(
             teamMode, teamClients, teamNavIds, teamCount,
             maxInclusive);
     }
+    if (teamMode)
+        SpawnSearch_ApplyTeamExclusions(
+            cursor, teamExcluded, teamExcludedCount, teamExclusionKey);
 }
 
 #define SPAWN_TERTILE_NEAR 0
@@ -1119,15 +1190,12 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
             int count;
             if (teamMode)
             {
-                count = AnneSpawn_NavCandidatesCollectTeam(
+                count = SpawnAccel_CollectTeamCandidatesPage(
                     cursor.teamTargetClients,
                     cursor.teamTargetNavIds,
                     cursor.teamTargetCount,
                     cursor.graphMinNavDistance,
                     cursor.graphMaxNavDistance,
-                    cursor.graphPathLimit,
-                    FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin),
-                    NAV_CANDIDATE_RESULT_TTL,
                     cursor.graphMaxInclusive,
                     cursor.graphFetchOffset,
                     page,
@@ -1135,7 +1203,9 @@ static SpawnCandidateReadResult SpawnSearch_NextCandidate(
                     pageOwner,
                     NAV_CANDIDATE_PAGE_SIZE,
                     resultAgeMs,
-                    totalInRange);
+                    totalInRange,
+                    cursor.teamExcludedClients,
+                    cursor.teamExcludedCount);
                 for (int row = 0; row < count; row++)
                     pageRankDistance[row] = pageNavDistance[row];
             }
@@ -1267,6 +1337,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         if (SpawnAccel_CollectEligibleTeamTargets(
                 teamClients, teamNavIds, sizeof(teamClients)) <= 0)
         {
+            SpawnSearch_LogEarlyExhausted(zc, "team owner set empty (no alive/mobile survivor)");
             SpawnSearch_ResetCursor(cursor);
             SpawnPerf_RecordAttempt(0.0, false);
             return SpawnSearch_Exhausted;
@@ -1276,6 +1347,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
     SpawnFrameContext frame;
     if (!SpawnSearch_BuildFrameContext(targetSurvivor, frame))
     {
+        SpawnSearch_LogEarlyExhausted(zc, "frame context unavailable");
         SpawnSearch_ResetCursor(cursor);
         SpawnPerf_RecordAttempt(0.0, false);
         return SpawnSearch_Exhausted;
@@ -1285,6 +1357,7 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
         teleportMode, frame.navStartClient, frame.navStartId);
     if (cursor.graphTeamMode && cursor.teamTargetCount <= 0)
     {
+        SpawnSearch_LogEarlyExhausted(zc, "cursor has no team targets");
         SpawnSearch_ResetCursor(cursor);
         SpawnPerf_RecordAttempt(0.0, false);
         return SpawnSearch_Exhausted;
@@ -1338,7 +1411,11 @@ static SpawnSearchResult FindSpawnPosViaNavAreaStepForCursor(
                 SpawnPerf_RecordFilterByOwnerInvalid();
                 continue;
             }
-            if (SpawnTarget_IsAtCapacity(ownerClient))
+            // 只跳过被本游标显式排除（已满且队伍里还有没满的人）的 owner。
+            // 不能直接看 IsAtCapacity：全员都满时排除列表为空，此时必须继续
+            // 围着队伍找点，由 target_override 在选目标阶段分流，而不是把所有
+            // 候选丢掉后退到 Director。
+            if (SpawnSearch_IsOwnerExcluded(cursor, ownerClient))
             {
                 cursor.stats.ownerCapacity++;
                 SpawnPerf_RecordFilterByOwnerCapacity();

@@ -34,13 +34,14 @@ public Plugin myinfo =
 		name 			= "Ai Boomer 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Boomer 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.9",
+		version 		= "3.0.10",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopFirstHopRatio,
 	g_hBhopMaxSpeed,
 	g_hBhopStartDistance,
 	g_hJumpVomit,
@@ -96,7 +97,8 @@ public void OnPluginStart()
 {
 	// CreateConVars
 	g_hAllowBhop = CreateConVar("ai_BoomerBhop", "1", "是否开启 Boomer 连跳", CVAR_FLAG, true, 0.0, true, 1.0);
-	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAG, true, 0.0);
+	g_hBhopSpeed = CreateConVar("ai_BoomerBhopSpeed", "150.0", "Boomer 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳按 ai_BoomerBhopFirstHopRatio 折算", CVAR_FLAG, true, 0.0);
+	g_hBhopFirstHopRatio = CreateConVar("ai_BoomerBhopFirstHopRatio", "0.8", "从跑动直接起跳的第一跳可拿到的推力比例, 0.0=不加推力, 1.0=与落地跳相同 (旧行为)", CVAR_FLAG, true, 0.0, true, 1.0);
 	// Boomer 使用独立的水平速度上限；动态难度按本职业六档值配置，不再与 Charger 上限联动
 	g_hBhopMaxSpeed = CreateConVar("ai_BoomerBhopMaxSpeed", "1000.0", "Boomer 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_BoomerBhopStartDistance", "2500.0", "Boomer 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
@@ -178,6 +180,7 @@ public void evt_RoundStart(Event event, const char[] name, bool dontBroadcast)
 		cachedClosestTarget[i] = 0;
 		nextClosestTargetRefresh[i] = 0.0;
 		AIPathMovement_Reset(i);
+		AIPathMovement_ResetHopChain(i);
 	}
 }
 
@@ -229,6 +232,13 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 	bool has_sight;
 
 	flags = GetEntityFlags(client);
+	bool onGround = (flags & FL_ONGROUND) != 0;
+	bool onLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
+	// 地面/梯子登记要每帧、在任何提前返回之前完成 (包括下面 ability 无效的返回), 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
+	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
+	if (onGround || onLadder)
+		AIPathMovement_NotifyGrounded(client, onLadder);
+
 	target = GetCachedClosestSurvivor(client);
 	ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
 	if (!IsValidEntity(ability)) { return Plugin_Continue; }
@@ -238,14 +248,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 
 	GetEntPropVector(client, Prop_Data, "m_vecVelocity", vec_speed);
 	cur_speed = SquareRoot(Pow(vec_speed[0], 2.0) + Pow(vec_speed[1], 2.0));
-	bool onGround = (flags & FL_ONGROUND) != 0;
-	bool onLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
-	// 地面/梯子登记要每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
 	if (onGround || onLadder)
-	{
-		AIPathMovement_NotifyGrounded(client);
 		AIPathMovement_Reset(client);
-	}
 	else if (isAbilityUsing || (buttons & (IN_ATTACK | IN_ATTACK2)))
 		AIPathMovement_Reset(client);
 	bool pathAirFacing = AIPathMovement_IsPathHopActive(client) && !onGround && !onLadder;
@@ -471,8 +475,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			float laneOffset = AIPathSnapshot_GetSuggestedLateralOffset(client, g_hPathLaneOffset.FloatValue);
 			pathGuided = AIPathSnapshot_GetLookAheadGoal(client, maxEstimateDist, laneOffset, bhopTarget, g_hPathLookAheadDepth.IntValue);
 		}
-		// 从跑动直接起跳的第一跳不加推力, 推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
-		float hopImpulse = AIPathMovement_GetHopImpulse(client, g_hBhopSpeed.FloatValue);
+		// 从跑动直接起跳的第一跳按 first_hop_ratio 折算推力 (0 = 不加), 完整推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
+		float hopImpulse = AIPathMovement_GetHopImpulse(client, g_hBhopSpeed.FloatValue, g_hBhopFirstHopRatio.FloatValue);
 		vel_buffer = CalculateVel(self_pos, bhopTarget, hopImpulse);
 		float proposedVelocity[3];
 		BuildBhopVelocity(client, vel_buffer, hopImpulse > 0.0, proposedVelocity);

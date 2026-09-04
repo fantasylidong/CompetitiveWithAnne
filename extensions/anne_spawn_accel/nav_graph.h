@@ -141,6 +141,16 @@ bool AnneBuildRankedNavCandidateSnapshot(
     std::vector<float> &pathDistances,
     std::vector<std::uint8_t> &usesSpecialEdge);
 
+// Team snapshot: one reverse multi-source field. Distance is the minimum
+// directed path to any target; owner is the client realizing it.
+//
+// When perTargetDistances is non-null it additionally receives one directed
+// distance layer per target, laid out row-major as
+// perTargetDistances[row * targets.size() + t] = candidate(row) -> targets[t],
+// +inf when that target is not reachable within maxPathDistance. Consumers can
+// re-derive "nearest remaining target" for any subset of the targets without
+// rebuilding the snapshot (e.g. skipping a survivor that already carries its
+// maximum number of Special Infected).
 bool AnneBuildTeamNavCandidateSnapshot(
     const AnneNavGraph &graph,
     const std::vector<AnneNavSearchTarget> &targets,
@@ -152,7 +162,19 @@ bool AnneBuildTeamNavCandidateSnapshot(
     std::vector<float> &candidatePathDistances,
     std::vector<int> &candidateOwners,
     std::vector<float> &pathDistances,
-    std::vector<std::uint8_t> &usesSpecialEdge);
+    std::vector<std::uint8_t> &usesSpecialEdge,
+    std::vector<float> *perTargetDistances = nullptr);
+
+// Resolves the effective distance/owner of one snapshot row when only the
+// targets flagged in activeTargets participate. Returns false when no active
+// target reaches the row. Ties prefer the lower client index.
+bool AnneResolveTeamCandidateForActiveTargets(
+    const std::vector<float> &perTargetDistances,
+    const std::vector<int> &targetClients,
+    const std::vector<std::uint8_t> &activeTargets,
+    std::size_t row,
+    float &distance,
+    int &owner);
 
 std::shared_ptr<AnneNavGraph> AnneBuildNavGraph(
     const AnneNavGraphMetadata &metadata,

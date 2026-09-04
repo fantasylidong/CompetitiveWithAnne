@@ -53,6 +53,8 @@ constexpr float kCandidateSpatialQuantum = 32.0f;
 constexpr float kCandidateRankHeightQuantum = 8.0f;
 constexpr std::size_t kCandidateCacheLimit = 8;
 constexpr std::size_t kMaxTeamTargets = 16;
+// Upper bound for the CollectTeamEx exclusion list (any client index may be passed).
+constexpr int kMaxExcludedTeamClients = 64;
 constexpr std::size_t kCandidatePerfSampleCap = 256;
 constexpr int kCandidatePending = -1;
 constexpr int kCandidateUnavailable = -2;
@@ -207,6 +209,9 @@ struct NavCandidateResult
     std::vector<float> rankDistances;
     std::vector<int> ownerClients;
     std::vector<std::uint32_t> flowOrder;
+    // Team snapshots only: row-major [row * targetClients.size() + t] directed
+    // distance from the candidate to each target; +inf when unreachable.
+    std::vector<float> perTargetDistances;
 };
 
 struct NavCandidateRequest
@@ -2211,7 +2216,7 @@ int PrepareTeamNavCandidates(std::vector<int> targetClients,
                 *graph, targets, request.maxPathDistance, blocked, survivorEyes,
                 request.minSurvivorDistance, result->areaIndices,
                 result->pathDistances, result->ownerClients, allPathDistances,
-                specialEdges);
+                specialEdges, &result->perTargetDistances);
             if (!built)
             {
                 result->areaIndices.clear();
@@ -2219,6 +2224,7 @@ int PrepareTeamNavCandidates(std::vector<int> targetClients,
                 result->rankDistances.clear();
                 result->ownerClients.clear();
                 result->flowOrder.clear();
+                result->perTargetDistances.clear();
             }
             else
             {
@@ -2943,12 +2949,13 @@ cell_t Native_NavCandidatesPrepareTeam(IPluginContext *context, const cell_t *pa
                                     maxSnapshotAge);
 }
 
-cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *params)
+// Shared body of AnneSpawn_NavCandidatesCollectTeam / ...CollectTeamEx. The first
+// 16 parameters are identical; excludedClients lists survivors that must not
+// participate in the nearest-target distance/owner of any row.
+cell_t CollectTeamNavCandidates(IPluginContext *context, const cell_t *params,
+                                const std::vector<int> &excludedClients,
+                                const char *nativeName)
 {
-    if (params[0] != 16)
-        return context->ThrowNativeError(
-            "AnneSpawn_NavCandidatesCollectTeam expects 16 parameters");
-
     int targetCount = params[3];
     float minNavDistance = std::max(0.0f, sp_ctof(params[4]));
     float maxNavDistance = sp_ctof(params[5]);
@@ -3026,12 +3033,45 @@ cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *pa
         return kCandidateUnavailable;
     }
 
+    // Excluded survivors (already at their SI target cap) drop out of the
+    // nearest-target computation: each row is re-resolved against the remaining
+    // targets from the per-target layers, so no snapshot rebuild is needed.
+    // Excluding every target degenerates to "no exclusion" so the caller still
+    // gets a usable candidate set instead of an empty range.
+    std::size_t snapshotTargets = result->targetClients.size();
+    std::vector<std::uint8_t> activeTargets(snapshotTargets, 1);
+    std::size_t activeCount = snapshotTargets;
+    for (int excluded : excludedClients)
+    {
+        for (std::size_t t = 0; t < snapshotTargets; ++t)
+        {
+            if (activeTargets[t] && result->targetClients[t] == excluded)
+            {
+                activeTargets[t] = 0;
+                --activeCount;
+            }
+        }
+    }
+    bool useLayers = activeCount > 0 && activeCount < snapshotTargets &&
+                     result->perTargetDistances.size() ==
+                         result->areaIndices.size() * snapshotTargets;
+    if (activeCount == 0)
+        std::fill(activeTargets.begin(), activeTargets.end(), 1);
+
     std::size_t offset = static_cast<std::size_t>(startOffset);
     std::size_t total = 0;
     int count = 0;
     for (std::uint32_t source : result->flowOrder)
     {
         float distance = result->pathDistances[source];
+        int owner = result->ownerClients[source];
+        if (useLayers &&
+            !AnneResolveTeamCandidateForActiveTargets(
+                result->perTargetDistances, result->targetClients, activeTargets,
+                source, distance, owner))
+        {
+            continue;
+        }
         if (distance < minNavDistance ||
             (maxInclusive ? distance > maxNavDistance
                           : distance >= maxNavDistance))
@@ -3040,7 +3080,7 @@ cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *pa
         {
             output[count] = static_cast<cell_t>(result->areaIndices[source]);
             distanceOutput[count] = sp_ftoc(distance);
-            ownerOutput[count] = static_cast<cell_t>(result->ownerClients[source]);
+            ownerOutput[count] = static_cast<cell_t>(owner);
             count++;
         }
         total++;
@@ -3056,7 +3096,44 @@ cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *pa
         g_NavCandidatePerf.resultAgeMs, g_NavCandidatePerf.ageWrite,
         g_NavCandidatePerf.ageCount, ageMs);
     ++g_NavCandidatePerf.collectHits;
+    (void)nativeName;
     return count;
+}
+
+cell_t Native_NavCandidatesCollectTeam(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 16)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavCandidatesCollectTeam expects 16 parameters");
+    return CollectTeamNavCandidates(context, params, {},
+                                    "AnneSpawn_NavCandidatesCollectTeam");
+}
+
+cell_t Native_NavCandidatesCollectTeamEx(IPluginContext *context, const cell_t *params)
+{
+    if (params[0] != 18)
+        return context->ThrowNativeError(
+            "AnneSpawn_NavCandidatesCollectTeamEx expects 18 parameters");
+
+    int excludedCount = params[18];
+    if (excludedCount < 0 || excludedCount > kMaxExcludedTeamClients)
+        return context->ThrowNativeError("Invalid team Nav candidate exclusion count");
+
+    std::vector<int> excludedClients;
+    if (excludedCount > 0)
+    {
+        cell_t *cells = nullptr;
+        if (!GetCells(context, params[17], cells))
+            return context->ThrowNativeError("Invalid team Nav candidate exclusion array");
+        excludedClients.reserve(static_cast<std::size_t>(excludedCount));
+        for (int i = 0; i < excludedCount; ++i)
+        {
+            if (cells[i] > 0)
+                excludedClients.push_back(static_cast<int>(cells[i]));
+        }
+    }
+    return CollectTeamNavCandidates(context, params, excludedClients,
+                                    "AnneSpawn_NavCandidatesCollectTeamEx");
 }
 
 cell_t Native_NavCandidatesGetPerf(IPluginContext *context, const cell_t *params)
@@ -3762,6 +3839,7 @@ sp_nativeinfo_t g_Natives[] = {
     {"AnneSpawn_NavCandidatesCollectRanked", Native_NavCandidatesCollectRanked},
     {"AnneSpawn_NavCandidatesPrepareTeam", Native_NavCandidatesPrepareTeam},
     {"AnneSpawn_NavCandidatesCollectTeam", Native_NavCandidatesCollectTeam},
+    {"AnneSpawn_NavCandidatesCollectTeamEx", Native_NavCandidatesCollectTeamEx},
     {"AnneSpawn_NavCandidatesGetPerf", Native_NavCandidatesGetPerf},
     {"AnneSpawn_NavCandidatesResetPerf", Native_NavCandidatesResetPerf},
     {"AnneSpawn_NavGraphGetAreaCount", Native_NavGraphGetAreaCount},

@@ -960,3 +960,24 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `ai_spitter_3` 升级到 3.0.8：推力改为落地追加，`spitterDoBhop` 直接写回已通过路线检查的起跳速度，不再在 Teleport 前重新算一份。
 - 四个插件的加速度 cvar 描述同步改为「落地后紧接着再起跳时追加，从跑动直接起跳的第一跳不加」。整条加速链只是整体后移一跳，上限、空中修正与转向损速逻辑不变。
 - 重新编译：`ai_charger3.smx`、`ai_tank3.smx`、`ai_boomer_3.smx`、`ai_spitter_3.smx`。
+
+### 2026年9月3日 特感连跳第一跳加速度比例 + 梯顶误判修复
+
+- 新增「第一跳加速度比例」cvar：`ai_charger3_bhop_first_hop_ratio`、`ai_tank3_bhop_first_hop_ratio`、`ai_BoomerBhopFirstHopRatio`、`ai_SpitterBhopFirstHopRatio`，范围 0.0–1.0。从跑动直接起跳的第一跳拿到 `加速度 × 比例`，落地后紧接着的起跳仍拿完整加速度；0 即上一条的「第一跳不加速」，1 等于旧行为。共享 `AIPathMovement_GetHopImpulse` 增加可选参数 `firstHopRatio`，默认 0 保持兼容。
+- 为什么要这个旋钮：第一跳不加速造成的起链滞后 ≈ 0.75 秒 × (1 − 比例) × (连跳上限 − 跑速)，与加速度大小无关，调 `BhopSpeed` / `impulse` 无法补偿；而高档上限更高，被削得反而最多（音理档 Charger 0.48 秒、Boomer 0.62 秒，简单档只有 0.28 / 0.53 秒），难度阶梯是反的。
+- 动态 AI 难度 `dynamic_ai_difficulty.cfg` 六档写入：Charger、Boomer、Spitter 统一 0.2 / 0.3 / 0.4 / 0.5 / 0.6 / 0.8，Tank 0 / 0.2 / 0.4 / 0.6 / 0.8 / 1.0（Tank 是被削最轻的职业，起链只多一跳，音理档直接保留旧的第一跳满加速）。修正后滞后随档位单调递减（音理档 Charger 0.10 秒、Tank 0 秒、Boomer 0.12 秒、Spitter 0.12 秒）。除 Tank 外顶档不给满 1.0，避免 Boomer / Spitter 250 推力的「第一跳突然加速」原样回来。插件默认值按音理档取 0.8 / 1.0 / 0.8 / 0.8，与这四个插件其余 cvar 默认值接近顶档的惯例一致。
+- 修复梯顶 dismount 误判落地：`AIPathMovement_NotifyGrounded(client, onLadder)` 记录上一次登记是否在梯子上；爬到梯顶时引擎有一小段既不在梯子也不在地面的 dismount，之后踩地不再算落地，爬完梯子后的第一跳不会白拿一份加速度。四个插件全部传入 onLadder。
+- `ai_boomer_3` 升级到 3.0.10：地面/梯子登记前移到 `m_customAbility` 无效的提前返回之前，否则那一帧漏登记会把站在地上的 Boomer 误判成滞空落地；`round_start` 同步重置连跳链。
+- `ai_spitter_3` 升级到 3.0.9：挂接 `player_spawn` 重置连跳链，与 Boomer / Charger 对齐。
+- `ai_charger3` 升级到 1.0.1.13、`ai_tank3` 升级到 1.0.0.13：Path / Direct / 博弈后跳（Charger）与普通 / Path 连跳（Tank）起跳后都调用 `AIPathMovement_MarkHopStart` 消费落地授权，与 Boomer / Spitter 一致。
+- 重新编译：`ai_charger3.smx`、`ai_tank3.smx`、`ai_boomer_3.smx`、`ai_spitter_3.smx`。
+
+### 2026年9月4日 刷点回退 Director 兜底修复（infected_control + anne_spawn_accel 1.5.0）
+
+- **问题**：2026-09-02.1 上线后大量特感改走 Director API 兜底、刷点散。云8/云4 两台空服的 5% 矩阵 A/B 复现并定位：默认名额下差异不大（云8：1.24% vs 0.88%；云4：4/480 vs 0/480），但名额收紧到生产常见的"上一波活体还占着账本"的状态后立刻爆开——云8 `SI_target_limit_manual 2` 下 12.78% vs 基线 1.94%，云4 同配置 80/480（16.7%）vs 基线 0/480。单变量隔离：换回 target_override 2.27 反而更差（14.44%），只换回旧 infected_control 立刻回落到 2.22%——罪魁是 infected_control 新加的「待锁定预留」把名额瞬间扣光，`SpawnAccel_CollectEligibleTeamTargets()` 按容量硬剔 owner 直到集合为空，`spawn_core.inc` 在 owner 集合为空时**静默**返回 `SpawnSearch_Exhausted`（无日志、`ownerCapacity` 恒为 0），`TryNormalSpawnOnce` 每帧 `band++`，10 帧内走完全部 Nav 分层直接进 Director。`inf_spawn_nav_band_timeout` 那条 3 秒超时完全没参与。
+- **扩展 `anne_spawn_accel` 升级到 1.5.0**：团队快照仍按完整队伍构建/缓存，但额外保留每名生还者一层有向距离场；新增 `AnneSpawn_NavCandidatesCollectTeamEx(..., excludedClients, excludedCount)`，分页取候选时把已满的生还者传进去，扩展按"其余生还者里最近的那个"逐行重算距离与 owner，只被排除者可达的行直接跳过；排除集合变化不重建快照、不 Pending。全员都满时按无排除处理。Linux 32 位 .so 在 pve 上用 Docker（Ubuntu 22.04 + hl2sdk-l4d2 + SM 1.12 + AMBuild）构建，`nav_graph_test` 通过。首版构建动态链接了新 GCC 的 libgcc（需要 `GCC_7.0.0` 符号版本），srcds 强制使用 Valve 自带的老 `bin/libgcc_s.so.1`，真机 `dlopen` 失败且 `sm exts unload/load` 会静默复用常驻的 1.4.4 镜像——已在 `AMBuilder` 加 `-static-libgcc` 重建（新 .so 不再依赖 libgcc_s，`readelf -V` 无 GCC_*/GLIBCXX_* 需求）；换扩展后必须用 `sm exts info` 核对版本，必要时重启容器。Windows .dll 未重编（老扩展下插件自动退回"不排除"）。
+- **`infected_control.smx` 升级到 2026-09-04.1**：团队 owner 集合只看存活/可动，容量不再决定成员资格；排除列表在 `EnsureCursor` 时算好，变化只重新分页；热循环只跳过被显式排除的 owner，不再直接看 `IsAtCapacity`；`IsAtCapacity` 硬口径只看 target_override 真实账本，预留只进 `ChooseTargetSurvivor` 的加权（TTL 2.5→1.5 秒，且只对控制类职业记账）；commit 不再让团队集合缓存失效；早退路径新增 `[FIND EARLY-EXHAUSTED]` 节流日志与计数。
+- **验证**：云4（4 图 × 10 个进度点，12 SI）新版在默认名额与收紧名额下均为 480/480 Nav 直刷、0 次 Director，波次耗时均值 245ms（基线 249ms），线上版同配置 80 次 Director；云8 全量 1083 格（`docs/infected_control_refactor/NAV_WAVE_MATRIX_20260904_TEAM_EXCLUDE_FULL.md`）12984/12984 零缺失，Nav 99.445%，Director Range 118→72，`[FIND EARLY-EXHAUSTED]` 与 `ownerCapacity` 全程 0，均值 364.6→332.4ms。注意这两轮因上述装载问题实际都跑在扩展 1.4.4 上，验收的是插件侧修复在老扩展下的"不排除"退回路径。重建后的扩展 1.5.0 在云8 以临时文件名装载、正式路径覆盖后 `docker restart` 两次核对 `sm exts info` 均为 1.5.0（`docs/infected_control_refactor/NAV_WAVE_MATRIX_20260904_TEAM_EXCLUDE_EXT150.md`）：名额收紧复现 480/480 Nav、0 Director（线上版同组 80/480），全量 1083 格 12906 Nav / 77 Director、均值 359.8ms，与 1.4.4 那轮在噪声范围内持平、相对 08-26 基线的收益全部保住。默认名额下每人容量 5、没人会满，排除列表恒为空，这份矩阵只能证明 1.5.0 无回归，量不出快路径收益；且 1.5.0 下被排除 owner 的候选在 native 内改归属，热循环 `ownerCapacity` 恒为 0 属正常，改看新增的 `[TEAM EXCLUDE]` 日志。测试后云4/云8 均已恢复生产文件（哈希核对）、cvar 复位。
+- 刷特时序（击杀阶段 + 独立 16 秒倒计时 + Anti-Bait）本次及 09-02 均未改动；体感"变成固定 24 秒"是远处兜底刷出的特感迟迟不死、提前启动条件达不到的副作用。
+- `scripts/run_nav_wave_matrix.py`：看守狗重启 srcds 后只重载 infected_control 和夹具、静默漏掉 `SI_Target_limit`/`l4d_target_override`（云8 首次全量因此作废重跑）。现在把这两个记为伴随插件：矩阵开始时在运行的，恢复时按加载顺序在 infected_control 之前重新加载。
+- 重新编译：`infected_control.smx`；重新构建：`anne_spawn_accel.ext.2.l4d2.so`（`-static-libgcc`）。

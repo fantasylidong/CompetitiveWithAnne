@@ -148,12 +148,19 @@ bool IsEligibleSpawnTarget(int client)
 // 刚刷出的特感要等 ChooseVictim 跑过才进 l4d_target_override 的账本；同一帧
 // burst 内后续刷出的特感看到的容量与第一只完全一样。这里按“导向目标”记一笔
 // 短期预留：账本里出现该特感、或超时、或该特感消失后自动释放。
-#define SPAWN_TARGET_RESERVE_TTL           2.5
+//
+// 两种口径：
+//  - 硬口径（IsAtCapacity / 排除 owner）只看 target_override 的真实账本。预留
+//    是推测值，一波 12 只在 0.3s 内刷完时预留会把名额瞬间扣光，2026-09-03 云8
+//    矩阵证实这会把整支队伍判满、直接退到 Director 兜底。
+//  - 软口径（GetHeadroom 加权选目标）把预留也算进去，只影响“更倾向选谁”。
+#define SPAWN_TARGET_RESERVE_TTL           1.5
 
 static float g_TargetCapCacheTime = -1.0;
 static bool g_TargetCapNativeOk = false;
 static bool g_TargetLedgerNativeOk = false;
-static int g_TargetCapState[MAXPLAYERS + 1];
+static int g_TargetCapState[MAXPLAYERS + 1];          // 真实账本 headroom
+static int g_TargetCapStatePending[MAXPLAYERS + 1];   // 含预留 headroom
 static int g_iPendingReserveTarget[MAXPLAYERS + 1];   // 按特感 client 索引：导向的生还者
 static float g_fPendingReserveUntil[MAXPLAYERS + 1];
 
@@ -162,11 +169,23 @@ void SpawnTarget_InvalidateCapacityCache()
     g_TargetCapCacheTime = -1.0;
 }
 
-void SpawnTarget_ReserveFor(int siClient, int target)
+// 该职业是否占用 SI_Target_limit 的控制类锁定名额。native 不可用时按默认
+// 控制类掩码（舌头/猎人/猴子/牛）判断。
+static bool SpawnTarget_IsClassLimited(int zc)
+{
+    if (GetFeatureStatus(FeatureType_Native, "IsClassTargetLimited") == FeatureStatus_Available)
+        return IsClassTargetLimited(zc) != 0;
+
+    return zc == view_as<int>(SI_Smoker) || zc == view_as<int>(SI_Hunter)
+        || zc == view_as<int>(SI_Jockey) || zc == view_as<int>(SI_Charger);
+}
+
+void SpawnTarget_ReserveFor(int siClient, int zc, int target)
 {
     if (siClient <= 0 || siClient > MaxClients)
         return;
-    if (target <= 0 || target > MaxClients)
+    // Boomer/Spitter 不占控制类名额，记预留只会把名额虚耗掉。
+    if (target <= 0 || target > MaxClients || !SpawnTarget_IsClassLimited(zc))
     {
         SpawnTarget_ReleaseReservation(siClient);
         return;
@@ -206,7 +225,10 @@ static void SpawnTarget_EnsureCapacityCache()
     g_TargetLedgerNativeOk = GetFeatureStatus(FeatureType_Native, "L4D_TargetOverride_GetValue")
         == FeatureStatus_Available;
     for (int i = 0; i <= MaxClients; i++)
+    {
         g_TargetCapState[i] = SPAWN_TARGET_HEADROOM_UNCOMPUTED;
+        g_TargetCapStatePending[i] = SPAWN_TARGET_HEADROOM_UNCOMPUTED;
+    }
 }
 
 // 账本已经登记（无论登记到谁）就不再算预留，避免和 GetClientTargetNum 重复计数。
@@ -238,41 +260,54 @@ static int SpawnTarget_CountPending(int target, float now)
     return pending;
 }
 
+static int SpawnTarget_ComputeHeadroom(int client, bool includePending)
+{
+    int headroom = SPAWN_TARGET_HEADROOM_UNLIMITED;
+    if (g_TargetCapNativeOk)
+    {
+        int limit = GetClientTargetLimit(client);
+        if (limit > 0)
+        {
+            int used = GetClientTargetNum(client);
+            if (includePending)
+                used += SpawnTarget_CountPending(client, g_TargetCapCacheTime);
+            headroom = limit - used;
+            if (headroom < 0)
+                headroom = 0;
+        }
+    }
+    else if (IsClientReachLimit(client) != 0)
+    {
+        headroom = 0;
+    }
+    return headroom;
+}
+
 // 剩余可锁定名额：SPAWN_TARGET_HEADROOM_UNLIMITED = 无上限/不可用；0 = 已满；
-// >0 = 还能再导向几只控制类特感（含待锁定预留）。
-int SpawnTarget_GetHeadroom(int client)
+// >0 = 还能再导向几只控制类特感。includePending=true 把待锁定预留也算作已用，
+// 只用于选目标加权；硬判定请用 SpawnTarget_IsAtCapacity。
+int SpawnTarget_GetHeadroom(int client, bool includePending = true)
 {
     if (!g_bTargetLimitLib || !IsValidSurvivor(client))
         return SPAWN_TARGET_HEADROOM_UNLIMITED;
 
     SpawnTarget_EnsureCapacityCache();
-    if (g_TargetCapState[client] == SPAWN_TARGET_HEADROOM_UNCOMPUTED)
+    if (includePending)
     {
-        int headroom = SPAWN_TARGET_HEADROOM_UNLIMITED;
-        if (g_TargetCapNativeOk)
-        {
-            int limit = GetClientTargetLimit(client);
-            if (limit > 0)
-            {
-                int used = GetClientTargetNum(client)
-                    + SpawnTarget_CountPending(client, g_TargetCapCacheTime);
-                headroom = limit - used;
-                if (headroom < 0)
-                    headroom = 0;
-            }
-        }
-        else if (IsClientReachLimit(client) != 0)
-        {
-            headroom = 0;
-        }
-        g_TargetCapState[client] = headroom;
+        if (g_TargetCapStatePending[client] == SPAWN_TARGET_HEADROOM_UNCOMPUTED)
+            g_TargetCapStatePending[client] = SpawnTarget_ComputeHeadroom(client, true);
+        return g_TargetCapStatePending[client];
     }
+
+    if (g_TargetCapState[client] == SPAWN_TARGET_HEADROOM_UNCOMPUTED)
+        g_TargetCapState[client] = SpawnTarget_ComputeHeadroom(client, false);
     return g_TargetCapState[client];
 }
 
+// 硬口径：该生还者在 target_override 真实账本里已被锁满。
 stock bool SpawnTarget_IsAtCapacity(int client)
 {
-    return SpawnTarget_GetHeadroom(client) == 0;
+    return SpawnTarget_GetHeadroom(client, false) == 0;
 }
 
 bool IsPinningSomeone(int client)

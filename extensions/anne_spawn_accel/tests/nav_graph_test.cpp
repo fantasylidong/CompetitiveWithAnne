@@ -210,6 +210,50 @@ void TestMultiSourceDistanceAndOwnerEqualsMinSingleSource()
     }
     assert(!sawExcludedFullSurvivorNav);
 
+    // Per-target layers must reproduce the single-source fields and let a caller
+    // re-resolve rows for any subset of targets without a rebuild.
+    std::vector<float> layers;
+    std::vector<std::uint32_t> layeredCandidates;
+    std::vector<float> layeredDistances;
+    std::vector<int> layeredOwners;
+    assert(AnneBuildTeamNavCandidateSnapshot(
+        *graph, targets, 2000.0f, blocked, survivorEyes, 250.0f,
+        layeredCandidates, layeredDistances, layeredOwners, allDistances, special,
+        &layers));
+    assert(layeredCandidates == candidates);
+    assert(layers.size() == candidates.size() * targets.size());
+    std::vector<int> layerClients = {2, 5};
+    std::vector<std::uint8_t> allActive = {1, 1};
+    std::vector<std::uint8_t> onlyBActive = {0, 1};
+    for (std::size_t row = 0; row < candidates.size(); ++row)
+    {
+        std::uint32_t index = candidates[row];
+        float layerA = layers[row * 2 + 0];
+        float layerB = layers[row * 2 + 1];
+        assert(std::isfinite(layerA) == std::isfinite(fromA[index]));
+        assert(std::isfinite(layerB) == std::isfinite(fromB[index]));
+        if (std::isfinite(layerA))
+            assert(std::fabs(layerA - fromA[index]) <= 0.01f);
+        if (std::isfinite(layerB))
+            assert(std::fabs(layerB - fromB[index]) <= 0.01f);
+
+        float resolved = 0.0f;
+        int resolvedOwner = 0;
+        assert(AnneResolveTeamCandidateForActiveTargets(
+            layers, layerClients, allActive, row, resolved, resolvedOwner));
+        assert(std::fabs(resolved - candidateDistances[row]) <= 0.01f);
+        assert(resolvedOwner == 2 || resolvedOwner == 5);
+
+        bool reachableFromB = AnneResolveTeamCandidateForActiveTargets(
+            layers, layerClients, onlyBActive, row, resolved, resolvedOwner);
+        assert(reachableFromB == std::isfinite(fromB[index]));
+        if (reachableFromB)
+        {
+            assert(resolvedOwner == 5);
+            assert(std::fabs(resolved - fromB[index]) <= 0.01f);
+        }
+    }
+
     AnneNavSearchTarget tieLeft{0, 7};
     AnneNavSearchTarget tieRight{2, 3};
     std::vector<AnneNavSearchTarget> reversed = {tieLeft, tieRight};

@@ -14,7 +14,10 @@ if 'l4d2' in SM.sdks:
       binary.compiler.cxxflags += ['-fPIC', '-gdwarf-4']
       # HL2SDK static archives may still contain DWARF 5, so remove debug
       # sections from the final ELF while preserving its regular symbol table.
-      binary.compiler.linkflags += ['-pthread', '-Wl,--strip-debug']
+      # srcds forces Valve's bundled (GCC 4.x era) bin/libgcc_s.so.1; a build
+      # that references newer libgcc symbol versions (e.g. GCC_7.0.0) fails to
+      # dlopen at runtime, so link libgcc statically.
+      binary.compiler.linkflags += ['-pthread', '-static-libgcc', '-Wl,--strip-debug']
     binary.sources += [
       'extension.cpp',
       'nav_graph.cpp',

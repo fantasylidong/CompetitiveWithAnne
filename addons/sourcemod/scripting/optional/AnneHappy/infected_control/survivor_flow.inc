@@ -197,9 +197,9 @@ int ChooseTargetSurvivor()
     if (gST.bPickRushMan && IsEligibleSpawnTarget(gST.rushManIndex))
         return gST.rushManIndex;
 
-    // 按剩余可锁定名额加权：名额越多越容易被选为本波导向目标，让压力分布跟
-    // SI_Target_limit 的上限口径一致（队首 ×2 自然拿到更高权重）。无上限信息时
-    // 退化为等权随机。
+    // 真实账本已锁满的人不选；其余按“剩余名额（含待锁定预留）”加权，名额越多
+    // 越容易被选为本波导向目标，让压力分布跟 SI_Target_limit 的上限口径一致
+    // （队首 ×2 自然拿到更高权重）。无上限信息时退化为等权随机。
     int cand[MAX_SURVIVOR_SLOTS];
     int weight[MAX_SURVIVOR_SLOTS];
     int n = 0;
@@ -208,12 +208,12 @@ int ChooseTargetSurvivor()
     {
         if (IsEligibleSpawnTarget(i))
         {
-            int headroom = SpawnTarget_GetHeadroom(i);
-            if (headroom == 0)
+            if (SpawnTarget_IsAtCapacity(i))
             {
                 LogMsg("[TARGET] skip %N: reach limit", i);
                 continue;
             }
+            int headroom = SpawnTarget_GetHeadroom(i, true);
             cand[n] = i;
             weight[n] = (headroom > 0) ? headroom : 1;
             totalWeight += weight[n];

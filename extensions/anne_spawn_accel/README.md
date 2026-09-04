@@ -50,6 +50,14 @@ distance cannot prove the minimum, its minimum too. Complete static and stable d
 directed graph; engine `BuildPath` only validates candidates returned by that graph. Flow buckets are not
 used as a candidate source or as proof of path connectivity.
 
+Team snapshots (`AnneSpawn_NavCandidatesPrepareTeam`) are built for the whole eligible survivor set as one
+reverse multi-source field (distance = shortest directed path to any survivor, owner = the survivor realizing it)
+and, since 1.5.0, also keep one bounded single-source distance layer per survivor. `AnneSpawn_NavCandidatesCollectTeamEx`
+takes an exclusion list (survivors that already carry their maximum number of Special Infected) and re-resolves every
+row against the remaining survivors from those layers at collect time, so "skip the full survivor and measure from
+the next nearest one" costs a page read instead of a snapshot rebuild; the cached snapshot key does not include the
+exclusion set. Excluding every survivor degenerates to no exclusion so the caller still receives candidates.
+
 The binary payload stores one ID per area plus forward CSR offsets and packed edges. Flow is read fresh
 from the engine on each graph capture, so it does not enlarge or invalidate the topology cache. A synthetic graph
 with 10,000 areas and 60,000 directed edges occupies 320,060 bytes (about 312.6 KiB). The standalone

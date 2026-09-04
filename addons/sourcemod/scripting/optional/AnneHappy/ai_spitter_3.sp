@@ -23,13 +23,14 @@ public Plugin myinfo =
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.8",
+		version 		= "3.0.9",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
 ConVar
 	g_hAllowBhop,
 	g_hBhopSpeed,
+	g_hBhopFirstHopRatio,
 	g_hBhopMaxSpeed,
 	g_hBhopStartDistance,
 	g_hPathBhop,
@@ -60,7 +61,8 @@ enum
 public void OnPluginStart()
 {
 	g_hAllowBhop = CreateConVar("ai_SpitterBhop", "1", "是否开启 Spitter 连跳功能", CVAR_FLAG, true, 0.0, true, 1.0);
-	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳不加", CVAR_FLAG, true, 0.0);
+	g_hBhopSpeed = CreateConVar("ai_SpitterBhopSpeed", "100", "Spitter 连跳推力, 落地后紧接着再起跳时追加, 从跑动直接起跳的第一跳按 ai_SpitterBhopFirstHopRatio 折算", CVAR_FLAG, true, 0.0);
+	g_hBhopFirstHopRatio = CreateConVar("ai_SpitterBhopFirstHopRatio", "0.8", "从跑动直接起跳的第一跳可拿到的推力比例, 0.0=不加推力, 1.0=与落地跳相同 (旧行为)", CVAR_FLAG, true, 0.0, true, 1.0);
 	g_hBhopMaxSpeed = CreateConVar("ai_SpitterBhopMaxSpeed", "1000.0", "Spitter 连跳的最大水平速度, 0=不限制", CVAR_FLAG, true, 0.0);
 	g_hBhopStartDistance = CreateConVar("ai_SpitterBhopStartDistance", "2500.0", "Spitter 距离最近生还者多远时开始连跳", CVAR_FLAG, true, 0.0);
 	g_hPathBhop = CreateConVar("ai_spitter3_path_bhop", "1", "是否优先使用 anne_nextbot 路径前视连跳", CVAR_FLAG, true, 0.0, true, 1.0);
@@ -72,6 +74,7 @@ public void OnPluginStart()
 	g_hAirSpit = CreateConVar("ai_spitter3_air_spit", "0", "是否允许 AI Spitter 空中吐痰, 0=禁止, 1=允许", CVAR_FLAG, true, 0.0, true, 1.0);
 	// HookEvent
 	HookEvent("ability_use", abilityUseHandler);
+	HookEvent("player_spawn", playerSpawnHandler);
 	// AddChangeHook
 	g_hSpitRange = FindConVar("z_spit_range");
 	g_hPinnedPriority.AddChangeHook(pinnedPriorityCvarChangedHandler);
@@ -139,8 +142,9 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
 	bool onLadder = GetEntityMoveType(spitter) == MOVETYPE_LADDER;
 	// 地面/梯子登记要每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
+	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
 	if (onGround || onLadder)
-		AIPathMovement_NotifyGrounded(spitter);
+		AIPathMovement_NotifyGrounded(spitter, onLadder);
 	if (onLadder)
 	{
 		AIPathMovement_Reset(spitter);
@@ -217,8 +221,8 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	buttons |= IN_DUCK;
 	float proposedVelocity[3], pushVelocity[3];
 	GetAngleVectors(eyeAngle, pushVelocity, NULL_VECTOR, NULL_VECTOR);
-	// 从跑动直接起跳的第一跳不加推力, 推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
-	float hopImpulse = AIPathMovement_GetHopImpulse(spitter, g_hBhopSpeed.FloatValue);
+	// 从跑动直接起跳的第一跳按 first_hop_ratio 折算推力 (0 = 不加), 完整推力留到落地再起跳时追加, 否则离地瞬间凭空多出一整份速度
+	float hopImpulse = AIPathMovement_GetHopImpulse(spitter, g_hBhopSpeed.FloatValue, g_hBhopFirstHopRatio.FloatValue);
 	// 推力只保留水平分量, 防止沿视线俯仰方向向上/向下加速；
 	// 俯仰 ±90 时水平分量为零, 归一化会退化成纯垂直向量, 此时不加推力
 	if (AIPathMovement_NormalizeHorizontal(pushVelocity))
@@ -263,6 +267,15 @@ public void OnClientDisconnect(int client)
 public void OnClientPutInServer(int client)
 {
 	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
+}
+
+// 重生时清掉上一条命残留的落地授权, 与 Boomer / Charger 的 player_spawn 重置对齐
+public void playerSpawnHandler(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (client < 1 || client > MaxClients)
+		return;
 	AIPathMovement_ResetHopChain(client);
 }
 

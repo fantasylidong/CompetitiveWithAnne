@@ -309,8 +309,8 @@ stock void buildDirectBhopVelocity(int client, const float pos[3], const float t
         return;
     }
 
-    // 从跑动直接起跳的第一跳只改方向, 加速度留到落地再起跳时追加
-    ScaleVector(outputVelVec, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue));
+    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加
+    ScaleVector(outputVelVec, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue));
 
     limitGroundBhopVel(outputVelVec);
 }
@@ -542,8 +542,8 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
         return Plugin_Continue;
     }
 
-    // 从跑动直接起跳的第一跳只改方向, 加速度留到落地再起跳时追加
-    ScaleVector(vFwd, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue));
+    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加
+    ScaleVector(vFwd, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue));
 
     // 连跳前限制速度, 使检查距离与最终实际速度一致
     limitGroundBhopVel(vFwd);
@@ -567,6 +567,7 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
     setForwardBhopInput(buttons, true);
     alignChargerFacingWithMovement(client, vFwd, ang);
     TeleportEntity(client, NULL_VECTOR, ang, vFwd);
+    AIPathMovement_MarkHopStart(client);
 
     // 保存起跳速度, 防止空中速度衰减
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
@@ -620,6 +621,7 @@ stock Action performDirectGrounBhop(int client, float targetDist, const float po
     setForwardBhopInput(buttons, true);
     alignChargerFacingWithMovement(client, vFwd, ang);
     TeleportEntity(client, NULL_VECTOR, ang, vFwd);
+    AIPathMovement_MarkHopStart(client);
 
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();

@@ -19,6 +19,9 @@ bool g_bSpawnAccelAvailabilityKnown;
 bool g_bSpawnAccelNativeSafetyAvailable;
 bool g_bSpawnAccelRankedNativesAvailable;
 bool g_bSpawnAccelTeamNativesAvailable;
+// 扩展 >= 1.5.0：CollectTeamEx 可在不重建快照的情况下把“已满”的生还者排除出
+// 最近目标计算。旧扩展没有这个 native 时，容量只影响目标加权，不再硬剔候选。
+bool g_bSpawnAccelTeamExcludeAvailable;
 Handle g_hSpawnAccelStartTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelGraphTimer = INVALID_HANDLE;
 Handle g_hSpawnAccelTopologyRetryTimer = INVALID_HANDLE;
@@ -169,6 +172,9 @@ stock void SpawnAccel_UpdateAvailability(bool forceLog = false)
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesPrepareTeam")
             == FeatureStatus_Available
         && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesCollectTeam")
+            == FeatureStatus_Available;
+    g_bSpawnAccelTeamExcludeAvailable = g_bSpawnAccelTeamNativesAvailable
+        && GetFeatureStatus(FeatureType_Native, "AnneSpawn_NavCandidatesCollectTeamEx")
             == FeatureStatus_Available;
     g_bSpawnAccelAvailabilityKnown = true;
 
@@ -419,16 +425,19 @@ stock int SpawnAccel_PrepareTargetCandidates(int target, float maxAge)
     return status;
 }
 
-// 参与集合带 TTL 缓存：成员集合（人+容量）没变时，TTL 内沿用上次的 navId
-// 快照。否则生还者每跨一个 NavArea 指纹就变、游标清零并重建扩展快照，
-// 真实对局里等于搜索不停从头再来（冻结 bot 矩阵测不出这种抖动）。
-// 成员集合一旦变化（倒地/被控/达到容量/复活）立即全量重收集。
+// 参与集合带 TTL 缓存：成员集合没变时，TTL 内沿用上次的 navId 快照。否则
+// 生还者每跨一个 NavArea 指纹就变、游标清零并重建扩展快照，真实对局里等于
+// 搜索不停从头再来（冻结 bot 矩阵测不出这种抖动）。
+// 成员集合只看“能不能当刷特目标”（存活/未倒地/未被控），一旦变化立即全量
+// 重收集。目标上限（容量）不再决定成员资格：快照始终按完整队伍构建，已满的
+// 人在 collect 阶段通过 CollectTeamEx 的排除列表跳过，这样容量翻转不会引起
+// 快照重建、Pending 和游标归零。
 static float g_TeamCollectCacheTime = -1.0;
 static int g_TeamCollectCacheCount = 0;
 static int g_TeamCollectCacheClients[TEAM_NAV_TARGET_MAX];
 static int g_TeamCollectCacheNavIds[TEAM_NAV_TARGET_MAX];
 
-void SpawnAccel_InvalidateTeamTargetsCache()
+stock void SpawnAccel_InvalidateTeamTargetsCache()
 {
     g_TeamCollectCacheTime = -1.0;
 }
@@ -438,7 +447,7 @@ static bool SpawnAccel_TeamMembersMatchCache(int maxCount)
     int n = 0;
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (!IsEligibleSpawnTarget(client) || SpawnTarget_IsAtCapacity(client))
+        if (!IsEligibleSpawnTarget(client))
             continue;
         if (n >= g_TeamCollectCacheCount || g_TeamCollectCacheClients[n] != client)
             return false;
@@ -447,6 +456,49 @@ static bool SpawnAccel_TeamMembersMatchCache(int maxCount)
             break;
     }
     return n == g_TeamCollectCacheCount;
+}
+
+stock bool SpawnAccel_CanExcludeTeamTargets()
+{
+    return g_bSpawnAccelTeamExcludeAvailable;
+}
+
+// 从当前队伍目标里挑出“已达到目标上限”的成员作为 collect 排除列表。
+// 全员都满时返回 0：这时 target_override 会在 ChooseVictim 阶段自行分流，
+// 刷点没有理由退化到 Director，仍按完整队伍搜索。
+int SpawnAccel_CollectTeamExclusions(const int[] clients, int count,
+                                     int[] excluded, int maxExcluded)
+{
+    if (!g_bSpawnAccelTeamExcludeAvailable || count <= 0 || maxExcluded <= 0)
+        return 0;
+
+    int n = 0;
+    for (int i = 0; i < count && n < maxExcluded; i++)
+    {
+        if (SpawnTarget_IsAtCapacity(clients[i]))
+            excluded[n++] = clients[i];
+    }
+    if (n >= count)
+        return 0;
+    return n;
+}
+
+stock int SpawnAccel_TeamExclusionKey(const int[] excluded, int count)
+{
+    int hash = count;
+    for (int i = 0; i < count; i++)
+        hash = hash * 16777619 ^ excluded[i];
+    return hash;
+}
+
+stock bool SpawnAccel_IsTeamExcluded(const int[] excluded, int count, int client)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (excluded[i] == client)
+            return true;
+    }
+    return false;
 }
 
 stock int SpawnAccel_CollectEligibleTeamTargets(int[] clients, int[] navIds, int maxCount)
@@ -472,7 +524,7 @@ stock int SpawnAccel_CollectEligibleTeamTargets(int[] clients, int[] navIds, int
 
     for (int client = 1; client <= MaxClients && count < maxCount; client++)
     {
-        if (!IsEligibleSpawnTarget(client) || SpawnTarget_IsAtCapacity(client))
+        if (!IsEligibleSpawnTarget(client))
             continue;
         int navId;
         if (!SpawnAccel_GetClientNavId(client, navId))
@@ -524,6 +576,35 @@ stock int SpawnAccel_PrepareTeamCandidates(
     else
         g_iSpawnAccelCandidatePrepareUnavailable++;
     return status;
+}
+
+// 团队快照分页读取。有 CollectTeamEx 时把已满的生还者传给扩展做“最近目标”
+// 重算；否则退回旧 native（不做排除）。
+stock int SpawnAccel_CollectTeamCandidatesPage(
+    const int[] clients, const int[] navIds, int count,
+    float minNavDistance, float maxNavDistance, bool maxInclusive,
+    int startOffset, int[] page, float[] distances, int[] owners, int maxResults,
+    float &resultAgeMs, int &totalInRange,
+    const int[] excluded, int excludedCount)
+{
+    float pathLimit = SpawnAccel_GetCandidatePathLimit();
+    float minTeamDistance = FloatMax(NAV_CANDIDATE_TEAM_EXCLUSION, gCV.fSpawnMin);
+    if (g_bSpawnAccelTeamExcludeAvailable)
+    {
+        return AnneSpawn_NavCandidatesCollectTeamEx(
+            clients, navIds, count,
+            minNavDistance, maxNavDistance, pathLimit, minTeamDistance,
+            NAV_CANDIDATE_RESULT_TTL, maxInclusive, startOffset,
+            page, distances, owners, maxResults,
+            resultAgeMs, totalInRange,
+            excluded, excludedCount);
+    }
+    return AnneSpawn_NavCandidatesCollectTeam(
+        clients, navIds, count,
+        minNavDistance, maxNavDistance, pathLimit, minTeamDistance,
+        NAV_CANDIDATE_RESULT_TTL, maxInclusive, startOffset,
+        page, distances, owners, maxResults,
+        resultAgeMs, totalInRange);
 }
 
 stock int SpawnAccel_PrepareTargetCandidatesRanked(
