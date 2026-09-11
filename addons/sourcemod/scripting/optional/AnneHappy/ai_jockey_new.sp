@@ -182,7 +182,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 						NormalizeVector(new_velvec, new_velvec);
 						// 保存当前位置
 						// 生还比特感高，关闭z方向
-						if(fTargetPos[2] > fTargetPos[2])
+						if(fTargetPos[2] > fJockeyPos[2])
 							fJockeyPos[2] = fTargetPos[2] = 0.0;
 						MakeVectorFromPoints(fJockeyPos, fTargetPos, self_target_vec);
 						NormalizeVector(self_target_vec, self_target_vec);
