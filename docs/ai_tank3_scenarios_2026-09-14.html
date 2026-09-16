@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ai_tank3 情景图鉴</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@700;900&display=swap">
+<style>
+:root{
+  --ground:#F0F3F5; --panel:#FFFFFF; --sunk:#E7ECF0;
+  --ink:#16202A; --ink-2:#4B5866; --ink-3:#778591;
+  --rule:#D3DAE1; --grid:#DFE5EA; --grid-major:#C3CCD5;
+  --solid:#C6CFD7; --raised:#D9E0E6;
+  --tank:#BF3A2A; --surv:#2A64A6; --new:#16805E; --old:#A5680E; --ladder:#7A592C;
+  --new-wash:rgba(22,128,94,.11); --old-wash:rgba(165,104,14,.11); --tank-wash:rgba(191,58,42,.10); --surv-wash:rgba(42,100,166,.10);
+  --focus:#2A64A6;
+  --serif:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+  --sans:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1115; --panel:#141A20; --sunk:#10151A;
+    --ink:#DCE3E9; --ink-2:#A2AEB9; --ink-3:#6E7B87;
+    --rule:#26303A; --grid:#18202A; --grid-major:#26313D;
+    --solid:#2A333C; --raised:#1F2830;
+    --tank:#E4644F; --surv:#5E9DE2; --new:#3DBE93; --old:#DDA24A; --ladder:#C19B63;
+    --new-wash:rgba(61,190,147,.13); --old-wash:rgba(221,162,74,.13); --tank-wash:rgba(228,100,79,.15); --surv-wash:rgba(94,157,226,.13);
+    --focus:#5E9DE2;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1115; --panel:#141A20; --sunk:#10151A;
+  --ink:#DCE3E9; --ink-2:#A2AEB9; --ink-3:#6E7B87;
+  --rule:#26303A; --grid:#18202A; --grid-major:#26313D;
+  --solid:#2A333C; --raised:#1F2830;
+  --tank:#E4644F; --surv:#5E9DE2; --new:#3DBE93; --old:#DDA24A; --ladder:#C19B63;
+  --new-wash:rgba(61,190,147,.13); --old-wash:rgba(221,162,74,.13); --tank-wash:rgba(228,100,79,.15); --surv-wash:rgba(94,157,226,.13);
+  --focus:#5E9DE2;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+code{font-family:var(--mono);font-size:.86em}
+.page{max-width:1240px;margin:0 auto;padding:28px 24px 64px;display:flex;flex-direction:column;gap:44px}
+.page>*{min-width:0}
+.lede,.verdict,ol.steps li,.trace td,.pv span,.readout dd,.tool header p,.cvars code,figcaption{overflow-wrap:anywhere}
+.eyebrow{font:600 12px/1.4 var(--mono);letter-spacing:.08em;color:var(--ink-3);margin:0}
+h1{font:900 clamp(30px,4vw,42px)/1.15 var(--serif);margin:6px 0 10px;text-wrap:balance;letter-spacing:.01em}
+.lede{max-width:62ch;color:var(--ink-2);margin:0}
+.top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:end;border-bottom:1px solid var(--rule);padding-bottom:22px}
+.basis{display:grid;grid-template-columns:repeat(5,auto);margin:0;border:1px solid var(--rule);background:var(--panel)}
+.basis div{padding:8px 14px;border-left:1px solid var(--rule)}
+.basis div:first-child{border-left:0}
+.basis dt{font:500 11px/1.3 var(--mono);color:var(--ink-3);letter-spacing:.03em}
+.basis dd{margin:2px 0 0;font:600 15px/1.2 var(--mono);font-variant-numeric:tabular-nums}
+.explorer{display:grid;grid-template-columns:240px minmax(0,1fr);gap:30px;align-items:start}
+.rail{position:sticky;top:16px;display:flex;flex-direction:column;gap:18px}
+.rail-group h3{font:600 11px/1.4 var(--mono);letter-spacing:.08em;color:var(--ink-3);margin:0 0 6px}
+.rail-group ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.scn{all:unset;box-sizing:border-box;display:grid;grid-template-columns:10px 1fr;gap:10px;align-items:center;width:100%;padding:7px 10px;border:1px solid transparent;border-radius:5px;cursor:pointer;color:var(--ink-2);font-size:14px;line-height:1.4}
+.scn:hover{color:var(--ink);background:var(--sunk)}
+.scn[aria-current="true"]{color:var(--ink);background:var(--panel);border-color:var(--rule);font-weight:500}
+.scn:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.kdot{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.kdot.change{background:var(--new)} .kdot.fix{background:var(--tank)} .kdot.detail{background:var(--surv)} .kdot.same{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-3)}
+.scenario{display:flex;flex-direction:column;gap:20px;min-width:0}
+.scn-head{display:flex;flex-direction:column;gap:8px}
+.scn-head h2{font:700 27px/1.25 var(--serif);margin:0;text-wrap:balance}
+.title-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.chip{display:inline-flex;align-items:center;font:600 12px/1 var(--mono);padding:5px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.chip.change{color:var(--new)} .chip.fix{color:var(--tank)} .chip.same{color:var(--ink-3)} .chip.detail{color:var(--surv)}
+.verdict{font-size:16.5px;line-height:1.65;max-width:62ch;margin:0}
+.toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 18px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:5px;overflow:hidden;background:var(--panel)}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;font:500 13px/1.2 var(--sans);color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.seg button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2);margin:0;padding:0;list-style:none}
+.legend li{display:inline-flex;align-items:center;gap:6px}
+.legend svg{display:block}
+figure.viewport{margin:0;border:1px solid var(--rule);background:var(--sunk);border-radius:4px;overflow:hidden}
+.vp-scroll{overflow-x:auto}
+.vp-scroll svg{display:block;width:100%;min-width:640px;height:auto}
+figure.viewport figcaption{padding:8px 12px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink-3);background:var(--panel)}
+.compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.compare.single{grid-template-columns:minmax(0,1fr)}
+.col{background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:14px 16px}
+.col h3{display:flex;align-items:center;gap:8px;font:700 14px/1.3 var(--sans);margin:0 0 10px}
+.swatch{display:inline-block;width:24px;border-top:3px solid var(--new)}
+.swatch.old{border-top:3px dashed var(--old)}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ol.steps li{display:grid;grid-template-columns:22px 1fr;gap:10px;font-size:14px;line-height:1.55;color:var(--ink-2);border-radius:4px;padding:3px 6px;margin:0 -6px}
+ol.steps li:hover,ol.steps li.hot{background:var(--sunk);color:var(--ink)}
+.num{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:600 11px/1 var(--mono);color:var(--panel);margin-top:1px}
+.num.old{background:var(--old)} .num.new{background:var(--new)}
+.trace{background:var(--panel);border:1px solid var(--rule);border-radius:4px;overflow-x:auto}
+.trace table{border-collapse:collapse;width:100%;font:13px/1.5 var(--mono);font-variant-numeric:tabular-nums}
+.trace caption{text-align:left;padding:12px 14px 8px;font:700 14px/1.3 var(--sans);color:var(--ink)}
+.trace td{padding:6px 14px;border-top:1px solid var(--rule);vertical-align:top}
+.trace td:nth-child(2){color:var(--ink-2)}
+.trace td.st{width:30px;text-align:center;font-weight:700}
+.st.pass{color:var(--new)} .st.fail{color:var(--tank)} .st.info{color:var(--ink-3)} .st.result{color:var(--surv)}
+.trace tr.result td{font-weight:600;color:var(--ink);background:var(--surv-wash)}
+.cvars{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.cvars code{display:inline-block;padding:3px 8px;border:1px solid var(--rule);border-radius:4px;background:var(--panel);font-size:12px;color:var(--ink-2)}
+.section-title{font:700 24px/1.25 var(--serif);margin:0 0 6px}
+.section-lede{margin:0 0 16px;color:var(--ink-2);max-width:62ch}
+.tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
+.tool{background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.tool h3{font:700 18px/1.3 var(--serif);margin:0 0 4px}
+.tool header p{margin:0;color:var(--ink-2);font-size:13.5px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.hint{font:400 11px/1.2 var(--mono);color:var(--ink-3)}
+.check{flex-direction:row!important;align-items:center;gap:8px!important;align-self:end;padding-bottom:8px}
+input[type=number],select{font:500 14px/1.2 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);background:var(--ground);border:1px solid var(--rule);border-radius:4px;padding:7px 8px;width:100%;min-width:0}
+input[type=radio],input[type=checkbox]{accent-color:var(--surv);width:16px;height:16px;margin:0}
+input:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.pill{display:inline-flex;align-self:flex-start;align-items:center;padding:8px 12px;border-radius:4px;font-weight:700;font-size:14px}
+.pill.hop{background:var(--new-wash);color:var(--new)} .pill.nohop{background:var(--tank-wash);color:var(--tank)} .pill.window{background:var(--old-wash);color:var(--old)}
+.strip{border:1px solid var(--rule);border-radius:4px;background:var(--sunk);overflow-x:auto}
+.strip svg{display:block;width:100%;min-width:460px;height:auto}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0;font-size:13.5px}
+.readout dt{color:var(--ink-3)}
+.readout dd{margin:0;font:600 13.5px/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.srows{display:flex;flex-direction:column;gap:6px;overflow-x:auto;padding-bottom:2px}
+.srow{display:grid;grid-template-columns:44px 24px 82px 82px 50px minmax(128px,1fr);gap:8px;align-items:center;min-width:460px}
+.srow.head{font:500 11px/1.3 var(--mono);color:var(--ink-3)}
+.srow>input[type=radio],.srow>input[type=checkbox]{justify-self:center}
+.sname{font:700 15px/1 var(--mono);color:var(--surv)}
+.table-wrap{overflow-x:auto}
+.pick-table{width:100%;border-collapse:collapse;font:13px/1.5 var(--mono);font-variant-numeric:tabular-nums;min-width:420px}
+.pick-table th{font:500 11px/1.3 var(--mono);color:var(--ink-3);text-align:left;padding:4px 8px;border-bottom:1px solid var(--rule)}
+.pick-table td{padding:6px 8px;border-bottom:1px solid var(--rule);color:var(--ink-2)}
+.pick-table td:first-child{color:var(--surv);font-weight:700}
+.pick-table td.pick{color:var(--ink);font-weight:600}
+.pv{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline;font-size:14px;line-height:1.55}
+.pv b{font:700 12px/1 var(--mono);padding:4px 7px;border-radius:3px;white-space:nowrap}
+.pv.old b{background:var(--old-wash);color:var(--old)} .pv.new b{background:var(--new-wash);color:var(--new)}
+footer{border-top:1px solid var(--rule);padding-top:16px;color:var(--ink-3);font-size:12.5px;display:flex;flex-direction:column;gap:4px}
+/* 情景视图 SVG */
+.g-minor{stroke:var(--grid);stroke-width:1}
+.g-major{stroke:var(--grid-major);stroke-width:1}
+.ax-t{font:10px var(--mono);fill:var(--ink-3)}
+.vp-label{font:600 10.5px var(--mono);fill:var(--ink-3);letter-spacing:.06em}
+.solid{fill:var(--solid)} .raised{fill:var(--raised);stroke:var(--grid-major)}
+.ground{stroke:var(--ink-3);stroke-width:1.5}
+.ladder{fill:none;stroke:var(--ladder);stroke-width:2}
+.zone{stroke-width:1.2;stroke-dasharray:3 4}
+.zone.new{fill:var(--new-wash);stroke:var(--new)} .zone.old{fill:var(--old-wash);stroke:var(--old)} .zone.neutral{fill:none;stroke:var(--ink-3)} .zone.tank{fill:var(--tank-wash);stroke:var(--tank)}
+.zone-t{font:11px var(--sans);fill:var(--ink-2)}
+.nav{stroke:var(--ink-3);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round;fill:none}
+.nav-t{font:10.5px var(--mono);fill:var(--ink-3)}
+.tr{fill:none;stroke-width:2.5;stroke-linecap:round}
+.layer-new .tr{stroke:var(--new)} .layer-old .tr{stroke:var(--old);stroke-dasharray:8 5}
+.tr.thin{stroke-width:1.5;stroke-dasharray:2 4}
+.op-t{font:600 10.5px var(--mono)}
+.layer-new .op-t{fill:var(--new)} .layer-old .op-t{fill:var(--old)}
+.ah-new{fill:var(--new)} .ah-old{fill:var(--old)} .ah-ink{fill:var(--ink-3)}
+.mk circle{stroke:var(--sunk);stroke-width:2}
+.layer-new .mk circle{fill:var(--new)} .layer-old .mk circle{fill:var(--old)}
+.mk text{font:600 11px var(--mono);fill:var(--panel)}
+.mk.hot circle{stroke:var(--ink);stroke-width:2.5}
+.tank{fill:var(--tank)} .surv{fill:var(--surv)} .ghost{fill:none;stroke:var(--surv);stroke-dasharray:3 3}
+.actor-t{font:600 11px var(--mono);fill:var(--ink)}
+.meas{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:4 3}
+.meas-t{font:10.5px var(--mono);fill:var(--ink-2)}
+.stop line{stroke:var(--tank);stroke-width:3;stroke-linecap:round}
+.stop-t{font:600 11px var(--sans);fill:var(--tank)}
+.show-new .layer-old,.show-old .layer-new{display:none}
+/* 计算器条带 */
+.s-base{stroke:var(--ink-3);stroke-width:2}
+.s-t{font:10.5px var(--mono);fill:var(--ink-2)}
+.s-entry{stroke:var(--ladder);stroke-width:3}
+.s-window{fill:var(--old-wash)} .s-margin{fill:var(--tank-wash)}
+.s-hop{fill:none;stroke:var(--new);stroke-width:2.5}
+@media (max-width:980px){
+  .explorer{grid-template-columns:minmax(0,1fr)}
+  .rail{position:static;flex-direction:row;overflow-x:auto;gap:18px;padding-bottom:6px}
+  .rail-group{min-width:max-content}
+  .top{grid-template-columns:minmax(0,1fr)}
+  .tools{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .page{padding:20px 14px 48px}
+  .compare{grid-template-columns:minmax(0,1fr)}
+  .basis{grid-template-columns:repeat(3,auto)}
+  .basis div:nth-child(4){border-left:0}
+  .fields{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <p class="eyebrow">ANNE · AI TANK · ai_tank3 2.0.0</p>
+      <h1>ai_tank3 情景图鉴</h1>
+      <p class="lede">同一个场面，1.x 和 2.0 各自会怎么走、为什么这么走。图是照着插件源码的判定逻辑画的示意，不是游戏录像，数值按 Anne 配置和极限档取。</p>
+    </div>
+    <dl class="basis" aria-label="图里用到的数值">
+      <div><dt>sv_gravity</dt><dd>750</dd></div>
+      <div><dt>一跳滞空</dt><dd>0.773 s</dd></div>
+      <div><dt>Tank 跑速</dt><dd>225</dd></div>
+      <div><dt>挥拳距离</dt><dd>75</dd></div>
+      <div><dt>连跳上限·极限档</dt><dd>800</dd></div>
+    </dl>
+  </header>
+
+  <section class="explorer" aria-label="情景">
+    <nav class="rail" id="rail" aria-label="情景列表"></nav>
+    <article class="scenario" id="scenario" aria-live="polite"></article>
+  </section>
+
+  <section aria-labelledby="tools-title">
+    <h2 class="section-title" id="tools-title">自己算一下</h2>
+    <p class="section-lede">两个最常被问到的判定，公式和插件里一致。示例值就是上面“人在梯子顶”和“高台上的人 vs 地面上的人”两个情景，改任何一格都会立刻重算。</p>
+    <div class="tools">
+      <form class="tool" id="hopTool" autocomplete="off">
+        <header>
+          <h3>连跳限速</h3>
+          <p>前方有梯子入口、深坑或高台边时，这一跳能跳多快、落在哪。</p>
+        </header>
+        <div class="fields">
+          <label>当前水平速度 <span class="hint">u/s</span><input type="number" name="speed" value="600" min="0" max="1500" step="10"></label>
+          <label>本跳推力 <span class="hint">ai_tank3_bhop_impulse</span><input type="number" name="impulse" value="65" min="0" max="300" step="5"></label>
+          <label>连跳上限 <span class="hint">ai_tank3_bhop_max_speed</span><input type="number" name="max" value="800" min="0" max="2000" step="50"></label>
+          <label>前方特殊段 <span class="hint">路径快照里的段类型</span>
+            <select name="kind">
+              <option value="ladder" selected>梯子入口（LadderUp / Down）</option>
+              <option value="drop">深下落（落差 &gt; 56）</option>
+              <option value="climb">高攀爬（高差 &gt; 56）</option>
+              <option value="gap">跳跃间隙（JumpGap）</option>
+              <option value="none">前方没有</option>
+            </select>
+          </label>
+          <label>沿路径到它的距离 <span class="hint">hu</span><input type="number" name="dist" value="740" min="0" max="5000" step="10"></label>
+          <label>梯子窗口 <span class="hint">ai_tank3_ladder_nearby_radius</span><input type="number" name="radius" value="180" min="0" max="1000" step="10"></label>
+          <label>Tank 跑速 <span class="hint">m_flMaxspeed</span><input type="number" name="run" value="225" min="1" max="600" step="5"></label>
+          <label>sv_gravity <span class="hint">Anne 锁 750</span><input type="number" name="gravity" value="750" min="100" max="2000" step="10"></label>
+        </div>
+        <output class="pill" id="hopVerdict" for="hopTool"></output>
+        <div class="strip" id="hopStrip"></div>
+        <dl class="readout" id="hopReadout"></dl>
+      </form>
+
+      <form class="tool" id="pickTool" autocomplete="off">
+        <header>
+          <h3>选目标打分</h3>
+          <p>1.x 让 target override 按直线距离挑；2.0 用分档寻路距离打分，再加换目标粘滞。</p>
+        </header>
+        <div class="srows" role="group" aria-label="生还者">
+          <div class="srow head" aria-hidden="true"><span>当前目标</span><span></span><span>直线 hu</span><span>寻路 hu</span><span>走不到</span><span>状态</span></div>
+          <div class="srow" data-id="A">
+            <input type="radio" name="current" value="A" checked aria-label="A 是当前目标">
+            <span class="sname">A</span>
+            <input type="number" name="straightA" value="250" min="1" step="10" aria-label="A 直线距离">
+            <input type="number" name="pathA" value="700" min="1" step="10" aria-label="A 寻路距离">
+            <input type="checkbox" name="unreachA" aria-label="A 走不到">
+            <select name="stateA" aria-label="A 状态"></select>
+          </div>
+          <div class="srow" data-id="B">
+            <input type="radio" name="current" value="B" aria-label="B 是当前目标">
+            <span class="sname">B</span>
+            <input type="number" name="straightB" value="350" min="1" step="10" aria-label="B 直线距离">
+            <input type="number" name="pathB" value="380" min="1" step="10" aria-label="B 寻路距离">
+            <input type="checkbox" name="unreachB" aria-label="B 走不到">
+            <select name="stateB" aria-label="B 状态"></select>
+          </div>
+          <div class="srow" data-id="C">
+            <input type="radio" name="current" value="C" aria-label="C 是当前目标">
+            <span class="sname">C</span>
+            <input type="number" name="straightC" value="600" min="1" step="10" aria-label="C 直线距离">
+            <input type="number" name="pathC" value="640" min="1" step="10" aria-label="C 寻路距离">
+            <input type="checkbox" name="unreachC" aria-label="C 走不到">
+            <select name="stateC" aria-label="C 状态"></select>
+          </div>
+        </div>
+        <div class="fields">
+          <label>距上次换目标 <span class="hint">秒 · ai_tank3_target_commit_time = 2</span><input type="number" name="since" value="3" min="0" max="60" step="0.5"></label>
+          <label class="check"><input type="checkbox" name="frozen"> 在梯子窗口内 / 爬梯或攀爬中</label>
+        </div>
+        <div class="table-wrap" id="pickTable"></div>
+        <div id="pickVerdicts" style="display:grid;gap:8px"></div>
+      </form>
+    </div>
+  </section>
+
+  <footer>
+    <span>依据：addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp 与 ai_tank3/*.inc（2.0.0），1.x 行为取自重写前的 ai_tank3.sp（1.0.0.13）。</span>
+    <span>坐标单位是 Hammer 单位（hu）；网格细线 64 hu、粗线 256 hu。极限档数值取自 dynamic_ai_difficulty.cfg 的 level5。</span>
+  </footer>
+</div>
+
+<script>
+// 情景数据。坐标单位 hu；侧视用 (x, z)，俯视用 (x, y)。
+// 轨迹操作：hop 跳跃弧 / run 直线 / fall 下落 / move CommandABot MOVE / rock 石头弧 / stop 罚站
+// 编号标记 [序号, x, z, 像素偏移x, 像素偏移y]
+const SCENARIOS = [
+{
+  id:'ledge', group:'移动 · 梯子', title:'人站在梯子顶的高台上', kind:'change', chip:'行为改变',
+  verdict:'2.0 顺着 NextBot 路径往梯子口跳，这一跳按离梯子口的剩余距离限速；进梯子窗口后压回跑速上梯，翻上去再恢复连跳。1.x 会被高台上的人拽到墙根，接着触发头顶卡撤离，最后原地罚站。',
+  alt:'侧视图：Tank 在地面，生还者 S 在梯子顶的高台上；2.0 沿路径跳到梯子口前压速上梯，1.x 被拽到墙根后撤离罚站。',
+  caption:'侧视，单位 hu。实线是 2.0，虚线是 1.x；圆圈编号对应下面的步骤。',
+  view:{mode:'side', x0:0, x1:1400, z0:-60, z1:440},
+  solids:[[900,0,1400,256]], ground:[[0,900]], ladders:[[872,0,900,256]],
+  zones:[
+    {r:[680,0,860,330], c:'new', t:'2.0 梯子窗口 ≤180', tp:[686,318]},
+    {r:[795,80,925,440], c:'old', t:'1.x 头顶卡框', tp:[800,428]}
+  ],
+  nav:[{p:[[120,0],[860,0],[860,256],[920,256]], t:'NextBot 路径 · LadderUp 段', tp:[300,-36]}],
+  actors:[{k:'tank', p:[120,0], t:'Tank'}, {k:'surv', p:[920,256], t:'S'}],
+  newOps:[['hop',120,0,634,0,60], ['run',634,0,860,0], ['run',860,0,860,256], ['run',860,256,905,256]],
+  newMarks:[[1,120,0,0,-66], [2,634,0,0,-22], [3,706,0,0,-22], [4,860,140,-18,0], [5,905,256,0,-22]],
+  oldOps:[['hop',120,0,560,0,60], ['hop',560,0,848,0,60], ['move',860,0,622,0,'MOVE 撤离'], ['stop',622,0,'罚站']],
+  oldMarks:[[1,120,0,0,24], [2,560,0,0,24], [3,838,0,-12,24], [4,860,40,22,0], [5,622,0,26,24]],
+  newSteps:[
+    '起跳：S 比 Tank 高 256，不算同一高度，不直追；路径前瞻点指向梯子。离梯子口 740，限速 (740−64)÷0.773≈875，取连跳上限 800，本跳 665 u/s、飞 514。',
+    '落地时离梯子口还剩 226，扣掉 64 的余量只剩 162，连跑速的一跳（174）都会越过去，所以不起跳，跑过去。',
+    '沿路径离梯子口 ≤180：进入梯子窗口，速度压回跑速，窗口内不换目标。',
+    '爬梯：视角锁到这架梯子的梯面、俯仰拉平，插件不按任何键。',
+    '翻上平台：路径里没有梯子段了，连跳恢复；离 S 已经小于停跳距离 120，出拳交给原生 AI。'
+  ],
+  oldSteps:[
+    '看得见 S 就朝 S 的预测点加速，推力偏向平台下的墙根。',
+    '空中修正继续朝 S 拧，落点离上梯点越来越偏。',
+    '离梯子实体中心 180 以内才停跳，但 0.2 秒才检测一次，800 速一跳能飞约 600，容易高速冲过上梯点或撞墙弹开，NextBot 只能重新对准梯子。',
+    '站在 S 脚下水平 65 以内、2 秒没挪 32 → 头顶卡立案，没有替代目标 → 发 MOVE 撤离。',
+    '撤到 250 外就不再刷新，也不 RESET：看得见就扔一块，扔完照样站着；梯子附近补发的 ATTACK 被拦下 → 原地罚站，等卡住传送插件。'
+  ],
+  chainTitle:'2.0 第 ① 跳的判定',
+  chain:[
+    ['连跳开关 ai_tank_bhop', '1', 'pass'],
+    ['水平速度 ≥ ai_tank3_bhop_min_speed', '600 ≥ 200', 'pass'],
+    ['与目标距离 ∈ [停跳 120, 9999]', '≈ 840', 'pass'],
+    ['路径快照未过期', '≤ 0.35 s', 'pass'],
+    ['前方特殊段', 'LadderUp，沿路径 740', 'info'],
+    ['起跳限速 (740 − 64) ÷ 0.773', '875 → 取上限 800', 'info'],
+    ['同一高度 |Δz| ≤ 56', 'Δz = 256', 'fail'],
+    ['路径前瞻点 hull 可达', '是', 'pass'],
+    ['起跳后路线检查（撞墙 / 断层）', '通过', 'pass'],
+    ['结果', '沿路径跳：600 + 65 = 665 u/s，飞 514', 'result']
+  ],
+  cvars:['ai_tank3_ladder_nearby_radius 180', 'ai_tank3_ladder_look_lock 1', 'ai_tank3_head_block_time 2.0（有上梯路线 ×3）', '_ai_tank3_direct_chase_max_angle 45']
+},
+{
+  id:'passby', group:'移动 · 梯子', title:'路过一架不在路线上的梯子', kind:'change', chip:'行为改变',
+  verdict:'路径快照里没有梯子段，2.0 就不把它当梯子窗口，照常连跳直追。1.x 只看离梯子实体中心的距离，走廊边挂着一架梯子，也会让它在 180 范围里停跳、停锁视角。',
+  alt:'俯视图：走廊一侧挂着梯子，但不在 Tank 的路线上；2.0 一路连跳，1.x 在梯子 180 范围内改成跑步。',
+  caption:'俯视，单位 hu。两条轨迹上下错开画，实际走的是同一条线。',
+  view:{mode:'top', x0:0, x1:1400, z0:-260, z1:300},
+  solids:[[0,220,1400,300], [0,-260,1400,-200]], ladders:[[680,200,740,220]],
+  zones:[{circle:[710,210,180], c:'old', t:'1.x 停跳圈 r=180', tp:[596,-8]}],
+  nav:[{p:[[100,60],[1300,60]], t:'NextBot 路径 · 全程 OnGround', tp:[930,84]}],
+  actors:[{k:'tank', p:[100,60], t:'Tank'}, {k:'surv', p:[1300,60], t:'S'}],
+  newOps:[['hop',100,60,560,60,0], ['hop',560,60,1010,60,0], ['hop',1010,60,1180,60,0]],
+  newMarks:[[1,560,60,0,-24], [2,1010,60,0,-24]],
+  oldOps:[['hop',100,-60,530,-60,0], ['run',530,-60,890,-60], ['hop',890,-60,1180,-60,0]],
+  oldMarks:[[1,530,-60,0,24], [2,890,-60,0,24]],
+  newSteps:[
+    '扫描路径快照前 32 段，没有 LadderUp / LadderDown：不在梯子窗口，梯子实体离得再近也不管。',
+    '同一高度、看得见，路径前瞻方向和 S 的方向几乎重合 → 直追连跳，空中修正照常。'
+  ],
+  oldSteps:[
+    '进入梯子实体中心 180 范围：停连跳、停挥拳锁视角，投石距离限制也跳过。',
+    '跑出 180 范围才恢复连跳。'
+  ],
+  chainTitle:'2.0 经过梯子旁那一跳的判定',
+  chain:[
+    ['路径快照未过期', '≤ 0.35 s', 'pass'],
+    ['扫描 32 段内的梯子段', '没有', 'info'],
+    ['梯子窗口', '否', 'pass'],
+    ['同一高度、看得见', '是', 'pass'],
+    ['路径前瞻 vs 目标夹角 ≤ 45°', '≈ 0°', 'pass'],
+    ['结果', '直追连跳', 'result'],
+    ['快照不可用时', '退回实体检测：梯子包围盒水平 ≤180 且高差 ≤72，或脚下 64 内 nav 连着梯子 → 仍然停跳', 'info']
+  ],
+  cvars:['ai_tank3_ladder_nearby_disable 1', 'ai_tank3_ladder_nearby_radius 180', 'ai_tank3_ladder_nearby_cache 0.20']
+},
+{
+  id:'open', group:'移动 · 梯子', title:'同一层空地追人', kind:'same', chip:'与 1.x 相同', same:true,
+  verdict:'看得见、同一高度、路径本来就朝着目标时，2.0 和 1.x 一模一样：推力朝目标 1 秒后的位置，落地接着跳拿满推力，空中渐进修正。强度没有削。',
+  alt:'俯视图：同一层空地，Tank 朝移动中的生还者的预测位置连跳。',
+  caption:'俯视，单位 hu。这个情景 1.x 与 2.0 相同，只画一条轨迹。',
+  view:{mode:'top', x0:0, x1:1400, z0:-220, z1:380},
+  zones:[{circle:[1200,40,120], c:'neutral', t:'停跳距离 120（极限档）', tp:[1060,-106]}],
+  motion:[[1200,40,1200,230,'S 220 u/s']], ghosts:[{p:[1200,260], t:'1 秒后'}],
+  actors:[{k:'tank', p:[100,0], t:'Tank'}, {k:'surv', p:[1200,40], t:'S'}],
+  newOps:[['hop',100,0,560,110,0], ['hop',560,110,1030,190,0]],
+  newMarks:[[1,100,0,0,-26], [2,560,110,0,-24], [3,1030,190,0,-24]],
+  newSteps:[
+    '起跳推力朝“S 的位置 + S 速度 × 1 秒”；从跑动直接起跳的第一跳推力 × ai_tank3_bhop_first_hop_ratio（极限档 0.8）。',
+    '落地后紧接着再跳，拿满推力 65；空中速度方向偏离 45°–89° 时每 0.05 秒渐进修正一次。',
+    '进入停跳距离 120 以内不再起跳，交给原生出拳。'
+  ],
+  oldSteps:[],
+  chainTitle:'2.0 起跳那一帧的判定',
+  chain:[
+    ['同一高度 |Δz| ≤ 56', '0', 'pass'],
+    ['路径终点接近目标', '是', 'pass'],
+    ['路径前瞻 vs 目标夹角 ≤ 45°', '≈ 12°', 'pass'],
+    ['第一跳推力', '65 × 0.8 = 52', 'info'],
+    ['落地跳推力', '65', 'info'],
+    ['空中修正角度带', '45°–89°', 'info'],
+    ['起跳路线检查', '改用起跳后的速度检查（1.x 用起跳前的速度）', 'info'],
+    ['结果', '直追连跳，与 1.x 相同', 'result']
+  ],
+  cvars:['ai_tank3_bhop_impulse 65', 'ai_tank3_bhop_first_hop_ratio 0.8', 'ai_tank3_bhop_max_speed 800', 'ai_Tank_StopDistance 120', 'ai_tank3_airvec_modify_degree 45']
+},
+{
+  id:'drop', group:'移动 · 梯子', title:'前方是高台边沿，人在下面', kind:'detail', chip:'细节改进',
+  verdict:'路径上的下落超过 56，2.0 把这一跳限速到正好落在边沿前 64，再让 NextBot 自己走下去，下落过程插件不碰速度。1.x 的断层检测也会拦下危险起跳，但上一跳留下的空中修正状态没有清，走下边沿时可能被朝人拧，还会被补回上一跳的速度。',
+  alt:'侧视图：Tank 在高台上，生还者在 200 hu 下方；2.0 在边沿前 64 落地后走下去。',
+  caption:'侧视，单位 hu。实线是 2.0，虚线是 1.x。',
+  view:{mode:'side', x0:0, x1:1500, z0:-60, z1:420},
+  solids:[[0,0,700,200]], ground:[[700,1500]],
+  zones:[{r:[636,200,700,300], c:'tank', t:'边沿前 64', tp:[560,316]}],
+  nav:[{p:[[150,200],[700,200],[760,0],[1250,0]], t:'路径 · DropDown 200', tp:[780,130]}],
+  actors:[{k:'tank', p:[150,200], t:'Tank'}, {k:'surv', p:[1250,0], t:'S'}],
+  newOps:[['hop',150,200,636,200,60], ['run',636,200,700,200], ['fall',700,200,770,0], ['hop',770,0,1150,0,60]],
+  newMarks:[[1,150,200,0,-66], [2,636,200,-8,-22], [3,740,120,26,0], [4,790,0,0,-22]],
+  oldOps:[['hop',150,200,560,200,60], ['run',560,200,700,200], ['fall',700,200,880,0], ['hop',880,0,1150,0,60]],
+  oldMarks:[[1,560,200,0,24], [2,810,90,24,0]],
+  newSteps:[
+    '起跳：S 在下面 200，不算同一高度；路径上的下落段起点在 550 外，限速 (550−64)÷0.773≈629，本跳正好落在边沿前 64。',
+    '落地后只剩 64，连跑速的一跳都会越过边沿 → 不跳，走到边上。',
+    'NextBot 自己走下去：这段下落不是插件起的跳，不做空中修正、不限速。',
+    '落地后前方没有特殊段，恢复连跳。'
+  ],
+  oldSteps:[
+    '起跳前沿当前速度方向做断层检测，一跳范围内有超过 56 的落差就不跳。',
+    '上一跳的空中修正状态没有清：走下边沿时只要速度方向和 S 偏 45°–89°，就会被朝 S 拧，水平速度还会补回上一跳的起跳速度，落点被拽远。'
+  ],
+  chainTitle:'2.0 第 ① 跳的判定',
+  chain:[
+    ['前方特殊段', 'DropDown，落差 200 > 56', 'info'],
+    ['段起点沿路径距离', '550', 'info'],
+    ['起跳限速 (550 − 64) ÷ 0.773', '629', 'info'],
+    ['本跳', '629 u/s，飞 486，停在边沿前 64', 'result'],
+    ['下一次落地：(64 − 64) ≥ 跑速一跳 174？', '0 < 174，不起跳', 'fail'],
+    ['下落途中', '不是插件起的跳 → 不修正', 'info'],
+    ['小落差 ≤ 56', '照常连跳，不限速', 'info']
+  ],
+  cvars:['ai_tank3_bhop_max_speed 800', 'ai_tank3_path_lookahead_maxdepth 10']
+},
+{
+  id:'pick', group:'选目标', title:'高台上的人 vs 地面上的人', kind:'change', chip:'行为改变',
+  verdict:'1.x 由 target override 按直线距离挑人，还不设冷却；Tank 往梯子绕的时候 A、B 轮流变成“最近”，目标来回换，路线也跟着来回重算。2.0 按分档寻路距离打分，选好走的 B，之后只有新目标明显更近、且过了 2 秒才换。',
+  alt:'俯视图：A 在要绕梯子才上得去的高台上，B 在地面；1.x 在两人之间来回换，2.0 追 B。',
+  caption:'俯视，单位 hu。分档估距：用有长度上限的寻路依次试直线距离的 1.15、1.5、2.25、3.5、6、10 倍（封顶 3000），第一档走得通就按这一档计分。',
+  view:{mode:'top', x0:-100, x1:1100, z0:-320, z1:380},
+  raised:[{r:[250,40,470,260], t:'高台 +160', tp:[262,238]}], ladders:[[470,170,486,230]],
+  nav:[{p:[[100,0],[500,-10],[500,200],[478,200],[380,150]], t:'去 A：绕到梯子，寻路约 700', tp:[520,70]}],
+  meas:[[100,0,380,150,'直线 250'], [100,0,440,-150,'直线 350']],
+  actors:[{k:'tank', p:[100,0], t:'Tank'}, {k:'surv', p:[380,150], t:'A'}, {k:'surv', p:[440,-150], t:'B'}],
+  newOps:[['hop',100,0,270,-80,0], ['hop',270,-80,410,-138,0]],
+  newMarks:[[1,100,0,-6,-28], [2,410,-138,22,-10]],
+  oldOps:[['run',100,0,300,-40], ['run',300,-40,400,-90], ['run',400,-90,330,-50], ['run',330,-50,420,-100], ['run',420,-100,350,-62]],
+  oldMarks:[[1,100,0,0,26], [2,400,-90,16,24], [3,330,-50,-22,22], [4,350,-62,30,6]],
+  newSteps:[
+    'A 寻路 700，落在 3.5 倍档（875）；B 寻路 380，落在 1.15 倍档（402）。再加“直线 × 0.01”：A 877.5，B 406。',
+    '追 B。之后要换目标，新目标得分必须 ≤ 当前 × 0.75、至少近 150，而且距上次换目标 ≥ 2 秒；在梯子窗口、爬梯或攀爬时不换。'
+  ],
+  oldSteps:[
+    '候选是 PVS 里的 A、B，按到 Tank 眼睛的直线距离排：A 250 更近，追 A。',
+    '往梯子绕的路上，B 的直线距离变得更近 → 换 B（wait 0，150 以外每次调用都重选）。',
+    '朝 B 走两步，A 又更近 → 换回 A，ChasePath 每换一次就重算路线。',
+    '在高台边原地打转，还会喂给头顶卡的“2 秒没挪动”判定。'
+  ],
+  chainTitle:'2.0 这一次选目标的判定',
+  chain:[
+    ['过滤：被猎人 / 猴子 / 牛控的人（pinned 14）', 'A、B 都不是', 'pass'],
+    ['过滤：安全屋里的人（safe 1）', '都不在', 'pass'],
+    ['倒地的人（incap 0）', '只在没有站着的人时兜底', 'info'],
+    ['A 分档估距', '700 ≤ 250 × 3.5 = 875', 'info'],
+    ['B 分档估距', '380 ≤ 350 × 1.15 = 402', 'info'],
+    ['得分（+ 直线 × 0.01，被喷 × 1.25）', 'A 877.5 · B 406', 'info'],
+    ['当前 A → 换 B？', '406 ≤ 877.5 × 0.75，差 471 ≥ 150，已过 2 秒', 'pass'],
+    ['梯子窗口 / 爬梯中', '否', 'pass'],
+    ['结果', '追 B，并登记到 target override 的锁定计数', 'result']
+  ],
+  cvars:['ai_tank3_target_select 1', 'ai_tank3_target_switch_ratio 0.75', 'ai_tank3_target_commit_time 2.0']
+},
+{
+  id:'overhead-alt', group:'头顶 · 骑头', title:'人卡在够不着的高处，还有别人可追', kind:'detail', chip:'去掉命令',
+  verdict:'头顶卡的判定条件没变：人在头顶 80 以上、水平 65 以内，Tank 2 秒挪不到 32 就立案，屏蔽这个人 10 秒。2.0 只让选目标换人，不再发 CommandABot；路径能经梯子或攀爬走到这个人时，判定时间放宽到 6 秒。',
+  alt:'侧视图：S1 站在没有 nav 连接的高台边，Tank 在正下方；立案后改追地面上的 S2。',
+  caption:'侧视，单位 hu。红色虚线框是头顶卡判定区（相对 Tank：高 ≥80、水平 ≤65）。',
+  view:{mode:'side', x0:0, x1:1300, z0:-60, z1:420},
+  solids:[[560,0,780,180]], ground:[[0,560],[780,1300]],
+  zones:[{r:[475,80,605,420], c:'tank', t:'头顶卡框', tp:[612,408]}],
+  notes:[[800,196,'这块高台没有 nav 连接']],
+  actors:[{k:'tank', p:[540,0], t:'Tank'}, {k:'surv', p:[590,180], t:'S1'}, {k:'surv', p:[120,0], t:'S2'}],
+  newOps:[['hop',520,0,260,0,56]],
+  newMarks:[[1,540,0,26,-66], [2,260,0,0,-22]],
+  oldOps:[['hop',520,0,260,0,56]],
+  oldMarks:[[1,540,0,0,24], [2,260,0,0,24]],
+  newSteps:[
+    'S1 比 Tank 高 180、水平 50：进入头顶卡框。路径走不到 S1（快照终点不在 S1 附近），判定时间就是 2 秒。',
+    '2 秒内挪动不到 32 → 立案，S1 屏蔽 10 秒；还有 S2 可追，下一次选目标直接换 S2，不进投石计划、不发任何命令。10 秒后 S1 重新参与打分。'
+  ],
+  oldSteps:[
+    '同样 2 秒立案、屏蔽 10 秒。',
+    '发 CommandABot RESET + ATTACK 切到 S2；Tank 如果在梯子 180 范围内，这条命令会被拦下，只剩选目标回调里的强制目标生效。'
+  ],
+  chainTitle:'2.0 立案那一帧的判定',
+  chain:[
+    ['S1 高于 Tank ≥ 80', '180', 'pass'],
+    ['水平距离 ≤ 65', '50', 'pass'],
+    ['S1 倒地 / 挂边 / 在骑头', '否', 'pass'],
+    ['路径能经梯子或攀爬走到 S1', '否 → 判定时间 2 秒', 'info'],
+    ['2 秒内挪动 ≥ 32', '否', 'fail'],
+    ['立案', '屏蔽 S1 10 秒', 'result'],
+    ['还有别的候选', 'S2', 'pass'],
+    ['结果', '换 S2，不进投石计划', 'result']
+  ],
+  cvars:['ai_tank3_head_block_vertical 80', 'ai_tank3_head_block_horizontal 65', 'ai_tank3_head_block_time 2.0', 'ai_tank3_head_block_ignore_time 10']
+},
+{
+  id:'overhead-solo', group:'头顶 · 骑头', title:'只剩够不着的那一个人', kind:'fix', chip:'修复 bug',
+  verdict:'没有替代目标时进入投石计划：水平距离不够 250 就发 MOVE 撤开，到 250 外立刻 RESET 再投。2.0 的每条 MOVE 都有看门狗兜底 RESET；1.x 撤到位后命令一直挂着，Tank 不再运行自己的 AI，就站在原地。',
+  alt:'侧视图：唯一的生还者 S 站在高台边，Tank 在下面；2.0 撤到 250 外 RESET 后投石，1.x 撤开后罚站。',
+  caption:'侧视，单位 hu。灰色虚线区是离 S 水平不到 250、需要先撤开的范围。',
+  view:{mode:'side', x0:0, x1:1300, z0:-60, z1:420},
+  solids:[[560,0,780,180]], ground:[[0,560],[780,1300]],
+  zones:[{r:[340,0,560,420], c:'neutral', t:'离 S 不到 250：先撤', tp:[346,406]}],
+  actors:[{k:'tank', p:[540,0], t:'Tank'}, {k:'surv', p:[590,180], t:'S'}],
+  newOps:[['move',540,0,292,0,'MOVE'], ['rock',292,94,590,232,90]],
+  newMarks:[[1,540,0,26,-66], [2,420,0,0,-24], [3,292,0,0,-24], [4,430,250,0,-12]],
+  oldOps:[['move',540,0,292,0,'MOVE'], ['stop',292,0,'罚站']],
+  oldMarks:[[1,420,0,0,24], [2,292,0,-30,24]],
+  newSteps:[
+    '立案后没有替代目标 → 投石计划，最长 20 秒。',
+    '水平 50 < 250：沿背离 S 的方向（再试 ±40°、±80°）找 248 外的点，要求同层高差 ≤72、离 S 的水平距离比现在至少多 96、96 以内没有梯子、寻路 ≤ 直线 × 2.5 + 100 → 发 MOVE，撤离时不连跳、不按攻击键。',
+    '到 250 外马上 RESET。3 秒超时、1.5 秒没挪 16、上梯、计划结束，也一律 RESET。',
+    '看得见 S、距离 ≤ 800 就按攻击 2，出手瞄准 S。找不到撤离点或撤了 3 次：水平 ≥96 且看得见就原地投。S 走开（水平 >400 或高差 >250）、死亡、20 秒到期，计划结束。'
+  ],
+  oldSteps:[
+    '水平 < 250 时每 0.5 秒刷新一次 RESET + MOVE。',
+    '撤到 250 外就不再刷新，也不 RESET：MOVE 让 Tank 不跑自身 AI，看得见就扔一块，扔完照样站着。离梯子远时每 0.75 秒补发 ATTACK，走回去又撤开；梯子 180 内补发被拦，只能罚站到卡住传送。'
+  ],
+  chainTitle:'2.0 投石计划的判定',
+  chain:[
+    ['替代目标', '无', 'fail'],
+    ['投石计划', '最长 20 秒', 'info'],
+    ['水平 50 < ai_tank3_head_block_force_rock_range 250', '需要撤', 'info'],
+    ['在地面、不在梯子窗口、撤离次数 < 3', '是', 'pass'],
+    ['撤离点（背离方向 248 外）', '同层 · 96 内无梯子 · 寻路可达', 'pass'],
+    ['MOVE 看门狗', '到 250 / 3 s / 1.5 s 没挪 16 / 上梯 / 计划结束 → RESET', 'info'],
+    ['到 250 外', 'RESET；看得见且 ≤ 800 → 攻击 2', 'result'],
+    ['撤不开', '水平 ≥ 96 且看得见 → 原地投', 'info']
+  ],
+  cvars:['ai_tank3_head_block_force_rock_time 20', 'ai_tank3_head_block_force_rock_range 250', 'ai_tank3_retreat_timeout 3.0', 'ai_tank3_head_block_force_rock_release_h 400', 'ai_tank3_head_block_force_rock_release_v 250']
+},
+{
+  id:'rider', group:'头顶 · 骑头', title:'人站在 Tank 头上', kind:'fix', chip:'修复 bug',
+  verdict:'打得到就出拳，挥拳时再向上补一记；连续 3 秒打不到就原地投石。1.x 的代码在这一步其实会先撤 250，又落进 MOVE 不 RESET 的问题，和更新日志里写的“原地投”对不上。',
+  alt:'侧视放大图：生还者 R 站在 Tank 头顶；2.0 打得到就上挥拳，打不到 3 秒后原地投。',
+  caption:'侧视放大，单位 hu。红色虚线框是骑头判定区（脚比 Tank 高 40–100、水平 ≤40），灰圈是挥拳够得着的范围。',
+  view:{mode:'side', x0:300, x1:900, z0:-40, z1:270},
+  ground:[[300,900]],
+  zones:[{r:[560,40,640,100], c:'tank', t:'骑头区', tp:[648,66]}, {circle:[600,62,83], c:'neutral', t:'挥拳够得着 75 + 8', tp:[690,170]}],
+  actors:[{k:'tank', p:[600,0], t:'Tank'}, {k:'surv', p:[608,84], t:'R'}],
+  newOps:[['rock',600,94,620,210,20]],
+  newMarks:[[1,540,40,-10,0], [2,652,210,18,0]],
+  oldOps:[['move',600,0,352,0,'MOVE'], ['stop',352,0,'罚站']],
+  oldMarks:[[1,470,0,0,22]],
+  newSteps:[
+    '判定骑头：R 在地面状态，脚比 Tank 高 40–100、水平 ≤40，并且脚下就是 Tank，或者两人的碰撞盒水平重叠（外扩 8）。',
+    '打得到（Tank 眼睛到 R 胸口 ≤ 挥拳距离 75 + 8，且看得见）：爪子冷却好了就出拳，挥拳时额外朝 R 向上 SweepFist 一次。连续 3 秒打不到（拳路被平台挡住）：原地按攻击 2，出手瞄准 R，水平距离接近 0 时直接朝 R 扔；R 下来或又打得到，计划结束。'
+  ],
+  oldSteps:[
+    '骑头判定和上挥拳与 2.0 相同。',
+    '3 秒打不到：投石计划要求先拉开 250 → 发 MOVE 撤离，之后同样不 RESET。'
+  ],
+  chainTitle:'2.0 骑头的判定',
+  chain:[
+    ['R 在地面状态', '是', 'pass'],
+    ['脚比 Tank 高 40–100', '84', 'pass'],
+    ['水平 ≤ 40', '8', 'pass'],
+    ['脚下是 Tank，或碰撞盒水平重叠 +8', '是', 'pass'],
+    ['眼睛到胸口 ≤ 75 + 8 且看得见', '否（被挡住）', 'fail'],
+    ['持续打不到', '≥ 3 秒', 'pass'],
+    ['结果', '原地按攻击 2，瞄准 R', 'result'],
+    ['骑头期间', '不跳砖、头顶卡计时清零', 'info']
+  ],
+  cvars:['ai_tank3_head_block_ride_horizontal 40', 'ai_tank3_head_block_ride_vertical_min 40', 'ai_tank3_head_block_ride_vertical_max 100', 'ai_tank3_head_block_ride_rock_time 3.0', 'ai_tank3_head_block_up_swing 1']
+},
+{
+  id:'rock', group:'投石', title:'扔石头：瞄谁、怎么瞄', kind:'detail', chip:'细节改进',
+  verdict:'除了头顶卡和骑头的投石计划会主动按攻击 2，什么时候扔仍由原生 AI 决定，插件只卡距离。出手瞬间，2.0 从石头真实的出手点解低抛仰角，按飞行时间给水平提前量后再解一次；跳砖不会在梯子口或高台边起跳。',
+  alt:'侧视图：Tank 朝向右移动的生还者投石，石头飞向按飞行时间提前后的位置。',
+  caption:'侧视，单位 hu。弧线只示意低抛解和提前量，没有按真实重力比例画。',
+  view:{mode:'side', x0:0, x1:1300, z0:-60, z1:420},
+  ground:[[0,1300]],
+  motion:[[800,-24,960,-24,'S 220 u/s']], ghosts:[{p:[967,0], t:'预测'}],
+  actors:[{k:'tank', p:[150,0], t:'Tank'}, {k:'surv', p:[800,0], t:'S'}],
+  newOps:[['rock',150,94,967,52,170]],
+  newMarks:[[1,150,94,20,-14], [2,967,52,24,-40]],
+  oldOps:[['rock',150,60,800,110,150]],
+  oldMarks:[[1,800,110,-24,-18]],
+  newSteps:[
+    '原生 AI 决定什么时候扔；距离超过 ai_tank3_throw_max_dist（800）时插件抹掉攻击 2，投石计划自己按下的除外。投石动画（序列 48–51）开始时，在地面、没被骑头、不在梯子窗口、前方 64 以内没有特殊段，才跳砖 +300。',
+    '出手瞬间选瞄准对象：投石计划指定的人 → 最近的看得见、站着、没被猎人或牛控的人 → 当前目标。从石头出手点解低抛仰角（重力 = sv_gravity × 石头重力倍率），按飞行时间给水平提前量，再对提前点重解一次；水平距离接近 0 时直接瞄准。'
+  ],
+  oldSteps:[
+    '仰角从 Tank 脚底加一个按动画序列估的出手高度算，不是石头真实位置；而且仰角解的是人当前的位置，只有偏航用了提前点，人往远处跑时扔短、朝 Tank 跑时扔远。水平距离接近 0 时公式除零，放弃调整。跳砖只避开梯子上和骑头，梯子口、高台边照样起跳。'
+  ],
+  chainTitle:'2.0 出手瞬间的判定',
+  chain:[
+    ['距离 ≤ 800', '650', 'pass'],
+    ['投石计划指定的人', '没有', 'info'],
+    ['最近的看得见、站着、未被猎人 / 牛控的人', 'S', 'pass'],
+    ['低抛仰角（从出手点算）', '有解', 'pass'],
+    ['提前量', '水平速度 × 飞行时间，再解一次仰角', 'info'],
+    ['结果', '朝 S 的提前点出手', 'result']
+  ],
+  cvars:['ai_tank3_throw_max_dist 800', 'ai_tank3_rock_target_adjust 1', 'ai_tank3_jump_rock 1']
+}
+];
+(function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fmt = x => String(Math.round(x));
+  const fmt1 = x => String(Math.round(x * 10) / 10);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // ---------- 情景视图 ----------
+  function drawScene(s) {
+    const v = s.view, W = 820, pl = 46, pr = 18, pt = 18, pb = 28;
+    const k = (W - pl - pr) / (v.x1 - v.x0);
+    const H = Math.round((v.z1 - v.z0) * k) + pt + pb;
+    const X = x => pl + (x - v.x0) * k;
+    const Y = z => pt + (v.z1 - z) * k;
+    const side = v.mode === 'side';
+    const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': s.alt});
+
+    const defs = el('defs', null, svg);
+    ['new', 'old', 'ink'].forEach(name => {
+      const m = el('marker', {id: `${s.id}-ah-${name}`, viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse'}, defs);
+      el('path', {d: 'M0,0 L10,5 L0,10 z', class: 'ah-' + name}, m);
+    });
+
+    const grid = el('g', null, svg);
+    const step = 64 * k >= 9 ? 64 : 128;
+    for (let x = Math.ceil(v.x0 / step) * step; x <= v.x1; x += step)
+      el('line', {x1: X(x), y1: pt, x2: X(x), y2: H - pb, class: x % 256 === 0 ? 'g-major' : 'g-minor'}, grid);
+    for (let z = Math.ceil(v.z0 / step) * step; z <= v.z1; z += step)
+      el('line', {x1: pl, y1: Y(z), x2: W - pr, y2: Y(z), class: z % 256 === 0 ? 'g-major' : 'g-minor'}, grid);
+    for (let x = Math.ceil(v.x0 / 256) * 256; x <= v.x1; x += 256)
+      el('text', {x: X(x), y: H - 9, 'text-anchor': 'middle', class: 'ax-t'}, grid, x);
+    for (let z = Math.ceil(v.z0 / 256) * 256; z <= v.z1; z += 256)
+      el('text', {x: pl - 6, y: Y(z) + 3, 'text-anchor': 'end', class: 'ax-t'}, grid, z);
+    el('text', {x: pl + 8, y: pt + 14, class: 'vp-label'}, grid, side ? '侧视 · x / z（hu）' : '俯视 · x / y（hu）');
+
+    const rect = (r, cls, parent) => el('rect', {
+      x: X(Math.min(r[0], r[2])), y: Y(Math.max(r[1], r[3])),
+      width: Math.abs(r[2] - r[0]) * k, height: Math.abs(r[3] - r[1]) * k, class: cls
+    }, parent);
+    const label = (p, text, cls) => el('text', {x: X(p[0]), y: Y(p[1]), class: cls}, svg, text);
+
+    (s.solids || []).forEach(r => rect(r, 'solid', svg));
+    (s.raised || []).forEach(o => { rect(o.r, 'raised', svg); if (o.t) label(o.tp, o.t, 'zone-t'); });
+    (s.ground || []).forEach(g => el('line', {x1: X(g[0]), y1: Y(0), x2: X(g[1]), y2: Y(0), class: 'ground'}, svg));
+    (s.zones || []).forEach(z => {
+      if (z.r) rect(z.r, 'zone ' + z.c, svg);
+      else el('circle', {cx: X(z.circle[0]), cy: Y(z.circle[1]), r: z.circle[2] * k, class: 'zone ' + z.c}, svg);
+      if (z.t) label(z.tp, z.t, 'zone-t');
+    });
+    (s.ladders || []).forEach(l => {
+      rect(l, 'ladder', svg);
+      if (side) for (let z = l[1] + 24; z < l[3]; z += 32)
+        el('line', {x1: X(l[0]), y1: Y(z), x2: X(l[2]), y2: Y(z), class: 'ladder'}, svg);
+    });
+    (s.nav || []).forEach(n => {
+      el('polyline', {points: n.p.map(p => X(p[0]) + ',' + Y(p[1])).join(' '), class: 'nav'}, svg);
+      if (n.t) label(n.tp, n.t, 'nav-t');
+    });
+    (s.notes || []).forEach(n => label([n[0], n[1]], n[2], 'nav-t'));
+    (s.meas || []).forEach(m => {
+      el('line', {x1: X(m[0]), y1: Y(m[1]), x2: X(m[2]), y2: Y(m[3]), class: 'meas'}, svg);
+      el('text', {x: (X(m[0]) + X(m[2])) / 2 + 6, y: (Y(m[1]) + Y(m[3])) / 2 - 6, class: 'meas-t'}, svg, m[4]);
+    });
+    (s.motion || []).forEach(m => {
+      el('line', {x1: X(m[0]), y1: Y(m[1]), x2: X(m[2]), y2: Y(m[3]), class: 'meas', 'marker-end': `url(#${s.id}-ah-ink)`}, svg);
+      el('text', {x: (X(m[0]) + X(m[2])) / 2 + 8, y: (Y(m[1]) + Y(m[3])) / 2 + (side ? 14 : -6), class: 'meas-t'}, svg, m[4]);
+    });
+
+    const actor = (a, cls) => {
+      const [x, z] = a.p;
+      if (side) {
+        const w = 32 * k, h = (a.k === 'tank' ? 84 : 72) * k;
+        el('rect', {x: X(x) - w / 2, y: Y(z) - h, width: w, height: h, rx: 3, class: cls}, svg);
+        el('text', {x: X(x) - w / 2 - 5, y: Y(z) - h / 2 + 4, 'text-anchor': 'end', class: 'actor-t'}, svg, a.t);
+      } else {
+        const r = Math.max(a.k === 'tank' ? 9 : 7, (a.k === 'tank' ? 20 : 14) * k);
+        el('circle', {cx: X(x), cy: Y(z), r, class: cls}, svg);
+        el('text', {x: X(x) - r - 5, y: Y(z) + 4, 'text-anchor': 'end', class: 'actor-t'}, svg, a.t);
+      }
+    };
+    (s.ghosts || []).forEach(a => actor(Object.assign({k: 'surv'}, a), 'ghost'));
+    (s.actors || []).forEach(a => actor(a, a.k === 'tank' ? 'tank' : 'surv'));
+
+    const layer = (ops, marks, name) => {
+      if (!ops || !ops.length) return;
+      const L = el('g', {class: 'layer-' + name}, svg);
+      const arrow = `url(#${s.id}-ah-${name})`;
+      ops.forEach(op => {
+        const t = op[0];
+        if (t === 'hop' || t === 'rock') {
+          const [, x1, z1, x2, z2, h] = op;
+          let d;
+          if (side) {
+            d = `M${X(x1)},${Y(z1)} Q${X((x1 + x2) / 2)},${Y(Math.max(z1, z2) + 2 * h)} ${X(x2)},${Y(z2)}`;
+          } else {
+            const dx = X(x2) - X(x1), dy = Y(z2) - Y(z1), len = Math.hypot(dx, dy) || 1, off = Math.min(26, len * 0.12);
+            d = `M${X(x1)},${Y(z1)} Q${(X(x1) + X(x2)) / 2 + dy / len * off},${(Y(z1) + Y(z2)) / 2 - dx / len * off} ${X(x2)},${Y(z2)}`;
+          }
+          el('path', {d, class: t === 'rock' ? 'tr thin' : 'tr'}, L);
+          if (t === 'hop') el('circle', {cx: X(x2), cy: Y(z2), r: 3.5, style: `fill:var(--${name})`}, L);
+        } else if (t === 'run') {
+          el('line', {x1: X(op[1]), y1: Y(op[2]), x2: X(op[3]), y2: Y(op[4]), class: 'tr'}, L);
+        } else if (t === 'fall') {
+          const [, x1, z1, x2, z2] = op;
+          el('path', {d: `M${X(x1)},${Y(z1)} Q${X(x2)},${Y(z1)} ${X(x2)},${Y(z2)}`, class: 'tr'}, L);
+        } else if (t === 'move') {
+          const [, x1, z1, x2, z2, text] = op;
+          el('line', {x1: X(x1), y1: Y(z1), x2: X(x2), y2: Y(z2), class: 'tr thin', 'marker-end': arrow}, L);
+          if (text) el('text', {x: (X(x1) + X(x2)) / 2, y: Y(z1) + (name === 'new' ? -8 : 16), 'text-anchor': 'middle', class: 'op-t'}, L, text);
+        } else if (t === 'stop') {
+          const [, x, z, text] = op;
+          const cx = X(x), cy = Y(z) - 16;
+          const g = el('g', {class: 'stop'}, L);
+          el('line', {x1: cx - 6, y1: cy - 6, x2: cx + 6, y2: cy + 6}, g);
+          el('line', {x1: cx + 6, y1: cy - 6, x2: cx - 6, y2: cy + 6}, g);
+          el('text', {x: cx, y: cy - 12, 'text-anchor': 'middle', class: 'stop-t'}, L, text);
+        }
+      });
+      (marks || []).forEach(m => {
+        const [n, x, z, dx = 0, dy = name === 'new' ? -22 : 22] = m;
+        const g = el('g', {class: 'mk', 'data-k': `${name}-${n}`}, L);
+        el('circle', {cx: X(x) + dx, cy: Y(z) + dy, r: 9}, g);
+        el('text', {x: X(x) + dx, y: Y(z) + dy + 4, 'text-anchor': 'middle'}, g, n);
+      });
+    };
+    layer(s.oldOps, s.oldMarks, 'old');
+    layer(s.newOps, s.newMarks, 'new');
+    return svg;
+  }
+
+  function legendHtml(same) {
+    const line = style => `<svg width="26" height="8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" style="${style}"/></svg>`;
+    const box = style => `<svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" style="${style}"/></svg>`;
+    return [
+      `<li>${line('stroke:var(--new);stroke-width:2.5')}2.0</li>`,
+      same ? '' : `<li>${line('stroke:var(--old);stroke-width:2.5;stroke-dasharray:6 4')}1.x</li>`,
+      `<li>${line('stroke:var(--ink-3);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round')}NextBot 路径</li>`,
+      `<li>${box('fill:var(--tank)')}Tank</li>`,
+      `<li>${box('fill:var(--surv)')}生还者</li>`,
+      `<li><svg width="10" height="14" aria-hidden="true"><rect x="1" y="1" width="8" height="12" style="fill:none;stroke:var(--ladder);stroke-width:2"/></svg>梯子</li>`
+    ].join('');
+  }
+
+  // ---------- 情景切换 ----------
+  const groups = [...new Set(SCENARIOS.map(s => s.group))];
+  let current = null;
+  let show = 'both';
+
+  function renderRail() {
+    const rail = $('#rail');
+    rail.innerHTML = groups.map(g => `
+      <div class="rail-group"><h3>${esc(g)}</h3><ul>
+        ${SCENARIOS.filter(s => s.group === g).map(s => `
+          <li><button type="button" class="scn" data-id="${s.id}" aria-current="false">
+            <span class="kdot ${s.kind}" title="${esc(s.chip)}"></span><span>${esc(s.title)}</span>
+          </button></li>`).join('')}
+      </ul></div>`).join('');
+    rail.addEventListener('click', e => {
+      const b = e.target.closest('.scn');
+      if (b) select(b.dataset.id, true);
+    });
+  }
+
+  function applyShow(fig) {
+    fig.classList.remove('show-new', 'show-old');
+    if (!current.same && show !== 'both') fig.classList.add('show-' + show);
+    document.querySelectorAll('#scenario .seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.show === show ? 'true' : 'false'));
+  }
+
+  function select(id, userAction) {
+    const s = SCENARIOS.find(x => x.id === id) || SCENARIOS[0];
+    current = s;
+    store.set('ai_tank3_scenario', s.id);
+    document.querySelectorAll('.scn').forEach(b => b.setAttribute('aria-current', b.dataset.id === s.id ? 'true' : 'false'));
+
+    const icon = {pass: '✓', fail: '✗', info: '·', result: '→'};
+    const iconName = {pass: '通过', fail: '不通过', info: '说明', result: '结果'};
+    const steps = (arr, name) => `<ol class="steps">${arr.map((t, i) =>
+      `<li data-k="${name}-${i + 1}"><span class="num ${name}">${i + 1}</span><span>${esc(t)}</span></li>`).join('')}</ol>`;
+
+    const art = $('#scenario');
+    art.innerHTML = `
+      <div class="scn-head">
+        <p class="eyebrow">${esc(s.group)}</p>
+        <div class="title-row"><h2>${esc(s.title)}</h2><span class="chip ${s.kind}">${esc(s.chip)}</span></div>
+        <p class="verdict">${esc(s.verdict)}</p>
+      </div>
+      <div class="toolbar">
+        ${s.same ? '<span></span>' : `<div class="seg" role="group" aria-label="轨迹显示">
+          <button type="button" data-show="both">两者对照</button><button type="button" data-show="new">只看 2.0</button><button type="button" data-show="old">只看 1.x</button></div>`}
+        <ul class="legend">${legendHtml(s.same)}</ul>
+      </div>
+      <figure class="viewport"><div class="vp-scroll"></div><figcaption>${esc(s.caption)}</figcaption></figure>
+      <div class="compare${s.same ? ' single' : ''}">
+        <section class="col"><h3><span class="swatch"></span>2.0 会怎么做</h3>${steps(s.newSteps, 'new')}</section>
+        ${s.same ? '' : `<section class="col"><h3><span class="swatch old"></span>1.x 当时怎么做</h3>${steps(s.oldSteps, 'old')}</section>`}
+      </div>
+      <div class="trace"><table><caption>${esc(s.chainTitle)}</caption><tbody>
+        ${s.chain.map(r => `<tr class="${r[2] === 'result' ? 'result' : ''}"><td class="st ${r[2]}"><span aria-label="${iconName[r[2]]}">${icon[r[2]]}</span></td><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}
+      </tbody></table></div>
+      <ul class="cvars" aria-label="相关 cvar">${s.cvars.map(c => `<li><code>${esc(c)}</code></li>`).join('')}</ul>`;
+
+    const fig = art.querySelector('figure');
+    fig.querySelector('.vp-scroll').appendChild(drawScene(s));
+    applyShow(fig);
+    art.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => { show = b.dataset.show; applyShow(fig); }));
+    art.querySelectorAll('ol.steps li').forEach(li => {
+      const mk = fig.querySelector(`.mk[data-k="${li.dataset.k}"]`);
+      if (!mk) return;
+      const on = () => { li.classList.add('hot'); mk.classList.add('hot'); };
+      const off = () => { li.classList.remove('hot'); mk.classList.remove('hot'); };
+      li.addEventListener('mouseenter', on);
+      li.addEventListener('mouseleave', off);
+      mk.addEventListener('mouseenter', on);
+      mk.addEventListener('mouseleave', off);
+    });
+    if (userAction && window.matchMedia('(max-width: 980px)').matches)
+      art.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
+  }
+
+  // ---------- 连跳限速 ----------
+  const KIND_NAME = {ladder: '梯子入口', drop: '下落段起点', climb: '攀爬段起点', gap: '跳跃间隙起点', none: ''};
+  function hopCalc() {
+    const f = $('#hopTool');
+    const num = name => { const v = parseFloat(f.elements[name].value); return isFinite(v) ? v : 0; };
+    const speed = num('speed'), impulse = num('impulse'), max = num('max'), dist = num('dist'), radius = num('radius');
+    const run = Math.max(1, num('run')), gravity = Math.max(1, num('gravity'));
+    const kind = f.elements.kind.value, MARGIN = 64;
+    const air = 2 * Math.sqrt(2 * 56 / gravity);
+    const want = max > 0 ? Math.min(max, speed + impulse) : speed + impulse;
+    let cls, text, hop = 0, cap = null, note = '';
+
+    if (speed < 200) {
+      cls = 'nohop'; text = '不起跳：水平速度低于 200（ai_tank3_bhop_min_speed）';
+    } else if (kind === 'ladder' && dist <= radius) {
+      cls = 'window'; text = '梯子窗口：停跳，速度压回跑速';
+      note = speed > run * 1.1 ? `${fmt(speed)} > 跑速 × 1.1 = ${fmt(run * 1.1)}，压到 ${fmt(run)}` : `没超过跑速 × 1.1 = ${fmt(run * 1.1)}，不用压`;
+    } else if (kind !== 'none' && dist - MARGIN < run * air) {
+      cls = 'nohop'; text = '不起跳：连跑速的一跳都会越过去，交给 NextBot 走';
+    } else {
+      cap = kind === 'none' ? null : (dist - MARGIN) / air;
+      hop = cap === null ? want : Math.min(want, cap);
+      cls = 'hop';
+      text = cap !== null && cap < want ? `起跳，限速到 ${fmt(hop)} u/s` : `起跳，${fmt(hop)} u/s`;
+    }
+    const reach = hop * air;
+
+    const out = $('#hopVerdict');
+    out.className = 'pill ' + cls;
+    out.textContent = text;
+
+    const rows = [
+      ['一跳滞空 2×√(2×56÷g)', `${air.toFixed(3)} s`],
+      ['跑速一跳能飞', `${fmt(run * air)} hu`],
+      ['起跳限速', kind === 'none' ? '前方没有特殊段，只受连跳上限约束' : `(${fmt(dist)} − 64) ÷ ${air.toFixed(3)} = ${fmt(Math.max(0, (dist - MARGIN) / air))} u/s`],
+      ['沿路径跳的速度', `min(${fmt(max)}, ${fmt(speed)} + ${fmt(impulse)}) = ${fmt(want)} u/s`]
+    ];
+    if (cls === 'hop') {
+      rows.push(['本跳飞行距离', `${fmt(reach)} hu`]);
+      if (kind !== 'none') rows.push(['落点离' + KIND_NAME[kind], `${fmt(dist - reach)} hu`]);
+    }
+    if (note) rows.push(['速度处理', note]);
+    $('#hopReadout').innerHTML = rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('');
+
+    // 条带示意：Tank → 特殊段
+    const W = 560, H = 96, x0 = 24, x1 = W - 24, base = 62;
+    const domain = Math.max(200, kind === 'none' ? reach : Math.max(dist, reach), kind === 'ladder' ? radius : 0) * 1.12;
+    const sx = v => x0 + Math.max(0, v) / domain * (x1 - x0);
+    const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': text});
+    if (kind === 'ladder') el('rect', {x: sx(dist - radius), y: 20, width: sx(dist) - sx(dist - radius), height: base - 20, class: 's-window'}, svg);
+    if (kind !== 'none') {
+      el('rect', {x: sx(dist - MARGIN), y: 20, width: sx(dist) - sx(dist - MARGIN), height: base - 20, class: 's-margin'}, svg);
+      el('line', {x1: sx(dist), y1: 14, x2: sx(dist), y2: base, class: 's-entry'}, svg);
+      el('text', {x: sx(dist) - 4, y: 12, 'text-anchor': 'end', class: 's-t'}, svg, KIND_NAME[kind]);
+      el('text', {x: sx(dist), y: base + 16, 'text-anchor': 'middle', class: 's-t'}, svg, fmt(dist));
+    }
+    el('line', {x1: x0, y1: base, x2: x1, y2: base, class: 's-base'}, svg);
+    el('rect', {x: x0 - 5, y: base - 22, width: 10, height: 22, rx: 2, style: 'fill:var(--tank)'}, svg);
+    el('text', {x: x0, y: base + 16, 'text-anchor': 'middle', class: 's-t'}, svg, '0');
+    if (cls === 'hop' && reach > 0) {
+      el('path', {d: `M${sx(0)},${base - 2} Q${(sx(0) + sx(reach)) / 2},${base - 56} ${sx(reach)},${base - 2}`, class: 's-hop'}, svg);
+      el('circle', {cx: sx(reach), cy: base - 2, r: 4, style: 'fill:var(--new)'}, svg);
+      el('text', {x: sx(reach), y: base + 30, 'text-anchor': 'middle', class: 's-t'}, svg, `落点 ${fmt(reach)}`);
+    }
+    const strip = $('#hopStrip');
+    strip.innerHTML = '';
+    strip.appendChild(svg);
+  }
+
+  // ---------- 选目标打分 ----------
+  const STATES = [['normal', '正常'], ['vomit', '被喷'], ['incap', '倒地'], ['hang', '挂边'], ['smoker', '被舌头拉'], ['pinned', '被猎人/猴子/牛控'], ['saferoom', '在安全屋']];
+  const STATE_NAME = Object.fromEntries(STATES);
+  function estimateTravel(straight, path) {
+    const ratios = [1.15, 1.5, 2.25, 3.5, 6, 10], CAP = 3000;
+    let tested = 0;
+    for (const r of ratios) {
+      const limit = Math.min(straight * r, CAP);
+      if (limit <= tested) continue;
+      tested = limit;
+      if (path <= limit) return {value: limit, label: `${r} 倍档 ${fmt1(limit)}`};
+    }
+    if (tested < CAP && path <= CAP) return {value: CAP, label: `封顶档 ${CAP}`};
+    return {value: -1, label: '走不到：直线 + 1500'};
+  }
+
+  function pickCalc() {
+    const f = $('#pickTool');
+    const rows = ['A', 'B', 'C'].map(id => ({
+      id,
+      straight: Math.max(1, parseFloat(f.elements['straight' + id].value) || 1),
+      path: parseFloat(f.elements['path' + id].value) || 0,
+      unreach: f.elements['unreach' + id].checked,
+      state: f.elements['state' + id].value
+    }));
+    const currentId = f.elements.current.value;
+    const since = parseFloat(f.elements.since.value) || 0;
+    const frozen = f.elements.frozen.checked;
+
+    // 2.0：沿用 target override 的 pinned 14 / incap 0 / safe 1
+    rows.forEach(r => {
+      if (r.state === 'hang' || r.state === 'saferoom' || r.state === 'pinned') { r.tier = 0; r.tierText = '排除（' + STATE_NAME[r.state] + '）'; }
+      else if (r.state === 'incap') { r.tier = 2; r.tierText = '兜底（倒地）'; }
+      else { r.tier = 1; r.tierText = '常规'; }
+      const est = estimateTravel(r.straight, r.unreach ? Infinity : Math.max(r.path, 0));
+      r.estLabel = est.label;
+      let score = est.value === -1 ? r.straight + 1500 : Math.max(est.value, r.straight);
+      score += r.straight * 0.01;
+      if (r.state === 'vomit') score *= 1.25;
+      r.score = score;
+    });
+    let best = null;
+    rows.forEach(r => { if (r.tier > 0 && (!best || r.tier < best.tier || (r.tier === best.tier && r.score < best.score))) best = r; });
+    const cur = rows.find(r => r.id === currentId);
+    let pickNew = null, whyNew;
+    if (!best) {
+      whyNew = '没有可选的人：交给 target override / 原生选。';
+    } else if (cur.tier > 0 && cur.tier === best.tier) {
+      if (cur === best) { pickNew = cur; whyNew = `${cur.id} 本来就是得分最低的，保持。`; }
+      else if (frozen) { pickNew = cur; whyNew = `在梯子窗口 / 爬梯中，冻结换目标，保持 ${cur.id}。`; }
+      else if (since < 2) { pickNew = cur; whyNew = `距上次换目标 ${fmt1(since)} 秒，不到 2 秒，保持 ${cur.id}。`; }
+      else if (best.score > cur.score * 0.75) { pickNew = cur; whyNew = `${best.id} 得分 ${fmt1(best.score)} 高于 ${cur.id} 的 ${fmt1(cur.score)} × 0.75 = ${fmt1(cur.score * 0.75)}，优势不够，保持 ${cur.id}。`; }
+      else if (cur.score - best.score < 150) { pickNew = cur; whyNew = `${best.id} 只近 ${fmt1(cur.score - best.score)}，不到 150，保持 ${cur.id}。`; }
+      else { pickNew = best; whyNew = `${best.id} 得分 ${fmt1(best.score)} ≤ ${fmt1(cur.score)} × 0.75，且近 ${fmt1(cur.score - best.score)} ≥ 150，已过 2 秒 → 换 ${best.id}。`; }
+    } else {
+      pickNew = best;
+      whyNew = cur.tier === 0 ? `当前目标 ${cur.id} 已被排除，直接换 ${best.id}。`
+        : cur.tier > best.tier ? `当前目标 ${cur.id} 倒地只剩兜底资格，有站着的人就换 ${best.id}。`
+        : `追得分最低的 ${best.id}。`;
+    }
+
+    // 1.x：target override —— order 1 正常生还者 > order 2 被喷，按直线距离；wait 0，150 以内保持
+    const eligible = rows.filter(r => !['pinned', 'saferoom', 'incap', 'hang'].includes(r.state)).sort((a, b) => a.straight - b.straight);
+    const order1 = eligible.find(r => r.state === 'normal');
+    const order2 = eligible.find(r => r.state === 'vomit');
+    let pickOld = order1 || order2 || null, whyOld;
+    if ((cur.state === 'normal' || cur.state === 'vomit') && cur.straight < 150) {
+      pickOld = cur; whyOld = `${cur.id} 在 150 以内，保持。`;
+    } else if (pickOld) {
+      whyOld = `${pickOld.id} 直线距离 ${fmt(pickOld.straight)} 最近${order1 ? '' : '（没有正常生还者，只剩被喷的人）'}；wait 0，下一次调用又会重新比较。`;
+    } else {
+      whyOld = '没有符合 order 1 / 2 的人：交给游戏原生选。';
+    }
+    rows.forEach(r => {
+      if (['pinned', 'saferoom', 'incap', 'hang'].includes(r.state)) r.oldText = '不选（' + STATE_NAME[r.state] + '）';
+      else if (r.state === 'smoker') r.oldText = '不选（被控不算正常）';
+      else r.oldText = (r.state === 'normal' ? 'order 1' : 'order 2') + ` · 直线 ${fmt(r.straight)}`;
+    });
+
+    $('#pickTable').innerHTML = `<table class="pick-table"><thead><tr><th>生还者</th><th>1.x 候选</th><th>2.0 分层</th><th>分档估距</th><th>2.0 得分</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${r.id}</td><td class="${pickOld === r ? 'pick' : ''}">${esc(r.oldText)}</td><td class="${pickNew === r ? 'pick' : ''}">${esc(r.tierText)}</td><td>${r.tier ? esc(r.estLabel) : '—'}</td><td class="${pickNew === r ? 'pick' : ''}">${r.tier ? fmt1(r.score) : '—'}</td></tr>`).join('')}
+    </tbody></table>`;
+    $('#pickVerdicts').innerHTML = `
+      <div class="pv old"><b>1.x 追 ${pickOld ? pickOld.id : '—'}</b><span>${esc(whyOld)}</span></div>
+      <div class="pv new"><b>2.0 追 ${pickNew ? pickNew.id : '—'}</b><span>${esc(whyNew)}</span></div>`;
+  }
+
+  // ---------- 初始化 ----------
+  const defaults = {A: 'normal', B: 'normal', C: 'incap'};
+  ['A', 'B', 'C'].forEach(id => {
+    const sel = $('#pickTool').elements['state' + id];
+    sel.innerHTML = STATES.map(([v, t]) => `<option value="${v}"${v === defaults[id] ? ' selected' : ''}>${t}</option>`).join('');
+  });
+  ['#hopTool', '#pickTool'].forEach(sel => {
+    const form = $(sel);
+    const calc = sel === '#hopTool' ? hopCalc : pickCalc;
+    form.addEventListener('input', calc);
+    form.addEventListener('change', calc);
+    form.addEventListener('submit', e => e.preventDefault());
+  });
+  renderRail();
+  const saved = store.get('ai_tank3_scenario');
+  select(SCENARIOS.some(s => s.id === saved) ? saved : 'ledge', false);
+  hopCalc();
+  pickCalc();
+})();
+</script>
+</body>
+</html>

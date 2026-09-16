@@ -188,6 +188,7 @@ stock bool _CIsVisible2C_traceRayFilter(int entity, int contentsMask, any data) 
 }
 
 stock bool _TraceWallFilter(int entity, int contentsMask, any data) {
+    #pragma unused contentsMask
     if (!IsValidEntity(entity))
         return false;
 

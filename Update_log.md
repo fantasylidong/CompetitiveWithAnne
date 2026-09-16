@@ -1021,3 +1021,18 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - zonemod 上游用 stripper `add:` 补 clip、blocker、实心模型和梯子。Anne 没有跟着改对应 nav，特感仍按旧网格走，会撞上这些新实体卡住。
 - 只动三方图：从 `cfg/stripper/zonemod_anne` 去掉这些图上 2026 年 5 月同步 zonemod 之后新加的梯子/实心模型等会挡特感的几何，包括 City 17、No Echo m3、Carried Off、Dark Carnival Remix、Parish Overgrowth 等。官图 `c1`–`c14` 的 nav 已经过完，stripper 几何 `add:` 全部还原，不改。`env_physics_blocker` 和 `env_player_blocker` 都保留，并把 `BlockType` 改成只挡生还（`1`）。
 - 三方图仍保留 filter/modify、道具/药包 `add:`、`nav_fixes` 的 logic_auto，以及更早已经在 anne 里的 clip。以后同步三方图时，没有对应 nav 就不要再复制梯子/实心模型这类会挡特感的 `add:`。
+
+### 2026年9月15日 Spitter 落地补吐（ai_spitter_3 3.0.11）
+
+- **现象**：简单～专家四档的 AI Spitter 几乎吐不出痰，看起来像不会用技能。
+- **根因**：`ai_spitter3_air_spit` 为 0 时，空中的 `IN_ATTACK` 是直接丢弃（不排队也不延后），能吐的只有 `FL_ONGROUND` 那一帧；而插件自己在 `ai_SpitterBhopStartDistance`（Anne 三套配置里是 2500）以内每次落地立刻再起跳，`z_spit_range` 远小于这个值，吐痰射程整个包在连跳半径里面。一跳滞空 `sqrt(2 × 56 / sv_gravity) × 2`，`TickrateFixes` 把 `sv_gravity` 锁在 750，约 0.77 秒；100 tick 下就是 77 帧滞空 + 1 帧落地，地面帧占比约 1/78。等于 98% 以上的帧攻击键被清掉，剩下不到 2% 还得正好撞上 AI 的出手时机。极限/音理档没这个问题，是因为空吐开着，走的是 `buttons |= IN_JUMP` 的跳吐分支，根本不判断地面。
+- **落地补吐**：空中被清掉的那一口记下时间（`SPIT_OWE_TTL` 1 秒，比一跳滞空稍长，只认当前这一跳欠下的），落地第一帧如果还看得见目标、技能也还能放，就由插件补按攻击并跳过这一帧的起跳。只停这一帧，下一帧照常连跳——离落地才 1 tick，仍在 0.15 秒的落地推力窗口内，连跳链不断、推力照拿满。补按用的是 AI 自己的视角：函数开头 `if (buttons & (IN_ATTACK | IN_ATTACK2)) AIPathMovement_Reset(spitter);` 已经关掉了这一跳的路径修正，`AlignFacing` 不会再改朝向，插件只替它按键、不替它瞄。
+- **吐完立刻恢复连跳**：地面那条攻击分支原来只要 `IN_ATTACK` 按着就抹掉 `IN_JUMP`，AI 按住不放时 Spitter 会一直黏在地上。现在用 `spitReadyToFire()`（`m_nextActivationTimer` 的时间戳已过）做条件：只有痰还没放出去时才压住起跳，已经进前摇或冷却就不再理会按键，照常连跳。
+- 不加 cvar、不分档：这是修 bug，不是削弱。极限与音理档 `ai_spitter3_air_spit` 为 1，走原来的跳吐分支，行为不变。
+- 重新编译：`ai_spitter_3.smx`。
+
+### 2026年9月15日 AI 行为审核修复
+
+- Spitter 的补吐记录在首次落地时立即消费；失去视野、技能未就绪或进入其他提前返回分支时直接丢弃，不再跨到下一跳自动吐痰。
+- Tank 的路径前瞻探测改为每只每 tick 独立最多 3 次，并沿路径从近到远检查；遇到遮挡或预算耗尽时保留已确认可达的点，避免远处弯道或其他 Tank 耗尽预算后丢失连跳路径。
+- 重新编译：`ai_spitter_3.smx`、`ai_tank3.smx`。

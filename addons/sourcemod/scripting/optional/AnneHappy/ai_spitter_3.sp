@@ -17,13 +17,15 @@
 #define SPITTER_JUMP_DELAY 1.0
 #define CHECK_PINNED_TIME 1.0
 #define SPITTER_KILL_DELAY 10.0
+// 空中欠下的那一口吐痰最多保留多久 (比一跳滞空 ~0.77 秒稍长, 只认当前这一跳欠的)
+#define SPIT_OWE_TTL 1.0
 
 public Plugin myinfo = 
 {
 		name 			= "Ai Spitter 3.0",
 	author 			= "夜羽真白",
 		description 	= "Ai Spitter 增强 3.0（anne_nextbot Path Follow）",
-		version 		= "3.0.9",
+		version 		= "3.0.11",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -42,7 +44,9 @@ ConVar
 	g_hAirSpit,
 	g_hSpitRange;
 float
-	clientDelay[MAXPLAYERS + 1][8];
+	clientDelay[MAXPLAYERS + 1][8],
+	// 空中被吃掉的那一口吐痰登记的时间, 0.0 = 没有欠着的
+	spitOweTime[MAXPLAYERS + 1];
 int
 	pinnedPriority[6] = {0},
 	pinnedTarget = -1,
@@ -117,9 +121,12 @@ void pinnedPriorityCvarChangedHandler(ConVar convar, const char[] oldValue, cons
 
 public void abilityUseHandler(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_hKilledAfterSpit.BoolValue) { return; }
 	int client = GetClientOfUserId(event.GetInt("userid"));
-	if (isAiSpitter(client) && IsPlayerAlive(client)) { CreateTimer(SPITTER_KILL_DELAY, killSpitterHandler, client); }
+	if (!isAiSpitter(client)) { return; }
+	// 痰已经吐出去了, 欠账清掉
+	spitOweClear(client);
+	if (!g_hKilledAfterSpit.BoolValue) { return; }
+	if (IsPlayerAlive(client)) { CreateTimer(SPITTER_KILL_DELAY, killSpitterHandler, client); }
 }
 
 public Action killSpitterHandler(Handle timer, int client)
@@ -141,6 +148,9 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		AIPathMovement_Reset(spitter);
 	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
 	bool onLadder = GetEntityMoveType(spitter) == MOVETYPE_LADDER;
+	bool hasSight = view_as<bool>(GetEntProp(spitter, Prop_Send, "m_hasVisibleThreats"));
+	// 首次落地即消费欠账，先于攻击/梯子分支的提前返回；这一帧不能补吐就丢弃，不带到下一跳。
+	bool owedSpit = onGround && spitOweTake(spitter);
 	// 地面/梯子登记要每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份推力
 	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
 	if (onGround || onLadder)
@@ -151,7 +161,10 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		buttons &= ~IN_JUMP;
 		buttons &= ~IN_DUCK;
 		if (!g_hAirSpit.BoolValue && !onGround && (buttons & IN_ATTACK))
+		{
 			buttons &= ~IN_ATTACK;
+			spitOweMark(spitter);
+		}
 		return Plugin_Changed;
 	}
 	if (buttons & IN_ATTACK)
@@ -160,13 +173,19 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		{
 			if (!onGround)
 			{
+				// 空中吐痰照旧吃掉, 但记下这一跳欠的一口, 落地那一帧由插件补按出去
 				buttons &= ~IN_ATTACK;
+				spitOweMark(spitter);
 				return Plugin_Changed;
 			}
-			buttons &= ~(IN_JUMP | IN_DUCK);
-			return Plugin_Changed;
+			// 只有痰还没放出去时才压住起跳。已经吐出去了 (前摇 / 冷却中) 就别再因为 AI 还按着键黏在地上, 照常连跳
+			if (spitReadyToFire(spitter))
+			{
+				buttons &= ~(IN_JUMP | IN_DUCK);
+				return Plugin_Changed;
+			}
 		}
-		if (delayExpired(spitter, 0, SPITTER_JUMP_DELAY))
+		else if (delayExpired(spitter, 0, SPITTER_JUMP_DELAY))
 		{
 			AIPathMovement_Reset(spitter);
 			delayStart(spitter, 0);
@@ -190,6 +209,14 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		return Plugin_Continue;
 	}
 	AIPathMovement_Reset(spitter);
+	// 落地第一帧把空中欠下的那一口补按出去: 只有这一帧不起跳, 下一帧照常连跳。
+	// 离落地才 1 tick, 仍在 AI_PATH_MOVEMENT_LANDING_IMPULSE_WINDOW 内, 连跳链不断、推力照拿满。
+	if (!g_hAirSpit.BoolValue && owedSpit && hasSight && spitReadyToFire(spitter))
+	{
+		buttons |= IN_ATTACK;
+		buttons &= ~(IN_JUMP | IN_DUCK);
+		return Plugin_Changed;
+	}
 	if (!(targetDist < g_hBhopStartDistance.FloatValue && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
 	// 上次起跳安全检查因地形失败且仍在冷却期内时跳过尝试，避免受阻时每帧重复整套 trace
 	if (AIPathMovement_IsRouteCheckThrottled(spitter)) { return Plugin_Continue; }
@@ -231,7 +258,6 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	AddVectors(proposedVelocity, pushVelocity, proposedVelocity);
 	// 起跳前限速, 保证安全检查使用的速度与实际推出的速度一致
 	AIPathMovement_ClampHorizontalSpeed(proposedVelocity, g_hBhopMaxSpeed.FloatValue);
-	bool hasSight = view_as<bool>(GetEntProp(spitter, Prop_Send, "m_hasVisibleThreats"));
 	if (!AIPathMovement_IsJumpRouteSafe(
 		spitter,
 		proposedVelocity,
@@ -262,12 +288,14 @@ public void OnClientDisconnect(int client)
 {
 	AIPathMovement_Reset(client);
 	AIPathMovement_ResetHopChain(client);
+	spitOweClear(client);
 }
 
 public void OnClientPutInServer(int client)
 {
 	AIPathMovement_Reset(client);
 	AIPathMovement_ResetHopChain(client);
+	spitOweClear(client);
 }
 
 // 重生时清掉上一条命残留的落地授权, 与 Boomer / Charger 的 player_spawn 重置对齐
@@ -277,6 +305,7 @@ public void playerSpawnHandler(Event event, const char[] name, bool dontBroadcas
 	if (client < 1 || client > MaxClients)
 		return;
 	AIPathMovement_ResetHopChain(client);
+	spitOweClear(client);
 }
 
 public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
@@ -338,6 +367,40 @@ bool spitterDoBhop(int client, int& buttons, const float velocity[3])
 bool isAiSpitter(int client)
 {
 	return GetInfectedClass(client) == ZC_SPITTER && IsFakeClient(client);
+}
+
+// 空中被吃掉的那一口吐痰: 记下时间, 落地那一帧补按
+void spitOweMark(int client)
+{
+	if (client < 1 || client > MaxClients) { return; }
+	spitOweTime[client] = GetGameTime();
+}
+
+void spitOweClear(int client)
+{
+	if (client < 1 || client > MaxClients) { return; }
+	spitOweTime[client] = 0.0;
+}
+
+bool spitOweTake(int client)
+{
+	if (client < 1 || client > MaxClients) { return false; }
+	float owe = spitOweTime[client];
+	spitOweClear(client);
+	if (owe <= 0.0) { return false; }
+	float now = GetGameTime();
+	// 过期或换图后 GameTime 回卷都按没欠处理
+	return owe <= now && now - owe <= SPIT_OWE_TTL;
+}
+
+// 技能还能不能放出去: m_nextActivationTimer 的时间戳已过。
+// 吐痰期间引擎会把它顶到很远 (前摇) 再换成真正的冷却, 所以痰一出去这里就是 false。
+// 读不到 ability 时按"还能放"处理, 维持旧行为。
+bool spitReadyToFire(int client)
+{
+	int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+	if (!IsValidEntity(ability)) { return true; }
+	return GetGameTime() >= GetEntPropFloat(ability, Prop_Send, "m_nextActivationTimer", 1);
 }
 
 void delayStart(int client, int no)
