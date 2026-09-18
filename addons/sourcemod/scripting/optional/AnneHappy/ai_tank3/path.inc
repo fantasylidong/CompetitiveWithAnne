@@ -114,7 +114,13 @@ void Path_Update(int client, const float pos[3], int target, const float targetP
             }
             case AnneNextBotPathSegment_DropDown:
             {
-                if (-rise > JUMP_HEIGHT)
+                if (-rise > JUMP_HEIGHT && g_TankPath[client].dropDist < 0.0)
+                {
+                    g_TankPath[client].dropDist = startDist;
+                    g_TankPath[client].dropLandingZ = goal[2];
+                }
+                // 普通落差不再预先限速；是否能跳下交给完整飞行路线和落点检查。
+                if (-rise > TANK_HOP_MAX_DROP)
                     Path_MarkBlockHop(client, startDist);
             }
             case AnneNextBotPathSegment_JumpGap:
@@ -166,8 +172,8 @@ bool Path_AcquireTraceBudget(int client)
     return true;
 }
 
-// 沿路径找一个这一跳能直接飞到的前瞻点：只看地面段和连跳能越过的小落差，必须 hull 可达
-bool Path_GetLookAhead(int client, const float pos[3], float maxDist, int maxDepth, float out[3])
+// 深下落候选仅供地面起跳验证使用；空中前瞻仍保持原来的小落差限制。
+bool Path_GetLookAhead(int client, const float pos[3], float maxDist, int maxDepth, float out[3], bool allowDrop = false)
 {
     if (!g_TankPath[client].fresh)
         return false;
@@ -212,8 +218,9 @@ bool Path_GetLookAhead(int client, const float pos[3], float maxDist, int maxDep
         AnneNextBotPathSegmentType type = view_as<AnneNextBotPathSegmentType>(segmentType);
         float rise = goal[2] - previousGoal[2];
         bool hopable = type == AnneNextBotPathSegment_OnGround ||
-            ((type == AnneNextBotPathSegment_DropDown || type == AnneNextBotPathSegment_ClimbUp) && FloatAbs(rise) <= JUMP_HEIGHT);
-        if (!hopable || goal[2] - pos[2] > JUMP_HEIGHT)
+            ((type == AnneNextBotPathSegment_DropDown || type == AnneNextBotPathSegment_ClimbUp) && FloatAbs(rise) <= JUMP_HEIGHT) ||
+            (allowDrop && type == AnneNextBotPathSegment_DropDown && rise < 0.0 && -rise <= TANK_HOP_MAX_DROP);
+        if (!hopable || goal[2] - pos[2] > JUMP_HEIGHT || (allowDrop && pos[2] - goal[2] > TANK_HOP_MAX_DROP))
             break;
 
         float dist = AIPathMovement_GetDistance2D(pos, goal);
@@ -242,6 +249,10 @@ bool Path_GetLookAhead(int client, const float pos[3], float maxDist, int maxDep
         float traceEnd[3];
         traceEnd = goal;
         traceEnd[2] += HULL_CENTER_HEIGHT;
+        // 直接斜着 trace 到低处会穿过脚下的平台。这里只确认水平出口，
+        // 真正的下落抛物线和落地支撑由 Movement_IsDropHopSafe 完整验证。
+        if (allowDrop && pos[2] - goal[2] > JUMP_HEIGHT)
+            traceEnd[2] = traceStart[2];
         Handle trace = TR_TraceHullFilterEx(traceStart, traceEnd, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, AIPathMovement_TraceFilter, client);
         bool blocked = TR_DidHit(trace);
         delete trace;

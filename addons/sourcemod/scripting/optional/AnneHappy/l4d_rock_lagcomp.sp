@@ -22,7 +22,7 @@
 #define BLOCK_POS_HISTORY 1
 #define BLOCK_DMG_DEALT 2
 #define BLOCK_SPAWN_TIME 3
-#define BLOCK_RELEASED 4
+#define BLOCK_RELEASE_TIME 4
 #define BLOCK_DETONATING 5
 #define BLOCK_COUNT 6
 
@@ -30,6 +30,7 @@ ConVar g_cvRockPrint;
 ConVar g_cvRockHitbox;
 ConVar g_cvRockLagComp;
 ConVar g_cvRockGodframes;
+ConVar g_cvRockReleaseGodframes;
 ConVar g_cvRockGodframesRender;
 ConVar g_cvRockHitboxRadius;
 ConVar g_cvRangeMinAll;
@@ -42,7 +43,7 @@ public Plugin myinfo =
 	name = "L4D(2) Tank Rock Lag Compensation",
 	author = "Luckylockm, harry, Silvers, AnneHappy",
 	description = "Provides lag compensation and weapon-attribute damage handling for tank rocks",
-	version = "2.0-anne",
+	version = "2.1-anne",
 	url = "https://github.com/LuckyServ/"
 };
 
@@ -52,8 +53,9 @@ public void OnPluginStart()
 	g_cvRockPrint = CreateConVar("sm_rock_print", "0", "Toggle printing of rock damage and range values", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockHitbox = CreateConVar("sm_rock_hitbox", "1", "Toggle custom rock hitbox and damage handling", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockLagComp = CreateConVar("sm_rock_lagcomp", "1", "Toggle lag compensation for hitscan rock shots", FCVAR_NONE, true, 0.0, true, 1.0);
-	g_cvRockGodframes = CreateConVar("sm_rock_godframes", "1.7", "Fallback protection seconds if tank rock release is not seen; release always ends protection immediately", FCVAR_NONE, true, 0.0, true, 10.0);
-	g_cvRockGodframesRender = CreateConVar("sm_rock_godframes_render", "1", "Toggle visual feedback while a rock is protected before release", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvRockGodframes = CreateConVar("sm_rock_godframes", "1.7", "Fallback protection seconds from rock creation if tank rock release is not seen", FCVAR_NONE, true, 0.0, true, 10.0);
+	g_cvRockReleaseGodframes = CreateConVar("sm_rock_release_godframes", "0.15", "Rock protection seconds after actual release; 0 allows immediate damage", FCVAR_NONE, true, 0.0, true, 10.0);
+	g_cvRockGodframesRender = CreateConVar("sm_rock_godframes_render", "1", "Toggle visual feedback while a rock is protected", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockHitboxRadius = CreateConVar("sm_rock_hitbox_radius", "30", "Custom rock hitbox radius", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMinAll = CreateConVar("sm_rock_range_min_all", "1", "Global minimum distance for hitscan rock damage", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMaxAll = CreateConVar("sm_rock_range_max_all", "2000", "Global maximum distance for rock damage; 0 disables this cap", FCVAR_NONE, true, 0.0, true, 10000.0);
@@ -124,7 +126,7 @@ public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3
 		return;
 	}
 
-	g_aRockEntities.Set(rockIndex, 1, BLOCK_RELEASED);
+	g_aRockEntities.Set(rockIndex, GetGameTime(), BLOCK_RELEASE_TIME);
 	SeedRockHistory(rockIndex, vecPos);
 	UpdateRockRender(rockIndex);
 }
@@ -445,7 +447,7 @@ void AddTrackedRock(int rockRef)
 	g_aRockEntities.Set(index, posHistory, BLOCK_POS_HISTORY);
 	g_aRockEntities.Set(index, 0.0, BLOCK_DMG_DEALT);
 	g_aRockEntities.Set(index, GetGameTime(), BLOCK_SPAWN_TIME);
-	g_aRockEntities.Set(index, 0, BLOCK_RELEASED);
+	g_aRockEntities.Set(index, -1.0, BLOCK_RELEASE_TIME);
 	g_aRockEntities.Set(index, 0, BLOCK_DETONATING);
 
 	float pos[3];
@@ -504,8 +506,9 @@ void SeedRockHistory(int rockIndex, const float pos[3])
 
 bool IsRockDamageAllowed(int rockIndex)
 {
-	if (g_aRockEntities.Get(rockIndex, BLOCK_RELEASED) != 0) {
-		return true;
+	float releaseTime = g_aRockEntities.Get(rockIndex, BLOCK_RELEASE_TIME);
+	if (releaseTime >= 0.0) {
+		return GetGameTime() - releaseTime >= g_cvRockReleaseGodframes.FloatValue;
 	}
 
 	float fallbackTime = g_cvRockGodframes.FloatValue;

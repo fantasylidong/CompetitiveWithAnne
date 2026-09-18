@@ -20,6 +20,10 @@
 #define JUMP_HEIGHT                     56.0
 #define JUMP_SPEED_Z                    300.0   // 跳砖时给的 Z 轴速度
 #define HULL_CENTER_HEIGHT              36.0
+#define TANK_AIR_THINK_INTERVAL          0.05
+#define TANK_AIR_GROUND_SEARCH           128.0
+#define TANK_AIR_TRACE_STEP              0.10
+#define TANK_HOP_MAX_DROP                256.0  // 路径明确且完整落点检查通过时，可连续跳下的普通落差
 
 // 路径快照（anne_nextbot）
 #define PATH_STALE_TIME                 0.35    // 快照超过这个年龄视为过期，回退到实体梯子检测
@@ -107,6 +111,8 @@ ConVar
     g_cvBhopNoVisionMaxAng,
     g_cvPathLookAheadMaxDepth,
     g_cvDirectChaseMaxAngle,
+    g_cvBhopStrafeAngle,
+    g_cvBhopStrafeMinDist,
     // 空中修正
     g_cvAirVecModifyDegree,
     g_cvAirVecModifyMaxDegree,
@@ -179,6 +185,8 @@ enum struct TankPathInfo
     bool  complete;
     float ladderDist;       // 沿路径到最近梯子段入口的距离，-1 = 扫描范围内没有
     float blockHopDist;     // 沿路径到最近“不能被连跳越过”的特殊段起点的距离，-1 = 没有
+    float dropDist;         // 最近深下落段入口，用于落点验证及禁止边沿蛇形/跳砖
+    float dropLandingZ;
     bool  routeUp;          // 扫描范围内有向上的梯子/攀爬段
     bool  reachesTarget;    // 路径终点接近当前目标
 
@@ -192,6 +200,8 @@ enum struct TankPathInfo
         this.complete = false;
         this.ladderDist = -1.0;
         this.blockHopDist = -1.0;
+        this.dropDist = -1.0;
+        this.dropLandingZ = 0.0;
         this.routeUp = false;
         this.reachesTarget = false;
     }
@@ -216,6 +226,9 @@ enum struct TankState
 
     // 移动
     TankHopMode hopMode;
+    float nextAirThink;
+    float hopStrafeYaw;         // 本跳的侧向偏角，空中不随机翻转
+    int   lastStrafeSide;       // 确认落地后的下一跳才换边
     float ladderCheckTime;
     bool  ladderNear;
 
@@ -272,6 +285,9 @@ enum struct TankState
         this.visTime = 0.0;
         this.visResult = false;
         this.hopMode = TankHop_None;
+        this.nextAirThink = 0.0;
+        this.hopStrafeYaw = 0.0;
+        this.lastStrafeSide = 0;
         this.ladderCheckTime = 0.0;
         this.ladderNear = false;
         this.headBlockUser = 0;

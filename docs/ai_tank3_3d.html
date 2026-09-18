@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#edf2f6">
+  <title>Tank 行为对照 · 3D 演示</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="tank3d/style.css?v=20260916">
+</head>
+<body>
+  <header class="header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><h1>Tank 行为对照</h1><p>同一场景，同步观察重构前后</p></div></div>
+    <a class="text-link" href="ai_tank3_scenarios_2026-09-14.html">查看历史图鉴 ↗</a>
+  </header>
+  <div class="layout">
+    <aside class="sidebar"><p class="nav-heading">选择场景 <span>12</span></p><nav id="scenarios" aria-label="演示场景"></nav><p class="sidebar-note">橙色为重构前，绿色为重构后。<br>蓝色人物是生还者。</p></aside>
+    <main>
+      <section class="intro" aria-labelledby="scene-title"><div><p id="scene-group" class="scene-group"></p><h2 id="scene-title">远距离左右连跳</h2><p id="scene-description"></p></div><label class="version-control">对比版本<select id="version" aria-label="对比版本"><option value="2.1">当前 2.1</option><option value="2.0">重构初版 2.0</option></select></label></section>
+      <div class="view-tools" aria-label="视图控制"><div class="segmented" aria-label="预设视角"><button data-view="perspective" aria-pressed="true">3D 斜视</button><button data-view="top" aria-pressed="false">俯视</button><button data-view="side" aria-pressed="false">侧视</button></div><div class="view-options"><label><input id="trails" type="checkbox" checked>运动轨迹</label><label><input id="paths" type="checkbox" checked>寻路参考</label><label><input id="sync" type="checkbox" checked>同步视角</label><button id="reset-camera" class="quiet">重置视角</button></div></div>
+      <section class="comparison" aria-label="同步 3D 对比">
+        <article class="viewport old" aria-label="重构前 3D 场景"><div class="view-label"><span class="dot"></span><strong>重构前</strong><span>1.0.0.13</span></div><div id="old-view" class="canvas-host" tabindex="0" aria-label="重构前场景，拖动旋转，滚轮缩放"></div><div class="state"><span>当前动作</span><strong id="old-state">准备起跳</strong></div></article>
+        <article class="viewport current" aria-label="重构后 3D 场景"><div class="view-label"><span class="dot"></span><strong>重构后</strong><span id="version-label">2.1.0</span></div><div id="new-view" class="canvas-host" tabindex="0" aria-label="重构后场景，拖动旋转，滚轮缩放"></div><div class="state"><span>当前动作</span><strong id="new-state">准备起跳</strong></div></article>
+      </section>
+      <div id="load-error" role="alert" hidden></div>
+      <div class="canvas-hint"><span>拖动旋转 · 滚轮缩放 · 右键平移</span><span><i class="legend-tank"></i>Tank <i class="legend-survivor"></i>生还者 <i class="legend-path"></i>路径</span></div>
+      <section class="player" aria-label="动画播放控制"><div class="play-row"><button id="play" class="primary" aria-label="播放">▶ 播放</button><button id="restart" class="restart" aria-label="从头播放">↺</button><label class="timeline-label" for="timeline">动画进度</label><input id="timeline" type="range" min="0" max="8" step="0.01" value="0" aria-label="动画进度"><output id="time">0.00 / 8.00 s</output><label class="speed-label">速度<select id="speed" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><label class="loop-label"><input id="loop" type="checkbox" checked>循环</label></div><div id="moments" class="moments" aria-label="跳到关键时刻"></div></section>
+      <section id="movement-options" class="movement-options" aria-label="连跳演示参数"><label>动态难度<select id="difficulty" aria-label="动态难度"><option value="0">简单 · 8°</option><option value="1">普通 · 10°</option><option value="2">困难 · 12°</option><option value="3">专家 · 15°</option><option value="4" selected>极限 · 18°</option><option value="5">音理 · 20°</option></select></label><label><input id="strafe" type="checkbox" checked>允许 2.1 主动左右连跳</label><span id="parameter-note"></span></section>
+      <section class="explanation" aria-label="行为差异说明"><div><h3><span class="dot old-dot"></span>重构前会怎样</h3><p id="old-explanation"></p></div><div><h3><span class="dot new-dot"></span>重构后改变了什么</h3><p id="new-explanation"></p></div></section>
+      <details class="basis"><summary>演示依据与适用条件</summary><p id="condition"></p><p id="source"></p><p>轨迹为依据代码判定制作的情景示意，地形、动作和用时经过简化；不是 Source 引擎模拟、实服录像或性能测试。旧版展示的是可能出现的问题分支，不代表每次必然发生。左右首跳在游戏中随机，演示固定首跳方向以便重复对比。</p><p><a href="tank3d/README.md">版本与源码索引</a> · <a href="annehappy_dynamic_ai_difficulty.md">动态 AI 难度说明</a></p></details>
+      <footer>行为示意 · 非实服录像 <span>ai_tank3 1.x → 2.0 → 2.1</span></footer>
+    </main>
+  </div>
+  <noscript>请启用 JavaScript 查看 3D 动画。</noscript>
+  <script type="module">
+    const error = document.getElementById('load-error');
+    import('./tank3d/app.js?v=20260916-drop').catch(() => {
+      error.hidden = false;
+      error.textContent = location.protocol === 'file:' ? '请通过本地网页服务打开：在仓库目录运行 python3 -m http.server 8765 --bind 127.0.0.1 --directory docs，再访问 http://127.0.0.1:8765/ai_tank3_3d.html' : '3D 场景加载失败，请确认浏览器支持 WebGL 2，并刷新页面重试。';
+    });
+  </script>
+</body>
+</html>

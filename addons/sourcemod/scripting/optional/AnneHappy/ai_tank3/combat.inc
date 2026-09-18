@@ -232,7 +232,9 @@ void Combat_JumpRock(int tank)
     GetClientAbsOrigin(tank, pos);
     if (Movement_IsLadderZone(tank, pos))
         return;
-    if (g_TankPath[tank].fresh && g_TankPath[tank].blockHopDist >= 0.0 && g_TankPath[tank].blockHopDist <= LADDER_HOP_MARGIN)
+    if (g_TankPath[tank].fresh &&
+        ((g_TankPath[tank].blockHopDist >= 0.0 && g_TankPath[tank].blockHopDist <= LADDER_HOP_MARGIN) ||
+        (g_TankPath[tank].dropDist >= 0.0 && g_TankPath[tank].dropDist <= LADDER_HOP_MARGIN)))
         return;
 
     float velocity[3];

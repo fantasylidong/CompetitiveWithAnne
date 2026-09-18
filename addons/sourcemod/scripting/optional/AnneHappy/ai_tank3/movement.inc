@@ -10,6 +10,8 @@
 void Movement_Reset(int tank)
 {
     g_Tank[tank].hopMode = TankHop_None;
+    g_Tank[tank].nextAirThink = 0.0;
+    g_Tank[tank].hopStrafeYaw = 0.0;
     AIPathMovement_Reset(tank);
 }
 
@@ -77,7 +79,7 @@ bool Movement_LockLadderLook(int tank, const float pos[3], float angles[3])
     return true;
 }
 
-// 1.x 的叠加式推速：按前进键时沿给定方向追加，按后退键时沿当前速度方向追加，其余情况只起跳不加速
+// 1.x 的叠加式推速：前/后优先，没有独占前后键时继承原生左右按键的侧向推力。
 void Movement_AddLegacyImpulse(int buttons, const float velocity[3], const float direction[3], float impulse, float output[3])
 {
     output[0] = velocity[0];
@@ -101,6 +103,50 @@ void Movement_AddLegacyImpulse(int buttons, const float velocity[3], const float
             output[1] += along[1] * impulse;
         }
     }
+    else
+    {
+        bool leftOnly = (buttons & IN_MOVELEFT) && !(buttons & IN_MOVERIGHT);
+        bool rightOnly = (buttons & IN_MOVERIGHT) && !(buttons & IN_MOVELEFT);
+        if (leftOnly || rightOnly)
+        {
+            float side = rightOnly ? 1.0 : -1.0;
+            // Source 的右向量在 yaw=0 时指向 -Y。
+            output[0] += direction[1] * impulse * side;
+            output[1] -= direction[0] * impulse * side;
+        }
+    }
+}
+
+bool Movement_CanDirectChase(int tank, const float pos[3], const float targetPos[3], bool visible, bool hasLook, const float lookGoal[3])
+{
+    if (!visible || FloatAbs(targetPos[2] - pos[2]) > JUMP_HEIGHT)
+        return false;
+    if (!g_TankPath[tank].fresh)
+        return true;
+    if (!g_TankPath[tank].reachesTarget || !hasLook)
+        return false;
+
+    float toTarget[3], toLook[3];
+    MakeVectorFromPoints(pos, targetPos, toTarget);
+    MakeVectorFromPoints(pos, lookGoal, toLook);
+    return AIPathMovement_VectorAngle(toLook, toTarget, true) <= g_cvDirectChaseMaxAngle.FloatValue;
+}
+
+void Movement_RotateHorizontal(const float input[3], float yaw, float output[3])
+{
+    float radians = DegToRad(yaw);
+    float cosine = Cosine(radians), sine = Sine(radians);
+    output[0] = input[0] * cosine - input[1] * sine;
+    output[1] = input[0] * sine + input[1] * cosine;
+    output[2] = input[2];
+}
+
+bool Movement_CanStrafe(int tank, float targetDist, float reach)
+{
+    return g_cvBhopStrafeAngle.FloatValue > 0.0 && targetDist > g_cvBhopStrafeMinDist.FloatValue &&
+        g_TankPath[tank].fresh && (g_TankPath[tank].blockHopDist < 0.0 ||
+        g_TankPath[tank].blockHopDist > reach + LADDER_HOP_MARGIN) &&
+        (g_TankPath[tank].dropDist < 0.0 || g_TankPath[tank].dropDist > reach + LADDER_HOP_MARGIN);
 }
 
 Action Movement_Bhop(int tank, int &buttons, const float pos[3], int target, const float targetPos[3], float dist, bool visible)
@@ -142,7 +188,7 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
     float maxSpeed = g_cvBhopMaxSpeed.FloatValue;
     bool pathFresh = g_TankPath[tank].fresh;
 
-    // 前方有梯子入口/高攀爬/深下落/跳跃间隙：这一跳只能落在它前面，按剩余距离压低起跳速度，连跑速都够不上就不跳
+    // 梯子入口/高攀爬/过深下落/跳跃间隙仍需让行；普通下落验证真实落点后保速续跳。
     if (pathFresh && g_TankPath[tank].blockHopDist >= 0.0)
     {
         float allowedReach = g_TankPath[tank].blockHopDist - LADDER_HOP_MARGIN;
@@ -157,25 +203,11 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
     if (horizon < PATH_LOOKAHEAD_MIN_DIST)
         horizon = PATH_LOOKAHEAD_MIN_DIST;
     float lookGoal[3];
-    bool hasLook = pathFresh && Path_GetLookAhead(tank, pos, horizon, g_cvPathLookAheadMaxDepth.IntValue, lookGoal);
+    bool hasLook = pathFresh && Path_GetLookAhead(tank, pos, horizon, g_cvPathLookAheadMaxDepth.IntValue, lookGoal, true);
 
     // 直追只在“看得见、同一高度、路径本身就朝着目标”时用；目标站在高台/梯子顶上时，
     // 朝目标加速只会把 Tank 拽到平台下的墙根，偏离去梯子的路线
-    bool direct = visible && FloatAbs(targetPos[2] - pos[2]) <= JUMP_HEIGHT;
-    if (direct && pathFresh)
-    {
-        if (!g_TankPath[tank].reachesTarget)
-        {
-            direct = false;
-        }
-        else if (hasLook)
-        {
-            float toTarget[3], toLook[3];
-            MakeVectorFromPoints(pos, targetPos, toTarget);
-            MakeVectorFromPoints(pos, lookGoal, toLook);
-            direct = AIPathMovement_VectorAngle(toLook, toTarget, true) <= g_cvDirectChaseMaxAngle.FloatValue;
-        }
-    }
+    bool direct = Movement_CanDirectChase(tank, pos, targetPos, visible, hasLook, lookGoal);
 
     float hopImpulse = AIPathMovement_GetHopImpulse(tank, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue);
     float hopVelocity[3], hopGoal[3], direction[3];
@@ -225,22 +257,244 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
 
     // 起跳帧同样受最大连跳速度约束
     AIPathMovement_ClampHorizontalSpeed(hopVelocity, maxSpeed);
-    if (!AIPathMovement_IsJumpRouteSafe(tank, hopVelocity, airTime, JUMP_HEIGHT, visible, g_cvBhopNoVisionMaxAng.FloatValue))
+    bool routeSafe;
+    float strafeYaw;
+    int strafeSide;
+    if (direct && !(buttons & IN_BACK) && Movement_CanStrafe(tank, GetVectorDistance(pos, targetPos),
+        AIPathMovement_GetHorizontalSpeed(hopVelocity) * airTime))
     {
-        AIPathMovement_MarkRouteCheckFailure(tank);
-        return Plugin_Continue;
+        strafeSide = g_Tank[tank].lastStrafeSide;
+        if (strafeSide == 0)
+            strafeSide = GetRandomInt(0, 1) == 0 ? -1 : 1;
+        else if (AIPathMovement_IsLandingHop(tank))
+            strafeSide = -strafeSide;
+        strafeYaw = g_cvBhopStrafeAngle.FloatValue * float(strafeSide);
+        float lateral[3];
+        Movement_RotateHorizontal(direction, strafeYaw, lateral);
+        ScaleVector(lateral, AIPathMovement_GetHorizontalSpeed(hopVelocity));
+        lateral[2] = hopVelocity[2];
+        // 不在起跳时突然掉头；侧跳受阻则继续尝试原来的直跳。
+        routeSafe = AIPathMovement_VectorAngle(velocity, lateral, true) <= g_cvDirectChaseMaxAngle.FloatValue &&
+            Movement_IsTurnRouteSafe(tank, pos, pos, lateral, airTime, true);
+        if (routeSafe)
+            hopVelocity = lateral;
+        else
+            strafeYaw = 0.0;
+    }
+    if (!routeSafe && !AIPathMovement_IsJumpRouteSafe(tank, hopVelocity, airTime, JUMP_HEIGHT, visible, g_cvBhopNoVisionMaxAng.FloatValue))
+    {
+        if (!hasLook || !Movement_IsDropHopSafe(tank, pos, hopVelocity, visible))
+        {
+            AIPathMovement_MarkRouteCheckFailure(tank);
+            return Plugin_Continue;
+        }
+        // 已验证完整下落轨迹，保持这次前冲方向，不在越过边沿后改向未知落点。
+        mode = TankHop_Velocity;
     }
 
     buttons |= IN_DUCK | IN_JUMP;
     g_Tank[tank].hopMode = mode;
+    g_Tank[tank].hopStrafeYaw = strafeYaw;
+    if (strafeYaw != 0.0)
+        g_Tank[tank].lastStrafeSide = strafeSide;
     AIPathMovement_BeginPathHop(tank, hopGoal, AIPathMovement_GetHorizontalSpeed(hopVelocity), maxSpeed);
+    g_Tank[tank].nextAirThink = GetEngineTime() + TANK_AIR_THINK_INTERVAL;
     TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, hopVelocity);
     return Plugin_Changed;
 }
 
+// 从当前高度/竖直速度估算剩余滞空时间，不拿完整一跳去检查空中转向。
+float Movement_RemainingAirTime(float height, float verticalSpeed, float fullAirTime)
+{
+    float gravity = 8.0 * JUMP_HEIGHT / (fullAirTime * fullAirTime);
+    if (height < 0.0)
+        height = 0.0;
+    float remaining = (verticalSpeed + SquareRoot(verticalSpeed * verticalSpeed + 2.0 * gravity * height)) / gravity;
+    if (remaining < TANK_AIR_THINK_INTERVAL)
+        remaining = TANK_AIR_THINK_INTERVAL;
+    if (remaining > fullAirTime)
+        remaining = fullAirTime;
+    return remaining;
+}
+
+bool Movement_IsTurnRouteSafe(int tank, const float pos[3], const float ground[3], const float velocity[3], float remaining, bool launching = false, float maxDrop = JUMP_HEIGHT)
+{
+    float reach = AIPathMovement_GetHorizontalSpeed(velocity) * remaining;
+    if (g_TankPath[tank].fresh && g_TankPath[tank].blockHopDist >= 0.0 &&
+        reach + LADDER_HOP_MARGIN > g_TankPath[tank].blockHopDist)
+        return false;
+
+    float end[3];
+    end = ground;
+    end[0] += velocity[0] * remaining;
+    end[1] += velocity[1] * remaining;
+    float fullAirTime = AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
+    float gravity = 8.0 * JUMP_HEIGHT / (fullAirTime * fullAirTime);
+    float verticalSpeed = launching ? gravity * fullAirTime * 0.5 : velocity[2];
+    float mins[3], maxs[3], traceStart[3], traceEnd[3];
+    GetEntPropVector(tank, Prop_Send, "m_vecMins", mins);
+    GetEntPropVector(tank, Prop_Send, "m_vecMaxs", maxs);
+    int steps = RoundToCeil(remaining / TANK_AIR_TRACE_STEP);
+    if (steps < 1)
+        steps = 1;
+    float stepTime = remaining / float(steps);
+    // 抛物线在每段弦线上方；抬高 hull 顶部覆盖曲率余量，避免漏掉低顶棚/悬挑物。
+    maxs[2] += gravity * stepTime * stepTime / 8.0;
+    traceStart = pos;
+    traceStart[2] += 1.0; // 留 1 单位接地余量，避免将预期的落地接触误判为障碍。
+    for (int step = 1; step <= steps; step++)
+    {
+        float time = stepTime * float(step);
+        traceEnd[0] = pos[0] + velocity[0] * time;
+        traceEnd[1] = pos[1] + velocity[1] * time;
+        traceEnd[2] = pos[2] + verticalSpeed * time - 0.5 * gravity * time * time + 1.0;
+        Handle trace = TR_TraceHullFilterEx(traceStart, traceEnd, mins, maxs,
+            MASK_PLAYERSOLID, AIPathMovement_TraceFilter, tank);
+        bool blocked = TR_StartSolid(trace) || TR_DidHit(trace);
+        delete trace;
+        if (blocked)
+            return false;
+        traceStart = traceEnd;
+    }
+    // 断层检测以脚下地面为参考，不能把当前离地高度当成地面。
+    return !AIPathMovement_HasPotentialGap(tank, ground, end, maxDrop);
+}
+
+// 只放开 NextBot 路径明确安排的普通下落。深落差腾空更久，必须按下方
+// 地面重算实际落点；只增大平地一跳的 gap 容差会漏掉远处的墙和第二道悬崖。
+bool Movement_IsDropHopSafe(int tank, const float pos[3], const float velocity[3], bool visible)
+{
+    if (!g_TankPath[tank].fresh || g_TankPath[tank].dropDist < 0.0)
+        return false;
+
+    float drop = pos[2] - g_TankPath[tank].dropLandingZ;
+    if (drop <= JUMP_HEIGHT || drop > TANK_HOP_MAX_DROP)
+        return false;
+
+    float fullAirTime = AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
+    float gravity = 8.0 * JUMP_HEIGHT / (fullAirTime * fullAirTime);
+    float riseSpeed = gravity * fullAirTime * 0.5;
+    float airTime, groundZ, end[3];
+    bool converged;
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        airTime = (riseSpeed + SquareRoot(riseSpeed * riseSpeed + 2.0 * gravity * drop)) / gravity;
+        if (AIPathMovement_GetHorizontalSpeed(velocity) * airTime <= g_TankPath[tank].dropDist)
+            return false;
+        end = pos;
+        end[0] += velocity[0] * airTime;
+        end[1] += velocity[1] * airTime;
+        if (!AIPathMovement_TryFindGround(tank, end, pos[2], false, TANK_HOP_MAX_DROP, groundZ) ||
+            FloatAbs(groundZ - g_TankPath[tank].dropLandingZ) > JUMP_HEIGHT)
+            return false;
+        float actualDrop = pos[2] - groundZ;
+        if (actualDrop <= JUMP_HEIGHT || actualDrop > TANK_HOP_MAX_DROP)
+            return false;
+        if (FloatAbs(actualDrop - drop) < 0.5)
+        {
+            converged = true;
+            break;
+        }
+        drop = actualDrop;
+    }
+    if (!converged)
+        return false;
+
+    // 落点四角也必须有地面，不能让中心射线恰好命中狭小凸起。
+    float mins[3], maxs[3], sample[3], supportZ;
+    GetEntPropVector(tank, Prop_Send, "m_vecMins", mins);
+    GetEntPropVector(tank, Prop_Send, "m_vecMaxs", maxs);
+    for (int corner = 0; corner < 4; corner++)
+    {
+        sample = end;
+        sample[0] += (corner & 1) ? maxs[0] : mins[0];
+        sample[1] += (corner & 2) ? maxs[1] : mins[1];
+        if (!AIPathMovement_TryFindGround(tank, sample, groundZ, true, JUMP_HEIGHT, supportZ) ||
+            FloatAbs(supportZ - groundZ) > AI_PATH_MOVEMENT_MAX_LOCAL_STEP_UP)
+            return false;
+    }
+    return AIPathMovement_IsJumpRouteSafe(tank, velocity, airTime, TANK_HOP_MAX_DROP, visible, g_cvBhopNoVisionMaxAng.FloatValue) &&
+        Movement_IsTurnRouteSafe(tank, pos, pos, velocity, airTime, true, TANK_HOP_MAX_DROP);
+}
+
+bool Movement_TrySafeAirCorrection(int tank, const float pos[3], const float ground[3], const float velocity[3],
+    const float direction[3], float goalDist, float minAngle, float remaining, float output[3])
+{
+    float previousTime = g_AIPathMovementState[tank].lastCorrectionTime;
+    if (!AIPathMovement_ComputeAirCorrectionToward(tank, velocity, direction, goalDist, PATH_GOAL_TOLERANCE_DIST,
+        minAngle, g_cvAirVecModifyMaxDegree.FloatValue, 0.3, g_cvAirVecModifyInterval.FloatValue, 0.12, output))
+        return false;
+    if (Movement_IsTurnRouteSafe(tank, pos, ground, output, remaining))
+        return true;
+    // 被安全检查拒绝的候选没有真正转向，不占用修正时间；侧向失败后本帧还可尝试正常方向。
+    g_AIPathMovementState[tank].lastCorrectionTime = previousTime;
+    return false;
+}
+
+bool Movement_UpdateAirDirection(int tank, int buttons, const float pos[3], const float velocity[3],
+    const float targetPos[3], float dist, bool visible, float output[3])
+{
+    float ground[3], groundZ;
+    if (!AIPathMovement_TryFindGround(tank, pos, pos[2], false, TANK_AIR_GROUND_SEARCH, groundZ))
+        return false;
+    ground = pos;
+    ground[2] = groundZ;
+    float fullAirTime = AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
+    float remaining = Movement_RemainingAirTime(pos[2] - groundZ, velocity[2], fullAirTime);
+    float horizon = AIPathMovement_GetHorizontalSpeed(velocity) * remaining;
+    if (horizon < PATH_LOOKAHEAD_MIN_DIST)
+        horizon = PATH_LOOKAHEAD_MIN_DIST;
+
+    float lookGoal[3], goal[3];
+    bool hasLook = g_TankPath[tank].fresh &&
+        Path_GetLookAhead(tank, pos, horizon, g_cvPathLookAheadMaxDepth.IntValue, lookGoal);
+    // 用脚下地面的高度判定同层，避免正常起跳到顶点时误判为追高台。
+    bool direct = g_Tank[tank].hopMode == TankHop_Target && !(buttons & IN_BACK) &&
+        Movement_CanDirectChase(tank, ground, targetPos, visible, hasLook, lookGoal);
+    float minAngle;
+    if (direct)
+    {
+        goal = targetPos;
+        minAngle = g_cvAirVecModifyDegree.FloatValue;
+    }
+    else if (hasLook)
+    {
+        goal = lookGoal;
+        minAngle = AI_PATH_MOVEMENT_MIN_TURN_DEG;
+        g_Tank[tank].hopStrafeYaw = 0.0;
+    }
+    else
+    {
+        // 快照过期/没有可达点时保持惯性，不再拽向已飞过的旧点。
+        return false;
+    }
+
+    AIPathMovement_UpdateGoal(tank, goal);
+    float direction[3];
+    MakeVectorFromPoints(pos, goal, direction);
+    direction[2] = 0.0;
+    float goalDist = AIPathMovement_GetDistance2D(pos, goal);
+    if (direct && g_Tank[tank].hopStrafeYaw != 0.0 && Movement_CanStrafe(tank, dist, horizon))
+    {
+        float lateral[3];
+        Movement_RotateHorizontal(direction, g_Tank[tank].hopStrafeYaw, lateral);
+        // 已沿本跳侧向方向飞行时无需修正，也不能因此误判侧向受阻。
+        if (AIPathMovement_VectorAngle(velocity, lateral, true) < minAngle)
+            return false;
+        if (Movement_TrySafeAirCorrection(tank, pos, ground, velocity, lateral, goalDist, minAngle, remaining, output))
+            return true;
+        g_Tank[tank].hopStrafeYaw = 0.0;
+    }
+    else
+    {
+        g_Tank[tank].hopStrafeYaw = 0.0;
+    }
+    return Movement_TrySafeAirCorrection(tank, pos, ground, velocity, direction, goalDist, minAngle, remaining, output);
+}
+
 Action Movement_AirControl(int tank, int &buttons, const float pos[3], const float velocity[3], float speed, const float targetPos[3], float dist, bool visible)
 {
-    // 只修正插件自己起的跳；NextBot 的跳跃、下落、被打飞都不碰
+    // 只修正插件自己起的跳；NextBot 的跳跃、下落、被打飞都不碰。
     if (!AIPathMovement_IsPathHopActive(tank))
         return Plugin_Continue;
 
@@ -254,41 +508,17 @@ Action Movement_AirControl(int tank, int &buttons, const float pos[3], const flo
         changed = true;
     }
 
-    float output[3];
-    switch (g_Tank[tank].hopMode)
+    float now = GetEngineTime();
+    if (now >= g_Tank[tank].nextAirThink && g_Tank[tank].hopMode != TankHop_Velocity)
     {
-        case TankHop_Path:
+        g_Tank[tank].nextAirThink = now + TANK_AIR_THINK_INTERVAL;
+        float output[3];
+        if (Movement_UpdateAirDirection(tank, buttons, pos, corrected, targetPos, dist, visible, output))
         {
-            if (AIPathMovement_ComputePathAirCorrection(tank, corrected, PATH_GOAL_TOLERANCE_DIST,
-                g_cvAirVecModifyDegree.FloatValue, g_cvAirVecModifyMaxDegree.FloatValue, 0.3,
-                g_cvAirVecModifyInterval.FloatValue, 0.12, output))
-            {
-                corrected = output;
-                changed = true;
-            }
-        }
-        case TankHop_Target:
-        {
-            float dz = targetPos[2] - pos[2];
-            float dx = AIPathMovement_GetDistance2D(pos, targetPos);
-            float pitch = dx > 0.0 ? RadToDeg(ArcTangent(dz / dx)) : 90.0;
-            bool steep = dz > JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange && pitch > 45.0;
-            if (visible && !(buttons & IN_BACK) && !steep)
-            {
-                float toTarget[3];
-                MakeVectorFromPoints(pos, targetPos, toTarget);
-                toTarget[2] = 0.0;
-                if (AIPathMovement_ComputeAirCorrectionToward(tank, corrected, toTarget, dist, PATH_GOAL_TOLERANCE_DIST,
-                    g_cvAirVecModifyDegree.FloatValue, g_cvAirVecModifyMaxDegree.FloatValue, 0.3,
-                    g_cvAirVecModifyInterval.FloatValue, 0.12, output))
-                {
-                    corrected = output;
-                    changed = true;
-                }
-            }
+            corrected = output;
+            changed = true;
         }
     }
-
     if (!changed)
         return Plugin_Continue;
     TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, corrected);

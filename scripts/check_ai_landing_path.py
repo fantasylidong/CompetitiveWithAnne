@@ -16,7 +16,7 @@ AI = ROOT / "addons/sourcemod/scripting/optional/AnneHappy"
 
 
 def function(source, name):
-    start = re.search(rf"^(?:bool|void) {name}\(", source, re.M).start()
+    start = re.search(rf"^(?:stock )?(?:bool|void|float|Action) {name}\(", source, re.M).start()
     opening = source.index("{", start)
     depth = 1
     end = opening + 1
@@ -27,16 +27,19 @@ def function(source, name):
 
 
 def cpp(source):
-    source = source.replace("const float pos[3]", "const Vec &pos")
-    source = source.replace("float out[3]", "Vec &out")
     source = re.sub(
-        r"float (\w+)\[3\](?:, (\w+)\[3\])?;",
-        lambda m: "Vec " + ", ".join(f"{n}{{}}" for n in m.groups() if n) + ";",
+        r"float (\w+(?:\[3\])?(?:,\s*\w+(?:\[3\])?)*)\s*;",
+        lambda m: " ".join(
+            f"Vec {n[:-3]}{{}};" if n.endswith("[3]") else f"float {n}{{}};"
+            for n in re.split(r",\s*", m[1])
+        ),
         source,
     )
+    source = re.sub(r"const float (\w+)\[3\]", r"const Vec &\1", source)
+    source = re.sub(r"float (\w+)\[3\](?=\s*[,)])", r"Vec &\1", source)
     # SourcePawn initializes local scalar variables to zero.
     source = re.sub(r"\b(int|float|bool|Address) (\w+);", r"\1 \2{};", source)
-    return source.replace("view_as<", "static_cast<")
+    return source.replace("view_as<", "static_cast<").replace("stock ", "")
 
 
 def main():
@@ -51,7 +54,7 @@ def main():
     assert "&& owedSpit && hasSight && spitReadyToFire(spitter)" in command
     constants = "\n".join(
         line for line in (spitter + setup).splitlines()
-        if re.match(r"#define (SPIT_OWE_TTL|PATH_LOOKAHEAD_\w+|JUMP_HEIGHT|HULL_CENTER_HEIGHT)\s", line)
+        if re.match(r"#define (SPIT_OWE_TTL|PATH_LOOKAHEAD_\w+|JUMP_HEIGHT|TANK_HOP_MAX_DROP|HULL_CENTER_HEIGHT)\s", line)
     )
     declarations = "\n".join(
         line for line in setup.splitlines()
@@ -95,7 +98,7 @@ constexpr int MASK_PLAYERSOLID = 0, AIPathMovement_TraceFilter = 0;
 Handle TR_TraceHullFilterEx(const Vec &, Vec end, const Vec &, const Vec &, int, int, int client) {
     ++traces[client]; end[2] -= HULL_CENTER_HEIGHT;
     for (const auto &segment : paths[client])
-        if (segment.pos == end) return new Trace{segment.blocked};
+        if (segment.pos[0] == end[0] && segment.pos[1] == end[1]) return new Trace{segment.blocked};
     assert(false); return nullptr;
 }
 bool TR_DidHit(Handle trace) { return trace->blocked; }
@@ -147,6 +150,18 @@ int main() {
     ++tick;
     setPath(1, {{{64,0,0},false,AnneNextBotPathSegment_LadderUp}});
     assert(!Path_GetLookAhead(1, pos, 400, 10, out) && traces[1] == 0);
+    // A known ordinary drop can supply a launch direction; air correction and
+    // deep/unknown cliffs still cannot take it as an ordinary flat waypoint.
+    ++tick;
+    setPath(1, {{{180,0,-200},false,AnneNextBotPathSegment_DropDown}});
+    assert(!Path_GetLookAhead(1, pos, 500, 10, out));
+    assert(Path_GetLookAhead(1, pos, 500, 10, out, true) && out[2] == -200);
+    ++tick;
+    setPath(1, {{{180,0,-300},false,AnneNextBotPathSegment_DropDown}});
+    assert(!Path_GetLookAhead(1, pos, 500, 10, out, true));
+    ++tick;
+    setPath(1, {{{180,0,-200},true,AnneNextBotPathSegment_DropDown}});
+    assert(!Path_GetLookAhead(1, pos, 500, 10, out, true));
     std::cout << "PASS: landing consumption, path fallback, per-Tank budget and limits\n";
 }
 '''

@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.15",
+	version 		= "1.0.1.16",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -262,6 +262,9 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 		g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
 	}
 
+	// 门会挡住目标视野, 必须先处理, 避免状态机清掉挥拳或继续向门连跳。
+	if (tryClawBlockingDoor(client, buttons, vel, angles))
+		return Plugin_Changed;
 
 	// 执行当前状态的每帧行为更新操作
 	static Action stateResult;
@@ -269,6 +272,68 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	if (ladderButtonsChanged && stateResult == Plugin_Continue)
 		stateResult = Plugin_Changed;
 	return stateResult;
+}
+
+bool tryClawBlockingDoor(int client, int& buttons, float vel[3], float angles[3]) {
+	if (GetEntityMoveType(client) == MOVETYPE_LADDER || !IsClientOnGround(client) ||
+		isChargerCharging(client) || IsPinningSurvivor(client) ||
+		IsValidSurvivor(L4D2_GetQueuedPummelVictim(client)) || L4D_IsPlayerStaggering(client))
+		return false;
+
+	float velocity[3];
+	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velocity);
+	// 只在低速受阻时探测, 正常跑动不增加射线也不打断攻击。
+	if (getVectorLength2D(velocity) > 50.0)
+		return false;
+
+	float eye[3], direction[3], right[3], flatAngles[3], end[3];
+	GetClientEyePosition(client, eye);
+	flatAngles[1] = angles[1];
+	GetAngleVectors(flatAngles, direction, right, NULL_VECTOR);
+	float moveSpeed = getVectorLength2D(vel);
+	// 优先探测原生寻路的移动方向；原地停住时回退到面朝方向。
+	if (moveSpeed > 1.0) {
+		ScaleVector(direction, vel[0]);
+		ScaleVector(right, vel[1]);
+		AddVectors(direction, right, direction);
+		NormalizeVector(direction, direction);
+	}
+	end = direction;
+	ScaleVector(end, getChargerClawRange());
+	AddVectors(eye, end, end);
+
+	// 保留墙、玩家及其他实体的遮挡, 只检查拳头射程内首先碰到的实体。
+	Handle trace = TR_TraceRayFilterEx(eye, end, MASK_SHOT, RayType_EndPoint, chargerDoorTraceFilter, client);
+	int door = TR_DidHit(trace) ? TR_GetEntityIndex(trace) : -1;
+	delete trace;
+	if (door <= MaxClients || !IsValidEntity(door))
+		return false;
+
+	char className[64];
+	GetEntityClassname(door, className, sizeof(className));
+	if (strcmp(className, "prop_door_rotating") != 0 ||
+		(L4D_GetDoorFlag(door) & DOOR_FLAG_UNBREAKABLE))
+		return false;
+
+	// 用正常挥拳打门, 不直接伤害/删除实体, 也不干预安全门。
+	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
+	AIPathMovement_Reset(client);
+	GetVectorAngles(direction, angles);
+	TeleportEntity(client, NULL_VECTOR, angles, NULL_VECTOR);
+	if (moveSpeed > 1.0) {
+		// 视角转向寻路方向后同步换算指令速度, 保持原本的世界移动方向。
+		vel[0] = moveSpeed;
+		vel[1] = 0.0;
+		setForwardBhopInput(buttons, false);
+	}
+	buttons &= ~(IN_ATTACK | IN_JUMP | IN_DUCK);
+	buttons |= IN_ATTACK2;
+	setChargerAbilityCooldown(client, 1.0);
+	return true;
+}
+
+bool chargerDoorTraceFilter(int entity, int contentsMask, any client) {
+	return entity != client;
 }
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {

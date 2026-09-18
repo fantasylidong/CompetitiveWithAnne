@@ -452,3 +452,28 @@
 - Spitter consumes its deferred spit on the first grounded frame. If sight is lost, the ability is not ready, or another branch returns early, the record is discarded instead of triggering an automatic spit on a later hop.
 - Each Tank now has its own budget of up to 3 path lookahead traces per tick. Candidates are checked from near to far along the path, retaining the last reachable point when blocked or out of budget, so distant corners or another Tank cannot consume the budget and erase a usable hop route.
 - Recompiled: `ai_spitter_3.smx` and `ai_tank3.smx`.
+
+### 2026-09-15 Tank air tracking and alternating hops (ai_tank3 2.1.0)
+
+- Refreshes safe path lookahead every 0.05 s in the air, continuing to the next segment after passing the old goal. Target-tracking thresholds are now 10 / 8 / 6 / 5 / 4 / 3 degrees across the six tiers; path following starts at 1 degree, retaining smooth turns and the 89-degree limit.
+- Restores lateral impulse from native left/right inputs. Beyond 600 units, safe direct chases can alternate hop sides at 8 / 10 / 12 / 15 / 18 / 20 degrees by tier. The first side is random; subsequent hops switch sides after a confirmed landing. Set the angle to 0 to disable.
+- Active side hops require a visible target on the same level and a supporting path. Close range, path turns, or blocked side routes restore normal tracking. Turns sweep the actual collision hull along sampled ballistic segments, including ascent, and check gaps and special path segments using the ground below and remaining airtime, preserving ladder handling, speed caps and landing acceleration.
+- Recompiled `ai_tank3.smx`; added movement regression checks for small target movements, path refresh, blocked-side fallback, alternating sides and terrain rejection.
+
+### 2026-09-16 Tank continuous hops over safe drops
+
+- For ordinary drops of up to 256 units on a known path, successful safety checks allow the Tank to hop off at speed, retain momentum during the fall and immediately hop again on landing with the full landing impulse.
+- Checks use the longer airtime calculated from the actual drop, covering walls, ceilings and ground support at all four landing corners. Active side hops and jump rocks stay disabled near the edge; deeper drops, ladders, jump gaps and unsafe routes retain their restrictions.
+- Updated the 3D comparison while retaining the early slowdown of version 2.0. Movement regression checks passed; recompiled `ai_tank3.smx`.
+
+### 2026-09-16 Tank rock protection after release (l4d_rock_lagcomp 2.1-anne)
+
+- Rock protection after actual release now follows the dynamic difficulty profile: Easy / Normal / Hard / Expert / Extreme / Neri use 0 / 0.05 / 0.10 / 0.15 / 0.20 / 0.25 seconds. This protects the rock entity for both AI and player-controlled Tanks.
+- Added `sm_rock_release_godframes` (default `0.15`; set to `0` for immediate damage after release). Existing `sm_rock_godframes 1.7` remains the fallback measured from entity creation if the release callback is missed. The timers are independent, and translucent feedback follows the protection window.
+- Timing boundary regression checks passed; recompiled the Anne version of `l4d_rock_lagcomp.smx`.
+
+### September 17, 2026 Charger Door Breaking (ai_charger3 1.0.1.16)
+
+- Fixed Chargers getting stuck against ordinary doors without punching when the door blocks sight of their target. While grounded and slowed by an obstacle, they check for an ordinary door within claw range along their movement direction and prioritize a normal claw attack.
+- Walls, players, and other entities still block detection. Saferoom doors, unbreakable doors, and airborne, ladder, stagger, charge, or pin states are excluded.
+- Added door behavior regression checks and recompiled `ai_charger3.smx`.

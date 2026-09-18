@@ -7,6 +7,8 @@ on:
       - 'addons/sourcemod/scripting/**/*.inc'
       - 'scripts/check_convar_visibility.py'
       - 'scripts/query_a2s_rules.py'
+      - 'scripts/check_charger_doors.py'
+      - 'scripts/check_ai_landing_path.py'
     branches:
       - master
   push:
@@ -15,6 +17,8 @@ on:
       - 'addons/sourcemod/scripting/**/*.inc'
       - 'scripts/check_convar_visibility.py'
       - 'scripts/query_a2s_rules.py'
+      - 'scripts/check_charger_doors.py'
+      - 'scripts/check_ai_landing_path.py'
     branches:
       - master
   workflow_dispatch:
@@ -39,6 +43,8 @@ jobs:
         run: |
           python3 -m py_compile scripts/check_convar_visibility.py scripts/query_a2s_rules.py
           python3 scripts/check_convar_visibility.py
+      - name: Check Charger door behavior
+        run: python3 scripts/check_charger_doors.py
       - name: Set environment variables
         run: |
           echo "SCRIPTS_PATH=$GITHUB_WORKSPACE/addons/sourcemod/scripting" >> $GITHUB_ENV

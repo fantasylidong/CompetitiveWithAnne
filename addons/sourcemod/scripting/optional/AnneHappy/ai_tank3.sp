@@ -38,7 +38,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白, AnneHappy",
     description = "Ai Tank 增强 3.0 版本（路径感知连跳、梯子让行、寻路距离选目标、反头顶卡、骑头反制、投石瞄准等）",
-    version     = "2.0.0",
+    version     = "2.1.0",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -74,11 +74,13 @@ public void OnPluginStart()
     g_cvBhopNoVisionMaxAng = CreateConVar("_ai_tank3_bhop_nvis_maxang", "75.0", "无视野时速度向量与视角前向向量阈值（度）", CVAR_FLAGS, true, 0.0);
     g_cvPathLookAheadMaxDepth = CreateConVar("ai_tank3_path_lookahead_maxdepth", "10", "沿路径连跳时向前搜索 PathSegment 的最大深度", CVAR_FLAGS, true, 1.0);
     g_cvDirectChaseMaxAngle = CreateConVar("_ai_tank3_direct_chase_max_angle", "45.0", "有视野时，路径前瞻方向与目标方向的夹角不超过该值才朝目标预测点直追，否则沿路径连跳（度）", CVAR_FLAGS, true, 0.0, true, 180.0);
+    g_cvBhopStrafeAngle = CreateConVar("ai_tank3_bhop_strafe_angle", "15.0", "远距离安全直追时逐跳左右交替的偏角，0=关闭（度）", CVAR_FLAGS, true, 0.0, true, 35.0);
+    g_cvBhopStrafeMinDist = CreateConVar("ai_tank3_bhop_strafe_min_dist", "600.0", "距离目标超过该值才主动左右连跳", CVAR_FLAGS, true, 0.0);
 
     // 空速矫正
-    g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "空速方向与目标方向角 >=此值 开始修正", CVAR_FLAGS, true, 0.0);
-    g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "135.0", "角度 >此值 不再修正", CVAR_FLAGS, true, 0.0);
-    g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空速方向修正最小间隔(秒)", CVAR_FLAGS, true, 0.1);
+    g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "5.0", "追人时空速方向与目标方向角 >=此值 开始修正；路径跟随固定从1度开始", CVAR_FLAGS, true, 0.0);
+    g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "89.0", "角度 >此值 不再修正，实际最大89度", CVAR_FLAGS, true, 0.0);
+    g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中转向平滑响应时间(秒)，每0.05秒检查一次", CVAR_FLAGS, true, 0.1);
 
     // 投石 / 挥拳
     g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离", CVAR_FLAGS, true, 0.0);
