@@ -21,21 +21,24 @@
 
 
 ## **AnneHappy 会自动更新的核心插件**
-- Path_SM/plugins/optional/AnneHappy/ai_boomer_2.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_charger_2.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_hunter_2.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_smoker3.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_spitter_2.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_jockey_2.smx"
-- Path_SM/plugins/optional/AnneHappy/ai_tank3.smx"
-- Path_SM/plugins/optional/AnneHappy/infected_control.smx"
-- Path_SM/plugins/optional/AnneHappy/text.smx"
-- Path_SM/plugins/optional/AnneHappy/server.smx"
-- Path_SM/plugins/optional/AnneHappy/SI_Target_limit.smx"
-- Path_SM/plugins/optional/AnneHappy/l4d_target_override.smx"
-- Path_SM/plugins/optional/AnneHappy/l4d2_Anne_stuck_tank_teleport.smx"
-- Path_SM/plugins/extend/join.smx"
-- Path_SM/plugins/extend/server_name.smx"
+- Path_SM/plugins/optional/AnneHappy/ai_boomer_3.smx
+- Path_SM/plugins/optional/AnneHappy/ai_charger3.smx
+- Path_SM/plugins/optional/AnneHappy/ai_hunter_2.smx
+- Path_SM/plugins/optional/AnneHappy/ai_smoker3.smx
+- Path_SM/plugins/optional/AnneHappy/ai_spitter_3.smx
+- Path_SM/plugins/optional/AnneHappy/ai_jockey_2.smx
+- Path_SM/plugins/optional/AnneHappy/ai_tank3.smx
+- Path_SM/plugins/optional/AnneHappy/infected_control.smx
+- Path_SM/plugins/optional/AnneHappy/text.smx
+- Path_SM/plugins/optional/AnneHappy/server.smx
+- Path_SM/plugins/optional/AnneHappy/SI_Target_limit.smx
+- Path_SM/plugins/optional/AnneHappy/l4d_target_override.smx
+- Path_SM/plugins/optional/AnneHappy/l4d2_Anne_stuck_tank_teleport.smx
+- Path_SM/plugins/optional/AnneHappy/anne_cvar_shield.smx
+- Path_SM/plugins/optional/AnneHappy/spawn_vote_menu.smx
+- Path_SM/plugins/optional/AnneHappy/l4d2_dirspawn.smx
+- Path_SM/plugins/extend/join.smx
+- Path_SM/plugins/extend/server_name.smx
 
 ## **关于新增模式:**
 

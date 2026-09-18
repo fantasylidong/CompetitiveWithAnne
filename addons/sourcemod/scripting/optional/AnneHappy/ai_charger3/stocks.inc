@@ -156,6 +156,15 @@ stock bool isChargerCharging(int client) {
     return view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
 }
 
+// 冲锋结束不等于恢复自由移动：撞停硬直和待砸地阶段仍由引擎接管。
+stock bool isChargerInNativeMotion(int client) {
+    return isChargerCharging(client) ||
+        IsValidSurvivor(L4D2_GetQueuedPummelVictim(client)) ||
+        IsValidSurvivor(L4D_GetVictimCharger(client)) ||
+        IsValidSurvivor(L4D_GetVictimCarry(client)) ||
+        L4D_IsPlayerStaggering(client);
+}
+
 // 武器属性表在每次 level init 时重建, 缓存必须随换图失效:
 // 否则首次调用若早于武器脚本装载, 兜底值会被锁死到进程结束。
 static bool g_bClawRangeCached = false;

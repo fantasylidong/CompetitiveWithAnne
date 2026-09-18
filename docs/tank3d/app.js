@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three.module.min.js';
 import { OrbitControls } from './vendor/OrbitControls.js';
-import { SCENARIOS, DIFFICULTIES, buildTrack, sampleTrack, sampleTank, sampleRock } from './scenarios.js?v=20260916-drop';
+import { SCENARIOS, DIFFICULTIES, buildTrack, sampleTrack, sampleTank, sampleRock } from './scenarios.js?v=20260917-turn';
 
 const $=id=>document.getElementById(id);
 const colors={old:0xbf7741,current:0x238579,survivor:0x477ebd,ground:0xe4ecf1,wall:0xb8c8d2,route:0x7d919e};
@@ -197,7 +197,7 @@ function updateText(){
   $('old-state').textContent=m.old;$('new-state').textContent=version==='2.0'?m.refactor:m.current;
   if(selected.dynamic){
     const fresh=sampleTank(selected,panes[1].track,time);
-    if(version==='2.1')$('new-state').textContent=fresh.mode==='punch'?'已经近身，尝试出拳':fresh.side?`${fresh.side>0?'向右':'向左'}侧跳 · 空中平滑跟随`:'距离或开关条件不满足 · 正常追逐';
+    if(version==='2.1')$('new-state').textContent=fresh.mode==='punch'?'已经近身，尝试出拳':fresh.side?`${fresh.side>0?'向右':'向左'}侧跳 · 达到角度门槛才修正`:'距离或开关条件不满足 · 正常追逐';
     $('parameter-note').textContent=`当前目标距离 ${Math.round(fresh.distance*100)} hu · 600 hu 外才允许侧跳`;
   }
   $('time').textContent=`${time.toFixed(2)} / ${selected.duration.toFixed(2)} s`;

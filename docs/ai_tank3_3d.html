@@ -34,7 +34,7 @@
   <noscript>请启用 JavaScript 查看 3D 动画。</noscript>
   <script type="module">
     const error = document.getElementById('load-error');
-    import('./tank3d/app.js?v=20260916-drop').catch(() => {
+    import('./tank3d/app.js?v=20260917-turn').catch(() => {
       error.hidden = false;
       error.textContent = location.protocol === 'file:' ? '请通过本地网页服务打开：在仓库目录运行 python3 -m http.server 8765 --bind 127.0.0.1 --directory docs，再访问 http://127.0.0.1:8765/ai_tank3_3d.html' : '3D 场景加载失败，请确认浏览器支持 WebGL 2，并刷新页面重试。';
     });

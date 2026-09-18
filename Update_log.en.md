@@ -477,3 +477,9 @@
 - Fixed Chargers getting stuck against ordinary doors without punching when the door blocks sight of their target. While grounded and slowed by an obstacle, they check for an ordinary door within claw range along their movement direction and prioritize a normal claw attack.
 - Walls, players, and other entities still block detection. Saferoom doors, unbreakable doors, and airborne, ladder, stagger, charge, or pin states are excluded.
 - Added door behavior regression checks and recompiled `ai_charger3.smx`.
+
+### 2026-09-17 Restore Tank target-tracking turn thresholds
+
+- Restored `ai_tank3_airvec_modify_degree` to 60 / 55 / 50 / 45 / 45 / 45 degrees across the six tiers and `ai_tank3_airvec_modify_degree_max` to 135 for every tier. Plugin defaults return to 45 / 135 degrees.
+- The shared movement code still caps the allowed direction error at 89 degrees. Path following from 1 degree, refreshed airborne paths, alternating hops, safe drops and difficulty-based rock protection remain in place.
+- Updated the 3D demonstration and parameter documentation; recompiled `ai_tank3.smx`.

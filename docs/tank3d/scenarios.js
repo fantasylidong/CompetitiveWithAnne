@@ -9,12 +9,12 @@ const DROP_LAND = DROP_LAUNCH + DROP_AIR_TIME;
 const DROP_LAND_X = -1 + DROP_SPEED * DROP_AIR_TIME;
 const DROP_FINISH = DROP_LAND + (8.8 - DROP_LAND_X) / DROP_SPEED;
 export const DIFFICULTIES = [
-  { angle:8, minTurn:10, legacyMinTurn:60, impulse:.40, first:0, cap:5, stop:2.2 },
-  { angle:10, minTurn:8, legacyMinTurn:55, impulse:.48, first:.2, cap:6, stop:1.9 },
-  { angle:12, minTurn:6, legacyMinTurn:50, impulse:.55, first:.4, cap:7, stop:1.6 },
-  { angle:15, minTurn:5, legacyMinTurn:45, impulse:.60, first:.6, cap:8, stop:1.35 },
-  { angle:18, minTurn:4, legacyMinTurn:45, impulse:.65, first:.8, cap:8, stop:1.2 },
-  { angle:20, minTurn:3, legacyMinTurn:45, impulse:.65, first:1, cap:10, stop:1.2 },
+  { angle:8, minTurn:60, legacyMinTurn:60, impulse:.40, first:0, cap:5, stop:2.2 },
+  { angle:10, minTurn:55, legacyMinTurn:55, impulse:.48, first:.2, cap:6, stop:1.9 },
+  { angle:12, minTurn:50, legacyMinTurn:50, impulse:.55, first:.4, cap:7, stop:1.6 },
+  { angle:15, minTurn:45, legacyMinTurn:45, impulse:.60, first:.6, cap:8, stop:1.35 },
+  { angle:18, minTurn:45, legacyMinTurn:45, impulse:.65, first:.8, cap:8, stop:1.2 },
+  { angle:20, minTurn:45, legacyMinTurn:45, impulse:.65, first:1, cap:10, stop:1.2 },
 ];
 const frame = (t,x,y,z,mode='run') => ({t,p:[x,y,z],mode});
 const track = rows => rows.map(row => frame(...row));
@@ -35,18 +35,18 @@ export const SCENARIOS = [
     current:'2.1 在目标超过 600 hu、同层可视且路径支持直追时，逐跳左右交替。空中维持本跳方向；接近目标、侧路受阻或即将经过特殊路径段时取消偏角。',
     refactor:'2.0 已按路径决定连跳方向，但还没有主动左右交替。本场景的安全直路通常仍呈近直线；左右连跳是 2.1 新增。',
     source:'movement.inc · Movement_GroundHop / Movement_UpdateAirDirection；动态配置 ai_tank3_bhop_strafe_angle、ai_tank3_bhop_strafe_min_dist。',
-    moments:[moment(0,'远距起跳','朝预测点起跳','允许安全侧跳','沿直路起跳'),moment(.78,'落地换边','继续直追','确认落地后换边','仍无主动侧跳'),moment(2.32,'连续观察','近直线连跳','左右交替；空中平滑跟随','保持路径连跳'),moment(5.4,'接近目标','接近后停跳出拳','距离不足 600 hu 时取消偏角','接近后停跳出拳')],
+    moments:[moment(0,'远距起跳','朝预测点起跳','允许安全侧跳','沿直路起跳'),moment(.78,'落地换边','继续直追','确认落地后换边','仍无主动侧跳'),moment(2.32,'连续观察','近直线连跳','左右交替；按原门槛修正','保持路径连跳'),moment(5.4,'接近目标','接近后停跳出拳','距离不足 600 hu 时取消偏角','接近后停跳出拳')],
   },
   {
-    ...shared,id:'moving',group:'移动与转向',title:'追逐横移的目标',tag:'2.1 改进',
-    description:'生还者持续横移：对比空中小角度跟随与等到下一次起跳才明显修正。',
+    ...shared,id:'moving',group:'移动与转向',title:'追逐横移的目标',tag:'追人门槛已恢复',
+    description:'生还者持续横移：直追角度门槛已恢复原值，小幅走位通常等到下一跳重新对准；可观察左右连跳的差异。',
     dynamic:true,floor:[34,16],center:[2,0,1],route:[[-9,0,0],[8,0,0],[13,0,4]],
     survivors:[person('S1',[[0,10,0,0],[2,12,0,1.6],[4,14,0,3.2],[6,14,0,.5],[8,14,0,-1.8]])],
     old:'地面起跳会预测目标位置，但空中方向误差要进入较大的角度窗口才修正。小幅横移容易表现为一跳内基本不转，落地后重新对准。',
-    current:'2.1 每 0.05 秒刷新目标或安全路径前瞻，直追修正下限按难度降至 3°–10°，用平滑响应追随；仍保留 89° 上限和转向路线安全检查。',
-    refactor:'2.0 改善了路径选择，但空中修正仍沿用较大的角度窗口。本场景可看到逐跳重定向，持续的小角度跟随属于 2.1。',
+    current:'2.1 保留每 0.05 秒刷新与转向安全检查；追人门槛恢复为 60/55/50/45/45/45°，小角差不再主动追随。上限配置恢复 135°，实际仍受共享代码 89° 限制；沿导航路径跟随仍从 1° 开始。',
+    refactor:'2.0 改善了路径选择，空中追人使用较大的角度窗口；当前 2.1 也已恢复相同追人门槛，保留路径续接与左右连跳。',
     source:'movement.inc · Movement_AirControl / Movement_UpdateAirDirection；ai_tank3_airvec_modify_degree / interval。',
-    moments:[moment(0,'开始追逐','预测起跳方向','预测起跳并检查侧路'),moment(1.7,'目标横移','小角度变化不立即跟随','空中持续平滑跟随','等待较大角差或下一跳'),moment(4.1,'目标折返','下一跳重新定向','刷新前瞻并渐进转向','逐跳重定向'),moment(6.3,'近身跟随','转为近身追逐','取消侧跳，继续追人')],
+    moments:[moment(0,'开始追逐','预测起跳方向','预测起跳并检查侧路'),moment(1.7,'目标横移','小角度变化不立即跟随','小角差保持本跳方向','等待较大角差或下一跳'),moment(4.1,'目标折返','下一跳重新定向','达到角度门槛或下一跳再调整','逐跳重定向'),moment(6.3,'近身跟随','转为近身追逐','取消侧跳，继续追人')],
   },
   {
     ...shared,id:'corner',group:'移动与转向',title:'绕过弯道与墙角',tag:'2.0 + 2.1',
@@ -227,7 +227,7 @@ export function makeMovementTrack(scene,version,{difficulty=4,strafe=true}={}) {
       if(version==='2.1'&&strafe&&distance>6) desired+=(hop%2===0?1:-1)*d.angle*Math.PI/180;
       const diff=wrap(desired-heading), degrees=Math.abs(diff)*180/Math.PI;
       const min=version==='2.1'?d.minTurn:d.legacyMinTurn;
-      const max=version==='2.1'?89:135;
+      const max=version==='old'?135:89;
       if(degrees>=min&&degrees<max) heading+=diff*(1-Math.exp(-dt/.84));
     }
     let mode=jumping?'hop':'run';

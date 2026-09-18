@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.16",
+	version 		= "1.0.1.17",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -246,6 +246,19 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	isCharging = view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
 	if (isCharging && g_AiChargers[client].m_bChargeDelayed)
 		g_AiChargers[client].m_bChargeDelayed = false;
+
+	// 所有状态统一让出原生冲锋、控人及撞停硬直；不能让 Bait 走位或空中修正绕过保护。
+	if (isChargerInNativeMotion(client)) {
+		AIPathMovement_Reset(client);
+		AIPathMovement_ResetHopChain(client);
+		g_AiChargers[client].m_BhopType = BhopType_None;
+		g_AiChargers[client].m_AirStrafe.init();
+		ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+		g_AiChargers[client].m_flLastHopSpeed = 0.0;
+		g_AiChargers[client].m_bBhopBeforeCharge = false;
+		g_AiChargers[client].m_flFinalBhopStartTime = 0.0;
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
+	}
 	
 	static int target;
 	target = GetClientOfUserId(g_AiChargers[client].m_iTarget);
@@ -649,12 +662,8 @@ stock void maintainEvadeMoveCommand(int client) {
 		return;
 	}
 
-	if (isChargerCharging(client) ||
-		IsValidSurvivor(L4D2_GetQueuedPummelVictim(client)) ||
-		IsValidSurvivor(L4D_GetVictimCharger(client)) ||
-		IsValidSurvivor(L4D_GetVictimCarry(client))
-	) {
-		stopEvadeMoveCommand(client, "charging or pinning");
+	if (isChargerInNativeMotion(client)) {
+		stopEvadeMoveCommand(client, "charging, pinning or staggering");
 		return;
 	}
 
@@ -728,11 +737,7 @@ Action chargerEvade_OnUpdate(BehaviorAction action, int actor, float interval, A
 		return Plugin_Continue;
 	}
 	// 撞停准备控人的时候有时候会触发 Evade 行为
-	if (isChargerCharging(actor) ||
-		IsValidSurvivor(L4D2_GetQueuedPummelVictim(actor)) ||
-		IsValidSurvivor(L4D_GetVictimCharger(actor)) ||
-		IsValidSurvivor(L4D_GetVictimCarry(actor))
-	) {
+	if (isChargerInNativeMotion(actor)) {
 		return Plugin_Continue;
 	}
 
@@ -771,12 +776,7 @@ void issueEvadeMoveCommandNextFrame(any userId) {
 		return;
 
 	g_AiChargers[actor].m_bEvadeMoveCommandPending = false;
-	if (!g_cvAntiRetreat.BoolValue ||
-		isChargerCharging(actor) ||
-		IsValidSurvivor(L4D2_GetQueuedPummelVictim(actor)) ||
-		IsValidSurvivor(L4D_GetVictimCharger(actor)) ||
-		IsValidSurvivor(L4D_GetVictimCarry(actor))
-	) {
+	if (!g_cvAntiRetreat.BoolValue || isChargerInNativeMotion(actor)) {
 		clearEvadeMoveCommandTracking(actor);
 		return;
 	}

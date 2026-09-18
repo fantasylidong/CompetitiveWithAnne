@@ -78,8 +78,8 @@ public void OnPluginStart()
     g_cvBhopStrafeMinDist = CreateConVar("ai_tank3_bhop_strafe_min_dist", "600.0", "距离目标超过该值才主动左右连跳", CVAR_FLAGS, true, 0.0);
 
     // 空速矫正
-    g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "5.0", "追人时空速方向与目标方向角 >=此值 开始修正；路径跟随固定从1度开始", CVAR_FLAGS, true, 0.0);
-    g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "89.0", "角度 >此值 不再修正，实际最大89度", CVAR_FLAGS, true, 0.0);
+    g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "追人时空速方向与目标方向角 >=此值 开始修正；路径跟随固定从1度开始", CVAR_FLAGS, true, 0.0);
+    g_cvAirVecModifyMaxDegree = CreateConVar("ai_tank3_airvec_modify_degree_max", "135.0", "角度 >此值 不再修正，实际最大89度", CVAR_FLAGS, true, 0.0);
     g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中转向平滑响应时间(秒)，每0.05秒检查一次", CVAR_FLAGS, true, 0.1);
 
     // 投石 / 挥拳
