@@ -121,7 +121,7 @@ public Plugin myinfo =
 	name 			= "Ai-Smoker 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai-Smoker 增强 3.0 版本",
-	version 		= "1.0.1.4",
+	version 		= "1.0.1.5",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -400,6 +400,11 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 		return Plugin_Continue;
 	if (maintainTongueCutRetreat(client))
 		return Plugin_Continue;
+	// 舌头伸出期间不连跳、不做空中速度修正；这些用 TeleportEntity 直接改速度，会绕开 l4d_air_abilities_patch 的定身
+	if (isTongueOut(client)) {
+		checkShouldBackVision(client);
+		return Plugin_Continue;
+	}
 
 	static int target;
 	target = GetClientOfUserId(g_AiSmokers[client].m_iTarget);
@@ -417,7 +422,8 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 
 	// 无法立刻攻击时, 判断是否允许进行连跳操作
 	Action bhopResult = checkeEnableBhop(client, target, buttons, pos, targetPos, dist, visible);
-	bool forceAirPull = g_cvJumpPull.BoolValue && !IsClientOnGround(client)
+	// 梯子上同样没有 m_hGroundEntity，但爬梯不算空中，不能在梯子上强制吐舌
+	bool forceAirPull = g_cvJumpPull.BoolValue && !IsClientOnGround(client) && GetEntityMoveType(client) != MOVETYPE_LADDER
 		&& isSmokerReadyToAttack(client) && isTargetEnterAttackRange(client, target, dist);
 	if (forceAirPull)
 		buttons |= IN_ATTACK;
@@ -494,6 +500,19 @@ stock bool isPullingSomeone(int client) {
 		return false;
 	
 	return true;
+}
+
+/**
+* 检查 Smoker 舌头是否伸出 (出舌、拉人、收舌), 与原版拉人定身 CTongue::IsTongueActive 的判定一致
+* @param client 客户端索引
+* @return bool 舌头是否伸出
+**/
+stock bool isTongueOut(int client) {
+	static int ability;
+	ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+	if (ability > MaxClients && HasEntProp(ability, Prop_Send, "m_tongueState"))
+		return GetEntProp(ability, Prop_Send, "m_tongueState") != 0;
+	return GetEntPropEnt(client, Prop_Send, "m_tongueVictim") > 0;
 }
 
 /**

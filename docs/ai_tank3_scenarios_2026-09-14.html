@@ -199,10 +199,10 @@ footer{border-top:1px solid var(--rule);padding-top:16px;color:var(--ink-3);font
 <div class="page">
   <header class="top">
     <div>
-      <p class="eyebrow">ANNE · AI TANK · ai_tank3 2.0.0</p>
+      <p class="eyebrow">ANNE · AI TANK · ai_tank3 1.x / 2.x</p>
       <h1>ai_tank3 情景图鉴</h1>
-      <p class="lede">同一个场面，1.x 和 2.0 各自会怎么走、为什么这么走。图是照着插件源码的判定逻辑画的示意，不是游戏录像，数值按 Anne 配置和极限档取。</p>
-      <p class="lede">本页保留 2.0.0 的历史行为对照。2.1.0 已加入空中路径刷新、小角度跟随和远距离左右连跳；当前参数与行为见<a href="annehappy_dynamic_ai_difficulty.md">动态 AI 难度说明</a>。也可以打开<a href="ai_tank3_3d.html">可旋转视角的 3D 动画对照</a>，同步查看 1.x、2.0 和 2.1 的行为。</p>
+      <p class="lede">同一个场面，1.x 和重写后的 2.x 各自会怎么走、为什么这么走。图是照着插件源码的判定逻辑画的示意，不是游戏录像，数值按 Anne 配置和极限档取。</p>
+      <p class="lede">情景图按 2.0 重写时的判定画，之后的版本在此基础上又改了几处：2.1 加了空中路径刷新、小角度跟随和距离 600 以外的左右连跳，落差不超过 256 的安全下落改为保速跃出（“同一层空地追人”和“前方是高台边沿”两个情景里有注明）；2.2 细化了寻路估距、放宽了换目标门槛，被喷的人得分 ×2，通背拳不再补刀倒地的人。“高台上的人 vs 地面上的人”和下面的选目标计算器按 2.2 的规则算。完整参数见<a href="annehappy_dynamic_ai_difficulty.md">动态 AI 难度说明</a>，也可以打开<a href="ai_tank3_3d.html">可旋转视角的 3D 动画对照</a>，同步查看 1.x、2.0 和 2.1 的行为。</p>
     </div>
     <dl class="basis" aria-label="图里用到的数值">
       <div><dt>sv_gravity</dt><dd>750</dd></div>
@@ -253,7 +253,7 @@ footer{border-top:1px solid var(--rule);padding-top:16px;color:var(--ink-3);font
       <form class="tool" id="pickTool" autocomplete="off">
         <header>
           <h3>选目标打分</h3>
-          <p>1.x 让 target override 按直线距离挑；2.0 用分档寻路距离打分，再加换目标粘滞。</p>
+          <p>1.x 让 target override 按直线距离挑；2.2 用细化后的寻路距离打分，再加换目标粘滞。换目标的四个 cvar 可以直接改。</p>
         </header>
         <div class="srows" role="group" aria-label="生还者">
           <div class="srow head" aria-hidden="true"><span>当前目标</span><span></span><span>直线 hu</span><span>寻路 hu</span><span>走不到</span><span>状态</span></div>
@@ -283,7 +283,11 @@ footer{border-top:1px solid var(--rule);padding-top:16px;color:var(--ink-3);font
           </div>
         </div>
         <div class="fields">
-          <label>距上次换目标 <span class="hint">秒 · ai_tank3_target_commit_time = 2</span><input type="number" name="since" value="3" min="0" max="60" step="0.5"></label>
+          <label>距上次换目标 <span class="hint">秒</span><input type="number" name="since" value="3" min="0" max="60" step="0.5"></label>
+          <label>换目标间隔 <span class="hint">ai_tank3_target_commit_time · 秒</span><input type="number" name="commit" value="1" min="0" max="10" step="0.5"></label>
+          <label>比例门槛 <span class="hint">ai_tank3_target_switch_ratio</span><input type="number" name="ratio" value="0.85" min="0.1" max="1" step="0.05"></label>
+          <label>最小差值 <span class="hint">ai_tank3_target_switch_gain</span><input type="number" name="gain" value="75" min="0" max="1000" step="5"></label>
+          <label>立即换比例 <span class="hint">ai_tank3_target_decisive_ratio · 0 关闭</span><input type="number" name="decisive" value="0.5" min="0" max="1" step="0.05"></label>
           <label class="check"><input type="checkbox" name="frozen"> 在梯子窗口内 / 爬梯或攀爬中</label>
         </div>
         <div class="table-wrap" id="pickTable"></div>
@@ -293,7 +297,7 @@ footer{border-top:1px solid var(--rule);padding-top:16px;color:var(--ink-3);font
   </section>
 
   <footer>
-    <span>依据：addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp 与 ai_tank3/*.inc（2.0.0），1.x 行为取自重写前的 ai_tank3.sp（1.0.0.13）。</span>
+    <span>依据：addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp 与 ai_tank3/*.inc。情景图按 2.0.0 画，选目标情景和计算器按 2.2.0；1.x 行为取自重写前的 ai_tank3.sp（1.0.0.13）。</span>
     <span>坐标单位是 Hammer 单位（hu）；网格细线 64 hu、粗线 256 hu。极限档数值取自 dynamic_ai_difficulty.cfg 的 level5。</span>
   </footer>
 </div>
@@ -385,7 +389,7 @@ const SCENARIOS = [
 },
 {
   id:'open', group:'移动 · 梯子', title:'同一层空地追人', kind:'same', chip:'与 1.x 相同', same:true,
-  verdict:'看得见、同一高度、路径本来就朝着目标时，2.0 和 1.x 一模一样：推力朝目标 1 秒后的位置，落地接着跳拿满推力，空中渐进修正。强度没有削。',
+  verdict:'看得见、同一高度、路径本来就朝着目标时，2.0 和 1.x 一模一样：推力朝目标 1 秒后的位置，落地接着跳拿满推力，空中渐进修正。强度没有削。2.1 起，距离目标 600 以外还会逐跳左右交替偏一个角度（ai_tank3_bhop_strafe_angle，六档 8–20°），近身、拐弯或侧路受阻时回到正常追踪。',
   alt:'俯视图：同一层空地，Tank 朝移动中的生还者的预测位置连跳。',
   caption:'俯视，单位 hu。这个情景 1.x 与 2.0 相同，只画一条轨迹。',
   view:{mode:'top', x0:0, x1:1400, z0:-220, z1:380},
@@ -415,7 +419,7 @@ const SCENARIOS = [
 },
 {
   id:'drop', group:'移动 · 梯子', title:'前方是高台边沿，人在下面', kind:'detail', chip:'细节改进',
-  verdict:'路径上的下落超过 56，2.0 把这一跳限速到正好落在边沿前 64，再让 NextBot 自己走下去，下落过程插件不碰速度。1.x 的断层检测也会拦下危险起跳，但上一跳留下的空中修正状态没有清，走下边沿时可能被朝人拧，还会被补回上一跳的速度。',
+  verdict:'路径上的下落超过 56，2.0 把这一跳限速到正好落在边沿前 64，再让 NextBot 自己走下去，下落过程插件不碰速度。1.x 的断层检测也会拦下危险起跳，但上一跳留下的空中修正状态没有清，走下边沿时可能被朝人拧，还会被补回上一跳的速度。2.1 起，路径明确、落差不超过 256 的普通下落在安全检查通过后改为保速跃出、落地立即续跳，本图画的是 2.0 的提前减速。',
   alt:'侧视图：Tank 在高台上，生还者在 200 hu 下方；2.0 在边沿前 64 落地后走下去。',
   caption:'侧视，单位 hu。实线是 2.0，虚线是 1.x。',
   view:{mode:'side', x0:0, x1:1500, z0:-60, z1:420},
@@ -450,10 +454,10 @@ const SCENARIOS = [
   cvars:['ai_tank3_bhop_max_speed 800', 'ai_tank3_path_lookahead_maxdepth 10']
 },
 {
-  id:'pick', group:'选目标', title:'高台上的人 vs 地面上的人', kind:'change', chip:'行为改变',
-  verdict:'1.x 由 target override 按直线距离挑人，还不设冷却；Tank 往梯子绕的时候 A、B 轮流变成“最近”，目标来回换，路线也跟着来回重算。2.0 按分档寻路距离打分，选好走的 B，之后只有新目标明显更近、且过了 2 秒才换。',
-  alt:'俯视图：A 在要绕梯子才上得去的高台上，B 在地面；1.x 在两人之间来回换，2.0 追 B。',
-  caption:'俯视，单位 hu。分档估距：用有长度上限的寻路依次试直线距离的 1.15、1.5、2.25、3.5、6、10 倍（封顶 3000），第一档走得通就按这一档计分。',
+  id:'pick', group:'选目标', title:'高台上的人 vs 地面上的人', kind:'change', chip:'行为改变', newLabel:'2.2',
+  verdict:'1.x 由 target override 按直线距离挑人，还不设冷却；Tank 往梯子绕的时候 A、B 轮流变成“最近”，目标来回换，路线也跟着来回重算。2.2 按细化后的寻路距离打分，选好走的 B；之后新目标得分要低 15% 且至少低 75、并隔 1 秒才换，得分不到当前一半时立刻换。',
+  alt:'俯视图：A 在要绕梯子才上得去的高台上，B 在地面；1.x 在两人之间来回换，2.2 追 B。',
+  caption:'俯视，单位 hu。估距：用有长度上限的寻路依次试直线距离的 1.15、1.5、2.25、3.5、6、10 倍（封顶 3000），第一档走得通后，在上一档与这一档之间二分到 64 以内取中点。',
   view:{mode:'top', x0:-100, x1:1100, z0:-320, z1:380},
   raised:[{r:[250,40,470,260], t:'高台 +160', tp:[262,238]}], ladders:[[470,170,486,230]],
   nav:[{p:[[100,0],[500,-10],[500,200],[478,200],[380,150]], t:'去 A：绕到梯子，寻路约 700', tp:[520,70]}],
@@ -464,8 +468,8 @@ const SCENARIOS = [
   oldOps:[['run',100,0,300,-40], ['run',300,-40,400,-90], ['run',400,-90,330,-50], ['run',330,-50,420,-100], ['run',420,-100,350,-62]],
   oldMarks:[[1,100,0,0,26], [2,400,-90,16,24], [3,330,-50,-22,22], [4,350,-62,30,6]],
   newSteps:[
-    'A 寻路 700，落在 3.5 倍档（875）；B 寻路 380，落在 1.15 倍档（402）。再加“直线 × 0.01”：A 877.5，B 406。',
-    '追 B。之后要换目标，新目标得分必须 ≤ 当前 × 0.75、至少近 150，而且距上次换目标 ≥ 2 秒；在梯子窗口、爬梯或攀爬时不换。'
+    'A 寻路 700：2.25 倍档（562.5）走不通、3.5 倍档（875）走得通，在两者之间二分到 64 以内，估 699；B 寻路 380：1.15 倍档（402.5）就走得通，350–402.5 已经够窄，取中点 376。再加“直线 × 0.01”：A 701.7，B 379.8。',
+    '追 B。之后要换目标，新目标得分必须 ≤ 当前 × 0.85、至少低 75，而且距上次换目标 ≥ 1 秒；新目标得分不到当前一半时不等这 1 秒；在梯子窗口、爬梯或攀爬时不换。'
   ],
   oldSteps:[
     '候选是 PVS 里的 A、B，按到 Tank 眼睛的直线距离排：A 250 更近，追 A。',
@@ -473,19 +477,19 @@ const SCENARIOS = [
     '朝 B 走两步，A 又更近 → 换回 A，ChasePath 每换一次就重算路线。',
     '在高台边原地打转，还会喂给头顶卡的“2 秒没挪动”判定。'
   ],
-  chainTitle:'2.0 这一次选目标的判定',
+  chainTitle:'2.2 这一次选目标的判定',
   chain:[
     ['过滤：被猎人 / 猴子 / 牛控的人（pinned 14）', 'A、B 都不是', 'pass'],
     ['过滤：安全屋里的人（safe 1）', '都不在', 'pass'],
     ['倒地的人（incap 0）', '只在没有站着的人时兜底', 'info'],
-    ['A 分档估距', '700 ≤ 250 × 3.5 = 875', 'info'],
-    ['B 分档估距', '380 ≤ 350 × 1.15 = 402', 'info'],
-    ['得分（+ 直线 × 0.01，被喷 × 1.25）', 'A 877.5 · B 406', 'info'],
-    ['当前 A → 换 B？', '406 ≤ 877.5 × 0.75，差 471 ≥ 150，已过 2 秒', 'pass'],
+    ['A 分档 + 二分', '562.5 < 700 ≤ 875，二分后估 699', 'info'],
+    ['B 分档 + 二分', '350 ≤ 380 ≤ 402.5，区间已够窄，估 376', 'info'],
+    ['得分（+ 直线 × 0.01，被喷 × 2）', 'A 701.7 · B 379.8', 'info'],
+    ['当前 A → 换 B？', '379.8 ≤ 701.7 × 0.85，低 322 ≥ 75，已过 1 秒', 'pass'],
     ['梯子窗口 / 爬梯中', '否', 'pass'],
     ['结果', '追 B，并登记到 target override 的锁定计数', 'result']
   ],
-  cvars:['ai_tank3_target_select 1', 'ai_tank3_target_switch_ratio 0.75', 'ai_tank3_target_commit_time 2.0']
+  cvars:['ai_tank3_target_select 1', 'ai_tank3_target_switch_ratio 0.85', 'ai_tank3_target_switch_gain 75', 'ai_tank3_target_commit_time 1.0', 'ai_tank3_target_decisive_ratio 0.5']
 },
 {
   id:'overhead-alt', group:'头顶 · 骑头', title:'人卡在够不着的高处，还有别人可追', kind:'detail', chip:'去掉命令',
@@ -767,11 +771,11 @@ const SCENARIOS = [
     return svg;
   }
 
-  function legendHtml(same) {
+  function legendHtml(same, newLabel) {
     const line = style => `<svg width="26" height="8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" style="${style}"/></svg>`;
     const box = style => `<svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" style="${style}"/></svg>`;
     return [
-      `<li>${line('stroke:var(--new);stroke-width:2.5')}2.0</li>`,
+      `<li>${line('stroke:var(--new);stroke-width:2.5')}${esc(newLabel)}</li>`,
       same ? '' : `<li>${line('stroke:var(--old);stroke-width:2.5;stroke-dasharray:6 4')}1.x</li>`,
       `<li>${line('stroke:var(--ink-3);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round')}NextBot 路径</li>`,
       `<li>${box('fill:var(--tank)')}Tank</li>`,
@@ -817,6 +821,7 @@ const SCENARIOS = [
     const steps = (arr, name) => `<ol class="steps">${arr.map((t, i) =>
       `<li data-k="${name}-${i + 1}"><span class="num ${name}">${i + 1}</span><span>${esc(t)}</span></li>`).join('')}</ol>`;
 
+    const newLabel = s.newLabel || '2.0';
     const art = $('#scenario');
     art.innerHTML = `
       <div class="scn-head">
@@ -826,12 +831,12 @@ const SCENARIOS = [
       </div>
       <div class="toolbar">
         ${s.same ? '<span></span>' : `<div class="seg" role="group" aria-label="轨迹显示">
-          <button type="button" data-show="both">两者对照</button><button type="button" data-show="new">只看 2.0</button><button type="button" data-show="old">只看 1.x</button></div>`}
-        <ul class="legend">${legendHtml(s.same)}</ul>
+          <button type="button" data-show="both">两者对照</button><button type="button" data-show="new">只看 ${esc(newLabel)}</button><button type="button" data-show="old">只看 1.x</button></div>`}
+        <ul class="legend">${legendHtml(s.same, newLabel)}</ul>
       </div>
       <figure class="viewport"><div class="vp-scroll"></div><figcaption>${esc(s.caption)}</figcaption></figure>
       <div class="compare${s.same ? ' single' : ''}">
-        <section class="col"><h3><span class="swatch"></span>2.0 会怎么做</h3>${steps(s.newSteps, 'new')}</section>
+        <section class="col"><h3><span class="swatch"></span>${esc(newLabel)} 会怎么做</h3>${steps(s.newSteps, 'new')}</section>
         ${s.same ? '' : `<section class="col"><h3><span class="swatch old"></span>1.x 当时怎么做</h3>${steps(s.oldSteps, 'old')}</section>`}
       </div>
       <div class="trace"><table><caption>${esc(s.chainTitle)}</caption><tbody>
@@ -930,15 +935,24 @@ const SCENARIOS = [
   const STATES = [['normal', '正常'], ['vomit', '被喷'], ['incap', '倒地'], ['hang', '挂边'], ['smoker', '被舌头拉'], ['pinned', '被猎人/猴子/牛控'], ['saferoom', '在安全屋']];
   const STATE_NAME = Object.fromEntries(STATES);
   function estimateTravel(straight, path) {
-    const ratios = [1.15, 1.5, 2.25, 3.5, 6, 10], CAP = 3000;
-    let tested = 0;
-    for (const r of ratios) {
-      const limit = Math.min(straight * r, CAP);
-      if (limit <= tested) continue;
-      tested = limit;
-      if (path <= limit) return {value: limit, label: `${r} 倍档 ${fmt1(limit)}`};
+    // 2.2：分档找第一个走得通的长度上限，再在上一档与这一档之间二分到 64 以内，取中点
+    const ratios = [1.15, 1.5, 2.25, 3.5, 6, 10], CAP = 3000, PREC = 64, STEPS = 4;
+    const limits = ratios.map(r => [Math.min(straight * r, CAP), `${r} 倍档`]).concat([[CAP, '封顶档']]);
+    let lower = straight;
+    for (const [limit, name] of limits) {
+      if (limit <= lower) continue;
+      if (path <= limit) {
+        let lo = lower, hi = limit, steps = 0;
+        while (steps < STEPS && hi - lo > PREC) {
+          const mid = (lo + hi) / 2;
+          if (path <= mid) hi = mid; else lo = mid;
+          steps++;
+        }
+        const value = (lo + hi) / 2;
+        return {value, label: `${name} ${fmt1(limit)} 走得通${steps ? `，二分 ${steps} 次` : ''} → ${fmt1(value)}`};
+      }
+      lower = limit;
     }
-    if (tested < CAP && path <= CAP) return {value: CAP, label: `封顶档 ${CAP}`};
     return {value: -1, label: '走不到：直线 + 1500'};
   }
 
@@ -954,8 +968,10 @@ const SCENARIOS = [
     const currentId = f.elements.current.value;
     const since = parseFloat(f.elements.since.value) || 0;
     const frozen = f.elements.frozen.checked;
+    const num = (name, def) => { const v = parseFloat(f.elements[name].value); return Number.isFinite(v) ? v : def; };
+    const commit = num('commit', 1), ratio = num('ratio', 0.85), gain = num('gain', 75), decisiveRatio = num('decisive', 0.5);
 
-    // 2.0：沿用 target override 的 pinned 14 / incap 0 / safe 1
+    // 2.2：沿用 target override 的 pinned 14 / incap 0 / safe 1
     rows.forEach(r => {
       if (r.state === 'hang' || r.state === 'saferoom' || r.state === 'pinned') { r.tier = 0; r.tierText = '排除（' + STATE_NAME[r.state] + '）'; }
       else if (r.state === 'incap') { r.tier = 2; r.tierText = '兜底（倒地）'; }
@@ -964,7 +980,7 @@ const SCENARIOS = [
       r.estLabel = est.label;
       let score = est.value === -1 ? r.straight + 1500 : Math.max(est.value, r.straight);
       score += r.straight * 0.01;
-      if (r.state === 'vomit') score *= 1.25;
+      if (r.state === 'vomit') score *= 2;
       r.score = score;
     });
     let best = null;
@@ -976,10 +992,23 @@ const SCENARIOS = [
     } else if (cur.tier > 0 && cur.tier === best.tier) {
       if (cur === best) { pickNew = cur; whyNew = `${cur.id} 本来就是得分最低的，保持。`; }
       else if (frozen) { pickNew = cur; whyNew = `在梯子窗口 / 爬梯中，冻结换目标，保持 ${cur.id}。`; }
-      else if (since < 2) { pickNew = cur; whyNew = `距上次换目标 ${fmt1(since)} 秒，不到 2 秒，保持 ${cur.id}。`; }
-      else if (best.score > cur.score * 0.75) { pickNew = cur; whyNew = `${best.id} 得分 ${fmt1(best.score)} 高于 ${cur.id} 的 ${fmt1(cur.score)} × 0.75 = ${fmt1(cur.score * 0.75)}，优势不够，保持 ${cur.id}。`; }
-      else if (cur.score - best.score < 150) { pickNew = cur; whyNew = `${best.id} 只近 ${fmt1(cur.score - best.score)}，不到 150，保持 ${cur.id}。`; }
-      else { pickNew = best; whyNew = `${best.id} 得分 ${fmt1(best.score)} ≤ ${fmt1(cur.score)} × 0.75，且近 ${fmt1(cur.score - best.score)} ≥ 150，已过 2 秒 → 换 ${best.id}。`; }
+      else {
+        // 新目标得分不到当前的 decisive 倍：明显更好打，不等换目标间隔（0 = 关闭）
+        const decisive = best.score <= cur.score * decisiveRatio;
+        if (!decisive && since < commit) {
+          pickNew = cur;
+          whyNew = `距上次换目标 ${fmt1(since)} 秒，不到 ${fmt1(commit)} 秒；` + (decisiveRatio > 0
+            ? `${best.id} 得分 ${fmt1(best.score)} 也没到 ${cur.id} 的 ${fmt1(cur.score)} × ${decisiveRatio} = ${fmt1(cur.score * decisiveRatio)}，不能提前换，保持 ${cur.id}。`
+            : `立即换已关闭，保持 ${cur.id}。`);
+        }
+        else if (best.score > cur.score * ratio) { pickNew = cur; whyNew = `${best.id} 得分 ${fmt1(best.score)} 高于 ${cur.id} 的 ${fmt1(cur.score)} × ${ratio} = ${fmt1(cur.score * ratio)}，优势不够，保持 ${cur.id}。`; }
+        else if (cur.score - best.score < gain) { pickNew = cur; whyNew = `${best.id} 只低 ${fmt1(cur.score - best.score)}，不到 ${fmt1(gain)}，保持 ${cur.id}。`; }
+        else {
+          pickNew = best;
+          whyNew = `${best.id} 得分 ${fmt1(best.score)} ≤ ${fmt1(cur.score)} × ${ratio}，且低 ${fmt1(cur.score - best.score)} ≥ ${fmt1(gain)}` +
+            (since < commit ? `；还不到 ${fmt1(commit)} 秒，但得分不到当前的 ${decisiveRatio} 倍，立即换` : `，已过 ${fmt1(commit)} 秒`) + ` → 换 ${best.id}。`;
+        }
+      }
     } else {
       pickNew = best;
       whyNew = cur.tier === 0 ? `当前目标 ${cur.id} 已被排除，直接换 ${best.id}。`
@@ -987,30 +1016,30 @@ const SCENARIOS = [
         : `追得分最低的 ${best.id}。`;
     }
 
-    // 1.x：target override —— order 1 正常生还者 > order 2 被喷，按直线距离；wait 0，150 以内保持
-    const eligible = rows.filter(r => !['pinned', 'saferoom', 'incap', 'hang'].includes(r.state)).sort((a, b) => a.straight - b.straight);
+    // 1.x：target override —— Tank 的 voms2 是 0，被喷的人在候选阶段就被整个挡掉，order 2 实际匹配不到；其余按直线距离，wait 0，150 以内保持
+    const eligible = rows.filter(r => !['pinned', 'saferoom', 'incap', 'hang', 'vomit'].includes(r.state)).sort((a, b) => a.straight - b.straight);
     const order1 = eligible.find(r => r.state === 'normal');
-    const order2 = eligible.find(r => r.state === 'vomit');
-    let pickOld = order1 || order2 || null, whyOld;
-    if ((cur.state === 'normal' || cur.state === 'vomit') && cur.straight < 150) {
+    let pickOld = order1 || null, whyOld;
+    if (cur.state === 'normal' && cur.straight < 150) {
       pickOld = cur; whyOld = `${cur.id} 在 150 以内，保持。`;
     } else if (pickOld) {
-      whyOld = `${pickOld.id} 直线距离 ${fmt(pickOld.straight)} 最近${order1 ? '' : '（没有正常生还者，只剩被喷的人）'}；wait 0，下一次调用又会重新比较。`;
+      whyOld = `${pickOld.id} 直线距离 ${fmt(pickOld.straight)} 最近；wait 0，下一次调用又会重新比较。`;
     } else {
-      whyOld = '没有符合 order 1 / 2 的人：交给游戏原生选。';
+      whyOld = '没有符合 order 1 的人（被喷的人被 voms2 0 挡在候选之外）：交给游戏原生选。';
     }
     rows.forEach(r => {
       if (['pinned', 'saferoom', 'incap', 'hang'].includes(r.state)) r.oldText = '不选（' + STATE_NAME[r.state] + '）';
       else if (r.state === 'smoker') r.oldText = '不选（被控不算正常）';
+      else if (r.state === 'vomit') r.oldText = '不选（voms2 0 挡掉被喷的人）';
       else r.oldText = (r.state === 'normal' ? 'order 1' : 'order 2') + ` · 直线 ${fmt(r.straight)}`;
     });
 
-    $('#pickTable').innerHTML = `<table class="pick-table"><thead><tr><th>生还者</th><th>1.x 候选</th><th>2.0 分层</th><th>分档估距</th><th>2.0 得分</th></tr></thead><tbody>
+    $('#pickTable').innerHTML = `<table class="pick-table"><thead><tr><th>生还者</th><th>1.x 候选</th><th>2.2 分层</th><th>估距</th><th>2.2 得分</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td>${r.id}</td><td class="${pickOld === r ? 'pick' : ''}">${esc(r.oldText)}</td><td class="${pickNew === r ? 'pick' : ''}">${esc(r.tierText)}</td><td>${r.tier ? esc(r.estLabel) : '—'}</td><td class="${pickNew === r ? 'pick' : ''}">${r.tier ? fmt1(r.score) : '—'}</td></tr>`).join('')}
     </tbody></table>`;
     $('#pickVerdicts').innerHTML = `
       <div class="pv old"><b>1.x 追 ${pickOld ? pickOld.id : '—'}</b><span>${esc(whyOld)}</span></div>
-      <div class="pv new"><b>2.0 追 ${pickNew ? pickNew.id : '—'}</b><span>${esc(whyNew)}</span></div>`;
+      <div class="pv new"><b>2.2 追 ${pickNew ? pickNew.id : '—'}</b><span>${esc(whyNew)}</span></div>`;
   }
 
   // ---------- 初始化 ----------

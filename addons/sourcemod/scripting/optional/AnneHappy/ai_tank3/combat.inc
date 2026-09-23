@@ -105,6 +105,10 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw)
         return;
 
     float fistRange = g_cvBackFistRange.FloatValue >= 0.0 ? g_cvBackFistRange.FloatValue : g_fTankSwingRange;
+    float reach[MAXPLAYERS + 1][3];
+    bool down[MAXPLAYERS + 1];
+    int reachCount;
+    bool hasStanding;
     for (int survivor = 1; survivor <= MaxClients; survivor++)
     {
         if (!IsValidSurvivor(survivor) || !IsPlayerAlive(survivor))
@@ -116,7 +120,21 @@ public void L4D_TankClaw_DoSwing_Post(int tank, int claw)
         GetClientEyePosition(survivor, survivorEye);
         if (GetVectorDistance(tankEye, survivorEye) > fistRange || !clientIsVisibleToClient(tank, survivor))
             continue;
-        Combat_SweepFist(claw, survivorEye, survivorEye);
+
+        down[reachCount] = IsClientIncapped(survivor) || IsClientHanging(survivor);
+        if (!down[reachCount])
+            hasStanding = true;
+        reach[reachCount] = survivorEye;
+        reachCount++;
+    }
+
+    // 通背拳是插件额外补的拳，范围内还有人站着时就不补刀倒地/挂边的人：
+    // 否则 Tank 站着打一个人，脚边倒地的队友每一拳都白挨一次，几拳就被打死。周围全倒了才照常扫。
+    for (int i = 0; i < reachCount; i++)
+    {
+        if (hasStanding && down[i])
+            continue;
+        Combat_SweepFist(claw, reach[i], reach[i]);
     }
 }
 

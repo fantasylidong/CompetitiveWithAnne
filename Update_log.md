@@ -1067,3 +1067,46 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 将 `ai_tank3_airvec_modify_degree` 六档恢复为 60 / 55 / 50 / 45 / 45 / 45°，`ai_tank3_airvec_modify_degree_max` 全档恢复 135°；插件默认值恢复 45° / 135°。
 - 实际允许的方向偏差仍由共享移动代码限制在 89°以内；保留从 1° 开始的路径跟随、空中路径续接、左右连跳、安全下落和石头保护分档。
 - 同步 3D 演示和参数说明，重新编译 `ai_tank3.smx`。
+
+### 2026年9月19日 修复 Hunter 空中凭空转向
+
+- 修复 Hunter 在飞扑途中可以反复重新起扑、凭空改变方向的问题。高难度档把 `z_lunge_interval`、`z_lunge_cooldown`、`z_pounce_crouch_delay` 归零并启用 `l4d2_hunter_patch_crouch_pounce 2` 之后，AI 会在空中逐 tick 重新起扑，引擎用新向量覆盖当前速度。现在 `ai_hunter_2` 和 `ai_hunter_new` 在飞扑途中都会屏蔽攻击键。
+- `ai_hunter_2` 的 `angleLunge()` 按“当前位置 → 目标当前位置”整条重算飞扑向量，一旦在空中被触发就会让 Hunter 重新瞄准并拿到一条满速新向量。现在只有刚从地面起扑（离地 0.25 秒以内）才允许改写 `m_queuedLunge`，`ai_hunter_new` 同样处理。
+- 修复 `ai_hunter_2` 算出 `ignoreCrouch` 却从未使用的问题：`l4d2_hunter_patch_crouch_pounce 2` 时 Hunter 不会下蹲，原本会让无视野起扑排队和飞扑前挠人完全不触发。
+- 重新编译 `ai_hunter_2.smx` 和 `ai_hunter_new.smx`。
+
+### 2026年9月19日 修复 1vht 命中率统计时有时无
+
+- `1v1_skeetstats` 的开火计数依赖 `player_left_start_area` 事件置位的 `bPlayerLeftStartArea`，而每次 `round_start` 都会把它清零。该事件漏发、或者出安全屋之后再来一次 `round_start`，整局的开火数就一直是 0，准确度那一行只输出"没开枪"，而不受这个门禁限制的击杀数、空爆数却照常显示。现在改用 left4dhooks 的 `L4D_HasAnySurvivorLeftSafeArea()` 直接问 director，并补上 `L4D_OnFirstSurvivorLeftSafeArea_Post`。
+- 修复命中率可能超过 100% 的问题：`player_hurt` 里的命中不受上述门禁限制，`weapon_fire` 里的开火却受限制。现在两边用同一个条件。
+- `iClientPlaying` 原来只在 `round_start` 和 `player_left_start_area` 赋值，中途接手生还者位置的玩家不会被统计，`GetCurrentSurvivor()` 还可能选到占位的 bot。现在按需重新解析并跳过 bot。
+- 1vht 跑在 versus 下且 `versus_round_restarttimer 2`，`round_start` 会赶在延迟 3 秒的报告之前清空所有计数器，导致整段统计打印成 0 或者干脆不打印。现在在 `round_end` 先把数据快照下来再打印，延迟同时缩短到 2 秒。
+- 重新编译 `1v1_skeetstats.smx`。
+
+### 2026年9月19日 修复跳舞时有人开安全门导致卡死
+
+- 修复跳舞期间别人离开安全区/打开安全门后，跳舞的人回不了正常状态、开不了枪也做不了任何操作的问题。跳舞开始时 `fornite_l4d` 会把 `m_hActiveWeapon` 置为 -1 并记下原武器实体，而 `l4d2_med_dynamic` 在 `player_left_start_area` 时会给每个生还者删掉旧医疗包再发新的。被删掉的正好是跳舞者藏起来的那把时，`WeaponUnblock()` 的实体引用已失效，判断直接跳过，`m_hActiveWeapon` 就永远停在 -1。
+- `fornite_l4d` 现在用 `EventHookMode_Pre` 挂 `player_left_start_area` 和 `door_open`（仅安全门），抢在发放物品的 Post 处理之前让所有人结束跳舞。
+- 跳舞开始时除了武器实体，还记下它所在的槽位。`WeaponUnblock()` 的兜底顺序改为：原武器实体 → 原槽位上现在的武器 → 身上任意一把（只在手上确实空着时），这样拿医疗包跳舞的人恢复后手上还是医疗包，不会被切成主武器。恢复时一并清掉 `m_flNextAttack` / `m_flNextPrimaryAttack` / `m_bInReload`，避免直接改写 `m_hActiveWeapon` 后仍然打不出子弹。
+- `StopEmote()` 原来只在舞蹈实体仍然有效时才恢复视角、武器和 `MOVETYPE_WALK`，实体先一步消失就只清标志位不恢复状态；`TerminateEmote()`（`round_start`、进服、断线都会走）则完全没有恢复移动方式。两者现在统一调用新增的 `RestoreEmoteState()`，无论舞蹈实体在不在都会解除父实体、复原视角、武器和移动方式。
+- 增加兜底自愈：`OnPlayerRunCmd` 发现玩家已经不在跳舞但状态没还原时立即补恢复，卡住的玩家不需要等到死亡或换关。
+- 重新编译 `fornite_l4d.smx`。
+
+### 2026年9月22日 Tank 换目标放宽、被喷降权、通背拳不补刀倒地（ai_tank3 2.2.0）
+
+- 修复 Tank 经常死追一个人、很难换目标的问题。原因叠了三层：一是寻路估距只在游戏调用 `ChooseVictim` 时顺带刷新、每次只刷一个人，走近的生还者还顶着之前更远的估距；二是估距直接取命中档的上限，1.15 倍档和 1.5 倍档之间一跳就差 30%；三是为了压住这些噪声，换目标门槛定得很高（得分低 25% 且至少低 150、间隔 2 秒），生还者挤在一两百单位内时基本换不动。
+- 估距改为在 `OnPlayerRunCmd` 里独立刷新：每只 Tank 每 0.5 秒轮到每个生还者一次（走不到的 1 秒），全插件每 tick 最多算一个人；命中分档后在“上一档走不通、这一档走得通”的区间里再二分到 64 单位以内取中点。得分 = 当前直线距离 × 绕路系数，两次刷新之间跟着实际距离实时变化。
+- 同一层换目标改为：新目标得分 ≤ 当前 × 0.85（`ai_tank3_target_switch_ratio`），且至少低 75（新增 `ai_tank3_target_switch_gain`），距上次换目标 1 秒（`ai_tank3_target_commit_time`）；新目标得分不到当前一半时不等这 1 秒（新增 `ai_tank3_target_decisive_ratio`，0 关闭）。75 大于两人估距误差之和的上限 64，估距噪声不会自己触发换目标；梯子窗口和爬梯期间照旧冻结。
+- 被 Boomer 喷到的生还者，选目标得分倍率从 1.25 提到 2.0。同样的寻路距离下 Tank 会绕开被喷的人，只有附近实在没有别人时才追。
+- 说明一下口径差异：`l4d_target_override` 的 Tank 条目是 `order 1,2` 加 `voms2 0`，被喷的人在候选阶段就被整个挡掉，order 2 其实永远匹配不到；插件这边保留为软性降权，避免身边只剩被喷的人时 Tank 站着发呆。
+- `docs/ai_tank3_scenarios_2026-09-14.html` 不再标注为历史对照：“高台上的人 vs 地面上的人”情景和选目标计算器改按 2.2.0 的规则计算（估距二分、被喷 ×2，四个换目标 cvar 可以在页面上直接改），其余情景仍按 2.0 的判定绘制，“同一层空地追人”“前方是高台边沿”两张补注了 2.1 的变化；同时修正 1.x 对照里被喷生还者的描述（`voms2 0` 在候选阶段就把人挡掉，轮不到 order 2）。当前参数见 `docs/annehappy_dynamic_ai_difficulty.md`。
+- 通背拳不再给倒地/挂边的人补刀：范围内还有人站着时，额外的 `SweepFist` 只扫站着的，周围全倒了才照常扫。原来这段循环只判断“活着、看得见、128 以内”，Tank 站定打一个人时，脚边倒地的队友每一拳都要白挨一次，几拳就被打死（1.x 同一段循环也是这样）。
+- 重新编译 `ai_tank3.smx`。
+
+### 2026年9月22日 所有档位禁止 Smoker 在梯子上拉人
+
+- 修复 Neri 档 Smoker 可以在梯子上吐舌拉人、拉住后还一边拖人一边继续往上爬的问题。Neri 开启的 `l4d_air_abilities_patch_neri` 为了让 Smoker 能在空中吐舌、空中拉人，去掉了原版舌头两处“必须站在地面”的判断：`CTongue::IsAbilityReadyToFire` 的吐舌条件，以及 `CTongue::OnUpdateAttachedToTargetState` 里“离地就断舌”的处理。爬梯子同样不算站在地面，所以 Smoker 在梯子上也能吐舌，拉住之后舌头也不会断。原版拉人时靠 `GetRunTopSpeed` 把 Smoker 的移动速度压到 1 来定身，但爬梯用的是固定爬梯速度，不受这个限制，AI 的爬梯动作就接着执行，把人一路往上拖；`l4d2_ai_ladder_boost` 的爬梯加速又把这个速度放大了几倍。
+- 空拉是空拉，不是梯子拉：`l4d_air_abilities_patch` 现在不分档位、也不看 Neri 补丁是否开启，只要 Smoker 处于爬梯状态，舌头一律视为未就绪，AI 和真人都吐不出舌头；已经拉住人的 Smoker 一旦进入爬梯状态就立即松舌（走原版断舌同一个 `ReleaseTongueVictim` 流程，照常进入冷却）。原版虽然要求站在地面才能出舌，但刚攀上梯子底部、脚还贴着地面时仍算落地，这种情况现在也一并禁止。Neri 档的空中吐舌、空中拉人不受影响。
+- 拉人期间真正定身：原版所谓“拉住人不能动”，只是舌头伸出期间把 Smoker 的跑速上限压到 1、再去掉跳和蹲（`CTerrorGameMovement::CheckParameters`），前进键和移动输入都还在。上梯子只看有没有朝梯子方向的移动输入、离梯子是否在 2 个单位以内，所以 AI 走到梯子底下正要爬时在地面拉到人，寻路还在往梯子里顶，就会直接挂上梯子，按固定爬梯速度往上爬（原版会因为离地断舌，Neri 档则一路拖着人爬）。现在从舌头伸出到收回（`m_tongueState` 非 0，和原版定身用的是同一个判定），所有 Smoker 的移动键和移动输入都会被清掉，真正一动不动，根本挂不上梯子，这一口也不会因为强制松舌白白浪费；“拉着人上了梯子就松舌”保留作兜底。`ai_smoker3` 在这段时间里也不再连跳、不做空中速度修正，因为这两样是直接改速度，会绕开定身。
+- `ai_smoker3_jump_pull` 原来用“没有落地实体”来判断是否在空中，梯子上同样满足，AI 会在梯子上一直按吐舌键。现在排除爬梯状态。
+- `l4d2_air_data.txt` 新增 `CTongue::IsAbilityReadyToFire` 的 DHooks 函数定义；重新编译 `l4d_air_abilities_patch.smx` 和 `ai_smoker3.smx`（1.0.1.5）。

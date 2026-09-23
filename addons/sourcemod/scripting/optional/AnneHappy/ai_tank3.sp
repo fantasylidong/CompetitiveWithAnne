@@ -38,7 +38,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白, AnneHappy",
     description = "Ai Tank 增强 3.0 版本（路径感知连跳、梯子让行、寻路距离选目标、反头顶卡、骑头反制、投石瞄准等）",
-    version     = "2.1.0",
+    version     = "2.2.0",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -95,8 +95,10 @@ public void OnPluginStart()
 
     // 目标选择
     g_cvTargetSelect = CreateConVar("ai_tank3_target_select", "1", "Tank 选目标, 0=排序交给 l4d_target_override/原生（只换掉反头顶卡屏蔽的人）, 1=沿用 target_override 的过滤口径, 但按寻路距离排序并带换目标粘滞", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvTargetSwitchRatio = CreateConVar("ai_tank3_target_switch_ratio", "0.75", "新目标的寻路距离小于当前目标的这个比例（且至少近 150）才换目标", CVAR_FLAGS, true, 0.1, true, 1.0);
-    g_cvTargetCommitTime = CreateConVar("ai_tank3_target_commit_time", "2.0", "两次主动换目标之间的最短间隔（秒），当前目标失效时不受限制", CVAR_FLAGS, true, 0.0);
+    g_cvTargetSwitchRatio = CreateConVar("ai_tank3_target_switch_ratio", "0.85", "同一层换目标时，新目标得分须不超过当前目标的这个比例（且差值不小于 ai_tank3_target_switch_gain）", CVAR_FLAGS, true, 0.1, true, 1.0);
+    g_cvTargetSwitchGain = CreateConVar("ai_tank3_target_switch_gain", "75", "同一层换目标时，新目标得分至少要比当前目标低这么多（按寻路距离，单位）；应大于估距精度 64，否则估距误差会自己触发换目标", CVAR_FLAGS, true, 0.0);
+    g_cvTargetCommitTime = CreateConVar("ai_tank3_target_commit_time", "1.0", "两次主动换目标之间的最短间隔（秒），当前目标失效或出现明显更好打的目标时不受限制", CVAR_FLAGS, true, 0.0);
+    g_cvTargetDecisiveRatio = CreateConVar("ai_tank3_target_decisive_ratio", "0.5", "新目标得分不超过当前目标的这个比例时视为明显更好打，不等换目标间隔，0=关闭", CVAR_FLAGS, true, 0.0, true, 1.0);
 
     // 反头顶卡 / 骑头 / 强制投石
     g_cvHeadBlockEnable = CreateConVar("ai_tank3_head_block_enable", "1", "是否启用 Tank 反头顶卡逻辑", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -280,6 +282,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     if (target > 0)
         GetClientAbsOrigin(target, targetPos);
     Path_Update(client, pos, target, targetPos);
+    if (g_cvTargetSelect.BoolValue)
+        Target_RefreshTravel(client, pos);
 
     bool ladderZone = onLadder || Movement_IsLadderZone(client, pos);
     if (ladderZone || moveType != MOVETYPE_WALK)

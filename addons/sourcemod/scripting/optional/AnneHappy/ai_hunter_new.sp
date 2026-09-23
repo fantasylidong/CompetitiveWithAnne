@@ -17,6 +17,8 @@ ConVar
 	g_hHunter_patch_crouch_pounce,
 	g_hWallDetectionDistance;
 
+#define GROUND_LUNGE_GRACE 0.25
+
 float
 	g_fLungeInterval,
 	g_fFastPounceProximity,
@@ -26,6 +28,7 @@ float
 	g_fStraightPounceProximity,
 	g_fWallDetectionDistance,
 	g_fAimOffsetSensitivityHunter,
+	g_fLastGroundTime[MAXPLAYERS + 1],
 	g_fCanLungeTime[MAXPLAYERS + 1];
 
 bool
@@ -145,8 +148,10 @@ void GetCvars() {
 }
 
 public void OnMapEnd() {
-	for (int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++) {
 		g_fCanLungeTime[i] = 0.0;
+		g_fLastGroundTime[i] = 0.0;
+	}
 }
 
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
@@ -156,6 +161,7 @@ void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
 void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	g_fCanLungeTime[client] = 0.0;
+	g_fLastGroundTime[client] = 0.0;
 	g_bHasQueuedLunge[client] = false;
 }
 
@@ -179,7 +185,21 @@ public Action OnPlayerRunCmd(int client, int &buttons) {
 
 	static int flags;
 	flags = GetEntityFlags(client);
-	if (flags & FL_ONGROUND == 0 || (!g_bIgnoreCrouch && flags & FL_DUCKING == 0) || !GetEntProp(client, Prop_Send, "m_hasVisibleThreats"))
+
+	// FIX: 飞扑途中禁止再次起扑。高难度把 z_lunge_interval / z_lunge_cooldown 设为 0,
+	//      不拦的话 AI 会在半空中重新起扑, 引擎用新向量覆盖当前速度, 表现为凭空转向。
+	if (flags & FL_ONGROUND == 0) {
+		static int ability;
+		ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+		if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isLunging")) {
+			buttons &= ~IN_ATTACK;
+			return Plugin_Changed;
+		}
+		return Plugin_Continue;
+	}
+	g_fLastGroundTime[client] = GetGameTime();
+
+	if ((!g_bIgnoreCrouch && flags & FL_DUCKING == 0) || !GetEntProp(client, Prop_Send, "m_hasVisibleThreats"))
 		return Plugin_Continue;
 	
 	buttons &= ~IN_ATTACK2;
@@ -224,6 +244,12 @@ float NearestSurDistance(int client, const float vPos[3]) {
 void HunterPounce(int client) {
 	static int iEnt;
 	static float vPos[3];
+
+	// FIX: 只有刚从地面蹬出去的飞扑才允许改写 m_queuedLunge, 飞行途中不再干预。
+	if (GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") == -1
+		&& (GetGameTime() - g_fLastGroundTime[client]) > GROUND_LUNGE_GRACE)
+		return;
+
 	GetClientAbsOrigin(client, vPos);
 	if (g_fWallDetectionDistance > 0.0 && HitWall(client, vPos)) {
 		iEnt = GetEntPropEnt(client, Prop_Send, "m_customAbility");

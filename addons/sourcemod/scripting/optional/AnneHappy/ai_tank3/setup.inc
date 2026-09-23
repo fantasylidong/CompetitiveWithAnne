@@ -50,13 +50,17 @@
 
 // 目标
 #define VISIBILITY_CACHE_TIME           0.10
-#define TARGET_TRAVEL_CACHE_TIME        1.0
+#define TARGET_TRAVEL_CACHE_TIME        0.5     // 走得到的人，绕路系数隔这么久重算一次
+#define TARGET_TRAVEL_UNREACHABLE_RETRY 1.0     // 走不到/没有 nav 的人结果很少变化，重算间隔放长
 #define TARGET_TRAVEL_UNKNOWN           -2.0
 #define TARGET_TRAVEL_UNREACHABLE       -1.0
 #define TARGET_TRAVEL_MAX_SEARCH        3000.0  // 分档寻路估距的封顶长度，超过按走不到计分
+// 分档命中后在“上一档走不通、这一档走得通”的区间里二分，直到区间不宽于这个值（最多 REFINE_STEPS 次），取中点。
+// 单人误差不超过它的一半，两人得分之差的误差不超过它本身，所以 ai_tank3_target_switch_gain 要比它大，估距噪声才不会自己触发换目标
+#define TARGET_TRAVEL_PRECISION         64.0
+#define TARGET_TRAVEL_REFINE_STEPS      4
 #define TARGET_UNREACHABLE_PENALTY      1500.0
-#define TARGET_VOMIT_SCORE_MULT         1.25    // 对应 target_override 的 order 2：被喷的人排在正常生还者后面
-#define TARGET_MIN_SWITCH_GAIN          150.0
+#define TARGET_VOMIT_SCORE_MULT         2.0     // 对应 target_override 的 order 2：被喷的人排在正常生还者后面，倍率越大越靠后
 #define TARGET_PINNED_MASK_DEFAULT      14      // target_override 未加载时的默认口径：忽略被猎人/猴子/牛控的人
 #define TARGET_INCAP_MODE_DEFAULT       0
 
@@ -130,7 +134,9 @@ ConVar
     // 目标选择
     g_cvTargetSelect,
     g_cvTargetSwitchRatio,
+    g_cvTargetSwitchGain,
     g_cvTargetCommitTime,
+    g_cvTargetDecisiveRatio,
     // 反头顶卡 / 骑头 / 强制投石
     g_cvHeadBlockEnable,
     g_cvHeadBlockTime,
@@ -216,7 +222,7 @@ enum struct TankState
     float victimSince;          // 最近一次换目标时间
     float victimFreezeUntil;    // 梯子/攀爬期间冻结换目标
     int   travelUser[MAXPLAYERS + 1];
-    float travelDist[MAXPLAYERS + 1];
+    float travelRatio[MAXPLAYERS + 1];   // 寻路距离 / 直线距离，或 TARGET_TRAVEL_UNKNOWN / UNREACHABLE
     float travelTime[MAXPLAYERS + 1];
     int   ignoreUser[MAXPLAYERS + 1];
     float ignoreUntil[MAXPLAYERS + 1];
@@ -273,7 +279,7 @@ enum struct TankState
         for (int i = 0; i <= MAXPLAYERS; i++)
         {
             this.travelUser[i] = 0;
-            this.travelDist[i] = TARGET_TRAVEL_UNKNOWN;
+            this.travelRatio[i] = TARGET_TRAVEL_UNKNOWN;
             this.travelTime[i] = 0.0;
             this.ignoreUser[i] = 0;
             this.ignoreUntil[i] = 0.0;

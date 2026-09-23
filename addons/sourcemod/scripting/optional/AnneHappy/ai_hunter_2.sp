@@ -39,6 +39,9 @@ public Plugin myinfo =
 #define POUNCE_LEFT_IDX         0     // FIX: 拼写统一
 #define POUNCE_RIGHT_IDX        1
 #define DEBUG                   0
+// 起扑向量允许被改写的“离地宽限”：只有刚从地面蹬出去的飞扑才算数。
+// 超过这个时间还在空中就是飞行途中的二次起扑，必须放行给引擎，不能重算向量。
+#define GROUND_LUNGE_GRACE      0.25
 
 // ===== 基本 cvar =====
 ConVar
@@ -76,6 +79,7 @@ bool
 
 float
     canLungeTime[MAXPLAYERS + 1],
+    lastGroundTime[MAXPLAYERS + 1],
     meleeMinRange,
     meleeMaxRange,
     noSightPounceRange,
@@ -244,6 +248,10 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
 {
     if (!isValidHunter(hunter)) return Plugin_Continue;
 
+    // FIX: 无条件记录离地时间, 不能受下面的目标/ability 校验影响,
+    //      否则 hunter 还没选到目标时这个时间戳会一直是旧值。
+    if (isOnGround(hunter)) lastGroundTime[hunter] = GetGameTime();
+
     int target = hunterCurrentTarget[hunter];
     int ability = GetEntPropEnt(hunter, Prop_Send, "m_customAbility");
     if (!IsValidEntity(ability) || !IsValidEdict(ability) || !IsValidSurvivor(target))
@@ -268,6 +276,11 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
     // 空中：一次性决定是否背对
     if (isLunging)
     {
+        // FIX: 飞扑途中禁止再次起扑。z_lunge_interval / z_lunge_cooldown 在高难度被设为 0,
+        //      不拦的话 AI 会在半空中逐 tick 重新起扑, 引擎用新向量覆盖当前速度,
+        //      表现为 hunter 凭空转向（“踩着空气转弯”）。
+        buttons &= ~IN_ATTACK;
+
         if (!canBackVision[hunter][0])
         {
             float backVisionChance = GetRandomFloat(0.0, 100.0); // FIX: 函数名
@@ -285,7 +298,7 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
             TeleportEntity(hunter, NULL_VECTOR, lungeVectorNegate, NULL_VECTOR);
             return Plugin_Changed;
         }
-        return Plugin_Continue;
+        return Plugin_Changed;
     }
 
     if (!isOnGround(hunter)) return Plugin_Continue;
@@ -294,7 +307,8 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
     // ===== 无视野：允许“排队起扑”与“近身右键” =====
     if (!hasSight && IsValidSurvivor(target))
     {
-        if (!isDucking) return Plugin_Changed;
+        // FIX: crouch_pounce=2 时 hunter 根本不会蹲, 这里原本会把无视野起扑逻辑整个卡死。
+        if (!ignoreCrouch && !isDucking) return Plugin_Changed;
 
         if (g_hMeleeFirst.BoolValue &&
             ((gametime > timestamp - 0.1) && (gametime < timestamp)) &&
@@ -323,7 +337,7 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
     }
 
     // ===== 有视野：飞扑前按右键（挠） =====
-    if (isDucking && g_hMeleeFirst.BoolValue &&
+    if ((ignoreCrouch || isDucking) && g_hMeleeFirst.BoolValue && // FIX: 同上, 不蹲也要能挠
         ((gametime > timestamp - 0.1) && (gametime < timestamp)) &&
         ((targetDistance < meleeMaxRange) && (targetDistance > meleeMinRange)))
     {
@@ -368,6 +382,7 @@ public void playerSpawnHandler(Event event, const char[] name, bool dontBroadcas
     canBackVision[client][0]    = false;
     canBackVision[client][1]    = false;
     canLungeTime[client]        = 0.0;
+    lastGroundTime[client]      = 0.0;
     anglePounceCount[client][POUNCE_LEFT_IDX]  = 0;
     anglePounceCount[client][POUNCE_RIGHT_IDX] = 0;
 }
@@ -394,6 +409,12 @@ public void roundEndHandler(Event event, const char[] name, bool dontBroadcast)
 public void hunterOnPounce(int hunter)
 {
     if (!isValidHunter(hunter)) return;
+
+    // FIX: 只有刚从地面蹬出去的飞扑才允许改写 m_queuedLunge。
+    // angleLunge() 是按“当前位置 -> 目标当前位置”整条重算的, 一旦在飞行途中被触发,
+    // hunter 会在半空中重新瞄准并拿到一条全新满速向量, 也就是“踩着空气转弯”。
+    if (!isOnGround(hunter) && (GetGameTime() - lastGroundTime[hunter]) > GROUND_LUNGE_GRACE)
+        return;
 
     int lungeEntity = GetEntPropEnt(hunter, Prop_Send, "m_customAbility");
 
@@ -735,6 +756,7 @@ void resetCanLungeTime()
     for (int i = 1; i <= MaxClients; i++)
     {
         canLungeTime[i] = 0.0;
+        lastGroundTime[i] = 0.0;
         anglePounceCount[i][POUNCE_LEFT_IDX]  = 0;
         anglePounceCount[i][POUNCE_RIGHT_IDX] = 0;
         hunterCurrentTarget[i] = 0;

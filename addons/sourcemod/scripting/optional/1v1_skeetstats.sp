@@ -81,6 +81,14 @@
     Changelog
     ---------
 
+		0.1h
+		    - accuracy no longer silently reads 0: shot counting now asks the director
+		      whether the round is live instead of trusting the player_left_start_area
+		      event, which round_start kept clearing
+		    - hits on SI obey the same gate as weapon_fire, so accuracy can't exceed 100%
+		    - the survivor being tracked is re-resolved on use and never a bot
+		    - the end-of-round report is snapshotted at round_end, so the versus restart
+		      (2s in 1vHunters) can't blank it before the delayed print
 		0.1g
 		    - fixed translations issues
         0.1f
@@ -96,7 +104,7 @@ public Plugin myinfo =
 	name        = "1v1 SkeetStats",
 	author      = "Tabun",
 	description = "Shows 1v1-relevant info at end of round.",
-	version     = "0.1g",
+	version     = "0.1h",
 	url         = "nope"
 };
 
@@ -161,7 +169,27 @@ int
 bool
 	bLateLoad,
 	bInRound,
-	bPlayerLeftStartArea;    // used for tracking FF when RUP enabled
+	bPlayerLeftStartArea;    // event-based hint; IsRoundLive() also asks the director directly
+
+// Snapshot of the round that just ended. In versus (1vHunters) the restart timer is 2
+// seconds, so round_start -- which wipes every counter -- fires before the delayed
+// report runs. Freeze the numbers at round_end and print from here instead.
+#define RPT_KILLS         0
+#define RPT_COMMON        1
+#define RPT_DAMAGE_ALL    2
+#define RPT_SKEETS        3
+#define RPT_SKEETS_INJ    4
+#define RPT_DEADSTOPS     5
+#define RPT_SHOTS_FIRED   6
+#define RPT_SHOTS_HIT     7
+#define RPT_PELLETS_FIRED 8
+#define RPT_PELLETS_HIT   9
+#define RPT_MELEES_FIRED  10
+#define RPT_MELEES_HIT    11
+#define RPT_SIZE          12
+
+int  iReport[RPT_SIZE];
+bool bReportValid;
 
 float fPreviousShot[MAXPLAYERS + 1];    // when was the previous shotgun blast? (to collect all hits for 1 shot)
 int
@@ -327,6 +355,14 @@ Action PlayerLeftStartArea(Handle event, const char[] name, bool dontBroadcast)
 	return Plugin_Continue;
 }
 
+// player_left_start_area does not fire on every map/round, and round_start clears the
+// flag again -- the director detour is the dependable one.
+public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
+{
+	iClientPlaying       = GetCurrentSurvivor();
+	bPlayerLeftStartArea = true;
+}
+
 public void OnMapStart()
 {
 	if (!bLateLoad)    // apparently mapstart gets called even after.. it has already started
@@ -367,8 +403,9 @@ void RoundEnd_Event(Handle event, const char[] name, bool dontBroadcast)
 	// only show / log stuff when the round is done "the first time"
 	if (bInRound)
 	{
-		ResolveOpenShots();    // just in case there are any shots opened.
-		CreateTimer(3.0, delayedSkeetStatPrint);
+		ResolveOpenShots();                     // just in case there are any shots opened.
+		BuildReport(ResolvePlayingClient());    // freeze numbers before round_start wipes them
+		CreateTimer(2.0, delayedSkeetStatPrint);
 		bInRound = false;
 	}
 }
@@ -399,6 +436,8 @@ Action SkeetStat_Cmd(int client, int args)
 {
 	// FloatSub(GetEngineTime(), fPreviousShot[user]) < SHOTGUN_TIME             // <-- use this to avoid the following from affecting stats.. maybe.
 	ResolveOpenShots();    // make sure we're up to date (this *might* affect the stats, but it'd have to be insanely badly timed
+	if (bInRound)
+		BuildReport(ResolvePlayingClient());    // live numbers mid-round, last round's report otherwise
 	PrintSkeetStats(client);
 	return Plugin_Handled;
 }
@@ -423,7 +462,11 @@ void PlayerHurt_Event(Handle event, const char[] name, bool dontBroadcast)
 	int attackerId = GetEventInt(event, "attacker");
 	int attacker   = GetClientOfUserId(attackerId);
 
-	if (attacker != iClientPlaying)    // ignore shots fired by anyone but survivor player
+	if (attacker <= 0 || attacker != ResolvePlayingClient())    // ignore shots fired by anyone but survivor player
+	{
+		return;
+	}
+	if (!IsClientAndInGame(victim))    // safeguard
 	{
 		return;
 	}
@@ -462,8 +505,12 @@ void PlayerHurt_Event(Handle event, const char[] name, bool dontBroadcast)
 	}
 	else if (damagetype & DMG_BULLET)
 	{
-		// for bullets, simply count all hits
-		iShotsHit[iClientPlaying]++;
+		// for bullets, simply count all hits -- but only while weapon_fire is counted too,
+		// otherwise hits outrun shots and accuracy climbs past 100%
+		if (IsRoundLive())
+		{
+			iShotsHit[iClientPlaying]++;
+		}
 		if (hitgroup == HITGROUP_HEAD)
 		{
 			iHuntHeadShots[iClientPlaying]++;
@@ -509,13 +556,13 @@ void InfectedHurt_Event(Handle event, const char[] name, bool dontBroadcast)
 	int userId = GetEventInt(event, "attacker");
 	int user   = GetClientOfUserId(userId);
 
-	if (user != iClientPlaying)    // ignore shots fired by anyone but survivor player
+	if (user <= 0 || user != ResolvePlayingClient())    // ignore shots fired by anyone but survivor player
 	{
 		return;
 	}
 
 	// check if round started
-	if (!bPlayerLeftStartArea)    // don't count saferoom shooting for now.
+	if (!IsRoundLive())    // don't count saferoom shooting for now.
 	{
 		return;
 	}
@@ -652,7 +699,7 @@ void PlayerDeath_Event(Handle event, const char[] name, bool dontBroadcast)
 	int attackerId = GetEventInt(event, "attacker");
 	int attacker   = GetClientOfUserId(attackerId);
 
-	if (attacker != iClientPlaying)    // ignore shots fired by anyone but survivor player
+	if (attacker <= 0 || attacker != ResolvePlayingClient())    // ignore shots fired by anyone but survivor player
 	{
 		return;
 	}
@@ -726,7 +773,7 @@ void PlayerShoved_Event(Handle event, const char[] name, bool dontBroadcast)
 	int userId = GetEventInt(event, "attacker");
 	int user   = GetClientOfUserId(userId);
 
-	if (user != iClientPlaying)    // ignore actions by anyone else
+	if (user <= 0 || user != ResolvePlayingClient())    // ignore actions by anyone else
 	{
 		return;
 	}
@@ -789,13 +836,13 @@ void WeaponFire_Event(Handle event, const char[] name, bool dontBroadcast)
 	// check user
 	int userId = GetEventInt(event, "userid");
 	int user   = GetClientOfUserId(userId);
-	if (user != iClientPlaying)    // ignore shots fired by anyone but survivor player
+	if (user <= 0 || user != ResolvePlayingClient())    // ignore shots fired by anyone but survivor player
 	{
 		return;
 	}
 
 	// check if round started
-	if (!bPlayerLeftStartArea)    // don't count saferoom shooting for now.
+	if (!IsRoundLive())    // don't count saferoom shooting for now.
 	{
 		return;
 	}
@@ -866,7 +913,7 @@ void WeaponFire_Event(Handle event, const char[] name, bool dontBroadcast)
 
 void PrintSkeetStats(int toClient)
 {
-	if (iClientPlaying <= 0)
+	if (!bReportValid)
 	{
 		return;
 	}
@@ -886,6 +933,32 @@ void PrintSkeetStats(int toClient)
 	}
 }
 
+// copy the playing survivor's counters into iReport, so the report survives the
+// round_start reset that follows a couple of seconds later
+void BuildReport(int client)
+{
+	if (client <= 0 || client > MaxClients)
+	{
+		bReportValid = false;
+		return;
+	}
+
+	iReport[RPT_KILLS]         = iGotKills[client];
+	iReport[RPT_COMMON]        = iGotCommon[client];
+	iReport[RPT_DAMAGE_ALL]    = iDidDamageAll[client];
+	iReport[RPT_SKEETS]        = iHuntSkeets[client];
+	iReport[RPT_SKEETS_INJ]    = iHuntSkeetsInj[client];
+	iReport[RPT_DEADSTOPS]     = iDeadStops[client];
+	iReport[RPT_SHOTS_FIRED]   = iShotsFired[client];
+	iReport[RPT_SHOTS_HIT]     = iShotsHit[client];
+	iReport[RPT_PELLETS_FIRED] = iPelletsFired[client];
+	iReport[RPT_PELLETS_HIT]   = iPelletsHit[client];
+	iReport[RPT_MELEES_FIRED]  = iMeleesFired[client];
+	iReport[RPT_MELEES_HIT]    = iMeleesHit[client];
+
+	bReportValid = true;
+}
+
 static void PrintSkeetStatsTo(int target)
 {
 	// 1. SI damage & SI kills
@@ -894,22 +967,22 @@ static void PrintSkeetStatsTo(int target)
 		if (!(iBrevityFlags & BREV_DMG))
 		{
 			if (!(iBrevityFlags & BREV_CI))
-				CPrintToChat(target, "%t %t", "TagKills", "SI_DMG_CI", iDidDamageAll[iClientPlaying], iGotKills[iClientPlaying], iGotCommon[iClientPlaying]);
+				CPrintToChat(target, "%t %t", "TagKills", "SI_DMG_CI", iReport[RPT_DAMAGE_ALL], iReport[RPT_KILLS], iReport[RPT_COMMON]);
 			else
-				CPrintToChat(target, "%t %t", "TagKills", "SI_DMG", iDidDamageAll[iClientPlaying], iGotKills[iClientPlaying]);
+				CPrintToChat(target, "%t %t", "TagKills", "SI_DMG", iReport[RPT_DAMAGE_ALL], iReport[RPT_KILLS]);
 		}
 		else
 		{
 			if (!(iBrevityFlags & BREV_CI))
-				CPrintToChat(target, "%t %t", "TagKills", "SI_CI", iGotKills[iClientPlaying], iGotCommon[iClientPlaying]);
+				CPrintToChat(target, "%t %t", "TagKills", "SI_CI", iReport[RPT_KILLS], iReport[RPT_COMMON]);
 			else
-				CPrintToChat(target, "%t %t", "TagKills", "SI", iGotKills[iClientPlaying]);
+				CPrintToChat(target, "%t %t", "TagKills", "SI", iReport[RPT_KILLS]);
 		}
 	}
 
 	// 2. skeets
 	if (!(iBrevityFlags & BREV_SKEET))
-		CPrintToChat(target, "%t %t", "TagSkeet", "SKEET", iHuntSkeets[iClientPlaying], iHuntSkeetsInj[iClientPlaying], iDeadStops[iClientPlaying]);
+		CPrintToChat(target, "%t %t", "TagSkeet", "SKEET", iReport[RPT_SKEETS], iReport[RPT_SKEETS_INJ], iReport[RPT_DEADSTOPS]);
 
 	// 3. accuracy
 	if (!(iBrevityFlags & BREV_ACC))
@@ -918,22 +991,22 @@ static void PrintSkeetStatsTo(int target)
 		char tmpBuffer[256];
 		printBuffer = "";
 
-		if (iShotsFired[iClientPlaying] || (iMeleesFired[iClientPlaying] && !(iBrevityFlags & BREV_MELEE)))
+		if (iReport[RPT_SHOTS_FIRED] || (iReport[RPT_MELEES_FIRED] && !(iBrevityFlags & BREV_MELEE)))
 		{
-			if (iShotsFired[iClientPlaying])
-				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T %T", "TagAcc", target, "ACC_AllShots", target, float(iShotsHit[iClientPlaying]) / float(iShotsFired[iClientPlaying]) * 100);
+			if (iReport[RPT_SHOTS_FIRED])
+				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T %T", "TagAcc", target, "ACC_AllShots", target, float(iReport[RPT_SHOTS_HIT]) / float(iReport[RPT_SHOTS_FIRED]) * 100);
 			else
 				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T %T", "TagAcc", target, "ACC_AllShots", target, 0.0);
 
-			if (iPelletsFired[iClientPlaying])
+			if (iReport[RPT_PELLETS_FIRED])
 			{
 				StrCat(printBuffer, sizeof(printBuffer), tmpBuffer);
-				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T", "ACC_BuckShot", target, float(iPelletsHit[iClientPlaying]) / float(iPelletsFired[iClientPlaying]) * 100);
+				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T", "ACC_BuckShot", target, float(iReport[RPT_PELLETS_HIT]) / float(iReport[RPT_PELLETS_FIRED]) * 100);
 			}
-			if (iMeleesFired[iClientPlaying] && !(iBrevityFlags & BREV_MELEE))
+			if (iReport[RPT_MELEES_FIRED] && !(iBrevityFlags & BREV_MELEE))
 			{
 				StrCat(printBuffer, sizeof(printBuffer), tmpBuffer);
-				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T", "ACC_Melee", target, float(iMeleesHit[iClientPlaying]) / float(iMeleesFired[iClientPlaying]) * 100);
+				FormatEx(tmpBuffer, sizeof(tmpBuffer), "%T", "ACC_Melee", target, float(iReport[RPT_MELEES_HIT]) / float(iReport[RPT_MELEES_FIRED]) * 100);
 			}
 			StrCat(printBuffer, sizeof(printBuffer), tmpBuffer);
 			strcopy(tmpBuffer, sizeof(tmpBuffer), "\n");
@@ -955,7 +1028,7 @@ static void PrintSkeetStatsTo(int target)
 // resolve hits, for the final shotgun blasts before wipe/saferoom
  void ResolveOpenShots()
 {
-	if (iClientPlaying <= 0)
+	if (ResolvePlayingClient() <= 0)
 	{
 		return;
 	}
@@ -1059,7 +1132,7 @@ stock int GetWeaponType(int weaponId)
 	return WPTYPE_NONE;
 }
 
-// get 1v1 survivor player
+// get 1v1 survivor player -- a bot can hold the slot during transitions, so skip bots
 stock int GetCurrentSurvivor()
 {
 	// assuming only 1, just get the first one
@@ -1067,12 +1140,45 @@ stock int GetCurrentSurvivor()
 		maxplayers = MaxClients;
 	for (i = 1; i <= maxplayers; i++)
 	{
-		if (IsSurvivor(i))
+		if (IsSurvivor(i) && !IsFakeClient(i))
 		{
 			return i;
 		}
 	}
 	return -1;
+}
+
+// iClientPlaying used to be set only at round_start / player_left_start_area, so anyone
+// who took the survivor slot later in the round was never tracked. Re-resolve on use.
+stock int ResolvePlayingClient()
+{
+	if (iClientPlaying > 0 && iClientPlaying <= MaxClients && IsSurvivor(iClientPlaying) && !IsFakeClient(iClientPlaying))
+	{
+		return iClientPlaying;
+	}
+
+	int current = GetCurrentSurvivor();
+	if (current > 0)
+	{
+		iClientPlaying = current;
+		return iClientPlaying;
+	}
+
+	// nobody holds the survivor slot right now (round transition, idle takeover): keep
+	// whoever we were tracking, otherwise round_end would throw the round's numbers away
+	if (iClientPlaying > 0 && iClientPlaying <= MaxClients && IsClientAndInGame(iClientPlaying) && !IsFakeClient(iClientPlaying))
+	{
+		return iClientPlaying;
+	}
+
+	return -1;
+}
+
+// bPlayerLeftStartArea alone loses a whole round's shot count whenever the event is
+// missed or a later round_start clears it; the director knows the real state.
+stock bool IsRoundLive()
+{
+	return bPlayerLeftStartArea || L4D_HasAnySurvivorLeftSafeArea();
 }
 
 // clear all stats for client

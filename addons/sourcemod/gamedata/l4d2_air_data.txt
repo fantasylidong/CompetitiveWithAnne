@@ -2,6 +2,17 @@
 {
 	"left4dead2"
 	{
+		"Functions"
+		{
+			"CTongue::IsAbilityReadyToFire"
+			{
+				"signature"	"CTongue::IsAbilityReadyToFire"
+				"callconv"	"thiscall"
+				"return"	"bool"
+				"this"		"entity"
+			}
+		}
+
 		"MemPatches"
 		{
 			"vomit"

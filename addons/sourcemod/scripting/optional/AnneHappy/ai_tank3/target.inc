@@ -127,67 +127,109 @@ bool Target_AcquireTravelBudget()
     return true;
 }
 
-// 用有长度上限的 NavAreaBuildPath 分档估算寻路距离：依次试直线距离的若干倍（封顶 TARGET_TRAVEL_MAX_SEARCH），
-// 第一档走得通就按该档长度计分。不用 L4D2_NavAreaTravelDistance：目标走不到、或脚下位置没被任何 nav 包含时，
-// 它的 A* 没有长度上限，会把整张 nav 翻一遍
-float Target_EstimateTravel(int tank, int survivor, float straight)
+// 在 (lower, upper] 里二分：upper 已确认走得通，lower 已确认走不通（第一档时是直线距离下界），返回剩下区间的中点
+float Target_RefineTravel(Address from, Address to, float lower, float upper)
+{
+    for (int step = 0; step < TARGET_TRAVEL_REFINE_STEPS && upper - lower > TARGET_TRAVEL_PRECISION; step++)
+    {
+        float mid = (lower + upper) * 0.5;
+        if (L4D2_NavAreaBuildPath(from, to, mid, TEAM_INFECTED, false))
+            upper = mid;
+        else
+            lower = mid;
+    }
+    return (lower + upper) * 0.5;
+}
+
+// 估算“寻路距离 / 直线距离”的绕路系数：用有长度上限的 NavAreaBuildPath 依次试直线距离的若干倍（封顶
+// TARGET_TRAVEL_MAX_SEARCH），第一档走得通后再二分细化。原来直接拿命中档的上限当距离，1.15 倍档和 1.5 倍档之间
+// 一跳就差 30%，只能靠很大的换目标门槛压住这个噪声。
+// 不用 L4D2_NavAreaTravelDistance：目标走不到、或脚下位置没被任何 nav 包含时，它的 A* 没有长度上限，会把整张 nav 翻一遍
+float Target_EstimateRatio(int tank, int survivor, float straight)
 {
     Address tankArea = view_as<Address>(L4D_GetLastKnownArea(tank));
     Address survivorArea = view_as<Address>(L4D_GetLastKnownArea(survivor));
     if (tankArea == Address_Null || survivorArea == Address_Null)
         return TARGET_TRAVEL_UNKNOWN;
-    if (tankArea == survivorArea)
-        return straight;
+    if (tankArea == survivorArea || straight < 1.0)
+        return 1.0;
 
-    float tested = 0.0;
-    for (int i = 0; i < sizeof(g_fTravelBucketRatios); i++)
+    // 路径长度不会明显短于直线距离，第一档的下界取直线距离
+    float lower = straight;
+    int buckets = sizeof(g_fTravelBucketRatios);
+    for (int i = 0; i <= buckets; i++)
     {
-        float limit = straight * g_fTravelBucketRatios[i];
+        float limit = i < buckets ? straight * g_fTravelBucketRatios[i] : TARGET_TRAVEL_MAX_SEARCH;
         if (limit > TARGET_TRAVEL_MAX_SEARCH)
             limit = TARGET_TRAVEL_MAX_SEARCH;
-        if (limit <= tested)
+        if (limit <= lower)
             continue;
 
-        tested = limit;
         if (L4D2_NavAreaBuildPath(tankArea, survivorArea, limit, TEAM_INFECTED, false))
-            return limit;
+            return Target_RefineTravel(tankArea, survivorArea, lower, limit) / straight;
+        lower = limit;
     }
-    if (tested < TARGET_TRAVEL_MAX_SEARCH && L4D2_NavAreaBuildPath(tankArea, survivorArea, TARGET_TRAVEL_MAX_SEARCH, TEAM_INFECTED, false))
-        return TARGET_TRAVEL_MAX_SEARCH;
     return TARGET_TRAVEL_UNREACHABLE;
 }
 
-// 寻路距离评分：每个生还者每秒最多刷新一次，全插件每 tick 最多刷新一个人，没有结果时用直线距离
-float Target_GetScore(int tank, int survivor, const float tankPos[3], bool &refreshed)
+// 每 tick 由 OnPlayerRunCmd 调用，给这只 Tank 最久没更新的一个生还者重算绕路系数，全插件每 tick 最多算一个人。
+// 原来只在游戏调用 ChooseVictim 时顺带刷新、每次只刷一个人，四个人轮一圈要调用四次：走近的人顶着旧的、更远的估距，
+// 看上去比实际远，换目标就更难。现在刷新频率和 ChooseVictim 脱钩。
+// 人在空中/梯子上时最后所在的 nav 不代表现在的位置，跳过，保留上一次结果
+void Target_RefreshTravel(int tank, const float tankPos[3])
+{
+    float now = GetEngineTime();
+    int stalest = 0;
+    float stalestAge = 0.0;
+    for (int survivor = 1; survivor <= MaxClients; survivor++)
+    {
+        if (!IsValidSurvivor(survivor) || !IsPlayerAlive(survivor) || IsClientHanging(survivor))
+            continue;
+        if (!IsClientOnGround(survivor) || GetEntityMoveType(survivor) == MOVETYPE_LADDER)
+            continue;
+
+        float age = 1.0e9;
+        if (g_Tank[tank].travelUser[survivor] == GetClientUserId(survivor))
+        {
+            age = now - g_Tank[tank].travelTime[survivor];
+            float interval = g_Tank[tank].travelRatio[survivor] < 0.0 ? TARGET_TRAVEL_UNREACHABLE_RETRY : TARGET_TRAVEL_CACHE_TIME;
+            if (age < interval)
+                continue;
+        }
+        if (stalest == 0 || age > stalestAge)
+        {
+            stalest = survivor;
+            stalestAge = age;
+        }
+    }
+    if (stalest == 0 || !Target_AcquireTravelBudget())
+        return;
+
+    float survivorPos[3];
+    GetClientAbsOrigin(stalest, survivorPos);
+    g_Tank[tank].travelRatio[stalest] = Target_EstimateRatio(tank, stalest, GetVectorDistance(tankPos, survivorPos));
+    g_Tank[tank].travelUser[stalest] = GetClientUserId(stalest);
+    g_Tank[tank].travelTime[stalest] = now;
+}
+
+// 得分 = 当前直线距离 × 绕路系数。绕路系数反映路线弯不弯，隔 0.5 秒重算；两次重算之间得分跟着直线距离实时变化，
+// 不会拿旧距离去比。还没有估距结果时按直线距离，走不到的人加罚分
+float Target_GetScore(int tank, int survivor, const float tankPos[3])
 {
     float survivorPos[3];
     GetClientAbsOrigin(survivor, survivorPos);
     float straight = GetVectorDistance(tankPos, survivorPos);
 
-    int userId = GetClientUserId(survivor);
-    float now = GetEngineTime();
-    bool cached = g_Tank[tank].travelUser[survivor] == userId;
-    // 人在空中/梯子上时最后所在的 nav 不代表现在的位置，保留上一次结果
-    bool grounded = IsClientOnGround(survivor) && GetEntityMoveType(survivor) != MOVETYPE_LADDER;
-    if (grounded && !refreshed && (!cached || now - g_Tank[tank].travelTime[survivor] >= TARGET_TRAVEL_CACHE_TIME) && Target_AcquireTravelBudget())
-    {
-        refreshed = true;
-        g_Tank[tank].travelDist[survivor] = Target_EstimateTravel(tank, survivor, straight);
-        g_Tank[tank].travelUser[survivor] = userId;
-        g_Tank[tank].travelTime[survivor] = now;
-        cached = true;
-    }
-
     float score = straight;
-    if (cached)
+    if (g_Tank[tank].travelUser[survivor] == GetClientUserId(survivor))
     {
-        float travel = g_Tank[tank].travelDist[survivor];
-        if (travel == TARGET_TRAVEL_UNREACHABLE)
+        float ratio = g_Tank[tank].travelRatio[survivor];
+        if (ratio == TARGET_TRAVEL_UNREACHABLE)
             score = straight + TARGET_UNREACHABLE_PENALTY;
-        else if (travel > straight)
-            score = travel;
+        else if (ratio > 1.0)
+            score = straight * ratio;
     }
-    // 分档估距经常打平，按直线距离微调，同一档里近的优先
+    // 估距相近时直线近的优先
     score += straight * 0.01;
     if (Target_IsVomited(survivor))
         score *= TARGET_VOMIT_SCORE_MULT;
@@ -210,14 +252,13 @@ int Target_Choose(int tank)
     int best = -1;
     int bestTier = TARGET_TIER_NONE;
     float bestScore = 0.0;
-    bool refreshed = false;
     for (int survivor = 1; survivor <= MaxClients; survivor++)
     {
         int tier = Target_Classify(tank, survivor, pinnedMask, incapMode, skipSaferoom);
         if (tier == TARGET_TIER_NONE)
             continue;
 
-        float score = Target_GetScore(tank, survivor, tankPos, refreshed);
+        float score = Target_GetScore(tank, survivor, tankPos);
         if (survivor == current)
         {
             currentTier = tier;
@@ -239,9 +280,11 @@ int Target_Choose(int tank)
     {
         if (current == best || now < g_Tank[tank].victimFreezeUntil)
             return current;
-        if (now - g_Tank[tank].victimSince < g_cvTargetCommitTime.FloatValue)
+        // 新目标得分不到当前目标的一定比例（默认一半）：明显更好打，不等换目标间隔
+        bool decisive = bestScore <= currentScore * g_cvTargetDecisiveRatio.FloatValue;
+        if (!decisive && now - g_Tank[tank].victimSince < g_cvTargetCommitTime.FloatValue)
             return current;
-        if (bestScore > currentScore * g_cvTargetSwitchRatio.FloatValue || currentScore - bestScore < TARGET_MIN_SWITCH_GAIN)
+        if (bestScore > currentScore * g_cvTargetSwitchRatio.FloatValue || currentScore - bestScore < g_cvTargetSwitchGain.FloatValue)
             return current;
     }
 
@@ -249,7 +292,7 @@ int Target_Choose(int tank)
     {
         g_Tank[tank].victimSince = now;
         if (log != null)
-            log.debugAll("%N victim -> %N (score %.0f, tier %d)", tank, best, bestScore, bestTier);
+            log.debugAll("%N victim -> %N (score %.0f, previous %.0f, tier %d)", tank, best, bestScore, currentScore, bestTier);
     }
     return best;
 }
