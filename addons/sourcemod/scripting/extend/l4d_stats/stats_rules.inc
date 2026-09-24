@@ -663,17 +663,21 @@ public CheckSurvivorsWin()
 		Score=400;
 	
 	new FormulaSinglePlayer = SinglePlayerMode() ? 1 : 0;
+	new SinglePlayerDifficultyBonus = 0;
 	if (FormulaSinglePlayer)
 	{
-		int addScore = 0;
-		if( GetAnneInfectedNumber() > 3 && ((g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_VALID)) && IsThisRoundValid())){
-			addScore = (GetAnneInfectedNumber() - 3) * 100;
+		ConVar aiLevel = FindConVar("ah_ai_dynamic_current_level");
+		if (GetAnneInfectedNumber() > 3
+			&& (aiLevel == null || aiLevel.IntValue >= 3)
+			&& g_brpgAvailable && L4D_RPG_GetGlobalValue(INDEX_VALID) && IsThisRoundValid())
+		{
+			SinglePlayerDifficultyBonus = (GetAnneInfectedNumber() - 3) * 100;
 		}
-		if (addScore > 0)
-			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SinglePlayerTripleBonusWithDifficulty", addScore);
+		if (SinglePlayerDifficultyBonus > 0)
+			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SinglePlayerTripleBonusWithDifficulty", SinglePlayerDifficultyBonus);
 		else
 			StatsPrintToChatTeam(TEAM_SURVIVORS, "L4DStats_SinglePlayerTripleBonus");
-		Score *=3;
+		Score *= 3;
 	}
 
 	new FormulaInfectedAdjustment = 0;
@@ -718,6 +722,8 @@ public CheckSurvivorsWin()
 		}
 		//return Plugin_Continue;
 	}
+
+	Score += SinglePlayerDifficultyBonus;
 
 	new String:All4Safe[64] = "";
 	if (Deaths == 0)
