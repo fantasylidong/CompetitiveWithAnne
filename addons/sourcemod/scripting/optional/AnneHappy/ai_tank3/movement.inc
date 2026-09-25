@@ -21,6 +21,13 @@ float Movement_GetRunSpeed(int tank)
     return speed > 0.0 ? speed : DEFAULT_TANK_RUN_SPEED;
 }
 
+// 空中修正能处理的最大偏角：cvar 上限，共享移动代码另外封顶 89°。超过这个角度的方向空中完全转不过来
+float Movement_GetMaxAirTurn()
+{
+    float maxTurn = g_cvAirVecModifyMaxDegree.FloatValue;
+    return maxTurn < AI_PATH_MOVEMENT_MAX_TURN_DEG ? maxTurn : AI_PATH_MOVEMENT_MAX_TURN_DEG;
+}
+
 // 梯子窗口：有路径快照时只看“路径上马上要爬的梯子”，从不相干的梯子旁边经过照常连跳；
 // 快照不可用时退回按梯子实体 / nav 梯子连接判断
 bool Movement_IsLadderZone(int tank, const float pos[3])
@@ -212,6 +219,8 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
     float hopImpulse = AIPathMovement_GetHopImpulse(tank, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue);
     float hopVelocity[3], hopGoal[3], direction[3];
     TankHopMode mode;
+    bool reverse;
+    float turn;
     if (direct)
     {
         // 预测目标 1 秒后的位置
@@ -223,7 +232,24 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
         MakeVectorFromPoints(pos, predicted, direction);
         if (!AIPathMovement_NormalizeHorizontal(direction))
             return Plugin_Continue;
-        Movement_AddLegacyImpulse(buttons, velocity, direction, hopImpulse, hopVelocity);
+        // 目标已经在身后（被人从身边闪过、换了身后的目标），这个角度空中修正转不过来：叠加式推速只会顺着原方向
+        // 再跳一次，每跳只慢几十，看着人连续往后跳。改成掉头跳：对准目标、退回跑速、不给加速度，
+        // 被闪过的代价是丢掉攒下的连跳速度，但连跳不断、方向立刻对上
+        turn = AIPathMovement_VectorAngle(velocity, direction, true);
+        reverse = g_cvBhopReverseHop.BoolValue && turn > Movement_GetMaxAirTurn();
+        if (reverse)
+        {
+            float reverseSpeed = Movement_GetRunSpeed(tank);
+            if (speed < reverseSpeed)
+                reverseSpeed = speed;
+            hopVelocity[0] = direction[0] * reverseSpeed;
+            hopVelocity[1] = direction[1] * reverseSpeed;
+            hopVelocity[2] = velocity[2];
+        }
+        else
+        {
+            Movement_AddLegacyImpulse(buttons, velocity, direction, hopImpulse, hopVelocity);
+        }
         hopGoal = targetPos;
         mode = TankHop_Target;
     }
@@ -260,7 +286,7 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
     bool routeSafe;
     float strafeYaw;
     int strafeSide;
-    if (direct && !(buttons & IN_BACK) && Movement_CanStrafe(tank, GetVectorDistance(pos, targetPos),
+    if (direct && !reverse && !(buttons & IN_BACK) && Movement_CanStrafe(tank, GetVectorDistance(pos, targetPos),
         AIPathMovement_GetHorizontalSpeed(hopVelocity) * airTime))
     {
         strafeSide = g_Tank[tank].lastStrafeSide;
@@ -300,6 +326,8 @@ Action Movement_GroundHop(int tank, int &buttons, const float pos[3], const floa
     AIPathMovement_BeginPathHop(tank, hopGoal, AIPathMovement_GetHorizontalSpeed(hopVelocity), maxSpeed);
     g_Tank[tank].nextAirThink = GetEngineTime() + TANK_AIR_THINK_INTERVAL;
     TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, hopVelocity);
+    if (reverse && log != null)
+        log.debugAll("%N reverse hop toward %N: turn %.0f, speed %.0f -> %.0f", tank, target, turn, speed, AIPathMovement_GetHorizontalSpeed(hopVelocity));
     return Plugin_Changed;
 }
 
@@ -431,6 +459,31 @@ bool Movement_TrySafeAirCorrection(int tank, const float pos[3], const float gro
     return false;
 }
 
+// 空中刹车：只减水平速度、不改方向，最多减到跑速，剩下的交给落地掉头跳。相当于玩家空中按反方向键
+bool Movement_TryReverseBrake(int tank, const float pos[3], const float ground[3], const float velocity[3],
+    float remaining, float output[3])
+{
+    float brake = g_cvBhopReverseBrake.FloatValue;
+    float runSpeed = Movement_GetRunSpeed(tank);
+    float speed = AIPathMovement_GetHorizontalSpeed(velocity);
+    if (brake <= 0.0 || speed <= runSpeed)
+        return false;
+
+    float braked = speed - brake * TANK_AIR_THINK_INTERVAL;
+    if (braked < runSpeed)
+        braked = runSpeed;
+    float scale = braked / speed;
+    output[0] = velocity[0] * scale;
+    output[1] = velocity[1] * scale;
+    output[2] = velocity[2];
+    // 减速会让这一跳落得更近，按刹车后的速度重查剩余路线；落点不安全（断层、坑边）就不刹
+    if (!Movement_IsTurnRouteSafe(tank, pos, ground, output, remaining))
+        return false;
+    // 目标之后又回到身前、空中修正接手时，按刹车后的速度保速，不把速度补回去
+    g_AIPathMovementState[tank].hopSpeed = braked;
+    return true;
+}
+
 bool Movement_UpdateAirDirection(int tank, int buttons, const float pos[3], const float velocity[3],
     const float targetPos[3], float dist, bool visible, float output[3])
 {
@@ -474,6 +527,13 @@ bool Movement_UpdateAirDirection(int tank, int buttons, const float pos[3], cons
     MakeVectorFromPoints(pos, goal, direction);
     direction[2] = 0.0;
     float goalDist = AIPathMovement_GetDistance2D(pos, goal);
+    // 直追起的这一跳，要去的方向已经落到身后：空中修正转不过来，先把速度刹向跑速，落地再掉头（Movement_GroundHop）
+    if (g_Tank[tank].hopMode == TankHop_Target && goalDist > PATH_GOAL_TOLERANCE_DIST &&
+        AIPathMovement_VectorAngle(velocity, direction, true) > Movement_GetMaxAirTurn())
+    {
+        g_Tank[tank].hopStrafeYaw = 0.0;
+        return Movement_TryReverseBrake(tank, pos, ground, velocity, remaining, output);
+    }
     if (direct && g_Tank[tank].hopStrafeYaw != 0.0 && Movement_CanStrafe(tank, dist, horizon))
     {
         float lateral[3];

@@ -117,6 +117,8 @@ ConVar
     g_cvDirectChaseMaxAngle,
     g_cvBhopStrafeAngle,
     g_cvBhopStrafeMinDist,
+    g_cvBhopReverseHop,
+    g_cvBhopReverseBrake,
     // 空中修正
     g_cvAirVecModifyDegree,
     g_cvAirVecModifyMaxDegree,

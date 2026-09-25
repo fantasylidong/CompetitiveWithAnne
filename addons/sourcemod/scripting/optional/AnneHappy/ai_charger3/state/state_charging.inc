@@ -655,7 +655,11 @@ stock Action performFinalBhopBeforeCharge(int client, const float pos[3], const 
     if (maxHopSpeed < baseSpeed)
         maxHopSpeed = baseSpeed;
 
-    maxHopSpeed += g_cvBhopImpulse.FloatValue;
+    /*
+    * 最后一跳和 Path / Direct / 后跳用同一套加速度规则: 从跑动直接起跳按 first_hop_ratio 折算,
+    * 再按起跳改向 (+ 落地跳时上一跳的空中偏转) 折算. 原先直接加满额 g_cvBhopImpulse, 跑动中起跳的最后一跳也能白拿一整份加速度
+    */
+    maxHopSpeed += getChargerHopImpulse(client, dir);
 
     if (maxHopSpeed > g_cvBhopMaxSpeed.FloatValue)
         maxHopSpeed = g_cvBhopMaxSpeed.FloatValue;
@@ -690,12 +694,14 @@ stock Action performFinalBhopBeforeCharge(int client, const float pos[3], const 
     AIPathMovement_MarkHopStart(client);
 
     stateLog.debugAll(
-        "Charger (%N) performed final bunnyhop before charge, dist %.2f, commitDist %.2f, requiredSpeed %.2f, maxHopSpeed %.2f",
+        "Charger (%N) performed final bunnyhop before charge, dist %.2f, commitDist %.2f, requiredSpeed %.2f, maxHopSpeed %.2f, hop turn %.1f, impulse scale %.2f",
         client,
         dist,
         commitDist,
         getVectorLength2D(dir),
-        maxHopSpeed
+        maxHopSpeed,
+        g_AiChargers[client].m_flLastHopTurn,
+        g_AiChargers[client].m_flLastHopImpulseScale
     );
 
     return Plugin_Changed;

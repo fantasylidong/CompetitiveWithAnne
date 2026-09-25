@@ -1,0 +1,16 @@
+"Phrases"
+{
+	"PillHint_List"
+	{
+		"#format"	"{1:d},{2:s}"
+		"en"		"{green}[Anne]{default} {olive}{1}{default} pain pill(s) on the way this map, at progress: {olive}{2}"
+	}
+	"PillHint_None"
+	{
+		"en"		"{green}[Anne]{default} No pain pills on the way this map."
+	}
+	"PillHint_Separator"
+	{
+		"en"		", "
+	}
+}

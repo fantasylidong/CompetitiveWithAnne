@@ -9,14 +9,19 @@
 #define PF_CULL_WINDOW 1
 #define PF_CULL_SEP    2
 #define PF_CULL_LIMIT  3
+#define PF_CULL_ROUTE  4
 #define PF_NO_FLOW     -1   // no nav/flow data: always kept, excluded from spacing
 
+#define PF_FILL_AREA_ATTEMPTS 32
+
 static int PF_GLOW_KEEP[3] = {255, 255, 255};   // white
-static int PF_GLOW_CULL[4][3] = {
+static int PF_GLOW_FILL[3] = {0, 255, 0};       // green
+static int PF_GLOW_CULL[5][3] = {
     {0, 0, 0},          // PF_KEEP (unused)
     {255, 0, 0},        // PF_CULL_WINDOW: red
     {255, 165, 0},      // PF_CULL_SEP: orange
-    {0, 255, 255}       // PF_CULL_LIMIT: cyan
+    {0, 255, 255},      // PF_CULL_LIMIT: cyan
+    {255, 0, 255}       // PF_CULL_ROUTE: magenta
 };
 
 // Item lists for tracking/decoding/etc
@@ -63,6 +68,16 @@ enum struct ItemTracking
     float IT_angles;
     float IT_angles1;
     float IT_angles2;
+}
+
+// Shortest start->goal route, measured once per filter pass
+enum struct PFRoute
+{
+    Address pStart;
+    Address pGoal;
+    float fStartFlow;
+    float fRouteLen;
+    float fScale;   // BuildPath length per flow unit
 }
 
 static const char g_sItemNames[ItemList_Size][ItemNames_Size][] =
@@ -128,6 +143,10 @@ static ConVar
     g_hCvarPillFlowMax = null,
     g_hCvarPillFlowSeparation = null,
     g_hCvarPillFlowFinale = null,
+    g_hCvarPillFlowMaxDetour = null,
+    g_hCvarPillFlowFill = null,
+    g_hCvarPillFlowFillMin = null,
+    g_hCvarPillFlowFillMax = null,
     g_hCvarPillFlowVisualize = null,
     g_hCvarLimits[ItemList_Size] = {null, ...}; // CVAR Handle Array for item limits
 
@@ -148,12 +167,17 @@ void IT_OnModuleStart()
     g_hCvarIgnorePlayerItems = CreateConVarEx("itemtracking_playeritems", "0", "Ignore items that players spawn with. 0 = Nope, 1 = Yes. (Non-issue in versus modes)", _, true, 0.0, true, 1.0);
 
     // Pill flow window. Per-map override keys in mapinfo.txt (map section):
-    // "pillflow_min", "pillflow_max", "pillflow_separation" (floats, same meaning as the cvars).
+    // "pillflow_min", "pillflow_max", "pillflow_separation", "pillflow_max_detour", "pillflow_fill", "pillflow_fill_min", "pillflow_fill_max"
+    // (floats, same meaning as the cvars).
     g_hCvarPillFlowMin = CreateConVarEx("pills_flow_min", "0", "Minimum map flow fraction (0.0-1.0) where pain pills may spawn. Pills earlier than this are removed. 0 with max 1 and separation 0 = flow filter off.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowMax = CreateConVarEx("pills_flow_max", "1", "Maximum map flow fraction (0.0-1.0) where pain pills may spawn. Pills later than this are removed.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowSeparation = CreateConVarEx("pills_flow_separation", "0", "Minimum flow-fraction gap between two kept pill spawns (0.05 = 5% of map flow). Of a too-close pair the earlier spawn wins. 0 = no separation enforced.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowFinale = CreateConVarEx("pills_flow_finale", "0", "Apply the pill flow window on finale maps. 0 = finales exempt.", _, true, 0.0, true, 1.0);
-    g_hCvarPillFlowVisualize = CreateConVarEx("pills_flow_visualize", "0", "Debug: 1 = don't remove pills, glow instead: white = kept, red = outside flow window, orange = too close to previous pill, cyan = over the pills limit. 2 = remove as normal, then glow the surviving pills white.", _, true, 0.0, true, 2.0);
+    g_hCvarPillFlowMaxDetour = CreateConVarEx("pills_flow_max_detour", "0", "Maximum detour (nav units) a pill spawn may sit off the shortest start->end route; a dead-end side room of depth d is a detour of d. Off-route pills are removed. 0 = off.", _, true, 0.0);
+    g_hCvarPillFlowFill = CreateConVarEx("pills_flow_fill", "0", "Fill missing pills at random progress positions on the main route, including maps with no original pills. 0 = off.", _, true, 0.0, true, 1.0);
+    g_hCvarPillFlowFillMin = CreateConVarEx("pills_flow_fill_min", "0.3", "Minimum map flow fraction for randomly spawned fill pills.", _, true, 0.0, true, 1.0);
+    g_hCvarPillFlowFillMax = CreateConVarEx("pills_flow_fill_max", "1.0", "Maximum map flow fraction for randomly spawned fill pills; saferoom nav areas are excluded.", _, true, 0.0, true, 1.0);
+    g_hCvarPillFlowVisualize = CreateConVarEx("pills_flow_visualize", "0", "Debug: 1 = don't remove pills, glow instead: white = kept, green = spawned to fill the limit, red = outside flow window, magenta = off the main route, orange = too close to previous pill, cyan = over the pills limit. 2 = remove as normal, then glow the surviving pills white/green.", _, true, 0.0, true, 2.0);
 
     char sNameBuf[64], sCvarDescBuf[256];
     // Create itemlimit cvars
@@ -179,6 +203,9 @@ void IT_OnModuleStart()
 
     g_hSurvivorLimit = FindConVar("survivor_limit");
 }
+
+
+
 
 void IT_OnMapStart()
 {
@@ -348,11 +375,8 @@ static void SpawnItems()
 
     float origins[3], angles[3];
     int arrsize = 0, itement = 0, wepid = 0;
-    char sModelname[PLATFORM_MAX_PATH];
 
     for (int itemidx = 0; itemidx < ItemList_Size; itemidx++) {
-        FormatEx(sModelname, sizeof(sModelname), "models/w_models/weapons/w_eq_%s.mdl", g_sItemNames[itemidx][IN_modelname]);
-
         arrsize = g_hItemSpawns[itemidx].Length;
 
         for (int idx = 0; idx < arrsize; idx++) {
@@ -367,17 +391,10 @@ static void SpawnItems()
                                 IT_MODULE_NAME, g_sItemNames[itemidx][IN_officialname], itemidx, wepid, idx, origins[0], origins[1], origins[2]);
             }
 
-            itement = CreateEntityByName("weapon_spawn");
+            itement = CreateItemSpawn(itemidx, origins, angles);
             if (itement == -1) {
                 continue;
             }
-
-            SetEntProp(itement, Prop_Send, "m_weaponID", wepid);
-            SetEntityModel(itement, sModelname);
-            DispatchKeyValue(itement, "count", "1");
-            TeleportEntity(itement, origins, angles, NULL_VECTOR);
-            DispatchSpawn(itement);
-            SetEntityMoveType(itement, MOVETYPE_NONE);
 
             /*
                 Keep the stored entry pointing at the live entity so passes that
@@ -388,6 +405,26 @@ static void SpawnItems()
             g_hItemSpawns[itemidx].SetArray(idx, curitem, sizeof(curitem));
         }
     }
+}
+
+static int CreateItemSpawn(int itemidx, const float origins[3], const float angles[3])
+{
+    int itement = CreateEntityByName("weapon_spawn");
+    if (itement == -1) {
+        return -1;
+    }
+
+    char sModelname[PLATFORM_MAX_PATH];
+    FormatEx(sModelname, sizeof(sModelname), "models/w_models/weapons/w_eq_%s.mdl", g_sItemNames[itemidx][IN_modelname]);
+
+    SetEntProp(itement, Prop_Send, "m_weaponID", GetWeaponIDFromItemList(itemidx));
+    SetEntityModel(itement, sModelname);
+    DispatchKeyValue(itement, "count", "1");
+    TeleportEntity(itement, origins, angles, NULL_VECTOR);
+    DispatchSpawn(itement);
+    SetEntityMoveType(itement, MOVETYPE_NONE);
+
+    return itement;
 }
 
 static void EnumerateSpawns()
@@ -526,8 +563,10 @@ static bool ApplyPillFlowFilter()
     float fFlowMin = PF_GetSetting("pillflow_min", g_hCvarPillFlowMin);
     float fFlowMax = PF_GetSetting("pillflow_max", g_hCvarPillFlowMax);
     float fSep = PF_GetSetting("pillflow_separation", g_hCvarPillFlowSeparation);
+    float fMaxDetour = PF_GetSetting("pillflow_max_detour", g_hCvarPillFlowMaxDetour);
+    bool bFill = (PF_GetSetting("pillflow_fill", g_hCvarPillFlowFill) > 0.0);
 
-    if (fFlowMin <= 0.0 && fFlowMax >= 1.0 && fSep <= 0.0) {
+    if (fFlowMin <= 0.0 && fFlowMax >= 1.0 && fSep <= 0.0 && fMaxDetour <= 0.0 && !bFill) {
         return false;
     }
 
@@ -550,17 +589,29 @@ static bool ApplyPillFlowFilter()
 
     ArrayList hSpawns = g_hItemSpawns[IL_PainPills];
     int iCount = hSpawns.Length;
+    int iLimit = g_iItemLimits[IL_PainPills];
+    int iVisualize = g_hCvarPillFlowVisualize.IntValue;
+    bool bVisualize = (iVisualize == 1);   // mode 1 glows instead of removing; mode 2 removes and glows survivors
+
+    bFill = bFill && iLimit > 0;
+
+    PFRoute route;
+    bool bRoute = fMaxDetour > 0.0 && iCount > 0 && PF_BuildRoute(fMaxFlowDist, route);
+
     if (!iCount) {
+        if (bFill) {
+            PF_FillToLimit(hSpawns, iLimit, fMaxFlowDist, fFlowMin, fFlowMax, iVisualize > 0);
+        }
         return true;
     }
 
-    int iVisualize = g_hCvarPillFlowVisualize.IntValue;
-    bool bVisualize = (iVisualize == 1);   // mode 1 glows instead of removing; mode 2 removes and glows survivors
     ItemTracking curitem;
     float fOrigins[3];
 
     // Resolve each stored pill spawn to a flow fraction and apply the window.
     float[] fPct = new float[iCount];
+    float[] fFlowRaw = new float[iCount];
+    Address[] pNavs = new Address[iCount];
     int[] iReason = new int[iCount];
 
     for (int i = 0; i < iCount; i++) {
@@ -573,6 +624,8 @@ static bool ApplyPillFlowFilter()
         }
 
         float fFlow = (pNav != Address_Null) ? L4D2Direct_GetTerrorNavAreaFlow(pNav) : -1.0;
+        pNavs[i] = pNav;
+        fFlowRaw[i] = fFlow;
         if (fFlow < 0.0) {
             fPct[i] = -1.0;
             iReason[i] = PF_NO_FLOW;
@@ -587,6 +640,11 @@ static bool ApplyPillFlowFilter()
         if (fPct[i] < fFlowMin || fPct[i] > fFlowMax) {
             iReason[i] = PF_CULL_WINDOW;
         }
+    }
+
+    // Off-route spawns go before spacing, so they can't win a cluster over an on-route neighbour.
+    if (fMaxDetour > 0.0 && bRoute) {
+        PF_ApplyRouteFilter(route, iCount, pNavs, fFlowRaw, iReason, fMaxDetour);
     }
 
     // Index order sorted by ascending flow (spacing passes walk the map start->end).
@@ -624,7 +682,6 @@ static bool ApplyPillFlowFilter()
         Enforce the pills limit here, evenly spaced by flow.
         Spawns without flow data can't be spaced, so they occupy limit slots off the top.
     */
-    int iLimit = g_iItemLimits[IL_PainPills];
     if (iLimit >= 0) {
         int iKept = 0, iNoFlow = 0;
         for (int i = 0; i < iCount; i++) {
@@ -687,12 +744,13 @@ static bool ApplyPillFlowFilter()
 
     // Apply: kill+erase culled spawns (descending so indices stay valid), or
     // just glow everything in visualize mode.
-    int iRemoved[4] = {0, ...};   // indexed by PF_CULL_* reason
-
+    int iRemoved[5] = {0, ...};   // indexed by PF_CULL_* reason
+    int iKeptTotal = 0;
     for (int i = iCount - 1; i >= 0; i--) {
         hSpawns.GetArray(i, curitem, sizeof(curitem));
 
         if (iReason[i] <= PF_KEEP) {
+            iKeptTotal++;
             if (IsDebugEnabled()) {
                 LogMessage("[%s] Pill spawn %d flow=%.1f%% KEPT%s", IT_MODULE_NAME, curitem.IT_entity,
                     fPct[i] * 100.0, iReason[i] == PF_NO_FLOW ? " (no flow data)" : "");
@@ -704,7 +762,7 @@ static bool ApplyPillFlowFilter()
         }
 
         if (IsDebugEnabled()) {
-            static const char sReasons[4][] = {"", "outside window", "separation", "limit spacing"};
+            static const char sReasons[5][] = {"", "outside window", "separation", "limit spacing", "off route"};
             LogMessage("[%s] Pill spawn %d flow=%.1f%% %s (%s)", IT_MODULE_NAME, curitem.IT_entity,
                 fPct[i] * 100.0, bVisualize ? "WOULD REMOVE" : "REMOVED", sReasons[iReason[i]]);
         }
@@ -721,15 +779,347 @@ static bool ApplyPillFlowFilter()
     }
 
     if (IsDebugEnabled()) {
-        LogMessage("[%s] Pill flow window %.0f%%-%.0f%% sep %.1f%%: %d kept, %d %s (window), %d (separation), %d (limit spacing).%s",
-            IT_MODULE_NAME, fFlowMin * 100.0, fFlowMax * 100.0, fSep * 100.0,
-            iCount - iRemoved[PF_CULL_WINDOW] - iRemoved[PF_CULL_SEP] - iRemoved[PF_CULL_LIMIT],
+        LogMessage("[%s] Pill flow window %.0f%%-%.0f%% sep %.1f%% detour %.0f: %d kept, %d %s (window), %d (off route), %d (separation), %d (limit spacing).%s",
+            IT_MODULE_NAME, fFlowMin * 100.0, fFlowMax * 100.0, fSep * 100.0, fMaxDetour,
+            iCount - iRemoved[PF_CULL_WINDOW] - iRemoved[PF_CULL_ROUTE] - iRemoved[PF_CULL_SEP] - iRemoved[PF_CULL_LIMIT],
             iRemoved[PF_CULL_WINDOW], bVisualize ? "flagged" : "removed",
-            iRemoved[PF_CULL_SEP], iRemoved[PF_CULL_LIMIT],
-            bVisualize ? " (visualize: nothing deleted; white = kept, red = window, orange = separation, cyan = limit)" : "");
+            iRemoved[PF_CULL_ROUTE], iRemoved[PF_CULL_SEP], iRemoved[PF_CULL_LIMIT],
+            bVisualize ? " (visualize: nothing deleted; white = kept, red = window, magenta = route, orange = separation, cyan = limit)" : "");
+    }
+
+    if (bFill) {
+        PF_FillToLimit(hSpawns, iLimit - iKeptTotal, fMaxFlowDist,
+            fFlowMin, fFlowMax, iVisualize > 0);
     }
 
     return true;
+}
+
+/*
+    Main-route test. For a spot on the shortest start->goal route, flow(spot) + path(spot->goal)
+    equals the route length; a dead-end side room of depth d adds 2d. Flow and BuildPath lengths
+    aren't measured identically, so the route is measured once with the BuildPath metric and flow
+    is scaled by that ratio.
+*/
+static bool PF_BuildRoute(float fMaxFlowDist, PFRoute route)
+{
+    float fGoalFlow;
+    if (!PF_FindRouteEnds(fMaxFlowDist, route.pStart, route.fStartFlow, route.pGoal, fGoalFlow)) {
+        LogMessage("[%s] No start/goal nav area found; pill route check skipped.", IT_MODULE_NAME);
+        return false;
+    }
+
+    float fRouteFlow = fGoalFlow - route.fStartFlow;
+    route.fRouteLen = PF_MeasurePath(route.pStart, route.pGoal, fRouteFlow * 0.5, fRouteFlow * 2.0);
+    if (route.fRouteLen <= 0.0) {
+        LogMessage("[%s] Start->goal route not walkable (flow %.0f); pill route check skipped.", IT_MODULE_NAME, fRouteFlow);
+        return false;
+    }
+
+    route.fScale = route.fRouteLen / fRouteFlow;
+
+    if (IsDebugEnabled()) {
+        LogMessage("[%s] Pill route: start area %d (flow %.0f), goal area %d (flow %.0f), path %.0f, scale %.3f",
+            IT_MODULE_NAME, L4D_GetNavAreaID(route.pStart), route.fStartFlow, L4D_GetNavAreaID(route.pGoal), fGoalFlow,
+            route.fRouteLen, route.fScale);
+    }
+
+    return true;
+}
+
+static bool PF_IsOnRoute(const PFRoute route, Address pArea, float fFlow, float fMaxDetour)
+{
+    if (pArea == route.pGoal) {
+        return true;
+    }
+
+    // Path budget from the spot to the goal that still keeps the detour within fMaxDetour.
+    float fBudget = route.fRouteLen - route.fScale * (fFlow - route.fStartFlow) + 2.0 * fMaxDetour;
+    return (fBudget > 0.0 && PF_PathWithin(pArea, route.pGoal, fBudget));
+}
+
+static void PF_ApplyRouteFilter(const PFRoute route, int iCount, const Address[] pNavs, const float[] fFlowRaw, int[] iReason, float fMaxDetour)
+{
+    for (int i = 0; i < iCount; i++) {
+        if (iReason[i] != PF_KEEP) {
+            continue;
+        }
+
+        bool bOnRoute = PF_IsOnRoute(route, pNavs[i], fFlowRaw[i], fMaxDetour);
+
+        if (IsDebugEnabled()) {
+            LogMessage("[%s] Pill area %d flow %.0f: %s", IT_MODULE_NAME, L4D_GetNavAreaID(pNavs[i]), fFlowRaw[i], bOnRoute ? "on route" : "off route");
+        }
+
+        if (!bOnRoute) {
+            iReason[i] = PF_CULL_ROUTE;
+        }
+    }
+}
+
+static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
+    float fMaxFlowDist, float fFlowMin, float fFlowMax, bool bGlow)
+{
+    if (iMissing <= 0) {
+        return;
+    }
+
+    float fFillMin = PF_GetSetting("pillflow_fill_min", g_hCvarPillFlowFillMin);
+    float fFillMax = PF_GetSetting("pillflow_fill_max", g_hCvarPillFlowFillMax);
+    if (fFillMin < fFlowMin) {
+        fFillMin = fFlowMin;
+    }
+    if (fFillMax > fFlowMax) {
+        fFillMax = fFlowMax;
+    }
+    if (fFillMax <= fFillMin) {
+        LogMessage("[%s] Pill fill: invalid progress range %.2f-%.2f.", IT_MODULE_NAME, fFillMin, fFillMax);
+        return;
+    }
+
+    ArrayList hAllAreas = new ArrayList();
+    ArrayList hCandidates = new ArrayList(2);
+    L4D_GetAllNavAreas(hAllAreas);
+    for (int i = 0; i < hAllAreas.Length; i++) {
+        Address pArea = view_as<Address>(hAllAreas.Get(i));
+        int iFlags = L4D_GetNavArea_SpawnAttributes(pArea);
+        if (!(iFlags & NAV_SPAWN_ESCAPE_ROUTE) ||
+            iFlags & (NAV_SPAWN_PLAYER_START | NAV_SPAWN_CHECKPOINT | NAV_SPAWN_RESCUE_VEHICLE | NAV_SPAWN_RESCUE_CLOSET)) {
+            continue;
+        }
+
+        float fFlow = L4D2Direct_GetTerrorNavAreaFlow(pArea);
+        if (fFlow < fFillMin * fMaxFlowDist || fFlow > fFillMax * fMaxFlowDist) {
+            continue;
+        }
+
+        int iRow = hCandidates.Push(fFlow);
+        hCandidates.Set(iRow, pArea, 1);
+    }
+    delete hAllAreas;
+    hCandidates.SortCustom(PF_SortByFirstFloat);
+
+    int iSpawned;
+    for (int choice = 0; choice < iMissing * 3 && iSpawned < iMissing; choice++) {
+        float fProgress = choice < iMissing
+            ? (float(choice) + GetRandomFloat(0.0, 1.0)) / float(iMissing)
+            : GetRandomFloat(0.0, 1.0);
+        float fTarget = (fFillMin + fProgress * (fFillMax - fFillMin)) * fMaxFlowDist;
+        int iRight = 0;
+        int iEnd = hCandidates.Length;
+        while (iRight < iEnd && hCandidates.Get(iRight, 0) < fTarget) {
+            iRight++;
+        }
+        int iLeft = iRight - 1;
+
+        for (int attempt = 0; attempt < PF_FILL_AREA_ATTEMPTS && (iLeft >= 0 || iRight < iEnd); attempt++) {
+            int iIndex;
+            if (iLeft >= 0 && (iRight == iEnd ||
+                fTarget - hCandidates.Get(iLeft, 0) <= hCandidates.Get(iRight, 0) - fTarget)) {
+                iIndex = iLeft--;
+            } else {
+                iIndex = iRight++;
+            }
+
+            Address pArea = view_as<Address>(hCandidates.Get(iIndex, 1));
+            float fFlow = hCandidates.Get(iIndex, 0);
+            float fOrigin[3];
+            if (!PF_FindRouteSpawnSpot(pArea, fOrigin) || PF_NearExistingPill(hSpawns, fOrigin)) {
+                continue;
+            }
+
+            float fAngles[3];
+            fAngles[1] = GetRandomFloat(0.0, 360.0);
+            int iEnt = CreateItemSpawn(IL_PainPills, fOrigin, fAngles);
+            if (iEnt == -1) {
+                continue;
+            }
+
+            if (bGlow) {
+                L4D2_SetEntityGlow(iEnt, L4D2Glow_Constant, 0, 0, PF_GLOW_FILL, false);
+            }
+
+            ItemTracking curitem;
+            curitem.IT_entity = iEnt;
+            SetSpawnOrigins(fOrigin, curitem);
+            SetSpawnAngles(fAngles, curitem);
+            hSpawns.PushArray(curitem, sizeof(curitem));
+            iSpawned++;
+
+            if (IsDebugEnabled()) {
+                LogMessage("[%s] Pill fill: spawned %d on main route at flow %.1f%% (%.0f %.0f %.0f)",
+                    IT_MODULE_NAME, iEnt, fFlow / fMaxFlowDist * 100.0, fOrigin[0], fOrigin[1], fOrigin[2]);
+            }
+            break;
+        }
+    }
+
+    delete hCandidates;
+    if (iSpawned < iMissing) {
+        LogMessage("[%s] Pill fill: spawned %d of %d missing pills on the main route.", IT_MODULE_NAME, iSpawned, iMissing);
+    }
+}
+
+static int PF_SortByFirstFloat(int index1, int index2, Handle array, Handle hndl)
+{
+    ArrayList hList = view_as<ArrayList>(array);
+    float a = hList.Get(index1, 0), b = hList.Get(index2, 0);
+    return (a < b) ? -1 : ((a > b) ? 1 : 0);
+}
+
+static bool PF_FindRouteSpawnSpot(Address pArea, float fOut[3])
+{
+    L4D_FindRandomSpot(view_as<int>(pArea), fOut);
+    float fStart[3], fEnd[3];
+    fStart = fOut;
+    fEnd = fOut;
+    fStart[2] += 16.0;
+    fEnd[2] -= 64.0;
+
+    Handle hTrace = TR_TraceRayFilterEx(fStart, fEnd, MASK_PLAYERSOLID, RayType_EndPoint, PF_TraceSolidOnly);
+    bool bGround = !TR_StartSolid(hTrace) && TR_DidHit(hTrace);
+    if (bGround) {
+        TR_GetEndPosition(fOut, hTrace);
+    }
+    delete hTrace;
+    if (!bGround) {
+        return false;
+    }
+
+    fOut[2] += 2.0;
+    if (L4D_GetNearestNavArea(fOut, 80.0, true, false, true, L4D2Team_Survivor) != pArea) {
+        return false;
+    }
+
+    if (IsMapDataAvailable()) {
+        float fPoint[3];
+        GetMapValueVector("start_point", fPoint);
+        float fStartDist = GetMapValueFloat("start_dist");
+        float fExtraDist = GetMapValueFloat("start_extra_dist");
+        if (fExtraDist > fStartDist) {
+            fStartDist = fExtraDist;
+        }
+        if (GetVectorDistance(fOut, fPoint) <= fStartDist) {
+            return false;
+        }
+        GetMapValueVector("end_point", fPoint);
+        if (GetVectorDistance(fOut, fPoint) <= GetMapValueFloat("end_dist")) {
+            return false;
+        }
+    }
+
+    static const float fMins[3] = {-8.0, -8.0, 0.0};
+    static const float fMaxs[3] = {8.0, 8.0, 12.0};
+    hTrace = TR_TraceHullFilterEx(fOut, fOut, fMins, fMaxs, MASK_PLAYERSOLID, PF_TraceSolidOnly);
+    bool bClear = !TR_StartSolid(hTrace) && !TR_DidHit(hTrace);
+    delete hTrace;
+    return bClear;
+}
+
+static bool PF_NearExistingPill(ArrayList hSpawns, const float fOrigin[3])
+{
+    ItemTracking curitem;
+    float fOther[3];
+    for (int i = 0; i < hSpawns.Length; i++) {
+        hSpawns.GetArray(i, curitem, sizeof(curitem));
+        GetSpawnOrigins(fOther, curitem);
+        if (GetVectorDistance(fOrigin, fOther) < 128.0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Hits world and props; ignores players and other items.
+static bool PF_TraceSolidOnly(int iEntity, int iContentsMask)
+{
+    if (iEntity > 0 && iEntity <= MaxClients) {
+        return false;
+    }
+
+    if (iEntity > MaxClients && IsValidEdict(iEntity)) {
+        char sClass[16];
+        GetEdictClassname(iEntity, sClass, sizeof(sClass));
+        if (strncmp(sClass, "weapon_", 7) == 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Start = lowest-flow area. Goal = end-checkpoint area nearest the map's max flow, else any area nearest it (no end saferoom).
+static bool PF_FindRouteEnds(float fMaxFlowDist, Address &pStart, float &fStartFlow, Address &pGoal, float &fGoalFlow)
+{
+    ArrayList hAreas = new ArrayList();
+    L4D_GetAllNavAreas(hAreas);
+
+    Address pAny = Address_Null;
+    float fAnyFlow = 0.0, fAnyDiff = 0.0, fGoalDiff = 0.0;
+    pStart = Address_Null;
+    pGoal = Address_Null;
+
+    int iAreas = hAreas.Length;
+    for (int i = 0; i < iAreas; i++) {
+        Address pArea = view_as<Address>(hAreas.Get(i));
+        float fFlow = L4D2Direct_GetTerrorNavAreaFlow(pArea);
+        if (fFlow < 0.0) {
+            continue;
+        }
+
+        if (pStart == Address_Null || fFlow < fStartFlow) {
+            pStart = pArea;
+            fStartFlow = fFlow;
+        }
+
+        float fDiff = FloatAbs(fFlow - fMaxFlowDist);
+        if (pAny == Address_Null || fDiff < fAnyDiff) {
+            pAny = pArea;
+            fAnyFlow = fFlow;
+            fAnyDiff = fDiff;
+        }
+
+        if (fFlow > fMaxFlowDist * 0.5 && (L4D_GetNavArea_SpawnAttributes(pArea) & NAV_SPAWN_CHECKPOINT)
+            && (pGoal == Address_Null || fDiff < fGoalDiff)) {
+            pGoal = pArea;
+            fGoalFlow = fFlow;
+            fGoalDiff = fDiff;
+        }
+    }
+
+    delete hAreas;
+
+    if (pGoal == Address_Null) {
+        pGoal = pAny;
+        fGoalFlow = fAnyFlow;
+    }
+
+    return (pStart != Address_Null && pGoal != Address_Null && fGoalFlow > fStartFlow);
+}
+
+// Walkable survivor path length between two areas, found by bisecting BuildPath's length cap; -1.0 if longer than fHigh.
+static float PF_MeasurePath(Address pFrom, Address pTo, float fLow, float fHigh)
+{
+    if (!PF_PathWithin(pFrom, pTo, fHigh)) {
+        return -1.0;
+    }
+
+    for (int i = 0; i < 8; i++) {
+        float fMid = (fLow + fHigh) * 0.5;
+        if (PF_PathWithin(pFrom, pTo, fMid)) {
+            fHigh = fMid;
+        } else {
+            fLow = fMid;
+        }
+    }
+
+    return fHigh;
+}
+
+// Event nav blockers are ignored: items are placed at round start, before crescendo gates open.
+static bool PF_PathWithin(Address pFrom, Address pTo, float fMaxLen)
+{
+    return L4D2_NavAreaBuildPath(pFrom, pTo, fMaxLen, L4D2Team_Survivor, true);
 }
 
 static void SetSpawnOrigins(const float buf[3], ItemTracking spawn)

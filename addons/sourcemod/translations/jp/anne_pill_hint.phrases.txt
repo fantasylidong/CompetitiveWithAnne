@@ -1,0 +1,15 @@
+"Phrases"
+{
+	"PillHint_List"
+	{
+		"jp"		"{green}[Anne]{default} このマップの道中に鎮痛剤が {olive}{1}{default} 個、進行度：{olive}{2}"
+	}
+	"PillHint_None"
+	{
+		"jp"		"{green}[Anne]{default} このマップの道中に鎮痛剤はありません。"
+	}
+	"PillHint_Separator"
+	{
+		"jp"		"、"
+	}
+}

@@ -1,0 +1,36 @@
+{
+  "started_utc": "2026-09-25T04:07:24.633609+00:00",
+  "server": "Anne云服#5",
+  "maps_expected": 57,
+  "source_sha256": "e314d5d0656f8e0dbe7c3de205bade91d2aff628e408732fc9dbdbad36549807",
+  "production_build_sha256": "3554075c1fce88ce238e671210628caf1f1d53cca644ed4cb927717c00834685",
+  "probe_sha256": "62e93990c2618f331ecadf3ba329101377a6275620ff955c531dfb604cfd1d3c",
+  "original_remote_sha256": "ac0a1ba5f5d90bf4f96a2c44c53885f951b6b84e55fae1fa790040b69a6010d4",
+  "settings": {
+    "mp_gamemode": "versus",
+    "sv_hibernate_when_empty": "0",
+    "sb_all_bot_game": "1",
+    "confogl_enable_itemtracking": "1",
+    "confogl_itemtracking_mapspecific": "3",
+    "confogl_itemtracking_savespawns": "0",
+    "confogl_pills_limit": "4",
+    "confogl_debug": "1",
+    "confogl_pills_flow_min": "0.3",
+    "confogl_pills_flow_max": "1",
+    "confogl_pills_flow_max_detour": "300",
+    "confogl_pills_flow_fill": "1",
+    "confogl_pills_flow_fill_min": "0.3",
+    "confogl_pills_flow_fill_max": "1",
+    "confogl_pills_flow_finale": "0",
+    "confogl_pills_flow_visualize": "0"
+  },
+  "mapinfo_sha256": {
+    "addons/sourcemod/configs/confogl/mapinfo.txt": "a93ff8d4d9e4ea26e4d204774dd4ab0a794b97ea5829440ed987818e5cffe4d2",
+    "cfg/cfgogl/annehappy/mapinfo.txt": "a4613bcb2c18fb5f22b39971fcaf158073222419ad3a363dad739c1ed3fd0e6f"
+  },
+  "finished_utc": "2026-09-25T04:18:37.830637+00:00",
+  "maps_completed": 57,
+  "restore_warnings": [],
+  "restored_map": "c2m1_highway",
+  "restored_remote_sha256": "ac0a1ba5f5d90bf4f96a2c44c53885f951b6b84e55fae1fa790040b69a6010d4"
+}

@@ -1,0 +1,15 @@
+"Phrases"
+{
+	"PillHint_List"
+	{
+		"chi"		"{green}[Anne]{default} 本关路上共 {olive}{1}{default} 瓶止痛药，位置在进度：{olive}{2}"
+	}
+	"PillHint_None"
+	{
+		"chi"		"{green}[Anne]{default} 本关路上没有止痛药。"
+	}
+	"PillHint_Separator"
+	{
+		"chi"		"、"
+	}
+}

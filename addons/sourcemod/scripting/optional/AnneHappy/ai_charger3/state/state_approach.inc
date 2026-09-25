@@ -297,8 +297,10 @@ stock void buildDirectBhopVelocity(int client, const float pos[3], const float t
         return;
     }
 
-    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加
-    ScaleVector(outputVelVec, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue));
+    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加, 再按起跳改向 (+ 落地跳时上一跳的空中偏转) 折算
+    static float hopImpulse;
+    hopImpulse = getChargerHopImpulse(client, outputVelVec);
+    ScaleVector(outputVelVec, speed + hopImpulse);
 
     limitGroundBhopVel(outputVelVec);
 }
@@ -530,8 +532,14 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
         return Plugin_Continue;
     }
 
-    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加
-    ScaleVector(vFwd, speed + AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue));
+    // 起跳会消费落地授权, 日志用的落地标记必须在起跳前取
+    static bool landingHop;
+    landingHop = AIPathMovement_IsLandingHop(client);
+
+    // 从跑动直接起跳的第一跳按 first_hop_ratio 折算加速度 (0 = 只改方向), 完整加速度留到落地再起跳时追加, 再按起跳改向 (+ 落地跳时上一跳的空中偏转) 折算
+    static float hopImpulse;
+    hopImpulse = getChargerHopImpulse(client, vFwd);
+    ScaleVector(vFwd, speed + hopImpulse);
 
     // 连跳前限制速度, 使检查距离与最终实际速度一致
     limitGroundBhopVel(vFwd);
@@ -561,17 +569,19 @@ stock Action performPathGroundBhop(int client, float targetDist, const float pos
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
 
-    static bool landingHop;
-    landingHop = AIPathMovement_IsLandingHop(client);
     AIPathMovement_BeginPathHop(client, lookAheadPos, g_AiChargers[client].m_flLastHopSpeed * g_cvAirSpeedFloorRatio.FloatValue, g_cvBhopMaxSpeed.FloatValue);
 
-    stateLog.debugAll("Charger(%N) Path Ground Bhop, speed: %.2f (ground %.2f, landing hop: %d), target dist: %.2f, air correction dist: %.2f, strafe type: %d",
-        client, g_AiChargers[client].m_flLastHopSpeed, speed, landingHop, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
+    stateLog.debugAll("Charger(%N) Path Ground Bhop, speed: %.2f (ground %.2f, landing hop: %d, hop turn: %.1f, impulse scale: %.2f), target dist: %.2f, air correction dist: %.2f, strafe type: %d",
+        client, g_AiChargers[client].m_flLastHopSpeed, speed, landingHop, g_AiChargers[client].m_flLastHopTurn, g_AiChargers[client].m_flLastHopImpulseScale, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
 
     return Plugin_Changed;
 }
 
 stock Action performDirectGrounBhop(int client, float targetDist, const float pos[3], const float targetPos[3], float speed, bool visible, int& buttons, float ang[3]) {
+    // 起跳会消费落地授权, 日志用的落地标记必须在起跳前取
+    static bool landingHop;
+    landingHop = AIPathMovement_IsLandingHop(client);
+
     static float vFwd[3];
     buildDirectBhopVelocity(client, pos, targetPos, speed, vFwd);
 
@@ -614,12 +624,10 @@ stock Action performDirectGrounBhop(int client, float targetDist, const float po
     g_AiChargers[client].m_flLastHopSpeed = getVectorLength2D(vFwd);
     g_AiChargers[client].m_flLastAirVecModifyTime = GetEngineTime();
 
-    static bool landingHop;
-    landingHop = AIPathMovement_IsLandingHop(client);
     AIPathMovement_BeginPathHop(client, targetPos, g_AiChargers[client].m_flLastHopSpeed * g_cvAirSpeedFloorRatio.FloatValue, g_cvBhopMaxSpeed.FloatValue);
 
-    stateLog.debugAll("Charger(%N) Direct Ground Bhop, speed: %.2f (ground %.2f, landing hop: %d), target dist: %.2f, air correction dist: %.2f, strafe type: %d",
-        client, g_AiChargers[client].m_flLastHopSpeed, speed, landingHop, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
+    stateLog.debugAll("Charger(%N) Direct Ground Bhop, speed: %.2f (ground %.2f, landing hop: %d, hop turn: %.1f, impulse scale: %.2f), target dist: %.2f, air correction dist: %.2f, strafe type: %d",
+        client, g_AiChargers[client].m_flLastHopSpeed, speed, landingHop, g_AiChargers[client].m_flLastHopTurn, g_AiChargers[client].m_flLastHopImpulseScale, targetDist, airCorrDist, g_AiChargers[client].m_AirStrafe.m_StrafeType);
 
     return Plugin_Changed;
 }
@@ -1014,6 +1022,9 @@ stock Action executeAirCorrection(
             g_cvAirTurnSpeedLoss.FloatValue,
             vFwd
         )) {
+            // 本跳的空中转向预算用完后不再写回速度, 按惯性飞完这一跳
+            if (!clampAirTurnToBudget(client, vVel, vFwd))
+                return Plugin_Changed;
 
             alignChargerFacingWithMovement(client, vFwd, ang);
             TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
@@ -1083,7 +1094,7 @@ stock Action executeAirCorrection(
             g_cvAirVecModifyInterval.FloatValue,
             g_cvAirTurnSpeedLoss.FloatValue,
             vFwd
-        )) {
+        ) && clampAirTurnToBudget(client, vVel, vFwd)) {
             alignChargerFacingWithMovement(client, vFwd, ang);
             TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vFwd);
             // 记录空中速度方向修正时间
@@ -1296,6 +1307,10 @@ stock bool preserveAirChargeLine(int client, int target, bool visible, int& butt
 
     buildAirCorrectionVelocity2D(curVel, desiredDir, smoothLerp, finalSpeed, outVel);
     outVel[2] = curVel[2];
+
+    // 冲锋前的空中追踪同样受本跳转向预算约束, 用完后按惯性落地, 起跳后再横移可以躲开
+    if (!clampAirTurnToBudget(client, curVel, outVel))
+        return true;
 
     alignChargerFacingWithMovement(client, outVel, ang);
     TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, outVel);

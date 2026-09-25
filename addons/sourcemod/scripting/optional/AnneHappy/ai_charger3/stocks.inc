@@ -670,6 +670,139 @@ stock float getJumpAirTime() {
     return AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
 }
 
+#define AIR_TURN_MIN_EFFECTIVE_DEG      0.5     // 预算裁剪后剩余转角小于该值视为转不动, 不再写回速度
+#define HOP_TURN_MIN_SPEED              50.0    // 地面水平速度低于该值时没有可比的前进方向, 起跳改向不计入转角
+
+/**
+* 登记离地状态: 每次新的离地清空偏转角, 并记录起跳水平方向作为空中转向预算的基准
+* 落地时不清偏转角, 落地后紧接着的那一跳要按上一次滞空的偏转角折算加速度, 到下一次离地才重新计数
+* @param client 客户端索引
+* @param grounded 当前是否在地面或梯子上
+**/
+stock void updateAirTurnTracking(int client, bool grounded) {
+    if (grounded) {
+        g_AiChargers[client].m_bAirborne = false;
+        g_AiChargers[client].m_bAirTakeoffDirValid = false;
+        return;
+    }
+
+    if (!g_AiChargers[client].m_bAirborne) {
+        g_AiChargers[client].m_bAirborne = true;
+        g_AiChargers[client].m_flAirTurnDeviation = 0.0;
+    }
+
+    if (g_AiChargers[client].m_bAirTakeoffDirValid)
+        return;
+
+    static float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vel);
+    registerAirTakeoffDir(client, vel);
+}
+
+stock bool registerAirTakeoffDir(int client, const float vel[3]) {
+    // 原地竖直起跳没有水平方向, 等出现水平速度再登记
+    if (getVectorLength2D(vel) <= 1.0)
+        return false;
+
+    static float dir[3];
+    dir = vel;
+    dir[2] = 0.0;
+    NormalizeVector(dir, dir);
+    g_AiChargers[client].m_vecAirTakeoffDir = dir;
+    g_AiChargers[client].m_bAirTakeoffDirValid = true;
+    return true;
+}
+
+/**
+* 空中转向预算: 把空中修正后的速度方向限制在起跳方向 ±ai_charger3_air_turn_budget 以内, 并记录本次离地的最大偏转角
+* 已经被碰撞等外力推出预算之外的, 只允许往回收, 不允许继续往外转
+* @param client 客户端索引
+* @param curVel 当前速度
+* @param outVel 修正后的速度, 超出预算时改写为预算边缘方向 (保持水平速率和 Z 速度)
+* @return bool 仍有有效转向返回 true; 已经贴在预算边缘转不动返回 false, 调用方不写回速度, 按惯性飞完这一跳
+**/
+stock bool clampAirTurnToBudget(int client, const float curVel[3], float outVel[3]) {
+    if (!g_AiChargers[client].m_bAirTakeoffDirValid && !registerAirTakeoffDir(client, curVel))
+        return false;
+
+    static float takeoffDir[3], newDev, budget;
+    takeoffDir = g_AiChargers[client].m_vecAirTakeoffDir;
+    newDev = calcVectorAngle(takeoffDir, outVel, true);
+    budget = g_cvAirTurnBudget.FloatValue;
+
+    if (budget > 0.0) {
+        static float allowed;
+        allowed = calcVectorAngle(takeoffDir, curVel, true);
+        if (allowed < budget)
+            allowed = budget;
+
+        if (newDev > allowed) {
+            // 把起跳方向朝修正方向那一侧旋转 allowed 度, 作为这一跳能转到的最远方向
+            static float side, rad, cosA, sinA, speed2D;
+            side = takeoffDir[0] * outVel[1] - takeoffDir[1] * outVel[0];
+            rad = DegToRad(side >= 0.0 ? allowed : -allowed);
+            cosA = Cosine(rad);
+            sinA = Sine(rad);
+            speed2D = getVectorLength2D(outVel);
+            outVel[0] = (takeoffDir[0] * cosA - takeoffDir[1] * sinA) * speed2D;
+            outVel[1] = (takeoffDir[0] * sinA + takeoffDir[1] * cosA) * speed2D;
+            newDev = allowed;
+
+            if (calcVectorAngle(curVel, outVel, true) < AIR_TURN_MIN_EFFECTIVE_DEG)
+                return false;
+        }
+    }
+
+    if (newDev > g_AiChargers[client].m_flAirTurnDeviation)
+        g_AiChargers[client].m_flAirTurnDeviation = newDev;
+    return true;
+}
+
+/**
+* 转向折算加速度: 1 - θ / 90, 转得越多加得越少, 转满 90 度 (含掉头) 不加速
+**/
+stock float getHopTurnImpulseScale(float turn) {
+    if (turn <= 0.0)
+        return 1.0;
+    if (turn >= 90.0)
+        return 0.0;
+    return 1.0 - (turn / 90.0);
+}
+
+/**
+* 起跳改向角: 起跳前地面水平速度方向与本次起跳方向的夹角, 速度太低时没有可比的前进方向, 视为没有改向
+* 必须在 Teleport 出起跳速度之前调用, 否则读到的已经是起跳后的速度
+**/
+stock float getTakeoffTurnAngle(int client, const float hopDir[3]) {
+    static float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vel);
+    if (getVectorLength2D(vel) < HOP_TURN_MIN_SPEED)
+        return 0.0;
+    return calcVectorAngle(vel, hopDir, true);
+}
+
+/**
+* 本次起跳可追加的加速度, 所有 Charger 起跳 (Path / Direct / 后跳 / 冲锋前最后一跳) 统一走这里
+* 基础加速度: 第一跳按 first_hop_ratio 折算, 落地跳拿完整加速度
+* 再按转角 θ 折算为 × (1 - θ / 90): θ = 起跳改向角, 落地跳再加上上一次滞空的空中最大偏转角 (非落地跳的空中偏转是旧数据, 不计入)
+* @param client 客户端索引
+* @param hopDir 本次起跳的水平方向, 必须在 Teleport 起跳速度之前传入
+**/
+stock float getChargerHopImpulse(int client, const float hopDir[3]) {
+    static bool landingHop;
+    landingHop = AIPathMovement_IsLandingHop(client);
+
+    static float turn;
+    turn = getTakeoffTurnAngle(client, hopDir);
+    if (landingHop)
+        turn += g_AiChargers[client].m_flAirTurnDeviation;
+
+    g_AiChargers[client].m_flLastHopTurn = turn;
+    g_AiChargers[client].m_flLastHopImpulseScale = getHopTurnImpulseScale(turn);
+
+    return AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue) * g_AiChargers[client].m_flLastHopImpulseScale;
+}
+
 /**
 * 下一帧连跳落点位置检测
 * @param client 客户端索引

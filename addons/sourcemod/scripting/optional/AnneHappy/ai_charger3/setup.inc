@@ -83,6 +83,7 @@ ConVar
 	g_cvAirVecModifyLerp,		// 空中速度修正转向插值因子
 	g_cvAirTurnSpeedLoss,		// 空中实际转向 90 度时损失的水平速度比例
 	g_cvAirSpeedFloorRatio,		// 空中方向修正使用的起跳保存速度下限比例
+	g_cvAirTurnBudget,			// 每次离地后空中速度方向最多偏离起跳方向的角度
 	g_cvBaitMaxDuration,		// charger 进入博弈状态的最长时间
 	g_cvMeleeBaitOrbit,			// 近战博弈死区内是否沿切向绕圈, 代替原地急停
 	g_cvMeleeBaitStalemateSwitch,	// 近战僵持升级到最后一级时是否允许换目标
@@ -204,6 +205,12 @@ enum struct AiCharger {
 	float m_vecAirCorrGoal[3];			// 空中速度修正的前瞻目标点 (一跳内最远且无障碍的 segment goal)
 	AirStrafe m_AirStrafe;				// 连跳空中侧向偏移数据
 	BhopType m_BhopType;				// 连跳类型 (基于 PATH 或基于目标)
+	bool m_bAirborne;					// 上一帧是否已经离地, 用于识别新的一次离地
+	bool m_bAirTakeoffDirValid;			// 本次离地的起跳方向是否已经登记
+	float m_vecAirTakeoffDir[3];		// 本次离地的起跳水平方向 (单位向量), 空中转向预算以它为基准
+	float m_flAirTurnDeviation;			// 本次 (落地后为上一次) 离地期间空中修正偏离起跳方向的最大角度
+	float m_flLastHopTurn;				// 最近一次起跳计入加速度折算的总转角 (起跳改向 + 落地跳时上一跳的空中偏转)
+	float m_flLastHopImpulseScale;		// 最近一次起跳的加速度折算系数 1 - θ / 90, 仅用于日志
 
 	float m_flPathWaitStart;			// Charger 开始等待下一次 RePath 的时间
 	float m_flLastPathInvalidateTime;	// Charger 上次 Path 人为失效时间
@@ -269,6 +276,12 @@ enum struct AiCharger {
 		this.m_LastPathSegment.init();
 		ZeroVector(this.m_vecAirCorrGoal);
 		this.m_AirStrafe.init();
+		this.m_bAirborne = false;
+		this.m_bAirTakeoffDirValid = false;
+		ZeroVector(this.m_vecAirTakeoffDir);
+		this.m_flAirTurnDeviation = 0.0;
+		this.m_flLastHopTurn = 0.0;
+		this.m_flLastHopImpulseScale = 1.0;
 	}
 }
 AiCharger g_AiChargers[MAXPLAYERS + 1];

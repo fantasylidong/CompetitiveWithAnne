@@ -38,7 +38,7 @@ public Plugin myinfo =
 	name 			= "Ai-Charger 3.0",
 	author 			= "夜羽真白",
 	description 	= "Ai Charger 增强 3.0 版本",
-	version 		= "1.0.1.17",
+	version 		= "1.0.1.18",
 	url 			= "https://steamcommunity.com/id/saku_ra/"
 }
 
@@ -93,6 +93,8 @@ public void OnPluginStart() {
 	// Horizontal speed loss per 90 degrees of actual in-air turning
 	g_cvAirTurnSpeedLoss = CreateConVar("ai_charger3_air_turn_speed_loss", "0.12", "空中实际转向 90 度时损失的水平速度比例", CVAR_FLAGS, true, 0.0, true, 0.5);
 	g_cvAirSpeedFloorRatio = CreateConVar("ai_charger3_air_speed_floor_ratio", "0.50", "空中方向修正使用的起跳保存速度下限比例", CVAR_FLAGS, true, 0.0, true, 1.0);
+	// The maximum angle charger's in-air velocity may deviate from its takeoff direction within one hop (0 = unlimited)
+	g_cvAirTurnBudget = CreateConVar("ai_charger3_air_turn_budget", "30.0", "每次离地后空中速度方向最多偏离起跳方向的角度, 用完后按惯性落地, 0 = 不限制", CVAR_FLAGS, true, 0.0, true, 89.0);
 	// the maximum allowed duration (in seconds) for charger to stay in the bait state
 	g_cvBaitMaxDuration = CreateConVar("ai_charger3_bait_max_duration", "7.0", "Charger 进入博弈状态的最大允许时间", CVAR_FLAGS, true, 0.0);
 	g_cvMeleeBaitOrbit = CreateConVar("ai_charger3_melee_bait_orbit", "1", "近战博弈处于博弈区内时, 沿目标切向绕圈代替原地急停 (0 = 关闭, 保持原地站定)", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -222,8 +224,11 @@ public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3
 	// 地面/梯子登记必须每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份加速度
 	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
 	bool groundedOnLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
-	if (groundedOnLadder || IsClientOnGround(client))
+	bool grounded = groundedOnLadder || IsClientOnGround(client);
+	if (grounded)
 		AIPathMovement_NotifyGrounded(client, groundedOnLadder);
+	// 离地登记同样要在提前返回之前完成, 空中转向预算和落地加速度折算都依赖它
+	updateAirTurnTracking(client, grounded);
 
 	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
 	maintainEvadeMoveCommand(client);

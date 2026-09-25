@@ -1,0 +1,58 @@
+map,finale_skipped,limit,raw,kept,filled,live,result,elapsed_seconds,fill_progress
+c1m1_hotel,0,4,5,0,4,4,pass,0.005,"[33.6, 47.3, 79.1, 86.8]"
+c1m2_streets,0,4,11,4,0,4,pass,0.01,[]
+c1m3_mall,0,4,10,4,0,4,pass,0.016,[]
+c1m4_atrium,1,4,2,0,0,2,finale_exempt,0.001,[]
+c2m1_highway,0,4,9,4,0,4,pass,1.143,[]
+c2m2_fairgrounds,0,4,14,4,0,4,pass,0.017,[]
+c2m3_coaster,0,4,7,4,0,4,pass,0.012,[]
+c2m4_barns,0,4,2,1,3,4,pass,0.006,"[31.4, 60.7, 84.6]"
+c2m5_concert,1,4,2,0,0,2,finale_exempt,0.0,[]
+c3m1_plankcountry,0,4,12,4,0,4,pass,1.539,[]
+c3m2_swamp,0,4,3,0,4,4,pass,0.016,"[32.5, 54.4, 65.5, 83.7]"
+c3m3_shantytown,0,4,5,0,4,4,pass,0.021,"[39.0, 60.0, 78.0, 87.1]"
+c3m4_plantation,1,4,4,0,0,4,finale_exempt,0.0,[]
+c4m1_milltown_a,0,4,9,4,0,4,pass,2.526,[]
+c4m2_sugarmill_a,0,4,9,0,4,4,pass,0.016,"[37.3, 53.6, 78.6, 97.4]"
+c4m3_sugarmill_b,0,4,8,1,3,4,pass,0.016,"[39.9, 54.7, 96.1]"
+c4m4_milltown_b,0,4,14,2,2,4,pass,0.02,"[56.2, 75.4]"
+c4m5_milltown_escape,1,4,9,0,0,4,finale_exempt,0.0,[]
+c5m1_waterfront,0,4,0,0,4,4,pass,0.002,"[31.3, 62.2, 78.4, 87.7]"
+c5m2_park,0,4,7,3,1,4,pass,0.012,[50.6]
+c5m3_cemetery,0,4,9,1,3,4,pass,0.013,"[51.5, 70.4, 84.3]"
+c5m4_quarter,0,4,6,0,4,4,pass,0.007,"[43.9, 49.4, 70.8, 98.3]"
+c5m5_bridge,1,4,4,0,0,4,finale_exempt,0.0,[]
+c6m1_riverbank,0,4,4,0,4,4,pass,0.556,"[34.7, 55.6, 68.0, 88.8]"
+c6m2_bedlam,0,4,6,1,3,4,pass,0.01,"[31.7, 55.9, 89.7]"
+c6m3_port,1,4,7,0,0,4,finale_exempt,0.001,[]
+c7m1_docks,0,4,3,2,2,4,pass,0.454,"[63.5, 69.9]"
+c7m2_barge,0,4,10,1,3,4,pass,0.022,"[34.9, 59.1, 86.1]"
+c7m3_port,1,4,5,0,0,4,finale_exempt,0.001,[]
+c8m1_apartment,0,4,3,0,4,4,pass,0.008,"[46.6, 63.0, 81.9, 86.3]"
+c8m2_subway,0,4,4,3,1,4,pass,0.005,[76.5]
+c8m3_sewers,0,4,7,4,0,4,pass,0.005,[]
+c8m4_interior,0,4,2,0,4,4,pass,0.002,"[31.3, 67.8, 80.4, 92.1]"
+c8m5_rooftop,1,4,0,0,0,0,finale_exempt,0.0,[]
+c9m1_alleys,0,4,7,4,0,4,pass,0.479,[]
+c9m2_lots,1,4,2,0,0,2,finale_exempt,0.0,[]
+c10m1_caves,0,4,1,1,3,4,pass,0.072,"[43.7, 71.0, 91.6]"
+c10m2_drainage,0,4,3,0,4,4,pass,0.004,"[44.1, 61.7, 81.0, 83.4]"
+c10m3_ranchhouse,0,4,3,2,2,4,pass,0.01,"[31.2, 72.7]"
+c10m4_mainstreet,0,4,4,2,2,4,pass,0.007,"[30.4, 71.4]"
+c10m5_houseboat,1,4,3,0,0,3,finale_exempt,0.0,[]
+c11m1_greenhouse,0,4,1,1,3,4,pass,0.006,"[34.2, 54.1, 96.5]"
+c11m2_offices,0,4,3,0,4,4,pass,0.005,"[32.6, 59.2, 80.9, 89.2]"
+c11m3_garage,0,4,5,1,3,4,pass,0.008,"[45.7, 68.2, 98.6]"
+c11m4_terminal,0,4,2,0,4,4,pass,0.006,"[47.4, 58.5, 77.2, 86.2]"
+c11m5_runway,1,4,3,0,0,3,finale_exempt,0.0,[]
+c12m1_hilltop,0,4,2,1,3,4,pass,0.075,"[51.8, 60.8, 84.9]"
+c12m2_traintunnel,0,4,7,4,0,4,pass,0.005,[]
+c12m3_bridge,0,4,6,4,0,4,pass,0.007,[]
+c12m4_barn,0,4,2,1,3,4,pass,0.008,"[48.3, 59.3, 89.2]"
+c12m5_cornfield,1,4,3,0,0,3,finale_exempt,0.0,[]
+c13m1_alpinecreek,0,4,0,0,4,4,pass,0.001,"[42.9, 57.3, 77.6, 96.0]"
+c13m2_southpinestream,0,4,1,1,3,4,pass,0.018,"[31.6, 76.3, 90.6]"
+c13m3_memorialbridge,0,4,1,0,4,4,pass,0.01,"[30.2, 49.9, 67.8, 85.3]"
+c13m4_cutthroatcreek,1,4,2,0,0,2,finale_exempt,0.0,[]
+c14m1_junkyard,0,4,5,0,4,4,pass,3.571,"[40.8, 52.6, 67.0, 94.3]"
+c14m2_lighthouse,1,4,2,0,0,2,finale_exempt,0.0,[]

@@ -1,12 +1,12 @@
 import * as THREE from './vendor/three.module.min.js';
 import { OrbitControls } from './vendor/OrbitControls.js';
-import { SCENARIOS, DIFFICULTIES, buildTrack, sampleTrack, sampleTank, sampleRock } from './scenarios.js?v=20260917-turn';
+import { SCENARIOS, DIFFICULTIES, buildTrack, sampleTrack, sampleTank, sampleRock } from './scenarios.js?v=20260925';
 
 const $=id=>document.getElementById(id);
 const colors={old:0xbf7741,current:0x238579,survivor:0x477ebd,ground:0xe4ecf1,wall:0xb8c8d2,route:0x7d919e};
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let selected=SCENARIOS.find(s=>s.id===location.hash.slice(1))||SCENARIOS[0];
-let version='2.1',time=0,playing=false,view='perspective',lastFrame=performance.now(),syncing=false,dirty=true;
+let selected=SCENARIOS.find(s=>s.id===location.hash.slice(1))||SCENARIOS.find(s=>s.id==='reverse');
+let version='2.3',time=0,playing=false,view='perspective',lastFrame=performance.now(),syncing=false,dirty=true;
 const panes=[];
 
 function material(color,extra={}){return new THREE.MeshStandardMaterial({color,roughness:.82,metalness:.05,...extra});}
@@ -118,7 +118,7 @@ function resetCamera(){
   syncing=true;
   for(const pane of panes){
     const c=selected.center;
-    pane.controls.target.set(c[0],.45,c[2]);pane.camera.up.set(0,1,0);pane.camera.zoom=1;
+    pane.controls.target.set(c[0],.45,c[2]);pane.camera.up.set(0,1,0);pane.camera.zoom=selected.id==='reverse'?1.35:1;
     if(view==='top')pane.camera.position.set(c[0],32,c[2]+.01);
     else if(view==='side')pane.camera.position.set(c[0],2.3,c[2]+30);
     else pane.camera.position.set(c[0]+8,18,c[2]+24);
@@ -159,10 +159,13 @@ function buildWorld(pane){
   }
   pane.route=new THREE.Group();world.add(pane.route);
   if(selected.route.length>1)routeLine(pane.route,selected.route);
+  pane.routeAfter=new THREE.Group();world.add(pane.routeAfter);
+  if(selected.routeAfter)routeLine(pane.routeAfter,selected.routeAfter);
   const points=[];pane.trailSamples=400;
   for(let i=0;i<=pane.trailSamples;i++){const p=sampleTank(selected,pane.track,selected.duration*i/pane.trailSamples).p;points.push([p[0],p[1]+.045,p[2]]);}
   pane.trail=tube(world,points,pane.variant==='old'?colors.old:colors.current,.8,.035);
   pane.tank=actor(world,true,pane.variant==='old'?colors.old:colors.current,'Tank');
+  if(selected.id==='reverse')pane.tank.tag.position.y+=.8;
   if(selected.id==='rider')pane.tank.body.scale.y=.78;
   pane.survivors=selected.survivors.map(s=>actor(world,false,colors.survivor,s.name));
   pane.rock=mesh(world,new THREE.DodecahedronGeometry(.23,0),material(0x64717d),[0,0,0]);
@@ -178,6 +181,7 @@ function renderPane(pane){
   if(!pane.track)return;
   const tank=sampleTank(selected,pane.track,time),future=sampleTank(selected,pane.track,Math.min(selected.duration,time+.04));
   let heading=future.p.map((v,i)=>v-tank.p[i]);
+  if(selected.id==='reverse'&&time>1.1){const target=selected.survivors[0].track[0].p;heading=target.map((value,index)=>value-tank.p[index]);}
   if(Math.hypot(heading[0],heading[2])<.001){const s=sampleTrack(selected.survivors[0].track,time).p;heading=s.map((v,i)=>v-tank.p[i]);}
   pose(pane.tank,tank.p,time,tank.mode,heading);
   selected.survivors.forEach((s,i)=>{
@@ -186,7 +190,8 @@ function renderPane(pane){
   });
   pane.trail.visible=$('trails').checked;
   pane.trail.geometry.setDrawRange(0,Math.floor(time/selected.duration*pane.trailSamples)*30);
-  pane.route.visible=$('paths').checked;
+  pane.route.visible=$('paths').checked&&(!selected.routeAfter||time<selected.routeSwitch);
+  pane.routeAfter.visible=$('paths').checked&&!!selected.routeAfter&&time>=selected.routeSwitch;
   const rock=sampleRock(selected,pane.version,time);pane.rock.visible=!!rock;
   if(rock){pane.rock.position.set(...rock);pane.rock.rotation.set(time*3,time*2,0);}
   pane.rockTrail.visible=$('trails').checked&&!!selected.rock&&time>=selected.rock.start;
@@ -194,10 +199,15 @@ function renderPane(pane){
 }
 function updateText(){
   const m=[...selected.moments].reverse().find(m=>m.t<=time)||selected.moments[0];
-  $('old-state').textContent=m.old;$('new-state').textContent=version==='2.0'?m.refactor:m.current;
+  $('old-state').textContent=m.old;$('new-state').textContent=version==='2.0'?m.refactor:version==='2.1'?m.previous:m.current;
+  if(selected.model==='reverse'){
+    const current=sampleTank(selected,panes[1].track,time);
+    $('new-state').textContent=`${current.state} · ${Math.round(current.speed*100)} hu/s`;
+    $('old-state').textContent=sampleTank(selected,panes[0].track,time).state;
+  }
   if(selected.dynamic){
     const fresh=sampleTank(selected,panes[1].track,time);
-    if(version==='2.1')$('new-state').textContent=fresh.mode==='punch'?'已经近身，尝试出拳':fresh.side?`${fresh.side>0?'向右':'向左'}侧跳 · 达到角度门槛才修正`:'距离或开关条件不满足 · 正常追逐';
+    if(version==='2.1'||version==='2.3')$('new-state').textContent=fresh.mode==='punch'?'已经近身，尝试出拳':fresh.side?`${fresh.side>0?'向右':'向左'}侧跳 · 达到角度门槛才修正`:'距离或开关条件不满足 · 正常追逐';
     $('parameter-note').textContent=`当前目标距离 ${Math.round(fresh.distance*100)} hu · 600 hu 外才允许侧跳`;
   }
   $('time').textContent=`${time.toFixed(2)} / ${selected.duration.toFixed(2)} s`;
@@ -213,10 +223,10 @@ function selectScene(id){
   $('scene-title').textContent=selected.title;$('scene-group').textContent=`${selected.group} / ${selected.tag}`;
   $('scene-description').textContent=selected.description;$('version-label').textContent=`${version}.0`;
   $('old-explanation').textContent=selected.old;
-  $('new-explanation').textContent=version==='2.0'?(selected.refactor||selected.current):selected.current;
+  $('new-explanation').textContent=version==='2.0'?(selected.refactor||selected.current):version==='2.1'?(selected.previous||selected.current):selected.current;
   $('condition').textContent=selected.conditions;$('source').textContent=selected.source;
   $('timeline').max=String(selected.duration);$('movement-options').hidden=!selected.dynamic;
-  $('strafe').disabled=version!=='2.1';
+  $('strafe').disabled=version==='2.0';
   $('moments').replaceChildren(...selected.moments.map(m=>{
     const b=document.createElement('button');b.className='moment';b.dataset.time=m.t;b.innerHTML=`<b>${m.t.toFixed(2)}s</b>${m.label}`;b.onclick=()=>{setPlaying(false);seek(m.t);};return b;
   }));
@@ -249,7 +259,7 @@ document.addEventListener('visibilitychange',()=>{lastFrame=performance.now();})
 selectScene(selected.id);
 // Start paused so both versions share an inspectable initial condition. Reduced
 // motion users also retain full manual playback and timeline control.
-if(!reducedMotion)seek(2.5);
+if(!reducedMotion)seek(selected.id==='reverse'?1.55:2.5);
 function animate(now){
   const dt=Math.min(.1,(now-lastFrame)/1000);lastFrame=now;
   if(playing&&!document.hidden){

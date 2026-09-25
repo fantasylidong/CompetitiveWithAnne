@@ -38,7 +38,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白, AnneHappy",
     description = "Ai Tank 增强 3.0 版本（路径感知连跳、梯子让行、寻路距离选目标、反头顶卡、骑头反制、投石瞄准等）",
-    version     = "2.2.0",
+    version     = "2.3.0",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -76,6 +76,8 @@ public void OnPluginStart()
     g_cvDirectChaseMaxAngle = CreateConVar("_ai_tank3_direct_chase_max_angle", "45.0", "有视野时，路径前瞻方向与目标方向的夹角不超过该值才朝目标预测点直追，否则沿路径连跳（度）", CVAR_FLAGS, true, 0.0, true, 180.0);
     g_cvBhopStrafeAngle = CreateConVar("ai_tank3_bhop_strafe_angle", "15.0", "远距离安全直追时逐跳左右交替的偏角，0=关闭（度）", CVAR_FLAGS, true, 0.0, true, 35.0);
     g_cvBhopStrafeMinDist = CreateConVar("ai_tank3_bhop_strafe_min_dist", "600.0", "距离目标超过该值才主动左右连跳", CVAR_FLAGS, true, 0.0);
+    g_cvBhopReverseHop = CreateConVar("ai_tank3_bhop_reverse_hop", "1", "直追时目标跑到身后（速度方向与目标方向夹角超过空中修正上限）落地改为掉头跳：对准目标、按跑速起跳、不给加速度；0=旧行为，叠加推速会顺着原方向继续跳", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvBhopReverseBrake = CreateConVar("ai_tank3_bhop_reverse_brake", "1500", "直追起的这一跳目标跑到身后时，空中每秒减掉的水平速度（单位/秒²），最多减到跑速，落地再掉头；0=不刹车", CVAR_FLAGS, true, 0.0);
 
     // 空速矫正
     g_cvAirVecModifyDegree = CreateConVar("ai_tank3_airvec_modify_degree", "45.0", "追人时空速方向与目标方向角 >=此值 开始修正；路径跟随固定从1度开始", CVAR_FLAGS, true, 0.0);

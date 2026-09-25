@@ -892,7 +892,8 @@ Action performBackwardBhop(int client, int target, bool visible, int& buttons, f
     backSpeed = awaySpeed;
     if (backSpeed < baseSpeed)
         backSpeed = baseSpeed;
-    backSpeed += AIPathMovement_GetHopImpulse(client, g_cvBhopImpulse.FloatValue, g_cvBhopFirstHopRatio.FloatValue);
+    // 后跳相对当前速度通常是大角度掉头, 按起跳改向折算后加速度会很少甚至为 0
+    backSpeed += getChargerHopImpulse(client, vBack);
 
     ScaleVector(vBack, backSpeed);
     limitGroundBhopVel(vBack);
@@ -909,7 +910,8 @@ Action performBackwardBhop(int client, int target, bool visible, int& buttons, f
         return Plugin_Continue;
     }
 
-    stateLog.debugAll("Charger (%N) bait to holding melee target (%N), performing backward bunnyhop, speed %.2f", client, target, backSpeed);
+    stateLog.debugAll("Charger (%N) bait to holding melee target (%N), performing backward bunnyhop, speed %.2f, hop turn %.1f, impulse scale %.2f",
+        client, target, backSpeed, g_AiChargers[client].m_flLastHopTurn, g_AiChargers[client].m_flLastHopImpulseScale);
     g_AiChargers[client].m_BhopType = BhopType_BaitRetreat;
     g_AiChargers[client].m_flLastHopSpeed = backSpeed;
     ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);

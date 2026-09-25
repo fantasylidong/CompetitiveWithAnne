@@ -20,19 +20,47 @@ const frame = (t,x,y,z,mode='run') => ({t,p:[x,y,z],mode});
 const track = rows => rows.map(row => frame(...row));
 const box = (x,y,z,w,h,d,kind='wall') => ({x,y,z,w,h,d,kind});
 const person = (name, rows) => ({name,track:track(rows)});
-const moment = (t,label,old,current,refactor=current) => ({t,label,old,current,refactor});
+const moment = (t,label,old,current,refactor=current,previous=current) => ({t,label,old,current,refactor,previous});
+const stalePathTrack = track([[0,-5,0,0,'hop'],[.773,-1.5,0,0,'hop'],[1.546,1.6,0,0,'hop'],[2.319,4.8,0,0,'hop'],[3.092,2.9,0,.5,'hop'],[3.865,-.3,0,1.3,'run'],[5,-2.2,0,1.8,'punch']]);
 const shared = {
   duration:8, floor:[26,14], center:[0,0,0], route:[], geometry:[], ladders:[],description:'同一地形与目标，观察两个版本的行动选择和状态转换。',
   conditions:'画面只展示一组可复现的情景。实际结果还受路径快照、可见性、地图 nav、碰撞检测和插件配置影响。',
 };
 export const SCENARIOS = [
   {
+    ...shared,id:'reverse',group:'移动与转向',title:'目标到了身后：刹车与掉头',tag:'2.3.0 · 重点',duration:4.6,
+    model:'reverse',floor:[40,14],center:[6,0,0],route:[[-7.5,0,0],[.7,0,0]],
+    description:'Tank 已攒出高速，在第二跳中越过目标。对比旧式叠加推速与 2.3 的空中刹车、落地掉头跳。',
+    survivors:[person('S1',[[0,.7,0,0],[4.6,.7,0,0]])],
+    old:'越过目标后，速度仍朝前；下一跳向身后的目标加一份反向推力，但保留原速度，因此仍向前跳。本图展示这一不利分支，并非旧版每次都这样。',
+    current:'2.3 的这次直追跳在目标方向超过空中转向上限时，安全检查通过才每次检查减速（默认每 0.05 秒最多 75 hu/s，最低到跑速）。落地仍可直追、距离足够且路线安全时，以不高于跑速的速度对准目标跳，不叠加推力、不侧跳。',
+    previous:'2.1 尚无反向刹车和掉头跳；在这组开阔直路与速度条件下，仍可能顺原速度再跳。',
+    refactor:'2.0 尚无反向刹车和掉头跳；这组开阔直路展示叠加推速后仍向前的分支。',
+    conditions:'示意采用极限档上限 800 hu/s、完整单跳约 0.773 秒、跑速假设 210 hu/s，且目标可见、同层、路径已朝目标更新、落点安全。横向运动按简化时间步长生成；实际刹车间隔受服务器 tick 影响，路径与安全检查可能阻止掉头跳。',
+    source:'movement.inc · Movement_GroundHop / Movement_TryReverseBrake / Movement_UpdateAirDirection；ai_tank3_bhop_reverse_hop、ai_tank3_bhop_reverse_brake。',
+    moments:[moment(0,'高速直追','保留已有速度','保留已有速度'),moment(1.1,'越过目标','继续前冲','方向差超过 89°，开始尝试空中刹车'),moment(1.55,'落地判断','反向推力仍抵不过原速度','路线允许时按跑速掉头起跳','继续叠加反向推力'),moment(2.33,'下一跳','继续向原方向飞','接近目标后停跳','仍可能继续向前'),moment(4,'拉开差距','速度逐跳减小','已回到目标附近','仍在消耗原速度')],
+  },
+  {
+    ...shared,id:'old-route',group:'移动与转向',title:'目标换到身后，但路径尚未改向',tag:'2.3.0 · 边界',duration:5,
+    floor:[26,14],route:[[-5,0,0],[6,0,0]],routeAfter:[[4.8,0,0],[-2.2,0,1.8]],routeSwitch:2.319,
+    description:'落地的那个 tick，路径快照仍指向旧目标 A；Tank 已改选身后的 B。看为什么这次不会立即触发掉头跳。',
+    survivors:[person('旧目标 A',[[0,6,0,0],[5,6,0,0]]),person('新目标 B',[[0,-2.2,0,1.8],[5,-2.2,0,1.8]])],
+    oldTrack:stalePathTrack,newTrack:stalePathTrack,
+    old:'旧路径仍向前时，继续沿路径走；画面与右侧相同，是为了隔离这条尚未解决的边界。',
+    current:'即使是 2.3，旧快照若仍被判为新鲜，路径前瞻与新目标夹角超过直追门槛时会先进入沿路径跳分支；反向刹车与掉头跳都不能保证介入。此图假设下一次落地前路径已重建，之后才朝 B 转。',
+    previous:'2.1 尚无反向刹车和掉头跳。快照指向旧目标时，仍会沿旧路径向前跳；此图假设下一次落地前路径已重建。',
+    refactor:'2.0 尚无反向保护。旧路径尚未改向时仍按其前瞻点连跳，直到路径更新；此图只展示多跳一次的条件分支。',
+    conditions:'条件示意：在落地前路径尚未重建，但快照时间仍新鲜。快照是在原生 PathFollower 更新之前采集，且不记录目标身份。画面只展示多沿旧路径跳一次的可能分支；若路径持续不重建，源码没有保证只多跳一次。',
+    source:'extension.cpp · Anne_PathFollowerUpdate；path.inc · Path_Update / Path_GetLookAhead；movement.inc · Movement_CanDirectChase / Movement_GroundHop。',
+    moments:[moment(0,'旧目标在前','沿旧路径追 A','沿旧路径追 A'),moment(1.2,'换成身后的 B','目标变了，路径未变','目标变了，路径未变'),moment(1.55,'落地仍见旧路','沿旧路继续跳','直追失败，反向保护未触发','尚无反向保护，继续沿旧路跳','尚无反向保护，继续沿旧路跳'),moment(2.32,'路径重新改向','之后才转向 B','下一次按新路径转向 B'),moment(4.25,'回到新目标','接近 B','接近 B')],
+  },
+  {
     ...shared,id:'far',group:'移动与转向',title:'远距离左右连跳',tag:'2.1 新增',
     description:'开阔、同层、可视的直路：看每次落地后是否换边，以及接近目标后何时收回侧跳。',
     dynamic:true,floor:[34,14],center:[2,0,0],route:[[-9,0,0],[13,0,0]],
     survivors:[person('S1',[[0,10,0,0],[4,13,0,0],[8,13,0,0]])],
     old:'没有主动左右交替的逻辑。起跳通常朝目标预测位置推进；原生单独左右按键可能加侧推，所以并非绝对只能走直线。',
-    current:'2.1 在目标超过 600 hu、同层可视且路径支持直追时，逐跳左右交替。空中维持本跳方向；接近目标、侧路受阻或即将经过特殊路径段时取消偏角。',
+    current:'2.1 起（2.3 延续），在目标超过 600 hu、同层可视且路径支持直追时，逐跳左右交替。空中维持本跳方向；接近目标、侧路受阻或即将经过特殊路径段时取消偏角。',
     refactor:'2.0 已按路径决定连跳方向，但还没有主动左右交替。本场景的安全直路通常仍呈近直线；左右连跳是 2.1 新增。',
     source:'movement.inc · Movement_GroundHop / Movement_UpdateAirDirection；动态配置 ai_tank3_bhop_strafe_angle、ai_tank3_bhop_strafe_min_dist。',
     moments:[moment(0,'远距起跳','朝预测点起跳','允许安全侧跳','沿直路起跳'),moment(.78,'落地换边','继续直追','确认落地后换边','仍无主动侧跳'),moment(2.32,'连续观察','近直线连跳','左右交替；按原门槛修正','保持路径连跳'),moment(5.4,'接近目标','接近后停跳出拳','距离不足 600 hu 时取消偏角','接近后停跳出拳')],
@@ -43,7 +71,7 @@ export const SCENARIOS = [
     dynamic:true,floor:[34,16],center:[2,0,1],route:[[-9,0,0],[8,0,0],[13,0,4]],
     survivors:[person('S1',[[0,10,0,0],[2,12,0,1.6],[4,14,0,3.2],[6,14,0,.5],[8,14,0,-1.8]])],
     old:'地面起跳会预测目标位置，但空中方向误差要进入较大的角度窗口才修正。小幅横移容易表现为一跳内基本不转，落地后重新对准。',
-    current:'2.1 保留每 0.05 秒刷新与转向安全检查；追人门槛恢复为 60/55/50/45/45/45°，小角差不再主动追随。上限配置恢复 135°，实际仍受共享代码 89° 限制；沿导航路径跟随仍从 1° 开始。',
+    current:'2.1 起保留空中刷新与转向安全检查；追人门槛为 60/55/50/45/45/45°，小角差不主动追随。上限配置为 135°，实际受共享代码 89° 限制；沿导航路径跟随仍从 1° 开始。2.3 仅对直追中超过转向上限的情形增加刹车。',
     refactor:'2.0 改善了路径选择，空中追人使用较大的角度窗口；当前 2.1 也已恢复相同追人门槛，保留路径续接与左右连跳。',
     source:'movement.inc · Movement_AirControl / Movement_UpdateAirDirection；ai_tank3_airvec_modify_degree / interval。',
     moments:[moment(0,'开始追逐','预测起跳方向','预测起跳并检查侧路'),moment(1.7,'目标横移','小角度变化不立即跟随','小角差保持本跳方向','等待较大角差或下一跳'),moment(4.1,'目标折返','下一跳重新定向','达到角度门槛或下一跳再调整','逐跳重定向'),moment(6.3,'近身跟随','转为近身追逐','取消侧跳，继续追人')],
@@ -208,6 +236,33 @@ export function sampleTrack(frames,t,smooth=false) {
 }
 
 const wrap = x => Math.atan2(Math.sin(x),Math.cos(x));
+export function makeReverseTrack(scene,version) {
+  const frames=[],step=.025,targetX=scene.survivors[0].track[0].p[0],updated=version==='2.3';
+  let x=-7.5,speed=7.3,heading=1,hop=-1,hopStart=0,lastBrake=0,reversed=false,jumping=true;
+  for(let t=0;t<=scene.duration+step/2;t+=step) {
+    const nextHop=Math.floor((t+1e-8)/HOP_TIME);
+    if(nextHop!==hop) {
+      hop=nextHop;hopStart=t;
+      if(hop===1) speed=Math.min(8,speed+.65);
+      else if(hop>1 && updated && !reversed && x>targetX) {
+        speed=Math.min(speed,2.1);heading=-1;reversed=true;
+      } else if(hop>1 && reversed && Math.abs(targetX-x)<=1.2) jumping=false;
+      else if(hop>1 && reversed) speed=Math.min(8,speed+.65);
+      else if(hop>1) speed=Math.max(0,speed-.65);
+    }
+    if(updated && jumping && !reversed && x>targetX && t-lastBrake+1e-8>=.05) {
+      speed=Math.max(2.1,speed-.75);lastBrake=t;
+    }
+    if(jumping) x+=heading*speed*step;
+    else if(Math.abs(targetX-x)>.85) x+=Math.sign(targetX-x)*2.1*step;
+    const phase=Math.min(1,(t-hopStart)/HOP_TIME),distance=Math.abs(targetX-x);
+    const mode=jumping?'hop':distance<=.85?'punch':'run';
+    const state=updated?(!jumping?'距离不足 · 停跳近战':reversed?'落地掉头跳 · 放弃攒下的速度':x>targetX?'空中刹车 · 仍朝原方向飞':'直追连跳'):
+      x>targetX?'叠加反向推力 · 仍向前跳':'直追连跳';
+    frames.push({t,p:[x,jumping?4*.56*phase*(1-phase):0,0],mode,distance,speed:mode==='punch'?0:speed,state});
+  }
+  return frames;
+}
 export function makeMovementTrack(scene,version,{difficulty=4,strafe=true}={}) {
   const d=DIFFICULTIES[difficulty], dt=.025, frames=[];
   let x=-9,z=0,heading=0,speed=2.25,hop=-1,hopStart=0,jumping=true;
@@ -221,10 +276,10 @@ export function makeMovementTrack(scene,version,{difficulty=4,strafe=true}={}) {
       jumping=distance>d.stop;
       speed=jumping?Math.min(d.cap,speed+d.impulse*(hop===0?d.first:1)):2.25;
       heading=Math.atan2(future[2]-z,future[0]-x);
-      if(version==='2.1'&&strafe&&distance>6) heading+=(hop%2===0?1:-1)*d.angle*Math.PI/180;
+      if(version!=='old'&&version!=='2.0'&&strafe&&distance>6) heading+=(hop%2===0?1:-1)*d.angle*Math.PI/180;
     } else if(jumping) {
       let desired=Math.atan2(s[2]-z,s[0]-x);
-      if(version==='2.1'&&strafe&&distance>6) desired+=(hop%2===0?1:-1)*d.angle*Math.PI/180;
+      if(version!=='old'&&version!=='2.0'&&strafe&&distance>6) desired+=(hop%2===0?1:-1)*d.angle*Math.PI/180;
       const diff=wrap(desired-heading), degrees=Math.abs(diff)*180/Math.PI;
       const min=version==='2.1'?d.minTurn:d.legacyMinTurn;
       const max=version==='old'?135:89;
@@ -234,12 +289,13 @@ export function makeMovementTrack(scene,version,{difficulty=4,strafe=true}={}) {
     if(!jumping) heading=Math.atan2(s[2]-z,s[0]-x);
     if(distance>.85){x+=Math.cos(heading)*speed*dt;z+=Math.sin(heading)*speed*dt;}else mode='punch';
     const u=jumping?Math.min(1,(t-hopStart)/HOP_TIME):0;
-    frames.push({t,p:[x,jumping?4*.56*u*(1-u):0,z],mode,distance,side:version==='2.1'&&strafe&&distance>6?(hop%2===0?1:-1):0});
+    frames.push({t,p:[x,jumping?4*.56*u*(1-u):0,z],mode,distance,side:version!=='old'&&version!=='2.0'&&strafe&&distance>6?(hop%2===0?1:-1):0});
   }
   return frames;
 }
 
 export function buildTrack(scene,version,options) {
+  if(scene.model==='reverse') return makeReverseTrack(scene,version);
   if(scene.dynamic) return makeMovementTrack(scene,version,options);
   return version==='old'?scene.oldTrack:version==='2.0'?(scene.refactorTrack||scene.newTrack):scene.newTrack;
 }
@@ -247,7 +303,7 @@ export function buildTrack(scene,version,options) {
 export function sampleTank(scene,frames,t) {
   // In the 2.1 corner example, changing waypoints must not manufacture a
   // landing. Keep the jump phase continuous while following the curved route.
-  if(!scene.dynamic) return sampleTrack(frames,t,scene.id==='corner'&&frames===scene.newTrack);
+  if(!scene.dynamic && scene.model!=='reverse') return sampleTrack(frames,t,scene.id==='corner'&&frames===scene.newTrack);
   const index=Math.min(frames.length-2,Math.max(0,Math.floor(t/.025)));
   const a=frames[index],b=frames[index+1],u=Math.max(0,Math.min(1,(t-a.t)/(b.t-a.t)));
   return {...a,p:a.p.map((v,j)=>v+(b.p[j]-v)*u)};

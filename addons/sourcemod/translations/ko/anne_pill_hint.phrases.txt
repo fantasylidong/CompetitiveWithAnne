@@ -1,0 +1,15 @@
+"Phrases"
+{
+	"PillHint_List"
+	{
+		"ko"		"{green}[Anne]{default} 이번 맵 길목에 진통제 {olive}{1}{default}개, 진행도: {olive}{2}"
+	}
+	"PillHint_None"
+	{
+		"ko"		"{green}[Anne]{default} 이번 맵 길목에는 진통제가 없습니다."
+	}
+	"PillHint_Separator"
+	{
+		"ko"		", "
+	}
+}
