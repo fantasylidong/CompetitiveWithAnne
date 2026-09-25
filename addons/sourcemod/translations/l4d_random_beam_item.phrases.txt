@@ -28,4 +28,262 @@
 	{
 		"en"		"{green}Beam added to target entity."
 	}
+	"L4DRandomBeamItem_MenuMainTitle"
+	{
+		"en"		"Item beam settings\nOnly changes what you see"
+	}
+	"L4DRandomBeamItem_MenuPresets"
+	{
+		"en"		"Quick styles"
+	}
+	"L4DRandomBeamItem_MenuGlobal"
+	{
+		"en"		"All items"
+	}
+	"L4DRandomBeamItem_MenuGroups"
+	{
+		"en"		"By item"
+	}
+	"L4DRandomBeamItem_MenuResetAll"
+	{
+		"en"		"Reset everything"
+	}
+	"L4DRandomBeamItem_MenuPresetsTitle"
+	{
+		"en"		"Quick styles\nOnly changes \"All items\"; per-item settings are kept"
+	}
+	"L4DRandomBeamItem_MenuGroupsTitle"
+	{
+		"en"		"By item\nItems marked [custom] have their own settings"
+	}
+	"L4DRandomBeamItem_MenuGlobalTitle"
+	{
+		"en"		"All items\nUsed by every item without its own setting.\nLength and width are a percentage of each item's standard beam"
+	}
+	"L4DRandomBeamItem_MenuGroupTitle"
+	{
+		"#format"	"{1:s}"
+		"en"		"{1}\nUnset options follow \"All items\""
+	}
+	"L4DRandomBeamItem_MenuFieldValue"
+	{
+		"#format"	"{1:s},{2:s}"
+		"en"		"{1}: {2}"
+	}
+	"L4DRandomBeamItem_MenuValueTitle"
+	{
+		"#format"	"{1:s},{2:s}"
+		"en"		"{1} - {2}"
+	}
+	"L4DRandomBeamItem_MenuResetScope"
+	{
+		"en"		"Reset this entry"
+	}
+	"L4DRandomBeamItem_MenuCustomized"
+	{
+		"#format"	"{1:s}"
+		"en"		"{1} [custom]"
+	}
+	"L4DRandomBeamItem_MenuCurrent"
+	{
+		"#format"	"{1:s}"
+		"en"		"{1} [current]"
+	}
+	"L4DRandomBeamItem_FieldVisible"
+	{
+		"en"		"Show"
+	}
+	"L4DRandomBeamItem_FieldLength"
+	{
+		"en"		"Length"
+	}
+	"L4DRandomBeamItem_FieldWidth"
+	{
+		"en"		"Width"
+	}
+	"L4DRandomBeamItem_FieldColor"
+	{
+		"en"		"Color"
+	}
+	"L4DRandomBeamItem_FieldHalo"
+	{
+		"en"		"Halo"
+	}
+	"L4DRandomBeamItem_ValueDefault"
+	{
+		"en"		"Default"
+	}
+	"L4DRandomBeamItem_ValueFollowGlobal"
+	{
+		"en"		"Same as all items"
+	}
+	"L4DRandomBeamItem_ValueShow"
+	{
+		"en"		"Shown"
+	}
+	"L4DRandomBeamItem_ValueHide"
+	{
+		"en"		"Hidden"
+	}
+	"L4DRandomBeamItem_ValueOn"
+	{
+		"en"		"On"
+	}
+	"L4DRandomBeamItem_ValueOff"
+	{
+		"en"		"Off"
+	}
+	"L4DRandomBeamItem_ColorWhite"
+	{
+		"en"		"White"
+	}
+	"L4DRandomBeamItem_ColorRed"
+	{
+		"en"		"Red"
+	}
+	"L4DRandomBeamItem_ColorOrange"
+	{
+		"en"		"Orange"
+	}
+	"L4DRandomBeamItem_ColorYellow"
+	{
+		"en"		"Yellow"
+	}
+	"L4DRandomBeamItem_ColorGreen"
+	{
+		"en"		"Green"
+	}
+	"L4DRandomBeamItem_ColorCyan"
+	{
+		"en"		"Cyan"
+	}
+	"L4DRandomBeamItem_ColorBlue"
+	{
+		"en"		"Blue"
+	}
+	"L4DRandomBeamItem_ColorPurple"
+	{
+		"en"		"Purple"
+	}
+	"L4DRandomBeamItem_ColorPink"
+	{
+		"en"		"Pink"
+	}
+	"L4DRandomBeamItem_StyleBright"
+	{
+		"en"		"Bright"
+	}
+	"L4DRandomBeamItem_StyleSubtle"
+	{
+		"en"		"Subtle"
+	}
+	"L4DRandomBeamItem_StyleOff"
+	{
+		"en"		"All off"
+	}
+	"L4DRandomBeamItem_StyleDefault"
+	{
+		"en"		"Default"
+	}
+	"L4DRandomBeamItem_StyleMenuBright"
+	{
+		"en"		"Bright (longer, wider, halo through walls)"
+	}
+	"L4DRandomBeamItem_StyleMenuSubtle"
+	{
+		"en"		"Subtle (shorter, thinner, no halo)"
+	}
+	"L4DRandomBeamItem_StyleMenuOff"
+	{
+		"en"		"All off (except items you set to shown)"
+	}
+	"L4DRandomBeamItem_StyleMenuDefault"
+	{
+		"en"		"Default (clear the \"All items\" settings)"
+	}
+	"L4DRandomBeamItem_Group_pills"
+	{
+		"en"		"Pain pills"
+	}
+	"L4DRandomBeamItem_Group_adrenaline"
+	{
+		"en"		"Adrenaline"
+	}
+	"L4DRandomBeamItem_Group_medkit"
+	{
+		"en"		"First aid kits"
+	}
+	"L4DRandomBeamItem_Group_defib"
+	{
+		"en"		"Defibrillators"
+	}
+	"L4DRandomBeamItem_Group_throwables"
+	{
+		"en"		"Throwables"
+	}
+	"L4DRandomBeamItem_Group_upgradepacks"
+	{
+		"en"		"Upgrade packs"
+	}
+	"L4DRandomBeamItem_Group_tier1"
+	{
+		"en"		"Tier 1 weapons (SMGs, pump shotguns)"
+	}
+	"L4DRandomBeamItem_Group_tier2"
+	{
+		"en"		"Tier 2 weapons (rifles, auto shotguns, snipers)"
+	}
+	"L4DRandomBeamItem_Group_tier3"
+	{
+		"en"		"Special weapons (M60, grenade launcher)"
+	}
+	"L4DRandomBeamItem_Group_pistols"
+	{
+		"en"		"Pistols"
+	}
+	"L4DRandomBeamItem_Group_melee"
+	{
+		"en"		"Melee weapons"
+	}
+	"L4DRandomBeamItem_Group_ammo"
+	{
+		"en"		"Ammo piles and upgrades"
+	}
+	"L4DRandomBeamItem_Group_carryables"
+	{
+		"en"		"Carryables (gnome, gas cans...)"
+	}
+	"L4DRandomBeamItem_Group_other"
+	{
+		"en"		"Other (bodies, health cabinets, miniguns...)"
+	}
+	"L4DRandomBeamItem_StyleSet"
+	{
+		"#format"	"{1:s}"
+		"en"		"{green}[Beam]{default} \"All items\" set to {olive}{1}{default}. Only you see this change."
+	}
+	"L4DRandomBeamItem_StyleUsage"
+	{
+		"en"		"{green}[Beam]{default} {olive}!beam{default} opens the settings menu, {olive}!beam bright/subtle/off/default{default} changes all items, {olive}!beam reset{default} resets everything."
+	}
+	"L4DRandomBeamItem_StyleUnavailable"
+	{
+		"en"		"{green}[Beam]{default} Per-player beam settings are unavailable: the server has not loaded the SendProxy extension."
+	}
+	"L4DRandomBeamItem_PrefsReset"
+	{
+		"en"		"{green}[Beam]{default} All your item beam settings are back to default."
+	}
+	"L4DRandomBeamItem_PrefsNotSaved"
+	{
+		"en"		"{green}[Beam]{default} The database is unavailable, so these settings only last until you disconnect."
+	}
+	"L4DRandomBeamItem_PrefsLoading"
+	{
+		"en"		"{green}[Beam]{default} Your beam settings are still loading, try again in a moment."
+	}
+	"L4DRandomBeamItem_EdictLimit"
+	{
+		"en"		"{green}[Beam]{default} The server is close to its entity limit, so some items hidden by default can't get a beam right now."
+	}
 }

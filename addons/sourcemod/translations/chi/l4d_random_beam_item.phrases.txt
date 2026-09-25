@@ -28,4 +28,256 @@
 	{
 		"chi"		"{green}Beam 添加到目标实体。"
 	}
+	"L4DRandomBeamItem_MenuMainTitle"
+	{
+		"chi"		"物品光束设置\n只改变你自己看到的效果"
+	}
+	"L4DRandomBeamItem_MenuPresets"
+	{
+		"chi"		"快捷样式"
+	}
+	"L4DRandomBeamItem_MenuGlobal"
+	{
+		"chi"		"全部物品"
+	}
+	"L4DRandomBeamItem_MenuGroups"
+	{
+		"chi"		"按物品设置"
+	}
+	"L4DRandomBeamItem_MenuResetAll"
+	{
+		"chi"		"全部恢复默认"
+	}
+	"L4DRandomBeamItem_MenuPresetsTitle"
+	{
+		"chi"		"快捷样式\n只修改「全部物品」，单独物品的设置保留"
+	}
+	"L4DRandomBeamItem_MenuGroupsTitle"
+	{
+		"chi"		"按物品设置\n带 [自定义] 的是你单独设置过的"
+	}
+	"L4DRandomBeamItem_MenuGlobalTitle"
+	{
+		"chi"		"全部物品\n没单独设置的物品都用这里的设置\n长度、宽度按各物品的标准光束计算百分比"
+	}
+	"L4DRandomBeamItem_MenuGroupTitle"
+	{
+		"chi"		"{1}\n没设置的项跟随「全部物品」"
+	}
+	"L4DRandomBeamItem_MenuFieldValue"
+	{
+		"chi"		"{1}：{2}"
+	}
+	"L4DRandomBeamItem_MenuValueTitle"
+	{
+		"chi"		"{1} - {2}"
+	}
+	"L4DRandomBeamItem_MenuResetScope"
+	{
+		"chi"		"恢复此项默认"
+	}
+	"L4DRandomBeamItem_MenuCustomized"
+	{
+		"chi"		"{1} [自定义]"
+	}
+	"L4DRandomBeamItem_MenuCurrent"
+	{
+		"chi"		"{1} [当前]"
+	}
+	"L4DRandomBeamItem_FieldVisible"
+	{
+		"chi"		"显示"
+	}
+	"L4DRandomBeamItem_FieldLength"
+	{
+		"chi"		"长度"
+	}
+	"L4DRandomBeamItem_FieldWidth"
+	{
+		"chi"		"宽度"
+	}
+	"L4DRandomBeamItem_FieldColor"
+	{
+		"chi"		"颜色"
+	}
+	"L4DRandomBeamItem_FieldHalo"
+	{
+		"chi"		"光晕"
+	}
+	"L4DRandomBeamItem_ValueDefault"
+	{
+		"chi"		"默认"
+	}
+	"L4DRandomBeamItem_ValueFollowGlobal"
+	{
+		"chi"		"跟随全部物品"
+	}
+	"L4DRandomBeamItem_ValueShow"
+	{
+		"chi"		"显示"
+	}
+	"L4DRandomBeamItem_ValueHide"
+	{
+		"chi"		"隐藏"
+	}
+	"L4DRandomBeamItem_ValueOn"
+	{
+		"chi"		"开"
+	}
+	"L4DRandomBeamItem_ValueOff"
+	{
+		"chi"		"关"
+	}
+	"L4DRandomBeamItem_ColorWhite"
+	{
+		"chi"		"白色"
+	}
+	"L4DRandomBeamItem_ColorRed"
+	{
+		"chi"		"红色"
+	}
+	"L4DRandomBeamItem_ColorOrange"
+	{
+		"chi"		"橙色"
+	}
+	"L4DRandomBeamItem_ColorYellow"
+	{
+		"chi"		"黄色"
+	}
+	"L4DRandomBeamItem_ColorGreen"
+	{
+		"chi"		"绿色"
+	}
+	"L4DRandomBeamItem_ColorCyan"
+	{
+		"chi"		"青色"
+	}
+	"L4DRandomBeamItem_ColorBlue"
+	{
+		"chi"		"蓝色"
+	}
+	"L4DRandomBeamItem_ColorPurple"
+	{
+		"chi"		"紫色"
+	}
+	"L4DRandomBeamItem_ColorPink"
+	{
+		"chi"		"粉色"
+	}
+	"L4DRandomBeamItem_StyleBright"
+	{
+		"chi"		"明显"
+	}
+	"L4DRandomBeamItem_StyleSubtle"
+	{
+		"chi"		"简洁"
+	}
+	"L4DRandomBeamItem_StyleOff"
+	{
+		"chi"		"全部关闭"
+	}
+	"L4DRandomBeamItem_StyleDefault"
+	{
+		"chi"		"默认"
+	}
+	"L4DRandomBeamItem_StyleMenuBright"
+	{
+		"chi"		"明显（更长更粗，打开透墙光晕）"
+	}
+	"L4DRandomBeamItem_StyleMenuSubtle"
+	{
+		"chi"		"简洁（更短更细，关闭光晕）"
+	}
+	"L4DRandomBeamItem_StyleMenuOff"
+	{
+		"chi"		"全部关闭（单独设为显示的物品除外）"
+	}
+	"L4DRandomBeamItem_StyleMenuDefault"
+	{
+		"chi"		"默认（清除「全部物品」的设置）"
+	}
+	"L4DRandomBeamItem_Group_pills"
+	{
+		"chi"		"止痛药"
+	}
+	"L4DRandomBeamItem_Group_adrenaline"
+	{
+		"chi"		"肾上腺素"
+	}
+	"L4DRandomBeamItem_Group_medkit"
+	{
+		"chi"		"医疗包"
+	}
+	"L4DRandomBeamItem_Group_defib"
+	{
+		"chi"		"电击器"
+	}
+	"L4DRandomBeamItem_Group_throwables"
+	{
+		"chi"		"投掷物"
+	}
+	"L4DRandomBeamItem_Group_upgradepacks"
+	{
+		"chi"		"升级弹药包"
+	}
+	"L4DRandomBeamItem_Group_tier1"
+	{
+		"chi"		"T1 武器（冲锋枪、单喷）"
+	}
+	"L4DRandomBeamItem_Group_tier2"
+	{
+		"chi"		"T2 武器（步枪、连喷、狙击枪）"
+	}
+	"L4DRandomBeamItem_Group_tier3"
+	{
+		"chi"		"特殊武器（M60、榴弹发射器）"
+	}
+	"L4DRandomBeamItem_Group_pistols"
+	{
+		"chi"		"手枪"
+	}
+	"L4DRandomBeamItem_Group_melee"
+	{
+		"chi"		"近战武器"
+	}
+	"L4DRandomBeamItem_Group_ammo"
+	{
+		"chi"		"弹药堆和升级"
+	}
+	"L4DRandomBeamItem_Group_carryables"
+	{
+		"chi"		"可搬运物品（侏儒、油桶等）"
+	}
+	"L4DRandomBeamItem_Group_other"
+	{
+		"chi"		"其他（尸体、医疗柜、机枪等）"
+	}
+	"L4DRandomBeamItem_StyleSet"
+	{
+		"chi"		"{green}[光束]{default} 「全部物品」已切换为 {olive}{1}{default}，只对你自己生效。"
+	}
+	"L4DRandomBeamItem_StyleUsage"
+	{
+		"chi"		"{green}[光束]{default} {olive}!beam{default} 打开设置菜单；{olive}!beam bright/subtle/off/default{default} 快速切换全部物品；{olive}!beam reset{default} 全部恢复默认。"
+	}
+	"L4DRandomBeamItem_StyleUnavailable"
+	{
+		"chi"		"{green}[光束]{default} 服务器没有加载 SendProxy 扩展，暂不支持个人光束设置。"
+	}
+	"L4DRandomBeamItem_PrefsReset"
+	{
+		"chi"		"{green}[光束]{default} 你的物品光束设置已全部恢复默认。"
+	}
+	"L4DRandomBeamItem_PrefsNotSaved"
+	{
+		"chi"		"{green}[光束]{default} 数据库暂不可用，这次的设置只在你本次连接期间有效。"
+	}
+	"L4DRandomBeamItem_PrefsLoading"
+	{
+		"chi"		"{green}[光束]{default} 正在读取你的光束设置，请稍后再试。"
+	}
+	"L4DRandomBeamItem_EdictLimit"
+	{
+		"chi"		"{green}[光束]{default} 服务器实体数量接近上限，部分默认不显示的物品暂时加不了光束。"
+	}
 }

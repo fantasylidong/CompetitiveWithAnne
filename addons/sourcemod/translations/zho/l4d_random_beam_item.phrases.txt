@@ -28,4 +28,256 @@
 	{
 		"zho"		"{green}Beam 新增到目標實體。"
 	}
+	"L4DRandomBeamItem_MenuMainTitle"
+	{
+		"zho"		"物品光束設定\n只改變你自己看到的效果"
+	}
+	"L4DRandomBeamItem_MenuPresets"
+	{
+		"zho"		"快捷樣式"
+	}
+	"L4DRandomBeamItem_MenuGlobal"
+	{
+		"zho"		"全部物品"
+	}
+	"L4DRandomBeamItem_MenuGroups"
+	{
+		"zho"		"按物品設定"
+	}
+	"L4DRandomBeamItem_MenuResetAll"
+	{
+		"zho"		"全部恢復預設"
+	}
+	"L4DRandomBeamItem_MenuPresetsTitle"
+	{
+		"zho"		"快捷樣式\n只修改「全部物品」，單獨物品的設定保留"
+	}
+	"L4DRandomBeamItem_MenuGroupsTitle"
+	{
+		"zho"		"按物品設定\n帶 [自訂] 的是你單獨設定過的"
+	}
+	"L4DRandomBeamItem_MenuGlobalTitle"
+	{
+		"zho"		"全部物品\n沒單獨設定的物品都用這裡的設定\n長度、寬度按各物品的標準光束計算百分比"
+	}
+	"L4DRandomBeamItem_MenuGroupTitle"
+	{
+		"zho"		"{1}\n沒設定的項跟隨「全部物品」"
+	}
+	"L4DRandomBeamItem_MenuFieldValue"
+	{
+		"zho"		"{1}：{2}"
+	}
+	"L4DRandomBeamItem_MenuValueTitle"
+	{
+		"zho"		"{1} - {2}"
+	}
+	"L4DRandomBeamItem_MenuResetScope"
+	{
+		"zho"		"恢復此項預設"
+	}
+	"L4DRandomBeamItem_MenuCustomized"
+	{
+		"zho"		"{1} [自訂]"
+	}
+	"L4DRandomBeamItem_MenuCurrent"
+	{
+		"zho"		"{1} [目前]"
+	}
+	"L4DRandomBeamItem_FieldVisible"
+	{
+		"zho"		"顯示"
+	}
+	"L4DRandomBeamItem_FieldLength"
+	{
+		"zho"		"長度"
+	}
+	"L4DRandomBeamItem_FieldWidth"
+	{
+		"zho"		"寬度"
+	}
+	"L4DRandomBeamItem_FieldColor"
+	{
+		"zho"		"顏色"
+	}
+	"L4DRandomBeamItem_FieldHalo"
+	{
+		"zho"		"光暈"
+	}
+	"L4DRandomBeamItem_ValueDefault"
+	{
+		"zho"		"預設"
+	}
+	"L4DRandomBeamItem_ValueFollowGlobal"
+	{
+		"zho"		"跟隨全部物品"
+	}
+	"L4DRandomBeamItem_ValueShow"
+	{
+		"zho"		"顯示"
+	}
+	"L4DRandomBeamItem_ValueHide"
+	{
+		"zho"		"隱藏"
+	}
+	"L4DRandomBeamItem_ValueOn"
+	{
+		"zho"		"開"
+	}
+	"L4DRandomBeamItem_ValueOff"
+	{
+		"zho"		"關"
+	}
+	"L4DRandomBeamItem_ColorWhite"
+	{
+		"zho"		"白色"
+	}
+	"L4DRandomBeamItem_ColorRed"
+	{
+		"zho"		"紅色"
+	}
+	"L4DRandomBeamItem_ColorOrange"
+	{
+		"zho"		"橙色"
+	}
+	"L4DRandomBeamItem_ColorYellow"
+	{
+		"zho"		"黃色"
+	}
+	"L4DRandomBeamItem_ColorGreen"
+	{
+		"zho"		"綠色"
+	}
+	"L4DRandomBeamItem_ColorCyan"
+	{
+		"zho"		"青色"
+	}
+	"L4DRandomBeamItem_ColorBlue"
+	{
+		"zho"		"藍色"
+	}
+	"L4DRandomBeamItem_ColorPurple"
+	{
+		"zho"		"紫色"
+	}
+	"L4DRandomBeamItem_ColorPink"
+	{
+		"zho"		"粉色"
+	}
+	"L4DRandomBeamItem_StyleBright"
+	{
+		"zho"		"明顯"
+	}
+	"L4DRandomBeamItem_StyleSubtle"
+	{
+		"zho"		"簡潔"
+	}
+	"L4DRandomBeamItem_StyleOff"
+	{
+		"zho"		"全部關閉"
+	}
+	"L4DRandomBeamItem_StyleDefault"
+	{
+		"zho"		"預設"
+	}
+	"L4DRandomBeamItem_StyleMenuBright"
+	{
+		"zho"		"明顯（更長更粗，打開透牆光暈）"
+	}
+	"L4DRandomBeamItem_StyleMenuSubtle"
+	{
+		"zho"		"簡潔（更短更細，關閉光暈）"
+	}
+	"L4DRandomBeamItem_StyleMenuOff"
+	{
+		"zho"		"全部關閉（單獨設為顯示的物品除外）"
+	}
+	"L4DRandomBeamItem_StyleMenuDefault"
+	{
+		"zho"		"預設（清除「全部物品」的設定）"
+	}
+	"L4DRandomBeamItem_Group_pills"
+	{
+		"zho"		"止痛藥"
+	}
+	"L4DRandomBeamItem_Group_adrenaline"
+	{
+		"zho"		"腎上腺素"
+	}
+	"L4DRandomBeamItem_Group_medkit"
+	{
+		"zho"		"醫療包"
+	}
+	"L4DRandomBeamItem_Group_defib"
+	{
+		"zho"		"電擊器"
+	}
+	"L4DRandomBeamItem_Group_throwables"
+	{
+		"zho"		"投擲物"
+	}
+	"L4DRandomBeamItem_Group_upgradepacks"
+	{
+		"zho"		"升級彈藥包"
+	}
+	"L4DRandomBeamItem_Group_tier1"
+	{
+		"zho"		"T1 武器（衝鋒槍、單噴）"
+	}
+	"L4DRandomBeamItem_Group_tier2"
+	{
+		"zho"		"T2 武器（步槍、連噴、狙擊槍）"
+	}
+	"L4DRandomBeamItem_Group_tier3"
+	{
+		"zho"		"特殊武器（M60、榴彈發射器）"
+	}
+	"L4DRandomBeamItem_Group_pistols"
+	{
+		"zho"		"手槍"
+	}
+	"L4DRandomBeamItem_Group_melee"
+	{
+		"zho"		"近戰武器"
+	}
+	"L4DRandomBeamItem_Group_ammo"
+	{
+		"zho"		"彈藥堆和升級"
+	}
+	"L4DRandomBeamItem_Group_carryables"
+	{
+		"zho"		"可搬運物品（侏儒、油桶等）"
+	}
+	"L4DRandomBeamItem_Group_other"
+	{
+		"zho"		"其他（屍體、醫療櫃、機槍等）"
+	}
+	"L4DRandomBeamItem_StyleSet"
+	{
+		"zho"		"{green}[光束]{default} 「全部物品」已切換為 {olive}{1}{default}，只對你自己生效。"
+	}
+	"L4DRandomBeamItem_StyleUsage"
+	{
+		"zho"		"{green}[光束]{default} {olive}!beam{default} 開啟設定選單；{olive}!beam bright/subtle/off/default{default} 快速切換全部物品；{olive}!beam reset{default} 全部恢復預設。"
+	}
+	"L4DRandomBeamItem_StyleUnavailable"
+	{
+		"zho"		"{green}[光束]{default} 伺服器沒有載入 SendProxy 擴充，暫不支援個人光束設定。"
+	}
+	"L4DRandomBeamItem_PrefsReset"
+	{
+		"zho"		"{green}[光束]{default} 你的物品光束設定已全部恢復預設。"
+	}
+	"L4DRandomBeamItem_PrefsNotSaved"
+	{
+		"zho"		"{green}[光束]{default} 資料庫暫時無法使用，這次的設定只在你本次連線期間有效。"
+	}
+	"L4DRandomBeamItem_PrefsLoading"
+	{
+		"zho"		"{green}[光束]{default} 正在讀取你的光束設定，請稍後再試。"
+	}
+	"L4DRandomBeamItem_EdictLimit"
+	{
+		"zho"		"{green}[光束]{default} 伺服器實體數量接近上限，部分預設不顯示的物品暫時加不了光束。"
+	}
 }

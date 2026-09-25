@@ -15,9 +15,9 @@
 ## 统计
 
 - 当前模式配置引用插件：328 个。
-- 主表已抽取命令/监听入口：452 条。
+- 主表已抽取命令/监听入口：453 条。
 - 对抗通用：386 条。
-- Anne 模式专用：66 条。
+- Anne 模式专用：67 条。
 - 启用目录存在但当前模式配置未加载的插件命令：70 条。
 - 未找到源码的未加载启用目录插件：16 个。
 - 配置引用但 `addons/sourcemod/plugins/` 启用目录未找到同路径二进制：1 个。
@@ -420,7 +420,7 @@
 
 ## Anne 模式专用命令
 
-共 66 条命令/监听入口。
+共 67 条命令/监听入口。
 
 | 插件 | 命令 | 类型 | 权限 | 说明 | 出现模式 |
 | --- | --- | --- | --- | --- | --- |
@@ -435,6 +435,7 @@
 | `extend/gnome.smx` | `sm_gnometele` | 管理员 | ADMFLAG_ROOT | Teleport to a gnome (Usage: sm_gnometele <index: 1 to MAX_GNOMES>). | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/HitStatistics.smx` | `sm_kills` | 玩家/控制台 | - | MVP Statistic | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/HitStatistics.smx` | `sm_killsme` | 玩家/控制台 | - | MyKills Statistic | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
+| `extend/l4d_random_beam_item.smx` | `sm_beam` | 玩家 | - | 打开个人物品光束设置菜单：快捷样式、全部物品、按物品设置显示/长度/宽度/颜色/光晕，设置存 MySQL；也可带参数 `bright`/`subtle`/`off`/`default`/`reset` | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/l4d_random_beam_item.smx` | `sm_beamadd` | 管理员 | ADMFLAG_ROOT | Add a beam (with default config) to entity at crosshair. | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/l4d_random_beam_item.smx` | `sm_beaminfo` | 管理员 | ADMFLAG_ROOT | Outputs to the chat the beam info about the entity at your crosshair. | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |
 | `extend/l4d_random_beam_item.smx` | `sm_beamreload` | 管理员 | ADMFLAG_ROOT | Reload the beam configs. | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |

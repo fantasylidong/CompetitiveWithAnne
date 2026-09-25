@@ -2,6 +2,13 @@
 // ====================================================================================================
 Change Log:
 
+1.1.0 (25-September-2026) [Anne]
+    - The data file now defines a "standard" beam that every item inherits, and groups the items for the player menu.
+    - Added per-player beam settings through the SendProxy extension: players open !beam to change the length and width
+      (as a percentage of the standard), color, halo and visibility, for all items or for each item group.
+    - Players can show beams on items that are hidden by default; those beams are only created while someone asks for them.
+    - Player settings are saved in MySQL (databases.cfg "rpg").
+
 1.0.3 (29-May-2022)
     - Improved performance.
     - Fixed logic running twice on plugin load.
@@ -29,7 +36,7 @@ Change Log:
 #define PLUGIN_NAME                   "[L4D1 & L4D2] Random Beam Item"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Gives a random beam to items on the map"
-#define PLUGIN_VERSION                "1.0.2"
+#define PLUGIN_VERSION                "1.1.0"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=334110"
 
 // ====================================================================================================
@@ -51,12 +58,16 @@ public Plugin myinfo =
 #include <colors>
 #include <sdktools>
 #include <sdkhooks>
+#undef REQUIRE_EXTENSIONS
+#include <sendproxy>
+#define REQUIRE_EXTENSIONS
 
 // ====================================================================================================
 // Pragmas
 // ====================================================================================================
 #pragma semicolon 1
 #pragma newdecls required
+#pragma dynamic 32768
 
 // ====================================================================================================
 // Cvar Flags
@@ -69,6 +80,12 @@ public Plugin myinfo =
 // ====================================================================================================
 #define CONFIG_FILENAME               "l4d_random_beam_item"
 #define DATA_FILENAME                 "l4d_random_beam_item"
+
+// ====================================================================================================
+// Database
+// ====================================================================================================
+#define DB_CONFIG                     "rpg"
+#define DB_TABLE                      "beam_item_prefs"
 
 // ====================================================================================================
 // Defines
@@ -145,11 +162,43 @@ public Plugin myinfo =
 #define CONFIG_WIDTH                  6
 #define CONFIG_HDR                    7
 #define CONFIG_HALO                   8
-#define CONFIG_ARRAYSIZE              9
+#define CONFIG_GROUP                  9
+#define CONFIG_PLAYER                 10
+#define CONFIG_ARRAYSIZE              11
 
 #define MAXENTITIES                   2048
 
 #define MAX_BEAM_WIDTH                102.3
+
+// Item groups shown in the player menu. Beams without a group (e.g. sm_beamadd) only follow the "all items" settings,
+// which are stored in the extra slot after the groups.
+#define MAX_GROUPS                    32
+#define GROUP_NONE                    MAX_GROUPS
+#define SCOPE_GLOBAL                  MAX_GROUPS
+
+#define PREF_VISIBLE                  0
+#define PREF_LENGTH                   1
+#define PREF_WIDTH                    2
+#define PREF_COLOR                    3
+#define PREF_HALO                     4
+#define PREF_COUNT                    5
+#define PREF_FOLLOW                   -1
+
+#define PREFS_MAX_LENGTH              2048
+
+#define PRESET_BRIGHT                 0
+#define PRESET_SUBTLE                 1
+#define PRESET_COUNT                  2
+
+#define PREFS_NONE                    0
+#define PREFS_LOADING                 1
+#define PREFS_READY                   2
+#define PREFS_FAILED                  3
+
+// Halo, HDR scale and color are only read when the client creates the beam, so a settings change
+// hides the beams from that client for this long to make the client rebuild them.
+#define REFRESH_DELAY                 0.3
+#define SAVE_DELAY                    3.0
 
 // ====================================================================================================
 // Plugin Cvars
@@ -158,6 +207,7 @@ ConVar g_hCvar_Enabled;
 ConVar g_hCvar_RemoveSpawner;
 ConVar g_hCvar_MinBrightness;
 ConVar g_hCvar_UseGlowColor;
+ConVar g_hCvar_PlayerEdictLimit;
 
 // ====================================================================================================
 // bool - Plugin Variables
@@ -167,12 +217,25 @@ bool g_bEventsHooked;
 bool g_bCvar_Enabled;
 bool g_bCvar_RemoveSpawner;
 bool g_bCvar_UseGlowColor;
+bool g_bSendProxy;
+bool g_bDatabaseReady;
+bool g_bGroupSelectable[MAX_GROUPS];
 
 // ====================================================================================================
 // int - Plugin Variables
 // ====================================================================================================
 int g_iHalo = -1;
 int g_iDefaultConfig[CONFIG_ARRAYSIZE];
+int g_iCvar_PlayerEdictLimit;
+int g_iGroupCount;
+int g_iGroupDemand[MAX_GROUPS];
+int g_iPresetLength[PRESET_COUNT];
+int g_iPresetWidth[PRESET_COUNT];
+int g_iPresetHalo[PRESET_COUNT];
+
+// Length and width choices, in percent of the item's standard beam
+int g_iScaleLevels[] = { 50, 75, 100, 150, 200, 300 };
+int g_iPaletteColor[] = { 0xFFFFFF, 0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0x0080FF, 0x9B30FF, 0xFF40C0 };
 
 // ====================================================================================================
 // float - Plugin Variables
@@ -182,9 +245,35 @@ float g_fExtraPosZ = 0.25;
 float g_fCvar_MinBrightness;
 
 // ====================================================================================================
+// string - Plugin Variables
+// ====================================================================================================
+char g_sGroupKey[MAX_GROUPS][32];
+char g_sPalettePhrase[][] = { "L4DRandomBeamItem_ColorWhite", "L4DRandomBeamItem_ColorRed", "L4DRandomBeamItem_ColorOrange", "L4DRandomBeamItem_ColorYellow", "L4DRandomBeamItem_ColorGreen", "L4DRandomBeamItem_ColorCyan", "L4DRandomBeamItem_ColorBlue", "L4DRandomBeamItem_ColorPurple", "L4DRandomBeamItem_ColorPink" };
+char g_sFieldPhrase[PREF_COUNT][] = { "L4DRandomBeamItem_FieldVisible", "L4DRandomBeamItem_FieldLength", "L4DRandomBeamItem_FieldWidth", "L4DRandomBeamItem_FieldColor", "L4DRandomBeamItem_FieldHalo" };
+
+// ====================================================================================================
+// Database - Plugin Variables
+// ====================================================================================================
+Database g_hDatabase;
+
+// ====================================================================================================
 // client - Plugin Variables
 // ====================================================================================================
 bool gc_bWeaponEquipPostHooked[MAXPLAYERS+1];
+bool gc_bBeamRefresh[MAXPLAYERS+1];
+bool gc_bPrefsDirty[MAXPLAYERS+1];
+bool gc_bNotSavedWarned[MAXPLAYERS+1];
+int gc_iPrefsState[MAXPLAYERS+1];
+int gc_iMenuScope[MAXPLAYERS+1];
+int gc_iMenuField[MAXPLAYERS+1];
+int gc_iGroupMenuPosition[MAXPLAYERS+1];
+// Player settings per scope (item groups, then "all items"); PREF_FOLLOW = not set
+int gc_iPref[MAXPLAYERS+1][MAX_GROUPS+1][PREF_COUNT];
+// Settings in effect per group: the group's own setting, or else the "all items" setting
+int gc_iResolved[MAXPLAYERS+1][MAX_GROUPS+1][PREF_COUNT];
+char gc_sAuthId[MAXPLAYERS+1][32];
+Handle gc_hRefreshTimer[MAXPLAYERS+1];
+Handle gc_hSaveTimer[MAXPLAYERS+1];
 
 // ====================================================================================================
 // entity - Plugin Variables
@@ -192,6 +281,8 @@ bool gc_bWeaponEquipPostHooked[MAXPLAYERS+1];
 bool ge_bUsePostHooked[MAXENTITIES+1];
 bool ge_bVPhysicsUpdatePostHooked[MAXENTITIES+1];
 bool ge_bTurnOn[MAXENTITIES+1];
+bool ge_bBeamDefault[MAXENTITIES+1];
+int ge_iBeamGroup[MAXENTITIES+1] = { GROUP_NONE, ... };
 int ge_iParentEntRef[MAXENTITIES+1] = { INVALID_ENT_REFERENCE, ... };
 int ge_iChildEntRef[MAXENTITIES+1] = { INVALID_ENT_REFERENCE, ... };
 
@@ -241,6 +332,9 @@ public void OnPluginStart()
     g_smMeleeConfig = new StringMap();
     g_smModelConfig = new StringMap();
 
+    for (int client = 0; client <= MAXPLAYERS; client++)
+        ResetClientPrefs(client);
+
     BuildMaps();
 
     LoadConfigs();
@@ -251,6 +345,7 @@ public void OnPluginStart()
     g_hCvar_MinBrightness    = CreateConVar("l4d_random_beam_item_min_brightness", "0.5", "Algorithm value to detect the beam minimum brightness for a random color (not accurate).", CVAR_FLAGS, true, 0.0, true, 1.0);
     if (g_bL4D2)
         g_hCvar_UseGlowColor = CreateConVar("l4d_random_beam_item_use_glow_color", "1", "(L4D2 only) Apply the same color from glow.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_hCvar_PlayerEdictLimit = CreateConVar("l4d_random_beam_item_player_edict_limit", "1900", "Beams that players turn on for items hidden by default are not created once the server uses this many edicts.\n0 = Players can't turn on beams for hidden items.", CVAR_FLAGS, true, 0.0, true, 2048.0);
 
     // Hook plugin ConVars change
     g_hCvar_Enabled.AddChangeHook(Event_ConVarChanged);
@@ -258,6 +353,7 @@ public void OnPluginStart()
     g_hCvar_MinBrightness.AddChangeHook(Event_ConVarChanged);
     if (g_bL4D2)
         g_hCvar_UseGlowColor.AddChangeHook(Event_ConVarChanged);
+    g_hCvar_PlayerEdictLimit.AddChangeHook(Event_ConVarChanged);
 
     // Load plugin configs from .cfg
     AutoExecConfig(true, CONFIG_FILENAME);
@@ -269,6 +365,43 @@ public void OnPluginStart()
     RegAdminCmd("sm_beamremoveall", CmdRemoveAll, ADMFLAG_ROOT, "Remove all beams created by the plugin.");
     RegAdminCmd("sm_beamadd", CmdAdd, ADMFLAG_ROOT, "Add a beam (with default config) to entity at crosshair.");
     RegAdminCmd("sm_print_cvars_l4d_random_beam_item", CmdPrintCvars, ADMFLAG_ROOT, "Print the plugin related cvars and their respective values to the console.");
+
+    // Public Commands
+    RegConsoleCmd("sm_beam", CmdBeam, "Item beam settings. Usage: sm_beam [bright|subtle|off|default|reset]");
+
+    ConnectDatabase();
+}
+
+/****************************************************************************************************/
+
+public void OnAllPluginsLoaded()
+{
+    g_bSendProxy = LibraryExists(SENDPROXY_LIB);
+    HookAllBeamSendProxies();
+}
+
+/****************************************************************************************************/
+
+public void OnLibraryAdded(const char[] name)
+{
+    if (!StrEqual(name, SENDPROXY_LIB))
+        return;
+
+    g_bSendProxy = true;
+    HookAllBeamSendProxies();
+    CreateDemandedBeams(0);
+}
+
+/****************************************************************************************************/
+
+public void OnLibraryRemoved(const char[] name)
+{
+    if (!StrEqual(name, SENDPROXY_LIB))
+        return;
+
+    // Nobody can hide the beams that were turned on for single players anymore
+    g_bSendProxy = false;
+    RemoveUndemandedBeams();
 }
 
 /****************************************************************************************************/
@@ -389,6 +522,7 @@ void GetCvars()
     g_fCvar_MinBrightness = g_hCvar_MinBrightness.FloatValue;
     if (g_bL4D2)
         g_bCvar_UseGlowColor = g_hCvar_UseGlowColor.BoolValue;
+    g_iCvar_PlayerEdictLimit = g_hCvar_PlayerEdictLimit.IntValue;
 }
 
 /****************************************************************************************************/
@@ -411,186 +545,187 @@ void LoadConfigs()
     g_smMeleeConfig.Clear();
     g_smModelConfig.Clear();
 
-    int default_enable;
-    int default_random;
-    char default_color[12];
-    int default_length;
-    int default_width;
-    int default_hdr;
-    int default_halo;
+    LoadGroups(kv);
 
-    int iColor[3];
+    // The standard beam: every item inherits the values it doesn't set itself
+    int fallback[CONFIG_ARRAYSIZE] = { 0, 0, 255, 255, 255, 0, 0, 0, 0, GROUP_NONE, 1 };
+    CopyConfig(fallback, g_iDefaultConfig);
+    if (kv.JumpToKey("standard") || kv.JumpToKey("default"))
+        ReadItemConfig(kv, fallback, g_iDefaultConfig, "");
 
-    if (kv.JumpToKey("default"))
-    {
-        default_enable = kv.GetNum("enable", 0);
-        default_random = kv.GetNum("random", 0);
-        kv.GetString("color", default_color, sizeof(default_color), "255 255 255");
-        default_length = kv.GetNum("length", 0);
-        default_width = kv.GetNum("width", 0);
-        default_hdr = kv.GetNum("hdr", 0);
-        default_halo = kv.GetNum("halo", 0);
+    LoadItemSection(kv, "classnames", g_smClassnameConfig, "other");
+    LoadItemSection(kv, "melees", g_smMeleeConfig, "melee");
+    LoadItemSection(kv, "models", g_smModelConfig, "other");
 
-        iColor = ConvertRGBToIntArray(default_color);
-
-        if (default_width > MAX_BEAM_WIDTH) // prevent clamping warning message
-            default_width = 102;
-
-        g_iDefaultConfig[CONFIG_ENABLE] = default_enable;
-        g_iDefaultConfig[CONFIG_RANDOM] = default_random;
-        g_iDefaultConfig[CONFIG_R] = iColor[0];
-        g_iDefaultConfig[CONFIG_G] = iColor[1];
-        g_iDefaultConfig[CONFIG_B] = iColor[2];
-        g_iDefaultConfig[CONFIG_LENGTH] = default_length;
-        g_iDefaultConfig[CONFIG_WIDTH] = default_width;
-        g_iDefaultConfig[CONFIG_HDR] = default_hdr;
-        g_iDefaultConfig[CONFIG_HALO] = default_halo;
-    }
-
-    kv.Rewind();
-
-    char section[64];
-    int enable;
-    int random;
-    char color[12];
-    int length;
-    int width;
-    int hdr;
-    int halo;
-
-    int config[CONFIG_ARRAYSIZE];
-
-    if (kv.JumpToKey("classnames"))
-    {
-        if (kv.GotoFirstSubKey())
-        {
-            do
-            {
-                enable = kv.GetNum("enable", default_enable);
-                if (enable == 0)
-                    continue;
-
-                random = kv.GetNum("random", default_random);
-                kv.GetString("color", color, sizeof(color), default_color);
-                length = kv.GetNum("length", default_length);
-                width = kv.GetNum("width", default_width);
-                hdr = kv.GetNum("hdr", default_hdr);
-                halo = kv.GetNum("halo", default_halo);
-
-                iColor = ConvertRGBToIntArray(color);
-
-                if (width > MAX_BEAM_WIDTH) // prevent clamping warning message
-                    width = 102;
-
-                config[CONFIG_ENABLE] = enable;
-                config[CONFIG_RANDOM] = random;
-                config[CONFIG_R] = iColor[0];
-                config[CONFIG_G] = iColor[1];
-                config[CONFIG_B] = iColor[2];
-                config[CONFIG_LENGTH] = length;
-                config[CONFIG_WIDTH] = width;
-                config[CONFIG_HDR] = hdr;
-                config[CONFIG_HALO] = halo;
-
-                kv.GetSectionName(section, sizeof(section));
-                TrimString(section);
-                StringToLowerCase(section);
-
-                g_smClassnameConfig.SetArray(section, config, sizeof(config));
-            } while (kv.GotoNextKey());
-        }
-    }
-
-    kv.Rewind();
-
-    if (kv.JumpToKey("melees"))
-    {
-        if (kv.GotoFirstSubKey())
-        {
-            do
-            {
-                enable = kv.GetNum("enable", default_enable);
-                if (enable == 0)
-                    continue;
-
-                random = kv.GetNum("random", default_random);
-                kv.GetString("color", color, sizeof(color), default_color);
-                length = kv.GetNum("length", default_length);
-                width = kv.GetNum("width", default_width);
-                hdr = kv.GetNum("hdr", default_hdr);
-                halo = kv.GetNum("halo", default_halo);
-
-                iColor = ConvertRGBToIntArray(color);
-
-                if (width > MAX_BEAM_WIDTH) // prevent clamping warning message
-                    width = 102;
-
-                config[CONFIG_ENABLE] = enable;
-                config[CONFIG_RANDOM] = random;
-                config[CONFIG_R] = iColor[0];
-                config[CONFIG_G] = iColor[1];
-                config[CONFIG_B] = iColor[2];
-                config[CONFIG_LENGTH] = length;
-                config[CONFIG_WIDTH] = width;
-                config[CONFIG_HDR] = hdr;
-                config[CONFIG_HALO] = halo;
-
-                kv.GetSectionName(section, sizeof(section));
-                TrimString(section);
-                StringToLowerCase(section);
-
-                g_smMeleeConfig.SetArray(section, config, sizeof(config));
-            } while (kv.GotoNextKey());
-        }
-    }
-
-    kv.Rewind();
-
-    char modelname[PLATFORM_MAX_PATH];
-    if (kv.JumpToKey("models"))
-    {
-        if (kv.GotoFirstSubKey())
-        {
-            do
-            {
-                enable = kv.GetNum("enable", default_enable);
-                if (enable == 0)
-                    continue;
-
-                random = kv.GetNum("random", default_random);
-                kv.GetString("color", color, sizeof(color), default_color);
-                length = kv.GetNum("length", default_length);
-                width = kv.GetNum("width", default_width);
-                hdr = kv.GetNum("hdr", default_hdr);
-                halo = kv.GetNum("halo", default_halo);
-
-                iColor = ConvertRGBToIntArray(color);
-
-                if (width > MAX_BEAM_WIDTH) // prevent clamping warning message
-                    width = 102;
-
-                config[CONFIG_ENABLE] = enable;
-                config[CONFIG_RANDOM] = random;
-                config[CONFIG_R] = iColor[0];
-                config[CONFIG_G] = iColor[1];
-                config[CONFIG_B] = iColor[2];
-                config[CONFIG_LENGTH] = length;
-                config[CONFIG_WIDTH] = width;
-                config[CONFIG_HDR] = hdr;
-                config[CONFIG_HALO] = halo;
-
-                kv.GetSectionName(modelname, sizeof(modelname));
-                TrimString(modelname);
-                StringToLowerCase(modelname);
-
-                g_smModelConfig.SetArray(modelname, config, sizeof(config));
-            } while (kv.GotoNextKey());
-        }
-    }
-
-    kv.Rewind();
+    LoadPresets(kv);
 
     delete kv;
+}
+
+/****************************************************************************************************/
+
+void LoadGroups(KeyValues kv)
+{
+    g_iGroupCount = 0;
+    for (int group = 0; group < MAX_GROUPS; group++)
+        g_bGroupSelectable[group] = false;
+
+    kv.Rewind();
+
+    char order[1024];
+    kv.GetString("groups", order, sizeof(order));
+
+    char keys[MAX_GROUPS][32];
+    int count = ExplodeString(order, " ", keys, sizeof(keys), sizeof(keys[]));
+    for (int i = 0; i < count; i++)
+        AddGroup(keys[i]);
+}
+
+/****************************************************************************************************/
+
+void LoadItemSection(KeyValues kv, const char[] name, StringMap map, const char[] defaultGroup)
+{
+    kv.Rewind();
+
+    if (!kv.JumpToKey(name) || !kv.GotoFirstSubKey())
+        return;
+
+    char section[PLATFORM_MAX_PATH];
+    int config[CONFIG_ARRAYSIZE];
+
+    do
+    {
+        ReadItemConfig(kv, g_iDefaultConfig, config, defaultGroup);
+
+        // Hidden by default and players can't turn it on either
+        if (config[CONFIG_ENABLE] == 0 && config[CONFIG_PLAYER] == 0)
+            continue;
+
+        if (config[CONFIG_GROUP] != GROUP_NONE)
+            g_bGroupSelectable[config[CONFIG_GROUP]] = true;
+
+        kv.GetSectionName(section, sizeof(section));
+        TrimString(section);
+        StringToLowerCase(section);
+
+        map.SetArray(section, config, sizeof(config));
+    } while (kv.GotoNextKey());
+}
+
+/****************************************************************************************************/
+
+void ReadItemConfig(KeyValues kv, const int[] base, int[] config, const char[] defaultGroup)
+{
+    config[CONFIG_ENABLE] = kv.GetNum("enable", base[CONFIG_ENABLE]);
+    config[CONFIG_RANDOM] = kv.GetNum("random", base[CONFIG_RANDOM]);
+
+    char color[16];
+    kv.GetString("color", color, sizeof(color));
+    if (color[0] == '\0')
+    {
+        config[CONFIG_R] = base[CONFIG_R];
+        config[CONFIG_G] = base[CONFIG_G];
+        config[CONFIG_B] = base[CONFIG_B];
+    }
+    else
+    {
+        int iColor[3];
+        iColor = ConvertRGBToIntArray(color);
+        config[CONFIG_R] = iColor[0];
+        config[CONFIG_G] = iColor[1];
+        config[CONFIG_B] = iColor[2];
+    }
+
+    config[CONFIG_LENGTH] = kv.GetNum("length", base[CONFIG_LENGTH]);
+
+    int width = kv.GetNum("width", base[CONFIG_WIDTH]);
+    if (width > MAX_BEAM_WIDTH) // prevent clamping warning message
+        width = 102;
+    config[CONFIG_WIDTH] = width;
+
+    config[CONFIG_HDR] = kv.GetNum("hdr", base[CONFIG_HDR]);
+    config[CONFIG_HALO] = kv.GetNum("halo", base[CONFIG_HALO]);
+    config[CONFIG_PLAYER] = kv.GetNum("player", base[CONFIG_PLAYER]);
+
+    char group[32];
+    kv.GetString("group", group, sizeof(group), defaultGroup);
+    config[CONFIG_GROUP] = AddGroup(group);
+}
+
+/****************************************************************************************************/
+
+void LoadPresets(KeyValues kv)
+{
+    SetPreset(PRESET_BRIGHT, 150, 150, 1);
+    SetPreset(PRESET_SUBTLE, 50, 75, 0);
+
+    kv.Rewind();
+
+    if (!kv.JumpToKey("styles"))
+        return;
+
+    char keys[PRESET_COUNT][] = { "bright", "subtle" };
+    for (int preset = 0; preset < PRESET_COUNT; preset++)
+    {
+        if (!kv.JumpToKey(keys[preset]))
+            continue;
+
+        SetPreset(preset, kv.GetNum("length", g_iPresetLength[preset]), kv.GetNum("width", g_iPresetWidth[preset]), kv.GetNum("halo", g_iPresetHalo[preset]));
+        kv.GoBack();
+    }
+}
+
+/****************************************************************************************************/
+
+void SetPreset(int preset, int length, int width, int halo)
+{
+    g_iPresetLength[preset] = SanitizePref(SCOPE_GLOBAL, PREF_LENGTH, length);
+    g_iPresetWidth[preset] = SanitizePref(SCOPE_GLOBAL, PREF_WIDTH, width);
+    g_iPresetHalo[preset] = SanitizePref(SCOPE_GLOBAL, PREF_HALO, halo);
+}
+
+/****************************************************************************************************/
+
+// Returns the group index of the key, adding it if it's new. Empty or overflowing keys get GROUP_NONE.
+int AddGroup(const char[] key)
+{
+    if (key[0] == '\0')
+        return GROUP_NONE;
+
+    int group = FindGroup(key);
+    if (group != -1)
+        return group;
+
+    if (g_iGroupCount >= MAX_GROUPS)
+    {
+        LogError("Too many beam item groups (max %i), \"%s\" only follows the \"all items\" settings.", MAX_GROUPS, key);
+        return GROUP_NONE;
+    }
+
+    strcopy(g_sGroupKey[g_iGroupCount], sizeof(g_sGroupKey[]), key);
+    StringToLowerCase(g_sGroupKey[g_iGroupCount]);
+    return g_iGroupCount++;
+}
+
+/****************************************************************************************************/
+
+int FindGroup(const char[] key)
+{
+    for (int group = 0; group < g_iGroupCount; group++)
+    {
+        if (StrEqual(g_sGroupKey[group], key, false))
+            return group;
+    }
+
+    return -1;
+}
+
+/****************************************************************************************************/
+
+void CopyConfig(const int[] source, int[] dest)
+{
+    for (int i = 0; i < CONFIG_ARRAYSIZE; i++)
+        dest[i] = source[i];
 }
 
 /****************************************************************************************************/
@@ -652,6 +787,15 @@ void LateLoad()
 public void OnClientDisconnect(int client)
 {
     gc_bWeaponEquipPostHooked[client] = false;
+
+    if (IsFakeClient(client))
+        return;
+
+    if (gc_iPrefsState[client] == PREFS_READY)
+        SaveClientPrefs(client);
+
+    ResetClientPrefs(client);
+    UpdateGroupDemand(0);
 }
 
 /****************************************************************************************************/
@@ -669,6 +813,13 @@ public void OnClientPutInServer(int client)
 
     gc_bWeaponEquipPostHooked[client] = true;
     SDKHook(client, SDKHook_WeaponEquipPost, OnWeaponEquipPost);
+}
+
+/****************************************************************************************************/
+
+public void OnClientPostAdminCheck(int client)
+{
+    LoadClientPrefs(client);
 }
 
 /****************************************************************************************************/
@@ -734,6 +885,8 @@ public void OnEntityDestroyed(int entity)
     ge_bUsePostHooked[entity] = false;
     ge_bVPhysicsUpdatePostHooked[entity] = false;
     ge_bTurnOn[entity] = false;
+    ge_bBeamDefault[entity] = false;
+    ge_iBeamGroup[entity] = GROUP_NONE;
 
     if (ge_iParentEntRef[entity] != INVALID_ENT_REFERENCE)
     {
@@ -772,6 +925,21 @@ void OnNextFrame(int entityRef)
     if (entity == INVALID_ENT_REFERENCE)
         return;
 
+    bool blocked;
+    TryCreateBeam(entity, false, blocked);
+}
+
+/****************************************************************************************************/
+
+/**
+ * Creates the beam of an item that should have one.
+ *
+ * @param entity          Item entity.
+ * @param demandOnly      Only create beams of items hidden by default that a player turned on.
+ * @param blocked         Set to true if such a beam was skipped because of the edict limit.
+ */
+void TryCreateBeam(int entity, bool demandOnly, bool &blocked)
+{
     if (ge_iChildEntRef[entity] != INVALID_ENT_REFERENCE)
         return;
 
@@ -794,13 +962,10 @@ void OnNextFrame(int entityRef)
     if (HasEntProp(entity, Prop_Send, "m_isCarryable")) // CPhysicsProp
         g_smPropModelToClassname.GetString(modelname, classname, sizeof(classname));
 
-    bool isMelee;
     char melee[16];
 
     if (StrContains(classname, "weapon_melee") == 0)
     {
-        isMelee = true;
-
         if (StrEqual(classname, "weapon_melee"))
             GetEntPropString(entity, Prop_Data, "m_strMapSetScriptName", melee, sizeof(melee));
         else //weapon_melee_spawn
@@ -821,18 +986,26 @@ void OnNextFrame(int entityRef)
         ReplaceString(classname, sizeof(classname), "_spawn", "");
 
     int config[CONFIG_ARRAYSIZE];
-
-    if (config[CONFIG_ENABLE] == 0)
-        g_smModelConfig.GetArray(modelname, config, sizeof(config));
-
-    if (isMelee && config[CONFIG_ENABLE] == 0)
-        g_smMeleeConfig.GetArray(melee, config, sizeof(config));
-
-    if (config[CONFIG_ENABLE] == 0)
-        g_smClassnameConfig.GetArray(classname, config, sizeof(config));
-
-    if (config[CONFIG_ENABLE] == 0)
+    if (!GetItemConfig(modelname, melee, classname, config))
         return;
+
+    bool defaultVisible = (config[CONFIG_ENABLE] != 0);
+    if (defaultVisible)
+    {
+        if (demandOnly)
+            return;
+    }
+    else
+    {
+        if (config[CONFIG_PLAYER] == 0 || !IsGroupDemanded(config[CONFIG_GROUP]))
+            return;
+
+        if (GetEntityCount() >= g_iCvar_PlayerEdictLimit)
+        {
+            blocked = true;
+            return;
+        }
+    }
 
     if (g_bCvar_UseGlowColor && HasEntProp(entity, Prop_Send, "m_glowColorOverride") && GetEntProp(entity, Prop_Send, "m_glowColorOverride") != 0)
     {
@@ -866,12 +1039,52 @@ void OnNextFrame(int entityRef)
         }
     }
 
-    CreateBeam(entity, config);
+    CreateBeam(entity, config, defaultVisible);
 }
 
 /****************************************************************************************************/
 
-void CreateBeam(int target, int[] config)
+/**
+ * Looks up the item config by model, melee name and classname, in that order.
+ * The first entry shown by default wins; otherwise the first entry found is used for players who turn it on.
+ *
+ * @return                True if any entry was found.
+ */
+bool GetItemConfig(const char[] modelname, const char[] melee, const char[] classname, int[] config)
+{
+    int candidate[CONFIG_ARRAYSIZE];
+    bool found;
+
+    if (g_smModelConfig.GetArray(modelname, candidate, sizeof(candidate)) && PickItemConfig(candidate, config, found))
+        return true;
+
+    if (melee[0] != '\0' && g_smMeleeConfig.GetArray(melee, candidate, sizeof(candidate)) && PickItemConfig(candidate, config, found))
+        return true;
+
+    if (g_smClassnameConfig.GetArray(classname, candidate, sizeof(candidate)) && PickItemConfig(candidate, config, found))
+        return true;
+
+    return found;
+}
+
+/****************************************************************************************************/
+
+bool PickItemConfig(const int[] candidate, int[] config, bool &found)
+{
+    bool enabled = (candidate[CONFIG_ENABLE] != 0);
+
+    if (!found || enabled)
+    {
+        CopyConfig(candidate, config);
+        found = true;
+    }
+
+    return enabled;
+}
+
+/****************************************************************************************************/
+
+void CreateBeam(int target, int[] config, bool defaultVisible)
 {
     char rendercolor[12];
     FormatEx(rendercolor, sizeof(rendercolor), "%i %i %i", config[CONFIG_R], config[CONFIG_G], config[CONFIG_B]);
@@ -882,7 +1095,8 @@ void CreateBeam(int target, int[] config)
 
     int entity = CreateEntityByName("beam_spotlight");
     DispatchKeyValue(entity, "targetname", "l4d_random_beam_item");
-    DispatchKeyValue(entity, "spawnflags", "3");
+    // 1 = Start on, 2 = No dynamic light. Beams hidden by default stay off and are only turned on for the players who asked.
+    DispatchKeyValue(entity, "spawnflags", defaultVisible ? "3" : "2");
     DispatchKeyValue(entity, "rendercolor", rendercolor);
     DispatchKeyValueFloat(entity, "SpotlightLength", float(config[CONFIG_LENGTH]));
     DispatchKeyValueFloat(entity, "SpotlightWidth", float(config[CONFIG_WIDTH]));
@@ -896,8 +1110,12 @@ void CreateBeam(int target, int[] config)
     SetEntProp(entity, Prop_Send, "m_nHaloIndex", config[CONFIG_HALO] == 1 ? g_iHalo : -1); // After dispatch spawn otherwise won't work
 
     ge_bTurnOn[entity] = true;
+    ge_bBeamDefault[entity] = defaultVisible;
+    ge_iBeamGroup[entity] = config[CONFIG_GROUP];
     ge_iParentEntRef[entity] = EntIndexToEntRef(target);
     ge_iChildEntRef[target] = EntIndexToEntRef(entity);
+
+    HookBeamSendProxy(entity);
 
     if (!ge_bVPhysicsUpdatePostHooked[target])
     {
@@ -980,7 +1198,7 @@ public void OnGameFrame()
             if (turnOff)
             {
                 ge_bTurnOn[entity] = false;
-                AcceptEntityInput(entity, "LightOff");
+                SetBeamTurnedOn(entity, false);
             }
         }
         else
@@ -990,7 +1208,7 @@ public void OnGameFrame()
             if (turnOn)
             {
                 ge_bTurnOn[entity] = true;
-                AcceptEntityInput(entity, "LightOn");
+                SetBeamTurnedOn(entity, true);
             }
         }
     }
@@ -998,8 +1216,25 @@ public void OnGameFrame()
 
 /****************************************************************************************************/
 
+void SetBeamTurnedOn(int beam, bool turnOn)
+{
+    // Beams hidden by default stay off on the server; the send proxy reads ge_bTurnOn instead
+    if (ge_bBeamDefault[beam])
+        AcceptEntityInput(beam, turnOn ? "LightOn" : "LightOff");
+    else
+        ChangeEdictState(beam);
+}
+
+/****************************************************************************************************/
+
 public void OnPluginEnd()
 {
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && !IsFakeClient(client) && gc_iPrefsState[client] == PREFS_READY)
+            SaveClientPrefs(client);
+    }
+
     RemoveAll();
 }
 
@@ -1027,6 +1262,1105 @@ void RemoveAll()
 
         g_alPluginEntities.Clear();
     }
+}
+
+// ====================================================================================================
+// Per-player beam settings (SendProxy)
+// ====================================================================================================
+void HookAllBeamSendProxies()
+{
+    int beam;
+    for (int i = 0; i < g_alPluginEntities.Length; i++)
+    {
+        beam = EntRefToEntIndex(g_alPluginEntities.Get(i));
+        if (beam != INVALID_ENT_REFERENCE)
+            HookBeamSendProxy(beam);
+    }
+}
+
+/****************************************************************************************************/
+
+// Hooking twice is a no-op, and the extension drops the hooks itself when the entity is destroyed or the map ends.
+void HookBeamSendProxy(int beam)
+{
+    if (!g_bSendProxy)
+        return;
+
+    SendProxy_HookEntity(beam, "m_bSpotlightOn", Prop_Int, ProxySpotlightOn);
+    SendProxy_HookEntity(beam, "m_nHaloIndex", Prop_Int, ProxyHaloIndex);
+    SendProxy_HookEntity(beam, "m_clrRender", Prop_Int, ProxyRenderColor);
+    SendProxy_HookEntity(beam, "m_flSpotlightMaxLength", Prop_Float, ProxySpotlightLength);
+    SendProxy_HookEntity(beam, "m_flSpotlightGoalWidth", Prop_Float, ProxySpotlightWidth);
+}
+
+/****************************************************************************************************/
+
+bool IsBeamVisibleTo(int client, int beam)
+{
+    if (gc_bBeamRefresh[client] || !ge_bTurnOn[beam])
+        return false;
+
+    int visible = gc_iResolved[client][ge_iBeamGroup[beam]][PREF_VISIBLE];
+    if (visible == PREF_FOLLOW)
+        return ge_bBeamDefault[beam];
+
+    return (visible == 1);
+}
+
+/****************************************************************************************************/
+
+// Each proxy only returns Plugin_Changed when the client should see something else than the server value,
+// so players on default settings don't make the beams repack every tick.
+Action ProxySpotlightOn(int entity, const char[] prop, int &value, int element, int client)
+{
+    if (!IsValidClientIndex(client))
+        return Plugin_Continue;
+
+    // m_bSpotlightOn is a bool: the extension reads 4 bytes, only the lowest one is the prop
+    int turnOn = IsBeamVisibleTo(client, entity) ? 1 : 0;
+    if ((value & 0xFF) == turnOn)
+        return Plugin_Continue;
+
+    value = turnOn;
+    return Plugin_Changed;
+}
+
+/****************************************************************************************************/
+
+Action ProxyHaloIndex(int entity, const char[] prop, int &value, int element, int client)
+{
+    if (!IsValidClientIndex(client))
+        return Plugin_Continue;
+
+    int halo = gc_iResolved[client][ge_iBeamGroup[entity]][PREF_HALO];
+    if (halo == PREF_FOLLOW)
+        return Plugin_Continue;
+
+    int haloIndex = (halo == 1) ? g_iHalo : -1;
+    if (value == haloIndex)
+        return Plugin_Continue;
+
+    value = haloIndex;
+    return Plugin_Changed;
+}
+
+/****************************************************************************************************/
+
+Action ProxyRenderColor(int entity, const char[] prop, int &value, int element, int client)
+{
+    if (!IsValidClientIndex(client))
+        return Plugin_Continue;
+
+    int color = gc_iResolved[client][ge_iBeamGroup[entity]][PREF_COLOR];
+    if (color == PREF_FOLLOW)
+        return Plugin_Continue;
+
+    // The setting is 0xRRGGBB, the network value is R, G, B, A from the lowest byte up
+    int packed = (value & 0xFF000000) | ((color >> 16) & 0xFF) | (color & 0xFF00) | ((color & 0xFF) << 16);
+    if (value == packed)
+        return Plugin_Continue;
+
+    value = packed;
+    return Plugin_Changed;
+}
+
+/****************************************************************************************************/
+
+Action ProxySpotlightLength(int entity, const char[] prop, float &value, int element, int client)
+{
+    if (!IsValidClientIndex(client))
+        return Plugin_Continue;
+
+    int percent = gc_iResolved[client][ge_iBeamGroup[entity]][PREF_LENGTH];
+    if (percent == PREF_FOLLOW || percent == 100)
+        return Plugin_Continue;
+
+    value *= percent / 100.0;
+    return Plugin_Changed;
+}
+
+/****************************************************************************************************/
+
+Action ProxySpotlightWidth(int entity, const char[] prop, float &value, int element, int client)
+{
+    if (!IsValidClientIndex(client))
+        return Plugin_Continue;
+
+    int percent = gc_iResolved[client][ge_iBeamGroup[entity]][PREF_WIDTH];
+    if (percent == PREF_FOLLOW || percent == 100)
+        return Plugin_Continue;
+
+    value *= percent / 100.0;
+    if (value > MAX_BEAM_WIDTH)
+        value = MAX_BEAM_WIDTH;
+
+    return Plugin_Changed;
+}
+
+/****************************************************************************************************/
+
+// Briefly turns every beam off for this client, then back on with the new settings,
+// so the client rebuilds its beams and picks up the halo and color.
+void RefreshClientBeams(int client)
+{
+    if (!g_bSendProxy)
+        return;
+
+    gc_bBeamRefresh[client] = true;
+    MarkAllBeamsChanged();
+
+    delete gc_hRefreshTimer[client];
+    gc_hRefreshTimer[client] = CreateTimer(REFRESH_DELAY, TimerEndRefresh, client);
+}
+
+/****************************************************************************************************/
+
+Action TimerEndRefresh(Handle timer, int client)
+{
+    gc_hRefreshTimer[client] = null;
+    gc_bBeamRefresh[client] = false;
+    MarkAllBeamsChanged();
+
+    return Plugin_Stop;
+}
+
+/****************************************************************************************************/
+
+// Proxied values only reach a client when the entity is repacked, so flag every beam as changed.
+void MarkAllBeamsChanged()
+{
+    int beam;
+    for (int i = 0; i < g_alPluginEntities.Length; i++)
+    {
+        beam = EntRefToEntIndex(g_alPluginEntities.Get(i));
+        if (beam != INVALID_ENT_REFERENCE)
+            ChangeEdictState(beam);
+    }
+}
+
+// ====================================================================================================
+// Beams that players turn on for items hidden by default
+// ====================================================================================================
+bool IsGroupDemanded(int group)
+{
+    return (g_bSendProxy && group != GROUP_NONE && g_iGroupDemand[group] > 0);
+}
+
+/****************************************************************************************************/
+
+/**
+ * Recounts, per item group, how many players turned the beams on.
+ *
+ * @param notifyClient    Client told in chat if a new beam hits the edict limit, 0 for nobody.
+ * @param scan            Create the beams of groups that just got their first player.
+ */
+void UpdateGroupDemand(int notifyClient, bool scan = true)
+{
+    int demand[MAX_GROUPS];
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (!IsClientInGame(client) || IsFakeClient(client))
+            continue;
+
+        for (int group = 0; group < g_iGroupCount; group++)
+        {
+            if (gc_iResolved[client][group][PREF_VISIBLE] == 1)
+                demand[group]++;
+        }
+    }
+
+    bool gained;
+    bool lost;
+
+    for (int group = 0; group < g_iGroupCount; group++)
+    {
+        if (demand[group] > 0 && g_iGroupDemand[group] == 0)
+            gained = true;
+        else if (demand[group] == 0 && g_iGroupDemand[group] > 0)
+            lost = true;
+
+        g_iGroupDemand[group] = demand[group];
+    }
+
+    if (lost)
+        RemoveUndemandedBeams();
+
+    if (gained && scan)
+        CreateDemandedBeams(notifyClient);
+}
+
+/****************************************************************************************************/
+
+void CreateDemandedBeams(int notifyClient)
+{
+    if (!g_bCvar_Enabled || !g_bSendProxy)
+        return;
+
+    bool blocked;
+
+    int entity = INVALID_ENT_REFERENCE;
+    while ((entity = FindEntityByClassname(entity, "*")) != INVALID_ENT_REFERENCE)
+    {
+        if (entity <= MaxClients)
+            continue;
+
+        TryCreateBeam(entity, true, blocked);
+    }
+
+    if (blocked && IsValidClient(notifyClient))
+        CPrintToChat(notifyClient, "%t", "L4DRandomBeamItem_EdictLimit");
+}
+
+/****************************************************************************************************/
+
+void RemoveUndemandedBeams()
+{
+    int beam;
+    for (int i = 0; i < g_alPluginEntities.Length; i++)
+    {
+        beam = EntRefToEntIndex(g_alPluginEntities.Get(i));
+        if (beam == INVALID_ENT_REFERENCE || ge_bBeamDefault[beam])
+            continue;
+
+        if (!IsGroupDemanded(ge_iBeamGroup[beam]))
+            AcceptEntityInput(beam, "Kill"); // Deferred to the end of the frame, the list is updated in OnEntityDestroyed
+    }
+}
+
+// ====================================================================================================
+// Player settings
+// ====================================================================================================
+void ResetClientPrefs(int client)
+{
+    for (int scope = 0; scope <= MAX_GROUPS; scope++)
+        ResetScope(client, scope);
+
+    ResolveClientPrefs(client);
+
+    gc_bBeamRefresh[client] = false;
+    gc_bPrefsDirty[client] = false;
+    gc_bNotSavedWarned[client] = false;
+    gc_iPrefsState[client] = PREFS_NONE;
+    gc_sAuthId[client][0] = '\0';
+    delete gc_hRefreshTimer[client];
+    delete gc_hSaveTimer[client];
+}
+
+/****************************************************************************************************/
+
+void ResetScope(int client, int scope)
+{
+    for (int field = 0; field < PREF_COUNT; field++)
+        gc_iPref[client][scope][field] = PREF_FOLLOW;
+}
+
+/****************************************************************************************************/
+
+bool IsScopeDefault(int client, int scope)
+{
+    for (int field = 0; field < PREF_COUNT; field++)
+    {
+        if (gc_iPref[client][scope][field] != PREF_FOLLOW)
+            return false;
+    }
+
+    return true;
+}
+
+/****************************************************************************************************/
+
+void ResolveClientPrefs(int client)
+{
+    int value;
+    for (int group = 0; group <= MAX_GROUPS; group++)
+    {
+        for (int field = 0; field < PREF_COUNT; field++)
+        {
+            value = gc_iPref[client][group][field];
+            if (value == PREF_FOLLOW)
+                value = gc_iPref[client][SCOPE_GLOBAL][field];
+
+            gc_iResolved[client][group][field] = value;
+        }
+    }
+}
+
+/****************************************************************************************************/
+
+int SanitizePref(int scope, int field, int value)
+{
+    switch (field)
+    {
+        case PREF_VISIBLE:
+        {
+            // "All items" can hide everything but not show every item on the map
+            if (value == 0 || (value == 1 && scope != SCOPE_GLOBAL))
+                return value;
+        }
+        case PREF_LENGTH, PREF_WIDTH:
+        {
+            if (value > 0)
+                return value < 10 ? 10 : (value > 1000 ? 1000 : value);
+        }
+        case PREF_COLOR:
+        {
+            if (0 <= value <= 0xFFFFFF)
+                return value;
+        }
+        case PREF_HALO:
+        {
+            if (value == 0 || value == 1)
+                return value;
+        }
+    }
+
+    return PREF_FOLLOW;
+}
+
+/****************************************************************************************************/
+
+// Called after the player changed a setting from the menu or the command.
+void OnClientPrefsEdited(int client)
+{
+    gc_bPrefsDirty[client] = true;
+    ApplyClientPrefs(client, client);
+
+    if (gc_iPrefsState[client] == PREFS_READY)
+    {
+        delete gc_hSaveTimer[client];
+        gc_hSaveTimer[client] = CreateTimer(SAVE_DELAY, TimerSavePrefs, client);
+    }
+    else if (gc_iPrefsState[client] != PREFS_LOADING && !gc_bNotSavedWarned[client])
+    {
+        gc_bNotSavedWarned[client] = true;
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_PrefsNotSaved");
+    }
+}
+
+/****************************************************************************************************/
+
+void ApplyClientPrefs(int client, int notifyClient)
+{
+    ResolveClientPrefs(client);
+
+    if (IsClientInGame(client))
+        RefreshClientBeams(client);
+
+    UpdateGroupDemand(notifyClient);
+}
+
+/****************************************************************************************************/
+
+void ApplyPreset(int client, const char[] style)
+{
+    int scope = SCOPE_GLOBAL;
+    char phrase[64];
+
+    if (StrEqual(style, "bright") || StrEqual(style, "subtle"))
+    {
+        int preset = StrEqual(style, "bright") ? PRESET_BRIGHT : PRESET_SUBTLE;
+        gc_iPref[client][scope][PREF_VISIBLE] = PREF_FOLLOW;
+        gc_iPref[client][scope][PREF_LENGTH] = g_iPresetLength[preset];
+        gc_iPref[client][scope][PREF_WIDTH] = g_iPresetWidth[preset];
+        gc_iPref[client][scope][PREF_HALO] = g_iPresetHalo[preset];
+        strcopy(phrase, sizeof(phrase), preset == PRESET_BRIGHT ? "L4DRandomBeamItem_StyleBright" : "L4DRandomBeamItem_StyleSubtle");
+    }
+    else if (StrEqual(style, "off"))
+    {
+        gc_iPref[client][scope][PREF_VISIBLE] = 0;
+        strcopy(phrase, sizeof(phrase), "L4DRandomBeamItem_StyleOff");
+    }
+    else // default
+    {
+        ResetScope(client, scope);
+        strcopy(phrase, sizeof(phrase), "L4DRandomBeamItem_StyleDefault");
+    }
+
+    OnClientPrefsEdited(client);
+
+    char name[64];
+    FormatEx(name, sizeof(name), "%T", phrase, client);
+    CPrintToChat(client, "%t", "L4DRandomBeamItem_StyleSet", name);
+}
+
+/****************************************************************************************************/
+
+void ResetAllClientPrefs(int client)
+{
+    for (int scope = 0; scope <= MAX_GROUPS; scope++)
+        ResetScope(client, scope);
+
+    OnClientPrefsEdited(client);
+    CPrintToChat(client, "%t", "L4DRandomBeamItem_PrefsReset");
+}
+
+/****************************************************************************************************/
+
+/**
+ * Stores the settings as "scope:visible,length,width,color,halo" entries separated by ";".
+ * The scope is "*" for all items or the group key; the color is RRGGBB in hex; -1 means not set.
+ */
+void SerializePrefs(int client, char[] buffer, int maxlength)
+{
+    buffer[0] = '\0';
+
+    char entry[96];
+    char color[8];
+    for (int scope = 0; scope <= MAX_GROUPS; scope++)
+    {
+        if (scope >= g_iGroupCount && scope != SCOPE_GLOBAL)
+            continue;
+
+        if (IsScopeDefault(client, scope))
+            continue;
+
+        if (gc_iPref[client][scope][PREF_COLOR] == PREF_FOLLOW)
+            strcopy(color, sizeof(color), "-1");
+        else
+            FormatEx(color, sizeof(color), "%06x", gc_iPref[client][scope][PREF_COLOR]);
+
+        FormatEx(entry, sizeof(entry), "%s%s:%i,%i,%i,%s,%i", buffer[0] == '\0' ? "" : ";", scope == SCOPE_GLOBAL ? "*" : g_sGroupKey[scope],
+            gc_iPref[client][scope][PREF_VISIBLE], gc_iPref[client][scope][PREF_LENGTH], gc_iPref[client][scope][PREF_WIDTH], color, gc_iPref[client][scope][PREF_HALO]);
+        StrCat(buffer, maxlength, entry);
+    }
+}
+
+/****************************************************************************************************/
+
+void ParsePrefs(int client, const char[] data)
+{
+    for (int scope = 0; scope <= MAX_GROUPS; scope++)
+        ResetScope(client, scope);
+
+    char entries[MAX_GROUPS + 1][96];
+    char parts[2][80];
+    char fields[PREF_COUNT][12];
+
+    int count = ExplodeString(data, ";", entries, sizeof(entries), sizeof(entries[]));
+    for (int i = 0; i < count; i++)
+    {
+        if (ExplodeString(entries[i], ":", parts, sizeof(parts), sizeof(parts[])) != 2)
+            continue;
+
+        int scope = StrEqual(parts[0], "*") ? SCOPE_GLOBAL : FindGroup(parts[0]);
+        if (scope == -1) // Group removed from the data file
+            continue;
+
+        if (ExplodeString(parts[1], ",", fields, sizeof(fields), sizeof(fields[])) != PREF_COUNT)
+            continue;
+
+        for (int field = 0; field < PREF_COUNT; field++)
+        {
+            int value = StringToInt(fields[field]);
+            if (field == PREF_COLOR && value != PREF_FOLLOW)
+                value = StringToInt(fields[field], 16);
+
+            gc_iPref[client][scope][field] = SanitizePref(scope, field, value);
+        }
+    }
+}
+
+// ====================================================================================================
+// Database
+// ====================================================================================================
+void ConnectDatabase()
+{
+    if (!SQL_CheckConfig(DB_CONFIG))
+    {
+        LogError("Database config \"%s\" is missing, player beam settings won't be saved.", DB_CONFIG);
+        return;
+    }
+
+    Database.Connect(OnDatabaseConnected, DB_CONFIG);
+}
+
+/****************************************************************************************************/
+
+void OnDatabaseConnected(Database db, const char[] error, any data)
+{
+    if (db == null)
+    {
+        LogError("Database connection failed, player beam settings won't be saved: %s", error);
+        return;
+    }
+
+    char driver[16];
+    db.Driver.GetIdentifier(driver, sizeof(driver));
+    if (!StrEqual(driver, "mysql"))
+    {
+        LogError("Database config \"%s\" uses \"%s\", player beam settings need MySQL.", DB_CONFIG, driver);
+        delete db;
+        return;
+    }
+
+    g_hDatabase = db;
+    g_hDatabase.SetCharset("utf8mb4");
+
+    char query[512];
+    FormatEx(query, sizeof(query),
+        "CREATE TABLE IF NOT EXISTS `%s` ("
+        ... "`steamid` varchar(64) NOT NULL,"
+        ... "`prefs` varchar(%i) NOT NULL DEFAULT '',"
+        ... "`updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
+        ... "PRIMARY KEY (`steamid`)"
+        ... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", DB_TABLE, PREFS_MAX_LENGTH);
+
+    g_hDatabase.Query(OnTableCreated, query);
+}
+
+/****************************************************************************************************/
+
+void OnTableCreated(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (results == null)
+    {
+        LogError("Failed to create table \"%s\", player beam settings won't be saved: %s", DB_TABLE, error);
+        return;
+    }
+
+    g_bDatabaseReady = true;
+
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && IsClientAuthorized(client))
+            LoadClientPrefs(client);
+    }
+}
+
+/****************************************************************************************************/
+
+void LoadClientPrefs(int client)
+{
+    if (!g_bDatabaseReady || IsFakeClient(client))
+        return;
+
+    if (gc_iPrefsState[client] != PREFS_NONE)
+        return;
+
+    if (!GetClientAuthId(client, AuthId_Steam2, gc_sAuthId[client], sizeof(gc_sAuthId[])))
+        return;
+
+    char query[256];
+    g_hDatabase.Format(query, sizeof(query), "SELECT `prefs` FROM `%s` WHERE `steamid` = '%s' LIMIT 1", DB_TABLE, gc_sAuthId[client]);
+
+    gc_iPrefsState[client] = PREFS_LOADING;
+    g_hDatabase.Query(OnPrefsLoaded, query, GetClientUserId(client));
+}
+
+/****************************************************************************************************/
+
+void OnPrefsLoaded(Database db, DBResultSet results, const char[] error, any userid)
+{
+    int client = GetClientOfUserId(userid);
+    if (client == 0 || gc_iPrefsState[client] != PREFS_LOADING)
+        return;
+
+    if (results == null)
+    {
+        // Keep the settings for this session only, saving could overwrite the stored ones
+        LogError("Failed to load the beam settings of %N: %s", client, error);
+        gc_iPrefsState[client] = PREFS_FAILED;
+        return;
+    }
+
+    gc_iPrefsState[client] = PREFS_READY;
+
+    // Settings changed before the database answered win over the stored ones
+    if (gc_bPrefsDirty[client])
+    {
+        SaveClientPrefs(client);
+        return;
+    }
+
+    if (!results.FetchRow())
+        return;
+
+    char data[PREFS_MAX_LENGTH];
+    results.FetchString(0, data, sizeof(data));
+    ParsePrefs(client, data);
+    ApplyClientPrefs(client, 0);
+}
+
+/****************************************************************************************************/
+
+Action TimerSavePrefs(Handle timer, int client)
+{
+    gc_hSaveTimer[client] = null;
+    SaveClientPrefs(client);
+
+    return Plugin_Stop;
+}
+
+/****************************************************************************************************/
+
+void SaveClientPrefs(int client)
+{
+    delete gc_hSaveTimer[client];
+
+    if (!gc_bPrefsDirty[client] || g_hDatabase == null || gc_sAuthId[client][0] == '\0')
+        return;
+
+    char data[PREFS_MAX_LENGTH];
+    SerializePrefs(client, data, sizeof(data));
+
+    char query[PREFS_MAX_LENGTH * 2 + 256];
+    g_hDatabase.Format(query, sizeof(query), "INSERT INTO `%s` (`steamid`, `prefs`) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE `prefs` = VALUES(`prefs`)", DB_TABLE, gc_sAuthId[client], data);
+    g_hDatabase.Query(OnPrefsSaved, query);
+
+    gc_bPrefsDirty[client] = false;
+}
+
+/****************************************************************************************************/
+
+void OnPrefsSaved(Database db, DBResultSet results, const char[] error, any data)
+{
+    if (results == null)
+        LogError("Failed to save player beam settings: %s", error);
+}
+
+// ====================================================================================================
+// Menus
+// ====================================================================================================
+void ShowMainMenu(int client)
+{
+    Menu menu = new Menu(MenuHandlerMain);
+    menu.SetTitle("%T", "L4DRandomBeamItem_MenuMainTitle", client);
+    AddMenuItemPhrase(menu, client, "presets", "L4DRandomBeamItem_MenuPresets");
+    AddMenuItemPhrase(menu, client, "global", "L4DRandomBeamItem_MenuGlobal");
+    AddMenuItemPhrase(menu, client, "groups", "L4DRandomBeamItem_MenuGroups");
+    AddMenuItemPhrase(menu, client, "reset", "L4DRandomBeamItem_MenuResetAll");
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+/****************************************************************************************************/
+
+int MenuHandlerMain(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[16];
+            menu.GetItem(param2, info, sizeof(info));
+
+            if (StrEqual(info, "presets"))
+                ShowPresetMenu(param1);
+            else if (StrEqual(info, "global"))
+                ShowScopeMenu(param1, SCOPE_GLOBAL);
+            else if (StrEqual(info, "groups"))
+                ShowGroupMenu(param1, 0);
+            else
+            {
+                ResetAllClientPrefs(param1);
+                ShowMainMenu(param1);
+            }
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************************************************************/
+
+void ShowPresetMenu(int client)
+{
+    Menu menu = new Menu(MenuHandlerPreset);
+    menu.SetTitle("%T", "L4DRandomBeamItem_MenuPresetsTitle", client);
+    AddMenuItemPhrase(menu, client, "bright", "L4DRandomBeamItem_StyleMenuBright");
+    AddMenuItemPhrase(menu, client, "subtle", "L4DRandomBeamItem_StyleMenuSubtle");
+    AddMenuItemPhrase(menu, client, "off", "L4DRandomBeamItem_StyleMenuOff");
+    AddMenuItemPhrase(menu, client, "default", "L4DRandomBeamItem_StyleMenuDefault");
+    menu.ExitBackButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+/****************************************************************************************************/
+
+int MenuHandlerPreset(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[16];
+            menu.GetItem(param2, info, sizeof(info));
+            ApplyPreset(param1, info);
+        }
+        case MenuAction_Cancel:
+        {
+            if (param2 == MenuCancel_ExitBack)
+                ShowMainMenu(param1);
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************************************************************/
+
+void ShowGroupMenu(int client, int position)
+{
+    Menu menu = new Menu(MenuHandlerGroup);
+    menu.SetTitle("%T", "L4DRandomBeamItem_MenuGroupsTitle", client);
+
+    char info[4];
+    char display[128];
+    for (int group = 0; group < g_iGroupCount; group++)
+    {
+        if (!g_bGroupSelectable[group])
+            continue;
+
+        GetScopeName(client, group, display, sizeof(display));
+        if (!IsScopeDefault(client, group))
+            Format(display, sizeof(display), "%T", "L4DRandomBeamItem_MenuCustomized", client, display);
+
+        IntToString(group, info, sizeof(info));
+        menu.AddItem(info, display);
+    }
+
+    menu.ExitBackButton = true;
+    menu.DisplayAt(client, position, MENU_TIME_FOREVER);
+}
+
+/****************************************************************************************************/
+
+int MenuHandlerGroup(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[4];
+            menu.GetItem(param2, info, sizeof(info));
+            gc_iGroupMenuPosition[param1] = menu.Selection;
+
+            int group = StringToInt(info);
+            if (group < g_iGroupCount)
+                ShowScopeMenu(param1, group);
+        }
+        case MenuAction_Cancel:
+        {
+            if (param2 == MenuCancel_ExitBack)
+                ShowMainMenu(param1);
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************************************************************/
+
+void ShowScopeMenu(int client, int scope)
+{
+    gc_iMenuScope[client] = scope;
+
+    char name[64];
+    GetScopeName(client, scope, name, sizeof(name));
+
+    Menu menu = new Menu(MenuHandlerScope);
+    if (scope == SCOPE_GLOBAL)
+        menu.SetTitle("%T", "L4DRandomBeamItem_MenuGlobalTitle", client);
+    else
+        menu.SetTitle("%T", "L4DRandomBeamItem_MenuGroupTitle", client, name);
+
+    char info[4];
+    char fieldName[64];
+    char value[64];
+    char display[128];
+    for (int field = 0; field < PREF_COUNT; field++)
+    {
+        FormatEx(fieldName, sizeof(fieldName), "%T", g_sFieldPhrase[field], client);
+        FormatPrefValue(client, scope, field, gc_iPref[client][scope][field], value, sizeof(value));
+        FormatEx(display, sizeof(display), "%T", "L4DRandomBeamItem_MenuFieldValue", client, fieldName, value);
+
+        IntToString(field, info, sizeof(info));
+        menu.AddItem(info, display);
+    }
+
+    AddMenuItemPhrase(menu, client, "reset", "L4DRandomBeamItem_MenuResetScope", IsScopeDefault(client, scope) ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+
+    menu.ExitBackButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+/****************************************************************************************************/
+
+int MenuHandlerScope(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            int scope = gc_iMenuScope[param1];
+
+            char info[8];
+            menu.GetItem(param2, info, sizeof(info));
+
+            if (StrEqual(info, "reset"))
+            {
+                ResetScope(param1, scope);
+                OnClientPrefsEdited(param1);
+                ShowScopeMenu(param1, scope);
+            }
+            else
+            {
+                ShowValueMenu(param1, scope, StringToInt(info));
+            }
+        }
+        case MenuAction_Cancel:
+        {
+            if (param2 == MenuCancel_ExitBack)
+            {
+                if (gc_iMenuScope[param1] == SCOPE_GLOBAL)
+                    ShowMainMenu(param1);
+                else
+                    ShowGroupMenu(param1, gc_iGroupMenuPosition[param1]);
+            }
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************************************************************/
+
+void ShowValueMenu(int client, int scope, int field)
+{
+    gc_iMenuField[client] = field;
+
+    char name[64];
+    char fieldName[64];
+    GetScopeName(client, scope, name, sizeof(name));
+    FormatEx(fieldName, sizeof(fieldName), "%T", g_sFieldPhrase[field], client);
+
+    Menu menu = new Menu(MenuHandlerValue);
+    menu.SetTitle("%T", "L4DRandomBeamItem_MenuValueTitle", client, name, fieldName);
+
+    int options[16];
+    int count = GetFieldOptions(scope, field, options);
+    int current = gc_iPref[client][scope][field];
+
+    char info[12];
+    char display[128];
+    for (int i = 0; i < count; i++)
+    {
+        FormatPrefValue(client, scope, field, options[i], display, sizeof(display));
+        if (options[i] == current)
+            Format(display, sizeof(display), "%T", "L4DRandomBeamItem_MenuCurrent", client, display);
+
+        IntToString(options[i], info, sizeof(info));
+        menu.AddItem(info, display, options[i] == current ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+    }
+
+    menu.ExitBackButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+/****************************************************************************************************/
+
+int MenuHandlerValue(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            int scope = gc_iMenuScope[param1];
+            int field = gc_iMenuField[param1];
+
+            char info[12];
+            menu.GetItem(param2, info, sizeof(info));
+
+            gc_iPref[param1][scope][field] = SanitizePref(scope, field, StringToInt(info));
+            OnClientPrefsEdited(param1);
+            ShowScopeMenu(param1, scope);
+        }
+        case MenuAction_Cancel:
+        {
+            if (param2 == MenuCancel_ExitBack)
+                ShowScopeMenu(param1, gc_iMenuScope[param1]);
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+
+    return 0;
+}
+
+/****************************************************************************************************/
+
+int GetFieldOptions(int scope, int field, int[] options)
+{
+    int count;
+    options[count++] = PREF_FOLLOW;
+
+    switch (field)
+    {
+        case PREF_VISIBLE:
+        {
+            if (scope != SCOPE_GLOBAL)
+                options[count++] = 1;
+            options[count++] = 0;
+        }
+        case PREF_LENGTH, PREF_WIDTH:
+        {
+            for (int i = 0; i < sizeof(g_iScaleLevels); i++)
+            {
+                // 100% is what "default" already means for all items
+                if (scope == SCOPE_GLOBAL && g_iScaleLevels[i] == 100)
+                    continue;
+
+                options[count++] = g_iScaleLevels[i];
+            }
+        }
+        case PREF_COLOR:
+        {
+            for (int i = 0; i < sizeof(g_iPaletteColor); i++)
+                options[count++] = g_iPaletteColor[i];
+        }
+        case PREF_HALO:
+        {
+            options[count++] = 1;
+            options[count++] = 0;
+        }
+    }
+
+    return count;
+}
+
+/****************************************************************************************************/
+
+void FormatPrefValue(int client, int scope, int field, int value, char[] buffer, int maxlength)
+{
+    if (value == PREF_FOLLOW)
+    {
+        if (scope == SCOPE_GLOBAL)
+            FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueDefault", client);
+        else
+            FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueFollowGlobal", client);
+        return;
+    }
+
+    switch (field)
+    {
+        case PREF_VISIBLE:
+        {
+            if (value == 1)
+                FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueShow", client);
+            else
+                FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueHide", client);
+        }
+        case PREF_LENGTH, PREF_WIDTH:
+        {
+            FormatEx(buffer, maxlength, "%i%%", value);
+        }
+        case PREF_COLOR:
+        {
+            for (int i = 0; i < sizeof(g_iPaletteColor); i++)
+            {
+                if (g_iPaletteColor[i] == value)
+                {
+                    FormatEx(buffer, maxlength, "%T", g_sPalettePhrase[i], client);
+                    return;
+                }
+            }
+
+            FormatEx(buffer, maxlength, "#%06X", value);
+        }
+        case PREF_HALO:
+        {
+            if (value == 1)
+                FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueOn", client);
+            else
+                FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_ValueOff", client);
+        }
+    }
+}
+
+/****************************************************************************************************/
+
+void GetScopeName(int client, int scope, char[] buffer, int maxlength)
+{
+    if (scope == SCOPE_GLOBAL)
+    {
+        FormatEx(buffer, maxlength, "%T", "L4DRandomBeamItem_MenuGlobal", client);
+        return;
+    }
+
+    // Groups added to the data file without a translation show their key
+    char phrase[64];
+    FormatEx(phrase, sizeof(phrase), "L4DRandomBeamItem_Group_%s", g_sGroupKey[scope]);
+    if (TranslationPhraseExists(phrase))
+        FormatEx(buffer, maxlength, "%T", phrase, client);
+    else
+        strcopy(buffer, maxlength, g_sGroupKey[scope]);
+}
+
+/****************************************************************************************************/
+
+void AddMenuItemPhrase(Menu menu, int client, const char[] info, const char[] phrase, int style = ITEMDRAW_DEFAULT)
+{
+    char display[128];
+    FormatEx(display, sizeof(display), "%T", phrase, client);
+    menu.AddItem(info, display, style);
+}
+
+// ====================================================================================================
+// Public Commands
+// ====================================================================================================
+Action CmdBeam(int client, int args)
+{
+    if (!IsValidClient(client) || IsFakeClient(client))
+        return Plugin_Handled;
+
+    if (!g_bSendProxy)
+    {
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_StyleUnavailable");
+        return Plugin_Handled;
+    }
+
+    if (gc_iPrefsState[client] == PREFS_LOADING)
+    {
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_PrefsLoading");
+        return Plugin_Handled;
+    }
+
+    if (args == 0)
+    {
+        ShowMainMenu(client);
+        return Plugin_Handled;
+    }
+
+    char arg[16];
+    GetCmdArg(1, arg, sizeof(arg));
+    StringToLowerCase(arg);
+
+    if (StrEqual(arg, "reset"))
+        ResetAllClientPrefs(client);
+    else if (StrEqual(arg, "bright") || StrEqual(arg, "subtle") || StrEqual(arg, "off") || StrEqual(arg, "default"))
+        ApplyPreset(client, arg);
+    else
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_StyleUsage");
+
+    return Plugin_Handled;
 }
 
 // ====================================================================================================
@@ -1084,7 +2418,28 @@ Action CmdInfo(int client, int args)
 
 Action CmdReload(int client, int args)
 {
+    // Group indexes can change, so carry the player settings over by group key
+    ArrayList saved = new ArrayList(ByteCountToCells(PREFS_MAX_LENGTH));
+    char data[PREFS_MAX_LENGTH];
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        SerializePrefs(target, data, sizeof(data));
+        saved.PushString(data);
+    }
+
     LoadConfigs();
+
+    for (int target = 1; target <= MaxClients; target++)
+    {
+        saved.GetString(target - 1, data, sizeof(data));
+        ParsePrefs(target, data);
+        ResolveClientPrefs(target);
+    }
+    delete saved;
+
+    for (int group = 0; group < MAX_GROUPS; group++)
+        g_iGroupDemand[group] = 0;
+    UpdateGroupDemand(0, false); // LateLoad creates the beams
 
     RemoveAll();
 
@@ -1192,7 +2547,7 @@ Action CmdAdd(int client, int args)
         g_iDefaultConfig[CONFIG_B] = colorRandom[2];
     }
 
-    CreateBeam(entity, g_iDefaultConfig);
+    CreateBeam(entity, g_iDefaultConfig, true);
 
     CPrintToChat(client, "%t", "L4DRandomBeamItem_BeamAddedTargetEntity");
 
@@ -1213,10 +2568,18 @@ Action CmdPrintCvars(int client, int args)
     PrintToConsole(client, "l4d_random_beam_item_remove_spawner : %b (%s)", g_bCvar_RemoveSpawner, g_bCvar_RemoveSpawner ? "true" : "false");
     PrintToConsole(client, "l4d_random_beam_item_min_brightness : %.1f", g_fCvar_MinBrightness);
     if (g_bL4D2) PrintToConsole(client, "l4d_random_beam_item_use_glow_color : %b (%s)", g_bCvar_UseGlowColor, g_bCvar_UseGlowColor ? "true" : "false");
+    PrintToConsole(client, "l4d_random_beam_item_player_edict_limit : %i", g_iCvar_PlayerEdictLimit);
     PrintToConsole(client, "");
     PrintToConsole(client, "----------------------------- Array List -----------------------------");
     PrintToConsole(client, "");
     PrintToConsole(client, "g_alPluginEntities count : %i", g_alPluginEntities.Length);
+    PrintToConsole(client, "");
+    PrintToConsole(client, "---------------------------- Player Beams ----------------------------");
+    PrintToConsole(client, "");
+    PrintToConsole(client, "SendProxy : %s", g_bSendProxy ? "loaded" : "not loaded");
+    PrintToConsole(client, "Database : %s", g_bDatabaseReady ? "ready" : "not ready");
+    for (int group = 0; group < g_iGroupCount; group++)
+        PrintToConsole(client, "Group %s : %i player(s) turned on", g_sGroupKey[group], g_iGroupDemand[group]);
     PrintToConsole(client, "");
     PrintToConsole(client, "======================================================================");
     PrintToConsole(client, "");

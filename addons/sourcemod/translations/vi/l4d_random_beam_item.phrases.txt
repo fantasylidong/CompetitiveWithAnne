@@ -28,4 +28,256 @@
 	{
 		"vi"		"{green}Beam được thêm vào thực thể mục tiêu."
 	}
+	"L4DRandomBeamItem_MenuMainTitle"
+	{
+		"vi"		"Cài đặt chùm sáng vật phẩm\nChỉ thay đổi những gì bạn thấy"
+	}
+	"L4DRandomBeamItem_MenuPresets"
+	{
+		"vi"		"Kiểu nhanh"
+	}
+	"L4DRandomBeamItem_MenuGlobal"
+	{
+		"vi"		"Tất cả vật phẩm"
+	}
+	"L4DRandomBeamItem_MenuGroups"
+	{
+		"vi"		"Theo từng vật phẩm"
+	}
+	"L4DRandomBeamItem_MenuResetAll"
+	{
+		"vi"		"Khôi phục tất cả"
+	}
+	"L4DRandomBeamItem_MenuPresetsTitle"
+	{
+		"vi"		"Kiểu nhanh\nChỉ đổi \"Tất cả vật phẩm\", cài đặt riêng từng vật phẩm được giữ nguyên"
+	}
+	"L4DRandomBeamItem_MenuGroupsTitle"
+	{
+		"vi"		"Theo từng vật phẩm\nMục có [tùy chỉnh] là mục bạn đã chỉnh riêng"
+	}
+	"L4DRandomBeamItem_MenuGlobalTitle"
+	{
+		"vi"		"Tất cả vật phẩm\nÁp dụng cho mọi vật phẩm chưa chỉnh riêng\nĐộ dài và độ rộng tính theo tỉ lệ so với chùm sáng chuẩn của từng vật phẩm"
+	}
+	"L4DRandomBeamItem_MenuGroupTitle"
+	{
+		"vi"		"{1}\nMục chưa chỉnh sẽ theo \"Tất cả vật phẩm\""
+	}
+	"L4DRandomBeamItem_MenuFieldValue"
+	{
+		"vi"		"{1}: {2}"
+	}
+	"L4DRandomBeamItem_MenuValueTitle"
+	{
+		"vi"		"{1} - {2}"
+	}
+	"L4DRandomBeamItem_MenuResetScope"
+	{
+		"vi"		"Khôi phục mục này"
+	}
+	"L4DRandomBeamItem_MenuCustomized"
+	{
+		"vi"		"{1} [tùy chỉnh]"
+	}
+	"L4DRandomBeamItem_MenuCurrent"
+	{
+		"vi"		"{1} [hiện tại]"
+	}
+	"L4DRandomBeamItem_FieldVisible"
+	{
+		"vi"		"Hiển thị"
+	}
+	"L4DRandomBeamItem_FieldLength"
+	{
+		"vi"		"Độ dài"
+	}
+	"L4DRandomBeamItem_FieldWidth"
+	{
+		"vi"		"Độ rộng"
+	}
+	"L4DRandomBeamItem_FieldColor"
+	{
+		"vi"		"Màu"
+	}
+	"L4DRandomBeamItem_FieldHalo"
+	{
+		"vi"		"Quầng sáng"
+	}
+	"L4DRandomBeamItem_ValueDefault"
+	{
+		"vi"		"Mặc định"
+	}
+	"L4DRandomBeamItem_ValueFollowGlobal"
+	{
+		"vi"		"Theo tất cả vật phẩm"
+	}
+	"L4DRandomBeamItem_ValueShow"
+	{
+		"vi"		"Hiện"
+	}
+	"L4DRandomBeamItem_ValueHide"
+	{
+		"vi"		"Ẩn"
+	}
+	"L4DRandomBeamItem_ValueOn"
+	{
+		"vi"		"Bật"
+	}
+	"L4DRandomBeamItem_ValueOff"
+	{
+		"vi"		"Tắt"
+	}
+	"L4DRandomBeamItem_ColorWhite"
+	{
+		"vi"		"Trắng"
+	}
+	"L4DRandomBeamItem_ColorRed"
+	{
+		"vi"		"Đỏ"
+	}
+	"L4DRandomBeamItem_ColorOrange"
+	{
+		"vi"		"Cam"
+	}
+	"L4DRandomBeamItem_ColorYellow"
+	{
+		"vi"		"Vàng"
+	}
+	"L4DRandomBeamItem_ColorGreen"
+	{
+		"vi"		"Xanh lá"
+	}
+	"L4DRandomBeamItem_ColorCyan"
+	{
+		"vi"		"Xanh lơ"
+	}
+	"L4DRandomBeamItem_ColorBlue"
+	{
+		"vi"		"Xanh dương"
+	}
+	"L4DRandomBeamItem_ColorPurple"
+	{
+		"vi"		"Tím"
+	}
+	"L4DRandomBeamItem_ColorPink"
+	{
+		"vi"		"Hồng"
+	}
+	"L4DRandomBeamItem_StyleBright"
+	{
+		"vi"		"Nổi bật"
+	}
+	"L4DRandomBeamItem_StyleSubtle"
+	{
+		"vi"		"Nhẹ"
+	}
+	"L4DRandomBeamItem_StyleOff"
+	{
+		"vi"		"Tắt hết"
+	}
+	"L4DRandomBeamItem_StyleDefault"
+	{
+		"vi"		"Mặc định"
+	}
+	"L4DRandomBeamItem_StyleMenuBright"
+	{
+		"vi"		"Nổi bật (dài hơn, rộng hơn, quầng sáng xuyên tường)"
+	}
+	"L4DRandomBeamItem_StyleMenuSubtle"
+	{
+		"vi"		"Nhẹ (ngắn hơn, mảnh hơn, không quầng sáng)"
+	}
+	"L4DRandomBeamItem_StyleMenuOff"
+	{
+		"vi"		"Tắt hết (trừ vật phẩm bạn đã chỉnh riêng là hiện)"
+	}
+	"L4DRandomBeamItem_StyleMenuDefault"
+	{
+		"vi"		"Mặc định (xóa cài đặt \"Tất cả vật phẩm\")"
+	}
+	"L4DRandomBeamItem_Group_pills"
+	{
+		"vi"		"Thuốc giảm đau"
+	}
+	"L4DRandomBeamItem_Group_adrenaline"
+	{
+		"vi"		"Adrenaline"
+	}
+	"L4DRandomBeamItem_Group_medkit"
+	{
+		"vi"		"Bộ sơ cứu"
+	}
+	"L4DRandomBeamItem_Group_defib"
+	{
+		"vi"		"Máy khử rung tim"
+	}
+	"L4DRandomBeamItem_Group_throwables"
+	{
+		"vi"		"Vũ khí ném"
+	}
+	"L4DRandomBeamItem_Group_upgradepacks"
+	{
+		"vi"		"Gói nâng cấp đạn"
+	}
+	"L4DRandomBeamItem_Group_tier1"
+	{
+		"vi"		"Vũ khí T1 (SMG, shotgun bơm)"
+	}
+	"L4DRandomBeamItem_Group_tier2"
+	{
+		"vi"		"Vũ khí T2 (súng trường, shotgun tự động, bắn tỉa)"
+	}
+	"L4DRandomBeamItem_Group_tier3"
+	{
+		"vi"		"Vũ khí đặc biệt (M60, súng phóng lựu)"
+	}
+	"L4DRandomBeamItem_Group_pistols"
+	{
+		"vi"		"Súng lục"
+	}
+	"L4DRandomBeamItem_Group_melee"
+	{
+		"vi"		"Vũ khí cận chiến"
+	}
+	"L4DRandomBeamItem_Group_ammo"
+	{
+		"vi"		"Đạn và nâng cấp"
+	}
+	"L4DRandomBeamItem_Group_carryables"
+	{
+		"vi"		"Vật mang theo (gnome, can xăng...)"
+	}
+	"L4DRandomBeamItem_Group_other"
+	{
+		"vi"		"Khác (xác, tủ y tế, súng máy...)"
+	}
+	"L4DRandomBeamItem_StyleSet"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Đã đổi \"Tất cả vật phẩm\" thành {olive}{1}{default}. Chỉ bạn thấy thay đổi này."
+	}
+	"L4DRandomBeamItem_StyleUsage"
+	{
+		"vi"		"{green}[Chùm sáng]{default} {olive}!beam{default} mở menu cài đặt, {olive}!beam bright/subtle/off/default{default} đổi nhanh tất cả vật phẩm, {olive}!beam reset{default} khôi phục tất cả."
+	}
+	"L4DRandomBeamItem_StyleUnavailable"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Máy chủ chưa tải tiện ích SendProxy nên chưa thể chỉnh chùm sáng riêng cho từng người."
+	}
+	"L4DRandomBeamItem_PrefsReset"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Đã khôi phục toàn bộ cài đặt chùm sáng vật phẩm của bạn."
+	}
+	"L4DRandomBeamItem_PrefsNotSaved"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Cơ sở dữ liệu không khả dụng, cài đặt này chỉ giữ đến khi bạn ngắt kết nối."
+	}
+	"L4DRandomBeamItem_PrefsLoading"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Đang tải cài đặt chùm sáng của bạn, hãy thử lại sau giây lát."
+	}
+	"L4DRandomBeamItem_EdictLimit"
+	{
+		"vi"		"{green}[Chùm sáng]{default} Máy chủ gần chạm giới hạn thực thể nên tạm thời không thể thêm chùm sáng cho một số vật phẩm vốn bị ẩn."
+	}
 }

@@ -443,6 +443,14 @@ CREATE TABLE IF NOT EXISTS `infected_control_traitor_quota` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+CREATE TABLE IF NOT EXISTS `beam_item_prefs` (
+  `steamid` varchar(64) NOT NULL,
+  `prefs` varchar(2048) NOT NULL DEFAULT '',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`steamid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE TABLE IF NOT EXISTS `scripted_hud_prefs` (
   `steamid` varchar(64) NOT NULL,
   `hud_mask` smallint(5) unsigned NOT NULL DEFAULT '3',

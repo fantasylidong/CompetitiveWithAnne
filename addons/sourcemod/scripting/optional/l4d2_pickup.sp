@@ -48,13 +48,20 @@
 // - Because this is how it was like.
 //
 //-------------------------------------------------------------------------------------------------------------------
+// Version 4.4: Reset client preferences
+//-------------------------------------------------------------------------------------------------------------------
+// - New cookie name so every client starts from the server default again.
+// - Client preference is reloaded once cookies are cached.
+// - Pills flag also covers pills/adrenaline given by plugins (not only the "M2" pass).
+//
+//-------------------------------------------------------------------------------------------------------------------
 // DONE:
 //-------------------------------------------------------------------------------------------------------------------
 // - Be a nice guy and less lazy, allow the plugin to work flawlessly with other's peoples needs.. It doesn't require much attention.
 // - Find cleaner methods to detect and handle functions.
 */
 
-#define PLUGIN_VERSION "4.3"
+#define PLUGIN_VERSION "4.4"
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -121,7 +128,7 @@ Cookie
 
 #define TRANSLATION_FILE "l4d2_pickup.phrases.txt"
 
-#define COOKIE_NAME "l4d2_pickup_switch_cookie"
+#define COOKIE_NAME "l4d2_pickup_switch_cookie_v2"
 
 void LoadSDK()
 {
@@ -201,10 +208,11 @@ public void OnPluginStart()
 {
 	LoadSDK();
 	LoadPluginTranslations();
-	
+	InitSwitchCookie();
+
 	CreateConVar("l4d2_pickup_version", PLUGIN_VERSION, "l4d2_pickup version cvar.", FCVAR_DONTRECORD|FCVAR_NONE|FCVAR_REPLICATED|FCVAR_SPONLY);
-	
-	ConVar cv = CreateConVar("pickup_switch_flags", "0", "Flags for Switching from current item (1:Secondary, 2: Passed Pills, 4: Primary)", _, true, 0.0, true, 7.0);
+
+	ConVar cv = CreateConVar("pickup_switch_flags", "0", "Flags for Switching from current item (1: Switch to picked-up Secondary by default, 2: Never switch to given Pills/Adrenaline, 4: Switch to picked-up Primary by default)", _, true, 0.0, true, 7.0);
 	SwitchCVarChanged(cv, "", "");
 	cv.AddChangeHook(SwitchCVarChanged);
 	
@@ -219,8 +227,7 @@ public void OnPluginStart()
 		
 		HookEvent("player_hurt", Event_PlayerHurt);
 	}
-	
-	InitSwitchCookie();
+
 	LateLoad();
 }
 
@@ -252,9 +259,15 @@ void LateLoad()
 public void OnClientPutInServer(int client)
 {
 	HookValidClient(client, true);
-	
-	if (!QuerySwitchCookie(client, g_iSwitchOnPickup[client]))
-		g_iSwitchOnPickup[client] = g_iSwitchFlags & (FLAGS_SWITCH_MELEE|FLAGS_SWITCH_GUNS);
+	g_iSwitchOnPickup[client] = g_iSwitchFlags & (FLAGS_SWITCH_MELEE|FLAGS_SWITCH_GUNS);
+	if (AreClientCookiesCached(client))
+		QuerySwitchCookie(client, g_iSwitchOnPickup[client]);
+}
+
+public void OnClientCookiesCached(int client)
+{
+	if (IsClientInGame(client))
+		QuerySwitchCookie(client, g_iSwitchOnPickup[client]);
 }
 
 public void OnClientDisconnect(int client)
@@ -380,7 +393,8 @@ Action SDK_OnWeaponCanSwitchTo(int client, int weapon)
 	}
 
 	// Health Items.
-	if ((g_iSwitchFlags & FLAGS_SWITCH_PILLS) && (wepslot == L4D2WeaponSlot_LightHealthItem) && g_bCantSwitchDropped[client]) {
+	if ((g_iSwitchFlags & FLAGS_SWITCH_PILLS) && (wepslot == L4D2WeaponSlot_LightHealthItem)
+		&& (g_bCantSwitchDropped[client] || g_bCantSwitchGun[client])) {
 		return Plugin_Stop;
 	}
 	

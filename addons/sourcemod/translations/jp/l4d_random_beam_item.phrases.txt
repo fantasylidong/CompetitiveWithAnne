@@ -28,4 +28,256 @@
 	{
 		"jp"		"{green}Beam がターゲット エンティティに追加されました。"
 	}
+	"L4DRandomBeamItem_MenuMainTitle"
+	{
+		"jp"		"アイテムビーム設定\n自分の画面だけに反映されます"
+	}
+	"L4DRandomBeamItem_MenuPresets"
+	{
+		"jp"		"クイックスタイル"
+	}
+	"L4DRandomBeamItem_MenuGlobal"
+	{
+		"jp"		"すべてのアイテム"
+	}
+	"L4DRandomBeamItem_MenuGroups"
+	{
+		"jp"		"アイテム別"
+	}
+	"L4DRandomBeamItem_MenuResetAll"
+	{
+		"jp"		"すべて初期状態に戻す"
+	}
+	"L4DRandomBeamItem_MenuPresetsTitle"
+	{
+		"jp"		"クイックスタイル\n「すべてのアイテム」だけを変更し、アイテム別の設定は残ります"
+	}
+	"L4DRandomBeamItem_MenuGroupsTitle"
+	{
+		"jp"		"アイテム別\n[カスタム] は個別に設定したアイテムです"
+	}
+	"L4DRandomBeamItem_MenuGlobalTitle"
+	{
+		"jp"		"すべてのアイテム\n個別設定のないアイテムはここの設定を使います\n長さと幅は各アイテムの標準ビームに対する割合です"
+	}
+	"L4DRandomBeamItem_MenuGroupTitle"
+	{
+		"jp"		"{1}\n未設定の項目は「すべてのアイテム」に従います"
+	}
+	"L4DRandomBeamItem_MenuFieldValue"
+	{
+		"jp"		"{1}：{2}"
+	}
+	"L4DRandomBeamItem_MenuValueTitle"
+	{
+		"jp"		"{1} - {2}"
+	}
+	"L4DRandomBeamItem_MenuResetScope"
+	{
+		"jp"		"この項目を初期状態に戻す"
+	}
+	"L4DRandomBeamItem_MenuCustomized"
+	{
+		"jp"		"{1} [カスタム]"
+	}
+	"L4DRandomBeamItem_MenuCurrent"
+	{
+		"jp"		"{1} [現在]"
+	}
+	"L4DRandomBeamItem_FieldVisible"
+	{
+		"jp"		"表示"
+	}
+	"L4DRandomBeamItem_FieldLength"
+	{
+		"jp"		"長さ"
+	}
+	"L4DRandomBeamItem_FieldWidth"
+	{
+		"jp"		"幅"
+	}
+	"L4DRandomBeamItem_FieldColor"
+	{
+		"jp"		"色"
+	}
+	"L4DRandomBeamItem_FieldHalo"
+	{
+		"jp"		"光輪"
+	}
+	"L4DRandomBeamItem_ValueDefault"
+	{
+		"jp"		"デフォルト"
+	}
+	"L4DRandomBeamItem_ValueFollowGlobal"
+	{
+		"jp"		"すべてのアイテムに従う"
+	}
+	"L4DRandomBeamItem_ValueShow"
+	{
+		"jp"		"表示"
+	}
+	"L4DRandomBeamItem_ValueHide"
+	{
+		"jp"		"非表示"
+	}
+	"L4DRandomBeamItem_ValueOn"
+	{
+		"jp"		"オン"
+	}
+	"L4DRandomBeamItem_ValueOff"
+	{
+		"jp"		"オフ"
+	}
+	"L4DRandomBeamItem_ColorWhite"
+	{
+		"jp"		"白"
+	}
+	"L4DRandomBeamItem_ColorRed"
+	{
+		"jp"		"赤"
+	}
+	"L4DRandomBeamItem_ColorOrange"
+	{
+		"jp"		"オレンジ"
+	}
+	"L4DRandomBeamItem_ColorYellow"
+	{
+		"jp"		"黄"
+	}
+	"L4DRandomBeamItem_ColorGreen"
+	{
+		"jp"		"緑"
+	}
+	"L4DRandomBeamItem_ColorCyan"
+	{
+		"jp"		"シアン"
+	}
+	"L4DRandomBeamItem_ColorBlue"
+	{
+		"jp"		"青"
+	}
+	"L4DRandomBeamItem_ColorPurple"
+	{
+		"jp"		"紫"
+	}
+	"L4DRandomBeamItem_ColorPink"
+	{
+		"jp"		"ピンク"
+	}
+	"L4DRandomBeamItem_StyleBright"
+	{
+		"jp"		"強調"
+	}
+	"L4DRandomBeamItem_StyleSubtle"
+	{
+		"jp"		"控えめ"
+	}
+	"L4DRandomBeamItem_StyleOff"
+	{
+		"jp"		"すべてオフ"
+	}
+	"L4DRandomBeamItem_StyleDefault"
+	{
+		"jp"		"デフォルト"
+	}
+	"L4DRandomBeamItem_StyleMenuBright"
+	{
+		"jp"		"強調（長く太く、壁越しに見える光輪）"
+	}
+	"L4DRandomBeamItem_StyleMenuSubtle"
+	{
+		"jp"		"控えめ（短く細く、光輪なし）"
+	}
+	"L4DRandomBeamItem_StyleMenuOff"
+	{
+		"jp"		"すべてオフ（個別に表示にしたアイテムを除く）"
+	}
+	"L4DRandomBeamItem_StyleMenuDefault"
+	{
+		"jp"		"デフォルト（「すべてのアイテム」の設定を消去）"
+	}
+	"L4DRandomBeamItem_Group_pills"
+	{
+		"jp"		"鎮痛剤"
+	}
+	"L4DRandomBeamItem_Group_adrenaline"
+	{
+		"jp"		"アドレナリン"
+	}
+	"L4DRandomBeamItem_Group_medkit"
+	{
+		"jp"		"救急キット"
+	}
+	"L4DRandomBeamItem_Group_defib"
+	{
+		"jp"		"除細動器"
+	}
+	"L4DRandomBeamItem_Group_throwables"
+	{
+		"jp"		"投擲武器"
+	}
+	"L4DRandomBeamItem_Group_upgradepacks"
+	{
+		"jp"		"アップグレードパック"
+	}
+	"L4DRandomBeamItem_Group_tier1"
+	{
+		"jp"		"T1 武器（SMG、ポンプショットガン）"
+	}
+	"L4DRandomBeamItem_Group_tier2"
+	{
+		"jp"		"T2 武器（ライフル、オートショットガン、スナイパー）"
+	}
+	"L4DRandomBeamItem_Group_tier3"
+	{
+		"jp"		"特殊武器（M60、グレネードランチャー）"
+	}
+	"L4DRandomBeamItem_Group_pistols"
+	{
+		"jp"		"ハンドガン"
+	}
+	"L4DRandomBeamItem_Group_melee"
+	{
+		"jp"		"近接武器"
+	}
+	"L4DRandomBeamItem_Group_ammo"
+	{
+		"jp"		"弾薬とアップグレード"
+	}
+	"L4DRandomBeamItem_Group_carryables"
+	{
+		"jp"		"運搬物（ノーム、ガソリン缶など）"
+	}
+	"L4DRandomBeamItem_Group_other"
+	{
+		"jp"		"その他（遺体、救急棚、機関銃など）"
+	}
+	"L4DRandomBeamItem_StyleSet"
+	{
+		"jp"		"{green}[ビーム]{default} 「すべてのアイテム」を {olive}{1}{default} に変更しました。自分の画面だけに反映されます。"
+	}
+	"L4DRandomBeamItem_StyleUsage"
+	{
+		"jp"		"{green}[ビーム]{default} {olive}!beam{default} で設定メニュー、{olive}!beam bright/subtle/off/default{default} ですべてのアイテムを切り替え、{olive}!beam reset{default} ですべて初期状態に戻します。"
+	}
+	"L4DRandomBeamItem_StyleUnavailable"
+	{
+		"jp"		"{green}[ビーム]{default} サーバーに SendProxy 拡張が読み込まれていないため、個別のビーム設定は使えません。"
+	}
+	"L4DRandomBeamItem_PrefsReset"
+	{
+		"jp"		"{green}[ビーム]{default} アイテムビームの設定をすべて初期状態に戻しました。"
+	}
+	"L4DRandomBeamItem_PrefsNotSaved"
+	{
+		"jp"		"{green}[ビーム]{default} データベースが使えないため、今回の設定は切断するまでしか保持されません。"
+	}
+	"L4DRandomBeamItem_PrefsLoading"
+	{
+		"jp"		"{green}[ビーム]{default} ビーム設定を読み込み中です。少し待ってからもう一度試してください。"
+	}
+	"L4DRandomBeamItem_EdictLimit"
+	{
+		"jp"		"{green}[ビーム]{default} サーバーのエンティティ数が上限に近いため、初期状態で非表示のアイテムの一部には今はビームを付けられません。"
+	}
 }
