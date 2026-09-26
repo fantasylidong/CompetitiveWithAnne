@@ -58,6 +58,7 @@ public Plugin myinfo =
 #include <colors>
 #include <sdktools>
 #include <sdkhooks>
+#include <anne_db>
 #undef REQUIRE_EXTENSIONS
 #include <sendproxy>
 #define REQUIRE_EXTENSIONS
@@ -316,6 +317,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
     g_bL4D2 = (engine == Engine_Left4Dead2);
 
+    RegPluginLibrary("l4d_random_beam_item"); // rpg.smx shows the !beam entry when this is loaded
+
     return APLRes_Success;
 }
 
@@ -368,8 +371,6 @@ public void OnPluginStart()
 
     // Public Commands
     RegConsoleCmd("sm_beam", CmdBeam, "Item beam settings. Usage: sm_beam [bright|subtle|off|default|reset]");
-
-    ConnectDatabase();
 }
 
 /****************************************************************************************************/
@@ -378,6 +379,10 @@ public void OnAllPluginsLoaded()
 {
     g_bSendProxy = LibraryExists(SENDPROXY_LIB);
     HookAllBeamSendProxies();
+
+    // 等 anne_db 连接中心加载完再连库，开服自动加载时顺序不固定。
+    if (g_hDatabase == null)
+        ConnectDatabase();
 }
 
 /****************************************************************************************************/
@@ -1772,7 +1777,7 @@ void ConnectDatabase()
         return;
     }
 
-    Database.Connect(OnDatabaseConnected, DB_CONFIG);
+    AnneDB_ConnectCompat(OnDatabaseConnected, DB_CONFIG);
 }
 
 /****************************************************************************************************/
@@ -1794,8 +1799,14 @@ void OnDatabaseConnected(Database db, const char[] error, any data)
         return;
     }
 
+    if (g_hDatabase != null)
+    {
+        delete db;
+        return;
+    }
+
     g_hDatabase = db;
-    g_hDatabase.SetCharset("utf8mb4");
+    AnneDB_SetCharsetIfOwned(g_hDatabase, "utf8mb4");
 
     char query[512];
     FormatEx(query, sizeof(query),

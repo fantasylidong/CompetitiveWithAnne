@@ -90,11 +90,12 @@ stock bool:QuarterRank_MigrateSchema()
 	decl String:query[512];
 	Format(query, sizeof(query), "SHOW KEYS FROM `%sscore_quarter` WHERE Key_name = 'PRIMARY'", DbPrefix);
 
-	new Handle:hndl = SQL_Query(db, query);
+	decl String:Error[256];
+	Error[0] = '\0';
+	new Handle:hndl = AnneDB_LockedQuery(db, query, Error, sizeof(Error));
 	if (hndl == INVALID_HANDLE)
 	{
-		decl String:Error[256];
-		if (SQL_GetError(db, Error, sizeof(Error)))
+		if (Error[0] != '\0')
 			LogError("QuarterRank_MigrateSchema failed to inspect score_quarter primary key: %s", Error);
 		else
 			LogError("QuarterRank_MigrateSchema failed to inspect score_quarter primary key: unknown");
@@ -131,10 +132,10 @@ stock bool:QuarterRank_MigrateSchema()
 	else
 		Format(query, sizeof(query), "ALTER TABLE `%sscore_quarter` DROP PRIMARY KEY, ADD PRIMARY KEY (`steamid`, `quarter_key`)", DbPrefix);
 
-	if (!SQL_FastQuery(db, query))
+	Error[0] = '\0';
+	if (!AnneDB_LockedFastQuery(db, query, Error, sizeof(Error)))
 	{
-		decl String:Error[256];
-		if (SQL_GetError(db, Error, sizeof(Error)))
+		if (Error[0] != '\0')
 			LogError("QuarterRank_MigrateSchema failed to migrate score_quarter primary key: %s", Error);
 		else
 			LogError("QuarterRank_MigrateSchema failed to migrate score_quarter primary key: unknown");
@@ -167,7 +168,7 @@ stock bool:QuarterRank_RecoverIfNeeded()
 	if (cvar_QuarterRankEnable == INVALID_HANDLE || !GetConVarBool(cvar_QuarterRankEnable))
 		return false;
 
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 	{
 		return false;
 	}

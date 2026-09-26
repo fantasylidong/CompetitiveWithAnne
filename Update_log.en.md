@@ -569,3 +569,22 @@
 - `sm_beamreload` keeps the settings of online players by group name.
 - Chat messages and menus are available in Simplified Chinese, Traditional Chinese, English, Japanese, Korean and Vietnamese.
 - Added `sm_beam` to `docs/plugin_commands.md`; recompiled `l4d_random_beam_item.smx`.
+
+### 2026-09-25 Fewer database connections: new anne_db connection hub
+
+- Added `extend/anne_db.smx`, loaded on the first line of `cfg/generalfixes.cfg`. Each database now keeps a single shared MySQL connection, and every plugin gets a copy of it. Each server goes from up to about 22 database connections to 3 (5 in Anne modes). SourceMod already queues all threaded queries on one database thread, so sharing the connection does not slow anything down.
+- Migrated: l4d_stats, rpg, l4d2_hitsound, l4d2_damage_show, l4d2_scripted_hud, l4d2_blacklist, global_chat, chatlog, lilac, l4d_player_count_unload_mode, l4d_random_beam_item, annehappy_dynamic_ai_difficulty, anne_traitor_quota, spawn_vote_menu, sbpp_main, sbpp_comms, sbpp_checker and sbpp_sleuth. If anne_db is not loaded, each plugin falls back to its own connection as before.
+- A database outage no longer freezes the server: for 30 seconds after a failed connect, requests return immediately instead of waiting on the main thread, and reconnects during gameplay never block the main thread. The MySQL connect timeout in `databases.cfg` drops from the default 60 seconds to 15.
+- The hub pings each connection every 120 seconds (MySQL `wait_timeout` is 600), so the first query after an idle period no longer fails. Per-plugin keepalives and per-map reconnects were removed.
+- Fixes: l4d_player_count_unload_mode leaked database connections when several cvars changed in a row; clearing l4d_stats now uses a SourceMod transaction, so other plugins' queries can no longer end up inside it; fixed a race in l4d_stats when reading affected rows.
+- New admin console command `sm_annedb_status` shows the state of each database connection.
+- The rules for writing database plugins are now in `AGENTS.md`.
+
+### 2026-09-26 Smaller pain pill beam
+
+- In `data/l4d_random_beam_item.cfg` the pain pill beam height goes from 250 to 100 and its width from 15 to 10; the color (green), HDR brightness and see-through-walls halo are unchanged. This is the server default: players who changed length or width with `!beam` get their percentages applied to the new values.
+
+### 2026-09-26 Item beam settings in the RPG menu
+
+- The `!rpg` / `!buy` main menu has a new "Item beam settings" entry after the hit feedback menu; it opens the `!beam` settings menu. It only shows in modes that load `l4d_random_beam_item`, which now registers a library of the same name for `rpg.smx` to check.
+- Recompiled `rpg.smx` and `l4d_random_beam_item.smx`.

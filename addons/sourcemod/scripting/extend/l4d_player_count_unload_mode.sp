@@ -23,6 +23,7 @@
 #include <sdkhooks>
 #include <multicolors>      // https://github.com/fbef0102/L4D1_2-Plugins/releases
 #include <SteamWorks>
+#include <anne_db>
 
 #define PLUGIN_VERSION			"1.1.3-2026/07/30"
 #define PLUGIN_NAME			    "l4d_player_count_unload_mode"
@@ -103,6 +104,7 @@ Handle
     g_hStatusDebounceTimer;
 
 Database g_hDB;
+int g_iDBGeneration;
 bool g_bDBReady, g_bPeakQueryPending, g_bLastPeakActive, g_bLastGoodServer, g_bIsMySQL;
 bool g_bAutoServerId;
 int g_iLastActiveServers, g_iLastTotalServers;
@@ -167,8 +169,13 @@ public void OnPluginStart()
 
     RegAdminCmd("sm_peakstatus", Cmd_PeakStatus, ADMFLAG_GENERIC, "查看当前全服高峰期判定状态");
 
-    SetupPeakDatabase();
     RestartStatusTimer();
+}
+
+public void OnAllPluginsLoaded()
+{
+    // 等 anne_db 等插件都加载完再连库，开服自动加载时顺序不固定。
+    SetupPeakDatabase();
 }
 
 // Cvars-------------------------------
@@ -462,18 +469,27 @@ void SetupPeakDatabase()
     g_iLastStatusPlayerCount = -1;
     g_iPeakHoldUntil = 0;
 
+    // 多个 cvar 连续变化会触发多次重连，用代数丢弃过期回调，避免旧连接泄漏。
     delete g_hDB;
-    SQL_TConnect(SQLCB_OnConnect, g_sCvarDBConfig, 0);
+    g_iDBGeneration++;
+    AnneDB_TConnectCompat(SQLCB_OnConnect, g_sCvarDBConfig, g_iDBGeneration);
 }
 
 public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any data)
 {
+    if (data != g_iDBGeneration)
+    {
+        delete hndl;
+        return;
+    }
+
     if (hndl == null)
     {
         LogError("[%s] DB connect failed: %s", PLUGIN_NAME, error);
         return;
     }
 
+    delete g_hDB;
     g_hDB = view_as<Database>(hndl);
 
     char sDriver[32];
@@ -486,7 +502,7 @@ public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any d
 
     if (g_bIsMySQL)
     {
-        if (!SQL_SetCharset(g_hDB, "utf8mb4"))
+        if (!AnneDB_SetCharsetIfOwned(g_hDB, "utf8mb4"))
         {
             LogError("[%s] SQL_SetCharset utf8mb4 failed", PLUGIN_NAME);
         }

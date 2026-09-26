@@ -3,6 +3,7 @@
 
 #include <sourcemod>
 #include <dbi>
+#include <anne_db>
 #include <builtinvotes>
 #include <builtinvotes_stocks>
 #include <colors>
@@ -115,12 +116,15 @@ public void OnPluginStart()
 
 	ResetPendingSpawnSettings();
 	RefreshSpawnVoteConVars();
-	ConnectPresetDatabase();
 }
 
 public void OnAllPluginsLoaded()
 {
 	RefreshSpawnVoteConVars();
+
+	// 等 anne_db 连接中心加载完再连库。
+	if (g_hPresetDb == null)
+		ConnectPresetDatabase(true);
 }
 
 public void OnPluginEnd()
@@ -1196,7 +1200,7 @@ bool EnsurePresetDatabase()
 {
 	if (g_hPresetDb == null)
 	{
-		ConnectPresetDatabase();
+		ConnectPresetDatabase(false);
 	}
 	else if (!g_bPresetSchemaReady)
 	{
@@ -1206,7 +1210,8 @@ bool EnsurePresetDatabase()
 	return g_hPresetDb != null && g_bPresetSchemaReady;
 }
 
-void ConnectPresetDatabase()
+// allowBlock=false 用在菜单操作等游戏过程路径：共享连接未就绪时不在主线程阻塞。
+void ConnectPresetDatabase(bool allowBlock)
 {
 	if (g_hPresetDb != null)
 	{
@@ -1228,7 +1233,7 @@ void ConnectPresetDatabase()
 		return;
 	}
 
-	g_hPresetDb = SQL_Connect(configName, false, error, sizeof(error));
+	g_hPresetDb = AnneDB_ConnectSyncCompat(configName, error, sizeof(error), AnneDBLane_Shared, allowBlock);
 	if (g_hPresetDb == null)
 	{
 		LogError("[SpawnVote] failed to connect preset database \"%s\": %s", configName, error);
@@ -1238,7 +1243,7 @@ void ConnectPresetDatabase()
 	ReadPresetDatabaseDriver();
 	if (g_bPresetDbIsMySQL)
 	{
-		SQL_SetCharset(g_hPresetDb, "utf8mb4");
+		AnneDB_SetCharsetIfOwned(g_hPresetDb, "utf8mb4");
 	}
 	CreatePresetTable();
 	LoadSpawnPresets();
@@ -1320,10 +1325,9 @@ void CreatePresetTable()
 			table);
 	}
 
-	if (!SQL_FastQuery(g_hPresetDb, query))
+	char error[256];
+	if (!AnneDB_LockedFastQuery(g_hPresetDb, query, error, sizeof(error)))
 	{
-		char error[256];
-		SQL_GetError(g_hPresetDb, error, sizeof(error));
 		LogError("[SpawnVote] failed to create preset table: %s", error);
 		return;
 	}
@@ -1351,11 +1355,10 @@ void LoadSpawnPresets()
 		"SELECT `mode`, `name`, `limit_value`, `interval_value`, `auto_mode`, `distance`, `teleport_check`, `assault`, `tank_together` FROM `%s` ORDER BY `mode`, `name`",
 		table);
 
-	DBResultSet results = SQL_Query(g_hPresetDb, query);
+	char error[256];
+	DBResultSet results = AnneDB_LockedQuery(g_hPresetDb, query, error, sizeof(error));
 	if (results == null)
 	{
-		char error[256];
-		SQL_GetError(g_hPresetDb, error, sizeof(error));
 		LogError("[SpawnVote] failed to load presets: %s", error);
 		return;
 	}
@@ -1476,9 +1479,8 @@ bool SaveCurrentSpawnPresetMySQL(const char[] name, const char[] table, const ch
 		now,
 		now);
 
-	if (!SQL_FastQuery(g_hPresetDb, query))
+	if (!PresetSaveQuery(query, name))
 	{
-		LogPresetSaveError(name);
 		return false;
 	}
 
@@ -1505,9 +1507,8 @@ bool SaveCurrentSpawnPresetSQLite(const char[] name, const char[] table, const c
 		now,
 		now);
 
-	if (!SQL_FastQuery(g_hPresetDb, query))
+	if (!PresetSaveQuery(query, name))
 	{
-		LogPresetSaveError(name);
 		return false;
 	}
 
@@ -1535,20 +1536,23 @@ bool SaveCurrentSpawnPresetSQLite(const char[] name, const char[] table, const c
 		escMode,
 		escName);
 
-	if (!SQL_FastQuery(g_hPresetDb, query))
+	if (!PresetSaveQuery(query, name))
 	{
-		LogPresetSaveError(name);
 		return false;
 	}
 
 	return true;
 }
 
-void LogPresetSaveError(const char[] name)
+// 同步查询必须加锁：预设库可能是 anne_db 的共享连接。
+bool PresetSaveQuery(const char[] query, const char[] name)
 {
 	char error[256];
-	SQL_GetError(g_hPresetDb, error, sizeof(error));
+	if (AnneDB_LockedFastQuery(g_hPresetDb, query, error, sizeof(error)))
+		return true;
+
 	LogError("[SpawnVote] failed to save preset \"%s\": %s", name, error);
+	return false;
 }
 
 bool DeleteSpawnPreset(SpawnVoteMode mode, const char[] name)
@@ -1582,10 +1586,9 @@ bool DeleteSpawnPreset(SpawnVoteMode mode, const char[] name)
 		escMode,
 		escName);
 
-	if (!SQL_FastQuery(g_hPresetDb, query))
+	char error[256];
+	if (!AnneDB_LockedFastQuery(g_hPresetDb, query, error, sizeof(error)))
 	{
-		char error[256];
-		SQL_GetError(g_hPresetDb, error, sizeof(error));
 		LogError("[SpawnVote] failed to delete preset \"%s\": %s", name, error);
 		return false;
 	}

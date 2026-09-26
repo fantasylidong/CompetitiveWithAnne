@@ -1,5 +1,6 @@
 #pragma semicolon 1
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 #include <clientprefs>
 #include <sdktools>

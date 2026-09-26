@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <anne_db>
 #include <sdkhooks>
 #include <sdktools>
 #include <clientprefs>
@@ -592,7 +593,8 @@ static void DB_DebugDumpSession()
         "SELECT @@character_set_client,@@character_set_connection,@@character_set_results,@@collation_connection", 0);
 }
 
-static void DB_BeginConnect()
+// allowBlock=false 用在存取偏好等游戏过程路径：共享连接未就绪时不在主线程阻塞。
+static void DB_BeginConnect(bool allowBlock = true)
 {
     if (g_DbConnecting) return;
     if (g_DB != INVALID_HANDLE) return;
@@ -611,14 +613,14 @@ static void DB_BeginConnect()
     g_DbReady = false;
 
     char error[256];
-    Handle hndl = SQL_Connect(DB_CONF_NAME, false, error, sizeof(error));
+    Handle hndl = AnneDB_ConnectSyncCompat(DB_CONF_NAME, error, sizeof(error), AnneDBLane_Shared, allowBlock);
     SQLCB_OnConnect(INVALID_HANDLE, hndl, error, 0);
 } 
 
 static bool DB_EnsureReady()
 {
     if (g_DbReady && g_DB != INVALID_HANDLE) return true;
-    DB_BeginConnect();
+    DB_BeginConnect(false);
     return (g_DbReady && g_DB != INVALID_HANDLE);
 }
 
@@ -648,7 +650,7 @@ public void SQLCB_OnConnect(Handle owner, Handle hndl, const char[] error, any d
     g_DB = hndl;
     g_DbReady = true;
 
-    if (!SQL_SetCharset(g_DB, "utf8mb4"))
+    if (!AnneDB_SetCharsetIfOwned(g_DB, "utf8mb4"))
     {
         LogErr("[DB] SQL_SetCharset utf8mb4 failed");
     }
@@ -940,7 +942,7 @@ static int DB_Save(int client, bool force = false)
         g_SaveSnapshot[client] = g_Plr[client];
         g_PendingSave[client] = true;
         Cookie_Save(client);
-        DB_BeginConnect();
+        DB_BeginConnect(false);
         CPrintToChat(client, "%t", "L4D2DamageShow_HUDSettingsSavedLocallyCookie");
         LogInfo("[Save] DB not available, saved to Cookie and queued. client=%d", client);
         return 1;
@@ -1078,8 +1080,7 @@ public void OnPluginStart()
     // Cookie
     g_ck = new Cookie(COOKIE_NAME, "damage hud per-client", CookieAccess_Protected);
 
-    // DB（持久连接，不做定时保活）
-    DB_BeginConnect();
+    // DB 连接放到 OnAllPluginsLoaded，保证 anne_db 连接中心已经加载。
 
     // 命令
     RegConsoleCmd("sm_dmgmenu", Cmd_Menu, "打开伤害数字设置菜单");
@@ -1104,10 +1105,7 @@ public void OnPluginStart()
     HookEvent("player_hurt", E_PlayerHurt);
     HookEvent("player_team", E_PlayerTeam, EventHookMode_Post);
 
-    if (g_bLateLoad)
-        InitializeLateLoadClients();
-    else
-        DamageHooks_Reconcile();
+    // 已在服内玩家的初始化放到 OnAllPluginsLoaded：要先连上库再读偏好。
 }
 
 public void OnPluginEnd()
@@ -2133,4 +2131,16 @@ static void Gate_EnforceFor(int client, const char[] reason = "")
         LogInfo("[Gate] client=%d blocked (%s), settings saved.", client, reason);
         DamageHooks_Reconcile();
     }
+}
+
+public void OnAllPluginsLoaded()
+{
+    // 持久连接由 anne_db 共享和保活；未加载连接中心时回退为本插件自己的连接。
+    // 先连库再给已在服内的玩家加载偏好，否则插件重载时共享连接还没就绪，这些玩家只能读到 Cookie。
+    DB_BeginConnect();
+
+    if (g_bLateLoad)
+        InitializeLateLoadClients();
+    else
+        DamageHooks_Reconcile();
 }

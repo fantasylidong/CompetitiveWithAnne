@@ -1153,3 +1153,22 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `sm_beamreload` 重新加载数据文件时，在线玩家的设置按分组名保留。
 - 聊天提示和菜单支持简体中文、繁体中文、英语、日语、韩语、越南语。
 - `docs/plugin_commands.md` 补上 `sm_beam`；重新编译 `l4d_random_beam_item.smx`。
+
+### 2026年9月25日 数据库连接收敛：新增 anne_db 连接中心
+
+- 新增 `extend/anne_db.smx`，在 `cfg/generalfixes.cfg` 第一行加载。同一个数据库只保留一条共享 MySQL 连接，各插件拿到的是这条连接的副本。每台服的数据库连接从最多约 22 条降到 3 条（Anne 模式 5 条）。SourceMod 的线程查询本来就在同一个数据库线程里排队，共享连接不影响速度。
+- 已接入：l4d_stats、rpg、l4d2_hitsound、l4d2_damage_show、l4d2_scripted_hud、l4d2_blacklist、global_chat、chatlog、lilac、l4d_player_count_unload_mode、l4d_random_beam_item、annehappy_dynamic_ai_difficulty、anne_traitor_quota、spawn_vote_menu、sbpp_main、sbpp_comms、sbpp_checker、sbpp_sleuth。没有加载 anne_db 时，各插件自动回到原来的独立连接。
+- 数据库断网时不再卡服：连接失败后 30 秒内直接返回，不在主线程反复等待；游戏过程中的按需重连不再阻塞主线程。`databases.cfg` 里 MySQL 的连接超时从默认 60 秒改为 15 秒。
+- 连接中心每 120 秒保活一次（MySQL `wait_timeout` 为 600 秒），空闲后的第一条查询不会再失败。插件各自的保活和每张图断开重连已去掉。
+- 修复：l4d_player_count_unload_mode 多个 cvar 连续变化时会泄漏数据库连接；l4d_stats 清空统计改用 SourceMod 事务，不会再把其他插件的查询卷进同一个事务；l4d_stats 读取影响行数时的竞态。
+- 新增管理员控制台命令 `sm_annedb_status`，查看各数据库连接状态。
+- 数据库插件的写法要求已写入 `AGENTS.md`。
+
+### 2026年9月26日 止痛药光束调小
+
+- `data/l4d_random_beam_item.cfg` 里止痛药光束的高度从 250 改为 100，宽度从 15 改为 10；颜色（绿色）、HDR 亮度和透墙光晕不变。这是服务器默认值，玩家用 `!beam` 调过长度、宽度的，按新的默认值换算百分比。
+
+### 2026年9月26日 RPG 菜单加入物品光束设置
+
+- `!rpg` / `!buy` 主菜单在「命中反馈菜单」后面新增「物品光束设置」，点进去就是 `!beam` 的光束设置菜单。只在加载了 `l4d_random_beam_item` 的模式里显示（该插件现在注册了同名库，`rpg.smx` 用它判断）。
+- 重新编译 `rpg.smx` 和 `l4d_random_beam_item.smx`。

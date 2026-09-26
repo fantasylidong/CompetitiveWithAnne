@@ -26,6 +26,7 @@
 
 #pragma semicolon 1
 #include <sourcemod>
+#include <anne_db>
 #include <sourcebanspp>
 
 #undef REQUIRE_PLUGIN
@@ -217,7 +218,8 @@ public OnPluginStart()
 		return;
 	}
 
-	Database.Connect(GotDatabase, "sourcebans");
+	// 实际连接放到 OnAllPluginsLoaded，保证 anne_db 连接中心已经加载；g_bConnecting 已置位，
+	// 期间的管理员缓存重建会等待 GotDatabase。
 
 	BuildPath(Path_SM, groupsLoc, sizeof(groupsLoc), "configs/sourcebans/sb_admin_groups.cfg");
 
@@ -255,6 +257,11 @@ public void OnLibraryAdded(const char[] name)
 
 public void OnAllPluginsLoaded()
 {
+	if (DB == INVALID_HANDLE && g_bConnecting)
+	{
+		AnneDB_ConnectCompat(GotDatabase, "sourcebans");
+	}
+
 	Handle topmenu;
 	#if defined DEBUG
 	LogToFile(logFile, "OnAllPluginsLoaded()");
@@ -363,7 +370,7 @@ public void OnRebuildAdminCache(AdminCachePart part)
 	if (DB == INVALID_HANDLE) {
 		if (!g_bConnecting) {
 			g_bConnecting = true;
-			Database.Connect(GotDatabase, "sourcebans");
+			AnneDB_ConnectCompat(GotDatabase, "sourcebans");
 		}
 	}
 	else {
@@ -1037,7 +1044,8 @@ public void GotDatabase(Database db, const char[] error, any data)
 
 	char query[1024];
 
-	SQL_SetCharset(DB, "utf8");
+	// 共享连接的字符集由 anne_db 统一设置（utf8mb4）。
+	AnneDB_SetCharsetIfOwned(DB, "utf8");
 
 	InsertServerInfo();
 

@@ -18,6 +18,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <anne_db>
 
 #define PLUGIN_NAME        "L4D2 BlockList"
 #define PLUGIN_AUTHOR      "morzlee"
@@ -174,7 +175,7 @@ bool DB_Connect()
     }
 
     char error[256];
-    g_hDb = SQL_Connect(g_sDBSection, false, error, sizeof(error));
+    g_hDb = AnneDB_ConnectSyncCompat(g_sDBSection, error, sizeof(error));
     if (g_hDb == INVALID_HANDLE)
     {
         LogError("[BlockList] DB connect failed: %s", error);
@@ -187,7 +188,7 @@ bool DB_Connect()
 
     if (isMySQL)
     {
-        if (!SQL_SetCharset(g_hDb, "utf8mb4"))
+        if (!AnneDB_SetCharsetIfOwned(g_hDb, "utf8mb4"))
             LogError("[BlockList] failed to set DB charset utf8mb4");
     }
 
@@ -296,7 +297,11 @@ public void OnPluginStart()
     HookConVarChange(gCvarExposeBlocker, OnCvarChanged);
     HookConVarChange(gCvarUseI18NKick,   OnCvarChanged);
     HookConVarChange(gCvarMutual,       OnCvarChanged);
+}
 
+public void OnAllPluginsLoaded()
+{
+    // 等 anne_db 等插件都加载完再连库，开服自动加载时顺序不固定。
     DB_Connect();
 }
 

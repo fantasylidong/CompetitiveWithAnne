@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <colors>
 #include <dbi>
+#include <anne_db>
 
 #define CVAR_FLAG FCVAR_NONE
 #define DEFAULT_TRAITOR_QUOTA_DB_CONFIG "l4dstats"
@@ -89,6 +90,11 @@ public void OnPluginStart()
 {
     LoadTranslations("infected_control.phrases");
     gCV.Create();
+}
+
+public void OnAllPluginsLoaded()
+{
+    // 等 anne_db 连接中心加载完再连库。
     TraitorQuota_Init();
 }
 

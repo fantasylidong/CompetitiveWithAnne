@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
@@ -654,7 +655,7 @@ void ConnectBlacklistDatabase()
 	g_cvBlacklistDatabaseConfig.GetString(configName, sizeof(configName));
 
 	g_bBlacklistConnecting = true;
-	Database.Connect(SQL_OnBlacklistConnect, configName, g_iBlacklistDatabaseGeneration);
+	AnneDB_ConnectCompat(SQL_OnBlacklistConnect, configName, g_iBlacklistDatabaseGeneration);
 }
 
 public void SQL_OnBlacklistConnect(Database database, const char[] error, any data)
@@ -681,8 +682,14 @@ public void SQL_OnBlacklistConnect(Database database, const char[] error, any da
 		g_hBlacklistReconnectTimer = null;
 	}
 
+	if (g_hBlacklistDatabase != null)
+	{
+		delete database;
+		return;
+	}
+
 	g_hBlacklistDatabase = database;
-	if (!g_hBlacklistDatabase.SetCharset("utf8mb4"))
+	if (!AnneDB_SetCharsetIfOwned(g_hBlacklistDatabase, "utf8mb4"))
 		LogError("[global_chat] 设置 blacklist 数据库字符集 utf8mb4 失败。");
 	StartBlacklistRefreshTimer();
 	RefreshBlacklistCache();
@@ -831,7 +838,7 @@ void ConnectDatabase()
 	g_cvDatabaseConfig.GetString(configName, sizeof(configName));
 
 	g_bConnecting = true;
-	Database.Connect(SQL_OnConnect, configName, g_iDatabaseGeneration);
+	AnneDB_ConnectCompat(SQL_OnConnect, configName, g_iDatabaseGeneration);
 }
 
 void MarkDatabaseUnavailable()
@@ -935,8 +942,15 @@ public void SQL_OnConnect(Database database, const char[] error, any data)
 		g_hDatabaseReconnectTimer = null;
 	}
 
+	// 过图时可能有两次连接在途，保留先到的那条。
+	if (g_hDatabase != null)
+	{
+		delete database;
+		return;
+	}
+
 	g_hDatabase = database;
-	if (!g_hDatabase.SetCharset("utf8mb4"))
+	if (!AnneDB_SetCharsetIfOwned(g_hDatabase, "utf8mb4"))
 		LogError("[global_chat] 设置数据库字符集 utf8mb4 失败。");
 	database.Query(SQL_OnCreateTable, "\
 		CREATE TABLE IF NOT EXISTS `anne_global_chat` ( \

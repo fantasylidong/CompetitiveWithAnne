@@ -2,6 +2,7 @@
 /**/
 #pragma semicolon 1
 #include <sourcemod>
+#include <anne_db>
 #include <sdktools>
 #include <sdkhooks>
 #include <colors>
@@ -72,7 +73,7 @@ ConVar g_hAntiKickBlockVote;
 ConVar g_hAntiKickBlockCmdKick;
 ConVar g_hAntiKickMinImmunity;   // 0=只要有任意管理员标识就保护；>0=要求免疫等级>=此值才保护
 ConVar g_hAntiKickEqualBlock;    // 同级免疫是否禁止互踢（默认禁用互踢）
-bool g_bHitSoundAvailable = false,g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false, g_bDamageShowHudAvailable = false;
+bool g_bHitSoundAvailable = false,g_bGodFrameSystemAvailable = false, g_bHatSystemAvailable = false, g_bHextagsSystemAvailable = false, g_bl4dstatsSystemAvailable = false, g_bMysqlSystemAvailable = false, g_bReadyUpSystemAvailable = false, g_bInfectedControlAvailable = false, g_bpunchangelSystemAvailable= false, g_bDamageShowHudAvailable = false, g_bBeamItemAvailable = false;
 bool g_bPendingCustomTagApply[MAXPLAYERS + 1];
 //new lastpoints[MAXPLAYERS + 1];
 
@@ -439,7 +440,7 @@ static bool BeginRpgClientLoad(int client)
 	char steamid[64];
 	if (!TryGetRpgSteamId(client, steamid, sizeof(steamid)))
 		return false;
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return false;
 
 	char query[768];
@@ -905,6 +906,7 @@ public void OnAllPluginsLoaded()
         }
     }
 	g_bDamageShowHudAvailable = LibraryExists("damage_show");
+	g_bBeamItemAvailable = LibraryExists("l4d_random_beam_item");
 }
 
 public void OnLibraryAdded(const char[] name)
@@ -942,6 +944,7 @@ public void OnLibraryAdded(const char[] name)
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = true; }
 	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = true; }
 	else if (StrEqual(name, "l4d2_hitsound")) { g_bHitSoundAvailable = true; }
+	else if (StrEqual(name, "l4d_random_beam_item")) { g_bBeamItemAvailable = true; }
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -963,6 +966,7 @@ public void OnLibraryRemoved(const char[] name)
 	else if (StrEqual(name, "punch_angle")) { g_bpunchangelSystemAvailable = false; }
 	else if (StrEqual(name, "damage_show")) { g_bDamageShowHudAvailable = false; }
 	else if (StrEqual(name, "l4d2_hitsound")) { g_bHitSoundAvailable = false; }
+	else if (StrEqual(name, "l4d_random_beam_item")) { g_bBeamItemAvailable = false; }
 }
 
 
@@ -1330,7 +1334,8 @@ public void EventReturnBlood(Handle event, const char []name, bool dontBroadcast
 	}
 }
 
-public bool ConnectDB()
+// allowBlock=false 用在游戏过程中的按需重连：共享连接未就绪时不在主线程阻塞。
+bool ConnectDB(bool allowBlock = true)
 {
 	if (db != INVALID_HANDLE)
 	{
@@ -1341,14 +1346,14 @@ public bool ConnectDB()
 	if (SQL_CheckConfig(DB_CONF_NAME))
 	{
 		char Error[256];
-		db = SQL_Connect(DB_CONF_NAME, false, Error, sizeof(Error));
+		db = AnneDB_ConnectSyncCompat(DB_CONF_NAME, Error, sizeof(Error), AnneDBLane_Shared, allowBlock);
 		if (db == INVALID_HANDLE)
 		{
 			LogError("Failed to connect to database: %s", Error);
 			g_bMysqlSystemAvailable = false;
 			return false;
 		}
-		else if (!SQL_SetCharset(db,"utf8mb4"))
+		else if (!AnneDB_SetCharsetIfOwned(db,"utf8mb4"))
 		{
 			if (SQL_GetError(db, Error, sizeof(Error)))
 				LogError("Failed to update encoding to utf8mb4: %s", Error);
@@ -1389,11 +1394,10 @@ bool EnsureAnneGuidePromptColumn()
 		return false;
 	}
 
-	Handle result = SQL_Query(db, "SHOW COLUMNS FROM `RPG` LIKE 'ANNE_GUIDE_PROMPT'");
+	char error[256];
+	Handle result = AnneDB_LockedQuery(db, "SHOW COLUMNS FROM `RPG` LIKE 'ANNE_GUIDE_PROMPT'", error, sizeof(error));
 	if (result == INVALID_HANDLE || result == null)
 	{
-		char error[256];
-		SQL_GetError(db, error, sizeof(error));
 		LogError("[RPG] Failed to inspect ANNE_GUIDE_PROMPT: %s", error);
 		return false;
 	}
@@ -1405,10 +1409,8 @@ bool EnsureAnneGuidePromptColumn()
 		return true;
 	}
 
-	if (!SQL_FastQuery(db, "ALTER TABLE `RPG` ADD COLUMN `ANNE_GUIDE_PROMPT` TINYINT NOT NULL DEFAULT 1 AFTER `RECOIL`"))
+	if (!AnneDB_LockedFastQuery(db, "ALTER TABLE `RPG` ADD COLUMN `ANNE_GUIDE_PROMPT` TINYINT NOT NULL DEFAULT 1 AFTER `RECOIL`", error, sizeof(error)))
 	{
-		char error[256];
-		SQL_GetError(db, error, sizeof(error));
 		LogError("[RPG] Failed to add ANNE_GUIDE_PROMPT: %s", error);
 		return false;
 	}
@@ -1425,11 +1427,10 @@ bool EnsureRpgNullableTinyintColumn(const char[] column, const char[] alterSql)
 
 	char inspect[192];
 	FormatEx(inspect, sizeof(inspect), "SHOW COLUMNS FROM `RPG` LIKE '%s'", column);
-	Handle result = SQL_Query(db, inspect);
+	char error[256];
+	Handle result = AnneDB_LockedQuery(db, inspect, error, sizeof(error));
 	if (result == INVALID_HANDLE || result == null)
 	{
-		char error[256];
-		SQL_GetError(db, error, sizeof(error));
 		LogError("[RPG] Failed to inspect %s: %s", column, error);
 		return false;
 	}
@@ -1441,10 +1442,8 @@ bool EnsureRpgNullableTinyintColumn(const char[] column, const char[] alterSql)
 		return true;
 	}
 
-	if (!SQL_FastQuery(db, alterSql))
+	if (!AnneDB_LockedFastQuery(db, alterSql, error, sizeof(error)))
 	{
-		char error[256];
-		SQL_GetError(db, error, sizeof(error));
 		if (StrContains(error, "Duplicate column", false) != -1)
 			return true;
 		LogError("[RPG] Failed to add %s: %s", column, error);
@@ -1489,7 +1488,7 @@ void CloseDbConnection()
 
 public void SendSQLUpdate(char []query)
 {
-    if (db == INVALID_HANDLE && !ConnectDB())
+    if (db == INVALID_HANDLE && !ConnectDB(false))
 	{
         return;
 	}
@@ -1743,7 +1742,7 @@ public void ClientSaveToFileCreate(int Client)
 {
 	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
 		return;
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return;
 
 	char query[768];
@@ -1806,7 +1805,7 @@ public void ClientTagsSaveToFileSave(int Client)
     if (!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
         return;
 
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return;
 
     char SteamID[64];
@@ -1827,7 +1826,7 @@ void ClientHatTypeSaveToFile(int client)
 {
 	if (!IsValidClient(client) || IsFakeClient(client) || !g_bMysqlSystemAvailable || !player[client].DataLoaded)
 		return;
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return;
 
 	char steamId[64];
@@ -1846,7 +1845,7 @@ void ClientHatPrefsSaveToFile(int client)
 	{
 		return;
 	}
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return;
 
 	char steamId[64];
@@ -1864,7 +1863,7 @@ public void ClientSaveToFileSave(int Client)
 {
 	if(!IsValidClient(Client) || IsFakeClient(Client) || !g_bMysqlSystemAvailable || !player[Client].DataLoaded)
 		return;
-	if (db == INVALID_HANDLE && !ConnectDB())
+	if (db == INVALID_HANDLE && !ConnectDB(false))
 		return;
 
 	char query[768];
@@ -2503,6 +2502,11 @@ public void BuildMenu(int client)
 			menu.AddItem("HitSound", binfo);
 		}
 
+		if(g_bBeamItemAvailable){
+			FormatEx(binfo, sizeof(binfo),  "物品光束设置", client); //物品光束菜单
+			menu.AddItem("BeamItem", binfo);
+		}
+
 		if(g_bEnableGlow && (HasBasicGlowAccess(client) || player[client].GlowType > 0))
 		{
 			FormatEx(binfo, sizeof(binfo),  "生还者轮廓", client); //生还者轮廓菜单
@@ -2559,6 +2563,8 @@ public int TopMenu(Menu menu, MenuAction action, int param1, int param2)
 				Damage(param1);
 			else if( StrEqual(bitem, "HitSound"))
 				HitSound(param1);
+			else if( StrEqual(bitem, "BeamItem"))
+				BeamItem(param1);
 		}
 		case MenuAction_End:
 			delete menu;
@@ -3079,6 +3085,12 @@ public void Damage(int client)
 public void HitSound(int client)
 {
 	ClientCommand(client,"sm_snd");	
+}
+
+//创建购买菜单>>主菜单--物品光束菜单
+public void BeamItem(int client)
+{
+	ClientCommand(client,"sm_beam");
 }
 
 //创建购买菜单>>主菜单--主武器类型

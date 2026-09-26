@@ -25,6 +25,7 @@
 // *************************************************************************
 
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 
 #define VERSION "1.6.4"
@@ -55,8 +56,12 @@ public OnPluginStart()
 	RegAdminCmd("sm_listbans", OnListSourceBansCmd, ADMFLAG_BAN, LISTBANS_USAGE);
 	RegAdminCmd("sm_listcomms", OnListSourceCommsCmd, ADMFLAG_BAN, LISTCOMMS_USAGE);
 	RegAdminCmd("sb_reload", OnReloadCmd, ADMFLAG_RCON, "Reload sourcebans config and ban reason menu options");
+}
 
-	SQL_TConnect(OnDatabaseConnected, "sourcebans");
+public OnAllPluginsLoaded()
+{
+	// 等 anne_db 等插件都加载完再连库，开服自动加载时顺序不固定。
+	AnneDB_TConnectCompat(OnDatabaseConnected, "sourcebans");
 }
 
 public OnMapStart()

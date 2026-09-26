@@ -297,81 +297,74 @@ public Action:cmd_ClearRank(client, args)
 	return Plugin_Handled;
 }
 
+// 清库用 SourceMod Transaction 在 DB 线程里原子执行。共享连接上不能用 START TRANSACTION，
+// 否则其他插件在这期间的查询会被卷进这个事务。
+#define CLEAR_QUERY_TIMEDMAPS	0
+#define CLEAR_QUERY_PLAYERS		1
+#define CLEAR_QUERY_MAPS		2
+
 public ClearStatsMaps(client)
 {
-	if (!DoFastQuery(client, "START TRANSACTION"))
-	{
-		return;
-	}
-
-	decl String:query[256];
-	Format(query, sizeof(query), "SELECT * FROM %smaps WHERE 1 = 2", DbPrefix);
-
-	SQL_TQuery(db, ClearStatsMapsHandler, query, GetClientUserId(client));
+	ClearStats_RequestMapColumns(client, false);
 }
 
 public ClearStatsAll(client)
 {
-	if (!DoFastQuery(client, "START TRANSACTION"))
+	ClearStats_RequestMapColumns(client, true);
+}
+
+public ClearStatsPlayers(client)
+{
+	if (db == INVALID_HANDLE)
 	{
+		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 		return;
 	}
 
-	if (!DoFastQuery(client, "DELETE FROM %stimedmaps", DbPrefix))
+	decl String:query[256];
+	Format(query, sizeof(query), "DELETE FROM %splayers", DbPrefix);
+
+	new Transaction:txn = SQL_CreateTransaction();
+	SQL_AddQuery(txn, query, CLEAR_QUERY_PLAYERS);
+	SQL_ExecuteTransaction(db, txn, ClearStats_OnPlayersCleared, ClearStats_OnFailed, ClearStats_PackData(client, false));
+}
+
+ClearStats_PackData(client, bool:clearAll)
+{
+	return (GetClientUserId(client) << 1) | (clearAll ? 1 : 0);
+}
+
+ClearStats_ResolveClient(any:data)
+{
+	new client;
+	if (!Stats_ResolveHumanQueryUserId(data >> 1, client))
+		client = 0;
+
+	return client;
+}
+
+// maps 表的列是动态的，先取列名再拼 UPDATE。
+ClearStats_RequestMapColumns(client, bool:clearAll)
+{
+	if (db == INVALID_HANDLE)
 	{
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearTimedMapsRollback");
-		DoFastQuery(client, "ROLLBACK");
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
-
-		return;
-	}
-	DoFastQuery(client, "DELETE FROM `%stimedmap_runs`", DbPrefix);
-
-	if (!DoFastQuery(client, "DELETE FROM %splayers", DbPrefix))
-	{
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearPlayersRollback");
-		DoFastQuery(client, "ROLLBACK");
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
-
 		return;
 	}
 
 	decl String:query[256];
 	Format(query, sizeof(query), "SELECT * FROM %smaps WHERE 1 = 2", DbPrefix);
 
-	SQL_TQuery(db, ClearStatsMapsHandler, query, GetClientUserId(client));
+	SQL_TQuery(db, ClearStatsMapsHandler, query, ClearStats_PackData(client, clearAll));
 }
 
-public ClearStatsPlayers(client)
+public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], any:data)
 {
-	if (!DoFastQuery(client, "START TRANSACTION"))
-	{
-		return;
-	}
+	new client = ClearStats_ResolveClient(data);
 
-	if (!DoFastQuery(client, "DELETE FROM %splayers", DbPrefix))
-	{
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearPlayersRollback");
-		DoFastQuery(client, "ROLLBACK");
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
-	}
-	else
-	{
-		DoFastQuery(client, "COMMIT");
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearRanksSuccess");
-	}
-}
-
-public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], any:userid)
-{
-	new client;
-	if (!Stats_ResolveHumanQueryUserId(userid, client))
-		client = 0;
-
-	if (hndl == INVALID_HANDLE)
+	if (hndl == INVALID_HANDLE || db == INVALID_HANDLE)
 	{
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearQueryFailed", error);
-		DoFastQuery(client, "ROLLBACK");
 		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
 		return;
 	}
@@ -404,17 +397,65 @@ public ClearStatsMapsHandler(Handle:owner, Handle:hndl, const String:error[], an
 		StrCat(query, sizeof(query), FieldSet);
 	}
 
-	if (!DoFastQuery(client, query))
+	new Transaction:txn = SQL_CreateTransaction();
+	if ((data & 1) != 0)
 	{
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearMapsRollback");
-		DoFastQuery(client, "ROLLBACK");
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
+		decl String:deleteQuery[256];
+		Format(deleteQuery, sizeof(deleteQuery), "DELETE FROM %stimedmaps", DbPrefix);
+		SQL_AddQuery(txn, deleteQuery, CLEAR_QUERY_TIMEDMAPS);
+		Format(deleteQuery, sizeof(deleteQuery), "DELETE FROM %splayers", DbPrefix);
+		SQL_AddQuery(txn, deleteQuery, CLEAR_QUERY_PLAYERS);
 	}
-	else
+	SQL_AddQuery(txn, query, CLEAR_QUERY_MAPS);
+
+	SQL_ExecuteTransaction(db, txn, ClearStats_OnMapsCleared, ClearStats_OnFailed, data);
+}
+
+public void ClearStats_OnMapsCleared(Database database, any data, int numQueries, DBResultSet[] results, any[] queryData)
+{
+	new client = ClearStats_ResolveClient(data);
+
+	// timedmap_runs 原本就是尽力清理（表可能不存在），不放进事务，失败只记日志。
+	if ((data & 1) != 0 && db != INVALID_HANDLE)
 	{
-		DoFastQuery(client, "COMMIT");
-		StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsSuccess");
+		decl String:query[256];
+		Format(query, sizeof(query), "DELETE FROM `%stimedmap_runs`", DbPrefix);
+		SQL_TQuery(db, ClearStats_OnOptionalDelete, query);
 	}
+
+	StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsSuccess");
+}
+
+public void ClearStats_OnPlayersCleared(Database database, any data, int numQueries, DBResultSet[] results, any[] queryData)
+{
+	StatsPrintToConsolePhrase(ClearStats_ResolveClient(data), "L4DStats_ClearRanksSuccess");
+}
+
+public void ClearStats_OnFailed(Database database, any data, int numQueries, const char[] error, int failIndex, any[] queryData)
+{
+	new client = ClearStats_ResolveClient(data);
+	LogError("Clearing stats failed and was rolled back: %s", error);
+
+	if (failIndex >= 0 && failIndex < numQueries)
+	{
+		switch (queryData[failIndex])
+		{
+			case CLEAR_QUERY_TIMEDMAPS:
+				StatsPrintToConsolePhrase(client, "L4DStats_ClearTimedMapsRollback");
+			case CLEAR_QUERY_PLAYERS:
+				StatsPrintToConsolePhrase(client, "L4DStats_ClearPlayersRollback");
+			case CLEAR_QUERY_MAPS:
+				StatsPrintToConsolePhrase(client, "L4DStats_ClearMapsRollback");
+		}
+	}
+
+	StatsPrintToConsolePhrase(client, "L4DStats_ClearStatsFailure");
+}
+
+public ClearStats_OnOptionalDelete(Handle:owner, Handle:hndl, const String:error[], any:data)
+{
+	if (hndl == INVALID_HANDLE)
+		LogError("Clearing timedmap_runs failed: %s", error);
 }
 
 bool:DoFastQuery(Client, const String:Query[], any:...)
@@ -427,9 +468,10 @@ bool:DoFastQuery(Client, const String:Query[], any:...)
 
 	new String:Error[1024];
 
-	if (!SQL_FastQuery(db, FormattedQuery))
+	// 共享连接上的同步查询必须加锁，错误信息也在锁内取出。
+	if (!AnneDB_LockedFastQuery(db, FormattedQuery, Error, sizeof(Error)))
 	{
-		if (SQL_GetError(db, Error, sizeof(Error)))
+		if (Error[0] != '\0')
 		{
 			StatsPrintToConsolePhrase(Client, "L4DStats_FastQueryError", Error, FormattedQuery);
 			LogError("Fast query failed! (Error = \"%s\") Query = \"%s\"", Error, FormattedQuery);

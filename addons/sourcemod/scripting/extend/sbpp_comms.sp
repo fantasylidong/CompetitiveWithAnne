@@ -27,6 +27,7 @@
 #pragma semicolon 1
 
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 #include <basecomm>
 #include <sourcecomms>
@@ -220,7 +221,6 @@ public OnPluginStart()
 		SetFailState("Database failure: could not find database config: %s", DATABASE);
 		return;
 	}
-	DB_Connect();
 	InitializeBackupDB();
 
 	ServerInfo();
@@ -230,6 +230,13 @@ public OnPluginStart()
 		if (IsClientInGame(client) && IsClientAuthorized(client))
 			OnClientPostAdminCheck(client);
 	}
+}
+
+public OnAllPluginsLoaded()
+{
+	// 等 anne_db 等插件都加载完再连库：开服自动加载时 OnPluginStart 阶段连接中心可能还没运行，
+	// 会退回独立连接。
+	DB_Connect();
 }
 
 public OnLibraryRemoved(const String:name[])
@@ -1213,18 +1220,22 @@ public GotDatabase(Handle:owner, Handle:hndl, const String:error[], any:data)
 	}
 
 	// Set character set to UTF-8 in the database
-	if (GetFeatureStatus(FeatureType_Native, "SQL_SetCharset") == FeatureStatus_Available)
+	// 共享连接的字符集由 anne_db 统一设置，不能再改会话字符集。
+	if (!AnneDB_IsShared(g_hDatabase))
 	{
-		SQL_SetCharset(g_hDatabase, "utf8");
-	}
-	else
-	{
-		decl String:query[128];
-		FormatEx(query, sizeof(query), "SET NAMES 'UTF8'");
-		#if defined LOG_QUERIES
-		LogToFile(logQuery, "Set encoding. QUERY: %s", query);
-		#endif
-		SQL_TQuery(g_hDatabase, Query_ErrorCheck, query);
+		if (GetFeatureStatus(FeatureType_Native, "SQL_SetCharset") == FeatureStatus_Available)
+		{
+			SQL_SetCharset(g_hDatabase, "utf8");
+		}
+		else
+		{
+			decl String:query[128];
+			FormatEx(query, sizeof(query), "SET NAMES 'UTF8'");
+			#if defined LOG_QUERIES
+			LogToFile(logQuery, "Set encoding. QUERY: %s", query);
+			#endif
+			SQL_TQuery(g_hDatabase, Query_ErrorCheck, query);
+		}
 	}
 
 	// Process queue
@@ -2015,7 +2026,7 @@ stock bool:DB_Connect()
 		g_DatabaseState = DatabaseState_Connecting;
 		g_iConnectLock = ++g_iSequence;
 		// Connect using the "sourcebans" section, or the "default" section if "sourcebans" does not exist
-		SQL_TConnect(GotDatabase, DATABASE, g_iConnectLock);
+		AnneDB_TConnectCompat(GotDatabase, DATABASE, g_iConnectLock);
 	}
 
 	return false;

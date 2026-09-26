@@ -36,9 +36,11 @@ bool Traitor_IsAdminClient(int client)
         && CheckCommandAccess(client, "infected_control_traitor_admin", ADMFLAG_GENERIC);
 }
 
+// 插件加载时允许同步连接一次；游戏过程中的配额读写只用已就绪的连接，不在主线程阻塞。
 void TraitorQuota_Init()
 {
-    TraitorQuota_Connect();
+    TraitorQuota_Connect(true);
+    TraitorQuota_EnsureAdminDatabase(true);
 }
 
 void TraitorQuota_Close()
@@ -176,13 +178,11 @@ bool TraitorQuota_Consume(int client, int cost = 1)
         today, cost, total,
         today, cost, total);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
-    {
-        TraitorQuota_LogSqlError("consume quota");
+    int affectedRows;
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "consume quota", affectedRows))
         return false;
-    }
 
-    if (SQL_GetAffectedRows(g_hTraitorQuotaDb) <= 0)
+    if (affectedRows <= 0)
     {
         TraitorQuota_InvalidateClientCache(client);
 
@@ -229,9 +229,8 @@ bool TraitorQuota_Refund(int client, int cost = 1)
         "UPDATE `%s` SET used_count = CASE WHEN used_count >= %d THEN used_count - %d ELSE 0 END, `updated_at` = %d WHERE `auth_id` = '%s'",
         table, cost, cost, now, escAuth);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "refund quota"))
     {
-        TraitorQuota_LogSqlError("refund quota");
         return false;
     }
 
@@ -294,9 +293,8 @@ bool TraitorQuota_BlockTank(int client, int seconds)
         "UPDATE `%s` SET tank_block_until = CASE WHEN tank_block_until > %d THEN tank_block_until ELSE %d END, `updated_at` = %d WHERE `auth_id` = '%s'",
         table, blockUntil, blockUntil, now, escAuth);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "block tank traitor"))
     {
-        TraitorQuota_LogSqlError("block tank traitor");
         return false;
     }
 
@@ -361,7 +359,7 @@ static bool TraitorQuota_EnsureDatabase()
 {
     if (g_hTraitorQuotaDb == null)
     {
-        TraitorQuota_Connect();
+        TraitorQuota_Connect(false);
     }
     else if (!g_bTraitorQuotaSchemaReady)
     {
@@ -371,7 +369,7 @@ static bool TraitorQuota_EnsureDatabase()
     return g_hTraitorQuotaDb != null && g_bTraitorQuotaSchemaReady;
 }
 
-static void TraitorQuota_Connect()
+static void TraitorQuota_Connect(bool allowBlock)
 {
     if (g_hTraitorQuotaDb != null)
         return;
@@ -389,7 +387,7 @@ static void TraitorQuota_Connect()
     }
 
     char error[256];
-    g_hTraitorQuotaDb = SQL_Connect(configName, false, error, sizeof(error));
+    g_hTraitorQuotaDb = AnneDB_ConnectSyncCompat(configName, error, sizeof(error), AnneDBLane_Sync, allowBlock);
     if (g_hTraitorQuotaDb == null)
     {
         LogError("[AnneTraitorQuota] failed to connect quota database \"%s\": %s", configName, error);
@@ -407,7 +405,7 @@ static void TraitorQuota_Connect()
         return;
     }
 
-    SQL_SetCharset(g_hTraitorQuotaDb, "utf8mb4");
+    AnneDB_SetCharsetIfOwned(g_hTraitorQuotaDb, "utf8mb4");
 
     TraitorQuota_CreateTable();
 }
@@ -455,9 +453,8 @@ static void TraitorQuota_CreateTable()
             table);
     }
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "create quota table"))
     {
-        TraitorQuota_LogSqlError("create quota table");
         return;
     }
 
@@ -483,9 +480,8 @@ static bool TraitorQuota_EnsureTankBlockColumn(const char[] table)
         "ALTER TABLE `%s` ADD COLUMN `tank_block_until` %s NOT NULL DEFAULT 0",
         table, typeName);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "add tank block column"))
     {
-        TraitorQuota_LogSqlError("add tank block column");
         return false;
     }
 
@@ -500,10 +496,9 @@ static bool TraitorQuota_TableHasColumn(const char[] table, const char[] column)
     else
         FormatEx(query, sizeof(query), "PRAGMA table_info(`%s`)", table);
 
-    DBResultSet results = SQL_Query(g_hTraitorQuotaDb, query);
+    DBResultSet results = TraitorQuota_Query(g_hTraitorQuotaDb, query, "inspect quota table");
     if (results == null)
     {
-        TraitorQuota_LogSqlError("inspect quota table");
         return false;
     }
 
@@ -544,10 +539,9 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
         "SELECT `total_count`, `used_count`, `quota_day`, `tank_block_until` FROM `%s` WHERE `auth_id` = '%s'",
         table, escAuth);
 
-    DBResultSet results = SQL_Query(g_hTraitorQuotaDb, query);
+    DBResultSet results = TraitorQuota_Query(g_hTraitorQuotaDb, query, "read quota");
     if (results == null)
     {
-        TraitorQuota_LogSqlError("read quota");
         return false;
     }
 
@@ -587,10 +581,11 @@ static bool TraitorQuota_EnsureClientRow(int client, const char[] auth, int &tot
     total = desiredTotal;
     used = 0;
     tankBlockUntil = 0;
-    if (!TraitorQuota_InsertClientRow(client, table, escAuth, today, total))
+    int insertedRows;
+    if (!TraitorQuota_InsertClientRow(client, table, escAuth, today, total, insertedRows))
         return false;
 
-    if (SQL_GetAffectedRows(g_hTraitorQuotaDb) == 0)
+    if (insertedRows == 0)
         return TraitorQuota_EnsureClientRow(client, auth, total, used, tankBlockUntil, false);
 
     return true;
@@ -626,12 +621,8 @@ static int TraitorQuota_GetAdminDailyTotal(int client, const char[] auth)
                     ... "ORDER BY (`authid` = '%s') DESC LIMIT 1",
                     TRAITOR_ADMIN_TABLE, escAuth, escAuthSuffix, escAuth);
 
-                DBResultSet results = SQL_Query(g_hTraitorAdminDb, query);
-                if (results == null)
-                {
-                    TraitorQuota_LogAdminSqlError("read admin expiry");
-                }
-                else
+                DBResultSet results = TraitorQuota_Query(g_hTraitorAdminDb, query, "read admin expiry");
+                if (results != null)
                 {
                     if (results.FetchRow())
                     {
@@ -659,7 +650,7 @@ static int TraitorQuota_GetAdminDailyTotal(int client, const char[] auth)
     return total;
 }
 
-static bool TraitorQuota_EnsureAdminDatabase()
+static bool TraitorQuota_EnsureAdminDatabase(bool allowBlock = false)
 {
     if (g_hTraitorAdminDb != null)
         return true;
@@ -676,9 +667,12 @@ static bool TraitorQuota_EnsureAdminDatabase()
     }
 
     char error[256];
-    g_hTraitorAdminDb = SQL_Connect(TRAITOR_ADMIN_DB_CONFIG, false, error, sizeof(error));
+    g_hTraitorAdminDb = AnneDB_ConnectSyncCompat(TRAITOR_ADMIN_DB_CONFIG, error, sizeof(error), AnneDBLane_Sync, allowBlock);
     if (g_hTraitorAdminDb == null)
     {
+        // 共享连接还在后台建立时很快会就绪，短暂等待后重试，不按缓存周期退避。
+        if (AnneDB_CanManage(TRAITOR_ADMIN_DB_CONFIG))
+            g_iTraitorAdminDbRetryAfter = now + 5;
         LogError("[AnneTraitorQuota] failed to connect admin expiry database \"%s\": %s", TRAITOR_ADMIN_DB_CONFIG, error);
         return false;
     }
@@ -693,7 +687,7 @@ static bool TraitorQuota_EnsureAdminDatabase()
         return false;
     }
 
-    SQL_SetCharset(g_hTraitorAdminDb, "utf8mb4");
+    AnneDB_SetCharsetIfOwned(g_hTraitorAdminDb, "utf8mb4");
     return true;
 }
 
@@ -715,7 +709,7 @@ static bool TraitorQuota_GetTankBlockRemaining(int client, int &remaining)
     return true;
 }
 
-static bool TraitorQuota_InsertClientRow(int client, const char[] table, const char[] escAuth, int today, int total)
+static bool TraitorQuota_InsertClientRow(int client, const char[] table, const char[] escAuth, int today, int total, int &affectedRows)
 {
     char name[TRAITOR_QUOTA_NAME_LENGTH];
     char escName[TRAITOR_QUOTA_NAME_LENGTH * 2 + 1];
@@ -730,9 +724,8 @@ static bool TraitorQuota_InsertClientRow(int client, const char[] table, const c
         ... "VALUES ('%s', %d, 0, %d, 0, '%s', %d)",
         table, escAuth, total, today, escName, now);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "insert quota", affectedRows))
     {
-        TraitorQuota_LogSqlError("insert quota");
         return false;
     }
 
@@ -747,9 +740,8 @@ static bool TraitorQuota_ResetClientDay(const char[] table, const char[] escAuth
         "UPDATE `%s` SET used_count = 0, quota_day = %d, `updated_at` = %d WHERE `auth_id` = '%s' AND quota_day != %d",
         table, today, now, escAuth, today);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "reset daily quota"))
     {
-        TraitorQuota_LogSqlError("reset daily quota");
         return false;
     }
 
@@ -764,9 +756,8 @@ static bool TraitorQuota_UpdateClientTotal(const char[] table, const char[] escA
         "UPDATE `%s` SET total_count = %d, `updated_at` = %d WHERE `auth_id` = '%s'",
         table, total, now, escAuth);
 
-    if (!SQL_FastQuery(g_hTraitorQuotaDb, query))
+    if (!TraitorQuota_FastQuery(g_hTraitorQuotaDb, query, "update quota total"))
     {
-        TraitorQuota_LogSqlError("update quota total");
         return false;
     }
 
@@ -831,16 +822,24 @@ static bool TraitorQuota_IsSafeSqlIdentifier(const char[] name)
     return true;
 }
 
-static void TraitorQuota_LogSqlError(const char[] action)
+// 所有同步查询都加锁执行：anne_db 会在 Sync 通道上跑线程保活，
+// 错误和影响行数也必须在锁内取出。
+static bool TraitorQuota_FastQuery(Database db, const char[] query, const char[] action, int &affectedRows = 0)
 {
     char error[256];
-    SQL_GetError(g_hTraitorQuotaDb, error, sizeof(error));
+    if (AnneDB_LockedFastQuery(db, query, error, sizeof(error), affectedRows))
+        return true;
+
     LogError("[AnneTraitorQuota] failed to %s: %s", action, error);
+    return false;
 }
 
-static void TraitorQuota_LogAdminSqlError(const char[] action)
+static DBResultSet TraitorQuota_Query(Database db, const char[] query, const char[] action)
 {
     char error[256];
-    SQL_GetError(g_hTraitorAdminDb, error, sizeof(error));
-    LogError("[AnneTraitorQuota] failed to %s: %s", action, error);
+    DBResultSet results = AnneDB_LockedQuery(db, query, error, sizeof(error));
+    if (results == null)
+        LogError("[AnneTraitorQuota] failed to %s: %s", action, error);
+
+    return results;
 }

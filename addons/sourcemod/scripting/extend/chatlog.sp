@@ -1,4 +1,5 @@
 #include <sourcemod>
+#include <anne_db>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -60,7 +61,7 @@ void SQL_ConnectChatLog()
 
 	g_bConnecting = true;
 	char error[256];
-	g_hDatabase = SQL_Connect(CHATLOG_DB_CONFIG, false, error, sizeof(error));
+	g_hDatabase = AnneDB_ConnectSyncCompat(CHATLOG_DB_CONFIG, error, sizeof(error));
 	g_bConnecting = false;
 
 	if (g_hDatabase == null)
@@ -70,7 +71,7 @@ void SQL_ConnectChatLog()
 		return;
 	}
 
-	if (!SQL_SetCharset(g_hDatabase, "utf8mb4"))
+	if (!AnneDB_SetCharsetIfOwned(g_hDatabase, "utf8mb4"))
 		LogError("[chatlog] 设置数据库字符集 utf8mb4 失败。");
 
 	SQL_CreateChatLogTable();

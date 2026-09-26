@@ -7,7 +7,8 @@
 
 // Make connection to database.
 
-bool:ConnectDB()
+// allowBlock=false 用在游戏过程中的按需重连：共享连接未就绪时不在主线程阻塞。
+bool:ConnectDB(bool:allowBlock=true)
 {
 	if (db != INVALID_HANDLE)
 		return true;
@@ -19,7 +20,7 @@ bool:ConnectDB()
 	}
 
 	new String:Error[256];
-	db = SQL_Connect(DB_CONF_NAME, false, Error, sizeof(Error));
+	db = AnneDB_ConnectSyncCompat(DB_CONF_NAME, Error, sizeof(Error), AnneDBLane_Shared, allowBlock);
 
 	if (db == INVALID_HANDLE)
 	{
@@ -27,7 +28,8 @@ bool:ConnectDB()
 		return false;
 	}
 
-	if (!SQL_FastQuery(db, "SET NAMES 'utf8mb4'"))
+	// 共享连接的字符集由 anne_db 统一设置；自己的连接用 SetCharset，自动重连后依然有效。
+	if (!AnneDB_SetCharsetIfOwned(db, "utf8mb4"))
 	{
 		if (SQL_GetError(db, Error, sizeof(Error)))
 			LogError("Failed to update encoding to utf8mb4: %s", Error);
@@ -53,10 +55,9 @@ bool:EnsurePlayerServerNameColumn()
 	decl String:query[512], String:Error[256];
 	Format(query, sizeof(query), "SHOW COLUMNS FROM `%splayers` LIKE 'lastservername'", DbPrefix);
 
-	new Handle:hndl = SQL_Query(db, query);
+	new Handle:hndl = AnneDB_LockedQuery(db, query, Error, sizeof(Error));
 	if (hndl == INVALID_HANDLE)
 	{
-		SQL_GetError(db, Error, sizeof(Error));
 		LogError("EnsurePlayerServerNameColumn failed to inspect players table: %s", Error);
 		return false;
 	}
@@ -67,9 +68,8 @@ bool:EnsurePlayerServerNameColumn()
 		return true;
 
 	Format(query, sizeof(query), "ALTER TABLE `%splayers` ADD COLUMN `lastservername` VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL DEFAULT '' AFTER `ip`", DbPrefix);
-	if (!SQL_FastQuery(db, query))
+	if (!AnneDB_LockedFastQuery(db, query, Error, sizeof(Error)))
 	{
-		SQL_GetError(db, Error, sizeof(Error));
 		LogError("EnsurePlayerServerNameColumn failed to add lastservername: %s", Error);
 		return false;
 	}
@@ -1005,7 +1005,7 @@ public SetClientRankMute(Handle:owner, Handle:hndl, const String:error[], any:dp
 	new client;
 	new bool:IdentityMatches = Stats_ResolveHumanQueryAuth(userid, SteamID, client);
 
-	if (SQL_GetAffectedRows(owner) == 0)
+	if (SQL_GetAffectedRows(hndl) == 0)
 	{
 		if (IdentityMatches)
 			ClientRankMute[client] = false;

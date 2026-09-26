@@ -569,3 +569,22 @@
 - `sm_beamreload` でデータファイルを再読み込みしても、オンラインのプレイヤーの設定はグループ名で引き継がれます。
 - チャットメッセージとメニューは簡体字中国語、繁体字中国語、英語、日本語、韓国語、ベトナム語に対応しています。
 - `docs/plugin_commands.md` に `sm_beam` を追記し、`l4d_random_beam_item.smx` を再コンパイルしました。
+
+### 2026年9月25日 データベース接続の削減：anne_db 接続ハブを追加
+
+- `extend/anne_db.smx` を追加し、`cfg/generalfixes.cfg` の先頭行で読み込みます。同じデータベースへの MySQL 接続は 1 本だけ共有し、各プラグインはその複製を使います。1 台あたりのデータベース接続は最大約 22 本から 3 本（Anne モードは 5 本）に減りました。SourceMod のスレッドクエリはもともと 1 本のデータベーススレッドに並ぶため、接続を共有しても速度は落ちません。
+- 対応済み：l4d_stats、rpg、l4d2_hitsound、l4d2_damage_show、l4d2_scripted_hud、l4d2_blacklist、global_chat、chatlog、lilac、l4d_player_count_unload_mode、l4d_random_beam_item、annehappy_dynamic_ai_difficulty、anne_traitor_quota、spawn_vote_menu、sbpp_main、sbpp_comms、sbpp_checker、sbpp_sleuth。anne_db が読み込まれていない場合、各プラグインは従来どおり独自の接続に戻ります。
+- データベースが落ちてもサーバーが固まらなくなりました。接続に失敗してから 30 秒間は待たずにすぐ返し、ゲーム中の再接続でもメインスレッドを止めません。`databases.cfg` の MySQL 接続タイムアウトは既定の 60 秒から 15 秒に短縮しました。
+- 接続ハブが 120 秒ごとにキープアライブを送るため（MySQL の `wait_timeout` は 600 秒）、しばらく使わなかった後の最初のクエリが失敗しなくなりました。各プラグイン独自のキープアライブと、マップごとの切断・再接続は削除しました。
+- 修正：l4d_player_count_unload_mode で複数の cvar が続けて変わるとデータベース接続がリークしていた問題。l4d_stats の統計クリアを SourceMod のトランザクションに変更し、他のプラグインのクエリが同じトランザクションに混ざらないようにしました。l4d_stats で影響行数を読むときの競合も修正しました。
+- 管理者用コンソールコマンド `sm_annedb_status` で各データベース接続の状態を確認できます。
+- データベースプラグインの書き方のルールを `AGENTS.md` に追記しました。
+
+### 2026年9月26日 鎮痛剤のビームを小さく
+
+- `data/l4d_random_beam_item.cfg` の鎮痛剤ビームの高さを 250 から 100 に、幅を 15 から 10 に変更しました。色（緑）、HDR の明るさ、壁越しに見える光輪は変わりません。これはサーバーのデフォルト値で、`!beam` で長さや幅を変えたプレイヤーは新しい値に対する割合で表示されます。
+
+### 2026年9月26日 RPG メニューにアイテムビーム設定を追加
+
+- `!rpg` / `!buy` のメインメニューで、ヒットフィードバックメニューの後ろに「アイテムビーム設定」を追加しました。選ぶと `!beam` のビーム設定メニューが開きます。`l4d_random_beam_item` を読み込むモードでだけ表示されます（このプラグインが同名のライブラリを登録するようになり、`rpg.smx` はそれで判定します）。
+- `rpg.smx` と `l4d_random_beam_item.smx` を再コンパイルしました。

@@ -15,8 +15,8 @@
 ## 统计
 
 - 当前模式配置引用插件：328 个。
-- 主表已抽取命令/监听入口：453 条。
-- 对抗通用：386 条。
+- 主表已抽取命令/监听入口：454 条。
+- 对抗通用：387 条。
 - Anne 模式专用：67 条。
 - 启用目录存在但当前模式配置未加载的插件命令：70 条。
 - 未找到源码的未加载启用目录插件：16 个。
@@ -25,7 +25,7 @@
 
 ## 对抗通用命令
 
-共 388 条命令/监听入口。
+共 389 条命令/监听入口。
 
 | 插件 | 命令 | 类型 | 权限 | 说明 | 出现模式 |
 | --- | --- | --- | --- | --- | --- |
@@ -75,6 +75,7 @@
 | `confoglcompmod.smx` | `sm_killlobbyres` | 管理员 | ADMFLAG_BAN | Forces the plugin to kill lobby reservation | 34 个模式 |
 | `confoglcompmod.smx` | `sm_resetmatch` | 管理员 | ADMFLAG_CONFIG | Forces match mode to turn off REGRADLESS for always on or forced match | 34 个模式 |
 | `extend/advertisements.smx` | `sm_advertisements_reload` | 服务器配置 | - | Reload the advertisements | 34 个模式 |
+| `extend/anne_db.smx` | `sm_annedb_status` | 管理员 | ADMFLAG_ROOT | 在控制台查看共享数据库连接状态：每个数据库目标的配置别名、shared/sync 通道是否就绪、已发出的连接副本数、失败次数和最近错误 | 34 个模式 |
 | `extend/attachments_api.smx` | `sm_attachment_qc` | 管理员 | ADMFLAG_ROOT | Parses .qc files to get model attachment names. Usage: sm_attachment_qc <folder path to .qc files>. Saves to sourcemod/data/attachments_new.cfg. | 34 个模式 |
 | `extend/attachments_api.smx` | `sm_attachment_reload` | 管理员 | ADMFLAG_ROOT | Reload the attachments config: sourcemod/data/attachments_api.<game>.cfg. | 34 个模式 |
 | `extend/fornite_l4d.smx` | `sm_dance` | 玩家/控制台 | - | - | 34 个模式 |

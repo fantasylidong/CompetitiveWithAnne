@@ -43,6 +43,7 @@
 #pragma semicolon 1
 
 #include <sourcemod>
+#include <anne_db>
 #include <sdktools>
 #include <sdkhooks>
 #include <adminmenu>
@@ -1098,7 +1099,8 @@ void LoadHitIconSets()
 // ========================================================
 // DB Connect callback
 // ========================================================
-static void StartDBConnect()
+// allowBlock=false 用在玩家加载等游戏过程路径：共享连接未就绪时不在主线程阻塞。
+static void StartDBConnect(bool allowBlock = true)
 {
     if (!GetConVarBool(cv_db_enable)) return;
     if (g_hDB != INVALID_HANDLE || g_DBConnecting) return;
@@ -1116,7 +1118,7 @@ static void StartDBConnect()
     g_DBConnecting = true;
 
     char error[256];
-    g_hDB = SQL_Connect(confName, false, error, sizeof(error));
+    g_hDB = AnneDB_ConnectSyncCompat(confName, error, sizeof(error), AnneDBLane_Shared, allowBlock);
     g_DBConnecting = false;
 
     if (g_hDB == INVALID_HANDLE)
@@ -1125,7 +1127,7 @@ static void StartDBConnect()
         return;
     }
 
-    if (!SQL_SetCharset(g_hDB, "utf8mb4"))
+    if (!AnneDB_SetCharsetIfOwned(g_hDB, "utf8mb4"))
         LogError("[hitsound] 设置数据库字符集 utf8mb4 失败。");
 
     LogMessage("[hitsound] 数据库连接成功。");
@@ -1246,7 +1248,7 @@ static void TryLoadPlayerPrefs(int client)
 
     if (g_hDB == INVALID_HANDLE)
     {
-        StartDBConnect();
+        StartDBConnect(false);
         if (g_DBLoadInFlight[client]) return;
         if (g_hDB == INVALID_HANDLE)
         {

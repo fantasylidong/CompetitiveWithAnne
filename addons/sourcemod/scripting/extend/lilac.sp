@@ -19,6 +19,7 @@
 #include <sourcemod>
 #include <sdktools_engine>
 #include <sdktools_entoutput>
+#include <anne_db>
 #undef REQUIRE_PLUGIN
 #undef REQUIRE_EXTENSIONS
 #tryinclude <materialadmin>

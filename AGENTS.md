@@ -56,4 +56,63 @@ When rolling the active infected-control version forward:
   newer releases.
 - Recompile the active `infected_control.smx`, the archived rollback SMX, and
   any changed extension before publishing.
+
+## MySQL / database plugins
+
+Every MySQL connection costs a server-side thread, and every game server runs
+many database plugins. All MySQL access goes through the `anne_db` connection
+hub (`extend/anne_db.sp`, `include/anne_db.inc`), which keeps one shared
+connection per physical database and hands out `CloneHandle` copies.
+SourceMod runs all threaded queries on a single worker thread, so sharing a
+connection costs no throughput.
+
+- Connect with `AnneDB_ConnectCompat` / `AnneDB_TConnectCompat` /
+  `AnneDB_ConnectSyncCompat` instead of `Database.Connect` / `SQL_TConnect` /
+  `SQL_Connect`. They fall back to the native call when `anne_db` is not loaded
+  or the config is not MySQL, so plugins keep working without the hub. Do not
+  open a second connection to a database a plugin is already connected to.
+- If a plugin calls an `AnneDB_*` native directly instead of through a stock,
+  guard that call with `AnneDB_NativeReady("<that native>")`.
+  `GetFeatureStatus` only reports natives the calling plugin itself references,
+  so testing a different native always says "unavailable" and silently falls
+  back to a private connection.
+- Request the first connection in `OnAllPluginsLoaded`, `OnConfigsExecuted`,
+  or later, never in `OnPluginStart`: `extend/` autoloads at boot in arbitrary
+  order. `extend/anne_db.smx` is the first line of `cfg/generalfixes.cfg`;
+  keep it there.
+- Prefer threaded queries. Every synchronous query (`SQL_Query`,
+  `SQL_FastQuery`) must go through `AnneDB_LockedQuery` /
+  `AnneDB_LockedFastQuery`, which hold `SQL_LockDatabase` and capture the
+  error, affected rows, and insert id inside the lock. Never read
+  `SQL_GetAffectedRows` / `SQL_GetInsertId` / `SQL_GetError` from a database
+  handle outside the lock; use the query or result handle instead.
+- Code on a gameplay path that must query synchronously uses
+  `AnneDBLane_Sync` and `allowBlock=false`. Block on a connect only at load
+  time. Never retry a synchronous connect on a timer.
+- Never change session state on a shared connection. That means no
+  `SetCharset`, `SET NAMES`, `SET @var`, `SET time_zone`, temporary tables, or
+  `START TRANSACTION`/`COMMIT` through `SQL_FastQuery`. Use
+  `AnneDB_SetCharsetIfOwned`. For atomic multi-statement writes use a
+  SourceMod `Transaction` with `SQL_ExecuteTransaction`. The hub sets the
+  charset (`anne_db_charset`, default `utf8mb4`).
+- Do not add private `SELECT 1` keepalive timers, and do not close and reopen
+  a connection on every map. The hub pings every `anne_db_keepalive` seconds
+  (keep this below MySQL `wait_timeout`, currently 600), and the MySQL driver
+  reconnects automatically. After a lost-connection error it is fine to
+  `delete` the handle and request it again, because that returns a cheap
+  clone.
+- Guard reconnect callbacks with a generation counter and `delete` the old
+  handle. A plugin must never have more than one connect in flight for the
+  same config.
+- Reuse the existing `databases.cfg` sections: `l4dstats`/`rpg` for
+  `l4d2stats`, `chatlog`/`globalchat` for `chat`, and `sourcebans`. A new MySQL
+  section must use the same host/user/pass so it shares the connection, and
+  must set `"timeout" "15"`. Keep the `home.trygek.com`, `12345`, `morzlee`,
+  and `anne123` placeholders; l4d2-docker substitutes them at deploy time.
+- One-shot checks (for example a license check at plugin start) may connect
+  directly but must `delete` the handle right after use. Local SQLite
+  (`storage-local`, clientprefs) is not managed and may be used directly.
+- Verify with `sm_annedb_status` (console only) and by counting connections
+  per game-server IP in `information_schema.PROCESSLIST`. The target is 3
+  connections per server, or 5 in Anne modes (the extra `Sync` lanes).
 </INSTRUCTIONS>

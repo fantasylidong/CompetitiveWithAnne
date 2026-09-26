@@ -26,6 +26,7 @@
 
 #pragma semicolon 1
 #include <sourcemod>
+#include <anne_db>
 #undef REQUIRE_PLUGIN
 #include <sourcebanspp>
 
@@ -81,8 +82,6 @@ public OnPluginStart()
 
 	AutoExecConfig(true, "Sm_SourceSleuth");
 
-	SQL_TConnect(SQL_OnConnect, "sourcebans");
-
 	RegAdminCmd("sm_sleuth_reloadlist", ReloadListCallBack, ADMFLAG_ROOT);
 
 	LoadWhiteList();
@@ -91,6 +90,9 @@ public OnPluginStart()
 public OnAllPluginsLoaded()
 {
 	CanUseSourcebans = LibraryExists("sourcebans");
+
+	// 等 anne_db 等插件都加载完再连库，开服自动加载时顺序不固定。
+	AnneDB_TConnectCompat(SQL_OnConnect, "sourcebans");
 }
 
 public OnLibraryAdded(const String:name[])

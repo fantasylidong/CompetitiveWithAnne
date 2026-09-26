@@ -569,3 +569,22 @@
 - `sm_beamreload`로 데이터 파일을 다시 불러와도 접속 중인 플레이어의 설정은 그룹 이름 기준으로 유지됩니다.
 - 채팅 메시지와 메뉴는 중국어 간체, 중국어 번체, 영어, 일본어, 한국어, 베트남어를 지원합니다.
 - `docs/plugin_commands.md`에 `sm_beam`을 추가하고 `l4d_random_beam_item.smx`를 다시 컴파일했습니다.
+
+### 2026년 9월 25일 데이터베이스 연결 축소: anne_db 연결 허브 추가
+
+- `extend/anne_db.smx`를 추가하고 `cfg/generalfixes.cfg` 첫 줄에서 불러옵니다. 같은 데이터베이스에는 MySQL 연결을 하나만 두고 공유하며, 각 플러그인은 그 연결의 복사본을 사용합니다. 서버 한 대의 데이터베이스 연결이 최대 약 22개에서 3개(Anne 모드는 5개)로 줄었습니다. SourceMod의 스레드 쿼리는 원래 하나의 데이터베이스 스레드에서 차례로 처리되므로, 연결을 공유해도 속도는 떨어지지 않습니다.
+- 적용 대상: l4d_stats, rpg, l4d2_hitsound, l4d2_damage_show, l4d2_scripted_hud, l4d2_blacklist, global_chat, chatlog, lilac, l4d_player_count_unload_mode, l4d_random_beam_item, annehappy_dynamic_ai_difficulty, anne_traitor_quota, spawn_vote_menu, sbpp_main, sbpp_comms, sbpp_checker, sbpp_sleuth. anne_db가 로드되지 않았으면 각 플러그인은 예전처럼 자체 연결을 사용합니다.
+- 데이터베이스가 끊겨도 서버가 멈추지 않습니다. 연결에 실패한 뒤 30초 동안은 기다리지 않고 바로 반환하며, 게임 중 재연결도 메인 스레드를 막지 않습니다. `databases.cfg`의 MySQL 연결 제한 시간을 기본 60초에서 15초로 줄였습니다.
+- 연결 허브가 120초마다 연결 유지 쿼리를 보내므로(MySQL `wait_timeout`은 600초), 한동안 쓰지 않은 뒤 첫 쿼리가 실패하지 않습니다. 플러그인마다 따로 하던 연결 유지와 맵마다 끊고 다시 연결하던 동작은 제거했습니다.
+- 수정: l4d_player_count_unload_mode에서 여러 cvar가 연달아 바뀌면 데이터베이스 연결이 누수되던 문제. l4d_stats 통계 초기화를 SourceMod 트랜잭션으로 바꿔 다른 플러그인의 쿼리가 같은 트랜잭션에 섞이지 않도록 했습니다. l4d_stats에서 영향받은 행 수를 읽을 때의 경쟁 상태도 수정했습니다.
+- 관리자 콘솔 명령 `sm_annedb_status`로 각 데이터베이스 연결 상태를 확인할 수 있습니다.
+- 데이터베이스 플러그인 작성 규칙을 `AGENTS.md`에 추가했습니다.
+
+### 2026년 9월 26일 진통제 빔 축소
+
+- `data/l4d_random_beam_item.cfg`에서 진통제 빔의 높이를 250에서 100으로, 너비를 15에서 10으로 줄였습니다. 색상(초록색), HDR 밝기, 벽 너머로 보이는 광륜은 그대로입니다. 서버 기본값이므로 `!beam`으로 길이나 너비를 바꾼 플레이어는 새 값을 기준으로 비율이 적용됩니다.
+
+### 2026년 9월 26일 RPG 메뉴에 아이템 빔 설정 추가
+
+- `!rpg` / `!buy` 메인 메뉴의 명중 피드백 메뉴 뒤에 '아이템 빔 설정'을 추가했습니다. 선택하면 `!beam` 빔 설정 메뉴가 열립니다. `l4d_random_beam_item`을 불러오는 모드에서만 표시됩니다(이 플러그인이 같은 이름의 라이브러리를 등록하고 `rpg.smx`가 이를 확인합니다).
+- `rpg.smx`와 `l4d_random_beam_item.smx`를 다시 컴파일했습니다.

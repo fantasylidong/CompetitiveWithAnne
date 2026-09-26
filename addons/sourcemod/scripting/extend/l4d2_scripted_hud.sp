@@ -48,6 +48,7 @@ public Plugin myinfo =
 // Includes
 // ====================================================================================================
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 #include <sdktools>
 #include <sdkhooks>
@@ -703,7 +704,6 @@ public void OnPluginStart()
     g_hHUDPrefsCookie = new Cookie(HUD_PREFS_COOKIE, "Scripted HUD per-client preferences", CookieAccess_Protected);
     g_hHUDLangCookie = new Cookie(HUD_LANG_COOKIE, "Scripted HUD display language", CookieAccess_Protected);
     BuildHUDLanguageOptions();
-    ConnectHUDPrefsDatabase();
 
     g_hCvar_pain_pills_decay_rate = FindConVar("pain_pills_decay_rate");
 
@@ -1361,6 +1361,8 @@ public void LoadPluginData()
 
 public void OnAllPluginsLoaded()
 {
+    // 等 anne_db 等插件都加载完再连库，开服自动加载时顺序不固定。
+    ConnectHUDPrefsDatabase();
     g_bWitchAndTankSystemAvailable = LibraryExists("witch_and_tankifier");
     g_bInfectedControlAvailable = LibraryExists("infected_control");
     HookHUDSendProxies();
@@ -4014,7 +4016,7 @@ void ConnectHUDPrefsDatabase()
     }
 
     g_bHUDPrefsDatabaseConnecting = true;
-    SQL_TConnect(SQLCB_ConnectHUDPrefsDatabase, HUD_PREFS_DB_CONFIG);
+    AnneDB_TConnectCompat(SQLCB_ConnectHUDPrefsDatabase, HUD_PREFS_DB_CONFIG);
 }
 
 public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const char[] error, any data)
@@ -4028,7 +4030,7 @@ public void SQLCB_ConnectHUDPrefsDatabase(Handle owner, Handle database, const c
     }
 
     g_hHUDPrefsDatabase = database;
-    SQL_SetCharset(g_hHUDPrefsDatabase, "utf8mb4");
+    AnneDB_SetCharsetIfOwned(g_hHUDPrefsDatabase, "utf8mb4");
 
     char query[1024];
     FormatEx(query, sizeof(query),

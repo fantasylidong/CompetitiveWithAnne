@@ -31,7 +31,7 @@ void Database_OnConfigExecuted()
 		LogError("Database config '%s' doesn't exist in databases.cfg", db_name);
 		return;
 	}
-	Database.Connect(OnDatabaseConnected, db_name);
+	AnneDB_ConnectCompat(OnDatabaseConnected, db_name);
 }
 
 public void OnDatabaseConnected(Database db, const char[] error, any data)
@@ -40,10 +40,16 @@ public void OnDatabaseConnected(Database db, const char[] error, any data)
 		LogError("Couldn't connect to the database. Please verify your config.");
 		return;
 	}
-	
+
+	// 换图时可能有两次连接请求在途，保留先到的那条。
+	if (lil_db) {
+		delete db;
+		return;
+	}
+
 	lil_db = db;
 	
-	if(!SQL_SetCharset(lil_db,"utf8mb4"))
+	if(!AnneDB_SetCharsetIfOwned(lil_db,"utf8mb4"))
 	{
 		LogError("Failed to update encoding to utf8mb4: %s", error);
 		return;

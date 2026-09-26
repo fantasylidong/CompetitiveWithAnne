@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <anne_db>
 #include <colors>
 #undef REQUIRE_PLUGIN
 #include <l4dstats>
@@ -43,6 +44,7 @@ Database g_hThresholdDb = null;
 Handle g_hTimer = null;
 Handle g_hThresholdDbReconnectTimer = null;
 Handle g_hThresholdDbKeepAliveTimer = null;
+int g_iThresholdDbGeneration;
 ArrayList g_aControlledCvars = null;
 StringMap g_mControlledCvarBaselines = null;
 float g_fNextCheckAt = 0.0;
@@ -141,8 +143,8 @@ public void OnMapEnd()
     g_bConfigsExecuted = false;
     g_bRoundStartSeen = false;
     StopDifficultyTimer();
-    StopThresholdDbReconnect();
-    CloseThresholdDb();
+    // 数据库连接跨图复用，不在过图时断开。
+    g_bThresholdQueryInFlight = false;
 }
 
 public void OnPluginEnd()
@@ -753,22 +755,43 @@ void ConnectThresholdDb()
         return;
     }
 
+    // 阈值查询全是线程查询，连接也异步获取，不在主线程阻塞。
     g_bThresholdDbConnecting = true;
-    char error[256];
-    g_hThresholdDb = SQL_Connect(configName, false, error, sizeof(error));
+    AnneDB_ConnectCompat(SQL_OnThresholdDbConnected, configName, ++g_iThresholdDbGeneration);
+}
+
+public void SQL_OnThresholdDbConnected(Database db, const char[] error, any data)
+{
+    if (data != g_iThresholdDbGeneration)
+    {
+        delete db;
+        return;
+    }
+
     g_bThresholdDbConnecting = false;
 
-    if (g_hThresholdDb == null)
+    if (db == null)
     {
         LogError("[AnneHappyAI] failed to connect threshold database: %s", error);
         ScheduleThresholdDbReconnect();
         return;
     }
 
-    if (!SQL_SetCharset(g_hThresholdDb, "utf8mb4") && g_cvDebug.BoolValue)
+    if (g_hThresholdDb != null)
+    {
+        delete db;
+        return;
+    }
+
+    g_hThresholdDb = db;
+
+    if (!AnneDB_SetCharsetIfOwned(g_hThresholdDb, "utf8mb4") && g_cvDebug.BoolValue)
         LogMessage("[AnneHappyAI] failed to set threshold database charset utf8mb4");
 
-    StartThresholdDbKeepAlive();
+    // 共享连接由 anne_db 保活；只有回退到自己的连接时才需要本插件保活。
+    if (!AnneDB_IsShared(g_hThresholdDb))
+        StartThresholdDbKeepAlive();
+
     CreateThresholdTable();
 }
 
@@ -789,6 +812,8 @@ void CloseThresholdDb()
         g_hThresholdDb = null;
     }
 
+    // 让在途的连接回调失效。
+    g_iThresholdDbGeneration++;
     g_bThresholdDbConnecting = false;
     g_bThresholdQueryInFlight = false;
     g_bThresholdSchemaReady = false;

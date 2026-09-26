@@ -170,10 +170,9 @@ stock bool:MapRecords_CheckSchema()
 	Format(Table, sizeof(Table), "%smap_runs", DbPrefix);
 	SQL_EscapeString(db, Table, EscTable, sizeof(EscTable));
 	Format(Query, sizeof(Query), "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' LIMIT 1", EscTable);
-	new Handle:Runs = SQL_Query(db, Query);
+	new Handle:Runs = AnneDB_LockedQuery(db, Query, Error, sizeof(Error));
 	if (Runs == INVALID_HANDLE)
 	{
-		SQL_GetError(db, Error, sizeof(Error));
 		LogError("MapRecords schema check failed for map_runs: %s", Error);
 		return false;
 	}
@@ -183,10 +182,9 @@ stock bool:MapRecords_CheckSchema()
 	Format(Table, sizeof(Table), "%smap_run_players", DbPrefix);
 	SQL_EscapeString(db, Table, EscTable, sizeof(EscTable));
 	Format(Query, sizeof(Query), "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' LIMIT 1", EscTable);
-	new Handle:Players = SQL_Query(db, Query);
+	new Handle:Players = AnneDB_LockedQuery(db, Query, Error, sizeof(Error));
 	if (Players == INVALID_HANDLE)
 	{
-		SQL_GetError(db, Error, sizeof(Error));
 		LogError("MapRecords schema check failed for map_run_players: %s", Error);
 		return false;
 	}
@@ -196,10 +194,9 @@ stock bool:MapRecords_CheckSchema()
 	Format(Table, sizeof(Table), "%slegacy_map_bests", DbPrefix);
 	SQL_EscapeString(db, Table, EscTable, sizeof(EscTable));
 	Format(Query, sizeof(Query), "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' LIMIT 1", EscTable);
-	new Handle:Legacy = SQL_Query(db, Query);
+	new Handle:Legacy = AnneDB_LockedQuery(db, Query, Error, sizeof(Error));
 	if (Legacy == INVALID_HANDLE)
 	{
-		SQL_GetError(db, Error, sizeof(Error));
 		LogError("MapRecords schema check failed for legacy_map_bests: %s", Error);
 		return false;
 	}
