@@ -1122,12 +1122,12 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 ### 2026年9月23日 药役刷药位置控制（confoglcompmod ItemTracking）
 
-- 普通 / 硬核 / 喷子药役（以及共用普通药役配置的 WitchParty、牛牛冲刺）现在只在地图进度 30% 之后刷药：`confogl_pills_flow_min 0.3`。这是上游 ItemTracking 已有的进度窗口，之前药役没有打开。药的数量仍按 `confogl_pills_limit` / mapinfo 的 `pain_pills`，在 30%–100% 之间按进度均匀挑选。
+- 普通 / 硬核 / 喷子药役（以及共用普通药役配置的 WitchParty、牛牛冲刺）现在只在地图进度 30%–90% 之间刷药：`confogl_pills_flow_min 0.3`、`confogl_pills_flow_max 0.9`。这是上游 ItemTracking 已有的进度窗口，之前药役没有打开。药的数量仍按 `confogl_pills_limit` / mapinfo 的 `pain_pills`，在 30%–90% 之间按进度均匀挑选。
 - 新增 `confogl_pills_flow_max_detour`（药役设为 300）：药只保留在起点到终点的主路线上。插件先量出起点到终点安全屋的最短可走路线长度，再检查每瓶药绕去拿它要多走多少：走在主路上顺手就能拿到的药绕路接近 0，深度为 d 的侧屋、死胡同或岔路里的药绕路约为 d，超过 300 的删除。这一步在药间距和数量筛选之前执行，所以留下的药都从主路上的点位里挑。
-- 新增 `confogl_pills_flow_fill`（药役设为 1）：筛完后药数不够上限时，不拿侧屋里的药凑数，而是在留下的药旁边 24–40 单位处补刷一瓶（同一平面、中间不隔墙，找不到就叠在原位置）。优先挑进度在 30%–80% 之间的药，离 55% 越近越先；缺多瓶时在这些药之间轮流补；30%–80% 没有药时，全部补在进度最靠后的那瓶旁边。范围由 `confogl_pills_flow_fill_min` / `confogl_pills_flow_fill_max` 控制。这一步不寻路，没有额外开销。补刷的药会记进 ItemTracking，团灭重开后位置不变。整张图一瓶药都没留下时不补，日志里会记下来。
+- 新增 `confogl_pills_flow_fill`（药役设为 1）：筛完后药数不够上限时，不拿侧屋里的药凑数，而是在进度 40%–80% 的主路线上补刷（`confogl_pills_flow_fill_min 0.4`、`confogl_pills_flow_fill_max 0.8`，并且不会超出上面的 30%–90%）。缺几瓶就把 40%–80% 等分成几段，每段随机取一个进度，在离这个进度最近的主路线导航区（带 ESCAPE_ROUTE 标记，排除出生点、安全屋和救援区域）里随机找落点：要有地面、放得下、离其他药至少 128 单位，并且不在 mapinfo 标出的起点 / 终点安全屋范围内。每个进度最多试 32 个导航区，还不够就在 40%–80% 里再随机试几次。原图一瓶药都没有也会补。这一步不寻路。补刷的药会记进 ItemTracking，团灭重开后位置不变；没补满时日志里会记下补了几瓶。
 - 药的光束调明显：`data/l4d_random_beam_item.cfg` 里止痛药的光束从白色、高 20 改为绿色、高 250、宽 15，并打开底部光晕（光晕可以透墙看到）。这个文件 Anne 战役、绝境也在用，那边的药光束也一起变了。
 - 新增 `anne_pill_hint.smx`（普通 / 硬核 / 喷子药役、WitchParty、牛牛冲刺加载）：第一个生还者出安全屋时，在聊天栏告诉所有人这一关路上一共几瓶药、分别在多少进度，例如“38%、52%×2、71%”。安全屋里的药不算；进度用药所在导航区的进度值，和删药时的算法一致。提示支持简体中文、繁体中文、英语、日语、韩语。
-- 个别地图可以在 mapinfo 里用 `pillflow_min`、`pillflow_max_detour`、`pillflow_fill`、`pillflow_fill_min`、`pillflow_fill_max` 单独调整；`confogl_pills_flow_visualize 1` 不删药，只用发光标出结果（白色 = 保留，绿色 = 补刷，红色 = 进度窗口外，品红 = 不在主路上，橙色 = 离上一瓶太近，青色 = 超出数量）。救援关默认不做这些筛选（`confogl_pills_flow_finale 0`）。
+- 个别地图可以在 mapinfo 里用 `pillflow_min`、`pillflow_max`、`pillflow_max_detour`、`pillflow_fill`、`pillflow_fill_min`、`pillflow_fill_max` 单独调整；`confogl_pills_flow_visualize 1` 不删药，只用发光标出结果（白色 = 保留，绿色 = 补刷，红色 = 进度窗口外，品红 = 不在主路上，橙色 = 离上一瓶太近，青色 = 超出数量）。救援关默认不做这些筛选（`confogl_pills_flow_finale 0`）。
 - 重新编译 `confoglcompmod.smx`，新编译 `anne_pill_hint.smx`。
 
 ### 2026年9月23日 Tank 目标跑到身后改为掉头跳（ai_tank3 2.3.0）

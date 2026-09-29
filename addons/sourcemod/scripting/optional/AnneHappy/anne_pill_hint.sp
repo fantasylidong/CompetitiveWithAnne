@@ -6,7 +6,7 @@
 #include <left4dhooks>
 #include <colors>
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 
 #define WEPID_PAIN_PILLS 15
 #define MAX_PILL_SPOTS   64
@@ -155,35 +155,23 @@ bool SpotAfter(int a, int b)
     return (b != -1 && a > b);
 }
 
-// "38%, 52%×2, 71%": pills at the same percent are merged.
 void BuildSpotList(const int[] iPct, const int[] iNum, int iSpots, const char[] sSep, char[] sOut, int iMaxLen)
 {
     sOut[0] = '\0';
 
-    int i = 0;
-    while (i < iSpots) {
-        int iSame = iNum[i];
-        int j = i + 1;
-        while (j < iSpots && iPct[j] == iPct[i]) {
-            iSame += iNum[j];
-            j++;
-        }
-
+    for (int spot = 0; spot < iSpots; spot++) {
         char sItem[16];
-        if (iPct[i] < 0) {
+        if (iPct[spot] < 0) {
             strcopy(sItem, sizeof(sItem), "?");
         } else {
-            FormatEx(sItem, sizeof(sItem), "%d%%", iPct[i]);
-        }
-        if (iSame > 1) {
-            Format(sItem, sizeof(sItem), "%s×%d", sItem, iSame);
+            FormatEx(sItem, sizeof(sItem), "%d%%", iPct[spot]);
         }
 
-        if (sOut[0] != '\0') {
-            StrCat(sOut, iMaxLen, sSep);
+        for (int pill = 0; pill < iNum[spot]; pill++) {
+            if (sOut[0] != '\0') {
+                StrCat(sOut, iMaxLen, sSep);
+            }
+            StrCat(sOut, iMaxLen, sItem);
         }
-        StrCat(sOut, iMaxLen, sItem);
-
-        i = j;
     }
 }
