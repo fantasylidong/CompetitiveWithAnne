@@ -78,7 +78,11 @@ This repository sets **`nqh_report_enable "1"`** in [`cfg/sourcemod/network_qual
 * SteamWorks (`addons/sourcemod/extensions/SteamWorks.ext.so`)
 * an explicit `nqh_report_enable "1"`
 
-Website incidents focus on packet loss. Choke below `nqh_report_choke_limit` (default 20%) is not reported as an incident. Local chat warnings still use `nqh_choke_limit` (default 5%).
+Website incidents focus on packet loss. Loss below `nqh_report_loss_limit` (default 5%) and choke below `nqh_report_choke_limit` (default 20%) are not reported as incidents. Local chat warnings still use `nqh_loss_limit` (default 2%) and `nqh_choke_limit` (default 5%).
+
+Loss is measured on packets the player sends to the server (the same number `status` shows). The server cannot see which of its own packets are dropped, so server-to-player loss is always 0; versions before 1.1.7 checked that direction, so loss warnings never fired. Choke is measured on packets the server sends to the player, which matches the player's `net_graph`.
+
+Since 1.1.7 the plugin probes every second and judges each `nqh_check_interval` window by its average (report `*_max` fields keep the highest 1-second probe). Earlier versions read the engine's ~1-second moving average once every 5 seconds, so short choke bursts were usually missed.
 
 If you deploy this pack on a server that is **not** on the website whitelist, set `nqh_report_enable "0"`. Local detection still works; the website will not accept reports from unknown servers.
 

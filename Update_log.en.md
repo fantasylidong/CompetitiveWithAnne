@@ -588,3 +588,13 @@
 
 - The `!rpg` / `!buy` main menu has a new "Item beam settings" entry after the hit feedback menu; it opens the `!beam` settings menu. It only shows in modes that load `l4d_random_beam_item`, which now registers a library of the same name for `rpg.smx` to check.
 - Recompiled `rpg.smx` and `l4d_random_beam_item.smx`.
+
+### 2026-10-01 Network quality hint: choke detection and loss direction fixes
+
+- Upgraded `network_quality_hint` to 1.1.7. The engine's loss/choke values are only a ~1-second moving average, and older versions read them once every 5 seconds, effectively sampling one random second. One- or two-second choke bursts during hordes or entity-heavy fights were almost never caught, and chat warnings also required 3 bad samples in a row, so choke practically never triggered.
+- The plugin now probes every second and judges ping/loss/choke by the average over each check window (`nqh_check_interval`, default 5 seconds); a timeout counts if it appears anywhere in the window. Thresholds are unchanged: 5% choke for chat warnings, 20% for website incidents.
+- Website reports use each window's average for avg/p95 and the highest 1-second probe for max, so short spikes are no longer lost.
+- Loss is now measured on packets the player sends to the server (the same number `status` shows). The server cannot tell whether its own packets were dropped, so the server-to-player loss checked by older versions was always 0 and loss warnings and website incidents never fired.
+- Added `nqh_report_loss_limit` (default 5%): a website incident is recorded only when the window's average loss exceeds it. Chat warnings still use `nqh_loss_limit` (2%, three windows in a row).
+- The `!net` measurement note now explains the loss direction. Warning reasons and the hard-coded "[网络]" tag now come from translation files, so all six languages follow the player's language.
+- Recompiled `network_quality_hint.smx`. Matching NewAnneWeb changes: the admin loss column shows player-to-server loss, and incident rows show their reason (loss / ping / choke / timing_out).

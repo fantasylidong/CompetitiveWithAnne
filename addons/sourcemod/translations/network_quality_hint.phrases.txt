@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"en"		"%s Detection caliber: choke Use the direction sent to you by the server; the direction you sent to the server is currently {olive}%.2f%%{default}."
+		"en"		"%s Measurement: loss counts packets you send to the server; choke counts packets the server sends to you. Choke on your packets to the server is currently {olive}%.2f%%{default}."
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"en"		"%s For third-line servers, please give priority to using the diversion entrance displayed on the web page to avoid taking the wrong route from collections or history records."
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"en"		"{green}[Network]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"en"		"high ping"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"en"		"high packet loss"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"en"		"high choke"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"en"		"connection timing out"
 	}
 }

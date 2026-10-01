@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"ko"		"%s 감지 구경: 초크 서버에서 보낸 방향을 사용합니다. 서버로 보낸 방향은 현재 {olive}%.2f%%{default}입니다."
+		"ko"		"%s 측정 방향: 손실은 내가 서버로 보내는 패킷, 초크는 서버가 나에게 보내는 패킷 기준입니다. 내가 서버로 보내는 방향의 초크는 현재 {olive}%.2f%%{default}입니다."
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"ko"		"%s 3차 서버의 경우 컬렉션이나 이력 기록에서 잘못된 경로를 선택하지 않도록 웹 페이지에 표시된 전환 입구를 우선적으로 이용하시기 바랍니다."
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"ko"		"{green}[네트워크]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"ko"		"핑 높음"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"ko"		"패킷 손실 높음"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"ko"		"초크 높음"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"ko"		"연결 시간 초과"
 	}
 }

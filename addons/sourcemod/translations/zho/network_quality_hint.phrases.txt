@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"zho"		"%s 偵測口徑：choke 使用伺服器寄給你的方向；你寄給伺服器方向目前為 {olive}%.2f%%{default}。"
+		"zho"		"%s 偵測口徑：丟包統計你傳給伺服器的方向；choke 統計伺服器傳給你的方向，你傳給伺服器方向的 choke 目前為 {olive}%.2f%%{default}。"
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"zho"		"%s 三線伺服器請優先使用網頁展示的分流入口，避免從收藏或歷史記錄走錯線路。"
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"zho"		"{green}[網路]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"zho"		"ping過高"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"zho"		"丟包過高"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"zho"		"choke過高"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"zho"		"連線逾時"
 	}
 }

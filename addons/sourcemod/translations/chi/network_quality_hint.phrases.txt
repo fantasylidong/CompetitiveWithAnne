@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"chi"		"%s 检测口径：choke 使用服务器发给你的方向；你发给服务器方向当前为 {olive}%.2f%%{default}。"
+		"chi"		"%s 检测口径：丢包统计你发给服务器的方向；choke 统计服务器发给你的方向，你发给服务器方向的 choke 当前为 {olive}%.2f%%{default}。"
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"chi"		"%s 三线服务器请优先使用网页展示的分流入口，避免从收藏或历史记录走错线路。"
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"chi"		"{green}[网络]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"chi"		"ping过高"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"chi"		"丢包过高"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"chi"		"choke过高"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"chi"		"连接超时"
 	}
 }

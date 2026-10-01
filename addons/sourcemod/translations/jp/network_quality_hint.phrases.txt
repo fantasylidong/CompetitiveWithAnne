@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"jp"		"%s 検出口径: チョーク サーバーから送信された方向を使用します。サーバーに送信した方向は現在 {olive}%.2f%%{default} です。"
+		"jp"		"%s 計測方向: 損失はあなたからサーバーへ送るパケット、チョークはサーバーからあなたへ送るパケットで計測します。あなたからサーバーへのチョークは現在 {olive}%.2f%%{default} です。"
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"jp"		"%s サードラインサーバーの場合は、コレクションや履歴からの誤ったルートを避けるために、Web ページに表示される迂回入り口を優先して使用してください。"
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"jp"		"{green}[ネットワーク]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"jp"		"ping が高い"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"jp"		"パケット損失が多い"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"jp"		"チョークが多い"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"jp"		"接続タイムアウト"
 	}
 }

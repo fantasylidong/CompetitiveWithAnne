@@ -6,7 +6,7 @@
 	}
 	"NetworkQualityHint_DetectionCaliberChokeUseDirection"
 	{
-		"vi"		"%s Phát hiện cỡ nòng: sặc Sử dụng hướng được máy chủ gửi cho bạn; hướng bạn gửi tới máy chủ hiện tại là {olive}%.2f%%{default}."
+		"vi"		"%s Cách đo: mất gói tính theo gói bạn gửi tới máy chủ; sặc (choke) tính theo gói máy chủ gửi cho bạn. Sặc theo chiều bạn gửi tới máy chủ hiện là {olive}%.2f%%{default}."
 	}
 	"NetworkQualityHint_AbnormalDelayPacketLossOpen"
 	{
@@ -23,5 +23,25 @@
 	"NetworkQualityHint_ThirdLineServersGivePriority"
 	{
 		"vi"		"%s Đối với các máy chủ tuyến thứ ba, vui lòng ưu tiên sử dụng lối vào chuyển hướng hiển thị trên trang web để tránh đi sai đường từ các bộ sưu tập hoặc hồ sơ lịch sử."
+	}
+	"NetworkQualityHint_Tag"
+	{
+		"vi"		"{green}[Mạng]{default}"
+	}
+	"NetworkQualityHint_ReasonPing"
+	{
+		"vi"		"ping cao"
+	}
+	"NetworkQualityHint_ReasonLoss"
+	{
+		"vi"		"mất gói cao"
+	}
+	"NetworkQualityHint_ReasonChoke"
+	{
+		"vi"		"sặc cao"
+	}
+	"NetworkQualityHint_ReasonTimeout"
+	{
+		"vi"		"kết nối sắp hết thời gian chờ"
 	}
 }

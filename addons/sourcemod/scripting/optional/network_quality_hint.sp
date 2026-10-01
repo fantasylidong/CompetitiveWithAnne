@@ -8,9 +8,9 @@
 #include <SteamWorks>
 #define REQUIRE_EXTENSIONS
 
-#define PLUGIN_VERSION "1.1.6"
-#define CHAT_TAG "{green}[网络]{default}"
+#define PLUGIN_VERSION "1.1.7"
 #define MAX_REPORT_SAMPLES 128
+#define NET_PROBE_INTERVAL 1.0
 
 enum NetworkMetric
 {
@@ -39,10 +39,12 @@ ConVar
 	g_hReportUrl,
 	g_hReportInterval,
 	g_hReportChokeLimit,
+	g_hReportLossLimit,
 	g_hReportBadSamples,
 	g_hReportRecoverySamples;
 
 Handle g_hTimer;
+int g_iProbeTicks;
 
 bool g_bEnable;
 bool g_bReportEnable;
@@ -55,6 +57,7 @@ float g_fWarnCooldown;
 float g_fIntroDelay;
 int g_iReportInterval;
 float g_fReportChokeLimit;
+float g_fReportLossLimit;
 int g_iReportBadSamples;
 int g_iReportRecoverySamples;
 char g_sIpPageUrl[192];
@@ -74,6 +77,11 @@ int g_iTimeoutSampleCount[MAXPLAYERS + 1];
 int g_iMaxConsecutiveBad[MAXPLAYERS + 1];
 char g_sPlayerIp[MAXPLAYERS + 1][46];
 char g_sPlayerSteamId[MAXPLAYERS + 1][32];
+
+float g_fProbeSum[MAXPLAYERS + 1][NetworkMetricCount];
+float g_fProbePeak[MAXPLAYERS + 1][NetworkMetricCount];
+int g_iProbeCount[MAXPLAYERS + 1][NetworkMetricCount];
+bool g_bProbeTimingOut[MAXPLAYERS + 1];
 
 float g_fMetricSum[MAXPLAYERS + 1][NetworkMetricCount];
 float g_fMetricMax[MAXPLAYERS + 1][NetworkMetricCount];
@@ -99,9 +107,9 @@ public void OnPluginStart()
 	CreateConVar("nqh_version", PLUGIN_VERSION, "Network Quality Hint version.", FCVAR_NONE | FCVAR_DONTRECORD);
 
 	g_hEnable = CreateConVar("nqh_enable", "1", "Enable network quality checks.", _, true, 0.0, true, 1.0);
-	g_hCheckInterval = CreateConVar("nqh_check_interval", "5.0", "Seconds between local network samples. Samples are not uploaded individually.", _, true, 5.0, true, 300.0);
+	g_hCheckInterval = CreateConVar("nqh_check_interval", "5.0", "Seconds between local network checks. Metrics are probed every second and averaged over this window; samples are not uploaded individually.", _, true, 5.0, true, 300.0);
 	g_hPingLimit = CreateConVar("nqh_ping_limit", "120", "Warn when ping is higher than this value in ms. -1 disables ping checks.", _, true, -1.0);
-	g_hLossLimit = CreateConVar("nqh_loss_limit", "2.0", "Warn when packet loss is higher than this percent. -1 disables loss checks.", _, true, -1.0);
+	g_hLossLimit = CreateConVar("nqh_loss_limit", "2.0", "Warn when client-to-server packet loss is higher than this percent. -1 disables loss checks.", _, true, -1.0);
 	g_hChokeLimit = CreateConVar("nqh_choke_limit", "5.0", "Warn when choke is higher than this percent. -1 disables choke checks.", _, true, -1.0);
 	g_hBadSamples = CreateConVar("nqh_bad_samples", "3", "Consecutive bad samples required before warning the player.", _, true, 1.0, true, 20.0);
 	g_hWarnCooldown = CreateConVar("nqh_warn_cooldown", "180.0", "Seconds before warning the same player again.", _, true, 30.0, true, 1800.0);
@@ -111,6 +119,7 @@ public void OnPluginStart()
 	g_hReportUrl = CreateConVar("nqh_report_url", "http://anne.trygek.com/api/player/connection_quality.php", "HTTP endpoint for player connection quality reports.");
 	g_hReportInterval = CreateConVar("nqh_report_interval", "600", "Seconds between normal summary reports. Incidents and disconnects report immediately.", _, true, 60.0, true, 3600.0);
 	g_hReportChokeLimit = CreateConVar("nqh_report_choke_limit", "20.0", "Report a choke incident only when choke is higher than this percent. -1 disables choke incidents. Local chat warnings still use nqh_choke_limit.", _, true, -1.0);
+	g_hReportLossLimit = CreateConVar("nqh_report_loss_limit", "5.0", "Report a loss incident only when client-to-server packet loss is higher than this percent. -1 disables loss incidents. Local chat warnings still use nqh_loss_limit.", _, true, -1.0);
 	g_hReportBadSamples = CreateConVar("nqh_report_bad_samples", "1", "Consecutive bad local samples required to report an incident.", _, true, 1.0, true, 20.0);
 	g_hReportRecoverySamples = CreateConVar("nqh_report_recovery_samples", "3", "Consecutive good local samples required to report recovery.", _, true, 1.0, true, 20.0);
 
@@ -132,6 +141,7 @@ public void OnPluginStart()
 	HookConVarChange(g_hReportUrl, OnCvarChanged);
 	HookConVarChange(g_hReportInterval, OnCvarChanged);
 	HookConVarChange(g_hReportChokeLimit, OnCvarChanged);
+	HookConVarChange(g_hReportLossLimit, OnCvarChanged);
 	HookConVarChange(g_hReportBadSamples, OnCvarChanged);
 	HookConVarChange(g_hReportRecoverySamples, OnCvarChanged);
 
@@ -217,6 +227,7 @@ void ReadCvars()
 	g_fIntroDelay = g_hIntroDelay.FloatValue;
 	g_iReportInterval = g_hReportInterval.IntValue;
 	g_fReportChokeLimit = g_hReportChokeLimit.FloatValue;
+	g_fReportLossLimit = g_hReportLossLimit.FloatValue;
 	g_iReportBadSamples = g_hReportBadSamples.IntValue;
 	g_iReportRecoverySamples = g_hReportRecoverySamples.IntValue;
 
@@ -227,8 +238,9 @@ void ReadCvars()
 void RestartTimer()
 {
 	StopTimer();
+	g_iProbeTicks = 0;
 	if (g_bEnable) {
-		g_hTimer = CreateTimer(g_fCheckInterval, Timer_CheckClients, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		g_hTimer = CreateTimer(NET_PROBE_INTERVAL, Timer_ProbeClients, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -249,51 +261,98 @@ Action Timer_IntroHint(Handle timer, any userid)
 	return Plugin_Stop;
 }
 
-Action Timer_CheckClients(Handle timer)
+// Engine loss/choke are ~1 second moving averages. Reading them once per check
+// interval only saw a random 1-second slice, so bursty choke (hordes, big
+// snapshots) was almost never caught. Probe every second and judge the whole window.
+Action Timer_ProbeClients(Handle timer)
 {
 	if (!g_bEnable) {
 		return Plugin_Continue;
 	}
 
+	bool check = ++g_iProbeTicks >= RoundToNearest(g_fCheckInterval / NET_PROBE_INTERVAL);
+	if (check) {
+		g_iProbeTicks = 0;
+	}
 	for (int client = 1; client <= MaxClients; client++) {
 		if (IsHumanInGame(client)) {
-			CheckClient(client);
+			ProbeClient(client);
+			if (check) {
+				CheckClient(client);
+			}
 		}
 	}
 	return Plugin_Continue;
 }
 
+void ProbeClient(int client)
+{
+	AddProbe(client, MetricLatencyIncoming, GetClientAvgLatency(client, NetFlow_Incoming) * 1000.0);
+	AddProbe(client, MetricLatencyOutgoing, GetClientAvgLatency(client, NetFlow_Outgoing) * 1000.0);
+	AddProbe(client, MetricLossIncoming, GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Incoming)));
+	AddProbe(client, MetricLossOutgoing, GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Outgoing)));
+	AddProbe(client, MetricChokeIncoming, GetNetworkPctRaw(GetClientAvgChoke(client, NetFlow_Incoming)));
+	AddProbe(client, MetricChokeOutgoing, GetNetworkPctRaw(GetClientAvgChoke(client, NetFlow_Outgoing)));
+	AddProbe(client, MetricPacketsIncoming, GetClientAvgPackets(client, NetFlow_Incoming));
+	AddProbe(client, MetricPacketsOutgoing, GetClientAvgPackets(client, NetFlow_Outgoing));
+	if (IsClientTimingOut(client)) {
+		g_bProbeTimingOut[client] = true;
+	}
+}
+
+void AddProbe(int client, NetworkMetric metric, float value)
+{
+	if (value < 0.0) {
+		return;
+	}
+	if (g_iProbeCount[client][metric] == 0 || value > g_fProbePeak[client][metric]) {
+		g_fProbePeak[client][metric] = value;
+	}
+	g_fProbeSum[client][metric] += value;
+	g_iProbeCount[client][metric]++;
+}
+
+float GetProbeAverage(int client, NetworkMetric metric)
+{
+	int count = g_iProbeCount[client][metric];
+	return count > 0 ? g_fProbeSum[client][metric] / float(count) : -1.0;
+}
+
+void ResetProbeWindow(int client)
+{
+	g_bProbeTimingOut[client] = false;
+	for (int metric = 0; metric < view_as<int>(NetworkMetricCount); metric++) {
+		g_fProbeSum[client][metric] = 0.0;
+		g_fProbePeak[client][metric] = 0.0;
+		g_iProbeCount[client][metric] = 0;
+	}
+}
+
 void CheckClient(int client)
 {
-	float latencyIncoming = GetClientAvgLatency(client, NetFlow_Incoming) * 1000.0;
-	float latencyOutgoing = GetClientAvgLatency(client, NetFlow_Outgoing) * 1000.0;
-	float lossIncoming = GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Incoming));
-	float lossOutgoing = GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Outgoing));
-	float chokeIncoming = GetNetworkPctRaw(GetClientAvgChoke(client, NetFlow_Incoming));
-	float chokeOutgoing = GetNetworkPctRaw(GetClientAvgChoke(client, NetFlow_Outgoing));
-	float packetsIncoming = GetClientAvgPackets(client, NetFlow_Incoming);
-	float packetsOutgoing = GetClientAvgPackets(client, NetFlow_Outgoing);
-	bool timingOut = IsClientTimingOut(client);
+	// The server never learns which of its own packets were dropped, so outgoing
+	// loss is always 0. Loss is judged on what the server receives from the player.
+	float latencyOutgoing = GetProbeAverage(client, MetricLatencyOutgoing);
+	float lossIncoming = GetProbeAverage(client, MetricLossIncoming);
+	float chokeOutgoing = GetProbeAverage(client, MetricChokeOutgoing);
+	bool timingOut = g_bProbeTimingOut[client];
 
-	AddMetricSample(client, MetricLatencyIncoming, latencyIncoming);
-	AddMetricSample(client, MetricLatencyOutgoing, latencyOutgoing);
-	AddMetricSample(client, MetricLossIncoming, lossIncoming);
-	AddMetricSample(client, MetricLossOutgoing, lossOutgoing);
-	AddMetricSample(client, MetricChokeIncoming, chokeIncoming);
-	AddMetricSample(client, MetricChokeOutgoing, chokeOutgoing);
-	AddMetricSample(client, MetricPacketsIncoming, packetsIncoming);
-	AddMetricSample(client, MetricPacketsOutgoing, packetsOutgoing);
+	for (int metric = 0; metric < view_as<int>(NetworkMetricCount); metric++) {
+		AddMetricSample(client, view_as<NetworkMetric>(metric));
+	}
+	ResetProbeWindow(client);
 	g_iSampleCount[client]++;
 
 	int ping = latencyOutgoing < 0.0 ? 0 : RoundToNearest(latencyOutgoing);
-	float loss = lossOutgoing < 0.0 ? 0.0 : lossOutgoing;
+	float loss = lossIncoming < 0.0 ? 0.0 : lossIncoming;
 	float choke = chokeOutgoing < 0.0 ? 0.0 : chokeOutgoing;
 	bool badPing = g_iPingLimit >= 0 && latencyOutgoing >= 0.0 && ping > g_iPingLimit;
-	bool badLoss = g_fLossLimit >= 0.0 && lossOutgoing >= 0.0 && lossOutgoing > g_fLossLimit;
+	bool warnLoss = g_fLossLimit >= 0.0 && lossIncoming >= 0.0 && lossIncoming > g_fLossLimit;
+	bool reportLoss = g_fReportLossLimit >= 0.0 && lossIncoming >= 0.0 && lossIncoming > g_fReportLossLimit;
 	bool warnChoke = g_fChokeLimit >= 0.0 && chokeOutgoing >= 0.0 && chokeOutgoing > g_fChokeLimit;
 	bool reportChoke = g_fReportChokeLimit >= 0.0 && chokeOutgoing >= 0.0 && chokeOutgoing > g_fReportChokeLimit;
-	bool warnBad = timingOut || badPing || badLoss || warnChoke;
-	bool reportBad = timingOut || badLoss || badPing || reportChoke;
+	bool warnBad = timingOut || badPing || warnLoss || warnChoke;
+	bool reportBad = timingOut || reportLoss || badPing || reportChoke;
 
 	if (timingOut) {
 		g_iTimeoutSampleCount[client]++;
@@ -307,7 +366,7 @@ void CheckClient(int client)
 		}
 		if (!g_bIncidentActive[client] && g_iBadCount[client] >= g_iReportBadSamples) {
 			char incidentCode[32];
-			ClassifyIncidentReason(timingOut, badLoss, badPing, reportChoke, incidentCode, sizeof(incidentCode));
+			ClassifyIncidentReason(timingOut, reportLoss, badPing, reportChoke, incidentCode, sizeof(incidentCode));
 			SendQualityReport(client, "incident", incidentCode, "");
 			g_bIncidentActive[client] = true;
 		}
@@ -323,7 +382,7 @@ void CheckClient(int client)
 
 	if (warnBad) {
 		g_iWarnCount[client]++;
-		MaybeWarnPlayer(client, ping, loss, choke, badPing, badLoss, warnChoke);
+		MaybeWarnPlayer(client, ping, loss, choke, badPing, warnLoss, warnChoke);
 	} else {
 		g_iWarnCount[client] = 0;
 	}
@@ -364,36 +423,44 @@ void PrintClientStatus(int client, bool includeRouteHint)
 	int ping = GetClientPingMs(client);
 	float loss = GetClientLossPct(client);
 	float choke = GetClientChokePct(client);
-	CPrintToChat(client, "%t", "NetworkQualityHint_CurrentNetworkPingMSLoss", CHAT_TAG, ping, loss, choke);
+	char tag[64];
+	FormatEx(tag, sizeof(tag), "%T", "NetworkQualityHint_Tag", client);
+	CPrintToChat(client, "%t", "NetworkQualityHint_CurrentNetworkPingMSLoss", tag, ping, loss, choke);
 
 	if (includeRouteHint) {
 		float clientChoke = GetClientIncomingChokePct(client);
 		char pageUrl[512];
 		BuildServerPageUrl(pageUrl, sizeof(pageUrl));
-		CPrintToChat(client, "%t", "NetworkQualityHint_DetectionCaliberChokeUseDirection", CHAT_TAG, clientChoke);
-		CPrintToChat(client, "%t", "NetworkQualityHint_AbnormalDelayPacketLossOpen", CHAT_TAG, pageUrl);
+		CPrintToChat(client, "%t", "NetworkQualityHint_DetectionCaliberChokeUseDirection", tag, clientChoke);
+		CPrintToChat(client, "%t", "NetworkQualityHint_AbnormalDelayPacketLossOpen", tag, pageUrl);
 	}
 }
 
 void PrintNetworkWarning(int client, int ping, float loss, float choke, bool badPing, bool badLoss, bool badChoke)
 {
-	char reason[128];
+	char tag[64];
+	char reason[192];
 	char pageUrl[512];
-	BuildReason(reason, sizeof(reason), badPing, badLoss, badChoke);
+	FormatEx(tag, sizeof(tag), "%T", "NetworkQualityHint_Tag", client);
+	BuildReason(client, reason, sizeof(reason), badPing, badLoss, badChoke);
 	BuildServerPageUrl(pageUrl, sizeof(pageUrl));
-	CPrintToChat(client, "%t", "NetworkQualityHint_AbnormalityNetworkStatusDetectedCurrent", CHAT_TAG, reason, ping, loss, choke);
-	CPrintToChat(client, "%t", "NetworkQualityHint_OpenIPPageCopyConnect", CHAT_TAG, pageUrl);
-	CPrintToChat(client, "%t", "NetworkQualityHint_ThirdLineServersGivePriority", CHAT_TAG);
+	CPrintToChat(client, "%t", "NetworkQualityHint_AbnormalityNetworkStatusDetectedCurrent", tag, reason, ping, loss, choke);
+	CPrintToChat(client, "%t", "NetworkQualityHint_OpenIPPageCopyConnect", tag, pageUrl);
+	CPrintToChat(client, "%t", "NetworkQualityHint_ThirdLineServersGivePriority", tag);
 }
 
-void AddMetricSample(int client, NetworkMetric metric, float value)
+// One report sample per check window: the window average feeds avg/p95, the
+// highest 1-second probe feeds max.
+void AddMetricSample(int client, NetworkMetric metric)
 {
-	if (value < 0.0) {
+	if (g_iProbeCount[client][metric] <= 0) {
 		return;
 	}
+	float value = GetProbeAverage(client, metric);
+	float peak = g_fProbePeak[client][metric];
 	g_fMetricSum[client][metric] += value;
-	if (g_iMetricValidCount[client][metric] == 0 || value > g_fMetricMax[client][metric]) {
-		g_fMetricMax[client][metric] = value;
+	if (g_iMetricValidCount[client][metric] == 0 || peak > g_fMetricMax[client][metric]) {
+		g_fMetricMax[client][metric] = peak;
 	}
 	g_iMetricValidCount[client][metric]++;
 	int index = g_iMetricWriteIndex[client][metric];
@@ -615,6 +682,7 @@ void ResetClientState(int client)
 	g_iSessionStartedAt[client] = GetTime();
 	g_sPlayerIp[client][0] = '\0';
 	g_sPlayerSteamId[client][0] = '\0';
+	ResetProbeWindow(client);
 	ResetReportWindow(client, g_iSessionStartedAt[client]);
 }
 
@@ -682,23 +750,31 @@ void BuildServerPageUrl(char[] buffer, int maxlen)
 	}
 }
 
-void BuildReason(char[] buffer, int maxlen, bool badPing, bool badLoss, bool badChoke)
+void BuildReason(int client, char[] buffer, int maxlen, bool badPing, bool badLoss, bool badChoke)
 {
 	buffer[0] = '\0';
 	if (badPing) {
-		StrCat(buffer, maxlen, "ping过高");
+		AppendReason(client, buffer, maxlen, "NetworkQualityHint_ReasonPing");
 	}
 	if (badLoss) {
-		if (buffer[0] != '\0') StrCat(buffer, maxlen, " / ");
-		StrCat(buffer, maxlen, "丢包过高");
+		AppendReason(client, buffer, maxlen, "NetworkQualityHint_ReasonLoss");
 	}
 	if (badChoke) {
-		if (buffer[0] != '\0') StrCat(buffer, maxlen, " / ");
-		StrCat(buffer, maxlen, "choke过高");
+		AppendReason(client, buffer, maxlen, "NetworkQualityHint_ReasonChoke");
 	}
 	if (buffer[0] == '\0') {
-		StrCat(buffer, maxlen, "连接超时");
+		AppendReason(client, buffer, maxlen, "NetworkQualityHint_ReasonTimeout");
 	}
+}
+
+void AppendReason(int client, char[] buffer, int maxlen, const char[] phrase)
+{
+	char part[64];
+	FormatEx(part, sizeof(part), "%T", phrase, client);
+	if (buffer[0] != '\0') {
+		StrCat(buffer, maxlen, " / ");
+	}
+	StrCat(buffer, maxlen, part);
 }
 
 int GetClientPingMs(int client)
@@ -709,7 +785,7 @@ int GetClientPingMs(int client)
 
 float GetClientLossPct(int client)
 {
-	float value = GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Outgoing));
+	float value = GetNetworkPctRaw(GetClientAvgLoss(client, NetFlow_Incoming));
 	return value < 0.0 ? 0.0 : value;
 }
 
