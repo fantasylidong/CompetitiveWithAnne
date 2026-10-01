@@ -10,18 +10,20 @@
 #define PF_CULL_SEP    2
 #define PF_CULL_LIMIT  3
 #define PF_CULL_ROUTE  4
+#define PF_CULL_NO_FLOW 5
 #define PF_NO_FLOW     -1   // no nav/flow data: always kept, excluded from spacing
 
 #define PF_FILL_AREA_ATTEMPTS 32
 
 static int PF_GLOW_KEEP[3] = {255, 255, 255};   // white
 static int PF_GLOW_FILL[3] = {0, 255, 0};       // green
-static int PF_GLOW_CULL[5][3] = {
+static int PF_GLOW_CULL[6][3] = {
     {0, 0, 0},          // PF_KEEP (unused)
     {255, 0, 0},        // PF_CULL_WINDOW: red
     {255, 165, 0},      // PF_CULL_SEP: orange
     {0, 255, 255},      // PF_CULL_LIMIT: cyan
-    {255, 0, 255}       // PF_CULL_ROUTE: magenta
+    {255, 0, 255},      // PF_CULL_ROUTE: magenta
+    {128, 128, 128}
 };
 
 // Item lists for tracking/decoding/etc
@@ -62,6 +64,7 @@ enum /*ItemNames*/
 enum struct ItemTracking
 {
     int IT_entity;
+    int IT_count;
     float IT_origins;
     float IT_origins1;
     float IT_origins2;
@@ -147,6 +150,7 @@ static ConVar
     g_hCvarPillFlowFill = null,
     g_hCvarPillFlowFillMin = null,
     g_hCvarPillFlowFillMax = null,
+    g_hCvarPillFlowRequireValid = null,
     g_hCvarPillFlowVisualize = null,
     g_hCvarLimits[ItemList_Size] = {null, ...}; // CVAR Handle Array for item limits
 
@@ -177,6 +181,7 @@ void IT_OnModuleStart()
     g_hCvarPillFlowFill = CreateConVarEx("pills_flow_fill", "0", "Fill missing pills at random progress positions on the main route, including maps with no original pills. 0 = off.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowFillMin = CreateConVarEx("pills_flow_fill_min", "0.3", "Minimum map flow fraction for randomly spawned fill pills.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowFillMax = CreateConVarEx("pills_flow_fill_max", "1.0", "Maximum map flow fraction for randomly spawned fill pills; saferoom nav areas are excluded.", _, true, 0.0, true, 1.0);
+    g_hCvarPillFlowRequireValid = CreateConVarEx("pills_flow_require_valid", "0", "Remove pills without readable flow so enabled main-route filling can replace them. Map override: pillflow_require_valid.", _, true, 0.0, true, 1.0);
     g_hCvarPillFlowVisualize = CreateConVarEx("pills_flow_visualize", "0", "Debug: 1 = don't remove pills, glow instead: white = kept, green = spawned to fill the limit, red = outside flow window, magenta = off the main route, orange = too close to previous pill, cyan = over the pills limit. 2 = remove as normal, then glow the surviving pills white/green.", _, true, 0.0, true, 2.0);
 
     char sNameBuf[64], sCvarDescBuf[256];
@@ -339,11 +344,11 @@ static void CreateItemListTrie()
 
 static void KillRegisteredItems()
 {
-    int itemindex = 0, psychonic = GetEntityCount();
+    int itemindex = 0, maxEntities = GetMaxEntities();
     int iSurvivorLimit = g_hSurvivorLimit.IntValue;
     bool bKeepPlayerItems = g_hCvarIgnorePlayerItems.BoolValue;
 
-    for (int i = (MaxClients + 1); i <= psychonic; i++) {
+    for (int i = (MaxClients + 1); i < maxEntities; i++) {
         if (!IsValidEdict(i)) {
             continue;
         }
@@ -391,7 +396,7 @@ static void SpawnItems()
                                 IT_MODULE_NAME, g_sItemNames[itemidx][IN_officialname], itemidx, wepid, idx, origins[0], origins[1], origins[2]);
             }
 
-            itement = CreateItemSpawn(itemidx, origins, angles);
+            itement = CreateItemSpawn(itemidx, origins, angles, curitem.IT_count);
             if (itement == -1) {
                 continue;
             }
@@ -407,7 +412,7 @@ static void SpawnItems()
     }
 }
 
-static int CreateItemSpawn(int itemidx, const float origins[3], const float angles[3])
+static int CreateItemSpawn(int itemidx, const float origins[3], const float angles[3], int count = 1)
 {
     int itement = CreateEntityByName("weapon_spawn");
     if (itement == -1) {
@@ -419,12 +424,20 @@ static int CreateItemSpawn(int itemidx, const float origins[3], const float angl
 
     SetEntProp(itement, Prop_Send, "m_weaponID", GetWeaponIDFromItemList(itemidx));
     SetEntityModel(itement, sModelname);
-    DispatchKeyValue(itement, "count", "1");
+    char countValue[16];
+    IntToString(count, countValue, sizeof(countValue));
     TeleportEntity(itement, origins, angles, NULL_VECTOR);
     DispatchSpawn(itement);
+    DispatchKeyValue(itement, "count", countValue);
     SetEntityMoveType(itement, MOVETYPE_NONE);
 
     return itement;
+}
+
+static int IT_GetSpawnCount(int entity)
+{
+    int count = HasEntProp(entity, Prop_Data, "m_itemCount") ? GetEntProp(entity, Prop_Data, "m_itemCount") : 1;
+    return count > 0 ? count : 0;
 }
 
 static void EnumerateSpawns()
@@ -441,16 +454,21 @@ static void EnumerateSpawns()
     ItemTracking curitem;
 
     float origins[3], angles[3];
-    int itemindex = 0, psychonic = GetEntityCount();
+    int itemindex = 0, maxEntities = GetMaxEntities();
     int iSurvivorLimit = g_hSurvivorLimit.IntValue;
 
-    for (int i = (MaxClients + 1); i <= psychonic; i++) {
+    for (int i = (MaxClients + 1); i < maxEntities; i++) {
         if (!IsValidEdict(i)) {
             continue;
         }
 
         itemindex = GetItemIndexFromEntity(i);
         if (itemindex >= 0/* && !IsEntityInSaferoom(i)*/) {
+            curitem.IT_count = IT_GetSpawnCount(i);
+            if (curitem.IT_count == 0) {
+                KillEntity(i);
+                continue;
+            }
             if (IsEntityInSaferoom(i, START_SAFEROOM)) {
                 if (g_iSaferoomCount[START_SAFEROOM - 1] < iSurvivorLimit) {
                     g_iSaferoomCount[START_SAFEROOM - 1]++;
@@ -522,6 +540,29 @@ static void RemoveToLimits()
         curlimit = g_iItemLimits[itemidx];
 
         if (curlimit > 0) {
+            if (itemidx == IL_PainPills) {
+                int total;
+                for (int spot = 0; spot < g_hItemSpawns[itemidx].Length; spot++) {
+                    g_hItemSpawns[itemidx].GetArray(spot, curitem, sizeof(curitem));
+                    total += curitem.IT_count;
+                }
+                while (total > curlimit) {
+                    killidx = GetURandomIntRange(0, g_hItemSpawns[itemidx].Length - 1);
+                    g_hItemSpawns[itemidx].GetArray(killidx, curitem, sizeof(curitem));
+                    int removeCount = total - curlimit;
+                    if (removeCount < curitem.IT_count) {
+                        curitem.IT_count -= removeCount;
+                        SetEntProp(curitem.IT_entity, Prop_Data, "m_itemCount", curitem.IT_count);
+                        g_hItemSpawns[itemidx].SetArray(killidx, curitem, sizeof(curitem));
+                        total -= removeCount;
+                    } else {
+                        total -= curitem.IT_count;
+                        KillEntity(curitem.IT_entity);
+                        g_hItemSpawns[itemidx].Erase(killidx);
+                    }
+                }
+                continue;
+            }
             // Kill off item spawns until we've reduced the item to the limit
             while (g_hItemSpawns[itemidx].Length > curlimit) {
                 // Pick a random
@@ -565,8 +606,9 @@ static bool ApplyPillFlowFilter()
     float fSep = PF_GetSetting("pillflow_separation", g_hCvarPillFlowSeparation);
     float fMaxDetour = PF_GetSetting("pillflow_max_detour", g_hCvarPillFlowMaxDetour);
     bool bFill = (PF_GetSetting("pillflow_fill", g_hCvarPillFlowFill) > 0.0);
+    bool requireValid = PF_GetSetting("pillflow_require_valid", g_hCvarPillFlowRequireValid) > 0.0;
 
-    if (fFlowMin <= 0.0 && fFlowMax >= 1.0 && fSep <= 0.0 && fMaxDetour <= 0.0 && !bFill) {
+    if (fFlowMin <= 0.0 && fFlowMax >= 1.0 && fSep <= 0.0 && fMaxDetour <= 0.0 && !bFill && !requireValid) {
         return false;
     }
 
@@ -613,9 +655,11 @@ static bool ApplyPillFlowFilter()
     float[] fFlowRaw = new float[iCount];
     Address[] pNavs = new Address[iCount];
     int[] iReason = new int[iCount];
+    int[] keepCounts = new int[iCount];
 
     for (int i = 0; i < iCount; i++) {
         hSpawns.GetArray(i, curitem, sizeof(curitem));
+        keepCounts[i] = curitem.IT_count;
         GetSpawnOrigins(fOrigins, curitem);
 
         Address pNav = L4D_GetNearestNavArea(fOrigins, 120.0, true, false, false, 2);
@@ -626,9 +670,9 @@ static bool ApplyPillFlowFilter()
         float fFlow = (pNav != Address_Null) ? L4D2Direct_GetTerrorNavAreaFlow(pNav) : -1.0;
         pNavs[i] = pNav;
         fFlowRaw[i] = fFlow;
-        if (fFlow < 0.0) {
+        if (!(fFlow >= 0.0)) {
             fPct[i] = -1.0;
-            iReason[i] = PF_NO_FLOW;
+            iReason[i] = requireValid ? PF_CULL_NO_FLOW : PF_NO_FLOW;
             continue;
         }
 
@@ -686,9 +730,9 @@ static bool ApplyPillFlowFilter()
         int iKept = 0, iNoFlow = 0;
         for (int i = 0; i < iCount; i++) {
             if (iReason[i] == PF_KEEP) {
-                iKept++;
+                iKept += keepCounts[i];
             } else if (iReason[i] == PF_NO_FLOW) {
-                iNoFlow++;
+                iNoFlow += keepCounts[i];
             }
         }
 
@@ -701,15 +745,21 @@ static bool ApplyPillFlowFilter()
             int iExcess = -iSlots;
             for (int i = iCount - 1; i >= 0 && iExcess > 0; i--) {
                 if (iReason[i] == PF_NO_FLOW) {
-                    iReason[i] = PF_CULL_LIMIT;
-                    iExcess--;
+                    if (keepCounts[i] <= iExcess) {
+                        iExcess -= keepCounts[i];
+                        keepCounts[i] = 0;
+                        iReason[i] = PF_CULL_LIMIT;
+                    } else {
+                        keepCounts[i] -= iExcess;
+                        iExcess = 0;
+                    }
                 }
             }
             iSlots = 0;
         }
 
         if (iSlots < iKept) {
-            bool[] bSelected = new bool[iCount];
+            int[] selectedCounts = new int[iCount];
             for (int slot = 0; slot < iSlots; slot++) {
                 // Ideal flow for this slot
                 float fWant = fFlowMin + (fFlowMax - fFlowMin) * (float(slot) + 0.5) / float(iSlots);
@@ -717,7 +767,7 @@ static bool ApplyPillFlowFilter()
                 int best = -1;
                 float fBestDist = 0.0;
                 for (int i = 0; i < iCount; i++) {
-                    if (iReason[i] != PF_KEEP || bSelected[i]) {
+                    if (iReason[i] != PF_KEEP || selectedCounts[i] >= keepCounts[i]) {
                         continue;
                     }
                     float d = fPct[i] - fWant;
@@ -730,13 +780,16 @@ static bool ApplyPillFlowFilter()
                     }
                 }
                 if (best != -1) {
-                    bSelected[best] = true;
+                    selectedCounts[best]++;
                 }
             }
 
             for (int i = 0; i < iCount; i++) {
-                if (iReason[i] == PF_KEEP && !bSelected[i]) {
-                    iReason[i] = PF_CULL_LIMIT;
+                if (iReason[i] == PF_KEEP) {
+                    keepCounts[i] = selectedCounts[i];
+                    if (!keepCounts[i]) {
+                        iReason[i] = PF_CULL_LIMIT;
+                    }
                 }
             }
         }
@@ -744,13 +797,18 @@ static bool ApplyPillFlowFilter()
 
     // Apply: kill+erase culled spawns (descending so indices stay valid), or
     // just glow everything in visualize mode.
-    int iRemoved[5] = {0, ...};   // indexed by PF_CULL_* reason
+    int iRemoved[6] = {0, ...};   // indexed by PF_CULL_* reason
     int iKeptTotal = 0;
     for (int i = iCount - 1; i >= 0; i--) {
         hSpawns.GetArray(i, curitem, sizeof(curitem));
 
         if (iReason[i] <= PF_KEEP) {
-            iKeptTotal++;
+            iKeptTotal += keepCounts[i];
+            if (!bVisualize && curitem.IT_count != keepCounts[i]) {
+                curitem.IT_count = keepCounts[i];
+                SetEntProp(curitem.IT_entity, Prop_Data, "m_itemCount", curitem.IT_count);
+                hSpawns.SetArray(i, curitem, sizeof(curitem));
+            }
             if (IsDebugEnabled()) {
                 LogMessage("[%s] Pill spawn %d flow=%.1f%% KEPT%s", IT_MODULE_NAME, curitem.IT_entity,
                     fPct[i] * 100.0, iReason[i] == PF_NO_FLOW ? " (no flow data)" : "");
@@ -762,7 +820,7 @@ static bool ApplyPillFlowFilter()
         }
 
         if (IsDebugEnabled()) {
-            static const char sReasons[5][] = {"", "outside window", "separation", "limit spacing", "off route"};
+            static const char sReasons[6][] = {"", "outside window", "separation", "limit spacing", "off route", "unreadable flow"};
             LogMessage("[%s] Pill spawn %d flow=%.1f%% %s (%s)", IT_MODULE_NAME, curitem.IT_entity,
                 fPct[i] * 100.0, bVisualize ? "WOULD REMOVE" : "REMOVED", sReasons[iReason[i]]);
         }
@@ -779,11 +837,11 @@ static bool ApplyPillFlowFilter()
     }
 
     if (IsDebugEnabled()) {
-        LogMessage("[%s] Pill flow window %.0f%%-%.0f%% sep %.1f%% detour %.0f: %d kept, %d %s (window), %d (off route), %d (separation), %d (limit spacing).%s",
+        LogMessage("[%s] Pill flow window %.0f%%-%.0f%% sep %.1f%% detour %.0f: %d pills kept, %d %s (window), %d (off route), %d (separation), %d (limit spacing), %d (unreadable flow).%s",
             IT_MODULE_NAME, fFlowMin * 100.0, fFlowMax * 100.0, fSep * 100.0, fMaxDetour,
-            iCount - iRemoved[PF_CULL_WINDOW] - iRemoved[PF_CULL_ROUTE] - iRemoved[PF_CULL_SEP] - iRemoved[PF_CULL_LIMIT],
+            iKeptTotal,
             iRemoved[PF_CULL_WINDOW], bVisualize ? "flagged" : "removed",
-            iRemoved[PF_CULL_ROUTE], iRemoved[PF_CULL_SEP], iRemoved[PF_CULL_LIMIT],
+            iRemoved[PF_CULL_ROUTE], iRemoved[PF_CULL_SEP], iRemoved[PF_CULL_LIMIT], iRemoved[PF_CULL_NO_FLOW],
             bVisualize ? " (visualize: nothing deleted; white = kept, red = window, magenta = route, orange = separation, cyan = limit)" : "");
     }
 
@@ -941,6 +999,7 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
 
             ItemTracking curitem;
             curitem.IT_entity = iEnt;
+            curitem.IT_count = 1;
             SetSpawnOrigins(fOrigin, curitem);
             SetSpawnAngles(fAngles, curitem);
             hSpawns.PushArray(curitem, sizeof(curitem));

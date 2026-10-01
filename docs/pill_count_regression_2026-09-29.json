@@ -1,0 +1,3203 @@
+{
+  "report_schema": "pill-count-regression/v1",
+  "verdict": "pass_with_scope_limits",
+  "metadata": {
+    "started_utc": "2026-09-29T16:42:17.341511+00:00",
+    "finished_utc": "2026-09-29T16:57:01.465790+00:00",
+    "complete": true,
+    "failure": null,
+    "restore_warnings": [],
+    "container": "anne1",
+    "selected_port": 18921,
+    "servers": [
+      {
+        "port": 18921,
+        "humans": 0,
+        "map": "c2m1_highway"
+      },
+      {
+        "port": 18922,
+        "humans": 0,
+        "map": "c2m1_highway"
+      },
+      {
+        "port": 18923,
+        "humans": 0,
+        "map": "c1m1_hotel"
+      },
+      {
+        "port": 18924,
+        "humans": 0,
+        "map": "c2m1_highway"
+      }
+    ],
+    "original_map": "c2m1_highway",
+    "hint_previously_loaded": false,
+    "settings": {
+      "mp_gamemode": "versus",
+      "sv_hibernate_when_empty": "0",
+      "sb_all_bot_game": "1",
+      "confogl_enable_itemtracking": "1",
+      "confogl_itemtracking_mapspecific": "3",
+      "confogl_itemtracking_savespawns": "1",
+      "confogl_pills_limit": "4",
+      "confogl_debug": "1",
+      "confogl_pills_flow_min": "0.3",
+      "confogl_pills_flow_max": "0.9",
+      "confogl_pills_flow_separation": "0",
+      "confogl_pills_flow_max_detour": "300",
+      "confogl_pills_flow_fill": "1",
+      "confogl_pills_flow_fill_min": "0.4",
+      "confogl_pills_flow_fill_max": "0.8",
+      "confogl_pills_flow_require_valid": "1",
+      "confogl_pills_flow_finale": "0",
+      "confogl_pills_flow_visualize": "0"
+    },
+    "maps": [
+      "c1m1_hotel",
+      "c1m2_streets",
+      "c1m3_mall",
+      "c1m4_atrium",
+      "c2m1_highway",
+      "c2m2_fairgrounds",
+      "c2m3_coaster",
+      "c2m4_barns",
+      "c2m5_concert",
+      "c3m1_plankcountry",
+      "c3m2_swamp",
+      "c3m3_shantytown",
+      "c3m4_plantation",
+      "c4m1_milltown_a",
+      "c4m2_sugarmill_a",
+      "c4m3_sugarmill_b",
+      "c4m4_milltown_b",
+      "c4m5_milltown_escape",
+      "c5m1_waterfront",
+      "c5m2_park",
+      "c5m3_cemetery",
+      "c5m4_quarter",
+      "c5m5_bridge",
+      "c6m1_riverbank",
+      "c6m2_bedlam",
+      "c6m3_port",
+      "c7m1_docks",
+      "c7m2_barge",
+      "c7m3_port",
+      "c8m1_apartment",
+      "c8m2_subway",
+      "c8m3_sewers",
+      "c8m4_interior",
+      "c8m5_rooftop",
+      "c9m1_alleys",
+      "c9m2_lots",
+      "c10m1_caves",
+      "c10m2_drainage",
+      "c10m3_ranchhouse",
+      "c10m4_mainstreet",
+      "c10m5_houseboat",
+      "c11m1_greenhouse",
+      "c11m2_offices",
+      "c11m3_garage",
+      "c11m4_terminal",
+      "c11m5_runway",
+      "c12m1_hilltop",
+      "c12m2_traintunnel",
+      "c12m3_bridge",
+      "c12m4_barn",
+      "c12m5_cornfield",
+      "c13m1_alpinecreek",
+      "c13m2_southpinestream",
+      "c13m3_memorialbridge",
+      "c13m4_cutthroatcreek",
+      "c14m1_junkyard",
+      "c14m2_lighthouse"
+    ],
+    "original_files": {
+      "addons/sourcemod/plugins/confoglcompmod.smx": "3554075c1fce88ce238e671210628caf1f1d53cca644ed4cb927717c00834685",
+      "addons/sourcemod/plugins/optional/AnneHappy/anne_pill_hint.smx": "24b8360d676abc8b1f281308432f6fc6cefd1a81693b094c6307f77b29cfb8fc",
+      "addons/sourcemod/translations/anne_pill_hint.phrases.txt": "d2e84a894de2e6395a6c0fa48bf368a15974b79522f367e9c85c56f314e0f0c9",
+      "addons/sourcemod/translations/chi/anne_pill_hint.phrases.txt": "8ec3935bb93a066a1558a63178efd12b7250185a66c4da6008bbfe47f10b41da",
+      "addons/sourcemod/translations/zho/anne_pill_hint.phrases.txt": "91afb4121b2f69b43d88665204a6ad722153b39f07b5cdb7e4a9d8076a4fec10",
+      "addons/sourcemod/translations/jp/anne_pill_hint.phrases.txt": "a18670a80f7dfe91546ebb15682eee67079e5fbfaf1f11a0923a1f23fbed3dc8",
+      "addons/sourcemod/translations/ko/anne_pill_hint.phrases.txt": "31bc3085c181d7b91e4038ac5fa60725aa2c9c96a69a9ebfbcf75343f5f50b07"
+    },
+    "probe_hashes": {
+      "addons/sourcemod/plugins/confoglcompmod.smx": "ede0d8e7b6cb1b50419c7289c5b0da4ac553d803b31ee2a52a34bc82436e045f",
+      "addons/sourcemod/plugins/optional/AnneHappy/anne_pill_hint.smx": "e20d7008b573c4408ed5269a954f5ec798a42482e2b42219f8f00416d1ca0467",
+      "addons/sourcemod/translations/anne_pill_hint.phrases.txt": "8a44de1ad219c6cac6055e3bc0beac62bc25c9653978283b450f0fc2c60851f3",
+      "addons/sourcemod/translations/chi/anne_pill_hint.phrases.txt": "3670000e6be835b59bf282cecc778541d9672cda847c5046b7f9c45e43427f99",
+      "addons/sourcemod/translations/zho/anne_pill_hint.phrases.txt": "4099c3238a90629df675d9410ce3de4bfaeca7f71d7ce379c6ed812254d6a6f1",
+      "addons/sourcemod/translations/jp/anne_pill_hint.phrases.txt": "88d2ba5118e45b784b4b7bc3330492fdc6968027a873c83b7e0a825bf336b5b1",
+      "addons/sourcemod/translations/ko/anne_pill_hint.phrases.txt": "9e8f3fd041563d319af20acfcbb2f259e4e5a85565531c01a226a185ba88f327"
+    }
+  },
+  "validation": {
+    "official_maps_expected": 57,
+    "official_maps_actual": 57,
+    "official_maps_unique": 57,
+    "official_maps_match_scripts_run_nav_wave_matrix_OFFICIAL_MAPS_in_order": true,
+    "map_cases": 57,
+    "non_finale_maps": 43,
+    "non_finale_first_second_known_all_4": true,
+    "finale_maps": 14,
+    "hint_tracking_comparisons": 63,
+    "hint_tracking_all_match": true,
+    "pill_fill_points": 110,
+    "pill_fill_progress_min_percent": 40.3,
+    "pill_fill_progress_max_percent": 79.6,
+    "pill_fill_all_within_40_80": true,
+    "unknown_bottles": 1,
+    "unknown_distribution": [
+      {
+        "map": "c4m5_milltown_escape",
+        "count": 1
+      }
+    ],
+    "language_checks": [
+      {
+        "language": "en",
+        "items": 80,
+        "lines": 4,
+        "max_bytes": 189
+      },
+      {
+        "language": "chi",
+        "items": 80,
+        "lines": 4,
+        "max_bytes": 186
+      },
+      {
+        "language": "zho",
+        "items": 80,
+        "lines": 4,
+        "max_bytes": 186
+      },
+      {
+        "language": "jp",
+        "items": 80,
+        "lines": 5,
+        "max_bytes": 189
+      },
+      {
+        "language": "ko",
+        "items": 80,
+        "lines": 4,
+        "max_bytes": 188
+      }
+    ],
+    "all_language_lines_within_190_bytes": true
+  },
+  "local_artifact_sha256": {
+    "addons/sourcemod/scripting/confoglcompmod/ItemTracking.sp": "6a83761de4e0d55d1fcb399602069cf8de0a18790e3bec9eadbd17377b16d077",
+    "addons/sourcemod/scripting/confoglcompmod/MapInfo.sp": "2faf89314f2457fb32b9e24e89378d9d38f1fa64f50ee616ea15b733aed191bb",
+    "addons/sourcemod/scripting/include/confogl.inc": "a81b2a38cfa62033a7e6e8abcbfa84d0660ed233254c64e865d16e164ee06b59",
+    "addons/sourcemod/scripting/optional/AnneHappy/anne_pill_hint.sp": "c8ea2d898a5b1b01a21509b5bcdf751738670b51341abc9b70cdf6bf40759512",
+    "addons/sourcemod/plugins/confoglcompmod.smx": "a650d40067b2b8ea8851f725bc47c6c2031bb9177abc86a1e9679fd4a5e33e2a",
+    "addons/sourcemod/plugins/optional/AnneHappy/anne_pill_hint.smx": "7054e5124c383fb4c924e6a0a746560d9477d39d11746d351b4e42d839e20e5c",
+    "cfg/cfgogl/annehappy/shared_cvars.cfg": "ba21a663444d9d1e33c26ca6b42e8e81c927631f0fd607499adb1ace67f1330a",
+    "cfg/cfgogl/annehappy_hardcore/shared_cvars.cfg": "eabf972fef35680860f4a24bdd374b7f4738946b16d2a649dabd43d54619fb03",
+    "cfg/cfgogl/annehappy_shotgun/shared_cvars.cfg": "f36e10dc31dc84ba53b6fe7d61c4903e617e2c449d5856bc081846dc4fc05519",
+    "addons/sourcemod/translations/anne_pill_hint.phrases.txt": "8a44de1ad219c6cac6055e3bc0beac62bc25c9653978283b450f0fc2c60851f3",
+    "addons/sourcemod/translations/chi/anne_pill_hint.phrases.txt": "3670000e6be835b59bf282cecc778541d9672cda847c5046b7f9c45e43427f99",
+    "addons/sourcemod/translations/zho/anne_pill_hint.phrases.txt": "4099c3238a90629df675d9410ce3de4bfaeca7f71d7ce379c6ed812254d6a6f1",
+    "addons/sourcemod/translations/jp/anne_pill_hint.phrases.txt": "88d2ba5118e45b784b4b7bc3330492fdc6968027a873c83b7e0a825bf336b5b1",
+    "addons/sourcemod/translations/ko/anne_pill_hint.phrases.txt": "9e8f3fd041563d319af20acfcbb2f259e4e5a85565531c01a226a185ba88f327"
+  },
+  "map_results": [
+    {
+      "map": "c1m1_hotel",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.7,
+        64.1,
+        76.3,
+        79.1
+      ]
+    },
+    {
+      "map": "c1m2_streets",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        37.8,
+        56.9,
+        68.0,
+        71.4
+      ]
+    },
+    {
+      "map": "c1m3_mall",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        36.9,
+        52.4,
+        52.5,
+        84.2
+      ]
+    },
+    {
+      "map": "c1m4_atrium",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": true,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        25.0,
+        79.1,
+        79.1,
+        79.1
+      ]
+    },
+    {
+      "map": "c2m1_highway",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        39.1,
+        45.8,
+        46.2,
+        47.4
+      ]
+    },
+    {
+      "map": "c2m2_fairgrounds",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.8,
+        67.7,
+        70.9,
+        71.2
+      ]
+    },
+    {
+      "map": "c2m3_coaster",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        41.1,
+        41.7,
+        41.7,
+        41.7
+      ]
+    },
+    {
+      "map": "c2m4_barns",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.6,
+        58.4,
+        69.4,
+        79.3
+      ]
+    },
+    {
+      "map": "c2m5_concert",
+      "first": 0,
+      "second": 0,
+      "known": 0,
+      "spots": 0,
+      "finale": true,
+      "hint_total": 0,
+      "hint_known": 0,
+      "progress_percent": []
+    },
+    {
+      "map": "c3m1_plankcountry",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        37.1,
+        42.8,
+        63.5,
+        63.7
+      ]
+    },
+    {
+      "map": "c3m2_swamp",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        36.3,
+        45.3,
+        57.5,
+        64.8
+      ]
+    },
+    {
+      "map": "c3m3_shantytown",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        45.2,
+        58.6,
+        65.2,
+        79.5
+      ]
+    },
+    {
+      "map": "c3m4_plantation",
+      "first": 3,
+      "second": 3,
+      "known": 3,
+      "spots": 3,
+      "finale": true,
+      "hint_total": 3,
+      "hint_known": 3,
+      "progress_percent": [
+        21.1,
+        28.9,
+        77.4
+      ]
+    },
+    {
+      "map": "c4m1_milltown_a",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        43.2,
+        52.9,
+        67.5,
+        86.5
+      ]
+    },
+    {
+      "map": "c4m2_sugarmill_a",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        40.4,
+        56.2,
+        64.8,
+        75.8
+      ]
+    },
+    {
+      "map": "c4m3_sugarmill_b",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        38.1,
+        53.2,
+        71.0,
+        85.0
+      ]
+    },
+    {
+      "map": "c4m4_milltown_b",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        49.8,
+        50.3,
+        59.8,
+        74.9
+      ]
+    },
+    {
+      "map": "c4m5_milltown_escape",
+      "first": 4,
+      "second": 4,
+      "known": 3,
+      "spots": 4,
+      "finale": true,
+      "hint_total": 4,
+      "hint_known": 3,
+      "progress_percent": [
+        79.9,
+        86.4,
+        90.1,
+        null
+      ]
+    },
+    {
+      "map": "c5m1_waterfront",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.5,
+        54.3,
+        68.7,
+        76.7
+      ]
+    },
+    {
+      "map": "c5m2_park",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        41.9,
+        42.0,
+        50.5,
+        69.0
+      ]
+    },
+    {
+      "map": "c5m3_cemetery",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        49.0,
+        50.2,
+        64.4,
+        75.9
+      ]
+    },
+    {
+      "map": "c5m4_quarter",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        45.2,
+        58.0,
+        63.8,
+        78.3
+      ]
+    },
+    {
+      "map": "c5m5_bridge",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": true,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        39.1,
+        39.3,
+        93.9,
+        94.1
+      ]
+    },
+    {
+      "map": "c6m1_riverbank",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        47.0,
+        52.0,
+        61.2,
+        79.3
+      ]
+    },
+    {
+      "map": "c6m2_bedlam",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        44.5,
+        49.8,
+        62.0,
+        74.7
+      ]
+    },
+    {
+      "map": "c6m3_port",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": true,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        18.8,
+        50.8,
+        51.9,
+        73.2
+      ]
+    },
+    {
+      "map": "c7m1_docks",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        33.7,
+        60.0,
+        77.6,
+        88.7
+      ]
+    },
+    {
+      "map": "c7m2_barge",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        54.5,
+        59.1,
+        73.2,
+        80.1
+      ]
+    },
+    {
+      "map": "c7m3_port",
+      "first": 3,
+      "second": 3,
+      "known": 3,
+      "spots": 3,
+      "finale": true,
+      "hint_total": 3,
+      "hint_known": 3,
+      "progress_percent": [
+        32.8,
+        60.1,
+        71.9
+      ]
+    },
+    {
+      "map": "c8m1_apartment",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        45.4,
+        57.7,
+        68.6,
+        79.6
+      ]
+    },
+    {
+      "map": "c8m2_subway",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        59.9,
+        60.5,
+        60.5,
+        69.7
+      ]
+    },
+    {
+      "map": "c8m3_sewers",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        40.7,
+        54.2,
+        63.1,
+        70.2
+      ]
+    },
+    {
+      "map": "c8m4_interior",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.4,
+        67.8,
+        68.9,
+        77.7
+      ]
+    },
+    {
+      "map": "c8m5_rooftop",
+      "first": 0,
+      "second": 0,
+      "known": 0,
+      "spots": 0,
+      "finale": true,
+      "hint_total": 0,
+      "hint_known": 0,
+      "progress_percent": []
+    },
+    {
+      "map": "c9m1_alleys",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        34.4,
+        41.3,
+        47.1,
+        59.6
+      ]
+    },
+    {
+      "map": "c9m2_lots",
+      "first": 2,
+      "second": 2,
+      "known": 2,
+      "spots": 2,
+      "finale": true,
+      "hint_total": 2,
+      "hint_known": 2,
+      "progress_percent": [
+        31.2,
+        76.9
+      ]
+    },
+    {
+      "map": "c10m1_caves",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        48.5,
+        51.4,
+        63.6,
+        76.2
+      ]
+    },
+    {
+      "map": "c10m2_drainage",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        40.3,
+        63.9,
+        66.7,
+        70.7
+      ]
+    },
+    {
+      "map": "c10m3_ranchhouse",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        47.8,
+        53.7,
+        62.6,
+        74.2
+      ]
+    },
+    {
+      "map": "c10m4_mainstreet",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        46.1,
+        55.6,
+        76.4,
+        82.1
+      ]
+    },
+    {
+      "map": "c10m5_houseboat",
+      "first": 3,
+      "second": 3,
+      "known": 3,
+      "spots": 3,
+      "finale": true,
+      "hint_total": 3,
+      "hint_known": 3,
+      "progress_percent": [
+        3.9,
+        21.1,
+        79.7
+      ]
+    },
+    {
+      "map": "c11m1_greenhouse",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.0,
+        54.1,
+        66.4,
+        74.0
+      ]
+    },
+    {
+      "map": "c11m2_offices",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        41.1,
+        54.3,
+        61.0,
+        76.0
+      ]
+    },
+    {
+      "map": "c11m3_garage",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        47.8,
+        54.9,
+        72.1,
+        76.6
+      ]
+    },
+    {
+      "map": "c11m4_terminal",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        40.5,
+        58.9,
+        64.4,
+        78.5
+      ]
+    },
+    {
+      "map": "c11m5_runway",
+      "first": 3,
+      "second": 3,
+      "known": 3,
+      "spots": 3,
+      "finale": true,
+      "hint_total": 3,
+      "hint_known": 3,
+      "progress_percent": [
+        26.6,
+        47.9,
+        77.3
+      ]
+    },
+    {
+      "map": "c12m1_hilltop",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        42.2,
+        51.8,
+        56.0,
+        79.5
+      ]
+    },
+    {
+      "map": "c12m2_traintunnel",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        38.2,
+        54.1,
+        72.6,
+        83.8
+      ]
+    },
+    {
+      "map": "c12m3_bridge",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        73.6,
+        73.6,
+        74.3,
+        74.3
+      ]
+    },
+    {
+      "map": "c12m4_barn",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        31.2,
+        53.2,
+        59.3,
+        74.4
+      ]
+    },
+    {
+      "map": "c12m5_cornfield",
+      "first": 2,
+      "second": 2,
+      "known": 2,
+      "spots": 2,
+      "finale": true,
+      "hint_total": 2,
+      "hint_known": 2,
+      "progress_percent": [
+        81.8,
+        82.8
+      ]
+    },
+    {
+      "map": "c13m1_alpinecreek",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        40.9,
+        57.0,
+        63.2,
+        76.4
+      ]
+    },
+    {
+      "map": "c13m2_southpinestream",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        54.2,
+        65.7,
+        69.0,
+        74.2
+      ]
+    },
+    {
+      "map": "c13m3_memorialbridge",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        48.6,
+        55.9,
+        61.9,
+        75.6
+      ]
+    },
+    {
+      "map": "c13m4_cutthroatcreek",
+      "first": 3,
+      "second": 3,
+      "known": 3,
+      "spots": 3,
+      "finale": true,
+      "hint_total": 3,
+      "hint_known": 3,
+      "progress_percent": [
+        43.3,
+        75.8,
+        88.4
+      ]
+    },
+    {
+      "map": "c14m1_junkyard",
+      "first": 4,
+      "second": 4,
+      "known": 4,
+      "spots": 4,
+      "finale": false,
+      "hint_total": 4,
+      "hint_known": 4,
+      "progress_percent": [
+        46.4,
+        52.8,
+        63.6,
+        70.1
+      ]
+    },
+    {
+      "map": "c14m2_lighthouse",
+      "first": 1,
+      "second": 1,
+      "known": 1,
+      "spots": 1,
+      "finale": true,
+      "hint_total": 1,
+      "hint_known": 1,
+      "progress_percent": [
+        100.0
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case": "stacked",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 454763,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 1,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        70.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:42:56: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 0: 4 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:42:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=4 progress=70.6%",
+        "L 09/30/2026 - 00:42:57: [confoglcompmod.smx] PILL_REGRESSION_PASS case=stacked map=c2m1_highway first=4 second=4 known=4 spots=1 finale=0",
+        "L 09/30/2026 - 00:42:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 71%, 71%, 71%, 71%",
+        "L 09/30/2026 - 00:42:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "generic",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 463321,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 1,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        70.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:43:05: [confoglcompmod.smx] PILL_REGRESSION_POINT count=4 progress=70.6%",
+        "L 09/30/2026 - 00:43:05: [confoglcompmod.smx] PILL_REGRESSION_PASS case=generic map=c2m1_highway first=4 second=4 known=4 spots=1 finale=0",
+        "L 09/30/2026 - 00:43:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 71%, 71%, 71%, 71%",
+        "L 09/30/2026 - 00:43:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "unlimited",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 471577,
+      "pass": {
+        "first": 7,
+        "second": 7,
+        "known": 7,
+        "spots": 1,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 7,
+        "known": 7
+      },
+      "progress_percent": [
+        70.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:43:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=7 progress=70.6%",
+        "L 09/30/2026 - 00:43:12: [confoglcompmod.smx] PILL_REGRESSION_PASS case=unlimited map=c2m1_highway first=7 second=7 known=7 spots=1 finale=0",
+        "L 09/30/2026 - 00:43:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 71%, 71%, 71%, 71%, 71%, 71%, 71%",
+        "L 09/30/2026 - 00:43:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=7 known=7"
+      ]
+    },
+    {
+      "case": "zero",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 479851,
+      "pass": {
+        "first": 0,
+        "second": 0,
+        "known": 0,
+        "spots": 0,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 0,
+        "known": 0
+      },
+      "progress_percent": [],
+      "logs": [
+        "L 09/30/2026 - 00:43:20: [confoglcompmod.smx] PILL_REGRESSION_PASS case=zero map=c2m1_highway first=0 second=0 known=0 spots=0 finale=0",
+        "L 09/30/2026 - 00:43:23: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=0 known=0"
+      ]
+    },
+    {
+      "case": "unknown",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 487721,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 0,
+        "spots": 1,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 0
+      },
+      "progress_percent": [],
+      "logs": [
+        "L 09/30/2026 - 00:43:28: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 0: 4 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:43:29: [confoglcompmod.smx] PILL_REGRESSION_PASS case=unknown map=c2m1_highway first=4 second=4 known=0 spots=1 finale=0",
+        "L 09/30/2026 - 00:43:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS unknown, unknown, unknown, unknown",
+        "L 09/30/2026 - 00:43:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=0"
+      ]
+    },
+    {
+      "case": "strict",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 496347,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        41.8,
+        59.7,
+        66.6,
+        77.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 0: 0 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 1 (unreadable flow).",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 230 on main route at flow 41.8% (2269 5007 -973)",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 231 on main route at flow 59.7% (2188 3429 -805)",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 232 on main route at flow 66.6% (2946 3053 -985)",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 233 on main route at flow 77.1% (1317 1612 -1795)",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.8%",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.7%",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=66.6%",
+        "L 09/30/2026 - 00:43:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=77.1%",
+        "L 09/30/2026 - 00:43:36: [confoglcompmod.smx] PILL_REGRESSION_PASS case=strict map=c2m1_highway first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:43:38: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 42%, 60%, 67%, 77%",
+        "L 09/30/2026 - 00:43:38: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "hint",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 506175,
+      "pass": null,
+      "hint_scan": null,
+      "progress_percent": [],
+      "logs": [
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_LANGUAGE_PASS language=en items=80 lines=4 max_bytes=189",
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_LANGUAGE_PASS language=chi items=80 lines=4 max_bytes=186",
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_LANGUAGE_PASS language=zho items=80 lines=4 max_bytes=186",
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_LANGUAGE_PASS language=jp items=80 lines=5 max_bytes=189",
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_LANGUAGE_PASS language=ko items=80 lines=4 max_bytes=188",
+        "L 09/30/2026 - 00:43:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_REGRESSION_PASS languages=5 stacked=3 empty=0 items=80"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c1m1_hotel",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 514582,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.7,
+        64.1,
+        76.3,
+        79.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 3 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 403 on main route at flow 42.7% (1721 6900 2466)",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 404 on main route at flow 64.1% (2110 5625 1186)",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 405 on main route at flow 76.3% (648 5897 1186)",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.1%",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.7%",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=64.1%",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.3%",
+        "L 09/30/2026 - 00:43:55: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c1m1_hotel first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:43:56: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 64%, 76%, 79%",
+        "L 09/30/2026 - 00:43:56: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c1m2_streets",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 530718,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        37.8,
+        56.9,
+        68.0,
+        71.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 4 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 2 (unreadable flow).",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 182 on main route at flow 56.9% (-5360 900 394)",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 269 on main route at flow 68.0% (-5114 -961 458)",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=37.8%",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=71.4%",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=56.9%",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=68.0%",
+        "L 09/30/2026 - 00:44:07: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c1m2_streets first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:44:10: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 38%, 57%, 68%, 71%",
+        "L 09/30/2026 - 00:44:10: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c1m3_mall",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 552702,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        36.9,
+        52.4,
+        52.5,
+        84.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 3 removed (window), 0 (off route), 0 (separation), 4 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=52.5%",
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=52.4%",
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=36.9%",
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=84.2%",
+        "L 09/30/2026 - 00:44:22: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c1m3_mall first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:44:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 37%, 52%, 53%, 84%",
+        "L 09/30/2026 - 00:44:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c1m4_atrium",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 572411,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        25.0,
+        79.1,
+        79.1,
+        79.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:44:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.1%",
+        "L 09/30/2026 - 00:44:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.1%",
+        "L 09/30/2026 - 00:44:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.1%",
+        "L 09/30/2026 - 00:44:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=25.0%",
+        "L 09/30/2026 - 00:44:35: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c1m4_atrium first=4 second=4 known=4 spots=4 finale=1",
+        "L 09/30/2026 - 00:44:36: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 25%, 79%, 79%, 79%",
+        "L 09/30/2026 - 00:44:36: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c2m1_highway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 588131,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        39.1,
+        45.8,
+        46.2,
+        47.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:44:48: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 0 removed (window), 5 (off route), 0 (separation), 2 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:44:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.4%",
+        "L 09/30/2026 - 00:44:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=46.2%",
+        "L 09/30/2026 - 00:44:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=45.8%",
+        "L 09/30/2026 - 00:44:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=39.1%",
+        "L 09/30/2026 - 00:44:49: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c2m1_highway first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:44:50: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 39%, 46%, 46%, 47%",
+        "L 09/30/2026 - 00:44:50: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c2m2_fairgrounds",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 607819,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.8,
+        67.7,
+        70.9,
+        71.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 6 removed (window), 4 (off route), 0 (separation), 2 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.8%",
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=71.2%",
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=70.9%",
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=67.7%",
+        "L 09/30/2026 - 00:45:03: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c2m2_fairgrounds first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:45:04: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 68%, 71%, 71%",
+        "L 09/30/2026 - 00:45:04: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c2m3_coaster",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 630142,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        41.1,
+        41.7,
+        41.7,
+        41.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 2 removed (window), 0 (off route), 0 (separation), 1 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.1%",
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.7%",
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.7%",
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.7%",
+        "L 09/30/2026 - 00:45:16: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c2m3_coaster first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:45:18: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 41%, 42%, 42%, 42%",
+        "L 09/30/2026 - 00:45:18: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c2m4_barns",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 643786,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.6,
+        58.4,
+        69.4,
+        79.3
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 0 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 113 on main route at flow 42.6% (-2011 275 -189)",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 115 on main route at flow 58.4% (94 -344 -189)",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 116 on main route at flow 69.4% (-1662 -75 -49)",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.3%",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.6%",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=58.4%",
+        "L 09/30/2026 - 00:45:29: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=69.4%",
+        "L 09/30/2026 - 00:45:30: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c2m4_barns first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:45:32: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 58%, 69%, 79%",
+        "L 09/30/2026 - 00:45:32: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c2m5_concert",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 656674,
+      "pass": {
+        "first": 0,
+        "second": 0,
+        "known": 0,
+        "spots": 0,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 0,
+        "known": 0
+      },
+      "progress_percent": [],
+      "logs": [
+        "L 09/30/2026 - 00:45:43: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c2m5_concert first=0 second=0 known=0 spots=0 finale=1",
+        "L 09/30/2026 - 00:45:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=0 known=0"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c3m1_plankcountry",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 669781,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        37.1,
+        42.8,
+        63.5,
+        63.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:45:57: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 2 removed (window), 0 (off route), 0 (separation), 6 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:45:57: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=37.1%",
+        "L 09/30/2026 - 00:45:57: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.8%",
+        "L 09/30/2026 - 00:45:57: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.7%",
+        "L 09/30/2026 - 00:45:57: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.5%",
+        "L 09/30/2026 - 00:45:58: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c3m1_plankcountry first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:45:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 37%, 43%, 64%, 64%",
+        "L 09/30/2026 - 00:45:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c3m2_swamp",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 697080,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        36.3,
+        45.3,
+        57.5,
+        64.8
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 2 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 104 on main route at flow 45.3% (-1050 2807 5)",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 105 on main route at flow 64.8% (3225 2976 79)",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=36.3%",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=57.5%",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=45.3%",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=64.8%",
+        "L 09/30/2026 - 00:46:13: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c3m2_swamp first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:46:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 36%, 45%, 58%, 65%",
+        "L 09/30/2026 - 00:46:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c3m3_shantytown",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 716038,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        45.2,
+        58.6,
+        65.2,
+        79.5
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 2 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 115 on main route at flow 45.2% (-3500 -2628 -8)",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 117 on main route at flow 58.6% (-1169 -2537 -1)",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 148 on main route at flow 65.2% (-87 -2642 -4)",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 150 on main route at flow 79.5% (2269 -3125 -22)",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=45.2%",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=58.6%",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=65.2%",
+        "L 09/30/2026 - 00:46:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.5%",
+        "L 09/30/2026 - 00:46:27: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c3m3_shantytown first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:46:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 45%, 59%, 65%, 80%",
+        "L 09/30/2026 - 00:46:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c3m4_plantation",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 731554,
+      "pass": {
+        "first": 3,
+        "second": 3,
+        "known": 3,
+        "spots": 3,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 3,
+        "known": 3
+      },
+      "progress_percent": [
+        21.1,
+        28.9,
+        77.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:46:41: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=77.4%",
+        "L 09/30/2026 - 00:46:41: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=28.9%",
+        "L 09/30/2026 - 00:46:41: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=21.1%",
+        "L 09/30/2026 - 00:46:41: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c3m4_plantation first=3 second=3 known=3 spots=3 finale=1",
+        "L 09/30/2026 - 00:46:42: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 21%, 29%, 77%",
+        "L 09/30/2026 - 00:46:42: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=3 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c4m1_milltown_a",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 748925,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        43.2,
+        52.9,
+        67.5,
+        86.5
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 0 removed (window), 0 (off route), 0 (separation), 4 (limit spacing), 1 (unreadable flow).",
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=52.9%",
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=67.5%",
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=43.2%",
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=86.5%",
+        "L 09/30/2026 - 00:46:56: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c4m1_milltown_a first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:46:58: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 53%, 68%, 87%",
+        "L 09/30/2026 - 00:46:58: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c4m2_sugarmill_a",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 765881,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        40.4,
+        56.2,
+        64.8,
+        75.8
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 4 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 102 on main route at flow 40.4% (3102 -5525 99)",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 103 on main route at flow 56.2% (492 -6442 98)",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 104 on main route at flow 64.8% (-563 -8303 98)",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 105 on main route at flow 75.8% (-1601 -8742 610)",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=40.4%",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=56.2%",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=64.8%",
+        "L 09/30/2026 - 00:47:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=75.8%",
+        "L 09/30/2026 - 00:47:12: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c4m2_sugarmill_a first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:47:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 40%, 56%, 65%, 76%",
+        "L 09/30/2026 - 00:47:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c4m3_sugarmill_b",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 782934,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        38.1,
+        53.2,
+        71.0,
+        85.0
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 3 pills kept, 2 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 73 on main route at flow 71.0% (1212 -4600 102)",
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=53.2%",
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=38.1%",
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=85.0%",
+        "L 09/30/2026 - 00:47:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=71.0%",
+        "L 09/30/2026 - 00:47:27: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c4m3_sugarmill_b first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:47:28: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 38%, 53%, 71%, 85%",
+        "L 09/30/2026 - 00:47:28: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c4m4_milltown_b",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 799381,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        49.8,
+        50.3,
+        59.8,
+        74.9
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:47:40: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 2 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:47:40: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.9%",
+        "L 09/30/2026 - 00:47:40: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=49.8%",
+        "L 09/30/2026 - 00:47:40: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=50.3%",
+        "L 09/30/2026 - 00:47:40: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.8%",
+        "L 09/30/2026 - 00:47:41: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c4m4_milltown_b first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:47:42: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 50%, 50%, 60%, 75%",
+        "L 09/30/2026 - 00:47:42: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c4m5_milltown_escape",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 818266,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 3,
+        "spots": 4,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 3
+      },
+      "progress_percent": [
+        79.9,
+        86.4,
+        90.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:47:53: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=86.4%",
+        "L 09/30/2026 - 00:47:53: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.9%",
+        "L 09/30/2026 - 00:47:53: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=90.1%",
+        "L 09/30/2026 - 00:47:53: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c4m5_milltown_escape first=4 second=4 known=3 spots=4 finale=1",
+        "L 09/30/2026 - 00:47:54: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 80%, 86%, 90%, unknown",
+        "L 09/30/2026 - 00:47:54: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c5m1_waterfront",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 833425,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.5,
+        54.3,
+        68.7,
+        76.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 286 on main route at flow 42.5% (-725 -1723 -374)",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 287 on main route at flow 54.3% (-2022 -2180 -376)",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 288 on main route at flow 68.7% (-2375 -862 -373)",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 289 on main route at flow 76.7% (-2438 -288 -365)",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.5%",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.3%",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=68.7%",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.7%",
+        "L 09/30/2026 - 00:48:05: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c5m1_waterfront first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:48:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 54%, 69%, 77%",
+        "L 09/30/2026 - 00:48:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c5m2_park",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 843020,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        41.9,
+        42.0,
+        50.5,
+        69.0
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 3 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 154 on main route at flow 50.5% (-8250 -5275 -246)",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 226 on main route at flow 69.0% (-8962 -6062 -254)",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.0%",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.9%",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=50.5%",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=69.0%",
+        "L 09/30/2026 - 00:48:18: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c5m2_park first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:48:19: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 42%, 42%, 51%, 69%",
+        "L 09/30/2026 - 00:48:19: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c5m3_cemetery",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 861556,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        49.0,
+        50.2,
+        64.4,
+        75.9
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 2 removed (window), 8 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 266 on main route at flow 49.0% (3700 837 34)",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 620 on main route at flow 50.2% (3900 649 2)",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 622 on main route at flow 64.4% (5964 -1523 -13)",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 625 on main route at flow 75.9% (6425 -4660 205)",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=49.0%",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=50.2%",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=64.4%",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=75.9%",
+        "L 09/30/2026 - 00:48:31: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c5m3_cemetery first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:48:32: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 49%, 50%, 64%, 76%",
+        "L 09/30/2026 - 00:48:32: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c5m4_quarter",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 881129,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        45.2,
+        58.0,
+        63.8,
+        78.3
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 4 removed (window), 4 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 116 on main route at flow 45.2% (-137 1012 258)",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 119 on main route at flow 58.0% (-1878 667 82)",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 121 on main route at flow 63.8% (-2609 50 98)",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 122 on main route at flow 78.3% (-995 -1520 258)",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=45.2%",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=58.0%",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.8%",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=78.3%",
+        "L 09/30/2026 - 00:48:43: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c5m4_quarter first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:48:46: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 45%, 58%, 64%, 78%",
+        "L 09/30/2026 - 00:48:46: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c5m5_bridge",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 898901,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        39.1,
+        39.3,
+        93.9,
+        94.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:48:58: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=39.3%",
+        "L 09/30/2026 - 00:48:58: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=39.1%",
+        "L 09/30/2026 - 00:48:58: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=93.9%",
+        "L 09/30/2026 - 00:48:58: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=94.1%",
+        "L 09/30/2026 - 00:48:58: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c5m5_bridge first=4 second=4 known=4 spots=4 finale=1",
+        "L 09/30/2026 - 00:48:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 39%, 39%, 94%, 94%",
+        "L 09/30/2026 - 00:48:59: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c6m1_riverbank",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 911422,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        47.0,
+        52.0,
+        61.2,
+        79.3
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 2 removed (window), 4 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 281 on main route at flow 47.0% (-449 944 230)",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 282 on main route at flow 52.0% (769 1200 352)",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 283 on main route at flow 61.2% (2259 2219 354)",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 284 on main route at flow 79.3% (-350 -237 576)",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.0%",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=52.0%",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=61.2%",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.3%",
+        "L 09/30/2026 - 00:49:11: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c6m1_riverbank first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:49:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 47%, 52%, 61%, 79%",
+        "L 09/30/2026 - 00:49:14: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c6m2_bedlam",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 927818,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        44.5,
+        49.8,
+        62.0,
+        74.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 7 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 183 on main route at flow 44.5% (1765 4125 -341)",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 184 on main route at flow 62.0% (1204 4451 -1197)",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 185 on main route at flow 74.7% (4249 5533 -1197)",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=49.8%",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=44.5%",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=62.0%",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.7%",
+        "L 09/30/2026 - 00:49:26: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c6m2_bedlam first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:49:27: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 45%, 50%, 62%, 75%",
+        "L 09/30/2026 - 00:49:27: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c6m3_port",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 944554,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        18.8,
+        50.8,
+        51.9,
+        73.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:49:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=18.8%",
+        "L 09/30/2026 - 00:49:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=73.2%",
+        "L 09/30/2026 - 00:49:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=51.9%",
+        "L 09/30/2026 - 00:49:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=50.8%",
+        "L 09/30/2026 - 00:49:38: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c6m3_port first=4 second=4 known=4 spots=4 finale=1",
+        "L 09/30/2026 - 00:49:41: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 19%, 51%, 52%, 73%",
+        "L 09/30/2026 - 00:49:41: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c7m1_docks",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 959668,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        33.7,
+        60.0,
+        77.6,
+        88.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 3 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 1 (unreadable flow).",
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 57 on main route at flow 77.6% (4800 953 178)",
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=88.7%",
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=60.0%",
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=33.7%",
+        "L 09/30/2026 - 00:49:52: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=77.6%",
+        "L 09/30/2026 - 00:49:53: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c7m1_docks first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:49:55: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 34%, 60%, 78%, 89%",
+        "L 09/30/2026 - 00:49:55: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c7m2_barge",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 974477,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        54.5,
+        59.1,
+        73.2,
+        80.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:50:07: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 3 pills kept, 2 removed (window), 4 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:50:07: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 76 on main route at flow 59.1% (-2230 1223 2)",
+        "L 09/30/2026 - 00:50:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=80.1%",
+        "L 09/30/2026 - 00:50:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.5%",
+        "L 09/30/2026 - 00:50:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=73.2%",
+        "L 09/30/2026 - 00:50:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.1%",
+        "L 09/30/2026 - 00:50:08: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c7m2_barge first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:50:10: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 55%, 59%, 73%, 80%",
+        "L 09/30/2026 - 00:50:10: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c7m3_port",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 996536,
+      "pass": {
+        "first": 3,
+        "second": 3,
+        "known": 3,
+        "spots": 3,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 3,
+        "known": 3
+      },
+      "progress_percent": [
+        32.8,
+        60.1,
+        71.9
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:50:21: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=60.1%",
+        "L 09/30/2026 - 00:50:21: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=71.9%",
+        "L 09/30/2026 - 00:50:21: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=32.8%",
+        "L 09/30/2026 - 00:50:21: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c7m3_port first=3 second=3 known=3 spots=3 finale=1",
+        "L 09/30/2026 - 00:50:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 33%, 60%, 72%",
+        "L 09/30/2026 - 00:50:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=3 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c8m1_apartment",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1013839,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        45.4,
+        57.7,
+        68.6,
+        79.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 0 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 189 on main route at flow 45.4% (2413 1236 18)",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 190 on main route at flow 57.7% (2083 2273 18)",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 191 on main route at flow 68.6% (1425 2970 18)",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 198 on main route at flow 79.6% (2162 3812 10)",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=45.4%",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=57.7%",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=68.6%",
+        "L 09/30/2026 - 00:50:35: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.6%",
+        "L 09/30/2026 - 00:50:36: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c8m1_apartment first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:50:36: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 45%, 58%, 69%, 80%",
+        "L 09/30/2026 - 00:50:36: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c8m2_subway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1026221,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        59.9,
+        60.5,
+        60.5,
+        69.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 3 pills kept, 1 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 295 on main route at flow 69.7% (7202 3391 250)",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=60.5%",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=60.5%",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.9%",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=69.7%",
+        "L 09/30/2026 - 00:50:47: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c8m2_subway first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:50:48: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 60%, 61%, 61%, 70%",
+        "L 09/30/2026 - 00:50:48: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c8m3_sewers",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1043640,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        40.7,
+        54.2,
+        63.1,
+        70.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 1 removed (window), 4 (off route), 0 (separation), 0 (limit spacing), 4 (unreadable flow).",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 229 on main route at flow 40.7% (11127 7700 18)",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 230 on main route at flow 54.2% (13319 7425 18)",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 231 on main route at flow 63.1% (13215 8441 -253)",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 232 on main route at flow 70.2% (14113 9787 -451)",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=40.7%",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.2%",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.1%",
+        "L 09/30/2026 - 00:50:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=70.2%",
+        "L 09/30/2026 - 00:51:00: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c8m3_sewers first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:51:00: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 41%, 54%, 63%, 70%",
+        "L 09/30/2026 - 00:51:00: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c8m4_interior",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1064779,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.4,
+        67.8,
+        68.9,
+        77.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 1 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 1 (unreadable flow).",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 154 on main route at flow 42.4% (13450 15010 426)",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 157 on main route at flow 67.8% (13448 15273 5545)",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 160 on main route at flow 68.9% (13406 15066 5538)",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 161 on main route at flow 77.7% (13408 14050 5538)",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.4%",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=67.8%",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=68.9%",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=77.7%",
+        "L 09/30/2026 - 00:51:12: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c8m4_interior first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:51:15: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 42%, 68%, 69%, 78%",
+        "L 09/30/2026 - 00:51:15: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c8m5_rooftop",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1079959,
+      "pass": {
+        "first": 0,
+        "second": 0,
+        "known": 0,
+        "spots": 0,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 0,
+        "known": 0
+      },
+      "progress_percent": [],
+      "logs": [
+        "L 09/30/2026 - 00:51:26: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c8m5_rooftop first=0 second=0 known=0 spots=0 finale=1",
+        "L 09/30/2026 - 00:51:26: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=0 known=0"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c9m1_alleys",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1090653,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        34.4,
+        41.3,
+        47.1,
+        59.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 3 pills kept, 3 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 1 (unreadable flow).",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 163 on main route at flow 41.3% (-2525 -8678 2)",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=34.4%",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.1%",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.6%",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.3%",
+        "L 09/30/2026 - 00:51:38: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c9m1_alleys first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:51:40: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 34%, 41%, 47%, 60%",
+        "L 09/30/2026 - 00:51:40: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c9m2_lots",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1108771,
+      "pass": {
+        "first": 2,
+        "second": 2,
+        "known": 2,
+        "spots": 2,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 2,
+        "known": 2
+      },
+      "progress_percent": [
+        31.2,
+        76.9
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:51:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.9%",
+        "L 09/30/2026 - 00:51:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=31.2%",
+        "L 09/30/2026 - 00:51:52: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c9m2_lots first=2 second=2 known=2 spots=2 finale=1",
+        "L 09/30/2026 - 00:51:52: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 31%, 77%",
+        "L 09/30/2026 - 00:51:52: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=2 known=2"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c10m1_caves",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1121720,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        48.5,
+        51.4,
+        63.6,
+        76.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 0 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 117 on main route at flow 48.5% (-12540 -7810 -61)",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 118 on main route at flow 51.4% (-12609 -7380 -61)",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 119 on main route at flow 63.6% (-13187 -5675 -53)",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 120 on main route at flow 76.2% (-13390 -5506 -253)",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=48.5%",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=51.4%",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.6%",
+        "L 09/30/2026 - 00:52:04: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.2%",
+        "L 09/30/2026 - 00:52:05: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c10m1_caves first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:52:05: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 49%, 51%, 64%, 76%",
+        "L 09/30/2026 - 00:52:05: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c10m2_drainage",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1135530,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        40.3,
+        63.9,
+        66.7,
+        70.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 1 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 78 on main route at flow 40.3% (-8862 -8187 -528)",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 79 on main route at flow 63.9% (-7087 -7387 -239)",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 80 on main route at flow 70.7% (-6450 -6986 -61)",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=66.7%",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=40.3%",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.9%",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=70.7%",
+        "L 09/30/2026 - 00:52:17: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c10m2_drainage first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:52:20: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 40%, 64%, 67%, 71%",
+        "L 09/30/2026 - 00:52:20: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c10m3_ranchhouse",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1148796,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        47.8,
+        53.7,
+        62.6,
+        74.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:52:32: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 2 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 134 on main route at flow 47.8% (-10332 -3935 -50)",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 135 on main route at flow 53.7% (-9549 -3195 -54)",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 136 on main route at flow 62.6% (-8070 -2368 -25)",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 137 on main route at flow 74.2% (-6258 -1334 -47)",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.8%",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=53.7%",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=62.6%",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.2%",
+        "L 09/30/2026 - 00:52:33: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c10m3_ranchhouse first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:52:35: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 48%, 54%, 63%, 74%",
+        "L 09/30/2026 - 00:52:35: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c10m4_mainstreet",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1164784,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        46.1,
+        55.6,
+        76.4,
+        82.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 1 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 284 on main route at flow 46.1% (2487 -2337 144)",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 305 on main route at flow 55.6% (2009 -3800 -60)",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 306 on main route at flow 76.4% (-1449 -4784 -53)",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=82.1%",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=46.1%",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=55.6%",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.4%",
+        "L 09/30/2026 - 00:52:47: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c10m4_mainstreet first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:52:48: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 46%, 56%, 76%, 82%",
+        "L 09/30/2026 - 00:52:48: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c10m5_houseboat",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1180250,
+      "pass": {
+        "first": 3,
+        "second": 3,
+        "known": 3,
+        "spots": 3,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 3,
+        "known": 3
+      },
+      "progress_percent": [
+        3.9,
+        21.1,
+        79.7
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:52:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=3.9%",
+        "L 09/30/2026 - 00:52:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.7%",
+        "L 09/30/2026 - 00:52:59: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=21.1%",
+        "L 09/30/2026 - 00:52:59: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c10m5_houseboat first=3 second=3 known=3 spots=3 finale=1",
+        "L 09/30/2026 - 00:53:02: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 4%, 21%, 80%",
+        "L 09/30/2026 - 00:53:02: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=3 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c11m1_greenhouse",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1194404,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.0,
+        54.1,
+        66.4,
+        74.0
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 0 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 176 on main route at flow 42.0% (3527 500 530)",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 190 on main route at flow 54.1% (2969 646 618)",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 191 on main route at flow 66.4% (3150 1473 402)",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 192 on main route at flow 74.0% (3018 2146 266)",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.0%",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.1%",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=66.4%",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.0%",
+        "L 09/30/2026 - 00:53:13: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c11m1_greenhouse first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:53:17: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 42%, 54%, 66%, 74%",
+        "L 09/30/2026 - 00:53:17: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c11m2_offices",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1206254,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        41.1,
+        54.3,
+        61.0,
+        76.0
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 0 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 246 on main route at flow 41.1% (7762 4212 528)",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 247 on main route at flow 54.3% (9315 3769 674)",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 248 on main route at flow 61.0% (8387 4312 570)",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 249 on main route at flow 76.0% (9811 4070 226)",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=41.1%",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.3%",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=61.0%",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.0%",
+        "L 09/30/2026 - 00:53:28: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c11m2_offices first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:53:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 41%, 54%, 61%, 76%",
+        "L 09/30/2026 - 00:53:29: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c11m3_garage",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1220065,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        47.8,
+        54.9,
+        72.1,
+        76.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 1 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 256 on main route at flow 47.8% (-3686 2975 16)",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 257 on main route at flow 54.9% (-2612 2073 18)",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 258 on main route at flow 72.1% (-2447 3707 18)",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.6%",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.8%",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.9%",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=72.1%",
+        "L 09/30/2026 - 00:53:42: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c11m3_garage first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:53:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 48%, 55%, 72%, 77%",
+        "L 09/30/2026 - 00:53:44: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c11m4_terminal",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1236355,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        40.5,
+        58.9,
+        64.4,
+        78.5
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 0 removed (window), 2 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 185 on main route at flow 40.5% (-205 3336 18)",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 186 on main route at flow 58.9% (862 1312 274)",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 187 on main route at flow 64.4% (775 1008 18)",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 188 on main route at flow 78.5% (2200 1337 18)",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=40.5%",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=58.9%",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=64.4%",
+        "L 09/30/2026 - 00:53:56: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=78.5%",
+        "L 09/30/2026 - 00:53:57: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c11m4_terminal first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:53:57: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 41%, 59%, 64%, 79%",
+        "L 09/30/2026 - 00:53:57: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c11m5_runway",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1249710,
+      "pass": {
+        "first": 3,
+        "second": 3,
+        "known": 3,
+        "spots": 3,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 3,
+        "known": 3
+      },
+      "progress_percent": [
+        26.6,
+        47.9,
+        77.3
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:54:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=47.9%",
+        "L 09/30/2026 - 00:54:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=26.6%",
+        "L 09/30/2026 - 00:54:08: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=77.3%",
+        "L 09/30/2026 - 00:54:08: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c11m5_runway first=3 second=3 known=3 spots=3 finale=1",
+        "L 09/30/2026 - 00:54:11: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 27%, 48%, 77%",
+        "L 09/30/2026 - 00:54:11: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=3 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c12m1_hilltop",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1260176,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        42.2,
+        51.8,
+        56.0,
+        79.5
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 1 pills kept, 1 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 65 on main route at flow 51.8% (-10262 -9987 412)",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 80 on main route at flow 56.0% (-9910 -9507 434)",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 82 on main route at flow 79.5% (-6883 -9167 298)",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=42.2%",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=51.8%",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=56.0%",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=79.5%",
+        "L 09/30/2026 - 00:54:23: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c12m1_hilltop first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:54:25: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 42%, 52%, 56%, 80%",
+        "L 09/30/2026 - 00:54:25: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c12m2_traintunnel",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1272642,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        38.2,
+        54.1,
+        72.6,
+        83.8
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 1 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 109 on main route at flow 54.1% (-6062 -8512 -55)",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 110 on main route at flow 72.6% (-3462 -8237 -56)",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=38.2%",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=83.8%",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.1%",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=72.6%",
+        "L 09/30/2026 - 00:54:36: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c12m2_traintunnel first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:54:37: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 38%, 54%, 73%, 84%",
+        "L 09/30/2026 - 00:54:37: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c12m3_bridge",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1287395,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        73.6,
+        73.6,
+        74.3,
+        74.3
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 4 pills kept, 1 removed (window), 1 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=73.6%",
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.3%",
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=73.6%",
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.3%",
+        "L 09/30/2026 - 00:54:48: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c12m3_bridge first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:54:49: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 74%, 74%, 74%, 74%",
+        "L 09/30/2026 - 00:54:49: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c12m4_barn",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1303335,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        31.2,
+        53.2,
+        59.3,
+        74.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 187 on main route at flow 59.3% (10637 -4875 -112)",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 188 on main route at flow 74.4% (10900 -4240 90)",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=31.2%",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=53.2%",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=59.3%",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.4%",
+        "L 09/30/2026 - 00:55:00: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c12m4_barn first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:55:01: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 31%, 53%, 59%, 74%",
+        "L 09/30/2026 - 00:55:01: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c12m5_cornfield",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1315720,
+      "pass": {
+        "first": 2,
+        "second": 2,
+        "known": 2,
+        "spots": 2,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 2,
+        "known": 2
+      },
+      "progress_percent": [
+        81.8,
+        82.8
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:55:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=82.8%",
+        "L 09/30/2026 - 00:55:12: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=81.8%",
+        "L 09/30/2026 - 00:55:12: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c12m5_cornfield first=2 second=2 known=2 spots=2 finale=1",
+        "L 09/30/2026 - 00:55:13: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 82%, 83%",
+        "L 09/30/2026 - 00:55:13: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=2 known=2"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c13m1_alpinecreek",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1326819,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        40.9,
+        57.0,
+        63.2,
+        76.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 173 on main route at flow 40.9% (-1551 3530 659)",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 211 on main route at flow 57.0% (100 3096 299)",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 214 on main route at flow 63.2% (805 2899 342)",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 215 on main route at flow 76.4% (1074 1694 509)",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=40.9%",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=57.0%",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.2%",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=76.4%",
+        "L 09/30/2026 - 00:55:25: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c13m1_alpinecreek first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:55:26: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 41%, 57%, 63%, 76%",
+        "L 09/30/2026 - 00:55:26: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c13m2_southpinestream",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1337533,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        54.2,
+        65.7,
+        69.0,
+        74.2
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 2 pills kept, 0 removed (window), 0 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 319 on main route at flow 54.2% (675 2750 338)",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 320 on main route at flow 69.0% (-1211 4858 269)",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=65.7%",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=74.2%",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=54.2%",
+        "L 09/30/2026 - 00:55:38: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=69.0%",
+        "L 09/30/2026 - 00:55:39: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c13m2_southpinestream first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:55:39: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 54%, 66%, 69%, 74%",
+        "L 09/30/2026 - 00:55:39: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c13m3_memorialbridge",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1349931,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        48.6,
+        55.9,
+        61.9,
+        75.6
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 281 on main route at flow 48.6% (1000 -4012 1330)",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 285 on main route at flow 55.9% (977 -4537 1179)",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 300 on main route at flow 61.9% (1000 -4189 592)",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 301 on main route at flow 75.6% (2543 -4250 124)",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=48.6%",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=55.9%",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=61.9%",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=75.6%",
+        "L 09/30/2026 - 00:55:51: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c13m3_memorialbridge first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:55:51: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 49%, 56%, 62%, 76%",
+        "L 09/30/2026 - 00:55:51: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c13m4_cutthroatcreek",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1362529,
+      "pass": {
+        "first": 3,
+        "second": 3,
+        "known": 3,
+        "spots": 3,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 3,
+        "known": 3
+      },
+      "progress_percent": [
+        43.3,
+        75.8,
+        88.4
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:56:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=43.3%",
+        "L 09/30/2026 - 00:56:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=75.8%",
+        "L 09/30/2026 - 00:56:03: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=88.4%",
+        "L 09/30/2026 - 00:56:03: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c13m4_cutthroatcreek first=3 second=3 known=3 spots=3 finale=1",
+        "L 09/30/2026 - 00:56:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 43%, 76%, 88%",
+        "L 09/30/2026 - 00:56:06: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=3 known=3"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c14m1_junkyard",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1375494,
+      "pass": {
+        "first": 4,
+        "second": 4,
+        "known": 4,
+        "spots": 4,
+        "finale": 0
+      },
+      "hint_scan": {
+        "total": 4,
+        "known": 4
+      },
+      "progress_percent": [
+        46.4,
+        52.8,
+        63.6,
+        70.1
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] [ItemTracking] Pill flow window 30%-90% sep 0.0% detour 300: 0 pills kept, 1 removed (window), 3 (off route), 0 (separation), 0 (limit spacing), 0 (unreadable flow).",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 155 on main route at flow 46.4% (-2459 -1017 -37)",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 167 on main route at flow 52.8% (-2400 612 -49)",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 172 on main route at flow 63.6% (-4979 1979 27)",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] [ItemTracking] Pill fill: spawned 176 on main route at flow 70.1% (-6525 2925 399)",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=46.4%",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=52.8%",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=63.6%",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=70.1%",
+        "L 09/30/2026 - 00:56:22: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c14m1_junkyard first=4 second=4 known=4 spots=4 finale=0",
+        "L 09/30/2026 - 00:56:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 46%, 53%, 64%, 70%",
+        "L 09/30/2026 - 00:56:24: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=4 known=4"
+      ]
+    },
+    {
+      "case": "map",
+      "map": "c14m2_lighthouse",
+      "log_path": "/home/louis/l4d2/left4dead2/addons/sourcemod/logs/L20260930.log",
+      "log_offset": 1392664,
+      "pass": {
+        "first": 1,
+        "second": 1,
+        "known": 1,
+        "spots": 1,
+        "finale": 1
+      },
+      "hint_scan": {
+        "total": 1,
+        "known": 1
+      },
+      "progress_percent": [
+        100.0
+      ],
+      "logs": [
+        "L 09/30/2026 - 00:56:37: [confoglcompmod.smx] PILL_REGRESSION_POINT count=1 progress=100.0%",
+        "L 09/30/2026 - 00:56:37: [confoglcompmod.smx] PILL_REGRESSION_PASS case=map map=c14m2_lighthouse first=1 second=1 known=1 spots=1 finale=1",
+        "L 09/30/2026 - 00:56:38: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_PROGRESS 100%",
+        "L 09/30/2026 - 00:56:38: [optional/AnneHappy/anne_pill_hint.smx] PILL_HINT_SCAN_RESULT total=1 known=1"
+      ]
+    }
+  ]
+}

@@ -103,6 +103,8 @@ native void LGO_ExecuteConfigCfg(const char[] sFileName);
  */
 native bool LGO_IsMapDataAvailable();
 
+native bool LGO_IsEntityInSaferoom(int entity, int saferoom = 3);
+
 /**
  * @brief Get an Int value from the MapInfo keyvalues for the current map with a specific key
  * @remarks Mapinfo keyvalues is used to store static data about maps
@@ -185,6 +187,7 @@ public void __pl_confogl_SetNTVOptional()
 	MarkNativeAsOptional("LGO_BuildConfigPath");
 	MarkNativeAsOptional("LGO_ExecuteConfigCfg");
 	MarkNativeAsOptional("LGO_IsMapDataAvailable");
+	MarkNativeAsOptional("LGO_IsEntityInSaferoom");
 	MarkNativeAsOptional("LGO_GetMapValueInt");
 	MarkNativeAsOptional("LGO_GetMapValueFloat");
 	MarkNativeAsOptional("LGO_GetMapValueVector");

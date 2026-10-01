@@ -1,0 +1,759 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CompetitiveWithAnne 服务端架构",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-anne-overview-20260930-074553/anne-overview.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/fantasylidong/CompetitiveWithAnne.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "37adcc39c6ee921022997e2bd00036f5553e2e04"
+    }
+  },
+  "components": [
+    {
+      "id": "source",
+      "type": "frontend",
+      "label": "SourcePawn 源码",
+      "sublabel": "scripting/*.sp → plugins/*.smx",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "README-AnneHappy-zh-cn.md",
+          "line": 56,
+          "end_line": 64,
+          "label": "源码与插件目录镜像"
+        },
+        {
+          "path": "scripts/spcomp-docker.sh",
+          "line": 4,
+          "end_line": 12,
+          "label": "远程 spcomp 编译"
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "type": "cloud",
+      "label": "GitHub Actions",
+      "sublabel": "完整包 / nomysql 包",
+      "pos": [
+        330,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": ".github/workflows/CompetitiveWithAnne.yml",
+          "line": 78,
+          "end_line": 90,
+          "label": "打包 database / nomysql"
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "line": 43,
+          "end_line": 53,
+          "label": "SM 1.12 spcomp 重编"
+        }
+      ]
+    },
+    {
+      "id": "players",
+      "type": "external",
+      "label": "L4D2 玩家",
+      "sublabel": "Steam 客户端",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/server.cfg",
+          "line": 64,
+          "end_line": 75,
+          "label": "客户端网络速率"
+        }
+      ]
+    },
+    {
+      "id": "srcds",
+      "type": "backend",
+      "label": "SRCDS",
+      "sublabel": "Metamod → SourceMod 1.12",
+      "pos": [
+        330,
+        200
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/metamod.vdf",
+          "line": 1,
+          "end_line": 4,
+          "label": "Metamod 入口"
+        },
+        {
+          "path": "addons/metamod/sourcemod.vdf",
+          "line": 1,
+          "end_line": 5,
+          "label": "加载 SourceMod"
+        },
+        {
+          "path": "cfg/server.cfg",
+          "line": 18,
+          "label": "confogl 插件 cfg 链"
+        }
+      ]
+    },
+    {
+      "id": "matchvote",
+      "type": "frontend",
+      "label": "match_vote",
+      "sublabel": "!match 模式投票",
+      "pos": [
+        620,
+        200
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/scripting/match_vote.sp",
+          "line": 70,
+          "end_line": 72,
+          "label": "!match 指令"
+        },
+        {
+          "path": "addons/sourcemod/scripting/match_vote.sp",
+          "line": 355,
+          "end_line": 367,
+          "label": "投票通过 → sm_forcematch"
+        },
+        {
+          "path": "addons/sourcemod/configs/matchmodes.txt",
+          "line": 1,
+          "end_line": 5,
+          "label": "可选模式列表"
+        }
+      ]
+    },
+    {
+      "id": "confogl",
+      "type": "backend",
+      "label": "confoglcompmod",
+      "sublabel": "ReqMatch 模式加载",
+      "pos": [
+        950,
+        200
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/scripting/confoglcompmod/ReqMatch.sp",
+          "line": 58,
+          "label": "三段 cfg 默认值"
+        },
+        {
+          "path": "addons/sourcemod/scripting/confoglcompmod/ReqMatch.sp",
+          "line": 155,
+          "end_line": 165,
+          "label": "unload_all 后逐个 exec"
+        },
+        {
+          "path": "addons/sourcemod/scripting/confoglcompmod/ReqMatch.sp",
+          "line": 64,
+          "label": "sm_forcematch"
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "backend",
+      "label": "特感 AI 插件",
+      "sublabel": "ai_hunter_2 · ai_tank3 …",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/cfgogl/annehappy/confogl_plugins.cfg",
+          "line": 28,
+          "end_line": 43,
+          "label": "加载 ai_* 插件"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp",
+          "line": 14,
+          "end_line": 20,
+          "label": "依赖 left4dhooks / anne_nextbot"
+        }
+      ]
+    },
+    {
+      "id": "infctl",
+      "type": "backend",
+      "label": "infected_control",
+      "sublabel": "刷特 wave 状态机 2026-08",
+      "tag": "Anti-Bait",
+      "pos": [
+        330,
+        430
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/cfgogl/annehappy/confogl_plugins.cfg",
+          "line": 37,
+          "end_line": 38,
+          "label": "模式 cfg 加载"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control.sp",
+          "line": 144,
+          "label": "BUCKET_CACHE_VER 2026-08"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/spawn_attempts.inc",
+          "line": 306,
+          "label": "L4D2_SpawnSpecial 刷特"
+        }
+      ]
+    },
+    {
+      "id": "traitor",
+      "type": "backend",
+      "label": "anne_traitor_quota",
+      "sublabel": "内鬼配额 provider (可选)",
+      "pos": [
+        620,
+        430
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/anne_traitor_quota.sp",
+          "line": 79,
+          "end_line": 83,
+          "label": "注册配额 natives"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/traitor_quota.inc",
+          "line": 14,
+          "label": "infected_control 可选调用"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/anne_traitor_quota/storage.inc",
+          "line": 390,
+          "label": "Sync lane 连接"
+        }
+      ]
+    },
+    {
+      "id": "l4dh",
+      "type": "backend",
+      "label": "left4dhooks",
+      "sublabel": "L4D2_SpawnSpecial 等 natives",
+      "pos": [
+        950,
+        430
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/generalfixes.cfg",
+          "line": 4,
+          "label": "前置层加载"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/spawn_attempts.inc",
+          "line": 92,
+          "label": "L4D_GetRandomPZSpawnPosition"
+        }
+      ]
+    },
+    {
+      "id": "dbplugins",
+      "type": "backend",
+      "label": "数据库扩展插件",
+      "sublabel": "l4d_stats · sbpp_* · chatlog",
+      "pos": [
+        1280,
+        430
+      ],
+      "size": [
+        250,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/sharedplugins.cfg",
+          "line": 6,
+          "end_line": 20,
+          "label": "扩展层加载"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/l4d_stats/persistence.inc",
+          "line": 23,
+          "label": "Shared lane 连接"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/sbpp_main.sp",
+          "line": 262,
+          "label": "sourcebans 连接"
+        }
+      ]
+    },
+    {
+      "id": "nextbot",
+      "type": "backend",
+      "label": "anne_nextbot",
+      "sublabel": "NextBot 寻路 natives",
+      "pos": [
+        40,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "extensions/anne_nextbot/extension.cpp",
+          "line": 777,
+          "label": "natives 表"
+        },
+        {
+          "path": "extensions/anne_nextbot/extension.cpp",
+          "line": 883,
+          "end_line": 884,
+          "label": "注册 anne_nextbot 库"
+        }
+      ]
+    },
+    {
+      "id": "accel",
+      "type": "backend",
+      "label": "anne_spawn_accel",
+      "sublabel": "Nav 候选 · worker 线程池",
+      "pos": [
+        330,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "extensions/anne_spawn_accel/extension.cpp",
+          "line": 3828,
+          "end_line": 3830,
+          "label": "AnneSpawn_* natives"
+        },
+        {
+          "path": "extensions/anne_spawn_accel/worker_pool.cpp",
+          "line": 24,
+          "end_line": 26,
+          "label": "worker 线程池"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/spawn_accel_bridge.inc",
+          "line": 969,
+          "end_line": 975,
+          "label": "NavGraphStart / 回退旧 buckets"
+        }
+      ]
+    },
+    {
+      "id": "datacache",
+      "type": "database",
+      "label": "SM data/ 缓存",
+      "sublabel": "infd_buckets .kv · .anvg",
+      "pos": [
+        620,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/nav_persist.inc",
+          "line": 13,
+          "end_line": 23,
+          "label": "infd_buckets/<map>.kv"
+        },
+        {
+          "path": "addons/sourcemod/scripting/optional/AnneHappy/infected_control/spawn_accel_bridge.inc",
+          "line": 950,
+          "end_line": 962,
+          "label": "navgraph/<map>.anvg 路径"
+        },
+        {
+          "path": "extensions/anne_spawn_accel/nav_graph.cpp",
+          "line": 872,
+          "end_line": 918,
+          "label": "扩展写入 .anvg"
+        }
+      ]
+    },
+    {
+      "id": "annedb",
+      "type": "backend",
+      "label": "anne_db 连接中心",
+      "sublabel": "共享连接 + Sync lane",
+      "pos": [
+        950,
+        620
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/generalfixes.cfg",
+          "line": 2,
+          "end_line": 3,
+          "label": "最先加载"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/anne_db.sp",
+          "line": 76,
+          "end_line": 81,
+          "label": "AnneDB_* natives"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/anne_db.sp",
+          "line": 412,
+          "label": "CloneHandle 分发"
+        }
+      ]
+    },
+    {
+      "id": "updater",
+      "type": "backend",
+      "label": "join · updater",
+      "sublabel": "join_autoupdate 热更新",
+      "pos": [
+        1280,
+        620
+      ],
+      "size": [
+        250,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cfg/sharedplugins.cfg",
+          "line": 7,
+          "label": "加载 updater"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/join.sp",
+          "line": 117,
+          "end_line": 119,
+          "label": "join_autoupdate 0/1/2"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/join.sp",
+          "line": 204,
+          "label": "Updater_AddPlugin"
+        }
+      ]
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "l4d2stats · sourcebans · chat",
+      "pos": [
+        950,
+        800
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/configs/databases.cfg",
+          "line": 42,
+          "end_line": 70,
+          "label": "sourcebans / l4dstats / rpg"
+        },
+        {
+          "path": "addons/sourcemod/scripting/extend/anne_db.sp",
+          "line": 320,
+          "label": "每条 lane 一次 Connect"
+        }
+      ]
+    },
+    {
+      "id": "trygek",
+      "type": "external",
+      "label": "anne.trygek.com",
+      "sublabel": "插件更新清单 (HTTP)",
+      "pos": [
+        1280,
+        800
+      ],
+      "size": [
+        250,
+        64
+      ],
+      "sources": [
+        {
+          "path": "addons/sourcemod/scripting/extend/join.sp",
+          "line": 60,
+          "end_line": 61,
+          "label": "公开 / 私有清单 URL"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "GitHub 仓库与 Actions",
+      "wraps": [
+        "source",
+        "release"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "② cfgogl/annehappy/confogl_plugins.cfg",
+      "wraps": [
+        "ai",
+        "infctl",
+        "traitor"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "① generalfixes.cfg",
+      "wraps": [
+        "l4dh",
+        "annedb"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "③ sharedplugins.cfg",
+      "wraps": [
+        "dbplugins",
+        "updater"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "C++ 扩展",
+      "wraps": [
+        "nextbot",
+        "accel"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "src-to-ci",
+      "from": "source",
+      "to": "release",
+      "label": "push 触发"
+    },
+    {
+      "id": "ci-to-srcds",
+      "from": "release",
+      "to": "srcds",
+      "label": "部署整合包",
+      "variant": "dashed"
+    },
+    {
+      "id": "players-to-srcds",
+      "from": "players",
+      "to": "srcds",
+      "label": "UDP 游戏连接",
+      "variant": "emphasis"
+    },
+    {
+      "id": "srcds-to-vote",
+      "from": "srcds",
+      "to": "matchvote",
+      "label": "!match 投票",
+      "variant": "emphasis"
+    },
+    {
+      "id": "vote-to-confogl",
+      "from": "matchvote",
+      "to": "confogl",
+      "label": "sm_forcematch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "confogl-prereq",
+      "from": "confogl",
+      "to": "l4dh",
+      "label": "① 前置层",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "confogl-anne",
+      "from": "confogl",
+      "to": "infctl",
+      "label": "② 模式插件",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "confogl-extend",
+      "from": "confogl",
+      "to": "dbplugins",
+      "label": "③ 扩展插件",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "infctl-quota",
+      "from": "infctl",
+      "to": "traitor",
+      "label": "配额查询",
+      "variant": "dashed"
+    },
+    {
+      "id": "infctl-accel",
+      "from": "infctl",
+      "to": "accel",
+      "label": "Nav 候选 / 建图",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "infctl-cache",
+      "from": "infctl",
+      "to": "datacache",
+      "label": ".kv 读写",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "accel-cache",
+      "from": "accel",
+      "to": "datacache",
+      "label": ".anvg 读写"
+    },
+    {
+      "id": "ai-nextbot",
+      "from": "ai",
+      "to": "nextbot",
+      "label": "寻路 natives"
+    },
+    {
+      "id": "quota-db",
+      "from": "traitor",
+      "to": "annedb",
+      "label": "Sync lane",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "plugins-db",
+      "from": "dbplugins",
+      "to": "annedb",
+      "label": "Shared lane",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "hub-mysql",
+      "from": "annedb",
+      "to": "mysql",
+      "label": "每库一条连接"
+    },
+    {
+      "id": "updater-manifest",
+      "from": "updater",
+      "to": "trygek",
+      "label": "HTTP 清单"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "模式加载链",
+      "items": [
+        "server.cfg 把 confogl_match_execcfg_plugins 设为 generalfixes → confogl_plugins → sharedplugins",
+        "ReqMatch 先 sm plugins unload_all，再按 ①②③ 顺序 exec",
+        "annehappy 模式把 stripper_cfg_path 指向 cfg/stripper/zonemod_anne"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Anne 刷特核心",
+      "items": [
+        "infected_control 2026-08：kill phase → 16s 基础倒计时 → Anti-Bait hold",
+        "anne_spawn_accel 不可用时回退到 .kv 旧版 buckets",
+        "infected_control26-07 为回滚版，经 cfg/vote/Anne/Anne26-07.cfg 切换"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "数据库",
+      "items": [
+        "anne_db 按物理库共享连接，插件拿到 CloneHandle 副本",
+        "未加载 anne_db 时，AnneDB_*Compat 回退到原生连接",
+        "nomysql 包移除直连数据库插件，rpg 换成无数据库构建"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "发布与更新",
+      "items": [
+        "push 后打包完整包与 nomysql 包；release.yml 用 SM 1.12 重编",
+        "join_autoupdate=1 拉公开清单，=2 拉含数据库插件的私有清单"
+      ]
+    }
+  ]
+}

@@ -13,4 +13,12 @@
 	{
 		"en"		", "
 	}
+	"PillHint_Continue"
+	{
+		"en"		"{green}[Anne]{default} More pill locations: {olive}"
+	}
+	"PillHint_Unknown"
+	{
+		"en"		"unknown"
+	}
 }

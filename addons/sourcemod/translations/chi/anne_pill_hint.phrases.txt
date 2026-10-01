@@ -12,4 +12,12 @@
 	{
 		"chi"		"、"
 	}
+	"PillHint_Continue"
+	{
+		"chi"		"{green}[Anne]{default} 止痛药进度（续）：{olive}"
+	}
+	"PillHint_Unknown"
+	{
+		"chi"		"未知"
+	}
 }

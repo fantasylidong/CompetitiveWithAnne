@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "2d3b93d6-0227-4b1e-b8fa-7cd9151ef044",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Volumes/data/GitHub/CompetitiveWithAnne/.archify/architecture-anne-overview-20260930-074553/candidate.json",
+  "output": "/Volumes/data/GitHub/CompetitiveWithAnne/.archify/architecture-anne-overview-20260930-074553/anne-overview.html",
+  "specification": {
+    "sha256": "ec5228834805432053408594c73d8623162611387374658cd33e52200690c675",
+    "bytes": 17388
+  },
+  "artifact": {
+    "sha256": "75fe95c1bc88939abac6de2ed314e294f6fc19ab2249d4b69fe9e3d793fdaf80",
+    "bytes": 797425
+  }
+}

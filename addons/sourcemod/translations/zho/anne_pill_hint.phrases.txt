@@ -12,4 +12,12 @@
 	{
 		"zho"		"、"
 	}
+	"PillHint_Continue"
+	{
+		"zho"		"{green}[Anne]{default} 止痛藥進度（續）：{olive}"
+	}
+	"PillHint_Unknown"
+	{
+		"zho"		"未知"
+	}
 }

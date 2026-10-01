@@ -28,6 +28,7 @@ static KeyValues
 void MI_APL()
 {
 	CreateNative("LGO_IsMapDataAvailable", _native_IsMapDataAvailable);
+	CreateNative("LGO_IsEntityInSaferoom", _native_IsEntityInSaferoom);
 	CreateNative("LGO_GetMapValueInt", _native_GetMapValueInt);
 	CreateNative("LGO_GetMapValueFloat", _native_GetMapValueFloat);
 	CreateNative("LGO_GetMapValueVector", _native_GetMapValueVector);
@@ -420,6 +421,15 @@ stock float GetMapStartExtraDist() //WeaponInformation use it
 }
 
 // Natives
+static int _native_IsEntityInSaferoom(Handle plugin, int numParams)
+{
+	int entity = GetNativeCell(1);
+	if (!IsValidEntity(entity)) {
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid entity %d", entity);
+	}
+	return IsEntityInSaferoom(entity, GetNativeCell(2));
+}
+
 static int _native_IsMapDataAvailable(Handle plugin, int numParams)
 {
 	return IsMapDataAvailable();

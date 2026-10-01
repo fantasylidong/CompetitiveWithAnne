@@ -2,38 +2,38 @@
 {
 	"Lerpmonitor_LerpWarningLerpValueIllegal"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor} warning: {default} Your Lerp value is illegal (minimum: {teamcolor}%.01f{default}, maximum: {teamcolor}%.01f{default})! Please change it back within 5 seconds."
+		"en"		"{default}<{olive}lerp{default}> {teamcolor} warning: {default} Your lerp value is illegal (minimum: {teamcolor}%.01f{default}, maximum: {teamcolor}%.01f{default})! Please change it back within 5 seconds."
 	}
 	"Lerpmonitor_LerpThanksCooperationLerpRestored"
 	{
-		"en"		"{default}<{olive}Lerp{default}> Thanks for your cooperation, Lerp has been restored to the legal range."
+		"en"		"{default}<{olive}lerp{default}> Thanks for your cooperation, lerp has been restored to the legal range."
 	}
 	"Lerpmonitor_Lerp"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f"
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f"
 	}
 	"Lerpmonitor_LerpChanges"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f {default}<== {teamcolor}%.01f {default}[%s%d{default}/%d {olive}changes]"
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f {default}<== {teamcolor}%.01f {default}[%s%d{default}/%d {olive}changes]"
 	}
 	"Lerpmonitor_LerpMovedSpectatorIllegalLerp"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default} was moved to spectator (illegal lerp change)!"
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default} was moved to spectator (illegal lerp change)!"
 	}
 	"Lerpmonitor_LerpIllegalChangeLerpGame"
 	{
-		"en"		"{default}<{olive}Lerp{default}> Illegal change of lerp in the game! Change lerp back to {teamcolor}%.01f"
+		"en"		"{default}<{olive}lerp{default}> Illegal change of lerp in the game! Change lerp back to {teamcolor}%.01f"
 	}
 	"Lerpmonitor_Lerp_2"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f {default}<== {teamcolor}%.01f"
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default}@ {teamcolor}%.01f {default}<== {teamcolor}%.01f"
 	}
 	"Lerpmonitor_LerpMovedBystanderDueFailure"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default} was moved to the bystander due to failure to adjust Lerp to the legal range within 5 seconds"
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default} was moved to the bystander due to failure to adjust lerp to the legal range within 5 seconds"
 	}
 	"Lerpmonitor_LerpKickedGameHeFailed"
 	{
-		"en"		"{default}<{olive}Lerp{default}> {teamcolor}%N {default} was kicked out of the game because he failed to adjust Lerp to the legal range within 5 seconds."
+		"en"		"{default}<{olive}lerp{default}> {teamcolor}%N {default} was kicked out of the game because he failed to adjust lerp to the legal range within 5 seconds."
 	}
 }

@@ -39,6 +39,11 @@ Handle g_hLerpWarningTimer[MAXPLAYERS + 1] = { null, ... };
 bool g_bLerpWarningActive[MAXPLAYERS + 1];
 int g_iLerpLegalConfirmations[MAXPLAYERS + 1];
 int g_iLerpWarningGeneration[MAXPLAYERS + 1];
+bool g_bLerpQueryPending[MAXPLAYERS + 1];
+bool g_bLerpQueryTeam[MAXPLAYERS + 1];
+float g_fCurrentLerp[MAXPLAYERS + 1];
+bool g_bCurrentLerpKnown[MAXPLAYERS + 1];
+float g_fLerpWarningDeadline[MAXPLAYERS + 1];
 float g_fQueriedUpdateRate[MAXPLAYERS + 1];
 float g_fQueriedInterpRatio[MAXPLAYERS + 1];
 
@@ -47,7 +52,7 @@ public Plugin myinfo =
     name = "LerpMonitor++",
     author = "ProdigySim, Die Teetasse, vintik, A1m`, Modified by Gemini",
     description = "Keep track of players' lerp settings with 5s warning",
-    version = "2.4.5",
+    version = "2.4.6",
     url = "https://github.com/SirPlease/L4D2-Competitive-Rework"
 };
 
@@ -103,7 +108,7 @@ void LateLoad()
         if (!IsClientInGame(i) || IsFakeClient(i)) {
             continue;
         }
-        ProcessPlayerLerp(i, true);
+        ProcessPlayerLerp(i);
     }
 }
 
@@ -118,6 +123,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
     ResetLerpWarning(client);
+    g_bCurrentLerpKnown[client] = false;
 }
 
 Action Process(Handle hTimer, int userid)
@@ -142,6 +148,7 @@ public void OnMapEnd()
 
     for (int client = 1; client <= MaxClients; client++) {
         ResetLerpWarning(client);
+        g_bCurrentLerpKnown[client] = false;
     }
 }
 
@@ -152,7 +159,7 @@ void Event_RoundGoesLive(Event hEvent, const char[] name, bool dontBroadcast)
 
 public void OnClientSettingsChanged(int client)
 {
-    if (IsValidEdict(client) && !IsFakeClient(client)) {
+    if (IsClientInGame(client) && !IsFakeClient(client)) {
         ProcessPlayerLerp(client);
     }
 }
@@ -175,9 +182,7 @@ void OnTeamChange(Event hEvent, const char[] eName, bool dontBroadcast)
         int userid = hEvent.GetInt("userid");
         int client = GetClientOfUserId(userid);
         if (client > 0 && IsClientInGame(client) && !IsFakeClient(client)) {
-            if (!isTransfer) {
-                CreateTimer(0.1, OnTeamChangeDelay, userid, TIMER_FLAG_NO_MAPCHANGE);
-            }
+            CreateTimer(0.1, OnTeamChangeDelay, userid, TIMER_FLAG_NO_MAPCHANGE);
         }
     }
 }
@@ -186,7 +191,7 @@ Action OnTeamChangeDelay(Handle hTimer, int userid)
 {
     int client = GetClientOfUserId(userid);
     if (client > 0) {
-        ProcessPlayerLerp(client, false, true);
+        ProcessPlayerLerp(client, !isTransfer);
     }
     return Plugin_Stop;
 }
@@ -208,7 +213,7 @@ Action Timer_RoundEndDelay(Handle hTimer)
 Action Lerps_Cmd(int client, int args)
 {
     int iCount = 0;
-    if (ArrLerpsValue.Size > 0) {
+    if (GetClientCount(true) > 0) {
         ReplyToCommand(client, "[!] Lerp setting list:");
 
         float fLerpValue;
@@ -217,7 +222,7 @@ Action Lerps_Cmd(int client, int args)
             if (IsClientInGame(i) && !IsFakeClient(i)) {
                 GetClientAuthId(i, AuthId_Steam2, sSteamID, sizeof(sSteamID));
 
-                if (ArrLerpsValue.GetValue(sSteamID, fLerpValue)) {
+                if (TryGetLerpTime(i, fLerpValue)) {
                     ReplyToCommand(client, "%N [%s]: %.01f", i, sSteamID, fLerpValue * 1000);
                     iCount++;
                 }
@@ -246,39 +251,59 @@ Action OnTransfer(Handle hTimer)
     return Plugin_Stop;
 }
 
-void ProcessPlayerLerp(int client, bool load = false, bool team = false)
+// Every entry point uses the same client CVar query, never userinfo snapshots.
+void ProcessPlayerLerp(int client, bool team = false)
 {
-    float newLerpTime;
-    if (!TryGetLerpTime(client, newLerpTime)) {
+    if (!IsClientInGame(client) || IsFakeClient(client)) {
         return;
     }
+    g_bLerpQueryTeam[client] = g_bLerpQueryTeam[client] || team;
+    BeginClientLerpQuery(client);
+}
 
-    if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
-        SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
-        return;
-    }
+void ProcessQueriedLerp(int client, float newLerpTime)
+{
+    g_fCurrentLerp[client] = newLerpTime;
+    g_bCurrentLerpKnown[client] = true;
+    SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
 
     if (!IsLerpInAllowedRange(newLerpTime)) {
-        SetEntPropFloat(client, Prop_Data, "m_fLerpTime", newLerpTime);
         g_iLerpLegalConfirmations[client] = 0;
-
-        if (load) {
+        if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
+            if (g_bLerpWarningActive[client]) {
+                ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
+            }
             return;
         }
-
         if (!g_bLerpWarningActive[client]) {
             g_bLerpWarningActive[client] = true;
-            g_iLerpWarningGeneration[client]++;
+            g_fLerpWarningDeadline[client] = GetGameTime() + 5.0;
             CPrintToChatEx(client, client, "%t", "Lerpmonitor_LerpWarningLerpValueIllegal", cVarMinLerp.FloatValue * 1000, cVarMaxLerp.FloatValue * 1000);
-            ScheduleLerpRecheck(client, 5.0);
+        } else if (GetGameTime() >= g_fLerpWarningDeadline[client]) {
+            // Keep the expired warning across spectating/rejoining until corrected.
+            if (cVarBadLerpAction.IntValue == 1) {
+                CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpMovedBystanderDueFailure", client);
+                ChangeClientTeam(client, L4D_TEAM_SPECTATE);
+            } else {
+                CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpKickedGameHeFailed", client);
+                KickClient(client, "Illegal lerp value (min: %.01f, max: %.01f)", cVarMinLerp.FloatValue * 1000, cVarMaxLerp.FloatValue * 1000);
+            }
         }
+        ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
         return;
     }
 
+    bool team = g_bLerpQueryTeam[client];
     if (g_bLerpWarningActive[client]) {
-        return;
+        g_iLerpLegalConfirmations[client]++;
+        if (g_iLerpLegalConfirmations[client] < LERP_LEGAL_CONFIRMATIONS) {
+            ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
+            return;
+        }
+        ResetLerpWarning(client);
+        CPrintToChatEx(client, client, "%t", "Lerpmonitor_LerpThanksCooperationLerpRestored");
     }
-
+    g_bLerpQueryTeam[client] = false;
     ApplyPlayerLerp(client, newLerpTime, team);
 }
 
@@ -346,23 +371,13 @@ Action Timer_CheckBadLerpRange(Handle timer, int userid)
     }
 
     g_hLerpWarningTimer[client] = null;
-    if (!g_bLerpWarningActive[client]) {
-        return Plugin_Stop;
-    }
-
-    if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
-        g_iLerpLegalConfirmations[client] = 0;
-        ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
-        return Plugin_Stop;
-    }
-
     BeginClientLerpQuery(client);
     return Plugin_Stop;
 }
 
 void ScheduleLerpRecheck(int client, float delay)
 {
-    if (!g_bLerpWarningActive[client] || !IsClientInGame(client)) {
+    if (!IsClientInGame(client)) {
         return;
     }
 
@@ -380,6 +395,9 @@ void ResetLerpWarning(int client)
         g_hLerpWarningTimer[client] = null;
     }
 
+    g_bLerpQueryPending[client] = false;
+    g_bLerpQueryTeam[client] = false;
+    g_fLerpWarningDeadline[client] = 0.0;
     g_bLerpWarningActive[client] = false;
     g_iLerpLegalConfirmations[client] = 0;
     g_iLerpWarningGeneration[client]++;
@@ -389,6 +407,13 @@ void ResetLerpWarning(int client)
 
 void BeginClientLerpQuery(int client)
 {
+    if (g_bLerpQueryPending[client]) {
+        // A settings/team event during a query must get another complete sample.
+        ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
+        return;
+    }
+    g_bLerpQueryPending[client] = true;
+    g_iLerpWarningGeneration[client]++;
     QueryCookie cookie = QueryClientConVar(client, "cl_updaterate", ClientLerpQueryFinished, g_iLerpWarningGeneration[client]);
     if (cookie == QUERYCOOKIE_FAILED) {
         RetryClientLerpQuery(client);
@@ -397,19 +422,15 @@ void BeginClientLerpQuery(int client)
 
 void RetryClientLerpQuery(int client)
 {
+    g_bLerpQueryPending[client] = false;
     g_iLerpLegalConfirmations[client] = 0;
     ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
 }
 
 public void ClientLerpQueryFinished(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any generation)
 {
-    if (client <= 0 || !IsClientInGame(client) || !g_bLerpWarningActive[client]
+    if (client <= 0 || !IsClientInGame(client) || !g_bLerpQueryPending[client]
         || generation != g_iLerpWarningGeneration[client]) {
-        return;
-    }
-
-    if (GetClientTeam(client) < L4D_TEAM_SURVIVORS) {
-        RetryClientLerpQuery(client);
         return;
     }
 
@@ -442,41 +463,15 @@ public void ClientLerpQueryFinished(QueryCookie cookie, int client, ConVarQueryR
         return;
     }
 
-    LogMessage("[LerpMonitor] Queried %L: cl_updaterate=%.3f cl_interp_ratio=%.3f cl_interp=%.6f lerp=%.3fms",
-        client, g_fQueriedUpdateRate[client], g_fQueriedInterpRatio[client], parsedValue, queriedLerpTime * 1000.0);
-
-    if (!IsLerpInAllowedRange(queriedLerpTime)) {
-        ResetLerpWarning(client);
-        if (cVarBadLerpAction.IntValue == 1) {
-            CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpMovedBystanderDueFailure", client);
-            ChangeClientTeam(client, L4D_TEAM_SPECTATE);
-        } else {
-            CPrintToChatAllEx(client, "%t", "Lerpmonitor_LerpKickedGameHeFailed", client);
-            KickClient(client, "Illegal lerp value (min: %.01f, max: %.01f)", cVarMinLerp.FloatValue * 1000, cVarMaxLerp.FloatValue * 1000);
-        }
-        return;
+    g_bLerpQueryPending[client] = false;
+    if (!g_bCurrentLerpKnown[client] || g_fCurrentLerp[client] != queriedLerpTime
+        || (g_bLerpWarningActive[client] && GetClientTeam(client) >= L4D_TEAM_SURVIVORS
+            && GetGameTime() >= g_fLerpWarningDeadline[client])) {
+        LogMessage("[LerpMonitor] Queried %L: cl_updaterate=%.3f cl_interp_ratio=%.3f cl_interp=%.6f lerp=%.6fms allowed=%.6f..%.6fms",
+            client, g_fQueriedUpdateRate[client], g_fQueriedInterpRatio[client], parsedValue, queriedLerpTime * 1000.0,
+            cVarMinLerp.FloatValue * 1000.0, cVarMaxLerp.FloatValue * 1000.0);
     }
-
-    g_iLerpLegalConfirmations[client]++;
-    if (g_iLerpLegalConfirmations[client] < LERP_LEGAL_CONFIRMATIONS) {
-        ScheduleLerpRecheck(client, LERP_RECHECK_INTERVAL);
-        return;
-    }
-
-    ResetLerpWarning(client);
-    CPrintToChatEx(client, client, "%t", "Lerpmonitor_LerpThanksCooperationLerpRestored");
-    ApplyPlayerLerp(client, queriedLerpTime);
-}
-
-bool TryGetClientInfoFloat(int client, const char[] key, float &value)
-{
-    char buffer[64];
-
-    if (!GetClientInfo(client, key, buffer, sizeof(buffer))) {
-        return false;
-    }
-
-    return TryParseClientFloat(buffer, value);
+    ProcessQueriedLerp(client, queriedLerpTime);
 }
 
 bool TryParseClientFloat(const char[] buffer, float &value)
@@ -488,17 +483,11 @@ bool TryParseClientFloat(const char[] buffer, float &value)
 
 bool TryGetLerpTime(int client, float &lerpTime)
 {
-    float clientUpdateRate;
-    float flLerpRatio;
-    float flLerpAmount;
-
-    if (!TryGetClientInfoFloat(client, "cl_updaterate", clientUpdateRate)
-        || !TryGetClientInfoFloat(client, "cl_interp_ratio", flLerpRatio)
-        || !TryGetClientInfoFloat(client, "cl_interp", flLerpAmount)) {
+    if (!g_bCurrentLerpKnown[client]) {
         return false;
     }
-
-    return TryCalculateLerpTime(clientUpdateRate, flLerpRatio, flLerpAmount, lerpTime);
+    lerpTime = g_fCurrentLerp[client];
+    return true;
 }
 
 bool TryCalculateLerpTime(float clientUpdateRate, float flLerpRatio, float flLerpAmount, float &lerpTime)
@@ -541,14 +530,7 @@ int LM_GetLerpTime(Handle plugin, int numParams)
 {
     int client = GetNativeCell(1);
 
-    char sSteamID[STEAMID_SIZE];
-    float fLerpValue = -1.0;
-    if (GetClientAuthId(client, AuthId_Steam2, sSteamID, sizeof(sSteamID))
-        && sSteamID[0] != '\0'
-        && ArrLerpsValue.GetValue(sSteamID, fLerpValue)) {
-        return view_as<int>(fLerpValue);
-    }
-
+    float fLerpValue;
     if (TryGetLerpTime(client, fLerpValue)) {
         return view_as<int>(fLerpValue);
     }

@@ -12,4 +12,12 @@
 	{
 		"ko"		", "
 	}
+	"PillHint_Continue"
+	{
+		"ko"		"{green}[Anne]{default} 진통제 진행도 (계속): {olive}"
+	}
+	"PillHint_Unknown"
+	{
+		"ko"		"알 수 없음"
+	}
 }

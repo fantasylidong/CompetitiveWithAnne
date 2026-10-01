@@ -5,11 +5,13 @@
 #include <sdktools>
 #include <left4dhooks>
 #include <colors>
+#undef REQUIRE_PLUGIN
+#include <confogl>
 
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 
 #define WEPID_PAIN_PILLS 15
-#define MAX_PILL_SPOTS   64
+#define PILL_HINT_MESSAGE_BYTES 190
 
 public Plugin myinfo =
 {
@@ -39,26 +41,27 @@ public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client)
     if (g_bAnnounced) {
         return;
     }
-    g_bAnnounced = true;
-
-    AnnouncePills();
+    g_bAnnounced = AnnouncePills();
 }
 
-void AnnouncePills()
+bool AnnouncePills()
 {
     float fMaxFlow = L4D2Direct_GetMapMaxFlowDistance();
     if (fMaxFlow <= 0.0) {
-        return;
+        return false;
     }
 
     // Progress percent per spot (-1 = no flow data) and how many pills lie there
-    int iPct[MAX_PILL_SPOTS], iNum[MAX_PILL_SPOTS];
+    int maxSpots = GetMaxEntities();
+    int[] iPct = new int[maxSpots];
+    int[] iNum = new int[maxSpots];
     int iSpots = 0, iTotal = 0;
+    bool sharedSaferoom = GetFeatureStatus(FeatureType_Native, "LGO_IsEntityInSaferoom") == FeatureStatus_Available;
 
     static const char sClasses[][] = {"weapon_pain_pills_spawn", "weapon_spawn", "weapon_pain_pills"};
     for (int c = 0; c < sizeof(sClasses); c++) {
         int iEnt = -1;
-        while ((iEnt = FindEntityByClassname(iEnt, sClasses[c])) != -1 && iSpots < MAX_PILL_SPOTS) {
+        while ((iEnt = FindEntityByClassname(iEnt, sClasses[c])) != -1 && iSpots < maxSpots) {
             int iCount = GetPillCount(iEnt, c);
             if (iCount <= 0) {
                 continue;
@@ -73,7 +76,8 @@ void AnnouncePills()
             }
 
             // Saferoom pills aren't on the way.
-            if (pNav != Address_Null && (L4D_GetNavArea_SpawnAttributes(pNav) & NAV_SPAWN_CHECKPOINT)) {
+            if (sharedSaferoom ? LGO_IsEntityInSaferoom(iEnt)
+                : (pNav != Address_Null && (L4D_GetNavArea_SpawnAttributes(pNav) & NAV_SPAWN_CHECKPOINT) != 0)) {
                 continue;
             }
 
@@ -105,11 +109,20 @@ void AnnouncePills()
             continue;
         }
 
-        char sList[512], sSep[16];
+        char sSep[16], header[MAX_MESSAGE_LENGTH], continuation[MAX_MESSAGE_LENGTH], unknown[32];
         FormatEx(sSep, sizeof(sSep), "%T", "PillHint_Separator", client);
-        BuildSpotList(iPct, iNum, iSpots, sSep, sList, sizeof(sList));
-        CPrintToChat(client, "%T", "PillHint_List", client, iTotal, sList);
+        FormatEx(header, sizeof(header), "%T", "PillHint_List", client, iTotal, "");
+        FormatEx(continuation, sizeof(continuation), "%T", "PillHint_Continue", client);
+        FormatEx(unknown, sizeof(unknown), "%T", "PillHint_Unknown", client);
+        ArrayList lines = BuildSpotLines(iPct, iNum, iSpots, sSep, header, continuation, unknown);
+        char message[MAX_MESSAGE_LENGTH];
+        for (int line = 0; line < lines.Length; line++) {
+            lines.GetString(line, message, sizeof(message));
+            CPrintToChat(client, "%s", message);
+        }
+        delete lines;
     }
+    return true;
 }
 
 // Pills this entity hands out; 0 when it isn't a free-standing pill.
@@ -128,7 +141,7 @@ int GetPillCount(int iEnt, int iClassIdx)
     }
 
     int iCount = HasEntProp(iEnt, Prop_Data, "m_itemCount") ? GetEntProp(iEnt, Prop_Data, "m_itemCount") : 1;
-    return (iCount > 0) ? iCount : 1;
+    return (iCount > 0) ? iCount : 0;
 }
 
 // Ascending progress; unknown (-1) last.
@@ -155,23 +168,45 @@ bool SpotAfter(int a, int b)
     return (b != -1 && a > b);
 }
 
-void BuildSpotList(const int[] iPct, const int[] iNum, int iSpots, const char[] sSep, char[] sOut, int iMaxLen)
+ArrayList BuildSpotLines(const int[] iPct, const int[] iNum, int iSpots, const char[] separator,
+    const char[] header, const char[] continuation, const char[] unknown)
 {
-    sOut[0] = '\0';
+    ArrayList lines = new ArrayList(ByteCountToCells(MAX_MESSAGE_LENGTH));
+    char message[MAX_MESSAGE_LENGTH];
+    strcopy(message, sizeof(message), header);
+    bool hasItems;
 
     for (int spot = 0; spot < iSpots; spot++) {
-        char sItem[16];
+        char sItem[32];
         if (iPct[spot] < 0) {
-            strcopy(sItem, sizeof(sItem), "?");
+            strcopy(sItem, sizeof(sItem), unknown);
         } else {
             FormatEx(sItem, sizeof(sItem), "%d%%", iPct[spot]);
         }
 
         for (int pill = 0; pill < iNum[spot]; pill++) {
-            if (sOut[0] != '\0') {
-                StrCat(sOut, iMaxLen, sSep);
+            if (strlen(message) + (hasItems ? strlen(separator) : 0) + strlen(sItem) > PILL_HINT_MESSAGE_BYTES) {
+                if (!hasItems) {
+                    delete lines;
+                    ThrowError("Pill hint translation exceeds the chat message budget");
+                }
+                lines.PushString(message);
+                strcopy(message, sizeof(message), continuation);
+                hasItems = false;
             }
-            StrCat(sOut, iMaxLen, sItem);
+            if (strlen(message) + strlen(sItem) > PILL_HINT_MESSAGE_BYTES) {
+                delete lines;
+                ThrowError("Pill hint continuation exceeds the chat message budget");
+            }
+            if (hasItems) {
+                StrCat(message, sizeof(message), separator);
+            }
+            StrCat(message, sizeof(message), sItem);
+            hasItems = true;
         }
     }
+    if (hasItems) {
+        lines.PushString(message);
+    }
+    return lines;
 }

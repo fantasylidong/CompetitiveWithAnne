@@ -4,17 +4,16 @@
 #define __lerpmonitor_included
 
 /**
- * @brief				Get the player's stored lerp time, if the stored value is not found in the array,
- * 						then the current lerp time will be returned.
+ * @brief				Get the player's most recently queried lerp time.
  * @param client		Client index.
  *
- * @return				The current lerp, if the value was not stored, otherwise the stored value from the array.
+ * @return				Last queried lerp, or the engine value before the first query completes.
  * @error				If the client is not connected or the index is invalid.
 **/
 native float LM_GetLerpTime(int client);
 
 /**
- * @brief				Get the player's current lerp time.
+ * @brief				Get the player's most recently queried lerp time.
  * @param client		Client index.
  *
  * @return				Current lerp time.

@@ -12,4 +12,12 @@
 	{
 		"jp"		"、"
 	}
+	"PillHint_Continue"
+	{
+		"jp"		"{green}[Anne]{default} 鎮痛剤の進行度（続き）：{olive}"
+	}
+	"PillHint_Unknown"
+	{
+		"jp"		"不明"
+	}
 }
