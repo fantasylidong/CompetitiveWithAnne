@@ -59,6 +59,19 @@ int g_FrameOverTick;
 int g_FrameOver2Tick;
 int g_FrameOver4Tick;
 ConVar g_AllowInfectedMovement;
+Handle g_GetMaxPlayerZombies;
+Handle g_CapGuard;
+int g_CapGuardRetries;
+bool g_CapsApplied;
+
+static const char g_CapCvars[][] = {
+    "z_smoker_limit", "z_boomer_limit", "z_hunter_limit",
+    "z_spitter_limit", "z_jockey_limit", "z_charger_limit"
+};
+static const char g_CapScriptKeys[][] = {
+    "SmokerLimit", "BoomerLimit", "HunterLimit",
+    "SpitterLimit", "JockeyLimit", "ChargerLimit"
+};
 
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int errMax)
 {
@@ -79,7 +92,7 @@ public Plugin myinfo =
     name = "Anne Nav Wave Matrix Probe",
     author = "AnneHappy",
     description = "Positions survivor bots at raw-flow checkpoints for spawn matrix tests",
-    version = "1.3.0",
+    version = "1.4.0",
     url = "https://github.com/morzlee/CompetitiveWithAnne"
 };
 
@@ -101,8 +114,141 @@ public void OnPluginStart()
         "sm_navmatrix_mark <text>");
     RegAdminCmd("sm_navmatrix_spawn_tank", Command_SpawnTank, ADMFLAG_ROOT,
         "Spawn one Tank at the validated matrix anchor");
+    RegServerCmd("sm_navmatrix_caps", Command_Caps,
+        "Synchronize and verify engine/plugin/Director SI limits on an empty server");
+    RegServerCmd("sm_navmatrix_caps_restore", Command_RestoreCaps,
+        "Restore the DirectorOptions changed by this fixture");
     HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
     HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
+}
+
+bool CapsServerEmpty()
+{
+    for (int client = 1; client <= MaxClients; client++)
+        if (IsClientConnected(client) && !IsFakeClient(client))
+            return false;
+    return true;
+}
+
+void SetDirectorCap(const char[] key, int value)
+{
+    // Match l4d2_dirspawn: update both the active and base DirectorOptions.
+    char code[2048];
+    FormatEx(code, sizeof(code),
+        "if((\"DirectorScript\" in getroottable())&&::DirectorScript!=null&&(\"GetDirectorOptions\" in ::DirectorScript)){local r=getroottable();if(!(\"__AnneNavMatrixCapsBackup\" in r))r.rawset(\"__AnneNavMatrixCapsBackup\",[]);local b=r.__AnneNavMatrixCapsBackup;local put=function(t,k,v){local saved=false;foreach(x in b){if(x.target==t&&x.key==k){saved=true;break;}}if(!saved)b.append({target=t,key=k,had=t.rawin(k),old=t.rawin(k)?t.rawget(k):null});t.rawset(k,v);};local d=::DirectorScript;local t=d.GetDirectorOptions();if(t!=null){put(t,\"%s\",%d);if((\"DirectorOptions\" in d)&&d.DirectorOptions!=null){put(d.DirectorOptions,\"%s\",%d)}}}",
+        key, value, key, value);
+    L4D2_ExecVScriptCode(code);
+    g_CapsApplied = true;
+}
+
+void RestoreDirectorCaps()
+{
+    delete g_CapGuard;
+    if (!g_CapsApplied)
+        return;
+    L4D2_ExecVScriptCode("local r=getroottable();if(\"__AnneNavMatrixCapsBackup\" in r){foreach(x in r.__AnneNavMatrixCapsBackup){if(x.had)x.target.rawset(x.key,x.old);else if(x.target.rawin(x.key))x.target.rawdelete(x.key);}r.rawdelete(\"__AnneNavMatrixCapsBackup\");}");
+    g_CapsApplied = false;
+}
+
+public Action Command_RestoreCaps(int args)
+{
+    RestoreDirectorCaps();
+    PrintToServer("[NavMatrix] Director cap overrides restored MaxSpecials=%d cm_MaxSpecials=%d",
+        L4D2_GetScriptValueInt("MaxSpecials", -1),
+        L4D2_GetScriptValueInt("cm_MaxSpecials", -1));
+    return Plugin_Handled;
+}
+
+bool SynchronizeCaps()
+{
+    ConVar limit = FindConVar("l4d_infected_limit");
+    ConVar playerLimit = FindConVar("z_max_player_zombies");
+    if (!CapsServerEmpty() || limit == null || playerLimit == null
+        || limit.IntValue < 1 || limit.IntValue + TEST_SURVIVORS > MaxClients)
+        return false;
+
+    SetDirectorCap("MaxSpecials", limit.IntValue);
+    SetDirectorCap("cm_MaxSpecials", limit.IntValue);
+    SetDirectorCap("DominatorLimit", limit.IntValue);
+    for (int i = 0; i < sizeof(g_CapCvars); i++)
+    {
+        ConVar classLimit = FindConVar(g_CapCvars[i]);
+        if (classLimit == null)
+            return false;
+        SetDirectorCap(g_CapScriptKeys[i], classLimit.IntValue);
+    }
+    playerLimit.SetBounds(ConVarBound_Upper, true, float(limit.IntValue));
+    playerLimit.IntValue = limit.IntValue;
+    return true;
+}
+
+int GetEngineZombieCap()
+{
+    if (g_GetMaxPlayerZombies == null)
+    {
+        GameData data = new GameData("infected_control");
+        if (data == null)
+            return -1;
+        StartPrepSDKCall(SDKCall_Raw);
+        bool found = PrepSDKCall_SetFromConf(data, SDKConf_Signature,
+            "CDirector::GetMaxPlayerZombies");
+        PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+        g_GetMaxPlayerZombies = EndPrepSDKCall();
+        delete data;
+        if (!found || g_GetMaxPlayerZombies == null)
+        {
+            delete g_GetMaxPlayerZombies;
+            return -1;
+        }
+    }
+    // infected_control owns the same return-31 patch as l4d2_dirspawn.
+    // Read its actual result instead of stacking another memory patch.
+    return SDKCall(g_GetMaxPlayerZombies, L4D_GetPointer(POINTER_DIRECTOR));
+}
+
+public Action Command_Caps(int args)
+{
+    if (!CapsServerEmpty())
+    {
+        PrintToServer("[NavMatrix] caps refused: human clients present");
+        return Plugin_Handled;
+    }
+    if (!SynchronizeCaps())
+    {
+        PrintToServer("[NavMatrix] caps refused: require an empty server, loaded spawn plugin and sufficient client slots");
+        return Plugin_Handled;
+    }
+    int classCaps[6];
+    for (int i = 0; i < sizeof(classCaps); i++)
+        classCaps[i] = L4D2_GetScriptValueInt(g_CapScriptKeys[i], -1);
+    MatrixLog("Caps engineMax=%d pluginMax=%d playerZombies=%d maxClients=%d MaxSpecials=%d cm_MaxSpecials=%d DominatorLimit=%d SmokerLimit=%d BoomerLimit=%d HunterLimit=%d SpitterLimit=%d JockeyLimit=%d ChargerLimit=%d",
+        GetEngineZombieCap(), FindConVar("l4d_infected_limit").IntValue,
+        FindConVar("z_max_player_zombies").IntValue, MaxClients,
+        L4D2_GetScriptValueInt("MaxSpecials", -1),
+        L4D2_GetScriptValueInt("cm_MaxSpecials", -1),
+        L4D2_GetScriptValueInt("DominatorLimit", -1),
+        classCaps[0], classCaps[1], classCaps[2], classCaps[3], classCaps[4], classCaps[5]);
+    delete g_CapGuard;
+    g_CapGuardRetries = 12;
+    g_CapGuard = CreateTimer(0.5, Timer_CapGuard, _, TIMER_REPEAT);
+    return Plugin_Handled;
+}
+
+public Action Timer_CapGuard(Handle timer)
+{
+    if (g_CapGuardRetries-- <= 0 || !SynchronizeCaps())
+    {
+        g_CapGuard = null;
+        return Plugin_Stop;
+    }
+    return Plugin_Continue;
+}
+
+public void OnMapEnd()
+{
+    delete g_CapGuard;
+    // The map's VScript VM and its saved tables are discarded on map change.
+    g_CapsApplied = false;
 }
 
 public Action Command_SpawnTank(int client, int args)
@@ -495,6 +641,8 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 public void OnPluginEnd()
 {
+    RestoreDirectorCaps();
+    delete g_GetMaxPlayerZombies;
     delete g_NavAreas;
     g_NavAreas = null;
     delete g_RejectedTargetNavIds;

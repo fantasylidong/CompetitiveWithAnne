@@ -1182,3 +1182,15 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新增 `nqh_report_loss_limit`（默认 5%）：窗口平均丢包高于它才记网站异常事件；聊天提醒仍用 `nqh_loss_limit`（2%，连续 3 个窗口）。
 - `!net` 的检测口径说明补上丢包方向；提醒里的异常原因和「[网络]」标签改走翻译文件，六种语言都会按玩家语言显示。
 - 重新编译 `network_quality_hint.smx`。网站后台对应改动见 NewAnneWeb：丢包列改显示玩家发给服务器方向，连接异常记录显示原因（loss / ping / choke / timing_out）。
+
+### 2026年10月3日 纯战役地图对抗机关兼容
+
+- 新增 `l4d2_coop_versus_compat.smx`，在地图载入前将纯战役三方地图 `info_gamemode` 的 `OnCoop` / `OnCoopPostIO` 连接改接到对应的对抗输出，保留参数、延迟与触发次数；不伪造游戏模式或触发全局 `OnCoop`。
+- 默认自动识别缺少原生 versus 声明的 coop 地图，保护官方图及原生对抗图；支持 `configs/l4d2_coop_versus_compat.cfg` 逐图启用或排除，控制台 `sm_coop_versus_status` 查看结果。加载插件或更改配置后需重新载图。
+- 地图投票升级到 `0.9.3-custom`，战役章节补入对抗的默认范围扩大到所有配置（`l4d2_mapvote_versus_from_coop 2`）。兼容插件不修复 NAV、脚本内模式判断或自定义救援，具体地图仍需验证换边、切关和结算。
+- 增加仅服务器控制台使用的 `sm_mapvote_list`，直接读取玩家菜单构造出的三方战役条目。云35实测 Utopia：versus 下关闭注入时不显示，开启后显示，三章均可载入并正确识别章节及终局；真人交互、自然换边和救援结算未验证。另确认服务端 VPK 文件名中扩展名前的小数点会导致该服引擎漏挂载，临时无额外小数点软链接可解决挂载。测试后已恢复服务器，详情见 `docs/coop_versus_cloud35_test_2026-10-03.md`。
+
+### 2026年10月3日 战役图转对抗的 Boomer 模型初始化修复
+
+- 地图投票升级到 `0.9.4-custom`，在 `OnMapInit` 重新注入 versus 任务信息，并清除上一张图的注入缓存。修复 Utopia 首章初始化模型时任务查询为空、Boomer 列表缺项导致的生成崩溃，保留男、女两种模型。
+- 沿用 `l4d2_mapvote_versus_from_coop` 开关；开关需在载图前生效，更新插件后重新载图。无需设置 `no_female_boomers` 或修改 NAV。

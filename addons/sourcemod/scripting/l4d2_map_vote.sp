@@ -4,7 +4,7 @@
 #define PLUGIN_NAME             "L4D2 Map vote"
 #define PLUGIN_AUTHOR           "fdxx, sorallll"
 #define PLUGIN_DESCRIPTION      "Map vote with mission-only for players; chapters for admins"
-#define PLUGIN_VERSION          "0.9.2-custom" // MOD: bumped
+#define PLUGIN_VERSION          "0.9.4-custom"
 #define PLUGIN_URL              ""
 
 #define TRANSLATION_MISSIONS    "missions.phrases.txt"
@@ -118,7 +118,7 @@ public void OnPluginStart() {
         "自动刷新冷却（秒），避免被频繁触发导致卡顿。",
         FCVAR_NONE);
 	g_cvVersusFromCoop = CreateConVar(
-		"l4d2_mapvote_versus_from_coop", "1",
+		"l4d2_mapvote_versus_from_coop", "2",
 		"给缺少 versus 的战役临时注入 modes/versus：0=关，1=仅 Anne 派生 cfg，2=所有 cfg。",
 		FCVAR_NONE);
     g_cvNotifyMapNext.AddChangeHook(CvarChanged);
@@ -146,6 +146,7 @@ public void OnPluginStart() {
     RegAdminCmd("sm_update_vpk",      cmdReload,      ADMFLAG_ROOT);
     //RegAdminCmd("sm_missions_reload", cmdReload,      ADMFLAG_ROOT);
     RegAdminCmd("sm_missions_export", cmdRxport,      ADMFLAG_ROOT);
+    RegServerCmd("sm_mapvote_list", cmdListMissions, "List the actual third-party campaign menu for the current mode.");
 
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 
@@ -989,6 +990,13 @@ int MapVote_MenuHandler(Menu menu, MenuAction action, int client, int param2) {
     return 0;
 }
 
+Action cmdListMissions(int args) {
+    GetCvars_Mode();
+    g_iType[0] = 1;
+    ShowVoteMap(0);
+    return Plugin_Handled;
+}
+
 void ShowVoteMap(int client) {
     InjectMissionKV();
 
@@ -1018,6 +1026,18 @@ void ShowVoteMap(int client) {
             fmt_Translate(title, buffer, sizeof buffer, client, title);
             menu.AddItem(title, buffer);
         }
+    }
+
+    if (client == 0) {
+        // Inspect the actual menu items without creating a fake player or
+        // duplicating the mission filtering used by the player-facing menu.
+        PrintToServer("[MapVote] mode=%s third_party_items=%d", g_sMode, menu.ItemCount);
+        for (int i = 0; i < menu.ItemCount; i++) {
+            menu.GetItem(i, title, sizeof title, _, buffer, sizeof buffer);
+            PrintToServer("[MapVote] %s | %s", title, buffer);
+        }
+        delete menu;
+        return;
     }
 
     menu.ExitBackButton = true;
@@ -1252,6 +1272,14 @@ void ChangeMap_Handler(L4D2NativeVote vote, VoteAction action, int param1, int p
                 vote.SetFail();
         }
     }
+}
+
+public void OnMapInit(const char[] mapName) {
+    // Mission KV can be rebuilt at the same address while changing maps.
+    // Register coop-only campaigns before CTerrorPlayer::Precache builds its
+    // infected model lists; OnConfigsExecuted is too late for that lookup.
+    MarkMissionKVDirty();
+    InjectMissionKV();
 }
 
 public void OnMapStart() {

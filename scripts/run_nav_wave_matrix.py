@@ -25,6 +25,12 @@ PROBE_CLASS_NAMES = {
     6: "charger",
 }
 PROBE_EXPECTED_CLASSES = {name: 2 for name in PROBE_CLASS_NAMES.values()}
+SI_CAP_CVARS = {
+    f"{prefix}{name}_limit": "2"
+    for prefix in ("z_", "z_versus_", "inf_")
+    for name in PROBE_CLASS_NAMES.values()
+}
+OPTIONAL_SI_CAP_CVARS = {name for name in SI_CAP_CVARS if name.startswith("inf_")}
 
 
 OFFICIAL_MAPS = [
@@ -113,6 +119,7 @@ TEST_CVARS = {
     "z_jockey_limit": "2",
     "z_charger_limit": "2",
 }
+TEST_CVARS.update(SI_CAP_CVARS)
 
 # Restore Anne production policy even when a previous aborted matrix run left
 # its isolation or legacy scoring values behind before capture_state() ran.
@@ -236,6 +243,7 @@ class MatrixRunner:
         self.initial_cvars: dict[str, str] = {}
         self.initial_plugins: dict[str, bool] = {}
         self.initial_server_password: str | None = None
+        self.state_captured = False
 
     def docker(self, *command: str, text: bool = True) -> str | bytes:
         result = subprocess.run(
@@ -266,6 +274,7 @@ class MatrixRunner:
 
     def start_wave_with_confirmation(self, offset: int,
                                      percent: int) -> tuple[bool, int, float]:
+        self.apply_si_caps(percent)
         started = time.monotonic()
         if self.args.assume_wave_start:
             self.rcon.command("sm_startspawn")
@@ -280,6 +289,43 @@ class MatrixRunner:
                     return True, attempts, time.monotonic() - started
                 time.sleep(0.1)
         return False, attempts, time.monotonic() - started
+
+    def apply_si_caps(self, percent: int | None = None) -> None:
+        cvars = {}
+        for name, expected in SI_CAP_CVARS.items():
+            value = self.query_cvar(name)
+            cvars[name] = value
+            if value is None and name in OPTIONAL_SI_CAP_CVARS:
+                continue  # Older infected_control builds have no inf_* mirrors.
+            if value is None or float(value) != float(expected):
+                raise RuntimeError(f"SI class limit mismatch: {name}={value}, expected {expected}")
+        output = self.rcon.command("sm_navmatrix_caps")
+        if "human clients present" in output.lower():
+            raise HumanClientsPresent(output.strip())
+        values = {key: int(value) for key, value in
+                  re.findall(r"\b(\w+)=(-?\d+)", output)}
+        expected = {
+            "pluginMax": 12, "playerZombies": 12,
+            "MaxSpecials": 12, "cm_MaxSpecials": 12, "DominatorLimit": 12,
+            "SmokerLimit": 2, "BoomerLimit": 2, "HunterLimit": 2,
+            "SpitterLimit": 2, "JockeyLimit": 2, "ChargerLimit": 2,
+        }
+        if ("[NavMatrix] Caps " not in output
+                or values.get("engineMax", -1) < 12
+                or values.get("maxClients", 0) < 16
+                or any(values.get(key) != value for key, value in expected.items())):
+            raise RuntimeError(f"SI limit verification failed: {output.strip()}")
+        with (self.output / "si_caps.jsonl").open("a", encoding="utf-8") as cap_log:
+            cap_log.write(json.dumps({"map": self.current_map(), "requested_percent": percent,
+                                      "cvars": cvars, "caps": values}) + "\n")
+
+    def require_empty_server(self) -> None:
+        output = self.rcon.command("status")
+        match = re.search(r"^players\s*:\s*(\d+) humans\b", output, re.MULTILINE)
+        if not match:
+            raise RuntimeError("Cannot verify that the test server is empty")
+        if int(match.group(1)):
+            raise HumanClientsPresent("Human clients present; refusing test/map change")
 
     def wait_for_map(self, map_name: str) -> None:
         deadline = time.monotonic() + self.args.map_timeout
@@ -316,18 +362,25 @@ class MatrixRunner:
         return None
 
     def capture_state(self) -> None:
+        self.require_empty_server()
         self.initial_map = self.current_map()
         self.initial_plugins = {
             path: self.plugin_running(path) for path in PLUGIN_PATHS + COMPANION_PLUGIN_PATHS
         }
-        for name in TEST_CVARS:
+        for name in [*TEST_CVARS, "z_max_player_zombies"]:
             value = self.query_cvar(name)
             if value is not None:
                 self.initial_cvars[name] = value
         if self.args.isolation_password:
             self.initial_server_password = self.query_cvar("sv_password")
-            self.rcon.command(
-                f'sm_cvar sv_password "{self.args.isolation_password}"')
+            if self.initial_server_password is None:
+                raise RuntimeError("Cannot capture the original server password")
+        self.state_captured = True
+        if self.args.isolation_password:
+            try:
+                self.rcon.command(f'sm_cvar sv_password "{self.args.isolation_password}"')
+            except Exception:
+                raise RuntimeError("Failed to set test isolation password") from None
 
     @staticmethod
     def parse_status(output: str) -> dict[str, float | int | str]:
@@ -409,10 +462,13 @@ class MatrixRunner:
             self.rcon.command(
                 f'sm_cvar sv_password "{self.args.isolation_password}"')
         for name, value in TEST_CVARS.items():
-            command = f"sm_cvar {name} {value}"
+            if name in OPTIONAL_SI_CAP_CVARS and self.query_cvar(name) is None:
+                continue
+            command = f'sm_cvar {name} "{value}"'
             response = self.rcon.command(command)
             if "failed to load" in response.lower():
                 raise RuntimeError(f"plugin setup failed: {command}: {response.strip()}")
+        self.apply_si_caps()
         activated_at = time.monotonic()
         activation = self.rcon.command("sm_navmatrix_activate")
         if "Unknown command" in activation or "not found" in activation.lower():
@@ -911,6 +967,7 @@ class MatrixRunner:
     def run(self, maps: list[str], progress: list[int]) -> list[dict]:
         results = []
         jsonl_path = self.output / "results.jsonl"
+        self.require_empty_server()
         self.bootstrap_plugins()
         with jsonl_path.open("a", encoding="utf-8") as jsonl:
             index = 0
@@ -921,6 +978,7 @@ class MatrixRunner:
                     print(f"MAP {map_name} CASE {percent}%", flush=True)
                     try:
                         if not self.args.reuse_map or not map_ready:
+                            self.require_empty_server()
                             self.rcon.command(f"changelevel {map_name}")
                             self.wait_for_map(map_name)
                             self.configure_map()
@@ -960,9 +1018,18 @@ class MatrixRunner:
         return results
 
     def restore(self) -> None:
-        commands = ["sm_stopspawn", "sm_navmatrix_clear"]
+        if not self.state_captured:
+            return
+        # Revert script table overrides even if changelevel fails or a human joins.
+        for command in ("sm_stopspawn", "sm_navmatrix_clear", "sm_navmatrix_caps_restore"):
+            try:
+                self.rcon.command(command)
+            except Exception as error:
+                print(f"RESTORE command warning {command}: {error}", flush=True)
+        commands = []
         try:
             if self.initial_map:
+                self.require_empty_server()
                 self.rcon.command(f"changelevel {self.initial_map}")
                 self.wait_for_map(self.initial_map)
         except Exception as error:
@@ -985,7 +1052,8 @@ class MatrixRunner:
             try:
                 self.rcon.command(command)
             except Exception as error:
-                print(f"RESTORE command warning {command}: {error}", flush=True)
+                detail = "sv_password [redacted]" if "sv_password" in command else f"{command}: {error}"
+                print(f"RESTORE command warning {detail}", flush=True)
 
 
 def write_csv(path: Path, results: list[dict]) -> None:

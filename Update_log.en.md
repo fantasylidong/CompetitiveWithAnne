@@ -598,3 +598,15 @@
 - Added `nqh_report_loss_limit` (default 5%): a website incident is recorded only when the window's average loss exceeds it. Chat warnings still use `nqh_loss_limit` (2%, three windows in a row).
 - The `!net` measurement note now explains the loss direction. Warning reasons and the hard-coded "[网络]" tag now come from translation files, so all six languages follow the player's language.
 - Recompiled `network_quality_hint.smx`. Matching NewAnneWeb changes: the admin loss column shows player-to-server loss, and incident rows show their reason (loss / ping / choke / timing_out).
+
+### October 3, 2026 Coop-Only Map I/O in Versus
+
+- Added `l4d2_coop_versus_compat.smx`. Before map entities load, it moves coop-only custom maps' `info_gamemode` connections from `OnCoop` / `OnCoopPostIO` to their versus counterparts, preserving parameters, delays and fire counts without spoofing the game mode or firing global `OnCoop` events.
+- Automatically detects coop maps without native versus declarations and protects official/native-versus maps. Per-map overrides are in `configs/l4d2_coop_versus_compat.cfg`; the console command `sm_coop_versus_status` reports the result. Reload the map after loading the plugin or changing its settings.
+- Updated map voting to `0.9.3-custom`; coop mission injection now defaults to all configs (`l4d2_mapvote_versus_from_coop 2`). The compatibility plugin does not repair NAV, script mode checks or custom finales. Team swaps, chapter transitions and scoring still require testing on each map.
+- Added the server-only `sm_mapvote_list` command, which reads the actual third-party campaign menu items. On cloud35, Utopia was absent in versus with injection disabled and appeared when enabled; all three chapters loaded with correct chapter/finale detection. Human interaction, natural team swaps and finale completion remain untested. An extra dot before the VPK extension prevented mounting on this server; a temporary alias without extra dots mounted successfully. The server was restored after testing; see `docs/coop_versus_cloud35_test_2026-10-03.md`.
+
+### October 3, 2026 Boomer Model Initialization for Coop Maps in Versus
+
+- Updated map voting to `0.9.4-custom`. Versus mission data is now injected during `OnMapInit`, with the previous map's injection cache cleared. This fixes Utopia's first chapter returning no mission during model initialization, leaving an incomplete Boomer list that crashes spawning. Both male and female models are retained.
+- The existing `l4d2_mapvote_versus_from_coop` switch still applies and must be enabled before map loading. Reload the map after updating the plugin; no `no_female_boomers` override or NAV changes are needed.
