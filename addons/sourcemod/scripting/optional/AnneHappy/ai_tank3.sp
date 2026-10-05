@@ -38,7 +38,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白, AnneHappy",
     description = "Ai Tank 增强 3.0 版本（路径感知连跳、梯子让行、寻路距离选目标、反头顶卡、骑头反制、投石瞄准等）",
-    version     = "2.3.0",
+    version     = "2.3.2",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -85,10 +85,9 @@ public void OnPluginStart()
     g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中转向平滑响应时间(秒)，每0.05秒检查一次", CVAR_FLAGS, true, 0.1);
 
     // 投石 / 挥拳
-    g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "0", "允许扔石头的最小距离", CVAR_FLAGS, true, 0.0);
-    g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "800", "允许扔石头的最大距离", CVAR_FLAGS, true, 0.0);
-    g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "出手时改为瞄准最近的可视生还者（强制投石计划指定的目标除外）", CVAR_FLAGS, true, 0.0, true, 1.0);
-    g_cvJumpRock = CreateConVar("ai_tank3_jump_rock", "1", "扔石头起手时允许“跳砖”", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "200", "普通投石目标的最小距离，范围外另选可见目标，无合适目标不起手；反卡位强制投石除外", CVAR_FLAGS, true, 0.0);
+    g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "450", "普通投石目标的最大距离，范围外另选可见目标，无合适目标不起手；反卡位计划也以此限制射程", CVAR_FLAGS, true, 0.0);
+    g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "起手与出手时在投石距离范围内选择最近的可视生还者，0=只检查当前追击目标（强制投石计划指定的目标除外）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "允许通背拳（可拍背后的人）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128.0", "通背拳距离（-1 使用 tank_swing_range）", CVAR_FLAGS, true, -1.0);
     g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "通背拳允许的最大移动速度（超过禁用）", CVAR_FLAGS, true, -1.0);
@@ -99,8 +98,6 @@ public void OnPluginStart()
     g_cvTargetSelect = CreateConVar("ai_tank3_target_select", "1", "Tank 选目标, 0=排序交给 l4d_target_override/原生（只换掉反头顶卡屏蔽的人）, 1=沿用 target_override 的过滤口径, 但按寻路距离排序并带换目标粘滞", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvTargetSwitchRatio = CreateConVar("ai_tank3_target_switch_ratio", "0.85", "同一层换目标时，新目标得分须不超过当前目标的这个比例（且差值不小于 ai_tank3_target_switch_gain）", CVAR_FLAGS, true, 0.1, true, 1.0);
     g_cvTargetSwitchGain = CreateConVar("ai_tank3_target_switch_gain", "75", "同一层换目标时，新目标得分至少要比当前目标低这么多（按寻路距离，单位）；应大于估距精度 64，否则估距误差会自己触发换目标", CVAR_FLAGS, true, 0.0);
-    g_cvTargetCommitTime = CreateConVar("ai_tank3_target_commit_time", "1.0", "两次主动换目标之间的最短间隔（秒），当前目标失效或出现明显更好打的目标时不受限制", CVAR_FLAGS, true, 0.0);
-    g_cvTargetDecisiveRatio = CreateConVar("ai_tank3_target_decisive_ratio", "0.5", "新目标得分不超过当前目标的这个比例时视为明显更好打，不等换目标间隔，0=关闭", CVAR_FLAGS, true, 0.0, true, 1.0);
 
     // 反头顶卡 / 骑头 / 强制投石
     g_cvHeadBlockEnable = CreateConVar("ai_tank3_head_block_enable", "1", "是否启用 Tank 反头顶卡逻辑", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -324,6 +321,10 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     if (RockPlan_Update(client, buttons, pos, onGround, ladderZone, holdMovement, now) == Plugin_Changed)
         result = Plugin_Changed;
 
+    // 投石目标可能与追人目标不同；普通投石即使没有追人目标也要检查起手机会。
+    if (Combat_LimitThrowDistance(client, buttons))
+        result = Plugin_Changed;
+
     if (rider > 0 || holdMovement || target <= 0)
     {
         Movement_Reset(client);
@@ -338,8 +339,6 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
     }
 
     float dist = GetVectorDistance(pos, targetPos);
-    if (Combat_LimitThrowDistance(client, buttons, dist))
-        result = Plugin_Changed;
 
     if (ladderZone)
     {

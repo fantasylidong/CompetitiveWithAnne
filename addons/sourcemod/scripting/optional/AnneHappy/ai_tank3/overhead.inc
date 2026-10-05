@@ -196,7 +196,6 @@ bool HeadBlock_Update(int tank, int target, const float tankPos[3], const float 
 void HeadBlock_OnFlagged(int tank, int blocked, float now)
 {
     Target_Ignore(tank, blocked, now + g_cvHeadBlockIgnoreTime.FloatValue);
-    g_Tank[tank].victimSince = 0.0;
     g_Tank[tank].victimFreezeUntil = 0.0;
 
     if (Target_HasAlternative(tank, blocked))

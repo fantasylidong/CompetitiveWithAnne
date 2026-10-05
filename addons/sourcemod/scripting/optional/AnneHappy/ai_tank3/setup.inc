@@ -18,7 +18,6 @@
 #define PLAYER_CHEST                    52.0
 #define TANK_HEIGHT                     84.0
 #define JUMP_HEIGHT                     56.0
-#define JUMP_SPEED_Z                    300.0   // 跳砖时给的 Z 轴速度
 #define HULL_CENTER_HEIGHT              36.0
 #define TANK_AIR_THINK_INTERVAL          0.05
 #define TANK_AIR_GROUND_SEARCH           128.0
@@ -127,7 +126,6 @@ ConVar
     g_cvThrowMinDist,
     g_cvThrowMaxDist,
     g_cvRockTargetAdjust,
-    g_cvJumpRock,
     g_cvBackFist,
     g_cvBackFistRange,
     g_cvBackFistAllowMaxSpd,
@@ -137,8 +135,6 @@ ConVar
     g_cvTargetSelect,
     g_cvTargetSwitchRatio,
     g_cvTargetSwitchGain,
-    g_cvTargetCommitTime,
-    g_cvTargetDecisiveRatio,
     // 反头顶卡 / 骑头 / 强制投石
     g_cvHeadBlockEnable,
     g_cvHeadBlockTime,
@@ -193,7 +189,7 @@ enum struct TankPathInfo
     bool  complete;
     float ladderDist;       // 沿路径到最近梯子段入口的距离，-1 = 扫描范围内没有
     float blockHopDist;     // 沿路径到最近“不能被连跳越过”的特殊段起点的距离，-1 = 没有
-    float dropDist;         // 最近深下落段入口，用于落点验证及禁止边沿蛇形/跳砖
+    float dropDist;         // 最近深下落段入口，用于落点验证及禁止边沿蛇形
     float dropLandingZ;
     bool  routeUp;          // 扫描范围内有向上的梯子/攀爬段
     bool  reachesTarget;    // 路径终点接近当前目标
@@ -221,7 +217,6 @@ enum struct TankState
 
     // 目标
     int   victim;               // 插件视角的当前目标(userid)
-    float victimSince;          // 最近一次换目标时间
     float victimFreezeUntil;    // 梯子/攀爬期间冻结换目标
     int   travelUser[MAXPLAYERS + 1];
     float travelRatio[MAXPLAYERS + 1];   // 寻路距离 / 直线距离，或 TARGET_TRAVEL_UNKNOWN / UNREACHABLE
@@ -276,7 +271,6 @@ enum struct TankState
     {
         this.userId = userId;
         this.victim = 0;
-        this.victimSince = 0.0;
         this.victimFreezeUntil = 0.0;
         for (int i = 0; i <= MAXPLAYERS; i++)
         {

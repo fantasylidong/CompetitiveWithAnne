@@ -37,11 +37,14 @@ void Combat_PunchLockVision(int tank, const float pos[3], const float targetPos[
     g_Tank[tank].nextAttackTime = nextAttack;
 }
 
-bool Combat_LimitThrowDistance(int tank, int &buttons, float dist)
+bool Combat_LimitThrowDistance(int tank, int &buttons)
 {
     if (!(buttons & IN_ATTACK2) || g_Tank[tank].throwing || g_Tank[tank].rockPendingUntil > GetEngineTime())
         return false;
-    if (dist >= g_cvThrowMinDist.FloatValue && dist <= g_cvThrowMaxDist.FloatValue)
+
+    // 用实际投石候选判断时机，不能拿寻路选出的追人目标距离代替。
+    // 可另选范围内的可见目标；没有合适目标就继续追，不额外催促原生 AI 出手。
+    if (Combat_SelectNormalRockTarget(tank) > 0)
         return false;
 
     buttons &= ~IN_ATTACK2;
@@ -170,7 +173,7 @@ void Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 }
 
 // =========================================================================
-// 投石动画：识别出手、跳砖
+// 投石动画：识别投石状态
 // =========================================================================
 
 void Anim_EnsureHook(int tank)
@@ -215,8 +218,6 @@ Action Anim_TankPost(int tank, int &sequence)
     // 出手已经开始：结束投石计划，瞄准目标留给 OnRelease；残留的撤离命令由看门狗下一帧 RESET
     if (g_Tank[tank].rockReason != TankRock_None)
         RockPlan_Clear(tank, true);
-    if (g_cvJumpRock.BoolValue)
-        Combat_JumpRock(tank);
     CreateTimer(THROW_STATE_POLL_INTERVAL, Timer_PollThrowState, GetClientUserId(tank), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     return Plugin_Continue;
 }
@@ -238,27 +239,6 @@ Action Timer_PollThrowState(Handle timer, any userId)
     g_Tank[tank].rockAimUser = 0;
     g_Tank[tank].rockPendingUntil = 0.0;
     return Plugin_Stop;
-}
-
-void Combat_JumpRock(int tank)
-{
-    if (GetEntityMoveType(tank) != MOVETYPE_WALK || !IsClientOnGround(tank) || Riding_FindRider(tank) > 0)
-        return;
-
-    // 梯子口、高台边沿起跳会把 Tank 从上梯/下落路线上弹开
-    float pos[3];
-    GetClientAbsOrigin(tank, pos);
-    if (Movement_IsLadderZone(tank, pos))
-        return;
-    if (g_TankPath[tank].fresh &&
-        ((g_TankPath[tank].blockHopDist >= 0.0 && g_TankPath[tank].blockHopDist <= LADDER_HOP_MARGIN) ||
-        (g_TankPath[tank].dropDist >= 0.0 && g_TankPath[tank].dropDist <= LADDER_HOP_MARGIN)))
-        return;
-
-    float velocity[3];
-    GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", velocity);
-    velocity[2] += JUMP_SPEED_Z;
-    TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, velocity);
 }
 
 // =========================================================================
@@ -286,23 +266,34 @@ bool Combat_SolveThrowPitch(const float from[3], const float to[3], float speed,
     return pitch > -89.0 && pitch < 89.0;
 }
 
-int Combat_FindNearestVisibleRockTarget(int tank)
+bool Combat_IsNormalRockTarget(int survivor)
 {
-    float tankEye[3];
-    GetClientEyePosition(tank, tankEye);
+    return IsValidSurvivor(survivor) && IsPlayerAlive(survivor) && !IsClientIncapped(survivor) &&
+        !IsClientHanging(survivor) && !isPinnedByHunterOrCharger(survivor);
+}
 
+int Combat_SelectNormalRockTarget(int tank)
+{
+    float tankPos[3];
+    GetClientAbsOrigin(tank, tankPos);
+
+    int current = Target_GetCurrent(tank);
     int best = -1;
     float bestDist = 0.0;
     for (int survivor = 1; survivor <= MaxClients; survivor++)
     {
-        if (!IsValidSurvivor(survivor) || !IsPlayerAlive(survivor) || IsClientIncapped(survivor) || isPinnedByHunterOrCharger(survivor))
+        if (!g_cvRockTargetAdjust.BoolValue && survivor != current)
+            continue;
+        if (!Combat_IsNormalRockTarget(survivor))
             continue;
         if (!clientIsVisibleToClient(tank, survivor))
             continue;
 
-        float survivorEye[3];
-        GetClientEyePosition(survivor, survivorEye);
-        float dist = GetVectorDistance(tankEye, survivorEye);
+        float survivorPos[3];
+        GetClientAbsOrigin(survivor, survivorPos);
+        float dist = GetVectorDistance(tankPos, survivorPos);
+        if (dist < g_cvThrowMinDist.FloatValue || dist > g_cvThrowMaxDist.FloatValue)
+            continue;
         if (best == -1 || dist < bestDist)
         {
             best = survivor;
@@ -326,13 +317,10 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 
     if (!IsValidSurvivor(aimTarget) || !IsPlayerAlive(aimTarget))
     {
-        aimTarget = Target_GetCurrent(tank);
-        if (g_cvRockTargetAdjust.BoolValue)
-        {
-            int nearest = Combat_FindNearestVisibleRockTarget(tank);
-            if (nearest > 0)
-                aimTarget = nearest;
-        }
+        // 出手时重新选范围内的目标；已起手但无人符合时保留原生弹道。
+        aimTarget = Combat_SelectNormalRockTarget(tank);
+        if (aimTarget <= 0)
+            return Plugin_Continue;
     }
     if (!IsValidSurvivor(aimTarget) || !IsPlayerAlive(aimTarget))
         return Plugin_Continue;

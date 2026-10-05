@@ -280,17 +280,12 @@ int Target_Choose(int tank)
     {
         if (current == best || now < g_Tank[tank].victimFreezeUntil)
             return current;
-        // 新目标得分不到当前目标的一定比例（默认一半）：明显更好打，不等换目标间隔
-        bool decisive = bestScore <= currentScore * g_cvTargetDecisiveRatio.FloatValue;
-        if (!decisive && now - g_Tank[tank].victimSince < g_cvTargetCommitTime.FloatValue)
-            return current;
         if (bestScore > currentScore * g_cvTargetSwitchRatio.FloatValue || currentScore - bestScore < g_cvTargetSwitchGain.FloatValue)
             return current;
     }
 
     if (best != current)
     {
-        g_Tank[tank].victimSince = now;
         if (log != null)
             log.debugAll("%N victim -> %N (score %.0f, previous %.0f, tier %d)", tank, best, bestScore, currentScore, bestTier);
     }

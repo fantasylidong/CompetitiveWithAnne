@@ -2,8 +2,9 @@
  * L4D2 Tank Rock Lag Compensation
  *
  * Keeps a short server-side position history for tank rocks and tests survivor
- * weapon_fire rays against the position the shooter saw. Weapon damage/range
- * are read from the current Left4DHooks weapon attributes.
+ * weapon_fire rays against the position the shooter saw. Shotguns use native
+ * pellet damage instead of treating every pellet as a hit on the aim ray.
+ * Other hitscan damage/range use the current Left4DHooks weapon attributes.
  */
 
 #pragma semicolon 1
@@ -24,7 +25,8 @@
 #define BLOCK_SPAWN_TIME 3
 #define BLOCK_RELEASE_TIME 4
 #define BLOCK_DETONATING 5
-#define BLOCK_COUNT 6
+#define BLOCK_PROTECTED_UNTIL 6
+#define BLOCK_COUNT 7
 
 ConVar g_cvRockPrint;
 ConVar g_cvRockHitbox;
@@ -35,6 +37,8 @@ ConVar g_cvRockGodframesRender;
 ConVar g_cvRockHitboxRadius;
 ConVar g_cvRangeMinAll;
 ConVar g_cvRangeMaxAll;
+ConVar g_cvNativeShotgun;
+ConVar g_cvMaxUnlag;
 
 ArrayList g_aRockEntities;
 
@@ -43,7 +47,7 @@ public Plugin myinfo =
 	name = "L4D(2) Tank Rock Lag Compensation",
 	author = "Luckylockm, harry, Silvers, AnneHappy",
 	description = "Provides lag compensation and weapon-attribute damage handling for tank rocks",
-	version = "2.1-anne",
+	version = "2.2-anne",
 	url = "https://github.com/LuckyServ/"
 };
 
@@ -54,11 +58,13 @@ public void OnPluginStart()
 	g_cvRockHitbox = CreateConVar("sm_rock_hitbox", "1", "Toggle custom rock hitbox and damage handling", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockLagComp = CreateConVar("sm_rock_lagcomp", "1", "Toggle lag compensation for hitscan rock shots", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockGodframes = CreateConVar("sm_rock_godframes", "1.7", "Fallback protection seconds from rock creation if tank rock release is not seen", FCVAR_NONE, true, 0.0, true, 10.0);
-	g_cvRockReleaseGodframes = CreateConVar("sm_rock_release_godframes", "0.15", "Rock protection seconds after actual release; 0 allows immediate damage", FCVAR_NONE, true, 0.0, true, 10.0);
+	g_cvRockReleaseGodframes = CreateConVar("sm_rock_release_godframes", "0.25", "Rock protection seconds after actual release; 0 allows immediate damage", FCVAR_NONE, true, 0.0, true, 10.0);
 	g_cvRockGodframesRender = CreateConVar("sm_rock_godframes_render", "1", "Toggle visual feedback while a rock is protected", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockHitboxRadius = CreateConVar("sm_rock_hitbox_radius", "30", "Custom rock hitbox radius", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMinAll = CreateConVar("sm_rock_range_min_all", "1", "Global minimum distance for hitscan rock damage", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMaxAll = CreateConVar("sm_rock_range_max_all", "2000", "Global maximum distance for rock damage; 0 disables this cap", FCVAR_NONE, true, 0.0, true, 10000.0);
+	g_cvNativeShotgun = CreateConVar("sm_rock_native_shotgun", "1", "Use native shotgun pellet hits and damage (no custom position rollback); 0 restores the whole-shot aim-ray approximation", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_cvMaxUnlag = FindConVar("sv_maxunlag");
 
 	g_aRockEntities = new ArrayList(BLOCK_COUNT);
 
@@ -109,7 +115,7 @@ public void OnEntityDestroyed(int entity)
 
 public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3], const float vecAng[3], const float vecVel[3], const float vecRot[3])
 {
-	if (rock <= MaxClients || !IsValidEntity(rock)) {
+	if (rock <= MaxClients || !IsValidEntity(rock) || GetEntProp(rock, Prop_Data, "m_iHammerID") == 92950) {
 		return;
 	}
 
@@ -126,7 +132,9 @@ public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3
 		return;
 	}
 
+	float protection = g_cvRockReleaseGodframes.FloatValue;
 	g_aRockEntities.Set(rockIndex, GetGameTime(), BLOCK_RELEASE_TIME);
+	g_aRockEntities.Set(rockIndex, GetGameTime() + protection, BLOCK_PROTECTED_UNTIL);
 	SeedRockHistory(rockIndex, vecPos);
 	UpdateRockRender(rockIndex);
 }
@@ -153,6 +161,7 @@ public void OnGameFrame()
 
 		ArrayList posHistory = view_as<ArrayList>(g_aRockEntities.Get(i, BLOCK_POS_HISTORY));
 		posHistory.SetArray(historyIndex, pos, sizeof(pos));
+		posHistory.Set(historyIndex, GetGameTickCount(), 3);
 
 		UpdateRockRender(i);
 	}
@@ -164,15 +173,14 @@ public Action OnRockTakeDamage(int victim, int &attacker, int &inflictor, float 
 		return Plugin_Continue;
 	}
 
+	int rockIndex = FindTrackedRock(EntIndexToEntRef(victim));
+	if (rockIndex == -1) {
+		return Plugin_Continue;
+	}
 	float incomingDamage = damage;
 	damage = 0.0;
 
 	if (!IsSurvivor(attacker)) {
-		return Plugin_Handled;
-	}
-
-	int rockIndex = FindTrackedRock(EntIndexToEntRef(victim));
-	if (rockIndex == -1 || !IsRockDamageAllowed(rockIndex)) {
 		return Plugin_Handled;
 	}
 
@@ -181,11 +189,18 @@ public Action OnRockTakeDamage(int victim, int &attacker, int &inflictor, float 
 		return Plugin_Handled;
 	}
 
-	if (IsHitscanWeaponName(weaponName) || incomingDamage <= 0.0) {
+	bool nativeShotgun = g_cvNativeShotgun.BoolValue && (damagetype & (DMG_BULLET | DMG_BUCKSHOT)) != 0 && IsShotgunWeaponName(weaponName);
+	if ((IsHitscanWeaponName(weaponName) && !nativeShotgun) || incomingDamage <= 0.0) {
 		return Plugin_Handled;
 	}
-
-
+	// Native pellet collisions stay native; only protection uses the shooter's time.
+	float shotTime = GetGameTime();
+	if (nativeShotgun) {
+		shotTime -= float(GetRollbackTicks(attacker)) * GetTickInterval();
+	}
+	if (!IsRockDamageAllowed(rockIndex, shotTime)) {
+		return Plugin_Handled;
+	}
 	float eyePos[3];
 	float rockPos[3];
 	GetClientEyePosition(attacker, eyePos);
@@ -225,10 +240,25 @@ public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcas
 	GetClientEyePosition(client, eyePos);
 	GetAngleVectors(eyeAng, direction, NULL_VECTOR, NULL_VECTOR);
 
-	float clientLerp = GetClientInterp(client);
-	float lagTime = IsFakeClient(client) ? 0.0 : GetClientLatency(client, NetFlow_Both) + clientLerp;
-	int rollbackTick = g_cvRockLagComp.BoolValue ? GetGameTickCount() - RoundToNearest(lagTime / GetTickInterval()) : GetGameTickCount();
-	int historyIndex = GetHistoryIndex(rollbackTick);
+	int rollbackTicks = GetRollbackTicks(client);
+	int rollbackTick = GetGameTickCount() - rollbackTicks;
+	float shotTime = GetGameTime() - float(rollbackTicks) * GetTickInterval();
+	float end[3];
+	float traceRange = weaponRange;
+	if (g_cvRangeMaxAll.FloatValue > 0.0 && traceRange > g_cvRangeMaxAll.FloatValue) {
+		traceRange = g_cvRangeMaxAll.FloatValue;
+	}
+	for (int axis = 0; axis < 3; axis++) {
+		end[axis] = eyePos[axis] + direction[axis] * traceRange;
+	}
+	Handle trace = TR_TraceRayFilterEx(eyePos, end, MASK_SHOT, RayType_EndPoint, TraceFilter_RockShot, client);
+	float nearestHit = TR_GetFraction(trace) * traceRange;
+	bool startSolid = TR_StartSolid(trace);
+	delete trace;
+	if (startSolid) {
+		return Plugin_Continue;
+	}
+	int nearestRock = -1;
 
 	for (int i = g_aRockEntities.Length - 1; i >= 0; i--) {
 		int rockRef = g_aRockEntities.Get(i, BLOCK_ENT_REF);
@@ -239,17 +269,20 @@ public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcas
 			continue;
 		}
 
-		if (!IsRockDamageAllowed(i)) {
+		float center[3];
+		if (!GetRockPositionAtTick(i, rollbackTick, center)) {
 			continue;
 		}
-
-		float center[3];
-		ArrayList posHistory = view_as<ArrayList>(g_aRockEntities.Get(i, BLOCK_POS_HISTORY));
-		posHistory.GetArray(historyIndex, center, sizeof(center));
-
-		if (RayIntersectsSphere(eyePos, direction, center, g_cvRockHitboxRadius.FloatValue)) {
-			ApplyDamageToRock(i, rockRef, weaponName, weaponDamage, weaponRange, weaponRangeModifier, GetVectorDistance(eyePos, center), false);
+		float hitDistance;
+		if (RayIntersectsSphere(eyePos, direction, center, g_cvRockHitboxRadius.FloatValue, hitDistance) && hitDistance < nearestHit) {
+			nearestHit = hitDistance;
+			nearestRock = rockRef;
 		}
+	}
+	// A protected rock still blocks the ray; never damage a second rock behind it.
+	int rockIndex = FindTrackedRock(nearestRock);
+	if (rockIndex != -1 && IsRockDamageAllowed(rockIndex, shotTime)) {
+		ApplyDamageToRock(rockIndex, nearestRock, weaponName, weaponDamage, weaponRange, weaponRangeModifier, nearestHit, false);
 	}
 
 	return Plugin_Continue;
@@ -303,6 +336,9 @@ bool GetHitscanWeaponAttributes(const char[] weaponName, float &damage, float &r
 	if (!IsHitscanWeaponType(weaponType)) {
 		return false;
 	}
+	if (g_cvNativeShotgun.BoolValue && weaponType == view_as<int>(WEAPONTYPE_SHOTGUN)) {
+		return false;
+	}
 
 	int baseDamage = L4D2_GetIntWeaponAttribute(normalized, L4D2IWA_Damage);
 	if (baseDamage <= 0) {
@@ -330,6 +366,11 @@ bool IsHitscanWeaponName(const char[] weaponName)
 	}
 
 	return IsHitscanWeaponType(L4D2_GetIntWeaponAttribute(normalized, L4D2IWA_WeaponType));
+}
+
+bool IsShotgunWeaponName(const char[] weaponName)
+{
+	return IsWeaponAttributeReadable(weaponName) && L4D2_GetIntWeaponAttribute(weaponName, L4D2IWA_WeaponType) == view_as<int>(WEAPONTYPE_SHOTGUN);
 }
 
 bool IsWeaponAttributeReadable(const char[] weaponName)
@@ -361,7 +402,7 @@ float GetClientInterp(int client)
 	return Clamp(StringToFloat(buffer), 0.0, 0.5);
 }
 
-bool RayIntersectsSphere(const float origin[3], const float direction[3], const float center[3], float radius)
+bool RayIntersectsSphere(const float origin[3], const float direction[3], const float center[3], float radius, float &hitDistance)
 {
 	float originMinusCenter[3];
 	SubtractVectors(origin, center, originMinusCenter);
@@ -374,7 +415,52 @@ bool RayIntersectsSphere(const float origin[3], const float direction[3], const 
 
 	float firstHit = -dot - SquareRoot(delta);
 	float secondHit = -dot + SquareRoot(delta);
-	return firstHit >= 0.0 || secondHit >= 0.0;
+	if (secondHit < 0.0) {
+		return false;
+	}
+	hitDistance = FloatMax(0.0, firstHit);
+	return true;
+}
+
+bool TraceFilter_RockShot(int entity, int contentsMask, any client)
+{
+	if (entity == client) {
+		return false;
+	}
+	// Tracked rocks are tested at their historical position, not their current one.
+	return entity <= MaxClients || FindTrackedRock(EntIndexToEntRef(entity)) == -1;
+}
+
+int GetRollbackTicks(int client)
+{
+	if (!g_cvRockLagComp.BoolValue || IsFakeClient(client)) {
+		return 0;
+	}
+	float tickInterval = GetTickInterval();
+	float maxLag = float(MAX_HISTORY_FRAMES - 1) * tickInterval;
+	if (g_cvMaxUnlag != null && g_cvMaxUnlag.FloatValue < maxLag) {
+		maxLag = FloatMax(0.0, g_cvMaxUnlag.FloatValue);
+	}
+	float lagTime = FloatMax(0.0, GetClientLatency(client, NetFlow_Outgoing)) + GetClientInterp(client);
+	int ticks = RoundToNearest(Clamp(lagTime, 0.0, maxLag) / tickInterval);
+	int maxTicks = RoundToFloor(maxLag / tickInterval);
+	return ticks > maxTicks ? maxTicks : ticks;
+}
+
+bool GetRockPositionAtTick(int rockIndex, int tick, float pos[3])
+{
+	if (tick == GetGameTickCount()) {
+		int entity = EntRefToEntIndex(g_aRockEntities.Get(rockIndex, BLOCK_ENT_REF));
+		GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
+		return true;
+	}
+	ArrayList history = view_as<ArrayList>(g_aRockEntities.Get(rockIndex, BLOCK_POS_HISTORY));
+	int index = GetHistoryIndex(tick);
+	if (history.Get(index, 3) != tick) {
+		return false;
+	}
+	history.GetArray(index, pos, 3);
+	return true;
 }
 
 void ApplyDamageToRock(int rockIndex, int rockRef, const char[] weaponName, float weaponDamage, float weaponRange, float weaponRangeModifier, float distance, bool nativeDamage)
@@ -443,12 +529,13 @@ void AddTrackedRock(int rockRef)
 	}
 
 	int index = g_aRockEntities.Push(rockRef);
-	ArrayList posHistory = new ArrayList(3, MAX_HISTORY_FRAMES);
+	ArrayList posHistory = new ArrayList(4, MAX_HISTORY_FRAMES);
 	g_aRockEntities.Set(index, posHistory, BLOCK_POS_HISTORY);
 	g_aRockEntities.Set(index, 0.0, BLOCK_DMG_DEALT);
 	g_aRockEntities.Set(index, GetGameTime(), BLOCK_SPAWN_TIME);
 	g_aRockEntities.Set(index, -1.0, BLOCK_RELEASE_TIME);
 	g_aRockEntities.Set(index, 0, BLOCK_DETONATING);
+	g_aRockEntities.Set(index, 0.0, BLOCK_PROTECTED_UNTIL);
 
 	float pos[3];
 	int entity = EntRefToEntIndex(rockRef);
@@ -500,15 +587,22 @@ void SeedRockHistory(int rockIndex, const float pos[3])
 {
 	ArrayList posHistory = view_as<ArrayList>(g_aRockEntities.Get(rockIndex, BLOCK_POS_HISTORY));
 	for (int i = 0; i < MAX_HISTORY_FRAMES; i++) {
-		posHistory.SetArray(i, pos, 3);
+		posHistory.Set(i, -1, 3);
 	}
+	int index = GetHistoryIndex(GetGameTickCount());
+	posHistory.SetArray(index, pos, 3);
+	posHistory.Set(index, GetGameTickCount(), 3);
 }
 
-bool IsRockDamageAllowed(int rockIndex)
+bool IsRockDamageAllowed(int rockIndex, float shotTime)
 {
+	float spawnTime = g_aRockEntities.Get(rockIndex, BLOCK_SPAWN_TIME);
+	if (shotTime < spawnTime) {
+		return false;
+	}
 	float releaseTime = g_aRockEntities.Get(rockIndex, BLOCK_RELEASE_TIME);
 	if (releaseTime >= 0.0) {
-		return GetGameTime() - releaseTime >= g_cvRockReleaseGodframes.FloatValue;
+		return shotTime >= view_as<float>(g_aRockEntities.Get(rockIndex, BLOCK_PROTECTED_UNTIL));
 	}
 
 	float fallbackTime = g_cvRockGodframes.FloatValue;
@@ -516,7 +610,7 @@ bool IsRockDamageAllowed(int rockIndex)
 		return true;
 	}
 
-	return GetGameTime() - g_aRockEntities.Get(rockIndex, BLOCK_SPAWN_TIME) >= fallbackTime;
+	return shotTime - spawnTime >= fallbackTime;
 }
 
 void UpdateRockRenderByRef(int rockRef)
@@ -536,7 +630,7 @@ void UpdateRockRender(int rockIndex)
 		return;
 	}
 
-	if (g_cvRockGodframesRender.BoolValue && !IsRockDamageAllowed(rockIndex)) {
+	if (g_cvRockHitbox.BoolValue && g_cvRockGodframesRender.BoolValue && !IsRockDamageAllowed(rockIndex, GetGameTime())) {
 		SetEntityRenderMode(entity, RENDER_TRANSCOLOR);
 		SetEntityRenderColor(entity, 255, 255, 255, 200);
 		return;
