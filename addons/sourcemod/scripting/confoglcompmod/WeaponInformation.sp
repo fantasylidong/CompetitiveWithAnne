@@ -1083,6 +1083,13 @@ static void WI_ReplaceExtra(int iEntity, int iWeaponIndex)
 	//------------------------------------------------
 	// Check location of medkit
 	//------------------------------------------------
+	// Disabled medkit rules must also skip the four-kit cap and its fixed-size array.
+	if (!Weapon_bConvar[iWeaponIndex] && !Weapon_bReplaceStartKits
+		&& !Weapon_bReplaceFinaleKits && !Weapon_bRemoveExtraItems
+	) {
+		return;
+	}
+
 	// If its outside the start safe room we assume
 	// it is a static medkit and it needs removal
 

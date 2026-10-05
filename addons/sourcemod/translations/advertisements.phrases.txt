@@ -66,11 +66,11 @@
 	}
 	"Advertisement_CoopHealthReset"
 	{
-		"en"		"{green}After completing a chapter, survivors below 50 health are restored to 50 and their status is reset; there is no need to suicide."
+		"en"		"{green}After each chapter, living survivors below 50 permanent health are raised to 50; higher health stays unchanged. Incapacitation counts and black-and-white status are reset for all living survivors."
 	}
 	"Advertisement_CoopMedkit"
 	{
-		"en"		"{green}There are no first aid kits in the saferoom.{lightgreen} You will receive one after leaving the saferoom at the start of the next chapter."
+		"en"		"{green}Medkits in the starting and ending saferooms are removed. Each living survivor receives one medkit when the team first leaves the starting saferoom."
 	}
 	"Advertisement_LobbyUnreserve"
 	{
@@ -79,5 +79,9 @@
 	"Advertisement_PendingVote"
 	{
 		"en"		"Pending vote"
+	}
+	"Advertisement_PureMedkit"
+	{
+		"en"		"{green}Pure modes keep the map's original medkits, with no dynamic additions, removals or kits issued on exit."
 	}
 }

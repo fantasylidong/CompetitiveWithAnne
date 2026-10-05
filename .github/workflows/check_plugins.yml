@@ -9,6 +9,7 @@ on:
       - 'scripts/query_a2s_rules.py'
       - 'scripts/check_charger_doors.py'
       - 'scripts/check_ai_landing_path.py'
+      - 'scripts/check_anne_entity_cleaner.py'
     branches:
       - master
   push:
@@ -19,6 +20,7 @@ on:
       - 'scripts/query_a2s_rules.py'
       - 'scripts/check_charger_doors.py'
       - 'scripts/check_ai_landing_path.py'
+      - 'scripts/check_anne_entity_cleaner.py'
     branches:
       - master
   workflow_dispatch:
@@ -45,6 +47,8 @@ jobs:
           python3 scripts/check_convar_visibility.py
       - name: Check Charger door behavior
         run: python3 scripts/check_charger_doors.py
+      - name: Check Anne entity cleaner safety
+        run: python3 scripts/check_anne_entity_cleaner.py
       - name: Set environment variables
         run: |
           echo "SCRIPTS_PATH=$GITHUB_WORKSPACE/addons/sourcemod/scripting" >> $GITHUB_ENV

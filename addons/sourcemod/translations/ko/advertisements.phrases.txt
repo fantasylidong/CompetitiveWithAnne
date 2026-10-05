@@ -66,11 +66,11 @@
 	}
 	"Advertisement_CoopHealthReset"
 	{
-		"ko"		"{green}챕터 완료 시 체력이 50 미만인 생존자는 체력 50으로 회복되고 상태가 초기화되므로 자살할 필요가 없습니다."
+		"ko"		"{green}챕터 완료 시 살아 있는 생존자의 영구 체력이 50 미만이면 50으로 회복하며, 50 이상은 그대로 유지됩니다. 살아 있는 모든 생존자의 쓰러진 횟수와 흑백 상태를 초기화합니다."
 	}
 	"Advertisement_CoopMedkit"
 	{
-		"ko"		"{green}안전실 안에는 구급상자가 없습니다.{lightgreen} 다음 챕터 시작 시 안전실을 나가면 하나가 지급됩니다."
+		"ko"		"{green}시작 및 종료 안전실의 구급상자를 제거합니다. 팀이 처음 시작 안전실을 나갈 때 살아 있는 생존자마다 1개씩 지급합니다."
 	}
 	"Advertisement_LobbyUnreserve"
 	{
@@ -79,5 +79,9 @@
 	"Advertisement_PendingVote"
 	{
 		"ko"		"투표 대기 중"
+	}
+	"Advertisement_PureMedkit"
+	{
+		"ko"		"{green}Pure 모드는 맵의 원래 구급상자를 유지하며, 동적으로 추가하거나 제거하지 않고 안전실 퇴장 시에도 지급하지 않습니다."
 	}
 }

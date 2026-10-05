@@ -3,7 +3,7 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <l4d2_saferoom_detect>
+#include <left4dhooks>
 
 /**
  * Saferoom Medkit Dynamic
@@ -14,9 +14,10 @@
 
 #define PLUGIN_NAME        "Saferoom Medkit Dynamic"
 #define PLUGIN_AUTHOR      "morzlee, edited for AnneHappy"
-#define PLUGIN_VERSION     "2.0.0"
+#define PLUGIN_VERSION     "2.1.0"
 
 #define SLOT_HEAVY_HEALTH  3
+#define WEAPON_ID_MEDKIT   12
 
 public Plugin myinfo =
 {
@@ -38,6 +39,7 @@ bool  g_bEnable;
 float g_fRemoveDelay;
 bool  g_bDebug;
 bool  g_bKitsGiven;
+Handle g_hScanTimer;
 
 // ======================
 // Utils
@@ -72,14 +74,15 @@ void KillEntitySafe(int ent)
 // ======================
 public void OnPluginStart()
 {
-    gC_Enable      = CreateConVar("sr_medkit_enable", "1", "Enable saferoom medkit control (1=on, 0=off).", FCVAR_NONE, true, 0.0, true, 1.0);
+    gC_Enable      = CreateConVar("sr_medkit_enable", "0", "Enable saferoom medkit control (1=on, 0=off).", FCVAR_NONE, true, 0.0, true, 1.0);
     gC_RemoveDelay = CreateConVar("sr_medkit_scan_delay", "1.5", "Delay after round_start before stripping saferoom medkits.", FCVAR_NONE, true, 0.0, true, 10.0);
     gC_Debug       = CreateConVar("sr_medkit_debug", "0", "Debug logging.", FCVAR_NONE, true, 0.0, true, 1.0);
 
     AutoExecConfig(true, "sr_medkit_refill_kv");
+    LoadTranslations("sr_medkit.phrases");
 
     HookEvent("round_start", Evt_RoundStart, EventHookMode_PostNoCopy);
-    HookEvent("player_left_start_area", Evt_PlayerLeftStartArea, EventHookMode_PostNoCopy);
+    HookEvent("player_left_start_area", Evt_PlayerLeftStartArea, EventHookMode_Post);
 
     HookConVarChange(gC_Enable,      CvarChanged);
     HookConVarChange(gC_RemoveDelay, CvarChanged);
@@ -100,16 +103,32 @@ void ReadCvars()
 public void CvarChanged(ConVar cvar, const char[] oldValue, const char[] newValue)
 {
     ReadCvars();
+    if (cvar == gC_Enable || cvar == gC_RemoveDelay)
+        ScheduleMedkitScan();
+}
+
+public void OnConfigsExecuted()
+{
+    ScheduleMedkitScan();
+}
+
+public void OnMapEnd()
+{
+    delete g_hScanTimer;
+    g_bKitsGiven = false;
+}
+
+void ScheduleMedkitScan()
+{
+    delete g_hScanTimer;
+    if (g_bEnable && !g_bKitsGiven)
+        g_hScanTimer = CreateTimer(g_fRemoveDelay, Timer_RemoveSaferoomMedkits, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void Evt_RoundStart(Event e, const char[] name, bool dontBroadcast)
 {
     g_bKitsGiven = false;
-
-    if (!g_bEnable)
-        return;
-
-    CreateTimer(g_fRemoveDelay, Timer_RemoveSaferoomMedkits, _, TIMER_FLAG_NO_MAPCHANGE);
+    ScheduleMedkitScan();
 }
 
 public void Evt_PlayerLeftStartArea(Event e, const char[] name, bool dontBroadcast)
@@ -121,15 +140,24 @@ public void Evt_PlayerLeftStartArea(Event e, const char[] name, bool dontBroadca
     if (!IsValidClientSurvivor(client))
         return;
 
+    delete g_hScanTimer;
+    RemoveSaferoomMedkits();
     GiveMedkitsBasedOnPlayers();
 }
 
 public Action Cmd_ApplyNow(int client, int args)
 {
+    if (!g_bEnable || g_bKitsGiven)
+    {
+        ReplyToCommand(client, "%t", g_bEnable ? "SRMedkit_AlreadyGiven" : "SRMedkit_Disabled");
+        return Plugin_Handled;
+    }
+
+    delete g_hScanTimer;
     RemoveSaferoomMedkits();
     GiveMedkitsBasedOnPlayers();
 
-    ReplyToCommand(client, "[SRMedkitKV] removed saferoom medkits and distributed kits.");
+    ReplyToCommand(client, "%t", "SRMedkit_Applied");
     return Plugin_Handled;
 }
 
@@ -138,7 +166,8 @@ public Action Cmd_ApplyNow(int client, int args)
 // ======================
 public Action Timer_RemoveSaferoomMedkits(Handle timer)
 {
-    if (!g_bEnable)
+    g_hScanTimer = null;
+    if (!g_bEnable || g_bKitsGiven)
         return Plugin_Stop;
 
     int removed = RemoveSaferoomMedkits();
@@ -151,6 +180,7 @@ int RemoveSaferoomMedkits()
     int total = 0;
     total += RemoveMedkitsByClass("weapon_first_aid_kit_spawn");
     total += RemoveMedkitsByClass("weapon_first_aid_kit");
+    total += RemoveMedkitsByClass("weapon_spawn");
     return total;
 }
 
@@ -161,6 +191,13 @@ int RemoveMedkitsByClass(const char[] classname)
     while ((ent = FindEntityByClassname(ent, classname)) != -1)
     {
         if (!IsValidEntity(ent))
+            continue;
+
+        if (StrEqual(classname, "weapon_spawn") && GetEntProp(ent, Prop_Data, "m_weaponID") != WEAPON_ID_MEDKIT)
+            continue;
+
+        // Keep carried kits, including those inherited from the previous chapter.
+        if (HasEntProp(ent, Prop_Send, "m_hOwnerEntity") && GetEntPropEnt(ent, Prop_Send, "m_hOwnerEntity") > 0)
             continue;
 
         if (IsEntityInAnySaferoom(ent))
@@ -174,7 +211,9 @@ int RemoveMedkitsByClass(const char[] classname)
 
 bool IsEntityInAnySaferoom(int ent)
 {
-    return (SAFEDETECT_IsEntityInStartSaferoom(ent) || SAFEDETECT_IsEntityInEndSaferoom(ent));
+    float origin[3];
+    GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
+    return L4D_IsPositionInFirstCheckpoint(origin) || L4D_IsPositionInLastCheckpoint(origin);
 }
 
 void GiveMedkitsBasedOnPlayers()
@@ -199,10 +238,12 @@ void GiveMedkitsBasedOnPlayers()
 int GiveMedkitToClient(int client)
 {
     int slot = GetPlayerWeaponSlot(client, SLOT_HEAVY_HEALTH);
+    char classname[64];
     if (slot != -1 && IsValidEntity(slot))
     {
-        RemovePlayerItem(client, slot);
-        KillEntitySafe(slot);
+        GetEntityClassname(slot, classname, sizeof(classname));
+        if (StrEqual(classname, "weapon_first_aid_kit"))
+            return 1;
     }
 
     int kit = CreateEntityByName("weapon_first_aid_kit");
@@ -210,6 +251,11 @@ int GiveMedkitToClient(int client)
         return 0;
 
     DispatchSpawn(kit);
+    if (slot != -1 && IsValidEntity(slot))
+    {
+        RemovePlayerItem(client, slot);
+        KillEntitySafe(slot);
+    }
     EquipPlayerWeapon(client, kit);
     return 1;
 }

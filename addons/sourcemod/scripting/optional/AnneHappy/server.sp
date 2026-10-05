@@ -64,7 +64,7 @@ public Plugin myinfo =
     name        = "AnneServer Server Function (quiet minimal)",
     author      = "def075, Caibiii, 东, simplified by ChatGPT",
     description = "Helpers + BeQuiet-style suppressors only (server_cvar / namechange / spec chat)",
-    version     = "2026.08.14",
+    version     = "2026.10.04",
     url         = "https://github.com/Caibiii/AnneServer"
 };
 
@@ -72,6 +72,7 @@ public Plugin myinfo =
 ConVar hMaxSurvivors, hSurvivorsManagerEnable, hCvarAutoKickTank;
 ConVar g_cvResetOnTransition;          // 满血+清背包（原逻辑）
 ConVar g_cvHeal50OnTransition;         // 新增：通关/切图最低50实血+重置倒地次数
+ConVar g_cvHealOnLeaveSafeArea;        // 首次离开安全区时回满血
 ConVar g_cvWarpSpawnToStart;           // 生还 player_spawn 后拉回起始点
 ConVar g_cvRoundWipeCount;             // 通过 A2S_RULES 发布当前地图团灭次数
 
@@ -130,8 +131,11 @@ public void OnPluginStart()
 
     // ---- 最低50实血（仅在未启用满血清背包时使用）----
     g_cvHeal50OnTransition = CreateConVar("anne_heal50_on_transition", "0",
-        "通关/切图时，若生还者实血<50则补至50，并重置倒地次数；>=50不变。仅在 anne_reset_on_transition=0 时生效",
+        "通关/切图时，仅将存活生还者实血<50补至50，并将所有存活生还者倒地次数重置为0；>=50实血不变。仅在 anne_reset_on_transition=0 时生效",
         CVAR_FLAGS, true, 0.0, true, 1.0);
+
+    g_cvHealOnLeaveSafeArea = CreateConVar("anne_heal_on_leave_safe_area", "1",
+        "首次离开安全区时是否回满血并重置倒地次数 (0/1)", CVAR_FLAGS, true, 0.0, true, 1.0);
 
     g_cvWarpSpawnToStart = CreateConVar("anne_spawn_warp_to_start", "1",
         "生还者 player_spawn 后是否在未离开安全区前传送到起始点 (0/1)", CVAR_FLAGS, true, 0.0, true, 1.0);
@@ -688,10 +692,13 @@ public Action Timer_AutoGive(Handle timer)
         }
 
         GivePainPillsIfNeeded(i);
-        BypassAndExecuteCommand(i, "give", "health");
-        SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
-        SetEntProp(i,   Prop_Send, "m_currentReviveCount", 0);
-        SetEntProp(i,   Prop_Send, "m_bIsOnThirdStrike", false);
+        if (g_cvHealOnLeaveSafeArea.BoolValue)
+        {
+            BypassAndExecuteCommand(i, "give", "health");
+            SetEntPropFloat(i, Prop_Send, "m_healthBuffer", 0.0);
+            SetEntProp(i,   Prop_Send, "m_currentReviveCount", 0);
+            SetEntProp(i,   Prop_Send, "m_bIsOnThirdStrike", false);
+        }
 
         if (IsFakeClient(i))
         {
@@ -787,12 +794,12 @@ void RestoreHealth()
     }
 }
 
-// 最低 50 实血 + 重置倒地次数（>=50 不变）
+// 存活生还者最低 50 实血（>=50 实血不变），倒地次数全部重置
 void ApplyHealFloorTo50()
 {
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsSurvivor(i)) continue;
+        if (!IsSurvivor(i) || !IsPlayerAlive(i)) continue;
 
         int hp = GetSurvivorPermHealth(i);
         if (hp < 50)
@@ -800,6 +807,7 @@ void ApplyHealFloorTo50()
 
         SetEntProp(i, Prop_Send, "m_currentReviveCount", 0);
         SetEntProp(i, Prop_Send, "m_bIsOnThirdStrike", false);
+        SetEntProp(i, Prop_Send, "m_isGoingToDie", false);
     }
 }
 

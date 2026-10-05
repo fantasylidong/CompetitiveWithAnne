@@ -66,11 +66,11 @@
 	}
 	"Advertisement_CoopHealthReset"
 	{
-		"zho"		"{green}過關時低於 50 血的倖存者會恢復至 50 血並重設狀態，不用自殺。"
+		"zho"		"{green}過關後，存活倖存者綠血不足50補至50，達到50不變；所有存活者倒地次數和黑白狀態歸零。"
 	}
 	"Advertisement_CoopMedkit"
 	{
-		"zho"		"{green}安全室內沒有醫療包。{lightgreen}過關後離開安全室時會發放一個醫療包。"
+		"zho"		"{green}起點、終點安全室的醫療包會被清除；首次出門時，每名存活倖存者獲得1個醫療包。"
 	}
 	"Advertisement_LobbyUnreserve"
 	{
@@ -79,5 +79,9 @@
 	"Advertisement_PendingVote"
 	{
 		"zho"		"等待投票"
+	}
+	"Advertisement_PureMedkit"
+	{
+		"zho"		"{green}Pure模式保留地圖原有醫療包，不動態新增、不刪除，也不在出門時發包。"
 	}
 }

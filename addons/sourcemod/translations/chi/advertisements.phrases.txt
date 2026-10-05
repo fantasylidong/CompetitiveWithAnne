@@ -66,11 +66,11 @@
 	}
 	"Advertisement_CoopHealthReset"
 	{
-		"chi"		"{green}过关时低于 50 血的生还者会恢复至 50 血并重置状态，不用自杀。"
+		"chi"		"{green}过关后，存活生还者绿血不足50补至50，达到50不变；所有存活者倒地次数和黑白状态清零。"
 	}
 	"Advertisement_CoopMedkit"
 	{
-		"chi"		"{green}安全门内没有医疗包。{lightgreen}过关后离开安全门时会发放一个医疗包。"
+		"chi"		"{green}起点、终点安全屋的医疗包会被清除；首次出门时，每名存活生还者获得1个医疗包。"
 	}
 	"Advertisement_LobbyUnreserve"
 	{
@@ -79,5 +79,9 @@
 	"Advertisement_PendingVote"
 	{
 		"chi"		"等待投票"
+	}
+	"Advertisement_PureMedkit"
+	{
+		"chi"		"{green}Pure模式保留地图原有医疗包，不动态新增、不删除，也不在出门时发包。"
 	}
 }

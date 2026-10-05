@@ -40,7 +40,7 @@
 	{
 		"type"		"S"
 		"phrase"	"Advertisement_CoopHealthReset"
-		"text"		"{GREEN}过关低于50血的都会恢复50血且重置状态，不用自杀"
+		"text"		"{green}过关后，存活生还者绿血不足50补至50，达到50不变；所有存活者倒地次数和黑白状态清零。"
 	}
 	"9"
 	{
@@ -58,7 +58,7 @@
 	{
 		"type"		"S"
 		"phrase"	"Advertisement_CoopMedkit"
-		"text"		"{GREEN}安全门内{LIGHTGREEN}没有理疗包，过关后出门会发一个医疗包{GREEN}"
+		"text"		"{green}起点、终点安全屋的医疗包会被清除；首次出门时，每名存活生还者获得1个医疗包。"
 	}
 	"12"
 	{

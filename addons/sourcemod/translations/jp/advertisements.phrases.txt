@@ -66,11 +66,11 @@
 	}
 	"Advertisement_CoopHealthReset"
 	{
-		"jp"		"{green}チャプター終了時、体力が 50 未満の生存者は体力 50 まで回復し、状態もリセットされるため自殺は不要です。"
+		"jp"		"{green}章クリア時、生存者の永久体力が50未満なら50まで回復し、50以上は変更しません。全生存者のダウン回数と白黒状態をリセットします。"
 	}
 	"Advertisement_CoopMedkit"
 	{
-		"jp"		"{green}セーフルーム内に救急キットはありません。{lightgreen}次のチャプター開始時にセーフルームを出ると 1 個支給されます。"
+		"jp"		"{green}開始・終了セーフルーム内の救急キットを撤去します。最初に開始セーフルームを出た時、各生存者に1個ずつ支給します。"
 	}
 	"Advertisement_LobbyUnreserve"
 	{
@@ -79,5 +79,9 @@
 	"Advertisement_PendingVote"
 	{
 		"jp"		"投票待ち"
+	}
+	"Advertisement_PureMedkit"
+	{
+		"jp"		"{green}Pureモードではマップ元来の救急キットを保持し、動的な追加・削除や退出時の支給は行いません。"
 	}
 }

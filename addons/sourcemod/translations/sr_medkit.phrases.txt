@@ -1,0 +1,27 @@
+"Phrases"
+{
+	"SRMedkit_Disabled"
+	{
+		"en"	"[SRMedkit] Medkit control is disabled in this mode."
+		"chi"	"[SRMedkit] 当前模式已关闭医疗包控制。"
+		"zho"	"[SRMedkit] 目前模式已關閉醫療包控制。"
+		"jp"	"[SRMedkit] このモードでは救急キット制御は無効です。"
+		"ko"	"[SRMedkit] 현재 모드에서는 구급상자 제어가 비활성화되어 있습니다."
+	}
+	"SRMedkit_AlreadyGiven"
+	{
+		"en"	"[SRMedkit] Medkits have already been issued this round."
+		"chi"	"[SRMedkit] 本回合已经发放过医疗包。"
+		"zho"	"[SRMedkit] 本回合已經發放過醫療包。"
+		"jp"	"[SRMedkit] このラウンドでは救急キットは支給済みです。"
+		"ko"	"[SRMedkit] 이번 라운드에는 이미 구급상자가 지급되었습니다."
+	}
+	"SRMedkit_Applied"
+	{
+		"en"	"[SRMedkit] Saferoom medkits removed and one kit issued to each living survivor."
+		"chi"	"[SRMedkit] 已清除安全屋医疗包，并给每名存活生还者发放一个包。"
+		"zho"	"[SRMedkit] 已清除安全室醫療包，並給每名存活倖存者發放一個包。"
+		"jp"	"[SRMedkit] 安全室の救急キットを撤去し、各生存者に1個ずつ支給しました。"
+		"ko"	"[SRMedkit] 안전실의 구급상자를 제거하고 살아 있는 생존자마다 1개씩 지급했습니다."
+	}
+}
