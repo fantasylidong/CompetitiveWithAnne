@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"vi"		"Thời gian hiệp / horde"
+			"vi"		"Thời gian hiệp"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"chi"		"回合计时 / 尸潮"
+			"chi"		"回合计时"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

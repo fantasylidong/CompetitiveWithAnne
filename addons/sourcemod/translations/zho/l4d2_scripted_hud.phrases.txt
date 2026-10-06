@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"zho"		"回合計時 / 屍潮"
+			"zho"		"回合計時"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

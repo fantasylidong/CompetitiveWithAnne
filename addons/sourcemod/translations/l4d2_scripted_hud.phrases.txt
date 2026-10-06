@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"en"		"Round timer / horde"
+			"en"		"Round timer"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

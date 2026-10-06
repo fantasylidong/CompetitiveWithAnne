@@ -86,7 +86,7 @@ public Plugin:myinfo =
     name = "Survivor MVP notification",
     author = "Tabun, Artifacial",
     description = "Shows MVP for survivor team at end of round",
-    version = "0.3.4",
+    version = "0.3.5",
     url = "https://github.com/alexberriman/l4d2_survivor_mvp"
 };
 
@@ -287,7 +287,7 @@ public OnPluginStart()
     // Commands
     RegConsoleCmd("sm_mvp", SurvivorMVP_Cmd, "Prints the current MVP for the survivor team");
     RegConsoleCmd("sm_mvpme", ShowMVPStats_Cmd, "Prints the client's own MVP-related stats");
-    RegConsoleCmd("sm_kills", AnneHappyMVP_Cmd, "Prints AnneHappy compact survivor stats");
+    RegConsoleCmd("sm_kills", AnneHappyMVP_Cmd, "Prints survivor stats for the current mode");
     
     RegConsoleCmd("say", Say_Cmd);
     RegConsoleCmd("say_team", Say_Cmd);
@@ -591,6 +591,11 @@ Action ShowMVPStats_Cmd(client, args)
 
 Action AnneHappyMVP_Cmd(client, args)
 {
+    if (!IsAnneHappyMVPMode())
+    {
+        return SurvivorMVP_Cmd(client, args);
+    }
+
     PrintAnneHappyMVPReport(client);
     return Plugin_Handled;
 }
@@ -705,8 +710,36 @@ void PrintLoserz(bool:bSolo, client)
     }
 }
 
+bool:IsAnneHappyMVPMode()
+{
+    if (!L4D_HasPlayerControlledZombies())
+    {
+        return true;
+    }
+
+    // Anne PvE modes also use versus; match the mode rules in l4d_stats.
+    new Handle:mode = FindConVar("l4d_ready_cfg_name");
+    if (mode == INVALID_HANDLE)
+    {
+        return false;
+    }
+
+    decl String:configName[128];
+    GetConVarString(mode, configName, sizeof(configName));
+    return StrContains(configName, "AnneHappy", false) != -1
+        || StrContains(configName, "WitchParty", false) != -1
+        || StrContains(configName, "AllCharger", false) != -1
+        || StrContains(configName, "Alone", false) != -1
+        || StrContains(configName, "1vHunters", false) != -1;
+}
+
 void PrintAnneHappyMVPReport(client)
 {
+    if (!IsAnneHappyMVPMode())
+    {
+        return;
+    }
+
     new players;
     new players_clients[MAXPLAYERS + 1];
 

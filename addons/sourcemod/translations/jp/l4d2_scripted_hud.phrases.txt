@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"jp"		"ラウンド時間 / ホード"
+			"jp"		"ラウンド時間"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

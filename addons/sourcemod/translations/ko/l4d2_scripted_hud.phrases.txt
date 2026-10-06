@@ -262,7 +262,7 @@
 		}
 		"L4D2ScriptedHUD_SourceRound"
 		{
-			"ko"		"라운드 시간 / 호드"
+			"ko"		"라운드 시간"
 		}
 		"L4D2ScriptedHUD_SourceWitch"
 		{

@@ -29,7 +29,7 @@ https://developer.valvesoftware.com/wiki/L4D2_EMS/Appendix:_HUD
 #define PLUGIN_NAME                   "[L4D2] Scripted HUD"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Display scripted HUD slots and an optional CS-style kill feed"
-#define PLUGIN_VERSION                "1.7.0"
+#define PLUGIN_VERSION                "1.7.1"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=331212"
 
 // ====================================================================================================
@@ -144,7 +144,6 @@ public Plugin myinfo =
 #define HUD_MENU_GROUP_RESERVED       2
 #define HUD_MENU_GROUP_COUNT          3
 
-#define HUD_PANIC_WINDOW              60.0
 #define HUD_WITCH_NEAR_UNITS          600.0
 #define HUD_BHOP_RESET_SPEED          230.0
 #define HUD_BHOP_RESET_HOLD           0.25
@@ -347,7 +346,7 @@ bool g_bWitchAndTankSystemAvailable = false;
 static bool g_bInfectedControlAvailable;
 static bool g_bLateLoad;
 static bool g_bTankBoardFrozen;
-static bool g_bPanicActive;
+static bool g_bTankRoundEnded;
 static bool g_bHUDProxyHooked[HUD_SLOT_COUNT][HUD_PROXY_COUNT];
 static bool g_bHUDResetPending[HUD_SLOT_COUNT];
 static bool g_bHUDPrefsDatabaseReady;
@@ -401,9 +400,11 @@ static int    g_iClientCommonKills[MAXPLAYERS + 1];
 static int    g_iHUD2WipeCount;
 static int    g_iHUD2InfectedCount;
 static int    g_iHUD2SpawnInterval;
-static int    g_iTankDamage[MAXPLAYERS + 1];
-static int    g_iTankMaxHealth;
-static int    g_iTankLastHealth;
+static int    g_iTankDamage[MAXPLAYERS + 1][MAXPLAYERS + 1];
+static int    g_iTankMaxHealth[MAXPLAYERS + 1];
+static int    g_iTankLastHealth[MAXPLAYERS + 1];
+static int    g_iTankBoardDamage[MAXPLAYERS + 1];
+static int    g_iTankBoardMaxHealth;
 
 // ====================================================================================================
 // float - Plugin Variables
@@ -459,7 +460,6 @@ static float  g_fHUD3_Y;
 static float  g_fHUD4_X;
 static float  g_fHUD4_Y;
 static float  g_fRoundStartTime;
-static float  g_fPanicUntil;
 static float  g_fClientBhopPeak[MAXPLAYERS + 1];
 static float  g_fClientGroundedSince[MAXPLAYERS + 1];
 
@@ -1210,6 +1210,10 @@ bool IsClientSlotVisible(int client, int hud)
     if (hud >= HUD_EXTRA_FIRST && source == HUD_CONTENT_DEFAULT)
         return false;
 
+    // Only the most recently killed Tank is public; a wipe hides its result too.
+    if (source == HUD_CONTENT_TANK_DMG && (!g_bTankBoardFrozen || g_bTankRoundEnded || !HasStandingHUDSurvivor()))
+        return false;
+
     int teamBit = GetClientHUDTeamBit(client);
 
     // Player preference: show this slot only while on the selected teams.
@@ -1738,8 +1742,7 @@ public void HookEvents()
         HookEvent("player_hurt", Event_PlayerHurt);
         HookEvent("infected_death", Event_InfectedDeath);
         HookEvent("round_start", Event_RoundStart);
-        HookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
-        HookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
+        HookEvent("round_end", Event_RoundEnd);
         HookEvent("player_team", Event_PlayerTeam, EventHookMode_PostNoCopy);
         return;
     }
@@ -1754,8 +1757,7 @@ public void HookEvents()
         UnhookEvent("player_hurt", Event_PlayerHurt);
         UnhookEvent("infected_death", Event_InfectedDeath);
         UnhookEvent("round_start", Event_RoundStart);
-        UnhookEvent("create_panic_event", Event_PanicStart, EventHookMode_PostNoCopy);
-        UnhookEvent("panic_event_finished", Event_PanicEnd, EventHookMode_PostNoCopy);
+        UnhookEvent("round_end", Event_RoundEnd);
         UnhookEvent("player_team", Event_PlayerTeam, EventHookMode_PostNoCopy);
         return;
     }
@@ -1794,10 +1796,17 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 		if (GetZombieClass(victim) == L4D2_ZOMBIECLASS_TANK)
 		{
-			if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR && g_iTankLastHealth > 0)
-				g_iTankDamage[attacker] += g_iTankLastHealth;
-			g_bTankBoardFrozen = true;
-			g_iTankLastHealth = 0;
+            if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR && g_iTankLastHealth[victim] > 0)
+                g_iTankDamage[victim][attacker] += g_iTankLastHealth[victim];
+
+            if (!g_bTankRoundEnded && HasStandingHUDSurvivor() && g_iTankMaxHealth[victim] > 0)
+            {
+                for (int client = 1; client <= MaxClients; client++)
+                    g_iTankBoardDamage[client] = g_iTankDamage[victim][client];
+                g_iTankBoardMaxHealth = g_iTankMaxHealth[victim];
+                g_bTankBoardFrozen = true;
+            }
+            ResetTankDamageStats(victim);
 		}
 	}
 
@@ -1805,7 +1814,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 
 	if(IsAiTank(victim))
     {
-        g_bAliveTank = false;
+        g_bAliveTank = HasAnyTankAlive();
     }
 }
 
@@ -1818,6 +1827,9 @@ public void Event_InfectedDeath(Handle event, const char[] name, bool dontBroadc
 
 public void Event_PlayerHurt(Handle event, const char[] name, bool dontBroadcast)
 {
+    if (g_bTankRoundEnded)
+        return;
+
     int victim = GetClientOfUserId(GetEventInt(event, "userid"));
     if (!IsValidClient(victim) || GetClientTeam(victim) != TEAM_INFECTED || GetZombieClass(victim) != L4D2_ZOMBIECLASS_TANK)
         return;
@@ -1829,36 +1841,29 @@ public void Event_PlayerHurt(Handle event, const char[] name, bool dontBroadcast
     int damage = GetEventInt(event, "dmg_health");
     int remain = GetEventInt(event, "health");
     if (IsValidClient(attacker) && GetClientTeam(attacker) == TEAM_SURVIVOR && damage > 0)
-        g_iTankDamage[attacker] += damage;
+        g_iTankDamage[victim][attacker] += damage;
 
-    g_iTankLastHealth = remain;
+    g_iTankLastHealth[victim] = remain;
     int maxHP = GetEntProp(victim, Prop_Data, "m_iMaxHealth");
-    if (maxHP > g_iTankMaxHealth)
-        g_iTankMaxHealth = maxHP;
+    if (maxHP > g_iTankMaxHealth[victim])
+        g_iTankMaxHealth[victim] = maxHP;
 }
 
 public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
     g_bAliveTank = false;
+    g_bTankRoundEnded = false;
     g_fRoundStartTime = GetGameTime();
-    g_fPanicUntil = 0.0;
-    g_bPanicActive = false;
     ResetHUDKillStats();
     ResetTankDamageBoard();
     KillFeed_EventRoundStart();
     HookHUDSendProxies();
 }
 
-public void Event_PanicStart(Handle event, const char[] name, bool dontBroadcast)
+public void Event_RoundEnd(Handle event, const char[] name, bool dontBroadcast)
 {
-    g_bPanicActive = true;
-    g_fPanicUntil = GetGameTime() + HUD_PANIC_WINDOW;
-}
-
-public void Event_PanicEnd(Handle event, const char[] name, bool dontBroadcast)
-{
-    g_bPanicActive = false;
-    g_fPanicUntil = 0.0;
+    g_bTankRoundEnded = true;
+    ResetTankDamageBoard();
 }
 
 void ResetHUDKillStats()
@@ -1875,10 +1880,31 @@ void ResetHUDKillStats()
 void ResetTankDamageBoard()
 {
     for (int client = 1; client <= MaxClients; client++)
-        g_iTankDamage[client] = 0;
-    g_iTankMaxHealth = 0;
-    g_iTankLastHealth = 0;
+    {
+        ResetTankDamageStats(client);
+        g_iTankBoardDamage[client] = 0;
+    }
+    g_iTankBoardMaxHealth = 0;
     g_bTankBoardFrozen = false;
+}
+
+void ResetTankDamageStats(int tank)
+{
+    for (int client = 1; client <= MaxClients; client++)
+        g_iTankDamage[tank][client] = 0;
+    g_iTankMaxHealth[tank] = 0;
+    g_iTankLastHealth[tank] = 0;
+}
+
+bool HasStandingHUDSurvivor()
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && GetClientTeam(client) == TEAM_SURVIVOR
+            && IsPlayerAlive(client) && !IsPlayerIncapacitated(client))
+            return true;
+    }
+    return false;
 }
 
 bool IsAiTank(int tank)
@@ -1896,26 +1922,36 @@ public void Event_TankSpawn(Event event, const char[] name, bool dontBroadcast)
         g_bAliveTank = true;
 
     int tank = GetClientOfUserId(event.GetInt("userid"));
-    if (!IsValidClient(tank))
+    if (!IsValidClient(tank) || g_bTankRoundEnded)
         return;
 
-    // A new tank fight starts a fresh board; extra tanks in the same fight keep accumulating.
-    if (g_bTankBoardFrozen || !HasAnyTankDamage())
-        ResetTankDamageBoard();
+    // A new fight hides the previous result. Extra Tanks keep the last kill visible.
+    bool ongoingFight;
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (client != tank && IsClientInGame(client) && IsPlayerTank(client))
+        {
+            ongoingFight = true;
+            break;
+        }
+    }
+    if (!ongoingFight)
+        g_bTankBoardFrozen = false;
+    ResetTankDamageStats(tank);
 
     int maxHP = GetEntProp(tank, Prop_Data, "m_iMaxHealth");
     int health = GetClientHealth(tank);
     if (maxHP < health)
         maxHP = health;
-    if (maxHP > g_iTankMaxHealth)
-        g_iTankMaxHealth = maxHP;
+    g_iTankMaxHealth[tank] = maxHP;
+    g_iTankLastHealth[tank] = health;
 }
 
 bool HasAnyTankDamage()
 {
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (g_iTankDamage[client] > 0)
+        if (g_iTankBoardDamage[client] > 0)
             return true;
     }
     return false;
@@ -2964,24 +3000,24 @@ void BuildTankDamageText(int client, char[] output, int size)
 {
     if (!HasAnyTankDamage())
     {
-        FormatEx(output, size, "%T", g_bAliveTank ? "L4D2ScriptedHUD_TankDmgEmpty" : "L4D2ScriptedHUD_TankDmgNone", client);
+        FormatEx(output, size, "%T", "L4D2ScriptedHUD_TankDmgEmpty", client);
         return;
     }
 
-    FormatEx(output, size, "%T", g_bTankBoardFrozen ? "L4D2ScriptedHUD_TankDmgDead" : "L4D2ScriptedHUD_TankDmgHeader", client);
+    FormatEx(output, size, "%T", "L4D2ScriptedHUD_TankDmgDead", client);
 
     int topClients[4];
     int topDamage[4];
     for (int target = 1; target <= MaxClients; target++)
     {
-        if (g_iTankDamage[target] <= 0)
+        if (g_iTankBoardDamage[target] <= 0)
             continue;
         if (!IsClientInGame(target) && !IsClientConnected(target))
             continue;
 
         for (int slot = 0; slot < 4; slot++)
         {
-            if (g_iTankDamage[target] > topDamage[slot])
+            if (g_iTankBoardDamage[target] > topDamage[slot])
             {
                 for (int shift = 3; shift > slot; shift--)
                 {
@@ -2989,13 +3025,13 @@ void BuildTankDamageText(int client, char[] output, int size)
                     topDamage[shift] = topDamage[shift - 1];
                 }
                 topClients[slot] = target;
-                topDamage[slot] = g_iTankDamage[target];
+                topDamage[slot] = g_iTankBoardDamage[target];
                 break;
             }
         }
     }
 
-    int maxHP = g_iTankMaxHealth;
+    int maxHP = g_iTankBoardMaxHealth;
     for (int slot = 0; slot < 4; slot++)
     {
         if (topClients[slot] == 0)
@@ -3203,25 +3239,6 @@ void BuildRoundStatusText(int client, char[] output, int size)
     char clock[16];
     FormatEx(clock, sizeof(clock), "%d:%02d", elapsed / 60, elapsed % 60);
     FormatEx(output, size, "%T", "L4D2ScriptedHUD_RoundTimer", client, clock);
-
-    if (g_bPanicActive || (g_fPanicUntil > 0.0 && GetGameTime() < g_fPanicUntil))
-    {
-        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeActive", client);
-        return;
-    }
-
-    float remaining = -1.0;
-    if (GetFeatureStatus(FeatureType_Native, "L4D2_CTimerGetRemainingTime") == FeatureStatus_Available
-        && GetFeatureStatus(FeatureType_Native, "L4D2_CTimerHasStarted") == FeatureStatus_Available)
-    {
-        if (L4D2_CTimerHasStarted(L4D2CT_MobSpawnTimer) && !L4D2_CTimerIsElapsed(L4D2CT_MobSpawnTimer))
-            remaining = L4D2_CTimerGetRemainingTime(L4D2CT_MobSpawnTimer);
-    }
-
-    if (remaining >= 0.0 && remaining < 180.0)
-        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeSoon", client, RoundToCeil(remaining));
-    else
-        Format(output, size, "%s\n%T", output, "L4D2ScriptedHUD_HordeIdle", client);
 }
 
 void BuildWitchWarnText(int client, char[] output, int size)
@@ -3606,7 +3623,10 @@ void ResetHUDPrefsClient(int client)
     g_sClientHUDLang[client][0] = '\0';
     g_iClientSpecialKills[client] = 0;
     g_iClientCommonKills[client] = 0;
-    g_iTankDamage[client] = 0;
+    ResetTankDamageStats(client);
+    for (int tank = 1; tank <= MaxClients; tank++)
+        g_iTankDamage[tank][client] = 0;
+    g_iTankBoardDamage[client] = 0;
     g_fClientBhopPeak[client] = 0.0;
     g_fClientGroundedSince[client] = 0.0;
     g_iHUDMenuSlot[client] = HUD3;
