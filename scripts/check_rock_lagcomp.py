@@ -59,7 +59,7 @@ enum { WEAPONTYPE_PISTOL=1, WEAPONTYPE_SMG, WEAPONTYPE_RIFLE,
 constexpr int Frame_DetonateRock=0, DMG_BULLET=2, DMG_BUCKSHOT=0x20000000;
 struct Cvar { float FloatValue=0; bool BoolValue=true; };
 Cvar lag{0,true}, unlag{0.35f}, fallback{1.7f}, nativeShotgun{0,true},
-    releaseTime{0.25f}, minRange{1}, maxRange{2000},
+    releaseTime{0.15f}, minRange{1}, maxRange{2000},
     hitbox{0,true}, print{0,false};
 Cvar *g_cvRockLagComp=&lag, *g_cvMaxUnlag=&unlag,
     *g_cvRockGodframes=&fallback, *g_cvNativeShotgun=&nativeShotgun,
@@ -153,21 +153,22 @@ int main() {
     fake[3]=true;
     releaseRock(3,0,origin,{800,0,0});
     assert(ROCK_HEALTH==100);
-    assert(!IsRockDamageAllowed(0,10.249f));
-    assert(IsRockDamageAllowed(0,10.251f));
+    assert(!IsRockDamageAllowed(0,10.149f));
+    assert(IsRockDamageAllowed(0,10.151f));
     assert(!IsRockDamageAllowed(0,8));
     // Server protection expired, but the historical shot is still protected.
-    now=10.4f; assert(!IsRockDamageAllowed(0,now-0.2f));
-    releaseTime.FloatValue=0.35f;
-    assert(near(g_aRockEntities.Get(0,BLOCK_PROTECTED_UNTIL),10.25f));
+    now=10.3f; assert(!IsRockDamageAllowed(0,now-0.2f));
+    releaseTime.FloatValue=0.25f;
+    assert(near(g_aRockEntities.Get(0,BLOCK_PROTECTED_UNTIL),10.15f));
     // Player and AI Tanks receive the same duration captured at release.
     now=10; releaseRock(4,0,origin,{1000,0,0});
-    assert(near(g_aRockEntities.Get(0,BLOCK_PROTECTED_UNTIL),10.35f));
-    float durations[]={0.15f,0.2f,0.25f,0.3f,0.35f,0.35f};
+    assert(near(g_aRockEntities.Get(0,BLOCK_PROTECTED_UNTIL),10.25f));
+    float durations[]={0.0f,0.05f,0.10f,0.15f,0.20f,0.25f};
     for(float duration:durations) {
         releaseTime.FloatValue=duration;
         releaseRock(3,0,origin,{800,0,0});
         assert(!IsRockDamageAllowed(0,10+duration-0.001f));
+        assert(IsRockDamageAllowed(0,10+duration));
         assert(IsRockDamageAllowed(0,10+duration+0.001f));
     }
     g_aRockEntities.Set(0,-1,BLOCK_RELEASE_TIME);
@@ -213,7 +214,7 @@ int main() {
     config = (ROOT / "addons/sourcemod/configs/AnneHappy/dynamic_ai_difficulty.cfg").read_text()
     tiers = re.findall(r'"level\d"\s*\{([^{}]*)\}', config)
     assert len(tiers) == 6
-    for tier, duration in zip(tiers, [0.15, 0.20, 0.25, 0.30, 0.35, 0.35]):
+    for tier, duration in zip(tiers, [0, 0.05, 0.10, 0.15, 0.20, 0.25]):
         pairs = re.findall(r'"([^"\n]+)"\s*"([^"\n]+)"', tier)
         values = dict(pairs)
         assert len(pairs) == len(values), "duplicate tier cvar"

@@ -100,4 +100,8 @@
 	{
 		"en"		"{lightgreen}Sneaky Tank{olive}[{green}On{olive}]"
 	}
+	"Text_ArchivedAiPreset"
+	{
+		"en"		"{lightgreen}Historical AI preset"
+	}
 }

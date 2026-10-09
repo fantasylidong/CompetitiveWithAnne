@@ -7,6 +7,7 @@
 #include <sdkhooks>
 #include <left4dhooks>
 #include <SteamWorks>
+#include <anne_ai_version>
 #define IsValidClient(%1)		(1 <= %1 <= MaxClients && IsClientInGame(%1))
 
 //#include <smlib>
@@ -220,7 +221,10 @@ void PrintInfoToClient(int client)
 	line1[0] = '\0';
 	line3[0] = '\0';
 
-	if(g_hCvarTankBhop != null)
+	bool archivedAi = AnneAI_IsArchivedVersion();
+	if(archivedAi)
+		FormatEx(line1, sizeof(line1), "%t", "Text_ArchivedAiPreset");
+	else if(g_hCvarTankBhop != null)
 		FormatEx(line1, sizeof(line1), "%t", TankBhop > 0 ? "Text_TankBhopOn" : "Text_TankBhopOff");
 
 	strcopy(weaponName, sizeof(weaponName), Weapon > 1 ? "Anne+" : (Weapon > 0 ? "Zone" : "Anne"));
@@ -260,17 +264,20 @@ void PrintInfoToClient(int client)
 		AppendChatPart(line3, sizeof(line3), part);
 	}
 
-	ConVar tankConsume = FindConVar("ai_TankConsume");
-	ConVar tankSneakTime = FindConVar("ai_TankSneakTime");
-	if(tankConsume != null && GetConVarInt(tankConsume) > 0)
+	if(!archivedAi)
 	{
-		FormatEx(part, sizeof(part), "%t", "Text_TankConsumeOn");
-		AppendChatPart(line3, sizeof(line3), part);
-	}
-	else if(tankSneakTime != null && GetConVarFloat(tankSneakTime) > 0.0)
-	{
-		FormatEx(part, sizeof(part), "%t", "Text_SneakyTankOn");
-		AppendChatPart(line3, sizeof(line3), part);
+		ConVar tankConsume = FindConVar("ai_TankConsume");
+		ConVar tankSneakTime = FindConVar("ai_TankSneakTime");
+		if(tankConsume != null && GetConVarInt(tankConsume) > 0)
+		{
+			FormatEx(part, sizeof(part), "%t", "Text_TankConsumeOn");
+			AppendChatPart(line3, sizeof(line3), part);
+		}
+		else if(tankSneakTime != null && GetConVarFloat(tankSneakTime) > 0.0)
+		{
+			FormatEx(part, sizeof(part), "%t", "Text_SneakyTankOn");
+			AppendChatPart(line3, sizeof(line3), part);
+		}
 	}
 
 	CPrintToChat(client, "%s", line1);
@@ -305,30 +312,7 @@ void PrintTraitorStatus(int client = 0, bool all = true)
 
 bool AnneVersionSupportsTraitor()
 {
-	if(g_hCvarPluginVersion == null)
-		return false;
-
-	char version[32];
-	g_hCvarPluginVersion.GetString(version, sizeof(version));
-	TrimString(version);
-	if(StrEqual(version, "Latest", false))
-		return true;
-
-	ReplaceString(version, sizeof(version), ".", "-");
-	ReplaceString(version, sizeof(version), "/", "-");
-
-	char parts[3][12];
-	if(ExplodeString(version, "-", parts, sizeof(parts), sizeof(parts[])) < 2)
-		return false;
-
-	int year = StringToInt(parts[0]);
-	int month = StringToInt(parts[1]);
-	if(year > 0 && year < 100)
-		year += 2000;
-	if(month < 1 || month > 12)
-		return false;
-
-	return year > 2026 || (year == 2026 && month >= 7);
+	return AnneAI_GetVersionMonth() >= 202607;
 }
 
 void RefreshDynamicAiCvars()
@@ -345,6 +329,9 @@ void RefreshDynamicAiCvars()
 
 bool BuildAiDifficultyText(int langClient, char[] buffer, int maxlen)
 {
+	if(!AnneAI_IsDynamicDifficultyAvailable())
+		return false;
+
 	RefreshDynamicAiCvars();
 
 	if(g_hCvarAiCurrentLevel == null)

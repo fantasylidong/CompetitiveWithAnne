@@ -32,6 +32,15 @@ Treat the following as a behavioral contract when changing `infected_control`:
 
 ## Infected control version rollover
 
+新增 Anne 年月版本、推进当前版本、归档或恢复旧版刷特与 AI，或修改 Anne
+版本切换时，必须先阅读并遵循
+[$anne-version-rollover](/Volumes/data/AI/codex/skills/anne-version-rollover/SKILL.md)。
+其他环境从 `$CODEX_HOME/skills/anne-version-rollover/SKILL.md`（默认
+`~/.codex/skills/anne-version-rollover/SKILL.md`）定位该 Skill。
+该流程包含 Git 版本取证、旧版刷特源码隔离、AI 私有参数固化、缺失源码的
+SMX 兼容入口、引擎参数恢复、菜单/UI 同步及编译验证。普通调参不自动升版；
+线上更新另遵循 `anne-server-updating`。
+
 The active `infected_control.smx` release is 2026-08. The rollback release
 `infected_control26-07.smx` preserves the 2026-07 spawning behavior. Its
 database quota integration may use the current optional `anne_traitor_quota`

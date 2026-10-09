@@ -44,4 +44,16 @@
 	{
 		"zho"		"[{olive}vote{default}] {blue}%N {default}發起投票封鎖 {blue} %N 一天"
 	}
+	"Vote_ArchivedAiPreset"
+	{
+		"zho"		"[{olive}vote{default}] {red}本版本使用歷史AI預設，不支援AI參數投票。"
+	}
+	"Vote_DynamicAiUnavailable"
+	{
+		"zho"		"[{olive}vote{default}] {red}本版本未啟用動態AI難度。"
+	}
+	"Vote_AiSettingsChanged"
+	{
+		"zho"		"[{olive}vote{default}] {red}AI可用狀態或Anne版本已變化，本次投票已取消。"
+	}
 }

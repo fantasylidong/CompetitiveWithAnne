@@ -44,4 +44,16 @@
 	{
 		"jp"		"[{olive}vote{default}] {blue}%N {default} は、いつか {blue} %N を禁止する投票を開始します"
 	}
+	"Vote_ArchivedAiPreset"
+	{
+		"jp"		"[{olive}vote{default}] {red}このバージョンでは旧AIプリセットを使用するため、AIパラメータ変更の投票は利用できません。"
+	}
+	"Vote_DynamicAiUnavailable"
+	{
+		"jp"		"[{olive}vote{default}] {red}このバージョンでは動的AI難易度を利用できません。"
+	}
+	"Vote_AiSettingsChanged"
+	{
+		"jp"		"[{olive}vote{default}] {red}AIの利用状況またはAnneバージョンが変わったため、この投票はキャンセルされました。"
+	}
 }

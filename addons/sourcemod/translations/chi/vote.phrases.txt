@@ -44,4 +44,16 @@
 	{
 		"chi"		"[{olive}vote{default}] {blue}%N {default}发起投票封禁 {blue} %N 一天"
 	}
+	"Vote_ArchivedAiPreset"
+	{
+		"chi"		"[{olive}vote{default}] {red}本版本使用历史AI预设，不支持AI参数投票。"
+	}
+	"Vote_DynamicAiUnavailable"
+	{
+		"chi"		"[{olive}vote{default}] {red}本版本未启用动态AI难度。"
+	}
+	"Vote_AiSettingsChanged"
+	{
+		"chi"		"[{olive}vote{default}] {red}AI可用状态或Anne版本已变化，本次投票已取消。"
+	}
 }

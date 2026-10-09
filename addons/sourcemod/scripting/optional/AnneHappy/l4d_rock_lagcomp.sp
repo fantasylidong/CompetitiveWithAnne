@@ -47,7 +47,7 @@ public Plugin myinfo =
 	name = "L4D(2) Tank Rock Lag Compensation",
 	author = "Luckylockm, harry, Silvers, AnneHappy",
 	description = "Provides lag compensation and weapon-attribute damage handling for tank rocks",
-	version = "2.2-anne",
+	version = "2.2.1-anne",
 	url = "https://github.com/LuckyServ/"
 };
 
@@ -58,7 +58,7 @@ public void OnPluginStart()
 	g_cvRockHitbox = CreateConVar("sm_rock_hitbox", "1", "Toggle custom rock hitbox and damage handling", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockLagComp = CreateConVar("sm_rock_lagcomp", "1", "Toggle lag compensation for hitscan rock shots", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockGodframes = CreateConVar("sm_rock_godframes", "1.7", "Fallback protection seconds from rock creation if tank rock release is not seen", FCVAR_NONE, true, 0.0, true, 10.0);
-	g_cvRockReleaseGodframes = CreateConVar("sm_rock_release_godframes", "0.25", "Rock protection seconds after actual release; 0 allows immediate damage", FCVAR_NONE, true, 0.0, true, 10.0);
+	g_cvRockReleaseGodframes = CreateConVar("sm_rock_release_godframes", "0.15", "Rock protection seconds after actual release; 0 allows immediate damage", FCVAR_NONE, true, 0.0, true, 10.0);
 	g_cvRockGodframesRender = CreateConVar("sm_rock_godframes_render", "1", "Toggle visual feedback while a rock is protected", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvRockHitboxRadius = CreateConVar("sm_rock_hitbox_radius", "30", "Custom rock hitbox radius", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMinAll = CreateConVar("sm_rock_range_min_all", "1", "Global minimum distance for hitscan rock damage", FCVAR_NONE, true, 0.0, true, 10000.0);

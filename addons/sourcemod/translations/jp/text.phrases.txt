@@ -100,4 +100,8 @@
 	{
 		"jp"		"{lightgreen}狡猾Tank{olive}[{green}オン{olive}]"
 	}
+	"Text_ArchivedAiPreset"
+	{
+		"jp"		"{lightgreen}旧AIプリセット"
+	}
 }

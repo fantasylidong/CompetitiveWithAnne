@@ -5,6 +5,7 @@
 #include <builtinvotes>
 #include <left4dhooks>
 #include <colors>
+#include <anne_ai_version>
 #undef REQUIRE_PLUGIN
 #include <confogl>
 #include <sourcebanspp>
@@ -67,6 +68,9 @@ int
 	kickclient;
 
 Handle g_hDefaultVoteFileTimer = null;
+ConVar g_hAnneVersion = null;
+int g_iAnneVersionRevision;
+int g_iVoteAiVersionRevision;
 
 
 
@@ -214,6 +218,8 @@ void DisplayBuiltinVoteMenu(int client)
 	{
 		do {
 			KvGetSectionName(g_hCfgsKV, sBuffer, sizeof(sBuffer));
+			if (!AnneAI_IsDynamicDifficultyAvailable() && IsDynamicAiVoteCategory())
+				continue;
 			AddMenuItem(hMenu, sBuffer, sBuffer, ITEMDRAW_DEFAULT);
 		} while (KvGotoNextKey(g_hCfgsKV, true));
 	}
@@ -237,13 +243,23 @@ bool DisplayBuiltinVoteCommandMenu(int client, const char[] category)
 		do {
 			KvGetSectionName(g_hCfgsKV, sInfo,  sizeof(sInfo));
 			KvGetString(g_hCfgsKV, "message", sBuffer, sizeof(sBuffer), "");
+			if (IsDynamicAiVoteCommand(sInfo) && !AnneAI_IsDynamicDifficultyAvailable())
+				continue;
 			int itemStyle = ITEMDRAW_DEFAULT;
-			if (L4D_HasAnySurvivorLeftSafeArea() && IsRestartMapVoteCommand(sInfo))
+			if ((AnneAI_IsArchivedVersion() && IsAiVoteCommand(sInfo))
+				|| (L4D_HasAnySurvivorLeftSafeArea() && IsRestartMapVoteCommand(sInfo)))
 			{
 				itemStyle = ITEMDRAW_DISABLED;
 			}
 			AddMenuItem(hMenu, sInfo, sBuffer, itemStyle);
 		} while (KvGotoNextKey(g_hCfgsKV, true));
+		if (GetMenuItemCount(hMenu) == 0)
+		{
+			CloseHandle(hMenu);
+			CPrintToChat(client, "%t", "Vote_DynamicAiUnavailable");
+			ShowVoteMenu(client);
+			return true;
+		}
 		DisplayMenu(hMenu, client, 20);
 		return true;
 	}
@@ -310,12 +326,11 @@ bool ShouldOfferLobbyUnreserveVote()
 
 void HandleVoteCommandSelected(int client, const char[] command, const char[] message)
 {
-	strcopy(g_sCfg, sizeof(g_sCfg), command);
 	if (IsSpawnVoteMenuCommand(command))
 	{
 		FakeClientCommand(client, command);
 	}
-	else if (!StrEqual(g_sCfg, "sm_votekick", true))
+	else if (!StrEqual(command, "sm_votekick", true))
 	{
 		if (StartVote(client, message, command))
 		{
@@ -402,8 +417,86 @@ bool IsRestartMapVoteCommand(const char[] command)
 	return StrEqual(sCommand, "sm_restartmap", false);
 }
 
+bool IsDynamicAiVoteCommand(const char[] command)
+{
+	char name[64];
+	BreakString(command, name, sizeof(name));
+	return StrEqual(name, "sm_aidiff", false) || StrEqual(name, "sm_aidiff_reload", false);
+}
+
+bool IsAiVoteCommand(const char[] command)
+{
+	if (IsDynamicAiVoteCommand(command))
+		return true;
+
+	char name[64];
+	char target[128];
+	int next = BreakString(command, name, sizeof(name));
+	if (StrContains(name, "ai_", false) == 0)
+		return true;
+	if (next == -1)
+		return false;
+	BreakString(command[next], target, sizeof(target));
+	if (StrEqual(name, "sm_cvar", false))
+		return StrContains(target, "ai_", false) == 0
+			|| StrContains(target, "ah_ai_dynamic_", false) == 0;
+	return StrEqual(name, "exec", false)
+		&& (StrEqual(target, "vote/Consume_on.cfg", false)
+			|| StrEqual(target, "vote/Consume_off.cfg", false));
+}
+
+// Called while the vote KV cursor is on a category; restore it before returning.
+bool IsDynamicAiVoteCategory()
+{
+	if (!KvGotoFirstSubKey(g_hCfgsKV, true))
+		return false;
+	bool dynamicOnly = true;
+	char command[128];
+	do {
+		KvGetSectionName(g_hCfgsKV, command, sizeof(command));
+		if (!IsDynamicAiVoteCommand(command))
+			dynamicOnly = false;
+	} while (KvGotoNextKey(g_hCfgsKV, true));
+	KvGoBack(g_hCfgsKV);
+	return dynamicOnly;
+}
+
+bool IsAiVoteAllowed(const char[] command, int client = 0)
+{
+	if (AnneAI_IsArchivedVersion() && IsAiVoteCommand(command))
+	{
+		if (client > 0)
+			CPrintToChat(client, "%t", "Vote_ArchivedAiPreset");
+		return false;
+	}
+	if (IsDynamicAiVoteCommand(command) && !AnneAI_IsDynamicDifficultyAvailable())
+	{
+		if (client > 0)
+			CPrintToChat(client, "%t", "Vote_DynamicAiUnavailable");
+		return false;
+	}
+	return true;
+}
+
+void RefreshAnneVersionHook()
+{
+	if (g_hAnneVersion != null)
+		return;
+	g_hAnneVersion = FindConVar("AnnePluginVersion");
+	if (g_hAnneVersion != null)
+		g_hAnneVersion.AddChangeHook(OnAnneVersionChanged);
+}
+
+void OnAnneVersionChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	g_iAnneVersionRevision++;
+}
+
 bool StartVote(int client, const char[] cfgname, const char[] command)
 {
+	if (!IsAiVoteAllowed(command, client))
+		return false;
+
 	if (L4D_HasAnySurvivorLeftSafeArea() && IsRestartMapVoteCommand(command))
 	{
 		CPrintToChat(client, "%t", "Vote_CannotVoteResetCurrentMap");
@@ -413,7 +506,9 @@ bool StartVote(int client, const char[] cfgname, const char[] command)
 	if (!IsBuiltinVoteInProgress())
 	{
 		char sBuffer[64];
+		RefreshAnneVersionHook();
 		strcopy(g_sCfg, sizeof(g_sCfg), command);
+		g_iVoteAiVersionRevision = g_iAnneVersionRevision;
 		g_hVote = CreateBuiltinVote(VoteActionHandler, BuiltinVoteType_Custom_YesNo, BuiltinVoteAction_Cancel | BuiltinVoteAction_VoteEnd | BuiltinVoteAction_End);
 		Format(sBuffer, 64, "执行 '%s' ?", cfgname);
 		SetBuiltinVoteArgument(g_hVote, sBuffer);
@@ -454,6 +549,13 @@ public void VoteResultHandler(Handle vote, int num_votes, int num_clients, const
 			{
 				if (g_hVote == vote)
 				{
+					if (!IsAiVoteAllowed(g_sCfg)
+						|| (IsAiVoteCommand(g_sCfg) && g_iVoteAiVersionRevision != g_iAnneVersionRevision))
+					{
+						DisplayBuiltinVoteFail(vote, BuiltinVoteFail_Loses);
+						CPrintToChatAll("%t", "Vote_AiSettingsChanged");
+						return;
+					}
 					DisplayBuiltinVotePass(vote, "文件正在加载...");
 					ServerCommand("%s", g_sCfg);
 					return;

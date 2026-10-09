@@ -19,7 +19,7 @@
 #define TEAM_SPECTATOR 1
 #define TEAM_SURVIVOR 2
 #define TEAM_INFECTED 3
-#define ENTITY_SAFE_LIMIT 2000
+#define ENTITY_SAFE_LIMIT 1800
 
 ConVar g_hItemHintCoolDown, g_hSpotMarkCoolDown, g_hInfectedMarkCoolDown,
 	g_hItemUseHintRange, g_hItemUseSound, g_hItemAnnounceType, g_hItemGlowTimer, g_hItemGlowRange, g_hItemCvarColor,
@@ -51,6 +51,7 @@ Handle    g_hUseEntity;
 StringMap g_smModelToName;
 StringMap g_smModelHeight;
 bool g_bMapStarted;
+bool g_bRoundEnding;
 
 enum EHintType {
 	eItemHint,
@@ -63,7 +64,7 @@ public Plugin myinfo =
 	name        = "L4D2 Item hint",
 	author      = "BHaType, fdxx, HarryPotter",
 	description = "When using 'Look' in vocalize menu, print corresponding item to chat area and make item glow or create spot marker/infeced maker like back 4 blood.",
-	version     = "2.0",
+	version     = "2.0.1",
 	url         = "https://forums.alliedmods.net/showpost.php?p=2765332&postcount=30"
 };
 
@@ -422,6 +423,7 @@ void CreateStringMap()
 int g_iFieldModelIndex;
 public void OnMapStart()
 {
+	g_bRoundEnding = false;
 	g_bMapStarted = true;
 	if (strlen(g_sItemUseSound) > 0) PrecacheSound(g_sItemUseSound);
 	if (strlen(g_sSpotMarkUseSound) > 0) PrecacheSound(g_sSpotMarkUseSound);
@@ -433,6 +435,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+	g_bRoundEnding = true;
 	g_bMapStarted = false;
 	RemoveAllGlow_Timer();
 }
@@ -460,11 +463,13 @@ public void OnWeaponEquipPost(int client, int weapon)
 
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+	g_bRoundEnding = false;
 	Clear();
 }
 
 public void Event_Round_End(Event event, const char[] name, bool dontBroadcast)
 {
+	g_bRoundEnding = true;
 	RemoveAllGlow_Timer();
 	RemoveAllSpotMark();
 }
@@ -742,13 +747,13 @@ void RemoveAllGlow_Timer()
 void RemoveAllSpotMark()
 {
     int entity;
-    char targetname[16];
+    char targetname[64];
 
     entity = INVALID_ENT_REFERENCE;
     while ((entity = FindEntityByClassname(entity, CLASSNAME_INFO_TARGET)) != INVALID_ENT_REFERENCE)
     {
         GetEntPropString(entity, Prop_Data, "m_iName", targetname, sizeof(targetname));
-        if (StrEqual(targetname, "l4d_mark_hint"))
+        if (IsSpotMarkerName(targetname))
             AcceptEntityInput(entity, "Kill");
     }
 
@@ -756,9 +761,22 @@ void RemoveAllSpotMark()
     while ((entity = FindEntityByClassname(entity, CLASSNAME_ENV_SPRITE)) != INVALID_ENT_REFERENCE)
     {
         GetEntPropString(entity, Prop_Data, "m_iName", targetname, sizeof(targetname));
-        if (StrEqual(targetname, "l4d_mark_hint"))
+        if (IsSpotMarkerName(targetname))
             AcceptEntityInput(entity, "Kill");
     }
+}
+
+bool IsSpotMarkerName(const char[] name)
+{
+    if (strncmp(name, "l4d_mark_hint-", 14) != 0)
+        return false;
+    int client;
+    int digits = StringToIntEx(name[14], client);
+    if (digits == 0 || digits != strlen(name[14]) || client < 1 || client > MAXPLAYERS)
+        return false;
+    char expected[32];
+    FormatEx(expected, sizeof(expected), "l4d_mark_hint-%02i", client);
+    return StrEqual(name, expected);
 }
 
 bool IsValidEntityIndex(int entity)
@@ -771,7 +789,7 @@ void CreateEntityModelGlow(int iEntity, const char[] sEntModelName)
 	if (g_iItemCvarColor == 0) return; //no glow
 		
 	// Spawn dynamic prop entity
-	int entity = CreateEntityByName("prop_dynamic_override");
+	int entity = CreateHintEntity("prop_dynamic_override");
 	if( !CheckIfEntityMax(entity) ) return;
 	
 	// Delete previous glow first
@@ -828,7 +846,7 @@ bool CreateInfectedMarker(int client, int infected, bool bIsWitch = false)
 		
 	// Spawn dynamic prop entity
 	int entity = -1;
-	entity = CreateEntityByName("prop_dynamic_ornament");
+	entity = CreateHintEntity("prop_dynamic_ornament");
 	
 	if( !CheckIfEntityMax(entity) ) return false;
 
@@ -1017,7 +1035,7 @@ void CreateSpotMarker(int client, int clientAim = 0, bool bIsAimInfeced)
 
 	if ( strlen(g_sSpotMarkSpriteModel) == 0 ) return; //disable spot marker info target
 
-	int infoTarget = CreateEntityByName(CLASSNAME_INFO_TARGET);
+	int infoTarget = CreateHintEntity(CLASSNAME_INFO_TARGET, 2);
 	if( CheckIfEntityMax(infoTarget) )
 	{
 		DispatchKeyValue(infoTarget, "targetname", targetname);
@@ -1032,7 +1050,7 @@ void CreateSpotMarker(int client, int clientAim = 0, bool bIsAimInfeced)
 		AcceptEntityInput(infoTarget, "AddOutput");
 		AcceptEntityInput(infoTarget, "FireUser1");
 
-		int sprite       = CreateEntityByName(CLASSNAME_ENV_SPRITE);
+		int sprite       = CreateHintEntity(CLASSNAME_ENV_SPRITE);
 		if( CheckIfEntityMax(sprite) )
 		{
 			DispatchKeyValue(sprite, "targetname", targetname);
@@ -1059,6 +1077,10 @@ void CreateSpotMarker(int client, int clientAim = 0, bool bIsAimInfeced)
 			AcceptEntityInput(sprite, "FireUser1");
 			
 			CreateTimer(0.1, TimerMoveSprite, EntIndexToEntRef(sprite), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		}
+		else
+		{
+			RemoveEntity(infoTarget);
 		}
 	}
 	NotifyMessage(client, "", view_as<EHintType>(eSpotMarker));
@@ -1326,16 +1348,30 @@ public Action Hook_SetTransmit(int entity, int client)
 	return Plugin_Continue;
 }
 
+int CreateHintEntity(const char[] classname, int needed = 1)
+{
+    if (g_bRoundEnding)
+        return -1;
+    int used;
+    int limit = GetMaxEntities();
+    for (int entity = 0; entity < limit; entity++)
+        if (IsValidEdict(entity))
+            used++;
+    if (used + needed > ENTITY_SAFE_LIMIT)
+        return -1;
+    return CreateEntityByName(classname);
+}
+
 bool CheckIfEntityMax(int entity)
 {
-	if(entity == -1) return false;
-
-	if(	entity > ENTITY_SAFE_LIMIT)
-	{
-		AcceptEntityInput(entity, "Kill");
-		return false;
-	}
-	return true;
+    if (entity == -1)
+        return false;
+    if (entity >= MAXENTITIES)
+    {
+        RemoveEntity(entity);
+        return false;
+    }
+    return true;
 }
 
 // by BHaType: https://forums.alliedmods.net/showthread.php?p=2709810#post2709810
@@ -1367,7 +1403,7 @@ void CreateInstructorHint(int client, const float vOrigin[3], const char[] sItem
 
 bool Create_info_target(int iEntity, const float vOrigin[3], const char[] sTargetName, float duration)
 {
-	int entity = CreateEntityByName(CLASSNAME_INFO_TARGET);
+	int entity = CreateHintEntity(CLASSNAME_INFO_TARGET, 2);
 	if (!CheckIfEntityMax(entity)) return false;
 	
 	DispatchKeyValue(entity, "targetname", sTargetName);
@@ -1403,7 +1439,7 @@ bool Create_info_target(int iEntity, const float vOrigin[3], const char[] sTarge
 
 void Create_env_instructor_hint(int iEntity, EHintType eType, const float vOrigin[3], const char[] sTargetName, const char[] icon_name, const char[] caption, const char[] hint_color, float duration, float range)
 {
-	int entity = CreateEntityByName("env_instructor_hint");
+	int entity = CreateHintEntity("env_instructor_hint");
 	if (!CheckIfEntityMax(entity)) return;
 
 	char sDuration[4];

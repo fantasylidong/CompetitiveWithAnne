@@ -100,4 +100,8 @@
 	{
 		"chi"		"{lightgreen}狡猾坦克{olive}[{green}开启{olive}]"
 	}
+	"Text_ArchivedAiPreset"
+	{
+		"chi"		"{lightgreen}历史AI预设"
+	}
 }

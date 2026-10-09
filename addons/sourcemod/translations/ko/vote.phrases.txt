@@ -44,4 +44,16 @@
 	{
 		"ko"		"[{olive}vote{default}] {blue}%N {default}는 언젠가 {blue} %N를 금지하는 투표를 시작합니다."
 	}
+	"Vote_ArchivedAiPreset"
+	{
+		"ko"		"[{olive}vote{default}] {red}이 버전은 과거 AI 프리셋을 사용하므로 AI 매개변수 변경 투표를 지원하지 않습니다."
+	}
+	"Vote_DynamicAiUnavailable"
+	{
+		"ko"		"[{olive}vote{default}] {red}이 버전에서는 동적 AI 난이도를 사용할 수 없습니다."
+	}
+	"Vote_AiSettingsChanged"
+	{
+		"ko"		"[{olive}vote{default}] {red}AI 사용 상태 또는 Anne 버전이 변경되어 이번 투표가 취소되었습니다."
+	}
 }

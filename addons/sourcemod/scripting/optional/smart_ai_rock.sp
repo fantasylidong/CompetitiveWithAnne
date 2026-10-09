@@ -4,7 +4,7 @@
 #include <sourcemod>
 #include <left4dhooks>
 
-#define PLUGIN_VERSION "2.0"
+#define PLUGIN_VERSION "2.1"
 
 public Plugin myinfo = 
 {
@@ -85,7 +85,7 @@ CountdownTimer CThrow__GetThrowTimer(int ability)
  * Smart AI Rock
  *  by CanadaRox
  */
-/*public Action L4D2_OnSelectTankAttack(int client, int &sequence)
+public Action L4D2_OnSelectTankAttack(int client, int &sequence)
 {
 	if (L4D_IsEngineLeft4Dead2() && IsFakeClient(client) && sequence == 50)
 	{
@@ -93,4 +93,4 @@ CountdownTimer CThrow__GetThrowTimer(int ability)
 		return Plugin_Handled;
 	}
 	return Plugin_Continue;
-}*/
+}

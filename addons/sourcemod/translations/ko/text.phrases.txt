@@ -100,4 +100,8 @@
 	{
 		"ko"		"{lightgreen}교활한 Tank{olive}[{green}켜짐{olive}]"
 	}
+	"Text_ArchivedAiPreset"
+	{
+		"ko"		"{lightgreen}과거 AI 프리셋"
+	}
 }

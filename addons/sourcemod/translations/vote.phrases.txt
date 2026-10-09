@@ -44,4 +44,16 @@
 	{
 		"en"		"[{olive}vote{default}] {blue}%N {default} initiates a vote to ban {blue} %N one day"
 	}
+	"Vote_ArchivedAiPreset"
+	{
+		"en"		"[{olive}vote{default}] {red}This version uses a historical AI preset; AI parameter votes are unavailable."
+	}
+	"Vote_DynamicAiUnavailable"
+	{
+		"en"		"[{olive}vote{default}] {red}Dynamic AI difficulty is unavailable in this version."
+	}
+	"Vote_AiSettingsChanged"
+	{
+		"en"		"[{olive}vote{default}] {red}AI availability or the Anne version changed; this vote was canceled."
+	}
 }

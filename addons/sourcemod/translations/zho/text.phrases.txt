@@ -100,4 +100,8 @@
 	{
 		"zho"		"{lightgreen}狡猾坦克{olive}[{green}開啟{olive}]"
 	}
+	"Text_ArchivedAiPreset"
+	{
+		"zho"		"{lightgreen}歷史AI預設"
+	}
 }

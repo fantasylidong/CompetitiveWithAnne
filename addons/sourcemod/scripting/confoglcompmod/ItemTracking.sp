@@ -957,6 +957,7 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
     delete hAllAreas;
     hCandidates.SortCustom(PF_SortByFirstFloat);
 
+    ArrayList hDoors = PF_CollectDoorClearances();
     int iSpawned;
     for (int choice = 0; choice < iMissing * 3 && iSpawned < iMissing; choice++) {
         float fProgress = choice < iMissing
@@ -982,7 +983,7 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
             Address pArea = view_as<Address>(hCandidates.Get(iIndex, 1));
             float fFlow = hCandidates.Get(iIndex, 0);
             float fOrigin[3];
-            if (!PF_FindRouteSpawnSpot(pArea, fOrigin) || PF_NearExistingPill(hSpawns, fOrigin)) {
+            if (!PF_FindRouteSpawnSpot(pArea, hDoors, fOrigin) || PF_NearExistingPill(hSpawns, fOrigin)) {
                 continue;
             }
 
@@ -1014,6 +1015,7 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
     }
 
     delete hCandidates;
+    delete hDoors;
     if (iSpawned < iMissing) {
         LogMessage("[%s] Pill fill: spawned %d of %d missing pills on the main route.", IT_MODULE_NAME, iSpawned, iMissing);
     }
@@ -1026,7 +1028,50 @@ static int PF_SortByFirstFloat(int index1, int index2, Handle array, Handle hndl
     return (a < b) ? -1 : ((a > b) ? 1 : 0);
 }
 
-static bool PF_FindRouteSpawnSpot(Address pArea, float fOut[3])
+// Cache once per fill pass. A circle around each hinge covers either swing direction,
+// even when the door is currently open. The extra 100 units keep pills out of the doorway.
+static ArrayList PF_CollectDoorClearances()
+{
+    ArrayList doors = new ArrayList(5); // world x, y, bottom, top, radius squared
+    static const char classes[][] = {"prop_door_rotating", "prop_door_rotating_checkpoint", "func_door", "func_door_rotating"};
+    for (int kind = 0; kind < sizeof(classes); kind++) {
+        int entity = -1;
+        while ((entity = FindEntityByClassname(entity, classes[kind])) != -1) {
+            float origin[3], mins[3], maxs[3], zone[5];
+            GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", origin);
+            GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+            GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+            float x = FloatAbs(mins[0]) > FloatAbs(maxs[0]) ? FloatAbs(mins[0]) : FloatAbs(maxs[0]);
+            float y = FloatAbs(mins[1]) > FloatAbs(maxs[1]) ? FloatAbs(mins[1]) : FloatAbs(maxs[1]);
+            float radius = SquareRoot(x * x + y * y) + 100.0;
+            zone[0] = origin[0];
+            zone[1] = origin[1];
+            zone[2] = origin[2] + mins[2] - 16.0;
+            zone[3] = origin[2] + maxs[2] + 16.0;
+            zone[4] = radius * radius;
+            doors.PushArray(zone, sizeof(zone));
+        }
+    }
+    return doors;
+}
+
+static bool PF_NearDoor(ArrayList doors, const float point[3])
+{
+    float zone[5];
+    for (int i = 0; i < doors.Length; i++) {
+        doors.GetArray(i, zone, sizeof(zone));
+        if (point[2] < zone[2] || point[2] > zone[3]) {
+            continue;
+        }
+        float dx = point[0] - zone[0], dy = point[1] - zone[1];
+        if (dx * dx + dy * dy <= zone[4]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool PF_FindRouteSpawnSpot(Address pArea, ArrayList hDoors, float fOut[3])
 {
     L4D_FindRandomSpot(view_as<int>(pArea), fOut);
     float fStart[3], fEnd[3];
@@ -1046,6 +1091,9 @@ static bool PF_FindRouteSpawnSpot(Address pArea, float fOut[3])
     }
 
     fOut[2] += 2.0;
+    if (PF_NearDoor(hDoors, fOut)) {
+        return false;
+    }
     if (L4D_GetNearestNavArea(fOut, 80.0, true, false, true, L4D2Team_Survivor) != pArea) {
         return false;
     }

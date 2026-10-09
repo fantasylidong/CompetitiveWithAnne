@@ -1,0 +1,1196 @@
+#pragma semicolon 1
+#pragma newdecls required
+
+// ===== 头文件 =====
+#include <sourcemod>
+#include <sdktools>
+#include <left4dhooks>
+#include <colors>
+
+#include "../include/treeutil.inc"
+
+#include "../include/logger2.inc"
+// 你自己的公共方法、工具函数（判定AI Tank / 可见性 / 贴图等）都在这里
+
+#include "stocks.sp"
+
+// ===== 常量 / 宏 =====
+#define CVAR_FLAGS                 FCVAR_NOTIFY
+#define PLUGIN_PREFIX              "Ai-Tank3"
+#define GAMEDATA                   "anne_ai_25_11_tank3"
+
+#define DEFAULT_THROW_FORCE        800.0
+#define DEFAULT_SV_GRAVITY         800.0
+#define DEFAULT_SWING_RANGE        56.0
+
+#define ROCK_FL_GRAVITY            0.4
+
+#define PLAYER_HEIGHT              72.0
+#define PLAYER_EYE_HEIGHT          62.0
+#define PLAYER_CHEST               52.0
+#define TANK_HEIGHT                84.0
+#define JUMP_HEIGHT                56.0
+
+#define THROW_UNDERHEAD_POS_Z      33.38  // 单手下挥出手高度
+#define THROW_OVERSHOULDER_POS_Z   93.58  // 单手过肩出手高度
+#define THROW_OVERHEAD_POS_Z       104.01 // 双手过头出手高度
+
+#define JUMP_SPEED_Z               300.0  // 跳砖时给的Z轴速度
+
+// ===== ConVar =====
+
+
+
+
+
+ConVar cvTankSwingRange;
+
+// ===== 运行时对象 =====
+StringMap
+    g_hThrowAnimMap,
+    g_hClimbAnimMap,
+    g_hLowClimbAnimMap;
+
+Handle g_hSdkTankClawSweepFist;
+
+bool  g_bLateLoad;
+float g_fTankSwingRange;
+float g_fHeadBlockIgnoreUntil[MAXPLAYERS + 1];
+
+// ===== 结构体 =====
+enum struct AiTank
+{
+    int   target;               // 目标(userId)
+    float lastAirVecModifyTime; // 上次空中速度修正时间
+    float nextAttackTime;       // 下次挥拳时间
+    bool  wasThrowing;          // 是否处于扔石头序列中
+    float lastHopSpeed;         // 上次起跳时的速度（用于空中修正还原）
+    float backFistExpire;       // 通背拳允许窗口到期时间（EngineTime <= 0 未开启）
+    float headBlockStart;       // 头顶卡检测开始时间
+    float forceRockUntil;       // 除卡位者外其他生还都倒地时的强制投石截止时间
+    int   forceRockTarget;      // 除卡位者外其他生还都倒地时的强制投石目标(userId)
+
+    void initData()
+    {
+        this.target = -1;
+        this.lastAirVecModifyTime = 0.0;
+        this.nextAttackTime = 0.0;
+        this.wasThrowing = false;
+        this.lastHopSpeed = 0.0;
+        this.backFistExpire = 0.0;
+        this.headBlockStart = 0.0;
+        this.forceRockUntil = 0.0;
+        this.forceRockTarget = -1;
+    }
+}
+AiTank g_AiTanks[MAXPLAYERS + 1];
+
+Logger log;
+
+// ===== Tank 动画类型（按逻辑分类）=====
+enum TankSequenceType
+{
+    tankSequence_Throw,
+    tankSequence_Climb
+}
+
+// ===== 插件信息 =====
+public Plugin myinfo =
+{
+    name        = "Ai-Tank 3",
+    author      = "夜羽真白",
+    description = "Ai Tank 增强 3.0 版本（含攀爬/梯子分离加速、空速修正、跳砖、通背拳窗口等）",
+    version     = "1.0.0.1",
+    url         = "https://steamcommunity.com/id/saku_ra/"
+};
+
+// ===== 预加载 =====
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+    if (GetEngineVersion() != Engine_Left4Dead2)
+    {
+        strcopy(error, err_max, "本插件仅支持 Left 4 Dead 2");
+        return APLRes_SilentFailure;
+    }
+    g_bLateLoad = late;
+    return APLRes_Success;
+}
+
+// ===== 启动 =====
+public void OnPluginStart()
+{
+    // 总开关
+    
+
+    // 连跳
+    
+    
+    
+    
+    
+    
+    
+    
+
+    // 空速矫正
+    
+    
+    
+
+    // 投石/距离
+    
+    
+
+    // 攀爬动画倍速（翻越）
+    
+    
+
+    // NEW: 梯子攀爬独立倍速
+    
+
+    // 投石目标调整 / 通背拳 / 锁视角 / 跳砖
+    
+    
+    
+    
+    
+    
+    
+
+    // 反头顶卡
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    // 日志
+    
+    char cvName[64];
+    strcopy(cvName, sizeof(cvName), "ai_tank3");
+    FormatEx(cvName, sizeof(cvName), "%s_log_level", cvName);
+    
+
+    // 事件
+    HookEvent("round_start", evtRoundStart);
+    HookEvent("round_end",   evtRoundEnd);
+    HookEvent("player_hurt", evtPlayerHurt, EventHookMode_Post); // 命中刷新通背拳窗口
+
+    // 日志对象
+    log = new Logger(PLUGIN_PREFIX, (32));
+
+    // 初始化动画活动映射
+    initAnimMap();
+
+    // 迟加载：给已在服玩家挂钩
+    if (g_bLateLoad)
+    {
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (!IsValidClient(i)) continue;
+            OnClientPutInServer(i);
+        }
+    }
+}
+
+// ===== 动态链接符 =====
+public void OnAllPluginsLoaded()
+{
+    char path[PLATFORM_MAX_PATH];
+    BuildPath(Path_SM, path, sizeof(path), "gamedata/%s.txt", GAMEDATA);
+    if (!FileExists(path))
+        SetFailState("Missing required gamedata file: %s", path);
+
+    Handle hGamedata = LoadGameConfigFile(GAMEDATA);
+    if (!hGamedata)
+        SetFailState("Failed to load %s gamedata.", GAMEDATA);
+
+    // CTankClaw::SweepFist(start,end)
+    StartPrepSDKCall(SDKCall_Entity);
+    PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTankClaw::SweepFist");
+    PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
+    PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
+    PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+    g_hSdkTankClawSweepFist = EndPrepSDKCall();
+    if (!g_hSdkTankClawSweepFist)
+        SetFailState("Failed to find signature for CTankClaw::SweepFist.");
+    delete hGamedata;
+}
+
+// ===== 读取/监听 CVar =====
+public void OnConfigsExecuted()
+{
+    cvTankSwingRange  = FindConVar("tank_swing_range");
+    g_fTankSwingRange = (!cvTankSwingRange) ? DEFAULT_SWING_RANGE : cvTankSwingRange.FloatValue;
+
+    // FIX: 只有找到 cvar 才能挂 ChangeHook（原版写反了）
+    if (cvTankSwingRange)
+        cvTankSwingRange.AddChangeHook(changeHookTankSwingRange);
+}
+
+void changeHookTankSwingRange(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    g_fTankSwingRange = convar.FloatValue;
+    log.debugAll("tank_swing_range changed to %d", convar.IntValue);
+}
+
+// ===== 结束回收 =====
+public void OnPluginEnd()
+{
+    delete log;
+    delete g_hThrowAnimMap;
+    delete g_hClimbAnimMap;
+    delete g_hLowClimbAnimMap;
+}
+
+// ===== 事件 =====
+void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
+    }
+}
+
+void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        g_AiTanks[i].backFistExpire = 0.0;
+        g_AiTanks[i].headBlockStart = 0.0;
+        g_AiTanks[i].forceRockUntil = 0.0;
+        g_AiTanks[i].forceRockTarget = -1;
+        g_fHeadBlockIgnoreUntil[i] = 0.0;
+    }
+}
+
+// ===== 动画活动映射 =====
+stock void initAnimMap()
+{
+    if (!g_hThrowAnimMap)    g_hThrowAnimMap    = new StringMap();
+    if (!g_hClimbAnimMap)    g_hClimbAnimMap    = new StringMap();
+    if (!g_hLowClimbAnimMap) g_hLowClimbAnimMap = new StringMap();
+
+    // 投石动画（活动名）
+    g_hThrowAnimMap.SetValue("ACT_SIGNAL2", true);
+    g_hThrowAnimMap.SetValue("ACT_SIGNAL3", true);
+    g_hThrowAnimMap.SetValue("ACT_SIGNAL_ADVANCE", true);
+
+    // 高翻越（Valve 复用了一些 DIES* 活动名）
+    g_hClimbAnimMap.SetValue("ACT_DIESIMPLE",  true);
+    g_hClimbAnimMap.SetValue("ACT_DIEBACKWARD",true);
+    g_hClimbAnimMap.SetValue("ACT_DIEFORWARD", true);
+    g_hClimbAnimMap.SetValue("ACT_DIEVIOLENT", true);
+
+    // 低翻越（复用 RANGE_ATTACK* 活动名）
+    g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK1",     true);
+    g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK2",     true);
+    g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK1_LOW", true);
+    g_hLowClimbAnimMap.SetValue("ACT_RANGE_ATTACK2_LOW", true);
+}
+
+// ===== 玩家指令帧 =====
+public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3], float angles[3])
+{
+    if (!true || !isAiTank(client))
+        return Plugin_Continue;
+
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+
+    handleForceRock(client, buttons, pos);
+
+    int target = GetClientOfUserId(g_AiTanks[client].target);
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return Plugin_Continue;
+
+    float targetPos[3];
+    GetClientAbsOrigin(target, targetPos);
+    float dist = GetVectorDistance(pos, targetPos);
+
+    bool targetIgnored = isSurvivorIgnored(target);
+    if (!targetIgnored)
+    {
+        handleHeadBlock(client, target, pos, targetPos);
+    }
+    else
+    {
+        g_AiTanks[client].headBlockStart = 0.0;
+        return Plugin_Continue;
+    }
+
+    // 挥拳锁视角
+    punchLockVision(client, target, pos, targetPos);
+
+    // 限制投石距离
+    checkEnableThrow(client, buttons, dist);
+
+    // 连跳逻辑
+    checkEnableBhop(client, target, buttons, pos, targetPos, dist);
+
+    return Plugin_Continue;
+}
+
+bool isSurvivorIgnored(int survivor)
+{
+    if (!true)
+        return false;
+    if (!IsValidSurvivor(survivor))
+        return false;
+    return g_fHeadBlockIgnoreUntil[survivor] > GetEngineTime();
+}
+
+static bool isClientDownState(int client)
+{
+    return IsClientIncapped(client) || IsClientHanging(client);
+}
+
+void handleHeadBlock(int tank, int target, const float tankPos[3], const float targetPos[3])
+{
+    if (!true)
+        return;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return;
+    if (isClientDownState(target))
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float targetMins[3], tankMaxs[3];
+    GetClientMins(target, targetMins);
+    GetClientMaxs(tank, tankMaxs);
+
+    float targetFootZ = targetPos[2] + targetMins[2];
+    float tankHeadZ   = tankPos[2] + tankMaxs[2];
+    float verticalDiff = targetFootZ - tankHeadZ;
+    if (verticalDiff < (80.0))
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float dx = targetPos[0] - tankPos[0];
+    float dy = targetPos[1] - tankPos[1];
+    float horizontalDiff = SquareRoot(dx * dx + dy * dy);
+    if (horizontalDiff > (65.0))
+    {
+        g_AiTanks[tank].headBlockStart = 0.0;
+        return;
+    }
+
+    float now = GetEngineTime();
+    if (g_AiTanks[tank].headBlockStart <= 0.0)
+    {
+        g_AiTanks[tank].headBlockStart = now;
+        return;
+    }
+
+    if ((now - g_AiTanks[tank].headBlockStart) < (2.0))
+        return;
+
+    g_AiTanks[tank].headBlockStart = 0.0;
+    g_fHeadBlockIgnoreUntil[target] = now + (10.0);
+    if (log != null)
+        log.debugAll("%N flagged %N for head blocking (v=%.1f h=%.1f)", tank, target, verticalDiff, horizontalDiff);
+}
+
+void handleForceRock(int tank, int& buttons, const float tankPos[3])
+{
+    if (!true)
+        return;
+
+    float now = GetEngineTime();
+    if (g_AiTanks[tank].forceRockUntil <= now)
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    int rockTarget = GetClientOfUserId(g_AiTanks[tank].forceRockTarget);
+    if (!IsValidSurvivor(rockTarget) || !IsPlayerAlive(rockTarget))
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    float blockedPos[3];
+    GetClientAbsOrigin(rockTarget, blockedPos);
+    float dx = blockedPos[0] - tankPos[0];
+    float dy = blockedPos[1] - tankPos[1];
+    float horizontal = SquareRoot(dx * dx + dy * dy);
+    float vertical = FloatAbs(blockedPos[2] - tankPos[2]);
+
+    float releaseHoriz = (400.0);
+    float releaseVert  = (250.0);
+    bool overHoriz = (releaseHoriz > 0.0 && horizontal > releaseHoriz);
+    bool overVert  = (releaseVert > 0.0 && vertical  > releaseVert);
+    if (overHoriz || overVert)
+    {
+        g_AiTanks[tank].forceRockUntil = 0.0;
+        g_AiTanks[tank].forceRockTarget = -1;
+        return;
+    }
+
+    float needDistance = (250.0);
+    if (horizontal < needDistance)
+        return;
+
+    bool visible = clientIsVisibleToClient(tank, rockTarget);
+    if (!visible)
+    {
+        float eyeTarget[3];
+        GetClientEyePosition(rockTarget, eyeTarget);
+        visible = L4D2_IsVisibleToPlayer(tank, TEAM_INFECTED, 0, 0, eyeTarget);
+    }
+    if (!visible)
+        return;
+
+    buttons |= IN_ATTACK2;
+    g_AiTanks[tank].forceRockUntil = 0.0;
+    g_AiTanks[tank].forceRockTarget = -1;
+}
+
+int findAlternativeVictim(int tank, int ignoreTarget, bool &allOthersDown, int &nearestDown)
+{
+    float tankPos[3];
+    GetClientAbsOrigin(tank, tankPos);
+
+    int bestStanding = -1;
+    float bestStandingDist = 999999.0;
+    nearestDown = -1;
+    float bestDownDist = 999999.0;
+    allOthersDown = true;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+        if (i == ignoreTarget)
+            continue;
+        if (isSurvivorIgnored(i))
+            continue;
+
+        bool down = isClientDownState(i);
+        if (!down)
+            allOthersDown = false;
+
+        float pos[3];
+        GetClientAbsOrigin(i, pos);
+        float dist = GetVectorDistance(tankPos, pos);
+
+        if (!down)
+        {
+            if (dist < bestStandingDist)
+            {
+                bestStandingDist = dist;
+                bestStanding = i;
+            }
+        }
+        else
+        {
+            if (dist < bestDownDist)
+            {
+                bestDownDist = dist;
+                nearestDown = i;
+            }
+        }
+    }
+
+    if (bestStanding != -1)
+        return bestStanding;
+    if (nearestDown != -1)
+        return nearestDown;
+
+    allOthersDown = false;
+    return -1;
+}
+
+// 确保目标缓存一致并处理反卡逻辑
+public Action L4D2_OnChooseVictim(int client, int &curTarget)
+{
+    if (!isAiTank(client) || !IsValidSurvivor(curTarget))
+        return Plugin_Continue;
+
+    float now = GetEngineTime();
+
+    int blockedClient = curTarget;
+
+    if (isSurvivorIgnored(blockedClient))
+    {
+        bool allOthersDown = false;
+        int nearestDown = -1;
+        int alternative = findAlternativeVictim(client, blockedClient, allOthersDown, nearestDown);
+        if (alternative > 0)
+        {
+            if (allOthersDown)
+            {
+                int moveTarget = (nearestDown > 0) ? nearestDown : blockedClient;
+                if (moveTarget > 0)
+                    curTarget = moveTarget;
+
+                int chaseUserId = GetClientUserId(curTarget);
+                if (chaseUserId > 0)
+                    g_AiTanks[client].target = chaseUserId;
+
+                int blockedUserId = GetClientUserId(blockedClient);
+                if (blockedUserId > 0)
+                {
+                    g_AiTanks[client].forceRockTarget = blockedUserId;
+                    g_AiTanks[client].forceRockUntil = now + (20.0);
+                }
+                else
+                {
+                    g_AiTanks[client].forceRockTarget = -1;
+                    g_AiTanks[client].forceRockUntil = 0.0;
+                }
+            }
+            else
+            {
+                curTarget = alternative;
+                g_AiTanks[client].target = GetClientUserId(curTarget);
+                g_AiTanks[client].forceRockTarget = -1;
+                g_AiTanks[client].forceRockUntil = 0.0;
+            }
+
+            return Plugin_Changed;
+        }
+    }
+
+    if (g_AiTanks[client].forceRockUntil > 0.0 && g_AiTanks[client].forceRockUntil <= now)
+    {
+        g_AiTanks[client].forceRockUntil = 0.0;
+        g_AiTanks[client].forceRockTarget = -1;
+    }
+
+    if (!isClientDownState(curTarget))
+    {
+        g_AiTanks[client].forceRockTarget = -1;
+        g_AiTanks[client].forceRockUntil = 0.0;
+    }
+
+    int cachedTarget = GetClientOfUserId(g_AiTanks[client].target);
+    if (!IsValidClient(cachedTarget) || cachedTarget != curTarget)
+        g_AiTanks[client].target = GetClientUserId(curTarget);
+
+    return Plugin_Continue;
+}
+
+// ===== 通背拳（背后扫击） =====
+stock bool IsBackFistAllowedNow(int tank)
+{
+    if (!true)                return false;
+    if (!isAiTank(tank))                        return false;
+    if (!IsClientOnGround(tank))                return false;                    // 必须在地上
+    if (GetEntityMoveType(tank) == MOVETYPE_LADDER) return false;               // 梯子上不允许
+    float now = GetEngineTime();
+    return (g_AiTanks[tank].backFistExpire > 0.0 && now <= g_AiTanks[tank].backFistExpire);
+}
+
+public void L4D_TankClaw_DoSwing_Post(int tank, int claw)
+{
+    if (!true || !isAiTank(tank))
+        return;
+
+    // 速度过快不允许通背拳
+    float vAbsVelVec[3];
+    GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+    float speed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
+    if (speed > (50.0))
+        return;
+
+    if (!IsBackFistAllowedNow(tank))
+        return;
+
+    float pos[3], targetPos[3];
+    float fistRange = ((128) >= 0) ? (128.0) : g_fTankSwingRange;
+
+    GetClientEyePosition(tank, pos);
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+
+        GetClientEyePosition(i, targetPos);
+        if (GetVectorDistance(pos, targetPos) > fistRange)
+            continue;
+        if (!clientIsVisibleToClient(tank, i))
+            continue;
+
+        // 用 TankClaw 扫描碰撞
+        SDKCall(g_hSdkTankClawSweepFist, claw, targetPos, targetPos);
+    }
+}
+
+// 爪击命中 -> 刷新通背拳窗口
+void evtPlayerHurt(Event event, const char[] name, bool dontBroadcast)
+{
+    int victim   = GetClientOfUserId(GetEventInt(event, "userid"));
+    int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+    if (!IsValidSurvivor(victim) || !IsValidClient(attacker) || !isAiTank(attacker))
+        return;
+
+    char wep[64];
+    GetEventString(event, "weapon", wep, sizeof(wep));
+    bool isClaw = StrEqual(wep, "tank_claw", false) || StrEqual(wep, "tank", false);
+    if (!isClaw)
+    {
+        int claw = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+        if (claw > 0 && IsValidEdict(claw))
+        {
+            char cls[64];
+            GetEntityClassname(claw, cls, sizeof(cls));
+            if (StrEqual(cls, "weapon_tank_claw", false))
+                isClaw = true;
+        }
+    }
+    if (!isClaw) return;
+
+    g_AiTanks[attacker].backFistExpire = GetEngineTime() + (3.0);
+}
+
+// 挥拳锁视角
+Action punchLockVision(int client, int target, const float pos[3], const float targetPos[3])
+{
+    if (!true || !isAiTank(client) || !IsValidSurvivor(target))
+        return Plugin_Continue;
+
+    int claw = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+    if (!claw || !IsValidEdict(claw)) return Plugin_Continue;
+    if (!HasEntProp(claw, Prop_Send, "m_flNextPrimaryAttack"))
+        return Plugin_Continue;
+
+    float nextAtk = GetEntPropFloat(claw, Prop_Send, "m_flNextPrimaryAttack");
+    if (g_AiTanks[client].nextAttackTime < GetEngineTime() && nextAtk > GetGameTime())
+    {
+        float vLookAt[3], vDir[3];
+        MakeVectorFromPoints(pos, targetPos, vLookAt);
+        GetVectorAngles(vLookAt, vDir);
+        TeleportEntity(client, NULL_VECTOR, vDir, NULL_VECTOR);
+    }
+    g_AiTanks[client].nextAttackTime = nextAtk;
+    return Plugin_Continue;
+}
+
+// ===== 连跳 =====
+Action checkEnableBhop(int client, int target, int& buttons, const float pos[3], const float targetPos[3], float dist)
+{
+    if (!true || !isAiTank(client) || !IsValidSurvivor(target))
+        return Plugin_Continue;
+
+    if (L4D_IsPlayerStaggering(client))
+        return Plugin_Continue;
+
+    // 梯子/水中不连跳
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER || GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
+        return Plugin_Continue;
+
+    float velVec[3];
+    GetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
+    float vel = SquareRoot(Pow(velVec[0], 2.0) + Pow(velVec[1], 2.0));
+    if (vel < (200.0))
+        return Plugin_Continue;
+
+    if (dist < (135.0) || dist > (9999.0))
+        return Plugin_Continue;
+
+    float vAbsVelVec[3], vTargetAbsVelVec[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+    GetEntPropVector(target, Prop_Data, "m_vecAbsVelocity", vTargetAbsVelVec);
+
+    // 是否可见
+    float l_targetPos[3]; l_targetPos = targetPos;
+    bool visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, 0, l_targetPos);
+
+    if (IsClientOnGround(client) && nextTickPosCheck(client, visible))
+    {
+        float vPredict[3], vDir[3], vFwd[3], vRight[3];
+
+        if (!visible)
+        {
+            NormalizeVector(velVec, vFwd);
+        }
+        else
+        {
+            // 预测目标下一帧位置
+            AddVectors(targetPos, vTargetAbsVelVec, vPredict);
+            MakeVectorFromPoints(pos, vPredict, vDir);
+            vDir[2] = 0.0;
+            NormalizeVector(vDir, vDir);
+            vFwd = vDir;
+        }
+
+        if (!true && !visible)
+            return Plugin_Continue;
+
+        buttons |= IN_DUCK;
+        buttons |= IN_JUMP;
+
+        bool fwdOnly  = ((buttons & IN_FORWARD) && !(buttons & IN_BACK));
+        bool backOnly = ((buttons & IN_BACK) && !(buttons & IN_FORWARD));
+        bool leftOnly = ((buttons & IN_LEFT) && !(buttons & IN_RIGHT));
+        bool rightOnly= ((buttons & IN_RIGHT) && !(buttons & IN_LEFT));
+
+        if (fwdOnly)
+        {
+            NormalizeVector(vFwd, vFwd);
+            ScaleVector(vFwd, (60.0));
+            AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+        }
+        else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0))
+        {
+            vFwd[0] = velVec[0]; vFwd[1] = velVec[1]; vFwd[2] = 0.0;
+            NormalizeVector(vFwd, vFwd);
+            ScaleVector(vFwd, (60.0));
+            AddVectors(vAbsVelVec, vFwd, vAbsVelVec);
+        }
+        else
+        {
+            float baseFwd[3];
+            if (fwdOnly)
+            {
+                baseFwd[0] = vFwd[0]; baseFwd[1] = vFwd[1]; baseFwd[2] = 0.0;
+            }
+            else if (backOnly && (velVec[0] > 0.0 || velVec[1] > 0.0))
+            {
+                baseFwd[0] = velVec[0]; baseFwd[1] = velVec[1]; baseFwd[2] = 0.0;
+            }
+            else
+            {
+                baseFwd[0] = vDir[0]; baseFwd[1] = vDir[1]; baseFwd[2] = 0.0;
+            }
+
+            GetVectorCrossProduct({0.0, 0.0, 1.0}, baseFwd, vRight);
+            NormalizeVector(vRight, vRight);
+            if (rightOnly ^ leftOnly)
+            {
+                vRight[2] = 0.0;
+                ScaleVector(vRight, (60.0) * (rightOnly ? 1.0 : -1.0));
+                AddVectors(vAbsVelVec, vRight, vAbsVelVec);
+            }
+        }
+
+        // 记录起跳水平速度（空中修正用）
+        g_AiTanks[client].lastHopSpeed = SquareRoot(Pow(vAbsVelVec[0], 2.0) + Pow(vAbsVelVec[1], 2.0));
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
+        return Plugin_Changed;
+    }
+
+    // 限速（空中）
+    if (vel > (1000.0))
+    {
+        NormalizeVector(velVec, velVec);
+        ScaleVector(velVec, (1000.0));
+        SetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
+    }
+
+    // 空中矫正：角度在 [min, max] 内
+    float vAbsVelVecCpy[3]; vAbsVelVecCpy = vAbsVelVec;
+    NormalizeVector(vAbsVelVec, vAbsVelVec);
+    float vDir2[3];
+    MakeVectorFromPoints(pos, targetPos, vDir2);
+    NormalizeVector(vDir2, vDir2);
+    vAbsVelVec[2] = 0.0; vDir2[2] = 0.0;
+
+    float dx = SquareRoot(Pow(targetPos[0] - pos[0], 2.0) + Pow(targetPos[1] - pos[1], 2.0));
+    float dz = targetPos[2] - pos[2];
+    float pitch = RadToDeg(ArcTangent(dz / dx));
+    if (dz > (JUMP_HEIGHT + TANK_HEIGHT + g_fTankSwingRange) && pitch > 45.0)
+        return Plugin_Continue;
+
+    float angle = RadToDeg(ArcCosine(GetVectorDotProduct(vAbsVelVec, vDir2)));
+    bool inAngleRange = (angle >= (45.0) && angle <= (135.0));
+    bool notPressBack = !(buttons & IN_BACK);
+    bool delayExpired = (GetEngineTime() - g_AiTanks[client].lastAirVecModifyTime) > (0.300000012);
+
+    if (visible && inAngleRange && notPressBack && delayExpired)
+    {
+        NormalizeVector(vDir2, vDir2);
+        if (vel < g_AiTanks[client].lastHopSpeed)
+            vel = g_AiTanks[client].lastHopSpeed;
+        ScaleVector(vDir2, vel);
+        vDir2[2] = vAbsVelVecCpy[2];
+        TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vDir2);
+        g_AiTanks[client].lastAirVecModifyTime = GetEngineTime();
+    }
+    return Plugin_Changed;
+}
+
+// 预测下一帧位置是否会撞/坠落
+stock bool nextTickPosCheck(int client, bool visible)
+{
+    if (!isAiTank(client)) return false;
+
+    float vMins[3], vMaxs[3];
+    GetClientMins(client, vMins);
+    GetClientMaxs(client, vMaxs);
+
+    float pos[3], endPos[3], velVec[3];
+    GetClientAbsOrigin(client, pos);
+    GetEntPropVector(client, Prop_Data, "m_vecVelocity", velVec);
+    float vel = GetVectorLength(velVec);
+    NormalizeVector(velVec, velVec);
+
+    ScaleVector(velVec, vel + FloatAbs(vMaxs[0] - vMins[0]) + 3.0);
+    AddVectors(pos, velVec, endPos);
+    pos[2]     += 10.0;
+    endPos[2]  += 10.0;
+
+    Handle hTrace = TR_TraceHullFilterEx(pos, endPos, {-36.0, -36.0, 10.0}, {36.0, 36.0, 72.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
+    if (TR_DidHit(hTrace))
+    {
+        float hitNormal[3];
+        TR_GetPlaneNormal(hTrace, hitNormal);
+        NormalizeVector(hitNormal, hitNormal);
+        NormalizeVector(velVec, velVec);
+        if (RadToDeg(ArcCosine(GetVectorDotProduct(hitNormal, velVec))) > 165.0)
+        {
+            delete hTrace;
+            return false;
+        }
+    }
+    delete hTrace;
+
+    if (!visible)
+    {
+        float eyeAng[3], dir[3];
+        GetClientEyeAngles(client, eyeAng);
+        GetAngleVectors(eyeAng, dir, NULL_VECTOR, NULL_VECTOR);
+        NormalizeVector(dir, dir);
+        NormalizeVector(velVec, velVec);
+        dir[2] = velVec[2] = 0.0;
+        float ang = RadToDeg(ArcCosine(GetVectorDotProduct(dir, velVec)));
+        if (floatIsNan(ang) || ang > (75.0))
+            return false;
+    }
+
+    float downPos[3]; downPos = endPos; downPos[2] -= 99999.0;
+    hTrace = TR_TraceHullFilterEx(endPos, downPos, {-16.0, -16.0, 0.0}, {16.0, 16.0, 0.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
+    if (!TR_DidHit(hTrace))
+    {
+        delete hTrace;
+        return false;
+    }
+    int hitEnt = TR_GetEntityIndex(hTrace);
+    if (IsValidEntity(hitEnt))
+    {
+        char className[32];
+        GetEntityClassname(hitEnt, className, sizeof(className));
+        if (strcmp(className, "trigger_hurt", false) == 0)
+        {
+            delete hTrace;
+            return false;
+        }
+    }
+    delete hTrace;
+    return true;
+}
+
+// ===== 玩家进服：启用动画钩子 & 梯子常驻维护 =====
+public void OnClientPutInServer(int client)
+{
+    g_AiTanks[client].initData();
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
+
+    // 后置动画钩子：识别投石/翻越等序列变化
+    AnimHookEnable(client, INVALID_FUNCTION, tankAnimHookPostCb);
+
+    // NEW: 梯子播放速率常驻维护（PostThinkPost 每帧极轻量）
+    SDKHook(client, SDKHook_PostThinkPost, ladderRateModifyHookHandler);
+}
+
+public void OnClientDisconnect(int client)
+{
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_fHeadBlockIgnoreUntil[client] = 0.0;
+    g_AiTanks[client].headBlockStart = 0.0;
+    g_AiTanks[client].forceRockUntil = 0.0;
+    g_AiTanks[client].forceRockTarget = -1;
+}
+
+// ===== 翻越播放速率维护（进入翻越时挂，退出解）=====
+void climbRateModifyHookHandler(int client)
+{
+    if (!isAiTank(client))
+        return;
+
+    int animSeq = GetEntProp(client, Prop_Data, "m_nSequence");
+
+    // 仍处于翻越：按“高/低翻越”倍速
+    if (isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Climb)))
+    {
+        float targetRate = getClimbPlaybackRate(animSeq);
+        float currentRate = GetEntPropFloat(client, Prop_Send, "m_flPlaybackRate");
+        if (currentRate != targetRate)
+        {
+            SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", targetRate);
+        }
+        return;
+    }
+
+    // NEW: 若此刻处于“梯子”，交给梯子常驻维护，不复位
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER)
+    {
+        return;
+    }
+
+    // 其它状态：复位并解绑本钩子
+    SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", 1.0);
+    SDKUnhook(client, SDKHook_PostThinkPost, climbRateModifyHookHandler);
+}
+
+// ===== NEW: 梯子播放速率常驻维护（互不干扰翻越）=====
+void ladderRateModifyHookHandler(int client)
+{
+    if (!isAiTank(client))
+        return;
+
+    // 在梯子上：持续“喂”播放速率为 ai_tank3_ladder_climb_rate
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER)
+    {
+        float want = (5.0);
+        float cur  = GetEntPropFloat(client, Prop_Send, "m_flPlaybackRate");
+        if (cur != want)
+            SetEntPropFloat(client, Prop_Send, "m_flPlaybackRate", want);
+        return;
+    }
+    // 非梯子：不做事（翻越的速度由 climbRateModifyHookHandler 处理）
+}
+
+// ===== 动画后置钩子：识别投石/攀爬序列并触发相应逻辑 =====
+Action tankAnimHookPostCb(int tank, int &sequence)
+{
+    if (!isAiTank(tank))
+    {
+        AnimHookDisable(tank, tankAnimHookPostCb);
+        return Plugin_Continue;
+    }
+
+    // 投石：跳砖 + 定时刷新 throwing 标志
+    if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Throw)))
+    {
+        if (true && !g_AiTanks[tank].wasThrowing)
+        {
+            makeTankJumpRock(tank);
+            g_AiTanks[tank].wasThrowing = true;
+            CreateTimer(0.5, timerResetThrowingFlagHandler, GetClientUserId(tank), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+        }
+    }
+    // 翻越：开启 PostThinkPost（仅在倍速变化时绑定，离开翻越自动解绑）
+    else if (isMatchedSequence(sequence, view_as<TankSequenceType>(tankSequence_Climb)))
+    {
+        float targetRate = getClimbPlaybackRate(sequence);
+        if (GetEntPropFloat(tank, Prop_Send, "m_flPlaybackRate") != targetRate)
+            SDKHook(tank, SDKHook_PostThinkPost, climbRateModifyHookHandler);
+    }
+    return Plugin_Continue;
+}
+
+// 判断序列是否匹配“投石/翻越”两类
+bool isMatchedSequence(int sequence, TankSequenceType seqType)
+{
+    if (sequence < 0) return false;
+
+    char seqName[64];
+    if (!AnimGetActivity(sequence, seqName, sizeof(seqName)))
+        return false;
+
+    switch (seqType)
+    {
+        case view_as<TankSequenceType>(tankSequence_Throw):
+            return g_hThrowAnimMap.ContainsKey(seqName);
+        case view_as<TankSequenceType>(tankSequence_Climb):
+        {
+            bool matchedHigh = g_hClimbAnimMap && g_hClimbAnimMap.ContainsKey(seqName);
+            bool matchedLow = g_hLowClimbAnimMap && g_hLowClimbAnimMap.ContainsKey(seqName);
+            return matchedHigh || matchedLow;
+        }
+    }
+    return false;
+}
+
+// 是否属于“低矮翻越”
+bool isLowClimbSequence(int sequence)
+{
+    if (sequence < 0 || !g_hLowClimbAnimMap) return false;
+
+    char seqName[64];
+    if (!AnimGetActivity(sequence, seqName, sizeof(seqName)))
+        return false;
+
+    return g_hLowClimbAnimMap.ContainsKey(seqName);
+}
+
+// 根据序列选择翻越倍速：低矮用 low，其他用高翻越
+float getClimbPlaybackRate(int sequence)
+{
+    if (isLowClimbSequence(sequence))
+        return (2.5);
+    return (3.5);
+}
+
+// ===== 投石：跳砖、距离限制、出手角度 =====
+void makeTankJumpRock(int tank)
+{
+    if (!isAiTank(tank)) return;
+
+    float vAbsVelVec[3];
+    GetEntPropVector(tank, Prop_Data, "m_vecAbsVelocity", vAbsVelVec);
+    vAbsVelVec[2] += JUMP_SPEED_Z;
+    TeleportEntity(tank, NULL_VECTOR, NULL_VECTOR, vAbsVelVec);
+}
+
+Action timerResetThrowingFlagHandler(Handle timer, int userId)
+{
+    int tank = GetClientOfUserId(userId);
+    if (!isAiTank(tank))
+        return Plugin_Stop;
+
+    int animSeq = GetEntProp(tank, Prop_Data, "m_nSequence");
+    if (!isMatchedSequence(animSeq, view_as<TankSequenceType>(tankSequence_Throw)))
+    {
+        g_AiTanks[tank].wasThrowing = false;
+        return Plugin_Stop;
+    }
+    return Plugin_Continue;
+}
+
+Action checkEnableThrow(int client, int& buttons, float dist)
+{
+    if (!isAiTank(client)) return Plugin_Continue;
+
+    if (dist < (0.0) || dist > (800.0))
+        buttons &= ~IN_ATTACK2;
+
+    return Plugin_Changed;
+}
+
+public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float vecAng[3], float vecVel[3], float vecRot[3])
+{
+    if (!isAiTank(tank)) return Plugin_Continue;
+    if (!HasEntProp(rock, Prop_Data, "m_flGravity")) return Plugin_Continue;
+
+    static ConVar cv_ThrowForce, cv_Gravity;
+    if (!cv_ThrowForce) cv_ThrowForce = FindConVar("z_tank_throw_force");
+    if (!cv_Gravity)    cv_Gravity    = FindConVar("sv_gravity");
+
+    float throwSpeed = (!cv_ThrowForce) ? DEFAULT_THROW_FORCE : cv_ThrowForce.FloatValue;
+    float svGravity  = (!cv_Gravity)    ? DEFAULT_SV_GRAVITY  : cv_Gravity.FloatValue;
+
+    int target = GetClientOfUserId(g_AiTanks[tank].target);
+    if (!IsValidSurvivor(target)) return Plugin_Continue;
+
+    int newRockTarget = -1;
+    if (true)
+    {
+        static ArrayList targets;
+        if (!targets) targets = new ArrayList(2);
+
+        float pos[3], tpos[3];
+        GetClientEyePosition(tank, pos);
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (tank == i || !IsValidSurvivor(i) || !IsPlayerAlive(i) || IsClientIncapped(i) || isPinnedByHunterOrCharger(i))
+                continue;
+            if (!clientIsVisibleToClient(tank, i))
+                continue;
+            GetClientEyePosition(i, tpos);
+            targets.Set(targets.Push(GetVectorDistance(pos, tpos)), i, 1);
+        }
+        if (targets.Length > 0)
+        {
+            SortADTArray(targets, Sort_Ascending, Sort_Float);
+            newRockTarget = targets.Get(0, 1);
+        }
+        delete targets;
+    }
+
+    int aimTarget = IsValidSurvivor(newRockTarget) ? newRockTarget : target;
+
+    // 计算上抬角
+    float rockGravityScale = GetEntPropFloat(rock, Prop_Data, "m_flGravity");
+    float pitch = calculateThrowAngle(tank, aimTarget, throwSpeed, svGravity * rockGravityScale);
+    if (pitch > 90.0 || pitch < -90.0)
+        return Plugin_Continue;
+
+    // 预测偏航
+    float pos0[3], tpos0[3], pred[3], vTargetAbsVelVec[3], aimAng[3];
+    GetClientAbsOrigin(tank, pos0);
+    GetClientAbsOrigin(aimTarget, tpos0);
+    GetEntPropVector(aimTarget, Prop_Data, "m_vecAbsVelocity", vTargetAbsVelVec);
+
+    float dx = SquareRoot(Pow(vecPos[0] - tpos0[0], 2.0) + Pow(vecPos[1] - tpos0[1], 2.0));
+    float vx = throwSpeed * Cosine(DegToRad(pitch));
+    float t  = dx / vx;
+
+    pred[0] = tpos0[0] + vTargetAbsVelVec[0] * t;
+    pred[1] = tpos0[1] + vTargetAbsVelVec[1] * t;
+    pred[2] = tpos0[2] + vTargetAbsVelVec[2] * t;
+
+    float yawCenter = ArcTangent2(pred[1] - pos0[1], pred[0] - pos0[0]);
+    float yawThrow  = ArcTangent2(pred[1] - vecPos[1], pred[0] - vecPos[0]);
+    yawThrow        = RadToDeg(yawThrow - yawCenter);
+
+    MakeVectorFromPoints(pos0, pred, aimAng);
+    GetVectorAngles(aimAng, aimAng);
+    aimAng[0] = -pitch;
+    aimAng[1] += yawThrow;
+    if (aimAng[1] > 180.0)  aimAng[1] -= 360.0;
+    if (aimAng[1] < -180.0) aimAng[1] += 360.0;
+    aimAng[2] = 0.0;
+
+    GetAngleVectors(aimAng, aimAng, NULL_VECTOR, NULL_VECTOR);
+    NormalizeVector(aimAng, aimAng);
+    ScaleVector(aimAng, throwSpeed);
+    vecVel = aimAng;
+
+    return Plugin_Changed;
+}
+
+// 计算投石出手角度
+float calculateThrowAngle(int tank, int target, float vSpeed = 800.0, float g = 320.0)
+{
+    if (!isAiTank(tank) || !IsValidSurvivor(target))
+        return -9999.0;
+
+    float pos[3], tpos[3];
+    GetClientAbsOrigin(tank, pos);
+
+    int animSeq = GetEntProp(tank, Prop_Data, "m_nSequence");
+    switch (animSeq)
+    {
+        case L4D2_ACT_SIGNAL3: { pos[2] += THROW_UNDERHEAD_POS_Z; }
+        case L4D2_ACT_SIGNAL2: { pos[2] += THROW_OVERSHOULDER_POS_Z; }
+        case L4D2_ACT_SIGNAL_ADVANCE: { pos[2] += THROW_OVERHEAD_POS_Z; }
+    }
+
+    GetClientAbsOrigin(target, tpos);
+    tpos[2] += PLAYER_CHEST;
+
+    float dx = SquareRoot(Pow(tpos[0] - pos[0], 2.0) + Pow(tpos[1] - pos[1], 2.0));
+    float dz = tpos[2] - pos[2];
+
+    float v2 = Pow(vSpeed, 2.0);
+    float v4 = Pow(vSpeed, 4.0);
+    float delta = v4 - g * (g * dx * dx + 2.0 * dz * v2);
+    if (delta < 0.0)
+    {
+        log.debugAll("%N rock unreachable: dist=%.2f dh=%.2f v=%.2f g=%.2f", tank, dx, dz, vSpeed, g);
+        return -9999.0;
+    }
+
+    float tanTheta = (v2 - SquareRoot(delta)) / (g * dx); // 取低抛解
+    return RadToDeg(ArcTangent(tanTheta));
+}
+

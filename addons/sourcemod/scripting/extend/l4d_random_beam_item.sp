@@ -36,7 +36,7 @@ Change Log:
 #define PLUGIN_NAME                   "[L4D1 & L4D2] Random Beam Item"
 #define PLUGIN_AUTHOR                 "Mart"
 #define PLUGIN_DESCRIPTION            "Gives a random beam to items on the map"
-#define PLUGIN_VERSION                "1.1.0"
+#define PLUGIN_VERSION                "1.1.1"
 #define PLUGIN_URL                    "https://forums.alliedmods.net/showthread.php?t=334110"
 
 // ====================================================================================================
@@ -209,12 +209,16 @@ ConVar g_hCvar_RemoveSpawner;
 ConVar g_hCvar_MinBrightness;
 ConVar g_hCvar_UseGlowColor;
 ConVar g_hCvar_PlayerEdictLimit;
+ConVar g_hCvar_EdictLimit;
 
 // ====================================================================================================
 // bool - Plugin Variables
 // ====================================================================================================
 bool g_bL4D2;
 bool g_bEventsHooked;
+bool g_bRoundEnding;
+int g_iRoundGeneration;
+Handle g_hBudgetRetry;
 bool g_bCvar_Enabled;
 bool g_bCvar_RemoveSpawner;
 bool g_bCvar_UseGlowColor;
@@ -228,6 +232,7 @@ bool g_bGroupSelectable[MAX_GROUPS];
 int g_iHalo = -1;
 int g_iDefaultConfig[CONFIG_ARRAYSIZE];
 int g_iCvar_PlayerEdictLimit;
+int g_iCvar_EdictLimit;
 int g_iGroupCount;
 int g_iGroupDemand[MAX_GROUPS];
 int g_iPresetLength[PRESET_COUNT];
@@ -350,6 +355,13 @@ public void OnPluginStart()
         g_hCvar_UseGlowColor = CreateConVar("l4d_random_beam_item_use_glow_color", "1", "(L4D2 only) Apply the same color from glow.\n0 = OFF, 1 = ON.", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_hCvar_PlayerEdictLimit = CreateConVar("l4d_random_beam_item_player_edict_limit", "1900", "Beams that players turn on for items hidden by default are not created once the server uses this many edicts.\n0 = Players can't turn on beams for hidden items.", CVAR_FLAGS, true, 0.0, true, 2048.0);
 
+    g_hCvar_EdictLimit = CreateConVar("l4d_random_beam_item_edict_limit", "1800", "Occupied edict budget for all item beams, including default and admin beams.", CVAR_FLAGS, true, 128.0, true, 1900.0);
+
+    HookEvent("round_end", Event_RoundEnd);
+    HookEvent("mission_lost", Event_RoundEnd);
+    HookEvent("map_transition", Event_RoundEnd);
+    HookEvent("round_start", Event_RoundStart);
+
     // Hook plugin ConVars change
     g_hCvar_Enabled.AddChangeHook(Event_ConVarChanged);
     g_hCvar_RemoveSpawner.AddChangeHook(Event_ConVarChanged);
@@ -357,6 +369,7 @@ public void OnPluginStart()
     if (g_bL4D2)
         g_hCvar_UseGlowColor.AddChangeHook(Event_ConVarChanged);
     g_hCvar_PlayerEdictLimit.AddChangeHook(Event_ConVarChanged);
+    g_hCvar_EdictLimit.AddChangeHook(Event_ConVarChanged);
 
     // Load plugin configs from .cfg
     AutoExecConfig(true, CONFIG_FILENAME);
@@ -489,12 +502,46 @@ void BuildMaps()
 
 public void OnMapStart()
 {
+    g_iRoundGeneration++;
+    g_bRoundEnding = false;
     g_iHalo = PrecacheModel(MODEL_HALO_SPRITE_PLUGIN, true);
     PrecacheModel(MODEL_HALO_SPRITE_DEFAULT, true); // Will late precache anyway
     PrecacheModel(MODEL_BEAM_SPRITE_DEFAULT, true); // Will late precache anyway
 }
 
 /****************************************************************************************************/
+
+public void OnMapEnd()
+{
+    g_iRoundGeneration++;
+    delete g_hBudgetRetry;
+    g_bRoundEnding = true;
+    RemoveAll();
+}
+
+void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
+{
+    // Release decorative entities before CleanUpMap recreates map entities.
+    g_iRoundGeneration++;
+    delete g_hBudgetRetry;
+    g_bRoundEnding = true;
+    RemoveAll();
+}
+
+void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    g_iRoundGeneration++;
+    delete g_hBudgetRetry;
+    RequestFrame(ResumeRoundBeams, g_iRoundGeneration);
+}
+
+void ResumeRoundBeams(any generation)
+{
+    if (generation != g_iRoundGeneration)
+        return;
+    g_bRoundEnding = false;
+    LateLoad();
+}
 
 public void OnConfigsExecuted()
 {
@@ -509,6 +556,7 @@ public void OnConfigsExecuted()
 
 void Event_ConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
+    delete g_hBudgetRetry;
     GetCvars();
 
     HookEvents();
@@ -528,6 +576,7 @@ void GetCvars()
     if (g_bL4D2)
         g_bCvar_UseGlowColor = g_hCvar_UseGlowColor.BoolValue;
     g_iCvar_PlayerEdictLimit = g_hCvar_PlayerEdictLimit.IntValue;
+    g_iCvar_EdictLimit = g_hCvar_EdictLimit.IntValue;
 }
 
 /****************************************************************************************************/
@@ -762,6 +811,9 @@ void HookEvents()
 
 void LateLoad()
 {
+    if (!g_bCvar_Enabled || g_bRoundEnding)
+        return;
+
     if (g_bL4D2)
     {
         for (int client = 1; client <= MaxClients; client++)
@@ -865,10 +917,10 @@ void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
 
 public void OnEntityCreated(int entity, const char[] classname)
 {
-    if (!g_bCvar_Enabled)
+    if (!g_bCvar_Enabled || g_bRoundEnding)
         return;
 
-    if (entity < 0)
+    if (entity < 0 || entity > MAXENTITIES)
         return;
 
     if (StrEqual(classname, "beam_spotlight")) // prevent loops
@@ -884,7 +936,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 
 public void OnEntityDestroyed(int entity)
 {
-    if (entity < 0)
+    if (entity < 0 || entity > MAXENTITIES)
         return;
 
     ge_bUsePostHooked[entity] = false;
@@ -945,6 +997,10 @@ void OnNextFrame(int entityRef)
  */
 void TryCreateBeam(int entity, bool demandOnly, bool &blocked)
 {
+    if (!g_bCvar_Enabled || g_bRoundEnding || entity <= MaxClients
+        || entity > MAXENTITIES || !IsValidEntity(entity))
+        return;
+
     if (ge_iChildEntRef[entity] != INVALID_ENT_REFERENCE)
         return;
 
@@ -1005,8 +1061,10 @@ void TryCreateBeam(int entity, bool demandOnly, bool &blocked)
         if (config[CONFIG_PLAYER] == 0 || !IsGroupDemanded(config[CONFIG_GROUP]))
             return;
 
-        if (GetEntityCount() >= g_iCvar_PlayerEdictLimit)
+        if (CountBeamEdicts() >= g_iCvar_PlayerEdictLimit)
         {
+            if (g_iCvar_PlayerEdictLimit > 0)
+                QueueBeamBudgetRetry();
             blocked = true;
             return;
         }
@@ -1044,7 +1102,8 @@ void TryCreateBeam(int entity, bool demandOnly, bool &blocked)
         }
     }
 
-    CreateBeam(entity, config, defaultVisible);
+    if (!CreateBeam(entity, config, defaultVisible))
+        blocked = true;
 }
 
 /****************************************************************************************************/
@@ -1089,8 +1148,41 @@ bool PickItemConfig(const int[] candidate, int[] config, bool &found)
 
 /****************************************************************************************************/
 
-void CreateBeam(int target, int[] config, bool defaultVisible)
+void QueueBeamBudgetRetry()
 {
+    if (g_hBudgetRetry == null)
+        g_hBudgetRetry = CreateTimer(2.0, RetryBeamBudget, g_iRoundGeneration, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+Action RetryBeamBudget(Handle timer, any generation)
+{
+    g_hBudgetRetry = null;
+    if (generation == g_iRoundGeneration && g_bCvar_Enabled && !g_bRoundEnding)
+        LateLoad();
+    return Plugin_Stop;
+}
+
+int CountBeamEdicts()
+{
+    int used;
+    int limit = GetMaxEntities();
+    for (int entity = 0; entity < limit; entity++)
+        if (IsValidEdict(entity))
+            used++;
+    return used;
+}
+
+bool CreateBeam(int target, int[] config, bool defaultVisible)
+{
+    // A spotlight may also create its beam/end entities. Preserve headroom for gameplay.
+    if (!g_bCvar_Enabled || g_bRoundEnding)
+        return false;
+    if (CountBeamEdicts() + 3 > g_iCvar_EdictLimit)
+    {
+        QueueBeamBudgetRetry();
+        return false;
+    }
+
     char rendercolor[12];
     FormatEx(rendercolor, sizeof(rendercolor), "%i %i %i", config[CONFIG_R], config[CONFIG_G], config[CONFIG_B]);
 
@@ -1099,6 +1191,13 @@ void CreateBeam(int target, int[] config, bool defaultVisible)
     vPos[2] += g_fExtraPosZ;
 
     int entity = CreateEntityByName("beam_spotlight");
+    if (entity == -1)
+        return false;
+    if (entity >= MAXENTITIES)
+    {
+        RemoveEntity(entity);
+        return false;
+    }
     DispatchKeyValue(entity, "targetname", "l4d_random_beam_item");
     // 1 = Start on, 2 = No dynamic light. Beams hidden by default stay off and are only turned on for the players who asked.
     DispatchKeyValue(entity, "spawnflags", defaultVisible ? "3" : "2");
@@ -1127,6 +1226,7 @@ void CreateBeam(int target, int[] config, bool defaultVisible)
         ge_bVPhysicsUpdatePostHooked[target] = true;
         SDKHook(target, SDKHook_VPhysicsUpdatePost, OnVPhysicsUpdatePost);
     }
+    return true;
 }
 
 /****************************************************************************************************/
@@ -2558,9 +2658,10 @@ Action CmdAdd(int client, int args)
         g_iDefaultConfig[CONFIG_B] = colorRandom[2];
     }
 
-    CreateBeam(entity, g_iDefaultConfig, true);
-
-    CPrintToChat(client, "%t", "L4DRandomBeamItem_BeamAddedTargetEntity");
+    if (CreateBeam(entity, g_iDefaultConfig, true))
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_BeamAddedTargetEntity");
+    else
+        CPrintToChat(client, "%t", "L4DRandomBeamItem_EdictLimit");
 
     return Plugin_Handled;
 }
@@ -2580,6 +2681,7 @@ Action CmdPrintCvars(int client, int args)
     PrintToConsole(client, "l4d_random_beam_item_min_brightness : %.1f", g_fCvar_MinBrightness);
     if (g_bL4D2) PrintToConsole(client, "l4d_random_beam_item_use_glow_color : %b (%s)", g_bCvar_UseGlowColor, g_bCvar_UseGlowColor ? "true" : "false");
     PrintToConsole(client, "l4d_random_beam_item_player_edict_limit : %i", g_iCvar_PlayerEdictLimit);
+    PrintToConsole(client, "l4d_random_beam_item_edict_limit : %i", g_iCvar_EdictLimit);
     PrintToConsole(client, "");
     PrintToConsole(client, "----------------------------- Array List -----------------------------");
     PrintToConsole(client, "");
