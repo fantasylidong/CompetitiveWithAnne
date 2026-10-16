@@ -626,3 +626,8 @@
 - Kept the multiplayer 30%–90% pill window, 40%–80% refill window and door clearance. Finales remain exempt from flow filtering and refilling. Alone and 1vHT default to one road pill each; Confogl retains one finale pill for their single survivor, and map overrides cannot raise the road-pill limit.
 - Fixed Confogl WeaponInformation's entity scan range so gaps in entity indices cannot hide higher-index supplies; rebuilt `confoglcompmod.smx`.
 - Finale pill hints now include the finale table while excluding starting supplies, preventing a false no-pills message; updated `anne_pill_hint.smx` to 1.0.4.
+
+### October 15, 2026 Hunter / Jockey Airborne Back-Facing Disabled
+
+- Disabled airborne back-facing for Hunter and Jockey across all six tiers: Easy, Normal, Hard, Expert, Extreme and Neri. Both `ai_hunter_back_vision` and `ai_JockeyBackVision` are now `0`; the Jockey baseline is also `0` in AnneHappy, Hardcore and Shotgun.
+- Fixed `ai_hunter_2` potentially turning backward when both the configured probability and random roll were `0`. The back-facing action now requires the current probability to be greater than `0`. Recompiled `ai_hunter_2.smx`; all six tier settings were checked and compilation passed.

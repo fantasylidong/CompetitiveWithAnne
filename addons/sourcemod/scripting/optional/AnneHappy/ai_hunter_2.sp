@@ -287,7 +287,7 @@ public Action OnPlayerRunCmd(int hunter, int& buttons, int& impulse, float vel[3
             canBackVision[hunter][1] = (backVisionChance <= CvarFloat(g_hBackVision, 0.0));
             canBackVision[hunter][0] = true;
         }
-        if (canBackVision[hunter][1])
+        if (canBackVision[hunter][1] && CvarFloat(g_hBackVision, 0.0) > 0.0)
         {
             // 背对“目标方向”而非“飞扑方向”，视觉表现更稳定
             float lungeVectorNegate[3];

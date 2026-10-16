@@ -1210,3 +1210,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 保留多人模式 30%–90% 的药品进度限制、40%–80% 的补药范围和避门规则；救援关继续豁免进度筛选及补药。Alone 单人和 1vHT 默认路药上限均为 1，救援补给由 Confogl 按单人生还者上限保留 1 瓶，地图覆盖不能提高路药上限。
 - 修正 Confogl WeaponInformation 的实体遍历范围，避免实体编号存在空洞时漏扫高编号物品；重新编译 `confoglcompmod.smx`。
 - 药品出门提示在救援关计入救援桌的药，仍排除起点补给，避免实际有药却显示“无药”；`anne_pill_hint.smx` 更新至 1.0.4。
+
+### 2026年10月15日 关闭 Hunter / Jockey 空中背身
+
+- 简单、普通、困难、专家、极限、音理六档统一关闭 Hunter 和 Jockey 的空中背身，`ai_hunter_back_vision` / `ai_JockeyBackVision` 均设为 `0`；AnneHappy、Hardcore、Shotgun 三套模式的 Jockey 基础值同步设为 `0`。
+- 修正 `ai_hunter_2` 在背身概率为 `0`、随机值恰好也为 `0` 时仍可能触发背身的问题：执行背身前检查当前概率必须大于 `0`。已重新编译 `ai_hunter_2.smx`，六档配置核验与编译通过。
