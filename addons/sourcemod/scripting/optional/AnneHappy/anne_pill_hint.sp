@@ -1,5 +1,7 @@
 #pragma semicolon 1
 #pragma newdecls required
+// Entity-sized arrays use 16 KiB; leave room for formatting and chat call frames.
+#pragma dynamic 8192
 
 #include <sourcemod>
 #include <sdktools>
@@ -8,7 +10,7 @@
 #undef REQUIRE_PLUGIN
 #include <confogl>
 
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.4"
 
 #define WEPID_PAIN_PILLS 15
 #define PILL_HINT_MESSAGE_BYTES 190
@@ -57,6 +59,7 @@ bool AnnouncePills()
     int[] iNum = new int[maxSpots];
     int iSpots = 0, iTotal = 0;
     bool sharedSaferoom = GetFeatureStatus(FeatureType_Native, "LGO_IsEntityInSaferoom") == FeatureStatus_Available;
+    int saferoomMask = L4D_IsMissionFinalMap() ? 1 : 3; // Finale supplies count; starting supplies do not.
 
     static const char sClasses[][] = {"weapon_pain_pills_spawn", "weapon_spawn", "weapon_pain_pills"};
     for (int c = 0; c < sizeof(sClasses); c++) {
@@ -75,8 +78,8 @@ bool AnnouncePills()
                 pNav = L4D2Direct_GetTerrorNavArea(fPos);
             }
 
-            // Saferoom pills aren't on the way.
-            if (sharedSaferoom ? LGO_IsEntityInSaferoom(iEnt)
+            // Exclude checkpoint supplies while keeping the finale table in the hint.
+            if (sharedSaferoom ? LGO_IsEntityInSaferoom(iEnt, saferoomMask)
                 : (pNav != Address_Null && (L4D_GetNavArea_SpawnAttributes(pNav) & NAV_SPAWN_CHECKPOINT) != 0)) {
                 continue;
             }

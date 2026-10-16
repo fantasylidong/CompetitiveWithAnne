@@ -2,7 +2,7 @@
 """Run rock protection/geometry decision bodies with mocked engine inputs.
 
 Uses the repository's SourcePawn-to-C++ test helper. This is not an SRCDS
-integration test; compile the plugin separately and verify native pellets live.
+integration test; compile the plugin separately and verify real gunfire live.
 """
 from pathlib import Path
 import re
@@ -34,7 +34,7 @@ def main():
         "Clamp", "FloatMax", "RayIntersectsSphere", "GetHistoryIndex",
         "GetRollbackTicks", "IsRockDamageAllowed",
         "SeedRockHistory", "GetRockPositionAtTick",
-        "IsHitscanWeaponType", "GetHitscanWeaponAttributes", "IsShotgunWeaponName",
+        "IsHitscanWeaponType", "GetHitscanWeaponAttributes",
         "IsHitscanWeaponName", "IsDistanceAllowed", "ApplyDamageToRock", "OnRockTakeDamage",
     ))
     # Execute the release snapshot statements, using a pre-registered rock.
@@ -56,13 +56,13 @@ enum { WEAPONTYPE_PISTOL=1, WEAPONTYPE_SMG, WEAPONTYPE_RIFLE,
     WEAPONTYPE_SHOTGUN, WEAPONTYPE_SNIPERRIFLE, WEAPONTYPE_MACHINEGUN,
     L4D2IWA_WeaponType, L4D2IWA_Damage, L4D2IWA_Bullets, L4D2FWA_Range,
     L4D2FWA_RangeModifier, Prop_Send, NetFlow_Outgoing };
-constexpr int Frame_DetonateRock=0, DMG_BULLET=2, DMG_BUCKSHOT=0x20000000;
+constexpr int Frame_DetonateRock=0, DMG_BULLET=2;
 struct Cvar { float FloatValue=0; bool BoolValue=true; };
-Cvar lag{0,true}, unlag{0.35f}, fallback{1.7f}, nativeShotgun{0,true},
+Cvar lag{0,true}, unlag{0.35f}, fallback{1.7f},
     releaseTime{0.15f}, minRange{1}, maxRange{2000},
     hitbox{0,true}, print{0,false};
 Cvar *g_cvRockLagComp=&lag, *g_cvMaxUnlag=&unlag,
-    *g_cvRockGodframes=&fallback, *g_cvNativeShotgun=&nativeShotgun,
+    *g_cvRockGodframes=&fallback,
     *g_cvRockReleaseGodframes=&releaseTime, *g_cvRangeMinAll=&minRange,
     *g_cvRangeMaxAll=&maxRange, *g_cvRockHitbox=&hitbox, *g_cvRockPrint=&print;
 struct Records {
@@ -175,29 +175,35 @@ int main() {
     assert(!IsRockDamageAllowed(0,10.69f) && IsRockDamageAllowed(0,10.71f));
     fallback.FloatValue=0; assert(!IsRockDamageAllowed(0,8) && IsRockDamageAllowed(0,9));
     float dmg,range,modifier;
-    assert(!GetHitscanWeaponAttributes("shotgun_chrome",dmg,range,modifier));
-    nativeShotgun.BoolValue=false;
     assert(GetHitscanWeaponAttributes("shotgun_chrome",dmg,range,modifier) && dmg==256);
-    nativeShotgun.BoolValue=true;
+    // The restored whole-shot ray includes range falloff, then breaks once.
+    ApplyDamageToRock(0,10,"shotgun_chrome",dmg,range,modifier,1000,false);
+    assert(requests==1);
+    ApplyDamageToRock(0,10,"shotgun_chrome",dmg,range,modifier,1000,false);
+    assert(requests==1);
+    g_aRockEntities.Set(0,0,BLOCK_DETONATING); requests=0;
     weaponType=WEAPONTYPE_SMG;
     assert(GetHitscanWeaponAttributes("smg",dmg,range,modifier) && dmg==24);
-    // Engine pellet damage is counted once, with no second distance falloff.
+    // Native pellet callbacks must not count a second time after weapon_fire.
     weaponType=WEAPONTYPE_SHOTGUN; latency=0; lerp=0;
     int attacker=1,inflictor=1,damageType=DMG_BULLET;
     dmg=40; assert(OnRockTakeDamage(10,attacker,inflictor,dmg,damageType)==Plugin_Handled);
-    assert(dmg==0 && g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==40 && requests==0);
+    assert(dmg==0 && g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==0 && requests==0);
     // Holding a shotgun must not classify a delayed blast as a pellet hit.
     damageType=64; dmg=50;
     OnRockTakeDamage(10,attacker,inflictor,dmg,damageType);
-    assert(g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==40);
+    assert(g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==0);
     damageType=DMG_BULLET;
     weaponType=WEAPONTYPE_SMG; dmg=24;
     OnRockTakeDamage(10,attacker,inflictor,dmg,damageType);
-    assert(g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==40);
-    weaponType=WEAPONTYPE_SHOTGUN; dmg=65;
-    OnRockTakeDamage(10,attacker,inflictor,dmg,damageType);
-    assert(requests==1); dmg=65;
-    OnRockTakeDamage(10,attacker,inflictor,dmg,damageType); assert(requests==1);
+    assert(g_aRockEntities.Get(0,BLOCK_DMG_DEALT)==0);
+    // Automatic weapons still accumulate successive hits with range falloff.
+    weaponType=WEAPONTYPE_MACHINEGUN;
+    assert(GetHitscanWeaponAttributes("rifle_m60",dmg,range,modifier) && dmg==24);
+    for(int i=0;i<4;i++) ApplyDamageToRock(0,10,"rifle_m60",dmg,range,modifier,100,false);
+    assert(requests==0 && g_aRockEntities.Get(0,BLOCK_DMG_DEALT)>90);
+    ApplyDamageToRock(0,10,"rifle_m60",dmg,range,modifier,100,false);
+    assert(requests==1);
     // Explicitly excluded rocks must retain their engine damage.
     tracked=false; dmg=16;
     assert(OnRockTakeDamage(10,attacker,inflictor,dmg,damageType)==Plugin_Continue && dmg==16);

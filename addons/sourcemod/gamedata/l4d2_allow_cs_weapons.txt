@@ -2,14 +2,28 @@
 {
 	"left4dead2"
 	{
-		"Functions"
+		"MemPatches"
 		{
 			"CDirectorItemManager::AreCSWeaponsAllowed"
 			{
 				"signature"	"CDirectorItemManager::AreCSWeaponsAllowed"
-				"callconv"	"cdecl"
-				"return"	"bool"
-				"this"		"ignore"
+				// Return true at entry, before any stack setup or mission-info calls.
+				"linux"
+				{
+					"offset"	"0"
+					// push ebp; mov ebp, esp; sub esp, 0x18
+					"verify"	"\x55\x89\xE5\x83\xEC\x18"
+					// mov eax, 1; ret
+					"patch"		"\xB8\x01\x00\x00\x00\xC3"
+				}
+				"windows"
+				{
+					"offset"	"0"
+					// call CTerrorGameRules::GetMissionInfo; test eax, eax
+					"verify"	"\xE8\x2A\x2A\x2A\x2A\x85\xC0"
+					// mov eax, 1; ret; nop
+					"patch"		"\xB8\x01\x00\x00\x00\xC3\x90"
+				}
 			}
 		}
 

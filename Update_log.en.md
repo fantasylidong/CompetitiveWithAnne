@@ -619,3 +619,10 @@
 - Rock protection and historical hits use the same shooter time. Rollback uses outgoing latency plus interpolation, bounded by `sv_maxunlag` and valid history. The approximate aim ray checks obstructions and damages only the nearest rock.
 - `sm_rock_native_shotgun 1` uses actual engine shotgun hit damage instead of assigning all pellets to one aim ray. Shotguns do not use this plugin's position rollback; set it to 0 to restore the old approximation.
 - Recompiled `ai_tank3.smx` and `l4d_rock_lagcomp.smx`; updated all six tiers and documentation. Regression checks passed for protection boundaries, rollback history, shotgun damage routing and throw timing. Not deployed to live servers; hit rates and high-latency behavior still need validation.
+
+### October 12, 2026 Anne Pill Management Migrated to Confogl
+
+- Removed the legacy `remove` and `replace` plugins and their load references. Confogl now manages map supplies: the default road-pill limit remains 4 for regular Anne, AllCharger and WitchParty, and 2 for Hardcore and Shotgun. Per-map pill overrides follow Zonemod; c1m4 has no road pills and retains four pills on the finale table.
+- Kept the multiplayer 30%–90% pill window, 40%–80% refill window and door clearance. Finales remain exempt from flow filtering and refilling. Alone and 1vHT default to one road pill each; Confogl retains one finale pill for their single survivor, and map overrides cannot raise the road-pill limit.
+- Fixed Confogl WeaponInformation's entity scan range so gaps in entity indices cannot hide higher-index supplies; rebuilt `confoglcompmod.smx`.
+- Finale pill hints now include the finale table while excluding starting supplies, preventing a false no-pills message; updated `anne_pill_hint.smx` to 1.0.4.

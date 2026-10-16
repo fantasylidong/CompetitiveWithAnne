@@ -10,9 +10,9 @@ import tempfile
 def main():
     root = Path(__file__).resolve().parents[1]
     source = (root / "addons/sourcemod/scripting/optional/AnneHappy/l4d_rock_lagcomp.sp").read_text()
-    start = source.index("bool IsRockDamageAllowed(int rockIndex)")
+    start = source.index("bool IsRockDamageAllowed(int rockIndex, float shotTime)")
     end = source.index("\nvoid UpdateRockRenderByRef", start)
-    predicate = source[start:end]
+    predicate = source[start:end].replace("view_as<float>", "static_cast<float>")
     constants = "\n".join(re.findall(r"^#define BLOCK_\w+ \d+$", source, re.M))
     defaults = dict(re.findall(r'CreateConVar\("(sm_rock_(?:release_)?godframes)", "([\d.]+)"', source))
     assert 'Set(index, -1.0, BLOCK_RELEASE_TIME)' in source
@@ -29,6 +29,7 @@ struct {
 float now;
 float GetGameTime() { return now; }
 PREDICATE
+bool IsRockDamageAllowed(int rockIndex) { return IsRockDamageAllowed(rockIndex, now); }
 int main() {
     auto &rock = g_aRockEntities.data[0];
     rock[BLOCK_SPAWN_TIME] = 0.0f;
@@ -36,21 +37,28 @@ int main() {
     now = 1.69f; assert(!IsRockDamageAllowed(0));
     now = 1.7f; assert(IsRockDamageAllowed(0)); // Missing release still expires.
     rock[BLOCK_RELEASE_TIME] = 1.0f;
+    rock[BLOCK_PROTECTED_UNTIL] = 1.0f + g_cvRockReleaseGodframes.FloatValue;
     now = 1.149f; assert(!IsRockDamageAllowed(0));
     now = 1.151f; assert(IsRockDamageAllowed(0)); // Does not wait for spawn fallback.
     rock[BLOCK_RELEASE_TIME] = 2.0f;
+    rock[BLOCK_PROTECTED_UNTIL] = 2.0f + g_cvRockReleaseGodframes.FloatValue;
     now = 2.149f; assert(!IsRockDamageAllowed(0)); // Late release gets its own window.
     now = 2.151f; assert(IsRockDamageAllowed(0));
     rock[BLOCK_RELEASE_TIME] = 0.0f; // Release at map time zero is valid.
+    rock[BLOCK_PROTECTED_UNTIL] = g_cvRockReleaseGodframes.FloatValue;
     now = 0.0f; assert(!IsRockDamageAllowed(0));
     now = 0.15f; assert(IsRockDamageAllowed(0)); // Exact boundary.
     g_cvRockReleaseGodframes.FloatValue = 0.0f;
+    assert(!IsRockDamageAllowed(0, 0.0f)); // Changes do not shorten a released rock's protection.
+    rock[BLOCK_PROTECTED_UNTIL] = 0.0f; // A new release snapshots the new duration.
     now = 0.0f; assert(IsRockDamageAllowed(0)); // Explicit opt-out.
     g_cvRockReleaseGodframes.FloatValue = 0.15f;
+    rock[BLOCK_PROTECTED_UNTIL] = g_cvRockReleaseGodframes.FloatValue;
     g_cvRockGodframes.FloatValue = 0.0f;
     rock[BLOCK_RELEASE_TIME] = -1.0f; assert(IsRockDamageAllowed(0));
     rock[BLOCK_RELEASE_TIME] = 0.0f; assert(!IsRockDamageAllowed(0));
     g_aRockEntities.data[1][BLOCK_RELEASE_TIME] = 1.0f;
+    g_aRockEntities.data[1][BLOCK_PROTECTED_UNTIL] = 1.15f;
     now = 1.05f;
     assert(IsRockDamageAllowed(0) && !IsRockDamageAllowed(1)); // Per-rock timestamps.
     std::cout << "PASS: rock release protection, fallback, zero-time release, opt-out and independent rocks\n";

@@ -537,6 +537,7 @@ static bool
 	Weapon_bLimitTier2_Safehouse = true,
 	Weapon_bReplaceStartKits = true,
 	Weapon_bReplaceFinaleKits = true,
+	Weapon_bRemoveMapHealth = false,
 	Weapon_bRemoveLaserSight = true,
 	Weapon_bRemoveExtraItems = true;
 
@@ -549,6 +550,7 @@ static ConVar
 	Weapon_hLimitTier2_Safehouse = null,
 	Weapon_hReplaceStartKits = null,
 	Weapon_hReplaceFinaleKits = null,
+	Weapon_hRemoveMapHealth = null,
 	Weapon_hRemoveLaserSight = null,
 	Weapon_hRemoveExtraItems = null;
 
@@ -605,6 +607,7 @@ static void WI_Convar_Setup()
 	Weapon_hLimitTier2_Safehouse = CreateConVarEx("limit_tier2_saferoom", "1", "Limit tier 2 weapons inside safe rooms. Replaces a tier 2 stack with tier 1 upon first weapon pickup", _, true, 0.0, true, 1.0);
 	Weapon_hReplaceStartKits = CreateConVarEx("replace_startkits", "1", "Replaces start medkits with pills", _, true, 0.0, true, 1.0);
 	Weapon_hReplaceFinaleKits = CreateConVarEx("replace_finalekits", "1", "Replaces finale medkits with pills", _, true, 0.0, true, 1.0);
+	Weapon_hRemoveMapHealth = CreateConVarEx("remove_map_health", "0", "Remove map pills, medkits and defibrillators, including saferoom and finale supplies", _, true, 0.0, true, 1.0);
 	Weapon_hRemoveLaserSight = CreateConVarEx("remove_lasersight", "1", "Remove all laser sight upgrades", _, true, 0.0, true, 1.0);
 	Weapon_hRemoveExtraItems = CreateConVarEx("remove_saferoomitems", "1", "Remove all extra items inside saferooms (items for slot 3, 4 and 5, minus medkits)", _, true, 0.0, true, 1.0);
 
@@ -617,6 +620,7 @@ static void WI_Convar_Setup()
 	Weapon_hLimitTier2_Safehouse.AddChangeHook(WI_ConvarChange);
 	Weapon_hReplaceStartKits.AddChangeHook(WI_ConvarChange);
 	Weapon_hReplaceFinaleKits.AddChangeHook(WI_ConvarChange);
+	Weapon_hRemoveMapHealth.AddChangeHook(WI_ConvarChange);
 	Weapon_hRemoveLaserSight.AddChangeHook(WI_ConvarChange);
 	Weapon_hRemoveExtraItems.AddChangeHook(WI_ConvarChange);
 }
@@ -630,6 +634,7 @@ static void ConVarsInType()
 	Weapon_bLimitTier2_Safehouse = Weapon_hLimitTier2_Safehouse.BoolValue;
 	Weapon_bReplaceStartKits = Weapon_hReplaceStartKits.BoolValue;
 	Weapon_bReplaceFinaleKits = Weapon_hReplaceFinaleKits.BoolValue;
+	Weapon_bRemoveMapHealth = Weapon_hRemoveMapHealth.BoolValue;
 	Weapon_bRemoveLaserSight = Weapon_hRemoveLaserSight.BoolValue;
 	Weapon_bRemoveExtraItems = Weapon_hRemoveExtraItems.BoolValue;
 }
@@ -1246,14 +1251,32 @@ static Action WI_RoundStartLoop(Handle hTimer)
 	Weapon_iKitCount = 0;
 
 	char entclass[MAX_ENTITY_NAME_LENGTH];
-	int iEntity, iWeaponIndex, entcount = GetEntityCount();
+	int iEntity, iWeaponIndex, entcount = GetMaxEntities();
 
-	for (iEntity = (MaxClients + 1); iEntity <= entcount; iEntity++) {
+	for (iEntity = (MaxClients + 1); iEntity < entcount; iEntity++) {
 		if (!IsValidEdict(iEntity)) {
 			continue;
 		}
 
 		GetEdictClassname(iEntity, entclass, sizeof(entclass));
+
+		// Solo modes remove map supplies before kit conversion and ItemTracking.
+		// Only spawners are considered; carried or dropped player items are untouched.
+		if (Weapon_bRemoveMapHealth) {
+			bool removeHealth = StrEqual(entclass, "weapon_pain_pills_spawn")
+				|| StrEqual(entclass, "weapon_first_aid_kit_spawn")
+				|| StrEqual(entclass, "weapon_defibrillator_spawn");
+			if (StrEqual(entclass, "weapon_spawn")) {
+				int weaponId = GetEntProp(iEntity, Prop_Send, "m_weaponID");
+				removeHealth = weaponId == view_as<int>(L4D2WeaponId_PainPills)
+					|| weaponId == view_as<int>(L4D2WeaponId_FirstAidKit)
+					|| weaponId == view_as<int>(L4D2WeaponId_Defibrillator);
+			}
+			if (removeHealth) {
+				KillEntity(iEntity);
+				continue;
+			}
+		}
 
 		iWeaponIndex = WI_GetWeaponIndex(iEntity, entclass);
 		if (iWeaponIndex != WEAPON_NULL_INDEX) {

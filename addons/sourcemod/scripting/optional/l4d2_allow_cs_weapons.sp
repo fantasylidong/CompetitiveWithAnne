@@ -3,16 +3,18 @@
 
 #include <sourcemod>
 #include <sdkhooks>
-#include <dhooks>
+#include <sourcescramble>
 
 #define GAMEDATA "l4d2_allow_cs_weapons"
+
+MemoryPatch g_hPatch;
 
 public Plugin myinfo =
 {
 	name = "[L4D2] Allow CS weapons on every map.",
 	author = "Sir",
 	description = "Force weapon spawners to ignore the 'no_cs_weapons' KeyValue, allowing for CS weapons on every map.",
-	version = "1.1"
+	version = "1.2"
 };
 
 public void OnPluginStart()
@@ -21,14 +23,20 @@ public void OnPluginStart()
 	if (hGameData == null)
 		SetFailState("Failed to load \"%s.txt\" gamedata.", GAMEDATA);
 
-	DynamicDetour hDetour = DynamicDetour.FromConf(hGameData, "CDirectorItemManager::AreCSWeaponsAllowed");
-	if (!hDetour)
-		SetFailState("Missing signature \"CDirectorItemManager::AreCSWeaponsAllowed\"");
-	if (!hDetour.Enable(Hook_Pre, DirectorItemManager_AreCSWeaponsAllowed))
-		SetFailState("Failed to detour \"CDirectorItemManager::AreCSWeaponsAllowed\"");
-
-	delete hDetour;
+	g_hPatch = MemoryPatch.CreateFromConf(hGameData, "CDirectorItemManager::AreCSWeaponsAllowed");
 	delete hGameData;
+	if (g_hPatch == null)
+		SetFailState("Failed to create patch \"CDirectorItemManager::AreCSWeaponsAllowed\"");
+	if (!g_hPatch.Validate())
+		SetFailState("Failed to validate patch \"CDirectorItemManager::AreCSWeaponsAllowed\"");
+	if (!g_hPatch.Enable())
+		SetFailState("Failed to enable patch \"CDirectorItemManager::AreCSWeaponsAllowed\"");
+}
+
+public void OnPluginEnd()
+{
+	// SourceScramble restores the original bytes when the patch handle is closed.
+	delete g_hPatch;
 }
 
 public void OnEntityCreated(int entity, const char[] classname)
@@ -39,7 +47,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 
 /*
 	Must run before Spawn: spawners with "spawn_without_director" "1" pick their weapon
-	inside Spawn() itself, and the entity-level KeyValue is checked before the detoured
+	inside Spawn() itself, and the entity-level KeyValue is checked before the patched
 	CDirectorItemManager::AreCSWeaponsAllowed ever runs, so it has to be cleared here.
 */
 Action WeaponSpawner_OnSpawn(int entity)
@@ -58,10 +66,4 @@ bool IsWeaponSpawnerClass(const char[] classname)
 
 	int len = strlen(classname);
 	return len >= 12 && StrEqual(classname[len - 6], "_spawn");
-}
-
-MRESReturn DirectorItemManager_AreCSWeaponsAllowed(DHookReturn hReturn)
-{
-	hReturn.Value = true;
-	return MRES_Supercede;
 }

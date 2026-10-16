@@ -38,7 +38,7 @@ public Plugin myinfo =
     name        = "Ai-Tank 3",
     author      = "夜羽真白, AnneHappy",
     description = "Ai Tank 增强 3.0 版本（路径感知连跳、梯子让行、寻路距离选目标、反头顶卡、骑头反制、投石瞄准等）",
-    version     = "2.3.2",
+    version     = "2.3.3",
     url         = "https://steamcommunity.com/id/saku_ra/"
 };
 
@@ -85,9 +85,9 @@ public void OnPluginStart()
     g_cvAirVecModifyInterval = CreateConVar("ai_tank3_airvec_modify_interval", "0.3", "空中转向平滑响应时间(秒)，每0.05秒检查一次", CVAR_FLAGS, true, 0.1);
 
     // 投石 / 挥拳
-    g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "200", "普通投石目标的最小距离，范围外另选可见目标，无合适目标不起手；反卡位强制投石除外", CVAR_FLAGS, true, 0.0);
-    g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "450", "普通投石目标的最大距离，范围外另选可见目标，无合适目标不起手；反卡位计划也以此限制射程", CVAR_FLAGS, true, 0.0);
-    g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "起手与出手时在投石距离范围内选择最近的可视生还者，0=只检查当前追击目标（强制投石计划指定的目标除外）", CVAR_FLAGS, true, 0.0, true, 1.0);
+    g_cvThrowMinDist = CreateConVar("ai_tank3_throw_min_dist", "200", "普通投石起手的最小距离，范围外另选可见目标，无合适目标不起手；已起手的弹道修正不受此限制，反卡位强制投石除外", CVAR_FLAGS, true, 0.0);
+    g_cvThrowMaxDist = CreateConVar("ai_tank3_throw_max_dist", "450", "普通投石起手的最大距离，范围外另选可见目标，无合适目标不起手；已起手的弹道修正不受此限制，反卡位计划也以此限制射程", CVAR_FLAGS, true, 0.0);
+    g_cvRockTargetAdjust = CreateConVar("ai_tank3_rock_target_adjust", "1", "投石选择最近的可视生还者；起手限制距离，出手优先范围内目标，无人符合则允许范围外目标；0=只检查当前追击目标（强制投石计划指定的目标除外）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBackFist = CreateConVar("ai_tank3_back_fist", "1", "允许通背拳（可拍背后的人）", CVAR_FLAGS, true, 0.0, true, 1.0);
     g_cvBackFistRange = CreateConVar("ai_tank3_back_fist_range", "128.0", "通背拳距离（-1 使用 tank_swing_range）", CVAR_FLAGS, true, -1.0);
     g_cvBackFistAllowMaxSpd = CreateConVar("ai_tank3_back_fist_max_spd", "50.0", "通背拳允许的最大移动速度（超过禁用）", CVAR_FLAGS, true, -1.0);

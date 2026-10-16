@@ -353,8 +353,8 @@
 | `optional/l4d2_weapon_attributes.smx` | `sm_weaponstats` | 玩家/控制台 | - | - | 34 个模式 |
 | `optional/l4d2_weaponrules.smx` | `l4d2_addweaponrule` | 服务器配置 | - | - | 32 个模式 |
 | `optional/l4d2_weaponrules.smx` | `l4d2_resetweaponrules` | 服务器配置 | - | - | 32 个模式 |
-| `optional/l4d2lib.smx` | `confogl_midata_save` | 管理员 | ADMFLAG_CONFIG | - | 34 个模式 |
-| `optional/l4d2lib.smx` | `confogl_save_location` | 管理员 | ADMFLAG_CONFIG | - | 34 个模式 |
+| `l4d2lib.smx` | `confogl_midata_save` | 管理员 | ADMFLAG_CONFIG | - | 启动自动加载及 34 个模式 |
+| `l4d2lib.smx` | `confogl_save_location` | 管理员 | ADMFLAG_CONFIG | - | 启动自动加载及 34 个模式 |
 | `optional/lerpmonitor.smx` | `sm_lerps` | 玩家/控制台 | - | List the Lerps of all players in game | 34 个模式 |
 | `optional/MeleeInTheSafeRoom.smx` | `sm_melee` | 管理员 | ADMFLAG_KICK | Lists all melee weapons spawnable in current campaign | 13 个模式 |
 | `optional/network_quality_hint.smx` | `sm_loss` | 玩家/控制台 | - | Show your network status. | 32 个模式 |

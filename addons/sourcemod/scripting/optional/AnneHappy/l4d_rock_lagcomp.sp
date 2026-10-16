@@ -2,9 +2,9 @@
  * L4D2 Tank Rock Lag Compensation
  *
  * Keeps a short server-side position history for tank rocks and tests survivor
- * weapon_fire rays against the position the shooter saw. Shotguns use native
- * pellet damage instead of treating every pellet as a hit on the aim ray.
- * Other hitscan damage/range use the current Left4DHooks weapon attributes.
+ * weapon_fire rays against the position the shooter saw. Shotguns retain the
+ * whole-shot aim-ray approximation. Hitscan damage/range use the current
+ * Left4DHooks weapon attributes.
  */
 
 #pragma semicolon 1
@@ -37,7 +37,6 @@ ConVar g_cvRockGodframesRender;
 ConVar g_cvRockHitboxRadius;
 ConVar g_cvRangeMinAll;
 ConVar g_cvRangeMaxAll;
-ConVar g_cvNativeShotgun;
 ConVar g_cvMaxUnlag;
 
 ArrayList g_aRockEntities;
@@ -47,7 +46,7 @@ public Plugin myinfo =
 	name = "L4D(2) Tank Rock Lag Compensation",
 	author = "Luckylockm, harry, Silvers, AnneHappy",
 	description = "Provides lag compensation and weapon-attribute damage handling for tank rocks",
-	version = "2.2.1-anne",
+	version = "2.2.2-anne",
 	url = "https://github.com/LuckyServ/"
 };
 
@@ -63,7 +62,6 @@ public void OnPluginStart()
 	g_cvRockHitboxRadius = CreateConVar("sm_rock_hitbox_radius", "30", "Custom rock hitbox radius", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMinAll = CreateConVar("sm_rock_range_min_all", "1", "Global minimum distance for hitscan rock damage", FCVAR_NONE, true, 0.0, true, 10000.0);
 	g_cvRangeMaxAll = CreateConVar("sm_rock_range_max_all", "2000", "Global maximum distance for rock damage; 0 disables this cap", FCVAR_NONE, true, 0.0, true, 10000.0);
-	g_cvNativeShotgun = CreateConVar("sm_rock_native_shotgun", "1", "Use native shotgun pellet hits and damage (no custom position rollback); 0 restores the whole-shot aim-ray approximation", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvMaxUnlag = FindConVar("sv_maxunlag");
 
 	g_aRockEntities = new ArrayList(BLOCK_COUNT);
@@ -189,16 +187,11 @@ public Action OnRockTakeDamage(int victim, int &attacker, int &inflictor, float 
 		return Plugin_Handled;
 	}
 
-	bool nativeShotgun = g_cvNativeShotgun.BoolValue && (damagetype & (DMG_BULLET | DMG_BUCKSHOT)) != 0 && IsShotgunWeaponName(weaponName);
-	if ((IsHitscanWeaponName(weaponName) && !nativeShotgun) || incomingDamage <= 0.0) {
+	// Hitscan shots, including shotguns, are counted once by weapon_fire.
+	if (IsHitscanWeaponName(weaponName) || incomingDamage <= 0.0) {
 		return Plugin_Handled;
 	}
-	// Native pellet collisions stay native; only protection uses the shooter's time.
-	float shotTime = GetGameTime();
-	if (nativeShotgun) {
-		shotTime -= float(GetRollbackTicks(attacker)) * GetTickInterval();
-	}
-	if (!IsRockDamageAllowed(rockIndex, shotTime)) {
+	if (!IsRockDamageAllowed(rockIndex, GetGameTime())) {
 		return Plugin_Handled;
 	}
 	float eyePos[3];
@@ -336,9 +329,6 @@ bool GetHitscanWeaponAttributes(const char[] weaponName, float &damage, float &r
 	if (!IsHitscanWeaponType(weaponType)) {
 		return false;
 	}
-	if (g_cvNativeShotgun.BoolValue && weaponType == view_as<int>(WEAPONTYPE_SHOTGUN)) {
-		return false;
-	}
 
 	int baseDamage = L4D2_GetIntWeaponAttribute(normalized, L4D2IWA_Damage);
 	if (baseDamage <= 0) {
@@ -366,11 +356,6 @@ bool IsHitscanWeaponName(const char[] weaponName)
 	}
 
 	return IsHitscanWeaponType(L4D2_GetIntWeaponAttribute(normalized, L4D2IWA_WeaponType));
-}
-
-bool IsShotgunWeaponName(const char[] weaponName)
-{
-	return IsWeaponAttributeReadable(weaponName) && L4D2_GetIntWeaponAttribute(weaponName, L4D2IWA_WeaponType) == view_as<int>(WEAPONTYPE_SHOTGUN);
 }
 
 bool IsWeaponAttributeReadable(const char[] weaponName)

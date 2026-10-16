@@ -272,7 +272,7 @@ bool Combat_IsNormalRockTarget(int survivor)
         !IsClientHanging(survivor) && !isPinnedByHunterOrCharger(survivor);
 }
 
-int Combat_SelectNormalRockTarget(int tank)
+int Combat_SelectNormalRockTarget(int tank, bool limitDistance = true)
 {
     float tankPos[3];
     GetClientAbsOrigin(tank, tankPos);
@@ -292,7 +292,7 @@ int Combat_SelectNormalRockTarget(int tank)
         float survivorPos[3];
         GetClientAbsOrigin(survivor, survivorPos);
         float dist = GetVectorDistance(tankPos, survivorPos);
-        if (dist < g_cvThrowMinDist.FloatValue || dist > g_cvThrowMaxDist.FloatValue)
+        if (limitDistance && (dist < g_cvThrowMinDist.FloatValue || dist > g_cvThrowMaxDist.FloatValue))
             continue;
         if (best == -1 || dist < bestDist)
         {
@@ -317,8 +317,10 @@ public Action L4D_TankRock_OnRelease(int tank, int rock, float vecPos[3], float 
 
     if (!IsValidSurvivor(aimTarget) || !IsPlayerAlive(aimTarget))
     {
-        // 出手时重新选范围内的目标；已起手但无人符合时保留原生弹道。
+        // 出手仍优先选范围内目标；已起手后距离变化不能让预判与弹道修正失效。
         aimTarget = Combat_SelectNormalRockTarget(tank);
+        if (aimTarget <= 0)
+            aimTarget = Combat_SelectNormalRockTarget(tank, false);
         if (aimTarget <= 0)
             return Plugin_Continue;
     }
