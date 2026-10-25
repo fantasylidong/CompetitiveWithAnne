@@ -191,7 +191,7 @@
 		}
 		"sm_cvar ZonemodWeapon 1"
 		{
-			"message" "zonemod2.6.4枪械"
+			"message" "zonemod2.9.2b枪械"
 		}
 		"sm_cvar ZonemodWeapon 2"
 		{

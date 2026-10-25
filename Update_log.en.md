@@ -632,6 +632,17 @@
 - Disabled airborne back-facing for Hunter and Jockey across all six tiers: Easy, Normal, Hard, Expert, Extreme and Neri. Both `ai_hunter_back_vision` and `ai_JockeyBackVision` are now `0`; the Jockey baseline is also `0` in AnneHappy, Hardcore and Shotgun.
 - Fixed `ai_hunter_2` potentially turning backward when both the configured probability and random roll were `0`. The back-facing action now requires the current probability to be greater than `0`. Recompiled `ai_hunter_2.smx`; all six tier settings were checked and compilation passed.
 
+### October 18, 2026 Anne Weapon Vote Synced with Zonemod 2.9.2b
+
+- Updated the Zonemod weapon option in Anne mode vote menus from 2.6.4 to 2.9.2b, and synchronized `cfg/vote/weapon/zonemod.cfg` with the current Uzi, silenced SMG, MP5 and Magnum parameters.
+- Kept the existing AnneHappy / AnneHappyPlus Uzi and silenced SMG balance, and added the MP5 baseline: 26 damage, 2000 range, 0.80 falloff modifier, 2.35 movement spread, 2.7-second reload and a 60-round clip.
+
+### October 19, 2026 Anne SMGs Rebalanced by Distance
+
+- Adapted the Zonemod 2.9.2b roles: the silenced SMG provides close-range burst damage, the MP5 supports extended firing at medium range, and the Uzi favors distance and accuracy. In Uzi / silenced SMG / MP5 order, damage per bullet is 24 / 32 / 31 in AnneHappy and 26 / 35 / 34 in AnneHappyPlus; both profiles use range modifiers of 0.83 / 0.65 / 0.80.
+- Set MP5 spread per shot to 0.24 and movement spread to 1.8 in both profiles. Its 60-round clip, 2.7-second reload and 2000 range provide a longer uninterrupted firing window with a longer reload as the tradeoff.
+- AnneHappyPlus Tank damage multipliers are 0.91 / 0.92 / 0.91 for the Uzi / silenced SMG / MP5, keeping each weapon's damage against Tanks close to its regular AnneHappy counterpart.
+
 ### October 24, 2026 Sync upstream/master through bb375533f
 
 - Merged 16 commits from SirPlease/L4D2-Competitive-Rework after Zonemod 2.9.2 (`8809937d0`), through `bb375533f` on October 23, 2026.

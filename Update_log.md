@@ -1216,6 +1216,17 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 简单、普通、困难、专家、极限、音理六档统一关闭 Hunter 和 Jockey 的空中背身，`ai_hunter_back_vision` / `ai_JockeyBackVision` 均设为 `0`；AnneHappy、Hardcore、Shotgun 三套模式的 Jockey 基础值同步设为 `0`。
 - 修正 `ai_hunter_2` 在背身概率为 `0`、随机值恰好也为 `0` 时仍可能触发背身的问题：执行背身前检查当前概率必须大于 `0`。已重新编译 `ai_hunter_2.smx`，六档配置核验与编译通过。
 
+### 2026年10月18日 Anne 武器投票同步 Zonemod 2.9.2b
+
+- 将 Anne 模式投票菜单中的 Zonemod 武器选项从 2.6.4 更新为 2.9.2b，并同步 `cfg/vote/weapon/zonemod.cfg` 的 Uzi、消音 SMG、MP5 和 Magnum 参数。
+- AnneHappy / AnneHappyPlus 保留各自 Uzi、消音 SMG 平衡，补入 MP5 的 26 伤害、2000 射程、0.80 衰减、2.35 移动散布、2.7 秒换弹和 60 发弹匣。
+
+### 2026年10月19日 Anne 冲锋枪按距离重新平衡
+
+- 参考 Zonemod 2.9.2b 的分工，将消音 SMG 定位为近距离爆发、MP5 定位为中距离持续射击、Uzi 定位为远距离与精度。按 Uzi / 消音 SMG / MP5 顺序，AnneHappy 单发伤害为 24 / 32 / 31，AnneHappyPlus 为 26 / 35 / 34；两档距离衰减系数统一为 0.83 / 0.65 / 0.80。
+- 两档 MP5 的每发散布设为 0.24、移动散布设为 1.8，保留 60 发弹匣、2.7 秒换弹和 2000 射程，使其拥有较长的连续射击窗口，并以较长换弹作为取舍。
+- AnneHappyPlus 的 Uzi / 消音 SMG / MP5 对 Tank 伤害倍率分别为 0.91 / 0.92 / 0.91，使三把枪对 Tank 的输出接近各自的普通 AnneHappy 数值。
+
 ### 2026年10月24日 同步 upstream/master 至 bb375533f
 
 - 合入 SirPlease/L4D2-Competitive-Rework 自 Zonemod 2.9.2（`8809937d0`）之后的 16 个提交，至 2026-10-23 的 `bb375533f`。

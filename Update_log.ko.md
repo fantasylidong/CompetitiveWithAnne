@@ -632,6 +632,17 @@
 - 쉬움·보통·어려움·전문가·극한·음리의 6단계 모두에서 Hunter와 Jockey가 공중에서 등을 돌리는 동작을 비활성화했습니다. `ai_hunter_back_vision` / `ai_JockeyBackVision`을 모두 `0`으로 설정하고 AnneHappy·Hardcore·Shotgun의 Jockey 기준값도 `0`으로 통일했습니다.
 - `ai_hunter_2`에서 설정 확률과 난수가 모두 `0`이면 등을 돌릴 수 있던 문제를 수정했습니다. 동작 실행 전에 현재 확률이 `0`보다 큰지 확인합니다. `ai_hunter_2.smx`를 다시 컴파일했으며 6단계 설정 확인과 컴파일을 통과했습니다.
 
+### 2026년 10월 18일 Anne 무기 투표를 Zonemod 2.9.2b로 동기화
+
+- Anne 모드 투표 메뉴의 Zonemod 무기 항목을 2.6.4에서 2.9.2b로 업데이트하고 `cfg/vote/weapon/zonemod.cfg`의 Uzi, 소음 SMG, MP5, Magnum 설정을 최신 값으로 동기화했습니다.
+- AnneHappy / AnneHappyPlus의 기존 Uzi와 소음 SMG 밸런스는 유지하고 MP5에 피해량 26, 사거리 2000, 감쇠 계수 0.80, 이동 산포 2.35, 재장전 2.7초, 60발 탄창을 추가했습니다.
+
+### 2026년 10월 19일 Anne SMG 거리별 밸런스 조정
+
+- Zonemod 2.9.2b의 역할 구분을 참고해 소음 SMG는 근거리 순간 화력, MP5는 중거리 연속 사격, Uzi는 원거리와 정확도에 중점을 두도록 조정했습니다. Uzi / 소음 SMG / MP5 순서로 발당 피해량은 AnneHappy가 24 / 32 / 31, AnneHappyPlus가 26 / 35 / 34이며, 두 설정의 거리 감쇠 계수는 0.83 / 0.65 / 0.80으로 통일했습니다.
+- 두 설정에서 MP5의 발당 산포를 0.24, 이동 산포를 1.8로 설정했습니다. 60발 탄창, 2.7초 재장전, 사거리 2000을 유지해 오래 연속으로 사격할 수 있는 대신 재장전 시간이 길도록 했습니다.
+- AnneHappyPlus의 Tank 대상 피해 배율은 Uzi / 소음 SMG / MP5 순서로 0.91 / 0.92 / 0.91이며, 각 무기의 Tank 대상 화력을 일반 AnneHappy에 가깝게 맞췄습니다.
+
 ### 2026년 10월 24일 upstream/master를 bb375533f까지 동기화
 
 - SirPlease/L4D2-Competitive-Rework의 Zonemod 2.9.2(`8809937d0`) 이후 16개 커밋을 2026년 10월 23일의 `bb375533f`까지 병합했습니다.
