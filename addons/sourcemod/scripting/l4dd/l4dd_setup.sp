@@ -37,7 +37,7 @@ void SetupForwardsNatives()
 	// ====================================================================================================
 	// FORWARDS
 	// List should match the CreateDetour list of forwards.
-	g_hFWD_OnMapStartPost													= new GlobalForward("L4D_OnMapStart_Left4DHooks",						ET_Event);
+	g_hFWD_OnMapStartPost													= new GlobalForward("L4D_OnLeft4DHooks_OnMapStart",						ET_Event);
 	g_hFWD_GameModeChange													= new GlobalForward("L4D_OnGameModeChange",								ET_Event, Param_Cell);
 	g_hFWD_ZombieManager_SpawnSpecial										= new GlobalForward("L4D_OnSpawnSpecial",								ET_Event, Param_CellByRef, Param_Array, Param_Array);
 	g_hFWD_ZombieManager_SpawnSpecial_Post									= new GlobalForward("L4D_OnSpawnSpecial_Post",							ET_Event, Param_Cell, Param_Cell, Param_Array, Param_Array);
@@ -172,6 +172,8 @@ void SetupForwardsNatives()
 	// g_hFWD_BossZombiePlayerBot_ChooseVictim_Pre								= new GlobalForward("L4D2_OnChooseVictim_Pre",							ET_Event, Param_Cell, Param_CellByRef, Param_CellByRef, Param_CellByRef, Param_CellByRef); // For a future update
 	g_hFWD_BossZombiePlayerBot_ChooseVictim_Pre								= new GlobalForward("L4D2_OnChooseVictim_Pre",							ET_Event, Param_Cell, Param_CellByRef);
 	g_hFWD_BossZombiePlayerBot_ChooseVictim_Post							= new GlobalForward("L4D2_OnChooseVictim",								ET_Event, Param_Cell, Param_CellByRef);
+	g_hFWD_CTerrorPlayer_SetClass											= new GlobalForward("L4D_OnSetClass",									ET_Event, Param_Cell, Param_CellByRef);
+	g_hFWD_CTerrorPlayer_SetClass_Post										= new GlobalForward("L4D_OnSetClass_Post",								ET_Event, Param_Cell, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_Pre							= new GlobalForward("L4D_OnMaterializeFromGhostPre",					ET_Event, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_Post							= new GlobalForward("L4D_OnMaterializeFromGhost",						ET_Event, Param_Cell);
 	g_hFWD_CTerrorPlayer_MaterializeFromGhost_PostHandled					= new GlobalForward("L4D_OnMaterializeFromGhost_PostHandled",			ET_Event, Param_Cell);
@@ -330,6 +332,10 @@ void SetupForwardsNatives()
 	CreateNative("AnimHookDisable",		 							Native_AnimHookDisable);
 	CreateNative("AnimGetActivity",		 							Native_AnimGetActivity);
 	CreateNative("AnimGetFromActivity",		 						Native_AnimGetFromActivity);
+
+	// ENTITY INPUT/OUTPUT HOOK
+	CreateNative("L4D_HookEntityInput",								Native_HookEntityInput);
+	CreateNative("L4D_UnhookEntityInput",							Native_UnhookEntityInput);
 
 
 

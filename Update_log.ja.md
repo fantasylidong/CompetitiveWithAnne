@@ -631,3 +631,12 @@
 
 - 簡単・普通・困難・専門家・極限・音理の全6段階で、Hunter と Jockey が空中で背を向ける動作を無効にしました。`ai_hunter_back_vision` / `ai_JockeyBackVision` はともに `0` とし、AnneHappy・Hardcore・Shotgun の Jockey 基準値も `0` に統一しました。
 - `ai_hunter_2` で設定確率と乱数がともに `0` の場合にも背を向ける可能性があった問題を修正しました。動作の実行前に現在の確率が `0` より大きいことを確認します。`ai_hunter_2.smx` を再コンパイルし、全6段階の設定確認とコンパイルを完了しました。
+
+### 2026年10月24日 upstream/master を bb375533f まで同期
+
+- SirPlease/L4D2-Competitive-Rework の Zonemod 2.9.2（`8809937d0`）以降 16 件を、2026年10月23日の `bb375533f` まで取り込みました。
+- Left4DHooks を 1.174 に更新しました。`left4dhooks_version` と `l4d2_addons_eclipse` は引き続き `FCVAR_NONE` で、A2S rules には出しません。自動更新はオフのままです。
+- `predictable_unloader` を `plugin_manager` に置き換えました。Anne 各モードの `confogl_off.cfg` は `pm_unload_plugins refresh` で終わるようにしました。`plugin_manager.smx` が読み込まれていない場合、試合モードの読み込みと変更は拒否され、プレイヤーに通知します。
+- 近接武器の出現修正、Tank の破壊可能オブジェクト発光の書き換え、ReadyUp 10.2.9、薬の受け渡し中のリロード、弾倉リロード修正、感染者用はしごの当たり判定修正、fullupdate 修正を同期しました。Tank 発光の ConVar は引き続き A2S rules に出しません。Anne モードでは、生存者が Tank を観戦するとき制御を Bot に戻します。突進中の Charger は途中でキックされません。
+- 公式マップ c7m3 の固定ダンプスターにある見えるはしごを、`zonemod` と `zonemod_anne` の stripper に同期しました。
+- `left4dhooks.smx`、`confoglcompmod.smx`、`playermanagement.smx`、`l4d2_tank_props_glow.smx`、`readyup.smx` を再コンパイルしました。

@@ -72,4 +72,8 @@
 	{
 		"en"		"{blue}[{default}Confogl{blue}]{default} This command can only be used by an in-game player."
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"en"		"{blue}[{default}Confogl{blue}]{default} {olive}plugin_manager.smx{default} is required to load or change match modes."
+	}
 }

@@ -287,7 +287,7 @@ stock void L4D2_SetPlayerZombieClass(int client, L4D2ZombieClassType class)
 stock char[] L4D1_GetZombieClassname(L4D1ZombieClassType type)
 {
 	char temp[32];
-	strcopy(temp, sizeof(temp), L4D2ZombieClassname[type]); // Copying because of SM 1.12 error 413: returned array does not have the same dimension count as return type
+	strcopy(temp, sizeof(temp), L4D1ZombieClassname[type]); // Copying because of SM 1.12 error 413: returned array does not have the same dimension count as return type
 	return temp;
 
 	// return L4D1ZombieClassname[type]; // Does not work on SM 1.12

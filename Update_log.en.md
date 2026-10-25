@@ -631,3 +631,12 @@
 
 - Disabled airborne back-facing for Hunter and Jockey across all six tiers: Easy, Normal, Hard, Expert, Extreme and Neri. Both `ai_hunter_back_vision` and `ai_JockeyBackVision` are now `0`; the Jockey baseline is also `0` in AnneHappy, Hardcore and Shotgun.
 - Fixed `ai_hunter_2` potentially turning backward when both the configured probability and random roll were `0`. The back-facing action now requires the current probability to be greater than `0`. Recompiled `ai_hunter_2.smx`; all six tier settings were checked and compilation passed.
+
+### October 24, 2026 Sync upstream/master through bb375533f
+
+- Merged 16 commits from SirPlease/L4D2-Competitive-Rework after Zonemod 2.9.2 (`8809937d0`), through `bb375533f` on October 23, 2026.
+- Updated Left4DHooks to 1.174. `left4dhooks_version` and `l4d2_addons_eclipse` stay on `FCVAR_NONE`, so they are not published in A2S rules. Auto-update remains off.
+- Replaced `predictable_unloader` with `plugin_manager`. Anne mode `confogl_off.cfg` files now end with `pm_unload_plugins refresh`. Loading or changing a match mode is refused, with a player-facing notice, when `plugin_manager.smx` is not loaded.
+- Brought in the upstream melee-spawn fix, Tank hittable glow rewrite, ReadyUp 10.2.9, pill-pass reload, clip-size reload fix, infected ladder-collision fix, and fullupdate fix. Tank glow ConVars still stay out of A2S rules. In Anne modes, a survivor spectating a Tank still returns control to a bot. A Charger who is mid-charge is not kicked.
+- The visible ladders on the static dumpster in official map c7m3 are mirrored in both the `zonemod` and `zonemod_anne` strippers.
+- Recompiled `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, and `readyup.smx`.

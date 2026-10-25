@@ -72,4 +72,8 @@
 	{
 		"chi"		"{blue}[{default}Confogl{blue}]{default} 该命令只能由游戏内玩家使用。"
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"chi"		"{blue}[{default}Confogl{blue}]{default} 加载或切换比赛模式需要 {olive}plugin_manager.smx{default}。"
+	}
 }

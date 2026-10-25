@@ -1215,3 +1215,12 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - 简单、普通、困难、专家、极限、音理六档统一关闭 Hunter 和 Jockey 的空中背身，`ai_hunter_back_vision` / `ai_JockeyBackVision` 均设为 `0`；AnneHappy、Hardcore、Shotgun 三套模式的 Jockey 基础值同步设为 `0`。
 - 修正 `ai_hunter_2` 在背身概率为 `0`、随机值恰好也为 `0` 时仍可能触发背身的问题：执行背身前检查当前概率必须大于 `0`。已重新编译 `ai_hunter_2.smx`，六档配置核验与编译通过。
+
+### 2026年10月24日 同步 upstream/master 至 bb375533f
+
+- 合入 SirPlease/L4D2-Competitive-Rework 自 Zonemod 2.9.2（`8809937d0`）之后的 16 个提交，至 2026-10-23 的 `bb375533f`。
+- Left4DHooks 更新到 1.174。`left4dhooks_version` 与 `l4d2_addons_eclipse` 继续使用 `FCVAR_NONE`，不写入 A2S rules；自动更新保持关闭。
+- `plugin_manager` 取代 `predictable_unloader`。Anne 各模式的 `confogl_off.cfg` 改为 `pm_unload_plugins refresh`。未加载 `plugin_manager.smx` 时，比赛模式的加载和切换会拒绝执行，并提示玩家。
+- 同步上游的近战生成修复、Tank 可砸物高亮重写、ReadyUp 10.2.9、药丸传递重载、弹夹换弹修复、感染者梯子碰撞修复和 fullupdate 修复。Tank 高亮相关 ConVar 仍不进入 A2S rules。Anne 模式中生还者旁观 Tank 时仍会把控制权交还 Bot；冲锋中的 Charger 不会被中途踢出。
+- 官方图 c7m3 静态垃圾箱的可见梯子已同步到 `zonemod` 与 `zonemod_anne` stripper。
+- 已重新编译 `left4dhooks.smx`、`confoglcompmod.smx`、`playermanagement.smx`、`l4d2_tank_props_glow.smx` 和 `readyup.smx`。

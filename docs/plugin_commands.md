@@ -382,7 +382,9 @@
 | `optional/playermanagement.smx` | `sm_swap` | 管理员 | ADMFLAG_KICK | sm_swap <player1> [player2] ... [playerN] - swap all listed players to opposite teams | 27 个模式 |
 | `optional/playermanagement.smx` | `sm_swapteams` | 管理员 | ADMFLAG_KICK | sm_swapteams - swap the players between both teams | 27 个模式 |
 | `optional/playermanagement.smx` | `sm_swapto` | 管理员 | ADMFLAG_KICK | sm_swapto [force] <teamnum> <player1> [player2] ... [playerN] - swap all listed players to <teamnum> (1,2, or 3) | 27 个模式 |
-| `optional/predictable_unloader.smx` | `pred_unload_plugins` | 服务器配置 | - | Unload Plugins! | 34 个模式 |
+| `plugin_manager.smx` | `pm_unload_plugins` | 服务器配置 | - | Unloads every unprotected plugin from last to first loaded. `refresh` reloads autoload plugins afterwards. | 比赛模式切换 |
+| `plugin_manager.smx` | `pm_protect` | 服务器配置 | - | Keeps a plugin loaded through pm_unload_plugins. | 比赛模式切换 |
+| `plugin_manager.smx` | `pm_protect_list` | 服务器配置 | - | Lists the protected plugins. | 比赛模式切换 |
 | `optional/ratemonitor.smx` | `sm_rates` | 玩家/控制台 | - | List netsettings of all players in game | 34 个模式 |
 | `optional/readyup.smx` | `sm_forcestart` | 管理员 | ADMFLAG_BAN | Forces the round to start regardless of player ready status. | 34 个模式 |
 | `optional/readyup.smx` | `sm_fs` | 管理员 | ADMFLAG_BAN | Forces the round to start regardless of player ready status. | 34 个模式 |

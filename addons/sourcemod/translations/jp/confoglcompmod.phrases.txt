@@ -72,4 +72,8 @@
 	{
 		"jp"		"{blue}[{default}Confogl{blue}]{default} このコマンドはゲーム内のプレイヤーのみ使用できます。"
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"jp"		"{blue}[{default}Confogl{blue}]{default} 試合モードの読み込みや変更には {olive}plugin_manager.smx{default} が必要です。"
+	}
 }

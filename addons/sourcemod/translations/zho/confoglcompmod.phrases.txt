@@ -72,4 +72,8 @@
 	{
 		"zho"		"{blue}[{default}Confogl{blue}]{default} 該命令只能由遊戲內玩家使用。"
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"zho"		"{blue}[{default}Confogl{blue}]{default} 載入或切換比賽模式需要 {olive}plugin_manager.smx{default}。"
+	}
 }

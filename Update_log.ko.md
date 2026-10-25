@@ -631,3 +631,12 @@
 
 - 쉬움·보통·어려움·전문가·극한·음리의 6단계 모두에서 Hunter와 Jockey가 공중에서 등을 돌리는 동작을 비활성화했습니다. `ai_hunter_back_vision` / `ai_JockeyBackVision`을 모두 `0`으로 설정하고 AnneHappy·Hardcore·Shotgun의 Jockey 기준값도 `0`으로 통일했습니다.
 - `ai_hunter_2`에서 설정 확률과 난수가 모두 `0`이면 등을 돌릴 수 있던 문제를 수정했습니다. 동작 실행 전에 현재 확률이 `0`보다 큰지 확인합니다. `ai_hunter_2.smx`를 다시 컴파일했으며 6단계 설정 확인과 컴파일을 통과했습니다.
+
+### 2026년 10월 24일 upstream/master를 bb375533f까지 동기화
+
+- SirPlease/L4D2-Competitive-Rework의 Zonemod 2.9.2(`8809937d0`) 이후 16개 커밋을 2026년 10월 23일의 `bb375533f`까지 병합했습니다.
+- Left4DHooks를 1.174로 업데이트했습니다. `left4dhooks_version`과 `l4d2_addons_eclipse`는 계속 `FCVAR_NONE`이라 A2S rules에 나가지 않습니다. 자동 업데이트는 꺼진 상태입니다.
+- `predictable_unloader`를 `plugin_manager`로 교체했습니다. Anne 각 모드의 `confogl_off.cfg`는 `pm_unload_plugins refresh`로 끝나도록 바꿨습니다. `plugin_manager.smx`가 로드되지 않으면 매치 모드를 불러오거나 바꾸는 동작은 거부되고 플레이어에게 알립니다.
+- 근접 무기 스폰 수정, Tank가 부술 수 있는 물체 발광 재작성, ReadyUp 10.2.9, 진통제 전달 중 재장전, 탄창 재장전 수정, 감염자 사다리 충돌 수정, fullupdate 수정을 동기화했습니다. Tank 발광 ConVar는 계속 A2S rules에 나가지 않습니다. Anne 모드에서 생존자가 Tank를 관전하면 제어권은 Bot에게 돌아갑니다. 돌진 중인 Charger는 도중에 추방되지 않습니다.
+- 공식 맵 c7m3의 고정 덤스터에 보이는 사다리를 `zonemod`와 `zonemod_anne` stripper에 동기화했습니다.
+- `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, `readyup.smx`를 다시 컴파일했습니다.

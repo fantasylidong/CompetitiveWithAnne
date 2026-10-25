@@ -72,4 +72,8 @@
 	{
 		"ko"		"{blue}[{default}Confogl{blue}]{default} 이 명령은 게임 내 플레이어만 사용할 수 있습니다."
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"ko"		"{blue}[{default}Confogl{blue}]{default} 매치 모드를 불러오거나 바꾸려면 {olive}plugin_manager.smx{default}가 필요합니다."
+	}
 }

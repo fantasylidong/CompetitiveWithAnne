@@ -1559,6 +1559,21 @@
 				"this"			"entity"
 			}
 
+			"L4DD::CTerrorPlayer::SetClass"
+			{
+				"signature"		"CTerrorPlayer::SetClass"
+				"callconv"		"thiscall"
+				"return"		"void"
+				"this"			"entity"
+				"arguments"
+				{
+					"a1"
+					{
+						"type"	"int"
+					}
+				}
+			}
+
 			"L4DD::CTerrorPlayer::MaterializeFromGhost"
 			{
 				"signature"		"CTerrorPlayer::MaterializeFromGhost"
@@ -2208,6 +2223,15 @@
 				"linux"		"7"
 			}
 
+			/*
+			* CBaseEntity::AcceptInput(char const*, CBaseEntity*, CBaseEntity*, variant_t, int)
+			*/
+			"CBaseEntity::AcceptInput"
+			{
+				"windows"	"44"
+				"linux"		"45"
+			}
+
 			"CBaseGrenade::Detonate"
 			{
 				"windows"	"346"
@@ -2749,6 +2773,11 @@
 			{
 				"windows"	"2196"
 				"linux"		"2196"
+			}
+			"L4D2IntWeapon_AmmoType"
+			{
+				"windows"	"2128"
+				"linux"		"2128"
 			}
 
 			// L4D2FloatWeapon

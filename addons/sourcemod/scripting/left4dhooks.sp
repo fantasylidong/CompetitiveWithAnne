@@ -18,8 +18,8 @@
 
 
 
-#define PLUGIN_VERSION		"1.168"
-#define PLUGIN_VERLONG		1168
+#define PLUGIN_VERSION		"1.174"
+#define PLUGIN_VERLONG		1174
 
 #define DEBUG				0
 // #define DEBUG			1	// Prints addresses + detour info (only use for debugging, slows server down).
@@ -197,6 +197,10 @@ float g_fProf;
 
 
 
+// Entities
+#define MAX_ENTITES				2048
+#define MAX_EDICTS				4096
+
 // Dissolver
 #define SPRITE_GLOW							"sprites/blueglow1.vmt"
 
@@ -256,6 +260,20 @@ int g_iCvar_AddonsEclipse, g_iCvar_RescueDeadTime;
 
 
 
+// Entity input/output Hooks
+bool g_bDHooksFixedVersion;			// Build "1.12.0.7232" fixed "DHooks: Fix setting CBaseEntity* params (#2465)"
+int g_iHookCount[MAX_EDICTS];		// Track number of hooks to this entity, only really unhook when no longer used by any plugin
+int g_iHookEntity[MAX_EDICTS];		// Entity reference to validate same entity
+int g_iHookID_Pre[MAX_EDICTS];		// Hook ID used to unhook the detour
+int g_iHookID_Post[MAX_EDICTS];		// Hook ID used to unhook the detour
+Handle g_CBaseEntity_AcceptInput;
+ArrayList g_hInputPlugins_Pre[MAX_EDICTS];
+ArrayList g_hInputPlugins_Post[MAX_EDICTS];
+PrivateForward g_hInputCallback_Pre[MAX_EDICTS];
+PrivateForward g_hInputCallback_Post[MAX_EDICTS];
+
+
+
 // Animation Hook
 int g_iAnimationDetourIndex;
 bool g_bAnimationRemoveHook;
@@ -283,6 +301,7 @@ Address g_pVanillaModeAddress;
 
 // Various offsets
 // int g_iOff_EHandle;
+int g_iOff_AcceptInput;
 int g_iOff_LobbyReservation;
 int g_iOff_VersusStartTimer;
 int g_iOff_m_rescueCheckTimer;
@@ -341,7 +360,7 @@ int L4D2CountdownTimer_Offsets[10];
 int L4D2IntervalTimer_Offsets[6];
 
 // l4d2weapons.inc
-int L4D2IntWeapon_Offsets[7];
+int L4D2IntWeapon_Offsets[8];
 int L4D2FloatWeapon_Offsets[21];
 int L4D2BoolMeleeWeapon_Offsets[1];
 int L4D2IntMeleeWeapon_Offsets[2];
@@ -579,6 +598,21 @@ public void OnPluginStart()
 
 
 
+	// Verify SM build version that fixed DHooks bug "DHooks: Fix setting CBaseEntity* params (#2465)"
+	// Used for the "L4D_HookEntityInput" natives "InputHookCallback" callback
+	ConVar cvar = FindConVar("sourcemod_version");
+
+	char version[16];
+	cvar.GetString(version, sizeof(version));
+
+	int pos = FindCharInString(version, '.', true);
+	if( pos != -1 )
+	{
+		g_bDHooksFixedVersion = StringToInt(version[pos + 1]) > 7232;
+	}
+
+
+
 	// NULL PTR - METHOD (kept for demonstration)
 	// Null pointer - by Dragokas
 	/*
@@ -602,6 +636,13 @@ public void OnPluginStart()
 	// TARGET FILTERS
 	// =========================
 	LoadTargetFilters();
+
+
+
+	// =========================
+	// ENTITY INPUT/OUTPUT HOOKS
+	// =========================
+	DetourEntityInput();
 
 
 
@@ -1094,6 +1135,8 @@ public void OnMapEnd()
 	g_iAnimationHookedClients = new ArrayList();
 	g_iAnimationHookedPlugins = new ArrayList(2);
 
+
+
 	// Remove all hooked functions from private forward
 	Handle hIterator = GetPluginIterator();
 	Handle hPlugin;
@@ -1109,11 +1152,28 @@ public void OnMapEnd()
 			{
 				if( g_hAnimationCallbackPre[i] ) g_hAnimationCallbackPre[i].RemoveAllFunctions(hPlugin);
 				if( g_hAnimationCallbackPost[i] ) g_hAnimationCallbackPost[i].RemoveAllFunctions(hPlugin);
+
+				if( g_hInputCallback_Pre[i] ) g_hInputCallback_Pre[i].RemoveAllFunctions(hPlugin);
+				if( g_hInputCallback_Post[i] ) g_hInputCallback_Post[i].RemoveAllFunctions(hPlugin);
 			}
 		}
 	}
 
 	delete hIterator;
+
+	// Entity input/output hooks
+	for( int i = 0; i < MAX_EDICTS; i++ )
+	{
+		g_iHookCount[i] = 0;
+		g_iHookEntity[i] = 0;
+		g_iHookID_Pre[i] = 0;
+		g_iHookID_Post[i] = 0;
+
+		delete g_hInputCallback_Pre[i];
+		delete g_hInputCallback_Post[i];
+		delete g_hInputPlugins_Pre[i];
+		delete g_hInputPlugins_Post[i];
+	}
 }
 
 public void OnClientDisconnect(int client)
@@ -1190,11 +1250,24 @@ public void OnNotifyPluginUnloaded(Handle plugin)
 {
 	if( plugin )
 	{
+		// Remove animation callbacks for plugin (probably not required and automatic...
 		for( int i = 1; i <= MaxClients; i++ )
 		{
 			if( g_hAnimationCallbackPre[i] ) g_hAnimationCallbackPre[i].RemoveAllFunctions(plugin);
 			if( g_hAnimationCallbackPost[i] ) g_hAnimationCallbackPost[i].RemoveAllFunctions(plugin);
 		}
+
+		// Remove AcceptInput callbacks for plugin and unhook detour if not being used
+		// Must be 1 frame later or the unloading plugin is counted
+		RequestFrame(OnFrame_OnNotifyPluginUnloaded);
+	}
+}
+
+void OnFrame_OnNotifyPluginUnloaded()
+{
+	for( int i = 0; i < MAX_EDICTS; i++ )
+	{
+		RemoveAcceptInputDetour(i);
 	}
 }
 
@@ -1647,7 +1720,7 @@ public void OnMapStart()
 		for( int i = 0; i < sizeof(g_sAcidSounds); i++ )
 			PrecacheSound(g_sAcidSounds[i]);
 
-		for( int i = 0; i <= 2048; i++ )
+		for( int i = 0; i <= MAX_ENTITES; i++ )
 			g_iAcidEntity[i] = 0;
 	}
 
@@ -1746,10 +1819,11 @@ public void OnMapStart()
 	}
 
 
-	Call_StartForward(g_hFWD_OnMapStartPost);
-	Call_Finish();
 
 	g_bMapStarted = true;
+
+	Call_StartForward(g_hFWD_OnMapStartPost);
+	Call_Finish();
 }
 
 

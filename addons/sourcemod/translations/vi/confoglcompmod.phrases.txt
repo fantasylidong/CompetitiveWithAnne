@@ -72,4 +72,8 @@
 	{
 		"vi"		"{blue}[{default}Confogl{blue}]{default} Lệnh này chỉ có thể được dùng bởi người chơi đang ở trong game."
 	}
+	"ConfoglCompMod_PluginManagerRequired"
+	{
+		"vi"		"{blue}[{default}Confogl{blue}]{default} Cần có {olive}plugin_manager.smx{default} để tải hoặc đổi chế độ trận đấu."
+	}
 }

@@ -56,7 +56,7 @@ void LoadGameDataRules(GameData hGameData)
 
 		g_iOff_NavAreaID = 140; // Hard-coding offset here, unlikely to ever change
 		g_iOff_NavAreaLadderBase = 0x60; // Offset found in "TerrorNavArea::ScriptGetLadders" function
-		g_iOff_NavAreaLadderEntity = 0x52; // Offset found by searching memory from base ptr for valid entity
+		g_iOff_NavAreaLadderEntity = 0x38; // Offset found by searching memory from base ptr for valid entity
 	}
 	else
 	{
@@ -2721,6 +2721,9 @@ void LoadGameData()
 	g_iOff_LobbyReservation = hGameData.GetOffset("LobbyReservationOffset");
 	ValidateOffset(g_iOff_LobbyReservation, "LobbyReservationOffset");
 
+	g_iOff_AcceptInput = hGameData.GetOffset("CBaseEntity::AcceptInput");
+	ValidateOffset(g_iOff_AcceptInput, "CBaseEntity::AcceptInput");
+
 	g_pAmmoDef = hGameData.GetAddress("ammoDef");
 	ValidateAddress(g_pAmmoDef, "AmmoDef", true);
 
@@ -3057,6 +3060,7 @@ void LoadGameData()
 	L4D2IntWeapon_Offsets[4] = hGameData.GetOffset("L4D2IntWeapon_Tier");
 	L4D2IntWeapon_Offsets[5] = hGameData.GetOffset("L4D2IntWeapon_DefaultSize");
 	L4D2IntWeapon_Offsets[6] = hGameData.GetOffset("L4D2IntWeapon_Type");
+	L4D2IntWeapon_Offsets[7] = hGameData.GetOffset("L4D2IntWeapon_AmmoType");
 	L4D2FloatWeapon_Offsets[0] = hGameData.GetOffset("L4D2FloatWeapon_MaxPlayerSpeed");
 	L4D2FloatWeapon_Offsets[1] = hGameData.GetOffset("L4D2FloatWeapon_SpreadPerShot");
 	L4D2FloatWeapon_Offsets[2] = hGameData.GetOffset("L4D2FloatWeapon_MaxSpread");
