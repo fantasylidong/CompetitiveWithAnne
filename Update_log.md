@@ -1257,6 +1257,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - Anne 普通、Hardcore、纯散弹和多人模式的 Tank 连跳开关投票统一调用现有 `vote/tank_bhop_on.cfg` / `vote/tank_bhop_off.cfg`，同时设置连跳开关和动态难度覆盖值，避免关闭后被重新应用的难度档位开启。单人模式已有相同处理，插件逻辑不变。
 
+### 2026年10月31日 刷特 Nav 缓存初始化修复
+
+- 修复 `infected_control.smx` 在 `OnPluginStart` 过早调用 `L4D_GetAllNavAreas`，被新版 Left4DHooks 拒绝并导致插件加载失败的问题。Nav 索引初始化改为复用 `OnMapStart` 后现有的 1 秒建图定时器，移除插件启动时的重复建图调度；不修改刷特波次或倒计时规则。
+
 ### 2026年11月6日 同步上游修复
 
 - 同步 `upstream/master` 至 `0390482d4`，合入 11 个提交：优化多个 CollisionHook 插件，更新幽灵反作弊，阻止暂停期间按住攻击键实体化特感并屏蔽 `bugpause` 刷屏；观战 HUD 改用武器自身弹药类型读取备弹，修复 MP5 等武器显示。

@@ -673,6 +673,10 @@
 
 - Tank bunnyhop on/off votes in standard Anne, Hardcore, Shotgun, and multiplayer modes now call the existing `vote/tank_bhop_on.cfg` / `vote/tank_bhop_off.cfg`, setting both the bunnyhop switch and the dynamic difficulty override so reapplying a difficulty profile does not turn bunnyhopping back on after a disable vote. Single-player mode already uses this handling; plugin logic is unchanged.
 
+### October 31, 2026 Infected spawn Nav cache initialization fix
+
+- Fixed `infected_control.smx` calling `L4D_GetAllNavAreas` too early in `OnPluginStart`, which newer Left4DHooks rejects and causes the plugin to fail to load. Nav index initialization now uses the existing one-second graph timer scheduled after `OnMapStart`, and the duplicate graph scheduling at plugin startup is removed. Spawn wave and countdown rules are unchanged.
+
 ### November 6, 2026 Upstream fixes
 
 - Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.

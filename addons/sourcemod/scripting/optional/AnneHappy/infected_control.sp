@@ -493,9 +493,7 @@ public void OnPluginStart()
     gQ.Create();
     gST.Reset();
     InitSDK_FromGamedata();   // ← 加载 NavArea SDK/偏移
-    BuildNavIdIndexMap();
     g_bInfectedControlStarted = true;
-    SpawnAccel_ScheduleNavGraphStart(false);
     RecalcSiCapFromAlive(true);
 
     // 分散度：初始化
@@ -642,6 +640,8 @@ public Action Timer_StartSpawnAccelGraph(Handle timer, any data)
 
     g_hSpawnAccelStartTimer = INVALID_HANDLE;
     SpawnAccel_UpdateAvailability();
+    // Left4DHooks Nav natives are ready only after OnMapStart's first frame.
+    BuildNavIdIndexMap();
     SpawnAccel_StartNavGraph(view_as<bool>(data));
     return Plugin_Stop;
 }
