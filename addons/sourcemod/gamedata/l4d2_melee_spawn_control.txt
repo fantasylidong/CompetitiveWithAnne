@@ -2,6 +2,23 @@
 {
     "left4dead2"
     {
+		"Addresses"
+		{
+			"g_pMatchExtL4D"
+			{
+				"linux"
+				{
+					"signature" "CTerrorGameRules::GetMissionInfo"
+					"read" "44"
+				}
+				"windows"
+				{
+					"signature" "CTerrorGameRules::GetMissionInfo"
+					"read" "42"
+				}
+				"read" "0"
+			}
+		}
 		"Functions"
 		{
 			"OnGetMissionInfo"
@@ -14,6 +31,12 @@
 		}
 		"Signatures"
 		{
+			"KeyValues::GetName"
+			{
+				"library" "server"
+				"linux" "@_ZNK9KeyValues7GetNameEv"
+				"windows" "\x56\x8B\xF1\x85\xF6\x74\x2A\xFF\x15\x2A\x2A\x2A\x2A"
+			}
 			// =========================
 			// SILVERS SIGS
 			// =========================

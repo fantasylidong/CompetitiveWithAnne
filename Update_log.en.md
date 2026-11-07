@@ -677,6 +677,12 @@
 
 - Fixed `infected_control.smx` calling `L4D_GetAllNavAreas` too early in `OnPluginStart`, which newer Left4DHooks rejects and causes the plugin to fail to load. Nav index initialization now uses the existing one-second graph timer scheduled after `OnMapStart`, and the duplicate graph scheduling at plugin startup is removed. Spawn wave and countdown rules are unchanged.
 
+### November 5, 2026 Stale pointers during map changes and safe-area callbacks
+
+- Updated `l4d2_melee_spawn_control` to 1.4.1. Engine-owned mission pointers are no longer cached across callbacks. Map changes, mission switches and unloads resolve the melee list by mission name in the current registry; removed missions and lists changed by a reload or another plugin are left alone, preventing writes to freed data or replacement lists.
+- Updated `l4d2_door_lock` to 2.13. Bot returns to the start area are deferred until the safe-area callbacks finish so the player object cannot be invalidated by this operation between Left4DHooks pre/post callbacks. Deferred work resolves the bot by connection serial and rechecks its entity, alive and team state after warping; invalid or replaced clients skip further operations. Left4DHooks remains at upstream 1.174.
+- Recompiled the melee-spawn and door-lock plugins. Production-function regressions cover mission reload/restoration, deferred bot returns and invalid/reused connections; retained the isolated SRCDS mission fixtures.
+
 ### November 6, 2026 Upstream fixes
 
 - Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.

@@ -2,6 +2,7 @@
 
 	General Updates:
 
+ *	05-11-2026 > Version 2.13: Defer bot returns until safe-area hooks finish and revalidate clients after warping.
  *	19-06-2026 > Version 2.12: Remove lock-phase ammo/damage cheats and print door block reasons.
  *	31-05-2026 > Version 2.11: Lock once after each non-first-map transition, not only chapter two.
  *	31-05-2026 > Version 2.10: Keep survivor bot freeze independent from one-time door locking.
@@ -38,7 +39,7 @@
 
 #pragma semicolon 1
 #pragma newdecls required
-#define PLUGIN_VERSION "2.12"
+#define PLUGIN_VERSION "2.13"
 #define DOOR_LOCK_REASON_COOLDOWN 5
 
 /* =============================================================================================================== *
@@ -1008,7 +1009,8 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 	// 只要还没有真人出过门，Bot 触发的出门事件一律拦截
 	if(!g_bLeftSafeAreas && client > 0 && client <= MaxClients && IsClientInGame(client) && IsFakeClient(client))
 	{
-		ReturnSurvivorBotToStartArea(client);
+		// Warping can remove the bot; keep it alive through Left4DHooks' post callback.
+		CreateTimer(0.0, Timer_ReturnSurvivorBotToStartArea, GetClientSerial(client), TIMER_FLAG_NO_MAPCHANGE);
 		return Plugin_Handled;
 	}
 
@@ -1036,17 +1038,30 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 	return Plugin_Continue;
 }
 
+Action Timer_ReturnSurvivorBotToStartArea(Handle timer, int serial)
+{
+	if(!L4D2_DoorLock_Enable() || g_bLeftSafeAreas) return Plugin_Handled;
+
+	int client = GetClientFromSerial(serial);
+	if(client) ReturnSurvivorBotToStartArea(client);
+	return Plugin_Handled;
+}
+
 void ReturnSurvivorBotToStartArea(int client)
 {
-	if(!IsClientInGame(client) || !IsPlayerAlive(client) || GetClientTeam(client) != 2 || !IsFakeClient(client)) return;
+	if(!IsValidEnt(client) || !IsClientInGame(client) || !IsPlayerAlive(client) || GetClientTeam(client) != 2 || !IsFakeClient(client)) return;
 
+	int serial = GetClientSerial(client);
 	int flags = GetCommandFlags("warp_to_start_area");
 	SetCommandFlags("warp_to_start_area", flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "warp_to_start_area");
 	SetCommandFlags("warp_to_start_area", flags);
 
-	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, NULL_VECTOR);
+	if(GetClientFromSerial(serial) != client || !IsValidEnt(client) || !IsClientInGame(client)
+		|| !IsPlayerAlive(client) || GetClientTeam(client) != 2 || !IsFakeClient(client)) return;
+
 	SetEntPropFloat(client, Prop_Send, "m_flFallVelocity", 0.0);
+	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, NULL_VECTOR);
 }
 
 /* =============================================================================================================== *
