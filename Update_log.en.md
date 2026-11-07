@@ -659,6 +659,16 @@
 - If a reload-give deletes the old entity and creates a new one, a `weapon_given` event within one second keeps the original identity, so replacing the entity does not create another score in the same round. A give is not scored when the recipient is not holding that item, and a different item is not marked as already given.
 - The existing limit of two medicine-give scores per player per round remains. Recompiled `l4d_stats.smx`.
 
+### October 25, 2026 Anne modes use fix_pill_pass
+
+- AnneHappy, Hardcore, Shotgun, All Charger, Witch Party, 1vHunters, and Alone no longer load `pill_passer`. They load `fix_pill_pass` with `fix_pill_pass_reload 1`. Reload still passes pain pills and adrenaline through the game's own pass, so the give can score.
+- The two plugins are no longer loaded together.
+
+### October 25, 2026 Every mode uses fix_pill_pass
+
+- Every remaining mode that loaded `pill_passer` now loads `fix_pill_pass` with `fix_pill_pass_reload 1`. That covers Coop, Realism, Mutation and their variants, plus ZoneRetro, ZoneHunters, Equilibrium, Apex, NeoMod, NextMod, AcemodRv, PMElite, Deadman, and the 1v1, 2v2, and 3v3 configs that use those plugin lists.
+- No mode configuration loads `pill_passer` anymore. Reload still passes pain pills and adrenaline through the game's own pass.
+
 ### November 6, 2026 Upstream fixes
 
 - Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.

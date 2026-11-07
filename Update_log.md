@@ -1243,6 +1243,16 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 换弹给药若删掉旧实体并新建一瓶，一秒钟内的 `weapon_given` 会让新实体沿用原编号，本回合不能靠换实体再拿一次分。接收者手里对不上这瓶药时不计分，也不会把别的药标成已经给过。
 - 每人每回合给药和肾上腺素合计最多 2 次的上限保持不变。已重新编译 `l4d_stats.smx`。
 
+### 2026年10月25日 Anne 换药改为 fix_pill_pass
+
+- AnneHappy、Hardcore、Shotgun、牛牛冲刺、女巫派对、1vHunters、Alone 不再加载 `pill_passer`，改为加载 `fix_pill_pass`，并设置 `fix_pill_pass_reload 1`。按换弹仍然递止痛药和肾上腺素，走游戏原版递药，可以记给药分。
+- 这两个插件不再同时加载。
+
+### 2026年10月25日 全部模式换药改为 fix_pill_pass
+
+- 其余仍加载 `pill_passer` 的模式全部改为 `fix_pill_pass`，并设置 `fix_pill_pass_reload 1`。包括战役、写实、突变及其衍生，以及 ZoneRetro、ZoneHunters、Equilibrium、Apex、NeoMod、NextMod、AcemodRv、PMElite、Deadman 和引用这些插件列表的 1v1、2v2、3v3。
+- 配置里不再有模式加载 `pill_passer`。按换弹仍递止痛药和肾上腺素，走游戏原版递药。
+
 ### 2026年11月6日 同步上游修复
 
 - 同步 `upstream/master` 至 `0390482d4`，合入 11 个提交：优化多个 CollisionHook 插件，更新幽灵反作弊，阻止暂停期间按住攻击键实体化特感并屏蔽 `bugpause` 刷屏；观战 HUD 改用武器自身弹药类型读取备弹，修复 MP5 等武器显示。
