@@ -87,7 +87,7 @@ enum costweapon
 	//冲锋枪
 	CostUzi 		    = 50,
 	CostSilenced 	    = 50,
-	CostMP5 		    = 100,
+	CostMP5 		    = 50,
 	//步枪
 	CostM16 		    = 200,
 	CostAK47   		    = 200,
@@ -3141,7 +3141,7 @@ public void gun(int client)
 			menu.AddItem("pistol", binfo);
 		}
 		
-		FormatEx(binfo, sizeof(binfo),  "mp5机枪 %dB数",CostMP5, client);
+		FormatEx(binfo, sizeof(binfo),  "mp5机枪 %dB数",player[client].ClientFirstBuy ? 0 : CostMP5, client);
 		menu.AddItem("smg_mp5", binfo);
 		
 		if(!IsAllowBigGun)
@@ -3227,10 +3227,18 @@ public int gun_back(Menu menu, MenuAction action, int param1, int param2)
 			}				
 			else if( StrEqual(bitem, "smg_mp5") )
 			{
-				
-				int costpoints = CostMP5;
+				bool firstBuy = player[param1].ClientFirstBuy;
+				int costpoints = firstBuy ? 0 : CostMP5;
 				if(RemovePoints(param1, costpoints, bitem))
-				CPrintToChatAll("%t", "RPG_BoughtItemWithPoints", param1, CostMP5, "mp5", player[param1].ClientPoints);
+				{
+					if(firstBuy)
+					{
+						player[param1].ClientFirstBuy = false;
+						CPrintToChatAll("%t", "RPG_FirstFreePurchase", param1, "MP5", player[param1].ClientPoints);
+					}
+					else
+						CPrintToChatAll("%t", "RPG_BoughtItemWithPoints", param1, CostMP5, "MP5", player[param1].ClientPoints);
+				}
 			}	
 			else if( StrEqual(bitem, "rifle") ){
 				//

@@ -669,6 +669,12 @@
 - Every remaining mode that loaded `pill_passer` now loads `fix_pill_pass` with `fix_pill_pass_reload 1`. That covers Coop, Realism, Mutation and their variants, plus ZoneRetro, ZoneHunters, Equilibrium, Apex, NeoMod, NextMod, AcemodRv, PMElite, Deadman, and the 1v1, 2v2, and 3v3 configs that use those plugin lists.
 - No mode configuration loads `pill_passer` anymore. Reload still passes pain pills and adrenaline through the game's own pass.
 
+### October 26, 2026 Anne MP5 map spawns and free first shop purchase
+
+- Anne, All Charger, and Witch Party reuse Zonemod's `l4d2_allow_cs_weapons`, `l4d2_weapon_spawn_variety`, and `director_cs_weapon_spawn_chance 1.0`, allowing existing Stripper `any_smg` spots and ordinary fixed SMG spawners to roll the Uzi, silenced SMG, or MP5. The plugin's equivalent tier-1 shotgun randomization is retained without overriding `weapon_spawn` spots that explicitly select a weapon. Hardcore and Shotgun do not load these two plugins and keep their existing restrictions.
+- The RPG shop MP5 now follows the Uzi and silenced SMG rules: one shared free first-purchase allowance, then 50B per purchase instead of a fixed 100B. The menu shows the current price, and a successful free purchase consumes that allowance. The shop enable switch and 15-second purchase cooldown remain; purchase messages keep using the existing translated phrases. Recompiled `extend/rpg.smx`.
+- This change only enables map spawning and shop pickup. AnneHappy / AnneHappyPlus damage, fire rate, spread, falloff, magazine, and reload values remain unchanged; balance changes await comparison.
+
 ### October 30, 2026 Tank bunnyhop votes use the dynamic difficulty override
 
 - Tank bunnyhop on/off votes in standard Anne, Hardcore, Shotgun, and multiplayer modes now call the existing `vote/tank_bhop_on.cfg` / `vote/tank_bhop_off.cfg`, setting both the bunnyhop switch and the dynamic difficulty override so reapplying a difficulty profile does not turn bunnyhopping back on after a disable vote. Single-player mode already uses this handling; plugin logic is unchanged.
@@ -689,3 +695,20 @@
 - Added the voice mechanics fix so voice packets do not affect infected growls or survivor noise. Replaced the old vomit trace patch with `l4d2_vomit_collision_fix`: hitbox testing applies only to already-biled survivors who are incapacitated, Hunter-pounced, or Charger-pummeled, so they stop blocking vomit aimed past them.
 - Mirrored the c7m3 dumpster ladder `func_brush` display fix and Amid The Ruins map 3 ferry-supply blockage fix into `zonemod_anne`. The new solid trailer skirtings in Downpour maps 1 and 4 remain in Zonemod only because the matching Anne Nav was not updated.
 - Preserved local translated messages, Anne pause rules, Tank HUD changes, and ConVar visibility policy; recompiled the four merged plugins. CI retains SourceMod 1.12 and disables the upstream-removed 1.13.7296 build.
+
+### November 7, 2026 Keep filled pain pills clear of ammo piles
+
+- Fixed Confogl main-route pill filling placing pills inside `weapon_ammo_spawn` ammo piles, making them impossible to pick up. Fill candidates now explicitly avoid each pile's horizontal bounding extent with an extra 48 units of pickup clearance. Height checks prevent piles on another floor from rejecting usable spots; existing door and pill-spacing rules are unchanged.
+- Previously only door clearance was implemented, and solid traces ignored all `weapon_` entities, with no ammo-specific avoidance. This change adds the missing check and retains the existing one-second round-start timing. Recompiled `confoglcompmod.smx`; targeted regressions cover overlap, pickup clearance, rotation coverage, floor separation, multiple piles, and zero bounds.
+
+### November 7, 2026 Trial improvements to pill-fill routes and distribution
+
+- Filled pain pills now use the same main-route detour check as original pills, including maps with no original pills. Candidate Nav verdicts are cached within each fill pass. When route restrictions are enabled but no walkable start-to-goal route can be built, filling is skipped with a diagnostic log.
+- Filling now accounts for retained pills and prioritizes the largest progress gap within the fill range, choosing a random target near its midpoint. Successful placements update the gaps using their actual flow; failed attempts move exploration to other gaps. Existing pill counts, progress ranges, round-start timing, door and ammo clearance, and pill spacing are preserved.
+- Route detours now use one Nav distance metric for start-to-pill plus pill-to-goal minus start-to-goal, with separate survivor traversal checks for both legs. Removed flow scaling and repeated binary path searches to avoid misclassifying later main-route areas as side branches.
+- Recompiled `confoglcompmod.smx`. On temporarily isolated empty cloud server 82, all three map-filter runs and nine empty-map fill runs across three maps reached four pills, with identical counts and positions after stored-spawn restoration. The 300-unit detour threshold was sufficient; 500 was not needed in this trial. Full processing took about 0.14–1.00 seconds. Restored the original plugin, map, cvars, and access setting, verified file hashes and state, and did not roll out the trial.
+
+### November 7, 2026 Add ammo bit widener extension plugin across all modes
+
+- Added `l4d2_ammo_bit_widener_ext` (`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`, `addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`, `addons/sourcemod/scripting/include/sendtable.inc`, `sendtable.ext` binaries, and `extensions/sendtable/README.md` source documentation), widening `CTerrorPlayer.m_iAmmo` from 10 to 16 bits and `CBaseCombatWeapon.m_iClip1` from 8 to 16 bits so the client HUD displays reserve ammo above 1023 and clip ammo above 255 (up to 65535).
+- Added `sm plugins load l4d2_ammo_bit_widener_ext.smx` to `cfg/sharedplugins.cfg` so it stays enabled by default across all modes.

@@ -80,7 +80,9 @@ enum struct PFRoute
     Address pGoal;
     float fStartFlow;
     float fRouteLen;
-    float fScale;   // BuildPath length per flow unit
+    float fPathMax;
+    float fStart[3];
+    float fGoal[3];
 }
 
 static const char g_sItemNames[ItemList_Size][ItemNames_Size][] =
@@ -638,11 +640,11 @@ static bool ApplyPillFlowFilter()
     bFill = bFill && iLimit > 0;
 
     PFRoute route;
-    bool bRoute = fMaxDetour > 0.0 && iCount > 0 && PF_BuildRoute(fMaxFlowDist, route);
+    bool bRoute = fMaxDetour > 0.0 && (iCount > 0 || bFill) && PF_BuildRoute(fMaxFlowDist, route);
 
     if (!iCount) {
         if (bFill) {
-            PF_FillToLimit(hSpawns, iLimit, fMaxFlowDist, fFlowMin, fFlowMax, iVisualize > 0);
+            PF_FillToLimit(hSpawns, iLimit, fMaxFlowDist, fFlowMin, fFlowMax, iVisualize > 0, route, fMaxDetour);
         }
         return true;
     }
@@ -847,18 +849,13 @@ static bool ApplyPillFlowFilter()
 
     if (bFill) {
         PF_FillToLimit(hSpawns, iLimit - iKeptTotal, fMaxFlowDist,
-            fFlowMin, fFlowMax, iVisualize > 0);
+            fFlowMin, fFlowMax, iVisualize > 0, route, fMaxDetour);
     }
 
     return true;
 }
 
-/*
-    Main-route test. For a spot on the shortest start->goal route, flow(spot) + path(spot->goal)
-    equals the route length; a dead-end side room of depth d adds 2d. Flow and BuildPath lengths
-    aren't measured identically, so the route is measured once with the BuildPath metric and flow
-    is scaled by that ratio.
-*/
+// Measure all three route legs with the same Nav distance metric. Flow remains a progress label.
 static bool PF_BuildRoute(float fMaxFlowDist, PFRoute route)
 {
     float fGoalFlow;
@@ -868,32 +865,42 @@ static bool PF_BuildRoute(float fMaxFlowDist, PFRoute route)
     }
 
     float fRouteFlow = fGoalFlow - route.fStartFlow;
-    route.fRouteLen = PF_MeasurePath(route.pStart, route.pGoal, fRouteFlow * 0.5, fRouteFlow * 2.0);
-    if (route.fRouteLen <= 0.0) {
+    route.fPathMax = fRouteFlow * 2.0;
+    L4D_GetNavAreaCenter(route.pStart, route.fStart);
+    L4D_GetNavAreaCenter(route.pGoal, route.fGoal);
+    route.fRouteLen = L4D2_NavAreaTravelDistance(route.fStart, route.fGoal, true);
+    if (!(route.fRouteLen > 0.0) || !PF_PathWithin(route.pStart, route.pGoal, route.fPathMax)) {
+        route.fRouteLen = 0.0;
         LogMessage("[%s] Start->goal route not walkable (flow %.0f); pill route check skipped.", IT_MODULE_NAME, fRouteFlow);
         return false;
     }
 
-    route.fScale = route.fRouteLen / fRouteFlow;
-
     if (IsDebugEnabled()) {
-        LogMessage("[%s] Pill route: start area %d (flow %.0f), goal area %d (flow %.0f), path %.0f, scale %.3f",
+        LogMessage("[%s] Pill route: start area %d (flow %.0f), goal area %d (flow %.0f), nav distance %.0f",
             IT_MODULE_NAME, L4D_GetNavAreaID(route.pStart), route.fStartFlow, L4D_GetNavAreaID(route.pGoal), fGoalFlow,
-            route.fRouteLen, route.fScale);
+            route.fRouteLen);
     }
 
     return true;
 }
 
-static bool PF_IsOnRoute(const PFRoute route, Address pArea, float fFlow, float fMaxDetour)
+static bool PF_IsOnRoute(const PFRoute route, Address pArea, float fMaxDetour)
 {
     if (pArea == route.pGoal) {
         return true;
     }
 
-    // Path budget from the spot to the goal that still keeps the detour within fMaxDetour.
-    float fBudget = route.fRouteLen - route.fScale * (fFlow - route.fStartFlow) + 2.0 * fMaxDetour;
-    return (fBudget > 0.0 && PF_PathWithin(pArea, route.pGoal, fBudget));
+    float fPoint[3];
+    L4D_GetNavAreaCenter(pArea, fPoint);
+    float fFromStart = L4D2_NavAreaTravelDistance(route.fStart, fPoint, true);
+    float fToGoal = L4D2_NavAreaTravelDistance(fPoint, route.fGoal, true);
+    if (!(fFromStart >= 0.0 && fToGoal >= 0.0) || fFromStart + fToGoal > route.fRouteLen + 2.0 * fMaxDetour) {
+        return false;
+    }
+
+    // TravelDistance alone does not validate survivor traversal; keep the team-specific checks.
+    float fBudget = route.fPathMax + 2.0 * fMaxDetour;
+    return PF_PathWithin(route.pStart, pArea, fBudget) && PF_PathWithin(pArea, route.pGoal, fBudget);
 }
 
 static void PF_ApplyRouteFilter(const PFRoute route, int iCount, const Address[] pNavs, const float[] fFlowRaw, int[] iReason, float fMaxDetour)
@@ -903,7 +910,7 @@ static void PF_ApplyRouteFilter(const PFRoute route, int iCount, const Address[]
             continue;
         }
 
-        bool bOnRoute = PF_IsOnRoute(route, pNavs[i], fFlowRaw[i], fMaxDetour);
+        bool bOnRoute = PF_IsOnRoute(route, pNavs[i], fMaxDetour);
 
         if (IsDebugEnabled()) {
             LogMessage("[%s] Pill area %d flow %.0f: %s", IT_MODULE_NAME, L4D_GetNavAreaID(pNavs[i]), fFlowRaw[i], bOnRoute ? "on route" : "off route");
@@ -916,9 +923,13 @@ static void PF_ApplyRouteFilter(const PFRoute route, int iCount, const Address[]
 }
 
 static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
-    float fMaxFlowDist, float fFlowMin, float fFlowMax, bool bGlow)
+    float fMaxFlowDist, float fFlowMin, float fFlowMax, bool bGlow, const PFRoute route, float fMaxDetour)
 {
     if (iMissing <= 0) {
+        return;
+    }
+    if (fMaxDetour > 0.0 && route.fRouteLen <= 0.0) {
+        LogMessage("[%s] Pill fill: no walkable start->goal route; fill skipped.", IT_MODULE_NAME);
         return;
     }
 
@@ -936,7 +947,7 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
     }
 
     ArrayList hAllAreas = new ArrayList();
-    ArrayList hCandidates = new ArrayList(2);
+    ArrayList hCandidates = new ArrayList(3); // flow, nav area, cached route verdict (0/1/-1)
     L4D_GetAllNavAreas(hAllAreas);
     for (int i = 0; i < hAllAreas.Length; i++) {
         Address pArea = view_as<Address>(hAllAreas.Get(i));
@@ -947,23 +958,41 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
         }
 
         float fFlow = L4D2Direct_GetTerrorNavAreaFlow(pArea);
-        if (fFlow < fFillMin * fMaxFlowDist || fFlow > fFillMax * fMaxFlowDist) {
+        if (!(fFlow >= fFillMin * fMaxFlowDist && fFlow <= fFillMax * fMaxFlowDist)) {
             continue;
         }
 
         int iRow = hCandidates.Push(fFlow);
         hCandidates.Set(iRow, pArea, 1);
+        hCandidates.Set(iRow, 0, 2);
     }
     delete hAllAreas;
     hCandidates.SortCustom(PF_SortByFirstFloat);
 
+    ArrayList hFlows = new ArrayList();
+    hFlows.Push(fFillMin * fMaxFlowDist);
+    hFlows.Push(fFillMax * fMaxFlowDist);
+    ItemTracking existing;
+    float fOrigin[3];
+    for (int i = 0; i < hSpawns.Length; i++) {
+        hSpawns.GetArray(i, existing, sizeof(existing));
+        GetSpawnOrigins(fOrigin, existing);
+        Address pArea = L4D_GetNearestNavArea(fOrigin, 120.0, true, false, false, 2);
+        if (pArea == Address_Null) {
+            pArea = L4D2Direct_GetTerrorNavArea(fOrigin);
+        }
+        float fFlow = pArea != Address_Null ? L4D2Direct_GetTerrorNavAreaFlow(pArea) : -1.0;
+        if (fFlow > fFillMin * fMaxFlowDist && fFlow < fFillMax * fMaxFlowDist) {
+            hFlows.Push(fFlow);
+        }
+    }
+
     ArrayList hDoors = PF_CollectDoorClearances();
     int iSpawned;
     for (int choice = 0; choice < iMissing * 3 && iSpawned < iMissing; choice++) {
-        float fProgress = choice < iMissing
-            ? (float(choice) + GetRandomFloat(0.0, 1.0)) / float(iMissing)
-            : GetRandomFloat(0.0, 1.0);
-        float fTarget = (fFillMin + fProgress * (fFillMax - fFillMin)) * fMaxFlowDist;
+        float fGapMin, fGapMax;
+        float fTarget = PF_PickFillGap(hFlows, fGapMin, fGapMax);
+        bool bSpawned;
         int iRight = 0;
         int iEnd = hCandidates.Length;
         while (iRight < iEnd && hCandidates.Get(iRight, 0) < fTarget) {
@@ -982,7 +1011,19 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
 
             Address pArea = view_as<Address>(hCandidates.Get(iIndex, 1));
             float fFlow = hCandidates.Get(iIndex, 0);
-            float fOrigin[3];
+            if (fFlow < fGapMin || fFlow > fGapMax) {
+                continue;
+            }
+            if (fMaxDetour > 0.0) {
+                int iOnRoute = hCandidates.Get(iIndex, 2);
+                if (!iOnRoute) {
+                    iOnRoute = PF_IsOnRoute(route, pArea, fMaxDetour) ? 1 : -1;
+                    hCandidates.Set(iIndex, iOnRoute, 2);
+                }
+                if (iOnRoute < 0) {
+                    continue;
+                }
+            }
             if (!PF_FindRouteSpawnSpot(pArea, hDoors, fOrigin) || PF_NearExistingPill(hSpawns, fOrigin)) {
                 continue;
             }
@@ -1005,6 +1046,8 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
             SetSpawnAngles(fAngles, curitem);
             hSpawns.PushArray(curitem, sizeof(curitem));
             iSpawned++;
+            bSpawned = true;
+            hFlows.Push(fFlow);
 
             if (IsDebugEnabled()) {
                 LogMessage("[%s] Pill fill: spawned %d on main route at flow %.1f%% (%.0f %.0f %.0f)",
@@ -1012,13 +1055,34 @@ static void PF_FillToLimit(ArrayList hSpawns, int iMissing,
             }
             break;
         }
+        if (!bSpawned) {
+            // Try another gap next time rather than repeatedly targeting an unusable one.
+            hFlows.Push(fTarget);
+        }
     }
 
     delete hCandidates;
+    delete hFlows;
     delete hDoors;
     if (iSpawned < iMissing) {
         LogMessage("[%s] Pill fill: spawned %d of %d missing pills on the main route.", IT_MODULE_NAME, iSpawned, iMissing);
     }
+}
+
+// Include retained pills and both fill-range boundaries, then split the largest gap.
+static float PF_PickFillGap(ArrayList hFlows, float &fGapMin, float &fGapMax)
+{
+    hFlows.Sort(Sort_Ascending, Sort_Float);
+    float fLargest = -1.0;
+    for (int i = 1; i < hFlows.Length; i++) {
+        float fLeft = hFlows.Get(i - 1), fRight = hFlows.Get(i);
+        if (fRight - fLeft > fLargest) {
+            fLargest = fRight - fLeft;
+            fGapMin = fLeft;
+            fGapMax = fRight;
+        }
+    }
+    return fGapMin + (fGapMax - fGapMin) * GetRandomFloat(0.4, 0.6);
 }
 
 static int PF_SortByFirstFloat(int index1, int index2, Handle array, Handle hndl)
@@ -1071,6 +1135,31 @@ static bool PF_NearDoor(ArrayList doors, const float point[3])
     return false;
 }
 
+// Ammo piles are weapon entities ignored by the solid traces, but still block pickup.
+static bool PF_NearAmmoPile(const float point[3])
+{
+    int entity = -1;
+    while ((entity = FindEntityByClassname(entity, "weapon_ammo_spawn")) != -1) {
+        float origin[3], mins[3], maxs[3];
+        GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", origin);
+        GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+        GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+        if (point[2] + 12.0 < origin[2] + mins[2] - 16.0 || point[2] > origin[2] + maxs[2] + 16.0) {
+            continue;
+        }
+
+        // A bounding circle also covers rotated piles; leave room to aim at the pills.
+        float x = FloatAbs(mins[0]) > FloatAbs(maxs[0]) ? FloatAbs(mins[0]) : FloatAbs(maxs[0]);
+        float y = FloatAbs(mins[1]) > FloatAbs(maxs[1]) ? FloatAbs(mins[1]) : FloatAbs(maxs[1]);
+        float radius = SquareRoot(x * x + y * y) + 48.0;
+        float dx = point[0] - origin[0], dy = point[1] - origin[1];
+        if (dx * dx + dy * dy <= radius * radius) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool PF_FindRouteSpawnSpot(Address pArea, ArrayList hDoors, float fOut[3])
 {
     L4D_FindRandomSpot(view_as<int>(pArea), fOut);
@@ -1091,7 +1180,7 @@ static bool PF_FindRouteSpawnSpot(Address pArea, ArrayList hDoors, float fOut[3]
     }
 
     fOut[2] += 2.0;
-    if (PF_NearDoor(hDoors, fOut)) {
+    if (PF_NearDoor(hDoors, fOut) || PF_NearAmmoPile(fOut)) {
         return false;
     }
     if (L4D_GetNearestNavArea(fOut, 80.0, true, false, true, L4D2Team_Survivor) != pArea) {
@@ -1202,25 +1291,6 @@ static bool PF_FindRouteEnds(float fMaxFlowDist, Address &pStart, float &fStartF
     }
 
     return (pStart != Address_Null && pGoal != Address_Null && fGoalFlow > fStartFlow);
-}
-
-// Walkable survivor path length between two areas, found by bisecting BuildPath's length cap; -1.0 if longer than fHigh.
-static float PF_MeasurePath(Address pFrom, Address pTo, float fLow, float fHigh)
-{
-    if (!PF_PathWithin(pFrom, pTo, fHigh)) {
-        return -1.0;
-    }
-
-    for (int i = 0; i < 8; i++) {
-        float fMid = (fLow + fHigh) * 0.5;
-        if (PF_PathWithin(pFrom, pTo, fMid)) {
-            fHigh = fMid;
-        } else {
-            fLow = fMid;
-        }
-    }
-
-    return fHigh;
 }
 
 // Event nav blockers are ignored: items are placed at round start, before crescendo gates open.

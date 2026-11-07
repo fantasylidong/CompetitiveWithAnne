@@ -40,19 +40,28 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--maps', nargs='*', choices=OFFICIAL_MAPS, default=OFFICIAL_MAPS)
     parser.add_argument('--registry-tool', type=Path, default=Path('/Volumes/data/AI/codex/skills/anne-server-provisioning/scripts/anne_server.py'))
+    parser.add_argument('--alias', default=ALIAS)
+    parser.add_argument('--port', type=int)
+    parser.add_argument('--tracking-only', action='store_true')
+    parser.add_argument('--fill-repeats', type=int, default=0)
+    parser.add_argument('--detour', type=float, default=300.0)
+    parser.add_argument('--cases', nargs='*', default=['stacked', 'generic', 'unlimited', 'zero', 'unknown', 'strict'])
     args = parser.parse_args()
+    SETTINGS['confogl_pills_flow_max_detour'] = str(args.detour)
     spec = importlib.util.spec_from_file_location('anne_server', args.registry_tool)
     registry = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(registry)
-    server = registry.get_server(registry.load_registry(), ALIAS)
+    alias = args.alias
+    server = registry.get_server(registry.load_registry(), alias)
     target = None
     report = {'started_utc': datetime.now(timezone.utc).isoformat(), 'servers': [], 'settings': SETTINGS, 'maps': args.maps, 'tests': []}
-    for port in (18921, 18922, 18923, 18924):
+    ports = server['rcon']['ports']
+    for port in ([args.port] if args.port else ports):
         if port not in server['rcon']['ports']:
             raise RuntimeError('unregistered port')
         candidate = copy.deepcopy(server)
         candidate['rcon']['port'] = port
-        status = registry.rcon_request(candidate, ALIAS, 'status', 8)
+        status = registry.rcon_request(candidate, alias, 'status', 8)
         humans = re.search(r'players\s*:\s*(\d+) humans', status)
         map_name = re.search(r'^map\s*:\s*(\S+)', status, re.M)
         if not humans or not map_name:
@@ -61,13 +70,14 @@ def main():
         if target is None and int(humans[1]) == 0:
             target = candidate
     if target is None:
-        raise RuntimeError('all cloud 1-4 servers have humans; no server changed')
+        raise RuntimeError('no empty server found; no server changed')
     port = target['rcon']['port']
-    container = 'anne' + str(port - 18920)
-    report.update({'selected_port': port, 'container': container})
+    container = server.get('topology', {}).get('container_prefix', 'anne') + str(ports.index(port) + 1)
+    report.update({'alias': alias, 'selected_port': port, 'container': container})
     ssh_config = server['ssh']
     endpoint = ssh_config['user'] + '@' + ssh_config['host']
-    ssh_args = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-p', str(ssh_config['port']), '-i', ssh_config['identity_file'], endpoint]
+    connection_options = ['-o', 'BatchMode=yes', '-o', 'ControlMaster=auto', '-o', 'ControlPersist=60', '-o', 'ControlPath=/tmp/anne-pill-ssh-%C']
+    ssh_args = ['ssh', *connection_options, '-o', 'ConnectTimeout=8', '-p', str(ssh_config['port']), '-i', ssh_config['identity_file'], endpoint]
 
     def ssh(command):
         return run(ssh_args + [command])
@@ -76,16 +86,37 @@ def main():
         return ssh('docker exec ' + container + ' sh -lc ' + shlex.quote(command))
 
     def rcon(command):
-        return registry.rcon_request(target, ALIAS, command, 12)
+        return registry.rcon_request(target, alias, command, 20)
 
     def cvar(name):
         values = re.findall(r'"([^"]*)"', rcon('sm_cvar ' + name))
         return values[-1] if len(values) >= 2 else None
 
+    def cvars(names):
+        names = list(names)
+        values = dict.fromkeys(names)
+        for offset in range(0, len(names), 6):
+            response = rcon('; '.join('sm_cvar ' + name for name in names[offset:offset + 6]))
+            for line in response.splitlines():
+                quoted = re.findall(r'"([^"]*)"', line)
+                if len(quoted) >= 2 and quoted[0] in values:
+                    values[quoted[0]] = quoted[-1]
+        return values
+
     def set_cvar(name, value):
         if any(character in value for character in ('"', '\n', '\r', ';')):
             raise RuntimeError('unsupported cvar quoting: ' + name)
         rcon(f'sm_cvar {name} "{value}"')
+
+    def set_cvars(values):
+        commands = []
+        for name, value in values.items():
+            if any(character in value for character in ('"', '\n', '\r', ';')):
+                raise RuntimeError('unsupported cvar quoting: ' + name)
+            commands.append(f'sm_cvar {name} "{value}"')
+        # Keep each console request short while avoiding one network round trip per cvar.
+        for offset in range(0, len(commands), 6):
+            rcon('; '.join(commands[offset:offset + 6]))
 
     def empty_status():
         status = rcon('status')
@@ -118,12 +149,13 @@ def main():
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
 
     original_map = empty_status()
-    initial = {name: cvar(name) for name in ('sv_password', 'confogl_customcfg', *SETTINGS)}
+    initial = cvars(('sv_password', 'confogl_customcfg', *SETTINGS))
     if any(value is None and name != 'confogl_pills_flow_require_valid' for name, value in initial.items()):
         raise RuntimeError('incomplete cvar snapshot')
-    files = [('addons/sourcemod/plugins/confoglcompmod.smx', args.probes / 'confogl_probe.smx'),
-             ('addons/sourcemod/plugins/optional/AnneHappy/anne_pill_hint.smx', args.probes / 'hint_probe.smx')]
-    for language in ('', 'chi/', 'zho/', 'jp/', 'ko/'):
+    files = [('addons/sourcemod/plugins/confoglcompmod.smx', args.probes / 'confogl_probe.smx')]
+    if not args.tracking_only:
+        files.append(('addons/sourcemod/plugins/optional/AnneHappy/anne_pill_hint.smx', args.probes / 'hint_probe.smx'))
+    for language in (() if args.tracking_only else ('', 'chi/', 'zho/', 'jp/', 'ko/')):
         relative = 'addons/sourcemod/translations/' + language + 'anne_pill_hint.phrases.txt'
         files.append((relative, ROOT / relative))
     originals = {}
@@ -150,26 +182,26 @@ def main():
             remote = GAME + '/' + relative
             if originals[relative]:
                 ssh(f'docker cp {container}:{shlex.quote(remote)} {shlex.quote(backup)}/original{index}')
-            run(['scp', '-q', '-o', 'BatchMode=yes', '-P', str(ssh_config['port']), '-i', ssh_config['identity_file'], str(local), endpoint + ':' + backup + '/new' + str(index)])
+            run(['scp', '-q', *connection_options, '-P', str(ssh_config['port']), '-i', ssh_config['identity_file'], str(local), endpoint + ':' + backup + '/new' + str(index)])
             modified.append((index, relative))
             ssh(f'docker cp {shlex.quote(backup)}/new{index} {container}:{shlex.quote(remote)} && docker exec -u 0 {container} chown louis:louis {shlex.quote(remote)}')
         rcon('sm plugins load_unlock')
         set_cvar('confogl_customcfg', 'annehappy')
         rcon('sm plugins reload confoglcompmod')
-        rcon('sm plugins ' + ('reload' if hint_loaded else 'load') + ' optional/AnneHappy/anne_pill_hint')
-        rcon('sm_reload_translations')
+        if not args.tracking_only:
+            rcon('sm plugins ' + ('reload' if hint_loaded else 'load') + ' optional/AnneHappy/anne_pill_hint')
+            rcon('sm_reload_translations')
         rcon('sm plugins load_lock')
-        if 'Status: running' not in rcon('sm plugins info confoglcompmod') or 'Status: running' not in rcon('sm plugins info optional/AnneHappy/anne_pill_hint'):
+        if 'Status: running' not in rcon('sm plugins info confoglcompmod') or (not args.tracking_only and 'Status: running' not in rcon('sm plugins info optional/AnneHappy/anne_pill_hint')):
             raise RuntimeError('probe plugin failed to load')
 
         def measure(case):
             empty_status()
-            for name, value in SETTINGS.items():
-                set_cvar(name, value)
+            set_cvars(SETTINGS)
             log_path = docker(f'ls -t {GAME}/addons/sourcemod/logs/L*.log | head -1').strip()
             offset = int(docker('wc -c < ' + shlex.quote(log_path)).strip())
-            error_path = docker(f'ls -t {GAME}/addons/sourcemod/logs/errors_*.log | head -1').strip()
-            error_offset = int(docker('wc -c < ' + shlex.quote(error_path)).strip())
+            error_path = docker(f'ls -t {GAME}/addons/sourcemod/logs/errors_*.log 2>/dev/null | head -1').strip()
+            error_offset = int(docker('wc -c < ' + shlex.quote(error_path)).strip()) if error_path else 0
             command = 'pill_hint_regression' if case == 'hint' else 'pill_regression_run ' + case
             response = rcon(command)
             if 'Unknown command' in response:
@@ -180,7 +212,7 @@ def main():
                 lines = [line for line in text.splitlines() if 'PILL_' in line or '[ItemTracking]' in line]
                 passed = [line for line in lines if 'PILL_REGRESSION_PASS ' in line or 'PILL_HINT_REGRESSION_PASS ' in line]
                 if passed:
-                    if case != 'hint':
+                    if case != 'hint' and not args.tracking_only:
                         scan_offset = int(docker('wc -c < ' + shlex.quote(log_path)).strip())
                         rcon('pill_hint_regression scan')
                         snapshot = docker(f'tail -c +{scan_offset + 1} {shlex.quote(log_path)}')
@@ -197,7 +229,7 @@ def main():
                     save_report()
                     print(passed[-1], flush=True)
                     return
-                errors = docker(f'tail -c +{error_offset + 1} {shlex.quote(error_path)}')
+                errors = docker(f'tail -c +{error_offset + 1} {shlex.quote(error_path)}') if error_path else ''
                 failures = [line for line in errors.splitlines() if 'REGRESSION_FAIL' in line]
                 if failures:
                     report['tests'].append({'case': case, 'map': empty_status(), 'logs': lines, 'errors': errors.splitlines()})
@@ -207,11 +239,13 @@ def main():
             raise RuntimeError('regression timeout/failure: ' + case)
 
         change_map('c2m1_highway')
-        for case in ('stacked', 'generic', 'unlimited', 'zero', 'unknown', 'strict', 'hint'):
+        for case in args.cases + ([] if args.tracking_only else ['hint']):
             measure(case)
         for name in args.maps:
             change_map(name)
             measure('map')
+            for _ in range(args.fill_repeats):
+                measure('fill')
         report['complete'] = True
     except BaseException as error:
         report['failure'] = str(error)
@@ -224,7 +258,8 @@ def main():
                 warnings.append(label + ': ' + str(error))
         if locked:
             restore('unlock', lambda: rcon('sm plugins load_unlock'))
-            restore('unload hint', lambda: rcon('sm plugins unload optional/AnneHappy/anne_pill_hint'))
+            if not args.tracking_only:
+                restore('unload hint', lambda: rcon('sm plugins unload optional/AnneHappy/anne_pill_hint'))
             for index, relative in reversed(modified):
                 remote = GAME + '/' + relative
                 if originals[relative]:
@@ -232,15 +267,14 @@ def main():
                 else:
                     restore(relative, lambda remote=remote: docker('rm -f -- ' + shlex.quote(remote)))
             restore('reload original', lambda: rcon('sm plugins reload confoglcompmod'))
-            if hint_loaded:
+            if hint_loaded and not args.tracking_only:
                 restore('load original hint', lambda: rcon('sm plugins load optional/AnneHappy/anne_pill_hint'))
-            restore('translations', lambda: rcon('sm_reload_translations'))
-            for name, value in initial.items():
-                if name != 'sv_password':
-                    restore(name, lambda name=name, value=value: set_cvar(name, value if value is not None else '0'))
+            if not args.tracking_only:
+                restore('translations', lambda: rcon('sm_reload_translations'))
+            settings_to_restore = {name: value if value is not None else '0' for name, value in initial.items() if name != 'sv_password'}
+            restore('settings before map', lambda: set_cvars(settings_to_restore))
             restore('map', lambda: change_map(original_map))
-            for name, value in initial.items():
-                restore(name, lambda name=name, value=value: set_cvar(name, value if value is not None else '0'))
+            restore('settings after map', lambda: set_cvars(settings_to_restore))
             restore('load lock', lambda: rcon('sm plugins load_lock'))
             for relative, original_hash in originals.items():
                 def verify_file(relative=relative, original_hash=original_hash):
@@ -249,11 +283,11 @@ def main():
                     if (result[0] if result else None) != original_hash:
                         raise RuntimeError('hash mismatch')
                 restore('verify ' + relative, verify_file)
-            for name, value in initial.items():
-                def verify_cvar(name=name, value=value):
-                    if value is not None and cvar(name) != value:
-                        raise RuntimeError('value mismatch')
-                restore('verify ' + name, verify_cvar)
+            def verify_cvars():
+                restored = cvars(settings_to_restore)
+                if any(value is not None and restored[name] != value for name, value in initial.items() if name != 'sv_password'):
+                    raise RuntimeError('value mismatch')
+            restore('verify settings', verify_cvars)
             def verify_plugin():
                 if 'Status: running' not in rcon('sm plugins info confoglcompmod'):
                     raise RuntimeError('not running')
@@ -262,6 +296,11 @@ def main():
                 if empty_status() != original_map:
                     raise RuntimeError('map mismatch')
             restore('original map', verify_map)
+            restore('access setting', lambda: set_cvar('sv_password', initial['sv_password']))
+            def verify_access():
+                if cvar('sv_password') != initial['sv_password']:
+                    raise RuntimeError('value mismatch')
+            restore('verify access setting', verify_access)
             if backup and not warnings:
                 restore('backup cleanup', lambda: ssh('rm -r -- ' + shlex.quote(backup)))
         report.update({'finished_utc': datetime.now(timezone.utc).isoformat(), 'restore_warnings': warnings})

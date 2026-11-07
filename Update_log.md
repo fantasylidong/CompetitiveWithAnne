@@ -1253,6 +1253,12 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 其余仍加载 `pill_passer` 的模式全部改为 `fix_pill_pass`，并设置 `fix_pill_pass_reload 1`。包括战役、写实、突变及其衍生，以及 ZoneRetro、ZoneHunters、Equilibrium、Apex、NeoMod、NextMod、AcemodRv、PMElite、Deadman 和引用这些插件列表的 1v1、2v2、3v3。
 - 配置里不再有模式加载 `pill_passer`。按换弹仍递止痛药和肾上腺素，走游戏原版递药。
 
+### 2026年10月26日 Anne 地图生成 MP5 与商店首购免费
+
+- Anne、牛牛冲刺、女巫派对复用 Zonemod 的 `l4d2_allow_cs_weapons`、`l4d2_weapon_spawn_variety` 和 `director_cs_weapon_spawn_chance 1.0`，让已有 Stripper `any_smg` 点及普通固定冲锋枪点随机生成 Uzi、消音 SMG 或 MP5。沿用插件对一级散弹枪点的同类随机化，不覆盖明确指定武器的 `weapon_spawn` 点；Hardcore、纯散弹不接入这两个插件，原有限制不变。
+- RPG 商店 MP5 与 Uzi、消音 SMG 使用相同规则：共享一次首购免费资格，之后每次 50B，不再固定收费 100B。菜单同步显示当前价格，成功领取后消耗首购资格；保留商店开关与 15 秒购买冷却，购买提示继续使用现有多语言短语。已重新编译 `extend/rpg.smx`。
+- 本次只接通地图生成和商店领取，不修改 AnneHappy / AnneHappyPlus 的伤害、射速、散布、衰减、弹匣或换弹数值，平衡调整留待对比后决定。
+
 ### 2026年10月30日 Tank 连跳投票接入动态难度覆盖
 
 - Anne 普通、Hardcore、纯散弹和多人模式的 Tank 连跳开关投票统一调用现有 `vote/tank_bhop_on.cfg` / `vote/tank_bhop_off.cfg`，同时设置连跳开关和动态难度覆盖值，避免关闭后被重新应用的难度档位开启。单人模式已有相同处理，插件逻辑不变。
@@ -1273,3 +1279,20 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新增语音机制修复，避免语音传输影响感染者叫声和生还者噪音；用 `l4d2_vomit_collision_fix` 替换旧吐汁射线补丁，仅让已经中胆汁且倒地、被 Hunter 扑住或 Charger 压制的生还者使用命中盒检测，避免继续挡住身后目标的吐汁。
 - `zonemod_anne` 同步 c7m3 垃圾箱梯子的 `func_brush` 显示修正及 Amid The Ruins 第三关渡船补给阻塞修复。Downpour 第一、四关新增拖车底裙实体碰撞仅保留在 Zonemod，Anne 未配套更新 Nav，因此不复制。
 - 保留本地多语言提示、Anne 暂停规则、Tank HUD 定制及 ConVar 可见性策略，重新编译四个合并插件；CI 暂停使用上游已撤下的 SourceMod 1.13.7296 构建，保留 1.12。
+
+### 2026年11月7日 补刷止痛药避开弹药堆
+
+- 修复 Confogl 主路线补药会与 `weapon_ammo_spawn` 弹药堆重合、导致药无法拾取的问题。补药落点现在显式避开弹药堆的水平包围范围，并额外留出 48 单位拾取空间；同时检查高度，避免楼上楼下的弹药堆误挡落点，原有避门和药瓶间距规则保持不变。
+- 此前仅有避门处理，空间检测会忽略所有 `weapon_` 实体，尚无弹药堆专用避让。本次补齐检测，保留原有开局 1 秒处理时序。已重新编译 `confoglcompmod.smx`，定向回归覆盖重合、拾取间距、旋转覆盖、楼层分离、多弹药堆和零包围盒。
+
+### 2026年11月7日 补药路线与分布优化试验
+
+- 新补止痛药复用原生药的主路线绕路检查，原图无药时也建立路线；同一补药批次缓存各候选 Nav 的检查结果。开启路线限制但无法建立起终点可走路线时，记录原因并跳过补药。
+- 补药把已有药的位置纳入规划，每次优先填补药范围内最大的进度空档，在空档中部随机选目标；成功后用实际落点更新空档，失败则在剩余尝试中探索其他空档。保留原有药量、进度范围、开局时序、避门、避弹药堆及药瓶间距限制。
+- 路线绕路量改为使用同一 Nav 距离口径计算“起点到药 + 药到终点 − 起点到终点”，并分别验证生还者可以走通两段；移除 flow 比例换算和重复二分寻路，避免把后半程主路误判为岔路。
+- 已重新编译 `confoglcompmod.smx`。在无人云82临时隔离测试3张地图，3次地图筛选及9次清空补药均达到4瓶，保存点位恢复后的数量和位置一致；300单位绕路阈值足够，本轮未放宽至500。完整处理耗时约0.14–1.00秒。测试后已恢复原插件、地图、参数和访问设置，文件哈希及状态核验通过；未推广上线。
+
+### 2026年11月7日 新增弹药网络位宽扩展插件并全模式默认启用
+
+- 新增 `l4d2_ammo_bit_widener_ext`（`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`、`addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`、`addons/sourcemod/scripting/include/sendtable.inc`、`sendtable.ext` 扩展及 `extensions/sendtable/README.md` 源码来源说明），将 `CTerrorPlayer.m_iAmmo` 备弹位宽从 10 位拓宽至 16 位、`CBaseCombatWeapon.m_iClip1` 弹匣位宽从 8 位拓宽至 16 位，让客户端 HUD 正常显示超过 1023 的备弹与超过 255 的弹匣（最高 65535）。
+- 在 `cfg/sharedplugins.cfg` 中加入 `sm plugins load l4d2_ammo_bit_widener_ext.smx`，随服务器启动及所有模式默认启用。
