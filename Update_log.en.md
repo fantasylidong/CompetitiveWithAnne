@@ -651,3 +651,10 @@
 - Brought in the upstream melee-spawn fix, Tank hittable glow rewrite, ReadyUp 10.2.9, pill-pass reload, clip-size reload fix, infected ladder-collision fix, and fullupdate fix. Tank glow ConVars still stay out of A2S rules. In Anne modes, a survivor spectating a Tank still returns control to a bot. A Charger who is mid-charge is not kicked.
 - The visible ladders on the static dumpster in official map c7m3 are mirrored in both the `zonemod` and `zonemod_anne` strippers.
 - Recompiled `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, and `readyup.smx`.
+
+### November 6, 2026 Upstream fixes
+
+- Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.
+- Added the voice mechanics fix so voice packets do not affect infected growls or survivor noise. Replaced the old vomit trace patch with `l4d2_vomit_collision_fix`: hitbox testing applies only to already-biled survivors who are incapacitated, Hunter-pounced, or Charger-pummeled, so they stop blocking vomit aimed past them.
+- Mirrored the c7m3 dumpster ladder `func_brush` display fix and Amid The Ruins map 3 ferry-supply blockage fix into `zonemod_anne`. The new solid trailer skirtings in Downpour maps 1 and 4 remain in Zonemod only because the matching Anne Nav was not updated.
+- Preserved local translated messages, Anne pause rules, Tank HUD changes, and ConVar visibility policy; recompiled the four merged plugins. CI retains SourceMod 1.12 and disables the upstream-removed 1.13.7296 build.

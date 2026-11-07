@@ -1235,3 +1235,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 同步上游的近战生成修复、Tank 可砸物高亮重写、ReadyUp 10.2.9、药丸传递重载、弹夹换弹修复、感染者梯子碰撞修复和 fullupdate 修复。Tank 高亮相关 ConVar 仍不进入 A2S rules。Anne 模式中生还者旁观 Tank 时仍会把控制权交还 Bot；冲锋中的 Charger 不会被中途踢出。
 - 官方图 c7m3 静态垃圾箱的可见梯子已同步到 `zonemod` 与 `zonemod_anne` stripper。
 - 已重新编译 `left4dhooks.smx`、`confoglcompmod.smx`、`playermanagement.smx`、`l4d2_tank_props_glow.smx` 和 `readyup.smx`。
+
+### 2026年11月6日 同步上游修复
+
+- 同步 `upstream/master` 至 `0390482d4`，合入 11 个提交：优化多个 CollisionHook 插件，更新幽灵反作弊，阻止暂停期间按住攻击键实体化特感并屏蔽 `bugpause` 刷屏；观战 HUD 改用武器自身弹药类型读取备弹，修复 MP5 等武器显示。
+- 新增语音机制修复，避免语音传输影响感染者叫声和生还者噪音；用 `l4d2_vomit_collision_fix` 替换旧吐汁射线补丁，仅让已经中胆汁且倒地、被 Hunter 扑住或 Charger 压制的生还者使用命中盒检测，避免继续挡住身后目标的吐汁。
+- `zonemod_anne` 同步 c7m3 垃圾箱梯子的 `func_brush` 显示修正及 Amid The Ruins 第三关渡船补给阻塞修复。Downpour 第一、四关新增拖车底裙实体碰撞仅保留在 Zonemod，Anne 未配套更新 Nav，因此不复制。
+- 保留本地多语言提示、Anne 暂停规则、Tank HUD 定制及 ConVar 可见性策略，重新编译四个合并插件；CI 暂停使用上游已撤下的 SourceMod 1.13.7296 构建，保留 1.12。

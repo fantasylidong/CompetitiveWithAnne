@@ -651,3 +651,10 @@
 - 근접 무기 스폰 수정, Tank가 부술 수 있는 물체 발광 재작성, ReadyUp 10.2.9, 진통제 전달 중 재장전, 탄창 재장전 수정, 감염자 사다리 충돌 수정, fullupdate 수정을 동기화했습니다. Tank 발광 ConVar는 계속 A2S rules에 나가지 않습니다. Anne 모드에서 생존자가 Tank를 관전하면 제어권은 Bot에게 돌아갑니다. 돌진 중인 Charger는 도중에 추방되지 않습니다.
 - 공식 맵 c7m3의 고정 덤스터에 보이는 사다리를 `zonemod`와 `zonemod_anne` stripper에 동기화했습니다.
 - `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, `readyup.smx`를 다시 컴파일했습니다.
+
+### 2026년 11월 6일 업스트림 수정 동기화
+
+- `upstream/master`의 `0390482d4`까지 11개 커밋을 동기화했습니다. 여러 CollisionHook 플러그인을 최적화하고 고스트 부정행위 방지를 업데이트했습니다. 일시 정지 중 공격 버튼을 누르고 있어도 특수 감염자가 실체화되지 않도록 하고 `bugpause` 채팅 도배를 차단합니다. 관전 HUD는 무기 자체의 탄약 유형으로 예비 탄약을 읽어 MP5 등의 표시를 수정했습니다.
+- 음성 통신이 감염자 울음소리와 생존자 소음에 영향을 주지 않도록 수정했습니다. 기존 구토 추적 패치를 `l4d2_vomit_collision_fix`로 교체했습니다. 이미 담즙에 맞았으며 쓰러졌거나 Hunter에게 덮쳐졌거나 Charger에게 얻어맞는 생존자만 히트박스 판정을 사용하여 뒤쪽을 향한 구토를 계속 막지 않게 합니다.
+- c7m3 쓰레기통 사다리의 `func_brush` 표시 수정과 Amid The Ruins 3번 맵의 페리 보급품 진행 방해 수정을 `zonemod_anne`에 반영했습니다. Downpour 1·4번 맵의 새 트레일러 하단 충돌은 대응 Anne Nav가 갱신되지 않아 Zonemod에만 유지합니다.
+- 기존 다국어 알림, Anne 일시 정지 규칙, Tank HUD 변경과 ConVar 공개 정책을 유지하고 병합한 플러그인 4개를 다시 컴파일했습니다. CI는 SourceMod 1.12를 유지하고 업스트림에서 배포가 중단된 1.13.7296 빌드를 비활성화했습니다.
