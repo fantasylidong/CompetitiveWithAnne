@@ -10,6 +10,8 @@ public OnPluginStart()
 {
 	LoadTranslations("l4d_stats.phrases");
 	CommandsRegistered = false;
+	if (g_hMedicineGiveOnce == INVALID_HANDLE)
+		g_hMedicineGiveOnce = CreateTrie();
 	// Require Left 4 Dead (2)
 	decl String:game_name[64];
 	GetGameFolderName(game_name, sizeof(game_name));
@@ -229,6 +231,8 @@ public OnPluginStart()
 	else
 	{
 		HookEvent("defibrillator_used", event_DefibPlayer);
+		// 只继承药的编号。二代计分走 award_earned，这里不能再发一次分。
+		HookEvent("weapon_given", event_InheritMedicineIdentity, EventHookMode_Post);
 	}
 	HookEvent("item_pickup", event_ItemPickup);
 	HookEvent("heal_begin", event_HealBegin);

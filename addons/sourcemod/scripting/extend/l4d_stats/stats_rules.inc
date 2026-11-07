@@ -350,6 +350,8 @@ public void L4D_OnFirstSurvivorLeftSafeArea_Post(int client){
 ResetVars()
 {
 	ClearTrie(FriendlyFireDamageTrie);
+	if (g_hMedicineGiveOnce != INVALID_HANDLE)
+		ClearTrie(g_hMedicineGiveOnce);
 
 	PlayerVomited = false;
 	PlayerVomitedIncap = false;
@@ -396,6 +398,7 @@ ResetVars()
 		QuarterRankChangeFirstCheck[i] = true;
 		SupportReloadTime[i] = 0.0;
 		SupportReloadType[i] = 0;
+		g_iSupportReloadSerial[i] = 0;
 		SupportGiveCommandUntil[i] = 0.0;
 		SupportReloadOrigin[i][0] = 0.0;
 		SupportReloadOrigin[i][1] = 0.0;

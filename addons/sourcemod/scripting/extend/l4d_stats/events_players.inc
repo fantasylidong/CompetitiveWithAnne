@@ -651,6 +651,10 @@ public OnEntityCreated(entity, const String:ClassName[])
 
 	Pills[entity] = 0;
 	Adrenaline[entity] = 0;
+	g_iMedicineSerial[entity] = g_iMedicineSerialNext;
+	g_iMedicineSerialNext++;
+	if (g_iMedicineSerialNext <= 0)
+		g_iMedicineSerialNext = 1;
 	PillsFirstHolder[entity] = 0;
 	AdrenalineFirstHolder[entity] = 0;
 	FirstAidFirstHolder[entity] = 0;
@@ -803,6 +807,9 @@ public Action:Command_ReloadSupportItem(client, const String:command[], argc)
 	SupportReloadTime[client] = GetEngineTime();
 	SupportReloadType[client] = ItemType;
 	GetClientAbsOrigin(client, SupportReloadOrigin[client]);
+
+	new Held = GetPlayerWeaponSlot(client, 4);
+	g_iSupportReloadSerial[client] = Stats_AssignMedicineSerial(Held);
 
 	return Plugin_Continue;
 }
@@ -1044,27 +1051,143 @@ stock bool:Stats_TryConsumeMedicineGiveAward(Giver, Recipient)
 	return Stats_TryConsumeSupportRoundAward(Giver, Recipient, SupportMedicineAwardCount);
 }
 
+stock Stats_AssignMedicineSerial(entity)
+{
+	if (!Stats_IsTrackedWeaponEntity(entity) || !IsValidEntity(entity))
+		return 0;
+
+	if (g_iMedicineSerial[entity] == 0)
+	{
+		g_iMedicineSerial[entity] = g_iMedicineSerialNext;
+		g_iMedicineSerialNext++;
+		if (g_iMedicineSerialNext <= 0)
+			g_iMedicineSerialNext = 1;
+	}
+
+	return g_iMedicineSerial[entity];
+}
+
+stock Stats_FindHeldSupportItem(client, const String:needle[])
+{
+	new entity = GetPlayerWeaponSlot(client, 4);
+	if (!Stats_IsTrackedWeaponEntity(entity) || !IsValidEntity(entity))
+		return -1;
+
+	decl String:ClassName[MAX_LINE_WIDTH];
+	GetEntityClassname(entity, ClassName, sizeof(ClassName));
+	if (StrContains(ClassName, needle, false) == -1)
+		return -1;
+
+	return entity;
+}
+
+// 同一编号在本回合只领取一次。下一回合开始时清空。
+stock bool:Stats_ClaimMedicineGiveOnce(entity, Recipient)
+{
+	new serial = Stats_AssignMedicineSerial(entity);
+	new userid = GetClientUserId(Recipient);
+	if (serial == 0 || userid == 0)
+		return false;
+
+	if (g_hMedicineGiveOnce == INVALID_HANDLE)
+		g_hMedicineGiveOnce = CreateTrie();
+
+	decl String:key[16];
+	Format(key, sizeof(key), "%d", serial);
+
+	new awarded;
+	if (GetTrieValue(g_hMedicineGiveOnce, key, awarded))
+		return false;
+
+	SetTrieValue(g_hMedicineGiveOnce, key, userid);
+	return true;
+}
+
+stock bool:Stats_MedicineSerialClaimed(serial)
+{
+	if (serial == 0 || g_hMedicineGiveOnce == INVALID_HANDLE)
+		return false;
+
+	decl String:key[16];
+	Format(key, sizeof(key), "%d", serial);
+
+	new awarded;
+	return GetTrieValue(g_hMedicineGiveOnce, key, awarded);
+}
+
+stock Stats_InheritMedicineSerial(entity, serial)
+{
+	if (serial == 0 || !Stats_IsTrackedWeaponEntity(entity) || !IsValidEntity(entity))
+		return;
+
+	new current = g_iMedicineSerial[entity];
+	if (current == serial || Stats_MedicineSerialClaimed(current))
+		return;
+
+	g_iMedicineSerial[entity] = serial;
+}
+
+public Action:event_InheritMedicineIdentity(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new giver = GetClientOfUserId(GetEventInt(event, "giver"));
+	new entity = GetEventInt(event, "weaponentid");
+	if (!Stats_IsValidClient(giver) || g_iSupportReloadSerial[giver] == 0)
+		return Plugin_Continue;
+
+	if (GetEngineTime() - SupportReloadTime[giver] > 1.0)
+		return Plugin_Continue;
+
+	Stats_InheritMedicineSerial(entity, g_iSupportReloadSerial[giver]);
+	return Plugin_Continue;
+}
+
+stock bool:Stats_PrepareMedicineGive(Giver, Recipient, &entity, const String:needle[])
+{
+	if (CurrentGamemodeID == GAMEMODE_SURVIVAL && !SurvivalStarted)
+		return false;
+
+	if (!Stats_IsValidClient(Giver) || !Stats_IsValidClient(Recipient))
+		return false;
+
+	if (!Stats_HasSupportAwardRoundStarted() || !Stats_IsRpgRoundValid())
+		return false;
+
+	if (!Stats_IsSurvivorHuman(Giver) || !Stats_IsSurvivorHuman(Recipient))
+		return false;
+
+	if (SupportMedicineAwardCount[Giver] >= SUPPORT_ROUND_AWARD_LIMIT)
+		return false;
+
+	if (!Stats_IsTrackedWeaponEntity(entity) || !IsValidEntity(entity))
+		entity = -1;
+	else
+	{
+		decl String:ClassName[MAX_LINE_WIDTH];
+		GetEntityClassname(entity, ClassName, sizeof(ClassName));
+		if (StrContains(ClassName, needle, false) == -1)
+			entity = -1;
+	}
+
+	if (entity < 0)
+		entity = Stats_FindHeldSupportItem(Recipient, needle);
+
+	if (entity < 0)
+		return false;
+
+	if (!Stats_ClaimMedicineGiveOnce(entity, Recipient))
+		return false;
+
+	SupportMedicineAwardCount[Giver]++;
+	return true;
+}
+
 // Adrenaline give code. Special note, Adrenalines can only be given once. (Even if it's initially given by a bot!)
 
 GiveAdrenaline(Giver, Recipient, AdrenalineID = -1)
 {
 	// Stats enabled is checked by the caller
 
-	if (CurrentGamemodeID == GAMEMODE_SURVIVAL && !SurvivalStarted)
-		return;
-
-	if (!Stats_IsValidClient(Giver) || !Stats_IsValidClient(Recipient))
-		return;
-
-	if (AdrenalineID < 0)
-		AdrenalineID = GetPlayerWeaponSlot(Recipient, 4);
-
-	if (AdrenalineID < 0 || Adrenaline[AdrenalineID] == 1)
-		return;
-	else
-		Adrenaline[AdrenalineID] = 1;
-
-	if (!Stats_TryConsumeMedicineGiveAward(Giver, Recipient))
+	if (!Stats_PrepareMedicineGive(Giver, Recipient, AdrenalineID, "adrenaline"))
 		return;
 
 	decl String:RecipientName[MAX_LINE_WIDTH];
@@ -1126,21 +1249,7 @@ GivePills(Giver, Recipient, PillsID = -1)
 {
 	// Stats enabled is checked by the caller
 
-	if (CurrentGamemodeID == GAMEMODE_SURVIVAL && !SurvivalStarted)
-		return;
-
-	if (!Stats_IsValidClient(Giver) || !Stats_IsValidClient(Recipient))
-		return;
-
-	if (PillsID < 0)
-		PillsID = GetPlayerWeaponSlot(Recipient, 4);
-
-	if (PillsID < 0 || Pills[PillsID] == 1)
-		return;
-	else
-		Pills[PillsID] = 1;
-
-	if (!Stats_TryConsumeMedicineGiveAward(Giver, Recipient))
+	if (!Stats_PrepareMedicineGive(Giver, Recipient, PillsID, "pain_pills"))
 		return;
 
 	decl String:RecipientName[MAX_LINE_WIDTH];

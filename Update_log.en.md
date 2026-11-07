@@ -652,6 +652,13 @@
 - The visible ladders on the static dumpster in official map c7m3 are mirrored in both the `zonemod` and `zonemod_anne` strippers.
 - Recompiled `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, and `readyup.smx`.
 
+### October 25, 2026 One medicine item scores once
+
+- Updated `l4d_stats` to 1.5.7. Each pain pills and adrenaline entity receives an identity. Within one round, after that item first scores for a successful give to a survivor, giving it to anyone else does not score.
+- Round start clears that record, including a restart after a team wipe, so the same item can score once again in the next round.
+- If a reload-give deletes the old entity and creates a new one, a `weapon_given` event within one second keeps the original identity, so replacing the entity does not create another score in the same round. A give is not scored when the recipient is not holding that item, and a different item is not marked as already given.
+- The existing limit of two medicine-give scores per player per round remains. Recompiled `l4d_stats.smx`.
+
 ### November 6, 2026 Upstream fixes
 
 - Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.

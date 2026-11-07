@@ -245,6 +245,11 @@ new TimerKills[MAXPLAYERS + 1];
 new TimerHeadshots[MAXPLAYERS + 1];
 new Pills[4096];
 new Adrenaline[4096];
+// 每瓶药的编号在同一回合内代表同一瓶。领取记录按编号保存，回合开始时清空。
+new Handle:g_hMedicineGiveOnce = INVALID_HANDLE;
+new g_iMedicineSerial[4096];
+new g_iMedicineSerialNext = 1;
+new g_iSupportReloadSerial[MAXPLAYERS + 1];
 new PillsFirstHolder[4096];
 new AdrenalineFirstHolder[4096];
 new FirstAidFirstHolder[4096];
