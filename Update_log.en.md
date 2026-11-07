@@ -669,6 +669,10 @@
 - Every remaining mode that loaded `pill_passer` now loads `fix_pill_pass` with `fix_pill_pass_reload 1`. That covers Coop, Realism, Mutation and their variants, plus ZoneRetro, ZoneHunters, Equilibrium, Apex, NeoMod, NextMod, AcemodRv, PMElite, Deadman, and the 1v1, 2v2, and 3v3 configs that use those plugin lists.
 - No mode configuration loads `pill_passer` anymore. Reload still passes pain pills and adrenaline through the game's own pass.
 
+### October 30, 2026 Tank bunnyhop votes use the dynamic difficulty override
+
+- Tank bunnyhop on/off votes in standard Anne, Hardcore, Shotgun, and multiplayer modes now call the existing `vote/tank_bhop_on.cfg` / `vote/tank_bhop_off.cfg`, setting both the bunnyhop switch and the dynamic difficulty override so reapplying a difficulty profile does not turn bunnyhopping back on after a disable vote. Single-player mode already uses this handling; plugin logic is unchanged.
+
 ### November 6, 2026 Upstream fixes
 
 - Synced 11 commits from `upstream/master` through `0390482d4`: optimized several CollisionHook plugins, updated ghost anti-cheat, blocked special infected materialization while holding attack during pauses, and blocked `bugpause` chat flooding. The spectator HUD now reads reserve ammo using each weapon's ammo type, fixing MP5 and other weapon displays.
