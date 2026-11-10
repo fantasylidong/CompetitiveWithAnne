@@ -719,3 +719,9 @@
 - Added client validity checks for ready, pause, team chat, scoring, and map-position commands; console score queries use server output. Fixed the rate list checking the wrong player and debug errors when no Tank exists. Preserved local translations, Anne pause rules, and ConVar visibility policy.
 - Synced the Coinflip rewrite: only in-game clients may use it, and missing, nonnumeric, zero, or negative die sizes fall back to 20. Preserved separate flip/roll cooldowns and added cooldown chat phrases in all seven existing languages. Synced the archival of three unused upstream plugins and their sources; static shotgun spread now uses its own named gamedata.
 - Mirrored the item blocker beneath the metal grate in Death Toll map 2 into both Zonemod and `zonemod_anne`. Recompiled 9 merged plugins; targeted ready-condition and coin/die regressions and the ConVar visibility check passed. No in-game validation or deployment was performed.
+
+### November 10, 2026 Upstream Charger and Ellis fixes and Portuguese translations
+
+- Synced 3 commits from `upstream/master` through `1ed611663`. Updated `l4d2_charge_target_fix` to 1.11 to prevent survivors from shooting or shoving during the brief window between a Charger slam and the queued pummel, including weapon switches and drawing a pistol after incapacitation.
+- Updated `l4d2_ellis_hunter_bandaid_fix` to 1.3. The accelerated Ellis Hunter-pounce get-up animation now remains applied after player/bot swaps during the animation.
+- Added 31 Brazilian Portuguese translation files with 334 phrases. Upstream made no Zonemod stripper changes, so no additional Anne map adaptation was needed. Recompiled both fix plugins; translation syntax, phrase keys, format parameters, and ConVar visibility checks passed. No in-game validation or deployment was performed.
