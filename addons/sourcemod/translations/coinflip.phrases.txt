@@ -16,4 +16,8 @@
 	{
 		"en"		"{lightgreen}%s{default} rolled a {green}%d{default} sided die!\nIt's {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"en"		"Please wait at least {green}%d{default} seconds before trying again."
+	}
 }

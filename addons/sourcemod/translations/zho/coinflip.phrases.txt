@@ -16,4 +16,8 @@
 	{
 		"zho"		"{lightgreen}%s{default} 擲了一個 {green}%d{default} 面骰子!\n結果是 {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"zho"		"請至少等待 {green}%d{default} 秒後再試。"
+	}
 }

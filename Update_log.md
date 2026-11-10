@@ -1296,3 +1296,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - 新增 `l4d2_ammo_bit_widener_ext`（`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`、`addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`、`addons/sourcemod/scripting/include/sendtable.inc`、`sendtable.ext` 扩展及 `extensions/sendtable/README.md` 源码来源说明），将 `CTerrorPlayer.m_iAmmo` 备弹位宽从 10 位拓宽至 16 位、`CBaseCombatWeapon.m_iClip1` 弹匣位宽从 8 位拓宽至 16 位，让客户端 HUD 正常显示超过 1023 的备弹与超过 255 的弹匣（最高 65535）。
 - 在 `cfg/sharedplugins.cfg` 中加入 `sm plugins load l4d2_ammo_bit_widener_ext.smx`，随服务器启动及所有模式默认启用。
+
+### 2026年11月9日 同步上游命令安全与合作准备支持
+
+- 同步 `upstream/master` 的 6 个提交至 `59c1b56f2`。ReadyUp 支持合作模式按实际生还者人数或生还者队伍准备开局；对抗模式保留双队准备要求。
+- 补齐准备、暂停、队伍聊天、计分和地图坐标命令的客户端有效性检查，控制台查询计分改用服务器输出；修复网络参数列表检查错玩家及无 Tank 时调试输出报错。保留本地多语言、Anne 暂停规则和 ConVar 可见性策略。
+- 同步 Coinflip 重写：仅限游戏内玩家使用，未提供、非数字、零或负数骰面回退至 20；保留掷币和掷骰独立冷却，冷却聊天提示补齐现有七种语言。同步归档上游三个停用插件及源码，静态霰弹散布改用专用同名 gamedata。
+- 将死亡丧钟第二关金属格栅下方的物品防掉落阻挡同时同步至 Zonemod 和 `zonemod_anne`。重新编译 9 个合并插件；准备条件与掷币/掷骰定向回归及 ConVar 可见性检查通过，未进行游戏内验证或部署。

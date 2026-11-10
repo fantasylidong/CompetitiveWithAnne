@@ -16,4 +16,8 @@
 	{
 		"vi"		"{lightgreen}%s{default} đã gieo xúc xắc {green}%d{default} mặt!\nKết quả là {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"vi"		"Vui lòng đợi ít nhất {green}%d{default} giây trước khi thử lại."
+	}
 }

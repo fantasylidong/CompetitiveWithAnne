@@ -16,4 +16,8 @@
 	{
 		"jp"		"{lightgreen}%s{default} が {green}%d{default} 面ダイスを振りました!\n結果は {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"jp"		"少なくとも {green}%d{default} 秒待ってからもう一度お試しください。"
+	}
 }

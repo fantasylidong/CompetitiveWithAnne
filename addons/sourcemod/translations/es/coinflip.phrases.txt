@@ -12,4 +12,8 @@
 	{
 		"es"		"!{lightgreen}%s{default} eligió un número del 1 al {green}%d{default}!\n¡Es {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"es"		"Espera al menos {green}%d{default} segundos antes de intentarlo de nuevo."
+	}
 }

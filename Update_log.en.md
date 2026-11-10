@@ -712,3 +712,10 @@
 
 - Added `l4d2_ammo_bit_widener_ext` (`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`, `addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`, `addons/sourcemod/scripting/include/sendtable.inc`, `sendtable.ext` binaries, and `extensions/sendtable/README.md` source documentation), widening `CTerrorPlayer.m_iAmmo` from 10 to 16 bits and `CBaseCombatWeapon.m_iClip1` from 8 to 16 bits so the client HUD displays reserve ammo above 1023 and clip ammo above 255 (up to 65535).
 - Added `sm plugins load l4d2_ammo_bit_widener_ext.smx` to `cfg/sharedplugins.cfg` so it stays enabled by default across all modes.
+
+### November 9, 2026 Upstream command safety and coop ready support
+
+- Synced 6 commits from `upstream/master` through `59c1b56f2`. ReadyUp supports coop starts based on the actual survivor roster or survivor team readiness; versus retains readiness requirements for both teams.
+- Added client validity checks for ready, pause, team chat, scoring, and map-position commands; console score queries use server output. Fixed the rate list checking the wrong player and debug errors when no Tank exists. Preserved local translations, Anne pause rules, and ConVar visibility policy.
+- Synced the Coinflip rewrite: only in-game clients may use it, and missing, nonnumeric, zero, or negative die sizes fall back to 20. Preserved separate flip/roll cooldowns and added cooldown chat phrases in all seven existing languages. Synced the archival of three unused upstream plugins and their sources; static shotgun spread now uses its own named gamedata.
+- Mirrored the item blocker beneath the metal grate in Death Toll map 2 into both Zonemod and `zonemod_anne`. Recompiled 9 merged plugins; targeted ready-condition and coin/die regressions and the ConVar visibility check passed. No in-game validation or deployment was performed.

@@ -712,3 +712,10 @@
 
 - `l4d2_ammo_bit_widener_ext`（`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`、`addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`、`addons/sourcemod/scripting/include/sendtable.inc`、`sendtable.ext` 拡張および `extensions/sendtable/README.md` のソース位置説明）を追加し、`CTerrorPlayer.m_iAmmo` の予備弾ビット幅を10ビットから16ビット、`CBaseCombatWeapon.m_iClip1` のマガジンビット幅を8ビットから16ビットへ拡張して、クライアント HUD で1023を超える予備弾と255を超えるマガジン弾数（最大65535）を正しく表示できるようにしました。
 - `cfg/sharedplugins.cfg` に `sm plugins load l4d2_ammo_bit_widener_ext.smx` を追加し、サーバー起動時および全モードで既定有効にしました。
+
+### 2026年11月9日 上流のコマンド安全性と協力モード準備対応を同期
+
+- `upstream/master` の 6 コミットを `59c1b56f2` まで同期。ReadyUp は協力モードで実際の生存者人数または生存者チームの準備に基づいて開始でき、対戦モードは両チームの準備条件を維持します。
+- 準備、一時停止、チームチャット、得点、マップ座標コマンドにクライアントの有効性確認を追加。コンソールからの得点照会はサーバー出力を使用します。通信設定一覧が別のプレイヤーを確認する問題と、Tank 不在時のデバッグ出力エラーを修正。既存の多言語対応、Anne の一時停止ルール、ConVar 公開方針を維持しました。
+- Coinflip の書き直しを同期。ゲーム内プレイヤーのみ利用でき、サイコロの面数が未指定、非数値、ゼロ、負数の場合は 20 に戻します。コイントスとサイコロの独立したクールダウンを維持し、待機チャット通知を既存の 7 言語に追加。上流で未使用の 3 プラグインとソースをアーカイブし、固定ショットガン拡散は専用の同名 gamedata を使用します。
+- Death Toll 第2マップの金属格子下へのアイテム落下を防ぐブロッカーを Zonemod と `zonemod_anne` の両方に反映。統合した 9 プラグインを再コンパイルし、準備条件とコイントス・サイコロの限定回帰検証、ConVar 公開方針チェックに合格。ゲーム内検証およびデプロイは行っていません。

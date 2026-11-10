@@ -712,3 +712,10 @@
 
 - `l4d2_ammo_bit_widener_ext`(`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`, `addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`, `addons/sourcemod/scripting/include/sendtable.inc`, `sendtable.ext` 확장 및 `extensions/sendtable/README.md` 소스 위치 문서)를 추가해 `CTerrorPlayer.m_iAmmo` 예비 탄약 비트 폭을 10비트에서 16비트로, `CBaseCombatWeapon.m_iClip1` 탄창 비트 폭을 8비트에서 16비트로 넓혀 클라이언트 HUD에서 1023을 넘는 예비 탄약과 255를 넘는 탄창 탄수(최대 65535)를 정상 표시하도록 했습니다.
 - `cfg/sharedplugins.cfg`에 `sm plugins load l4d2_ammo_bit_widener_ext.smx`를 추가하여 서버 시작 시 및 모든 모드에서 기본으로 활성화되도록 했습니다.
+
+### 2026년 11월 9일 업스트림 명령 안전성 및 협동 준비 지원 동기화
+
+- `upstream/master`의 커밋 6개를 `59c1b56f2`까지 동기화했습니다. ReadyUp은 협동 모드에서 실제 생존자 인원 또는 생존자 팀의 준비 상태에 따라 시작하며, 대전 모드는 양 팀의 준비 조건을 유지합니다.
+- 준비, 일시정지, 팀 채팅, 점수 및 맵 좌표 명령에 클라이언트 유효성 검사를 추가하고, 콘솔 점수 조회는 서버 출력으로 처리합니다. 네트워크 설정 목록이 잘못된 플레이어를 검사하는 문제와 Tank가 없을 때의 디버그 출력 오류를 수정했습니다. 기존 다국어, Anne 일시정지 규칙 및 ConVar 공개 정책을 유지했습니다.
+- Coinflip 재작성을 동기화했습니다. 게임 내 플레이어만 사용할 수 있으며, 주사위 면수가 생략되거나 숫자가 아니거나 0 또는 음수이면 20으로 돌아갑니다. 동전과 주사위의 독립적인 재사용 대기시간을 유지하고, 대기시간 채팅 안내를 기존 7개 언어에 추가했습니다. 업스트림에서 사용하지 않는 플러그인 3개와 소스를 보관하고, 고정 산탄 분산은 전용 동명 gamedata를 사용합니다.
+- 사망자 명단 두 번째 맵의 금속 격자 아래로 아이템이 떨어지는 것을 막는 블로커를 Zonemod와 `zonemod_anne`에 함께 반영했습니다. 병합한 플러그인 9개를 다시 컴파일했으며 준비 조건, 동전·주사위의 대상 회귀 검사와 ConVar 공개 정책 검사를 통과했습니다. 게임 내 검증이나 배포는 하지 않았습니다.

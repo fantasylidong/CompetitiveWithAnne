@@ -16,4 +16,8 @@
 	{
 		"ko"		"{lightgreen}%s{default}님이 {green}%d{default}면 주사위를 굴렸습니다!\n결과는 {green}%d{default}!"
 	}
+	"Cooldown"
+	{
+		"ko"		"최소 {green}%d{default}초 후에 다시 시도하세요."
+	}
 }
