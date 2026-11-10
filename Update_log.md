@@ -1236,6 +1236,11 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 官方图 c7m3 静态垃圾箱的可见梯子已同步到 `zonemod` 与 `zonemod_anne` stripper。
 - 已重新编译 `left4dhooks.smx`、`confoglcompmod.smx`、`playermanagement.smx`、`l4d2_tank_props_glow.smx` 和 `readyup.smx`。
 
+### 2026年10月25日 Anne 默认枪械加入 MP5
+
+- Anne、牛牛冲刺、女巫派对不再把地图上的 MP5 换成消音 SMG。MP5 与 Uzi、消音 SMG 一起作为默认一级冲锋枪保留。Hardcore 仍禁用 MP5，散弹模式仍把三把冲锋枪换成散弹枪。
+- 三把冲锋枪的当前平衡候选参数详见 2026年11月8日记录。
+
 ### 2026年10月25日 一瓶药只给药分一次
 
 - `l4d_stats` 更新至 1.5.7。止痛药和肾上腺素生成时各得到一个编号。同一回合里，一瓶药第一次成功递给生还者并计分之后，再递给任何人都不计分。
@@ -1296,6 +1301,12 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - 新增 `l4d2_ammo_bit_widener_ext`（`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`、`addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`、`addons/sourcemod/scripting/include/sendtable.inc`、`sendtable.ext` 扩展及 `extensions/sendtable/README.md` 源码来源说明），将 `CTerrorPlayer.m_iAmmo` 备弹位宽从 10 位拓宽至 16 位、`CBaseCombatWeapon.m_iClip1` 弹匣位宽从 8 位拓宽至 16 位，让客户端 HUD 正常显示超过 1023 的备弹与超过 255 的弹匣（最高 65535）。
 - 在 `cfg/sharedplugins.cfg` 中加入 `sm plugins load l4d2_ammo_bit_widener_ext.smx`，随服务器启动及所有模式默认启用。
+
+### 2026年11月8日 AnneHappyPlus 与普通 Anne 冲锋枪平衡候选（未部署）
+
+- 重设计三把一级冲锋枪的正交定位：`AnneHappyPlus` 下 Uzi / 消音 SMG / MP5 的单发伤害设为 25 / 29 / 33，距离衰减系数设为 0.94 / 0.80 / 0.88，对 Tank 倍率设为 0.91 / 0.87 / 0.88；普通 Anne（`AnneHappy`）同步设为伤害 24 / 27 / 31、衰减系数 0.935 / 0.80 / 0.88、对 Tank 倍率 0.96 / 0.94 / 0.95。
+- 细化散布、换弹与穿透分工：Uzi 换弹缩至 1.65s、移动散布降至 1.35°、散布恢复提至 6.0、最大散布降至 20°；消音 SMG 站立 / 蹲姿 / 移动散布设为 1.25° / 0.90° / 2.00°、每发扩散提至 0.38° 并显式将 `gainrange` 归零；MP5 射程设为 2200、弹匣 55 发、换弹 2.60s，站立 / 蹲姿散布压至 0.75° / 0.45°、移动散布设为 2.60°、每发扩散 0.35°、最大散布 25°，并赋予 `penpower` 40 与 `charpenmaxdist` 300。
+- 按全部命中计算，`AnneHappyPlus` 在 100u 三人最优冲锋枪对 Tank 集火约为 1158 DPS（旧版基线约 1151 DPS）；仅更新本地配置与 NewAnneWeb 未发布对比快照，尚未部署游戏服。
 
 ### 2026年11月9日 同步上游命令安全与合作准备支持
 

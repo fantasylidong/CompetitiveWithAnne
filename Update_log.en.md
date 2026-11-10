@@ -652,6 +652,11 @@
 - The visible ladders on the static dumpster in official map c7m3 are mirrored in both the `zonemod` and `zonemod_anne` strippers.
 - Recompiled `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, and `readyup.smx`.
 
+### October 25, 2026 MP5 joins the Anne default weapons
+
+- Anne, All Charger, and Witch Party no longer replace map MP5s with the silenced SMG. The MP5 stays in the default tier-1 pool with the Uzi and silenced SMG. Hardcore still removes the MP5, and Shotgun still replaces all three SMGs with shotguns.
+- See the November 8, 2026 entry below for the current SMG balance candidate parameters.
+
 ### October 25, 2026 One medicine item scores once
 
 - Updated `l4d_stats` to 1.5.7. Each pain pills and adrenaline entity receives an identity. Within one round, after that item first scores for a successful give to a survivor, giving it to anyone else does not score.
@@ -712,6 +717,12 @@
 
 - Added `l4d2_ammo_bit_widener_ext` (`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`, `addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`, `addons/sourcemod/scripting/include/sendtable.inc`, `sendtable.ext` binaries, and `extensions/sendtable/README.md` source documentation), widening `CTerrorPlayer.m_iAmmo` from 10 to 16 bits and `CBaseCombatWeapon.m_iClip1` from 8 to 16 bits so the client HUD displays reserve ammo above 1023 and clip ammo above 255 (up to 65535).
 - Added `sm plugins load l4d2_ammo_bit_widener_ext.smx` to `cfg/sharedplugins.cfg` so it stays enabled by default across all modes.
+
+### November 8, 2026 AnneHappyPlus and Anne SMG balance candidate (not deployed)
+
+- Redesigned the three tier-1 SMGs around orthogonal roles: in `AnneHappyPlus`, Uzi / silenced SMG / MP5 damage is set to 25 / 29 / 33, range modifiers to 0.94 / 0.80 / 0.88, and Tank damage multipliers to 0.91 / 0.87 / 0.88; standard Anne (`AnneHappy`) uses damage 24 / 27 / 31, range modifiers 0.935 / 0.80 / 0.88, and Tank multipliers 0.96 / 0.94 / 0.95.
+- Differentiated spread, reload, and penetration: Uzi uses a 1.65s reload, 1.35° move spread, 6.0 spread decay, and 20° max spread; silenced SMG uses 1.25° / 0.90° / 2.00° stand / duck / move spread, 0.38° spread per shot, and `gainrange` 0; MP5 uses 2200 range, 55-round clip, 2.60s reload, 0.75° / 0.45° stand / duck spread, 2.60° move spread, 0.35° spread per shot, 25° max spread, `penpower` 40, and `charpenmaxdist` 300.
+- With all shots hitting, three players using the strongest SMG at 100u in `AnneHappyPlus` deal about 1158 DPS to a Tank (versus about 1151 in the released baseline). Updated only local configuration and the NewAnneWeb unpublished comparison snapshot; game servers have not received this candidate.
 
 ### November 9, 2026 Upstream command safety and coop ready support
 

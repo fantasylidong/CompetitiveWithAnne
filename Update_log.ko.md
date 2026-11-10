@@ -652,6 +652,11 @@
 - 공식 맵 c7m3의 고정 덤스터에 보이는 사다리를 `zonemod`와 `zonemod_anne` stripper에 동기화했습니다.
 - `left4dhooks.smx`, `confoglcompmod.smx`, `playermanagement.smx`, `l4d2_tank_props_glow.smx`, `readyup.smx`를 다시 컴파일했습니다.
 
+### 2026년 10월 25일 Anne 기본 무기에 MP5 추가
+
+- Anne, 올 차저, 위치 파티는 맵의 MP5를 소음 SMG로 바꾸지 않습니다. MP5는 Uzi, 소음 SMG와 함께 기본 1티어 기관단총으로 남습니다. Hardcore는 MP5를 계속 제거하고, 샷건 모드는 세 SMG를 샷건으로 바꿉니다.
+- SMG 3종의 현재 밸런스 후보 수치는 아래 2026년 11월 8일 기록을 참고하세요.
+
 ### 2026년 10월 25일 약 하나는 한 번만 점수
 
 - `l4d_stats`를 1.5.7로 업데이트했습니다. 진통제와 아드레날린은 생성될 때 번호를 받습니다. 같은 라운드에서 그 약을 생존자에게 건네 한 번 점수를 받은 뒤에는 누구에게 건네도 점수가 나지 않습니다.
@@ -712,6 +717,12 @@
 
 - `l4d2_ammo_bit_widener_ext`(`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`, `addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`, `addons/sourcemod/scripting/include/sendtable.inc`, `sendtable.ext` 확장 및 `extensions/sendtable/README.md` 소스 위치 문서)를 추가해 `CTerrorPlayer.m_iAmmo` 예비 탄약 비트 폭을 10비트에서 16비트로, `CBaseCombatWeapon.m_iClip1` 탄창 비트 폭을 8비트에서 16비트로 넓혀 클라이언트 HUD에서 1023을 넘는 예비 탄약과 255를 넘는 탄창 탄수(최대 65535)를 정상 표시하도록 했습니다.
 - `cfg/sharedplugins.cfg`에 `sm plugins load l4d2_ammo_bit_widener_ext.smx`를 추가하여 서버 시작 시 및 모든 모드에서 기본으로 활성화되도록 했습니다.
+
+### 2026년 11월 8일 AnneHappyPlus 및 일반 Anne SMG 밸런스 후보안 (게임 서버 미반영)
+
+- 1티어 SMG 3종의 역할을 재설계했습니다: `AnneHappyPlus`에서 Uzi / 소음 SMG / MP5의 피해량을 25 / 29 / 33, 거리 감쇠 계수를 0.94 / 0.80 / 0.88, Tank 대상 배율을 0.91 / 0.87 / 0.88로 설정하고, 일반 Anne(`AnneHappy`)은 피해량 24 / 27 / 31, 거리 감쇠 계수 0.935 / 0.80 / 0.88, Tank 배율 0.96 / 0.94 / 0.95로 동기화했습니다.
+- 산포, 재장전 및 관통 특성을 구분했습니다: Uzi는 재장전 1.65초, 이동 산포 1.35°, 산포 회복 6.0, 최대 산포 20°로 설정했습니다. 소음 SMG는 서기 / 앉기 / 이동 산포를 1.25° / 0.90° / 2.00°, 발당 산포 증가를 0.38°, `gainrange`를 0으로 설정했습니다. MP5는 사거리 2200, 탄창 55발, 재장전 2.60초, 서기 / 앉기 산포 0.75° / 0.45°, 이동 산포 2.60°, 발당 산포 증가 0.35°, 최대 산포 25°, `penpower` 40, `charpenmaxdist` 300으로 설정했습니다.
+- 전탄 명중 기준 `AnneHappyPlus`의 100u에서 가장 강한 SMG로 3명이 Tank를 집중 사격할 때 약 1158 DPS(공개 버전 약 1151 DPS)입니다. 로컬 설정과 NewAnneWeb 미공개 비교 데이터만 갱신했으며 게임 서버에는 반영하지 않았습니다.
 
 ### 2026년 11월 9일 업스트림 명령 안전성 및 협동 준비 지원 동기화
 

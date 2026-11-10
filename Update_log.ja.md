@@ -652,6 +652,11 @@
 - 公式マップ c7m3 の固定ダンプスターにある見えるはしごを、`zonemod` と `zonemod_anne` の stripper に同期しました。
 - `left4dhooks.smx`、`confoglcompmod.smx`、`playermanagement.smx`、`l4d2_tank_props_glow.smx`、`readyup.smx` を再コンパイルしました。
 
+### 2026年10月25日 Anne の標準武器に MP5 を追加
+
+- Anne、オールチャージャー、ウィッチパーティーは、マップ上の MP5 をサイレンサー SMG に置き換えなくなりました。MP5 は Uzi、サイレンサー SMG とともに標準のティア1サブマシンガンとして残ります。Hardcore は MP5 を引き続き無効にし、ショットガンモードは 3 種のサブマシンガンをショットガンに置き換えます。
+- 3種の SMG の現在の調整候補値は、後述の2026年11月8日の記録を参照してください。
+
 ### 2026年10月25日 一つの薬は一度だけ得点
 
 - `l4d_stats` を 1.5.7 に更新しました。鎮痛剤とアドレナリンは生成時に番号を受け取ります。同一ラウンドで、その薬が生存者への受け渡しで一度得点したあとは、誰に渡しても得点しません。
@@ -712,6 +717,12 @@
 
 - `l4d2_ammo_bit_widener_ext`（`addons/sourcemod/plugins/l4d2_ammo_bit_widener_ext.smx`、`addons/sourcemod/scripting/l4d2_ammo_bit_widener_ext.sp`、`addons/sourcemod/scripting/include/sendtable.inc`、`sendtable.ext` 拡張および `extensions/sendtable/README.md` のソース位置説明）を追加し、`CTerrorPlayer.m_iAmmo` の予備弾ビット幅を10ビットから16ビット、`CBaseCombatWeapon.m_iClip1` のマガジンビット幅を8ビットから16ビットへ拡張して、クライアント HUD で1023を超える予備弾と255を超えるマガジン弾数（最大65535）を正しく表示できるようにしました。
 - `cfg/sharedplugins.cfg` に `sm plugins load l4d2_ammo_bit_widener_ext.smx` を追加し、サーバー起動時および全モードで既定有効にしました。
+
+### 2026年11月8日 AnneHappyPlus・通常 Anne SMG の調整候補（ゲームサーバー未反映）
+
+- 3種のティア1 SMG の役割を再設計：`AnneHappyPlus` では Uzi / 消音 SMG / MP5 のダメージを 25 / 29 / 33、距離減衰係数を 0.94 / 0.80 / 0.88、対 Tank 倍率を 0.91 / 0.87 / 0.88 に設定。通常 Anne（`AnneHappy`）はダメージ 24 / 27 / 31、距離減衰係数 0.935 / 0.80 / 0.88、対 Tank 倍率 0.96 / 0.94 / 0.95 に同期しました。
+- 拡散・リロード・貫通の差別化：Uzi はリロード 1.65秒、移動拡散 1.35°、拡散回復 6.0、最大拡散 20°。消音 SMG は立ち / しゃがみ / 移動拡散を 1.25° / 0.90° / 2.00°、1発ごと拡散を 0.38°、`gainrange` を 0 に設定。MP5 は射程 2200、装弾数 55、リロード 2.60秒、立ち / しゃがみ拡散 0.75° / 0.45°、移動拡散 2.60°、1発ごと拡散 0.35°、最大拡散 25°、`penpower` 40、`charpenmaxdist` 300 に設定しました。
+- 全弾命中時の計算では、`AnneHappyPlus` の 100u で最も強い SMG を3人で Tank に撃つ DPS は約1158（公開版は約1151）です。ローカル設定と NewAnneWeb の未公開比較データのみを更新し、ゲームサーバーには反映していません。
 
 ### 2026年11月9日 上流のコマンド安全性と協力モード準備対応を同期
 
