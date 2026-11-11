@@ -747,6 +747,10 @@
 
 - Updated map voting to `0.9.5-custom`: setting the next map, changing campaigns, and changing chapters now pass all eligible human survivors and infected to `DisplayVote` in one call, preventing only the first player from receiving the vote. Added targeted checks for electorate size, team filtering, and empty electorates.
 
+### November 11, 2026 No-buy completion bonus native validation
+
+- When `l4dstats_AddClientScore` or its compatibility native receives `nobuy_bonus`, validate human survivor status, round eligibility, and the exact reward amount, rejecting invalid awards. Reuse the normal settlement's `v3n` formula to keep score-log records consistent.
+
 ### November 11, 2026 Upstream Simplified Chinese Translation Fixes
 
 - Synced one `upstream/master` commit through `a3f246ae5`. Reviewed 26 Simplified Chinese translation files, retaining 46 local extension phrases and the existing pause, horde, and slot-vote format arguments to preserve Anne-specific messages.
