@@ -2,7 +2,7 @@
 {
 	"SI"
 	{
-		"chi"		"SI: "
+		"chi"		"特感: "
 	}
 	"SpecialInfected"
 	{

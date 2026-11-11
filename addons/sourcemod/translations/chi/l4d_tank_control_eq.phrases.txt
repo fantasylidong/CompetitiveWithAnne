@@ -18,11 +18,11 @@
 	}
 	"YouBecomeTank"
 	{
-		"chi"		"{green}You{default} 将会成为 {red}Tank{default}!"
+		"chi"		"{green}你 {default}将成为 {red}Tank{default}！"
 	}
 	"BecomeTank"
 	{
-		"chi"		"{olive}%s{default} 将会成为 {red}Tank{default}!"
+		"chi"		"{olive}%N {default}将成为 {red}Tank！"
 	}
 	"TagControl"
 	{

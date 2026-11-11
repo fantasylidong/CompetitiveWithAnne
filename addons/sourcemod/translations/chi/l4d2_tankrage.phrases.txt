@@ -2,11 +2,11 @@
 {
 	"Tag"
 	{
-		"chi"		"{red} [ {default} 坦克狂暴 {red} ] {default}"
+		"chi"		"{red}[{default}Tank控制权{red}]{default}"
 	}
 	"SurvivorsRunBack"
 	{
-		"chi"		"每有 {olive}%i{green}%% {default}的幸存者往回跑，Tank 的怒气会冻结 {olive}%0.1f {green}秒{default}。"
+		"chi"		"生还者每回退{olive}%i{green}%%{default}路程，Tank控制权将冻结{olive}%0.1f{green}秒{default}。"
 	}
 	"L4D2Tankrage_Tank"
 	{
