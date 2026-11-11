@@ -739,9 +739,29 @@
 
 ### 2026年11月10日 Anne PvE モードのプラグイン整理・廃止プラグイン削除および AI／拡張プラグインの性能改善
 
-- 廃止または高負荷な重複プラグインとソース 7 件を削除：`extend/savechat`（無フィルタの全コマンド監視により全クライアントコマンドでメインスレッドの同期ファイル書き込みが発生し、チャット記録は `chatlog.smx` の非同期 MySQL 保存で代替済み）、`extend/attachments_api`（呼び出し元がないにもかかわらず毎フレーム `OnPlayerRunCmd` と `0.1s` タイマーおよび `SetTransmit` エンティティを実行）、`extend/sbpp_sleuth`（監視ライブラリ名 `"sourcebans"` と `"sourcebans++"` の不一致により常時無効）、`fixes/l4d_unrestrict_panic_battlefield`（`MemoryPatch` を一切有効化しない無処理プラグイン）、`fixes/lfd_both_fixSG552`（`l4d2_sg552_zoom_fix` と重複し毎フレーム武器クラス名を取得）、`optional/AnneHappy/l4d2_si_ladder_booster`（`l4d2_ai_ladder_boost` に統合済み）、孤立バイナリ `optional/AnneHappy/anne_movement_diag.smx`。
-- PvE 薬役および協力派生モードの読み込み設定を整理：重複・対戦専用プラグイン（`nosaferoomkits`、`l4d2_stats`、`l4d2_playstats`、`l4d2_tank_attack_control`、`l4d_texture_manager_block`、`ratemonitor`、`l4d_equalise_alarm_cars`）、高負荷な見た目専用プラグイン `extend/Survivor_Legs`（100Tick で毎フレーム 22 個のポーズパラメータ更新と `SetTransmit` 属性照会を実行）、および重複読み込みされていた `extend/rpg` と `fixes/l4d_tongue_block_fix` を無効化。`fixes/annoyance_exploit_fixes.smx` のアンロードパスを修正し、`l4d2_jockey_jumpcap_patch`、`l4d2_shadow_removal`、`l4d2_fix_firsthit`、`l4d2_fix_team_shuffle`、`l4d2_fullupdate_fix`、`l4d2_transition_info_fix` を薬役モードでアンロード。`confogl_reduce_finalespawnrange` を `0`、`sm_allowed_lerp_changes` を `20`、`sm_lerp_change_spec` を `0` に設定しました。
+- 廃止または高負荷な重複プラグインとソース 7 件を削除：`extend/savechat`（無フィルタの全コマンド監視により全クライアントコマンドでメインスレッドの同期ファイル書き込みが発生し、チャット記録は `chatlog.smx` の非同期 MySQL 保存で代替済み）、`extend/attachments_api`（呼び出し元がないにもかかわらず毎フレーム `OnPlayerRunCmd` と `0.1s` タイマーおよび `SetTransmit` エンティティを実行）、`extend/sbpp_sleuth`（サーバー側でファミリーシェアリングを無効化済みで動的 IP・アクセラレータ共有 IP による誤判定リスクがあり、旧実装も `"sourcebans"` と `"sourcebans++"` の不一致で常時無効だったため、ホワイトリスト・翻訳ファイル・`nomysql` パッケージ項目とあわせて削除）、`fixes/l4d_unrestrict_panic_battlefield`（`MemoryPatch` を一切有効化しない無処理プラグイン）、`fixes/lfd_both_fixSG552`（`l4d2_sg552_zoom_fix` と重複し毎フレーム武器クラス名を取得）、`optional/AnneHappy/l4d2_si_ladder_booster`（`l4d2_ai_ladder_boost` に統合済み）、孤立バイナリ `optional/AnneHappy/anne_movement_diag.smx`。
+- PvE 薬役および協力派生モードの読み込み設定を整理：重複・対戦専用プラグイン（`nosaferoomkits`、`l4d2_stats`、`l4d2_playstats`、`l4d2_tank_attack_control`、`l4d_texture_manager_block`、`l4d_equalise_alarm_cars`）、高負荷な見た目専用プラグイン `extend/Survivor_Legs`（100Tick で毎フレーム 22 個のポーズパラメータ更新と `SetTransmit` 属性照会を実行）、および重複読み込みされていた `extend/rpg` と `fixes/l4d_tongue_block_fix` を無効化。`fixes/annoyance_exploit_fixes.smx` のアンロードパスを修正し、`l4d2_jockey_jumpcap_patch`、`l4d2_fix_firsthit`、`l4d2_fix_team_shuffle`、`l4d2_fullupdate_fix`、`l4d2_transition_info_fix` を薬役モードでアンロードし、`confogl_reduce_finalespawnrange` を `0` に設定しました。
 - Anne・拡張プラグイン 32 件を修正・最適化して再コンパイル：`ai_jockey_2` の連跳で速度ベクトルを視点角として `TeleportEntity` に渡していた不具合と毎フレームの `ArrayList` 生成、`l4d_target_override` の Charger 拘束解除判定における `||` 誤用、`ai_boomer_3` が Z 座標を 0 にした後に射線判定していた問題、`ai_hunter_2` の `L4D2_IsVisibleToPlayer` 引数誤りと照準角方向の逆転、`ai_smoker3` の UserId 誤渡しと毎フレーム `ArrayList` 生成、`ai_spitter_3` の無条件距離計算、`ai_charger3` の壁判定トレースフィルタ引数漏れ、`SI_Target_limit` の毎秒 `FindConVar` 呼び出し、`anne_cvar_shield` の全コマンド監視、`witch_announce` の多人数配列境界外アクセス、`l4d_tank_damage_announce` のマップ切り替え時ハンドル漏れと整数除算、`sam_vs` の入力ごとのタイマー生成、`join` による `FindConVar` ハンドル誤破棄、`SpecListener` の SourceTV 判定逆転とメニュー漏れ、`veterans` の 32 スロット境界外、`l4d_hats` の `SetTransmit` 多重登録、`rpg` メニュー表示時の `DumpAdminCache` 全体再構築と虹色輪郭 `PreThink` 重複登録および非管理者エラー、`ThirdPersonShoulder_Detect` のポーリング周期緩和と生存者限定化、`Survivor_Legs` の BOT 送信抑止と視線ピッチ早期判定、`smoker_anim_fix` のホットパスと `l4d2_sg552_zoom_fix` の武器検証を修正しました。
+
+### 2026年11月11日 マップ投票の全対象者への送信
+
+- マップ投票を `0.9.5-custom` に更新しました。次マップの設定・キャンペーン変更・チャプター変更時に、投票資格を持つ人間の生存者と感染者全員を一度の `DisplayVote` に渡し、最初のプレイヤーにしか投票が届かない問題を修正しました。投票者数・チーム除外・空リストの個別検証を追加しました。
+
+### 2026年11月11日 購入なしクリア報酬 native の検証
+
+- `l4dstats_AddClientScore` と互換 native が `nobuy_bonus` を受け取る際、人間の生存者であること・当該ラウンドの報酬資格・正確な報酬額を検証し、不適切な加点を拒否します。通常精算と同じ `v3n` 計算式を再利用し、スコア履歴を統一しました。
+
+### 2026年11月11日 Tank 跑男検出タイマーの後処理
+
+- `l4d2_Anne_stuck_tank_teleport` の跑男検出タイマーがプラグイン無効または Tank 数ゼロにより自動停止した際、保存ハンドルも消去します。後のマップ終了処理で失効ハンドルを再削除してエラーになる問題を防ぎます。
+
+### 2026年11月11日 広告 flags の除外規則を復元
+
+- `advertisements` の明示的な `flags` を従来どおり除外条件として扱うよう戻しました。一般プレイヤー向けの広告が、除外対象の権限や root 管理者だけに表示される問題を修正しました。
+
+### 2026年11月11日 text と Witch 通知のコンパイル整理
+
+- `text` の未使用関数 `IsTeamImmobilised` と `witch_announce` の未使用変数 `g_iSurvivorLimit` を削除してコンパイル警告を解消し、対応バイナリを再コンパイルしました。
 
 ### 2026年11月11日 上流の簡体字中国語翻訳修正を同期
 

@@ -4,7 +4,7 @@
 #define PLUGIN_NAME             "L4D2 Map vote"
 #define PLUGIN_AUTHOR           "fdxx, sorallll"
 #define PLUGIN_DESCRIPTION      "Map vote with mission-only for players; chapters for admins"
-#define PLUGIN_VERSION          "0.9.4-custom"
+#define PLUGIN_VERSION          "0.9.5-custom"
 #define PLUGIN_URL              ""
 
 #define TRANSLATION_MISSIONS    "missions.phrases.txt"
@@ -891,17 +891,19 @@ void VoteNextMap(int client, const char[] item) {
     vote.SetInfo(buffer);
 
     int team;
-    int clients[1];
+    int clients[MAXPLAYERS];
+    int numClients;
     for (int i = 1; i <= MaxClients; i++) {
         if (!IsClientInGame(i) || IsFakeClient(i) || (team = GetClientTeam(i)) < 2 || team > 3)
             continue;
 
-        fmt_Translate(item, buffer, sizeof buffer, i, item);
-        vote.SetTitle("设置下一张地图为: %s", buffer);
-
-        clients[0] = i;
-        vote.DisplayVote(clients, 1, 20);
+        clients[numClients++] = i;
     }
+
+    // DisplayVote starts the vote once; pass the complete electorate together.
+    fmt_Translate(item, buffer, sizeof buffer, client, item);
+    vote.SetTitle("设置下一张地图为: %s", buffer);
+    vote.DisplayVote(clients, numClients, 20);
 }
 
 void NextMap_Handler(L4D2NativeVote vote, VoteAction action, int param1, int param2) {
@@ -1094,19 +1096,20 @@ void VoteChangeMission(int client, const char[] mission) {
     vote.SetInfo(mission);
 
     int team;
-    int clients[1];
+    int clients[MAXPLAYERS];
+    int numClients;
 
     char display[64];
     for (int i = 1; i <= MaxClients; i++) {
         if (!IsClientInGame(i) || IsFakeClient(i) || (team = GetClientTeam(i)) < 2 || team > 3)
             continue;
 
-        fmt_Translate(mission, display, sizeof display, i, mission);
-        vote.SetTitle("更换战役: %s", display);
-
-        clients[0] = i;
-        vote.DisplayVote(clients, 1, 20);
+        clients[numClients++] = i;
     }
+
+    fmt_Translate(mission, display, sizeof display, client, mission);
+    vote.SetTitle("更换战役: %s", display);
+    vote.DisplayVote(clients, numClients, 20);
 }
 
 // MOD: 新增 — 战役级投票处理
@@ -1220,18 +1223,19 @@ void VoteChangeMap(int client, const char[] item) {
     ExplodeString(item, "//", info, sizeof info, sizeof info[]);
 
     int team;
-    int clients[1];
+    int clients[MAXPLAYERS];
+    int numClients;
     for (int i = 1; i <= MaxClients; i++) {
         if (!IsClientInGame(i) || IsFakeClient(i) || (team = GetClientTeam(i)) < 2 || team > 3)
             continue;
 
-        fmt_Translate(info[0], info[0], sizeof info[], i, info[0]);
-        fmt_Translate(info[1], info[1], sizeof info[], i, info[1]);
-        vote.SetTitle("更换地图: %s (%s)", info[0], info[1]);
-
-        clients[0] = i;
-        vote.DisplayVote(clients, 1, 20);
+        clients[numClients++] = i;
     }
+
+    fmt_Translate(info[0], info[0], sizeof info[], client, info[0]);
+    fmt_Translate(info[1], info[1], sizeof info[], client, info[1]);
+    vote.SetTitle("更换地图: %s (%s)", info[0], info[1]);
+    vote.DisplayVote(clients, numClients, 20);
 }
 
 void ChangeMap_Handler(L4D2NativeVote vote, VoteAction action, int param1, int param2) {

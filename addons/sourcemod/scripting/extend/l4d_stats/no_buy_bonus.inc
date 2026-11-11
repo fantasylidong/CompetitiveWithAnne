@@ -61,42 +61,54 @@ stock NoBuyBonus_GetFinalScore()
 	return Score;
 }
 
-stock NoBuyBonus_TryAwardSurvivors()
+stock NoBuyBonus_GetEligibleScore(bool:Announce = false)
 {
 	if (!GetConVarBool(cvar_NoBuyBonusEnable))
-		return;
+		return 0;
 
 	if (!g_brpgAvailable || !IsAnne())
-		return;
+		return 0;
 
 	if (L4D_RPG_GetGlobalValue(INDEX_USEBUY))
-		return;
+		return 0;
 
 	if (!L4D_RPG_GetGlobalValue(INDEX_VALID))
-		return;
+		return 0;
 
 	if (IsGaoJiRenJiEnabled())
 	{
-		StatsPrintToChatAll("L4DStats_NoBuyBonusAdvancedBotsDisabled");
-		return;
+		if (Announce)
+			StatsPrintToChatAll("L4DStats_NoBuyBonusAdvancedBotsDisabled");
+		return 0;
 	}
 
 	if (!IsThisRoundValid())
 	{
-		StatsPrintToChatAll("L4DStats_NoBuyBonusBunnyHopDisabled");
-		return;
+		if (Announce)
+			StatsPrintToChatAll("L4DStats_NoBuyBonusBunnyHopDisabled");
+		return 0;
 	}
 
-	new Score = NoBuyBonus_GetFinalScore();
+	return NoBuyBonus_GetFinalScore();
+}
+
+stock NoBuyBonus_BuildFormula(String:ScoreFormula[], MaxLength)
+{
+	new BaseScore = NoBuyBonus_GetBaseScore();
+	new HardcoreMultiplier = IsAnne() == 2 ? view_as<int>(GetConVarFloat(cvar_NoBuyBonusHardcoreMultiplier)) : view_as<int>(1.0);
+	new AbovePlayers = IsAboveFourPeople() ? getSurvivorNum() : 0;
+	Format(ScoreFormula, MaxLength, "v3n:%i:%i:%i", BaseScore, HardcoreMultiplier, AbovePlayers);
+}
+
+stock NoBuyBonus_TryAwardSurvivors()
+{
+	new Score = NoBuyBonus_GetEligibleScore(true);
 	if (Score <= 0)
 		return;
 
 	new Awarded = 0;
-	new BaseScore = NoBuyBonus_GetBaseScore();
-	new HardcoreMultiplier = IsAnne() == 2 ? view_as<int>(GetConVarFloat(cvar_NoBuyBonusHardcoreMultiplier)) : view_as<int>(1.0);
-	new AbovePlayers = IsAboveFourPeople() ? getSurvivorNum() : 0;
 	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
-	Format(ScoreFormula, sizeof(ScoreFormula), "v3n:%i:%i:%i", BaseScore, HardcoreMultiplier, AbovePlayers);
+	NoBuyBonus_BuildFormula(ScoreFormula, sizeof(ScoreFormula));
 	for (new i = 1; i <= MaxClients; i++)
 	{
 		if (!Stats_IsSurvivorHuman(i))

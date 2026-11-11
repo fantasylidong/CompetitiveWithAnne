@@ -314,7 +314,21 @@ public int Native_AddClientScore(Handle plugin, int numParams)
 			strcopy(Reason, sizeof(Reason), "native_add_score");
 	}
 
-	if (!Stats_AwardClientScore(client, Score, Reason, "native=l4dstats_AddClientScore"))
+	decl String:ScoreFormula[MAX_MESSAGE_WIDTH];
+	strcopy(ScoreFormula, sizeof(ScoreFormula), "native=l4dstats_AddClientScore");
+	if (StrEqual(Reason, "nobuy_bonus", false))
+	{
+		if (!Stats_IsSurvivorHuman(client) || Score <= 0 || Score != NoBuyBonus_GetEligibleScore())
+		{
+			decl String:Caller[PLATFORM_MAX_PATH];
+			GetPluginFilename(plugin, Caller, sizeof(Caller));
+			LogError("Rejected nobuy_bonus from %s for client %d: score=%d; no-buy prerequisites or amount do not match", Caller, client, Score);
+			return ClientPoints[client];
+		}
+		NoBuyBonus_BuildFormula(ScoreFormula, sizeof(ScoreFormula));
+	}
+
+	if (!Stats_AwardClientScore(client, Score, Reason, ScoreFormula))
 		return ClientPoints[client];
 	return ClientPoints[client];
 }

@@ -1323,9 +1323,29 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 ### 2026年11月10日 Anne 药役模式插件精简、废弃插件清理与 AI/扩展插件性能优化
 
-- 删除 7 个废弃或高开销冗余插件及源码：`extend/savechat`（全局命令监听未过滤指令，导致任意客户端指令触发主线程同步打开与刷新日志文件，聊天记录已由 `chatlog.smx` 异步写入 MySQL）、`extend/attachments_api`（全服无任何插件调用其 Native，却每帧执行 `OnPlayerRunCmd`、`0.1s` 定时器并创建额外 `SetTransmit` 实体）、`extend/sbpp_sleuth`（监听库名 `"sourcebans"` 与 `sbpp_main` 注册的 `"sourcebans++"` 不一致，运行时永久失效）、`fixes/l4d_unrestrict_panic_battlefield`（未启用任何 `MemoryPatch` 的空操作插件）、`fixes/lfd_both_fixSG552`（与 `l4d2_sg552_zoom_fix` 功能重复且每帧遍历武器类名）、`optional/AnneHappy/l4d2_si_ladder_booster`（已合并至 `l4d2_ai_ladder_boost`）及孤儿二进制 `optional/AnneHappy/anne_movement_diag.smx`。
-- 精简 PVE 药役与战役衍生模式加载项：禁用冗余或纯 PVP 插件 `nosaferoomkits`、`l4d2_stats`、`l4d2_playstats`、`l4d2_tank_attack_control`、`l4d_texture_manager_block`、`ratemonitor`、`l4d_equalise_alarm_cars`、高开销纯外观插件 `extend/Survivor_Legs`（100Tick 下每帧拷贝 22 项姿态参数并触发 `SetTransmit` 大量属性查询）以及重复加载的 `extend/rpg`、`fixes/l4d_tongue_block_fix`；修正 `fixes/annoyance_exploit_fixes.smx` 卸载路径，并在药役模式卸载 `l4d2_jockey_jumpcap_patch`、`l4d2_shadow_removal`、`l4d2_fix_firsthit`、`l4d2_fix_team_shuffle`、`l4d2_fullupdate_fix`、`l4d2_transition_info_fix` 等纯 PVP/真人特感对局插件；将 `confogl_reduce_finalespawnrange` 设为 `0`、放宽药役模式 `sm_allowed_lerp_changes` 至 `20` 且关闭切旁观惩罚（`sm_lerp_change_spec 0`）。
+- 删除 7 个废弃或高开销冗余插件及源码：`extend/savechat`（全局命令监听未过滤指令，导致任意客户端指令触发主线程同步打开与刷新日志文件，聊天记录已由 `chatlog.smx` 异步写入 MySQL）、`extend/attachments_api`（全服无任何插件调用其 Native，却每帧执行 `OnPlayerRunCmd`、`0.1s` 定时器并创建额外 `SetTransmit` 实体）、`extend/sbpp_sleuth`（服务器已禁用家庭组共享，动态公网/加速器共享 IP 关联易误判，且原版监听库名 `"sourcebans"` 与 `"sourcebans++"` 不一致长期失效；同步清理其白名单、翻译文件与 `nomysql` 发布打包项）、`fixes/l4d_unrestrict_panic_battlefield`（未启用任何 `MemoryPatch` 的空操作插件）、`fixes/lfd_both_fixSG552`（与 `l4d2_sg552_zoom_fix` 功能重复且每帧遍历武器类名）、`optional/AnneHappy/l4d2_si_ladder_booster`（已合并至 `l4d2_ai_ladder_boost`）及孤儿二进制 `optional/AnneHappy/anne_movement_diag.smx`。
+- 精简 PVE 药役与战役衍生模式加载项：禁用冗余或纯 PVP 插件 `nosaferoomkits`、`l4d2_stats`、`l4d2_playstats`、`l4d2_tank_attack_control`、`l4d_texture_manager_block`、`l4d_equalise_alarm_cars`、高开销纯外观插件 `extend/Survivor_Legs`（100Tick 下每帧拷贝 22 项姿态参数并触发 `SetTransmit` 大量属性查询）以及重复加载的 `extend/rpg`、`fixes/l4d_tongue_block_fix`；修正 `fixes/annoyance_exploit_fixes.smx` 卸载路径，并在药役模式卸载 `l4d2_jockey_jumpcap_patch`、`l4d2_fix_firsthit`、`l4d2_fix_team_shuffle`、`l4d2_fullupdate_fix`、`l4d2_transition_info_fix` 等纯 PVP/真人特感对局插件；将 `confogl_reduce_finalespawnrange` 设为 `0`。
 - 修复并优化重编译 32 个 Anne 与扩展插件：修复 `ai_jockey_2` 连跳将速度向量误作视角传给 `TeleportEntity` 及每帧分配 `ArrayList`、`l4d_target_override` 的 Charger 控制解除判断使用 `||` 导致恒为真、`ai_boomer_3` 将 Z 坐标清零后做视线射线检测、`ai_hunter_2` 的 `L4D2_IsVisibleToPlayer` 参数错误与视线夹角方向写反、`ai_smoker3` UserId 误传与每帧分配 `ArrayList`、`ai_spitter_3` 每帧无条件计算距离、`ai_charger3` 墙体射线过滤参数缺失、`SI_Target_limit` 每秒重复 `FindConVar`、`anne_cvar_shield` 全局通配命令监听、`witch_announce` 多人模式数组越界、`l4d_tank_damage_announce` 换图悬空句柄与整数除法、`sam_vs` 按键定时器风暴、`join` 误释放 `FindConVar` 句柄、`SpecListener` 判断取反与菜单句柄泄漏、`veterans` 32 槽位越界、`l4d_hats` 重复叠加 `SetTransmit` 钩子、`rpg` 打开菜单触发 `DumpAdminCache` 全表刷新与彩虹轮廓 `PreThink` 叠加及非管理员权限句柄报错、`ThirdPersonShoulder_Detect` 客户端轮询降频与仅查存活生还者、`Survivor_Legs` 过滤假客户端与非低头快速返回、`smoker_anim_fix` 热路径及 `l4d2_sg552_zoom_fix` 空武器实体检查。
+
+### 2026年11月11日 地图投票完整广播
+
+- 地图投票更新至 `0.9.5-custom`：设置下一张地图、更换战役和更换章节时，将全部符合条件的真人生还者与感染者一次性传给 `DisplayVote`，避免只有首名玩家收到投票。加入投票人数、队伍过滤与空名单的定向检查。
+
+### 2026年11月11日 不购买过关奖励 native 校验
+
+- `l4dstats_AddClientScore` 与兼容 native 收到 `nobuy_bonus` 时，统一校验真人生还者身份、本局奖励资格与准确金额，拒绝不符合条件的发分；复用正常结算的 `v3n` 公式记录，保持积分流水一致。
+
+### 2026年11月11日 Tank 跑男检测定时器清理
+
+- `l4d2_Anne_stuck_tank_teleport` 的跑男检测定时器因插件禁用或 Tank 计数为零而自行停止时，同步清空保存的句柄，避免后续换图清理再次删除失效句柄并报错。
+
+### 2026年11月11日 恢复广告 flags 排除规则
+
+- 恢复 `advertisements` 中显式 `flags` 的既有排除语义，避免原本面向普通玩家的广告反而只向被排除权限和 root 管理员显示。
+
+### 2026年11月11日 text 与 Witch 播报编译清理
+
+- 删除 `text` 未使用的 `IsTeamImmobilised` 与 `witch_announce` 未使用的 `g_iSurvivorLimit`，消除编译警告并同步重编译产物。
 
 ### 2026年11月11日 同步上游简体中文翻译修正
 

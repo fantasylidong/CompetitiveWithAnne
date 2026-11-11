@@ -82,14 +82,14 @@
 ## **无外部数据库版本:**
 > Anne 的 MySQL 数据库不对外开放。自行部署时，请使用 `nomysql` 包，或者按项目内的 `database.sql` 和 Wiki 配置自己的数据库。
 
-重新检查非 `disabled/` 的已发布插件后，共有 **18 个 `.smx` 直接调用 SourceMod 数据库 API**。`nomysql` 的处理口径如下：
+重新检查非 `disabled/` 的已发布插件后，共有 **17 个 `.smx` 直接调用 SourceMod 数据库 API**。`nomysql` 的处理口径如下：
 
 * 保留 `l4d2_map_vote.smx` 和 `optional/AnneHappy/spawn_vote_menu.smx`：前者只用本地 SQLite，后者默认使用 `storage-local` SQLite
 * 使用 `disabled/rpg.smx` 覆盖 `extend/rpg.smx`：插件路径和 cfg 加载项不变，但换成无数据库构建
-* 删除其余 15 个直接访问外部数据库的插件，并额外删除 `sbpp_admcfg.smx`、`sbpp_report.smx` 和依赖积分时长数据的 `veterans.smx`
+* 删除其余 14 个直接访问外部数据库的插件，并额外删除 `sbpp_admcfg.smx`、`sbpp_report.smx` 和依赖积分时长数据的 `veterans.smx`
 * 当前版和 2026-07 回滚版 `infected_control` 都通过可选的 `anne_traitor_quota.smx` 保存配额；`nomysql` 删除 provider 后，两个版本都会跳过持久化资格门槛并继续运行
 
-因此，发布 workflow 只生成完整数据库包与 `nomysql` 包；当前完整包共有 **423 个 `.smx`**，`nomysql` 删除 **18 个**并替换 RPG 构建，最终保留 **405 个**。`disabled/` 下不会自动加载的 SourceMod SQL 管理插件不计入上述 18 个直接访问数据库的插件。
+因此，发布 workflow 只生成完整数据库包与 `nomysql` 包；`nomysql` 删除 **17 个**插件并替换 RPG 构建。`disabled/` 下不会自动加载的 SourceMod SQL 管理插件不计入上述 17 个直接访问数据库的插件。
 
 `nomysql` 删除的插件为：
 
@@ -100,7 +100,6 @@ extend/sbpp_checker.smx
 extend/sbpp_comms.smx
 extend/sbpp_main.smx
 extend/sbpp_report.smx
-extend/sbpp_sleuth.smx
 extend/lilac.smx
 extend/chatlog.smx
 extend/veterans.smx

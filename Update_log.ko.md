@@ -739,9 +739,29 @@
 
 ### 2026년 11월 10일 Anne PvE 모드 플러그인 정리, 폐기 플러그인 삭제 및 AI/확장 플러그인 성능 최적화
 
-- 폐기되었거나 부하가 큰 중복 플러그인 및 소스 7개를 삭제했습니다: `extend/savechat`(필터 없는 전체 명령 리스너로 인해 모든 클라이언트 명령마다 메인 스레드 동기 파일 쓰기가 발생하며 채팅 기록은 이미 `chatlog.smx`가 비동기 MySQL로 저장), `extend/attachments_api`(호출하는 플러그인이 없음에도 매 틱 `OnPlayerRunCmd`, `0.1s` 타이머 및 추가 `SetTransmit` 엔티티 실행), `extend/sbpp_sleuth`(감지 라이브러리 이름 `"sourcebans"`와 `"sourcebans++"` 불일치로 영구 비활성), `fixes/l4d_unrestrict_panic_battlefield`(`MemoryPatch`를 전혀 활성화하지 않는 빈 플러그인), `fixes/lfd_both_fixSG552`(`l4d2_sg552_zoom_fix`와 중복되며 매 틱 무기 클래스명 조회), `optional/AnneHappy/l4d2_si_ladder_booster`(`l4d2_ai_ladder_boost`에 통합됨), 고아 바이너리 `optional/AnneHappy/anne_movement_diag.smx`.
-- PvE 약역 및 협동 파생 모드의 로드 구성을 정리했습니다: 중복 또는 대전 전용 플러그인(`nosaferoomkits`, `l4d2_stats`, `l4d2_playstats`, `l4d2_tank_attack_control`, `l4d_texture_manager_block`, `ratemonitor`, `l4d_equalise_alarm_cars`), 고부하 외형 전용 플러그인 `extend/Survivor_Legs`(100틱에서 매 프레임 22개 포즈 파라미터 갱신 및 `SetTransmit` 속성 조회 수행), 중복 로드되던 `extend/rpg`와 `fixes/l4d_tongue_block_fix`를 비활성화했습니다. `fixes/annoyance_exploit_fixes.smx` 언로드 경로를 바로잡고 약역 모드에서 `l4d2_jockey_jumpcap_patch`, `l4d2_shadow_removal`, `l4d2_fix_firsthit`, `l4d2_fix_team_shuffle`, `l4d2_fullupdate_fix`, `l4d2_transition_info_fix`를 언로드했으며 `confogl_reduce_finalespawnrange`를 `0`, `sm_allowed_lerp_changes`를 `20`, `sm_lerp_change_spec`을 `0`으로 설정했습니다.
+- 폐기되었거나 부하가 큰 중복 플러그인 및 소스 7개를 삭제했습니다: `extend/savechat`(필터 없는 전체 명령 리스너로 인해 모든 클라이언트 명령마다 메인 스레드 동기 파일 쓰기가 발생하며 채팅 기록은 이미 `chatlog.smx`가 비동기 MySQL로 저장), `extend/attachments_api`(호출하는 플러그인이 없음에도 매 틱 `OnPlayerRunCmd`, `0.1s` 타이머 및 추가 `SetTransmit` 엔티티 실행), `extend/sbpp_sleuth`(서버에서 이미 가족 공유를 차단했고 유동 IP·가속기 공유 IP에서 오판 위험이 있으며 기존 구현도 `"sourcebans"`와 `"sourcebans++"` 불일치로 영구 비활성 상태였으므로 화이트리스트·번역 파일·`nomysql` 패키징 항목과 함께 제거), `fixes/l4d_unrestrict_panic_battlefield`(`MemoryPatch`를 전혀 활성화하지 않는 빈 플러그인), `fixes/lfd_both_fixSG552`(`l4d2_sg552_zoom_fix`와 중복되며 매 틱 무기 클래스명 조회), `optional/AnneHappy/l4d2_si_ladder_booster`(`l4d2_ai_ladder_boost`에 통합됨), 고아 바이너리 `optional/AnneHappy/anne_movement_diag.smx`.
+- PvE 약역 및 협동 파생 모드의 로드 구성을 정리했습니다: 중복 또는 대전 전용 플러그인(`nosaferoomkits`, `l4d2_stats`, `l4d2_playstats`, `l4d2_tank_attack_control`, `l4d_texture_manager_block`, `l4d_equalise_alarm_cars`), 고부하 외형 전용 플러그인 `extend/Survivor_Legs`(100틱에서 매 프레임 22개 포즈 파라미터 갱신 및 `SetTransmit` 속성 조회 수행), 중복 로드되던 `extend/rpg`와 `fixes/l4d_tongue_block_fix`를 비활성화했습니다. `fixes/annoyance_exploit_fixes.smx` 언로드 경로를 바로잡고 약역 모드에서 `l4d2_jockey_jumpcap_patch`, `l4d2_fix_firsthit`, `l4d2_fix_team_shuffle`, `l4d2_fullupdate_fix`, `l4d2_transition_info_fix`를 언로드했으며 `confogl_reduce_finalespawnrange`를 `0`으로 설정했습니다.
 - Anne 및 확장 플러그인 32개를 수정·최적화하고 재컴파일했습니다: `ai_jockey_2` 연속 점프 시 속도 벡터를 시야각으로 `TeleportEntity`에 전달하던 버그 및 매 틱 `ArrayList` 할당, `l4d_target_override`의 Charger 제압 해제 판정 `||` 오용, `ai_boomer_3`에서 Z 좌표를 0으로 만든 뒤 시야 레이캐스트를 수행하던 문제, `ai_hunter_2`의 `L4D2_IsVisibleToPlayer` 인자 오류와 조준각 방향 역전, `ai_smoker3`의 UserId 오전달과 매 틱 `ArrayList` 할당, `ai_spitter_3`의 무조건 거리 계산, `ai_charger3` 벽 트레이스 필터 인자 누락, `SI_Target_limit`의 매초 `FindConVar` 호출, `anne_cvar_shield`의 와일드카드 명령 리스너, `witch_announce` 다인원 배열 범위 초과, `l4d_tank_damage_announce` 맵 전환 핸들 누수 및 정수 나눗셈, `sam_vs` 키 입력 타이머 폭주, `join`의 `FindConVar` 핸들 삭제 버그, `SpecListener`의 SourceTV 판정 반전과 메뉴 누수, `veterans` 32슬롯 범위 초과, `l4d_hats`의 `SetTransmit` 중복 훅 누적, `rpg` 메뉴 열기 시 `DumpAdminCache` 전체 캐시 재구축과 무지개 외곽선 `PreThink` 중복 등록 및 비관리자 오류, `ThirdPersonShoulder_Detect` 폴링 주기 완화 및 생존자 필터링, `Survivor_Legs` 봇 전송 차단 및 시선 피치 조기 반환, `smoker_anim_fix` 핫패스 및 `l4d2_sg552_zoom_fix` 무기 유효성 검사를 수정했습니다.
+
+### 2026년 11월 11일 맵 투표 전체 대상 전송
+
+- 맵 투표를 `0.9.5-custom`으로 업데이트했습니다. 다음 맵 설정, 캠페인 변경, 챕터 변경 시 자격을 갖춘 모든 인간 생존자와 감염자를 한 번의 `DisplayVote` 호출에 전달하여 첫 플레이어만 투표를 받던 문제를 수정했습니다. 투표 인원, 팀 필터링, 빈 명단에 대한 검사를 추가했습니다.
+
+### 2026년 11월 11일 구매 없는 클리어 보상 native 검증
+
+- `l4dstats_AddClientScore`와 호환 native가 `nobuy_bonus`를 받으면 인간 생존자 여부, 해당 라운드 보상 자격, 정확한 보상액을 검증하고 잘못된 지급을 거부합니다. 정상 정산의 `v3n` 공식을 재사용하여 점수 내역을 일치시켰습니다.
+
+### 2026년 11월 11일 Tank 선행 플레이어 감지 타이머 정리
+
+- `l4d2_Anne_stuck_tank_teleport`의 선행 플레이어 감지 타이머가 플러그인 비활성화 또는 Tank 수 0으로 자동 종료되면 저장된 핸들도 비웁니다. 이후 맵 정리에서 만료된 핸들을 다시 삭제하여 오류가 발생하는 문제를 방지합니다.
+
+### 2026년 11월 11일 광고 flags 제외 규칙 복원
+
+- `advertisements`의 명시적 `flags`를 기존의 제외 조건으로 복원했습니다. 일반 플레이어용 광고가 제외 대상 권한과 root 관리자에게만 표시되던 문제를 수정했습니다.
+
+### 2026년 11월 11일 text 및 Witch 알림 컴파일 정리
+
+- `text`의 사용하지 않는 `IsTeamImmobilised`와 `witch_announce`의 사용하지 않는 `g_iSurvivorLimit`를 제거하여 컴파일 경고를 없애고 해당 바이너리를 다시 컴파일했습니다.
 
 ### 2026년 11월 11일 업스트림 중국어 간체 번역 수정 동기화
 
