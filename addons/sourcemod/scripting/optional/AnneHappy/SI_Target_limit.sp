@@ -663,12 +663,12 @@ stock bool IsValidClient(int client)
 		return false;
 	}
 }
-int ReadClassCap(const char[] infName, const char[] zName)
+int ReadCachedClassCap(int zIndex, int infIndex)
 {
-	ConVar inf = FindConVar(infName);
+	ConVar inf = g_hClassLimitCvars[infIndex];
 	if(inf != null && inf.IntValue >= 0)
 		return inf.IntValue;
-	ConVar z = FindConVar(zName);
+	ConVar z = g_hClassLimitCvars[zIndex];
 	return z == null ? 0 : z.IntValue;
 }
 
@@ -676,13 +676,13 @@ int GetControlSIBudget()
 {
 	int n = 0;
 	if(g_iSI_enable_option & ENABLE_SMOKER)
-		n += ReadClassCap("inf_smoker_limit", "z_smoker_limit");
+		n += ReadCachedClassCap(0, 4);
 	if(g_iSI_enable_option & ENABLE_HUNTER)
-		n += ReadClassCap("inf_hunter_limit", "z_hunter_limit");
+		n += ReadCachedClassCap(1, 5);
 	if(g_iSI_enable_option & ENABLE_JOCKEY)
-		n += ReadClassCap("inf_jockey_limit", "z_jockey_limit");
+		n += ReadCachedClassCap(2, 6);
 	if(g_iSI_enable_option & ENABLE_CHARGER)
-		n += ReadClassCap("inf_charger_limit", "z_charger_limit");
+		n += ReadCachedClassCap(3, 7);
 	if(n < 1)
 		n = g_iSILimit;
 	if(g_iSILimit > 0 && n > g_iSILimit)

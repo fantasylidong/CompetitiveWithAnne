@@ -61,7 +61,6 @@ public void OnPluginStart()
 	HookEvent("player_incapacitated_start", Incap_Event, EventHookMode_Post);
 	HookEvent("player_incapacitated", Incap_Event, EventHookMode_Post);
 	HookEvent("round_start", event_RoundStart);
-	HookEvent("player_death", player_death, EventHookMode_Post);
 	RegAdminCmd("sm_killall", killall, ADMFLAG_BAN, "处死所有玩家");
 }
 
@@ -73,15 +72,6 @@ public void OnAllPluginsLoaded()
 public void OnPluginEnd()
 {
 	g_hCvarWeapon.RestoreDefault();
-}
-
-public Action player_death(Handle event, char[] name, bool dontBroadcast)
-{
-	if(IsTeamImmobilised())
-	{
-		SlaySurvivors();
-	}
-	return Plugin_Continue;
 }
 
 public Action killall(int client, int args)
@@ -99,14 +89,10 @@ public void SlaySurvivors() { //incap everyone
 
 public void Incap_Event(Handle event, char[] name, bool dontBroadcast)
 {
-	int  Incap = GetClientOfUserId(GetEventInt(event, "userid"));
-	if(GetConVarBool(g_hCvarCoop))
+	int Incap = GetClientOfUserId(GetEventInt(event, "userid"));
+	if(Incap > 0 && GetConVarBool(g_hCvarCoop))
 	{
 		ForcePlayerSuicide(Incap);
-	}
-	if(IsTeamImmobilised())
-	{
-		SlaySurvivors();
 	}
 }
 
@@ -394,8 +380,14 @@ public void OnClientPutInServer(int Client)
 	//FormatTime(sBuffer, sizeof(sBuffer), "%Y/%m/%d");
 	if (IsValidPlayer(Client, false))
 	{
-		MaxPlayers ++ ;
-		if(MaxPlayers == getBotLimit())
+		int humanCount = 0;
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (IsValidPlayer(i, false))
+				humanCount++;
+		}
+		MaxPlayers = humanCount;
+		if(MaxPlayers >= getBotLimit())
 		{
 			ConVar gjrj = FindConVar("sb_fix_enabled");
 			if(gjrj != null && gjrj.BoolValue)
@@ -429,15 +421,15 @@ stock bool IsValidPlayer(int Client, bool AllowBot = true, bool AllowDeath = tru
 bool IsTeamImmobilised() {
 	//Check if there is still an upright survivor
 	bool bIsTeamImmobilised = true;
-	for (int client = 1; client < MaxClients; client++) {
+	for (int client = 1; client <= MaxClients; client++) {
 		// If a survivor is found to be alive and neither pinned nor incapacitated
 		// team is not immobilised.
-		if (Survivor(client) && IsPlayerAlive(client) ) 
-		{		
-			if (!Incapacitated(client) ) 
-			{		
-				bIsTeamImmobilised = false;				
-			} 
+		if (Survivor(client) && IsPlayerAlive(client) )
+		{
+			if (!Incapacitated(client) )
+			{
+				bIsTeamImmobilised = false;
+			}
 		}
 	}
 	return bIsTeamImmobilised;

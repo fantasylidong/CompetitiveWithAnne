@@ -66,11 +66,11 @@ public void playerSpawnHandler(Event event, const char[] name, bool dontBroadcas
 	GetClientAbsOrigin(target, targetPos);
 	if (g_hOnlyHighPush.BoolValue && (selfPos[2] - targetPos[2] <= g_hPosHeight.FloatValue)) { return; }
 	// 未开启高处推动或开启了高处推动 z 高度大于限制高度，下一帧进行推动
-	DataPack pack = new DataPack();
-	pack.WriteCell(client);
-	pack.WriteCell(target);
 	if (!g_bHasBeenPushed[client])
 	{
+		DataPack pack = new DataPack();
+		pack.WriteCell(GetClientUserId(client));
+		pack.WriteCell(GetClientUserId(target));
 		RequestFrame(nextFramePushToSurvivorHandler, pack);
 		g_bHasBeenPushed[client] = true;
 	}
@@ -79,9 +79,8 @@ public void nextFramePushToSurvivorHandler(DataPack pack)
 {
 	if (pack == null) { return; }
 	pack.Reset();
-	static int client, target;
-	client = pack.ReadCell();
-	target = pack.ReadCell();
+	int client = GetClientOfUserId(pack.ReadCell());
+	int target = GetClientOfUserId(pack.ReadCell());
 	delete pack;
 	if (!IsValidInfected(client) || !IsPlayerAlive(client) || !IsValidSurvivor(target) || !IsPlayerAlive(target)) { return; }
 	static float selfPos[3], targetPos[3], eyeAngle[3], resultPos[3];
@@ -98,13 +97,21 @@ public void nextFramePushToSurvivorHandler(DataPack pack)
 
 void GetAllowedInfected()
 {
+	for (int i = 0; i < sizeof(g_bAllowInfected); i++)
+	{
+		g_bAllowInfected[i] = false;
+	}
 	char cvarString[32] = {'\0'}, resultString[6][4];
 	g_hAllowPushInfected.GetString(cvarString, sizeof(cvarString));
-	ExplodeString(cvarString, ",", resultString, 6, 4);
-	for (int i = 0; i < ZC_CHARGER; i++)
+	int count = ExplodeString(cvarString, ",", resultString, 6, 4);
+	for (int i = 0; i < count; i++)
 	{
-		if (strcmp(resultString[i], NULL_STRING) != 0) { g_bAllowInfected[StringToInt(resultString[i])] = true; }
-		else { continue; }
+		if (resultString[i][0] == '\0') { continue; }
+		int zc = StringToInt(resultString[i]);
+		if (zc >= 1 && zc < sizeof(g_bAllowInfected))
+		{
+			g_bAllowInfected[zc] = true;
+		}
 	}
 }
 
@@ -112,21 +119,19 @@ int getClosestSurvivor(int client)
 {
 	if (!IsValidClient(client)) { return -1; }
 	static float selfPos[3], targetPos[3];
-	static int i, target;
-	static ArrayList distList;
-	distList = new ArrayList(2);
 	GetClientAbsOrigin(client, selfPos);
-	for (i = 1; i <= MaxClients; i++)
+	int best = -1;
+	float bestDistSq = 1.0e18;
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != TEAM_SURVIVOR) { continue; }
 		GetClientAbsOrigin(i, targetPos);
-		distList.Set(distList.Push(GetVectorDistance(selfPos, targetPos)), i, 1);
+		float distSq = GetVectorDistance(selfPos, targetPos, true);
+		if (distSq < bestDistSq)
+		{
+			bestDistSq = distSq;
+			best = i;
+		}
 	}
-	if (distList.Length > 0)
-	{
-		distList.Sort(Sort_Ascending, Sort_Float);
-		target = distList.Get(0, 1);
-	}
-	delete distList;
-	return target;
+	return best;
 }

@@ -52,7 +52,7 @@ enum struct PlayerStruct{
 		return this.realplaytime-this.last2weektime;
 	}
 }
-PlayerStruct player[32];
+PlayerStruct player[MAXPLAYERS + 1];
 new Handle:g_cvAPIkey;
 // --------------------------------- PLUGIN DETAILS ---------------------------------
 public Plugin:myinfo = 
@@ -491,7 +491,7 @@ public Action:AddToWhitelist(int client, int args)
 	do
 	{
 		decl String:steamId[32];
-		if (GetCmdArg(args, steamId, strlen(steamId)) == 18) {
+		if (GetCmdArg(args, steamId, sizeof(steamId)) == 18) {
 			KvJumpToKey(kv, steamId, true);
 			KvSetNum(kv, "Excluded", 1);
 			KvRewind(kv);
@@ -501,7 +501,7 @@ public Action:AddToWhitelist(int client, int args)
 				formated,
 				sizeof(formated),
 				"%T",
-				"EXCLUDED", 
+				"EXCLUDED",
 				client,
 				steamId
 			);
@@ -513,7 +513,7 @@ public Action:AddToWhitelist(int client, int args)
 	KeyValuesToFile(kv, ExcludeFile);
 	CloseHandle(kv);
 	return Plugin_Handled;
-} 
+}
 
 public Action:RemoveFromWhitelist(int client, int args)
 {
@@ -528,7 +528,7 @@ public Action:RemoveFromWhitelist(int client, int args)
 	do
 	{
 		decl String:steamId[32];
-		if (GetCmdArg(args, steamId, strlen(steamId)) == 18) {
+		if (GetCmdArg(args, steamId, sizeof(steamId)) == 18) {
 			if (KvJumpToKey(kv, steamId, false)) {
 				KvSetNum(kv, "Excluded", 0);
 				KvDeleteThis(kv);

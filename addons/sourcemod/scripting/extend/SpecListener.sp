@@ -214,6 +214,10 @@ public int Menu_Listener(Handle hMenu, MenuAction iAction, int iClient, int iInd
 			PrintToChat(iClient, "%t", "SpecListener_ClientMenuCancelledReason", iClient, iIndex);
 #endif
 		}
+		case MenuAction_End:
+		{
+			delete hMenu;
+		}
 	}
 	return 0;
 }
@@ -222,7 +226,7 @@ public void Event_PlayerTeam(Event hEvent, const char[] sEventName, bool bDontBr
 {
 	int iclient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
 	int iteam   = GetEventInt(hEvent, "team");
-	if (IsValidClientIndex(iclient) || IsValidClient(iclient))
+	if (IsValidClientIndex(iclient) && IsValidClient(iclient))
 	{
 		switch (iteam)
 		{
@@ -286,7 +290,7 @@ bool IsValidClient(int iClient)
 	{
 		return false;
 	}
-	if(!IsClientSourceTV(iClient))
+	if(IsClientSourceTV(iClient))
 	{
 		return false;
 	}

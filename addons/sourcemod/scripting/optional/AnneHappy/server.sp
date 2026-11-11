@@ -209,7 +209,7 @@ public void OnMapStart()
 {
     g_bFirstMapInScenario = L4D_IsFirstMapInScenario();
 
-    if (g_bwSound[0] != ' ')
+    if (g_bwSound[0] != '\0' && g_bwSound[0] != ' ')
         PrecacheSound(g_bwSound, true);
 }
 
@@ -479,7 +479,8 @@ public Action SetBot(int client, int args)
 
 public Action ZiSha(int client, int args)
 {
-    ForcePlayerSuicide(client);
+    if (IsValidAliveClient(client) && GetClientTeam(client) == 2)
+        ForcePlayerSuicide(client);
     return Plugin_Handled;
 }
 
@@ -882,7 +883,7 @@ void AnnounceBW(int client)
         PrintHintText(client, "%t", "Server_PromptBlackWhiteHintSelf");
     }
 
-    if (g_bwSound[0] != ' ')
+    if (g_bwSound[0] != '\0' && g_bwSound[0] != ' ')
     {
         for (int i = 1; i <= MaxClients; i++)
             if (IsValidClient(i) && GetClientTeam(i) == 2)
@@ -907,7 +908,7 @@ public Action Timer_CheckBW(Handle timer, any userid)
 public void CvarChanged_BWSound(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     convar.GetString(g_bwSound, sizeof(g_bwSound));
-    if (g_bwSound[0] != ' ')
+    if (g_bwSound[0] != '\0' && g_bwSound[0] != ' ')
         PrecacheSound(g_bwSound, true);
 }
 
@@ -953,11 +954,13 @@ public Action OnAmbientSound(char sample[PLATFORM_MAX_PATH], int &entity, float 
 
 stock bool IsRealismORCoop()
 {
-    char plugin_name[120];
-    ConVar h = FindConVar("l4d_ready_cfg_name");
+    static ConVar h;
+    if (h == null)
+        h = FindConVar("l4d_ready_cfg_name");
     if (h == null)
         return false;
 
+    char plugin_name[120];
     h.GetString(plugin_name, sizeof(plugin_name));
     return (StrContains(plugin_name, "AnneCoop", false) != -1 || StrContains(plugin_name, "AnneRealism", false) != -1);
 }

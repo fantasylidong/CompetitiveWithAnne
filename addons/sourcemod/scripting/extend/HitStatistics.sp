@@ -39,7 +39,7 @@ public OnPluginStart()
 	GetGameFolderName(Game_Name, sizeof(Game_Name));
 	if(!StrEqual(Game_Name, "left4dead2", false))
 	{
-		SetFailState("Mvp Statistic %d插件仅支持L4D2!", PLUGIN_VERSION);
+		SetFailState("Mvp Statistic %s插件仅支持L4D2!", PLUGIN_VERSION);
 	}
 
 	HookEvents();
@@ -135,6 +135,7 @@ public ScavRoundStart(Handle:event)
 
 public RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
+    g_bIsPrintInfo = false;
     for (new i = 1; i <= MaxClients; i++)
     {
         iSmoker[i] = 0;

@@ -267,7 +267,6 @@ public void OnLibraryRemoved(const char[] name)
 	else if (StrEqual(name, "infected_control"))
 	{
 		g_bInfectedControlAvailable = false;
-		delete hCvarTraitorEnable;
 		hCvarTraitorEnable = null;
 	}
 }
@@ -842,7 +841,6 @@ bool IsTraitorModeEnabled()
 
 void RefreshTraitorEnableConVar()
 {
-	delete hCvarTraitorEnable;
 	hCvarTraitorEnable = g_bInfectedControlAvailable ? FindConVar("inf_traitor_enable") : null;
 }
 

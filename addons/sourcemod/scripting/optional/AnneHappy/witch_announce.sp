@@ -180,12 +180,15 @@ public WitchDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
 	//If Damage is lower than Max Health, Adjust.
 	if (DamageWitchTotal < g_fWitchHealth)
 	{
-		iDamageWitch[killer] += (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
-		DamageWitchTotal = RoundToFloor(g_fWitchHealth);
+		if (IsValidClient(killer) && GetClientTeam(killer) == TEAM_SURVIVOR)
+		{
+			iDamageWitch[killer] += (RoundToFloor(g_fWitchHealth - DamageWitchTotal));
+			DamageWitchTotal = RoundToFloor(g_fWitchHealth);
+		}
 	}
 
 	if (!bRoundOver)
-	{	
+	{
 		bWitchSpawned = false;
 		CalculateWitch();
 		ClearDamage();
@@ -201,7 +204,7 @@ public PlayerDied_Event(Handle:event, const String:name[], bool:dontBroadcast)
 	if (IsClientAndInGame(victim) && GetClientTeam(victim) == TEAM_SURVIVOR && IsWitch(attacker))
 	{
 		//Delayed Timer in case Witch gets killed while she's running off.
-		CreateTimer(3.0, PrintAnyway)
+		CreateTimer(3.0, PrintAnyway, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -240,7 +243,7 @@ PrintWitchDamage()
 	new percent_total; // Accumulated total of calculated percents, for fudging out numbers at the end
 	new damage_total; // Accumulated total damage dealt by survivors, to see if we need to fudge upwards to 100%
 	new survivor_index = -1;
-	new survivor_clients[g_iSurvivorLimit]; // Array to store survivor client indexes in, for the display iteration
+	new survivor_clients[MAXPLAYERS + 1]; // Array to store survivor client indexes in, for the display iteration
 	decl percent_damage, damage;
 
 	for (client = 1; client <= MaxClients; client++)
@@ -253,7 +256,10 @@ PrintWitchDamage()
 		percent_damage = GetDamageAsPercent(damage);
 		percent_total += percent_damage;
 	}
-	SortCustom1D(survivor_clients, g_iSurvivorLimit, SortByDamageDesc);
+	if (survivor_index >= 0)
+	{
+		SortCustom1D(survivor_clients, survivor_index + 1, SortByDamageDesc);
+	}
 
 	new percent_adjustment;
 	// Percents add up to less than 100% AND > 99.5% damage was dealt to witch

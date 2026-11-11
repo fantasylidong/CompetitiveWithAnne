@@ -140,7 +140,7 @@ public void OnPluginStart()
         "Capture current Anne SI limit cvars as shield targets."
     );
     AddCommandListener(OnAuthorityCommand, "sm_cvar");
-    AddCommandListener(OnAnyAuthorityCommand);
+    AddCommandListener(OnAuthorityCommand, "confogl_addcvar");
 
     for (int i = 0; i < PROTECTED_COUNT; i++)
         AddCommandListener(OnDirectProtectedCommand, g_sProtectedCvars[i]);
@@ -214,14 +214,6 @@ public Action OnAuthorityCommand(int client, const char[] command, int argc)
 
     AuthorizeTargetFromCommand(index, value, command);
     return Plugin_Continue;
-}
-
-public Action OnAnyAuthorityCommand(int client, const char[] command, int argc)
-{
-    if (!StrEqual(command, "confogl_addcvar", false))
-        return Plugin_Continue;
-
-    return OnAuthorityCommand(client, command, argc);
 }
 
 public Action OnDirectProtectedCommand(int client, const char[] command, int argc)

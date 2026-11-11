@@ -83,8 +83,22 @@ public void OnPluginStart()
 /* 玩家离开 UnHook 吃铁检测 */
 public void OnClientDisconnect(int client)
 {
+	if (client >= 1 && client <= MaxClients)
+	{
+		delete ironCheckTimer[client][0];
+		delete ironCheckTimer[client][1];
+	}
 	if (!IsValidClient(client)) { return; }
 	SDKUnhook(client, SDKHook_OnTakeDamage, onTakeDamageHandler);
+}
+
+public void OnMapEnd()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		ironCheckTimer[i][0] = null;
+		delete ironCheckTimer[i][1];
+	}
 }
 
 /* 第一个玩家出门时，给每个生还者设置 OnTakeDamage 的 SDKHook 用来检测吃铁 */
@@ -126,9 +140,9 @@ public Action onTakeDamageHandler(int victim, int& attacker, int& inflictor, flo
 	delete ironCheckTimer[victim][1];
 	DataPack pack = new DataPack();
 	pack.Reset();
-	pack.WriteCell(attacker);
-	pack.WriteCell(victim);
-	ironCheckTimer[victim][0] = CreateTimer(IRON_CHECK_INTERVAL, checkIronHandler, pack);
+	pack.WriteCell(GetClientUserId(attacker));
+	pack.WriteCell(GetClientUserId(victim));
+	ironCheckTimer[victim][0] = CreateTimer(IRON_CHECK_INTERVAL, checkIronHandler, pack, TIMER_FLAG_NO_MAPCHANGE);
 	ironCheckTimer[victim][1] = pack;
 	return Plugin_Continue;
 }
@@ -136,16 +150,18 @@ public Action checkIronHandler(Handle timer, DataPack pack)
 {
 	if (pack == null) { return Plugin_Continue; }
 	pack.Reset();
-	int attacker = pack.ReadCell(), victim = pack.ReadCell();
+	int attacker = GetClientOfUserId(pack.ReadCell()), victim = GetClientOfUserId(pack.ReadCell());
 	delete pack;
-	ironCheckTimer[victim][1] = null;
-	if (!isTank(attacker) || !IsValidSurvivor(victim))
+	if (victim >= 1 && victim <= MaxClients)
 	{
 		ironCheckTimer[victim][0] = null;
+		ironCheckTimer[victim][1] = null;
+	}
+	if (!isTank(attacker) || !IsValidSurvivor(victim))
+	{
 		return Plugin_Stop;
 	}
 	playerHurts[attacker][victim].iron++;
-	ironCheckTimer[victim][0] = null;
 	return Plugin_Stop;
 }
 
@@ -236,7 +252,8 @@ public void roundEndHandler(Event event, const char[] name, bool dontBroadcast)
 			if (!isTank(i) || !IsPlayerAlive(i)) { continue; }
 			/* 坦克还存在，计算存在时长 */
 			tankLiveTime[i] = GetGameTime() - tankLiveTime[i];
-			CPrintToChatAll("%t", "L4DTankDamageAnnounce_RemainingBloodVolume", i, GetClientHealth(i), RoundToNearest(float(GetClientHealth(i)) / float(tankHealth[i]) * 100.0));
+			int maxHp = tankHealth[i] > 0 ? tankHealth[i] : 1;
+			CPrintToChatAll("%t", "L4DTankDamageAnnounce_RemainingBloodVolume", i, GetClientHealth(i), RoundToNearest(float(GetClientHealth(i)) / float(maxHp) * 100.0));
 			/* 如果已经显示过了 Tank 伤害，则不再显示 */
 			if (hasPrintDamage[i]) { continue; }
 			CreateTimer(DAMAGE_DISPLAY_DELAY, printTankDamageHandler, GetClientUserId(i), TIMER_FLAG_NO_MAPCHANGE);
@@ -326,12 +343,14 @@ bool isTank(int client)
 
 int getDamageAsPercent(int damage, int health)
 {
-	return damage == 0 ? 0 : RoundToNearest((float(damage) / float(health)) * 100.0);
+	if (damage == 0 || health <= 0) { return 0; }
+	return RoundToNearest((float(damage) / float(health)) * 100.0);
 }
 
 bool isExactPercent(int damage, int health)
 {
-	float percent = (damage / health) * 100.0, difference = (getDamageAsPercent(damage, health)) - percent;
+	if (health <= 0) { return true; }
+	float percent = (float(damage) / float(health)) * 100.0, difference = float(getDamageAsPercent(damage, health)) - percent;
 	return FloatAbs(difference) < 0.001 ? true : false;
 }
 

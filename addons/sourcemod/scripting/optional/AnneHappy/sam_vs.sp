@@ -86,6 +86,20 @@ public OnPluginStart()
 public OnMapStart()
 {
 	g_iRoundEnd = 0;
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		g_hTimer[i] = INVALID_HANDLE;
+		g_bTempBlock[i] = false;
+	}
+}
+
+public OnMapEnd()
+{
+	for (new i = 1; i <= MaxClients; i++)
+	{
+		g_hTimer[i] = INVALID_HANDLE;
+		g_bTempBlock[i] = false;
+	}
 }
 
 public SAM_ev_RoundEnd(Handle:event, String:event_name[], bool:dontBroadcast)
@@ -117,7 +131,9 @@ public SAM_ev_PlayerSay(Handle:event, String:event_name[], bool:dontBroadcast)
 
 public Action:OnPlayerRunCmd(client, &buttons)
 {
-	if (buttons && !g_bTempBlock[client] && !IsFakeClient(client)){
+	if (buttons && !IsFakeClient(client)){
+		if (GetEngineTime() - g_fButtonTime[client] < CHECK_TIME)
+			return;
 
 		switch (GetClientTeam(client)){
 
@@ -139,14 +155,6 @@ SAM_PluseTime(client)
 	#endif
 
 	SetEngineTime(client);
-
-	g_bTempBlock[client] = true;
-	CreateTimer(CHECK_TIME, SAM_t_Unlock, client);
-}
-
-public Action:SAM_t_Unlock(Handle:timer, any:client)
-{
-	g_bTempBlock[client] = false;
 }
 
 public Action:SAM_t_CheckIdles(Handle:timer)
@@ -301,7 +309,7 @@ bool:IsPlayerBussy(client, team)
 
 bool:IsSurvivorBussy(client)
 {
-	return GetEntProp(client, Prop_Send, "m_tongueOwner") > 0 || GetEntProp(client, Prop_Send, "m_pounceAttacker") > 0 || g_bLeft4Dead2 && (GetEntProp(client, Prop_Send, "m_pummelAttacker") > 0 || GetEntProp(client, Prop_Send, "m_jockeyAttacker") > 0);
+	return GetEntProp(client, Prop_Send, "m_tongueOwner") > 0 || GetEntProp(client, Prop_Send, "m_pounceAttacker") > 0 || g_bLeft4Dead2 && (GetEntProp(client, Prop_Send, "m_pummelAttacker") > 0 || GetEntProp(client, Prop_Send, "m_carryAttacker") > 0 || GetEntProp(client, Prop_Send, "m_jockeyAttacker") > 0);
 }
 
 bool:IsInfectedBussy(client)

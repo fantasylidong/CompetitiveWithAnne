@@ -18,8 +18,10 @@ void WeaponZoom_Event(Event hEvent, const char[] eName, bool dontBroadcast)
 {
 	int userid = GetEventInt(hEvent, "userid");
 	int client = GetClientOfUserId(userid);
+	if (client <= 0 || client > MaxClients || !IsClientInGame(client))
+		return;
 
-	if (GetEntProp(client, Prop_Send, "m_hZoomOwner") == -1 && UsingTheGunSG552(client))
+	if (GetEntPropEnt(client, Prop_Send, "m_hZoomOwner") == -1 && UsingTheGunSG552(client))
 		UnZoom(client);
 }
 
@@ -33,8 +35,10 @@ stock void UnZoom(int client)
 stock bool UsingTheGunSG552(int client)
 {
 	int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	if (weapon <= MaxClients || !IsValidEntity(weapon))
+		return false;
 
-	char classname[256];
+	char classname[64];
 	GetEntityClassname(weapon, classname, sizeof(classname));
 
 	return StrEqual(classname, "weapon_rifle_sg552");

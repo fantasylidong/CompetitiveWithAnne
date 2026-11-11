@@ -2597,8 +2597,6 @@ public void Survivor_glow(int client)
 			menu.AddItem("option12", "粉红色", player[client].GlowType == 12 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			menu.AddItem("option13", "紫色", player[client].GlowType == 13 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			menu.AddItem("option14", "白色", player[client].GlowType == 14 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
-			DumpAdminCache(AdminCache_Admins,true);
-			DumpAdminCache(AdminCache_Groups,true);
 			if(CanClientUseGlow(client, 15))
 				menu.AddItem("option15", "金黄色", player[client].GlowType == 15 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			if(CanClientUseGlow(client, 16))
@@ -2745,8 +2743,12 @@ void GetAura(int client, int id, bool validate = true, bool announce = true)
             SetEntProp(client, Prop_Send, "m_glowColorOverride", 255 + (155 * 256) + (0 * 65536));
             if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorGold");
         }
-        case 16: 
+        case 16:
         {
+            SDKUnhook(client, SDKHook_PreThink, RainbowPlayer);
+            SetEntProp(client, Prop_Send, "m_iGlowType", 3);
+            SetEntProp(client, Prop_Send, "m_nGlowRange", 99999);
+            SetEntProp(client, Prop_Send, "m_nGlowRangeMin", 0);
             SDKHook(client, SDKHook_PreThink, RainbowPlayer);
             if (announce) CPrintToChat(client, "%t", "RPG_SetOutlineColorRainbow");
         }
@@ -2791,23 +2793,29 @@ void DisableGlow( int client )
 
 public Action RainbowPlayer(int client)
 {
-	if( IsValidClient( client ) != true || IsPlayerAlive(client) != true || GetClientTeam( client ) == 3 )
+	if( IsValidClient( client ) != true )
 	{
 		SDKUnhook(client, SDKHook_PreThink, RainbowPlayer);
-		
+		return Plugin_Handled;
+	}
+
+	if( IsPlayerAlive(client) != true || GetClientTeam( client ) == 3 )
+	{
+		SDKUnhook(client, SDKHook_PreThink, RainbowPlayer);
+
 		if( GetClientTeam( client ) == 3 )
 		{
 			SetEntProp(client, Prop_Send, "m_glowColorOverride", 0);
 			SetEntProp(client, Prop_Send, "m_iGlowType", 0);
 		}
-		
+
 		return Plugin_Handled;
 	}
-    
+
+	if ((GetGameTickCount() + client) % 5 != 0)
+		return Plugin_Continue;
+
 	SetEntProp(client, Prop_Send, "m_glowColorOverride", RoundToNearest(Cosine((GetGameTime() * 8.0) + client + 1) * 127.5 + 127.5) + (RoundToNearest(Cosine((GetGameTime() * 8.0) + client + 3) * 127.5 + 127.5) * 256) + (RoundToNearest(Cosine((GetGameTime() * 8.0) + client + 5) * 127.5 + 127.5) * 65536));
-	SetEntProp(client, Prop_Send, "m_iGlowType", 3);
-	SetEntProp(client, Prop_Send, "m_nGlowRange", 99999);
-	SetEntProp(client, Prop_Send, "m_nGlowRangeMin", 0);
 	return Plugin_Continue;
 }
 
@@ -2835,13 +2843,13 @@ public void Survivor_skin(int client)
 			menu.AddItem("option11", "藍綠色", player[client].SkinType == 11 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			menu.AddItem("option12", "粉红色", player[client].SkinType == 12 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			menu.AddItem("option13", "紫色", player[client].SkinType == 13 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
-			DumpAdminCache(AdminCache_Admins,true);
-			DumpAdminCache(AdminCache_Groups,true);
-			if((g_bl4dstatsSystemAvailable && l4dstats_IsTopPlayer(client,20)) || GetUserAdmin(client).ImmunityLevel == 100 || !g_bl4dstatsSystemAvailable)
+			AdminId adminId = GetUserAdmin(client);
+			bool bMaxImmunity = (adminId != INVALID_ADMIN_ID && adminId.ImmunityLevel == 100);
+			if((g_bl4dstatsSystemAvailable && l4dstats_IsTopPlayer(client,20)) || bMaxImmunity || !g_bl4dstatsSystemAvailable)
 				menu.AddItem("option14", "黑色", player[client].SkinType == 14 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
-			if((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,5) || GetUserAdmin(client).ImmunityLevel == 100)) || !g_bl4dstatsSystemAvailable)
+			if((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,5) || bMaxImmunity)) || !g_bl4dstatsSystemAvailable)
 				menu.AddItem("option15", "金黄色", player[client].SkinType == 15 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
-			if((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,3)) || GetUserAdmin(client).ImmunityLevel == 100) || !g_bl4dstatsSystemAvailable)
+			if((g_bl4dstatsSystemAvailable && (l4dstats_IsTopPlayer(client,3) || bMaxImmunity)) || !g_bl4dstatsSystemAvailable)
 				menu.AddItem("option16", "透明色", player[client].SkinType == 16 ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 			//个人定制皮肤部分
 			char steamid[32];

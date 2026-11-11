@@ -202,8 +202,8 @@ void GetCvars()
 	g_fSpeedTank = g_hSpeedTank.FloatValue;
 	g_fSpeedTankDef = g_hSpeedTankDef.FloatValue;
 	g_iCvarSmoker = g_hCvarSmoker.IntValue;
-	g_iCvarType = g_hCvarBots.IntValue;
-	g_iCvarBots = g_hCvarType.IntValue;
+	g_iCvarBots = g_hCvarBots.IntValue;
+	g_iCvarType = g_hCvarType.IntValue;
 }
 
 void IsAllowed()

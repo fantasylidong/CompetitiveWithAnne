@@ -121,19 +121,42 @@ void pinnedPriorityCvarChangedHandler(ConVar convar, const char[] oldValue, cons
 
 public void abilityUseHandler(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("userid"));
+	int userId = event.GetInt("userid");
+	int client = GetClientOfUserId(userId);
 	if (!isAiSpitter(client)) { return; }
 	// 痰已经吐出去了, 欠账清掉
 	spitOweClear(client);
 	if (!g_hKilledAfterSpit.BoolValue) { return; }
-	if (IsPlayerAlive(client)) { CreateTimer(SPITTER_KILL_DELAY, killSpitterHandler, client); }
+	if (IsPlayerAlive(client)) { CreateTimer(SPITTER_KILL_DELAY, killSpitterHandler, userId, TIMER_FLAG_NO_MAPCHANGE); }
 }
 
-public Action killSpitterHandler(Handle timer, int client)
+public Action killSpitterHandler(Handle timer, int userId)
 {
+	int client = GetClientOfUserId(userId);
 	if (!isAiSpitter(client) || !IsPlayerAlive(client)) { return Plugin_Continue; }
 	ForcePlayerSuicide(client);
 	return Plugin_Continue;
+}
+
+int GetClosestSurvivorDistFast(int spitter)
+{
+	float selfPos[3], targetPos[3];
+	GetClientAbsOrigin(spitter, selfPos);
+	float minDistSq = 1.0e18;
+	bool found = false;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || GetClientTeam(i) != TEAM_SURVIVOR || !IsPlayerAlive(i))
+			continue;
+		GetClientAbsOrigin(i, targetPos);
+		float distSq = GetVectorDistance(selfPos, targetPos, true);
+		if (distSq < minDistSq)
+		{
+			minDistSq = distSq;
+			found = true;
+		}
+	}
+	return found ? RoundToNearest(SquareRoot(minDistSq)) : -1;
 }
 
 public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[3], float angles[3], int& weapon, int& subtype, int& cmdnum, int& tickcount, int& seed, int mouse[2])
@@ -143,7 +166,6 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 	static int targetDist;
 	GetEntPropVector(spitter, Prop_Data, "m_vecVelocity", velVec);
 	curSpeed = SquareRoot(Pow(velVec[0], 2.0) + Pow(velVec[1], 2.0));
-	targetDist = GetClosetSurvivorDistance(spitter);
 	if (buttons & (IN_ATTACK | IN_ATTACK2))
 		AIPathMovement_Reset(spitter);
 	bool onGround = (GetEntityFlags(spitter) & FL_ONGROUND) != 0;
@@ -217,7 +239,9 @@ public Action OnPlayerRunCmd(int spitter, int& buttons, int& impulse, float vel[
 		buttons &= ~(IN_JUMP | IN_DUCK);
 		return Plugin_Changed;
 	}
-	if (!(targetDist < g_hBhopStartDistance.FloatValue && curSpeed > 150.0) || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
+	if (curSpeed <= 150.0 || !g_hAllowBhop.BoolValue) { return Plugin_Continue; }
+	targetDist = GetClosestSurvivorDistFast(spitter);
+	if (targetDist < 0 || targetDist >= g_hBhopStartDistance.FloatValue) { return Plugin_Continue; }
 	// 上次起跳安全检查因地形失败且仍在冷却期内时跳过尝试，避免受阻时每帧重复整套 trace
 	if (AIPathMovement_IsRouteCheckThrottled(spitter)) { return Plugin_Continue; }
 	GetClientEyeAngles(spitter, eyeAngle);

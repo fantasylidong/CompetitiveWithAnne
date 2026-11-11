@@ -1580,25 +1580,26 @@ void SetHatView(int client, bool bShowHat)
 // Could be better instead of unhooking and hooking everyone each time, but quick and dirty addition...
 void SpectatorHatHooks()
 {
+	bool anyDeadOrSpec = false;
+	for( int i = 1; i <= MaxClients; i++ )
+	{
+		if( IsClientInGame(i) && !IsFakeClient(i) && !IsPlayerAlive(i) )
+		{
+			anyDeadOrSpec = true;
+			break;
+		}
+	}
+
 	for( int index = 1; index <= MaxClients; index++ )
 	{
 		if( IsValidEntRef(g_iHatIndex[index]) )
 		{
-			for( int i = 1; i <= MaxClients; i++ )
+			SDKUnhook(g_iHatIndex[index], SDKHook_SetTransmit, Hook_SetSpecTransmit);
+			if( anyDeadOrSpec )
 			{
-				if( IsClientInGame(i) )
-				{
-					SDKUnhook(g_iHatIndex[index], SDKHook_SetTransmit, Hook_SetSpecTransmit);
-
-					if( !IsPlayerAlive(i) )
-					{
-						// Must hook 1 frame later because SDKUnhook first and then SDKHook doesn't work, it won't be hooked for some reason.
-						DataPack dPack = new DataPack();
-						dPack.WriteCell(GetClientUserId(i));
-						dPack.WriteCell(index);
-						RequestFrame(OnFrameHooks, dPack);
-					}
-				}
+				DataPack dPack = new DataPack();
+				dPack.WriteCell(index);
+				RequestFrame(OnFrameHooks, dPack);
 			}
 		}
 	}
@@ -1607,17 +1608,15 @@ void SpectatorHatHooks()
 void OnFrameHooks(DataPack dPack)
 {
 	dPack.Reset();
-
-	int client = dPack.ReadCell();
-	client = GetClientOfUserId(client);
-
-	if( client && IsClientInGame(client) && !IsPlayerAlive(client) )
-	{
-		int index = dPack.ReadCell();
-		SDKHook(EntRefToEntIndex(g_iHatIndex[index]), SDKHook_SetTransmit, Hook_SetSpecTransmit);
-	}
-
+	int index = dPack.ReadCell();
 	delete dPack;
+
+	if( IsValidEntRef(g_iHatIndex[index]) )
+	{
+		int hatEnt = EntRefToEntIndex(g_iHatIndex[index]);
+		SDKUnhook(hatEnt, SDKHook_SetTransmit, Hook_SetSpecTransmit);
+		SDKHook(hatEnt, SDKHook_SetTransmit, Hook_SetSpecTransmit);
+	}
 }
 
 Action Hook_SetSpecTransmit(int entity, int client)

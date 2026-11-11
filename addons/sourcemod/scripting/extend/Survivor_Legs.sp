@@ -226,40 +226,30 @@ void AttachOverlayLegs(int iClient, bool bBaseReattach)
 public Action HideModel(int iEntity, int iClient)
 {
 	if(IsFakeClient(iClient))
-		return Plugin_Continue;
-	
-	static int iOwner;
-	iOwner = GetClientOfUserId(iEntOwner[iEntity]);
-	
-	if(iOwner < 1 || !IsClientInGame(iOwner))
-	return Plugin_Continue;
-	
+		return Plugin_Handled;
+
+	int iOwner = GetClientOfUserId(iEntOwner[iEntity]);
 	if(iOwner != iClient)
 		return Plugin_Handled;
-	
+
 	if(ShouldHideLegs(iClient))
 		return Plugin_Handled;
-	
+
 	return Plugin_Continue;
 }
 
 public Action HideOverlayModel(int iEntity, int iClient)
 {
 	if(IsFakeClient(iClient))
-		return Plugin_Continue;
-	
-	static int iOwner;
-	iOwner = GetClientOfUserId(iAttachedOwner[iEntity]);
-	
-	if(iOwner < 1 || !IsClientInGame(iOwner))
-	return Plugin_Continue;
-	
+		return Plugin_Handled;
+
+	int iOwner = GetClientOfUserId(iAttachedOwner[iEntity]);
 	if(iOwner != iClient)
 		return Plugin_Handled;
-	
+
 	if(ShouldHideLegs(iClient))
 		return Plugin_Handled;
-	
+
 	return Plugin_Continue;
 }
 
@@ -330,13 +320,13 @@ public void ePlayerDeath(Handle hEvent, const char[] sEventName, bool bDontBroad
 
 public void Hook_OnPostThinkPost(int iClient)
 {
-	if(!IsPlayerAlive(iClient) || GetClientTeam(iClient) != 2) 
+	if(!IsPlayerAlive(iClient) || GetClientTeam(iClient) != 2)
 		return;
-	
+
 	static int iEntity;
 	iEntity = EntRefToEntIndex(iEntRef[iClient]);
-	
-	if(!IsValidEntRef(iEntity))
+
+	if(iEntity == INVALID_ENT_REFERENCE || iEntity <= MaxClients)
 		return;
 	
 	static int iModelIndex[MAXPLAYERS+1] = {0, ...};		
@@ -449,9 +439,13 @@ static bool IsValidEntRef(int iEnt)
 	return (iEnt != 0 && EntRefToEntIndex(iEnt) != INVALID_ENT_REFERENCE);
 }
 
-static bool ShouldHideLegs(int iClient) 
+static bool ShouldHideLegs(int iClient)
 {
 	if(bThirdPerson[iClient])
+		return true;
+	float fEyeAngles[3];
+	GetClientEyeAngles(iClient, fEyeAngles);
+	if(fEyeAngles[0] < 35.0)
 		return true;
 	if(GetEntPropEnt(iClient, Prop_Send, "m_hZoomOwner") == iClient)
 		return true;

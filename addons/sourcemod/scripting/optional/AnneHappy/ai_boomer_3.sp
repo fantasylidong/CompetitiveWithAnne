@@ -415,7 +415,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		{
 			float tgtEye[3];
 			GetClientEyePosition(target, tgtEye);
-			if (L4D2_IsVisibleToPlayer(client, TEAM_SURVIVOR, TEAM_INFECTED, 0, tgtEye))
+			if (L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, 0, tgtEye))
 			{
 				// 只有喷吐不可用（在CD/被推）或当前没视线时，才允许右键
 				if (!can_bile[client] || in_bile_interval[client] || !has_sight)
@@ -518,6 +518,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			}
 			return Plugin_Changed;
 		}
+		AIPathMovement_MarkRouteCheckFailure(client);
 	}
 
 	/* 爬梯子时，禁止连跳，蹲下与喷吐 */
@@ -589,17 +590,21 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
 {
 	if (IsBoomer(specialInfected) && IsPlayerAlive(specialInfected))
 	{
-		float eyePos[3] = {0.0}, targetEyePos[3] = {0.0}, dist = 0.0;
+		float eyePos[3] = {0.0}, targetEyePos[3] = {0.0};
 		GetClientEyePosition(specialInfected, eyePos);
+		float maxRange = g_hBileFindRange.FloatValue;
+		if (maxRange <= 0.0)
+			return Plugin_Continue;
+		float maxRangeSq = maxRange * maxRange;
 		// 寻找范围内符合要求的玩家，优先找被控或者倒地的
 		for (int i = 1; i <= MaxClients; i++)
 		{
 			if (IsClientInGame(i) && GetClientTeam(i) == TEAM_SURVIVOR && IsPlayerAlive(i) && (IsClientIncapped(i) || IsClientPinned(i)))
 			{
 				GetClientEyePosition(i, targetEyePos);
-				eyePos[2] = targetEyePos[2] = 0.0;
-				dist = GetVectorDistance(eyePos, targetEyePos);
-				if (g_hBileFindRange.FloatValue > 0.0 && dist <= g_hBileFindRange.FloatValue)
+				float dx = eyePos[0] - targetEyePos[0];
+				float dy = eyePos[1] - targetEyePos[1];
+				if ((dx * dx + dy * dy) <= maxRangeSq)
 				{
 					Handle hTrace = TR_TraceRayFilterEx(eyePos, targetEyePos, MASK_VISIBLE, RayType_EndPoint, TR_VomitClientFilter, specialInfected);
 					if (!TR_DidHit(hTrace) || TR_GetEntityIndex(hTrace) == i)

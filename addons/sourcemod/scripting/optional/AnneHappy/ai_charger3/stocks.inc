@@ -845,7 +845,7 @@ stock bool _TraceWallFilter(int entity, int contentsMask, any data) {
 
     // 忽略普通感染者和 witch
     static char clsName[32];
-    if (IsValidEntity(data)) {
+    if (IsValidEntity(entity)) {
         GetEntityClassname(entity, clsName, sizeof(clsName));
         if (strcmp(clsName, "infected", false) == 0 ||
             strcmp(clsName, "witch", false) == 0)
@@ -1069,14 +1069,11 @@ stock int isAnySurvivorWatchingCharger(int client, int target, float fovDeg = 60
 stock int getClosestSurvivorAndValid(int charger, int excludeTar = -1) {
 	if (!isAiCharger(charger))
 		return -1;
-	
-	static int target;
-	static float pos[3], targetPos[3];
-	static ArrayList targets;
-	if (!targets)
-		targets = new ArrayList(2);
 
+	static float pos[3], targetPos[3];
 	GetClientAbsOrigin(charger, pos);
+	int bestTarget = -1;
+	float bestDistSq = 1.0e18;
 	for (int i = 1; i <= MaxClients; i++) {
 		if (i == charger || i == excludeTar)
 			continue;
@@ -1084,18 +1081,13 @@ stock int getClosestSurvivorAndValid(int charger, int excludeTar = -1) {
 			continue;
 
 		GetClientAbsOrigin(i, targetPos);
-		targets.Set(targets.Push(GetVectorDistance(pos, targetPos)), i, 1);
+		float distSq = GetVectorDistance(pos, targetPos, true);
+		if (distSq < bestDistSq) {
+			bestDistSq = distSq;
+			bestTarget = i;
+		}
 	}
-
-	if (targets.Length < 1) {
-		delete targets;
-		return -1;
-	}
-
-	SortADTArray(targets, Sort_Ascending, Sort_Float);
-	target = targets.Get(0, 1);
-	delete targets;
-	return target;
+	return bestTarget;
 }
 
 stock bool vectorsEqual(const float vec1[3], const float vec2[3]) {
@@ -1332,7 +1324,7 @@ stock bool getLookAheadGoalPos(int client, const float pos[3], float maxDist, fl
 		
 		static Handle hTrace;
         static bool isHit;
-		hTrace = TR_TraceHullFilterEx(vStart, vEnd, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter);
+		hTrace = TR_TraceHullFilterEx(vStart, vEnd, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter, client);
         isHit = TR_DidHit(hTrace);
         delete hTrace;
 

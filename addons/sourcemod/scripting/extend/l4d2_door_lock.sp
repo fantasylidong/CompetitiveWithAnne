@@ -233,15 +233,30 @@ public void OnPluginStart()
 
 public Action OnClientSayCommand(int client, const char[] command, const char[] message)
 {
-	if (strcmp(command, "say_team", false) == 0 || strcmp(command, "say", false) == 0)
+	if ((strcmp(command, "say_team", false) == 0 || strcmp(command, "say", false) == 0) && message[0] != '\0')
 	{
-		char sCvarCommand[512];
+		char sCvarCommand[512], sToken[64];
 		Cvar_DoorLock_EnableCmd.GetString(sCvarCommand, sizeof(sCvarCommand));
-		if(StrContains(sCvarCommand, message) != -1)
+		int pos = 0, len = strlen(sCvarCommand);
+		while (pos < len)
 		{
-			g_bPanelIsOpened[client] = false;
-			FakeClientCommand(client, message);
-			return Plugin_Continue;
+			int next = SplitString(sCvarCommand[pos], ",", sToken, sizeof(sToken));
+			if (next == -1)
+			{
+				strcopy(sToken, sizeof(sToken), sCvarCommand[pos]);
+				pos = len;
+			}
+			else
+			{
+				pos += next;
+			}
+			TrimString(sToken);
+			if (sToken[0] != '\0' && strcmp(message, sToken, false) == 0)
+			{
+				g_bPanelIsOpened[client] = false;
+				FakeClientCommand(client, message);
+				return Plugin_Continue;
+			}
 		}
 	}
 	return Plugin_Continue;
@@ -391,7 +406,7 @@ void Event_OnRoundEnd(Event event, const char[] name, bool dontBroadcast)
 
 public Action OnPlayerRunCmd (int client, int &buttons)
 {
-	if(g_bSurvivorBotFreezeActive && !g_bLeftSafeAreas)
+	if(g_bSurvivorBotFreezeActive && !g_bLeftSafeAreas && client > 0 && client <= MaxClients && IsClientInGame(client) && IsFakeClient(client))
 		UpdateClientSurvivorBotFreeze(client);
 
 	return Plugin_Continue;

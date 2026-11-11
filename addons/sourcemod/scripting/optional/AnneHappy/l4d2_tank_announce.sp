@@ -9,11 +9,11 @@
 #define SOUNDEFFECT "ui/pickup_secret01.wav"
 
 // ConVar
-ConVar g_hPlaySound, g_hMessageType;
+ConVar g_hPlaySound, g_hMessageType, g_hGameMode;
 // Ints
 int g_iPlaySound, g_iMessageType;
 
-public Plugin myinfo = 
+public Plugin myinfo =
 {
 	name 			= "Tank刷新提示",
 	author 			= "夜羽真白",
@@ -28,6 +28,7 @@ public void OnPluginStart()
 	// CreateConVar
 	g_hPlaySound = CreateConVar("l4d2_tankannounce_playsound", "1", "是否在Tank生成时播放声音", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_hMessageType = CreateConVar("l4d2_tankannounce_messagetype", "1", "Tank生成提示的类型：0=不提示，1=聊天框提示，2=中央提示框提示，3=中央文字提示", FCVAR_NONE, true, 0.0, true, 3.0);
+	g_hGameMode = FindConVar("mp_gamemode");
 	// HookEvent
 	HookEvent("player_spawn", evt_PlayerSpawn);
 	// AddChangeHook
@@ -46,10 +47,12 @@ public void OnMapStart()
 public void evt_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
-	char sGameMod[32];	GetConVarString(FindConVar("mp_gamemode"), sGameMod, sizeof(sGameMod));
 	// 判断是否玩家Tank
 	if (IsAiTank(client))
 	{
+		char sGameMod[32];
+		if (g_hGameMode != null)
+			g_hGameMode.GetString(sGameMod, sizeof(sGameMod));
 		switch (g_iMessageType)
 		{
 			case 1:

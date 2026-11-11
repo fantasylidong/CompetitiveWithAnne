@@ -126,7 +126,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 	float fCurrentSpeed = SquareRoot(fSpeed[0] * fSpeed[0] + fSpeed[1] * fSpeed[1]);
 	if (fCurrentSpeed <= 130.0) { return Plugin_Continue; }
 
-	int iTarget = g_bCanAttackPinned[jockey] ? GetClientAimTarget(jockey, true) : GetClosetMobileSurvivor(jockey);
+	int iTarget = g_bCanAttackPinned[jockey] ? GetClientAimTarget(jockey, true) : GetClosestMobileSurvivorFast(jockey);
 	if (!IsValidSurvivor(iTarget) || !IsPlayerAlive(iTarget)) { return Plugin_Continue; }
 
 	// 当前 Jockey 有效，目标有效，进行其他操作
@@ -166,7 +166,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 				SubtractVectors(fTargetPos, fJockeyPos, subtractVec);
 				NormalizeVector(subtractVec, subtractVec);
 				GetVectorAngles(subtractVec, eyeAngleVec);
-				ScaleVector(subtractVec, g_hBhopSpeed.FloatValue * 2.5);			
+				ScaleVector(subtractVec, g_hBhopSpeed.FloatValue * 2.5);
 				TeleportEntity(jockey, NULL_VECTOR, eyeAngleVec, subtractVec);
 				SetState(jockey, 0, IN_ATTACK);
 				return Plugin_Changed;
@@ -182,12 +182,12 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 					g_fNoActionTime[jockey][0] = GetGameTime();
 					g_fNoActionTime[jockey][1] = getRandomFloatInRange(0.0, FREEZE_MAX_TIME);
 					SetEntityMoveType(jockey, MOVETYPE_NONE);
-					CreateTimer(g_fNoActionTime[jockey][1], setMoveTypeToCustomHandler, jockey);
+					CreateTimer(g_fNoActionTime[jockey][1], setMoveTypeToCustomHandler, GetClientUserId(jockey), TIMER_FLAG_NO_MAPCHANGE);
 					#if DEBUG_ALL
 						PrintToConsoleAll("[Ai-Jockey]：目前概率：%d，冻结 Jockey：%.2f 秒，时间戳：%.2f", actionPercent, g_fNoActionTime[jockey][1], GetGameTime());
 					#endif
 				}
-				else if (actionPercent > g_iActionArray[ACTION_FROZEN] 
+				else if (actionPercent > g_iActionArray[ACTION_FROZEN]
 					&& actionPercent <= g_iActionArray[ACTION_JUMP_BACK]
 					&& (fDistance > 0.0 && fDistance <= SPECIAL_JUMP_DIST))
 				{
@@ -205,7 +205,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 						PrintToConsoleAll("[Ai-Jockey]：目前概率：%d，Jockey 向后跳", actionPercent);
 					#endif
 				}
-				else if (actionPercent > g_iActionArray[ACTION_JUMP_BACK] 
+				else if (actionPercent > g_iActionArray[ACTION_JUMP_BACK]
 					&& actionPercent <= g_iActionArray[ACTION_JUMP_HIGH])
 				{
 					// 高跳
@@ -233,7 +233,7 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 			GetVectorAngles(eyeAngleVec, eyeAngles);
 			// Jockey 和生还者距离超过 SPECIAL_JUMP_DIST，正常连跳靠近生还者
 			if (IsTargetWatchingAttacker(jockey, iTarget, g_hSpecialJumpAngle.IntValue))
-			{				
+			{
 				// 50% 概率向左向右跳
 				if (getRandomIntInRange(0, 1)) { eyeAngles[1] += getRandomIntInRange(10, 30); }
 				else { eyeAngles[1] -= getRandomIntInRange(10, 30); }
@@ -258,7 +258,8 @@ public Action OnPlayerRunCmd(int jockey, int &buttons, int &impulse, float vel[3
 				eyeAngleVec[2] = 0.0;
 				float tempspeed = CapJockeyBhopBaseSpeed(fCurrentSpeed);
 				ScaleVector(eyeAngleVec, tempspeed + g_hBhopSpeed.FloatValue);
-				if(jockeyDoBhop(jockey, buttons, eyeAngleVec, eyeAngleVec))
+				buttons |= IN_JUMP;
+				if (jockeyDoBhop(jockey, buttons, eyeAngles, eyeAngleVec))
 					SetState(jockey, 0, IN_JUMP);
 				#if DEBUG_ALL
 					PrintToConsoleAll("[Ai-Jockey]：目标没有看着 Jockey，对着目标开始普通连跳");
@@ -325,8 +326,9 @@ public void L4D_OnSwingStart(int client, int weapon)
 // ***************
 //		Stuff
 // ***************
-public Action setMoveTypeToCustomHandler(Handle timer, int client)
+public Action setMoveTypeToCustomHandler(Handle timer, int userId)
 {
+	int client = GetClientOfUserId(userId);
 	if (!IsAiJockey(client)) { return Plugin_Continue; }
 	SetEntityMoveType(client, MOVETYPE_CUSTOM);
 	g_fNoActionTime[client][0] = g_fNoActionTime[client][1] = 0.0;
@@ -336,6 +338,27 @@ public Action setMoveTypeToCustomHandler(Handle timer, int client)
 	}
 	#endif
 	return Plugin_Continue;
+}
+
+int GetClosestMobileSurvivorFast(int client)
+{
+	float selfPos[3], targetPos[3];
+	GetClientAbsOrigin(client, selfPos);
+	int best = -1;
+	float bestDistSq = 1.0e18;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || GetClientTeam(i) != TEAM_SURVIVOR || !IsPlayerAlive(i) || IsClientIncapped(i) || IsClientPinned(i))
+			continue;
+		GetClientAbsOrigin(i, targetPos);
+		float distSq = GetVectorDistance(selfPos, targetPos, true);
+		if (distSq < bestDistSq)
+		{
+			bestDistSq = distSq;
+			best = i;
+		}
+	}
+	return best;
 }
 
 public Action evt_PlayerShoved(Event event, const char[] name, bool dontBroadcast)

@@ -143,6 +143,7 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    delete g_hTimerRusher;
     g_hTimerRusher = null;
     g_iTanksCount = 0;
     g_bSuccessTeleport = true;
@@ -157,6 +158,8 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+    delete g_hTimerRusher;
+    g_hTimerRusher = null;
     g_iTanksCount = 0;
 }
 
@@ -261,7 +264,7 @@ static void BeginRusherTracing(bool reset = true)
     }
 
     if (g_hTimerRusher == null)
-        g_hTimerRusher = CreateTimer(g_hRusherCheckInterv.FloatValue, Timer_CheckRusher, _, TIMER_REPEAT);
+        g_hTimerRusher = CreateTimer(g_hRusherCheckInterv.FloatValue, Timer_CheckRusher, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action Timer_CheckPos(Handle timer, int userid)
@@ -282,10 +285,14 @@ public Action Timer_CheckPos(Handle timer, int userid)
     {
         if (g_iStuckTimes[tank] > 6 && g_bSuccessTeleport)
         {
+            g_iStuckTimes[tank] = 0;
             SDKHook(tank, SDKHook_PostThinkPost, SDK_UpdateThink_Stuck);
             g_bSuccessTeleport = false;
         }
-        g_iStuckTimes[tank]++;
+        else
+        {
+            g_iStuckTimes[tank]++;
+        }
     }
     else
     {

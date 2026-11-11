@@ -532,7 +532,7 @@ public Action L4D2_OnChooseVictim(int specialInfected, int &curTarget)
     float targetPos[3];
     GetEntPropVector(curTarget, Prop_Send, "m_vecOrigin", targetPos);
 
-    if (!L4D2_IsVisibleToPlayer(specialInfected, TEAM_INFECTED, curTarget, INVALID_NAV_AREA, targetPos))
+    if (!L4D2_IsVisibleToPlayer(specialInfected, TEAM_INFECTED, 0, INVALID_NAV_AREA, targetPos))
     {
         int newTarget = getClosestSurvivor(specialInfected);
         // 新目标已达到控制类锁定上限时不换靶，保持引擎/底层分配结果
@@ -577,12 +577,12 @@ static int getClosestSurvivor(int client)
     float targetPos[3];
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsValidSurvivor(i)) continue;
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i) || L4D_IsPlayerIncapacitated(i)) continue;
         // 若你的环境没有 IsClientPinned，可去掉或替换为你自己的判断
         if (IsClientPinned(i)) continue;
 
         GetEntPropVector(i, Prop_Send, "m_vecOrigin", targetPos);
-        if (!L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, i, INVALID_NAV_AREA, targetPos))
+        if (!L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, 0, INVALID_NAV_AREA, targetPos))
             continue;
 
         float d = GetVectorDistance(selfPos, targetPos);
@@ -608,7 +608,7 @@ float getPlayerAimingOffset(int hunter, int target)
 {
     float look[3], selfPos[3], targetPos[3];
 
-    GetClientEyeAngles(hunter, look);
+    GetClientEyeAngles(target, look);
     look[0] = look[2] = 0.0;
     GetAngleVectors(look, look, NULL_VECTOR, NULL_VECTOR);
     NormalizeVector(look, look);
@@ -618,7 +618,7 @@ float getPlayerAimingOffset(int hunter, int target)
     selfPos[2] = targetPos[2] = 0.0;
 
     float toSelf[3];
-    MakeVectorFromPoints(selfPos, targetPos, toSelf); // 注意方向：用 self->target 或 target->self 皆可，只要一致
+    MakeVectorFromPoints(targetPos, selfPos, toSelf);
     NormalizeVector(toSelf, toSelf);
 
     return RadToDeg(ArcCosine(GetVectorDotProduct(look, toSelf)));

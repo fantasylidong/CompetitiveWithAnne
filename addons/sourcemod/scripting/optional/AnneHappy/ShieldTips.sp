@@ -28,8 +28,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax)
 
 public void OnPluginStart()
 {
-	HookEvent("server_cvar", Event_ServerCvar);
-	HookEvent("player_disconnect", Event_PlayerDisconnect);
+	HookEvent("server_cvar", Event_ServerCvar, EventHookMode_Pre);
+	HookEvent("player_disconnect", Event_PlayerDisconnect, EventHookMode_Pre);
 	HookUserMessage(GetUserMessageId("TextMsg"), OnTextMsg, true);
 
 	g_cvGameIdle = CreateConVar("sms_game_idle_notify_block", "1", "屏蔽游戏自带的玩家闲置提示.");

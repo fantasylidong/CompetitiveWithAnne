@@ -108,7 +108,6 @@ public void OnPluginEnd()
 {
     if (hSequenceSet != null)
     {
-        DHookDisableDetour(hSequenceSet, false, OnSequenceSet_Pre);
         DHookDisableDetour(hSequenceSet, true,  OnSequenceSet_Post);
     }
 }
@@ -167,7 +166,7 @@ public Action Event_AbilityUse(Event event, const char[] name, bool dontBroadcas
         }
 
         // 起手兜底（可配）
-        CreateTimer(g_cvSafetyTimer.FloatValue, Timer_ResetTongueFlag, client);
+        CreateTimer(g_cvSafetyTimer.FloatValue, Timer_ResetTongueFlag, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
     }
 
     return Plugin_Continue;
@@ -230,7 +229,7 @@ public Action Event_PlayerTeam(Event e, const char[] n, bool db)
 public Action Event_PlayerSwap(Event e, const char[] n, bool db)
 {
     // bot_player_replace / player_bot_replace 都清一次
-    ResetSmokerFlag(GetClientOfUserId(e.GetInt("userid")));
+    ResetSmokerFlag(GetClientOfUserId(e.GetInt("player")));
     ResetSmokerFlag(GetClientOfUserId(e.GetInt("bot")));
     return Plugin_Continue;
 }
@@ -254,10 +253,12 @@ public Action Event_MissionLost(Event e, const char[] n, bool db)
 // >> TIMERS
 // ====================================================================================================
 
-public Action Timer_ResetTongueFlag(Handle timer, int client)
+public Action Timer_ResetTongueFlag(Handle timer, int userid)
 {
+    int client = GetClientOfUserId(userid);
     // 兜底：到时清理强制标志（若仍在窗口内，窗口检查也会结束）
-    ResetSmokerFlag(client);
+    if (client > 0 && GetEngineTime() > g_fTongueWindow[client])
+        ResetSmokerFlag(client);
     return Plugin_Stop;
 }
 
@@ -265,21 +266,13 @@ public Action Timer_ResetTongueFlag(Handle timer, int client)
 // >> DHOOK CALLBACKS
 // ====================================================================================================
 
-public MRESReturn OnSequenceSet_Pre(int client, Handle hReturn, Handle hParams)
-{
-    return MRES_Ignored;
-}
-
 public MRESReturn OnSequenceSet_Post(int client, Handle hReturn, Handle hParams)
 {
-    if (!GetConVarBool(g_cvEnabled))
+    // 若未处于强制期，立即返回（避免对全体生还者和特感每次动作都查 ConVar 与实体属性）
+    if (client <= 0 || client > MaxClients || !g_bTongueAttacking[client])
         return MRES_Ignored;
 
-    if (!IsValidSmoker(client))
-        return MRES_Ignored;
-
-    // 若未处于强制期，或强制期超时，则不覆盖
-    if (!g_bTongueAttacking[client])
+    if (!g_cvEnabled.BoolValue || !IsValidSmoker(client))
         return MRES_Ignored;
 
     float now = GetEngineTime();
@@ -402,7 +395,6 @@ void LoadOffset()
     hSequenceSet = DHookCreateDetour(Address_Null, CallConv_THISCALL, ReturnType_Int, ThisPointer_CBaseEntity);
     DHookSetFromConf(hSequenceSet, hConf, SDKConf_Signature, NAME_SelectWeightedSequence);
     DHookAddParam(hSequenceSet, HookParamType_Int); // Activity
-    DHookEnableDetour(hSequenceSet, false, OnSequenceSet_Pre);
     DHookEnableDetour(hSequenceSet, true,  OnSequenceSet_Post);
 }
 

@@ -524,18 +524,11 @@ stock bool isSmokerReadyToAttack(int client) {
 	if (!isAiSmoker(client))
 		return false;
 
-	static int ability;
-	ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
-	if (!IsValidEdict(ability))
+	int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+	if (ability <= MaxClients || !IsValidEdict(ability))
 		return false;
-	static char clsName[32];
-	GetEntityClassname(ability, clsName, sizeof(clsName));
-	if (strcmp(clsName, "ability_tongue", false) != 0)
-		return false;
-	
-	static float timestamp;
-	timestamp = GetEntPropFloat(ability, Prop_Send, "m_timestamp");
-	return GetGameTime() >= timestamp;
+
+	return GetGameTime() >= GetEntPropFloat(ability, Prop_Send, "m_timestamp");
 }
 
 // ============================================================
@@ -806,7 +799,8 @@ public Action L4D2_OnChooseVictim(int smoker, int &curTarget) {
 	if (g_AiSmokers[smoker].m_bIsMove2ChangeTar)
 		return Plugin_Continue;
 
-	if (!IsValidSurvivor(g_AiSmokers[smoker].m_iTarget) || GetClientOfUserId(g_AiSmokers[smoker].m_iTarget) != curTarget)
+	int prevTarget = GetClientOfUserId(g_AiSmokers[smoker].m_iTarget);
+	if (!IsValidSurvivor(prevTarget) || prevTarget != curTarget)
 		g_AiSmokers[smoker].m_iTarget = GetClientUserId(curTarget);
 
 	return Plugin_Continue;
@@ -955,6 +949,9 @@ Action onMove2Change2Attack(BehaviorAction action, int actor, float interval, Ac
 	}
 
 	// 每隔一定时间间隔, 检测是否还有比当前目标更近的生还者, 如果有, 则改为追更近的生还者
+	if (GetEngineTime() - g_AiSmokers[actor].m_flLastMoveToTime <= g_cvMove2NewTarInterval.FloatValue)
+		return Plugin_Continue;
+
 	nearestTar = getClosestSurvivorAndValid(actor, -1);
 	static float targetPos[3];
 	static bool shouldInvalidate;
@@ -963,10 +960,7 @@ Action onMove2Change2Attack(BehaviorAction action, int actor, float interval, Ac
 	if (IsValidSurvivor(nearestTar)) {
 		// 获取最近目标位置, 定时与 Smoker 结构体中的 m_vecMoveToPos 比对
 		GetClientAbsOrigin(nearestTar, targetPos);
-		shouldInvalidate = (
-			!vectorsEqual(g_AiSmokers[actor].m_vecMoveToPos, targetPos) &&
-			GetEngineTime() - g_AiSmokers[actor].m_flLastMoveToTime > g_cvMove2NewTarInterval.FloatValue
-		);
+		shouldInvalidate = !vectorsEqual(g_AiSmokers[actor].m_vecMoveToPos, targetPos);
 		// 最近目标不是当前目标或者位置变了
 		if (target != nearestTar) {
 			// 更换当前目标到最近的生还者
@@ -976,10 +970,7 @@ Action onMove2Change2Attack(BehaviorAction action, int actor, float interval, Ac
 		}
 	} else {
 		GetClientAbsOrigin(target, targetPos);
-		shouldInvalidate = (
-			!vectorsEqual(g_AiSmokers[actor].m_vecMoveToPos, targetPos) &&
-			GetEngineTime() - g_AiSmokers[actor].m_flLastMoveToTime > g_cvMove2NewTarInterval.FloatValue
-		);
+		shouldInvalidate = !vectorsEqual(g_AiSmokers[actor].m_vecMoveToPos, targetPos);
 	}
 	if (shouldInvalidate) {
 		// 结束当前 BehaviorMoveTo 移动行为, 若舌头 CD 还没好, 则回到 RetreatToCover 重新触发移动到新的目标位置
@@ -998,7 +989,7 @@ Action onMove2Change2Attack(BehaviorAction action, int actor, float interval, Ac
 stock BehaviorAction createSmokerMoveToPosition(int target) {
 	if (!IsValidSurvivor(target))
 		return INVALID_ACTION;
-	
+
 	// 调用构造函数初始化申请的内存块
 	return g_hSmokerMove2AtkPosConstructor.Execute(target);
 }
@@ -1006,14 +997,11 @@ stock BehaviorAction createSmokerMoveToPosition(int target) {
 stock int getClosestSurvivorAndValid(int smoker, int excludeTar = -1) {
 	if (!isAiSmoker(smoker))
 		return -1;
-	
-	static int target;
-	static float pos[3], targetPos[3];
-	static ArrayList targets;
-	if (!targets)
-		targets = new ArrayList(2);
 
+	static float pos[3], targetPos[3];
 	GetClientAbsOrigin(smoker, pos);
+	int bestTarget = -1;
+	float bestDistSq = 1.0e18;
 	for (int i = 1; i <= MaxClients; i++) {
 		if (i == smoker || i == excludeTar)
 			continue;
@@ -1021,16 +1009,11 @@ stock int getClosestSurvivorAndValid(int smoker, int excludeTar = -1) {
 			continue;
 
 		GetClientAbsOrigin(i, targetPos);
-		targets.Set(targets.Push(GetVectorDistance(pos, targetPos)), i, 1);
+		float distSq = GetVectorDistance(pos, targetPos, true);
+		if (distSq < bestDistSq) {
+			bestDistSq = distSq;
+			bestTarget = i;
+		}
 	}
-
-	if (targets.Length < 1) {
-		delete targets;
-		return -1;
-	}
-
-	SortADTArray(targets, Sort_Ascending, Sort_Float);
-	target = targets.Get(0, 1);
-	delete targets;
-	return target;
+	return bestTarget;
 }

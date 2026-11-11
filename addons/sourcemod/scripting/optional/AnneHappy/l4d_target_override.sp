@@ -1676,7 +1676,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 
 					if( g_iOptionPinned[class] & 8 && g_bPinCharger[victim] )
 					{
-						if( GetEntPropEnt(victim, Prop_Send, "m_carryAttacker") == -1  || GetEntPropEnt(victim, Prop_Send, "m_pummelAttacker") == -1 )
+						if( GetEntPropEnt(victim, Prop_Send, "m_carryAttacker") == -1 && GetEntPropEnt(victim, Prop_Send, "m_pummelAttacker") == -1 )
 						{
 							allPinned = false;
 							g_bPinCharger[victim] = false;
@@ -1762,7 +1762,7 @@ MRESReturn ChooseVictim(int attacker, Handle hReturn)
 
 						if( g_iOptionPinned[class] & 8 && g_bPinCharger[i] )
 						{
-							if( GetEntPropEnt(i, Prop_Send, "m_carryAttacker") == -1  || GetEntPropEnt(i, Prop_Send, "m_pummelAttacker") == -1 )
+							if( GetEntPropEnt(i, Prop_Send, "m_carryAttacker") == -1 && GetEntPropEnt(i, Prop_Send, "m_pummelAttacker") == -1 )
 							{
 								allPinned = false;
 								g_bPinCharger[i] = false;

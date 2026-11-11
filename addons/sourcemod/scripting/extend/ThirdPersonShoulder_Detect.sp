@@ -46,7 +46,7 @@ public void OnPluginStart()
 	HookConVarChange(hCvar_AllowVersus, eConvarChanged);
 	
 	
-	CreateTimer(0.25, tThirdPersonCheck, INVALID_HANDLE, TIMER_REPEAT);
+	CreateTimer(1.0, tThirdPersonCheck, INVALID_HANDLE, TIMER_REPEAT);
 }
 
 public void OnMapStart()
@@ -85,18 +85,24 @@ void CvarsChanged()
 
 public Action tThirdPersonCheck(Handle hTimer)
 {
+	if(ShouldForceFirstPersonInVersus())
+		return Plugin_Continue;
+
 	for(int i = 1; i <= MaxClients; i++)
 	{
-		if(!__IsValidClient(i) || IsFakeClient(i))
+		if(!__IsValidClient(i) || IsFakeClient(i) || GetClientTeam(i) != 2 || !IsPlayerAlive(i))
 			continue;
-		
-			QueryClientConVar(i, "c_thirdpersonshoulder", QueryClientConVarCallback);
-		}
+
+		QueryClientConVar(i, "c_thirdpersonshoulder", QueryClientConVarCallback);
+	}
 	return Plugin_Continue;
 }
 
 public void QueryClientConVarCallback(QueryCookie sCookie, int iClient, ConVarQueryResult sResult, const char[] sCvarName, const char[] sCvarValue)
 {
+	if(sResult != ConVarQuery_Okay || !__IsValidClient(iClient))
+		return;
+
 	static bool bLastVal;
 	bLastVal = bThirdPerson[iClient];
 	

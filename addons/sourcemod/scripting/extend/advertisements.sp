@@ -159,7 +159,8 @@ public Action Timer_DisplayAd(Handle timer)
 
                 DataPack hCenterAd;
                 CreateDataTimer(1.0, Timer_CenterAd, hCenterAd, TIMER_FLAG_NO_MAPCHANGE|TIMER_REPEAT);
-                hCenterAd.WriteCell(i);
+                hCenterAd.WriteCell(GetClientUserId(i));
+                hCenterAd.WriteCell(0);
                 hCenterAd.WriteString(message);
             }
         }
@@ -243,17 +244,20 @@ public Action Timer_DisplayAd(Handle timer)
 public Action Timer_CenterAd(Handle timer, DataPack pack)
 {
     char message[1024];
-    static int iCount = 0;
 
     pack.Reset();
-    int iClient = pack.ReadCell();
+    int userId = pack.ReadCell();
+    DataPackPos countPos = pack.Position;
+    int iCount = pack.ReadCell() + 1;
     pack.ReadString(message, sizeof(message));
 
-    if (!IsClientInGame(iClient) || ++iCount >= 5) {
-        iCount = 0;
+    int iClient = GetClientOfUserId(userId);
+    if (iClient <= 0 || !IsClientInGame(iClient) || iCount >= 5) {
         return Plugin_Stop;
     }
 
+    pack.Position = countPos;
+    pack.WriteCell(iCount);
     PrintCenterText(iClient, "%s", message);
     return Plugin_Continue;
 }
@@ -265,7 +269,7 @@ public Action Timer_CenterAd(Handle timer, DataPack pack)
 bool IsValidClient(int client, Advertisement ad)
 {
     return IsClientInGame(client) && !IsFakeClient(client)
-        && ((!ad.adminsOnly && !(ad.hasFlags && (GetUserFlagBits(client) & (ad.flags|ADMFLAG_ROOT))))
+        && ((!ad.adminsOnly && (!ad.hasFlags || (GetUserFlagBits(client) & (ad.flags|ADMFLAG_ROOT))))
             || (ad.adminsOnly && (GetUserFlagBits(client) & (ADMFLAG_GENERIC|ADMFLAG_ROOT))));
 }
 

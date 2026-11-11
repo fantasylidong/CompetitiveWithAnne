@@ -2329,26 +2329,27 @@ void GetHUD1_Text(char[] output, int size)
 void GetHUD1_Text(char[] output, int size)
 {
 	int IsStaticTank = 0, IsStaticWitch = 0;
-	ConVar cv;
+	static ConVar cvTankCanSpawn, cvWitchCanSpawn;
 	if(g_bWitchAndTankSystemAvailable){
-		cv = FindConVar("sm_tank_can_spawn");
-		if(cv.IntValue){
+		if (cvTankCanSpawn == null)
+			cvTankCanSpawn = FindConVar("sm_tank_can_spawn");
+		if(cvTankCanSpawn != null && cvTankCanSpawn.IntValue){
 			if(IsStaticTankMap()){
 				IsStaticTank = 2;
 			}else{
 				IsStaticTank = 1;
 			}
-	        
-	    }
-		cv = FindConVar("sm_witch_can_spawn");
-		if(cv.IntValue){
+		}
+		if (cvWitchCanSpawn == null)
+			cvWitchCanSpawn = FindConVar("sm_witch_can_spawn");
+		if(cvWitchCanSpawn != null && cvWitchCanSpawn.IntValue){
 			if(IsStaticWitchMap())
 			{
 				IsStaticWitch = 2;
 			}else
 			{
 				IsStaticWitch = 1;
-			}	    
+			}
 		}
 	}	
 	
