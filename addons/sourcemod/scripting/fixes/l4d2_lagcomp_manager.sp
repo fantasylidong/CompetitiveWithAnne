@@ -18,8 +18,11 @@
 
 #define MAX_ENTITY_NAME_SIZE 64
 
-int 
+int
 	g_iCUserCmdSize = -1;
+
+bool
+	g_bTrackedRock[2048];
 
 ConVar
 	g_hSvUnlag = null;
@@ -224,15 +227,23 @@ MRESReturn DTR__CTerrorPlayer__WantsLagCompensationOnEntity_Post(int client, DHo
 	return MRES_Ignored;
 }
 
+public void OnMapEnd()
+{
+	for (int i = 0; i < sizeof(g_bTrackedRock); i++) {
+		g_bTrackedRock[i] = false;
+	}
+}
+
 public void OnEntityCreated(int iEntity, const char[] sClassName)
 {
-	if (sClassName[0] != 't') {
+	if (sClassName[0] != 't' || iEntity <= MaxClients || iEntity >= sizeof(g_bTrackedRock)) {
 		return;
 	}
-	
+
 	if (strcmp(sClassName, "tank_rock") == 0) {
+		g_bTrackedRock[iEntity] = true;
 		LagComp_AddAdditionalEntity(iEntity);
-		
+
 		#if DEBUG
 			if (IsFindEntity(iEntity)) {
 				PrintToChatAll("%t", "L4D2LagcompManager_SuccessfullyEntitySuccessfullyAddedArray", sClassName, iEntity);
@@ -245,17 +256,22 @@ public void OnEntityCreated(int iEntity, const char[] sClassName)
 
 public void OnEntityDestroyed(int iEntity)
 {
-	if (IsRock(iEntity)) {
+	if (iEntity <= MaxClients || iEntity >= sizeof(g_bTrackedRock) || !g_bTrackedRock[iEntity]) {
+		return;
+	}
+
+	g_bTrackedRock[iEntity] = false;
+	{
 		#if DEBUG
 			bool IsFind = IsFindEntity(iEntity);
 		#endif
-		
+
 		LagComp_RemoveAdditionalEntity(iEntity);
-		
+
 		#if DEBUG
 			char sClassName[MAX_ENTITY_NAME_SIZE];
 			GetEntityClassname(iEntity, sClassName, sizeof(sClassName));
-			
+
 			if (IsFind) {
 				if (IsFindEntity(iEntity)) {
 					PrintToChatAll("%t", "L4D2LagcompManager_ErrorEntityNotRemovedAfter", sClassName, iEntity);
@@ -320,17 +336,6 @@ Address GetPlayerCurrentCommand(int player)
 									+ g_iCUserCmdSize /* m_LastCmd */;
 	
 	return view_as<Address>(GetEntData(player, s_iOffs_m_pCurrentCommand, 4));
-}
-
-bool IsRock(int iEntity)
-{
-	if (IsValidEntity(iEntity)) {
-		char sClassName[MAX_ENTITY_NAME_SIZE];
-		GetEntityClassname(iEntity, sClassName, sizeof(sClassName));
-		return (strcmp(sClassName, "tank_rock") == 0);
-	}
-
-	return false;
 }
 
 #if DEBUG

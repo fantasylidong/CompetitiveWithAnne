@@ -169,7 +169,7 @@ Action OnTransmit(int iEntity, int iClient)
 		return Plugin_Continue;
 	}
 
-	if (GetClientTeam(iClient) != L4D2Team_Infected) {
+	if (IsFakeClient(iClient) || GetClientTeam(iClient) != L4D2Team_Infected) {
 		return Plugin_Continue;
 	}
 
@@ -235,32 +235,22 @@ bool IsVisibleToSurvivors(int iEntity)
 
 bool IsVisibleTo(int iClient, int iEntity) // check an entity for being visible to a client
 {
-	float fAngles[3], fOrigin[3], fEnt[3], fLookAt[3];
-	
-	GetClientEyePosition(iClient, fOrigin); // get both player and zombie position
-	
+	float fOrigin[3], fEnt[3];
+
+	GetClientEyePosition(iClient, fOrigin);
 	GetEntPropVector(iEntity, Prop_Send, "m_vecOrigin", fEnt);
-	
-	MakeVectorFromPoints(fOrigin, fEnt, fLookAt); // compute vector from player to zombie
-	
-	GetVectorAngles(fLookAt, fAngles); // get angles from vector for trace
-	
-	// execute Trace
-	Handle hTrace = TR_TraceRayFilterEx(fOrigin, fAngles, MASK_SHOT, RayType_Infinite, TraceFilter);
-	
-	bool bIsVisible = false;
+
+	// Trace only up to the weapon position instead of an infinite ray across the map
+	Handle hTrace = TR_TraceRayFilterEx(fOrigin, fEnt, MASK_SHOT, RayType_EndPoint, TraceFilter);
+
+	bool bIsVisible = true;
 	if (TR_DidHit(hTrace)) {
-		float fStart[3];
-		TR_GetEndPosition(fStart, hTrace); // retrieve our trace endpoint
-		
-		if ((GetVectorDistance(fOrigin, fStart, false) + TRACE_TOLERANCE) >= GetVectorDistance(fOrigin, fEnt)) {
-			bIsVisible = true; // if trace ray lenght plus tolerance equal or bigger absolute distance, you hit the targeted zombie
-		}
-	} else {
-		//Debug_Print("Zombie Despawner Bug: Player-Zombie Trace did not hit anything, WTF");
-		bIsVisible = true;
+		float fHitPos[3];
+		TR_GetEndPosition(fHitPos, hTrace);
+
+		bIsVisible = ((GetVectorDistance(fOrigin, fHitPos, false) + TRACE_TOLERANCE) >= GetVectorDistance(fOrigin, fEnt, false));
 	}
-	
+
 	delete hTrace;
 
 	return bIsVisible;

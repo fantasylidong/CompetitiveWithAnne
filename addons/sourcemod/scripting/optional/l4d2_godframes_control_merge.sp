@@ -67,7 +67,7 @@ ConVar
 	g_hCvarMaxFF = null;
 
 bool
-	g_bBuckshot[MAXPLAYERS + 1] = {false, ...};
+	g_bBuckshot[MAXPLAYERS + 1][MAXPLAYERS + 1];
 
 //undo ff
 ConVar
@@ -192,10 +192,13 @@ public void OnPluginStart()
 			if (IsClientInGame(i)) {
 				SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 				SDKHook(i, SDKHook_TraceAttack, TraceAttackUndoFF);
-				
-				g_bBuckshot[i] = false;
 			}
-			
+
+			for (int k = 1; k <= MaxClients; k++) {
+				g_bBuckshot[i][k] = false;
+				g_iPelletsShot[i][k] = 0;
+			}
+
 			for (int j = 0; j < UNDO_SIZE; j++) {
 				g_iLastHealth[i][j][UNDO_PERM] = 0;
 				g_iLastHealth[i][j][UNDO_TEMP] = 0;
@@ -216,7 +219,12 @@ public void Event_RoundStart(Event hEvent, const char[] sEventName, bool bDontBr
 	for (int i = 1; i <= MaxClients; i++) { //clear both fake and real just because
 		g_fFakeGodframeEnd[i] = 0.0;
 		g_fFakeChargeGodframeEnd[i] = 0.0;
-		g_bBuckshot[i] = false;
+		g_bChargerCarryNoFF[i] = false;
+		g_bStupidGuiltyBots[i] = false;
+		for (int k = 1; k <= MaxClients; k++) {
+			g_bBuckshot[i][k] = false;
+			g_iPelletsShot[i][k] = 0;
+		}
 		if (g_hTimer[i] != null) delete g_hTimer[i];
 	}
 }
@@ -264,11 +272,18 @@ public void L4D2_OnStagger_Post(int client, int source)
 	}
 }
 
-void Event_Replaced(Event hEvent, char[] name, bool dontBroadcast) 
+void Event_Replaced(Event hEvent, char[] name, bool dontBroadcast)
 {
 	bool bBotReplaced = (!strncmp(name, "b", 1));
 	int replaced = bBotReplaced ? GetClientOfUserId(hEvent.GetInt("bot")) : GetClientOfUserId(hEvent.GetInt("player"));
 	int replacer = bBotReplaced ? GetClientOfUserId(hEvent.GetInt("player")) : GetClientOfUserId(hEvent.GetInt("bot"));
+
+	if (!IsClientAndInGame(replaced) || !IsClientAndInGame(replacer)) {
+		if (replaced > 0 && replaced <= MaxClients && g_hTimer[replaced] != null) {
+			delete g_hTimer[replaced];
+		}
+		return;
+	}
 
 	g_fFakeGodframeEnd[replacer] = g_fFakeGodframeEnd[replaced];
 	g_fFakeChargeGodframeEnd[replacer] = g_fFakeChargeGodframeEnd[replaced];
@@ -285,12 +300,38 @@ public void OnClientPutInServer(int iClient)
 {
 	SDKHook(iClient, SDKHook_OnTakeDamage, OnTakeDamage);
 	SDKHook(iClient, SDKHook_TraceAttack, TraceAttackUndoFF);
-	
-	g_bBuckshot[iClient] = false;
-	
+
+	g_bChargerCarryNoFF[iClient] = false;
+	g_bStupidGuiltyBots[iClient] = false;
+	g_iTargetTempHealth[iClient] = 0;
+
+	for (int k = 1; k <= MaxClients; k++) {
+		g_bBuckshot[iClient][k] = false;
+		g_bBuckshot[k][iClient] = false;
+		g_iPelletsShot[iClient][k] = 0;
+		g_iPelletsShot[k][iClient] = 0;
+	}
+
 	for (int j = 0; j < UNDO_SIZE; j++) {
 		g_iLastHealth[iClient][j][UNDO_PERM] = 0;
 		g_iLastHealth[iClient][j][UNDO_TEMP] = 0;
+	}
+}
+
+public void OnClientDisconnect(int iClient)
+{
+	if (g_hTimer[iClient] != null) {
+		delete g_hTimer[iClient];
+	}
+	g_bChargerCarryNoFF[iClient] = false;
+	g_bStupidGuiltyBots[iClient] = false;
+	g_iTargetTempHealth[iClient] = 0;
+}
+
+public void OnMapEnd()
+{
+	for (int i = 1; i <= MaxClients; i++) {
+		g_hTimer[i] = null;
 	}
 }
 
@@ -302,9 +343,10 @@ public void OnClientPutInServer(int iClient)
 //																												   //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
 
-void Timed_SetFrustration(any iClient)
+void Timed_SetFrustration(any userid)
 {
-	if (IsTank(iClient) && IsPlayerAlive(iClient)) {
+	int iClient = GetClientOfUserId(userid);
+	if (iClient > 0 && IsTank(iClient) && IsPlayerAlive(iClient)) {
 		int iFrust = GetEntProp(iClient, Prop_Send, "m_frustration");
 		iFrust += g_iFrustrationOffset[iClient];
 		
@@ -475,21 +517,23 @@ Action OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fDamage
 		if (g_hCvarEnableShotFF.BoolValue && fTimeLeft <= 0.0 && IsT1Shotgun(iWeapon)) {
 			g_iPelletsShot[iVictim][iAttacker]++;
 
-			if (!g_bBuckshot[iAttacker]) {
-				g_bBuckshot[iAttacker] = true;
-				
-				ArrayStack hStack = new ArrayStack(3);
-				hStack.Push(iWeapon);
+			if (!g_bBuckshot[iVictim][iAttacker]) {
+				g_bBuckshot[iVictim][iAttacker] = true;
+
+				ArrayStack hStack = new ArrayStack();
+				hStack.Push(EntIndexToEntRef(iWeapon));
+				hStack.Push(GetClientUserId(iAttacker));
+				hStack.Push(GetClientUserId(iVictim));
 				hStack.Push(iAttacker);
 				hStack.Push(iVictim);
-				
+
 				RequestFrame(ProcessShot, hStack);
 			}
-			
+
 			return Plugin_Handled;
 		}
 	}
-	
+
 	if (IsValidClientIndex(iAttacker) && IsTank(iAttacker)) {
 		if (strcmp(sClassname, "prop_physics") == 0|| strcmp(sClassname, "prop_car_alarm") == 0) {
 			if (g_hRageHittables.BoolValue) {
@@ -497,17 +541,17 @@ Action OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fDamage
 			} else {
 				g_iFrustrationOffset[iAttacker] = 0;
 			}
-			
-			RequestFrame(Timed_SetFrustration, iAttacker);
+
+			RequestFrame(Timed_SetFrustration, GetClientUserId(iAttacker));
 		} else if (iWeapon == 52) { //tank rock
 			if (g_hRageRock.BoolValue) {
 				g_iFrustrationOffset[iAttacker] = -100;
 			} else {
 				g_iFrustrationOffset[iAttacker] = 0;
 			}
-			
-			RequestFrame(Timed_SetFrustration, iAttacker);
-		} 
+
+			RequestFrame(Timed_SetFrustration, GetClientUserId(iAttacker));
+		}
 	}
 
 	if (fTimeLeft > 0) {//means fake god frames are in effect
@@ -539,13 +583,15 @@ Action OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fDamage
 
 Action Timed_ResetGlow(Handle hTimer, any iClient)
 {
-	if (IsClientAndInGame(iClient)) {
-		// remove transparency/color
-		SetEntityRenderMode(iClient, RENDER_NORMAL);
-		SetEntityRenderColor(iClient, 255, 255, 255, 255);
-		SendForward(iClient);
+	if (iClient > 0 && iClient <= MaxClients) {
+		g_hTimer[iClient] = null;
+		if (IsClientInGame(iClient)) {
+			// remove transparency/color
+			SetEntityRenderMode(iClient, RENDER_NORMAL);
+			SetEntityRenderColor(iClient, 255, 255, 255, 255);
+			SendForward(iClient);
+		}
 	}
-	g_hTimer[iClient] = null;
 	return Plugin_Stop;
 }
 
@@ -652,12 +698,15 @@ Action Event_PlayerIncapStart(Event hEvent, const char[] sEventName, bool bDontB
 {
 	// Cycle the incap pointer, now that the damage has been confirmed
 	int iVictim = GetClientOfUserId(hEvent.GetInt("userid"));
-	
+	if (iVictim < 1 || !IsSurvivor(iVictim)) {
+		return Plugin_Continue;
+	}
+
 	// Cycle the undo pointer when we have confirmed that the damage was actually taken
 	g_iCurrentUndo[iVictim] = (g_iCurrentUndo[iVictim] + 1) % UNDO_SIZE;
-	
+
 	int iAttacker = GetClientOfUserId(hEvent.GetInt("attacker"));
- 
+
 	// Announce damage, and check for guilty bots that slipped through OnTakeDamage
 	if (IsValidSurvivor(iAttacker)) {
 		// Unfortunately, the friendly fire event only fires *after* OnTakeDamage has been called so it can't be blocked in time
@@ -677,19 +726,23 @@ Action Event_FriendlyFire(Event hEvent, const char[] sEventName, bool bDontBroad
 	if (!(g_iEnabledFlags & FFTYPE_STUPIDBOTS)) {
 		return Plugin_Continue;
 	}
-	
-	int iClient = GetClientOfUserId(hEvent.GetInt("guilty"));
-	if (IsFakeClient(iClient)) {
+
+	int userid = hEvent.GetInt("guilty");
+	int iClient = GetClientOfUserId(userid);
+	if (IsClientAndInGame(iClient) && IsFakeClient(iClient)) {
 		g_bStupidGuiltyBots[iClient] = true;
-		CreateTimer(0.4, StupidGuiltyBotDelay, iClient, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(0.4, StupidGuiltyBotDelay, userid, TIMER_FLAG_NO_MAPCHANGE);
 	}
-	
+
 	return Plugin_Continue;
 }
 
-Action StupidGuiltyBotDelay(Handle hTimer, any iClient)
+Action StupidGuiltyBotDelay(Handle hTimer, any userid)
 {
-	g_bStupidGuiltyBots[iClient] = false;
+	int iClient = GetClientOfUserId(userid);
+	if (iClient > 0 && iClient <= MaxClients) {
+		g_bStupidGuiltyBots[iClient] = false;
+	}
 
 	return Plugin_Stop;
 }
@@ -701,10 +754,11 @@ Action Event_ChargerCarryStart(Event hEvent, const char[] sEventName, bool bDont
 	if (!(g_iEnabledFlags & FFTYPE_CHARGERCARRY)) {
 		return Plugin_Continue;
 	}
-	
-	int iClient = GetClientOfUserId(hEvent.GetInt("victim"));
 
-	g_bChargerCarryNoFF[iClient] = true;
+	int iClient = GetClientOfUserId(hEvent.GetInt("victim"));
+	if (iClient > 0 && iClient <= MaxClients) {
+		g_bChargerCarryNoFF[iClient] = true;
+	}
 
 	return Plugin_Continue;
 }
@@ -715,15 +769,20 @@ Action Event_ChargerCarryStart(Event hEvent, const char[] sEventName, bool bDont
 // and besides the survivor has natural FF immunity when pinned)
 Action Event_ChargerCarryEnd(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
-	int iClient = GetClientOfUserId(hEvent.GetInt("victim"));
-	CreateTimer(1.0, ChargerCarryFFDelay, iClient, TIMER_FLAG_NO_MAPCHANGE);
+	int userid = hEvent.GetInt("victim");
+	if (GetClientOfUserId(userid) > 0) {
+		CreateTimer(1.0, ChargerCarryFFDelay, userid, TIMER_FLAG_NO_MAPCHANGE);
+	}
 
 	return Plugin_Continue;
 }
 
-Action ChargerCarryFFDelay(Handle hTimer, any iClient)
+Action ChargerCarryFFDelay(Handle hTimer, any userid)
 {
-	g_bChargerCarryNoFF[iClient] = false;
+	int iClient = GetClientOfUserId(userid);
+	if (iClient > 0 && iClient <= MaxClients) {
+		g_bChargerCarryNoFF[iClient] = false;
+	}
 
 	return Plugin_Stop;
 }
@@ -761,6 +820,9 @@ Action Event_HealEnd(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 	}
 	
 	int iClient = GetClientOfUserId(hEvent.GetInt("userid"));
+	if (iClient < 1) {
+		return Plugin_Continue;
+	}
 	int iSubject = g_iTargetTempHealth[iClient]; // this is used first to carry the subject...
 	
 	if (iSubject < 1 || !IsSurvivor(iSubject) || !IsPlayerAlive(iSubject)) {
@@ -791,7 +853,10 @@ Action Event_HealSuccess(Event hEvent, const char[] sEventName, bool bDontBroadc
 	}
 	
 	int iClient = GetClientOfUserId(hEvent.GetInt("userid"));
-	
+	if (iClient < 1) {
+		return Plugin_Continue;
+	}
+
 	int iNextUndo = (g_iCurrentUndo[iSubject] + 1) % UNDO_SIZE;
 	g_iLastHealth[iSubject][iNextUndo][UNDO_PERM] = -hEvent.GetInt("health_restored");
 	g_iLastHealth[iSubject][iNextUndo][UNDO_TEMP] = g_iTargetTempHealth[iClient];
@@ -957,33 +1022,43 @@ void OnPermFracChanged(ConVar hConVar, const char[] sOldValue, const char[] sNew
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
 void ProcessShot(ArrayStack hStack)
 {
-	int iVictim = 0, iAttacker = 0, iWeapon = 0;
+	int origVictim = 0, origAttacker = 0, victimUserId = 0, attackerUserId = 0, weaponRef = INVALID_ENT_REFERENCE;
 	if (!hStack.Empty) {
-		iVictim = hStack.Pop();
-		iAttacker = hStack.Pop();
-		iWeapon = hStack.Pop();
+		origVictim = hStack.Pop();
+		origAttacker = hStack.Pop();
+		victimUserId = hStack.Pop();
+		attackerUserId = hStack.Pop();
+		weaponRef = hStack.Pop();
 	}
-	
-	if (IsClientAndInGame(iVictim) && IsClientAndInGame(iAttacker)) {
+
+	int pellets = 0;
+	if (origVictim > 0 && origVictim <= MaxClients && origAttacker > 0 && origAttacker <= MaxClients) {
+		pellets = g_iPelletsShot[origVictim][origAttacker];
+		g_iPelletsShot[origVictim][origAttacker] = 0;
+		g_bBuckshot[origVictim][origAttacker] = false;
+	}
+
+	int iVictim = GetClientOfUserId(victimUserId);
+	int iAttacker = GetClientOfUserId(attackerUserId);
+	int iWeapon = EntRefToEntIndex(weaponRef);
+
+	if (pellets > 0 && IsClientAndInGame(iVictim) && IsClientAndInGame(iAttacker)) {
 		CountdownTimer cTimerGod = L4D2Direct_GetInvulnerabilityTimer(iVictim); // left4dhooks
 		if (cTimerGod != CTimer_Null) {
 			CTimer_Invalidate(cTimerGod); //set m_timestamp - 0.0
 		}
-		
+
 		// Replicate natural behaviour
 		float fMinFF = g_hCvarMinFF.FloatValue;
 		float fMaxFFCvarValue = g_hCvarMaxFF.FloatValue;
 		float fMaxFF = fMaxFFCvarValue <= 0.0 ? 99999.0 : fMaxFFCvarValue;
-		float fDamage = L4D2Util_GetMaxFloat(fMinFF, L4D2Util_GetMinFloat((g_iPelletsShot[iVictim][iAttacker] * g_hCvarModifier.FloatValue), fMaxFF));
-		g_iPelletsShot[iVictim][iAttacker] = 0;
-		
+		float fDamage = L4D2Util_GetMaxFloat(fMinFF, L4D2Util_GetMinFloat((pellets * g_hCvarModifier.FloatValue), fMaxFF));
+
 		int iNewPelletCount = RoundFloat(fDamage);
 		for (int i = 0; i < iNewPelletCount; i++) {
 			SDKHooks_TakeDamage(iVictim, iAttacker, iAttacker, 1.0, DMG_BUCKSHOT, iWeapon, .bypassHooks = true);
 		}
 	}
-	
-	g_bBuckshot[iAttacker] = false;
 
 	delete hStack;
 }
@@ -1055,6 +1130,6 @@ void SetGodFrameGlows(int client)
 		SetEntityRenderMode(client, RENDER_GLOW);
 		SetEntityRenderColor(client, 255, 0, 0, 200);
 		
-		g_hTimer[client] = CreateTimer(g_fFakeGodframeEnd[client] - fNow, Timed_ResetGlow, client);
+		g_hTimer[client] = CreateTimer(g_fFakeGodframeEnd[client] - fNow, Timed_ResetGlow, client, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }

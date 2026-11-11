@@ -266,6 +266,8 @@ bool  g_bSmokerShoved[MAXPLAYERS + 1];			// [smoker] set if the victim of a pull
 int	  g_iTankRock[MAXPLAYERS + 1];	   // rock entity per tank
 int	  g_iRocksBeingThrown[10];		   // 10 tanks max simultanously throwing rocks should be ok (this stores the tank client)
 int	  g_iRocksBeingThrownCount = 0;	   // so we can do a push/pop type check for who is throwing a created rock
+bool  g_bTrackedRock[2048];
+bool  g_bTrackedWitch[2048];
 
 // hops
 bool  g_bIsHopping[MAXPLAYERS + 1];			// currently in a hop streak
@@ -615,6 +617,25 @@ void CvarChange_PounceInterrupt(Handle convar, const char[] oldValue, const char
 	g_iPounceInterrupt = GetConVarInt(convar);
 }
 
+public void OnMapEnd()
+{
+	ClearTrie(g_hRockTrie);
+	ClearTrie(g_hWitchTrie);
+	ClearTrie(g_hCarTrie);
+	for (int i = 0; i < sizeof(g_bTrackedRock); i++)
+	{
+		g_bTrackedRock[i] = false;
+		g_bTrackedWitch[i] = false;
+	}
+}
+
+void UnhookInfectedTraceAttack(int client)
+{
+	SDKUnhook(client, SDKHook_TraceAttack, TraceAttack_Hunter);
+	SDKUnhook(client, SDKHook_TraceAttack, TraceAttack_Jockey);
+	SDKUnhook(client, SDKHook_TraceAttack, TraceAttack_Charger);
+}
+
 public void OnClientPutInServer(int client)
 {
 	SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamageByWitch);
@@ -623,6 +644,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
 	SDKUnhook(client, SDKHook_OnTakeDamage, OnTakeDamageByWitch);
+	UnhookInfectedTraceAttack(client);
 }
 
 /*

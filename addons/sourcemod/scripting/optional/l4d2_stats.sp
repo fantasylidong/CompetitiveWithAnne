@@ -93,6 +93,7 @@ void Event_PlayerSpawn(Event hEvent, const char[] sEventName, bool bDontBroadcas
 			}
 
 			DestroyTimer(g_hBoomerShoveTimer);
+			DestroyTimer(g_hBoomerKillTimer);
 
 			BoomerKillTime     = 0.0;
 			g_hBoomerKillTimer = CreateTimer(0.1, Timer_KillBoomer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -105,6 +106,10 @@ void Event_PlayerSpawn(Event hEvent, const char[] sEventName, bool bDontBroadcas
 void Event_WeaponFire(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
 	int client = GetClientOfUserId(hEvent.GetInt("userid"));
+	if (client <= 0 || client > MaxClients)
+	{
+		return;
+	}
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		// [Victim][Attacker]
@@ -166,7 +171,7 @@ void Event_AbilityUse(Event hEvent, const char[] sEventName, bool bDontBroadcast
 	int userid = hEvent.GetInt("userid");
 	int client = GetClientOfUserId(userid);
 
-	if (!IsClientInGame(client) || GetClientTeam(client) != TEAM_ZOMBIE)
+	if (client <= 0 || !IsClientInGame(client) || GetClientTeam(client) != TEAM_ZOMBIE)
 	{
 		return;
 	}
@@ -175,14 +180,21 @@ void Event_AbilityUse(Event hEvent, const char[] sEventName, bool bDontBroadcast
 
 	if (zombieclass == L4D2Infected_Hunter)
 	{
-		g_bIsPouncing[client] = true;
-		CreateTimer(0.5, Timer_GroundedCheck, userid, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		if (!g_bIsPouncing[client])
+		{
+			g_bIsPouncing[client] = true;
+			CreateTimer(0.5, Timer_GroundedCheck, userid, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		}
 	}
 }
 
 void Event_LungePounce(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
-	int attacker    = GetClientOfUserId(hEvent.GetInt("userid"));
+	int attacker = GetClientOfUserId(hEvent.GetInt("userid"));
+	if (attacker <= 0 || !IsClientInGame(attacker))
+	{
+		return;
+	}
 	int zombieclass = GetInfectedClass(attacker);
 
 	if (zombieclass == L4D2Infected_Hunter)
@@ -194,7 +206,11 @@ void Event_LungePounce(Event hEvent, const char[] sEventName, bool bDontBroadcas
 Action Timer_GroundedCheck(Handle hTimer, any userid)
 {
 	int client = GetClientOfUserId(userid);
-	if (client > 0 && !(GetEntityFlags(client) & FL_ONGROUND))
+	if (client <= 0 || !IsClientInGame(client))
+	{
+		return Plugin_Stop;
+	}
+	if (!(GetEntityFlags(client) & FL_ONGROUND))
 	{
 		return Plugin_Continue;
 	}

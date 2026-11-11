@@ -445,12 +445,12 @@ stock void HandleCarAlarmTriggered(int survivor, int infected, int reason)
 				{
 					switch (GetEntProp(infected, Prop_Send, "m_zombieClass"))
 					{
-						case ZC_SMOKER:
+						case ZC_HUNTER:
 							CPrintToChatAll("%t %t", "Tag+", "CalarmTouchedHunter", survivor);
 						case ZC_JOCKEY:
 							CPrintToChatAll("%t %t", "Tag+", "CalarmTouchedJockey", survivor);
 						case ZC_CHARGER:
-							CPrintToChatAll("%t %t", "Tag+", survivor);
+							CPrintToChatAll("%t %t", "Tag+", "CalarmTouchedCharger", survivor);
 						default:
 							CPrintToChatAll("%t %t", "Tag+", "CalarmTouchedInfected", survivor);
 					}

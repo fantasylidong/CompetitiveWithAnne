@@ -8,21 +8,13 @@
 
 #define GAMEDATA "l4d2_si_ability"
 
-#define MAX_ENTITY_NAME_SIZE 64
-#define MAX_INT_STRING_SIZE 8
+#define MAX_ENTS 2048
+#define MAX_PUDDLES 32
 
 #define TICK_TIME 0.200072
 #define TEAM_SURVIVOR 2
 
 #define DMG_TYPE_SPIT (DMG_RADIATION|DMG_ENERGYBEAM)
-
-enum
-{
-	eCount = 0,
-	eAltTick,
-	
-	eArray_Size
-};
 
 ConVar
 	g_hCvarDamagePerTick,
@@ -30,15 +22,16 @@ ConVar
 	g_hCvarMaxTicks,
 	g_hCvarGodframeTicks;
 
-StringMap
-	g_hPuddles;
-
 int
+	g_iPuddleSlot[MAX_ENTS] = {-1, ...},
+	g_iPuddleEntity[MAX_PUDDLES] = {-1, ...},
+	g_iPuddleTicks[MAX_PUDDLES][MAXPLAYERS + 1],
 	g_iActiveTimerOffset,
 	g_iMaxTicks,
 	g_iGodframeTicks;
 
 bool
+	g_bPuddleAltTick[MAX_PUDDLES][MAXPLAYERS + 1],
 	g_bLateLoad;
 
 float
@@ -75,16 +68,21 @@ public void OnPluginStart()
 	g_hCvarMaxTicks.AddChangeHook(CvarsChanged);
 	g_hCvarGodframeTicks.AddChangeHook(CvarsChanged);
 	
-	g_hPuddles = new StringMap();
-	
+	ResetAllPuddles();
+
 	HookEvent("round_start", Event_RoundReset, EventHookMode_PostNoCopy);
 	//HookEvent("round_end", Event_RoundReset, EventHookMode_PostNoCopy);
-	
+
 	if (g_bLateLoad) {
 		for (int i = 1; i <= MaxClients; i++) {
 			if (IsClientInGame(i)) {
 				OnClientPutInServer(i);
 			}
+		}
+
+		int entity = -1;
+		while ((entity = FindEntityByClassname(entity, "insect_swarm")) != -1) {
+			AllocPuddleSlot(entity);
 		}
 	}
 }
@@ -123,14 +121,71 @@ void CvarsToType()
 	g_iGodframeTicks = g_hCvarGodframeTicks.IntValue;
 }
 
+void ResetAllPuddles()
+{
+	for (int i = 0; i < MAX_ENTS; i++) {
+		g_iPuddleSlot[i] = -1;
+	}
+	for (int s = 0; s < MAX_PUDDLES; s++) {
+		g_iPuddleEntity[s] = -1;
+		for (int c = 0; c <= MAXPLAYERS; c++) {
+			g_iPuddleTicks[s][c] = 0;
+			g_bPuddleAltTick[s][c] = false;
+		}
+	}
+}
+
+int AllocPuddleSlot(int iEntity)
+{
+	if (iEntity <= MaxClients || iEntity >= MAX_ENTS) {
+		return -1;
+	}
+
+	int existing = g_iPuddleSlot[iEntity];
+	if (existing != -1) {
+		for (int c = 0; c <= MAXPLAYERS; c++) {
+			g_iPuddleTicks[existing][c] = 0;
+			g_bPuddleAltTick[existing][c] = false;
+		}
+		return existing;
+	}
+
+	for (int s = 0; s < MAX_PUDDLES; s++) {
+		if (g_iPuddleEntity[s] == -1) {
+			g_iPuddleEntity[s] = iEntity;
+			g_iPuddleSlot[iEntity] = s;
+			for (int c = 0; c <= MAXPLAYERS; c++) {
+				g_iPuddleTicks[s][c] = 0;
+				g_bPuddleAltTick[s][c] = false;
+			}
+			return s;
+		}
+	}
+
+	return -1;
+}
+
+void FreePuddleSlot(int iEntity)
+{
+	if (iEntity <= MaxClients || iEntity >= MAX_ENTS) {
+		return;
+	}
+
+	int s = g_iPuddleSlot[iEntity];
+	if (s != -1) {
+		g_iPuddleSlot[iEntity] = -1;
+		g_iPuddleEntity[s] = -1;
+	}
+}
+
 void Event_RoundReset(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
-	g_hPuddles.Clear();
+	ResetAllPuddles();
 }
 
 public void OnMapEnd()
 {
-	g_hPuddles.Clear();
+	ResetAllPuddles();
 }
 
 public void OnClientPutInServer(int iClient)
@@ -148,24 +203,15 @@ public void OnEntityCreated(int iEntity, const char[] sClassName)
 	if (sClassName[0] != 'i') {
 		return;
 	}
-	
-	if (strcmp(sClassName, "insect_swarm") == 0) {
-		char sTrieKey[MAX_INT_STRING_SIZE];
-		IntToString(iEntity, sTrieKey, sizeof(sTrieKey));
 
-		int iVictimArray[MAXPLAYERS + 1][eArray_Size];
-		g_hPuddles.SetArray(sTrieKey, iVictimArray[0][0], (sizeof(iVictimArray) * sizeof(iVictimArray[])));
+	if (strcmp(sClassName, "insect_swarm") == 0) {
+		AllocPuddleSlot(iEntity);
 	}
 }
 
 public void OnEntityDestroyed(int iEntity)
 {
-	if (IsInsectSwarm(iEntity)) {
-		char sTrieKey[MAX_INT_STRING_SIZE];
-		IntToString(iEntity, sTrieKey, sizeof(sTrieKey));
-
-		g_hPuddles.Remove(sTrieKey);
-	}
+	FreePuddleSlot(iEntity);
 }
 
 /*
@@ -180,64 +226,59 @@ Action Hook_OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fD
 		return Plugin_Continue;
 	}
 
-	if (!IsInsectSwarm(iInflictor) || !IsSurvivor(iVictim)) {
+	if (iInflictor <= MaxClients || iInflictor >= MAX_ENTS || !IsSurvivor(iVictim)) {
 		return Plugin_Continue;
 	}
-	
-	char sTrieKey[MAX_INT_STRING_SIZE];
-	IntToString(iInflictor, sTrieKey, sizeof(sTrieKey));
 
-	int iVictimArray[MAXPLAYERS + 1][eArray_Size];
-	if (g_hPuddles.GetArray(sTrieKey, iVictimArray[0][0], (sizeof(iVictimArray) * sizeof(iVictimArray[])))) {
-		iVictimArray[iVictim][eCount]++;
-		
-		// Check to see if it's a godframed tick
-		if ((GetPuddleLifetime(iInflictor) >= g_iGodframeTicks * TICK_TIME) && iVictimArray[iVictim][eCount] < g_iGodframeTicks) {
-			iVictimArray[iVictim][eCount] = g_iGodframeTicks + 1;
+	int iSlot = g_iPuddleSlot[iInflictor];
+	if (iSlot == -1) {
+		if (!IsValidEdict(iInflictor)) {
+			return Plugin_Continue;
 		}
-
-		// Let's see what do we have here
-		if (g_fDamagePerTick > -1.0) {
-			if (g_fAlternatePerTick > -1.0 && iVictimArray[iVictim][eAltTick]) {
-				iVictimArray[iVictim][eAltTick] = false;
-				fDamage = g_fAlternatePerTick;
-			} else {
-				fDamage = g_fDamagePerTick;
-				iVictimArray[iVictim][eAltTick] = true;
-			}
+		char sClassName[32];
+		GetEdictClassname(iInflictor, sClassName, sizeof(sClassName));
+		if (strcmp(sClassName, "insect_swarm") != 0) {
+			return Plugin_Continue;
 		}
-		
-		// Update the array with stored tickcounts
-		g_hPuddles.SetArray(sTrieKey, iVictimArray[0][0], (sizeof(iVictimArray) * sizeof(iVictimArray[])));
-		
-		if (g_iGodframeTicks >= iVictimArray[iVictim][eCount] || iVictimArray[iVictim][eCount] > g_iMaxTicks) {
-			fDamage = 0.0;
+		iSlot = AllocPuddleSlot(iInflictor);
+		if (iSlot == -1) {
+			return Plugin_Continue;
 		}
-		
-		if (iVictimArray[iVictim][eCount] > g_iMaxTicks) {
-			RemoveEntity(iInflictor);
-		}
-		
-		return Plugin_Changed;
 	}
 
-	return Plugin_Continue;
+	int iTicks = ++g_iPuddleTicks[iSlot][iVictim];
+
+	// Check to see if it's a godframed tick
+	if (iTicks < g_iGodframeTicks && GetPuddleLifetime(iInflictor) >= g_iGodframeTicks * TICK_TIME) {
+		iTicks = g_iGodframeTicks + 1;
+		g_iPuddleTicks[iSlot][iVictim] = iTicks;
+	}
+
+	// Let's see what do we have here
+	if (g_fDamagePerTick > -1.0) {
+		if (g_fAlternatePerTick > -1.0 && g_bPuddleAltTick[iSlot][iVictim]) {
+			g_bPuddleAltTick[iSlot][iVictim] = false;
+			fDamage = g_fAlternatePerTick;
+		} else {
+			fDamage = g_fDamagePerTick;
+			g_bPuddleAltTick[iSlot][iVictim] = true;
+		}
+	}
+
+	if (g_iGodframeTicks >= iTicks || iTicks > g_iMaxTicks) {
+		fDamage = 0.0;
+	}
+
+	if (iTicks > g_iMaxTicks) {
+		RemoveEntity(iInflictor);
+	}
+
+	return Plugin_Changed;
 }
 
 float GetPuddleLifetime(int iPuddle)
 {
 	return ITimer_GetElapsedTime(view_as<IntervalTimer>(GetEntityAddress(iPuddle) + view_as<Address>(g_iActiveTimerOffset)));
-}
-
-bool IsInsectSwarm(int iEntity)
-{
-	if (iEntity <= MaxClients || !IsValidEdict(iEntity)) {
-		return false;
-	}
-
-	char sClassName[MAX_ENTITY_NAME_SIZE];
-	GetEdictClassname(iEntity, sClassName, sizeof(sClassName));
-	return (strcmp(sClassName, "insect_swarm") == 0);
 }
 
 bool IsSurvivor(int iClient)
