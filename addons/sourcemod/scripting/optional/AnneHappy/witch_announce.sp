@@ -72,9 +72,6 @@ new Float: g_fWitchHealth            = 1000.0;
 //In case a CFG uses a different Witch Health, adjust to it.
 new Handle: g_hCvarWitchHealth       = INVALID_HANDLE;
 
-//Survivor Array - Store Survivors in here for Damage Print.
-new g_iSurvivorLimit = 4;   
-
 //Handles Cvars
 new Handle:cvar_witch_true_damage;
 
