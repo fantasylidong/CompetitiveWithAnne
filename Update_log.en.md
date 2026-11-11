@@ -755,6 +755,10 @@
 
 - When the rusher timer in `l4d2_Anne_stuck_tank_teleport` stops itself because the plugin is disabled or the Tank count is zero, clear its saved handle so later map cleanup does not delete an expired handle and raise an error.
 
+### November 11, 2026 Restore advertisement flags exclusions
+
+- Restored the existing exclusion semantics of explicit `flags` in `advertisements`, preventing ads intended for regular players from instead being shown only to the excluded permissions and root administrators.
+
 ### November 11, 2026 Upstream Simplified Chinese Translation Fixes
 
 - Synced one `upstream/master` commit through `a3f246ae5`. Reviewed 26 Simplified Chinese translation files, retaining 46 local extension phrases and the existing pause, horde, and slot-vote format arguments to preserve Anne-specific messages.
