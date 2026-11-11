@@ -124,8 +124,18 @@ public void OnMapStart()
 	ClearMapStats();
 }
 
+public void OnClientPutInServer(int client)
+{
+	g_bIsPouncing[client] = false;
+}
+
 public void OnMapEnd()
 {
+	for (int client = 1; client <= MaxClients; client++)
+	{
+		g_bIsPouncing[client] = false;
+	}
+
 	/*
 	 * Sometimes the event 'round_start' is called before OnMapStart()
 	 * and the timer handle is not reset, so it's better to do it here.

@@ -85,6 +85,7 @@ public void OnMapEnd()
 	{
 		g_hRestoreTimer[i] = INVALID_HANDLE;
 		g_hFixGlitchTimer[i] = INVALID_HANDLE;
+		g_bTempWarnLock[i] = false;
 #if debug
 		g_hDebugTimer[i] = INVALID_HANDLE;
 #endif
@@ -193,6 +194,7 @@ bool IsFallDamage(int client)
 */
 public void OnClientDisconnect(int client)
 {
+	g_bTempWarnLock[client] = false;
 	if (client && g_iCvarEngineFlags & HEALTH_BOOST_GLITCH_FIX)
 		EF_ClearAllVars(client);
 }
