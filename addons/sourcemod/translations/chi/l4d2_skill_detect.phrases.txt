@@ -104,7 +104,7 @@
 	}
 	"Unchipped"
 	{
-		"chi"		"(如果猎人在空中被击杀，就是空爆!)"
+		"chi"		"(如果hunter没被打残，这就是空爆！)"
 	}
 	"CrownedWitch"
 	{
@@ -180,16 +180,16 @@
 	"DeathCharged"
 	{
 		"#format"	"{1:N},{2:N},{3:t},{4:i}"
-		"chi"		"{olive}{1}{default} {red}冲锋{default} 造成 {olive}{2} 死亡{default} ({3})({red}高度{default}: {red}{4}{default})"
+		"chi"		"{olive}{1}{default} {red}冲锋{default} 造成 {olive}{2}{default} 死亡{3}({red}高度{default}: {red}{4}{default})"
 	}
 	"DeathChargedBot"
 	{
 		"#format"	"{1:N},{2:t},{3:i}"
-		"chi"		"{olive}牛{default} {red}冲锋{default} 造成 {olive}{1}{default} 死亡({2})({red}高度{default}: {red}{3}{default})"
+		"chi"		"{olive}牛{default} {red}冲锋{default} 造成 {olive}{1}{default} 死亡{2}({red}高度{default}: {red}{3}{default})"
 	}
 	"Bowling"
 	{
-		"chi"		"被携带"
+		"chi"		"(撞飞)"
 	}
 	"SIClear"
 	{
