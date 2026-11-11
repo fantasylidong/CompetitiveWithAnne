@@ -743,6 +743,10 @@
 - PvE 약역 및 협동 파생 모드의 로드 구성을 정리했습니다: 중복 또는 대전 전용 플러그인(`nosaferoomkits`, `l4d2_stats`, `l4d2_playstats`, `l4d2_tank_attack_control`, `l4d_texture_manager_block`, `l4d_equalise_alarm_cars`), 고부하 외형 전용 플러그인 `extend/Survivor_Legs`(100틱에서 매 프레임 22개 포즈 파라미터 갱신 및 `SetTransmit` 속성 조회 수행), 중복 로드되던 `extend/rpg`와 `fixes/l4d_tongue_block_fix`를 비활성화했습니다. `fixes/annoyance_exploit_fixes.smx` 언로드 경로를 바로잡고 약역 모드에서 `l4d2_jockey_jumpcap_patch`, `l4d2_fix_firsthit`, `l4d2_fix_team_shuffle`, `l4d2_fullupdate_fix`, `l4d2_transition_info_fix`를 언로드했으며 `confogl_reduce_finalespawnrange`를 `0`으로 설정했습니다.
 - Anne 및 확장 플러그인 32개를 수정·최적화하고 재컴파일했습니다: `ai_jockey_2` 연속 점프 시 속도 벡터를 시야각으로 `TeleportEntity`에 전달하던 버그 및 매 틱 `ArrayList` 할당, `l4d_target_override`의 Charger 제압 해제 판정 `||` 오용, `ai_boomer_3`에서 Z 좌표를 0으로 만든 뒤 시야 레이캐스트를 수행하던 문제, `ai_hunter_2`의 `L4D2_IsVisibleToPlayer` 인자 오류와 조준각 방향 역전, `ai_smoker3`의 UserId 오전달과 매 틱 `ArrayList` 할당, `ai_spitter_3`의 무조건 거리 계산, `ai_charger3` 벽 트레이스 필터 인자 누락, `SI_Target_limit`의 매초 `FindConVar` 호출, `anne_cvar_shield`의 와일드카드 명령 리스너, `witch_announce` 다인원 배열 범위 초과, `l4d_tank_damage_announce` 맵 전환 핸들 누수 및 정수 나눗셈, `sam_vs` 키 입력 타이머 폭주, `join`의 `FindConVar` 핸들 삭제 버그, `SpecListener`의 SourceTV 판정 반전과 메뉴 누수, `veterans` 32슬롯 범위 초과, `l4d_hats`의 `SetTransmit` 중복 훅 누적, `rpg` 메뉴 열기 시 `DumpAdminCache` 전체 캐시 재구축과 무지개 외곽선 `PreThink` 중복 등록 및 비관리자 오류, `ThirdPersonShoulder_Detect` 폴링 주기 완화 및 생존자 필터링, `Survivor_Legs` 봇 전송 차단 및 시선 피치 조기 반환, `smoker_anim_fix` 핫패스 및 `l4d2_sg552_zoom_fix` 무기 유효성 검사를 수정했습니다.
 
+### 2026년 11월 11일 맵 투표 전체 대상 전송
+
+- 맵 투표를 `0.9.5-custom`으로 업데이트했습니다. 다음 맵 설정, 캠페인 변경, 챕터 변경 시 자격을 갖춘 모든 인간 생존자와 감염자를 한 번의 `DisplayVote` 호출에 전달하여 첫 플레이어만 투표를 받던 문제를 수정했습니다. 투표 인원, 팀 필터링, 빈 명단에 대한 검사를 추가했습니다.
+
 ### 2026년 11월 11일 업스트림 중국어 간체 번역 수정 동기화
 
 - `upstream/master`의 커밋 1개를 `a3f246ae5`까지 동기화했습니다. 중국어 간체 번역 파일 26개를 확인하고 로컬 확장 문구 46개와 일시정지·호드·인원 투표의 기존 서식 인수를 유지하여 Anne 전용 안내를 보존했습니다.
