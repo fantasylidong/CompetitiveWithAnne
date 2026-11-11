@@ -211,7 +211,6 @@
 | `extend/sbpp_main.smx` | `sm_rehash` | 服务器配置 | - | Reload SQL admins | 34 个模式 |
 | `extend/sbpp_main.smx` | `sm_unban` | 管理员 | ADMFLAG_UNBAN | sm_unban <steamid\|ip> [reason] | 34 个模式 |
 | `extend/sbpp_report.smx` | `sm_report` | 玩家/控制台 | - | Initialize Report | 34 个模式 |
-| `extend/sbpp_sleuth.smx` | `sm_sleuth_reloadlist` | 管理员 | ADMFLAG_ROOT | - | 34 个模式 |
 | `extend/SpecListener.smx` | `sm_listen` | 玩家/控制台 | - | - | 34 个模式 |
 | `extend/updater.smx` | `sm_updater_check` | 管理员 | ADMFLAG_RCON | Updater - Forces Updater to check for updates. | 34 个模式 |
 | `extend/updater.smx` | `sm_updater_forcecheck` | 管理员 | ADMFLAG_RCON | Updater - Forces updater to check for updates without limits | 34 个模式 |
