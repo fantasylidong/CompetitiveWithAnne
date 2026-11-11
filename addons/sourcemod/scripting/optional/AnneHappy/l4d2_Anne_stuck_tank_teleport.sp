@@ -311,10 +311,11 @@ public void SDK_UpdateThink_Stuck(int tank)
 
 public Action Timer_CheckRusher(Handle timer)
 {
-    if (!g_bEnabled) return Plugin_Stop;
-
-    if (g_iTanksCount == 0)
+    if (!g_bEnabled || g_iTanksCount == 0)
+    {
+        g_hTimerRusher = null;
         return Plugin_Stop;
+    }
 
     if (L4D_IsMissionFinalMap())
         return Plugin_Continue; // 救援关不惩罚

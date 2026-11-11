@@ -751,6 +751,10 @@
 
 - When `l4dstats_AddClientScore` or its compatibility native receives `nobuy_bonus`, validate human survivor status, round eligibility, and the exact reward amount, rejecting invalid awards. Reuse the normal settlement's `v3n` formula to keep score-log records consistent.
 
+### November 11, 2026 Tank rusher timer cleanup
+
+- When the rusher timer in `l4d2_Anne_stuck_tank_teleport` stops itself because the plugin is disabled or the Tank count is zero, clear its saved handle so later map cleanup does not delete an expired handle and raise an error.
+
 ### November 11, 2026 Upstream Simplified Chinese Translation Fixes
 
 - Synced one `upstream/master` commit through `a3f246ae5`. Reviewed 26 Simplified Chinese translation files, retaining 46 local extension phrases and the existing pause, horde, and slot-vote format arguments to preserve Anne-specific messages.
