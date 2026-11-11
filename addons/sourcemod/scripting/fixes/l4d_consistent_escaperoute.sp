@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define DEBUG 1
+#define DEBUG 0
 #define PLUGIN_VERSION "2.1"
 #define PLUGIN_TAG "l4d_consistent_escaperoute"
 
@@ -95,20 +95,33 @@ methodmap GameDataWrapper < GameData {
 methodmap Address {}
 
 #if DEBUG
+int g_offs_m_id;
+#endif
+
+methodmap TerrorNavArea < Address
+{
+#if DEBUG
+	public int GetID() {
+		return LoadFromAddress(this + view_as<Address>(g_offs_m_id), NumberType_Int32);
+	}
+#endif
+}
+
+#if DEBUG
 int g_iOffs_m_nMainPathAreaCount;
 methodmap CEscapeRoute < Address
 {
 	public CEscapeRoute(int entity) {
 		return view_as<CEscapeRoute>(GetEntityAddress(entity));
 	}
-	
+
 	public TerrorNavArea GetMainPathArea(int index) {
 		return LoadFromAddress(this
 							+ view_as<Address>(g_iOffs_m_nMainPathAreaCount + 8)
 							+ view_as<Address>(index * 4),
 							NumberType_Int32);
 	}
-	
+
 	property int m_nMainPathAreaCount {
 		public get() { return LoadFromAddress(this
 										+ view_as<Address>(g_iOffs_m_nMainPathAreaCount),
@@ -117,14 +130,6 @@ methodmap CEscapeRoute < Address
 }
 bool g_bEscapeRouteChecked = false;
 ArrayList g_SavedEscapeRouteAreas;
-
-int g_offs_m_id;
-methodmap TerrorNavArea < Address
-{
-	public int GetID() {
-		return LoadFromAddress(this + view_as<Address>(g_offs_m_id), NumberType_Int32);
-	}
-}
 #endif
 
 MemoryPatch g_patch_SkipSpawnPosIdx;
@@ -156,6 +161,14 @@ public void OnPluginStart()
 
 	HookEvent("round_start", Event_round_start);
 #endif
+}
+
+public void OnPluginEnd()
+{
+	if (g_patch_SkipSpawnPosIdx != null)
+	{
+		g_patch_SkipSpawnPosIdx.Disable();
+	}
 }
 
 public void OnMapEnd()

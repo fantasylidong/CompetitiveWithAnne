@@ -68,7 +68,10 @@ void PlayerTeam_Event(Event event, const char[] name, bool dontBroadcast)
     if (team == 1)
     {
         int client = GetClientOfUserId(event.GetInt("userid"));
-        SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", currentMulti[client]);
+        if (IsValidClient(client))
+        {
+            SetEntPropFloat(client, Prop_Send, "m_flLaggedMovementValue", currentMulti[client]);
+        }
     }
 }
 
@@ -163,6 +166,11 @@ Action SetVerticalIncrement_Cmd(int client, int args)
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
 {
+	if (!(buttons & (IN_USE | IN_RELOAD)))
+	{
+		return Plugin_Continue;
+	}
+
 	if (IsValidClient(client) && GetClientTeam(client) == 1)
 	{
 		if (buttons & IN_USE)

@@ -39,6 +39,9 @@ bool
 	announcedEventEnd,
 	finiteEventActive,
 	deferredMobSavedForTank,
+	g_bTankUp,
+	g_bNoEventHordeDuringTanks,
+	g_bHordeCheckpointAnnounce,
 	checkpointAnnounced[MAX_CHECKPOINTS];
 
 float
@@ -75,11 +78,21 @@ public void OnPluginStart()
 	
 	hCvarNoEventHordeDuringTanks = CreateConVar("l4d2_heq_no_tank_horde", "0", "Put infinite hordes on a 'hold up' during Tank fights");
 	hCvarHordeCheckpointAnnounce = CreateConVar("l4d2_heq_checkpoint_sound", "1", "Play the incoming mob sound at checkpoints (each 1/4 of total commons killed off) to simulate L4D1 behaviour");
+	g_bNoEventHordeDuringTanks = hCvarNoEventHordeDuringTanks.BoolValue;
+	g_bHordeCheckpointAnnounce = hCvarHordeCheckpointAnnounce.BoolValue;
+	hCvarNoEventHordeDuringTanks.AddChangeHook(OnHeqCvarChanged);
+	hCvarHordeCheckpointAnnounce.AddChangeHook(OnHeqCvarChanged);
 
 	HookEvent("round_start", RoundStartEvent, EventHookMode_PostNoCopy);
 	HookEvent("round_end", RoundEndEvent, EventHookMode_PostNoCopy);
 	HookEvent("tank_spawn", TankSpawn, EventHookMode_PostNoCopy);
 	HookEvent("player_death", TankDeath);
+}
+
+void OnHeqCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	g_bNoEventHordeDuringTanks = hCvarNoEventHordeDuringTanks.BoolValue;
+	g_bHordeCheckpointAnnounce = hCvarHordeCheckpointAnnounce.BoolValue;
 }
 
 void InitGameData()
@@ -114,6 +127,7 @@ public void OnMapStart()
 	finiteEventActive = false;
 	finiteEventActiveUntil = 0.0;
 	finiteEventPauseStartedAt = 0.0;
+	g_bTankUp = false;
 	RefreshMapSettings();
 
 	PrecacheSound(HORDE_SOUND);
@@ -123,6 +137,7 @@ void RefreshMapSettings()
 {
 	commonLimit = L4D2_GetMapValueInt("horde_limit", -1);
 	commonTank = L4D2_GetMapValueInt("horde_tank", -1);
+	g_bTankUp = ScanTankUp();
 	finiteEventActive = false;
 	finiteEventActiveUntil = 0.0;
 	if (commonLimit > 0 && IsInfiniteHordeActive()) {
@@ -138,6 +153,7 @@ void RoundStartEvent(Event hEvent, const char[] name, bool dontBroadcast)
 	lastCheckpoint = 0;
 	deferredMobCount = 0;
 	deferredMobSavedForTank = false;
+	g_bTankUp = false;
 	announcedInChat = false;
 	announcedEventEnd = false;
 	finiteEventPauseStartedAt = 0.0;
@@ -153,6 +169,7 @@ void RoundEndEvent(Event hEvent, const char[] name, bool dontBroadcast)
 	finiteEventPauseStartedAt = 0.0;
 	deferredMobCount = 0;
 	deferredMobSavedForTank = false;
+	g_bTankUp = false;
 }
 
 public void OnMapEnd()
@@ -161,6 +178,7 @@ public void OnMapEnd()
 	finiteEventPauseStartedAt = 0.0;
 	deferredMobCount = 0;
 	deferredMobSavedForTank = false;
+	g_bTankUp = false;
 }
 
 public void OnPluginEnd()
@@ -242,7 +260,7 @@ public void OnGameFrame()
 	}
 
 	if (deferredMobSavedForTank) {
-		if (IsTankUp()) {
+		if (g_bTankUp) {
 			if (finiteEventActive) {
 				finiteEventActiveUntil = GetGameTime() + FINITE_EVENT_ACTIVITY_HOLD;
 			}
@@ -263,18 +281,19 @@ void TankDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if (client > 0 && IsInfected(client) && IsTank(client)) {
-		CreateTimer(0.1, Timer_CheckTank);
+		CreateTimer(0.1, Timer_CheckTank, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
 void TankSpawn(Event event, const char[] name, bool dontBroadcast)
 {
+	g_bTankUp = true;
 	bool infiniteHordeActive = IsInfiniteHordeActive();
 	if (commonLimit > 0 && infiniteHordeActive) {
 		TouchFiniteEventActivity();
 	}
 
-	if ((hCvarNoEventHordeDuringTanks.BoolValue || commonTank > 0) && infiniteHordeActive) {
+	if ((g_bNoEventHordeDuringTanks || commonTank > 0) && infiniteHordeActive) {
 		DeferMobCount(0);
 		SetPendingMobCount(0);
 	}
@@ -283,13 +302,14 @@ void TankSpawn(Event event, const char[] name, bool dontBroadcast)
 public void OnClientDisconnect(int client)
 {
 	if (client > 0 && IsInfected(client) && IsTank(client) && IsFakeClient(client)) {
-		CreateTimer(0.1, Timer_CheckTank);
+		CreateTimer(0.1, Timer_CheckTank, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
 Action Timer_CheckTank(Handle timer)
 {
-	if (!IsTankUp()) {
+	g_bTankUp = ScanTankUp();
+	if (!g_bTankUp) {
 		RestoreDeferredMobCount();
 	}
 
@@ -299,9 +319,9 @@ Action Timer_CheckTank(Handle timer)
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	// TO-DO: Find a value that tells wanderers from active event commons?
-	if (strcmp(classname, "infected") == 0 && IsInfiniteHordeActive()) {
+	if (classname[0] == 'i' && strcmp(classname, "infected") == 0 && IsInfiniteHordeActive()) {
 		// Don't count in boomer hordes, alarm cars and wanderers during a Tank fight
-		if (hCvarNoEventHordeDuringTanks.BoolValue && IsTankUp()) {
+		if (g_bNoEventHordeDuringTanks && IsTankUp()) {
 			return;
 		}
 
@@ -319,8 +339,8 @@ public void OnEntityCreated(int entity, const char[] classname)
 		}
 
 		commonTotal++;
-		if (hCvarHordeCheckpointAnnounce.BoolValue &&
-			(commonTotal >= ((lastCheckpoint + 1) * RoundFloat(float(commonLimit / MAX_CHECKPOINTS))))
+		if (g_bHordeCheckpointAnnounce &&
+			(commonTotal >= ((lastCheckpoint + 1) * RoundFloat(float(commonLimit) / float(MAX_CHECKPOINTS))))
 		) {
 			if (commonLimit >= HORDE_MIN_SIZE_AUDIAL_FEEDBACK) {
 				EmitSoundToAll(HORDE_SOUND);
@@ -350,7 +370,7 @@ public Action L4D_OnSpawnMob(int &amount)
 	////////////////////////////////////
 	
 	bool bInfiniteHordeActive = IsInfiniteHordeActive();
-	bool bHoldingForTank = ((hCvarNoEventHordeDuringTanks.BoolValue || commonTank > 0) && IsTankUp() && bInfiniteHordeActive);
+	bool bHoldingForTank = ((g_bNoEventHordeDuringTanks || commonTank > 0) && IsTankUp() && bInfiniteHordeActive);
 	bool bFiniteEventActive = (bInfiniteHordeActive && commonLimit > 0);
 
 	if (bFiniteEventActive) {
@@ -464,10 +484,16 @@ void SetPendingMobCount(int count)
 
 int GetHordeCountdown()
 {
-	return (CTimer_HasStarted(L4D2Direct_GetMobSpawnTimer())) ? RoundFloat(CTimer_GetRemainingTime(L4D2Direct_GetMobSpawnTimer())) : -1;
+	CountdownTimer timer = L4D2Direct_GetMobSpawnTimer();
+	return (CTimer_HasStarted(timer)) ? RoundFloat(CTimer_GetRemainingTime(timer)) : -1;
 }
 
 bool IsTankUp()
+{
+	return g_bTankUp;
+}
+
+bool ScanTankUp()
 {
 	for (int i = 1; i <= MaxClients; i++) {
 		if (IsClientInGame(i) && GetClientTeam(i) == TEAM_INFECTED) {

@@ -29,18 +29,44 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	return APLRes_Success;
 }
 
+ConVar g_hCvarCheats;
+
 public void OnPluginStart()
 {
 	CreateConVar("l4d2_script_cmd_swap_version", PLUGIN_VERSION, "Script Cmd Swap version.", FCVAR_NONE|FCVAR_DONTRECORD);
+	g_hCvarCheats = FindConVar("sv_cheats");
 	AddCommandListener(CmdScript, "script");
 }
 
 Action CmdScript(int client, const char[] command, int arg)
 {
+	if( client != 0 && (g_hCvarCheats == null || !g_hCvarCheats.BoolValue) && !CheckCommandAccess(client, "script", ADMFLAG_RCON, true) )
+	{
+		return Plugin_Continue;
+	}
+
 	static char args[BUFFER_SIZE];
 	GetCmdArgString(args, sizeof(args));
-	L4D2_RunScript(args);
+	RunScriptRaw(args);
 	return Plugin_Handled;
+}
+
+void RunScriptRaw(const char[] sCode)
+{
+	static int iScriptLogic = INVALID_ENT_REFERENCE;
+	int entity = EntRefToEntIndex(iScriptLogic);
+	if( entity == INVALID_ENT_REFERENCE || !IsValidEntity(entity) )
+	{
+		entity = CreateEntityByName("logic_script");
+		if( entity == -1 || !IsValidEntity(entity) )
+			SetFailState("Could not create 'logic_script'");
+
+		DispatchSpawn(entity);
+		iScriptLogic = EntIndexToEntRef(entity);
+	}
+
+	SetVariantString(sCode);
+	AcceptEntityInput(entity, "RunScriptCode");
 }
 
 // Credit to Timocop on VScript function
@@ -53,19 +79,7 @@ Action CmdScript(int client, const char[] command, int arg)
 */
 stock void L4D2_RunScript(char[] sCode, any ...)
 {
-	static int iScriptLogic = INVALID_ENT_REFERENCE;
-	if( iScriptLogic == INVALID_ENT_REFERENCE || !IsValidEntity(iScriptLogic) )
-	{
-		iScriptLogic = EntIndexToEntRef(CreateEntityByName("logic_script"));
-		if( iScriptLogic == INVALID_ENT_REFERENCE || !IsValidEntity(iScriptLogic) )
-			SetFailState("Could not create 'logic_script'");
-
-		DispatchSpawn(iScriptLogic);
-	}
-
 	static char sBuffer[BUFFER_SIZE];
 	VFormat(sBuffer, sizeof(sBuffer), sCode, 2);
-
-	SetVariantString(sBuffer);
-	AcceptEntityInput(iScriptLogic, "RunScriptCode");
+	RunScriptRaw(sBuffer);
 }

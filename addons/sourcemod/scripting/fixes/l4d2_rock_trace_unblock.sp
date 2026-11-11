@@ -31,7 +31,8 @@ ConVar
 	g_cvHurtCapper;
 
 int
-	g_iFlags;
+	g_iFlags,
+	g_iTraceIgnore[3];
 
 Handle
 	g_hSDKCall_BounceTouch;
@@ -129,6 +130,11 @@ void GetCvars()
 	}
 }
 
+public void OnPluginEnd()
+{
+	ApplyPatch(false);
+}
+
 void ApplyPatch(bool patch)
 {
 	if (patch)
@@ -148,53 +154,50 @@ public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3
 
 Action SDK_OnThink(int entity)
 {
-	static float vOrigin[3], vLastOrigin[3], vPos[3], vClosestPos[3];
+	static float vOrigin[3], vLastOrigin[3], vPos[3], vPoint[3], vClosestPos[3];
 	GetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", vOrigin);
-	
+
 	static int m_vLastPosition = -1;
 	if (m_vLastPosition == -1)
 		m_vLastPosition = FindSendPropInfo("CBaseCSGrenadeProjectile", "m_vInitialVelocity") + 24;
-	
+
 	GetEntDataVector(entity, m_vLastPosition, vLastOrigin);
-	
+
 	float flMinDistSqr = g_fRockRadiusSquared;
 	int iClosestSurvivor = -1;
-	
-	// Serves as a List for ignored entities in traces
-	DataPack dp = new DataPack();
-	dp.WriteCell(entity); // always self-ignored
-	dp.WriteCell(GetEntPropEnt(entity, Prop_Send, "m_hThrower"));
-	DataPackPos pos = dp.Position;
-	
+
+	// Ignored entities in traces: [0] = rock, [1] = tank, [2] = candidate survivor
+	g_iTraceIgnore[0] = entity;
+	g_iTraceIgnore[1] = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
+
 	for (int i = 1; i <= MaxClients; ++i)
 	{
 		if (!IsClientInGame(i) || GetClientTeam(i) != 2 || !IsPlayerAlive(i))
 			continue;
-		
+
 		if (L4D_IsPlayerIncapacitated(i) || L4D_IsPlayerHangingFromLedge(i))
 			continue;
-		
+
 		L4D_GetEntityWorldSpaceCenter(i, vPos);
-		ComputeClosestPoint(vLastOrigin, vOrigin, vPos, vOrigin);
-		
-		float flDistSqr = GetVectorDistance(vOrigin, vPos, true);
+		ComputeClosestPoint(vLastOrigin, vOrigin, vPos, vPoint);
+
+		float flDistSqr = GetVectorDistance(vPoint, vPos, true);
 		if (flDistSqr < flMinDistSqr)
 		{
-			// See if there's any obstracle in the way
-			dp.Position = pos;
-			dp.WriteCell(i);
-			
-			Handle tr = TR_TraceRayFilterEx(vOrigin, vPos, MASK_SOLID, RayType_EndPoint, ProximityThink_TraceFilter, dp);
-			
+			// See if there's any obstacle in the way
+			g_iTraceIgnore[2] = i;
+
+			Handle tr = TR_TraceRayFilterEx(vPoint, vPos, MASK_SOLID, RayType_EndPoint, ProximityThink_TraceFilter);
+
 			if (!TR_DidHit(tr) && TR_GetFraction(tr) >= 1.0)
 			{
 				flMinDistSqr = flDistSqr;
 				iClosestSurvivor = i;
-				vClosestPos = vOrigin;
+				vClosestPos = vPoint;
 			}
-			
+
 			delete tr;
-			
+
 			// Keep in mind that rock finds multiple targets basically only around the moment the Tank releases it.
 			// Exit the loop if we are really gonna search for nothing.
 			if (iClosestSurvivor != -1)
@@ -207,9 +210,7 @@ Action SDK_OnThink(int entity)
 			}
 		}
 	}
-	
-	delete dp;
-	
+
 	if (iClosestSurvivor != -1)
 	{
 		// Maybe "TeleportEntity" does the same, let it be.
@@ -278,24 +279,19 @@ bool ComputeClosestPoint(const float vLeft[3], const float vRight[3], const floa
 	}
 }
 
-bool ProximityThink_TraceFilter(int entity, int contentsMask, DataPack dp)
+bool ProximityThink_TraceFilter(int entity, int contentsMask)
 {
-	dp.Reset();
-	
 	/**
-	 * dp[0] = rock
-	 * dp[1] = tank
-	 * dp[2] = survivor
+	 * g_iTraceIgnore[0] = rock
+	 * g_iTraceIgnore[1] = tank
+	 * g_iTraceIgnore[2] = survivor
 	 */
-	
-	if (entity == dp.ReadCell())
+
+	if (entity == g_iTraceIgnore[0] || entity == g_iTraceIgnore[2])
 		return false;
-	
-	if (entity == dp.ReadCell())
+
+	if (entity == g_iTraceIgnore[1])
 		return !(g_iFlags & 16);
-	
-	if (entity == dp.ReadCell())
-		return false;
 	
 	if (entity > 0 && entity <= MaxClients && IsClientInGame(entity))
 	{

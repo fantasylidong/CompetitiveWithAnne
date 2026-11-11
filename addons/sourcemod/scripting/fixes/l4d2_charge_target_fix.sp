@@ -381,9 +381,9 @@ void HandlePlayerReplace(int replacer, int replacee)
 {
 	if (!replacer || !IsClientInGame(replacer))
 		return;
-	
-	if (!replacee)
-		replacee = -1;
+
+	if (replacee <= 0 || replacee > MaxClients)
+		return;
 	
 	if (GetClientTeam(replacer) == 3)
 	{

@@ -70,6 +70,9 @@ public void OnPluginStart()
 	g_hCvarSurvivorLimit = FindConVar("survivor_limit");
 
 	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+	HookEvent("player_spawn", Event_GhostStateEnd);
+	HookEvent("player_death", Event_GhostStateEnd);
+	HookEvent("player_team", Event_GhostStateEnd);
 
 	RegConsoleCmd("sm_warptosurvivor", Cmd_WarpToSurvivor);
 	RegConsoleCmd("sm_warpto", Cmd_WarpToSurvivor);
@@ -199,9 +202,31 @@ Action Cmd_WarpToSurvivor(int iClient, int iArgs)
 	return Plugin_Handled;
 }
 
+void StopGhostThinkHook(int iClient)
+{
+	if (iClient > 0 && iClient <= MaxClients) {
+		SDKUnhook(iClient, SDKHook_PostThinkPost, Hook_OnPostThinkPost);
+		g_iLastTargetSurvivor[iClient] = 0;
+	}
+}
+
+void Event_GhostStateEnd(Event hEvent, const char[] sEventName, bool bDontBroadcast)
+{
+	StopGhostThinkHook(GetClientOfUserId(hEvent.GetInt("userid")));
+}
+
+public void OnClientDisconnect(int iClient)
+{
+	StopGhostThinkHook(iClient);
+}
+
 public void L4D_OnEnterGhostState(int iClient)
 {
 	if (!(g_hCvarGhostWarpFlag.IntValue & eAllowButton)) {
+		return;
+	}
+
+	if (iClient <= 0 || iClient > MaxClients || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
 		return;
 	}
 
@@ -336,6 +361,7 @@ int GetSurvivorOfFlowRank(int iRank)
 
 	int iArraySize = hFlowArray.Length;
 	if (iArraySize < 1) {
+		delete hFlowArray;
 		return 0;
 	}
 

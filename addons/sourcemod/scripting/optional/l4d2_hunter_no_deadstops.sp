@@ -9,15 +9,17 @@
 #define TEAM_INFECTED 3
 
 bool bIsPouncing[MAXPLAYERS + 1]; // whether hunter player is currently pouncing/lunging
+int g_iPouncingCount;
 
-float 
-	bIsPouncingStartTime[MAXPLAYERS + 1],  // Pouncing stop time 
-	bIsPouncingStopTime[MAXPLAYERS + 1];  // Pouncing stop time 
+float
+	bIsPouncingStartTime[MAXPLAYERS + 1],  // Pouncing stop time
+	bIsPouncingStopTime[MAXPLAYERS + 1],   // Pouncing stop time
+	g_fGroundM2Godframes = 0.75;
 
 ConVar
 	cvarHunterGroundM2Godframes;
 
-public Plugin myinfo = 
+public Plugin myinfo =
 {
 	name = "[L4D2] No Hunter Deadstops",
 	author = "Spoon, Luckylock, A1m`",
@@ -33,6 +35,26 @@ public void OnPluginStart()
 	HookEvent("ability_use", Event_AbilityUse, EventHookMode_Post);
 
 	cvarHunterGroundM2Godframes = CreateConVar("hunter_ground_m2_godframes", "0.75", "m2 godframes after a hunter lands on the ground", _, true, 0.0, true, 1.0);
+	g_fGroundM2Godframes = cvarHunterGroundM2Godframes.FloatValue;
+	cvarHunterGroundM2Godframes.AddChangeHook(OnGodframesCvarChanged);
+}
+
+void OnGodframesCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	g_fGroundM2Godframes = convar.FloatValue;
+}
+
+void SetPouncingState(int client, bool pouncing)
+{
+	if (bIsPouncing[client] == pouncing) {
+		return;
+	}
+	bIsPouncing[client] = pouncing;
+	if (pouncing) {
+		g_iPouncingCount++;
+	} else if (g_iPouncingCount > 0) {
+		g_iPouncingCount--;
+	}
 }
 
 public Action L4D_OnShovedBySurvivor(int shover, int shovee, const float vecDir[3])
@@ -109,9 +131,24 @@ bool HasTarget(int hunter)
 	return (IsSurvivor(target) && IsPlayerAlive(target));
 }
 
+public void OnMapStart()
+{
+	g_iPouncingCount = 0;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		bIsPouncing[i] = false;
+	}
+}
+
+public void OnClientDisconnect(int client)
+{
+	SetPouncingState(client, false);
+}
+
 void Event_RoundStart(Event hEvent, const char[] name, bool dontBroadcast)
 {
 	// clear SI tracking stats
+	g_iPouncingCount = 0;
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		bIsPouncing[i] = false;
@@ -122,12 +159,11 @@ void Event_PlayerDeath(Event hEvent, const char[] name, bool dontBroadcast)
 {
 	int victim = GetClientOfUserId(hEvent.GetInt("userid"));
 
-	if (victim <= 0 
-	|| victim > MaxClients
-	|| !IsClientInGame(victim)) 
+	if (victim <= 0
+	|| victim > MaxClients)
 		return;
 
-	bIsPouncing[victim] = false;
+	SetPouncingState(victim, false);
 }
 
 // hunters pouncing / tracking
@@ -136,43 +172,48 @@ void Event_AbilityUse(Event hEvent, const char[] name, bool dontBroadcast)
 	// track hunters pouncing
 	char abilityName[64];
 	hEvent.GetString("ability", abilityName, sizeof(abilityName));
-	
+
 	if (strcmp(abilityName, "ability_lunge", false) == 0) {
 		int client = GetClientOfUserId(hEvent.GetInt("userid"));
-		
-		if (client <= 0 
-		|| client > MaxClients 
-		|| !IsClientInGame(client) 
+
+		if (client <= 0
+		|| client > MaxClients
+		|| !IsClientInGame(client)
 		|| GetClientTeam(client) != TEAM_INFECTED)
 			return;
-
 
 		// Hunter pounce
 		bIsPouncingStopTime[client] = 0.0;
 		bIsPouncingStartTime[client] = GetGameTime();
-		bIsPouncing[client] = true;
+		SetPouncingState(client, true);
 	}
 }
 
 public void OnGameFrame()
 {
+	if (g_iPouncingCount <= 0) {
+		return;
+	}
+
 	float fNow = GetGameTime();
 	for (int client = 1; client <= MaxClients; client++) {
-		bIsPouncing[client] = bIsPouncing[client] && IsClientInGame(client) && IsPlayerAlive(client);
+		if (!bIsPouncing[client]) {
+			continue;
+		}
 
-		if (bIsPouncing[client]) {
-			if (fNow - bIsPouncingStartTime[client] > 0.04) {
+		if (!IsClientInGame(client) || !IsPlayerAlive(client)) {
+			SetPouncingState(client, false);
+			continue;
+		}
 
-				if (bIsPouncingStopTime[client] == 0.0) {
-					if (GetEntityFlags(client) & FL_ONGROUND) {
-						// PrintToChatAll("Hunter grounded (buffer = %.0f ms)", cvarHunterGroundM2Godframes.FloatValue * 1000);
-						bIsPouncingStopTime[client] = fNow;    
-					}
-				} else if (fNow - bIsPouncingStopTime[client] > cvarHunterGroundM2Godframes.FloatValue) {
-					// PrintToChatAll("Not pouncing anymore.");
-					bIsPouncing[client] = false;
+		if (fNow - bIsPouncingStartTime[client] > 0.04) {
+			if (bIsPouncingStopTime[client] == 0.0) {
+				if (GetEntityFlags(client) & FL_ONGROUND) {
+					bIsPouncingStopTime[client] = fNow;
 				}
+			} else if (fNow - bIsPouncingStopTime[client] > g_fGroundM2Godframes) {
+				SetPouncingState(client, false);
 			}
 		}
-	} 
+	}
 }

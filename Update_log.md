@@ -1352,3 +1352,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 同步 `upstream/master` 的 1 个提交至 `a3f246ae5`。核对上游 26 份简体中文翻译，保留本地 46 个扩展词条及暂停、尸潮、人数投票等现有格式参数，避免覆盖 Anne 定制提示。
 - 修正死亡冲锋的撞飞描述及空括号、残血空爆说明、1v1 命中率格式与拼接空格、跳过死亡计时的中文提示、Tank 控制权和回退进度说明，以及特感标签；Tank 选择名称占位符与根翻译保持一致。
 - 本次没有 Zonemod stripper 或插件源码变更；翻译语法、词条保留和格式参数定向检查通过，未进行游戏内验证或部署。
+
+### 2026年11月11日 药抗（ZoneMod）共享与修复插件热路径优化与缺陷修复
+
+- 修复与加固 6 个 `fixes` 插件并重新编译：`l4d2_script_cmd_swap` 限制非服务器控制台且无 `sv_cheats`/`ADMFLAG_RCON` 权限的客户端执行 `script` VScript 指令，移除对原始脚本字符串的 `VFormat` 格式化解析并修正实体引用转换；`l4d2_spit_cooldown_frozen_fix` 移除 100Hz `OnGameFrame` 轮询，改为 `ability_spit` 触发单次 1.2s 定时器；`l4d2_rock_trace_unblock` 移除 `SDK_OnThink` 每帧分配 `DataPack` 句柄，修复 `ComputeClosestPoint` 原地覆盖 `vOrigin` 导致第 2 名起生还者线段失真的问题，并在卸载时还原内存补丁；`l4d2_lagcomp_manager` 用布尔位图记录 `tank_rock`，避免每次任意实体销毁都查询类名；`l4d_consistent_escaperoute` 关闭残留的 `DEBUG 1` 每回合导航区遍历并在卸载时还原补丁；`l4d2_charge_target_fix` 修复 `HandlePlayerReplace` 中 `replacee = -1` 触发的数组下标越界。
+- 优化与修复 11 个 `optional` 药抗核心插件并重新编译：`l4d2_skill_detect` 修复特感每次复活无限叠加 `SDKHook_TraceAttack` 的严重泄漏、为 `OnEntityDestroyed` 增加岩石/女巫位图过滤（消除任意实体死亡时的双 `FormatEx` + `StringMap` 查询），并修复警报车 `ZC_HUNTER` 分支错写为 `ZC_SMOKER` 及 `ZC_CHARGER` 漏传翻译键名报错；`l4d2_horde_equaliser` 事件化维护 Tank 存活标志与 ConVar 缓存，避免 `OnGameFrame` 每帧遍历客户端，并修复四分之一进度提示的整数整除截断；`l4d2_hunter_no_deadstops` 增加突袭计数守卫使无 Hunter 飞扑时 `OnGameFrame` 零开销返回；`l4d2_uniform_spit` 用固定槽位池替代 `StringMap` 字符串转换与每跳 528 字节数组读写及每次实体销毁的类名检查；`l4d2_godframes_control_merge` 修复一维 `g_bBuckshot` 导致单发霰弹同时命中多名队友时漏算友伤的问题，并补齐事件槽位校验、换图句柄清理与 UserId 传递；`l4d2_stats` 修复多 Boomer 生成泄漏 `0.1s` 重复定时器的问题；`fix_engine`、`staggersolver`、`caster_assister` 在 `OnPlayerRunCmd` 首行增加按键位掩码短路过滤；`l4d2_blind_infected` 改用有限终点射线并跳过假客户端传输检查；`l4d2_ghost_warp` 在灵魂特感刷出/死亡/换队时立即卸载 `PostThinkPost` 钩子并修复空流向列表句柄泄漏。
+- 合并前核验补齐状态生命周期：`l4d2_stats` 在换图与玩家进入槽位时清除 Hunter 扑跃标记，避免落地检测无法重启及空爆误报；`fix_engine` 在换图与断线时清除警告锁，避免解锁计时器取消后永久停止警告。

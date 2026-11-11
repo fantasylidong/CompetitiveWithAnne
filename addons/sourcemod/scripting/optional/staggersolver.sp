@@ -23,7 +23,7 @@ public void L4D2_OnStagger_Post(int client, int source)
 	// Interesting to note is that this might not be needed.
 	// Issues might be caused by other plugins messing with the current stagger/anim prior to Post.
 	// Do with this information what you want.
-	if (GetClientTeam(client) != 3)
+	if (client <= 0 || client > MaxClients || !IsClientInGame(client) || GetClientTeam(client) != 3)
 		return;
 
 	if (!L4D_IsPlayerStaggering(client))
@@ -83,7 +83,10 @@ public void L4D2_OnStagger_Post(int client, int source)
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if (IsClientInGame(client) 
+	if (buttons == 0)
+		return Plugin_Continue;
+
+	if (IsClientInGame(client)
 	&& IsPlayerAlive(client)
 	&& L4D_IsPlayerStaggering(client))
 	{

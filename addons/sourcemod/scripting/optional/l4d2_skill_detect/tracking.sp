@@ -277,6 +277,8 @@ Action Event_PlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 	g_fPinTime[client][0] = 0.0;
 	g_fPinTime[client][1] = 0.0;
 
+	UnhookInfectedTraceAttack(client);
+
 	switch (zClass)
 	{
 		case ZC_BOOMER:
@@ -1004,6 +1006,8 @@ public void OnEntityCreated(int entity, const char[] classname)
 				rock_array[rckTank] = tank;
 			}
 			SetTrieArray(g_hRockTrie, rock_key, rock_array, sizeof(rock_array), true);
+			if (entity > 0 && entity < sizeof(g_bTrackedRock))
+				g_bTrackedRock[entity] = true;
 
 			SDKHook(entity, SDKHook_TraceAttack, TraceAttack_Rock);
 			SDKHook(entity, SDKHook_Touch, OnTouch_Rock);
@@ -1084,26 +1088,43 @@ void OnEntitySpawned_CarAlarmGlass(int entity)
 // entity destruction
 public void OnEntityDestroyed(int entity)
 {
+	if (entity <= MaxClients || entity >= sizeof(g_bTrackedRock))
+		return;
+
+	bool trackedRock = g_bTrackedRock[entity];
+	bool trackedWitch = g_bTrackedWitch[entity];
+	if (!trackedRock && !trackedWitch)
+		return;
+
+	g_bTrackedRock[entity] = false;
+	g_bTrackedWitch[entity] = false;
+
 	char witch_key[10];
 	FormatEx(witch_key, sizeof(witch_key), "%x", entity);
 
-	int rock_array[3];
-	if (GetTrieArray(g_hRockTrie, witch_key, rock_array, sizeof(rock_array)))
+	if (trackedRock)
 	{
-		// tank rock
-		CreateTimer(ROCK_CHECK_TIME, Timer_CheckRockSkeet, entity);
-		SDKUnhook(entity, SDKHook_TraceAttack, TraceAttack_Rock);
-		return;
+		int rock_array[3];
+		if (GetTrieArray(g_hRockTrie, witch_key, rock_array, sizeof(rock_array)))
+		{
+			// tank rock
+			CreateTimer(ROCK_CHECK_TIME, Timer_CheckRockSkeet, entity, TIMER_FLAG_NO_MAPCHANGE);
+			SDKUnhook(entity, SDKHook_TraceAttack, TraceAttack_Rock);
+			return;
+		}
 	}
 
-	int witch_array[MAXPLAYERS + DMGARRAYEXT];
-	if (GetTrieArray(g_hWitchTrie, witch_key, witch_array, sizeof(witch_array)))
+	if (trackedWitch)
 	{
-		// witch
-		//  delayed deletion, to avoid potential problems with crowns not detecting
-		CreateTimer(WITCH_DELETE_TIME, Timer_WitchKeyDelete, entity);
-		SDKUnhook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost_Witch);
-		return;
+		int witch_array[MAXPLAYERS + DMGARRAYEXT];
+		if (GetTrieArray(g_hWitchTrie, witch_key, witch_array, sizeof(witch_array)))
+		{
+			// witch
+			//  delayed deletion, to avoid potential problems with crowns not detecting
+			CreateTimer(WITCH_DELETE_TIME, Timer_WitchKeyDelete, entity, TIMER_FLAG_NO_MAPCHANGE);
+			SDKUnhook(entity, SDKHook_OnTakeDamagePost, OnTakeDamagePost_Witch);
+			return;
+		}
 	}
 }
 
@@ -1192,6 +1213,8 @@ Action Event_WitchSpawned(Handle event, const char[] name, bool dontBroadcast)
 	FormatEx(witch_key, sizeof(witch_key), "%x", witch);
 	witch_dmg_array[MAXPLAYERS + WTCH_HEALTH] = g_cvarWitchHealth.IntValue;
 	SetTrieArray(g_hWitchTrie, witch_key, witch_dmg_array, MAXPLAYERS + DMGARRAYEXT, false);
+	if (witch > 0 && witch < sizeof(g_bTrackedWitch))
+		g_bTrackedWitch[witch] = true;
 	return Plugin_Continue;
 }
 
@@ -1233,6 +1256,8 @@ Action Event_WitchHarasserSet(Handle event, const char[] name, bool dontBroadcas
 		witch_dmg_array[MAXPLAYERS + WTCH_HEALTH]	= g_cvarWitchHealth.IntValue;
 		witch_dmg_array[MAXPLAYERS + WTCH_STARTLED] = 1;	// harasser set
 		SetTrieArray(g_hWitchTrie, witch_key, witch_dmg_array, MAXPLAYERS + DMGARRAYEXT, false);
+		if (witch > 0 && witch < sizeof(g_bTrackedWitch))
+			g_bTrackedWitch[witch] = true;
 	}
 	else
 	{
@@ -1263,6 +1288,8 @@ Action OnTakeDamageByWitch(int victim, int& attacker, int& inflictor, float& dam
 				witch_dmg_array[MAXPLAYERS + WTCH_HEALTH]	= g_cvarWitchHealth.IntValue;
 				witch_dmg_array[MAXPLAYERS + WTCH_GOTSLASH] = 1;	// failed
 				SetTrieArray(g_hWitchTrie, witch_key, witch_dmg_array, MAXPLAYERS + DMGARRAYEXT, false);
+				if (attacker > 0 && attacker < sizeof(g_bTrackedWitch))
+					g_bTrackedWitch[attacker] = true;
 			}
 			else
 			{

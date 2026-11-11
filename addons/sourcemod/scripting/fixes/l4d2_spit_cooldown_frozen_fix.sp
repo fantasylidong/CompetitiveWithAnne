@@ -15,41 +15,50 @@ public Plugin myinfo =
 };
 
 ConVar z_spit_interval;
-ArrayList g_hWaitList;
+int g_iRoundSerial;
 
 public void OnPluginStart()
 {
 	z_spit_interval = FindConVar("z_spit_interval");
-	
-	g_hWaitList = new ArrayList(2);
-	
-	HookEvent("round_start", Event_RoundStart);
+
+	HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 	HookEvent("ability_use", Event_AbilityUse);
+}
+
+public void OnMapStart()
+{
+	g_iRoundSerial++;
 }
 
 void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-	g_hWaitList.Clear();
+	g_iRoundSerial++;
 }
 
 void Event_AbilityUse(Event event, const char[] name, bool dontBroadcast)
 {
 	char sAbility[16];
 	event.GetString("ability", sAbility, sizeof(sAbility));
-	if (strcmp(sAbility[8], "spit") == 0)
+	if (strncmp(sAbility, "ability_", 8) == 0 && strcmp(sAbility[8], "spit") == 0)
 	{
 		// duration of spit animation seems to vary from [1.160003, 1.190002] on 100t sv
-		g_hWaitList.Set(g_hWaitList.Push(event.GetInt("userid")), GetGameTime() + 1.2, 1);
+		DataPack dp;
+		CreateDataTimer(1.2, Timer_CheckSpitAbility, dp, TIMER_FLAG_NO_MAPCHANGE);
+		dp.WriteCell(event.GetInt("userid"));
+		dp.WriteCell(g_iRoundSerial);
 	}
 }
 
-public void OnGameFrame()
+Action Timer_CheckSpitAbility(Handle timer, DataPack dp)
 {
-	while (g_hWaitList.Length && GetGameTime() >= g_hWaitList.Get(0, 1))
+	dp.Reset();
+	int userid = dp.ReadCell();
+	int roundSerial = dp.ReadCell();
+	if (roundSerial == g_iRoundSerial)
 	{
-		CheckSpitAbility(g_hWaitList.Get(0, 0));
-		g_hWaitList.Erase(0);
+		CheckSpitAbility(userid);
 	}
+	return Plugin_Stop;
 }
 
 void CheckSpitAbility(int userid)
