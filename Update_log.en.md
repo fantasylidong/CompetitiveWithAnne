@@ -759,6 +759,10 @@
 
 - Restored the existing exclusion semantics of explicit `flags` in `advertisements`, preventing ads intended for regular players from instead being shown only to the excluded permissions and root administrators.
 
+### November 11, 2026 text and Witch announcement compilation cleanup
+
+- Removed the unused `IsTeamImmobilised` from `text` and `g_iSurvivorLimit` from `witch_announce` to eliminate compiler warnings, and rebuilt the corresponding binaries.
+
 ### November 11, 2026 Upstream Simplified Chinese Translation Fixes
 
 - Synced one `upstream/master` commit through `a3f246ae5`. Reviewed 26 Simplified Chinese translation files, retaining 46 local extension phrases and the existing pause, horde, and slot-vote format arguments to preserve Anne-specific messages.

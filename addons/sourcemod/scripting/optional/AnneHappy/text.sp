@@ -418,22 +418,6 @@ stock bool IsValidPlayer(int Client, bool AllowBot = true, bool AllowDeath = tru
 
 
 
-bool IsTeamImmobilised() {
-	//Check if there is still an upright survivor
-	bool bIsTeamImmobilised = true;
-	for (int client = 1; client <= MaxClients; client++) {
-		// If a survivor is found to be alive and neither pinned nor incapacitated
-		// team is not immobilised.
-		if (Survivor(client) && IsPlayerAlive(client) )
-		{
-			if (!Incapacitated(client) )
-			{
-				bIsTeamImmobilised = false;
-			}
-		}
-	}
-	return bIsTeamImmobilised;
-}
 stock bool Survivor(int i)
 {
     return i > 0 && i <= MaxClients && IsClientInGame(i) && GetClientTeam(i) == 2;

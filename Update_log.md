@@ -1343,6 +1343,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - 恢复 `advertisements` 中显式 `flags` 的既有排除语义，避免原本面向普通玩家的广告反而只向被排除权限和 root 管理员显示。
 
+### 2026年11月11日 text 与 Witch 播报编译清理
+
+- 删除 `text` 未使用的 `IsTeamImmobilised` 与 `witch_announce` 未使用的 `g_iSurvivorLimit`，消除编译警告并同步重编译产物。
+
 ### 2026年11月11日 同步上游简体中文翻译修正
 
 - 同步 `upstream/master` 的 1 个提交至 `a3f246ae5`。核对上游 26 份简体中文翻译，保留本地 46 个扩展词条及暂停、尸潮、人数投票等现有格式参数，避免覆盖 Anne 定制提示。
