@@ -799,3 +799,8 @@
 ### 2026年11月12日 胆汁状態の生存者がいる場合は Anti-Bait の待機を継続しないよう変更
 
 - `infected_control.smx` を `2026-11-12.2` に更新（現行 `2026-11测试版` のみ対象、アーカイブ済みの `2026-08` / `2026-07` は変更なし）：Anti-Bait の生存者状態判定に Boomer の胆汁付着（嘔吐および破裂飛沫による `m_itTimer` 有効状態）を追加し、`vulnerableCount` に計上するようにしました。いずれかの生存者が胆汁を浴びている場合、16 秒の基本カウントダウン満了時に Anti-Bait の延長待機へ入らず直ちに次ウェーブを放出し、延長待機中に胆汁を浴びた場合も解放確認時間を経て待機を解除します（立っている胆汁状態の生存者は引き続き隊形・進行度・ランナー判定に参加します）。
+
+### 2026年11月12日 ハードコアモードで MP5 を解禁し SMG 合計 3 丁上限に統合
+
+- `annehappy_hardcore` で `weapon_smg_mp5` を禁止リストからティア1 SMG 制限グループ（`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`）へ移動しました。チーム全体で種類を問わず最大 3 丁まで SMG を所持でき（MP5 を 3 丁持つことも可能）、すでに SMG を持っているプレイヤーは Uzi・消音 SMG・MP5 の間で自由に持ち替えられます。
+- ハードコア `shared_settings.cfg` の `smg_mp5 -> smg_silenced` 置換ルールを削除し、Zonemod・通常 Anne と同様に `l4d2_allow_cs_weapons.smx` と `l4d2_weapon_spawn_variety.smx`（`director_cs_weapon_spawn_chance 1.0`）を読み込むよう変更するとともに、`cfg/vote/weapon/zonemod.cfg` に `sm_weapon smg_mp5 defclip 60` を追加しました。

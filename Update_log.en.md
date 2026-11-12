@@ -799,3 +799,8 @@
 ### November 12, 2026 Anti-Bait stops holding waves when survivors are biled
 
 - Updated `infected_control.smx` to `2026-11-12.2` (active `2026-11测试版` only; archived `2026-08` and `2026-07` remain unchanged): Anti-Bait now counts living survivors covered in Boomer bile (`m_itTimer` active from vomit or explosion splash) toward `vulnerableCount`. If any survivor is biled when the 16-second base countdown finishes, Anti-Bait no longer enters an intensive hold and releases the next wave immediately; if a survivor is biled during an active hold, the hold clears after the standard release confirmation window while standing biled survivors continue to participate in formation, progress, and runner tracking.
+
+### November 12, 2026 Enable MP5 in Hardcore under the shared 3-SMG team limit
+
+- Moved `weapon_smg_mp5` out of the banned weapon list in `annehappy_hardcore` into the tier-1 SMG limit group (`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`): the team may hold up to 3 SMGs total in any combination (including 3 MP5s) and freely swap among Uzi, silenced SMG, and MP5 while already holding an SMG.
+- Removed the `smg_mp5 -> smg_silenced` weapon rule in Hardcore `shared_settings.cfg`, loaded `l4d2_allow_cs_weapons.smx` and `l4d2_weapon_spawn_variety.smx` with `director_cs_weapon_spawn_chance 1.0` to match Zonemod and standard AnneHappy, and added `sm_weapon smg_mp5 defclip 60` to `cfg/vote/weapon/zonemod.cfg`.

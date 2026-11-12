@@ -1383,3 +1383,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 ### 2026年11月12日 Anti-Bait 计入胖子喷吐胆汁破绽状态
 
 - `infected_control.smx` 升级到 `2026-11-12.2`（仅作用于当前 `2026-11测试版`，已归档的 `2026-08` / `2026-07` 保持不变）：Anti-Bait 在采样生还者状态时新增 Boomer 胆汁（`m_itTimer` 处于有效 IT 状态，含喷吐与爆炸溅射）判定并计入 `vulnerableCount`。若任意生还者处于被胖子喷的状态，16 秒基础倒计时到点时不再进入 Anti-Bait 无限延长等待而是直接放行下一波；若已在延长等待中有人被喷，则在释放确认窗口后解除等待并立即刷出下一波，站立状态的被喷生还者仍正常参与队形、推进与跑男统计。
+
+### 2026年11月12日 硬核药役开放 MP5 并与一级冲锋枪共享 3 把上限
+
+- `annehappy_hardcore` 将 `weapon_smg_mp5` 从禁用列表移入一级冲锋枪限枪组（`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`）：全队最多同时持有 3 把冲锋枪，不限制具体枪种组合（可拿 3 把 MP5、3 把 Uzi/消音或任意混搭，且已持冲锋枪的玩家可在三把冲锋枪间自由换枪）。
+- 同步移除硬核 `shared_settings.cfg` 中将 `smg_mp5` 替换为 `smg_silenced` 的规则，并对齐 Zonemod 与普通药役加载 `l4d2_allow_cs_weapons.smx`、`l4d2_weapon_spawn_variety.smx`（`director_cs_weapon_spawn_chance 1.0`），同时在 `cfg/vote/weapon/zonemod.cfg` 补齐 `sm_weapon smg_mp5 defclip 60`。

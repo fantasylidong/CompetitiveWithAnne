@@ -799,3 +799,8 @@
 ### 2026년 11월 12일 생존자가 Boomer 담즙에 맞은 상태면 Anti-Bait 대기를 중단
 
 - `infected_control.smx`를 `2026-11-12.2`로 업데이트했습니다(활성 `2026-11测试版`에만 적용되며 아카이브된 `2026-08` / `2026-07`은 그대로 유지): Anti-Bait 생존자 상태 집계에 Boomer 담즙 부착(`m_itTimer` 활성 상태, 구토 및 폭발 비산 포함) 판정을 추가하여 `vulnerableCount`에 포함합니다. 생존자 중 누구라도 담즙에 맞은 상태라면 16초 기본 카운트다운 종료 시 Anti-Bait 연장 보류에 들어가지 않고 즉시 다음 웨이브를 방출하며, 이미 연장 보류 중일 때 담즙에 맞으면 해제 확인 시간 후 보류를 풀고 다음 웨이브를 시작합니다(서 있는 담즙 상태 생존자는 대형·진행도·러너 집계에 계속 참여합니다).
+
+### 2026년 11월 12일 하드코어 모드 MP5 개방 및 SMG 합산 3정 제한 적용
+
+- `annehappy_hardcore`에서 `weapon_smg_mp5`를 금지 목록에서 1티어 SMG 제한 그룹(`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`)으로 옮겼습니다. 팀 전체에서 종류와 무관하게 SMG를 최대 3정까지 보유할 수 있으며(MP5 3정도 가능), 이미 SMG를 든 플레이어는 Uzi·소음 SMG·MP5 사이에서 자유롭게 교체할 수 있습니다.
+- 하드코어 `shared_settings.cfg`의 `smg_mp5 -> smg_silenced` 교체 규칙을 제거하고 Zonemod 및 일반 Anne과 동일하게 `l4d2_allow_cs_weapons.smx`와 `l4d2_weapon_spawn_variety.smx`(`director_cs_weapon_spawn_chance 1.0`)를 로드하도록 맞추었으며, `cfg/vote/weapon/zonemod.cfg`에 `sm_weapon smg_mp5 defclip 60`을 추가했습니다.
