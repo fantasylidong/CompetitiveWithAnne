@@ -30,7 +30,7 @@ int
 	TankBhop,
 	Weapon,
 	MaxPlayers;
-char PLUGIN_VERSION[32];
+char PLUGIN_VERSION[64];
 
 public void OnPluginStart()
 {

@@ -23,7 +23,7 @@ Treat the following as a behavioral contract when changing `infected_control`:
 - Anti-Bait observes progress and formation throughout the wave but may arm only near the base countdown deadline (default: the final 4 seconds).
 - At the base countdown deadline, a healthy, stalled, tightly grouped formation that has remained stable for the configured confirmation time (default: 2 seconds) enters the Anti-Bait intensive hold.
 - The Anti-Bait intensive hold has no maximum duration. As long as the advantageous grouped/stalled condition remains true, the next wave remains delayed indefinitely.
-- Progress, formation breakup, isolation, excessive team spread, Tank pressure, or a survivor becoming dead, incapacitated, ledged, pinned, or otherwise vulnerable clears the hold candidate. Release the next wave only after the clear condition remains stable for the configured release confirmation (default: 2 seconds).
+- Progress, formation breakup, isolation, excessive team spread, Tank pressure, or a survivor becoming dead, incapacitated, ledged, pinned, covered in Boomer bile (`m_itTimer`), or otherwise vulnerable prevents entering the hold at the deadline and clears an active hold candidate (standing biled survivors still count toward formation and progress tracking). Release the next wave only after the clear condition remains stable for the configured release confirmation (default: 2 seconds).
 - In addition to the existing pause reasons (Tank pressure, half the team down/dead, everyone pinned), Anti-Bait also pauses when every standing survivor has permanent health below `inf_antibait_lowhp` (default 40) and no living survivor is carrying a first-aid kit, defibrillator, pain pills, or adrenaline. This extra gate does not replace the other pause or hold-clear conditions.
 - Formation breakup/spread/isolation must additionally persist for the spread confirmation (`inf_antibait_spread_confirm`, default 3 seconds) before the pressure state demotes. A survivor briefly stepping away and immediately regrouping must not clear the hold, and spreading is not progress (it must not reset the stall clock). A survivor flow-read failure (elevator, bad Nav) is not vulnerability; such members still count for formation, only their flow is excluded.
 - Traitor (player-controlled SI) materialization is exempt from the live totalSI cap: a traitor in the SpawnAllowed state whose release wave has arrived may materialize even if leftover AI temporarily fills `l4d_infected_limit`, because the slot was already deducted from that wave's AI budget. AI-side spawning pauses on its own while the field is over cap.
@@ -41,10 +41,12 @@ Treat the following as a behavioral contract when changing `infected_control`:
 SMX 兼容入口、引擎参数恢复、菜单/UI 同步及编译验证。普通调参不自动升版；
 线上更新另遵循 `anne-server-updating`。
 
-The active `infected_control.smx` release is 2026-08. The rollback release
-`infected_control26-07.smx` preserves the 2026-07 spawning behavior. Its
-database quota integration may use the current optional `anne_traitor_quota`
-provider as long as the archived spawning modules remain unchanged.
+The active `infected_control.smx` release is 2026-11 (`AnnePluginVersion`
+`2026-11测试版` during testing). The rollback releases
+`infected_control26-08.smx` and `infected_control26-07.smx` preserve the
+2026-08 and 2026-07 spawning behavior. Their database quota integration may use
+the current optional `anne_traitor_quota` provider as long as the archived
+spawning modules remain unchanged.
 
 When rolling the active infected-control version forward:
 

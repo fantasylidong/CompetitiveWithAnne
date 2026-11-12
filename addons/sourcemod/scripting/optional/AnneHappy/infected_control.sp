@@ -141,7 +141,7 @@ enum InfectedControlNativeWavePhase
 
 // Nav Flow 分桶
 #define FLOW_BUCKETS              101     // 0..100
-#define BUCKET_CACHE_VER "2026-08"  // 和插件版号保持同步
+#define BUCKET_CACHE_VER "2026-11"  // 和插件版号保持同步
 
 // areaIdx -> 冷却过期时间；候选热循环直接 O(1) 读取。
 ArrayList g_NavCooldownUntil = null;
@@ -227,7 +227,7 @@ public Plugin myinfo =
     name        = "Direct InfectedSpawn (directed-nav + maxdist-fallback)",
     author      = "东, Caibiii, 夜羽真白, Paimon-Kawaii, fdxx (inspiration)",
     description = "特感刷新控制 / 传送 / 跑男 / 有向Nav候选 + 当前帧安全精判 + 最大距离兜底",
-    version     = "2026-09-04.1",
+    version     = "2026-11-12.2",
     url         = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 

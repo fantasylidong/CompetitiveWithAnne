@@ -1,0 +1,1310 @@
+#if defined _infected_control_config_included
+    #endinput
+#endif
+#define _infected_control_config_included
+
+static const float DEFAULT_AI_WAVE_CHECK_TIME[AI_LEVEL_SLOTS] = { 0.0, 16.0, 12.0, 10.0, 8.0, 6.0, 6.0 };
+static const float DEFAULT_AI_WAVE_FLOOR_RATIO[AI_LEVEL_SLOTS] = { 0.0, 1.50, 1.40, 1.25, 1.15, 1.10, 1.10 };
+static const float DEFAULT_AI_WAVE_LOW_SI_RATIO[AI_LEVEL_SLOTS] = { 0.0, 0.12, 0.20, 0.27, 0.34, 0.50, 0.50 };
+static const float DEFAULT_AI_DIST_SWEET_OFFSET[AI_LEVEL_SLOTS] = { 0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 };
+static const float DEFAULT_AI_DIST_WIDTH_SCALE[AI_LEVEL_SLOTS] = { 0.0, 1.25, 1.15, 1.08, 1.00, 1.00, 1.00 };
+static const float DEFAULT_AI_SPAWN_BUDGET_BONUS[AI_LEVEL_SLOTS] = { 0.0, -3.0, -2.0, -1.0, 0.0, 0.0, 0.0 };
+
+static void Config_ParseDifficultyFloatList(ConVar convar, const float defaults[AI_LEVEL_SLOTS], float values[AI_LEVEL_SLOTS], float minValue, float maxValue)
+{
+    char buffer[256];
+    char parts[AI_DIFFICULTY_LEVELS][24];
+    convar.GetString(buffer, sizeof(buffer));
+
+    int count = ExplodeString(buffer, " ", parts, AI_DIFFICULTY_LEVELS, 24);
+    for (int level = 1; level <= AI_DIFFICULTY_LEVELS; level++)
+    {
+        float value = defaults[level];
+        if (level <= count)
+            value = StringToFloat(parts[level - 1]);
+
+        values[level] = ClampFloat(value, minValue, maxValue);
+    }
+}
+
+enum struct Config
+{
+    ConVar SpawnMin;
+    ConVar SpawnMax;
+    ConVar TeleportEnable;
+    ConVar TeleportSpawnMin;
+    ConVar LegacyTeleportSpawnMin;
+    ConVar TeleportCheckTime;
+    ConVar EnableMask;
+    ConVar AllCharger;
+    ConVar AllHunter;
+    ConVar AutoSpawnTime;
+    ConVar IgnoreIncapSight;
+    ConVar AddDmgSmoker;
+    ConVar SiLimit;
+    ConVar SiInterval;
+    ConVar DebugMode;
+    ConVar SpawnAccelNativeSafety;
+    ConVar NavTeamNearest;
+
+    ConVar MaxPlayerZombies;
+    ConVar VsBossFlowBuffer;
+    ConVar SurvivorLimit;
+    ConVar DirectorNoSpecials;
+    ConVar AiDifficultyLevel;
+    ConVar ZSmokerLimit;
+    ConVar ZBoomerLimit;
+    ConVar ZHunterLimit;
+    ConVar ZSpitterLimit;
+    ConVar ZJockeyLimit;
+    ConVar ZChargerLimit;
+
+    // —— AI 难度联动策略 —— //
+    ConVar AiDifficultyLink;
+    ConVar AiDifficultyFallbackLevel;
+    ConVar AiWaveCheckTime;
+    ConVar AiWaveCheckRatio;
+    ConVar AiWaveFloorRatio;
+    ConVar AiWaveLowSiRatio;
+    ConVar AiDistSweetOffset;
+    ConVar AiDistWidthScale;
+    ConVar AiSpawnBudgetBonus;
+
+    // —— Nav 分桶 —— //
+    ConVar NavBucketEnable;
+    ConVar NavBucketWindow;
+
+    // —— 动态分桶 —— //
+    ConVar NavBucketLinkToRing;   // 1=跟随扩圈动态调整桶窗口
+    ConVar NavBucketWindowMin;    // ring<=MinAt 时窗口(±N)
+    ConVar NavBucketWindowMax;    // ring>=MaxAt 时窗口(±N)
+    ConVar NavBucketMinAt;        // ring 下界
+    ConVar NavBucketMaxAt;        // ring 上界
+
+    // —— 分桶策略增强 —— //
+    ConVar NavBucketFirstFit;     // 找到第一个合格点就返回
+    ConVar NavBucketIncludeCtr;   // 是否包含中心桶 s
+
+    // —— 死亡CD（两档） —— //
+    ConVar DeathCDKiller;
+    ConVar DeathCDSupport;
+
+    // —— 死亡CD放宽的“双保险” —— //
+    ConVar DeathCDBypassAfter;
+    ConVar DeathCDUnderfill;
+
+    ConVar TeleportSpawnGrace;   // 新刷出来后多少秒内不允许传送
+    ConVar TeleportRunnerFast;   // 跑男时的快速阈值（秒），最低也要有个门槛
+    // —— 支援特感解锁 —— //
+    ConVar SupportUnlockKillers;
+    ConVar SupportUnlockRatio;
+    ConVar SupportUnlockGrace;
+    ConVar NavBucketMapInvalid;        // 将坏flow的NavArea映射到就近正常桶
+    ConVar NavBucketAssignRadius;      // 可选：就近半径上限(0=不限)
+    ConVar gCvarNavCacheEnable;
+    // 评分系统权重与参数
+    ConVar Score_w_dist;
+    ConVar Score_w_hght;
+    ConVar Score_w_flow;
+    ConVar Score_w_disp;
+    ConVar NavHighSortScale;
+    ConVar NavHighSortMinHeight;
+    ConVar ScoreLowHeightStart;
+    ConVar ScoreLowHeightPer100;
+    ConVar ScoreLowHeightCap;
+    ConVar ScoreLowHeightBehindMultiplier;
+    ConVar ScoreHighHeightPer50;
+    ConVar ScoreHighHeightCap;
+    ConVar ScoreBehindPerFlow;
+    ConVar ScoreBehindCap;
+    ConVar ScoreBehindRejectGap;
+    ConVar ScoreBehindRejectGapHjc;
+    ConVar ScoreBehindHjcScale;
+    ConVar ScoreBehindSoftPct;
+    ConVar SpawnBehindEvalBudget;
+    ConVar SpawnNavBandTimeout;
+
+    ConVar PathCacheEnable;
+    ConVar PathCacheQuantize;
+    ConVar FrameThinkStep;
+    ConVar FrameThinkStepActive;
+    ConVar SpawnAttemptsPerFrame;
+    ConVar SpawnFrameBudgetMs;
+    ConVar SpawnFailedCycleRetry;
+    ConVar SpawnNavCandidatesPerSlice;
+    ConVar SpawnNavExpensivePerSlice;
+    ConVar SpawnNavSliceBudgetMs;
+    ConVar SpawnCandidateBudget;
+    ConVar BucketCountCacheTTL;
+    // 轻度惩罚 badflow：仅扣 Flow 分项一点点分数（0 关闭）
+    ConVar FlowBadPenaltyPoints;
+    ConVar SpawnScoreFloor;      // 总分下限
+    ConVar FlowBucketShare;      // Flow 桶占比上限
+    // === 刷点分散度强化 ===
+    ConVar SpawnSepRadius;       // 最近实际刷出点硬分散半径
+    ConVar SpawnSepTtl;          // 硬分散记忆秒数
+    ConVar SpawnKernelRadius;    // 核密度惩罚衰减距离(0 关闭)
+    ConVar SpawnKernelPoints;    // 核密度惩罚强度
+    ConVar SpawnCandidateShuffle;// 有向候选页内洗牌
+    ConVar SpawnBudgetNear;      // 当前页近距三分位评分名额
+    ConVar SpawnBudgetMid;       // 当前页中距三分位评分名额
+    ConVar SpawnBudgetFar;       // 当前页远距三分位评分名额
+    // === 职业多样性 ===
+    ConVar ScarcityJitter;       // 稀缺度随机抖动幅度
+    ConVar SupportWaiveProb;     // 每波支援闸门随机放宽概率
+    // === 可视射线控制 ===
+    ConVar VisEyeRayMode;        // 0=仅中线；1=中+左+右；2=自动：>4只中线，<=4三线
+    int    iVisRayMode;
+
+    // === 生还者进度本地回退 ===
+    ConVar SurFlowFallbackEnable; // 0/1：启用“最后一次有效进度”回退
+    ConVar SurFlowFallbackTTL;    // 回退进度的有效期（秒）
+    bool   bSurFlowFallback;
+    float  fSurFlowFallbackTTL;
+
+    // === Anti-baiter / 停滞压力控制 ===
+    ConVar AntiBaitEnable;
+    ConVar LegacyAntiBaitEnable;
+    ConVar AntiBaitGrace;
+    ConVar AntiBaitWindow;
+    ConVar AntiBaitProgressPct;
+    ConVar AntiBaitProgressDist;
+    ConVar AntiBaitMinSiRatio;
+    ConVar AntiBaitForceAfter;
+    ConVar AntiBaitRecover;
+    ConVar AntiBaitArmBefore;
+    ConVar AntiBaitHoldConfirm;
+    ConVar AntiBaitReleaseConfirm;
+    ConVar AntiBaitSpreadConfirm;
+    ConVar AntiBaitAction;
+    ConVar AntiBaitRunnerGapPct;
+    ConVar AntiBaitRunnerNearDist;
+    ConVar AntiBaitRunnerOffConfirm;
+    ConVar AntiBaitFastTeleport;
+    ConVar AntiBaitLatestBaseScale;
+    ConVar AntiBaitLatestScaleStep;
+    ConVar AntiBaitClusterDist;
+    ConVar AntiBaitTeamDist;
+    ConVar AntiBaitPairDist;
+    ConVar AntiBaitIsolateDist;
+    ConVar AntiBaitTankPressureDist;
+    ConVar AntiBaitLowHp;
+    ConVar AntiBaitDebug;
+    ConVar TraitorEnable;
+    ConVar TraitorMaxSlots;
+    ConVar TraitorPlayerLimit;
+    ConVar TraitorAdminLimit;
+    ConVar TraitorClassMask;
+    ConVar TraitorPublicMinScore;
+    bool   bAntiBaitEnable;
+    float  fAntiBaitGrace;
+    float  fAntiBaitWindow;
+    int    iAntiBaitProgressPct;
+    float  fAntiBaitProgressDist;
+    float  fAntiBaitMinSiRatio;
+    float  fAntiBaitForceAfter;
+    float  fAntiBaitRecover;
+    float  fAntiBaitArmBefore;
+    float  fAntiBaitHoldConfirm;
+    float  fAntiBaitReleaseConfirm;
+    float  fAntiBaitSpreadConfirm;
+    int    iAntiBaitAction;
+    int    iAntiBaitRunnerGapPct;
+    float  fAntiBaitRunnerNearDist;
+    float  fAntiBaitRunnerOffConfirm;
+    float  fAntiBaitFastTeleport;
+    float  fAntiBaitLatestBaseScale;
+    float  fAntiBaitLatestScaleStep;
+    float  fAntiBaitClusterDist;
+    float  fAntiBaitTeamDist;
+    float  fAntiBaitPairDist;
+    float  fAntiBaitIsolateDist;
+    float  fAntiBaitTankPressureDist;
+    int    iAntiBaitLowHp;
+    bool   bAntiBaitDebug;
+    bool   bTraitorEnable;
+    int    iTraitorMaxSlots;
+    int    iTraitorPlayerLimit;
+    int    iTraitorAdminLimit;
+    int    iTraitorClassMask;
+    int    iTraitorPublicMinScore;
+
+    // 缓存值
+    float fFlowBadPenalty;
+    float fNavHighSortScale[7];
+    float fNavHighSortMinHeight;
+    float fScoreLowHeightStart;
+    float fScoreLowHeightPer100;
+    float fScoreLowHeightCap;
+    float fScoreLowHeightBehindMultiplier;
+    float fScoreHighHeightPer50;
+    float fScoreHighHeightCap;
+    float fScoreBehindPerFlow;
+    float fScoreBehindCap;
+    int   iScoreBehindRejectGap;
+    int   iScoreBehindRejectGapHjc;
+    int   iScoreBehindSoftPct;
+    int   iSpawnBehindEvalBudget;
+    float fSpawnNavBandTimeout;
+    float fScoreBehindHjcScale;
+
+    bool  bPathCacheEnable;
+    float fPathCacheQuantize;
+    float fFrameThinkStep;
+    float fFrameThinkStepActive;
+    int   iSpawnAttemptsPerFrame;
+    float fSpawnFrameBudgetMs;
+    float fSpawnFailedCycleRetry;
+    int   iSpawnNavCandidatesPerSlice;
+    int   iSpawnNavExpensivePerSlice;
+    float fSpawnNavSliceBudgetMs;
+    float fBucketCountCacheTTL;
+    int   iSpawnCandidateBudget;
+
+    bool  bAiDifficultyLink;
+    int   iAiDifficultyFallbackLevel;
+    float fAiWaveCheckTime[AI_LEVEL_SLOTS];
+    float fAiWaveFloorRatio[AI_LEVEL_SLOTS];
+    float fAiWaveLowSiRatio[AI_LEVEL_SLOTS];
+    float fAiDistSweetOffset[AI_LEVEL_SLOTS];
+    float fAiDistWidthScale[AI_LEVEL_SLOTS];
+    float fAiSpawnBudgetBonus[AI_LEVEL_SLOTS];
+
+    float w_dist[7];
+    float w_hght[7];
+    float w_flow[7];
+    float w_disp[7];
+    bool  bNavCacheEnable;
+
+    bool  bNavBucketMapInvalid;
+    float fNavBucketAssignRadius;
+    float  fTeleportSpawnGrace;
+    float  fTeleportRunnerFast;
+    int   iSupportUnlockKillers;
+    float fSupportUnlockRatio;
+    float fSupportUnlockGrace;
+
+    float fSpawnMin;
+    float fSpawnMax;
+    float fTeleportSpawnMin;
+    float fSiInterval;
+    int   iSiLimit;
+    int   iEnableMask;
+    int   iTeleportCheckTime;
+    int   iDebugMode;
+    bool  bSpawnAccelNativeSafety;
+    bool  bNavTeamNearest;
+    bool  bTeleport;
+    bool  bAutoSpawn;
+    bool  bIgnoreIncapSight;
+    bool  bAddDmgSmoker;
+
+    // —— Nav 分桶 —— //
+    bool  bNavBucketEnable;
+    int   iNavBucketWindow;
+
+    // —— 动态分桶 —— //
+    bool  bNavBucketLinkToRing;
+    int   iNavBucketWindowMin;
+    int   iNavBucketWindowMax;
+    float fNavBucketMinAt;
+    float fNavBucketMaxAt;
+
+    // —— 分桶策略增强 —— //
+    bool  bNavBucketFirstFit;
+    bool  bNavBucketIncludeCtr;
+
+    float fDeathCDKiller;
+    float fDeathCDSupport;
+    float fDeathCDBypassAfter;
+    float fDeathCDUnderfill;
+    float fSpawnScoreFloor;
+    float fBucketSpawnRatio;
+    int   iBucketMaxPerFlow;
+    float fSepRadius;
+    float fSepTtl;
+    float fKernelRadius;
+    float fKernelPoints;
+    bool  bCandidateShuffle;
+    int   iSpawnBudgetNear;
+    int   iSpawnBudgetMid;
+    int   iSpawnBudgetFar;
+    float fScarcityJitter;
+    float fSupportWaiveProb;
+
+    void RefreshRuntimeConVars()
+    {
+        if (this.SurvivorLimit == null)
+            this.SurvivorLimit = FindConVar("survivor_limit");
+        if (this.DirectorNoSpecials == null)
+            this.DirectorNoSpecials = FindConVar("director_no_specials");
+        if (this.AiDifficultyLevel == null)
+            this.AiDifficultyLevel = FindConVar("ah_ai_dynamic_current_level");
+    }
+
+    void Create()
+    {
+        this.SpawnMin          = CreateConVar("inf_SpawnDistanceMin", "250.0", "特感复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
+        this.TeleportSpawnMin  = CreateConVar("inf_TeleportDistanceMin", "400.0", "特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
+        this.LegacyTeleportSpawnMin = CreateConVar("inf_TeleportDistance", "400.0", "兼容旧配置：特感传送复活离生还者最近的距离限制", CVAR_FLAG, true, 0.0);
+        this.SpawnMax          = CreateConVar("inf_SpawnDistanceMax", "1500.0", "有向Nav职业范围的基准上限，最远可使用其2倍；Director API兜底固定为2000的3D直线上限", CVAR_FLAG, true, this.SpawnMin.FloatValue);
+        this.TeleportEnable    = CreateConVar("inf_TeleportSi", "1", "是否开启特感超时传送", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.TeleportCheckTime = CreateConVar("inf_TeleportCheckTime", "5", "特感几秒后没被看到开始传送", CVAR_FLAG, true, 0.0);
+        this.EnableMask        = CreateConVar("inf_EnableSIoption", "63", "启用生成的特感类型位掩码 (1~63)", CVAR_FLAG, true, 0.0, true, 63.0);
+        this.AllCharger        = CreateConVar("inf_AllChargerMode", "0", "是否是全牛模式", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.AllHunter         = CreateConVar("inf_AllHunterMode", "0", "是否是全猎人模式", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.AutoSpawnTime     = CreateConVar("inf_EnableAutoSpawnTime", "1", "是否开启自动增时", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.IgnoreIncapSight  = CreateConVar("inf_IgnoreIncappedSurvivorSight", "1", "传送检测是否忽略倒地/挂边视线", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.AddDmgSmoker      = CreateConVar("inf_AddDamageToSmoker", "0", "单人时Smoker拉人对Smoker增伤5x", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.SiLimit           = CreateConVar("l4d_infected_limit", "6", "一次刷出多少特感", CVAR_FLAG, true, 0.0);
+        this.SiInterval        = CreateConVar("versus_special_respawn_interval", "16.0", "对抗刷新间隔", CVAR_FLAG, true, 0.0);
+        this.DebugMode         = CreateConVar("inf_DebugMode", "0","0=off,1=log,2=console+log,3=console+log(+beam)", CVAR_FLAG, true, 0.0, true, 3.0);
+        this.SpawnAccelNativeSafety = CreateConVar(
+            "inf_spawn_accel_native_safety", "0",
+            "Use anne_spawn_accel native stuck/visibility traces (0=SourcePawn fallback, 1=native)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.NavTeamNearest = CreateConVar(
+            "inf_nav_team_nearest", "1",
+            "Directed Nav candidate search uses team-nearest distance/owner (0=legacy single-target)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+
+        this.AiDifficultyLink = CreateConVar(
+            "inf_ai_difficulty_link", "1",
+            "Link infected_control spawn strategy to ah_ai_dynamic_current_level (0/1)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.AiDifficultyFallbackLevel = CreateConVar(
+            "inf_ai_difficulty_fallback_level", "3",
+            "Fallback spawn strategy level when dynamic AI difficulty is missing or not locked (1-6)",
+            CVAR_FLAG, true, 1.0, true, 6.0
+        );
+        this.AiWaveCheckTime = CreateConVar(
+            "inf_ai_wave_check_time", "16.0 12.0 10.0 8.0 6.0 6.0",
+            "Per AI level absolute seconds before anti-bait/AutoSpawn starts evaluating next-wave pressure; spawn still respects versus_special_respawn_interval",
+            CVAR_FLAG
+        );
+        this.AiWaveCheckRatio = CreateConVar(
+            "inf_ai_wave_check_ratio", "1.00 0.75 0.625 0.50 0.375 0.375",
+            "Legacy ratio-based check window; kept for old cfgs, replaced by inf_ai_wave_check_time",
+            CVAR_FLAG
+        );
+        this.AiWaveFloorRatio = CreateConVar(
+            "inf_ai_wave_floor_ratio", "1.50 1.40 1.25 1.15 1.10 1.10",
+            "Legacy per AI level normal-wave floor ratio; current spawn lower bound is versus_special_respawn_interval",
+            CVAR_FLAG
+        );
+        this.AiWaveLowSiRatio = CreateConVar(
+            "inf_ai_wave_low_si_ratio", "0.12 0.20 0.27 0.34 0.50 0.50",
+            "Legacy per AI level low-SI pressure ratio; no longer allows waves before base respawn interval",
+            CVAR_FLAG
+        );
+        this.AiDistSweetOffset = CreateConVar(
+            "inf_ai_dist_sweet_offset", "0.00 0.00 0.00 0.00 0.00 0.00",
+            "Per AI level: normalized offset applied to class spawn distance sweet spot; default keeps class-specific sweet spots unchanged",
+            CVAR_FLAG
+        );
+        this.AiDistWidthScale = CreateConVar(
+            "inf_ai_dist_width_scale", "1.25 1.15 1.08 1.00 1.00 1.00",
+            "Per AI level: width multiplier for spawn distance scoring sweet zone",
+            CVAR_FLAG
+        );
+        this.AiSpawnBudgetBonus = CreateConVar(
+            "inf_ai_spawn_budget_bonus", "-3 -2 -1 0 0 0",
+            "Per AI level: additive candidate budget adjustment for spawn scoring",
+            CVAR_FLAG
+        );
+
+        // —— Nav 分桶（静态窗口） —— //
+        this.NavBucketEnable   = CreateConVar("inf_NavBucketEnable", "1", "启用 Nav 进度分桶筛选(0=禁用,1=启用)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketWindow   = CreateConVar("inf_NavBucketWindow", "10", "按进度百分比搜索的桶半径(±N)", CVAR_FLAG, true, 0.0, true, 100.0);
+
+        // —— 动态分桶 —— //
+        this.NavBucketLinkToRing = CreateConVar("inf_NavBucketLinkToRing", "1", "扩圈时动态调整桶窗口(0=关闭,1=开启)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketWindowMin  = CreateConVar("inf_NavBucketWindowMin", "6", "ring<=MinAt时使用的桶窗口(±N)", CVAR_FLAG, true, 0.0, true, 100.0);
+        this.NavBucketWindowMax  = CreateConVar("inf_NavBucketWindowMax", "12", "ring>=MaxAt时使用的桶窗口(±N)", CVAR_FLAG, true, 0.0, true, 100.0);
+        this.NavBucketMinAt      = CreateConVar("inf_NavBucketMinAt", "500.0", "小桶阈值对应的ring", CVAR_FLAG, true, 0.0);
+        this.NavBucketMaxAt      = CreateConVar("inf_NavBucketMaxAt", "1500.0", "大桶阈值对应的ring", CVAR_FLAG, true, 0.0);
+
+        // —— 分桶策略增强 —— //
+        this.NavBucketFirstFit   = CreateConVar("inf_NavBucketFirstFit", "0",  "找到第一个合格点就返回(1=是,0=否)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketIncludeCtr = CreateConVar("inf_NavBucketIncludeCenter", "1", "是否把中心桶 s 也加入扫描序列(1=是,0=否)", CVAR_FLAG, true, 0.0, true, 1.0);
+
+        // —— 死亡CD —— //
+        this.DeathCDKiller     = CreateConVar("inf_DeathCooldownKiller",  "1.0","同类击杀后最小补位CD（秒）：Hunter/Smoker/Jockey/Charger", CVAR_FLAG, true, 0.0, true, 30.0);
+        this.DeathCDSupport    = CreateConVar("inf_DeathCooldownSupport", "2.0","同类击杀后最小补位CD（秒）：Boomer/Spitter", CVAR_FLAG, true, 0.0, true, 30.0);
+
+        // —— 双保险 —— //
+        this.DeathCDBypassAfter = CreateConVar("inf_DeathCooldown_BypassAfter", "1.5","距离上次成功刷出超过该秒数时，临时忽略死亡CD", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.DeathCDUnderfill   = CreateConVar("inf_DeathCooldown_Underfill", "0.5","当【场上活着特感】< iSiLimit * 本值 时，忽略死亡CD", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.TeleportSpawnGrace = CreateConVar("inf_TeleportSpawnGrace", "2.5",
+            "特感生成后多少秒内禁止传送", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.TeleportRunnerFast = CreateConVar("inf_TeleportRunnerFast", "1.5",
+            "跑男时的快速传送阈值（秒），仍需达到该不可见时长才可传送", CVAR_FLAG, true, 0.0, true, 10.0);
+        this.SupportUnlockKillers = CreateConVar("inf_support_unlock_killers", "-1",
+            "支援特感(Spitter/Boomer)解锁所需的控场特感(Smoker/Hunter/Jockey/Charger)数量；<0 表示按 inf_support_unlock_ratio 自动计算，0 关闭限制。",
+            CVAR_FLAG, true, -1.0, true, 12.0);
+        this.SupportUnlockRatio = CreateConVar("inf_support_unlock_ratio", "0.4",
+            "当 inf_support_unlock_killers < 0 时，所需优先特感 = RoundToFloor(limit * ratio)。0 关闭比例限制。",
+            CVAR_FLAG, true, 0.0, true, 1.0);
+        this.SupportUnlockGrace = CreateConVar("inf_support_unlock_grace", "1.0",
+            "当优先类不足时等待多少秒后自动放开支援限制；0 = 永不自动放开。",
+            CVAR_FLAG, true, 0.0, true, 30.0);
+        this.NavBucketMapInvalid   = CreateConVar("inf_NavBucketMapInvalid", "1",
+            "Map invalid-flow NavAreas to nearest valid-flow bucket (0=off,1=on)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.NavBucketAssignRadius = CreateConVar("inf_NavBucketAssignRadius", "2000.0",
+            "Max Nav graph distance for invalid-flow progress mapping (legacy fallback uses XY); 0 = unlimited",
+            CVAR_FLAG, true, 0.0);
+        this.gCvarNavCacheEnable = CreateConVar(
+            "inf_NavCacheEnable", "1",
+            "Enable on-disk cache for Nav flow buckets (0=off,1=on)",
+            CVAR_FLAG, true, 0.0, true, 1.0);
+        // 评分系统权重
+        this.Score_w_dist = CreateConVar("inf_score_w_dist", "1.20 0.90 1.05 0.95 1.35 1.60", "距离分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_hght = CreateConVar("inf_score_w_hght", "2.20 1.05 1.30 1.55 0.45 0.60", "高度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_flow = CreateConVar("inf_score_w_flow", "1.55 1.00 1.05 1.45 1.20 1.55", "流程分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.Score_w_disp = CreateConVar("inf_score_w_disp", "2.20 1.90 1.10 1.60 0.75 0.65", "分散度分权重(S,B,H,P,J,C)", CVAR_FLAG);
+        this.NavHighSortScale = CreateConVar(
+            "inf_nav_high_sort_scale", "0.85 1.00 0.95 1.00 1.00 1.00",
+            "有向候选排序的高点距离折减(S,B,H,P,J,C)；<1 时高于目标的候选按折减后距离前置，1.00=不折减",
+            CVAR_FLAG);
+        // 高点判定的统一起点：ranked 排序折减、Nav 距离折减和最终分高点
+        // 奖励三处共用这一个阈值，参考面统一为目标眼位。
+        this.NavHighSortMinHeight = CreateConVar(
+            "inf_nav_high_sort_min_height", "64.0",
+            "高点统一起点：候选中心高于目标眼位多少单位后才算高点（同时作用于排序折减、Nav距离折减和最终分高点奖励）",
+            CVAR_FLAG, true, 0.0, true, 1000.0);
+        this.ScoreLowHeightStart = CreateConVar(
+            "inf_score_low_height_start", "50.0",
+            "候选点低于目标生还者脚部多少单位后进入第一个50u离散扣分档",
+            CVAR_FLAG, true, 50.0, true, 1000.0);
+        SetConVarBounds(this.ScoreLowHeightStart,
+            ConVarBound_Lower, true, 50.0);
+        this.ScoreLowHeightPer100 = CreateConVar(
+            "inf_score_low_height_per_100", "10.0",
+            "低点离散扣分率；每满50u扣该值的一半（默认每50u扣5分）",
+            CVAR_FLAG, true, 0.0, true, 200.0);
+        SetConVarBounds(this.ScoreLowHeightPer100,
+            ConVarBound_Upper, true, 200.0);
+        this.ScoreLowHeightCap = CreateConVar(
+            "inf_score_low_height_cap", "100.0",
+            "所有职业低点额外扣分最终上限（落后倍率之后）；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        // CreateConVar returns the existing handle on hot reload and does not
+        // widen bounds left by the previous release (which capped this at 50).
+        SetConVarBounds(this.ScoreLowHeightCap,
+            ConVarBound_Upper, true, 100.0);
+        this.ScoreLowHeightBehindMultiplier = CreateConVar(
+            "inf_score_low_height_behind_multiplier", "2.0",
+            "候选Nav进度落后目标时，低点扣分倍率",
+            CVAR_FLAG, true, 1.0, true, 10.0);
+        // 奖励要能偏好高点，但不能大到把最终分顶到 100 的钳位上——那样所有
+        // 高台候选会并列满分，距离/Flow/分散/战术分全部失效。3 分/50u、
+        // 上限 20 让它退回“决胜项”的定位。
+        this.ScoreHighHeightPer50 = CreateConVar(
+            "inf_score_high_height_per_50", "3.0",
+            "Smoker/Hunter候选点自高点起点起每满50u增加的最终评分（再按可落下质量折算）",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        this.ScoreHighHeightCap = CreateConVar(
+            "inf_score_high_height_cap", "20.0",
+            "Smoker/Hunter高点最终评分奖励上限；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        this.ScoreBehindPerFlow = CreateConVar(
+            "inf_score_behind_per_flow", "2.0",
+            "候选Flow每落后目标1个百分点扣多少总分",
+            CVAR_FLAG, true, 0.0, true, 20.0);
+        SetConVarBounds(this.ScoreBehindPerFlow,
+            ConVarBound_Upper, true, 20.0);
+        this.ScoreBehindCap = CreateConVar(
+            "inf_score_behind_cap", "100.0",
+            "Flow后点梯度扣分上限；0关闭",
+            CVAR_FLAG, true, 0.0, true, 100.0);
+        SetConVarBounds(this.ScoreBehindCap,
+            ConVarBound_Upper, true, 100.0);
+        this.ScoreBehindRejectGap = CreateConVar(
+            "inf_score_behind_reject_gap", "8",
+            "候选Nav最多允许落后目标多少个Flow百分点；-1关闭硬拒绝，默认-8允许、-9拒绝",
+            CVAR_FLAG, true, -1.0, true, 100.0);
+        this.ScoreBehindRejectGapHjc = CreateConVar(
+            "inf_score_behind_reject_gap_hjc", "4",
+            "Hunter/Jockey/Charger 后方硬拒绝缺口；默认-4允许、-5拒绝。-1沿用全局 inf_score_behind_reject_gap",
+            CVAR_FLAG, true, -1.0, true, 100.0);
+        this.ScoreBehindHjcScale = CreateConVar(
+            "inf_score_behind_hjc_scale", "2.5",
+            "Hunter/Jockey/Charger 的 Flow 后点梯度扣分倍率；1.0 与全局相同",
+            CVAR_FLAG, true, 1.0, true, 5.0);
+        this.ScoreBehindSoftPct = CreateConVar(
+            "inf_score_behind_soft_pct", "90",
+            "owner Flow 进度达到该百分比后，落后 gap 的候选不再硬拒绝、只做评分扣分；101=永远硬拒绝",
+            CVAR_FLAG, true, 0.0, true, 101.0);
+        this.SpawnBehindEvalBudget = CreateConVar(
+            "inf_spawn_behind_eval_budget", "32",
+            "尾段软化生效时，每个距离层最多评估的后方候选数（超出直接跳过，保证按时轮到 Director 兜底）；0=不限制",
+            CVAR_FLAG, true, 0.0, true, 512.0);
+        this.SpawnNavBandTimeout = CreateConVar(
+            "inf_spawn_nav_band_timeout", "3.0",
+            "单个搜索周期内有向 Nav 分层搜索的最长耗时（秒），超时直接进入 Director 兜底档；0=关闭",
+            CVAR_FLAG, true, 0.0, true, 30.0);
+        this.PathCacheEnable   = CreateConVar("inf_PathCacheEnable", "1",
+            "Enable PathPenalty_NoBuild cache (0/1)", CVAR_FLAG, true, 0.0, true, 1.0);
+        this.PathCacheQuantize = CreateConVar("inf_PathCacheQuantize", "50.0",
+            "Quantization step for limitCost when caching (world units)",
+            CVAR_FLAG, true, 1.0, true, 500.0);
+        this.FrameThinkStep = CreateConVar(
+            "inf_FrameThinkStep", "0.05",
+            "Idle seconds between spawn queue attempts; active work uses inf_FrameThinkStepActive",
+            CVAR_FLAG, true, 0.01, true, 0.25
+        );
+        this.FrameThinkStepActive = CreateConVar(
+            "inf_FrameThinkStepActive", "0.02",
+            "Seconds between spawn/teleport attempts while work is queued",
+            CVAR_FLAG, true, 0.01, true, 0.25
+        );
+        this.SpawnAttemptsPerFrame = CreateConVar(
+            "inf_spawn_attempts_per_frame", "8",
+            "Maximum spawn/teleport attempts in one active think frame",
+            CVAR_FLAG, true, 1.0, true, 12.0
+        );
+        this.SpawnFrameBudgetMs = CreateConVar(
+            "inf_spawn_frame_budget_ms", "4.0",
+            "Maximum wall-clock milliseconds spent on spawn attempts in one active think frame",
+            CVAR_FLAG, true, 0.1, true, 6.0
+        );
+        this.SpawnFailedCycleRetry = CreateConVar(
+            "inf_spawn_failed_cycle_retry", "0.10",
+            "Seconds before restarting directed Nav bands after a complete failed spawn cycle",
+            CVAR_FLAG, true, 0.02, true, 1.0
+        );
+        this.SpawnNavCandidatesPerSlice = CreateConVar(
+            "inf_spawn_nav_candidates_per_slice", "512",
+            "Maximum Nav candidates inspected in one search slice",
+            CVAR_FLAG, true, 1.0, true, 1024.0
+        );
+        this.SpawnNavExpensivePerSlice = CreateConVar(
+            "inf_spawn_nav_expensive_per_slice", "24",
+            "Maximum candidates entering visibility/path checks in one search slice",
+            CVAR_FLAG, true, 1.0, true, 32.0
+        );
+        this.SpawnNavSliceBudgetMs = CreateConVar(
+            "inf_spawn_nav_slice_budget_ms", "2.0",
+            "Soft wall-clock milliseconds allowed for one Nav search slice",
+            CVAR_FLAG, true, 0.1, true, 4.0
+        );
+        this.SpawnCandidateBudget = CreateConVar(
+            "inf_spawn_candidate_budget", "12",
+            "Base accepted spawn candidates to score per attempt before AI difficulty adjustments",
+            CVAR_FLAG, true, 1.0, true, 24.0
+        );
+        this.BucketCountCacheTTL = CreateConVar(
+            "inf_BucketCountCacheTTL", "0.20",
+            "Seconds to cache alive-SI Flow bucket counts during spawn candidate filtering",
+            CVAR_FLAG, true, 0.0, true, 2.0
+        );
+        // badflow 轻度惩罚（仅影响 Flow 分项）
+        this.FlowBadPenaltyPoints = CreateConVar(
+            "inf_flow_bad_penalty_points",
+            "30.0",
+            "Mild points to subtract from FLOW score when the area has invalid raw flow (mapped badflow). 0 disables.",
+            CVAR_FLAG,
+            true, 0.0, true, 100.0
+        );
+        // 可视射线：0=仅中线；1=三线；2=自动（>4生还者仅中线）
+        this.VisEyeRayMode = CreateConVar(
+            "inf_VisEyeRayMode", "2",
+            "0=center only; 1=center+left+right; 2=auto (if alive survivors > 4 -> center only)",
+            CVAR_FLAG, true, 0.0, true, 2.0
+        );
+        this.SpawnScoreFloor = CreateConVar(
+            "inf_spawn_score_floor", "0.0",
+            "0..100 额外总评分阈值；最终分<=0始终拒绝，0表示不再提高正分门槛。",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
+        this.FlowBucketShare = CreateConVar(
+            "inf_spawn_bucket_ratio", "0",
+            "同一 Flow 桶中允许同时存在的特感占比（相对 l4d_infected_limit）；默认 0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SpawnSepRadius = CreateConVar(
+            "inf_spawn_sep_radius", "100.0",
+            "最近实际刷出点的硬防叠半径（固定值，不再随特感上限或波内占用缩放）；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 500.0
+        );
+        this.SpawnSepTtl = CreateConVar(
+            "inf_spawn_sep_ttl", "1.5",
+            "最近实际刷出点的硬分散记忆秒数。",
+            CVAR_FLAG, true, 0.1, true, 10.0
+        );
+        this.SpawnKernelRadius = CreateConVar(
+            "inf_spawn_kernel_radius", "280.0",
+            "分散度核惩罚的距离衰减常数基准（对仍在接近途中的特感与最近刷点按 exp(-d/r) 累加；已贴脸交战的存活特感不计入）。实际半径=该值*特感上限缩放系数：低特推得开、高特只防叠；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1000.0
+        );
+        this.SpawnKernelPoints = CreateConVar(
+            "inf_spawn_kernel_points", "50.0",
+            "分散度核惩罚强度：扣分=该值*min(核密度和,1.5)。上限缩放已作用在半径上，此处不再二次缩放。"
+            ... "取值需保证 该值*1.5 < 100，否则密集处 disp 会压到 0 而失去梯度（70 实测会让紧凑图刷点外推）。",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
+        this.SpawnCandidateShuffle = CreateConVar(
+            "inf_spawn_candidate_shuffle", "1",
+            "有向候选分页读取后页内洗牌，打散“永远评估最近一簇”的偏置(0/1)。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SpawnBudgetNear = CreateConVar(
+            "inf_spawn_budget_near", "6",
+            "当前候选页近距三分位最多接受的评分名额；与 mid/far 全 0 时退回整页名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
+        );
+        this.SpawnBudgetMid = CreateConVar(
+            "inf_spawn_budget_mid", "5",
+            "当前候选页中距三分位最多接受的评分名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
+        );
+        this.SpawnBudgetFar = CreateConVar(
+            "inf_spawn_budget_far", "1",
+            "当前候选页远距三分位最多接受的评分名额。",
+            CVAR_FLAG, true, 0.0, true, 24.0
+        );
+        this.ScarcityJitter = CreateConVar(
+            "inf_class_scarcity_jitter", "0.06",
+            "选类稀缺度随机抖动幅度（±该值），打破每波固定轮转；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 0.5
+        );
+        this.SupportWaiveProb = CreateConVar(
+            "inf_support_gate_waive_prob", "0.15",
+            "每波按该概率放宽支援特感(Boomer/Spitter)解锁闸门；0=关闭。",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+
+        // 生还者进度回退
+        this.SurFlowFallbackEnable = CreateConVar(
+            "inf_SurProgressFallback", "1",
+            "Enable survivor progress fallback when all flows are invalid (0/1)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.SurFlowFallbackTTL = CreateConVar(
+            "inf_SurProgressFallbackTTL", "20.0",
+            "TTL (seconds) for last-good survivor progress fallback",
+            CVAR_FLAG, true, 1.0, true, 120.0
+        );
+
+        this.AntiBaitEnable = CreateConVar(
+            "inf_antibait_enable", "1",
+            "Enable anti-bait pressure controller (0/1)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.LegacyAntiBaitEnable = CreateConVar(
+            "inf_AntiBaitMode", "1",
+            "兼容旧配置：Enable anti-bait pressure controller (0/1)",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.AntiBaitGrace = CreateConVar(
+            "inf_antibait_grace", "8.0",
+            "Seconds after each wave before anti-bait observes survivor progress",
+            CVAR_FLAG, true, 0.0, true, 60.0
+        );
+        this.AntiBaitWindow = CreateConVar(
+            "inf_antibait_window", "12.0",
+            "Seconds without enough survivor progress before pressure can start",
+            CVAR_FLAG, true, 1.0, true, 120.0
+        );
+        this.AntiBaitProgressPct = CreateConVar(
+            "inf_antibait_progress_pct", "4",
+            "Lower-median survivor flow percent needed to reset anti-bait baseline",
+            CVAR_FLAG, true, 1.0, true, 20.0
+        );
+        this.AntiBaitProgressDist = CreateConVar(
+            "inf_antibait_progress_dist", "1000.0",
+            "Team-center world distance from the last progress baseline needed to reset anti-bait; 0 disables",
+            CVAR_FLAG, true, 0.0, true, 10000.0
+        );
+        this.AntiBaitMinSiRatio = CreateConVar(
+            "inf_antibait_min_si_ratio", "0.50",
+            "Legacy compatibility value; breach pressure no longer requires alive SI",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.AntiBaitForceAfter = CreateConVar(
+            "inf_antibait_force_after", "25.0",
+            "Legacy compatibility value; no runtime effect",
+            CVAR_FLAG, true, 0.0, true, 180.0
+        );
+        this.AntiBaitRecover = CreateConVar(
+            "inf_antibait_recover", "4.0",
+            "Seconds to stay in recover state after survivors make progress",
+            CVAR_FLAG, true, 0.0, true, 60.0
+        );
+        this.AntiBaitArmBefore = CreateConVar(
+            "inf_antibait_arm_before", "4.0",
+            "Seconds before the base countdown deadline when anti-bait pressure may arm",
+            CVAR_FLAG, true, 0.0, true, 16.0
+        );
+        this.AntiBaitHoldConfirm = CreateConVar(
+            "inf_antibait_hold_confirm", "2.0",
+            "Seconds that a healthy stalled formation must remain stable before it can hold a wave at the deadline",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
+        this.AntiBaitReleaseConfirm = CreateConVar(
+            "inf_antibait_release_confirm", "2.0",
+            "Seconds that hold conditions must remain cleared before an extended wave is released",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
+        this.AntiBaitSpreadConfirm = CreateConVar(
+            "inf_antibait_spread_confirm", "3.0",
+            "Seconds a spread/isolated formation must persist before anti-bait pressure demotes; brief walk-away fake-outs keep the hold",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
+        this.AntiBaitAction = CreateConVar(
+            "inf_antibait_action", "2",
+            "0=debug only, 1=prepare breach waves, 2=also fast-teleport invisible SI",
+            CVAR_FLAG, true, 0.0, true, 2.0
+        );
+        this.AntiBaitRunnerGapPct = CreateConVar(
+            "inf_antibait_runner_gap_pct", "12",
+            "Highest survivor flow percent lead over median to mark a runner",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
+        this.AntiBaitRunnerNearDist = CreateConVar(
+            "inf_antibait_runner_near_dist", "1200.0",
+            "Runner is ignored when another survivor is within this world distance",
+            CVAR_FLAG, true, 0.0, true, 5000.0
+        );
+        this.AntiBaitRunnerOffConfirm = CreateConVar(
+            "inf_antibait_runner_off_confirm", "2.3",
+            "Seconds the runner must keep failing the runner checks (gap/near distance) before runner state is cleared; death/incap clears immediately",
+            CVAR_FLAG, true, 0.0, true, 10.0
+        );
+        this.AntiBaitFastTeleport = CreateConVar(
+            "inf_antibait_fast_tp", "1.5",
+            "Invisible seconds needed for anti-bait fast teleport; still respects spawn grace",
+            CVAR_FLAG, true, 0.8, true, 10.0
+        );
+        this.AntiBaitLatestBaseScale = CreateConVar(
+            "inf_antibait_latest_scale", "1.50",
+            "Legacy compatibility value; no runtime effect",
+            CVAR_FLAG, true, 1.0, true, 3.0
+        );
+        this.AntiBaitLatestScaleStep = CreateConVar(
+            "inf_antibait_latest_scale_step", "0.10",
+            "Legacy compatibility value; no runtime effect",
+            CVAR_FLAG, true, 0.0, true, 0.5
+        );
+        this.AntiBaitClusterDist = CreateConVar(
+            "inf_antibait_cluster_dist", "800.0",
+            "Hard cluster distance: all active survivors within this max spread are considered holding a bait position",
+            CVAR_FLAG, true, 0.0, true, 3000.0
+        );
+        this.AntiBaitTeamDist = CreateConVar(
+            "inf_antibait_team_dist", "1500.0",
+            "Soft team spread distance: above this, survivors are considered spread enough to attack normally",
+            CVAR_FLAG, true, 0.0, true, 5000.0
+        );
+        this.AntiBaitPairDist = CreateConVar(
+            "inf_antibait_pair_dist", "800.0",
+            "Average nearest-teammate distance under this means the team still has mutual cover",
+            CVAR_FLAG, true, 0.0, true, 3000.0
+        );
+        this.AntiBaitIsolateDist = CreateConVar(
+            "inf_antibait_isolate_dist", "1200.0",
+            "A survivor whose nearest teammate is farther than this releases anti-bait pressure as pickable",
+            CVAR_FLAG, true, 0.0, true, 3000.0
+        );
+        this.AntiBaitTankPressureDist = CreateConVar(
+            "inf_antibait_tank_pressure_dist", "1200.0",
+            "Tank distance to any living survivor that clears an anti-bait hold; 0 restores any-active-Tank behavior",
+            CVAR_FLAG, true, 0.0, true, 5000.0
+        );
+        this.AntiBaitLowHp = CreateConVar(
+            "inf_antibait_lowhp", "40",
+            "Pause anti-bait when every standing survivor has permanent HP below this and nobody alive carries a kit, defib, pills, or adrenaline; 0 disables",
+            CVAR_FLAG, true, 0.0, true, 100.0
+        );
+        this.AntiBaitDebug = CreateConVar(
+            "inf_antibait_debug", "0",
+            "Log anti-bait state transitions even when inf_DebugMode is off",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.TraitorEnable = CreateConVar(
+            "inf_traitor_enable", "1",
+            "Enable traitor SI mode (0/1).",
+            CVAR_FLAG, true, 0.0, true, 1.0
+        );
+        this.TraitorMaxSlots = CreateConVar(
+            "inf_traitor_max_slots", "1",
+            "Shared max active/reserved traitor slots; effective value is always below l4d_infected_limit.",
+            CVAR_FLAG, true, 0.0, true, float(MAXPLAYERS)
+        );
+        this.TraitorPlayerLimit = CreateConVar(
+            "inf_traitor_player_limit", "1",
+            "Per-round successful spawns allowed for each normal traitor SI class for non-admin players. Tank is excluded; 0 disables.",
+            CVAR_FLAG, true, 0.0, true, 32.0
+        );
+        this.TraitorAdminLimit = CreateConVar(
+            "inf_traitor_admin_limit", "3",
+            "Per-round successful spawns allowed for each normal traitor SI class for admins. Tank is excluded; 0 disables.",
+            CVAR_FLAG, true, 0.0, true, 32.0
+        );
+        this.TraitorClassMask = CreateConVar(
+            "inf_traitor_class_mask", "127",
+            "Additional traitor class mask, intersected with the active spawn pool: 1 smoker, 2 boomer, 4 hunter, 8 spitter, 16 jockey, 32 charger; 64 tank is retained for rollback compatibility. 0 = all active classes.",
+            CVAR_FLAG, true, 0.0, true, 127.0
+        );
+        this.TraitorPublicMinScore = CreateConVar(
+            "inf_traitor_public_min_score", "100000",
+            "Minimum l4d_stats total score required for a non-admin to register as traitor.",
+            CVAR_FLAG, true, 0.0, true, 100000000.0
+        );
+
+        // 变更回调
+        this.AiDifficultyLink.AddChangeHook(OnCfgChanged);
+        this.AiDifficultyFallbackLevel.AddChangeHook(OnCfgChanged);
+        this.AiWaveCheckTime.AddChangeHook(OnCfgChanged);
+        this.AiWaveCheckRatio.AddChangeHook(OnCfgChanged);
+        this.AiWaveFloorRatio.AddChangeHook(OnCfgChanged);
+        this.AiWaveLowSiRatio.AddChangeHook(OnCfgChanged);
+        this.AiDistSweetOffset.AddChangeHook(OnCfgChanged);
+        this.AiDistWidthScale.AddChangeHook(OnCfgChanged);
+        this.AiSpawnBudgetBonus.AddChangeHook(OnCfgChanged);
+        this.VisEyeRayMode.AddChangeHook(OnCfgChanged);
+        this.SurFlowFallbackEnable.AddChangeHook(OnCfgChanged);
+        this.SurFlowFallbackTTL.AddChangeHook(OnCfgChanged);
+        this.FlowBadPenaltyPoints.AddChangeHook(OnCfgChanged);
+        this.NavHighSortScale.AddChangeHook(OnCfgChanged);
+        this.NavHighSortMinHeight.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightStart.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightPer100.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightCap.AddChangeHook(OnCfgChanged);
+        this.ScoreLowHeightBehindMultiplier.AddChangeHook(OnCfgChanged);
+        this.ScoreHighHeightPer50.AddChangeHook(OnCfgChanged);
+        this.ScoreHighHeightCap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindPerFlow.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindCap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindRejectGap.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindRejectGapHjc.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindHjcScale.AddChangeHook(OnCfgChanged);
+        this.ScoreBehindSoftPct.AddChangeHook(OnCfgChanged);
+        this.SpawnBehindEvalBudget.AddChangeHook(OnCfgChanged);
+        this.SpawnNavBandTimeout.AddChangeHook(OnCfgChanged);
+        this.SpawnScoreFloor.AddChangeHook(OnCfgChanged);
+        this.FlowBucketShare.AddChangeHook(OnCfgChanged);
+        this.SpawnSepRadius.AddChangeHook(OnCfgChanged);
+        this.SpawnSepTtl.AddChangeHook(OnCfgChanged);
+        this.SpawnKernelRadius.AddChangeHook(OnCfgChanged);
+        this.SpawnKernelPoints.AddChangeHook(OnCfgChanged);
+        this.SpawnCandidateShuffle.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetNear.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetMid.AddChangeHook(OnCfgChanged);
+        this.SpawnBudgetFar.AddChangeHook(OnCfgChanged);
+        this.ScarcityJitter.AddChangeHook(OnCfgChanged);
+        this.SupportWaiveProb.AddChangeHook(OnCfgChanged);
+        this.AntiBaitEnable.AddChangeHook(OnCfgChanged);
+        this.LegacyAntiBaitEnable.AddChangeHook(OnCfgChanged);
+        this.AntiBaitGrace.AddChangeHook(OnCfgChanged);
+        this.AntiBaitWindow.AddChangeHook(OnCfgChanged);
+        this.AntiBaitProgressPct.AddChangeHook(OnCfgChanged);
+        this.AntiBaitProgressDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitMinSiRatio.AddChangeHook(OnCfgChanged);
+        this.AntiBaitForceAfter.AddChangeHook(OnCfgChanged);
+        this.AntiBaitRecover.AddChangeHook(OnCfgChanged);
+        this.AntiBaitArmBefore.AddChangeHook(OnCfgChanged);
+        this.AntiBaitHoldConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitReleaseConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitSpreadConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitAction.AddChangeHook(OnCfgChanged);
+        this.AntiBaitRunnerGapPct.AddChangeHook(OnCfgChanged);
+        this.AntiBaitRunnerNearDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitRunnerOffConfirm.AddChangeHook(OnCfgChanged);
+        this.AntiBaitFastTeleport.AddChangeHook(OnCfgChanged);
+        this.AntiBaitLatestBaseScale.AddChangeHook(OnCfgChanged);
+        this.AntiBaitLatestScaleStep.AddChangeHook(OnCfgChanged);
+        this.AntiBaitClusterDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitTeamDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitPairDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitIsolateDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitTankPressureDist.AddChangeHook(OnCfgChanged);
+        this.AntiBaitLowHp.AddChangeHook(OnCfgChanged);
+        this.AntiBaitDebug.AddChangeHook(OnCfgChanged);
+        this.TraitorEnable.AddChangeHook(OnCfgChanged);
+        this.TraitorMaxSlots.AddChangeHook(OnCfgChanged);
+        this.TraitorPlayerLimit.AddChangeHook(OnCfgChanged);
+        this.TraitorAdminLimit.AddChangeHook(OnCfgChanged);
+        this.TraitorClassMask.AddChangeHook(OnCfgChanged);
+        this.TraitorPublicMinScore.AddChangeHook(OnCfgChanged);
+
+        this.PathCacheEnable.AddChangeHook(OnCfgChanged);
+        this.PathCacheQuantize.AddChangeHook(OnCfgChanged);
+        this.FrameThinkStep.AddChangeHook(OnCfgChanged);
+        this.FrameThinkStepActive.AddChangeHook(OnCfgChanged);
+        this.SpawnAttemptsPerFrame.AddChangeHook(OnCfgChanged);
+        this.SpawnFrameBudgetMs.AddChangeHook(OnCfgChanged);
+        this.SpawnFailedCycleRetry.AddChangeHook(OnCfgChanged);
+        this.SpawnNavCandidatesPerSlice.AddChangeHook(OnCfgChanged);
+        this.SpawnNavExpensivePerSlice.AddChangeHook(OnCfgChanged);
+        this.SpawnNavSliceBudgetMs.AddChangeHook(OnCfgChanged);
+        this.SpawnCandidateBudget.AddChangeHook(OnCfgChanged);
+        this.BucketCountCacheTTL.AddChangeHook(OnCfgChanged);
+        this.Score_w_dist.AddChangeHook(OnCfgChanged);
+        this.Score_w_hght.AddChangeHook(OnCfgChanged);
+        this.Score_w_flow.AddChangeHook(OnCfgChanged);
+        this.Score_w_disp.AddChangeHook(OnCfgChanged);
+        this.gCvarNavCacheEnable.AddChangeHook(OnCfgChanged);
+
+        this.NavBucketMapInvalid.AddChangeHook(OnCfgChanged);
+        this.NavBucketAssignRadius.AddChangeHook(OnCfgChanged);
+        this.TeleportSpawnGrace.AddChangeHook(OnCfgChanged);
+        this.TeleportRunnerFast.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockKillers.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockRatio.AddChangeHook(OnCfgChanged);
+        this.SupportUnlockGrace.AddChangeHook(OnCfgChanged);
+        this.MaxPlayerZombies  = FindConVar("z_max_player_zombies");
+        this.VsBossFlowBuffer  = FindConVar("versus_boss_buffer");
+        this.SurvivorLimit     = FindConVar("survivor_limit");
+        this.DirectorNoSpecials = FindConVar("director_no_specials");
+        this.AiDifficultyLevel = FindConVar("ah_ai_dynamic_current_level");
+        this.ZSmokerLimit      = FindConVar("z_smoker_limit");
+        this.ZBoomerLimit      = FindConVar("z_boomer_limit");
+        this.ZHunterLimit      = FindConVar("z_hunter_limit");
+        this.ZSpitterLimit     = FindConVar("z_spitter_limit");
+        this.ZJockeyLimit      = FindConVar("z_jockey_limit");
+        this.ZChargerLimit     = FindConVar("z_charger_limit");
+        if (this.AiDifficultyLevel != null)
+            this.AiDifficultyLevel.AddChangeHook(OnCfgChanged);
+        this.DeathCDKiller.AddChangeHook(OnCfgChanged);
+        this.DeathCDSupport.AddChangeHook(OnCfgChanged);
+        this.DeathCDBypassAfter.AddChangeHook(OnCfgChanged);
+        this.DeathCDUnderfill.AddChangeHook(OnCfgChanged);
+
+        if (this.DirectorNoSpecials != null)
+            SetConVarInt(this.DirectorNoSpecials, 1);
+
+        this.SpawnMax.AddChangeHook(OnCfgChanged);
+        this.SpawnMin.AddChangeHook(OnCfgChanged);
+        this.TeleportSpawnMin.AddChangeHook(OnCfgChanged);
+        this.LegacyTeleportSpawnMin.AddChangeHook(OnCfgChanged);
+        this.TeleportEnable.AddChangeHook(OnCfgChanged);
+        this.TeleportCheckTime.AddChangeHook(OnCfgChanged);
+        this.SiInterval.AddChangeHook(OnCfgChanged);
+        this.IgnoreIncapSight.AddChangeHook(OnCfgChanged);
+        this.EnableMask.AddChangeHook(OnCfgChanged);
+        this.AllCharger.AddChangeHook(OnCfgChanged);
+        this.AllHunter.AddChangeHook(OnCfgChanged);
+        this.AutoSpawnTime.AddChangeHook(OnCfgChanged);
+        this.AddDmgSmoker.AddChangeHook(OnCfgChanged);
+        this.SiLimit.AddChangeHook(OnSiLimitChanged);
+        this.DebugMode.AddChangeHook(OnCfgChanged);
+        this.SpawnAccelNativeSafety.AddChangeHook(OnCfgChanged);
+        this.NavTeamNearest.AddChangeHook(OnCfgChanged);
+
+        // Nav 分桶
+        this.NavBucketEnable.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindow.AddChangeHook(OnCfgChanged);
+        this.NavBucketLinkToRing.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindowMin.AddChangeHook(OnCfgChanged);
+        this.NavBucketWindowMax.AddChangeHook(OnCfgChanged);
+        this.NavBucketMinAt.AddChangeHook(OnCfgChanged);
+        this.NavBucketMaxAt.AddChangeHook(OnCfgChanged);
+        this.NavBucketFirstFit.AddChangeHook(OnCfgChanged);
+        this.NavBucketIncludeCtr.AddChangeHook(OnCfgChanged);
+
+        this.VsBossFlowBuffer.AddChangeHook(OnFlowBufferChanged); // Flow百分比受它影响 → 仅重算进度数组
+
+        this.Refresh();
+        this.ApplyMaxZombieBound();
+        SpawnPerfConfig_Refresh();
+    }
+
+    void Refresh()
+    {
+        this.RefreshRuntimeConVars();
+        float teleportSpawnMinModern = this.TeleportSpawnMin.FloatValue;
+        float teleportSpawnMinLegacy = this.LegacyTeleportSpawnMin.FloatValue;
+        this.fSpawnMax          = this.SpawnMax.FloatValue;
+        this.fSpawnMin          = this.SpawnMin.FloatValue;
+        this.fTeleportSpawnMin  = (FloatAbs(teleportSpawnMinLegacy - 400.0) > 0.01) ? teleportSpawnMinLegacy : teleportSpawnMinModern;
+        this.bTeleport          = this.TeleportEnable.BoolValue;
+        this.fSiInterval        = this.SiInterval.FloatValue;
+        this.iSiLimit           = this.SiLimit.IntValue;
+        this.iTeleportCheckTime = this.TeleportCheckTime.IntValue;
+        this.iEnableMask        = this.EnableMask.IntValue;
+        this.bAddDmgSmoker      = this.AddDmgSmoker.BoolValue;
+        this.bAutoSpawn         = this.AutoSpawnTime.BoolValue;
+        this.bIgnoreIncapSight  = this.IgnoreIncapSight.BoolValue;
+        this.iDebugMode         = this.DebugMode.IntValue;
+        this.bSpawnAccelNativeSafety = this.SpawnAccelNativeSafety.BoolValue;
+        this.bNavTeamNearest = this.NavTeamNearest.BoolValue;
+        this.bTraitorEnable     = this.TraitorEnable.BoolValue;
+        this.iTraitorMaxSlots   = this.TraitorMaxSlots.IntValue;
+        int maxTraitorSlots = this.iSiLimit - 1;
+        if (maxTraitorSlots < 0)
+            maxTraitorSlots = 0;
+        if (maxTraitorSlots > MAXPLAYERS)
+            maxTraitorSlots = MAXPLAYERS;
+        SetConVarBounds(this.TraitorMaxSlots, ConVarBound_Upper, true, float(MAXPLAYERS));
+        if (this.iTraitorMaxSlots < 0) this.iTraitorMaxSlots = 0;
+        if (this.iTraitorMaxSlots > maxTraitorSlots) this.iTraitorMaxSlots = maxTraitorSlots;
+        this.iTraitorPlayerLimit = this.TraitorPlayerLimit.IntValue;
+        if (this.iTraitorPlayerLimit < 0) this.iTraitorPlayerLimit = 0;
+        if (this.iTraitorPlayerLimit > 32) this.iTraitorPlayerLimit = 32;
+        this.iTraitorAdminLimit = this.TraitorAdminLimit.IntValue;
+        if (this.iTraitorAdminLimit < 0) this.iTraitorAdminLimit = 0;
+        if (this.iTraitorAdminLimit > 32) this.iTraitorAdminLimit = 32;
+        this.iTraitorClassMask = this.TraitorClassMask.IntValue;
+        if (this.iTraitorClassMask < 0) this.iTraitorClassMask = 0;
+        if (this.iTraitorClassMask > 127) this.iTraitorClassMask = 127;
+        this.iTraitorPublicMinScore = this.TraitorPublicMinScore.IntValue;
+        if (this.iTraitorPublicMinScore < 0) this.iTraitorPublicMinScore = 0;
+        if (this.iTraitorPublicMinScore > 100000000) this.iTraitorPublicMinScore = 100000000;
+
+        this.bAiDifficultyLink = this.AiDifficultyLink.BoolValue;
+        this.iAiDifficultyFallbackLevel = ClampInt(this.AiDifficultyFallbackLevel.IntValue, 1, AI_DIFFICULTY_LEVELS);
+        Config_ParseDifficultyFloatList(this.AiWaveCheckTime, DEFAULT_AI_WAVE_CHECK_TIME, this.fAiWaveCheckTime, 1.00, 120.00);
+        Config_ParseDifficultyFloatList(this.AiWaveFloorRatio, DEFAULT_AI_WAVE_FLOOR_RATIO, this.fAiWaveFloorRatio, 1.00, 3.00);
+        Config_ParseDifficultyFloatList(this.AiWaveLowSiRatio, DEFAULT_AI_WAVE_LOW_SI_RATIO, this.fAiWaveLowSiRatio, 0.0, 1.0);
+        Config_ParseDifficultyFloatList(this.AiDistSweetOffset, DEFAULT_AI_DIST_SWEET_OFFSET, this.fAiDistSweetOffset, -0.40, 0.40);
+        Config_ParseDifficultyFloatList(this.AiDistWidthScale, DEFAULT_AI_DIST_WIDTH_SCALE, this.fAiDistWidthScale, 0.40, 2.50);
+        Config_ParseDifficultyFloatList(this.AiSpawnBudgetBonus, DEFAULT_AI_SPAWN_BUDGET_BONUS, this.fAiSpawnBudgetBonus, -12.0, 12.0);
+
+        // Nav 分桶
+        this.bNavBucketEnable   = this.NavBucketEnable.BoolValue;
+        this.iNavBucketWindow   = this.NavBucketWindow.IntValue;
+
+        // 动态分桶
+        this.bNavBucketLinkToRing = this.NavBucketLinkToRing.BoolValue;
+        this.iNavBucketWindowMin  = this.NavBucketWindowMin.IntValue;
+        this.iNavBucketWindowMax  = this.NavBucketWindowMax.IntValue;
+        this.fNavBucketMinAt      = this.NavBucketMinAt.FloatValue;
+        this.fNavBucketMaxAt      = this.NavBucketMaxAt.FloatValue;
+
+        // 分桶策略增强
+        this.bNavBucketFirstFit   = this.NavBucketFirstFit.BoolValue;
+        this.bNavBucketIncludeCtr = this.NavBucketIncludeCtr.BoolValue;
+
+        // 死亡CD & 放宽
+        this.fDeathCDKiller     = this.DeathCDKiller.FloatValue;
+        this.fDeathCDSupport    = this.DeathCDSupport.FloatValue;
+        this.fDeathCDBypassAfter= this.DeathCDBypassAfter.FloatValue;
+        this.fDeathCDUnderfill  = this.DeathCDUnderfill.FloatValue;
+        this.fTeleportSpawnGrace = this.TeleportSpawnGrace.FloatValue;
+        this.fTeleportRunnerFast = this.TeleportRunnerFast.FloatValue;
+        this.iSupportUnlockKillers = this.SupportUnlockKillers.IntValue;
+        this.fSupportUnlockRatio   = this.SupportUnlockRatio.FloatValue;
+        if (this.fSupportUnlockRatio < 0.0) this.fSupportUnlockRatio = 0.0;
+        if (this.fSupportUnlockRatio > 1.0) this.fSupportUnlockRatio = 1.0;
+        this.fSupportUnlockGrace   = this.SupportUnlockGrace.FloatValue;
+        if (this.fSupportUnlockGrace < 0.0) this.fSupportUnlockGrace = 0.0;
+
+        this.bNavBucketMapInvalid   = this.NavBucketMapInvalid.BoolValue;
+        this.fNavBucketAssignRadius = this.NavBucketAssignRadius.FloatValue;
+        this.bNavCacheEnable = this.gCvarNavCacheEnable.BoolValue;
+        // 刷新评分系统权重。先清除上一次解析的尾部值，
+        // 运行中把六项 CVar 缩短时，未提供的职业应回到默认权重。
+        char buffer[256];
+        char parts[SI_COUNT][16];
+        int numParts;
+
+        for (int i = 1; i <= SI_COUNT; i++)
+        {
+            this.w_dist[i] = 1.0;
+            this.w_hght[i] = 1.0;
+            this.w_flow[i] = 1.0;
+            this.w_disp[i] = 1.0;
+        }
+
+        this.Score_w_dist.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
+        for (int i = 0; i < numParts && i < SI_COUNT; i++) {
+            this.w_dist[i+1] = StringToFloat(parts[i]);
+        }
+
+        this.Score_w_hght.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
+        for (int i = 0; i < numParts && i < SI_COUNT; i++) {
+            this.w_hght[i+1] = StringToFloat(parts[i]);
+        }
+
+        this.Score_w_flow.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
+        for (int i = 0; i < numParts && i < SI_COUNT; i++) {
+            this.w_flow[i+1] = StringToFloat(parts[i]);
+        }
+
+        this.Score_w_disp.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
+        for (int i = 0; i < numParts && i < SI_COUNT; i++) {
+            this.w_disp[i+1] = StringToFloat(parts[i]);
+        }
+
+        // 高点排序折减：<1 时 Smoker/Hunter 等职业改走 ranked 有向候选，
+        // 高于目标的候选按折减后的距离前置，使其进入有限的评分名额。
+        this.NavHighSortScale.GetString(buffer, sizeof(buffer));
+        numParts = ExplodeString(buffer, " ", parts, SI_COUNT, 16);
+        for (int i = 1; i <= SI_COUNT; i++)
+            this.fNavHighSortScale[i] = 1.0;
+        for (int i = 0; i < numParts && i < SI_COUNT; i++)
+        {
+            float scale = StringToFloat(parts[i]);
+            if (scale <= 0.0)
+                scale = 1.0;
+            this.fNavHighSortScale[i + 1] = ClampFloat(scale, 0.50, 1.0);
+        }
+
+        // 权重兜底：CVar 值不足或为 0 时回退到 1.0，避免意外禁用某因子。
+        // 必须在 ConVar 解析之后执行，确保验证的是新解析的值。
+        for (int i = 1; i <= SI_COUNT; i++) {
+            if (this.w_dist[i] <= 0.0) this.w_dist[i] = 1.0;
+            if (this.w_hght[i] <= 0.0) this.w_hght[i] = 1.0;
+            if (this.w_flow[i] <= 0.0) this.w_flow[i] = 1.0;
+            if (this.w_disp[i] <= 0.0) this.w_disp[i] = 1.0;
+        }
+
+        this.bPathCacheEnable   = this.PathCacheEnable.BoolValue;
+        this.fPathCacheQuantize = this.PathCacheQuantize.FloatValue;
+        if (this.fPathCacheQuantize < 1.0) this.fPathCacheQuantize = 1.0;
+        this.fFrameThinkStep    = this.FrameThinkStep.FloatValue;
+        if (this.fFrameThinkStep < 0.01) this.fFrameThinkStep = 0.01;
+        if (this.fFrameThinkStep > 0.25) this.fFrameThinkStep = 0.25;
+        this.fFrameThinkStepActive = this.FrameThinkStepActive.FloatValue;
+        if (this.fFrameThinkStepActive < 0.01) this.fFrameThinkStepActive = 0.01;
+        if (this.fFrameThinkStepActive > 0.25) this.fFrameThinkStepActive = 0.25;
+        this.iSpawnAttemptsPerFrame = this.SpawnAttemptsPerFrame.IntValue;
+        if (this.iSpawnAttemptsPerFrame < 1) this.iSpawnAttemptsPerFrame = 1;
+        if (this.iSpawnAttemptsPerFrame > 12) this.iSpawnAttemptsPerFrame = 12;
+        this.fSpawnFrameBudgetMs = this.SpawnFrameBudgetMs.FloatValue;
+        if (this.fSpawnFrameBudgetMs < 0.1) this.fSpawnFrameBudgetMs = 0.1;
+        if (this.fSpawnFrameBudgetMs > 6.0) this.fSpawnFrameBudgetMs = 6.0;
+        this.fSpawnFailedCycleRetry = this.SpawnFailedCycleRetry.FloatValue;
+        if (this.fSpawnFailedCycleRetry < 0.02) this.fSpawnFailedCycleRetry = 0.02;
+        if (this.fSpawnFailedCycleRetry > 1.0) this.fSpawnFailedCycleRetry = 1.0;
+        this.iSpawnNavCandidatesPerSlice = this.SpawnNavCandidatesPerSlice.IntValue;
+        if (this.iSpawnNavCandidatesPerSlice < 1) this.iSpawnNavCandidatesPerSlice = 1;
+        if (this.iSpawnNavCandidatesPerSlice > 1024) this.iSpawnNavCandidatesPerSlice = 1024;
+        this.iSpawnNavExpensivePerSlice = this.SpawnNavExpensivePerSlice.IntValue;
+        if (this.iSpawnNavExpensivePerSlice < 1) this.iSpawnNavExpensivePerSlice = 1;
+        if (this.iSpawnNavExpensivePerSlice > 32) this.iSpawnNavExpensivePerSlice = 32;
+        this.fSpawnNavSliceBudgetMs = this.SpawnNavSliceBudgetMs.FloatValue;
+        if (this.fSpawnNavSliceBudgetMs < 0.1) this.fSpawnNavSliceBudgetMs = 0.1;
+        if (this.fSpawnNavSliceBudgetMs > 4.0) this.fSpawnNavSliceBudgetMs = 4.0;
+        this.iSpawnCandidateBudget = this.SpawnCandidateBudget.IntValue;
+        if (this.iSpawnCandidateBudget < 1) this.iSpawnCandidateBudget = 1;
+        if (this.iSpawnCandidateBudget > 24) this.iSpawnCandidateBudget = 24;
+        this.fBucketCountCacheTTL = this.BucketCountCacheTTL.FloatValue;
+        if (this.fBucketCountCacheTTL < 0.0) this.fBucketCountCacheTTL = 0.0;
+        if (this.fBucketCountCacheTTL > 2.0) this.fBucketCountCacheTTL = 2.0;
+        // 读取 badflow 轻度惩罚。
+        this.fFlowBadPenalty = this.FlowBadPenaltyPoints.FloatValue;
+        if (this.fFlowBadPenalty < 0.0) this.fFlowBadPenalty = 0.0;
+        if (this.fFlowBadPenalty > 100.0) this.fFlowBadPenalty = 100.0;
+        this.fNavHighSortMinHeight = this.NavHighSortMinHeight.FloatValue;
+        this.fScoreLowHeightStart = this.ScoreLowHeightStart.FloatValue;
+        this.fScoreLowHeightPer100 = this.ScoreLowHeightPer100.FloatValue;
+        this.fScoreLowHeightCap = this.ScoreLowHeightCap.FloatValue;
+        this.fScoreLowHeightBehindMultiplier = this.ScoreLowHeightBehindMultiplier.FloatValue;
+        this.fScoreHighHeightPer50 = this.ScoreHighHeightPer50.FloatValue;
+        this.fScoreHighHeightCap = this.ScoreHighHeightCap.FloatValue;
+        this.fScoreBehindPerFlow = this.ScoreBehindPerFlow.FloatValue;
+        this.fScoreBehindCap = this.ScoreBehindCap.FloatValue;
+        this.iScoreBehindRejectGap = this.ScoreBehindRejectGap.IntValue;
+        this.iScoreBehindRejectGapHjc = this.ScoreBehindRejectGapHjc.IntValue;
+        this.iScoreBehindSoftPct = this.ScoreBehindSoftPct.IntValue;
+        this.iSpawnBehindEvalBudget = this.SpawnBehindEvalBudget.IntValue;
+        this.fSpawnNavBandTimeout = this.SpawnNavBandTimeout.FloatValue;
+        this.fScoreBehindHjcScale = this.ScoreBehindHjcScale.FloatValue;
+        if (this.fScoreBehindHjcScale < 1.0) this.fScoreBehindHjcScale = 1.0;
+        if (this.fScoreBehindHjcScale > 5.0) this.fScoreBehindHjcScale = 5.0;
+        this.iVisRayMode        = this.VisEyeRayMode.IntValue;
+        this.fSpawnScoreFloor   = this.SpawnScoreFloor.FloatValue;
+        this.fBucketSpawnRatio  = this.FlowBucketShare.FloatValue;
+        if (this.fBucketSpawnRatio <= 0.0)
+        {
+            this.fBucketSpawnRatio = 0.0;
+            this.iBucketMaxPerFlow = 0;
+        }
+        else
+        {
+            if (this.fBucketSpawnRatio > 1.0) this.fBucketSpawnRatio = 1.0;
+            int cap = RoundToCeil(float(this.iSiLimit) * this.fBucketSpawnRatio);
+            if (cap < 1) cap = 1;
+            this.iBucketMaxPerFlow = cap;
+        }
+
+        this.fSepRadius = this.SpawnSepRadius.FloatValue;
+        if (this.fSepRadius < 0.0) this.fSepRadius = 0.0;
+        this.fSepTtl = this.SpawnSepTtl.FloatValue;
+        if (this.fSepTtl < 0.1) this.fSepTtl = 0.1;
+        this.fKernelRadius = this.SpawnKernelRadius.FloatValue;
+        if (this.fKernelRadius < 0.0) this.fKernelRadius = 0.0;
+        this.fKernelPoints = this.SpawnKernelPoints.FloatValue;
+        if (this.fKernelPoints < 0.0) this.fKernelPoints = 0.0;
+        this.bCandidateShuffle = this.SpawnCandidateShuffle.BoolValue;
+        this.iSpawnBudgetNear = this.SpawnBudgetNear.IntValue;
+        if (this.iSpawnBudgetNear < 0) this.iSpawnBudgetNear = 0;
+        if (this.iSpawnBudgetNear > 24) this.iSpawnBudgetNear = 24;
+        this.iSpawnBudgetMid = this.SpawnBudgetMid.IntValue;
+        if (this.iSpawnBudgetMid < 0) this.iSpawnBudgetMid = 0;
+        if (this.iSpawnBudgetMid > 24) this.iSpawnBudgetMid = 24;
+        this.iSpawnBudgetFar = this.SpawnBudgetFar.IntValue;
+        if (this.iSpawnBudgetFar < 0) this.iSpawnBudgetFar = 0;
+        if (this.iSpawnBudgetFar > 24) this.iSpawnBudgetFar = 24;
+        this.fScarcityJitter = this.ScarcityJitter.FloatValue;
+        if (this.fScarcityJitter < 0.0) this.fScarcityJitter = 0.0;
+        this.fSupportWaiveProb = this.SupportWaiveProb.FloatValue;
+        this.fSupportWaiveProb = ClampFloat(this.fSupportWaiveProb, 0.0, 1.0);
+
+        this.bSurFlowFallback   = this.SurFlowFallbackEnable.BoolValue;
+        this.fSurFlowFallbackTTL= this.SurFlowFallbackTTL.FloatValue;
+        if (this.fSurFlowFallbackTTL < 1.0) this.fSurFlowFallbackTTL = 1.0;
+
+        this.bAntiBaitEnable = this.AntiBaitEnable.BoolValue && this.LegacyAntiBaitEnable.BoolValue;
+        this.fAntiBaitGrace = this.AntiBaitGrace.FloatValue;
+        this.fAntiBaitWindow = this.AntiBaitWindow.FloatValue;
+        this.iAntiBaitProgressPct = this.AntiBaitProgressPct.IntValue;
+        this.fAntiBaitProgressDist = this.AntiBaitProgressDist.FloatValue;
+        this.fAntiBaitMinSiRatio = this.AntiBaitMinSiRatio.FloatValue;
+        this.fAntiBaitForceAfter = this.AntiBaitForceAfter.FloatValue;
+        this.fAntiBaitRecover = this.AntiBaitRecover.FloatValue;
+        this.fAntiBaitArmBefore = this.AntiBaitArmBefore.FloatValue;
+        this.fAntiBaitHoldConfirm = this.AntiBaitHoldConfirm.FloatValue;
+        this.fAntiBaitReleaseConfirm = this.AntiBaitReleaseConfirm.FloatValue;
+        this.fAntiBaitSpreadConfirm = this.AntiBaitSpreadConfirm.FloatValue;
+        this.iAntiBaitAction = this.AntiBaitAction.IntValue;
+        this.iAntiBaitRunnerGapPct = this.AntiBaitRunnerGapPct.IntValue;
+        this.fAntiBaitRunnerNearDist = this.AntiBaitRunnerNearDist.FloatValue;
+        this.fAntiBaitRunnerOffConfirm = this.AntiBaitRunnerOffConfirm.FloatValue;
+        this.fAntiBaitFastTeleport = this.AntiBaitFastTeleport.FloatValue;
+        this.fAntiBaitLatestBaseScale = this.AntiBaitLatestBaseScale.FloatValue;
+        this.fAntiBaitLatestScaleStep = this.AntiBaitLatestScaleStep.FloatValue;
+        this.fAntiBaitClusterDist = this.AntiBaitClusterDist.FloatValue;
+        this.fAntiBaitTeamDist = this.AntiBaitTeamDist.FloatValue;
+        this.fAntiBaitPairDist = this.AntiBaitPairDist.FloatValue;
+        this.fAntiBaitIsolateDist = this.AntiBaitIsolateDist.FloatValue;
+        this.fAntiBaitTankPressureDist = this.AntiBaitTankPressureDist.FloatValue;
+        this.iAntiBaitLowHp = this.AntiBaitLowHp.IntValue;
+        this.bAntiBaitDebug = this.AntiBaitDebug.BoolValue;
+        if (this.fAntiBaitMinSiRatio < 0.0) this.fAntiBaitMinSiRatio = 0.0;
+        if (this.fAntiBaitMinSiRatio > 1.0) this.fAntiBaitMinSiRatio = 1.0;
+        if (this.fAntiBaitLatestBaseScale < 1.0) this.fAntiBaitLatestBaseScale = 1.0;
+        if (this.fAntiBaitFastTeleport < 0.8) this.fAntiBaitFastTeleport = 0.8;
+        if (this.fAntiBaitArmBefore < 0.0) this.fAntiBaitArmBefore = 0.0;
+        if (this.fAntiBaitHoldConfirm < 0.0) this.fAntiBaitHoldConfirm = 0.0;
+        if (this.fAntiBaitReleaseConfirm < 0.0) this.fAntiBaitReleaseConfirm = 0.0;
+        if (this.fAntiBaitSpreadConfirm < 0.0) this.fAntiBaitSpreadConfirm = 0.0;
+        if (this.fAntiBaitClusterDist < 0.0) this.fAntiBaitClusterDist = 0.0;
+        if (this.fAntiBaitTeamDist < 0.0) this.fAntiBaitTeamDist = 0.0;
+        if (this.fAntiBaitPairDist < 0.0) this.fAntiBaitPairDist = 0.0;
+        if (this.fAntiBaitIsolateDist < 0.0) this.fAntiBaitIsolateDist = 0.0;
+        if (this.fAntiBaitTankPressureDist < 0.0) this.fAntiBaitTankPressureDist = 0.0;
+        if (this.iAntiBaitLowHp < 0) this.iAntiBaitLowHp = 0;
+    }
+
+    int GetMaxPlayerZombieBound()
+    {
+        return this.iSiLimit;
+    }
+
+    void ApplyMaxZombieBound()
+    {
+        int maxZombies = this.GetMaxPlayerZombieBound();
+        SetConVarBounds(this.MaxPlayerZombies, ConVarBound_Upper, true, float(maxZombies));
+        this.MaxPlayerZombies.IntValue = maxZombies;
+    }
+}

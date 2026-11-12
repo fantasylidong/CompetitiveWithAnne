@@ -81,8 +81,8 @@ jobs:
           archive_package database "$RELEASE_NAME.tar.gz"
 
           stage_package nomysql
-          # Keep local SQLite users l4d2_map_vote and spawn_vote_menu.  Both the
-          # active and 2026-07 infected_control builds tolerate a missing quota provider.
+          # Keep local SQLite users l4d2_map_vote and spawn_vote_menu.  The
+          # active and 2026-07/2026-08 infected_control builds tolerate a missing quota provider.
           NOMYSQL_REMOVALS=(
             extend/l4d_stats
             extend/sbpp_admcfg

@@ -40,6 +40,7 @@ active migration:
 - `addons/sourcemod/scripting/dev_plugins/`
 - `addons/sourcemod/scripting/sourcemod/`
 - `infected_control26-07.sp` and `infected_control26-07/`
+- `infected_control26-08.sp` and `infected_control26-08/`
 - binary-only plugins
 
 Active vendor plugins may carry a local flags-only patch. Such patches must be

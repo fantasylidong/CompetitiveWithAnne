@@ -84,11 +84,17 @@ def check():
     assert parameters['26-07', 'ai_charger3', 'ai_charger3_bhop_direct_dist']['numeric'] == 350
     assert parameters['26-07', 'ai_charger3', 'ai_charger3_bhop_impulse']['numeric'] == 90
     assert parameters['26-07', 'ai_charger3', 'ai_charger3_target_watch_maxdeg']['numeric'] == 30
+    assert parameters['26-08', 'ai_charger3', 'ai_charger3_bhop_direct_dist']['numeric'] == 350
+    assert parameters['26-08', 'ai_charger3', 'ai_charger3_bhop_impulse']['numeric'] == 90
+    assert parameters['26-08', 'ai_jockey_2', 'ai_JockeyBackVision']['numeric'] == 0
+    assert parameters['26-08', 'ai_hunter_2', 'ai_hunter_back_vision']['numeric'] == 0
     for version in ('25-10', '25-11'):
         assert parameters[version, 'ai_smoker3', 'ai_smoker3_imm_pull']['numeric'] == 0
-    july = manifest['profiles']['26-07']['settings']['parameters']
-    assert july['inf_ai_difficulty_link'] == '0' and july['inf_ai_difficulty_fallback_level'] == '3'
-    print(f'PASS: {count} SMXs, {len(parameters)} frozen parameters, 15 version entries, engine restore order and compatibility paths')
+    for version in ('26-07', '26-08'):
+        archived_settings = manifest['profiles'][version]['settings']['parameters']
+        assert archived_settings['inf_ai_difficulty_link'] == '0' and archived_settings['inf_ai_difficulty_fallback_level'] == '3'
+    assert manifest['profiles']['26-08']['settings']['parameters']['smoker_tongue_delay'] == '1.0'
+    print(f'PASS: {count} SMXs, {len(parameters)} frozen parameters, 16 version entries, engine restore order and compatibility paths')
 
 
 if __name__ == '__main__':

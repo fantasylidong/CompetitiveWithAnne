@@ -22,7 +22,7 @@ DEST = ROOT / SCRIPTING / 'archive/AnneHappy/ai_versions'
 PLUGIN_ROOT = 'optional/AnneHappy/ai_versions'
 SPEC = Path(__file__).with_name('anne_ai_profiles.json')
 PINNED_INCLUDES = {'treeutil', 'logger2', 'vector_show', 'infected_control', 'anne_nextbot'}
-INCLUDE = re.compile(r'^\s*#include\s*[<"]([^>"\n]+)[>"]', re.M)
+INCLUDE = re.compile(r'^\s*#include\s*([<"])([^>"\n]+)[>"]', re.M)
 
 
 def git(commit: str, path: str) -> str:
@@ -131,10 +131,10 @@ def snapshot(commit: str, entry: str, values: dict[str, str]):
         source = prepare(original, path, values)
 
         def include(match):
-            name = match.group(1)
+            delim, name = match.group(1), match.group(2)
             if name in PINNED_INCLUDES:
                 target = SCRIPTING + 'include/' + name + '.inc'
-            elif name.startswith('.') or '/' in name and not name.startswith('sourcemod'):
+            elif delim == '"' or name.startswith('.') or '/' in name and not name.startswith('sourcemod'):
                 target = posixpath.normpath(posixpath.join(posixpath.dirname(path), name))
                 if not target.endswith(('.sp', '.inc')):
                     target += '.inc'

@@ -22,7 +22,11 @@
 	{
 		"sm_fchmatch annehappy_shotgun"
 		{
-			"message" "喷子硬核26-8月最新版本"
+			"message" "喷子硬核26-11月测试版"
+		}
+		"exec vote/Anne/Anne26-08.cfg"
+		{
+			"message" "26-8月版本"
 		}
 		"exec vote/Anne/Anne26-07.cfg"
 		{

@@ -132,6 +132,12 @@ bool IsPinned(int client)
         || GetEntPropEnt(client, Prop_Send, "m_pummelAttacker") > 0;
 }
 
+bool IsSurvivorBiled(int client)
+{
+    return IsValidSurvivor(client) && IsPlayerAlive(client)
+        && GetEntPropFloat(client, Prop_Send, "m_itTimer", 1) > GetGameTime();
+}
+
 bool IsEligibleSpawnTarget(int client)
 {
     return IsValidSurvivor(client)

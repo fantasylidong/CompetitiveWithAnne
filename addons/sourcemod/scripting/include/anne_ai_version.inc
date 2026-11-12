@@ -5,12 +5,13 @@
 
 #include <sourcemod>
 
-// AnnePluginVersion accepts both legacy dates (21-7-7) and release months (2026-08).
+// AnnePluginVersion accepts legacy dates (21-7-7), release months (2026-08),
+// and suffixed test labels (2026-11测试版, 2026-11-beta).
 stock int AnneAI_ParseVersionMonth(const char[] value)
 {
-	if (strlen(value) >= 32)
+	if (strlen(value) >= 64)
 		return 0;
-	char version[32];
+	char version[64];
 	strcopy(version, sizeof(version), value);
 	TrimString(version);
 	if (StrEqual(version, "Latest", false))
@@ -18,31 +19,54 @@ stock int AnneAI_ParseVersionMonth(const char[] value)
 
 	ReplaceString(version, sizeof(version), ".", "-");
 	ReplaceString(version, sizeof(version), "/", "-");
-	int separators;
-	for (int i = 0; version[i] != '\0'; i++)
+
+	int pos = 0;
+	int yearDigits = 0;
+	int year = 0;
+	while (version[pos] >= '0' && version[pos] <= '9')
 	{
-		if (version[i] == '-')
-			separators++;
-		else if (version[i] < '0' || version[i] > '9')
+		if (++yearDigits > 4)
 			return 0;
+		year = year * 10 + (version[pos] - '0');
+		pos++;
 	}
-	if (separators < 1 || separators > 2)
+	if ((yearDigits != 2 && yearDigits != 4) || version[pos] != '-')
 		return 0;
-	char parts[3][12];
-	int count = ExplodeString(version, "-", parts, sizeof(parts), sizeof(parts[]));
-	int yearLength = strlen(parts[0]);
-	if (count != separators + 1 || (yearLength != 2 && yearLength != 4)
-		|| strlen(parts[1]) < 1 || strlen(parts[1]) > 2)
-		return 0;
-	if (count == 3 && (strlen(parts[2]) < 1 || strlen(parts[2]) > 2
-		|| StringToInt(parts[2]) < 1 || StringToInt(parts[2]) > 31))
+	pos++;
+
+	int monthDigits = 0;
+	int month = 0;
+	while (version[pos] >= '0' && version[pos] <= '9')
+	{
+		if (++monthDigits > 2)
+			return 0;
+		month = month * 10 + (version[pos] - '0');
+		pos++;
+	}
+	if (monthDigits < 1 || month < 1 || month > 12)
 		return 0;
 
-	int year = StringToInt(parts[0]);
-	int month = StringToInt(parts[1]);
+	if (version[pos] == '-' && version[pos + 1] >= '0' && version[pos + 1] <= '9')
+	{
+		pos++;
+		int dayDigits = 0;
+		int day = 0;
+		while (version[pos] >= '0' && version[pos] <= '9')
+		{
+			if (++dayDigits > 2)
+				return 0;
+			day = day * 10 + (version[pos] - '0');
+			pos++;
+		}
+		if (day < 1 || day > 31)
+			return 0;
+		if (version[pos] == '-' && version[pos + 1] >= '0' && version[pos + 1] <= '9')
+			return 0;
+	}
+
 	if (year > 0 && year < 100)
 		year += 2000;
-	if (year < 2000 || month < 1 || month > 12)
+	if (year < 2000)
 		return 0;
 	return year * 100 + month;
 }
@@ -60,12 +84,12 @@ stock int AnneAI_GetVersionMonth()
 stock bool AnneAI_IsArchivedVersion()
 {
 	int version = AnneAI_GetVersionMonth();
-	return version >= 202206 && version < 202608;
+	return version >= 202206 && version < 202611;
 }
 
 stock bool AnneAI_IsDynamicDifficultyAvailable()
 {
-	if (AnneAI_GetVersionMonth() < 202608
+	if (AnneAI_GetVersionMonth() < 202611
 		|| !LibraryExists("annehappy_dynamic_ai_difficulty"))
 		return false;
 	Handle plugin = FindPluginByFile("optional/AnneHappy/annehappy_dynamic_ai_difficulty.smx");

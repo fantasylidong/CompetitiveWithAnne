@@ -1,0 +1,812 @@
+#pragma semicolon 1
+#pragma newdecls required
+
+// 头文件
+#include <sourcemod>
+#include <sdktools>
+#include <left4dhooks>
+#include <colors>
+
+#include "../../../include/treeutil.inc"
+
+#include "../../../include/logger2.inc"
+#include <actions>
+
+// For debug print vector direction, positon
+
+#include "../../../include/vector_show.inc"
+
+#include "setup.inc"
+
+#include "../ai_path_movement.inc"
+
+#include "stocks.inc"
+
+#include "state/state.inc"
+#undef REQUIRE_PLUGIN
+#include <si_target_limit>
+#define REQUIRE_PLUGIN
+
+// 将插件日志前缀改成自己插件的日志前缀
+#define PLUGIN_PREFIX "AI-Charger3"
+#define ACT_NAME_CHARGER_EVADE		"ChargerEvade"
+#define ACT_NAME_CHARGE_AT_VICTIM 	"ChargerChargeAtVictim"
+
+
+
+Logger
+	log;
+
+public Plugin myinfo = 
+{
+	name 			= "Ai-Charger 3.0",
+	author 			= "夜羽真白",
+	description 	= "Ai Charger 增强 3.0 版本",
+	version 		= "1.0.1.18",
+	url 			= "https://steamcommunity.com/id/saku_ra/"
+}
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int errMax) {
+		return APLRes_Success;
+}
+
+public void OnPluginStart() {
+	// allow charger to bhop?
+	
+	// charger is allowed to bhop when its distance from the target is between [ai_charger3_bhop_min_dist, ai_charger3_bhop_max_dist], if the distance is less than this value, charger will transition to bait state
+	
+	
+	
+	// the bhop impulse, added only when charger re-jumps right after landing from a previous hop; the first hop taken straight from running keeps its run speed
+	
+	// the fraction of bhop impulse granted to the first hop taken straight from running (0.0 = none, 1.0 = same as a landing hop / legacy behavior)
+	
+	// when charger's speed is greater than 'ai_charger3_bhop_min_speed', it is allowed to bhop, and its max bhop speed will not greater than 'ai_charger3_bhop_max_speed'
+	
+	
+	// Whether charger is allowed to perform bhop before charging. 0=Disabled, 1=Enabled
+	
+	// when charger has no vision of the target survivor, allow it to bhop?
+	
+	// when charger has no sight of target, it is allowed to bhop when its speed vector and eye angle forward vector within this degree
+	
+	// when the vector of charger to target and charger's eye angle forward vector within this degree, consider the target is looking at charger
+	
+	// when the distance between charger and target is less than this value, disable left/right strafing offset of charger's bhop direction
+	
+	// the minimum angle of random left/right strafing offset for charger's bhop direction. Enable if greater than 0.0, disable this feature if set to -1.0
+	
+	// the maximum angle of random left/right strafing offset for charger's bhop direction
+	
+	// The minimum distance from target required for charger to perform single strafe bhop (bhopping is disabled when closer than this distance)
+	
+	// The minimum distance from target required for charger to perform double strafe bhop (bhopping is disabled when closer than this distance)
+	
+	// when the target is holding a melee weapon, the minimum range of the melee bait zone (calculated as melee_range plus this value)
+	
+	// when the target is holding a melee weapon, the maximum range of the melee bait zone (calculated as melee_range plus this value)
+	
+	// when the angle between charger's air velocity direction and the direction from charger to target exceeds this value, perform air velocity modification (air modification: set charger's current velocity direction to the target direction)
+	
+	// When the angle between charger's air velocity direction and the direction from charger to target exceeds this value, abandon air velocity modification
+	
+	// the interval (in seconds) between consecutive air velocity vector modifications for charger
+	
+	// The interpolation factor for charger's air velocity direction modification. Min: 0.0, Max: 1.0. Lower values result in smoother air turning, higher values result in sharper air turning
+	
+	// Horizontal speed loss per 90 degrees of actual in-air turning
+	
+	
+	// The maximum angle charger's in-air velocity may deviate from its takeoff direction within one hop (0 = unlimited)
+	
+	// the maximum allowed duration (in seconds) for charger to stay in the bait state
+	
+	
+	
+	
+	// the detection interval (in seconds) for charger's probabilistic charge when in the bait state
+	
+	// the probability (0.0 to 1.0) of charger performing a probabilistic charge when in the bait state
+	
+	// whether to prohibit charger from retreating: 0=Disabled (allow retreat), 1=Enabled (forbid retreat)
+	
+	// refresh interval for the target destination used by BehaviorMoveTo while ChargerEvade is intercepted
+	
+	// The maximum depth of path segments that charger will look ahead when it is on ground and preparing to bhop (0 = disabled). Controls how far ahead charger scans the current PATH to find suitable landing spots before hopping from ground
+	
+
+	// 兼容 ai_charger_2 的配置。先查找旧 Cvar，支持同一局内从旧版本切换到新版本。
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+	// 将插件名称改成自己插件名称
+	
+
+	char cvName[64];
+	strcopy(cvName, sizeof(cvName), "ai_charger3");
+	FormatEx(cvName, sizeof(cvName), "%s_log_level", cvName);
+	// log recording level: 1=Disabled, 2=Console output, 4=Log file output, 8=Chat box output, 16=Server console output, 32=Error file output. Values can be added together for multiple outputs
+	
+
+	HookEvent("round_start", evtRoundStart);
+	HookEvent("round_end", evtRoundEnd);
+	HookEvent("player_spawn", evtPlayerSpawn);
+
+	log = new Logger(PLUGIN_PREFIX, (1));
+
+	// 子模块初始化
+	SetUp_OnModuleStart();
+	State_OnModuleStart();
+	Stock_OnModuleStart();
+}
+
+public void OnPluginEnd() {
+	SetUp_OnModuleEnd();
+	State_OnModuleEnd();
+	Stock_OnModuleEnd();
+	delete log;
+}
+
+public void OnAllPluginsLoaded() {
+	SetUp_OnAllPluginsLoaded();
+}
+
+public void OnConfigsExecuted() {
+	SetUp_OnConfigsExecuted();
+	syncLegacyChargerConfig();
+}
+
+
+
+void syncLegacyChargerConfig()
+{
+	g_fLegacyExtraTargetMin = 0.0;
+	g_fLegacyExtraTargetMax = 350.0;
+	if (true)
+	{
+		char range[64];
+		char values[2][32];
+		strcopy(range, sizeof(range), "100,600");
+		int count = ExplodeString(range, ",", values, sizeof(values), sizeof(values[]));
+		if (count >= 1)
+			g_fLegacyExtraTargetMin = StringToFloat(values[0]);
+		if (count >= 2)
+			g_fLegacyExtraTargetMax = StringToFloat(values[1]);
+		if (g_fLegacyExtraTargetMax < g_fLegacyExtraTargetMin)
+			g_fLegacyExtraTargetMax = g_fLegacyExtraTargetMin;
+	}
+}
+
+void legacyChargerConfigChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	syncLegacyChargerConfig();
+}
+
+public Action OnPlayerRunCmd(int client, int& buttons, int& impulse, float vel[3], float angles[3], int& weapon) {
+	if (!isAiCharger(client))
+		return Plugin_Continue;
+
+	beginChargerVisibilityMemo(client);
+
+	// 地面/梯子登记必须每帧、在任何提前返回之前完成, 否则站在地上的帧漏登记会被误判成滞空落地, 让停顿后的第一跳白拿一份加速度
+	// 传入 onLadder 让梯顶 dismount 那段短暂离地不被当成落地
+	bool groundedOnLadder = GetEntityMoveType(client) == MOVETYPE_LADDER;
+	bool grounded = groundedOnLadder || IsClientOnGround(client);
+	if (grounded)
+		AIPathMovement_NotifyGrounded(client, groundedOnLadder);
+	// 离地登记同样要在提前返回之前完成, 空中转向预算和落地加速度折算都依赖它
+	updateAirTurnTracking(client, grounded);
+
+	// BehaviorMoveTo 无法被 actions.ext 捕获, 因此从始终执行的 RunCmd 维护 BOT_CMD_MOVE 的目标坐标
+	maintainEvadeMoveCommand(client);
+
+	// 梯子上清除跳/蹲输入后必须以 Plugin_Changed 返回, 否则按键修改会被丢弃
+	static bool ladderButtonsChanged;
+	ladderButtonsChanged = false;
+	if (GetEntityMoveType(client) == MOVETYPE_LADDER) {
+		if (buttons & (IN_JUMP | IN_DUCK))
+			ladderButtonsChanged = true;
+		buttons &= ~IN_JUMP;
+		buttons &= ~IN_DUCK;
+	}
+
+	static int ability;
+	ability = getChargeAbilityEnt(client);
+	if (!IsValidEdict(ability))
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
+	static bool isCharging;
+	isCharging = view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
+	if (isCharging && g_AiChargers[client].m_bChargeDelayed)
+		g_AiChargers[client].m_bChargeDelayed = false;
+
+	// 所有状态统一让出原生冲锋、控人及撞停硬直；不能让 Bait 走位或空中修正绕过保护。
+	if (isChargerInNativeMotion(client)) {
+		AIPathMovement_Reset(client);
+		AIPathMovement_ResetHopChain(client);
+		g_AiChargers[client].m_BhopType = BhopType_None;
+		g_AiChargers[client].m_AirStrafe.init();
+		ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+		g_AiChargers[client].m_flLastHopSpeed = 0.0;
+		g_AiChargers[client].m_bBhopBeforeCharge = false;
+		g_AiChargers[client].m_flFinalBhopStartTime = 0.0;
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
+	}
+	
+	static int target;
+	target = GetClientOfUserId(g_AiChargers[client].m_iTarget);
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+		return ladderButtonsChanged ? Plugin_Changed : Plugin_Continue;
+
+	if (g_ChargerStateContext[client].userId != GetClientUserId(client)) {
+		g_AiChargers[client].init();
+		AIPathMovement_Reset(client);
+		AIPathMovement_ResetHopChain(client);
+		clearPathSnapshot(client);
+		// 目标变化, 重置状态
+		g_ChargerStateContext[client].init(client);
+		g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
+	}
+
+	// 门会挡住目标视野, 必须先处理, 避免状态机清掉挥拳或继续向门连跳。
+	if (tryClawBlockingDoor(client, buttons, vel, angles))
+		return Plugin_Changed;
+
+	// 执行当前状态的每帧行为更新操作
+	static Action stateResult;
+	stateResult = g_ChargerStateContext[client].update(buttons, vel, angles);
+	if (ladderButtonsChanged && stateResult == Plugin_Continue)
+		stateResult = Plugin_Changed;
+	return stateResult;
+}
+
+bool tryClawBlockingDoor(int client, int& buttons, float vel[3], float angles[3]) {
+	if (GetEntityMoveType(client) == MOVETYPE_LADDER || !IsClientOnGround(client) ||
+		isChargerCharging(client) || IsPinningSurvivor(client) ||
+		IsValidSurvivor(L4D2_GetQueuedPummelVictim(client)) || L4D_IsPlayerStaggering(client))
+		return false;
+
+	float velocity[3];
+	GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velocity);
+	// 只在低速受阻时探测, 正常跑动不增加射线也不打断攻击。
+	if (getVectorLength2D(velocity) > 50.0)
+		return false;
+
+	float eye[3], direction[3], right[3], flatAngles[3], end[3];
+	GetClientEyePosition(client, eye);
+	flatAngles[1] = angles[1];
+	GetAngleVectors(flatAngles, direction, right, NULL_VECTOR);
+	float moveSpeed = getVectorLength2D(vel);
+	// 优先探测原生寻路的移动方向；原地停住时回退到面朝方向。
+	if (moveSpeed > 1.0) {
+		ScaleVector(direction, vel[0]);
+		ScaleVector(right, vel[1]);
+		AddVectors(direction, right, direction);
+		NormalizeVector(direction, direction);
+	}
+	end = direction;
+	ScaleVector(end, getChargerClawRange());
+	AddVectors(eye, end, end);
+
+	// 保留墙、玩家及其他实体的遮挡, 只检查拳头射程内首先碰到的实体。
+	Handle trace = TR_TraceRayFilterEx(eye, end, MASK_SHOT, RayType_EndPoint, chargerDoorTraceFilter, client);
+	int door = TR_DidHit(trace) ? TR_GetEntityIndex(trace) : -1;
+	delete trace;
+	if (door <= MaxClients || !IsValidEntity(door))
+		return false;
+
+	char className[64];
+	GetEntityClassname(door, className, sizeof(className));
+	if (strcmp(className, "prop_door_rotating") != 0 ||
+		(L4D_GetDoorFlag(door) & DOOR_FLAG_UNBREAKABLE))
+		return false;
+
+	// 用正常挥拳打门, 不直接伤害/删除实体, 也不干预安全门。
+	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
+	AIPathMovement_Reset(client);
+	GetVectorAngles(direction, angles);
+	TeleportEntity(client, NULL_VECTOR, angles, NULL_VECTOR);
+	if (moveSpeed > 1.0) {
+		// 视角转向寻路方向后同步换算指令速度, 保持原本的世界移动方向。
+		vel[0] = moveSpeed;
+		vel[1] = 0.0;
+		setForwardBhopInput(buttons, false);
+	}
+	buttons &= ~(IN_ATTACK | IN_JUMP | IN_DUCK);
+	buttons |= IN_ATTACK2;
+	setChargerAbilityCooldown(client, 1.0);
+	return true;
+}
+
+bool chargerDoorTraceFilter(int entity, int contentsMask, any client) {
+	return entity != client;
+}
+
+void evtRoundStart(Event event, const char[] name, bool dontBroadcast) {
+
+}
+
+void evtRoundEnd(Event event, const char[] name, bool dontBroadcast) {
+
+}
+
+void evtPlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
+	static int client;
+	client = GetClientOfUserId(event.GetInt("userid"));
+	if (!isAiCharger(client))
+		return;
+	
+	// 新的 charger, 重置状态
+	g_AiChargers[client].init();
+	clearBaitTargetBlacklist(client);
+	clearChargerForcedTarget(client);
+	AIPathMovement_Reset(client);
+	AIPathMovement_ResetHopChain(client);
+	clearPathSnapshot(client);
+	g_ChargerStateContext[client].init(client);
+	g_ChargerStateContext[client].transitionTo(CH_STATE_APPROACH);
+}
+
+public void OnMapStart() {
+	GetVectorShowSprite();
+	resetChargerClawRangeCache();
+}
+
+public void OnMapEnd() {
+	resetChargerClawRangeCache();
+}
+
+public Action L4D2_OnChooseVictim(int client, int &curTarget) {
+	if (!isAiCharger(client))
+		return Plugin_Continue;
+
+	// 近战僵持无解时登记的强制目标, 优先于常规选目标逻辑落实一次
+	int forcedTarget = getChargerForcedTarget(client);
+	if (forcedTarget > 0 && !SITL_TargetCapBlocks(client, forcedTarget))
+	{
+		clearChargerForcedTarget(client);
+		g_AiChargers[client].m_iTarget = GetClientUserId(forcedTarget);
+		if (curTarget != forcedTarget)
+		{
+			curTarget = forcedTarget;
+			SITL_CommitVictim(client, forcedTarget);
+			return Plugin_Changed;
+		}
+		return Plugin_Continue;
+	}
+
+	int selected = selectLegacyCompatibleTarget(client, curTarget);
+	// 新目标已达到控制类锁定上限时放弃改写，保持引擎/底层分配结果
+	if (selected > 0 && selected != curTarget && SITL_TargetCapBlocks(client, selected))
+		selected = 0;
+	if (selected > 0 && selected != curTarget)
+	{
+		curTarget = selected;
+		g_AiChargers[client].m_iTarget = GetClientUserId(selected);
+		SITL_CommitVictim(client, selected);
+		return Plugin_Changed;
+	}
+
+	if (IsValidSurvivor(curTarget) && IsPlayerAlive(curTarget))
+		g_AiChargers[client].m_iTarget = GetClientUserId(curTarget);
+	return Plugin_Continue;
+}
+
+bool isLegacyTargetCandidate(int client, int target, const float origin[3], float &distance)
+{
+	if (target == client || !IsValidSurvivor(target) || !IsPlayerAlive(target))
+		return false;
+	if (IsClientIncapped(target) || IsClientHanging(target) || IsClientPinned(target))
+		return false;
+	// 刚因为近战僵持放弃过的目标, 冷却期内不要立刻再选回来
+	if (isBaitTargetBlacklisted(client, target))
+		return false;
+
+	float targetPos[3];
+	GetClientAbsOrigin(target, targetPos);
+	distance = GetVectorDistance(origin, targetPos);
+	return distance >= g_fLegacyExtraTargetMin && distance <= g_fLegacyExtraTargetMax;
+}
+
+int selectLegacyCompatibleTarget(int client, int currentTarget)
+{
+	if (false || (1) <= 1)
+	{
+		if (IsValidSurvivor(currentTarget) && IsPlayerAlive(currentTarget) && !isBaitTargetBlacklisted(client, currentTarget))
+			return currentTarget;
+		// 黑名单只是偏好, getClosestSurvivorAndValid 不看黑名单, 保证极端情况下不会没有目标
+		return getClosestSurvivorAndValid(client);
+	}
+
+	float origin[3];
+	GetClientAbsOrigin(client, origin);
+
+	int bestTarget = -1;
+	float bestDistance = 999999.0;
+	float bestScore = 999999999.0;
+	int mode = (1);
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		float distance;
+		if (!isLegacyTargetCandidate(client, i, origin, distance))
+			continue;
+
+		if (mode == 2)
+		{
+			if (distance < bestDistance)
+			{
+				bestDistance = distance;
+				bestTarget = i;
+			}
+			continue;
+		}
+
+		float candidatePos[3];
+		GetClientAbsOrigin(i, candidatePos);
+		float crowdScore = 0.0;
+		for (int j = 1; j <= MaxClients; j++)
+		{
+			if (j == client || !IsValidSurvivor(j) || !IsPlayerAlive(j))
+				continue;
+
+			float survivorPos[3];
+			GetClientAbsOrigin(j, survivorPos);
+			crowdScore += GetVectorDistance(candidatePos, survivorPos, true);
+		}
+
+		if (crowdScore < bestScore)
+		{
+			bestScore = crowdScore;
+			bestTarget = i;
+		}
+	}
+
+	if (bestTarget > 0)
+		return bestTarget;
+	if (IsValidSurvivor(currentTarget) && IsPlayerAlive(currentTarget) && !isBaitTargetBlacklisted(client, currentTarget))
+		return currentTarget;
+	return getClosestSurvivorAndValid(client);
+}
+
+// PathFollower::Update 首次执行晚于 OnPlayerRunCmd, 并且频率大概是 OnPlayerRunCmd 的 1/3
+public void AnneNextBot_OnChargerPathSnapshotUpdated(int client) {
+		if (!isAiCharger(client))
+			return;
+
+		if (g_AiChargers[client].m_bPathInvalidatePending) {
+			g_AiChargers[client].m_bPathInvalidatePending = false;
+			AnneNextBot_InvalidatePath(client);
+			clearCachedPath(client);
+			return;
+		}
+
+		int count, currentIndex;
+		bool complete;
+		float age;
+		if (!AnneNextBot_GetPathSnapshotInfo(client, count, currentIndex, complete, age) ||
+			currentIndex < 0 || currentIndex >= count) {
+			clearCachedPath(client);
+			return;
+		}
+
+		PathSegment curSegment;
+		if (!constructPathSegmentFromSnapshot(client, currentIndex, curSegment)) {
+			clearCachedPath(client);
+			return;
+		}
+		g_AiChargers[client].m_PathSegment = curSegment;
+
+		// 检查落后的 m_goal；无法在剩余路径中重新定位时，无效化旧路径并等待原生 Action 重新寻路。
+		if (!checkGoalIsBehind(client, currentIndex))
+			return;
+
+		if (!capturePathSnapshot(client))
+			clearCachedPath(client);
+}
+
+bool checkGoalIsBehind(int client, int currentIndex) {
+		if (!isAiCharger(client))
+			return false;
+
+		PathSegment curSeg;
+		curSeg = g_AiChargers[client].m_PathSegment;
+		if (!curSeg.m_pNavArea)
+			return false;
+
+	Address pLastKnownArea = L4D_GetLastKnownArea(client);
+	if (!pLastKnownArea) {
+		static float pos[3];
+		GetClientAbsOrigin(client, pos);
+		pos[2] += 20.0;
+		pLastKnownArea = view_as<Address>(L4D_GetNearestNavArea(pos, _, _, true, true, TEAM_INFECTED));
+
+			if (!pLastKnownArea) {
+				log.error("[CheckGoalIsBehind]: Failed to get client %N's LastKnownArea or nearest NavArea", client);
+				return true;
+			}
+		}
+
+		int count, refreshedCurrent;
+		bool complete;
+		float age;
+		if (!AnneNextBot_GetPathSnapshotInfo(client, count, refreshedCurrent, complete, age))
+			return false;
+		if (refreshedCurrent != currentIndex)
+			currentIndex = refreshedCurrent;
+
+		PathSegment segment;
+		for (int index = 0; index <= currentIndex && index < count; index++) {
+			if (constructPathSegmentFromSnapshot(client, index, segment) && segment.m_pNavArea == pLastKnownArea)
+				return true;
+		}
+
+		int matchedIndex = -1;
+		for (int index = currentIndex + 1; index < count; index++) {
+			if (constructPathSegmentFromSnapshot(client, index, segment) && segment.m_pNavArea == pLastKnownArea) {
+				matchedIndex = index;
+				break;
+			}
+		}
+
+		if (matchedIndex >= 0 && AnneNextBot_SetPathGoal(client, matchedIndex)) {
+			// 进入匹配 NavArea 不代表已经越过该 Segment 的 GoalPos, 因此不再额外跳到 NextSegment
+			// 重新找到了新的 CurrentGoal, 重置空中速度修正坐标
+			ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+			AIPathMovement_Reset(client);
+			g_AiChargers[client].m_AirStrafe.init();
+
+			log.debugAll("[CheckGoalIsBehind]: Advanced Charger %N goal after matching future NavArea %d", client, L4D_GetNavAreaID(pLastKnownArea));
+			return true;
+		}
+
+	/*
+	* 如果 LastKnownArea 无法匹配当前 Path 上任何一个节点, 说明 Charger 已经脱离该 Path, 此时需要使旧的 Path 无效化
+	* 然后通过 ChargerAttack::Update 这个 Action 重新构造一条新的 Path
+	*/
+		AnneNextBot_InvalidatePath(client);
+
+	clearCachedPath(client);
+	ZeroVector(g_AiChargers[client].m_vecAirCorrGoal);
+	AIPathMovement_Reset(client);
+	g_AiChargers[client].m_AirStrafe.init();
+	g_AiChargers[client].m_BhopType = BhopType_None;
+
+		log.debugAll("[CheckGoalIsBehind]: Invalidated Charger %N path because LastKnownArea %d is absent from the remaining path", client, L4D_GetNavAreaID(pLastKnownArea));
+		return false;
+}
+
+/**
+* 将生还者当前位置解析为适合 BOT_CMD_MOVE 的 Nav 目的地。
+* 目标可能站在箱子或处于空中, 因此优先使用当前位置附近的 NavArea,
+* LastKnownArea 只作为最后回退, 避免传送后继续使用旧区域。
+*/
+stock bool getEvadeMoveDestination(int target, float movePos[3]) {
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+		return false;
+
+	static float targetPos[3], navQueryPos[3];
+	GetClientAbsOrigin(target, targetPos);
+
+	static Address targetNavArea;
+	targetNavArea = L4D2Direct_GetTerrorNavArea(targetPos);
+
+	if (!targetNavArea) {
+		navQueryPos = targetPos;
+		navQueryPos[2] += 20.0;
+		targetNavArea = L4D_GetNearestNavArea(navQueryPos, _, false, true, true, TEAM_SURVIVOR);
+	}
+
+	if (!targetNavArea)
+		targetNavArea = L4D_GetLastKnownArea(target);
+
+	if (!targetNavArea)
+		return false;
+
+	L4D_GetNavAreaCenter(targetNavArea, movePos);
+	return true;
+}
+
+stock void clearEvadeMoveCommandTracking(int client) {
+	g_AiChargers[client].m_bEvadeMoveCommandActive = false;
+	g_AiChargers[client].m_bEvadeMoveCommandPending = false;
+	g_AiChargers[client].m_flLastEvadeMoveToCheckTime = 0.0;
+	ZeroVector(g_AiChargers[client].m_vecEvadeMoveToPos);
+}
+
+stock void stopEvadeMoveCommand(int client, const char[] reason) {
+	static bool accepted;
+	accepted = L4D2_CommandABot(client, 0, BOT_CMD_RESET);
+
+	log.debugAll("[EvadeMoveCommand]: Reset Charger %N command, accepted: %d, reason: %s", client, accepted, reason);
+	clearEvadeMoveCommandTracking(client);
+}
+
+/**
+* actions.ext 无法观察 CommandABot 创建的 BehaviorMoveTo, 因此由 RunCmd 定时维护命令
+* 目标 Nav 目的地变化后只 RESET 旧的 CommandABot MOVE 命令; ChargerEvade 恢复时负责读取新坐标并重新下发 MOVE
+*/
+stock void maintainEvadeMoveCommand(int client) {
+	if (!g_AiChargers[client].m_bEvadeMoveCommandActive)
+		return;
+
+	if (!true) {
+		stopEvadeMoveCommand(client, "anti-retreat disabled");
+		return;
+	}
+
+	if (isChargerInNativeMotion(client)) {
+		stopEvadeMoveCommand(client, "charging, pinning or staggering");
+		return;
+	}
+
+	static int target;
+	target = GetClientOfUserId(g_AiChargers[client].m_iTarget);
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target)) {
+		stopEvadeMoveCommand(client, "target invalid");
+		return;
+	}
+
+	/*
+	* 检查旧的目标位置是否仍然有效, 目标移动超过 EVADE_MOVETO_REFRESH_MIN_DIST 时, 下达 BOT_CMD_RESET 恢复 Charger 原生行为
+	* 如果 ChargerEvade 继续生效, 那么会尝试获取新的目标位置, 下达 BOT_CMD_MOVE 命令
+	*/
+	static float now;
+	now = GetEngineTime();
+	if (now - g_AiChargers[client].m_flLastEvadeMoveToCheckTime < (1.0))
+		return;
+
+	g_AiChargers[client].m_flLastEvadeMoveToCheckTime = now;
+
+	static float newMovePos[3];
+	if (!getEvadeMoveDestination(target, newMovePos)) {
+		log.debugAll("[EvadeMoveCommand]: Failed to resolve target %N's current move destination", target);
+		return;
+	}
+
+	static float movedDist;
+	movedDist = GetVectorDistance(g_AiChargers[client].m_vecEvadeMoveToPos, newMovePos);
+	if (movedDist < EVADE_MOVETO_REFRESH_MIN_DIST)
+		return;
+
+	/*
+	* 不在这里更新旧坐标或清除 active 标记。若 RESET 未生效, 下一周期仍会重试
+	* 若 RESET 生效, 恢复的 ChargerEvade 会重新下发 MOVE 并写入新坐标
+	*/
+	static bool accepted;
+	accepted = L4D2_CommandABot(client, 0, BOT_CMD_RESET);
+	log.debugAll("[EvadeMoveCommand]: Target %N destination moved %.2f units, reset Charger %N command, accepted: %d",
+		target, movedDist, client, accepted);
+}
+
+// ============================================================
+// Action Extension
+// ============================================================
+public void OnActionCreated(BehaviorAction action, int actor, const char[] name) {
+	if (action == INVALID_ACTION || !isAiCharger(actor))
+		return;
+
+	if (true) {
+		if (strcmp(name, ACT_NAME_CHARGER_EVADE, false) == 0) {
+			action.OnUpdate = chargerEvade_OnUpdate;
+			action.OnEnd = chargerEvade_OnEnd;
+		}
+	}
+	// 防止 charger 刷新距离生还者很近时, 游戏强制冲撞, 但是 APPROACH STATE 同时将 Charger 能力就绪时间设置为 1 秒后, 导致 Charger 原地卡住
+	if (strcmp(name, ACT_NAME_CHARGE_AT_VICTIM, false) == 0) {
+		action.OnUpdate = chargerChargeAtVictim_OnUpdate;
+	}
+}
+
+Action chargerEvade_OnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
+	if (!isAiCharger(actor)) {
+		return Plugin_Continue;
+	}
+	if (g_AiChargers[actor].m_bEvadeMoveCommandActive || g_AiChargers[actor].m_bEvadeMoveCommandPending)
+		return Plugin_Continue;
+
+	if (!true) {
+		clearEvadeMoveCommandTracking(actor);
+		return Plugin_Continue;
+	}
+	// 撞停准备控人的时候有时候会触发 Evade 行为
+	if (isChargerInNativeMotion(actor)) {
+		return Plugin_Continue;
+	}
+
+	static int target;
+	target = GetClientOfUserId(g_AiChargers[actor].m_iTarget);
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target)) {
+		return Plugin_Continue;
+	}
+	
+	static float movePos[3];
+	if (!getEvadeMoveDestination(target, movePos)) {
+		log.debugAll("[ChargerEvadeOnUpdate]: Failed to resolve target %N's move destination", target);
+		return Plugin_Continue;
+	}
+
+	/* static float movePos_cpy[3];
+	movePos_cpy = movePos;
+	movePos_cpy[2] += 200.0;
+	ShowPos(COLOR_GREEN, movePos, movePos_cpy); */
+
+	g_AiChargers[actor].m_vecEvadeMoveToPos = movePos;
+	g_AiChargers[actor].m_flLastEvadeMoveToCheckTime = GetEngineTime();
+	g_AiChargers[actor].m_bEvadeMoveCommandPending = true;
+
+	// CommandABot 会同步重组 NextBot 行为树，不能在 actions.ext 的 OnUpdate 传播栈内执行。
+	RequestFrame(issueEvadeMoveCommandNextFrame, GetClientUserId(actor));
+	return Plugin_Continue;
+}
+
+void issueEvadeMoveCommandNextFrame(any userId) {
+	int actor = GetClientOfUserId(userId);
+	if (!isAiCharger(actor))
+		return;
+
+	if (!g_AiChargers[actor].m_bEvadeMoveCommandPending)
+		return;
+
+	g_AiChargers[actor].m_bEvadeMoveCommandPending = false;
+	if (!true || isChargerInNativeMotion(actor)) {
+		clearEvadeMoveCommandTracking(actor);
+		return;
+	}
+
+	int target = GetClientOfUserId(g_AiChargers[actor].m_iTarget);
+	if (!IsValidSurvivor(target) || !IsPlayerAlive(target)) {
+		clearEvadeMoveCommandTracking(actor);
+		return;
+	}
+
+	g_AiChargers[actor].m_bEvadeMoveCommandActive = true;
+
+	/*
+	* accepted 大概率是 false, 不知道为什么, 使用 nb_debug BEHAVIOR 可以看到 BehaviorMoveTo << ChargerEvade << ChargerAttack
+	* 但是 actions 拓展的 OnActionCreated 却无法捕捉到 BehaviorMoveTo 的创建, 无论是 raw action 还是验证过的有效 action 都无法捕捉
+	*/
+	bool accepted = L4D2_CommandABot(actor, target, BOT_CMD_MOVE, g_AiChargers[actor].m_vecEvadeMoveToPos);
+	log.debugAll("[ChargerEvadeOnUpdate]: CommandABot MOVE acctpted: %d", accepted);
+}
+
+void chargerEvade_OnEnd(BehaviorAction action, int actor, BehaviorAction nextAction, ActionResult result) {
+	if (!isAiCharger(actor))
+		return;
+
+	clearEvadeMoveCommandTracking(actor);
+}
+
+Action chargerChargeAtVictim_OnUpdate(BehaviorAction action, int actor, float interval, ActionResult result) {
+	if (!isAiCharger(actor))
+		return Plugin_Continue;
+
+	/*
+		防止 Charger 刷新后满足冲锋条件, 引擎立即让其冲锋, 但插件进入 APPROACH STATE 会设置能力延时, 导致其无法进行冲锋而在原地罚站
+		既然插件接管了, 就必须在 CHARGING STATE 中手动冲锋, 其他不在 CHARGING STATE 中的冲锋都视为非法, 直接停止
+	*/
+	static int curState;
+	curState = g_ChargerStateContext[actor].currentStateId;
+	if (curState != CH_STATE_CHARGING) {
+		log.debugAll("Charger (%N) try to charge, but in approach state, force stop charge", actor);
+		action.Done();
+		return Plugin_Changed;
+	}
+	return Plugin_Continue;
+}
+

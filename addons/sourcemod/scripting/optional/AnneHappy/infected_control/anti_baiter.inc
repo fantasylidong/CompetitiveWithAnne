@@ -176,6 +176,12 @@ static bool AntiBait_GetProgressSnapshot(int &avgPct,
             continue;
         }
 
+        // 被 Boomer 喷吐或爆炸胆汁覆盖（处于 IT 状态）时视为可进攻破绽：
+        // 计入 vulnerableCount，到点不再进入延长等待，已在延长中则进入释放确认；
+        // 但该生还者仍可行动，继续参与下方的队形与进度统计。
+        if (IsSurvivorBiled(i))
+            vulnerableCount++;
+
         if (n >= MAX_FORMATION_SLOTS)
             continue;
 

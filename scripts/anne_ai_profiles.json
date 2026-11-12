@@ -7543,6 +7543,935 @@
         "optional/AnneHappy/ai_versions/26-07/smart_ai_rock.smx"
       ],
       "adaptations": []
+    },
+    "26-08": {
+      "commit": "acd50462523420749ec48e5ae92ac63b08b226ce",
+      "basis": "2026-11测试版升版前的2026-08线上基线快照（含10-15背身调整与Left4DHooks 1.174加载兼容修复，不含11-10未部署AI重构）",
+      "versions": [
+        "Anne26-08.cfg"
+      ],
+      "compatibility_plugins": [],
+      "sources": [
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_smoker3.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_hunter_2.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_jockey_2.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_spitter_3.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_boomer_3.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/SI_Target_limit.sp",
+        "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp",
+        "addons/sourcemod/scripting/optional/smart_ai_rock.sp"
+      ],
+      "parameters": {
+        "ai_charger3_bhop": "1",
+        "ai_charger3_bhop_direct_dist": "350.0",
+        "ai_charger3_bhop_impulse": "90",
+        "ai_charger3_target_watch_maxdeg": "30.0",
+        "ai_SmokerBhopSpeed": "90",
+        "ai_hunter_back_vision": "0",
+        "ai_hunter_melee_first": "300.0,1000.0",
+        "ai_hunter_high_pounce": "400",
+        "ai_hunter_angle_diff": "2",
+        "ai_JockeyBhopSpeed": "80",
+        "ai_JockeyStartHopDistance": "600.0",
+        "ai_JockeyStumbleRadius": "50.0",
+        "ai_JockeySpecialJumpAngle": "60.0",
+        "ai_JockeySpecialJumpChance": "60.0",
+        "ai_jockeyNoActionChance": "40,10,50",
+        "ai_JockeyAllowInterControl": "0",
+        "ai_JockeyBackVision": "0",
+        "ai_SpitterBhop": "1",
+        "ai_SpitterBhopSpeed": "100",
+        "ai_SpitterBhopStartDistance": "2500.0",
+        "ai_spitter3_path_bhop": "1",
+        "ai_spitter3_path_lookahead_depth": "6",
+        "ai_spitter3_path_lane_offset": "12.0",
+        "ai_SpitterTarget": "3",
+        "ai_SpitterPinnedPr": "6,3,1,5",
+        "ai_ChargerBhop": "1",
+        "ai_ChagrerBhopSpeed": "90",
+        "ai_ChargerChargeDistance": "350.0",
+        "ai_ChargerExtraTargetDistance": "100,600",
+        "ai_ChargerAimOffset": "30.0",
+        "ai_ChargerMeleeAvoid": "1",
+        "ai_ChargerMeleeDamage": "420",
+        "ai_ChargerTarget": "1",
+        "ai_BoomerBhop": "1",
+        "ai_BoomerBhopSpeed": "150",
+        "ai_BoomerBhopStartDistance": "2500.0",
+        "ai_boomer3_path_bhop": "1",
+        "ai_boomer3_path_lookahead_depth": "5",
+        "ai_boomer3_path_lane_offset": "10.0",
+        "ai_BoomerUpVision": "1",
+        "ai_BoomerTurnVision": "1",
+        "ai_BoomerForceBile": "0",
+        "ai_BoomerBileFindRange": "300",
+        "ai_BoomerTurnInterval": "25",
+        "ai_BoomerDegreeForceBile": "10",
+        "ai_BoomerAutoFrame": "1",
+        "SI_target_enable": "1",
+        "SI_enable_option": "53",
+        "SI_target_limit_auto": "1",
+        "SI_target_rushman_scope": "1",
+        "ai_tank_bhop": "1",
+        "ai_Tank_StopDistance": "135",
+        "ai_charger3_log_level": "1",
+        "ai_smoker3_log_level": "32",
+        "ai_tank3_log_level": "32"
+      },
+      "parameter_sources": {
+        "ai_charger3_bhop": {
+          "runtime_alias": "ai_ChargerBhop",
+          "source": {
+            "seq": 267,
+            "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+            "line": 62,
+            "raw": "confogl_addcvar ai_ChargerBhop 1",
+            "command": "confogl_addcvar",
+            "name": "ai_ChargerBhop",
+            "value": "1"
+          },
+          "code_file": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "code_line": 202
+        },
+        "ai_charger3_bhop_direct_dist": {
+          "runtime_alias": "ai_ChargerChargeDistance",
+          "source": {
+            "seq": 268,
+            "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+            "line": 64,
+            "raw": "confogl_addcvar ai_ChargerChargeDistance 350.0 ",
+            "command": "confogl_addcvar",
+            "name": "ai_ChargerChargeDistance",
+            "value": "350.0"
+          },
+          "code_file": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "code_line": 206
+        },
+        "ai_charger3_bhop_impulse": {
+          "runtime_alias": "ai_ChagrerBhopSpeed",
+          "source": {
+            "seq": 39,
+            "file": "cfg/vote/hard_off.cfg",
+            "line": 11,
+            "raw": "sm_cvar ai_ChagrerBhopSpeed 90",
+            "command": "sm_cvar",
+            "name": "ai_ChagrerBhopSpeed",
+            "value": "90"
+          },
+          "code_file": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "code_line": 204
+        },
+        "ai_charger3_target_watch_maxdeg": {
+          "runtime_alias": "ai_ChargerAimOffset",
+          "source": {
+            "seq": 270,
+            "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+            "line": 66,
+            "raw": "confogl_addcvar ai_ChargerAimOffset 30.0",
+            "command": "confogl_addcvar",
+            "name": "ai_ChargerAimOffset",
+            "value": "30.0"
+          },
+          "code_file": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "code_line": 208
+        },
+        "ai_SmokerBhopSpeed": {
+          "seq": 40,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 12,
+          "raw": "sm_cvar ai_SmokerBhopSpeed 90",
+          "command": "sm_cvar",
+          "name": "ai_SmokerBhopSpeed",
+          "value": "90"
+        },
+        "ai_hunter_back_vision": {
+          "seq": 276,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 78,
+          "raw": "confogl_addcvar ai_hunter_back_vision 0 //Hunter背跳概率",
+          "command": "confogl_addcvar",
+          "name": "ai_hunter_back_vision",
+          "value": "0"
+        },
+        "ai_hunter_melee_first": {
+          "seq": 277,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 79,
+          "raw": "confogl_addcvar ai_hunter_melee_first \"300.0,1000.0\" //hunter 每次准备突袭时是否先按右键（最小最大距离，逗号分隔，0=禁用）",
+          "command": "confogl_addcvar",
+          "name": "ai_hunter_melee_first",
+          "value": "300.0,1000.0"
+        },
+        "ai_hunter_high_pounce": {
+          "seq": 278,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 80,
+          "raw": "confogl_addcvar ai_hunter_high_pounce 400 //hunter 在与目标多高时会直扑目标",
+          "command": "confogl_addcvar",
+          "name": "ai_hunter_high_pounce",
+          "value": "400"
+        },
+        "ai_hunter_angle_diff": {
+          "seq": 279,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 81,
+          "raw": "confogl_addcvar ai_hunter_angle_diff 2 //hunter 进行由随机数生成器生成角度侧飞时，左右飞的次数差不能大于这个值",
+          "command": "confogl_addcvar",
+          "name": "ai_hunter_angle_diff",
+          "value": "2"
+        },
+        "ai_JockeyBhopSpeed": {
+          "seq": 38,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 10,
+          "raw": "sm_cvar ai_JockeyBhopSpeed 80",
+          "command": "sm_cvar",
+          "name": "ai_JockeyBhopSpeed",
+          "value": "80"
+        },
+        "ai_JockeyStartHopDistance": {
+          "seq": 280,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 85,
+          "raw": "confogl_addcvar ai_JockeyStartHopDistance 600.0",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeyStartHopDistance",
+          "value": "600.0"
+        },
+        "ai_JockeyStumbleRadius": {
+          "seq": 281,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 86,
+          "raw": "confogl_addcvar ai_JockeyStumbleRadius 50.0 ",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeyStumbleRadius",
+          "value": "50.0"
+        },
+        "ai_JockeySpecialJumpAngle": {
+          "seq": 282,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 87,
+          "raw": "confogl_addcvar ai_JockeySpecialJumpAngle 60.0 //当目标正在看着 Jockey 并与其处于这个角度之内，Jockey 会尝试骗推",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeySpecialJumpAngle",
+          "value": "60.0"
+        },
+        "ai_JockeySpecialJumpChance": {
+          "seq": 283,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 88,
+          "raw": "confogl_addcvar ai_JockeySpecialJumpChance 60.0 //Jockey 有多少概率执行骗推",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeySpecialJumpChance",
+          "value": "60.0"
+        },
+        "ai_jockeyNoActionChance": {
+          "seq": 284,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 89,
+          "raw": "confogl_addcvar ai_jockeyNoActionChance \"40,10,50\" //Jockey 执行以下行为的概率（冻结行动 [时间 0 - FREEZE_MAX_TIME 秒随机]，向后跳，高跳）逗号分割",
+          "command": "confogl_addcvar",
+          "name": "ai_jockeyNoActionChance",
+          "value": "40,10,50"
+        },
+        "ai_JockeyAllowInterControl": {
+          "seq": 285,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 90,
+          "raw": "confogl_addcvar ai_JockeyAllowInterControl \"0\" //Jockey 优先找被这些特感控制的生还者，被控完成后补控",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeyAllowInterControl",
+          "value": "0"
+        },
+        "ai_JockeyBackVision": {
+          "seq": 286,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 91,
+          "raw": "confogl_addcvar ai_JockeyBackVision 0 //Jockey 在空中时将会以这个概率向当前视角反方向看",
+          "command": "confogl_addcvar",
+          "name": "ai_JockeyBackVision",
+          "value": "0"
+        },
+        "ai_SpitterBhop": {
+          "seq": 287,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 100,
+          "raw": "confogl_addcvar ai_SpitterBhop 1",
+          "command": "confogl_addcvar",
+          "name": "ai_SpitterBhop",
+          "value": "1"
+        },
+        "ai_SpitterBhopSpeed": {
+          "seq": 41,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 13,
+          "raw": "sm_cvar ai_SpitterBhopSpeed 100",
+          "command": "sm_cvar",
+          "name": "ai_SpitterBhopSpeed",
+          "value": "100"
+        },
+        "ai_SpitterBhopStartDistance": {
+          "seq": 288,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 101,
+          "raw": "confogl_addcvar ai_SpitterBhopStartDistance 2500.0",
+          "command": "confogl_addcvar",
+          "name": "ai_SpitterBhopStartDistance",
+          "value": "2500.0"
+        },
+        "ai_spitter3_path_bhop": {
+          "seq": 289,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 102,
+          "raw": "confogl_addcvar ai_spitter3_path_bhop 1",
+          "command": "confogl_addcvar",
+          "name": "ai_spitter3_path_bhop",
+          "value": "1"
+        },
+        "ai_spitter3_path_lookahead_depth": {
+          "seq": 290,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 103,
+          "raw": "confogl_addcvar ai_spitter3_path_lookahead_depth 6",
+          "command": "confogl_addcvar",
+          "name": "ai_spitter3_path_lookahead_depth",
+          "value": "6"
+        },
+        "ai_spitter3_path_lane_offset": {
+          "seq": 291,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 104,
+          "raw": "confogl_addcvar ai_spitter3_path_lane_offset 12.0",
+          "command": "confogl_addcvar",
+          "name": "ai_spitter3_path_lane_offset",
+          "value": "12.0"
+        },
+        "ai_SpitterTarget": {
+          "seq": 292,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 106,
+          "raw": "confogl_addcvar ai_SpitterTarget 3 //Spitter 目标选择：1=默认 2=最近 3=被控优先，否则第一个生还 4=人多处",
+          "command": "confogl_addcvar",
+          "name": "ai_SpitterTarget",
+          "value": "3"
+        },
+        "ai_SpitterPinnedPr": {
+          "seq": 293,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 107,
+          "raw": "confogl_addcvar ai_SpitterPinnedPr \"6,3,1,5\" //被控目标优先级（被控特感编号，逗号分隔）",
+          "command": "confogl_addcvar",
+          "name": "ai_SpitterPinnedPr",
+          "value": "6,3,1,5"
+        },
+        "ai_ChargerBhop": {
+          "seq": 267,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 62,
+          "raw": "confogl_addcvar ai_ChargerBhop 1",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerBhop",
+          "value": "1"
+        },
+        "ai_ChagrerBhopSpeed": {
+          "seq": 39,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 11,
+          "raw": "sm_cvar ai_ChagrerBhopSpeed 90",
+          "command": "sm_cvar",
+          "name": "ai_ChagrerBhopSpeed",
+          "value": "90"
+        },
+        "ai_ChargerChargeDistance": {
+          "seq": 268,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 64,
+          "raw": "confogl_addcvar ai_ChargerChargeDistance 350.0 ",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerChargeDistance",
+          "value": "350.0"
+        },
+        "ai_ChargerExtraTargetDistance": {
+          "seq": 269,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 65,
+          "raw": "confogl_addcvar ai_ChargerExtraTargetDistance \"100,600\"",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerExtraTargetDistance",
+          "value": "100,600"
+        },
+        "ai_ChargerAimOffset": {
+          "seq": 270,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 66,
+          "raw": "confogl_addcvar ai_ChargerAimOffset 30.0",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerAimOffset",
+          "value": "30.0"
+        },
+        "ai_ChargerMeleeAvoid": {
+          "seq": 271,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 67,
+          "raw": "confogl_addcvar ai_ChargerMeleeAvoid 1",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerMeleeAvoid",
+          "value": "1"
+        },
+        "ai_ChargerMeleeDamage": {
+          "seq": 272,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 68,
+          "raw": "confogl_addcvar ai_ChargerMeleeDamage 420",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerMeleeDamage",
+          "value": "420"
+        },
+        "ai_ChargerTarget": {
+          "seq": 273,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 69,
+          "raw": "confogl_addcvar ai_ChargerTarget 1",
+          "command": "confogl_addcvar",
+          "name": "ai_ChargerTarget",
+          "value": "1"
+        },
+        "ai_BoomerBhop": {
+          "seq": 257,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 47,
+          "raw": "confogl_addcvar ai_BoomerBhop 1",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerBhop",
+          "value": "1"
+        },
+        "ai_BoomerBhopSpeed": {
+          "seq": 37,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 9,
+          "raw": "sm_cvar ai_BoomerBhopSpeed 150",
+          "command": "sm_cvar",
+          "name": "ai_BoomerBhopSpeed",
+          "value": "150"
+        },
+        "ai_BoomerBhopStartDistance": {
+          "seq": 258,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 48,
+          "raw": "confogl_addcvar ai_BoomerBhopStartDistance 2500.0",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerBhopStartDistance",
+          "value": "2500.0"
+        },
+        "ai_boomer3_path_bhop": {
+          "seq": 259,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 49,
+          "raw": "confogl_addcvar ai_boomer3_path_bhop 1",
+          "command": "confogl_addcvar",
+          "name": "ai_boomer3_path_bhop",
+          "value": "1"
+        },
+        "ai_boomer3_path_lookahead_depth": {
+          "seq": 260,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 50,
+          "raw": "confogl_addcvar ai_boomer3_path_lookahead_depth 5",
+          "command": "confogl_addcvar",
+          "name": "ai_boomer3_path_lookahead_depth",
+          "value": "5"
+        },
+        "ai_boomer3_path_lane_offset": {
+          "seq": 261,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 51,
+          "raw": "confogl_addcvar ai_boomer3_path_lane_offset 10.0",
+          "command": "confogl_addcvar",
+          "name": "ai_boomer3_path_lane_offset",
+          "value": "10.0"
+        },
+        "ai_BoomerUpVision": {
+          "seq": 262,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 53,
+          "raw": "confogl_addcvar ai_BoomerUpVision 1",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerUpVision",
+          "value": "1"
+        },
+        "ai_BoomerTurnVision": {
+          "seq": 263,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 54,
+          "raw": "confogl_addcvar ai_BoomerTurnVision 1",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerTurnVision",
+          "value": "1"
+        },
+        "ai_BoomerForceBile": {
+          "seq": 264,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 55,
+          "raw": "confogl_addcvar ai_BoomerForceBile 0",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerForceBile",
+          "value": "0"
+        },
+        "ai_BoomerBileFindRange": {
+          "seq": 265,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 56,
+          "raw": "confogl_addcvar ai_BoomerBileFindRange 300 //在这个距离内有被控或倒地的生还 Boomer 会优先攻击，0 = 关闭此功能",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerBileFindRange",
+          "value": "300"
+        },
+        "ai_BoomerTurnInterval": {
+          "seq": 43,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 15,
+          "raw": "sm_cvar ai_BoomerTurnInterval 25 //Boomer 喷吐旋转视角时每隔多少帧转移一个目标",
+          "command": "sm_cvar",
+          "name": "ai_BoomerTurnInterval",
+          "value": "25"
+        },
+        "ai_BoomerDegreeForceBile": {
+          "seq": 44,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 16,
+          "raw": "sm_cvar ai_BoomerDegreeForceBile 10",
+          "command": "sm_cvar",
+          "name": "ai_BoomerDegreeForceBile",
+          "value": "10"
+        },
+        "ai_BoomerAutoFrame": {
+          "seq": 266,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 59,
+          "raw": "confogl_addcvar ai_BoomerAutoFrame 1",
+          "command": "confogl_addcvar",
+          "name": "ai_BoomerAutoFrame",
+          "value": "1"
+        },
+        "SI_target_enable": {
+          "seq": 327,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 171,
+          "raw": "confogl_addcvar SI_target_enable 1",
+          "command": "confogl_addcvar",
+          "name": "SI_target_enable",
+          "value": "1"
+        },
+        "SI_enable_option": {
+          "seq": 328,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 172,
+          "raw": "confogl_addcvar SI_enable_option 53",
+          "command": "confogl_addcvar",
+          "name": "SI_enable_option",
+          "value": "53"
+        },
+        "SI_target_limit_auto": {
+          "seq": 329,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 173,
+          "raw": "confogl_addcvar SI_target_limit_auto 1",
+          "command": "confogl_addcvar",
+          "name": "SI_target_limit_auto",
+          "value": "1"
+        },
+        "SI_target_rushman_scope": {
+          "seq": 330,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 174,
+          "raw": "confogl_addcvar SI_target_rushman_scope 1 // 跑男时只放开跑男本人的目标上限；0=全体放开（旧行为）",
+          "command": "confogl_addcvar",
+          "name": "SI_target_rushman_scope",
+          "value": "1"
+        },
+        "ai_tank_bhop": {
+          "seq": 23,
+          "file": "cfg/cfgogl/annehappy/confogl_plugins.cfg",
+          "line": 85,
+          "raw": "sm_cvar ai_tank_bhop 1",
+          "command": "sm_cvar",
+          "name": "ai_tank_bhop",
+          "value": "1"
+        },
+        "ai_Tank_StopDistance": {
+          "seq": 36,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 8,
+          "raw": "sm_cvar ai_Tank_StopDistance 135",
+          "command": "sm_cvar",
+          "name": "ai_Tank_StopDistance",
+          "value": "135"
+        },
+        "ai_charger3_log_level": {
+          "file": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "line": 141,
+          "layer": "derived_name_CreateConVar",
+          "raw": "g_cvLogLevel = CreateConVar(cvName, \"1\", ...); cvName derives from ai_charger3_plugin_name"
+        },
+        "ai_smoker3_log_level": {
+          "file": "addons/sourcemod/scripting/optional/AnneHappy/ai_smoker3.sp",
+          "line": 169,
+          "layer": "derived_name_CreateConVar",
+          "raw": "g_cvLogLevel = CreateConVar(cvName, \"32\", ...); cvName derives from ai_smoker3_plugin_name"
+        },
+        "ai_tank3_log_level": {
+          "file": "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp",
+          "line": 131,
+          "layer": "derived_name_CreateConVar",
+          "raw": "g_cvLogLevel = CreateConVar(cvName, \"32\", ...); cvName derives from ai_tank3_plugin_name"
+        }
+      },
+      "engine_parameters": {
+        "z_acquire_far_time": "5.0",
+        "z_acquire_near_time": "0.5",
+        "hunter_pounce_air_speed": "700",
+        "jockey_pounce_air_speed": "700",
+        "z_spit_latency": "0.3",
+        "z_jockey_control_variance": "0.0",
+        "z_vomit_interval": "15",
+        "z_spit_interval": "15",
+        "z_charge_warmup": "0",
+        "boomer_exposed_time_tolerance": "0.0",
+        "boomer_vomit_delay": "0.0",
+        "z_jockey_speed": "275",
+        "z_jockey_leap_time": "0.4",
+        "z_spitter_max_wait_time": "0",
+        "smoker_tongue_delay": "1.0",
+        "z_hunter_lunge_distance": "5000",
+        "hunter_pounce_loft_rate": "0.055",
+        "z_attack_flow_range": "50000",
+        "z_tank_walk_speed": "225",
+        "z_tank_attack_interval": "0.0",
+        "tank_swing_interval": "1.2",
+        "tank_swing_miss_interval": "0.0",
+        "tank_throw_min_interval": "8",
+        "z_tank_throw_interval": "8",
+        "tank_attack_range": "75",
+        "tank_swing_range": "75",
+        "z_tank_speed_vs": "225",
+        "tongue_hit_delay": "13",
+        "tongue_vertical_choke_height": "99999.9",
+        "tongue_miss_delay": "7",
+        "tongue_dropping_to_ground_time": "0.5",
+        "tongue_los_forgiveness_time": "1.0",
+        "inf_ai_difficulty_link": "0",
+        "inf_ai_difficulty_fallback_level": "3"
+      },
+      "engine_parameter_sources": {
+        "z_acquire_far_time": {
+          "seq": 31,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 3,
+          "raw": "sm_cvar z_acquire_far_time 5.0",
+          "command": "sm_cvar",
+          "name": "z_acquire_far_time",
+          "value": "5.0"
+        },
+        "z_acquire_near_time": {
+          "seq": 32,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 4,
+          "raw": "sm_cvar z_acquire_near_time 0.5",
+          "command": "sm_cvar",
+          "name": "z_acquire_near_time",
+          "value": "0.5"
+        },
+        "hunter_pounce_air_speed": {
+          "seq": 33,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 5,
+          "raw": "sm_cvar hunter_pounce_air_speed 700",
+          "command": "sm_cvar",
+          "name": "hunter_pounce_air_speed",
+          "value": "700"
+        },
+        "jockey_pounce_air_speed": {
+          "seq": 34,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 6,
+          "raw": "sm_cvar jockey_pounce_air_speed 700",
+          "command": "sm_cvar",
+          "name": "jockey_pounce_air_speed",
+          "value": "700"
+        },
+        "z_spit_latency": {
+          "seq": 35,
+          "file": "cfg/vote/hard_off.cfg",
+          "line": 7,
+          "raw": "sm_cvar z_spit_latency 0.3",
+          "command": "sm_cvar",
+          "name": "z_spit_latency",
+          "value": "0.3"
+        },
+        "z_jockey_control_variance": {
+          "seq": 131,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 100,
+          "raw": "confogl_addcvar z_jockey_control_variance 0.0",
+          "command": "confogl_addcvar",
+          "name": "z_jockey_control_variance",
+          "value": "0.0"
+        },
+        "z_vomit_interval": {
+          "seq": 135,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 104,
+          "raw": "confogl_addcvar z_vomit_interval 15",
+          "command": "confogl_addcvar",
+          "name": "z_vomit_interval",
+          "value": "15"
+        },
+        "z_spit_interval": {
+          "seq": 138,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 107,
+          "raw": "confogl_addcvar z_spit_interval 15",
+          "command": "confogl_addcvar",
+          "name": "z_spit_interval",
+          "value": "15"
+        },
+        "z_charge_warmup": {
+          "seq": 149,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 118,
+          "raw": "confogl_addcvar z_charge_warmup 0",
+          "command": "confogl_addcvar",
+          "name": "z_charge_warmup",
+          "value": "0"
+        },
+        "boomer_exposed_time_tolerance": {
+          "seq": 152,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 123,
+          "raw": "confogl_addcvar boomer_exposed_time_tolerance 0.0",
+          "command": "confogl_addcvar",
+          "name": "boomer_exposed_time_tolerance",
+          "value": "0.0"
+        },
+        "boomer_vomit_delay": {
+          "seq": 153,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 124,
+          "raw": "confogl_addcvar boomer_vomit_delay 0.0",
+          "command": "confogl_addcvar",
+          "name": "boomer_vomit_delay",
+          "value": "0.0"
+        },
+        "z_jockey_speed": {
+          "seq": 169,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 142,
+          "raw": "confogl_addcvar z_jockey_speed 275",
+          "command": "confogl_addcvar",
+          "name": "z_jockey_speed",
+          "value": "275"
+        },
+        "z_jockey_leap_time": {
+          "seq": 171,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 144,
+          "raw": "confogl_addcvar z_jockey_leap_time 0.4",
+          "command": "confogl_addcvar",
+          "name": "z_jockey_leap_time",
+          "value": "0.4"
+        },
+        "z_spitter_max_wait_time": {
+          "seq": 172,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 145,
+          "raw": "confogl_addcvar z_spitter_max_wait_time 0",
+          "command": "confogl_addcvar",
+          "name": "z_spitter_max_wait_time",
+          "value": "0"
+        },
+        "smoker_tongue_delay": {
+          "seq": 173,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 146,
+          "raw": "confogl_addcvar smoker_tongue_delay 1.0",
+          "command": "confogl_addcvar",
+          "name": "smoker_tongue_delay",
+          "value": "1.0"
+        },
+        "z_hunter_lunge_distance": {
+          "seq": 174,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 147,
+          "raw": "confogl_addcvar z_hunter_lunge_distance 5000",
+          "command": "confogl_addcvar",
+          "name": "z_hunter_lunge_distance",
+          "value": "5000"
+        },
+        "hunter_pounce_loft_rate": {
+          "seq": 175,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 148,
+          "raw": "confogl_addcvar hunter_pounce_loft_rate 0.055",
+          "command": "confogl_addcvar",
+          "name": "hunter_pounce_loft_rate",
+          "value": "0.055"
+        },
+        "z_attack_flow_range": {
+          "seq": 177,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 150,
+          "raw": "confogl_addcvar z_attack_flow_range 50000",
+          "command": "confogl_addcvar",
+          "name": "z_attack_flow_range",
+          "value": "50000"
+        },
+        "z_tank_walk_speed": {
+          "seq": 201,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 178,
+          "raw": "confogl_addcvar z_tank_walk_speed 225",
+          "command": "confogl_addcvar",
+          "name": "z_tank_walk_speed",
+          "value": "225"
+        },
+        "z_tank_attack_interval": {
+          "seq": 202,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 179,
+          "raw": "confogl_addcvar z_tank_attack_interval 0.0",
+          "command": "confogl_addcvar",
+          "name": "z_tank_attack_interval",
+          "value": "0.0"
+        },
+        "tank_swing_interval": {
+          "seq": 203,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 180,
+          "raw": "confogl_addcvar tank_swing_interval 1.2",
+          "command": "confogl_addcvar",
+          "name": "tank_swing_interval",
+          "value": "1.2"
+        },
+        "tank_swing_miss_interval": {
+          "seq": 204,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 181,
+          "raw": "confogl_addcvar tank_swing_miss_interval 0.0",
+          "command": "confogl_addcvar",
+          "name": "tank_swing_miss_interval",
+          "value": "0.0"
+        },
+        "tank_throw_min_interval": {
+          "seq": 205,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 182,
+          "raw": "confogl_addcvar tank_throw_min_interval 8",
+          "command": "confogl_addcvar",
+          "name": "tank_throw_min_interval",
+          "value": "8"
+        },
+        "z_tank_throw_interval": {
+          "seq": 206,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 183,
+          "raw": "confogl_addcvar z_tank_throw_interval 8",
+          "command": "confogl_addcvar",
+          "name": "z_tank_throw_interval",
+          "value": "8"
+        },
+        "tank_attack_range": {
+          "seq": 207,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 184,
+          "raw": "confogl_addcvar tank_attack_range 75",
+          "command": "confogl_addcvar",
+          "name": "tank_attack_range",
+          "value": "75"
+        },
+        "tank_swing_range": {
+          "seq": 208,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 185,
+          "raw": "confogl_addcvar tank_swing_range 75",
+          "command": "confogl_addcvar",
+          "name": "tank_swing_range",
+          "value": "75"
+        },
+        "z_tank_speed_vs": {
+          "seq": 357,
+          "file": "cfg/cfgogl/annehappy/shared_settings.cfg",
+          "line": 225,
+          "raw": "confogl_addcvar z_tank_speed_vs 225",
+          "command": "confogl_addcvar",
+          "name": "z_tank_speed_vs",
+          "value": "225"
+        },
+        "tongue_hit_delay": {
+          "seq": 139,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 108,
+          "raw": "confogl_addcvar tongue_hit_delay 13",
+          "command": "confogl_addcvar",
+          "name": "tongue_hit_delay",
+          "value": "13"
+        },
+        "tongue_vertical_choke_height": {
+          "seq": 151,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 120,
+          "raw": "confogl_addcvar tongue_vertical_choke_height 99999.9",
+          "command": "confogl_addcvar",
+          "name": "tongue_vertical_choke_height",
+          "value": "99999.9"
+        },
+        "tongue_miss_delay": {
+          "seq": 162,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 135,
+          "raw": "confogl_addcvar tongue_miss_delay 7",
+          "command": "confogl_addcvar",
+          "name": "tongue_miss_delay",
+          "value": "7"
+        },
+        "tongue_dropping_to_ground_time": {
+          "seq": 163,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 136,
+          "raw": "confogl_addcvar tongue_dropping_to_ground_time 0.5",
+          "command": "confogl_addcvar",
+          "name": "tongue_dropping_to_ground_time",
+          "value": "0.5"
+        },
+        "tongue_los_forgiveness_time": {
+          "seq": 164,
+          "file": "cfg/cfgogl/annehappy/shared_cvars.cfg",
+          "line": 137,
+          "raw": "confogl_addcvar tongue_los_forgiveness_time 1.0",
+          "command": "confogl_addcvar",
+          "name": "tongue_los_forgiveness_time",
+          "value": "1.0"
+        },
+        "inf_ai_difficulty_link": {
+          "policy": "历史AI归档停用动态难度，刷特使用原有fallback等级3"
+        },
+        "inf_ai_difficulty_fallback_level": {
+          "policy": "历史AI归档停用动态难度，刷特使用原有fallback等级3"
+        }
+      },
+      "load_order": [
+        "optional/AnneHappy/ai_versions/26-08/settings.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_smoker3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_hunter_2.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_jockey_2.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_spitter_3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_charger3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_boomer_3.smx",
+        "optional/AnneHappy/ai_versions/26-08/SI_Target_limit.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_tank3.smx",
+        "optional/AnneHappy/ai_versions/26-08/smart_ai_rock.smx"
+      ],
+      "adaptations": []
     }
   }
 }

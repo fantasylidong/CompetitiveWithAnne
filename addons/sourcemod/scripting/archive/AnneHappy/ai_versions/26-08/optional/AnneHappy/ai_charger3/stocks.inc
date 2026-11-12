@@ -1,0 +1,1488 @@
+#if defined _stocks_included_
+    #endinput
+#endif
+#define _stocks_included_
+
+#include <sourcemod>
+#include <sdktools>
+#include <sdkhooks>
+
+#include "../../../include/treeutil.inc"
+
+#include "../../../include/logger2.inc"
+
+#include "setup.inc"
+
+#define STOCK_LOG_PREFIX "AI-ChargerStock"
+
+Logger
+    stockLog;
+
+
+
+int g_iVisibilityMemoSerial[MAXPLAYERS + 1];
+int g_iVisibilityMemoEntrySerial[MAXPLAYERS + 1][MAXPLAYERS + 1];
+bool g_bVisibilityMemoResult[MAXPLAYERS + 1][MAXPLAYERS + 1];
+float g_flVisibilityMemoExpiry[MAXPLAYERS + 1][MAXPLAYERS + 1];
+int g_iVisibilityMemoClientUserid[MAXPLAYERS + 1];
+int g_iVisibilityMemoTargetUserid[MAXPLAYERS + 1][MAXPLAYERS + 1];
+
+stock void Stock_OnModuleStart() {
+    
+    stockLog = new Logger(STOCK_LOG_PREFIX, (1));
+}
+
+stock void Stock_OnModuleEnd() {
+    delete stockLog;
+}
+
+stock bool isAiCharger(int client) {
+    return IsValidInfected(client) && GetInfectedClass(client) == ZC_CHARGER &&
+            IsFakeClient(client) && IsPlayerAlive(client) && !IsInGhostState(client);
+}
+
+stock bool alignChargerFacingWithMovement(int client, const float movement[3], float commandAngles[3]) {
+    if (!isAiCharger(client))
+        return false;
+
+    static float direction[3];
+    direction = movement;
+    direction[2] = 0.0;
+    if (NormalizeVector(direction, direction) <= 0.0)
+        return false;
+
+    GetVectorAngles(direction, commandAngles);
+    commandAngles[0] = 0.0;
+    commandAngles[2] = 0.0;
+    return true;
+}
+
+stock void setForwardBhopInput(int& buttons, bool startJump) {
+    buttons &= ~(IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_LEFT | IN_RIGHT | IN_JUMP | IN_DUCK);
+    buttons |= IN_FORWARD;
+
+    if (startJump)
+        buttons |= IN_JUMP | IN_DUCK;
+}
+
+stock bool allowToBhop(int client) {
+    if (!isAiCharger(client))
+        return false;
+    
+    // 处于 APPROACH STATE 且不允许接近状态时连跳或处于 CHARGING STATE 时不允许冲锋前连跳
+    if (
+        (g_ChargerStateContext[client].currentStateId == CH_STATE_APPROACH && !true) ||
+        (g_ChargerStateContext[client].currentStateId == CH_STATE_CHARGING && !true)
+    ) {
+        return false;
+    }
+
+    if (L4D_IsPlayerStaggering(client))
+        return false;
+    
+    if (GetEntityMoveType(client) == MOVETYPE_LADDER || GetEntProp(client, Prop_Data, "m_nWaterLevel") > 1)
+        return false;
+    
+    // 当前需要上下梯子或者爬上障碍物, 不允许连跳
+    static PathSegment curSeg;
+    curSeg = g_AiChargers[client].m_PathSegment;
+    if (
+        curSeg.m_pPathSegment && curSeg.m_SegmentType == SegType_ClimbUp ||
+        curSeg.m_pPathSegment && curSeg.m_SegmentType == SegType_LadderUp ||
+        curSeg.m_pPathSegment && curSeg.m_SegmentType == SegType_LadderDown
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+stock bool isNearLadder(int client, const float checkDist) {
+    static int entity;
+    entity = -1;
+    static float pos[3], origin[3], mins[3], maxs[3], nearest[3];
+    L4D_GetEntityWorldSpaceCenter(client, pos);
+    while ((entity = FindEntityByClassname(entity, "func_simpleladder")) != -1) {
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", origin);
+        GetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
+        GetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
+
+        AddVectors(origin, mins, mins);
+        AddVectors(origin, maxs, maxs);
+
+        nearest[0] = (pos[0] < mins[0]) ? mins[0] : ((pos[0] > maxs[0]) ? maxs[0] : pos[0]);
+        nearest[1] = (pos[1] < mins[1]) ? mins[1] : ((pos[1] > maxs[1]) ? maxs[1] : pos[1]);
+        nearest[2] = (pos[2] < mins[2]) ? mins[2] : ((pos[2] > maxs[2]) ? maxs[2] : pos[2]);
+
+        if (GetVectorDistance(pos, nearest) <= checkDist) {
+            return true;
+        }
+    }
+    return false;
+}
+
+stock int getChargeAbilityEnt(int client) {
+    if (!isAiCharger(client))
+        return -1;
+
+    static int ability;
+    static char clsName[32];
+    ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+    if (!IsValidEdict(ability))
+        return -1;
+    GetEntityClassname(ability, clsName, sizeof(clsName));
+    if (strcmp(clsName, "ability_charge", false) != 0)
+        return -1;
+
+    return ability;
+}
+
+stock bool isChargerCharging(int client) {
+    if (!isAiCharger(client))
+        return false;
+    
+    static int ability;
+    ability = getChargeAbilityEnt(client);
+    if (!IsValidEdict(ability))
+        return false;
+    
+    return view_as<bool>(GetEntProp(ability, Prop_Send, "m_isCharging"));
+}
+
+// 冲锋结束不等于恢复自由移动：撞停硬直和待砸地阶段仍由引擎接管。
+stock bool isChargerInNativeMotion(int client) {
+    return isChargerCharging(client) ||
+        IsValidSurvivor(L4D2_GetQueuedPummelVictim(client)) ||
+        IsValidSurvivor(L4D_GetVictimCharger(client)) ||
+        IsValidSurvivor(L4D_GetVictimCarry(client)) ||
+        L4D_IsPlayerStaggering(client);
+}
+
+// 武器属性表在每次 level init 时重建, 缓存必须随换图失效:
+// 否则首次调用若早于武器脚本装载, 兜底值会被锁死到进程结束。
+static bool g_bClawRangeCached = false;
+static float g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+static int g_iClawRangeRetries = 0;
+static float g_flNextClawRangeRetry = 0.0;
+
+stock void resetChargerClawRangeCache() {
+    g_bClawRangeCached = false;
+    g_flClawRange = DEFAULT_CHARGER_CLAW_RANGE;
+    g_iClawRangeRetries = 0;
+    g_flNextClawRangeRetry = 0.0;
+}
+
+stock float getChargerClawRange() {
+    if (g_bClawRangeCached)
+        return g_flClawRange;
+
+    float now = GetGameTime();
+    if (g_iClawRangeRetries >= 3 || now < g_flNextClawRangeRetry)
+        return DEFAULT_CHARGER_CLAW_RANGE;
+
+    float range = L4D2_GetFloatWeaponAttribute("weapon_charger_claw", L4D2FWA_Range);
+    if (range <= 0.0) {
+        g_iClawRangeRetries++;
+        g_flNextClawRangeRetry = now + 1.0;
+        return DEFAULT_CHARGER_CLAW_RANGE;
+    }
+
+    g_flClawRange = range;
+    g_bClawRangeCached = true;
+    return g_flClawRange;
+}
+
+stock bool isChargerClawInRange(int client, int target) {
+    if (!isAiCharger(client) || !IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+
+    static float pos[3], targetPos[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+    return GetVectorDistance(pos, targetPos) <= getChargerClawRange();
+}
+
+/**
+* 检查 Charger 冲撞能力是否就绪
+* @param client 客户端索引
+* @return bool, true 就绪, false 未就绪
+**/
+stock bool isChargeAbilityReady(int client) {
+    if (!isAiCharger(client))
+        return false;
+
+    static int ability;
+    ability = getChargeAbilityEnt(client);
+    if (!IsValidEdict(ability))
+        return false;
+    
+    static float timestamp;
+    timestamp = GetEntPropFloat(ability, Prop_Send, "m_timestamp");
+    // ============================================================
+    // 1. 如果技能就绪时刻大于当前时刻, 且是人为延时, 则说明技能其实可以准备就绪, 允许冲锋
+    // 2. 如果技能就绪时刻小于当前时刻, 允许冲锋
+    // ============================================================
+    if (timestamp > GetGameTime() && g_AiChargers[client].m_bChargeDelayed)
+        return true;
+    if (timestamp <= GetGameTime())
+        return true;
+    
+    return false;
+}
+
+/**
+* 检查目标是否处在 Charger 可以冲锋的高度范围内
+* @param pos Charger 位置
+* @param targetPos 目标位置
+* @param threshold 最大允许高度差
+* @return bool, true 表示高度可冲锋, false 表示高度差过大
+**/
+stock float getChargeHeightLimit(float threshold = -1.0) {
+	if (threshold > 0.0)
+		return threshold;
+	if (true && (80.0) > 0.0)
+		return (80.0);
+	return CHARGE_Z_THRESHOLD;
+}
+
+stock bool isChargeHeightReachable(const float pos[3], const float targetPos[3], float threshold = -1.0) {
+	return FloatAbs(pos[2] - targetPos[2]) <= getChargeHeightLimit(threshold);
+}
+
+/**
+* 检查目标实体是否处在 Charger 可以冲锋的高度范围内
+* @param client Charger 客户端索引
+* @param target 目标客户端索引
+* @param threshold 最大允许高度差
+* @return bool, true 表示高度可冲锋, false 表示高度差过大
+**/
+stock bool isChargeTargetHeightReachable(int client, int target, float threshold = -1.0) {
+    if (!isAiCharger(client))
+        return false;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+
+    static float pos[3], targetPos[3];
+    GetClientAbsOrigin(client, pos);
+    GetClientAbsOrigin(target, targetPos);
+
+    return isChargeHeightReachable(pos, targetPos, threshold);
+}
+
+/**
+* 设置 Charger 冲锋技能的冷却时间
+* @param client 客户端索引
+* @param duration 冷却剩余时间 (0.0 = 立刻就绪, 0.5 = 锁定)
+* @return void
+**/
+stock void setChargerAbilityCooldown(int client, float duration) {
+    if (!isAiCharger(client))
+        return;
+    
+    static int ability;
+    ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+    if (!IsValidEntity(ability))
+        return;
+    
+    static char clsName[32];
+    GetEntityClassname(ability, clsName, sizeof(clsName));
+    if (strcmp(clsName, "ability_charge", false) != 0)
+        return;
+    
+    // =========================================================================
+    // 检查能力冷却时间, 若能力就绪时间大于当前时间, 且无论 duration > 0.0 还是小于 0.0
+    // 则说明还在冷却, 不处理, 避免能力还没就绪就直接设置为 GetGameTime() ± 0.1 导致能力立即就绪
+    // =========================================================================
+    static float timestamp, gameTime;
+    timestamp = GetEntPropFloat(ability, Prop_Send, "m_timestamp");
+    gameTime = GetGameTime();
+    if (duration > 0.0) {
+        // 如果当前已经处在自然冷却时间, 且 timestamp 远大于 gametime + duration, 返回
+        if (timestamp > gameTime + duration && !g_AiChargers[client].m_bChargeDelayed)
+            return;
+        // 可以进行人为延迟, 进行标记
+        SetEntPropFloat(ability, Prop_Send, "m_timestamp", gameTime + duration);
+        g_AiChargers[client].m_bChargeDelayed = true;
+    } else {
+        // 如果是自然冷却, 不能重置
+        if (timestamp > gameTime && !g_AiChargers[client].m_bChargeDelayed)
+            return;
+        // 只有是人为延迟的，或者已经就绪的，才允许重置, 并重置标记
+        SetEntPropFloat(ability, Prop_Send, "m_timestamp", gameTime + duration);
+        g_AiChargers[client].m_bChargeDelayed = false;
+    }
+}
+
+/**
+* 检查 Charger 冲锋路径 start 和 end 坐标中会不会被实体阻挡
+* @param client 客户端索引
+* @param start 起点坐标 (使用 GetWorldSpaceCenter 获得)
+* @param end 终点坐标
+* @return bool, false 表示无障碍, true 存在障碍
+**/
+stock bool isChargePathBlocked(int client, int target) {
+    if (!isAiCharger(client))
+        return false;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+
+    static float start[3], end[3];
+    L4D_GetEntityWorldSpaceCenter(client, start);
+    L4D_GetEntityWorldSpaceCenter(target, end);
+    return SDKCall(g_hSdkIsChargeBlocked, client, start, end);
+}
+
+/**
+* 检查 charger 当前目标是否处在易受攻击状态
+* @param client 客户端索引
+* @param target 目标索引
+* @return bool, true 表示易受攻击, false 表示非易受攻击
+**/
+stock bool isTargetVulnerable(int client, int target) {
+    if (!isAiCharger(client))
+        return false;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+    
+    static int weapon;
+    weapon = GetEntPropEnt(target, Prop_Send, "m_hActiveWeapon");
+    // 没有武器, 可以直接冲撞
+    if (!IsValidEntity(weapon)) {
+        stockLog.debugAll("Charger (%N)'s target (%N) has no weaopn, can charge", client, target);
+        return true;
+    }
+
+    static char weaponName[32];
+    GetEntityClassname(weapon, weaponName, sizeof(weaponName));
+
+    // 正在换弹中, 可以直接冲撞
+    if (HasEntProp(weapon, Prop_Send, "m_bInReload") &&
+        view_as<bool>(GetEntProp(weapon, Prop_Send, "m_bInReload"))) {
+        stockLog.debugAll("Charger (%N)'s target (%N) is reloading, weapon %s, can charge", client, target, weaponName);
+        return true;
+    }
+
+    // 正在攻击间隔中, 可以直接冲撞
+    static float nextPrimaryAttack;
+    nextPrimaryAttack = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
+    if (nextPrimaryAttack > GetGameTime() + 0.5) {
+        stockLog.debugAll("Charger (%N)'s target (%N) is in primary attack cooldown, weapon %s, can charge", client, target, weaponName);
+        return true;
+    }
+
+    // 正在推的间隔中, 可以直接冲撞
+    static float nextShoveTime;
+    nextShoveTime = GetEntPropFloat(target, Prop_Send, "m_flNextShoveTime");
+    if (nextShoveTime > GetGameTime() + 0.5) {
+        stockLog.debugAll("Charger (%N)'s target (%N) is in shove cooldown, can charge", client, target);
+        return true;
+    }
+
+    // 如果除了目标以外, 有另外的生还者正在看着 charger, 可以直接冲撞
+    if (isAnySurvivorWatchingCharger(client, target) >= 1) {
+        stockLog.debugAll("Charger (%N)'s target (%N) is being watched by another survivor, can charge", client, target);
+        return true;
+    }
+    
+    // 如果目标手持近战武器, 且 charger 生命值高于近战斩杀线, 可以直接冲撞
+    if (L4D2_GetMeleeWeaponIndex(weaponName) > -1) {
+        static int health;
+        static int meleeDamageCharger;
+        health = GetEntProp(client, Prop_Data, "m_iHealth");
+		meleeDamageCharger = getLegacyMeleeDamage();
+        if (health > meleeDamageCharger) {
+            stockLog.debugAll("Charger (%N)'s target (%N) is holding melee weapon %s, charger health %d is greater than melee damage charger %.2f, can charge",
+                client, target, weaponName, health, meleeDamageCharger);
+            return true;
+        }
+    }
+
+    // 如果当前 charger 的博弈时间超过了最大允许的博弈时间, 直接冲撞
+    if (g_ChargerStateContext[client].getStateDuration() > (7.0)) {
+        stockLog.debugAll("Charger (%N)'s bait time is up, can charge to its target (%N)", client, target);
+        return true;
+    }
+
+    // 进阶检查, 检查朝着目标方向冲撞位置后若干距离是否有墙体或向下是否有足够高差或必杀
+    static float eyeAng[3];
+	GetClientEyeAngles(target, eyeAng);
+    if (isDirectionBlockedOrFall(target, eyeAng, TARGET_VULNERABLE_ADV_CHECK_DIST)) {
+        stockLog.debugAll("Ahead charger (%N)'s target (%N)'s direction %.2f distance, will hit wall or fall down, can charge",
+            client, target, TARGET_VULNERABLE_ADV_CHECK_DIST);
+        return true;
+    }
+
+    return false;
+}
+
+/**
+* 检查 charger 当前目标 ang 方向 checkDist 距离内是否有障碍物
+* @param target 目标索引
+* @param ang 检测方向
+* @param checkDist 检测距离
+* @return book, true 存在障碍, false 无障碍
+**/
+stock bool isDirectionBlockedOrFall(int target, float ang[3], float checkDist) {
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+    
+    static float targetPos[3], eyePos[3], dir[3];
+    GetClientAbsOrigin(target, targetPos);
+    GetClientEyePosition(target, eyePos);
+    // 计算方向向量
+    GetAngleVectors(ang, dir, NULL_VECTOR, NULL_VECTOR);
+    dir[2] = 0.0;
+    NormalizeVector(dir, dir);
+    // 计算终点
+    ScaleVector(dir, checkDist);
+    AddVectors(eyePos, dir, dir);
+
+    static Handle hTrace;
+    static bool blocked;
+    hTrace = TR_TraceHullFilterEx(eyePos, dir, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter, target);
+    blocked = TR_DidHit(hTrace);
+    delete hTrace;
+    if (blocked)
+        return true;
+
+    // 如果没有障碍物阻挡, 那么向下检测是否有很高的高差或者可以直接摔死
+    static float vDown[3];
+    vDown = dir;
+    vDown[2] -= 9999.0;
+    hTrace = TR_TraceRayFilterEx(dir, vDown, MASK_PLAYERSOLID, RayType_EndPoint, _TraceWallFilter, target);
+    blocked = TR_DidHit(hTrace);
+    if (!blocked) {
+        // 如果连向下的射线都没有阻挡, 直接允许冲锋
+        delete hTrace;
+        return true;
+    }
+    static int hitEnt;
+    static float endPos[3];
+    hitEnt = TR_GetEntityIndex(hTrace);
+    TR_GetEndPosition(endPos, hTrace);
+    delete hTrace;
+
+    // 检查落点高度, 若距离目标当前位置高差大于阈值, 则允许冲锋
+    if (targetPos[2] - endPos[2] > DROP_DOWN_THRESHOLD)
+        return true;
+    // 检查落点是否有危险
+    static char clsName[64];
+    if (IsValidEntity(hitEnt)) {
+        GetEntityClassname(hitEnt, clsName, sizeof(clsName));
+        if (strcmp(clsName, "trigger_hurt", false) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+stock int getLegacyMeleeDamage() {
+	if (true)
+		return (420);
+	if (cvMeleeDamageCharger != null)
+		return cvMeleeDamageCharger.IntValue;
+	return DEFAULT_MELEE_DMG_CHARGER;
+}
+
+/**
+* 近战僵持黑名单: 记录 Charger 主动放弃过的目标
+* 没有这个黑名单时, 换目标之后 L4D2_OnChooseVictim 会按距离立刻把同一个近战玩家选回来 (他往往就是最近的那个)
+* @param client Charger 客户端索引
+* @param target 被放弃的目标索引
+* @return void
+**/
+stock void blacklistBaitTarget(int client, int target) {
+    if (client < 1 || client > MaxClients || target < 1 || target > MaxClients)
+        return;
+
+    static float dur;
+    dur = true ? (10.0) : 0.0;
+    if (dur <= 0.0)
+        return;
+
+    g_flBaitTargetBlacklist[client][target] = GetGameTime() + dur;
+}
+
+/**
+* 目标当前是否处于该 Charger 的近战僵持黑名单中
+**/
+stock bool isBaitTargetBlacklisted(int client, int target) {
+    if (client < 1 || client > MaxClients || target < 1 || target > MaxClients)
+        return false;
+
+    return g_flBaitTargetBlacklist[client][target] > GetGameTime();
+}
+
+/**
+* 清空某个 Charger 的黑名单 (重新生成 / 换人时调用)
+**/
+stock void clearBaitTargetBlacklist(int client) {
+    if (client < 1 || client > MaxClients)
+        return;
+
+    for (int i = 0; i <= MaxClients; i++)
+        g_flBaitTargetBlacklist[client][i] = 0.0;
+}
+
+/**
+* 请求把 Charger 的目标换成 newTarget
+* 引擎侧的受害者由 L4D2_OnChooseVictim 决定, 这里只登记强制目标, 等下一次 OnChooseVictim 落实
+* 同时立刻改写插件自己的 m_iTarget 并让当前路径失效, 避免状态机还在朝旧目标做决策
+* @param client Charger 客户端索引
+* @param newTarget 新目标索引
+* @return void
+**/
+stock void requestChargerTargetSwitch(int client, int newTarget) {
+    if (!isAiCharger(client) || !IsValidSurvivor(newTarget) || !IsPlayerAlive(newTarget))
+        return;
+
+    g_iChargerForcedTarget[client] = GetClientUserId(newTarget);
+    g_flChargerForcedTargetUntil[client] = GetGameTime() + CHARGER_FORCED_TARGET_TTL;
+    g_AiChargers[client].m_iTarget = GetClientUserId(newTarget);
+    g_AiChargers[client].m_bPathInvalidatePending = true;
+}
+
+/**
+* 取得当前有效的强制目标, 过期或目标失效时自动清除
+* @return int, 无效时返回 -1
+**/
+stock int getChargerForcedTarget(int client) {
+    if (client < 1 || client > MaxClients || g_iChargerForcedTarget[client] <= 0)
+        return -1;
+
+    if (GetGameTime() > g_flChargerForcedTargetUntil[client]) {
+        clearChargerForcedTarget(client);
+        return -1;
+    }
+
+    static int target;
+    target = GetClientOfUserId(g_iChargerForcedTarget[client]);
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target)) {
+        clearChargerForcedTarget(client);
+        return -1;
+    }
+
+    return target;
+}
+
+stock void clearChargerForcedTarget(int client) {
+    if (client < 1 || client > MaxClients)
+        return;
+
+    g_iChargerForcedTarget[client] = 0;
+    g_flChargerForcedTargetUntil[client] = 0.0;
+}
+
+/**
+* 近战僵持无解时, 挑一个更值得打的生还者
+* 优先挑当前就能直接冲的 (高度可达 + 冲锋路径不被挡), 没有就退而求其次挑最近的非近战目标, 让 Approach 正常走过去
+* @param client Charger 客户端索引
+* @param curTarget 当前目标索引
+* @return int, 没有合适目标时返回 -1
+**/
+stock int findMeleeStalemateSwitchTarget(int client, int curTarget) {
+    if (!isAiCharger(client))
+        return -1;
+
+    static float pos[3], candidatePos[3], dist;
+    GetClientAbsOrigin(client, pos);
+
+    static int bestChargeable, bestFallback;
+    static float bestChargeableDist, bestFallbackDist;
+    bestChargeable = -1;
+    bestFallback = -1;
+    bestChargeableDist = 999999.0;
+    bestFallbackDist = 999999.0;
+
+    static float maxDist;
+    maxDist = g_fLegacyExtraTargetMax > 0.0 ? g_fLegacyExtraTargetMax : DEFAULT_STALEMATE_SWITCH_DIST;
+
+    for (int i = 1; i <= MaxClients; i++) {
+        if (i == curTarget || !IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+        if (IsClientIncapped(i) || IsClientHanging(i) || IsClientPinned(i))
+            continue;
+        if (isBaitTargetBlacklisted(client, i))
+            continue;
+        // 换到另一个拿近战的人身上只是把同一个僵局换个地方重演
+        if (getTargetThreatType(client, i) == Threat_Melee)
+            continue;
+
+        GetClientAbsOrigin(i, candidatePos);
+        dist = getVectorDistance2D(pos, candidatePos);
+        if (dist > maxDist)
+            continue;
+
+        if (dist < bestFallbackDist) {
+            bestFallbackDist = dist;
+            bestFallback = i;
+        }
+
+        if (!isChargeTargetHeightReachable(client, i) || isChargePathBlocked(client, i))
+            continue;
+
+        if (dist < bestChargeableDist) {
+            bestChargeableDist = dist;
+            bestChargeable = i;
+        }
+    }
+
+    return bestChargeable > 0 ? bestChargeable : bestFallback;
+}
+
+/**
+* 计算 charger 是否允许概率冲锋
+* @param client 客户端索引
+* @return bool, true 允许概率冲锋, false 不允许
+**/
+stock bool isChargerProbCharge(int client) {
+    if (!isAiCharger(client))
+        return false;
+
+    // 没到检测时间
+    if (GetGameTime() - g_AiChargers[client].m_flLastProbChargeChkTime <= (0.5))
+        return false;
+
+    // 重新计算此次冲锋概率
+    g_AiChargers[client].m_flLastProbChargeChkTime = GetGameTime();
+    // 计算概率
+    static float chargeProb;
+    chargeProb = GetRandomFloatInRange(0.0, 1.0);
+    if (chargeProb <= (0.800000012))
+        return true;
+    
+    return false;
+}
+
+/**
+* 计算在平地上正常跳跃的滞空时间, Client 起跳高度为 56.0
+* @param 
+* @return float
+**/
+stock float getJumpAirTime() {
+    return AIPathMovement_GetJumpAirTime(JUMP_HEIGHT);
+}
+
+#define AIR_TURN_MIN_EFFECTIVE_DEG      0.5     // 预算裁剪后剩余转角小于该值视为转不动, 不再写回速度
+#define HOP_TURN_MIN_SPEED              50.0    // 地面水平速度低于该值时没有可比的前进方向, 起跳改向不计入转角
+
+/**
+* 登记离地状态: 每次新的离地清空偏转角, 并记录起跳水平方向作为空中转向预算的基准
+* 落地时不清偏转角, 落地后紧接着的那一跳要按上一次滞空的偏转角折算加速度, 到下一次离地才重新计数
+* @param client 客户端索引
+* @param grounded 当前是否在地面或梯子上
+**/
+stock void updateAirTurnTracking(int client, bool grounded) {
+    if (grounded) {
+        g_AiChargers[client].m_bAirborne = false;
+        g_AiChargers[client].m_bAirTakeoffDirValid = false;
+        return;
+    }
+
+    if (!g_AiChargers[client].m_bAirborne) {
+        g_AiChargers[client].m_bAirborne = true;
+        g_AiChargers[client].m_flAirTurnDeviation = 0.0;
+    }
+
+    if (g_AiChargers[client].m_bAirTakeoffDirValid)
+        return;
+
+    static float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vel);
+    registerAirTakeoffDir(client, vel);
+}
+
+stock bool registerAirTakeoffDir(int client, const float vel[3]) {
+    // 原地竖直起跳没有水平方向, 等出现水平速度再登记
+    if (getVectorLength2D(vel) <= 1.0)
+        return false;
+
+    static float dir[3];
+    dir = vel;
+    dir[2] = 0.0;
+    NormalizeVector(dir, dir);
+    g_AiChargers[client].m_vecAirTakeoffDir = dir;
+    g_AiChargers[client].m_bAirTakeoffDirValid = true;
+    return true;
+}
+
+/**
+* 空中转向预算: 把空中修正后的速度方向限制在起跳方向 ±ai_charger3_air_turn_budget 以内, 并记录本次离地的最大偏转角
+* 已经被碰撞等外力推出预算之外的, 只允许往回收, 不允许继续往外转
+* @param client 客户端索引
+* @param curVel 当前速度
+* @param outVel 修正后的速度, 超出预算时改写为预算边缘方向 (保持水平速率和 Z 速度)
+* @return bool 仍有有效转向返回 true; 已经贴在预算边缘转不动返回 false, 调用方不写回速度, 按惯性飞完这一跳
+**/
+stock bool clampAirTurnToBudget(int client, const float curVel[3], float outVel[3]) {
+    if (!g_AiChargers[client].m_bAirTakeoffDirValid && !registerAirTakeoffDir(client, curVel))
+        return false;
+
+    static float takeoffDir[3], newDev, budget;
+    takeoffDir = g_AiChargers[client].m_vecAirTakeoffDir;
+    newDev = calcVectorAngle(takeoffDir, outVel, true);
+    budget = (30.0);
+
+    if (budget > 0.0) {
+        static float allowed;
+        allowed = calcVectorAngle(takeoffDir, curVel, true);
+        if (allowed < budget)
+            allowed = budget;
+
+        if (newDev > allowed) {
+            // 把起跳方向朝修正方向那一侧旋转 allowed 度, 作为这一跳能转到的最远方向
+            static float side, rad, cosA, sinA, speed2D;
+            side = takeoffDir[0] * outVel[1] - takeoffDir[1] * outVel[0];
+            rad = DegToRad(side >= 0.0 ? allowed : -allowed);
+            cosA = Cosine(rad);
+            sinA = Sine(rad);
+            speed2D = getVectorLength2D(outVel);
+            outVel[0] = (takeoffDir[0] * cosA - takeoffDir[1] * sinA) * speed2D;
+            outVel[1] = (takeoffDir[0] * sinA + takeoffDir[1] * cosA) * speed2D;
+            newDev = allowed;
+
+            if (calcVectorAngle(curVel, outVel, true) < AIR_TURN_MIN_EFFECTIVE_DEG)
+                return false;
+        }
+    }
+
+    if (newDev > g_AiChargers[client].m_flAirTurnDeviation)
+        g_AiChargers[client].m_flAirTurnDeviation = newDev;
+    return true;
+}
+
+/**
+* 转向折算加速度: 1 - θ / 90, 转得越多加得越少, 转满 90 度 (含掉头) 不加速
+**/
+stock float getHopTurnImpulseScale(float turn) {
+    if (turn <= 0.0)
+        return 1.0;
+    if (turn >= 90.0)
+        return 0.0;
+    return 1.0 - (turn / 90.0);
+}
+
+/**
+* 起跳改向角: 起跳前地面水平速度方向与本次起跳方向的夹角, 速度太低时没有可比的前进方向, 视为没有改向
+* 必须在 Teleport 出起跳速度之前调用, 否则读到的已经是起跳后的速度
+**/
+stock float getTakeoffTurnAngle(int client, const float hopDir[3]) {
+    static float vel[3];
+    GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", vel);
+    if (getVectorLength2D(vel) < HOP_TURN_MIN_SPEED)
+        return 0.0;
+    return calcVectorAngle(vel, hopDir, true);
+}
+
+/**
+* 本次起跳可追加的加速度, 所有 Charger 起跳 (Path / Direct / 后跳 / 冲锋前最后一跳) 统一走这里
+* 基础加速度: 第一跳按 first_hop_ratio 折算, 落地跳拿完整加速度
+* 再按转角 θ 折算为 × (1 - θ / 90): θ = 起跳改向角, 落地跳再加上上一次滞空的空中最大偏转角 (非落地跳的空中偏转是旧数据, 不计入)
+* @param client 客户端索引
+* @param hopDir 本次起跳的水平方向, 必须在 Teleport 起跳速度之前传入
+**/
+stock float getChargerHopImpulse(int client, const float hopDir[3]) {
+    static bool landingHop;
+    landingHop = AIPathMovement_IsLandingHop(client);
+
+    static float turn;
+    turn = getTakeoffTurnAngle(client, hopDir);
+    if (landingHop)
+        turn += g_AiChargers[client].m_flAirTurnDeviation;
+
+    g_AiChargers[client].m_flLastHopTurn = turn;
+    g_AiChargers[client].m_flLastHopImpulseScale = getHopTurnImpulseScale(turn);
+
+    return AIPathMovement_GetHopImpulse(client, (90.0), (0.800000012)) * g_AiChargers[client].m_flLastHopImpulseScale;
+}
+
+/**
+* 下一帧连跳落点位置检测
+* @param client 客户端索引
+* @param visible 是否有目标的视野
+* @return bool, true 表示下一帧位置没有威胁, 允许连跳, false 反之
+**/
+stock bool nextTickPosCheck(int client, float vFwd[3], bool visible) {
+	if (!isAiCharger(client))
+		return false;
+
+	return AIPathMovement_IsJumpRouteSafe(
+		client,
+		vFwd,
+		getJumpAirTime(),
+		JUMP_HEIGHT,
+		visible,
+		(90.0)
+	);
+}
+
+stock float navAreaGetCenterZ(Address navArea) {
+    if (navArea == Address_Null)
+        return 0.0;
+    
+    static float center[3];
+    L4D_GetNavAreaCenter(navArea, center);
+    return center[2];
+}
+
+stock bool _TraceWallFilter(int entity, int contentsMask, any data) {
+    // worldspawn
+    if (entity == 0)
+        return true;
+    // 忽略自身
+    if (entity == data)
+        return false;
+    // 忽略所有玩家 (生还和特感)
+    if (entity > 0 && entity <= MaxClients)
+        return false;
+
+    // 忽略普通感染者和 witch
+    static char clsName[32];
+    if (IsValidEntity(data)) {
+        GetEntityClassname(entity, clsName, sizeof(clsName));
+        if (strcmp(clsName, "infected", false) == 0 ||
+            strcmp(clsName, "witch", false) == 0)
+            return false;
+    }
+
+    static char className[64];
+    GetEntityClassname(entity, className, sizeof(className));
+    if (StrContains(className, "trigger_", false) >= 0)
+        return false;
+    if (strcmp(className, "func_illusionary", false) == 0)
+        return false;
+    // 忽略玻璃
+    static int solidType, effects;
+    solidType = GetEntProp(entity, Prop_Data, "m_nSolidType");
+    if (strcmp(className, "func_breakable", false) == 0 && solidType == 1)
+        return false;
+    // 忽略阻挡玩家或特感的空气墙
+    if (strcmp(className, "func_playerclip", false) == 0 ||
+        strcmp(className, "player_infected_clip", false) == 0 ||
+        strcmp(className, "func_playerinfected_clip", false) == 0)
+        return false;
+    // 忽略效果包含 EF_NODRAW 的实体
+    effects = GetEntProp(entity, Prop_Send, "m_fEffects");
+    if (effects & 32)
+        return false;
+
+    return true;
+}
+
+/**
+* 获取 charger 目标的威胁类型
+* @param client 客户端索引
+* @param target 目标索引
+* @return TargetThreatType, 威胁类型
+**/
+stock TargetThreatType getTargetThreatType(int client, int target) {
+    if (!isAiCharger(client))
+        return Threat_None;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return Threat_None;
+
+    static int weapon;
+    weapon = GetEntPropEnt(target, Prop_Send, "m_hActiveWeapon");
+    if (!IsValidEntity(weapon))
+        return Threat_None;
+    
+    char clsName[64];
+    GetEntityClassname(weapon, clsName, sizeof(clsName));
+    if (StrContains(clsName, "shotgun", false) >= 0)
+        return Threat_Shotgun;
+	else if (StrContains(clsName, "melee", false) >= 0 || StrContains(clsName, "chainsaw", false) >= 0)
+	{
+		if (true && !true)
+			return Threat_Normal;
+		return Threat_Melee;
+	}
+    
+    return Threat_Normal;
+}
+
+stock float angleNormalize(float angle) {
+    while (angle > 180.0) angle -= 360.0;
+    while (angle < -180.0) angle += 360.0;
+    return angle;
+}
+
+stock void beginChargerVisibilityMemo(int client) {
+    int userid = GetClientUserId(client);
+    if (g_iVisibilityMemoClientUserid[client] != userid) {
+        g_iVisibilityMemoClientUserid[client] = userid;
+        for (int target = 1; target <= MaxClients; target++) {
+            g_flVisibilityMemoExpiry[client][target] = 0.0;
+            g_iVisibilityMemoTargetUserid[client][target] = 0;
+        }
+    }
+
+    g_iVisibilityMemoSerial[client]++;
+    if (g_iVisibilityMemoSerial[client] > 0)
+        return;
+
+    g_iVisibilityMemoSerial[client] = 1;
+    for (int target = 1; target <= MaxClients; target++)
+        g_iVisibilityMemoEntrySerial[client][target] = 0;
+}
+
+stock bool isSurvivorVisibleToCharger(int client, int target, float targetEyePos[3]) {
+    int serial = g_iVisibilityMemoSerial[client];
+    if (serial > 0 && g_iVisibilityMemoEntrySerial[client][target] == serial)
+        return g_bVisibilityMemoResult[client][target];
+
+    float now = GetGameTime();
+    int targetUserid = GetClientUserId(target);
+    if (targetUserid != 0
+        && g_iVisibilityMemoTargetUserid[client][target] == targetUserid
+        && now < g_flVisibilityMemoExpiry[client][target])
+    {
+        bool cached = g_bVisibilityMemoResult[client][target];
+        if (serial > 0) {
+            g_iVisibilityMemoEntrySerial[client][target] = serial;
+        }
+        return cached;
+    }
+
+    bool visible = L4D2_IsVisibleToPlayer(client, TEAM_INFECTED, TEAM_SURVIVOR, 0, targetEyePos);
+    g_iVisibilityMemoTargetUserid[client][target] = targetUserid;
+    g_flVisibilityMemoExpiry[client][target] = now + 0.04;
+    g_bVisibilityMemoResult[client][target] = visible;
+    if (serial > 0)
+    {
+        g_iVisibilityMemoEntrySerial[client][target] = serial;
+    }
+    return visible;
+}
+
+/**
+* 判断目标是否正在看着 charger
+* @param client 客户端索引
+* @param target 目标索引
+* @param fovDeg 视野角度 (默认 60 度, 即目标的视角方向与目标到 charger 的位置向量方向夹角小于 fovDeg 即为正在看着)
+* @return bool
+**/
+stock bool isTargetWatchingCharger(int client, int target, float fovDeg = 60.0) {
+    if (!isAiCharger(client))
+        return false;
+    if (!IsValidSurvivor(target) || !IsPlayerAlive(target))
+        return false;
+    
+    static float eyePos[3], vDir[3];
+    GetClientEyePosition(client, eyePos);
+    
+    static float targetEyePos[3], targetEyeAng[3], vFwd[3];
+    GetClientEyePosition(target, targetEyePos);
+    GetClientEyeAngles(target, targetEyeAng);
+    GetAngleVectors(targetEyeAng, vFwd, NULL_VECTOR, NULL_VECTOR);
+    NormalizeVector(vFwd, vFwd);
+    
+    MakeVectorFromPoints(targetEyePos, eyePos, vDir);
+    NormalizeVector(vDir, vDir);
+
+    float dot = GetVectorDotProduct(vFwd, vDir);
+    if (dot > 1.0) dot = 1.0;
+    else if (dot < -1.0) dot = -1.0;
+    float deg = RadToDeg(ArcCosine(dot));
+    
+    if (deg > fovDeg)
+        return false;
+
+    /**
+    // 检测是否能够直视 charger (没有被障碍物挡住)
+    static Handle hTrace;
+    static bool visible;
+    hTrace = TR_TraceRayFilterEx(targetEyePos, eyePos, MASK_VISIBLE, RayType_EndPoint, _TraceRayFilterNoPlayer, target);
+    visible = !TR_DidHit(hTrace);
+    delete hTrace;
+    return visible;
+    **/
+
+    return isSurvivorVisibleToCharger(client, target, targetEyePos);
+}
+
+/**
+* 检查当前有几个生还者正在看着 Charger
+* @param client 客户端索引
+* @param target Charger 的目标索引, 一般是把它排除的, 如果需要检查目标, target 传递 INVALID_CLIENT_INDEX 即可
+* @param fovDeg 视野角度 (默认 60 度)
+* @return int 正在看着 Charger 的生还者数量
+**/
+stock int isAnySurvivorWatchingCharger(int client, int target, float fovDeg = 60.0) {
+    if (!isAiCharger(client))
+        return 0;
+
+    int count = 0;
+    static float pos[3], targetPos[3], dist, weaponRange, rangeModifier;
+    static int weapon;
+    static char clsName[32];
+
+    GetClientAbsOrigin(client, pos);
+    pos[2] = 0.0;
+
+    for (int i = 1; i <= MaxClients; i++) {
+        if (i == client || i == target)
+            continue;
+        if (!IsValidSurvivor(i) || !IsPlayerAlive(i))
+            continue;
+        if (IsClientIncapped(i) || IsClientHanging(i) || IsClientPinned(i))
+            continue;
+        // =========================================================================
+        // 对不同的武器类型进行判断
+        // 1. 如果生还者拿着近战武器但是距离 charger 的距离大于 melee_range + _ai_charger3_melee_bait_maxrange.FloatValue, 那么没有威胁
+        // 2. 如果生还者拿着枪械, 如果距离大于射程范围, 没有威胁
+        // =========================================================================
+        GetClientAbsOrigin(i, targetPos);
+        targetPos[2] = 0.0;
+        dist = GetVectorDistance(pos, targetPos);
+
+        weapon = GetEntPropEnt(i, Prop_Send, "m_hActiveWeapon");
+        if (!IsValidEntity(weapon))
+            continue;
+        GetEntityClassname(weapon, clsName, sizeof(clsName));
+        // 近战武器的情况
+        if (L4D2_GetMeleeWeaponIndex(clsName) > -1 || strcmp(clsName[7], "chainsaw", false) == 0) {
+		float meleeRange = cvMeleeRange != null ? cvMeleeRange.FloatValue : DEFAULT_MELEE_RANGE;
+		if (dist > meleeRange + (50.0))
+                continue;
+        }
+        // 非近战武器的情况
+        weaponRange = L4D2_GetFloatWeaponAttribute(clsName, L4D2FWA_Range);
+        rangeModifier = L4D2_GetFloatWeaponAttribute(clsName, L4D2FWA_RangeModifier);
+        if (dist > (weaponRange * rangeModifier))
+            continue;
+
+        if (!isTargetWatchingCharger(client, i, fovDeg))
+            continue;
+        
+        count += 1;
+    }
+    return count;
+}
+
+stock int getClosestSurvivorAndValid(int charger, int excludeTar = -1) {
+	if (!isAiCharger(charger))
+		return -1;
+	
+	static int target;
+	static float pos[3], targetPos[3];
+	static ArrayList targets;
+	if (!targets)
+		targets = new ArrayList(2);
+
+	GetClientAbsOrigin(charger, pos);
+	for (int i = 1; i <= MaxClients; i++) {
+		if (i == charger || i == excludeTar)
+			continue;
+		if (!IsValidSurvivor(i) || !IsPlayerAlive(i) || IsClientPinned(i) || IsClientIncapped(i) || IsClientHanging(i))
+			continue;
+
+		GetClientAbsOrigin(i, targetPos);
+		targets.Set(targets.Push(GetVectorDistance(pos, targetPos)), i, 1);
+	}
+
+	if (targets.Length < 1) {
+		delete targets;
+		return -1;
+	}
+
+	SortADTArray(targets, Sort_Ascending, Sort_Float);
+	target = targets.Get(0, 1);
+	delete targets;
+	return target;
+}
+
+stock bool vectorsEqual(const float vec1[3], const float vec2[3]) {
+    return (vec1[0] == vec2[0] &&
+            vec1[1] == vec2[1] &&
+            vec1[2] == vec2[2]);
+}
+
+stock float getVectorLength2D(const float vec[3]) {
+    return SquareRoot(vec[0] * vec[0] + vec[1] * vec[1]);
+}
+
+stock float getVectorDistance2D(const float vec1[3], const float vec2[3]) {
+    return SquareRoot(Pow(vec1[0] - vec2[0], 2.0) + Pow(vec1[1] - vec2[1], 2.0));
+}
+
+stock bool isSurvivorPinned(int client) {
+    if (!IsValidSurvivor(client) || !IsPlayerAlive(client))
+        return false;
+
+    // 检查是否被 Hunter 扑倒
+    if (GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0) return true;
+    // 检查是否被其他 Charger 携带着冲锋
+    if (GetEntPropEnt(client, Prop_Send, "m_carryAttacker") > 0) return true;
+    // 检查是否被其他 Charger 按在地上捶打
+    if (GetEntPropEnt(client, Prop_Send, "m_pummelAttacker") > 0) return true;
+
+    return false;
+}
+
+/* struct Segment
+{
+    CNavArea *area;									// the area along the path
+    NavTraverseType how;							// how to enter this area from the previous one
+    Vector pos;										// our movement goal position at this point in the path
+    const CNavLadder *ladder;						// if "how" refers to a ladder, this is it
+    
+    SegmentType type;								// how to traverse this segment of the path
+    Vector forward;									// unit vector along segment
+    float length;									// length of this segment
+    float distanceFromStart;						// distance of this node from the start of the path
+    float curvature;								// how much the path 'curves' at this point in the XY plane (0 = none, 1 = 180 degree doubleback)
+
+    Vector m_portalCenter;							// position of center of 'portal' between previous area and this area
+    float m_portalHalfWidth;						// half width of 'portal'
+}; */
+stock void clearPathSnapshot(int client) {
+    if (client < 1 || client > MaxClients)
+        return;
+
+    if (g_ChargerPathSnapshots[client] != null)
+        g_ChargerPathSnapshots[client].Clear();
+
+    g_AiChargers[client].m_bPathSnapshotComplete = false;
+}
+
+stock void clearCachedPath(int client) {
+    clearPathSnapshot(client);
+    g_AiChargers[client].m_PathSegment.init();
+    g_AiChargers[client].m_NextPathSegment.init();
+    g_AiChargers[client].m_LastPathSegment.init();
+}
+
+stock bool hasPathSnapshot(int client) {
+    return (
+        client >= 1 && client <= MaxClients &&
+        g_ChargerPathSnapshots[client] != null &&
+        g_ChargerPathSnapshots[client].Length > 0
+    );
+}
+
+bool constructPathSegmentFromSnapshot(int client, int sourceIndex, PathSegment segment) {
+    segment.init();
+    int segmentType;
+    if (!AnneNextBot_GetPathSegment(
+        client,
+        sourceIndex,
+        segment.m_pNavArea,
+        segment.m_iNavTraverseType,
+        segment.m_vecGoalPos,
+        segmentType,
+        segment.m_vecForward,
+        segment.m_flLength,
+        segment.m_flDistFromStart
+    )) {
+        return false;
+    }
+
+    segment.m_pPathSegment = view_as<Address>(sourceIndex + 1);
+    segment.m_SegmentType = view_as<SegmentType>(segmentType);
+    return true;
+}
+
+stock bool capturePathSnapshot(int client) {
+    clearPathSnapshot(client);
+
+    ArrayList snapshot = g_ChargerPathSnapshots[client];
+    int count, currentIndex;
+    bool complete;
+    float age;
+    if (snapshot == null ||
+        !AnneNextBot_GetPathSnapshotInfo(client, count, currentIndex, complete, age) ||
+        currentIndex < 0 || currentIndex >= count) {
+        clearCachedPath(client);
+        return false;
+    }
+
+    PathSegment segment;
+
+    int maxDepth = (10);
+    if (maxDepth < 1)
+        maxDepth = 1;
+
+    // 前瞻逻辑最多先跳过 maxDepth 段，再向前检查 maxDepth 段。
+    int snapshotLimit = (maxDepth >= (MAX_PATH_SNAPSHOT_SEGMENTS - 1) / 2)
+        ? MAX_PATH_SNAPSHOT_SEGMENTS
+        : maxDepth * 2 + 1;
+
+    int endIndex = currentIndex + snapshotLimit;
+    if (endIndex > count)
+        endIndex = count;
+    for (int sourceIndex = currentIndex; sourceIndex < endIndex; sourceIndex++) {
+        if (!constructPathSegmentFromSnapshot(client, sourceIndex, segment))
+            break;
+        snapshot.PushArray(segment, sizeof(segment));
+    }
+
+    g_AiChargers[client].m_bPathSnapshotComplete = complete && endIndex == count && snapshot.Length == endIndex - currentIndex;
+
+    if (snapshot.Length < 1) {
+        clearCachedPath(client);
+        return false;
+    }
+
+    snapshot.GetArray(0, g_AiChargers[client].m_PathSegment, sizeof(PathSegment));
+
+    if (snapshot.Length > 1)
+        snapshot.GetArray(1, g_AiChargers[client].m_NextPathSegment, sizeof(PathSegment));
+    else
+        g_AiChargers[client].m_NextPathSegment.init();
+
+    if (g_AiChargers[client].m_bPathSnapshotComplete)
+        snapshot.GetArray(snapshot.Length - 1, g_AiChargers[client].m_LastPathSegment, sizeof(PathSegment));
+    else
+        g_AiChargers[client].m_LastPathSegment.init();
+
+    return true;
+}
+
+stock bool getLookAheadGoalPos(int client, const float pos[3], float maxDist, float outPos[3], int maxDepth = 10) {
+	// A: iterSeg, B: nextSeg
+    static PathSegment A, B;
+	ArrayList snapshot = g_ChargerPathSnapshots[client];
+	if (snapshot == null || snapshot.Length < 1)
+		return false;
+
+	static int segmentIndex, segmentCount;
+	segmentIndex = 0;
+	segmentCount = snapshot.Length;
+	snapshot.GetArray(segmentIndex, A, sizeof(A));
+
+	static float vPos2D[3];
+	vPos2D = pos;
+	vPos2D[2] = 0.0;
+
+	// ============================================================
+	// 使用几何投影法, 找到真正的前向节点
+	// ============================================================
+	for (int i = 0; i < maxDepth; i++) {
+		// 先尝试获取下一个节点, 如果没有下一个节点, 说明 iterSeg 为当前路径的终点, 跳出循环
+		if (segmentIndex + 1 >= segmentCount)
+			break;
+		snapshot.GetArray(segmentIndex + 1, B, sizeof(B));
+
+		// 获取 2D 节点坐标, 用于计算投影
+		static float curGoal2D[3], nextGoal2D[3];
+		curGoal2D = A.m_vecGoalPos;
+		nextGoal2D = B.m_vecGoalPos;
+		curGoal2D[2] = 0.0;
+		nextGoal2D[2] = 0.0;
+
+		// 获取 current goal pos 到 next goal pos 的向量 x
+		// 获取 current goal pos 到 client pos 的向量 y
+		static float vCur2Next[3], vCur2Client[3], lenSqrAB;
+		MakeVectorFromPoints(curGoal2D, nextGoal2D, vCur2Next);
+		MakeVectorFromPoints(curGoal2D, vPos2D, vCur2Client);
+		lenSqrAB = GetVectorDotProduct(vCur2Next, vCur2Next);
+		
+		if (lenSqrAB <= 0.0) {
+			A = B;
+			segmentIndex += 1;
+			continue;
+		}
+
+		// 计算 y 到 x 向量的投影
+		static float proj;
+		proj = GetVectorDotProduct(vCur2Next, vCur2Client) / lenSqrAB;
+
+		// 如果 y 向量在 x 向量上的投影长过 x 向量, 说明当前 path segment 完全在 client 身后, 继续推进检测下一段 path segment
+		if (proj >= 1.0) {
+			A = B;
+			segmentIndex += 1;
+			continue;
+		} else if (proj >= 0.5) {
+			// 若 y 向量在 x 向量上的投影超过 x 向量长度一半, 说明 client 已经走了当前 path segment 的一半, 找一个以当前 client 速度一次可达的最远节点
+			A = B;
+			segmentIndex += 1;
+			break;
+		} else {
+			// 若投影小于等于 0, 说明当前节点依旧是有效的起步点, 找一个以当前 client 速度一次可达的最远节点
+			break;
+		}
+	}
+
+	// ============================================================
+	// 以上一步的起点为基础, 外推, 找一个以当前 client 速度一次
+	// 可达且可见 (client pos 到目标节点中间没有障碍物遮挡, 不会阻止连跳) 的最远节点
+	// ============================================================
+	static float lastVisPos[3];
+	lastVisPos = A.m_vecGoalPos;
+
+	static float vStart[3];
+	L4D_GetEntityWorldSpaceCenter(client, vStart);
+
+	static int fwdCount;
+	fwdCount = 0;
+
+	for (int i = 0; i < maxDepth; i++) { 
+		static float vGoal[3], vEnd[3];
+		vGoal = A.m_vecGoalPos;
+
+		vEnd = vGoal;
+		vEnd[2] += 36.0;
+		
+		static Handle hTrace;
+        static bool isHit;
+		hTrace = TR_TraceHullFilterEx(vStart, vEnd, {-16.0, -16.0, -16.0}, {16.0, 16.0, 16.0}, MASK_PLAYERSOLID, _TraceWallFilter);
+        isHit = TR_DidHit(hTrace);
+        delete hTrace;
+
+        // 如果视线被墙挡住, 前面的路无法直接一次连跳过去, 跳出循环, 返回最远的可见节点
+        if (isHit) {
+            break;
+        }
+
+		// 该节点并没有被遮挡, 立即记录为最优节点, 增加检查节点数量
+		lastVisPos = vGoal;
+		fwdCount += 1;
+
+		static float dist2CurGoal;
+		dist2CurGoal = getVectorDistance2D(vStart, vGoal);
+		// 到达以当前速度最远可达的距离, 这个节点以当前速度一次连跳不可达, 跳出循环
+		if (dist2CurGoal >= maxDist) {
+			break;
+		}
+
+        // 如果当前节点的高度大于 client pos + MaxJumpHeight, 说明一跳上不去, 跳出循环
+        if (vGoal[2] - pos[2] > JUMP_HEIGHT) {
+            break;
+        }
+
+		// 如果这个节点以当前速度可达, 继续遍历下一个节点
+		// 如果下一个节点没有了, 说明当前节点就是路径的最后一个节点, 跳出循环
+		if (segmentIndex + 1 >= segmentCount)
+			break;
+
+		segmentIndex += 1;
+		snapshot.GetArray(segmentIndex, A, sizeof(A));
+	}
+
+	// 如果前向检查节点没有任何一个以当前速度一次跳跃可达的节点, 说明 client 当前位置到下一个节点中间存在障碍物, 不允许连跳
+	if (fwdCount < 1) {
+		return false;
+	}
+
+	outPos = lastVisPos;
+	return true;
+}
+
+/**
+ * 计算客户端的剩余滞空时间
+ * @param client  客户端索引
+ * @param pos     客户端当前坐标
+ * @param vVel    m_vecAbsVelocity
+ * @return float
+ */
+stock float calcRemainingAirTime(const float pos[3], const float vVel[3]) {
+    float vEnd[3];
+    vEnd = pos;
+    vEnd[2] -= 9999.0;
+
+    Handle hTrace = TR_TraceRayFilterEx(pos, vEnd, MASK_PLAYERSOLID, RayType_Infinite, _TraceWallFilter);
+
+    float H = JUMP_HEIGHT;
+    if (TR_DidHit(hTrace)) {
+        float vHitPos[3];
+        TR_GetEndPosition(vHitPos, hTrace);
+        H = pos[2] - vHitPos[2];
+    }
+    delete hTrace;
+
+    /*
+        如果射线没有打到任何东西, 说明下面是深渊, 使用什么 H 都无所谓了
+    */
+    if (H < 0.0) {
+        H = 0.0;
+    }
+
+    float gravity = !cvGravity ? DEFAULT_GRAVITY : cvGravity.FloatValue;
+
+    float root = (vVel[2] * vVel[2]) + (2.0 * gravity * H);
+    if (root < 0.0) {
+        root = 0.0;
+    }
+
+    // 计算落地时间, 设置最小值和最大值
+    float t = (vVel[2] + SquareRoot(root)) / gravity;
+    if (t < 0.1) {
+        t = 0.1;
+    }
+    if (t > 3.0) {
+        t = 3.0;
+    }
+
+    return t;
+}
+
+stock bool hasPotentialGap2(int client, const float start[3], const float end[3], float maxLocalDrop) {
+    return AIPathMovement_HasPotentialGap(client, start, end, maxLocalDrop);
+}
+
+stock float calcVectorAngle(const float v1[3], const float v2[3], bool ignoreZ = true) {
+    return AIPathMovement_VectorAngle(v1, v2, ignoreZ);
+}
+
+/**
+* 从 Client Index 获取该 Bot 的 ILocomotion 指针
+* @param client 客户端索引
+* @return Address ILocomotion 指针地址, 无效返回 Address Null
+**/
+stock Address clientGetLocomotionInterface(int client) {
+    if (!IsValidClient(client))
+        return Address_Null;
+    
+    Address pEntity = GetEntityAddress(client);
+    if (!pEntity)
+        return Address_Null;
+    
+    Address pNextBot = view_as<Address>(SDKCall(g_hSdkMyNextBotPointer, pEntity));
+    if (!pNextBot)
+        return Address_Null;
+    
+    Address pLocomotion = view_as<Address>(SDKCall(g_hSdkGetLocomotionInterface, pNextBot));
+    if (!pLocomotion)
+        return Address_Null;
+    
+    return pLocomotion;
+}
+
+/**
+* 检查 start 坐标和 end 坐标中间有没有纵向高差超过 MaxJumpHeight 的下坠, 有则返回 true, 无返回 false
+* 底层采用从 start 到 end 进行步进然后向下作射线检测, 检测是否有超过 MaxJumpHeight 的高差
+* @param start 起点坐标
+* @param end 终点坐标
+* @return bool
+**/
+stock bool hasPotentialGap(Address pLocomotion, const float start[3], const float end[3]) {
+    if (!pLocomotion)
+        return false;
+
+    /*
+        bool ILocomotion::HasPotentialGap( const Vector &from, const Vector &desiredTo, float *fraction ) const
+        最后一个参数 fraction 表示射线检测的进度, 射线检测到 has gap, 这个 fraction 表示从 start 到高度差的距离占 start 到 end 的距离的百分比
+    */
+    float fraction = 0.0;
+
+    return SDKCall(g_hSdkHasPotentialGap, pLocomotion, start, end, fraction);
+}
+
+/**
+* 调试输出 PathSegment 结构体信息
+* @param segment PathSegment 结构体
+* @return void
+**/
+stock void debugPrintPathSegment(PathSegment segment) {
+    PrintToConsoleAll("\n===== PathSegment Info =====");
+    PrintToConsoleAll("\tthis pointer: 0x%X", segment.m_pPathSegment);
+    PrintToConsoleAll("\tNavArea: 0x%X", segment.m_pNavArea);
+    PrintToConsoleAll("\tNavTraverseType: %d", segment.m_iNavTraverseType);
+    PrintToConsoleAll("\tSegmentType: %d", segment.m_SegmentType);
+    PrintToConsoleAll("\tGoal Pos: (%f, %f, %f)", segment.m_vecGoalPos[0], segment.m_vecGoalPos[1], segment.m_vecGoalPos[2]);
+    PrintToConsoleAll("\tForward: (%f, %f, %f)", segment.m_vecForward[0], segment.m_vecForward[1], segment.m_vecForward[2]);
+    PrintToConsoleAll("\tLength: %f", segment.m_flLength);
+    PrintToConsoleAll("\tDistFromStart: %f", segment.m_flDistFromStart);
+    PrintToConsoleAll("\n");
+}
+

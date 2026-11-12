@@ -8,6 +8,7 @@
 #include <builtinvotes_stocks>
 #include <colors>
 #include <anne_cvar_shield>
+#include <anne_ai_version>
 
 #define PLUGIN_VERSION "1.0.7"
 #define VOTE_TIME 20
@@ -351,43 +352,7 @@ bool AnneVersionSupportsTraitor()
 		return false;
 	}
 
-	char version[32];
-	g_cvAnneVersion.GetString(version, sizeof(version));
-	return IsAnneVersionAtLeast(version, 2026, 7);
-}
-
-bool IsAnneVersionAtLeast(const char[] rawVersion, int minimumYear, int minimumMonth)
-{
-	char version[32];
-	strcopy(version, sizeof(version), rawVersion);
-	TrimString(version);
-
-	if (StrEqual(version, "Latest", false))
-	{
-		return true;
-	}
-
-	ReplaceString(version, sizeof(version), ".", "-");
-	ReplaceString(version, sizeof(version), "/", "-");
-
-	char parts[3][12];
-	if (ExplodeString(version, "-", parts, sizeof(parts), sizeof(parts[])) < 2)
-	{
-		return false;
-	}
-
-	int year = StringToInt(parts[0]);
-	int month = StringToInt(parts[1]);
-	if (year > 0 && year < 100)
-	{
-		year += 2000;
-	}
-	if (month < 1 || month > 12)
-	{
-		return false;
-	}
-
-	return year > minimumYear || (year == minimumYear && month >= minimumMonth);
+	return AnneAI_GetVersionMonth() >= 202607;
 }
 
 SpawnVoteMode DetectSpawnVoteMode()

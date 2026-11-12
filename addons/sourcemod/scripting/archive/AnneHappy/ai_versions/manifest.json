@@ -8137,6 +8137,1776 @@
           "inf_ai_difficulty_fallback_level": "3"
         }
       }
+    },
+    "26-08": {
+      "commit": "acd50462523420749ec48e5ae92ac63b08b226ce",
+      "basis": "2026-11测试版升版前的2026-08线上基线快照（含10-15背身调整与Left4DHooks 1.174加载兼容修复，不含11-10未部署AI重构）",
+      "versions": [
+        "Anne26-08.cfg"
+      ],
+      "compatibility_plugins": [],
+      "load_order": [
+        "optional/AnneHappy/ai_versions/26-08/settings.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_smoker3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_hunter_2.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_jockey_2.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_spitter_3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_charger3.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_boomer_3.smx",
+        "optional/AnneHappy/ai_versions/26-08/SI_Target_limit.smx",
+        "optional/AnneHappy/ai_versions/26-08/ai_tank3.smx",
+        "optional/AnneHappy/ai_versions/26-08/smart_ai_rock.smx"
+      ],
+      "adaptations": [],
+      "plugins": [
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_smoker3.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_smoker3.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_smoker3.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_smoker3.sp": "61231e1f90d9aadb22fb24fbc18ec6a44c659db5",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd",
+            "addons/sourcemod/scripting/include/logger2.inc": "920ba6f5699a001d3eda7129f3fa496a6dfdb458",
+            "addons/sourcemod/scripting/archive/AnneHappy/stocks.sp": "de22f2f42f9f2a6ca19082811eba92940393dd73"
+          },
+          "gamedata": {
+            "addons/sourcemod/gamedata/l4d2_ai_smoker3.txt": "addons/sourcemod/gamedata/anne_ai_26_08_smoker3.txt"
+          },
+          "private_cvars": [
+            {
+              "handle": "g_cvEnableBhop",
+              "name": "ai_smoker3_bhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1539
+            },
+            {
+              "handle": "g_cvBhopNoVision",
+              "name": "ai_smoker3_bhop_no_vision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1541
+            },
+            {
+              "handle": "g_cvBhopImpulse",
+              "name": "ai_SmokerBhopSpeed",
+              "value": "90",
+              "default": "120",
+              "numeric": 90.0,
+              "numeric_clamped": false,
+              "line": 1543
+            },
+            {
+              "handle": "g_cvBhopMinSpeed",
+              "name": "ai_smoker3_bhop_min_speed",
+              "value": "200",
+              "default": "200",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 1545
+            },
+            {
+              "handle": "g_cvBhopMaxSpeed",
+              "name": "ai_smoker3_bhop_max_speed",
+              "value": "1000",
+              "default": "1000",
+              "numeric": 1000.0,
+              "numeric_clamped": false,
+              "line": 1546
+            },
+            {
+              "handle": "g_cvBhopMinDist",
+              "name": "ai_smoker3_bhop_min_dist",
+              "value": "75",
+              "default": "75",
+              "numeric": 75.0,
+              "numeric_clamped": false,
+              "line": 1548
+            },
+            {
+              "handle": "g_cvBhopMaxDist",
+              "name": "ai_smoker3_bhop_max_dist",
+              "value": "9999",
+              "default": "9999",
+              "numeric": 9999.0,
+              "numeric_clamped": false,
+              "line": 1549
+            },
+            {
+              "handle": "g_cvBhopSideMinAng",
+              "name": "ai_smoker3_bhop_side_minang",
+              "value": "15.0",
+              "default": "15.0",
+              "numeric": 15.0,
+              "numeric_clamped": false,
+              "line": 1551
+            },
+            {
+              "handle": "g_cvBhopSideMaxAng",
+              "name": "ai_smoker3_bhop_side_maxang",
+              "value": "30.0",
+              "default": "30.0",
+              "numeric": 30.0,
+              "numeric_clamped": false,
+              "line": 1552
+            },
+            {
+              "handle": "g_cvBhopNoVisionMaxAng",
+              "name": "_ai_smoker3_bhop_nvis_maxang",
+              "value": "75.0",
+              "default": "75.0",
+              "numeric": 75.0,
+              "numeric_clamped": false,
+              "line": 1554
+            },
+            {
+              "handle": "g_cvAirVecModifyDegree",
+              "name": "ai_smoker3_airvec_modify_degree",
+              "value": "50.0",
+              "default": "50.0",
+              "numeric": 50.0,
+              "numeric_clamped": false,
+              "line": 1556
+            },
+            {
+              "handle": "g_cvAirVecModifyMaxDegree",
+              "name": "ai_smoker3_airvec_modify_degree_max",
+              "value": "105.0",
+              "default": "105.0",
+              "numeric": 105.0,
+              "numeric_clamped": false,
+              "line": 1557
+            },
+            {
+              "handle": "g_cvAirVecModifyInterval",
+              "name": "ai_smoker3_airvec_modify_interval",
+              "value": "0.3",
+              "default": "0.3",
+              "numeric": 0.30000001192092896,
+              "numeric_clamped": false,
+              "line": 1558
+            },
+            {
+              "handle": "g_cvJumpPull",
+              "name": "ai_smoker3_jump_pull",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1559
+            },
+            {
+              "handle": "g_cvPullBackVision",
+              "name": "ai_smoker3_pull_back_vision",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1561
+            },
+            {
+              "handle": "g_cvAntiRetreat",
+              "name": "ai_smoker3_anti_retreat",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1564
+            },
+            {
+              "handle": "g_cvMove2NewTarInterval",
+              "name": "ai_smoker3_move2_newtar_interval",
+              "value": "1.0",
+              "default": "1.0",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1566
+            },
+            {
+              "handle": "g_cvStopSmokerWarnSnd",
+              "name": "ai_smoker3_stop_warn_snd",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1569
+            },
+            {
+              "handle": "g_cvPluginName",
+              "name": "ai_smoker3_plugin_name",
+              "value": "ai_smoker3",
+              "default": "ai_smoker3",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1572
+            },
+            {
+              "handle": "g_cvLogLevel",
+              "name": null,
+              "value": "32",
+              "default": "32",
+              "numeric": 32.0,
+              "numeric_clamped": false,
+              "line": 1577
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_hunter_2.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_hunter_2.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_hunter_2.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_hunter_2.sp": "f4e939e01af1545e3cf0923bda1a38f010738cd3",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd"
+          },
+          "gamedata": {},
+          "private_cvars": [
+            {
+              "handle": "g_hFastPounceDistance",
+              "name": "ai_hunter_fast_pounce_distance",
+              "value": "1000.0",
+              "default": "1000.0",
+              "numeric": 1000.0,
+              "numeric_clamped": false,
+              "line": 812
+            },
+            {
+              "handle": "g_hPounceVerticalAngle",
+              "name": "ai_hunter_vertical_angle",
+              "value": "7.0",
+              "default": "7.0",
+              "numeric": 7.0,
+              "numeric_clamped": false,
+              "line": 814
+            },
+            {
+              "handle": "g_hPounceAngleMean",
+              "name": "ai_hunter_angle_mean",
+              "value": "10.0",
+              "default": "10.0",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 816
+            },
+            {
+              "handle": "g_hPounceAngleStd",
+              "name": "ai_hunter_angle_std",
+              "value": "20.0",
+              "default": "20.0",
+              "numeric": 20.0,
+              "numeric_clamped": false,
+              "line": 818
+            },
+            {
+              "handle": "g_hStraightPounceDistance",
+              "name": "ai_hunter_straight_pounce_distance",
+              "value": "200.0",
+              "default": "200.0",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 820
+            },
+            {
+              "handle": "g_hAimOffset",
+              "name": "ai_hunter_aim_offset",
+              "value": "360.0",
+              "default": "360.0",
+              "numeric": 360.0,
+              "numeric_clamped": false,
+              "line": 822
+            },
+            {
+              "handle": "g_hNoSightPounceRange",
+              "name": "ai_hunter_no_sight_pounce_range",
+              "value": "300.0,250.0",
+              "default": "300.0,250.0",
+              "numeric": 300.0,
+              "numeric_clamped": false,
+              "line": 826
+            },
+            {
+              "handle": "g_hBackVision",
+              "name": "ai_hunter_back_vision",
+              "value": "0",
+              "default": "25",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 829
+            },
+            {
+              "handle": "g_hMeleeFirst",
+              "name": "ai_hunter_melee_first",
+              "value": "300.0,1000.0",
+              "default": "300.0,1000.0",
+              "numeric": 300.0,
+              "numeric_clamped": false,
+              "line": 832
+            },
+            {
+              "handle": "g_hHighPounceHeight",
+              "name": "ai_hunter_high_pounce",
+              "value": "400",
+              "default": "400",
+              "numeric": 400.0,
+              "numeric_clamped": false,
+              "line": 835
+            },
+            {
+              "handle": "g_hWallDetectDistance",
+              "name": "ai_hunter_wall_detect_distance",
+              "value": "-1.0",
+              "default": "-1.0",
+              "numeric": -1.0,
+              "numeric_clamped": false,
+              "line": 839
+            },
+            {
+              "handle": "g_hAnglePounceCount",
+              "name": "ai_hunter_angle_diff",
+              "value": "2",
+              "default": "3",
+              "numeric": 2.0,
+              "numeric_clamped": false,
+              "line": 842
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_jockey_2.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_jockey_2.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_jockey_2.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_jockey_2.sp": "a4795b20a5ee0257535780d98cfefac48e531d4a",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd"
+          },
+          "gamedata": {},
+          "private_cvars": [
+            {
+              "handle": "g_hBhopSpeed",
+              "name": "ai_JockeyBhopSpeed",
+              "value": "80",
+              "default": "80.0",
+              "numeric": 80.0,
+              "numeric_clamped": false,
+              "line": 759
+            },
+            {
+              "handle": "g_hStartHopDistance",
+              "name": "ai_JockeyStartHopDistance",
+              "value": "600.0",
+              "default": "800",
+              "numeric": 600.0,
+              "numeric_clamped": false,
+              "line": 760
+            },
+            {
+              "handle": "g_hJockeyStumbleRadius",
+              "name": "ai_JockeyStumbleRadius",
+              "value": "50.0",
+              "default": "50",
+              "numeric": 50.0,
+              "numeric_clamped": false,
+              "line": 761
+            },
+            {
+              "handle": "g_hSpecialJumpAngle",
+              "name": "ai_JockeySpecialJumpAngle",
+              "value": "60.0",
+              "default": "60",
+              "numeric": 60.0,
+              "numeric_clamped": false,
+              "line": 763
+            },
+            {
+              "handle": "g_hSpecialJumpChance",
+              "name": "ai_JockeySpecialJumpChance",
+              "value": "60.0",
+              "default": "60",
+              "numeric": 60.0,
+              "numeric_clamped": false,
+              "line": 764
+            },
+            {
+              "handle": "g_hActionChance",
+              "name": "ai_jockeyNoActionChance",
+              "value": "40,10,50",
+              "default": "20,20,60",
+              "numeric": 40.0,
+              "numeric_clamped": false,
+              "line": 765
+            },
+            {
+              "handle": "g_hAllowInterControl",
+              "name": "ai_JockeyAllowInterControl",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 766
+            },
+            {
+              "handle": "g_hBackVision",
+              "name": "ai_JockeyBackVision",
+              "value": "0",
+              "default": "50",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 767
+            },
+            {
+              "handle": "g_hShovedCooldown",
+              "name": "ai_JockeyShovedCooldown",
+              "value": "3.0",
+              "default": "3.0",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 768
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_spitter_3.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_spitter_3.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_spitter_3.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_spitter_3.sp": "dffff0a7f47ed6e42ee4cd777ae5767cefd83e37",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd",
+            "addons/sourcemod/scripting/include/anne_nextbot.inc": "e1d148d280a9172053d74ce633ec88f046bd0cc1",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_snapshot.inc": "34d124304aaebcd3ae8351f352ef76e928354218",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_movement.inc": "60ef23d1931e94718e9938bdbb790f180e276151"
+          },
+          "gamedata": {},
+          "private_cvars": [
+            {
+              "handle": "g_hAllowBhop",
+              "name": "ai_SpitterBhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1777
+            },
+            {
+              "handle": "g_hBhopSpeed",
+              "name": "ai_SpitterBhopSpeed",
+              "value": "100",
+              "default": "100",
+              "numeric": 100.0,
+              "numeric_clamped": false,
+              "line": 1778
+            },
+            {
+              "handle": "g_hBhopFirstHopRatio",
+              "name": "ai_SpitterBhopFirstHopRatio",
+              "value": "0.8",
+              "default": "0.8",
+              "numeric": 0.800000011920929,
+              "numeric_clamped": false,
+              "line": 1779
+            },
+            {
+              "handle": "g_hBhopMaxSpeed",
+              "name": "ai_SpitterBhopMaxSpeed",
+              "value": "1000.0",
+              "default": "1000.0",
+              "numeric": 1000.0,
+              "numeric_clamped": false,
+              "line": 1780
+            },
+            {
+              "handle": "g_hBhopStartDistance",
+              "name": "ai_SpitterBhopStartDistance",
+              "value": "2500.0",
+              "default": "2500.0",
+              "numeric": 2500.0,
+              "numeric_clamped": false,
+              "line": 1781
+            },
+            {
+              "handle": "g_hPathBhop",
+              "name": "ai_spitter3_path_bhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1782
+            },
+            {
+              "handle": "g_hPathLookAheadDepth",
+              "name": "ai_spitter3_path_lookahead_depth",
+              "value": "6",
+              "default": "6",
+              "numeric": 6.0,
+              "numeric_clamped": false,
+              "line": 1783
+            },
+            {
+              "handle": "g_hPathLaneOffset",
+              "name": "ai_spitter3_path_lane_offset",
+              "value": "12.0",
+              "default": "12.0",
+              "numeric": 12.0,
+              "numeric_clamped": false,
+              "line": 1784
+            },
+            {
+              "handle": "g_hTargetPolicy",
+              "name": "ai_SpitterTarget",
+              "value": "3",
+              "default": "3",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 1785
+            },
+            {
+              "handle": "g_hPinnedPriority",
+              "name": "ai_SpitterPinnedPr",
+              "value": "6,3,1,5",
+              "default": "6,3,1,5",
+              "numeric": 6.0,
+              "numeric_clamped": false,
+              "line": 1786
+            },
+            {
+              "handle": "g_hKilledAfterSpit",
+              "name": "ai_SpiiterDieAfterSpit",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1787
+            },
+            {
+              "handle": "g_hAirSpit",
+              "name": "ai_spitter3_air_spit",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1788
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_charger3.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/ai_charger3.sp": "fb0b55bb0511d401e662ca025074344a367f18d5",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd",
+            "addons/sourcemod/scripting/include/logger2.inc": "920ba6f5699a001d3eda7129f3fa496a6dfdb458",
+            "addons/sourcemod/scripting/include/vector_show.inc": "3b6edbd522940af745a339694acb400d4d70b98c",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/setup.inc": "e0c69b1ca6de8375bdfdd9248226ac7065b1a448",
+            "addons/sourcemod/scripting/include/anne_nextbot.inc": "e1d148d280a9172053d74ce633ec88f046bd0cc1",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_movement.inc": "60ef23d1931e94718e9938bdbb790f180e276151",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/stocks.inc": "6ceb0334cda56755083a315ec0aa12c85fcd5597",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/state/state.inc": "1f9f2cca72b1ab61e776f2c7b2a7fbed28a1f45b",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/state/state_approach.inc": "2c9d5ff95a080ff1946490751324d16f5fa63ee5",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/state/state_bait.inc": "d4849b2c33d1be68036a074920aa0e0bcdd7b961",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/state/state_locked.inc": "3289edabb6529e1956698402d35b7c091f57d880",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_charger3/state/state_charging.inc": "972bda7a1a9490f9efdb1dab12be44b0a2a44d25"
+          },
+          "gamedata": {
+            "addons/sourcemod/gamedata/l4d2_ai_charger3.txt": "addons/sourcemod/gamedata/anne_ai_26_08_charger3.txt"
+          },
+          "private_cvars": [
+            {
+              "handle": "g_cvBhop",
+              "name": "ai_charger3_bhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1260
+            },
+            {
+              "handle": "g_cvBhopMinDist",
+              "name": "ai_charger3_bhop_min_dist",
+              "value": "100.0",
+              "default": "100.0",
+              "numeric": 100.0,
+              "numeric_clamped": false,
+              "line": 1262
+            },
+            {
+              "handle": "g_cvBhopMaxDist",
+              "name": "ai_charger3_bhop_max_dist",
+              "value": "9999.0",
+              "default": "9999.0",
+              "numeric": 9999.0,
+              "numeric_clamped": false,
+              "line": 1263
+            },
+            {
+              "handle": "g_cvDirectBhopDist",
+              "name": "ai_charger3_bhop_direct_dist",
+              "value": "350.0",
+              "default": "400.0",
+              "numeric": 350.0,
+              "numeric_clamped": false,
+              "line": 1264
+            },
+            {
+              "handle": "g_cvBhopImpulse",
+              "name": "ai_charger3_bhop_impulse",
+              "value": "90",
+              "default": "100.0",
+              "numeric": 90.0,
+              "numeric_clamped": false,
+              "line": 1266
+            },
+            {
+              "handle": "g_cvBhopFirstHopRatio",
+              "name": "ai_charger3_bhop_first_hop_ratio",
+              "value": "0.8",
+              "default": "0.8",
+              "numeric": 0.800000011920929,
+              "numeric_clamped": false,
+              "line": 1268
+            },
+            {
+              "handle": "g_cvBhopMinSpeed",
+              "name": "ai_charger3_bhop_min_speed",
+              "value": "200",
+              "default": "200",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 1270
+            },
+            {
+              "handle": "g_cvBhopMaxSpeed",
+              "name": "ai_charger3_bhop_max_speed",
+              "value": "800",
+              "default": "800",
+              "numeric": 800.0,
+              "numeric_clamped": false,
+              "line": 1271
+            },
+            {
+              "handle": "g_cvBhopBeforeCharge",
+              "name": "ai_charger3_bhop_before_charge",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1273
+            },
+            {
+              "handle": "g_cvBhopNoVision",
+              "name": "ai_charger3_bhop_no_vision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1275
+            },
+            {
+              "handle": "g_cvBhopNoVisionMaxAng",
+              "name": "ai_charger3_bhop_nvis_maxang",
+              "value": "90.0",
+              "default": "90.0",
+              "numeric": 90.0,
+              "numeric_clamped": false,
+              "line": 1277
+            },
+            {
+              "handle": "g_cvTargetWatchMaxDeg",
+              "name": "ai_charger3_target_watch_maxdeg",
+              "value": "30.0",
+              "default": "22.5",
+              "numeric": 30.0,
+              "numeric_clamped": false,
+              "line": 1279
+            },
+            {
+              "handle": "g_cvBhopStrafeMinDist",
+              "name": "ai_charger3_bhop_strafe_mindist",
+              "value": "400.0",
+              "default": "400.0",
+              "numeric": 400.0,
+              "numeric_clamped": false,
+              "line": 1281
+            },
+            {
+              "handle": "g_cvBhopStrafeMinDeg",
+              "name": "ai_charger3_bhop_strafe_mindeg",
+              "value": "30.0",
+              "default": "30.0",
+              "numeric": 30.0,
+              "numeric_clamped": false,
+              "line": 1283
+            },
+            {
+              "handle": "g_cvBhopStrafeMaxDeg",
+              "name": "ai_charger3_bhop_strafe_maxdeg",
+              "value": "55.0",
+              "default": "55.0",
+              "numeric": 55.0,
+              "numeric_clamped": false,
+              "line": 1285
+            },
+            {
+              "handle": "g_cvBhopStrafeOnceDist",
+              "name": "ai_charger3_bhop_strafe_once_dist",
+              "value": "200.0",
+              "default": "200.0",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 1287
+            },
+            {
+              "handle": "g_cvBhopStrafeTwiceDist",
+              "name": "ai_charger3_bhop_strafe_twice_dist",
+              "value": "400.0",
+              "default": "400.0",
+              "numeric": 400.0,
+              "numeric_clamped": false,
+              "line": 1289
+            },
+            {
+              "handle": "g_cvMeleeBaitZoneMinRange",
+              "name": "_ai_charger3_melee_bait_minrange",
+              "value": "15.0",
+              "default": "15.0",
+              "numeric": 15.0,
+              "numeric_clamped": false,
+              "line": 1291
+            },
+            {
+              "handle": "g_cvMeleeBaitZoneMaxRange",
+              "name": "_ai_charger3_melee_bait_maxrange",
+              "value": "50.0",
+              "default": "50.0",
+              "numeric": 50.0,
+              "numeric_clamped": false,
+              "line": 1293
+            },
+            {
+              "handle": "g_cvAirVecModifyMinDegree",
+              "name": "ai_charger3_airvec_modify_min_deg",
+              "value": "45.0",
+              "default": "45.0",
+              "numeric": 45.0,
+              "numeric_clamped": false,
+              "line": 1295
+            },
+            {
+              "handle": "g_cvAirVecModifyMaxDegree",
+              "name": "ai_charger3_airvec_modify_max_deg",
+              "value": "89.0",
+              "default": "89.0",
+              "numeric": 89.0,
+              "numeric_clamped": false,
+              "line": 1297
+            },
+            {
+              "handle": "g_cvAirVecModifyInterval",
+              "name": "ai_charger3_airvec_modify_interval",
+              "value": "0.3",
+              "default": "0.3",
+              "numeric": 0.30000001192092896,
+              "numeric_clamped": false,
+              "line": 1299
+            },
+            {
+              "handle": "g_cvAirVecModifyLerp",
+              "name": "_ai_charger3_airvec_modify_lerp",
+              "value": "0.3",
+              "default": "0.3",
+              "numeric": 0.30000001192092896,
+              "numeric_clamped": false,
+              "line": 1301
+            },
+            {
+              "handle": "g_cvAirTurnSpeedLoss",
+              "name": "ai_charger3_air_turn_speed_loss",
+              "value": "0.12",
+              "default": "0.12",
+              "numeric": 0.11999999731779099,
+              "numeric_clamped": false,
+              "line": 1303
+            },
+            {
+              "handle": "g_cvAirSpeedFloorRatio",
+              "name": "ai_charger3_air_speed_floor_ratio",
+              "value": "0.50",
+              "default": "0.50",
+              "numeric": 0.5,
+              "numeric_clamped": false,
+              "line": 1304
+            },
+            {
+              "handle": "g_cvAirTurnBudget",
+              "name": "ai_charger3_air_turn_budget",
+              "value": "30.0",
+              "default": "30.0",
+              "numeric": 30.0,
+              "numeric_clamped": false,
+              "line": 1306
+            },
+            {
+              "handle": "g_cvBaitMaxDuration",
+              "name": "ai_charger3_bait_max_duration",
+              "value": "7.0",
+              "default": "7.0",
+              "numeric": 7.0,
+              "numeric_clamped": false,
+              "line": 1308
+            },
+            {
+              "handle": "g_cvMeleeBaitOrbit",
+              "name": "ai_charger3_melee_bait_orbit",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1309
+            },
+            {
+              "handle": "g_cvMeleeBaitStalemateSwitch",
+              "name": "ai_charger3_melee_bait_stalemate_switch",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1310
+            },
+            {
+              "handle": "g_cvMeleeBaitBlacklistDur",
+              "name": "ai_charger3_melee_bait_blacklist_dur",
+              "value": "10.0",
+              "default": "10.0",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 1311
+            },
+            {
+              "handle": "g_cvProbChargeChkDur",
+              "name": "ai_charger3_prob_charge_chk_dur",
+              "value": "0.5",
+              "default": "0.5",
+              "numeric": 0.5,
+              "numeric_clamped": false,
+              "line": 1313
+            },
+            {
+              "handle": "g_cvProbChargeProb",
+              "name": "ai_charger3_prob_charge_prob",
+              "value": "0.8",
+              "default": "0.8",
+              "numeric": 0.800000011920929,
+              "numeric_clamped": false,
+              "line": 1315
+            },
+            {
+              "handle": "g_cvAntiRetreat",
+              "name": "ai_charger3_anti_retreat",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1317
+            },
+            {
+              "handle": "g_cvEvadeMoveToRefreshInterval",
+              "name": "ai_charger3_evade_moveto_refresh_interval",
+              "value": "1.0",
+              "default": "1.0",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1319
+            },
+            {
+              "handle": "g_cvPathLookAheadMaxDepth",
+              "name": "ai_charger3_path_lookahead_maxdepth",
+              "value": "10",
+              "default": "10",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 1321
+            },
+            {
+              "handle": "g_cvLegacyBhop",
+              "name": "ai_ChargerBhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1324
+            },
+            {
+              "handle": "g_cvLegacyBhopSpeed",
+              "name": "ai_ChagrerBhopSpeed",
+              "value": "90",
+              "default": "90.0",
+              "numeric": 90.0,
+              "numeric_clamped": false,
+              "line": 1325
+            },
+            {
+              "handle": "g_cvLegacyChargeDistance",
+              "name": "ai_ChargerChargeDistance",
+              "value": "350.0",
+              "default": "250.0",
+              "numeric": 350.0,
+              "numeric_clamped": false,
+              "line": 1326
+            },
+            {
+              "handle": "g_cvLegacyExtraTargetDistance",
+              "name": "ai_ChargerExtraTargetDistance",
+              "value": "100,600",
+              "default": "0,350",
+              "numeric": 100.0,
+              "numeric_clamped": false,
+              "line": 1327
+            },
+            {
+              "handle": "g_cvLegacyAimOffset",
+              "name": "ai_ChargerAimOffset",
+              "value": "30.0",
+              "default": "30.0",
+              "numeric": 30.0,
+              "numeric_clamped": false,
+              "line": 1328
+            },
+            {
+              "handle": "g_cvLegacyMeleeAvoid",
+              "name": "ai_ChargerMeleeAvoid",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1329
+            },
+            {
+              "handle": "g_cvLegacyMeleeDamage",
+              "name": "ai_ChargerMeleeDamage",
+              "value": "420",
+              "default": "350",
+              "numeric": 420.0,
+              "numeric_clamped": false,
+              "line": 1330
+            },
+            {
+              "handle": "g_cvLegacyTarget",
+              "name": "ai_ChargerTarget",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1331
+            },
+            {
+              "handle": "g_cvLegacyChargeHeightDiff",
+              "name": "ai_ChargerChargeHeightDiff",
+              "value": "80.0",
+              "default": "80.0",
+              "numeric": 80.0,
+              "numeric_clamped": false,
+              "line": 1332
+            },
+            {
+              "handle": "g_cvPluginName",
+              "name": "ai_charger3_plugin_name",
+              "value": "ai_charger3",
+              "default": "ai_charger3",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 1344
+            },
+            {
+              "handle": "g_cvLogLevel",
+              "name": null,
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 1350
+            },
+            {
+              "handle": "g_cvStateLogLevel",
+              "name": "_ai_charger3_state_log_level",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2611
+            },
+            {
+              "handle": "g_cvStockLogLevel",
+              "name": "_ai_charger3_stock_log_level",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 5967
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_boomer_3.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_boomer_3.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_boomer_3.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_boomer_3.sp": "f31cb58c130e3777cc21d1a106da234fda6f39d5",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd",
+            "addons/sourcemod/scripting/include/anne_nextbot.inc": "e1d148d280a9172053d74ce633ec88f046bd0cc1",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_snapshot.inc": "34d124304aaebcd3ae8351f352ef76e928354218",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_movement.inc": "60ef23d1931e94718e9938bdbb790f180e276151"
+          },
+          "gamedata": {},
+          "private_cvars": [
+            {
+              "handle": "g_hAllowBhop",
+              "name": "ai_BoomerBhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 879
+            },
+            {
+              "handle": "g_hBhopSpeed",
+              "name": "ai_BoomerBhopSpeed",
+              "value": "150",
+              "default": "150.0",
+              "numeric": 150.0,
+              "numeric_clamped": false,
+              "line": 880
+            },
+            {
+              "handle": "g_hBhopFirstHopRatio",
+              "name": "ai_BoomerBhopFirstHopRatio",
+              "value": "0.8",
+              "default": "0.8",
+              "numeric": 0.800000011920929,
+              "numeric_clamped": false,
+              "line": 881
+            },
+            {
+              "handle": "g_hBhopMaxSpeed",
+              "name": "ai_BoomerBhopMaxSpeed",
+              "value": "1000.0",
+              "default": "1000.0",
+              "numeric": 1000.0,
+              "numeric_clamped": false,
+              "line": 883
+            },
+            {
+              "handle": "g_hBhopStartDistance",
+              "name": "ai_BoomerBhopStartDistance",
+              "value": "2500.0",
+              "default": "2500.0",
+              "numeric": 2500.0,
+              "numeric_clamped": false,
+              "line": 884
+            },
+            {
+              "handle": "g_hJumpVomit",
+              "name": "ai_BoomerJumpVomit",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 885
+            },
+            {
+              "handle": "g_hPathBhop",
+              "name": "ai_boomer3_path_bhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 886
+            },
+            {
+              "handle": "g_hPathLookAheadDepth",
+              "name": "ai_boomer3_path_lookahead_depth",
+              "value": "5",
+              "default": "5",
+              "numeric": 5.0,
+              "numeric_clamped": false,
+              "line": 887
+            },
+            {
+              "handle": "g_hPathLaneOffset",
+              "name": "ai_boomer3_path_lane_offset",
+              "value": "10.0",
+              "default": "10.0",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 888
+            },
+            {
+              "handle": "g_hUpVision",
+              "name": "ai_BoomerUpVision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 889
+            },
+            {
+              "handle": "g_hTurnVision",
+              "name": "ai_BoomerTurnVision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 890
+            },
+            {
+              "handle": "g_hForceBile",
+              "name": "ai_BoomerForceBile",
+              "value": "0",
+              "default": "0",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 893
+            },
+            {
+              "handle": "g_hBileFindRange",
+              "name": "ai_BoomerBileFindRange",
+              "value": "300",
+              "default": "300",
+              "numeric": 300.0,
+              "numeric_clamped": false,
+              "line": 895
+            },
+            {
+              "handle": "g_hTurnInterval",
+              "name": "ai_BoomerTurnInterval",
+              "value": "25",
+              "default": "15",
+              "numeric": 25.0,
+              "numeric_clamped": false,
+              "line": 896
+            },
+            {
+              "handle": "g_hAllowInDegreeForceBile",
+              "name": "ai_BoomerDegreeForceBile",
+              "value": "10",
+              "default": "10",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 898
+            },
+            {
+              "handle": "g_hAllowAutoFrame",
+              "name": "ai_BoomerAutoFrame",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 899
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/SI_Target_limit.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/SI_Target_limit.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/SI_Target_limit.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/SI_Target_limit.sp": "0ec2b41a5951595ea5ae0609cbd68e5a77c6cae8"
+          },
+          "gamedata": {},
+          "private_cvars": [
+            {
+              "handle": "g_hPluginEnable",
+              "name": "SI_target_enable",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 133
+            },
+            {
+              "handle": "g_hSI_enable_option",
+              "name": "SI_enable_option",
+              "value": "53",
+              "default": "53",
+              "numeric": 53.0,
+              "numeric_clamped": false,
+              "line": 134
+            },
+            {
+              "handle": "g_hLimit_auto",
+              "name": "SI_target_limit_auto",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 135
+            },
+            {
+              "handle": "g_hLimit_manual",
+              "name": "SI_target_limit_manual",
+              "value": "3",
+              "default": "3",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 136
+            },
+            {
+              "handle": "g_hRushmanScope",
+              "name": "SI_target_rushman_scope",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 137
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/AnneHappy/ai_tank3.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/ai_tank3.smx",
+          "original": "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3.sp": "807664e2c782a8a9e7d45c7e00489c5f550fe836",
+            "addons/sourcemod/scripting/include/treeutil.inc": "2ea467d660de762781251fb70b15674701dcdddd",
+            "addons/sourcemod/scripting/include/logger2.inc": "920ba6f5699a001d3eda7129f3fa496a6dfdb458",
+            "addons/sourcemod/scripting/include/anne_nextbot.inc": "e1d148d280a9172053d74ce633ec88f046bd0cc1",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_path_movement.inc": "60ef23d1931e94718e9938bdbb790f180e276151",
+            "addons/sourcemod/scripting/archive/AnneHappy/stocks.sp": "de22f2f42f9f2a6ca19082811eba92940393dd73",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/setup.inc": "8e0284d10a52bbe35cefb84888cd355468f2282b",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/path.inc": "be9ee520a48efb23f6fa01fc24d8ed0dda2a8d29",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/target.inc": "66136578a9ad840330aea2a9a3210bdf13f55e33",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/command.inc": "18529709cc7671dfdcf819b0f9efd6b185c0f9ef",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/overhead.inc": "efa8e238cd50f6f626fee13b95d06788a25edc96",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/movement.inc": "d148f98a0516274207de6b81a23c46fcb917923e",
+            "addons/sourcemod/scripting/optional/AnneHappy/ai_tank3/combat.inc": "638299594536cfcd14c952ca6623c24c2b78932b"
+          },
+          "gamedata": {
+            "addons/sourcemod/gamedata/l4d2_ai_tank3.txt": "addons/sourcemod/gamedata/anne_ai_26_08_tank3.txt"
+          },
+          "private_cvars": [
+            {
+              "handle": "g_cvEnable",
+              "name": "ai_tank3_enable",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2190
+            },
+            {
+              "handle": "g_cvTankBhop",
+              "name": "ai_tank_bhop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2193
+            },
+            {
+              "handle": "g_cvBhopMinDist",
+              "name": "ai_Tank_StopDistance",
+              "value": "135",
+              "default": "135",
+              "numeric": 135.0,
+              "numeric_clamped": false,
+              "line": 2194
+            },
+            {
+              "handle": "g_cvBhopMaxDist",
+              "name": "ai_tank3_bhop_max_dist",
+              "value": "9999",
+              "default": "9999",
+              "numeric": 9999.0,
+              "numeric_clamped": false,
+              "line": 2195
+            },
+            {
+              "handle": "g_cvBhopMinSpeed",
+              "name": "ai_tank3_bhop_min_speed",
+              "value": "200",
+              "default": "200",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 2196
+            },
+            {
+              "handle": "g_cvBhopMaxSpeed",
+              "name": "ai_tank3_bhop_max_speed",
+              "value": "1000",
+              "default": "1000",
+              "numeric": 1000.0,
+              "numeric_clamped": false,
+              "line": 2197
+            },
+            {
+              "handle": "g_cvBhopImpulse",
+              "name": "ai_tank3_bhop_impulse",
+              "value": "60",
+              "default": "60",
+              "numeric": 60.0,
+              "numeric_clamped": false,
+              "line": 2198
+            },
+            {
+              "handle": "g_cvBhopFirstHopRatio",
+              "name": "ai_tank3_bhop_first_hop_ratio",
+              "value": "1.0",
+              "default": "1.0",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2199
+            },
+            {
+              "handle": "g_cvBhopNoVision",
+              "name": "ai_tank3_bhop_no_vision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2200
+            },
+            {
+              "handle": "g_cvBhopNoVisionMaxAng",
+              "name": "_ai_tank3_bhop_nvis_maxang",
+              "value": "75.0",
+              "default": "75.0",
+              "numeric": 75.0,
+              "numeric_clamped": false,
+              "line": 2201
+            },
+            {
+              "handle": "g_cvPathLookAheadMaxDepth",
+              "name": "ai_tank3_path_lookahead_maxdepth",
+              "value": "10",
+              "default": "10",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 2202
+            },
+            {
+              "handle": "g_cvDirectChaseMaxAngle",
+              "name": "_ai_tank3_direct_chase_max_angle",
+              "value": "45.0",
+              "default": "45.0",
+              "numeric": 45.0,
+              "numeric_clamped": false,
+              "line": 2203
+            },
+            {
+              "handle": "g_cvBhopStrafeAngle",
+              "name": "ai_tank3_bhop_strafe_angle",
+              "value": "15.0",
+              "default": "15.0",
+              "numeric": 15.0,
+              "numeric_clamped": false,
+              "line": 2204
+            },
+            {
+              "handle": "g_cvBhopStrafeMinDist",
+              "name": "ai_tank3_bhop_strafe_min_dist",
+              "value": "600.0",
+              "default": "600.0",
+              "numeric": 600.0,
+              "numeric_clamped": false,
+              "line": 2205
+            },
+            {
+              "handle": "g_cvBhopReverseHop",
+              "name": "ai_tank3_bhop_reverse_hop",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2206
+            },
+            {
+              "handle": "g_cvBhopReverseBrake",
+              "name": "ai_tank3_bhop_reverse_brake",
+              "value": "1500",
+              "default": "1500",
+              "numeric": 1500.0,
+              "numeric_clamped": false,
+              "line": 2207
+            },
+            {
+              "handle": "g_cvAirVecModifyDegree",
+              "name": "ai_tank3_airvec_modify_degree",
+              "value": "45.0",
+              "default": "45.0",
+              "numeric": 45.0,
+              "numeric_clamped": false,
+              "line": 2210
+            },
+            {
+              "handle": "g_cvAirVecModifyMaxDegree",
+              "name": "ai_tank3_airvec_modify_degree_max",
+              "value": "135.0",
+              "default": "135.0",
+              "numeric": 135.0,
+              "numeric_clamped": false,
+              "line": 2211
+            },
+            {
+              "handle": "g_cvAirVecModifyInterval",
+              "name": "ai_tank3_airvec_modify_interval",
+              "value": "0.3",
+              "default": "0.3",
+              "numeric": 0.30000001192092896,
+              "numeric_clamped": false,
+              "line": 2212
+            },
+            {
+              "handle": "g_cvThrowMinDist",
+              "name": "ai_tank3_throw_min_dist",
+              "value": "200",
+              "default": "200",
+              "numeric": 200.0,
+              "numeric_clamped": false,
+              "line": 2215
+            },
+            {
+              "handle": "g_cvThrowMaxDist",
+              "name": "ai_tank3_throw_max_dist",
+              "value": "450",
+              "default": "450",
+              "numeric": 450.0,
+              "numeric_clamped": false,
+              "line": 2216
+            },
+            {
+              "handle": "g_cvRockTargetAdjust",
+              "name": "ai_tank3_rock_target_adjust",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2217
+            },
+            {
+              "handle": "g_cvBackFist",
+              "name": "ai_tank3_back_fist",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2218
+            },
+            {
+              "handle": "g_cvBackFistRange",
+              "name": "ai_tank3_back_fist_range",
+              "value": "128.0",
+              "default": "128.0",
+              "numeric": 128.0,
+              "numeric_clamped": false,
+              "line": 2219
+            },
+            {
+              "handle": "g_cvBackFistAllowMaxSpd",
+              "name": "ai_tank3_back_fist_max_spd",
+              "value": "50.0",
+              "default": "50.0",
+              "numeric": 50.0,
+              "numeric_clamped": false,
+              "line": 2220
+            },
+            {
+              "handle": "g_cvBackFistWindow",
+              "name": "ai_tank3_back_fist_window",
+              "value": "3.0",
+              "default": "3.0",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 2221
+            },
+            {
+              "handle": "g_cvPunchLockVision",
+              "name": "ai_tank3_punch_lock_vision",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2222
+            },
+            {
+              "handle": "g_cvTargetSelect",
+              "name": "ai_tank3_target_select",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2225
+            },
+            {
+              "handle": "g_cvTargetSwitchRatio",
+              "name": "ai_tank3_target_switch_ratio",
+              "value": "0.85",
+              "default": "0.85",
+              "numeric": 0.8500000238418579,
+              "numeric_clamped": false,
+              "line": 2226
+            },
+            {
+              "handle": "g_cvTargetSwitchGain",
+              "name": "ai_tank3_target_switch_gain",
+              "value": "75",
+              "default": "75",
+              "numeric": 75.0,
+              "numeric_clamped": false,
+              "line": 2227
+            },
+            {
+              "handle": "g_cvHeadBlockEnable",
+              "name": "ai_tank3_head_block_enable",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2230
+            },
+            {
+              "handle": "g_cvHeadBlockTime",
+              "name": "ai_tank3_head_block_time",
+              "value": "2.0",
+              "default": "2.0",
+              "numeric": 2.0,
+              "numeric_clamped": false,
+              "line": 2231
+            },
+            {
+              "handle": "g_cvHeadBlockVertical",
+              "name": "ai_tank3_head_block_vertical",
+              "value": "80.0",
+              "default": "80.0",
+              "numeric": 80.0,
+              "numeric_clamped": false,
+              "line": 2232
+            },
+            {
+              "handle": "g_cvHeadBlockHorizontal",
+              "name": "ai_tank3_head_block_horizontal",
+              "value": "65.0",
+              "default": "65.0",
+              "numeric": 65.0,
+              "numeric_clamped": false,
+              "line": 2233
+            },
+            {
+              "handle": "g_cvHeadBlockIgnoreTime",
+              "name": "ai_tank3_head_block_ignore_time",
+              "value": "10.0",
+              "default": "10.0",
+              "numeric": 10.0,
+              "numeric_clamped": false,
+              "line": 2234
+            },
+            {
+              "handle": "g_cvHeadBlockForceRockTime",
+              "name": "ai_tank3_head_block_force_rock_time",
+              "value": "20.0",
+              "default": "20.0",
+              "numeric": 20.0,
+              "numeric_clamped": false,
+              "line": 2235
+            },
+            {
+              "handle": "g_cvHeadBlockForceRockRange",
+              "name": "ai_tank3_head_block_force_rock_range",
+              "value": "250.0",
+              "default": "250.0",
+              "numeric": 250.0,
+              "numeric_clamped": false,
+              "line": 2236
+            },
+            {
+              "handle": "g_cvHeadBlockForceRockReleaseHoriz",
+              "name": "ai_tank3_head_block_force_rock_release_h",
+              "value": "400",
+              "default": "400",
+              "numeric": 400.0,
+              "numeric_clamped": false,
+              "line": 2237
+            },
+            {
+              "handle": "g_cvHeadBlockForceRockReleaseVert",
+              "name": "ai_tank3_head_block_force_rock_release_v",
+              "value": "250",
+              "default": "250",
+              "numeric": 250.0,
+              "numeric_clamped": false,
+              "line": 2238
+            },
+            {
+              "handle": "g_cvHeadBlockRideEnable",
+              "name": "ai_tank3_head_block_ride_enable",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2239
+            },
+            {
+              "handle": "g_cvHeadBlockRideHorizontal",
+              "name": "ai_tank3_head_block_ride_horizontal",
+              "value": "40.0",
+              "default": "40.0",
+              "numeric": 40.0,
+              "numeric_clamped": false,
+              "line": 2240
+            },
+            {
+              "handle": "g_cvHeadBlockRideVerticalMin",
+              "name": "ai_tank3_head_block_ride_vertical_min",
+              "value": "40.0",
+              "default": "40.0",
+              "numeric": 40.0,
+              "numeric_clamped": false,
+              "line": 2241
+            },
+            {
+              "handle": "g_cvHeadBlockRideVerticalMax",
+              "name": "ai_tank3_head_block_ride_vertical_max",
+              "value": "100.0",
+              "default": "100.0",
+              "numeric": 100.0,
+              "numeric_clamped": false,
+              "line": 2242
+            },
+            {
+              "handle": "g_cvHeadBlockRideRockTime",
+              "name": "ai_tank3_head_block_ride_rock_time",
+              "value": "3.0",
+              "default": "3.0",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 2243
+            },
+            {
+              "handle": "g_cvHeadBlockUpSwing",
+              "name": "ai_tank3_head_block_up_swing",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2244
+            },
+            {
+              "handle": "g_cvRetreatTimeout",
+              "name": "ai_tank3_retreat_timeout",
+              "value": "3.0",
+              "default": "3.0",
+              "numeric": 3.0,
+              "numeric_clamped": false,
+              "line": 2245
+            },
+            {
+              "handle": "g_cvLadderLookLock",
+              "name": "ai_tank3_ladder_look_lock",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2248
+            },
+            {
+              "handle": "g_cvLadderNearbyDisable",
+              "name": "ai_tank3_ladder_nearby_disable",
+              "value": "1",
+              "default": "1",
+              "numeric": 1.0,
+              "numeric_clamped": false,
+              "line": 2249
+            },
+            {
+              "handle": "g_cvLadderNearbyRadius",
+              "name": "ai_tank3_ladder_nearby_radius",
+              "value": "180.0",
+              "default": "180.0",
+              "numeric": 180.0,
+              "numeric_clamped": false,
+              "line": 2250
+            },
+            {
+              "handle": "g_cvLadderNearbyCacheTime",
+              "name": "ai_tank3_ladder_nearby_cache",
+              "value": "0.20",
+              "default": "0.20",
+              "numeric": 0.20000000298023224,
+              "numeric_clamped": false,
+              "line": 2251
+            },
+            {
+              "handle": "g_cvPluginName",
+              "name": "ai_tank3_plugin_name",
+              "value": "ai_tank3",
+              "default": "ai_tank3",
+              "numeric": 0.0,
+              "numeric_clamped": false,
+              "line": 2254
+            },
+            {
+              "handle": "g_cvLogLevel",
+              "name": null,
+              "value": "32",
+              "default": "32",
+              "numeric": 32.0,
+              "numeric_clamped": false,
+              "line": 2258
+            }
+          ]
+        },
+        {
+          "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/optional/smart_ai_rock.sp",
+          "smx": "optional/AnneHappy/ai_versions/26-08/smart_ai_rock.smx",
+          "original": "addons/sourcemod/scripting/optional/smart_ai_rock.sp",
+          "blobs": {
+            "addons/sourcemod/scripting/optional/smart_ai_rock.sp": "98e7c2797e41c7d3bf16fb99f9a621e4efae28ec"
+          },
+          "gamedata": {},
+          "private_cvars": []
+        }
+      ],
+      "settings": {
+        "source": "addons/sourcemod/scripting/archive/AnneHappy/ai_versions/26-08/settings.sp",
+        "smx": "optional/AnneHappy/ai_versions/26-08/settings.smx",
+        "parameters": {
+          "z_acquire_far_time": "5.0",
+          "z_acquire_near_time": "0.5",
+          "hunter_pounce_air_speed": "700",
+          "jockey_pounce_air_speed": "700",
+          "z_spit_latency": "0.3",
+          "z_jockey_control_variance": "0.0",
+          "z_vomit_interval": "15",
+          "z_spit_interval": "15",
+          "z_charge_warmup": "0",
+          "boomer_exposed_time_tolerance": "0.0",
+          "boomer_vomit_delay": "0.0",
+          "z_jockey_speed": "275",
+          "z_jockey_leap_time": "0.4",
+          "z_spitter_max_wait_time": "0",
+          "smoker_tongue_delay": "1.0",
+          "z_hunter_lunge_distance": "5000",
+          "hunter_pounce_loft_rate": "0.055",
+          "z_attack_flow_range": "50000",
+          "z_tank_walk_speed": "225",
+          "z_tank_attack_interval": "0.0",
+          "tank_swing_interval": "1.2",
+          "tank_swing_miss_interval": "0.0",
+          "tank_throw_min_interval": "8",
+          "z_tank_throw_interval": "8",
+          "tank_attack_range": "75",
+          "tank_swing_range": "75",
+          "z_tank_speed_vs": "225",
+          "tongue_hit_delay": "13",
+          "tongue_vertical_choke_height": "99999.9",
+          "tongue_miss_delay": "7",
+          "tongue_dropping_to_ground_time": "0.5",
+          "tongue_los_forgiveness_time": "1.0",
+          "inf_ai_difficulty_link": "0",
+          "inf_ai_difficulty_fallback_level": "3"
+        }
+      }
     }
   }
 }

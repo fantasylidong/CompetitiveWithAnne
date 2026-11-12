@@ -19,9 +19,11 @@ EXCLUDED_PREFIXES = (
 )
 EXCLUDED_PATHS = {
     "optional/AnneHappy/infected_control26-07.sp",
+    "optional/AnneHappy/infected_control26-08.sp",
 }
 EXCLUDED_DIRS = (
     "optional/AnneHappy/infected_control26-07/",
+    "optional/AnneHappy/infected_control26-08/",
 )
 
 PUBLIC_ALLOWLIST = {
