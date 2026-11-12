@@ -184,4 +184,24 @@
 	{
 		"zho"		"{green}[Join]{default} 內鬼模式正在更新，請等待下一回合後再登記或切換隊伍。"
 	}
+	"Join_AwayPinned"
+	{
+		"zho"		"{green}[Join]{default} 你正在被控，無法切換旁觀，切隊請求已取消。"
+	}
+	"Join_AwayScheduled"
+	{
+		"zho"		"{green}[Join]{default} 將在 3 秒後切換到旁觀隊伍，輸入 /join 可取消。"
+	}
+	"Join_AwayCancelled"
+	{
+		"zho"		"{green}[Join]{default} 已取消切換旁觀隊伍。"
+	}
+	"Join_AwayPending"
+	{
+		"zho"		"{green}[Join]{default} 正在等待切換旁觀隊伍，輸入 /join 可取消。"
+	}
+	"Join_AwayGettingUp"
+	{
+		"zho"		"{green}[Join]{default} 你正在起身，無法切換旁觀，切隊請求已取消。"
+	}
 }

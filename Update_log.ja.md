@@ -774,3 +774,12 @@
 - `fixes` プラグイン 6 件を修正・強化し再コンパイル：`l4d2_script_cmd_swap` で `sv_cheats` 無効時に権限のないクライアントからの `script` 実行を遮断し、生スクリプト文字列への `VFormat` 展開を廃止、エンティティ参照変換を修正；`l4d2_spit_cooldown_frozen_fix` の 100Hz `OnGameFrame` ポーリングを `ability_spit` 時の 1.2 秒単発タイマーへ置換；`l4d2_rock_trace_unblock` で毎フレームの `DataPack` 生成を廃止し、`ComputeClosestPoint` が `vOrigin` を上書きして 2 人目以降の生存者判定を歪めていた問題と終了時のパッチ解除漏れを修正；`l4d2_lagcomp_manager` で `tank_rock` をビットマップ追跡し全エンティティ破棄時のクラス名照会を回避；`l4d_consistent_escaperoute` の残留 `DEBUG 1` 走査を無効化し終了時パッチ解除を追加；`l4d2_charge_target_fix` の `replacee = -1` 配列境界外参照を修正しました。
 - `optional` の ZoneMod プラグイン 11 件を最適化・修正し再コンパイル：`l4d2_skill_detect` で特殊感染者のリスポーンごとに `SDKHook_TraceAttack` が多重登録される漏れを修正し、`OnEntityDestroyed` に岩・Witch ビットマップを導入して全エンティティ破棄時の `FormatEx`／`StringMap` 検索を削減、警報車の `ZC_HUNTER`（`ZC_SMOKER` 誤記）と `ZC_CHARGER` 翻訳キー欠落を修正；`l4d2_horde_equaliser` で Tank 生存状態と ConVar をキャッシュして `OnGameFrame` のクライアント走査を廃止し、チェックポイント計算の整数除算切り捨てを修正；`l4d2_hunter_no_deadstops` に飛びかかり数カウンタを追加し待機中の `OnGameFrame` を即時終了；`l4d2_uniform_spit` の `StringMap` 文字列キーと 528 バイト配列コピーおよび破棄時のクラス名取得を固定スロットプールへ置換；`l4d2_godframes_control_merge` の 1 次元 `g_bBuckshot` を 2 次元化して散弾が複数味方に同時命中した際の FF 欠落を修正し、UserId タイマー化と境界検証を追加；`l4d2_stats` の複数 Boomer 出現時の `0.1s` タイマー漏れを修正；`fix_engine`・`staggersolver`・`caster_assister` の `OnPlayerRunCmd` 冒頭にボタンビットマスク早期判定を追加；`l4d2_blind_infected` を終点指定レイトレースと BOT 送信除外に変更；`l4d2_ghost_warp` でゴースト解除時に `PostThinkPost` を即時解除し、`ArrayList` 漏れを修正しました。
 - マージ前のライフサイクル確認で補修：`l4d2_stats` はマップ終了とクライアント接続時に Hunter の飛びかかりフラグを解除し、着地検出の再開不能と空中撃破の誤通知を防止；`fix_engine` はマップ終了と切断時に警告ロックを解除し、解除タイマーの取消後に警告が永久停止する問題を防止します。
+
+### 2026年11月11日 away の遅延切り替えとキャンセル
+
+- `join.smx` を 1.8 に更新。`/away`（`/afk`・`/spec`・`/s` を含む）は 3 秒後に観戦へ切り替えます。拘束中はメッセージを表示して拒否し、実行時にも再確認して拘束中なら予約を取り消します。
+- 予約時に `/join` でキャンセルできることを案内します。`/join` と生存者参加の別名コマンドは、BOT の追加・引き継ぎより先に予約を取り消します。連続入力によるタイマーの重複を防ぎ、チーム変更・切断・マップ終了時に予約を解除します。6 言語のメッセージとコンパイル済みプラグインを更新しました。
+
+### 2026年11月11日 away の起き上がり動作保護
+
+- `join.smx` を 1.8.1 に更新。Left4DHooks の現在のアニメーション活動と起き上がり待機フラグから Hunter 解放後、Charger の吹き飛ばし・壁叩きつけ・地面叩きつけ後、Tank のパンチ・岩による転倒後の起き上がりを判定します。`/away` 入力時と 3 秒後の実行時に確認し、起き上がり中は案内して予約を取り消します。`/join` によるキャンセルと拘束時の保護を維持し、6 言語のメッセージとコンパイル済みプラグインを更新しました。

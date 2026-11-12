@@ -184,4 +184,24 @@
 	{
 		"ko"		"{green}[Join]{default} 배신자 모드를 업데이트하는 중입니다. 다음 라운드까지 등록이나 팀 변경을 기다려 주세요."
 	}
+	"Join_AwayPinned"
+	{
+		"ko"		"{green}[Join]{default} 특수 감염자에게 제압당한 상태에서는 관전으로 전환할 수 없습니다. 전환 예약이 취소되었습니다."
+	}
+	"Join_AwayScheduled"
+	{
+		"ko"		"{green}[Join]{default} 3초 후 관전 팀으로 전환합니다. /join을 입력하면 취소할 수 있습니다."
+	}
+	"Join_AwayCancelled"
+	{
+		"ko"		"{green}[Join]{default} 관전 팀 전환을 취소했습니다."
+	}
+	"Join_AwayPending"
+	{
+		"ko"		"{green}[Join]{default} 관전 팀 전환을 기다리는 중입니다. /join을 입력하면 취소할 수 있습니다."
+	}
+	"Join_AwayGettingUp"
+	{
+		"ko"		"{green}[Join]{default} 일어나는 동작 중에는 관전으로 전환할 수 없습니다. 전환 예약이 취소되었습니다."
+	}
 }

@@ -184,4 +184,24 @@
 	{
 		"jp"		"{green}[Join]{default} 裏切り者モードを更新中です。次のラウンドまで登録やチーム変更をお待ちください。"
 	}
+	"Join_AwayPinned"
+	{
+		"jp"		"{green}[Join]{default} 特殊感染者に拘束されているため観戦に切り替えられません。切り替え予約は取り消されました。"
+	}
+	"Join_AwayScheduled"
+	{
+		"jp"		"{green}[Join]{default} 3 秒後に観戦に切り替わります。/join でキャンセルできます。"
+	}
+	"Join_AwayCancelled"
+	{
+		"jp"		"{green}[Join]{default} 観戦への切り替えをキャンセルしました。"
+	}
+	"Join_AwayPending"
+	{
+		"jp"		"{green}[Join]{default} 観戦への切り替えを待機中です。/join でキャンセルできます。"
+	}
+	"Join_AwayGettingUp"
+	{
+		"jp"		"{green}[Join]{default} 起き上がり動作中は観戦に切り替えられません。切り替え予約は取り消されました。"
+	}
 }

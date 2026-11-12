@@ -184,4 +184,24 @@
 	{
 		"en"		"{green}[Join]{default} Traitor mode is updating. Please wait until the next round before registering or changing teams."
 	}
+	"Join_AwayPinned"
+	{
+		"en"		"{green}[Join]{default} You are pinned and cannot switch to spectators. No team switch is scheduled."
+	}
+	"Join_AwayScheduled"
+	{
+		"en"		"{green}[Join]{default} You will switch to spectators in 3 seconds. Type /join to cancel."
+	}
+	"Join_AwayCancelled"
+	{
+		"en"		"{green}[Join]{default} The switch to spectators has been cancelled."
+	}
+	"Join_AwayPending"
+	{
+		"en"		"{green}[Join]{default} A switch to spectators is already pending. Type /join to cancel."
+	}
+	"Join_AwayGettingUp"
+	{
+		"en"		"{green}[Join]{default} You are getting up and cannot switch to spectators. No team switch is scheduled."
+	}
 }

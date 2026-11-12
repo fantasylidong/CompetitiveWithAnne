@@ -184,4 +184,24 @@
 	{
 		"vi"		"{green}[Join]{default} Chế độ nội gián đang được cập nhật. Hãy chờ đến vòng tiếp theo trước khi đăng ký hoặc đổi đội."
 	}
+	"Join_AwayPinned"
+	{
+		"vi"		"{green}[Join]{default} Bạn đang bị khống chế nên không thể chuyển sang khán giả. Yêu cầu chuyển đội đã bị hủy."
+	}
+	"Join_AwayScheduled"
+	{
+		"vi"		"{green}[Join]{default} Bạn sẽ chuyển sang khán giả sau 3 giây. Nhập /join để hủy."
+	}
+	"Join_AwayCancelled"
+	{
+		"vi"		"{green}[Join]{default} Đã hủy chuyển sang khán giả."
+	}
+	"Join_AwayPending"
+	{
+		"vi"		"{green}[Join]{default} Đang chờ chuyển sang khán giả. Nhập /join để hủy."
+	}
+	"Join_AwayGettingUp"
+	{
+		"vi"		"{green}[Join]{default} Bạn đang đứng dậy nên không thể chuyển sang khán giả. Yêu cầu chuyển đội đã bị hủy."
+	}
 }

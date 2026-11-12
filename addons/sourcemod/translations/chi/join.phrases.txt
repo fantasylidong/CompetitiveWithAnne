@@ -184,4 +184,24 @@
 	{
 		"chi"		"{green}[Join]{default} 内鬼模式正在更新，请等待下一回合后再登记或切换队伍。"
 	}
+	"Join_AwayPinned"
+	{
+		"chi"		"{green}[Join]{default} 你正在被控，无法切换旁观，切队请求已取消。"
+	}
+	"Join_AwayScheduled"
+	{
+		"chi"		"{green}[Join]{default} 将在 3 秒后切换到旁观队伍，输入 /join 可取消。"
+	}
+	"Join_AwayCancelled"
+	{
+		"chi"		"{green}[Join]{default} 已取消切换旁观队伍。"
+	}
+	"Join_AwayPending"
+	{
+		"chi"		"{green}[Join]{default} 正在等待切换旁观队伍，输入 /join 可取消。"
+	}
+	"Join_AwayGettingUp"
+	{
+		"chi"		"{green}[Join]{default} 你正在起身，无法切换旁观，切队请求已取消。"
+	}
 }

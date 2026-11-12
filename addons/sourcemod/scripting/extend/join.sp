@@ -53,7 +53,7 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.7",
+	version = "1.8.1",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 #define AUTOUPDATE_URL_LENGTH 256
@@ -83,6 +83,7 @@ char
 	g_sAutoUpdaterUrl[AUTOUPDATE_URL_LENGTH];
 
 Handle
+	g_hAwayTimer[MAXPLAYERS + 1],
 	g_hDonateRemindTimer[MAXPLAYERS + 1];
 
 int
@@ -547,6 +548,9 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 	int target = GetClientOfUserId(client);
 	int team = GetEventInt(event, "team");
 	bool disconnect = GetEventBool(event, "disconnect");
+	if(IsValidPlayer(target) && GetEventInt(event, "oldteam") != team)
+		CancelAwayTimer(target);
+
 	if (IsValidPlayer(target) && !disconnect && team == TEAM_INFECTED && ShouldRestrictInfectedTeam())
 	{
 		if(IsFakeClient(target))
@@ -583,8 +587,40 @@ public Action Timer_MoveClientToSpectator(Handle Timer, int userid)
 	if(client <= 0)
 		return Plugin_Stop;
 
+	g_hAwayTimer[client] = null;
+	if(!IsValidClient(client))
+		return Plugin_Stop;
+
+	if(IsPinned(client))
+	{
+		CPrintToChat(client, "%t", "Join_AwayPinned");
+		return Plugin_Stop;
+	}
+
+	if(IsGettingUp(client))
+	{
+		CPrintToChat(client, "%t", "Join_AwayGettingUp");
+		return Plugin_Stop;
+	}
+
 	MoveClientToSpectator(client, false, IsAnneManagedMode());
 	return Plugin_Stop;
+}
+
+bool CancelAwayTimer(int client)
+{
+	if(g_hAwayTimer[client] == null)
+		return false;
+
+	delete g_hAwayTimer[client];
+	g_hAwayTimer[client] = null;
+	return true;
+}
+
+public void OnMapEnd()
+{
+	for(int client = 1; client <= MaxClients; client++)
+		CancelAwayTimer(client);
 }
 
 
@@ -635,6 +671,7 @@ public void OnClientDisconnect(int client)
 {
 	if(1 <= client <= MaxClients)
 	{
+		CancelAwayTimer(client);
 		ResetDonateClientState(client);
 	}
 }
@@ -713,6 +750,12 @@ public Action TurnClientToSurvivors(int client, int args)
 	if(!IsValidClient(client))
 		return Plugin_Handled;
 
+	if(CancelAwayTimer(client))
+	{
+		CPrintToChat(client, "%t", "Join_AwayCancelled");
+		return Plugin_Handled;
+	}
+
 	checkbot();
 	if(!IsSuivivorTeamFull())
 	{
@@ -727,8 +770,31 @@ public Action AFKTurnClientToSpe(int client, int args)
 	if(!IsValidClient(client))
 		return Plugin_Handled;
 
-	if(!IsPinned(client))
-		CreateTimer(1.0, Timer_MoveClientToSpectator, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	if(GetClientTeam(client) == TEAM_SPECTATOR)
+		return Plugin_Handled;
+
+	if(IsPinned(client))
+	{
+		CancelAwayTimer(client);
+		CPrintToChat(client, "%t", "Join_AwayPinned");
+		return Plugin_Handled;
+	}
+
+	if(IsGettingUp(client))
+	{
+		CancelAwayTimer(client);
+		CPrintToChat(client, "%t", "Join_AwayGettingUp");
+		return Plugin_Handled;
+	}
+
+	if(g_hAwayTimer[client] != null)
+	{
+		CPrintToChat(client, "%t", "Join_AwayPending");
+		return Plugin_Handled;
+	}
+
+	g_hAwayTimer[client] = CreateTimer(3.0, Timer_MoveClientToSpectator, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	CPrintToChat(client, "%t", "Join_AwayScheduled");
 	return Plugin_Handled;
 }
 
@@ -1767,6 +1833,35 @@ stock bool IsValidPlayer(int client, bool AllowBot = true, bool AllowDeath = tru
 	}	
 	
 	return true;
+}
+
+bool IsGettingUp(int client)
+{
+	if(!IsSurvivor(client) || !IsPlayerAlive(client))
+		return false;
+
+	PlayerAnimState anim = PlayerAnimState.FromPlayer(client);
+	// Event flags also cover the frame before the main activity changes after release.
+	if(anim.m_bIsPouncedOn || anim.m_bIsHitByCharger || anim.m_bIsPounded
+		|| anim.m_bIsSlammedIntoWall || anim.m_bIsSlammedIntoGround || anim.m_bIsPunchedByTank)
+		return true;
+
+	// Activity IDs work across all survivor models, unlike model-specific sequences.
+	switch(anim.GetMainActivity())
+	{
+		case L4D2_ACT_TERROR_POUNCED_TO_STAND,
+			L4D2_ACT_TERROR_HIT_BY_TANKPUNCH,
+			L4D2_ACT_TERROR_IDLE_FALL_FROM_TANKPUNCH,
+			L4D2_ACT_TERROR_TANKPUNCH_LAND,
+			L4D2_ACT_TERROR_HIT_BY_CHARGER,
+			L4D2_ACT_TERROR_IDLE_FALL_FROM_CHARGERHIT,
+			L4D2_ACT_TERROR_CHARGERHIT_LAND_SLOW,
+			L4D2_ACT_TERROR_CHARGER_PUMMELED,
+			L4D2_ACT_TERROR_SLAMMED_WALL,
+			L4D2_ACT_TERROR_SLAMMED_GROUND:
+			return true;
+	}
+	return false;
 }
 
 //判断生还者是否已经被控
