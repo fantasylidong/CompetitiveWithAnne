@@ -221,6 +221,14 @@ public Plugin myinfo =
     description = "Allowing tweaking of the attributes of all weapons"
 };
 
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+    CreateNative("L4D2WA_GetWeaponTankDamageMult", Native_GetWeaponTankDamageMult);
+    CreateNative("L4D2WA_GetWeaponReloadDurationMult", Native_GetWeaponReloadDurationMult);
+    RegPluginLibrary("l4d2_weapon_attributes");
+    return APLRes_Success;
+}
+
 public void OnPluginStart()
 {
     GameData gd = new GameData(GAMEDATA_FILE);
@@ -1036,4 +1044,34 @@ void PrintDebug(MessageTypeFlag iType, const char[] Message, any ...)
     if (iType & eLogError) {
         LogError(DebugBuff);
     }
+}
+
+any Native_GetWeaponTankDamageMult(Handle plugin, int numParams)
+{
+    char sWeaponName[MAX_WEAPON_NAME_LENGTH];
+    GetNativeString(1, sWeaponName, sizeof(sWeaponName));
+    if (strncmp(sWeaponName, "weapon_", 7) == 0) {
+        strcopy(sWeaponName, sizeof(sWeaponName), sWeaponName[7]);
+    }
+
+    float fBuff = 1.0;
+    if (!hTankDamageAttri.GetValue(sWeaponName, fBuff)) {
+        return 1.0;
+    }
+    return fBuff;
+}
+
+any Native_GetWeaponReloadDurationMult(Handle plugin, int numParams)
+{
+    char sWeaponName[MAX_WEAPON_NAME_LENGTH];
+    GetNativeString(1, sWeaponName, sizeof(sWeaponName));
+    if (strncmp(sWeaponName, "weapon_", 7) == 0) {
+        strcopy(sWeaponName, sizeof(sWeaponName), sWeaponName[7]);
+    }
+
+    float fBuff = 1.0;
+    if (!hReloadDurationAttri.GetValue(sWeaponName, fBuff)) {
+        return 1.0;
+    }
+    return fBuff;
 }

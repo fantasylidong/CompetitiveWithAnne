@@ -804,3 +804,28 @@
 
 - `annehappy_hardcore`에서 `weapon_smg_mp5`를 금지 목록에서 1티어 SMG 제한 그룹(`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`)으로 옮겼습니다. 팀 전체에서 종류와 무관하게 SMG를 최대 3정까지 보유할 수 있으며(MP5 3정도 가능), 이미 SMG를 든 플레이어는 Uzi·소음 SMG·MP5 사이에서 자유롭게 교체할 수 있습니다.
 - 하드코어 `shared_settings.cfg`의 `smg_mp5 -> smg_silenced` 교체 규칙을 제거하고 Zonemod 및 일반 Anne과 동일하게 `l4d2_allow_cs_weapons.smx`와 `l4d2_weapon_spawn_variety.smx`(`director_cs_weapon_spawn_chance 1.0`)를 로드하도록 맞추었으며, `cfg/vote/weapon/zonemod.cfg`에 `sm_weapon smg_mp5 defclip 60`을 추가했습니다.
+
+### 2026년 11월 12일 이벤트 우회 경로에서 길 위 약이 사라지는 문제 수정
+
+- `f37459fe6`에서 도입된 약 보충 경로 회귀를 수정했습니다. 맵의 탈출 경로가 전체 Nav 최단 경로보다 길면 c2m4 등에서 길 위 약을 경로 밖으로 판단하고 모든 보충 후보도 거부했습니다. `confoglcompmod`는 `ESCAPE_ROUTE`가 표시된 구역에서 시작점부터 약까지, 약부터 종점까지 생존자가 이동할 수 있는지 계속 검사하되 전체 최단 경로 기준의 우회 거리 상한으로 제외하지 않습니다. 다른 구역에는 기존 우회 제한을 유지합니다. 약 개수, 진행도 범위, 문과 탄약 더미를 피하는 규칙은 변경하지 않았습니다.
+
+### 2026년 11월 12일 Anne 악용 방지·내귀 체감 플러그인 복원 및 chatlog 순수 채팅·명령어/키워드 차단 감사 로그 분리
+
+- Anne 및 협동 파생 모드에서 이전에 축소했던 플러그인과 피날레 스폰 거리 설정을 복원했습니다: `fixes/l4d2_fullupdate_fix.smx`, `fixes/annoyance_exploit_fixes.smx`, `fixes/l4d2_jockey_jumpcap_patch.smx` 언로드를 중단하고 `optional/l4d_texture_manager_block.smx`, `optional/l4d2_stats.smx`, `optional/l4d2_tank_attack_control.smx`, `optional/l4d_equalise_alarm_cars.smx` 로드를 복구했으며, 각 Anne 모드의 `confogl_reduce_finalespawnrange`를 `1`로 되돌렸습니다. 또한 `fixes/lfd_both_fixSG552.smx`를 복원·재컴파일하여 비줌 상태 `OnPlayerRunCmd` 조기 반환, 동적 탄창 크기 호환, 잘못된 엔티티 방어 및 언로드 시 패치 복구를 추가했습니다.
+- `extend/chatlog.smx`를 `1.5`로 업그레이드했습니다: 공개 조회용 `chat_log`에는 순수 채팅 메시지만 저장하고, `!`·`/`로 시작하는 모든 채팅 명령(`bequiet`나 `server`에 의해 먼저 차단되어 누락되지 않도록 `say`/`say_team` 리스너에서 직접 감시)과 `sm_` / `sm` 콘솔 명령을 입퇴장 기록, 추방 대상 해석 `callvote`, 일시정지, 2초 쿨다운 안전실 문 개폐, 자리비움, 민감 인자를 제거한 `sponsor_cmd`와 함께 `chat_audit_log`에 비동기로 기록합니다. 맵/라운드 시작·종료 로그는 기본 비활성화(`sm_chatlog_audit_lifecycle 0`)하고 `chat_audit_log` 자동 삭제 주기를 `1 MONTH`(1개월)로 설정했으며, 공유 차단 테이블 `chat_audit_ignore`에서 명령어 일치(`cmd`)와 키워드 포함(`keyword`) 두 가지 방식을 모두 지원해 업로드 전에 메모리에서 비교·차단합니다(기본 명령어 122개 탑재, 부팅·맵 시작·플레이어 접속 중 60초 주기 및 `sm_chatlog_reload_ignore`로 NewAnneWeb 관리 페이지와 동기화). `database.sql`도 동기화했습니다.
+
+### 2026년 11월 12일 동적 AI 난이도 단계별 Smoker 혀 발사 선딜레이 조정
+
+- `dynamic_ai_difficulty.cfg` 6단계의 `smoker_tongue_delay`를 쉬움 `1.5`, 보통 `1.5`, 어려움 `1.0`, 전문가 `0.5`, 극한 `0.0`, 음리 `0.0`으로 조정하고(기존 `1.0 / 1.0 / 1.0 / 1.0 / 0.5 / 0.0`), `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `alone`의 `shared_cvars.cfg` 전문가 기준값도 `0.5`로 맞추었습니다.
+
+### 2026년 11월 13일 c13m4 Anne 구출 보급 진통제를 4개로 증량
+
+- `c13m4_cutthroatcreek`의 Anne Stripper에서 기존 구출 보급 구역에 고정 진통제 스폰 2곳을 추가하여 고정 보급량을 2개에서 4개로 늘렸습니다. `mapinfo.txt`의 기존 구출 구역 판정은 그대로 사용합니다.
+
+### 2026년 11월 13일 Anne 공중 사살 발사 수 표시 복원
+
+- Anne 공통 설정에서 `optional/l4d2_stats.smx` 로드를 복원하여 일반·하드코어·샷건 및 해당 설정을 사용하는 파생 모드에 Hunter 공중 사살 발사 수와 도움 피해량을 다시 표시합니다. `l4d2_skill_detect.smx`는 공중 사살 발사 수를 표시하지 않아 이 플러그인을 완전히 대체할 수 없음을 주석으로 명시하고 기존 다국어 알림을 유지합니다.
+### 2026년 11월 13일 저부하 무기 밸런스 통계 플러그인 및 데이터베이스 테이블 추가
+
+- `extend/l4d2_weapon_balance_stats.smx`를 새로 추가해 `cfg/sharedplugins.cfg`에 등록했습니다. 생존자가 세이프룸을 출발해 실전에 돌입한 뒤 고정 배열 기반으로 19종 총기의 교전 거리 구간(`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`), 정지·이동 사격 자세, 플레이어 점수 티어, 오버킬을 제외한 유효 피해, 근거리 풀피 원샷 처치 및 1–15HP 남김, 관통 추가 명중, 전투 중 무기 교체 흐름, Tank 교전 실전 출력을 집계합니다(아군 오사 피해는 제외). 모든 카운터는 라운드 또는 맵 종료 시 `anne_db`의 공유 `l4dstats` 연결을 통해 비동기 트랜잭션으로 `weapon_balance_configs`, `weapon_balance_daily`, `weapon_balance_usage_daily`, `weapon_balance_swaps_daily`, `weapon_tank_fights`에 일괄 저장됩니다(`database.sql` 동기화).
+- `optional/l4d2_weapon_attributes.smx`에 읽기 전용 선택적 Native `L4D2WA_GetWeaponTankDamageMult`와 `L4D2WA_GetWeaponReloadDurationMult`(`include/l4d2_weapon_attributes.inc` 포함)를 추가해 실제 서버 무기 설정 스냅샷과 해시를 기록하고 NewAnneWeb `/stats/weapons/` 대시보드에서 비교할 수 있게 했습니다.

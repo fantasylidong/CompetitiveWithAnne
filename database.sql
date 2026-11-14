@@ -68,6 +68,38 @@ CREATE TABLE IF NOT EXISTS `chat_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+CREATE TABLE IF NOT EXISTS `chat_audit_log` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `date` datetime NOT NULL,
+  `server` varchar(126) DEFAULT NULL,
+  `port` int(11) DEFAULT NULL,
+  `map` varchar(128) NOT NULL,
+  `event_type` varchar(24) NOT NULL,
+  `team` varchar(16) NOT NULL DEFAULT '',
+  `steamid` varchar(32) NOT NULL DEFAULT '',
+  `name` varchar(128) NOT NULL DEFAULT '',
+  `ip` varchar(45) NOT NULL DEFAULT '',
+  `country` varchar(4) NOT NULL DEFAULT '',
+  `detail` varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_chat_audit_log_date` (`date`),
+  KEY `idx_chat_audit_log_steamid_date` (`steamid`,`date`),
+  KEY `idx_chat_audit_log_event_date` (`event_type`,`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `chat_audit_ignore` (
+  `match_type` varchar(16) NOT NULL DEFAULT 'cmd',
+  `command_key` varchar(64) NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `is_builtin` tinyint(1) NOT NULL DEFAULT '0',
+  `note` varchar(128) NOT NULL DEFAULT '',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`match_type`,`command_key`) USING BTREE,
+  KEY `idx_chat_audit_ignore_enabled` (`enabled`,`match_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 USE `l4d2stats`;
 
 CREATE TABLE IF NOT EXISTS `ai_dynamic_ppm_thresholds` (
@@ -714,6 +746,104 @@ CREATE TABLE IF NOT EXISTS `legacy_map_bests` (
   PRIMARY KEY (`source_hash`),
   KEY `idx_legacy_map_bests_filter` (`ruleset_key`,`map`,`difficulty`,`best_duration_ms`),
   KEY `idx_legacy_map_bests_steamid` (`steamid`,`modified`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE IF NOT EXISTS `weapon_balance_configs` (
+  `config_hash` char(16) CHARACTER SET ascii NOT NULL,
+  `weapon_config` varchar(64) NOT NULL DEFAULT '',
+  `anne_version` varchar(64) NOT NULL DEFAULT '',
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL DEFAULT '',
+  `sg_center_pellet` tinyint(4) NOT NULL DEFAULT '-1',
+  `sg_ring1_bullets` smallint(6) NOT NULL DEFAULT '-1',
+  `sg_ring1_factor` decimal(6,2) NOT NULL DEFAULT '-1.00',
+  `attrs_json` mediumtext NOT NULL,
+  `first_seen` int(10) unsigned NOT NULL DEFAULT '0',
+  `last_seen` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`config_hash`),
+  KEY `idx_wbc_lookup` (`ruleset_key`,`weapon_config`,`last_seen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `weapon_balance_daily` (
+  `stat_date` int(10) unsigned NOT NULL,
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `weapon_config` varchar(64) NOT NULL DEFAULT '',
+  `config_hash` char(16) CHARACTER SET ascii NOT NULL,
+  `weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
+  `target_class` tinyint(3) unsigned NOT NULL,
+  `dist_bucket` tinyint(3) unsigned NOT NULL,
+  `move_state` tinyint(3) unsigned NOT NULL,
+  `skill_tier` tinyint(3) unsigned NOT NULL,
+  `hits` int(10) unsigned NOT NULL DEFAULT '0',
+  `headshots` int(10) unsigned NOT NULL DEFAULT '0',
+  `raw_damage` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `effective_damage` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `kills` int(10) unsigned NOT NULL DEFAULT '0',
+  `shot_bursts` int(10) unsigned NOT NULL DEFAULT '0',
+  `one_shot_kills` int(10) unsigned NOT NULL DEFAULT '0',
+  `near_kill_misses` int(10) unsigned NOT NULL DEFAULT '0',
+  `collateral_hits` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`),
+  KEY `idx_wbd_config_date` (`config_hash`,`stat_date`),
+  KEY `idx_wbd_ruleset_date` (`ruleset_key`,`weapon_config`,`stat_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `weapon_balance_usage_daily` (
+  `stat_date` int(10) unsigned NOT NULL,
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `weapon_config` varchar(64) NOT NULL DEFAULT '',
+  `config_hash` char(16) CHARACTER SET ascii NOT NULL,
+  `weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
+  `move_state` tinyint(3) unsigned NOT NULL,
+  `skill_tier` tinyint(3) unsigned NOT NULL,
+  `shots_fired` int(10) unsigned NOT NULL DEFAULT '0',
+  `pellets_fired` int(10) unsigned NOT NULL DEFAULT '0',
+  `reloads` int(10) unsigned NOT NULL DEFAULT '0',
+  `hold_seconds` int(10) unsigned NOT NULL DEFAULT '0',
+  `pickups` int(10) unsigned NOT NULL DEFAULT '0',
+  `swaps_away` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`),
+  KEY `idx_wbud_config_date` (`config_hash`,`stat_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `weapon_balance_swaps_daily` (
+  `stat_date` int(10) unsigned NOT NULL,
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `weapon_config` varchar(64) NOT NULL DEFAULT '',
+  `config_hash` char(16) CHARACTER SET ascii NOT NULL,
+  `from_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
+  `to_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
+  `swap_count` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS `weapon_tank_fights` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `fight_id` varchar(40) CHARACTER SET ascii NOT NULL,
+  `stat_date` int(10) unsigned NOT NULL,
+  `created_at` int(10) unsigned NOT NULL,
+  `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `weapon_config` varchar(64) NOT NULL DEFAULT '',
+  `config_hash` char(16) CHARACTER SET ascii NOT NULL,
+  `map` varchar(64) NOT NULL DEFAULT '',
+  `tank_max_hp` int(10) unsigned NOT NULL DEFAULT '0',
+  `duration_ms` int(10) unsigned NOT NULL DEFAULT '0',
+  `shooter_count` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `killed` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
+  `raw_damage` int(10) unsigned NOT NULL DEFAULT '0',
+  `effective_damage` int(10) unsigned NOT NULL DEFAULT '0',
+  `hits` int(10) unsigned NOT NULL DEFAULT '0',
+  `shots_fired` int(10) unsigned NOT NULL DEFAULT '0',
+  `dist_sum` bigint(20) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `idx_wtf_lookup` (`ruleset_key`,`weapon_config`,`config_hash`,`stat_date`),
+  KEY `idx_wtf_fight` (`fight_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 

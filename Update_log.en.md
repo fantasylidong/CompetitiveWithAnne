@@ -804,3 +804,28 @@
 
 - Moved `weapon_smg_mp5` out of the banned weapon list in `annehappy_hardcore` into the tier-1 SMG limit group (`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`): the team may hold up to 3 SMGs total in any combination (including 3 MP5s) and freely swap among Uzi, silenced SMG, and MP5 while already holding an SMG.
 - Removed the `smg_mp5 -> smg_silenced` weapon rule in Hardcore `shared_settings.cfg`, loaded `l4d2_allow_cs_weapons.smx` and `l4d2_weapon_spawn_variety.smx` with `director_cs_weapon_spawn_chance 1.0` to match Zonemod and standard AnneHappy, and added `sm_weapon smg_mp5 defclip 60` to `cfg/vote/weapon/zonemod.cfg`.
+
+### November 12, 2026 Fix missing route pills on event detours
+
+- Fixed the pill-route regression introduced by `f37459fe6`: a map's escape route can be longer than the globally shortest Nav path, causing route pills to be rejected as off-route and every fill attempt to fail on maps such as c2m4. For areas marked `ESCAPE_ROUTE`, `confoglcompmod` still validates survivor traversal from the start to the pill and from the pill to the goal, but no longer rejects them against the global shortest-path detour cap. Other areas retain the existing detour limit. Pill counts, progress windows, door clearance, and ammo-pile clearance remain unchanged.
+
+### November 12, 2026 Restore Anne anti-exploit and traitor-mode plugins and split chatlog pure chat from command/keyword-filtered audit logs
+
+- Restored previously pruned plugins and finale ghost spawn range across Anne and coop-derived modes: kept `fixes/l4d2_fullupdate_fix.smx`, `fixes/annoyance_exploit_fixes.smx`, and `fixes/l4d2_jockey_jumpcap_patch.smx` loaded; re-enabled `optional/l4d_texture_manager_block.smx`, `optional/l4d2_stats.smx`, `optional/l4d2_tank_attack_control.smx`, and `optional/l4d_equalise_alarm_cars.smx`; restored `confogl_reduce_finalespawnrange` to `1` across Anne modes; restored and recompiled `fixes/lfd_both_fixSG552.smx` with an unzoomed `OnPlayerRunCmd` fast exit, dynamic clip-size lookup, invalid-entity guards, and `OnPluginEnd` patch restoration.
+- Upgraded `extend/chatlog.smx` to `1.5`: strictly separated pure player chat (`chat_log`) from command and server audit logs (`chat_audit_log`), monitoring all `!`/`/` chat commands (hooked directly on `say`/`say_team` so triggers suppressed by `bequiet` or `server` are never missed) and `sm_`/`sm` console commands alongside connect/disconnect records, kick-target-resolved `callvote`, `setpause`/`unpause`, 2-second-throttled saferoom door actions, AFK, and argument-sanitized `sponsor_cmd` triggers. Disabled noisy map/round lifecycle rows by default (`sm_chatlog_audit_lifecycle 0`), set `chat_audit_log` retention to automatic `1 MONTH` deletion, and supported both exact command (`cmd`) and substring keyword (`keyword`) rules in `chat_audit_ignore` (pre-seeded with 122 default commands, synced from NewAnneWeb on boot, map start, every 60s while occupied, and via `sm_chatlog_reload_ignore`, filtering in memory before SQL upload); synchronized `database.sql`.
+
+### November 12, 2026 Adjust tiered AI Smoker tongue windup delay
+
+- Updated `smoker_tongue_delay` across all six tiers in `dynamic_ai_difficulty.cfg` to Easy `1.5`, Normal `1.5`, Hard `1.0`, Expert `0.5`, Extreme `0.0`, and Neri `0.0` (previously `1.0 / 1.0 / 1.0 / 1.0 / 0.5 / 0.0`), and aligned the Expert mode baseline in `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, and `alone` `shared_cvars.cfg` to `0.5`.
+
+### November 13, 2026: Four Pills at the c13m4 Anne Finale Supply Point
+
+- Added two fixed pain pill spawns to the existing finale supply area in the Anne Stripper for `c13m4_cutthroatcreek`, increasing the fixed supply from two pills to four while retaining the existing finale area definition in `mapinfo.txt`.
+
+### November 13, 2026: Restore Anne Skeet Shot Counts
+
+- Restored `optional/l4d2_stats.smx` in the shared Anne plugin config, bringing back Hunter skeet shot counts and assist damage in standard, hardcore, shotgun, and other modes using that config. Documented that `l4d2_skill_detect.smx` does not report skeet shot counts and cannot fully replace this plugin; existing multilingual announcements remain in use.
+### November 13, 2026: Add Low-Overhead Firearm Balance Telemetry Plugin and Schema
+
+- Added `extend/l4d2_weapon_balance_stats.smx` to `cfg/sharedplugins.cfg`, using static in-memory buckets after survivors leave the saferoom to record live combat metrics across 19 firearms (excluding friendly fire): five distance buckets (`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`), stationary vs moving posture, player score tier, overkill-clamped effective damage, near-full close-range one-shot kills vs 1–15 HP near-misses, penetration collateral hits, post-saferoom weapon swaps, and Tank fight telemetry. All counters flush asynchronously at round or map end via `anne_db`'s shared `l4dstats` connection into `weapon_balance_configs`, `weapon_balance_daily`, `weapon_balance_usage_daily`, `weapon_balance_swaps_daily`, and `weapon_tank_fights` (synchronized in `database.sql`).
+- Added read-only optional natives `L4D2WA_GetWeaponTankDamageMult` and `L4D2WA_GetWeaponReloadDurationMult` to `optional/l4d2_weapon_attributes.smx` (with `include/l4d2_weapon_attributes.inc`) so active weapon snapshots and config hashes match live server settings for NewAnneWeb's `/stats/weapons/` dashboard.

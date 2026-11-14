@@ -1388,3 +1388,28 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - `annehappy_hardcore` 将 `weapon_smg_mp5` 从禁用列表移入一级冲锋枪限枪组（`l4d_wlimits_add 3 1 weapon_smg_silenced weapon_smg weapon_smg_mp5`）：全队最多同时持有 3 把冲锋枪，不限制具体枪种组合（可拿 3 把 MP5、3 把 Uzi/消音或任意混搭，且已持冲锋枪的玩家可在三把冲锋枪间自由换枪）。
 - 同步移除硬核 `shared_settings.cfg` 中将 `smg_mp5` 替换为 `smg_silenced` 的规则，并对齐 Zonemod 与普通药役加载 `l4d2_allow_cs_weapons.smx`、`l4d2_weapon_spawn_variety.smx`（`director_cs_weapon_spawn_chance 1.0`），同时在 `cfg/vote/weapon/zonemod.cfg` 补齐 `sm_weapon smg_mp5 defclip 60`。
+
+### 2026年11月12日 修复事件绕行地图沿路无药
+
+- 修复 `f37459fe6` 引入的补药路线回归：地图逃生主路可能比全图最短 Nav 路径更长，导致 C2 第四关等地图的路药被误判偏离主路，补药也全部被拒绝。`confoglcompmod` 对标有 `ESCAPE_ROUTE` 的区域仍检查起点到药点、药点到终点的生还者可达性，但不再用全图最短路的绕路上限排除；其他区域继续使用原绕路限制。补药数量、进度范围、避门和避弹药堆规则保持不变。
+
+### 2026年11月12日 恢复药役防利用与内鬼体验插件并拆分 chatlog 纯聊天与命令关键词过滤审计
+
+- 恢复药役与合作衍生模式此前误精简的插件与救援关出生距离：保留 `fixes/l4d2_fullupdate_fix.smx`、`fixes/annoyance_exploit_fixes.smx`、`fixes/l4d2_jockey_jumpcap_patch.smx` 不卸载；恢复加载 `optional/l4d_texture_manager_block.smx`、`optional/l4d2_stats.smx`、`optional/l4d2_tank_attack_control.smx`、`optional/l4d_equalise_alarm_cars.smx`；将各 Anne 模式的 `confogl_reduce_finalespawnrange` 恢复为 `1`；恢复并优化重编译 `fixes/lfd_both_fixSG552.smx`（未开镜时 `OnPlayerRunCmd` 直接短路返回，补充动态弹匣容量兼容、空实体与卸载补丁还原保护）。
+- `extend/chatlog.smx` 升级到 `1.5`：将纯玩家聊天与命令/事件审计彻底分表——公开检索的 `chat_log` 仅保留纯聊天文本，所有以 `!`、`/` 开头的聊天命令（前置挂载 `say`/`say_team` 监听避免被 `bequiet` 或 `server` 提前吞掉）与控制台 `sm_` / `sm` 命令统一监测并异步写入 `chat_audit_log`（同时保留进出服 IP/国家码/断线原因、`callvote` 踢人目标解析、暂停、2 秒节流的安全门开关、闲置与脱敏赞助触发词）；默认关闭回合与地图起止噪音（`sm_chatlog_audit_lifecycle 0`），`chat_audit_log` 自动保留 `1 MONTH`（过期记录自动清理），共享屏蔽表 `chat_audit_ignore` 支持“精确命令 (`cmd`) + 包含关键词 (`keyword`)”双模式并在上传前按内存规则直接拦截（预置 122 条默认命令，启动、换图、有人在服每 60 秒及 `sm_chatlog_reload_ignore` 与 NewAnneWeb 后台同步）；同步更新 `database.sql`。
+
+### 2026年11月12日 调整动态 AI 难度各档 Smoker 拉舌前摇
+
+- 调整 `dynamic_ai_difficulty.cfg` 六档 `smoker_tongue_delay`：简单 `1.5`、普通 `1.5`、困难 `1.0`、专家 `0.5`、极限 `0.0`、音理 `0.0`（原为 `1.0 / 1.0 / 1.0 / 1.0 / 0.5 / 0.0`），并将 `annehappy`、`annehappy_hardcore`、`annehappy_shotgun`、`alone` 的 `shared_cvars.cfg` 专家基线同步更新为 `0.5`。
+
+### 2026年11月13日 c13m4 Anne 救援补给补足 4 瓶
+
+- `c13m4_cutthroatcreek` 的 Anne Stripper 在原救援补给区域新增 2 个固定止痛药点，固定药量由 2 瓶增至 4 瓶；沿用现有 `mapinfo.txt` 救援区域判定。
+
+### 2026年11月13日 恢复 Anne 空爆枪数播报
+
+- 恢复 Anne 共用配置中的 `optional/l4d2_stats.smx` 加载，使普通、硬核、喷子及共用该配置的衍生模式重新显示 Hunter 空爆枪数与助攻伤害；明确 `l4d2_skill_detect.smx` 不提供空爆枪数，不能完全替代本插件，继续使用现有多语言播报。
+### 2026年11月13日 新增低开销枪械平衡统计插件与数据库表
+
+- 新增 `extend/l4d2_weapon_balance_stats.smx` 并加入 `cfg/sharedplugins.cfg`，在生还者离开安全区进入实战后按固定数组统计 19 把枪械的分距离（`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`）、稳射与移动跑打姿态、玩家积分分段、去溢伤有效伤害、单发霰弹阈值（近满血一枪秒杀与剩 1–15 血未秒）、穿透追加命中、主动换枪流向及 Tank 战实战输出（不统计友伤）；所有计数仅在回合结束或换图时通过 `anne_db` 的 `l4dstats` 共享连接异步事务汇总写入 `weapon_balance_configs`、`weapon_balance_daily`、`weapon_balance_usage_daily`、`weapon_balance_swaps_daily` 与 `weapon_tank_fights`（同步更新 `database.sql`）。
+- 为 `optional/l4d2_weapon_attributes.smx` 补充只读可选 Native `L4D2WA_GetWeaponTankDamageMult` 与 `L4D2WA_GetWeaponReloadDurationMult`（配套 `include/l4d2_weapon_attributes.inc`），供统计插件采集当前生效的配置快照与指纹哈希并接入 NewAnneWeb `/stats/weapons/` 展示。

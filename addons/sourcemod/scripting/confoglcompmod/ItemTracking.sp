@@ -894,7 +894,10 @@ static bool PF_IsOnRoute(const PFRoute route, Address pArea, float fMaxDetour)
     L4D_GetNavAreaCenter(pArea, fPoint);
     float fFromStart = L4D2_NavAreaTravelDistance(route.fStart, fPoint, true);
     float fToGoal = L4D2_NavAreaTravelDistance(fPoint, route.fGoal, true);
-    if (!(fFromStart >= 0.0 && fToGoal >= 0.0) || fFromStart + fToGoal > route.fRouteLen + 2.0 * fMaxDetour) {
+    // Event routes can be longer than the unrestricted shortest path (e.g. c2m4).
+    bool bEscapeRoute = (L4D_GetNavArea_SpawnAttributes(pArea) & NAV_SPAWN_ESCAPE_ROUTE) != 0;
+    if (!(fFromStart >= 0.0 && fToGoal >= 0.0) ||
+        (!bEscapeRoute && fFromStart + fToGoal > route.fRouteLen + 2.0 * fMaxDetour)) {
         return false;
     }
 
