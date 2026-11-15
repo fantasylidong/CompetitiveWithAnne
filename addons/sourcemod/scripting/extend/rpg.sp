@@ -1125,6 +1125,7 @@ public void  OnPluginStart()
 	RegConsoleCmd("sm_pum", BuyPum, "快速买一把一代单喷");
 	RegConsoleCmd("sm_smg", BuySmg, "快速买smg");
 	RegConsoleCmd("sm_uzi", BuyUzi, "快速买uzi");
+	RegConsoleCmd("sm_mp5", BuyMP5, "快速买mp5");
 	RegConsoleCmd("sm_pill", BuyPill, "快速买药");
 	RegConsoleCmd("sm_setch", SetCH, "设置自定义称号");
 	RegConsoleCmd("sm_unsetch", UnSetCH, "设置自定义称号");
@@ -2112,6 +2113,27 @@ public Action BuyUzi(int client,int args)
 			CPrintToChatAll("%t", "RPG_QuicklySpend50RandomlyBuy", client);
 		}else{
 			CPrintToChat(client, "%t", "RPG_DonMoneyCanBuyCrappy");
+		}
+	}
+	return Plugin_Continue;
+}
+
+//快速买mp5指令
+public Action BuyMP5(int client, int args)
+{
+	if(IsSurvivor(client) && IsPlayerAlive(client) && CanUseShop(client))
+	{
+		bool firstBuy = player[client].ClientFirstBuy;
+		int costpoints = firstBuy ? 0 : CostMP5;
+		if(RemovePoints(client, costpoints, "smg_mp5"))
+		{
+			if(firstBuy)
+			{
+				player[client].ClientFirstBuy = false;
+				CPrintToChatAll("%t", "RPG_FirstFreePurchase", client, "MP5", player[client].ClientPoints);
+			}
+			else
+				CPrintToChatAll("%t", "RPG_BoughtItemWithPoints", client, CostMP5, "MP5", player[client].ClientPoints);
 		}
 	}
 	return Plugin_Continue;
@@ -3235,18 +3257,7 @@ public int gun_back(Menu menu, MenuAction action, int param1, int param2)
 			}				
 			else if( StrEqual(bitem, "smg_mp5") )
 			{
-				bool firstBuy = player[param1].ClientFirstBuy;
-				int costpoints = firstBuy ? 0 : CostMP5;
-				if(RemovePoints(param1, costpoints, bitem))
-				{
-					if(firstBuy)
-					{
-						player[param1].ClientFirstBuy = false;
-						CPrintToChatAll("%t", "RPG_FirstFreePurchase", param1, "MP5", player[param1].ClientPoints);
-					}
-					else
-						CPrintToChatAll("%t", "RPG_BoughtItemWithPoints", param1, CostMP5, "MP5", player[param1].ClientPoints);
-				}
+				BuyMP5(param1, 0);
 			}	
 			else if( StrEqual(bitem, "rifle") ){
 				//

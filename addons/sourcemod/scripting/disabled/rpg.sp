@@ -492,6 +492,7 @@ public void OnMapStart()
 
 public void  OnPluginStart()
 {
+	LoadTranslations("rpg.phrases");
 //	LoadTranslations("menu_shop.phrases.txt");
 	HookEvent("round_start", 	EventRoundStart, 				EventHookMode_Pre);
 	HookEvent("player_death", 	EventReturnBlood, 				EventHookMode_Pre);
@@ -543,6 +544,7 @@ public void  OnPluginStart()
 	RegConsoleCmd("sm_pum", BuyPum, "快速买一把一代单喷");
 	RegConsoleCmd("sm_smg", BuySmg, "快速买smg");
 	RegConsoleCmd("sm_uzi", BuyUzi, "快速买uzi");
+	RegConsoleCmd("sm_mp5", BuyMP5, "快速买mp5");
 	RegConsoleCmd("sm_pill", BuyPill, "快速买药");
 	RegConsoleCmd("sm_setch", SetCH, "设置自定义称号");
 	RegConsoleCmd("sm_unsetch", UnSetCH, "设置自定义称号");
@@ -1184,7 +1186,7 @@ static bool CanUseShop(int client)
 
 	if (IsValidClient(client))
 	{
-		PrintToChat(client, "\x03商店已关闭，无法使用该功能。");
+		CPrintToChat(client, "%t", "RPG_StoreClosedFunctionCannotUsed");
 	}
 	return false;
 }
@@ -1305,6 +1307,27 @@ public Action BuyUzi(int client,int args)
 			PrintToChatAll("\x04%N \x03快速花费50B数随机购买一把Uzi机枪",client);
 		}else{
 			PrintToChat(client,"\x03没钱你买个屁机枪，心里没点B数");
+		}
+	}
+	return Plugin_Continue;
+}
+
+//快速买mp5指令
+public Action BuyMP5(int client, int args)
+{
+	if(IsSurvivor(client) && IsPlayerAlive(client) && CanUseShop(client))
+	{
+		bool firstBuy = player[client].ClientFirstBuy;
+		int costpoints = firstBuy ? 0 : CostMP5;
+		if(RemovePoints(client, costpoints, "smg_mp5"))
+		{
+			if(firstBuy)
+			{
+				player[client].ClientFirstBuy = false;
+				CPrintToChatAll("%t", "RPG_FirstFreePurchase", client, "MP5", player[client].ClientPoints);
+			}
+			else
+				CPrintToChatAll("%t", "RPG_BoughtItemWithPoints", client, CostMP5, "MP5", player[client].ClientPoints);
 		}
 	}
 	return Plugin_Continue;
@@ -1431,7 +1454,7 @@ static bool CanSpendB(int client, int costpoints)
     // >0B 时需开关允许
     if (g_bAllowUseB) return true;
 
-    PrintToChat(client, "\x03当前已禁止使用B数购买商品（仅允许 0B 物品）。");
+    CPrintToChat(client, "%t", "RPG_CurrentlyProhibitedUseNumberPurchase");
     return false;
 }
 
@@ -1445,13 +1468,13 @@ public bool RemovePoints(int client, int costpoints,char bitem[64])
 
 	if(!player[client].CanBuy)
 	{
-		PrintToChat(client,"\x03商店技能冷却中(冷却时间15s)");
+		CPrintToChat(client, "%t", "RPG_ShopSkillsCoolingDownCooling");
 		return false;
 	}
 	// 新增：消费开关判定（>0B 时禁止）
     if (!CanSpendB(client, costpoints))
     {
-		PrintToChat(client, "服务器关闭了B币使用通道，如需使用请投票开启");
+		CPrintToChat(client, "%t", "RPG_ServerClosedCoinUsageChannel");
 		return false;
 	}
 	int actuallypoints = player[client].ClientPoints - costpoints;
@@ -1469,7 +1492,7 @@ public bool RemovePoints(int client, int costpoints,char bitem[64])
 	}
 	else
 	{
-		PrintToChat(client,"\x03你自己心里没有点B数吗?");
+		CPrintToChat(client, "%t", "RPG_DonPointMind");
 		return false;
 	}
 
@@ -2216,7 +2239,7 @@ public void gun(int client)
 			menu.AddItem("pistol", binfo);
 		}
 		
-		FormatEx(binfo, sizeof(binfo),  "mp5机枪 %dB数",CostMP5, client);
+		FormatEx(binfo, sizeof(binfo),  "mp5机枪 %dB数",player[client].ClientFirstBuy ? 0 : CostMP5, client);
 		menu.AddItem("smg_mp5", binfo);
 		
 		if(!IsAllowBigGun)
@@ -2302,10 +2325,7 @@ public int gun_back(Menu menu, MenuAction action, int param1, int param2)
 			}				
 			else if( StrEqual(bitem, "smg_mp5") )
 			{
-				
-				int costpoints = CostMP5;
-				if(RemovePoints(param1, costpoints, bitem))
-				PrintToChatAll("\x04%N\x03B数-%d,购买了%s，还剩%d的B数",param1,CostMP5,"mp5",player[param1].ClientPoints);
+				BuyMP5(param1, 0);
 			}	
 			else if( StrEqual(bitem, "rifle") ){
 				//

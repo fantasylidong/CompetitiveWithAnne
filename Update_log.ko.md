@@ -829,3 +829,7 @@
 
 - `extend/l4d2_weapon_balance_stats.smx`를 새로 추가해 `cfg/sharedplugins.cfg`에 등록했습니다. 생존자가 세이프룸을 출발해 실전에 돌입한 뒤 고정 배열 기반으로 19종 총기의 교전 거리 구간(`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`), 정지·이동 사격 자세, 플레이어 점수 티어, 오버킬을 제외한 유효 피해, 근거리 풀피 원샷 처치 및 1–15HP 남김, 관통 추가 명중, 전투 중 무기 교체 흐름, Tank 교전 실전 출력을 집계합니다(아군 오사 피해는 제외). 모든 카운터는 라운드 또는 맵 종료 시 `anne_db`의 공유 `l4dstats` 연결을 통해 비동기 트랜잭션으로 `weapon_balance_configs`, `weapon_balance_daily`, `weapon_balance_usage_daily`, `weapon_balance_swaps_daily`, `weapon_tank_fights`에 일괄 저장됩니다(`database.sql` 동기화).
 - `optional/l4d2_weapon_attributes.smx`에 읽기 전용 선택적 Native `L4D2WA_GetWeaponTankDamageMult`와 `L4D2WA_GetWeaponReloadDurationMult`(`include/l4d2_weapon_attributes.inc` 포함)를 추가해 실제 서버 무기 설정 스냅샷과 해시를 기록하고 NewAnneWeb `/stats/weapons/` 대시보드에서 비교할 수 있게 했습니다.
+
+### 2026년 11월 14일 MP5 빠른 구매 명령 추가
+
+- RPG 상점 일반 버전과 데이터베이스 없는 버전에 `!mp5`, `/mp5`(콘솔: `sm_mp5`)를 추가했습니다. Uzi·소음 SMG와 첫 무료 구매 기회를 공유하고 이후에는 각 버전의 기존 MP5 가격(일반 버전 50 B, 데이터베이스 없는 버전 100 B)을 사용합니다. 메뉴와 명령이 구매 처리를 공유하며 상점 활성화 설정, B 포인트 소비 설정, 15초 구매 쿨다운을 따릅니다. 구매 실패 시 무료 기회를 소모하지 않으며 기존 다국어 메시지를 사용합니다.

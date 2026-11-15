@@ -1413,3 +1413,7 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - 新增 `extend/l4d2_weapon_balance_stats.smx` 并加入 `cfg/sharedplugins.cfg`，在生还者离开安全区进入实战后按固定数组统计 19 把枪械的分距离（`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`）、稳射与移动跑打姿态、玩家积分分段、去溢伤有效伤害、单发霰弹阈值（近满血一枪秒杀与剩 1–15 血未秒）、穿透追加命中、主动换枪流向及 Tank 战实战输出（不统计友伤）；所有计数仅在回合结束或换图时通过 `anne_db` 的 `l4dstats` 共享连接异步事务汇总写入 `weapon_balance_configs`、`weapon_balance_daily`、`weapon_balance_usage_daily`、`weapon_balance_swaps_daily` 与 `weapon_tank_fights`（同步更新 `database.sql`）。
 - 为 `optional/l4d2_weapon_attributes.smx` 补充只读可选 Native `L4D2WA_GetWeaponTankDamageMult` 与 `L4D2WA_GetWeaponReloadDurationMult`（配套 `include/l4d2_weapon_attributes.inc`），供统计插件采集当前生效的配置快照与指纹哈希并接入 NewAnneWeb `/stats/weapons/` 展示。
+
+### 2026年11月14日 新增 MP5 快速购买指令
+
+- RPG 商店完整版与无数据库版新增 `!mp5`、`/mp5`（控制台 `sm_mp5`），参考 Uzi、消音 SMG 共享首次免费资格，后续沿用各版本现有 MP5 售价（完整版 50 B、无数据库版 100 B）。菜单与快捷指令共用购买处理，沿用商店开关、B 数消费开关和 15 秒购买冷却；购买失败不消耗免费资格，使用现有多语言提示。

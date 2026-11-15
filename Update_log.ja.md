@@ -829,3 +829,7 @@
 
 - `extend/l4d2_weapon_balance_stats.smx` を新規追加して `cfg/sharedplugins.cfg` に登録しました。生存者がセーフハウスを出発して実戦に入った後、固定配列による低負荷集計で 19 種の銃器の距離別（`0–160u` / `160–300u` / `300–650u` / `650–1200u` / `1200u+`）・静止／移動撃ち姿勢・プレイヤースコア帯・オーバーキル補正済み有効ダメージ・近距離満タン即死および残 1–15HP 撃ち漏らし・貫通追加命中・戦闘中持ち替え傾向・Tank 戦実戦出力を計測します（フレンドリーファイアは非集計）。全カウンタはラウンド終了時またはマップ変更時に `anne_db` の共有 `l4dstats` 接続から非同期トランザクションで `weapon_balance_configs`・`weapon_balance_daily`・`weapon_balance_usage_daily`・`weapon_balance_swaps_daily`・`weapon_tank_fights` へ一括集計します（`database.sql` も更新）。
 - `optional/l4d2_weapon_attributes.smx` に読み取り専用のオプション Native `L4D2WA_GetWeaponTankDamageMult` と `L4D2WA_GetWeaponReloadDurationMult`（および `include/l4d2_weapon_attributes.inc`）を追加し、現行設定のスナップショットと設定ハッシュを記録して NewAnneWeb の `/stats/weapons/` で比較表示できるようにしました。
+
+### 2026年11月14日 MP5 のクイック購入コマンドを追加
+
+- RPG ショップの通常版とデータベースなし版に `!mp5`、`/mp5`（コンソール：`sm_mp5`）を追加しました。Uzi・消音 SMG と初回無料枠を共有し、以降は各版の既存の MP5 価格（通常版 50 B、データベースなし版 100 B）を使用します。メニューとコマンドで購入処理を共用し、ショップの有効設定、B ポイント消費設定、15 秒の購入クールダウンに従います。購入失敗時は無料枠を消費せず、既存の多言語メッセージを使用します。
