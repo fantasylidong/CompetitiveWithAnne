@@ -833,3 +833,10 @@
 ### November 14, 2026: Add MP5 Quick Purchase Command
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
+
+### November 16, 2026: Nerf Uzi with Slower Reload and Steeper Falloff
+
+- Based on firearm balance telemetry (last 14 days): in AnneHappyPlus the Uzi has a 39.7% hold share versus 12.3% for the silenced SMG and 8.7% for the MP5, deals 14–23% more effective damage per second held, and leads across new, intermediate, and veteran players. The lead is smaller in standard AnneHappy (7–14%).
+- `cfg/vote/weapon/AnneHappyPlus.cfg`: Uzi `reloadduration` 1.55 → 1.85, `rangemod` 0.965 → 0.93.
+- `cfg/vote/weapon/AnneHappy.cfg`: Uzi `reloadduration` 1.55 → 1.75, `rangemod` 0.965 → 0.94.
+- Damage, fire rate, accuracy, and the Tank multiplier are unchanged, and the Uzi still has the fastest reload of the three SMGs. In the theoretical model, reload-inclusive sustained output at 320u drops by about 8% (Plus) / 6% (standard), and the distance where the Uzi overtakes the MP5 moves from about 700u to about 740–770u.
