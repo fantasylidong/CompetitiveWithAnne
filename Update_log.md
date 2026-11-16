@@ -1418,9 +1418,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - RPG 商店完整版与无数据库版新增 `!mp5`、`/mp5`（控制台 `sm_mp5`），参考 Uzi、消音 SMG 共享首次免费资格，后续沿用各版本现有 MP5 售价（完整版 50 B、无数据库版 100 B）。菜单与快捷指令共用购买处理，沿用商店开关、B 数消费开关和 15 秒购买冷却；购买失败不消耗免费资格，使用现有多语言提示。
 
-### 2026年11月16日 削弱 Uzi：换弹放慢、距离衰减加重
+### 2026年11月16日 重新设计 Uzi：定位为跑打与远距离压制，换弹与消音 SMG 统一
 
-- 依据枪械平衡统计（最近 14 天）：AnneHappyPlus 中 Uzi 持有占比 39.7%，远高于消音 SMG 的 12.3% 和 MP5 的 8.7%，持有每秒有效伤害高 14–23%，且新人、进阶、主力三档玩家都领先；普通 AnneHappy 中领先幅度较小（7–14%）。
-- `cfg/vote/weapon/AnneHappyPlus.cfg`：Uzi `reloadduration` 1.55 → 1.85，`rangemod` 0.965 → 0.93。
-- `cfg/vote/weapon/AnneHappy.cfg`：Uzi `reloadduration` 1.55 → 1.75，`rangemod` 0.965 → 0.94。
-- 伤害、射速、精度与 Tank 倍率不变，Uzi 换弹仍是三把冲锋枪中最快的；按理论模型，320u 含换弹持续输出约降低 8%（Plus）/ 6%（普通），Uzi 反超 MP5 的距离从约 700u 推到约 740–770u。
+- 依据枪械平衡统计（最近 14 天）：AnneHappyPlus 中 Uzi 持有占比 39.7%，远高于消音 SMG 的 12.3% 和 MP5 的 8.7%，持有每秒有效伤害高 14–23%，且新人、进阶、主力三档玩家都领先；它的站桩命中率（39.1%）与定位为中距离架点的 MP5（39.7%）几乎相同，再加上最快的射速和换弹，导致没有短板。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的 Uzi 改为同一组手感参数：`reloadduration` 1.55 → 1.9（与消音 SMG 相同，两个模式一致），`rangemod` 0.965 → 0.93，`minstandspread` 0.72 → 0.85，`minduckspread` 0.45 → 0.55，`spreadpershot` 0.13 → 0.16。
+- 伤害、射速、移动散布（1.15）与 Tank 倍率不变：Uzi 移动射击几乎不掉精度，站桩中距离连射则不再和 MP5 一样准。
+- 按理论模型，320u 站立含换弹持续输出约降低 14%，移动时只比站立低约 5%；MP5 在约 250–930u 的站立输出领先，Uzi 在移动射击和 930u 以外领先。

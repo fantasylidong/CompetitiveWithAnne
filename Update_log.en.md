@@ -834,9 +834,9 @@
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
 
-### November 16, 2026: Nerf Uzi with Slower Reload and Steeper Falloff
+### November 16, 2026: Redesign Uzi as the Run-and-Gun and Long-Range Suppression SMG, with Reload Matched to the Silenced SMG
 
-- Based on firearm balance telemetry (last 14 days): in AnneHappyPlus the Uzi has a 39.7% hold share versus 12.3% for the silenced SMG and 8.7% for the MP5, deals 14–23% more effective damage per second held, and leads across new, intermediate, and veteran players. The lead is smaller in standard AnneHappy (7–14%).
-- `cfg/vote/weapon/AnneHappyPlus.cfg`: Uzi `reloadduration` 1.55 → 1.85, `rangemod` 0.965 → 0.93.
-- `cfg/vote/weapon/AnneHappy.cfg`: Uzi `reloadduration` 1.55 → 1.75, `rangemod` 0.965 → 0.94.
-- Damage, fire rate, accuracy, and the Tank multiplier are unchanged, and the Uzi still has the fastest reload of the three SMGs. In the theoretical model, reload-inclusive sustained output at 320u drops by about 8% (Plus) / 6% (standard), and the distance where the Uzi overtakes the MP5 moves from about 700u to about 740–770u.
+- Based on firearm balance telemetry (last 14 days): in AnneHappyPlus the Uzi has a 39.7% hold share versus 12.3% for the silenced SMG and 8.7% for the MP5, deals 14–23% more effective damage per second held, and leads across new, intermediate, and veteran players. Its stationary hit rate (39.1%) is almost identical to the MP5 (39.7%), which is meant to be the mid-range holding weapon, and combined with the fastest fire rate and reload it had no weakness.
+- The Uzi now uses the same handling values in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `reloadduration` 1.55 → 1.9 (same as the silenced SMG and identical in both modes), `rangemod` 0.965 → 0.93, `minstandspread` 0.72 → 0.85, `minduckspread` 0.45 → 0.55, `spreadpershot` 0.13 → 0.16.
+- Damage, fire rate, moving spread (1.15), and the Tank multiplier are unchanged: the Uzi loses almost no accuracy while moving, but its stationary mid-range bursts are no longer as accurate as the MP5.
+- In the theoretical model, reload-inclusive sustained output while standing at 320u drops by about 14%, and moving costs only about 5% compared with standing. The MP5 leads standing output from about 250u to 930u; the Uzi leads while moving and beyond 930u.
