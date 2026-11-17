@@ -1424,3 +1424,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的 Uzi 改为同一组手感参数：`reloadduration` 1.55 → 1.75（两个模式一致），`rangemod` 0.965 → 0.95，`maxmovespread` 1.15 → 1.35。
 - 伤害、射速、站立与蹲伏散布、每发扩散和 Tank 倍率不变，Uzi 换弹仍是三把冲锋枪中最快的。
 - 按理论模型并以实战距离分布加权，Uzi 含换弹持续输出站立时约降低 5%，移动时约降低 12%；站立时 MP5 在约 250–695u 小幅领先（500u 约高 6%），移动射击时 Uzi 仍从约 205u 起领先，但 325u 移动输出降为站立的约 89%。
+
+### 2026年11月17日 加强消音 SMG：更准、衰减推迟，接住喷子之后的距离
+
+- 依据枪械平衡统计（最近 14 天）：消音 SMG 在两个模式里持有每秒有效伤害都是三把冲锋枪最低（AnneHappyPlus 44.9、AnneHappy 33.1），AnneHappyPlus 中持有占比只有 12.3%。按弹道模型，它在任何距离都不是五把主武器里输出最高的：0–180u 被木喷和铁喷压住，再往后是 MP5 和 Uzi。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的消音 SMG：`minstandspread` 0.95 → 0.80，`minduckspread` 0.68 → 0.55，`spreadpershot` 0.21 → 0.17，`maxmovespread` 1.95 → 1.70，`gainrange` 255/250 → 320（两个模式一致）。
+- 伤害、射速、射程、换弹和 Tank 倍率不变，100u 三人集火 Tank 的理论上限不变。
+- 按理论模型，AnneHappyPlus 中消音在站立约 255–310u、移动约 215–255u 成为输出最高的主武器；300u 站立含换弹输出约提高 8%，400u 约提高 13%。按实战距离分布加权，持续输出站立约提高 14%，移动约提高 20%（模型按满速计算移动惩罚，实际移动提升会更小）。
