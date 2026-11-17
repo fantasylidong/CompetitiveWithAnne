@@ -12,7 +12,7 @@
 #include <l4d2_weapon_attributes>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.1.0"
 
 #define WBS_TEAM_SURVIVOR 2
 #define WBS_L4D2Team_Infected 3
@@ -20,7 +20,7 @@
 #define WEP_COUNT 19
 #define TARGET_COUNT 9
 #define DIST_BUCKETS 5
-#define MOVE_STATES 2
+#define MOVE_STATES 4
 #define SKILL_TIERS 3
 #define STAT_FIELDS 9
 #define USAGE_FIELDS 6
@@ -152,8 +152,18 @@ static const float g_fDistBucketMaxSq[DIST_BUCKETS - 1] =
 	1440000.0   // 1200^2
 };
 
-// 跑打判定阈值：水平速度 > 50u/s (50^2 = 2500)
-#define MOVE_SPEED_SQ_THRESHOLD 2500.0
+// 姿态分档（1.1.0 起）：0=静止站立 1=蹲下 2=慢走 3=跑动（含空中）。
+// 写库时加 MOVE_STATE_DB_BASE：旧版写入的 0（站/蹲稳射）和 1（水平速度 >50u/s）保持原意，
+// 新数据落在 2–5，网站把 0/2/3 归为"稳射"、1/4/5 归为"移动"。
+#define MOVE_STATE_STILL 0
+#define MOVE_STATE_CROUCH 1
+#define MOVE_STATE_WALK 2
+#define MOVE_STATE_RUN 3
+#define MOVE_STATE_DB_BASE 2
+// 静止：水平速度 <= 50u/s；慢走：<= 130u/s（按住走路 85、蹲走 75 落在这里）；
+// 跑动：> 130u/s（跛行 150、正常跑 220）。
+#define MOVE_STILL_SPEED_SQ 2500.0
+#define MOVE_WALK_SPEED_SQ 16900.0
 
 ConVar g_cvEnable;
 ConVar g_cvDbConf;
@@ -2026,7 +2036,7 @@ static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[]
 						int rowLen = FormatEx(row, sizeof(row),
 							"(%d,'%s','%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
 							statDate, escRuleset, escWepCfg, escHash, g_sWeaponKeys[w],
-							c, d, m, t,
+							c, d, m + MOVE_STATE_DB_BASE, t,
 							g_iCombatStats[w][c][d][m][t][STAT_HITS],
 							g_iCombatStats[w][c][d][m][t][STAT_HEADSHOTS],
 							g_iCombatStats[w][c][d][m][t][STAT_RAW_DMG],
@@ -2106,7 +2116,7 @@ static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] 
 				int rowLen = FormatEx(row, sizeof(row),
 					"(%d,'%s','%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d)",
 					statDate, escRuleset, escWepCfg, escHash, g_sWeaponKeys[w],
-					m, t,
+					m + MOVE_STATE_DB_BASE, t,
 					g_iUsageStats[w][m][t][USAGE_SHOTS_FIRED],
 					g_iUsageStats[w][m][t][USAGE_PELLETS_FIRED],
 					g_iUsageStats[w][m][t][USAGE_RELOADS],
@@ -2378,10 +2388,24 @@ static void SyncClientSlotWeapons(int client)
 
 static int GetClientMoveState(int client)
 {
+	int flags = GetEntityFlags(client);
+	if (!(flags & FL_ONGROUND))
+	{
+		return MOVE_STATE_RUN;
+	}
+	if (flags & FL_DUCKING)
+	{
+		return MOVE_STATE_CROUCH;
+	}
+
 	float vel[3];
 	GetEntPropVector(client, Prop_Data, "m_vecVelocity", vel);
 	float speedSq = vel[0] * vel[0] + vel[1] * vel[1];
-	return (speedSq > MOVE_SPEED_SQ_THRESHOLD) ? 1 : 0;
+	if (speedSq <= MOVE_STILL_SPEED_SQ)
+	{
+		return MOVE_STATE_STILL;
+	}
+	return (speedSq <= MOVE_WALK_SPEED_SQ) ? MOVE_STATE_WALK : MOVE_STATE_RUN;
 }
 
 static void UpdateClientSkillTier(int client)

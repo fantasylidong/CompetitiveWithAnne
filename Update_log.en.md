@@ -833,3 +833,9 @@
 ### November 14, 2026: Add MP5 Quick Purchase Command
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
+
+### November 17, 2026: Split Firearm Balance Telemetry Stances into Still, Crouching, Walking, and Running
+
+- `extend/l4d2_weapon_balance_stats.smx` is now version 1.1.0. It previously split shots only at a horizontal speed of 50u/s into "standing/crouching" and "moving", so walking, crouch-walking, and full-speed running were all counted as moving, and standing was mixed with crouching. That made it impossible to see the real effect of spread changes.
+- New stances: airborne counts as running; crouching (`FL_DUCKING`) is its own stance; while standing, horizontal speed up to 50u/s is still, up to 130u/s is walking (walk 85, crouch-walk 75), and above 130u/s is running (limp 150, normal run 220).
+- New rows store `move_state` as 2 still, 3 crouching, 4 walking, and 5 running. Old rows keep 0 (standing/crouching) and 1 (moving) with their original meaning, and the table schema is unchanged. The website must be updated at the same time; otherwise it counts new walking and running rows as stationary.
