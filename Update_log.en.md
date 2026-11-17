@@ -833,3 +833,31 @@
 ### November 14, 2026: Add MP5 Quick Purchase Command
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
+
+### November 16, 2026: Nerf Uzi with a Slower, Unified Reload and Wider Moving Spread
+
+- Based on firearm balance telemetry (last 14 days): in AnneHappyPlus the Uzi has a 39.7% hold share versus 12.3% for the silenced SMG and 8.7% for the MP5, deals 14–23% more effective damage per second held, and leads across new, intermediate, and veteran players. The lead is smaller in standard AnneHappy (7–14%).
+- The Uzi now uses the same handling values in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `reloadduration` 1.55 → 1.75 (identical in both modes), `rangemod` 0.965 → 0.95, `maxmovespread` 1.15 → 1.35.
+- Damage, fire rate, standing and crouching spread, spread per shot, and the Tank multiplier are unchanged, and the Uzi still has the fastest reload of the three SMGs.
+- In the theoretical model weighted by live engagement distances, the Uzi loses about 5% of its reload-inclusive sustained output while standing and about 12% while moving. While standing, the MP5 leads slightly from about 250u to 695u (about 6% higher at 500u); while moving, the Uzi still leads from about 205u, but its moving output at 325u drops to about 89% of its standing output.
+
+### November 17, 2026: Buff the Silenced SMG with Better Accuracy and Later Falloff to Cover the Range After Shotguns
+
+- Based on firearm balance telemetry (last 14 days): the silenced SMG has the lowest effective damage per second held of the three SMGs in both modes (44.9 in AnneHappyPlus, 33.1 in AnneHappy), and only a 12.3% hold share in AnneHappyPlus. In the ballistics model it is never the highest-output primary weapon at any distance: the Pump and Chrome shotguns lead from 0u to 180u, then the MP5 and Uzi take over.
+- Silenced SMG in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `minstandspread` 0.95 → 0.80, `minduckspread` 0.68 → 0.55, `spreadpershot` 0.21 → 0.17, `maxmovespread` 1.95 → 1.70, `gainrange` 255/250 → 320 (identical in both modes).
+- Damage, fire rate, range, reload, and the Tank multiplier are unchanged, so the theoretical 100u three-player Tank focus-fire cap is unchanged.
+- In the theoretical model, the silenced SMG becomes the highest-output primary weapon in AnneHappyPlus from about 255u to 310u while standing and about 215u to 255u while moving. Reload-inclusive output while standing rises by about 8% at 300u and about 13% at 400u. Weighted by live engagement distances, sustained output rises by about 14% standing and about 20% moving (the model applies the full-speed moving penalty, so the real moving gain will be smaller).
+
+### November 17, 2026: Raise Shotgun Crouching Spread from 0 to 0.4
+
+- In the ballistics model, the Pump and Chrome shotguns have a native crouching spread of 0, so crouching centers the whole pellet pattern on the crosshair. Crouched, the Chrome shotgun was the highest-output primary weapon from about 230u to 390u, and the silenced SMG never led at any distance while crouching.
+- `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: added `minduckspread 0.4` to `pumpshotgun` and `shotgun_chrome` (native 0). Standing spread stays 0.8, so crouching is still more accurate than standing.
+- Only crouched shooting is affected: the Pump shotgun is unchanged within 160u; the Chrome shotgun still deals about 268 expected damage per crouched shot at 250u (above 250 HP), and drops from about 263 to about 236 at 300u.
+- In the theoretical model, the highest-output primary weapon while crouching in AnneHappyPlus becomes: Pump 0–200u, Chrome 200–300u, silenced SMG 300–350u, MP5 350–600u, and Uzi beyond 600u. Shotguns use a fixed ring pattern, while the model combines weapon spread and pellet scatter into a uniform ellipse, so the real effect may be smaller than estimated.
+
+### November 17, 2026: Reposition the MP5 as the Stationary Mid-to-Long-Range SMG
+
+- The MP5 and Uzi both used to be "beyond 300u" SMGs: standing, the MP5 led only slightly from about 320u to 690u (about 6% higher at 500u), with the Uzi ahead beyond that; moving, the MP5 never led at any distance and had the slowest reload. Its hold share in AnneHappyPlus was only 8.7%.
+- MP5 in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `gainrange` 380/378 → 600, `range` 1600/1580 → 2200, `maxmovespread` 2.65 → 2.2 (identical in both modes). Damage, fire rate, magazine, reload, and the Tank multiplier are unchanged, so the theoretical 100u three-player Tank focus-fire cap is unchanged.
+- The roles now split by stance: the MP5 covers stationary or crouched mid-to-long range, and the Uzi covers shooting on the move. In the theoretical model (AnneHappyPlus), the standing MP5 leads from about 320u to about 1170u (previously to about 690u) and the crouched MP5 from about 350u to about 980u; while moving, the Uzi still leads from about 260u, and the distance where the MP5 keeps a 50% moving hit rate rises from about 360u to about 410u.
+- Weighted by the MP5's live engagement distances, standing sustained output rises by about 6%. The model estimates about 30% for moving, but it applies the full-speed moving penalty, so the real moving gain will be much smaller.
