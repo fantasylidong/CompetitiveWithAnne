@@ -1431,3 +1431,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的消音 SMG：`minstandspread` 0.95 → 0.80，`minduckspread` 0.68 → 0.55，`spreadpershot` 0.21 → 0.17，`maxmovespread` 1.95 → 1.70，`gainrange` 255/250 → 320（两个模式一致）。
 - 伤害、射速、射程、换弹和 Tank 倍率不变，100u 三人集火 Tank 的理论上限不变。
 - 按理论模型，AnneHappyPlus 中消音在站立约 255–310u、移动约 215–255u 成为输出最高的主武器；300u 站立含换弹输出约提高 8%，400u 约提高 13%。按实战距离分布加权，持续输出站立约提高 14%，移动约提高 20%（模型按满速计算移动惩罚，实际移动提升会更小）。
+
+### 2026年11月17日 喷子蹲下散布从 0 调到 0.4
+
+- 按弹道模型，木喷和铁喷原生蹲下散布为 0，蹲下后整个弹丸图案正对准星，铁喷蹲下时在约 230–390u 都是五把主武器里输出最高的，消音 SMG 蹲着打时在任何距离都排不到第一。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg`：`pumpshotgun` 与 `shotgun_chrome` 新增 `minduckspread 0.4`（原生 0）。站立散布仍为 0.8，蹲下依旧比站立准。
+- 只影响蹲下射击：木喷 160u 内不受影响，铁喷蹲下打 250u 的单喷期望约 268（仍高于 250 血），300u 从约 263 降到约 236。
+- 按理论模型，AnneHappyPlus 蹲下时各距离输出最高的主武器变为：木喷 0–200u、铁喷 200–300u、消音 SMG 300–350u、MP5 350–600u、Uzi 600u 以外。喷子使用固定环形弹道，模型把武器散布与弹丸散布叠成均匀椭圆，实际影响可能小于估算。

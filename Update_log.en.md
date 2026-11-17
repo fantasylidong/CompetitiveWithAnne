@@ -847,3 +847,10 @@
 - Silenced SMG in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `minstandspread` 0.95 → 0.80, `minduckspread` 0.68 → 0.55, `spreadpershot` 0.21 → 0.17, `maxmovespread` 1.95 → 1.70, `gainrange` 255/250 → 320 (identical in both modes).
 - Damage, fire rate, range, reload, and the Tank multiplier are unchanged, so the theoretical 100u three-player Tank focus-fire cap is unchanged.
 - In the theoretical model, the silenced SMG becomes the highest-output primary weapon in AnneHappyPlus from about 255u to 310u while standing and about 215u to 255u while moving. Reload-inclusive output while standing rises by about 8% at 300u and about 13% at 400u. Weighted by live engagement distances, sustained output rises by about 14% standing and about 20% moving (the model applies the full-speed moving penalty, so the real moving gain will be smaller).
+
+### November 17, 2026: Raise Shotgun Crouching Spread from 0 to 0.4
+
+- In the ballistics model, the Pump and Chrome shotguns have a native crouching spread of 0, so crouching centers the whole pellet pattern on the crosshair. Crouched, the Chrome shotgun was the highest-output primary weapon from about 230u to 390u, and the silenced SMG never led at any distance while crouching.
+- `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: added `minduckspread 0.4` to `pumpshotgun` and `shotgun_chrome` (native 0). Standing spread stays 0.8, so crouching is still more accurate than standing.
+- Only crouched shooting is affected: the Pump shotgun is unchanged within 160u; the Chrome shotgun still deals about 268 expected damage per crouched shot at 250u (above 250 HP), and drops from about 263 to about 236 at 300u.
+- In the theoretical model, the highest-output primary weapon while crouching in AnneHappyPlus becomes: Pump 0–200u, Chrome 200–300u, silenced SMG 300–350u, MP5 350–600u, and Uzi beyond 600u. Shotguns use a fixed ring pattern, while the model combines weapon spread and pellet scatter into a uniform ellipse, so the real effect may be smaller than estimated.
