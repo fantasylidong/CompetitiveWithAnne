@@ -3,6 +3,7 @@
 
 #include <sourcemod>
 #include <sdktools>
+#include <sdkhooks>
 #include <left4dhooks>
 #include <l4d2util_constants>
 #include <anne_db>
@@ -12,7 +13,7 @@
 #include <l4d2_weapon_attributes>
 #define REQUIRE_PLUGIN
 
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.2.0"
 
 #define WBS_TEAM_SURVIVOR 2
 #define WBS_L4D2Team_Infected 3
@@ -24,7 +25,7 @@
 #define SKILL_TIERS 3
 #define STAT_FIELDS 9
 #define USAGE_FIELDS 6
-#define MAX_SG_TRACKED 4
+#define MAX_SG_TRACKED 8
 #define MAX_TRACKED_EDICTS 2048
 #define SQL_BATCH_ROWS 32
 #define SQL_QUERY_MAX 12288
@@ -71,6 +72,11 @@ enum struct PendingTankFight
 	int statDate;
 	int createdAt;
 	char rulesetKey[64];
+	char anneVersion[64];
+	char difficultyType[16];
+	int difficulty;
+	int siCount;
+	int siSpawnTime;
 	char weaponConfig[64];
 	char configHash[24];
 	char mapName[64];
@@ -93,6 +99,14 @@ enum struct TankFightState
 	int maxHp;
 	float startTime;
 	int shooterMask;
+	char rulesetKey[64];
+	char anneVersion[64];
+	char difficultyType[16];
+	int difficulty;
+	int siCount;
+	int siSpawnTime;
+	char weaponConfig[64];
+	char configHash[24];
 	int rawDmg[WEP_COUNT];
 	int effDmg[WEP_COUNT];
 	int hits[WEP_COUNT];
@@ -165,9 +179,34 @@ ConVar g_cvGameMode;
 ConVar g_cvAnneVersion;
 ConVar g_cvWeaponConfig;
 ConVar g_cvStatsRuleset;
+ConVar g_cvDiffProfile;
+ConVar g_cvZDifficulty;
+ConVar g_cvAiEnable;
+ConVar g_cvAiCurrentLevel;
+ConVar g_cvAiFixedLevel;
+ConVar g_cvAiCurrentLocked;
+ConVar g_cvInfectedLimit;
+ConVar g_cvSiSpawnInterval;
 ConVar g_cvSgCenterPellet;
 ConVar g_cvSgRing1Bullets;
 ConVar g_cvSgRing1Factor;
+
+bool g_bHookReadyCfg = false;
+bool g_bHookGameMode = false;
+bool g_bHookAnneVer = false;
+bool g_bHookWeaponConfig = false;
+bool g_bHookStatsRuleset = false;
+bool g_bHookDiffProfile = false;
+bool g_bHookZDifficulty = false;
+bool g_bHookAiEnable = false;
+bool g_bHookAiCurrentLevel = false;
+bool g_bHookAiFixedLevel = false;
+bool g_bHookAiCurrentLocked = false;
+bool g_bHookInfectedLimit = false;
+bool g_bHookSiSpawnInterval = false;
+bool g_bHookSgCenter = false;
+bool g_bHookSgRing1 = false;
+bool g_bHookSgFactor = false;
 
 Database g_hDb = null;
 int g_iDbGen = 0;
@@ -181,6 +220,7 @@ char g_sWeaponKeys[WEP_COUNT][32];
 int g_iWepBullets[WEP_COUNT];
 
 bool g_bRoundLive = false;
+bool g_bRoundFinished = false;
 bool g_bDirtyCombat = false;
 bool g_bDirtyUsage = false;
 bool g_bDirtySwaps = false;
@@ -188,6 +228,10 @@ bool g_bDirtySwaps = false;
 char g_sDbPrefix[32];
 char g_sCurrentMap[64];
 char g_sActiveRuleset[64] = "legacy_unknown";
+char g_sActiveDifficultyType[16] = "game";
+int g_iActiveDifficulty = 1;
+int g_iActiveSiCount = 0;
+int g_iActiveSiSpawnTime = 0;
 char g_sActiveWeaponConfig[64] = "default";
 char g_sActiveAnneVersion[64] = "";
 char g_sActiveConfigHash[24] = "";
@@ -196,6 +240,13 @@ int g_iActiveSgCenter = -1;
 int g_iActiveSgRing1 = -1;
 float g_fActiveSgFactor = -1.0;
 bool g_bConfigPendingUpload = false;
+bool g_bLightRefreshPending = false;
+bool g_bLightRefreshQueued = false;
+bool g_bFullRefreshPending = false;
+Handle g_hFullRefreshTimer = null;
+DataPack g_hFlushBackup = null;
+ArrayList g_hUploadBackups;
+int g_iFailedBatchSerial;
 
 int g_iCombatStats[WEP_COUNT][TARGET_COUNT][DIST_BUCKETS][MOVE_STATES][SKILL_TIERS][STAT_FIELDS];
 int g_iUsageStats[WEP_COUNT][MOVE_STATES][SKILL_TIERS][USAGE_FIELDS];
@@ -204,6 +255,9 @@ int g_iSwapMatrix[WEP_COUNT][WEP_COUNT];
 ArrayList g_hPendingTanks = null;
 TankFightState g_TankFight[MAXPLAYERS + 1];
 int g_iTankFightSerial = 0;
+char g_sSessionId[24];
+int g_iLastSgShot[MAX_TRACKED_EDICTS];
+int g_iShotSerial;
 
 int g_iActiveWepEnt[MAXPLAYERS + 1];
 int g_iActiveWepIdx[MAXPLAYERS + 1];
@@ -211,7 +265,6 @@ int g_iClientSlotWep[MAXPLAYERS + 1][2];
 int g_iClientSkillTier[MAXPLAYERS + 1];
 int g_iShotSeq[MAXPLAYERS + 1];
 int g_iBulletHitTargetsInSeq[MAXPLAYERS + 1];
-float g_fLastGLFireTime[MAXPLAYERS + 1];
 
 // 霰弹单发同帧归并槽（零 DataPack / 零堆分配）
 int g_SgCount[MAXPLAYERS + 1];
@@ -235,8 +288,11 @@ bool g_bClientDeathCounted[MAXPLAYERS + 1];
 
 // 实体缓存（Witch 与榴弹投射物，避免热路径类名比较）
 bool g_bEntityIsWitch[MAX_TRACKED_EDICTS];
+int g_iEntityPreHp[MAX_TRACKED_EDICTS];
+int g_iEntityDamageAttacker[MAX_TRACKED_EDICTS];
+int g_iEntityDamageTick[MAX_TRACKED_EDICTS];
 bool g_bEntityIsGLProj[MAX_TRACKED_EDICTS];
-int g_iActiveGLProjectiles = 0;
+bool g_bEntityDamageIsGL[MAX_TRACKED_EDICTS];
 
 Handle g_hHoldTimer = null;
 Handle g_hSnapshotTimer = null;
@@ -266,7 +322,9 @@ public void OnPluginStart()
 	g_cvDbPrefix = CreateConVar("sm_weapon_balance_db_prefix", "", "统计数据表前缀", FCVAR_NONE);
 	g_cvMinHumans = CreateConVar("sm_weapon_balance_min_humans", "1", "至少多少名真人生还者时才计入统计", FCVAR_NONE, true, 1.0, true, 32.0);
 
+	FormatEx(g_sSessionId, sizeof(g_sSessionId), "%08x%08x", GetURandomInt(), GetURandomInt());
 	g_hPendingTanks = new ArrayList(sizeof(PendingTankFight));
+	g_hUploadBackups = new ArrayList();
 	BuildWeaponMaps();
 	ResetAllClientState();
 	ResetAllBuckets();
@@ -294,8 +352,10 @@ public void OnAllPluginsLoaded()
 	EnsureDbConnected();
 	if (g_bLateLoaded)
 	{
+		if (g_hHoldTimer == null) g_hHoldTimer = CreateTimer(1.0, Timer_SampleHoldSeconds, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 		GetCurrentMap(g_sCurrentMap, sizeof(g_sCurrentMap));
 		LowerString(g_sCurrentMap);
+		ScanExistingInfected();
 		RefreshWeaponConfigSnapshot();
 		if (L4D_HasAnySurvivorLeftSafeArea())
 		{
@@ -303,6 +363,20 @@ public void OnAllPluginsLoaded()
 		}
 		g_bLateLoaded = false;
 	}
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+	if (StrEqual(name, "annehappy_dynamic_ai_difficulty"))
+	{
+		RefreshCvarHandles();
+		g_bLightRefreshPending = true;
+	}
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	if (StrEqual(name, "annehappy_dynamic_ai_difficulty")) g_bLightRefreshPending = true;
 }
 
 public void OnConfigsExecuted()
@@ -322,6 +396,7 @@ public void OnConfigsExecuted()
 
 public void OnMapStart()
 {
+	g_bRoundFinished = false;
 	g_bRoundLive = false;
 	GetCurrentMap(g_sCurrentMap, sizeof(g_sCurrentMap));
 	LowerString(g_sCurrentMap);
@@ -335,9 +410,12 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+	g_bRoundFinished = true;
 	g_bRoundLive = false;
 	g_hHoldTimer = null;
 	g_hSnapshotTimer = null;
+	g_hFullRefreshTimer = null;
+	g_bLightRefreshPending = false;
 	FinalizeActiveTankFights(false);
 	FlushAllStatsToDb();
 }
@@ -345,6 +423,15 @@ public void OnMapEnd()
 public void OnPluginEnd()
 {
 	FinalizeActiveTankFights(false);
+	FlushAllStatsToDb();
+	// SourceMod may cancel callbacks after unload; preserve every in-flight payload.
+	for (int i = 0; i < g_hUploadBackups.Length; i++)
+	{
+		DataPack backup = view_as<DataPack>(g_hUploadBackups.Get(i));
+		backup.Reset();
+		backup.ReadCell();
+		SaveFailedBatch(backup);
+	}
 	if (g_hDb != null)
 	{
 		delete g_hDb;
@@ -354,7 +441,10 @@ public void OnPluginEnd()
 
 public void LGO_OnMatchModeUnloaded()
 {
+	g_bRoundFinished = true;
 	g_bRoundLive = false;
+	g_bLightRefreshPending = false;
+	delete g_hFullRefreshTimer;
 	FinalizeActiveTankFights(false);
 	FlushAllStatsToDb();
 }
@@ -372,6 +462,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
 	FlushClientShotgunBurst(client);
+	FinalizeTankFight(client, false);
 	ResetClientState(client);
 }
 
@@ -382,18 +473,37 @@ public void OnEntityCreated(int entity, const char[] classname)
 		return;
 	}
 
-	if (classname[0] == 'w' && strcmp(classname, "witch") == 0)
+	if (StrEqual(classname, "infected") || StrEqual(classname, "witch"))
 	{
-		g_bEntityIsWitch[entity] = true;
+		g_bEntityIsWitch[entity] = StrEqual(classname, "witch");
+		g_iEntityPreHp[entity] = 0;
+		SDKHook(entity, SDKHook_OnTakeDamage, OnInfectedTakeDamage);
 	}
 	else if (classname[0] == 'g' && strcmp(classname, "grenade_launcher_projectile") == 0)
 	{
-		if (!g_bEntityIsGLProj[entity])
-		{
-			g_bEntityIsGLProj[entity] = true;
-			g_iActiveGLProjectiles++;
-		}
+		g_bEntityIsGLProj[entity] = true;
 	}
+}
+
+// Entity health at FireEvent time is not guaranteed to be pre-damage health.
+// Capture it at the actual SDK damage boundary; the event consumes one matching snapshot.
+public Action OnInfectedTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
+{
+	g_iEntityPreHp[victim] = 0;
+	if (!g_cvEnable.BoolValue || !g_bRoundLive || !IsValidHumanSurvivor(attacker)) return Plugin_Continue;
+	g_iEntityPreHp[victim] = GetEntProp(victim, Prop_Data, "m_iHealth");
+	g_bEntityDamageIsGL[victim] = inflictor > MaxClients && inflictor < MAX_TRACKED_EDICTS && g_bEntityIsGLProj[inflictor];
+	g_iEntityDamageAttacker[victim] = attacker;
+	g_iEntityDamageTick[victim] = GetGameTickCount();
+	return Plugin_Continue;
+}
+
+static void ScanExistingInfected()
+{
+	int entity = -1;
+	while ((entity = FindEntityByClassname(entity, "infected")) != -1) OnEntityCreated(entity, "infected");
+	entity = -1;
+	while ((entity = FindEntityByClassname(entity, "witch")) != -1) OnEntityCreated(entity, "witch");
 }
 
 public void OnEntityDestroyed(int entity)
@@ -404,14 +514,9 @@ public void OnEntityDestroyed(int entity)
 	}
 
 	g_bEntityIsWitch[entity] = false;
-	if (g_bEntityIsGLProj[entity])
-	{
-		g_bEntityIsGLProj[entity] = false;
-		if (g_iActiveGLProjectiles > 0)
-		{
-			g_iActiveGLProjectiles--;
-		}
-	}
+	g_iLastSgShot[entity] = 0;
+	g_iEntityPreHp[entity] = 0;
+	g_bEntityIsGLProj[entity] = false;
 }
 
 public Action Timer_RefreshConfigSnapshot(Handle timer)
@@ -423,12 +528,15 @@ public Action Timer_RefreshConfigSnapshot(Handle timer)
 
 public Action Timer_SampleHoldSeconds(Handle timer)
 {
+	EnsureDbConnected();
+	EnsureSchema();
+	UploadConfigSnapshotIfReady();
 	if (!g_cvEnable.BoolValue || !g_bRoundLive)
 	{
 		return Plugin_Continue;
 	}
 
-	if (!HasEnoughHumanSurvivors())
+	if (!PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
 		return Plugin_Continue;
 	}
@@ -458,7 +566,9 @@ public Action Timer_SampleHoldSeconds(Handle timer)
 
 public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+	g_bRoundFinished = false;
 	g_bRoundLive = false;
+	RefreshCvarHandles();
 	ResetAllTankFights();
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -480,7 +590,10 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+	g_bRoundFinished = true;
 	g_bRoundLive = false;
+	g_bLightRefreshPending = false;
+	delete g_hFullRefreshTimer;
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		FlushClientShotgunBurst(i);
@@ -496,7 +609,7 @@ public void Event_LeftSafeArea(Event event, const char[] name, bool dontBroadcas
 
 static void ActivateRoundLive()
 {
-	if (!g_cvEnable.BoolValue)
+	if (!g_cvEnable.BoolValue || g_bRoundFinished)
 	{
 		return;
 	}
@@ -512,6 +625,11 @@ static void ActivateRoundLive()
 			{
 				SyncClientSlotWeapons(i);
 				UpdateClientSkillTier(i);
+			}
+			else if (IsClientInGame(i) && GetClientTeam(i) == L4D2Team_Infected && IsPlayerAlive(i))
+			{
+				g_iClientLastHp[i] = GetClientHealth(i);
+				g_iClientMaxHp[i] = GetEntProp(i, Prop_Data, "m_iMaxHealth");
 			}
 		}
 	}
@@ -542,7 +660,7 @@ public void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 		}
 	}
 
-	if (!HasEnoughHumanSurvivors())
+	if (!PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
 		return;
 	}
@@ -553,13 +671,8 @@ public void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 		return;
 	}
 
-	g_iShotSeq[client]++;
+	g_iShotSeq[client] = ++g_iShotSerial;
 	g_iBulletHitTargetsInSeq[client] = 0;
-
-	if (wepIdx == 18) // grenade_launcher
-	{
-		g_fLastGLFireTime[client] = GetGameTime();
-	}
 
 	if (g_bWepIsShotgun[wepIdx] && g_SgCount[client] > 0)
 	{
@@ -569,7 +682,8 @@ public void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 	int moveState = GetClientMoveState(client);
 	int tier = g_iClientSkillTier[client];
 	g_iUsageStats[wepIdx][moveState][tier][USAGE_SHOTS_FIRED]++;
-	g_iUsageStats[wepIdx][moveState][tier][USAGE_PELLETS_FIRED] += g_iWepBullets[wepIdx];
+	int pellets = event.GetInt("count");
+	g_iUsageStats[wepIdx][moveState][tier][USAGE_PELLETS_FIRED] += (g_bWepIsShotgun[wepIdx] && pellets > 0) ? pellets : g_iWepBullets[wepIdx];
 	g_bDirtyUsage = true;
 
 	RecordTankFightShot(client, wepIdx);
@@ -577,7 +691,7 @@ public void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_WeaponReload(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_cvEnable.BoolValue || !g_bRoundLive || !HasEnoughHumanSurvivors())
+	if (!g_cvEnable.BoolValue || !g_bRoundLive || !PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
 		return;
 	}
@@ -602,7 +716,7 @@ public void Event_WeaponReload(Event event, const char[] name, bool dontBroadcas
 
 public void Event_ItemPickup(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_cvEnable.BoolValue || !g_bRoundLive || !HasEnoughHumanSurvivors())
+	if (!g_cvEnable.BoolValue || !g_bRoundLive || !PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
 		return;
 	}
@@ -697,118 +811,53 @@ public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast
 
 public Action Event_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_cvEnable.BoolValue || !g_bRoundLive)
-	{
-		return Plugin_Continue;
-	}
-
 	int victim = GetClientOfUserId(event.GetInt("userid"));
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	if (victim <= 0 || victim > MaxClients || attacker <= 0 || attacker > MaxClients)
+	if (victim <= 0 || victim > MaxClients || !IsClientInGame(victim) || GetClientTeam(victim) != L4D2Team_Infected)
 	{
 		return Plugin_Continue;
 	}
-
-	// 不统计友伤：仅统计生还者对感染者队伍的伤害
-	if (!IsClientInGame(attacker) || IsFakeClient(attacker) || GetClientTeam(attacker) != TEAM_SURVIVOR)
-	{
-		return Plugin_Continue;
-	}
-	if (!IsClientInGame(victim) || GetClientTeam(victim) != L4D2Team_Infected)
-	{
-		return Plugin_Continue;
-	}
-	if (!HasEnoughHumanSurvivors())
-	{
-		return Plugin_Continue;
-	}
-
-	int damagetype = event.GetInt("type");
-	bool isBullet = (damagetype & (DMG_BULLET | DMG_BUCKSHOT)) != 0;
-	bool isBlast = (damagetype & DMG_BLAST) != 0;
-	if (!isBullet && !isBlast)
-	{
-		return Plugin_Continue;
-	}
-
 	int zClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
-	if (zClass < 1 || zClass > TARGET_TANK || zClass == TARGET_WITCH)
+	if (zClass < 1 || zClass > TARGET_TANK || zClass == TARGET_WITCH || g_bClientDeathCounted[victim])
 	{
 		return Plugin_Continue;
 	}
-
-	if (zClass == TARGET_TANK)
-	{
-		if (g_bClientDeathCounted[victim] || GetEntProp(victim, Prop_Send, "m_isIncapacitated") != 0)
-		{
-			return Plugin_Continue;
-		}
-	}
-	else if (g_bClientDeathCounted[victim])
+	// Tank dying emits artificial health/damage; the incap/death event owns its killing blow.
+	if (zClass == TARGET_TANK && GetEntProp(victim, Prop_Send, "m_isIncapacitated") != 0)
 	{
 		return Plugin_Continue;
 	}
-
-	char wepStr[48];
-	event.GetString("weapon", wepStr, sizeof(wepStr));
-	int wepIdx = LookupWeaponIdx(wepStr);
-	if (wepIdx < 0)
-	{
-		return Plugin_Continue;
-	}
-	if (isBlast && wepIdx != 18)
-	{
-		return Plugin_Continue;
-	}
-
 	int remain = event.GetInt("health");
 	int dmgHealth = event.GetInt("dmg_health");
 	int preHp = g_iClientLastHp[victim];
-
-	if (!g_bClientHitOnce[victim])
-	{
-		int curMax = GetEntProp(victim, Prop_Data, "m_iMaxHealth");
-		if (curMax > g_iClientMaxHp[victim])
-		{
-			g_iClientMaxHp[victim] = curMax;
-		}
-		if (remain > 0 && remain + dmgHealth > preHp)
-		{
-			preHp = remain + dmgHealth;
-		}
-		else if (preHp <= 0)
-		{
-			preHp = g_iClientMaxHp[victim];
-		}
-		g_bClientHitOnce[victim] = true;
-	}
-	else if (preHp <= 0)
-	{
-		preHp = (remain > 0) ? (remain + dmgHealth) : dmgHealth;
-	}
-
+	int curMax = GetEntProp(victim, Prop_Data, "m_iMaxHealth");
+	if (curMax > g_iClientMaxHp[victim]) g_iClientMaxHp[victim] = curMax;
+	if (remain > 0 && dmgHealth >= 0) preHp = remain + dmgHealth;
+	else if (preHp <= 0) preHp = g_iClientMaxHp[victim];
 	int maxHp = g_iClientMaxHp[victim] > 0 ? g_iClientMaxHp[victim] : preHp;
-	int effDmg;
-	int rawDmg;
-	bool killed = false;
+	bool killed = remain <= 0;
+	int effDmg = killed ? preHp : dmgHealth;
+	if (preHp > 0 && effDmg > preHp) effDmg = preHp;
+	int rawDmg = dmgHealth > effDmg ? dmgHealth : effDmg;
+	g_iClientLastHp[victim] = remain > 0 ? remain : 0;
+	g_bClientHitOnce[victim] = true;
+	g_bClientDeathCounted[victim] = killed;
 
-	if (remain > 0)
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	if (!g_cvEnable.BoolValue || !g_bRoundLive || !IsValidHumanSurvivor(attacker)
+		|| !PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
-		effDmg = dmgHealth > 0 ? dmgHealth : (preHp > remain ? preHp - remain : 0);
-		if (effDmg > preHp && preHp > 0)
-		{
-			effDmg = preHp;
-		}
-		rawDmg = effDmg;
-		g_iClientLastHp[victim] = remain;
+		return Plugin_Continue;
 	}
-	else
+	int damagetype = event.GetInt("type");
+	bool isBullet = (damagetype & (DMG_BULLET | DMG_BUCKSHOT)) != 0;
+	bool isBlast = (damagetype & DMG_BLAST) != 0;
+	char wepStr[48];
+	event.GetString("weapon", wepStr, sizeof(wepStr));
+	int wepIdx = LookupWeaponIdx(wepStr);
+	if (wepIdx < 0 || (!isBullet && !isBlast) || (isBlast && wepIdx != 18))
 	{
-		effDmg = preHp > 0 ? preHp : dmgHealth;
-		rawDmg = dmgHealth > effDmg ? dmgHealth : effDmg;
-		killed = true;
-		g_iClientLastHp[victim] = 0;
-		g_bClientDeathCounted[victim] = true;
+		if (killed && zClass == TARGET_TANK) FinalizeTankFight(victim, true);
+		return Plugin_Continue;
 	}
 
 	if (effDmg <= 0 && rawDmg <= 0)
@@ -862,26 +911,7 @@ public void Event_PlayerIncap(Event event, const char[] name, bool dontBroadcast
 		return;
 	}
 
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	if (!g_bClientDeathCounted[victim] && g_iClientLastHp[victim] > 0 && IsValidHumanSurvivor(attacker) && g_bRoundLive && HasEnoughHumanSurvivors())
-	{
-		int wepIdx = GetClientActiveWeaponIdxCached(attacker);
-		if (wepIdx >= 0)
-		{
-			int remHp = g_iClientLastHp[victim];
-			float posA[3], posV[3];
-			GetClientAbsOrigin(attacker, posA);
-			GetClientAbsOrigin(victim, posV);
-			float distSq = GetVectorDistance(posA, posV, true);
-
-			RecordHit(attacker, victim, wepIdx, TARGET_TANK, distSq, false, remHp, remHp, true, remHp, g_iClientMaxHp[victim], 0);
-			RecordTankFightHit(attacker, victim, wepIdx, remHp, remHp, distSq);
-		}
-	}
-
-	g_iClientLastHp[victim] = 0;
-	g_bClientDeathCounted[victim] = true;
-	FinalizeTankFight(victim, true);
+	RecordTankKillingBlow(event, victim, true);
 }
 
 public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -891,46 +921,42 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 	{
 		return;
 	}
-
-	int zClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
-	if (zClass == TARGET_TANK && !g_bClientDeathCounted[victim] && g_iClientLastHp[victim] > 0)
+	if (GetEntProp(victim, Prop_Send, "m_zombieClass") == TARGET_TANK)
 	{
-		int attacker = GetClientOfUserId(event.GetInt("attacker"));
-		if (IsValidHumanSurvivor(attacker) && g_bRoundLive && HasEnoughHumanSurvivors())
-		{
-			char wepStr[48];
-			event.GetString("weapon", wepStr, sizeof(wepStr));
-			int wepIdx = LookupWeaponIdx(wepStr);
-			if (wepIdx < 0)
-			{
-				wepIdx = GetClientActiveWeaponIdxCached(attacker);
-			}
-			if (wepIdx >= 0)
-			{
-				int remHp = g_iClientLastHp[victim];
-				float posA[3], posV[3];
-				GetClientAbsOrigin(attacker, posA);
-				GetClientAbsOrigin(victim, posV);
-				float distSq = GetVectorDistance(posA, posV, true);
-				bool hs = event.GetBool("headshot");
-
-				RecordHit(attacker, victim, wepIdx, TARGET_TANK, distSq, hs, remHp, remHp, true, remHp, g_iClientMaxHp[victim], 0);
-				RecordTankFightHit(attacker, victim, wepIdx, remHp, remHp, distSq);
-			}
-		}
+		RecordTankKillingBlow(event, victim, false);
 	}
-
 	g_iClientLastHp[victim] = 0;
 	g_bClientDeathCounted[victim] = true;
-	if (zClass == TARGET_TANK)
+}
+
+static void RecordTankKillingBlow(Event event, int victim, bool hasDamageType)
+{
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
+	char weapon[48];
+	event.GetString("weapon", weapon, sizeof(weapon));
+	int wepIdx = LookupWeaponIdx(weapon);
+	int type = hasDamageType ? event.GetInt("type") : (wepIdx == 18 ? DMG_BLAST : DMG_BULLET);
+	bool firearm = (type & (DMG_BULLET | DMG_BUCKSHOT)) != 0 || ((type & DMG_BLAST) != 0 && wepIdx == 18);
+	if (!g_bClientDeathCounted[victim] && g_iClientLastHp[victim] > 0 && wepIdx >= 0 && firearm
+		&& g_cvEnable.BoolValue && g_bRoundLive && IsValidHumanSurvivor(attacker)
+		&& PrepareSampleContext() && HasEnoughHumanSurvivors())
 	{
-		FinalizeTankFight(victim, true);
+		int hp = g_iClientLastHp[victim];
+		float posA[3], posV[3];
+		GetClientAbsOrigin(attacker, posA);
+		GetClientAbsOrigin(victim, posV);
+		float distSq = GetVectorDistance(posA, posV, true);
+		RecordHit(attacker, victim, wepIdx, TARGET_TANK, distSq, event.GetBool("headshot"), hp, hp, true, hp, g_iClientMaxHp[victim], 0);
+		RecordTankFightHit(attacker, victim, wepIdx, hp, hp, distSq);
 	}
+	g_iClientLastHp[victim] = 0;
+	g_bClientDeathCounted[victim] = true;
+	FinalizeTankFight(victim, true);
 }
 
 public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadcast)
 {
-	if (!g_cvEnable.BoolValue || !g_bRoundLive || !HasEnoughHumanSurvivors())
+	if (!g_cvEnable.BoolValue || !g_bRoundLive || !PrepareSampleContext() || !HasEnoughHumanSurvivors())
 	{
 		return Plugin_Continue;
 	}
@@ -949,6 +975,13 @@ public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadc
 		return Plugin_Continue;
 	}
 
+	int victim = event.GetInt("entityid");
+	if (victim <= MaxClients || victim >= MAX_TRACKED_EDICTS || !IsValidEntity(victim)) return Plugin_Continue;
+	if (g_iEntityDamageAttacker[victim] != attacker || g_iEntityDamageTick[victim] != GetGameTickCount()) return Plugin_Continue;
+	int preHp = g_iEntityPreHp[victim];
+	g_iEntityPreHp[victim] = 0;
+	if (preHp <= 0) return Plugin_Continue;
+
 	int wepIdx = -1;
 	if (isBullet)
 	{
@@ -958,24 +991,12 @@ public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadc
 			wepIdx = -1;
 		}
 	}
-	else if (isBlast && g_iActiveGLProjectiles > 0 && (GetGameTime() - g_fLastGLFireTime[attacker] <= 4.0))
+	else if (isBlast && g_bEntityDamageIsGL[victim])
 	{
 		wepIdx = 18;
 	}
 
 	if (wepIdx < 0)
-	{
-		return Plugin_Continue;
-	}
-
-	int victim = event.GetInt("entityid");
-	if (victim <= MaxClients || victim >= MAX_TRACKED_EDICTS || !IsValidEntity(victim))
-	{
-		return Plugin_Continue;
-	}
-
-	int preHp = GetEntProp(victim, Prop_Data, "m_iHealth");
-	if (preHp <= 0)
 	{
 		return Plugin_Continue;
 	}
@@ -1136,8 +1157,11 @@ static void TrackShotgunPellet(
 		}
 	}
 
-	// 新击中目标：记一次 shot_burst（代表这一枪对该目标至少有弹丸上靶）
+	// 去重不依赖阈值槽容量；普通小僵尸不占用特感/女巫阈值槽。
+	if (victim <= 0 || victim >= MAX_TRACKED_EDICTS || g_iLastSgShot[victim] == g_iShotSeq[attacker]) return;
+	g_iLastSgShot[victim] = g_iShotSeq[attacker];
 	g_iCombatStats[wepIdx][targetClass][distBucket][moveState][tier][STAT_SHOT_BURSTS]++;
+	if (targetClass < TARGET_SMOKER || targetClass > TARGET_WITCH) return;
 
 	if (count < MAX_SG_TRACKED)
 	{
@@ -1218,11 +1242,24 @@ static void FlushClientShotgunBurst(int client)
 	g_SgCount[client] = 0;
 }
 
+static void SnapshotTankFightContext(int tank)
+{
+	strcopy(g_TankFight[tank].rulesetKey, sizeof(g_TankFight[].rulesetKey), g_sActiveRuleset);
+	strcopy(g_TankFight[tank].anneVersion, sizeof(g_TankFight[].anneVersion), g_sActiveAnneVersion);
+	strcopy(g_TankFight[tank].difficultyType, sizeof(g_TankFight[].difficultyType), g_sActiveDifficultyType);
+	g_TankFight[tank].difficulty = g_iActiveDifficulty;
+	g_TankFight[tank].siCount = g_iActiveSiCount;
+	g_TankFight[tank].siSpawnTime = g_iActiveSiSpawnTime;
+	strcopy(g_TankFight[tank].weaponConfig, sizeof(g_TankFight[].weaponConfig), g_sActiveWeaponConfig);
+	strcopy(g_TankFight[tank].configHash, sizeof(g_TankFight[].configHash), g_sActiveConfigHash);
+}
+
 static void StartTankFight(int tank, int maxHp)
 {
 	ResetTankFightSlot(tank);
 	g_TankFight[tank].active = true;
 	g_TankFight[tank].maxHp = maxHp;
+	SnapshotTankFightContext(tank);
 }
 
 static void RecordTankFightHit(int attacker, int tank, int wepIdx, int rawDmg, int effDmg, float distSq)
@@ -1233,8 +1270,13 @@ static void RecordTankFightHit(int attacker, int tank, int wepIdx, int rawDmg, i
 	}
 	if (!g_TankFight[tank].engaged)
 	{
+		if (g_bLightRefreshPending)
+		{
+			RefreshLightContext();
+		}
 		g_TankFight[tank].engaged = true;
 		g_TankFight[tank].startTime = GetGameTime();
+		SnapshotTankFightContext(tank);
 	}
 	if (g_iClientMaxHp[tank] > g_TankFight[tank].maxHp)
 	{
@@ -1305,9 +1347,8 @@ static void FinalizeTankFight(int tank, bool killed)
 
 	int now = GetTime();
 	int statDate = GetStatDateInt(now);
-	g_iTankFightSerial++;
 	char fightId[40];
-	FormatEx(fightId, sizeof(fightId), "%d_%d_%d", now, g_iTankFightSerial, tank);
+	FormatEx(fightId, sizeof(fightId), "%s_%d", g_sSessionId, ++g_iTankFightSerial);
 
 	for (int w = 0; w < WEP_COUNT; w++)
 	{
@@ -1320,9 +1361,15 @@ static void FinalizeTankFight(int tank, bool killed)
 		strcopy(item.fightId, sizeof(item.fightId), fightId);
 		item.statDate = statDate;
 		item.createdAt = now;
-		strcopy(item.rulesetKey, sizeof(item.rulesetKey), g_sActiveRuleset);
-		strcopy(item.weaponConfig, sizeof(item.weaponConfig), g_sActiveWeaponConfig);
-		strcopy(item.configHash, sizeof(item.configHash), g_sActiveConfigHash);
+		bool hasSnapshot = (g_TankFight[tank].rulesetKey[0] != '\0');
+		strcopy(item.rulesetKey, sizeof(item.rulesetKey), hasSnapshot ? g_TankFight[tank].rulesetKey : g_sActiveRuleset);
+		strcopy(item.anneVersion, sizeof(item.anneVersion), hasSnapshot ? g_TankFight[tank].anneVersion : g_sActiveAnneVersion);
+		strcopy(item.difficultyType, sizeof(item.difficultyType), g_TankFight[tank].difficultyType[0] != '\0' ? g_TankFight[tank].difficultyType : g_sActiveDifficultyType);
+		item.difficulty = g_TankFight[tank].difficulty;
+		item.siCount = g_TankFight[tank].siCount;
+		item.siSpawnTime = g_TankFight[tank].siSpawnTime;
+		strcopy(item.weaponConfig, sizeof(item.weaponConfig), g_TankFight[tank].weaponConfig[0] != '\0' ? g_TankFight[tank].weaponConfig : g_sActiveWeaponConfig);
+		strcopy(item.configHash, sizeof(item.configHash), g_TankFight[tank].configHash[0] != '\0' ? g_TankFight[tank].configHash : g_sActiveConfigHash);
 		strcopy(item.mapName, sizeof(item.mapName), g_sCurrentMap);
 		item.tankMaxHp = g_TankFight[tank].maxHp;
 		item.durationMs = durationMs;
@@ -1367,6 +1414,14 @@ static void ResetTankFightSlot(int tank)
 	g_TankFight[tank].maxHp = 0;
 	g_TankFight[tank].startTime = 0.0;
 	g_TankFight[tank].shooterMask = 0;
+	g_TankFight[tank].rulesetKey[0] = '\0';
+	g_TankFight[tank].anneVersion[0] = '\0';
+	g_TankFight[tank].difficultyType[0] = '\0';
+	g_TankFight[tank].difficulty = 0;
+	g_TankFight[tank].siCount = 0;
+	g_TankFight[tank].siSpawnTime = 0;
+	g_TankFight[tank].weaponConfig[0] = '\0';
+	g_TankFight[tank].configHash[0] = '\0';
 	for (int w = 0; w < WEP_COUNT; w++)
 	{
 		g_TankFight[tank].rawDmg[w] = 0;
@@ -1381,12 +1436,78 @@ static void ResetTankFightSlot(int tank)
 // 配置快照与版本指纹（区分同一模式下的不同调参版本）
 // ---------------------------------------------------------------------------
 
+static bool PrepareSampleContext()
+{
+	if ((g_bFullRefreshPending || g_bLightRefreshPending) && HasDirtyStats() && !g_bSchemaReady) return false;
+	if (g_bFullRefreshPending) RefreshWeaponConfigSnapshot();
+	else if (g_bLightRefreshPending) RefreshLightContext();
+	return !g_bLightRefreshPending && !g_bFullRefreshPending;
+}
+
+static void RefreshLightContext()
+{
+	RefreshCvarHandles();
+
+	char newRuleset[64];
+	DetectRulesetKey(newRuleset, sizeof(newRuleset));
+
+	char newAnneVer[64];
+	DetectAnneVersion(newRuleset, newAnneVer, sizeof(newAnneVer));
+
+	char newDiffType[16];
+	int newDifficulty = DetectDifficulty(newRuleset, newDiffType, sizeof(newDiffType));
+
+	int newSiCount = 0;
+	int newSiSpawnTime = 0;
+	DetectSIConfig(newSiCount, newSiSpawnTime);
+
+	bool changed = (g_sActiveConfigHash[0] != '\0') && (
+		!StrEqual(g_sActiveRuleset, newRuleset, false)
+		|| !StrEqual(g_sActiveAnneVersion, newAnneVer, false)
+		|| !StrEqual(g_sActiveDifficultyType, newDiffType, false)
+		|| g_iActiveDifficulty != newDifficulty
+		|| g_iActiveSiCount != newSiCount
+		|| g_iActiveSiSpawnTime != newSiSpawnTime
+	);
+
+	if (changed && !FlushAllStatsToDb())
+	{
+		g_bLightRefreshPending = true;
+		return;
+	}
+	g_bLightRefreshPending = false;
+
+	bool anneVerChanged = !StrEqual(g_sActiveAnneVersion, newAnneVer, false);
+	strcopy(g_sActiveRuleset, sizeof(g_sActiveRuleset), newRuleset);
+	strcopy(g_sActiveAnneVersion, sizeof(g_sActiveAnneVersion), newAnneVer);
+	strcopy(g_sActiveDifficultyType, sizeof(g_sActiveDifficultyType), newDiffType);
+	g_iActiveDifficulty = newDifficulty;
+	g_iActiveSiCount = newSiCount;
+	g_iActiveSiSpawnTime = newSiSpawnTime;
+
+	if (anneVerChanged && g_sActiveConfigHash[0] != '\0')
+	{
+		g_bConfigPendingUpload = true;
+		UploadConfigSnapshotIfReady();
+	}
+}
+
 static void RefreshWeaponConfigSnapshot()
 {
 	RefreshCvarHandles();
 
 	char newRuleset[64];
 	DetectRulesetKey(newRuleset, sizeof(newRuleset));
+
+	char newAnneVer[64];
+	DetectAnneVersion(newRuleset, newAnneVer, sizeof(newAnneVer));
+
+	char newDiffType[16];
+	int newDifficulty = DetectDifficulty(newRuleset, newDiffType, sizeof(newDiffType));
+
+	int newSiCount = 0;
+	int newSiSpawnTime = 0;
+	DetectSIConfig(newSiCount, newSiSpawnTime);
 
 	char newWeaponConfig[64];
 	if (g_cvWeaponConfig != null)
@@ -1403,17 +1524,6 @@ static void RefreshWeaponConfigSnapshot()
 		strcopy(newWeaponConfig, sizeof(newWeaponConfig), "default");
 	}
 
-	char newAnneVer[64];
-	if (g_cvAnneVersion != null)
-	{
-		g_cvAnneVersion.GetString(newAnneVer, sizeof(newAnneVer));
-		TrimString(newAnneVer);
-	}
-	else
-	{
-		newAnneVer[0] = '\0';
-	}
-
 	int sgCenter = g_cvSgCenterPellet != null ? g_cvSgCenterPellet.IntValue : -1;
 	int sgRing1 = g_cvSgRing1Bullets != null ? g_cvSgRing1Bullets.IntValue : -1;
 	float sgFactor = g_cvSgRing1Factor != null ? g_cvSgRing1Factor.FloatValue : -1.0;
@@ -1424,15 +1534,29 @@ static void RefreshWeaponConfigSnapshot()
 	char newHash[24];
 	ComputeConfigHash(newWeaponConfig, sgCenter, sgRing1, sgFactor, attrsJson, newHash, sizeof(newHash));
 
-	bool changed = (g_sActiveConfigHash[0] != '\0')
-		&& (!StrEqual(g_sActiveConfigHash, newHash, false) || !StrEqual(g_sActiveRuleset, newRuleset, false));
+	bool changed = (g_sActiveConfigHash[0] != '\0') && (
+		!StrEqual(g_sActiveConfigHash, newHash, false)
+		|| !StrEqual(g_sActiveRuleset, newRuleset, false)
+		|| !StrEqual(g_sActiveAnneVersion, newAnneVer, false)
+		|| !StrEqual(g_sActiveDifficultyType, newDiffType, false)
+		|| g_iActiveDifficulty != newDifficulty
+		|| g_iActiveSiCount != newSiCount
+		|| g_iActiveSiSpawnTime != newSiSpawnTime
+	);
 
-	if (changed && HasDirtyStats())
+	if (changed && !FlushAllStatsToDb())
 	{
-		FlushAllStatsToDb();
+		g_bFullRefreshPending = true;
+		return;
 	}
+	g_bLightRefreshPending = false;
+	g_bFullRefreshPending = false;
 
 	strcopy(g_sActiveRuleset, sizeof(g_sActiveRuleset), newRuleset);
+	strcopy(g_sActiveDifficultyType, sizeof(g_sActiveDifficultyType), newDiffType);
+	g_iActiveDifficulty = newDifficulty;
+	g_iActiveSiCount = newSiCount;
+	g_iActiveSiSpawnTime = newSiSpawnTime;
 	strcopy(g_sActiveWeaponConfig, sizeof(g_sActiveWeaponConfig), newWeaponConfig);
 	strcopy(g_sActiveAnneVersion, sizeof(g_sActiveAnneVersion), newAnneVer);
 	strcopy(g_sActiveConfigHash, sizeof(g_sActiveConfigHash), newHash);
@@ -1443,6 +1567,47 @@ static void RefreshWeaponConfigSnapshot()
 	g_bConfigPendingUpload = true;
 
 	UploadConfigSnapshotIfReady();
+}
+
+public void OnLightContextCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	if (StrEqual(oldValue, newValue, false))
+	{
+		return;
+	}
+	g_bLightRefreshPending = true;
+	if (!g_bLightRefreshQueued)
+	{
+		g_bLightRefreshQueued = true;
+		RequestFrame(Frame_RefreshLightContext);
+	}
+}
+
+public void Frame_RefreshLightContext(any data)
+{
+	g_bLightRefreshQueued = false;
+	if (g_bLightRefreshPending)
+	{
+		RefreshLightContext();
+	}
+}
+
+public void OnFullConfigCvarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	if (StrEqual(oldValue, newValue, false))
+	{
+		return;
+	}
+	g_bFullRefreshPending = true;
+	delete g_hFullRefreshTimer;
+	g_hFullRefreshTimer = CreateTimer(0.2, Timer_DeferredFullRefresh, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_DeferredFullRefresh(Handle timer)
+{
+	g_hFullRefreshTimer = null;
+	RefreshWeaponConfigSnapshot();
+	return Plugin_Stop;
 }
 
 static void BuildWeaponAttrsJson(char[] out, int maxlen)
@@ -1631,7 +1796,26 @@ static void DetectRulesetKey(char[] ruleset, int maxlen)
 
 	if (gm[0] != '\0')
 	{
-		FormatEx(ruleset, maxlen, "legacy_%s", gm);
+		if (StrEqual(gm, "teamversus", false))
+		{
+			strcopy(ruleset, maxlen, "legacy_versus");
+		}
+		else if (StrEqual(gm, "teamscavenge", false))
+		{
+			strcopy(ruleset, maxlen, "legacy_scavenge");
+		}
+		else if (StrEqual(gm, "realismversus", false) || StrEqual(gm, "teamrealismversus", false) || StrEqual(gm, "mutation12", false))
+		{
+			strcopy(ruleset, maxlen, "legacy_realism_versus");
+		}
+		else if (StrContains(gm, "mutation", false) == 0 || StrContains(gm, "community", false) == 0)
+		{
+			FormatEx(ruleset, maxlen, "legacy_mutation_%s", gm);
+		}
+		else
+		{
+			FormatEx(ruleset, maxlen, "legacy_%s", gm);
+		}
 	}
 	else
 	{
@@ -1641,15 +1825,36 @@ static void DetectRulesetKey(char[] ruleset, int maxlen)
 
 static void NormalizeRulesetSlug(const char[] src, char[] dst, int maxlen)
 {
-	int out = 0;
-	bool lastSep = true;
-	for (int i = 0; src[i] != '\0' && out < maxlen - 1; i++)
+	char tokens[16][32];
+	char base[128];
+	base[0] = '\0';
+	int tokenCount = ExplodeString(src, " ", tokens, sizeof(tokens), sizeof(tokens[]));
+	for (int t = 0; t < tokenCount; t++)
 	{
-		int c = src[i];
-		if ((c == 'v' || c == 'V') && i > 0 && src[i - 1] == ' ' && src[i + 1] >= '0' && src[i + 1] <= '9')
+		if (tokens[t][0] == '\0')
+		{
+			continue;
+		}
+		int first = tokens[t][0];
+		int second = tokens[t][1];
+		bool startsVersion = (first == 'v' || first == 'V') && second >= '0' && second <= '9';
+		bool numericVersion = first >= '0' && first <= '9' && StrContains(tokens[t], ".", false) != -1;
+		if (startsVersion || numericVersion)
 		{
 			break;
 		}
+		if (base[0] != '\0')
+		{
+			StrCat(base, sizeof(base), "_");
+		}
+		StrCat(base, sizeof(base), tokens[t]);
+	}
+
+	int out = 0;
+	bool lastSep = true;
+	for (int i = 0; base[i] != '\0' && out < maxlen - 1; i++)
+	{
+		int c = base[i];
 		bool isAlpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 		bool isDigit = (c >= '0' && c <= '9');
 		if (isAlpha || isDigit)
@@ -1668,6 +1873,177 @@ static void NormalizeRulesetSlug(const char[] src, char[] dst, int maxlen)
 		out--;
 	}
 	dst[out] = '\0';
+}
+
+static bool IsAnneRulesetKey(const char[] rulesetKey)
+{
+	return StrEqual(rulesetKey, "annehappy", false)
+		|| StrEqual(rulesetKey, "anne_hardcore", false)
+		|| StrEqual(rulesetKey, "anne_shotgun", false)
+		|| StrEqual(rulesetKey, "witchparty", false)
+		|| StrEqual(rulesetKey, "allcharger", false)
+		|| StrEqual(rulesetKey, "alone", false)
+		|| StrEqual(rulesetKey, "hunters", false);
+}
+
+static bool IsAnneModeActive(const char[] rulesetKey)
+{
+	if (IsAnneRulesetKey(rulesetKey))
+	{
+		return true;
+	}
+	Handle hText = FindPluginByFile("optional/AnneHappy/text.smx");
+	if (hText == null)
+	{
+		hText = FindPluginByFile("text.smx");
+	}
+	return hText != null && GetPluginStatus(hText) == Plugin_Running;
+}
+
+static void DetectAnneVersion(const char[] rulesetKey, char[] anneVer, int maxlen)
+{
+	anneVer[0] = '\0';
+	if (!IsAnneModeActive(rulesetKey))
+	{
+		return;
+	}
+	if (g_cvAnneVersion != null)
+	{
+		g_cvAnneVersion.GetString(anneVer, maxlen);
+		TrimString(anneVer);
+	}
+}
+
+static bool IsPvpGamemode(const char[] gm)
+{
+	return StrEqual(gm, "versus", false)
+		|| StrEqual(gm, "teamversus", false)
+		|| StrEqual(gm, "scavenge", false)
+		|| StrEqual(gm, "teamscavenge", false)
+		|| StrEqual(gm, "realismversus", false)
+		|| StrEqual(gm, "teamrealismversus", false)
+		|| StrEqual(gm, "mutation12", false)
+		|| StrEqual(gm, "mutation13", false)
+		|| StrEqual(gm, "mutation15", false)
+		|| StrEqual(gm, "mutation18", false)
+		|| StrEqual(gm, "mutation19", false);
+}
+
+static int GetAnneAIDifficultyLevel()
+{
+	if (!LibraryExists("annehappy_dynamic_ai_difficulty") || (g_cvAiEnable != null && !g_cvAiEnable.BoolValue))
+	{
+		return 0;
+	}
+	if (g_cvAiCurrentLevel != null)
+	{
+		int lvl = g_cvAiCurrentLevel.IntValue;
+		if (lvl >= 1 && lvl <= 6)
+		{
+			return lvl;
+		}
+	}
+	return 0;
+}
+
+static int GetGameDifficultyLevel()
+{
+	if (g_cvZDifficulty == null)
+	{
+		return 1;
+	}
+	char diff[32];
+	g_cvZDifficulty.GetString(diff, sizeof(diff));
+	TrimString(diff);
+	if (StrEqual(diff, "easy", false))
+	{
+		return 0;
+	}
+	if (StrEqual(diff, "normal", false))
+	{
+		return 1;
+	}
+	if (StrEqual(diff, "hard", false))
+	{
+		return 2;
+	}
+	if (StrEqual(diff, "impossible", false))
+	{
+		return 3;
+	}
+	return 1;
+}
+
+static int DetectDifficulty(const char[] rulesetKey, char[] diffType, int maxlen)
+{
+	char overrideProfile[24];
+	overrideProfile[0] = '\0';
+	if (g_cvDiffProfile != null)
+	{
+		g_cvDiffProfile.GetString(overrideProfile, sizeof(overrideProfile));
+		TrimString(overrideProfile);
+		LowerString(overrideProfile);
+	}
+
+	if (StrEqual(overrideProfile, "anne_ai", false))
+	{
+		strcopy(diffType, maxlen, "anne_ai");
+		return GetAnneAIDifficultyLevel();
+	}
+	if (StrEqual(overrideProfile, "none", false))
+	{
+		strcopy(diffType, maxlen, "none");
+		return 0;
+	}
+	if (StrEqual(overrideProfile, "game", false))
+	{
+		strcopy(diffType, maxlen, "game");
+		return GetGameDifficultyLevel();
+	}
+
+	bool hasActiveAiPlugin = LibraryExists("annehappy_dynamic_ai_difficulty") && g_cvAiCurrentLevel != null && (g_cvAiEnable == null || g_cvAiEnable.BoolValue);
+	if (IsAnneRulesetKey(rulesetKey) || hasActiveAiPlugin)
+	{
+		strcopy(diffType, maxlen, "anne_ai");
+		return GetAnneAIDifficultyLevel();
+	}
+
+	char gm[32];
+	gm[0] = '\0';
+	if (g_cvGameMode != null)
+	{
+		g_cvGameMode.GetString(gm, sizeof(gm));
+		TrimString(gm);
+	}
+	if (IsPvpGamemode(gm))
+	{
+		strcopy(diffType, maxlen, "none");
+		return 0;
+	}
+
+	strcopy(diffType, maxlen, "game");
+	return GetGameDifficultyLevel();
+}
+
+static void DetectSIConfig(int &siCount, int &siSpawnTime)
+{
+	if (g_cvInfectedLimit != null)
+	{
+		int limit = g_cvInfectedLimit.IntValue;
+		if (limit < 0) limit = 0;
+		if (limit > 255) limit = 255;
+		siCount = limit;
+
+		int interval = g_cvSiSpawnInterval != null ? g_cvSiSpawnInterval.IntValue : 0;
+		if (interval < 0) interval = 0;
+		if (interval > 65535) interval = 65535;
+		siSpawnTime = interval;
+	}
+	else
+	{
+		siCount = 0;
+		siSpawnTime = 0;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1712,7 +2088,6 @@ static void EnsureDbConnected()
 
 public void OnDbConnected(Database db, const char[] error, any data)
 {
-	g_bDbConnecting = false;
 	if (view_as<int>(data) != g_iDbGen)
 	{
 		if (db != null)
@@ -1722,8 +2097,10 @@ public void OnDbConnected(Database db, const char[] error, any data)
 		return;
 	}
 
+	g_bDbConnecting = false;
 	if (db == null || error[0] != '\0')
 	{
+		delete db;
 		LogError("[WeaponBalanceStats] 数据库连接失败: %s", error);
 		g_fNextDbRetry = GetEngineTime() + 30.0;
 		return;
@@ -1751,7 +2128,7 @@ public void OnDbConnected(Database db, const char[] error, any data)
 
 static void EnsureSchema()
 {
-	if (g_hDb == null || g_bSchemaReady || g_bSchemaCreating)
+	if (g_hDb == null || g_bSchemaReady || g_bSchemaCreating || GetEngineTime() < g_fNextDbRetry)
 	{
 		return;
 	}
@@ -1782,6 +2159,11 @@ static void EnsureSchema()
 		"CREATE TABLE IF NOT EXISTS `%sweapon_balance_daily` ("
 		... "`stat_date` int unsigned NOT NULL,"
 		... "`ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,"
+		... "`anne_version` varchar(64) NOT NULL DEFAULT '',"
+		... "`difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',"
+		... "`difficulty` tinyint unsigned NOT NULL DEFAULT 0,"
+		... "`si_count` smallint unsigned NOT NULL DEFAULT 0,"
+		... "`si_spawn_time` smallint unsigned NOT NULL DEFAULT 0,"
 		... "`weapon_config` varchar(64) NOT NULL DEFAULT '',"
 		... "`config_hash` char(16) CHARACTER SET ascii NOT NULL,"
 		... "`weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,"
@@ -1798,9 +2180,10 @@ static void EnsureSchema()
 		... "`one_shot_kills` int unsigned NOT NULL DEFAULT 0,"
 		... "`near_kill_misses` int unsigned NOT NULL DEFAULT 0,"
 		... "`collateral_hits` int unsigned NOT NULL DEFAULT 0,"
-		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`),"
+		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`),"
 		... "KEY `idx_wbd_config_date` (`config_hash`,`stat_date`),"
-		... "KEY `idx_wbd_ruleset_date` (`ruleset_key`,`weapon_config`,`stat_date`)"
+		... "KEY `idx_wbd_ruleset_date` (`ruleset_key`,`weapon_config`,`stat_date`),"
+		... "KEY `idx_wbd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)"
 		... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 		g_sDbPrefix);
 	txn.AddQuery(query);
@@ -1809,6 +2192,11 @@ static void EnsureSchema()
 		"CREATE TABLE IF NOT EXISTS `%sweapon_balance_usage_daily` ("
 		... "`stat_date` int unsigned NOT NULL,"
 		... "`ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,"
+		... "`anne_version` varchar(64) NOT NULL DEFAULT '',"
+		... "`difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',"
+		... "`difficulty` tinyint unsigned NOT NULL DEFAULT 0,"
+		... "`si_count` smallint unsigned NOT NULL DEFAULT 0,"
+		... "`si_spawn_time` smallint unsigned NOT NULL DEFAULT 0,"
 		... "`weapon_config` varchar(64) NOT NULL DEFAULT '',"
 		... "`config_hash` char(16) CHARACTER SET ascii NOT NULL,"
 		... "`weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,"
@@ -1820,8 +2208,9 @@ static void EnsureSchema()
 		... "`hold_seconds` int unsigned NOT NULL DEFAULT 0,"
 		... "`pickups` int unsigned NOT NULL DEFAULT 0,"
 		... "`swaps_away` int unsigned NOT NULL DEFAULT 0,"
-		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`),"
-		... "KEY `idx_wbud_config_date` (`config_hash`,`stat_date`)"
+		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`),"
+		... "KEY `idx_wbud_config_date` (`config_hash`,`stat_date`),"
+		... "KEY `idx_wbud_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)"
 		... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 		g_sDbPrefix);
 	txn.AddQuery(query);
@@ -1830,12 +2219,18 @@ static void EnsureSchema()
 		"CREATE TABLE IF NOT EXISTS `%sweapon_balance_swaps_daily` ("
 		... "`stat_date` int unsigned NOT NULL,"
 		... "`ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,"
+		... "`anne_version` varchar(64) NOT NULL DEFAULT '',"
+		... "`difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',"
+		... "`difficulty` tinyint unsigned NOT NULL DEFAULT 0,"
+		... "`si_count` smallint unsigned NOT NULL DEFAULT 0,"
+		... "`si_spawn_time` smallint unsigned NOT NULL DEFAULT 0,"
 		... "`weapon_config` varchar(64) NOT NULL DEFAULT '',"
 		... "`config_hash` char(16) CHARACTER SET ascii NOT NULL,"
 		... "`from_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,"
 		... "`to_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,"
 		... "`swap_count` int unsigned NOT NULL DEFAULT 0,"
-		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`)"
+		... "PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`),"
+		... "KEY `idx_wbsd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)"
 		... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 		g_sDbPrefix);
 	txn.AddQuery(query);
@@ -1847,6 +2242,11 @@ static void EnsureSchema()
 		... "`stat_date` int unsigned NOT NULL,"
 		... "`created_at` int unsigned NOT NULL,"
 		... "`ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,"
+		... "`anne_version` varchar(64) NOT NULL DEFAULT '',"
+		... "`difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',"
+		... "`difficulty` tinyint unsigned NOT NULL DEFAULT 0,"
+		... "`si_count` smallint unsigned NOT NULL DEFAULT 0,"
+		... "`si_spawn_time` smallint unsigned NOT NULL DEFAULT 0,"
 		... "`weapon_config` varchar(64) NOT NULL DEFAULT '',"
 		... "`config_hash` char(16) CHARACTER SET ascii NOT NULL,"
 		... "`map` varchar(64) NOT NULL DEFAULT '',"
@@ -1862,16 +2262,236 @@ static void EnsureSchema()
 		... "`dist_sum` bigint unsigned NOT NULL DEFAULT 0,"
 		... "PRIMARY KEY (`id`),"
 		... "KEY `idx_wtf_lookup` (`ruleset_key`,`weapon_config`,`config_hash`,`stat_date`),"
+		... "KEY `idx_wtf_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`stat_date`),"
 		... "KEY `idx_wtf_fight` (`fight_id`)"
 		... ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 		g_sDbPrefix);
 	txn.AddQuery(query);
 
-	g_hDb.Execute(txn, OnSchemaTxnSuccess, OnSchemaTxnFailure);
+	g_hDb.Execute(txn, OnSchemaTxnSuccess, OnSchemaTxnFailure, g_iDbGen);
 }
 
 public void OnSchemaTxnSuccess(Database db, any data, int numQueries, DBResultSet[] results, any[] queryData)
 {
+	if (g_hDb == null || data != g_iDbGen) return;
+
+	char tDaily[96], tUsage[96], tSwaps[96], tTanks[96];
+	FormatEx(tDaily, sizeof(tDaily), "%sweapon_balance_daily", g_sDbPrefix);
+	FormatEx(tUsage, sizeof(tUsage), "%sweapon_balance_usage_daily", g_sDbPrefix);
+	FormatEx(tSwaps, sizeof(tSwaps), "%sweapon_balance_swaps_daily", g_sDbPrefix);
+	FormatEx(tTanks, sizeof(tTanks), "%sweapon_tank_fights", g_sDbPrefix);
+
+	char escDaily[192], escUsage[192], escSwaps[192], escTanks[192];
+	g_hDb.Escape(tDaily, escDaily, sizeof(escDaily));
+	g_hDb.Escape(tUsage, escUsage, sizeof(escUsage));
+	g_hDb.Escape(tSwaps, escSwaps, sizeof(escSwaps));
+	g_hDb.Escape(tTanks, escTanks, sizeof(escTanks));
+
+	char checkQuery[2048];
+	FormatEx(checkQuery, sizeof(checkQuery),
+		"SELECT 'col' AS kind, TABLE_NAME, COLUMN_NAME AS item_name "
+		... "FROM information_schema.COLUMNS "
+		... "WHERE TABLE_SCHEMA = DATABASE() "
+		... "AND TABLE_NAME IN ('%s','%s','%s','%s') "
+		... "AND COLUMN_NAME IN ('anne_version','difficulty_type','difficulty','si_count','si_spawn_time') "
+		... "UNION ALL "
+		... "SELECT 'idx' AS kind, TABLE_NAME, CONCAT(INDEX_NAME, ':', COLUMN_NAME) AS item_name "
+		... "FROM information_schema.STATISTICS "
+		... "WHERE TABLE_SCHEMA = DATABASE() "
+		... "AND TABLE_NAME IN ('%s','%s','%s','%s') "
+		... "AND ((INDEX_NAME = 'PRIMARY' AND (SEQ_IN_INDEX = 1 OR COLUMN_NAME = 'anne_version')) "
+		... "OR (INDEX_NAME IN ('idx_wbd_mode_diff','idx_wbud_mode_diff','idx_wbsd_mode_diff','idx_wtf_mode_diff') "
+		... "AND (SEQ_IN_INDEX = 1 OR COLUMN_NAME = 'anne_version')))",
+		escDaily, escUsage, escSwaps, escTanks,
+		escDaily, escUsage, escSwaps, escTanks
+	);
+	g_hDb.Query(OnSchemaVerifyDone, checkQuery, g_iDbGen);
+}
+
+public void OnSchemaVerifyDone(Database db, DBResultSet results, const char[] error, any data)
+{
+	if (g_hDb == null || data != g_iDbGen) return;
+
+	if (results == null || error[0] != '\0')
+	{
+		g_bSchemaCreating = false;
+		g_fNextDbRetry = GetEngineTime() + 10.0;
+		LogError("[WeaponBalanceStats] 校验表结构列失败: %s", error);
+		HandleDbConnectionError(error);
+		return;
+	}
+
+	char tDaily[96], tUsage[96], tSwaps[96], tTanks[96];
+	FormatEx(tDaily, sizeof(tDaily), "%sweapon_balance_daily", g_sDbPrefix);
+	FormatEx(tUsage, sizeof(tUsage), "%sweapon_balance_usage_daily", g_sDbPrefix);
+	FormatEx(tSwaps, sizeof(tSwaps), "%sweapon_balance_swaps_daily", g_sDbPrefix);
+	FormatEx(tTanks, sizeof(tTanks), "%sweapon_tank_fights", g_sDbPrefix);
+
+	int colMask[4];
+	bool hasPk[4];
+	bool hasNewPk[4];
+	bool hasModeIdx[4];
+	bool hasNewModeIdx[4];
+
+	while (results.FetchRow())
+	{
+		char kind[16], tbl[96], item[96];
+		results.FetchString(0, kind, sizeof(kind));
+		results.FetchString(1, tbl, sizeof(tbl));
+		results.FetchString(2, item, sizeof(item));
+
+		int idx = -1;
+		if (StrEqual(tbl, tDaily, false)) idx = 0;
+		else if (StrEqual(tbl, tUsage, false)) idx = 1;
+		else if (StrEqual(tbl, tSwaps, false)) idx = 2;
+		else if (StrEqual(tbl, tTanks, false)) idx = 3;
+		if (idx < 0)
+		{
+			continue;
+		}
+
+		if (StrEqual(kind, "col", false))
+		{
+			if (StrEqual(item, "difficulty_type", false)) colMask[idx] |= 1;
+			else if (StrEqual(item, "difficulty", false)) colMask[idx] |= 2;
+			else if (StrEqual(item, "si_count", false)) colMask[idx] |= 4;
+			else if (StrEqual(item, "si_spawn_time", false)) colMask[idx] |= 8;
+			else if (StrEqual(item, "anne_version", false)) colMask[idx] |= 16;
+		}
+		else
+		{
+			if (StrContains(item, "PRIMARY:", false) == 0)
+			{
+				hasPk[idx] = true;
+				if (StrEqual(item, "PRIMARY:anne_version", false))
+				{
+					hasNewPk[idx] = true;
+				}
+			}
+			else
+			{
+				hasModeIdx[idx] = true;
+				if (StrContains(item, ":anne_version", false) != -1)
+				{
+					hasNewModeIdx[idx] = true;
+				}
+			}
+		}
+	}
+
+	Transaction migrateTxn = new Transaction();
+	int migrateCount = 0;
+
+	for (int i = 0; i < 4; i++)
+	{
+		bool needCols = (colMask[i] != 31);
+		bool needPk = (i < 3 && !hasNewPk[i]);
+		bool needIdx = !hasNewModeIdx[i];
+		if (!needCols && !needPk && !needIdx)
+		{
+			continue;
+		}
+
+		char tblName[96];
+		if (i == 0) strcopy(tblName, sizeof(tblName), tDaily);
+		else if (i == 1) strcopy(tblName, sizeof(tblName), tUsage);
+		else if (i == 2) strcopy(tblName, sizeof(tblName), tSwaps);
+		else strcopy(tblName, sizeof(tblName), tTanks);
+
+		char alter[1536];
+		int len = FormatEx(alter, sizeof(alter), "ALTER TABLE `%s` ", tblName);
+		bool first = true;
+
+		bool addedAnneCol = ((colMask[i] & 16) == 0);
+		if (addedAnneCol)
+		{
+			len += FormatEx(alter[len], sizeof(alter) - len, "%sADD COLUMN `anne_version` varchar(64) NOT NULL DEFAULT '' AFTER `ruleset_key`", first ? "" : ", ");
+			first = false;
+		}
+		if ((colMask[i] & 1) == 0)
+		{
+			len += FormatEx(alter[len], sizeof(alter) - len, "%sADD COLUMN `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown' AFTER `%s`", first ? "" : ", ", addedAnneCol ? "anne_version" : "ruleset_key");
+			first = false;
+		}
+		if ((colMask[i] & 2) == 0)
+		{
+			len += FormatEx(alter[len], sizeof(alter) - len, "%sADD COLUMN `difficulty` tinyint unsigned NOT NULL DEFAULT 0 AFTER `difficulty_type`", first ? "" : ", ");
+			first = false;
+		}
+		if ((colMask[i] & 4) == 0)
+		{
+			len += FormatEx(alter[len], sizeof(alter) - len, "%sADD COLUMN `si_count` smallint unsigned NOT NULL DEFAULT 0 AFTER `difficulty`", first ? "" : ", ");
+			first = false;
+		}
+		if ((colMask[i] & 8) == 0)
+		{
+			len += FormatEx(alter[len], sizeof(alter) - len, "%sADD COLUMN `si_spawn_time` smallint unsigned NOT NULL DEFAULT 0 AFTER `si_count`", first ? "" : ", ");
+			first = false;
+		}
+		if (needPk)
+		{
+			if (hasPk[i])
+			{
+				len += FormatEx(alter[len], sizeof(alter) - len, "%sDROP PRIMARY KEY", first ? "" : ", ");
+				first = false;
+			}
+			if (i == 0)
+			{
+				len += FormatEx(alter[len], sizeof(alter) - len, "%sADD PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`)", first ? "" : ", ");
+			}
+			else if (i == 1)
+			{
+				len += FormatEx(alter[len], sizeof(alter) - len, "%sADD PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`)", first ? "" : ", ");
+			}
+			else
+			{
+				len += FormatEx(alter[len], sizeof(alter) - len, "%sADD PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`)", first ? "" : ", ");
+			}
+			first = false;
+		}
+		if (needIdx)
+		{
+			static const char idxNames[4][24] = {
+				"idx_wbd_mode_diff",
+				"idx_wbud_mode_diff",
+				"idx_wbsd_mode_diff",
+				"idx_wtf_mode_diff"
+			};
+			if (hasModeIdx[i])
+			{
+				len += FormatEx(alter[len], sizeof(alter) - len, "%sDROP INDEX `%s`", first ? "" : ", ", idxNames[i]);
+				first = false;
+			}
+			if (i == 0)
+				FormatEx(alter[len], sizeof(alter) - len, "%sADD KEY `idx_wbd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)", first ? "" : ", ");
+			else if (i == 1)
+				FormatEx(alter[len], sizeof(alter) - len, "%sADD KEY `idx_wbud_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)", first ? "" : ", ");
+			else if (i == 2)
+				FormatEx(alter[len], sizeof(alter) - len, "%sADD KEY `idx_wbsd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)", first ? "" : ", ");
+			else
+				FormatEx(alter[len], sizeof(alter) - len, "%sADD KEY `idx_wtf_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`stat_date`)", first ? "" : ", ");
+		}
+
+		migrateTxn.AddQuery(alter);
+		migrateCount++;
+	}
+
+	if (migrateCount == 0)
+	{
+		delete migrateTxn;
+		g_bSchemaCreating = false;
+		g_bSchemaReady = true;
+		UploadConfigSnapshotIfReady();
+		FlushAllStatsToDb();
+		return;
+	}
+
+	g_hDb.Execute(migrateTxn, OnSchemaMigrateSuccess, OnSchemaTxnFailure, g_iDbGen);
+}
+
+public void OnSchemaMigrateSuccess(Database db, any data, int numQueries, DBResultSet[] results, any[] queryData)
+{
+	if (g_hDb == null || data != g_iDbGen) return;
 	g_bSchemaCreating = false;
 	g_bSchemaReady = true;
 	UploadConfigSnapshotIfReady();
@@ -1880,6 +2500,8 @@ public void OnSchemaTxnSuccess(Database db, any data, int numQueries, DBResultSe
 
 public void OnSchemaTxnFailure(Database db, any data, int numQueries, const char[] error, int failIndex, any[] queryData)
 {
+	if (data != g_iDbGen) return;
+	g_fNextDbRetry = GetEngineTime() + 10.0;
 	g_bSchemaCreating = false;
 	LogError("[WeaponBalanceStats] 建表事务失败 (#%d): %s", failIndex, error);
 	HandleDbConnectionError(error);
@@ -1887,7 +2509,7 @@ public void OnSchemaTxnFailure(Database db, any data, int numQueries, const char
 
 static void UploadConfigSnapshotIfReady()
 {
-	if (!g_bConfigPendingUpload || g_hDb == null || !g_bSchemaReady || g_sActiveConfigHash[0] == '\0')
+	if (!g_bConfigPendingUpload || g_hDb == null || !g_bSchemaReady || g_sActiveConfigHash[0] == '\0' || GetEngineTime() < g_fNextDbRetry)
 	{
 		return;
 	}
@@ -1912,33 +2534,48 @@ static void UploadConfigSnapshotIfReady()
 		escJson, now, now);
 
 	g_bConfigPendingUpload = false;
-	g_hDb.Query(OnSimpleQueryDone, query);
+	DataPack backup = new DataPack();
+	backup.WriteCell(g_iDbGen);
+	backup.WriteString(query);
+	g_hUploadBackups.Push(backup);
+	g_hDb.Query(OnSimpleQueryDone, query, backup);
 }
 
 public void OnSimpleQueryDone(Database db, DBResultSet results, const char[] error, any data)
 {
+	DataPack backup = view_as<DataPack>(data);
+	backup.Reset();
+	int generation = backup.ReadCell();
 	if (error[0] != '\0')
 	{
+		SaveFailedBatch(backup);
 		LogError("[WeaponBalanceStats] 写入配置快照失败: %s", error);
-		HandleDbConnectionError(error);
+		if (generation == g_iDbGen)
+		{
+			g_bConfigPendingUpload = true;
+			g_fNextDbRetry = GetEngineTime() + 10.0;
+			HandleDbConnectionError(error);
+		}
 	}
+	ReleaseUploadBackup(backup);
 }
 
-static void FlushAllStatsToDb()
+static bool FlushAllStatsToDb()
 {
+	for (int i = 1; i <= MaxClients; i++) FlushClientShotgunBurst(i);
 	if (!HasDirtyStats())
 	{
-		return;
+		return true;
 	}
 
 	if (g_hDb == null)
 	{
 		EnsureDbConnected();
-		return;
+		return false;
 	}
 	if (!g_bSchemaReady)
 	{
-		return;
+		return false;
 	}
 	if (g_sActiveConfigHash[0] == '\0')
 	{
@@ -1948,25 +2585,29 @@ static void FlushAllStatsToDb()
 	int now = GetTime();
 	int statDate = GetStatDateInt(now);
 
-	char escRuleset[160], escWepCfg[160], escHash[64];
+	char escRuleset[160], escAnneVer[160], escDiffType[40], escWepCfg[160], escHash[64];
 	g_hDb.Escape(g_sActiveRuleset, escRuleset, sizeof(escRuleset));
+	g_hDb.Escape(g_sActiveAnneVersion, escAnneVer, sizeof(escAnneVer));
+	g_hDb.Escape(g_sActiveDifficultyType, escDiffType, sizeof(escDiffType));
 	g_hDb.Escape(g_sActiveWeaponConfig, escWepCfg, sizeof(escWepCfg));
 	g_hDb.Escape(g_sActiveConfigHash, escHash, sizeof(escHash));
 
 	Transaction txn = new Transaction();
+	g_hFlushBackup = new DataPack();
+	g_hFlushBackup.WriteCell(g_iDbGen);
 	int queryCount = 0;
 
 	if (g_bDirtyCombat)
 	{
-		AppendCombatFlushQueries(txn, statDate, escRuleset, escWepCfg, escHash, queryCount);
+		AppendCombatFlushQueries(txn, statDate, escRuleset, escAnneVer, escDiffType, g_iActiveDifficulty, g_iActiveSiCount, g_iActiveSiSpawnTime, escWepCfg, escHash, queryCount);
 	}
 	if (g_bDirtyUsage)
 	{
-		AppendUsageFlushQueries(txn, statDate, escRuleset, escWepCfg, escHash, queryCount);
+		AppendUsageFlushQueries(txn, statDate, escRuleset, escAnneVer, escDiffType, g_iActiveDifficulty, g_iActiveSiCount, g_iActiveSiSpawnTime, escWepCfg, escHash, queryCount);
 	}
 	if (g_bDirtySwaps)
 	{
-		AppendSwapFlushQueries(txn, escRuleset, escWepCfg, escHash, statDate, queryCount);
+		AppendSwapFlushQueries(txn, escRuleset, escAnneVer, escDiffType, g_iActiveDifficulty, g_iActiveSiCount, g_iActiveSiSpawnTime, escWepCfg, escHash, statDate, queryCount);
 	}
 	if (g_hPendingTanks.Length > 0)
 	{
@@ -1976,22 +2617,26 @@ static void FlushAllStatsToDb()
 	if (queryCount <= 0)
 	{
 		delete txn;
+		delete g_hFlushBackup;
 		ResetAllBuckets();
-		return;
+		return true;
 	}
 
-	// 立即清空已入队的内存计数器，避免跨回合重复累计；若 SQL 执行失败会直接记日志
+	// 查询已携带原上下文；失败时将备份写入本地恢复文件，避免静默丢失。
 	ResetAllBuckets();
-	g_hDb.Execute(txn, OnFlushTxnSuccess, OnFlushTxnFailure);
+	g_hUploadBackups.Push(g_hFlushBackup);
+	g_hDb.Execute(txn, OnFlushTxnSuccess, OnFlushTxnFailure, g_hFlushBackup);
+	g_hFlushBackup = null;
+	return true;
 }
 
-static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[] escRuleset, const char[] escWepCfg, const char[] escHash, int &queryCount)
+static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[] escRuleset, const char[] escAnneVer, const char[] escDiffType, int difficulty, int siCount, int siSpawnTime, const char[] escWepCfg, const char[] escHash, int &queryCount)
 {
 	char query[SQL_QUERY_MAX];
-	char header[320];
+	char header[512];
 	FormatEx(header, sizeof(header),
 		"INSERT INTO `%sweapon_balance_daily` "
-		... "(`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`,"
+		... "(`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`,"
 		... "`hits`,`headshots`,`raw_damage`,`effective_damage`,`kills`,`shot_bursts`,`one_shot_kills`,`near_kill_misses`,`collateral_hits`) VALUES ",
 		g_sDbPrefix);
 
@@ -2022,10 +2667,10 @@ static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[]
 							continue;
 						}
 
-						char row[256];
+						char row[512];
 						int rowLen = FormatEx(row, sizeof(row),
-							"(%d,'%s','%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
-							statDate, escRuleset, escWepCfg, escHash, g_sWeaponKeys[w],
+							"(%d,'%s','%s','%s',%d,%d,%d,'%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+							statDate, escRuleset, escAnneVer, escDiffType, difficulty, siCount, siSpawnTime, escWepCfg, escHash, g_sWeaponKeys[w],
 							c, d, m, t,
 							g_iCombatStats[w][c][d][m][t][STAT_HITS],
 							g_iCombatStats[w][c][d][m][t][STAT_HEADSHOTS],
@@ -2042,6 +2687,7 @@ static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[]
 						{
 							StrCat(query, sizeof(query), suffix);
 							txn.AddQuery(query);
+							g_hFlushBackup.WriteString(query);
 							queryCount++;
 							len = strcopy(query, sizeof(query), header);
 							rows = 0;
@@ -2064,17 +2710,18 @@ static void AppendCombatFlushQueries(Transaction txn, int statDate, const char[]
 	{
 		StrCat(query, sizeof(query), suffix);
 		txn.AddQuery(query);
+		g_hFlushBackup.WriteString(query);
 		queryCount++;
 	}
 }
 
-static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] escRuleset, const char[] escWepCfg, const char[] escHash, int &queryCount)
+static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] escRuleset, const char[] escAnneVer, const char[] escDiffType, int difficulty, int siCount, int siSpawnTime, const char[] escWepCfg, const char[] escHash, int &queryCount)
 {
 	char query[SQL_QUERY_MAX];
-	char header[320];
+	char header[512];
 	FormatEx(header, sizeof(header),
 		"INSERT INTO `%sweapon_balance_usage_daily` "
-		... "(`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`,"
+		... "(`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`,"
 		... "`shots_fired`,`pellets_fired`,`reloads`,`hold_seconds`,`pickups`,`swaps_away`) VALUES ",
 		g_sDbPrefix);
 
@@ -2102,10 +2749,10 @@ static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] 
 					continue;
 				}
 
-				char row[256];
+				char row[512];
 				int rowLen = FormatEx(row, sizeof(row),
-					"(%d,'%s','%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d)",
-					statDate, escRuleset, escWepCfg, escHash, g_sWeaponKeys[w],
+					"(%d,'%s','%s','%s',%d,%d,%d,'%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d)",
+					statDate, escRuleset, escAnneVer, escDiffType, difficulty, siCount, siSpawnTime, escWepCfg, escHash, g_sWeaponKeys[w],
 					m, t,
 					g_iUsageStats[w][m][t][USAGE_SHOTS_FIRED],
 					g_iUsageStats[w][m][t][USAGE_PELLETS_FIRED],
@@ -2119,6 +2766,7 @@ static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] 
 				{
 					StrCat(query, sizeof(query), suffix);
 					txn.AddQuery(query);
+					g_hFlushBackup.WriteString(query);
 					queryCount++;
 					len = strcopy(query, sizeof(query), header);
 					rows = 0;
@@ -2139,17 +2787,18 @@ static void AppendUsageFlushQueries(Transaction txn, int statDate, const char[] 
 	{
 		StrCat(query, sizeof(query), suffix);
 		txn.AddQuery(query);
+		g_hFlushBackup.WriteString(query);
 		queryCount++;
 	}
 }
 
-static void AppendSwapFlushQueries(Transaction txn, const char[] escRuleset, const char[] escWepCfg, const char[] escHash, int statDate, int &queryCount)
+static void AppendSwapFlushQueries(Transaction txn, const char[] escRuleset, const char[] escAnneVer, const char[] escDiffType, int difficulty, int siCount, int siSpawnTime, const char[] escWepCfg, const char[] escHash, int statDate, int &queryCount)
 {
 	char query[SQL_QUERY_MAX];
-	char header[256];
+	char header[512];
 	FormatEx(header, sizeof(header),
 		"INSERT INTO `%sweapon_balance_swaps_daily` "
-		... "(`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`,`swap_count`) VALUES ",
+		... "(`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`,`swap_count`) VALUES ",
 		g_sDbPrefix);
 
 	static const char suffix[] = " ON DUPLICATE KEY UPDATE `swap_count`=`swap_count`+VALUES(`swap_count`)";
@@ -2165,16 +2814,17 @@ static void AppendSwapFlushQueries(Transaction txn, const char[] escRuleset, con
 				continue;
 			}
 
-			char row[224];
+			char row[512];
 			int rowLen = FormatEx(row, sizeof(row),
-				"(%d,'%s','%s','%s','%s','%s',%d)",
-				statDate, escRuleset, escWepCfg, escHash, g_sWeaponKeys[f], g_sWeaponKeys[to], g_iSwapMatrix[f][to]
+				"(%d,'%s','%s','%s',%d,%d,%d,'%s','%s','%s','%s',%d)",
+				statDate, escRuleset, escAnneVer, escDiffType, difficulty, siCount, siSpawnTime, escWepCfg, escHash, g_sWeaponKeys[f], g_sWeaponKeys[to], g_iSwapMatrix[f][to]
 			);
 
 			if (rows >= SQL_BATCH_ROWS || len + rowLen + 2 + sizeof(suffix) >= sizeof(query))
 			{
 				StrCat(query, sizeof(query), suffix);
 				txn.AddQuery(query);
+				g_hFlushBackup.WriteString(query);
 				queryCount++;
 				len = strcopy(query, sizeof(query), header);
 				rows = 0;
@@ -2194,6 +2844,7 @@ static void AppendSwapFlushQueries(Transaction txn, const char[] escRuleset, con
 	{
 		StrCat(query, sizeof(query), suffix);
 		txn.AddQuery(query);
+		g_hFlushBackup.WriteString(query);
 		queryCount++;
 	}
 }
@@ -2207,10 +2858,10 @@ static void AppendTankFlushQueries(Transaction txn, int &queryCount)
 	}
 
 	char query[SQL_QUERY_MAX];
-	char header[320];
+	char header[512];
 	FormatEx(header, sizeof(header),
 		"INSERT INTO `%sweapon_tank_fights` "
-		... "(`fight_id`,`stat_date`,`created_at`,`ruleset_key`,`weapon_config`,`config_hash`,`map`,"
+		... "(`fight_id`,`stat_date`,`created_at`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`map`,"
 		... "`tank_max_hp`,`duration_ms`,`shooter_count`,`killed`,`weapon_key`,`raw_damage`,`effective_damage`,`hits`,`shots_fired`,`dist_sum`) VALUES ",
 		g_sDbPrefix);
 
@@ -2222,17 +2873,19 @@ static void AppendTankFlushQueries(Transaction txn, int &queryCount)
 		PendingTankFight item;
 		g_hPendingTanks.GetArray(i, item, sizeof(item));
 
-		char escFight[96], escRuleset[160], escWepCfg[160], escHash[64], escMap[160];
+		char escFight[96], escRuleset[160], escAnneVer[160], escDiffType[40], escWepCfg[160], escHash[64], escMap[160];
 		g_hDb.Escape(item.fightId, escFight, sizeof(escFight));
 		g_hDb.Escape(item.rulesetKey, escRuleset, sizeof(escRuleset));
+		g_hDb.Escape(item.anneVersion, escAnneVer, sizeof(escAnneVer));
+		g_hDb.Escape(item.difficultyType, escDiffType, sizeof(escDiffType));
 		g_hDb.Escape(item.weaponConfig, escWepCfg, sizeof(escWepCfg));
 		g_hDb.Escape(item.configHash, escHash, sizeof(escHash));
 		g_hDb.Escape(item.mapName, escMap, sizeof(escMap));
 
-		char row[512];
+		char row[640];
 		int rowLen = FormatEx(row, sizeof(row),
-			"('%s',%d,%d,'%s','%s','%s','%s',%d,%d,%d,%d,'%s',%d,%d,%d,%d,%d)",
-			escFight, item.statDate, item.createdAt, escRuleset, escWepCfg, escHash, escMap,
+			"('%s',%d,%d,'%s','%s','%s',%d,%d,%d,'%s','%s','%s',%d,%d,%d,%d,'%s',%d,%d,%d,%d,%d)",
+			escFight, item.statDate, item.createdAt, escRuleset, escAnneVer, escDiffType, item.difficulty, item.siCount, item.siSpawnTime, escWepCfg, escHash, escMap,
 			item.tankMaxHp, item.durationMs, item.shooterCount, item.killed,
 			g_sWeaponKeys[item.weaponIdx], item.rawDmg, item.effDmg, item.hits, item.shots, item.distSum
 		);
@@ -2240,6 +2893,7 @@ static void AppendTankFlushQueries(Transaction txn, int &queryCount)
 		if (rows >= SQL_BATCH_ROWS || len + rowLen + 2 >= sizeof(query) - 32)
 		{
 			txn.AddQuery(query);
+			g_hFlushBackup.WriteString(query);
 			queryCount++;
 			len = strcopy(query, sizeof(query), header);
 			rows = 0;
@@ -2257,18 +2911,59 @@ static void AppendTankFlushQueries(Transaction txn, int &queryCount)
 	if (rows > 0)
 	{
 		txn.AddQuery(query);
+		g_hFlushBackup.WriteString(query);
 		queryCount++;
 	}
 }
 
 public void OnFlushTxnSuccess(Database db, any data, int numQueries, DBResultSet[] results, any[] queryData)
 {
+	DataPack backup = view_as<DataPack>(data);
+	ReleaseUploadBackup(backup);
 }
 
 public void OnFlushTxnFailure(Database db, any data, int numQueries, const char[] error, int failIndex, any[] queryData)
 {
+	DataPack backup = view_as<DataPack>(data);
+	backup.Reset();
+	int generation = backup.ReadCell();
+	SaveFailedBatch(backup);
+	ReleaseUploadBackup(backup);
 	LogError("[WeaponBalanceStats] 统计落库事务失败 (#%d): %s", failIndex, error);
-	HandleDbConnectionError(error);
+	if (generation == g_iDbGen) HandleDbConnectionError(error);
+}
+
+static void ReleaseUploadBackup(DataPack backup)
+{
+	int index = g_hUploadBackups.FindValue(backup);
+	if (index != -1) g_hUploadBackups.Erase(index);
+	delete backup;
+}
+
+// 断线时 COMMIT 的结果可能不确定；保留 SQL 供核对后恢复，避免盲重放重复计数。
+static void SaveFailedBatch(DataPack backup)
+{
+	char path[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, path, sizeof(path), "data/weapon_balance_failed_%s_%d.sql", g_sSessionId, ++g_iFailedBatchSerial);
+	File file = OpenFile(path, "w");
+	if (file == null)
+	{
+		LogError("[WeaponBalanceStats] 无法写入统计恢复文件: %s", path);
+		return;
+	}
+	file.WriteLine("-- Verify whether the original transaction committed before replaying.");
+	file.WriteLine("START TRANSACTION;");
+	char query[25600];
+	while (backup.IsReadable())
+	{
+		backup.ReadString(query, sizeof(query));
+		// WriteLine formats into a 2048-byte native buffer; raw SQL may be 25KB.
+		file.WriteString(query, false);
+		file.WriteString(";\n", false);
+	}
+	file.WriteLine("COMMIT;");
+	delete file;
+	LogError("[WeaponBalanceStats] 待核对恢复 SQL 已保存: %s", path);
 }
 
 static void HandleDbConnectionError(const char[] error)
@@ -2282,6 +2977,8 @@ static void HandleDbConnectionError(const char[] error)
 			delete g_hDb;
 			g_hDb = null;
 		}
+		g_iDbGen++;
+		g_bSchemaCreating = false;
 		g_bSchemaReady = false;
 		g_fNextDbRetry = GetEngineTime() + 5.0;
 	}
@@ -2309,16 +3006,44 @@ static void BuildWeaponMaps()
 	g_smWeaponNameToIdx.SetValue("grenade_launcher_projectile", 18);
 }
 
+static void BindContextCvar(ConVar &cv, const char[] name, bool &hooked, bool isFull)
+{
+	if (cv == null)
+	{
+		cv = FindConVar(name);
+	}
+	if (cv != null && !hooked)
+	{
+		hooked = true;
+		if (isFull)
+		{
+			cv.AddChangeHook(OnFullConfigCvarChanged);
+		}
+		else
+		{
+			cv.AddChangeHook(OnLightContextCvarChanged);
+		}
+	}
+}
+
 static void RefreshCvarHandles()
 {
-	if (g_cvReadyCfgName == null) g_cvReadyCfgName = FindConVar("l4d_ready_cfg_name");
-	if (g_cvGameMode == null) g_cvGameMode = FindConVar("mp_gamemode");
-	if (g_cvAnneVersion == null) g_cvAnneVersion = FindConVar("AnnePluginVersion");
-	if (g_cvWeaponConfig == null) g_cvWeaponConfig = FindConVar("l4d2_player_attr_db_weapon_config");
-	if (g_cvStatsRuleset == null) g_cvStatsRuleset = FindConVar("l4d_stats_map_record_ruleset");
-	if (g_cvSgCenterPellet == null) g_cvSgCenterPellet = FindConVar("sgspread_center_pellet");
-	if (g_cvSgRing1Bullets == null) g_cvSgRing1Bullets = FindConVar("sgspread_ring1_bullets");
-	if (g_cvSgRing1Factor == null) g_cvSgRing1Factor = FindConVar("sgspread_ring1_factor");
+	BindContextCvar(g_cvReadyCfgName, "l4d_ready_cfg_name", g_bHookReadyCfg, false);
+	BindContextCvar(g_cvGameMode, "mp_gamemode", g_bHookGameMode, false);
+	BindContextCvar(g_cvAnneVersion, "AnnePluginVersion", g_bHookAnneVer, true);
+	BindContextCvar(g_cvWeaponConfig, "l4d2_player_attr_db_weapon_config", g_bHookWeaponConfig, true);
+	BindContextCvar(g_cvStatsRuleset, "l4d_stats_map_record_ruleset", g_bHookStatsRuleset, false);
+	BindContextCvar(g_cvDiffProfile, "l4d_stats_map_record_difficulty_profile", g_bHookDiffProfile, false);
+	BindContextCvar(g_cvZDifficulty, "z_difficulty", g_bHookZDifficulty, false);
+	BindContextCvar(g_cvAiEnable, "ah_ai_dynamic_enable", g_bHookAiEnable, false);
+	BindContextCvar(g_cvAiCurrentLevel, "ah_ai_dynamic_current_level", g_bHookAiCurrentLevel, false);
+	BindContextCvar(g_cvAiFixedLevel, "ah_ai_dynamic_fixed_level", g_bHookAiFixedLevel, false);
+	BindContextCvar(g_cvAiCurrentLocked, "ah_ai_dynamic_current_locked", g_bHookAiCurrentLocked, false);
+	BindContextCvar(g_cvInfectedLimit, "l4d_infected_limit", g_bHookInfectedLimit, false);
+	BindContextCvar(g_cvSiSpawnInterval, "versus_special_respawn_interval", g_bHookSiSpawnInterval, false);
+	BindContextCvar(g_cvSgCenterPellet, "sgspread_center_pellet", g_bHookSgCenter, true);
+	BindContextCvar(g_cvSgRing1Bullets, "sgspread_ring1_bullets", g_bHookSgRing1, true);
+	BindContextCvar(g_cvSgRing1Factor, "sgspread_ring1_factor", g_bHookSgFactor, true);
 }
 
 static int LookupWeaponIdx(const char[] name)
@@ -2493,9 +3218,10 @@ static void ClearEntityCaches()
 	for (int i = 0; i < MAX_TRACKED_EDICTS; i++)
 	{
 		g_bEntityIsWitch[i] = false;
+		g_iEntityPreHp[i] = 0;
+		g_iLastSgShot[i] = 0;
 		g_bEntityIsGLProj[i] = false;
 	}
-	g_iActiveGLProjectiles = 0;
 }
 
 static void ResetClientState(int client)
@@ -2509,9 +3235,8 @@ static void ResetClientState(int client)
 	g_iClientSlotWep[client][0] = -1;
 	g_iClientSlotWep[client][1] = -1;
 	g_iClientSkillTier[client] = 0;
-	g_iShotSeq[client] = 0;
+	g_iShotSeq[client] = ++g_iShotSerial;
 	g_iBulletHitTargetsInSeq[client] = 0;
-	g_fLastGLFireTime[client] = 0.0;
 	g_SgCount[client] = 0;
 	g_SgFlushPending[client] = false;
 	g_iClientLastHp[client] = 0;

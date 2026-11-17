@@ -1417,3 +1417,20 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 ### 2026年11月14日 新增 MP5 快速购买指令
 
 - RPG 商店完整版与无数据库版新增 `!mp5`、`/mp5`（控制台 `sm_mp5`），参考 Uzi、消音 SMG 共享首次免费资格，后续沿用各版本现有 MP5 售价（完整版 50 B、无数据库版 100 B）。菜单与快捷指令共用购买处理，沿用商店开关、B 数消费开关和 15 秒购买冷却；购买失败不消耗免费资格，使用现有多语言提示。
+### 2026年11月15日 枪械平衡统计支持按模式、难度与刷特配置独立记录
+
+- `extend/l4d2_weapon_balance_stats.smx` 升级至 `1.1.0`：在原有玩法模式（`ruleset_key`）与武器配置快照的基础上，新增难度类型（`difficulty_type`：`anne_ai` / `game` / `none`）、难度档位（`difficulty`：Anne 动态 AI 0–6 档或原版游戏 0–3 档）、特感数量（`si_count`）与刷特间隔（`si_spawn_time`）维度。
+- 内存统计桶继续保持单套定长数组与热路径 O(1) 零分配累加，并通过监听模式、动态 AI 锁档、游戏难度及刷特 ConVar 变化在下一帧自动刷新活跃上下文；当回合中设置发生切换且存在未落库数据时，先异步冲刷旧上下文再切换新桶，避免动态难度出安全门定档时序或投票改配造成串桶，Tank 战也会锁定开战时的环境快照。
+- 同步更新 `database.sql` 与插件自动建表/平滑升级逻辑：为 `weapon_balance_daily`、`weapon_balance_usage_daily`、`weapon_balance_swaps_daily` 与 `weapon_tank_fights` 补齐上述 4 个维度字段、联合主键与查询索引，已有旧表在建连校验时会自动 `ALTER TABLE` 兼容升级，并对接 NewAnneWeb `/stats/weapons/` 提供分模式/难度筛选及单武器跨难度表现对比。
+
+### 2026年11月15日 修复枪械统计入库阻断与伤害归因
+
+- `l4d2_weapon_balance_stats.smx` 更新至 `1.1.1`：异步数据库回调改用连接世代校验，修复临时句柄比较导致建表成功后始终无法入库；利用已有计时器重试连接和表结构校验，切换模式或难度时先结算霰弹、成功提交旧桶后再更新环境标签，数据库未就绪时暂停新环境采样，避免串桶。
+- 感染者任何来源的伤害都会更新血量缓存，修正火伤或机器人伤害后枪械尾刀的有效伤害虚高；Tank 尾刀按事件武器和伤害类型归因并去重，取消按当前手持枪猜测。普通感染者与女巫改由 SDK 预伤害钩子取得扣血前生命快照，榴弹依据实际投射物识别；霰弹多目标去重独立于阈值槽容量，开火分母优先读取实际弹丸数。
+- 补充动态 AI 插件卸载后的残留 ConVar 防护、回合结束后停止采样、热加载实体扫描与采样计时器，以及跨服务器 Tank 战 ID 随机会话前缀。写入失败或卸载时未确认完成的批次保存至 `addons/sourcemod/data/weapon_balance_failed_*.sql`，包含原始环境；恢复前须核对原事务是否已提交，避免重复累计。增加 `scripts/test_weapon_balance_stats.py`，在模拟宿主中执行实际插件函数的伤害、霰弹、上下文和回调回归检查。
+- 旧表新增难度字段时默认标记为 `unknown`（未定档/旧记录），防止将无法追溯难度的历史样本误归为原版简单难度。
+
+### 2026年11月16日 枪械平衡统计支持按 Anne 版本独立分桶
+
+- `extend/l4d2_weapon_balance_stats.smx` 升级至 `1.2.0`：在 4 张统计与 Tank 战明细表（`weapon_balance_daily`、`weapon_balance_usage_daily`、`weapon_balance_swaps_daily`、`weapon_tank_fights`）中新增 `anne_version` 维度列并纳入联合主键与查询索引，同步更新 `database.sql` 与连接期自动 `ALTER TABLE` 升级逻辑（历史旧表及已有 `idx_w*_mode_diff` 索引会自动重建补齐）。
+- 仅在 Anne 模式或 `text.smx` 运行时采集 `AnnePluginVersion`，切换至非 Anne 模式时自动清空为空串，避免卸载残留 ConVar 污染记录；局内投票切换 Anne 版本时同步先结清霰弹并冲刷旧桶再切换上下文，Tank 战同步锁存开战时的 Anne 版本，保持 `config_hash` 纯粹用于枪械参数快照对比。

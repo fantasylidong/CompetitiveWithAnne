@@ -769,6 +769,11 @@ CREATE TABLE IF NOT EXISTS `weapon_balance_configs` (
 CREATE TABLE IF NOT EXISTS `weapon_balance_daily` (
   `stat_date` int(10) unsigned NOT NULL,
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `anne_version` varchar(64) NOT NULL DEFAULT '',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
   `weapon_config` varchar(64) NOT NULL DEFAULT '',
   `config_hash` char(16) CHARACTER SET ascii NOT NULL,
   `weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
@@ -785,15 +790,21 @@ CREATE TABLE IF NOT EXISTS `weapon_balance_daily` (
   `one_shot_kills` int(10) unsigned NOT NULL DEFAULT '0',
   `near_kill_misses` int(10) unsigned NOT NULL DEFAULT '0',
   `collateral_hits` int(10) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`),
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`target_class`,`dist_bucket`,`move_state`,`skill_tier`),
   KEY `idx_wbd_config_date` (`config_hash`,`stat_date`),
-  KEY `idx_wbd_ruleset_date` (`ruleset_key`,`weapon_config`,`stat_date`)
+  KEY `idx_wbd_ruleset_date` (`ruleset_key`,`weapon_config`,`stat_date`),
+  KEY `idx_wbd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 CREATE TABLE IF NOT EXISTS `weapon_balance_usage_daily` (
   `stat_date` int(10) unsigned NOT NULL,
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `anne_version` varchar(64) NOT NULL DEFAULT '',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
   `weapon_config` varchar(64) NOT NULL DEFAULT '',
   `config_hash` char(16) CHARACTER SET ascii NOT NULL,
   `weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
@@ -805,20 +816,27 @@ CREATE TABLE IF NOT EXISTS `weapon_balance_usage_daily` (
   `hold_seconds` int(10) unsigned NOT NULL DEFAULT '0',
   `pickups` int(10) unsigned NOT NULL DEFAULT '0',
   `swaps_away` int(10) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`),
-  KEY `idx_wbud_config_date` (`config_hash`,`stat_date`)
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`weapon_key`,`move_state`,`skill_tier`),
+  KEY `idx_wbud_config_date` (`config_hash`,`stat_date`),
+  KEY `idx_wbud_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 CREATE TABLE IF NOT EXISTS `weapon_balance_swaps_daily` (
   `stat_date` int(10) unsigned NOT NULL,
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `anne_version` varchar(64) NOT NULL DEFAULT '',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
   `weapon_config` varchar(64) NOT NULL DEFAULT '',
   `config_hash` char(16) CHARACTER SET ascii NOT NULL,
   `from_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
   `to_weapon_key` varchar(32) CHARACTER SET ascii NOT NULL,
   `swap_count` int(10) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`stat_date`,`ruleset_key`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`)
+  PRIMARY KEY (`stat_date`,`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`from_weapon_key`,`to_weapon_key`),
+  KEY `idx_wbsd_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`stat_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -828,6 +846,11 @@ CREATE TABLE IF NOT EXISTS `weapon_tank_fights` (
   `stat_date` int(10) unsigned NOT NULL,
   `created_at` int(10) unsigned NOT NULL,
   `ruleset_key` varchar(64) CHARACTER SET ascii NOT NULL,
+  `anne_version` varchar(64) NOT NULL DEFAULT '',
+  `difficulty_type` varchar(16) CHARACTER SET ascii NOT NULL DEFAULT 'unknown',
+  `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `si_count` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `si_spawn_time` smallint(5) unsigned NOT NULL DEFAULT '0',
   `weapon_config` varchar(64) NOT NULL DEFAULT '',
   `config_hash` char(16) CHARACTER SET ascii NOT NULL,
   `map` varchar(64) NOT NULL DEFAULT '',
@@ -843,6 +866,7 @@ CREATE TABLE IF NOT EXISTS `weapon_tank_fights` (
   `dist_sum` bigint(20) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `idx_wtf_lookup` (`ruleset_key`,`weapon_config`,`config_hash`,`stat_date`),
+  KEY `idx_wtf_mode_diff` (`ruleset_key`,`anne_version`,`difficulty_type`,`difficulty`,`si_count`,`si_spawn_time`,`weapon_config`,`config_hash`,`stat_date`),
   KEY `idx_wtf_fight` (`fight_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
