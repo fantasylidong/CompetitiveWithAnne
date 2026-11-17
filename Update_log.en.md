@@ -834,9 +834,9 @@
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
 
-### November 16, 2026: Adjust Uzi with a Slower, Unified Reload and a Stronger Run-and-Gun Role
+### November 16, 2026: Nerf Uzi with a Slower, Unified Reload and Wider Moving Spread
 
 - Based on firearm balance telemetry (last 14 days): in AnneHappyPlus the Uzi has a 39.7% hold share versus 12.3% for the silenced SMG and 8.7% for the MP5, deals 14–23% more effective damage per second held, and leads across new, intermediate, and veteran players. The lead is smaller in standard AnneHappy (7–14%).
-- The Uzi now uses the same handling values in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `reloadduration` 1.55 → 1.75 (identical in both modes), `rangemod` 0.965 → 0.95, `maxmovespread` 1.15 → 1.0.
+- The Uzi now uses the same handling values in `cfg/vote/weapon/AnneHappyPlus.cfg` and `cfg/vote/weapon/AnneHappy.cfg`: `reloadduration` 1.55 → 1.75 (identical in both modes), `rangemod` 0.965 → 0.95, `maxmovespread` 1.15 → 1.35.
 - Damage, fire rate, standing and crouching spread, spread per shot, and the Tank multiplier are unchanged, and the Uzi still has the fastest reload of the three SMGs.
-- In the theoretical model weighted by live engagement distances, the Uzi loses about 5% of its reload-inclusive sustained output while standing and is essentially unchanged while moving. While standing, the MP5 leads slightly from about 250u to 695u (about 6% higher at 500u); while moving, the Uzi leads from about 205u.
+- In the theoretical model weighted by live engagement distances, the Uzi loses about 5% of its reload-inclusive sustained output while standing and about 12% while moving. While standing, the MP5 leads slightly from about 250u to 695u (about 6% higher at 500u); while moving, the Uzi still leads from about 205u, but its moving output at 325u drops to about 89% of its standing output.
