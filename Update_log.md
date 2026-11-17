@@ -1438,3 +1438,10 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg`：`pumpshotgun` 与 `shotgun_chrome` 新增 `minduckspread 0.4`（原生 0）。站立散布仍为 0.8，蹲下依旧比站立准。
 - 只影响蹲下射击：木喷 160u 内不受影响，铁喷蹲下打 250u 的单喷期望约 268（仍高于 250 血），300u 从约 263 降到约 236。
 - 按理论模型，AnneHappyPlus 蹲下时各距离输出最高的主武器变为：木喷 0–200u、铁喷 200–300u、消音 SMG 300–350u、MP5 350–600u、Uzi 600u 以外。喷子使用固定环形弹道，模型把武器散布与弹丸散布叠成均匀椭圆，实际影响可能小于估算。
+
+### 2026年11月17日 MP5 重新定位：站定打中远距离
+
+- MP5 和 Uzi 原来都是"300u 以外"的冲锋枪：站立时 MP5 只在约 320–690u 小幅领先（500u 约高 6%），更远是 Uzi；移动时 MP5 在任何距离都不领先，换弹还最慢。实战里 MP5 在 AnneHappyPlus 的持有占比只有 8.7%。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的 MP5：`gainrange` 380/378 → 600，`range` 1600/1580 → 2200，`maxmovespread` 2.65 → 2.2（两个模式一致）。伤害、射速、弹匣、换弹和 Tank 倍率不变，100u 三人集火 Tank 的理论上限不变。
+- 定位按姿态分开：MP5 负责站定或蹲下的中远距离，Uzi 负责边走边打。按理论模型（AnneHappyPlus），站立时 MP5 从约 320u 领先到约 1170u（原来到约 690u），蹲下时从约 350u 领先到约 980u；移动时仍由 Uzi 从约 260u 起领先，MP5 移动命中率 50% 的距离从约 360u 提到约 410u。
+- 按 MP5 实战距离分布加权，站立持续输出约提高 6%；移动部分模型估算约提高 30%，但模型按满速计算移动惩罚，实际提升会小得多。
