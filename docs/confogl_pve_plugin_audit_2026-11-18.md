@@ -48,11 +48,7 @@
 
 ## 4. 过时 / 冲突插件
 
-**配置引用但不存在的 SMX（加载会报错）** — `cfg/sharedplugins.cfg`：
-
-- `extend/anne_status_privacy.smx`
-- `anne_mission_cfg_rules.smx`
-- `anne_srcds_master_register.smx`
+**仓库外提供的 SMX** — `cfg/sharedplugins.cfg` 引用的 `extend/anne_status_privacy.smx`、`anne_mission_cfg_rules.smx`、`anne_srcds_master_register.smx` 不在本仓库，由另一个仓库在线更新获取并加载，不属于缺失。
 
 **存在但未被任何 cfg 加载的 SMX**：
 
@@ -70,14 +66,13 @@
 | 层 | 文件 | 内容 |
 | --- | --- | --- |
 | 基础修复 | `cfg/generalfixes.cfg` | `anne_db` 首行 + `fixes/*`，所有模式共用 |
-| 通用 | `cfg/sharedplugins.cfg` | 与模式无关的扩展（统计、投票、语言）；先移除 3 个缺失引用 |
+| 通用 | `cfg/sharedplugins.cfg` | 与模式无关的扩展（统计、投票、语言）；含在线更新提供的 3 个 SMX |
 | 对抗核心 | `cfgogl/<mode>/confogl_plugins.cfg` | `confoglcompmod`、readyup、scoremod、boss 相关 |
 | Anne PVE | `cfgogl/annehappy/confogl_plugins.cfg` + `shared_plugins.cfg` | `versus_coop_mode`、`infected_control`、AI 特感、`anne_traitor_quota`、target override |
 | Coop | `cfgogl/coop/*.cfg` | `confoglcompmod` + `l4d2_dirspawn`、`spawn_vote_menu` |
 
 建议的后续动作（需确认后执行，均为破坏性改动）：
 
-1. 删除或补齐 3 个缺失 SMX 的引用。
-2. 确认 9 个未加载 SMX 是否仍需要；不需要则移到 `disabled/`。
-3. 每组重复源码只保留实际编译部署的一份。
-4. 将第 3 节列出的字符串模式判断统一为 left4dhooks 判断（逐插件单独 PR）。
+1. 确认 9 个未加载 SMX 是否仍需要；不需要则移到 `disabled/`。
+2. 每组重复源码只保留实际编译部署的一份。
+3. 将第 3 节列出的字符串模式判断统一为 left4dhooks 判断（逐插件单独 PR）。
