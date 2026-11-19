@@ -1417,3 +1417,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 ### 2026年11月14日 新增 MP5 快速购买指令
 
 - RPG 商店完整版与无数据库版新增 `!mp5`、`/mp5`（控制台 `sm_mp5`），参考 Uzi、消音 SMG 共享首次免费资格，后续沿用各版本现有 MP5 售价（完整版 50 B、无数据库版 100 B）。菜单与快捷指令共用购买处理，沿用商店开关、B 数消费开关和 15 秒购买冷却；购买失败不消耗免费资格，使用现有多语言提示。
+
+### 2026年11月18日 Confogl 核心模块模式判断与计分回合修复
+
+- `confoglcompmod.smx` 的对抗/清道夫判断改用 left4dhooks 的引擎基础模式（`L4D_GetGameModeType()`），不再按 `mp_gamemode` 字符串匹配，基于对抗的突变模式（如 mutation12）也会被正确识别；现有配置均为 `versus`/`coop`/`realism`/`mutation4`/`community*`，实际行为不变。
+- ScoreMod 抽出统一的每名生还者奖励公式，修复无生还者时的除零；第一/第二回合改用引擎 `m_bInSecondHalfOfRound` 判断并按半场去重播报，战役/PVE 团灭重开不再被当成第二回合重复播报（各模式默认 `confogl_SM_enable 0`，不影响现有计分）。
+- BossSpawning 仅在对抗基础模式下生效，战役团灭重开后不再误删或误传送 Witch/Tank；GhostTank 仅在有真人感染者可接管时才冻结 AI Tank，纯 AI 感染者时 Tank 不再被白白冻住。

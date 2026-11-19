@@ -8,7 +8,6 @@
 #define CVAR_PRIVATE		(FCVAR_DONTRECORD|FCVAR_PROTECTED)
 
 static ConVar
-	g_hCvarMpGameMode = null,
 	g_hCvarPainPillsDecayRate = null;
 
 static bool
@@ -16,7 +15,6 @@ static bool
 
 void Fns_OnModuleStart()
 {
-	g_hCvarMpGameMode = FindConVar("mp_gamemode");
 	g_hCvarPainPillsDecayRate = FindConVar("pain_pills_decay_rate");
 }
 
@@ -52,18 +50,31 @@ stock bool IsHumansOnServer()
 	return false;
 }
 
+// Uses the director's base mode, so mutations built on versus (e.g. mutation12) count too.
 stock bool IsVersus()
 {
-	char GameMode[32];
-	g_hCvarMpGameMode.GetString(GameMode, sizeof(GameMode));
-	return (StrContains(GameMode, "versus", false) != -1);
+	return (L4D_GetGameModeType() == GAMEMODE_VERSUS);
+}
+
+stock bool InSecondHalfOfRound()
+{
+	return view_as<bool>(GameRules_GetProp("m_bInSecondHalfOfRound"));
+}
+
+stock bool IsHumanOnInfectedTeam()
+{
+	for (int i = 1; i <= MaxClients; i++) {
+		if (IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) == L4D2Team_Infected) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /*stock bool IsScavenge()
 {
-	char GameMode[32];
-	g_hCvarMpGameMode.GetString(GameMode, sizeof(GameMode));
-	return (StrContains(GameMode, "scavenge", false) != -1);
+	return (L4D_GetGameModeType() == GAMEMODE_SCAVENGE);
 }*/
 
 stock bool IsPluginEnabled(bool bSetStatus = false, bool bStatus = false)

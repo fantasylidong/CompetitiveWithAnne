@@ -833,3 +833,9 @@
 ### November 14, 2026: Add MP5 Quick Purchase Command
 
 - Added `!mp5` and `/mp5` (console: `sm_mp5`) to the full and no-database RPG shop builds. MP5 shares the first-free-purchase allowance with Uzi and the silenced SMG, then uses each build's existing MP5 price (50 B in the full build, 100 B in the no-database build). The menu and shortcut share purchase handling and honor the shop toggle, B-point spending toggle, and 15-second purchase cooldown. Failed purchases preserve the free allowance, and messages reuse existing translations.
+
+### November 18, 2026: Confogl Core Mode Detection and Score Round Fixes
+
+- `confoglcompmod.smx` now detects versus/scavenge from the engine base mode via left4dhooks (`L4D_GetGameModeType()`) instead of matching the `mp_gamemode` string, so versus-based mutations (e.g. mutation12) are recognized. Existing configs only use `versus`/`coop`/`realism`/`mutation4`/`community*`, so live behavior is unchanged.
+- ScoreMod now shares one per-survivor bonus formula, fixes a division by zero when no survivors are counted, and uses the engine's `m_bInSecondHalfOfRound` with per-half de-duplication. Coop/PVE wipes are no longer reported as a second round (all modes default to `confogl_SM_enable 0`, so live scoring is unaffected).
+- BossSpawning only runs in versus base modes, so coop wipes no longer delete or teleport Witches/Tanks. GhostTank only freezes an AI Tank while a human infected player can still take it over, so all-AI infected teams no longer get a frozen Tank.
