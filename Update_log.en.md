@@ -839,3 +839,9 @@
 - `extend/l4d2_weapon_balance_stats.smx` is now version 1.1.0. It previously split shots only at a horizontal speed of 50u/s into "standing/crouching" and "moving", so walking, crouch-walking, and full-speed running were all counted as moving, and standing was mixed with crouching. That made it impossible to see the real effect of spread changes.
 - New stances: airborne counts as running; crouching (`FL_DUCKING`) is its own stance; while standing, horizontal speed up to 50u/s is still, up to 130u/s is walking (walk 85, crouch-walk 75), and above 130u/s is running (limp 150, normal run 220).
 - New rows store `move_state` as 2 still, 3 crouching, 4 walking, and 5 running. Old rows keep 0 (standing/crouching) and 1 (moving) with their original meaning, and the table schema is unchanged. The website must be updated at the same time; otherwise it counts new walking and running rows as stationary.
+
+### November 18, 2026: Confogl Core Mode Detection and Score Round Fixes
+
+- `confoglcompmod.smx` now detects versus/scavenge from the engine base mode via left4dhooks (`L4D_GetGameModeType()`) instead of matching the `mp_gamemode` string, so versus-based mutations (e.g. mutation12) are recognized. Existing configs only use `versus`/`coop`/`realism`/`mutation4`/`community*`, so live behavior is unchanged.
+- ScoreMod now shares one per-survivor bonus formula, fixes a division by zero when no survivors are counted, and uses the engine's `m_bInSecondHalfOfRound` with per-half de-duplication. Coop/PVE wipes are no longer reported as a second round (all modes default to `confogl_SM_enable 0`, so live scoring is unaffected).
+- BossSpawning only runs in versus base modes, so coop wipes no longer delete or teleport Witches/Tanks. GhostTank only freezes an AI Tank while a human infected player can still take it over, so all-AI infected teams no longer get a frozen Tank.

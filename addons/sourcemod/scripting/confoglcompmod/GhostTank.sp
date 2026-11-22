@@ -210,7 +210,8 @@ static void GT_TankSpawn(Event hEvent, const char[] sEventName, bool bDontBroadc
 	float fFireImmunityTime = FIREIMMUNITY_TIME;
 	float fSelectionTime = g_hCvarDirectorTankLotterySelectionTime.FloatValue;
 
-	if (IsFakeClient(client)) {
+	// Freezing only makes sense while a human infected can still take the tank over.
+	if (IsFakeClient(client) && L4D_HasPlayerControlledZombies() && IsHumanOnInfectedTeam()) {
 		GT_PauseTank();
 		CreateTimer(fSelectionTime, GT_ResumeTankTimer);
 		fFireImmunityTime += fSelectionTime;
