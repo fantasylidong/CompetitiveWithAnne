@@ -1434,3 +1434,52 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - `extend/l4d2_weapon_balance_stats.smx` 升级至 `1.2.0`：在 4 张统计与 Tank 战明细表（`weapon_balance_daily`、`weapon_balance_usage_daily`、`weapon_balance_swaps_daily`、`weapon_tank_fights`）中新增 `anne_version` 维度列并纳入联合主键与查询索引，同步更新 `database.sql` 与连接期自动 `ALTER TABLE` 升级逻辑（历史旧表及已有 `idx_w*_mode_diff` 索引会自动重建补齐）。
 - 仅在 Anne 模式或 `text.smx` 运行时采集 `AnnePluginVersion`，切换至非 Anne 模式时自动清空为空串，避免卸载残留 ConVar 污染记录；局内投票切换 Anne 版本时同步先结清霰弹并冲刷旧桶再切换上下文，Tank 战同步锁存开战时的 Anne 版本，保持 `config_hash` 纯粹用于枪械参数快照对比。
+
+### 2026年11月16日 削弱 Uzi：换弹放慢并统一，移动散布与距离衰减加重
+
+- 依据枪械平衡统计（最近 14 天）：AnneHappyPlus 中 Uzi 持有占比 39.7%，远高于消音 SMG 的 12.3% 和 MP5 的 8.7%，持有每秒有效伤害高 14–23%，且新人、进阶、主力三档玩家都领先；普通 AnneHappy 中领先幅度较小（7–14%）。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的 Uzi 改为同一组手感参数：`reloadduration` 1.55 → 1.75（两个模式一致），`rangemod` 0.965 → 0.95，`maxmovespread` 1.15 → 1.35。
+- 伤害、射速、站立与蹲伏散布、每发扩散和 Tank 倍率不变，Uzi 换弹仍是三把冲锋枪中最快的。
+- 按理论模型并以实战距离分布加权，Uzi 含换弹持续输出站立时约降低 5%，移动时约降低 12%；站立时 MP5 在约 250–695u 小幅领先（500u 约高 6%），移动射击时 Uzi 仍从约 205u 起领先，但 325u 移动输出降为站立的约 89%。
+
+### 2026年11月17日 加强消音 SMG：更准、衰减推迟，接住喷子之后的距离
+
+- 依据枪械平衡统计（最近 14 天）：消音 SMG 在两个模式里持有每秒有效伤害都是三把冲锋枪最低（AnneHappyPlus 44.9、AnneHappy 33.1），AnneHappyPlus 中持有占比只有 12.3%。按弹道模型，它在任何距离都不是五把主武器里输出最高的：0–180u 被木喷和铁喷压住，再往后是 MP5 和 Uzi。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的消音 SMG：`minstandspread` 0.95 → 0.80，`minduckspread` 0.68 → 0.55，`spreadpershot` 0.21 → 0.17，`maxmovespread` 1.95 → 1.70，`gainrange` 255/250 → 320（两个模式一致）。
+- 伤害、射速、射程、换弹和 Tank 倍率不变，100u 三人集火 Tank 的理论上限不变。
+- 按理论模型，AnneHappyPlus 中消音在站立约 255–310u、移动约 215–255u 成为输出最高的主武器；300u 站立含换弹输出约提高 8%，400u 约提高 13%。按实战距离分布加权，持续输出站立约提高 14%，移动约提高 20%（模型按满速计算移动惩罚，实际移动提升会更小）。
+
+### 2026年11月17日 喷子蹲下散布从 0 调到 0.4
+
+- 按弹道模型，木喷和铁喷原生蹲下散布为 0，蹲下后整个弹丸图案正对准星，铁喷蹲下时在约 230–390u 都是五把主武器里输出最高的，消音 SMG 蹲着打时在任何距离都排不到第一。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg`：`pumpshotgun` 与 `shotgun_chrome` 新增 `minduckspread 0.4`（原生 0）。站立散布仍为 0.8，蹲下依旧比站立准。
+- 只影响蹲下射击：木喷 160u 内不受影响，铁喷蹲下打 250u 的单喷期望约 268（仍高于 250 血），300u 从约 263 降到约 236。
+- 按理论模型，AnneHappyPlus 蹲下时各距离输出最高的主武器变为：木喷 0–200u、铁喷 200–300u、消音 SMG 300–350u、MP5 350–600u、Uzi 600u 以外。喷子使用固定环形弹道，模型把武器散布与弹丸散布叠成均匀椭圆，实际影响可能小于估算。
+
+### 2026年11月17日 MP5 重新定位：站定打中远距离
+
+- MP5 和 Uzi 原来都是"300u 以外"的冲锋枪：站立时 MP5 只在约 320–690u 小幅领先（500u 约高 6%），更远是 Uzi；移动时 MP5 在任何距离都不领先，换弹还最慢。实战里 MP5 在 AnneHappyPlus 的持有占比只有 8.7%。
+- `cfg/vote/weapon/AnneHappyPlus.cfg` 与 `cfg/vote/weapon/AnneHappy.cfg` 的 MP5：`gainrange` 380/378 → 600，`range` 1600/1580 → 2200，`maxmovespread` 2.65 → 2.2（两个模式一致）。伤害、射速、弹匣、换弹和 Tank 倍率不变，100u 三人集火 Tank 的理论上限不变。
+- 定位按姿态分开：MP5 负责站定或蹲下的中远距离，Uzi 负责边走边打。按理论模型（AnneHappyPlus），站立时 MP5 从约 320u 领先到约 1170u（原来到约 690u），蹲下时从约 350u 领先到约 980u；移动时仍由 Uzi 从约 260u 起领先，MP5 移动命中率 50% 的距离从约 360u 提到约 410u。
+- 按 MP5 实战距离分布加权，站立持续输出约提高 6%；移动部分模型估算约提高 30%，但模型按满速计算移动惩罚，实际提升会小得多。
+
+### 2026年11月17日 枪械平衡统计的姿态拆成静止、蹲下、慢走、跑动四档
+
+- `extend/l4d2_weapon_balance_stats.smx` 升级到 1.3.0（在 1.2.0 的分桶基础上）。原来只按水平速度 50u/s 分成"站/蹲稳射"和"移动"两档，按住走路、蹲走和满速跑都算移动，站立和蹲下也混在一起，无法看出散布调整的实际效果。
+- 新分档：在空中按跑动算；蹲下（`FL_DUCKING`）单独一档；站立时水平速度 ≤50u/s 为静止，≤130u/s 为慢走（按住走路 85、蹲走 75），>130u/s 为跑动（跛行 150、正常跑 220）。
+- 写库时新数据的 `move_state` 记为 2 静止、3 蹲下、4 慢走、5 跑动；旧数据的 0（站/蹲稳射）和 1（移动）保持原意，表结构不变。网站需同时更新，否则会把新数据的慢走和跑动误算成稳射。
+
+### 2026年11月18日 Confogl 核心模块模式判断与计分回合修复
+
+- `confoglcompmod.smx` 的对抗/清道夫判断改用 left4dhooks 的引擎基础模式（`L4D_GetGameModeType()`），不再按 `mp_gamemode` 字符串匹配，基于对抗的突变模式（如 mutation12）也会被正确识别；现有配置均为 `versus`/`coop`/`realism`/`mutation4`/`community*`，实际行为不变。
+- ScoreMod 抽出统一的每名生还者奖励公式，修复无生还者时的除零；第一/第二回合改用引擎 `m_bInSecondHalfOfRound` 判断并按半场去重播报，战役/PVE 团灭重开不再被当成第二回合重复播报（各模式默认 `confogl_SM_enable 0`，不影响现有计分）。
+- BossSpawning 仅在对抗基础模式下生效，战役团灭重开后不再误删或误传送 Witch/Tank；GhostTank 仅在有真人感染者可接管时才冻结 AI Tank，纯 AI 感染者时 Tank 不再被白白冻住。
+
+### 2026年11月22日 依据 9 天枪械统计复核冲锋枪方案：AnneHappyPlus 消音衰减再推迟，普通模式木喷装填加快
+
+- 复核数据：枪械平衡统计 11 月 14–22 日（对应当前上线数值），持有时间 AnneHappy 约 1172 小时、AnneHappyPlus 约 747 小时。AnneHappyPlus 中 Uzi 持有占比从首日约 48% 升到近几日 56–67%（9 天合计 55.1%）；主力玩家持有每秒有效伤害为 Uzi 56.4、铁喷 51.7、木喷 51.1、MP5 49.9、消音 45.6。普通 AnneHappy 主力玩家为 Uzi 39.9、铁喷 39.8、MP5 38.0、木喷 37.7、消音 36.1。
+- 实测拆解：Uzi 的领先主要来自开火量（AnneHappyPlus 每分钟持有 347 发，消音 306、MP5 261），其次是命中率。约一半的冲锋枪命中发生在 300–650u，0–160u 只占一成左右；消音在 300–650u 的单发有效伤害已与 Uzi 持平，命中率还低 7–10%。移动散布对实战命中率影响很小：MP5 移动散布 2.65、Uzi 1.15，两者移动命中率只差 1–2 个百分点。
+- 结论：11 月 16–17 日的 Uzi、消音、MP5 与喷子蹲下散布调整保持不变。用实测数据标定后估算，普通模式五把主武器的持有每秒有效伤害会落在约 38–40；AnneHappyPlus 中 Uzi 约 54、MP5 约 51.5，但消音只到约 48，仍明显落后。
+- `cfg/vote/weapon/AnneHappyPlus.cfg`：消音 SMG `gainrange` 320 → 450（普通模式仍为 320）。伤害、`rangemod` 和 Tank 倍率不变，100u 三人集火 Tank 的理论上限仍约 1159。预计 AnneHappyPlus 消音的持有每秒有效伤害到约 49.4。
+- `cfg/vote/weapon/AnneHappy.cfg`：木喷 `reloaddurationmult` 0.9 → 0.8（铁喷仍为 0.9），预计木喷输出提高约 3%。普通模式里木喷 9 天每天的持有每秒有效伤害都低于铁喷（合计 33.9 对 36.1），木喷换成铁喷 629 次、反向只有 308 次。AnneHappyPlus 两把喷子输出接近，不改。
+- 以上为估算，未在游戏内实测。上线后需按新数据复核，尤其是 AnneHappyPlus 的 Uzi，预计仍比喷子和 MP5 高约 4%。
