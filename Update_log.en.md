@@ -899,3 +899,13 @@
 - `cfg/vote/weapon/AnneHappyPlus.cfg`: silenced SMG `gainrange` 320 → 450 (AnneHappy stays at 320). Damage, `rangemod`, and the Tank multiplier are unchanged, so the theoretical 100u three-player Tank focus-fire cap stays at about 1159. The silenced SMG in AnneHappyPlus is expected to reach about 49.4 effective damage per hold-second.
 - `cfg/vote/weapon/AnneHappy.cfg`: Pump `reloaddurationmult` 0.9 → 0.8 (Chrome stays at 0.9), expected to raise Pump output by about 3%. In AnneHappy the Pump's effective damage per hold-second was below the Chrome's on every one of the 9 days (33.9 versus 36.1 overall), and players swapped Pump for Chrome 629 times against only 308 the other way. The two shotguns are close in AnneHappyPlus, so nothing changes there.
 - These are estimates and have not been tested in game. Re-check against new data after release, especially the Uzi in AnneHappyPlus, which is expected to stay about 4% ahead of the shotguns and the MP5.
+
+### November 22, 2026 Fix leftover starting medkits on Hard Rain in AnneHappy
+
+- Added a separate saferoom detection box for the starting medkit table on `c4m1`. After `nosaferoomkits.smx` was disabled, the four medkits outside the original box were left behind. `l4d2_saferoom_item_remove.smx` now removes them under the existing AnneHappy rules.
+
+### November 23, 2026 Lower the MP5 spawn share in Hardcore
+
+- `l4d2_weapon_spawn_variety.smx` adds `l4d2_spawn_variety_mp5_keep` (default 1.0, the engine odds, so Zonemod and other modes are unchanged): when a random weapon pool rolls an MP5 it is kept with this chance, otherwise it becomes an Uzi or a silenced SMG. Only random pool results are affected, not fixed MP5 placements.
+- `annehappy_hardcore` sets it to 0.5: the MP5 chance at each SMG spawn drops from 1/3 to about 1/6, with about 5/12 each for the Uzi and the silenced SMG. The 3-SMG team limit, the swap rules, and the MP5 attributes are unchanged.
+- These odds are calculated, not yet tested in game.

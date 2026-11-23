@@ -1483,3 +1483,13 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `cfg/vote/weapon/AnneHappyPlus.cfg`：消音 SMG `gainrange` 320 → 450（普通模式仍为 320）。伤害、`rangemod` 和 Tank 倍率不变，100u 三人集火 Tank 的理论上限仍约 1159。预计 AnneHappyPlus 消音的持有每秒有效伤害到约 49.4。
 - `cfg/vote/weapon/AnneHappy.cfg`：木喷 `reloaddurationmult` 0.9 → 0.8（铁喷仍为 0.9），预计木喷输出提高约 3%。普通模式里木喷 9 天每天的持有每秒有效伤害都低于铁喷（合计 33.9 对 36.1），木喷换成铁喷 629 次、反向只有 308 次。AnneHappyPlus 两把喷子输出接近，不改。
 - 以上为估算，未在游戏内实测。上线后需按新数据复核，尤其是 AnneHappyPlus 的 Uzi，预计仍比喷子和 MP5 高约 4%。
+
+### 2026年11月22日 修复药役暴风骤雨开局漏删医疗包
+
+- 为 `c4m1` 的开局医疗包桌补上独立的安全屋判定区域。停载 `nosaferoomkits.smx` 后，桌上的四个医疗包落在原判定框外，现由 `l4d2_saferoom_item_remove.smx` 按现有药役规则清理。
+
+### 2026年11月23日 硬核药役降低 MP5 刷新占比
+
+- `l4d2_weapon_spawn_variety.smx` 新增 `l4d2_spawn_variety_mp5_keep`（默认 1.0，即引擎原始概率，Zonemod 等其他模式不变）：随机武器池抽到 MP5 时按该概率保留，否则改为 Uzi 或消音冲锋枪。只作用于随机池抽取结果，不影响指定放置的 MP5。
+- `annehappy_hardcore` 设为 0.5：每个冲锋枪刷新点的 MP5 概率由 1/3 降到约 1/6，Uzi 和消音各约 5/12。全队 3 把冲锋枪上限、换枪规则与 MP5 参数不变。
+- 以上为按概率推算，未在游戏内实测。
