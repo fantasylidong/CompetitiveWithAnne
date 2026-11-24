@@ -298,7 +298,7 @@
 | `optional/l4d_boss_percent.smx` | `sm_tank` | 玩家/控制台 | - | - | 32 个模式 |
 | `optional/l4d_boss_percent.smx` | `sm_witch` | 玩家/控制台 | - | - | 32 个模式 |
 | `optional/l4d_boss_vote.smx` | `sm_bossvote` | 玩家/控制台 | - | - | 25 个模式 |
-| `optional/l4d_boss_vote.smx` | `sm_ftank` | 管理员 | ADMFLAG_BAN | - | 25 个模式 |
+| `optional/l4d_boss_vote.smx` | `sm_ftank` | 管理员 | ADMFLAG_GENERIC | 设置 Tank 刷新进度；`0` 禁刷仅限免疫等级高于 90 的管理员 | 25 个模式 |
 | `optional/l4d_boss_vote.smx` | `sm_fwitch` | 管理员 | ADMFLAG_BAN | - | 25 个模式 |
 | `optional/l4d_boss_vote.smx` | `sm_voteboss` | 玩家/控制台 | - | - | 25 个模式 |
 | `optional/l4d_tank_control_eq.smx` | `sm_boss` | 玩家/控制台 | - | Shows who is becoming the tank. | 25 个模式 |
@@ -472,7 +472,7 @@
 | `optional/AnneHappy/infected_control.smx` | `sm_startspawn` | 管理员 | ADMFLAG_ROOT | 管理员重置刷特时钟 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `optional/AnneHappy/infected_control.smx` | `sm_stopspawn` | 管理员 | ADMFLAG_ROOT | 管理员停止刷特 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `optional/AnneHappy/l4d_boss_vote.smx` | `sm_bossvote` | 玩家/控制台 | - | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
-| `optional/AnneHappy/l4d_boss_vote.smx` | `sm_ftank` | 管理员 | ADMFLAG_BAN | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
+| `optional/AnneHappy/l4d_boss_vote.smx` | `sm_ftank` | 管理员 | ADMFLAG_GENERIC | 设置 Tank 刷新进度；`0` 禁刷仅限免疫等级高于 90 的管理员 | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `optional/AnneHappy/l4d_boss_vote.smx` | `sm_fwitch` | 管理员 | ADMFLAG_BAN | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `optional/AnneHappy/l4d_boss_vote.smx` | `sm_voteboss` | 玩家/控制台 | - | - | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `hunters`, `witchparty` |
 | `optional/AnneHappy/l4d_target_override.smx` | `sm_to_reload` | 管理员 | ADMFLAG_ROOT | Reloads the data config. | `allcharger`, `alone`, `annehappy`, `annehappy_hardcore`, `annehappy_shotgun`, `coop`, `hunters`, `realism`, `witchparty` |

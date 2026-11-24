@@ -64,15 +64,9 @@ static void BS_ConVarChange(ConVar convar, const char[] oldValue, const char[] n
 	BS_bEnabled = BS_hEnabled.BoolValue;
 }
 
-// Coop/PVE wipes restart the same half, so there is no second team to mirror boss spawns for.
-static bool BS_IsActive()
-{
-	return (BS_bEnabled && IsPluginEnabled() && IsVersus());
-}
-
 static void BS_WitchSpawn(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
-	if (!BS_IsActive()) {
+	if (!BS_bEnabled || !IsPluginEnabled()) {
 		return;
 	}
 
@@ -106,7 +100,7 @@ static void BS_WitchSpawn(Event hEvent, const char[] sEventName, bool bDontBroad
 
 void BS_OnTankSpawnPost_Forward(int iTankClient)
 {
-	if (!BS_IsActive()) {
+	if (!BS_bEnabled || !IsPluginEnabled()) {
 		return;
 	}
 
@@ -160,10 +154,6 @@ void BS_OnTankSpawnPost_Forward(int iTankClient)
 
 static void BS_RoundEnd(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
-	if (!IsVersus()) {
-		return;
-	}
-
 	BS_bIsFirstRound = false;
 	BS_bFinaleStarted = false;
 

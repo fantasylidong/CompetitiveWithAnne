@@ -46,7 +46,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_voteboss", VoteBossCmd); // Allows players to vote for custom boss spawns
 	RegConsoleCmd("sm_bossvote", VoteBossCmd); // Allows players to vote for custom boss spawns
 	
-	RegAdminCmd("sm_ftank", ForceTankCommand, ADMFLAG_BAN);
+	RegAdminCmd("sm_ftank", ForceTankCommand, ADMFLAG_GENERIC);
 	RegAdminCmd("sm_fwitch", ForceWitchCommand, ADMFLAG_BAN);
 }
 
@@ -392,6 +392,13 @@ Action ForceTankCommand(int client, int args)
 
 	// Convert it to in int boy
 	int p_iRequestedPercent = StringToInt(bv_sTank);
+
+	// Moving a Tank and disabling its spawn require different privileges.
+	if (p_iRequestedPercent == 0 && !CanDisableBosses(client))
+	{
+		CReplyToCommand(client, "%t %t", "Tag", "DisableBossesRestricted");
+		return Plugin_Handled;
+	}
 
 	if (p_iRequestedPercent < 0)
 	{

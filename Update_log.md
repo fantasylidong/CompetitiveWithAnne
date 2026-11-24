@@ -1469,11 +1469,9 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新分档：在空中按跑动算；蹲下（`FL_DUCKING`）单独一档；站立时水平速度 ≤50u/s 为静止，≤130u/s 为慢走（按住走路 85、蹲走 75），>130u/s 为跑动（跛行 150、正常跑 220）。
 - 写库时新数据的 `move_state` 记为 2 静止、3 蹲下、4 慢走、5 跑动；旧数据的 0（站/蹲稳射）和 1（移动）保持原意，表结构不变。网站需同时更新，否则会把新数据的慢走和跑动误算成稳射。
 
-### 2026年11月18日 Confogl 核心模块模式判断与计分回合修复
+### 2026年11月18日 Confogl 核心模块改动（已撤回）
 
-- `confoglcompmod.smx` 的对抗/清道夫判断改用 left4dhooks 的引擎基础模式（`L4D_GetGameModeType()`），不再按 `mp_gamemode` 字符串匹配，基于对抗的突变模式（如 mutation12）也会被正确识别；现有配置均为 `versus`/`coop`/`realism`/`mutation4`/`community*`，实际行为不变。
-- ScoreMod 抽出统一的每名生还者奖励公式，修复无生还者时的除零；第一/第二回合改用引擎 `m_bInSecondHalfOfRound` 判断并按半场去重播报，战役/PVE 团灭重开不再被当成第二回合重复播报（各模式默认 `confogl_SM_enable 0`，不影响现有计分）。
-- BossSpawning 仅在对抗基础模式下生效，战役团灭重开后不再误删或误传送 Witch/Tank；GhostTank 仅在有真人感染者可接管时才冻结 AI Tank，纯 AI 感染者时 Tank 不再被白白冻住。
+- 11 月 23 日撤回此次 Confogl 模式判断、计分半场判断以及 BossSpawning / GhostTank 的 PvE 行为改动；源码和 `confoglcompmod.smx` 均恢复到合并前版本。
 
 ### 2026年11月22日 依据 9 天枪械统计复核冲锋枪方案：AnneHappyPlus 消音衰减再推迟，普通模式木喷装填加快
 
@@ -1493,3 +1491,11 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `l4d2_weapon_spawn_variety.smx` 新增 `l4d2_spawn_variety_mp5_keep`（默认 1.0，即引擎原始概率，Zonemod 等其他模式不变）：随机武器池抽到 MP5 时按该概率保留，否则改为 Uzi 或消音冲锋枪。只作用于随机池抽取结果，不影响指定放置的 MP5。
 - `annehappy_hardcore` 设为 0.5：每个冲锋枪刷新点的 MP5 概率由 1/3 降到约 1/6，Uzi 和消音各约 5/12。全队 3 把冲锋枪上限、换枪规则与 MP5 参数不变。
 - 以上为按概率推算，未在游戏内实测。
+
+### 2026年11月23日 普通 AnneHappy 同步消音 SMG 的中距离增强
+
+- `cfg/vote/weapon/AnneHappy.cfg` 的消音 SMG（`smg_silenced`）将 `gainrange` 从 320u 提高到 450u，与 AnneHappyPlus 一致，推迟额外距离衰减。基础伤害、`rangemod`、散布和 Tank 倍率不变。
+
+### 2026年11月23日 修改 Tank 刷新位置不再需要封禁权限
+
+- 通用版和 Anne 版的 `!ftank` 改用普通管理员权限（`b`），不再要求封禁权限（`d`）。玩家不能直接改位置；`!ftank 0` 禁刷仅限免疫等级高于 90 的管理员。`!fwitch` 和玩家投票不变。

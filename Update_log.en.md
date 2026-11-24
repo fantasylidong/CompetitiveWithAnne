@@ -885,11 +885,9 @@
 - New stances: airborne counts as running; crouching (`FL_DUCKING`) is its own stance; while standing, horizontal speed up to 50u/s is still, up to 130u/s is walking (walk 85, crouch-walk 75), and above 130u/s is running (limp 150, normal run 220).
 - New rows store `move_state` as 2 still, 3 crouching, 4 walking, and 5 running. Old rows keep 0 (standing/crouching) and 1 (moving) with their original meaning, and the table schema is unchanged. The website must be updated at the same time; otherwise it counts new walking and running rows as stationary.
 
-### November 18, 2026: Confogl Core Mode Detection and Score Round Fixes
+### November 18, 2026: Confogl Core Changes (Reverted)
 
-- `confoglcompmod.smx` now detects versus/scavenge from the engine base mode via left4dhooks (`L4D_GetGameModeType()`) instead of matching the `mp_gamemode` string, so versus-based mutations (e.g. mutation12) are recognized. Existing configs only use `versus`/`coop`/`realism`/`mutation4`/`community*`, so live behavior is unchanged.
-- ScoreMod now shares one per-survivor bonus formula, fixes a division by zero when no survivors are counted, and uses the engine's `m_bInSecondHalfOfRound` with per-half de-duplication. Coop/PVE wipes are no longer reported as a second round (all modes default to `confogl_SM_enable 0`, so live scoring is unaffected).
-- BossSpawning only runs in versus base modes, so coop wipes no longer delete or teleport Witches/Tanks. GhostTank only freezes an AI Tank while a human infected player can still take it over, so all-AI infected teams no longer get a frozen Tank.
+- On November 23, the changes to Confogl mode detection, scoring half detection, and BossSpawning / GhostTank behavior in PvE were reverted. Both the source and `confoglcompmod.smx` were restored to their pre-merge versions.
 
 ### November 22, 2026: Re-check the SMG Plan Against 9 Days of Weapon Stats: Later Silenced SMG Falloff in AnneHappyPlus, Faster Pump Reload in AnneHappy
 
@@ -909,3 +907,11 @@
 - `l4d2_weapon_spawn_variety.smx` adds `l4d2_spawn_variety_mp5_keep` (default 1.0, the engine odds, so Zonemod and other modes are unchanged): when a random weapon pool rolls an MP5 it is kept with this chance, otherwise it becomes an Uzi or a silenced SMG. Only random pool results are affected, not fixed MP5 placements.
 - `annehappy_hardcore` sets it to 0.5: the MP5 chance at each SMG spawn drops from 1/3 to about 1/6, with about 5/12 each for the Uzi and the silenced SMG. The 3-SMG team limit, the swap rules, and the MP5 attributes are unchanged.
 - These odds are calculated, not yet tested in game.
+
+### November 23, 2026: Match the AnneHappyPlus Silenced SMG Mid-Range Buff in Standard AnneHappy
+
+- Raised `gainrange` for the silenced SMG (`smg_silenced`) in `cfg/vote/weapon/AnneHappy.cfg` from 320u to 450u, matching AnneHappyPlus and delaying the additional distance falloff. Base damage, `rangemod`, spread, and the Tank multiplier are unchanged.
+
+### November 23, 2026: Moving the Tank Spawn No Longer Requires Ban Permission
+
+- `!ftank` now requires the generic admin flag (`b`), not the ban flag (`d`), in both the standard and Anne plugins. Regular players cannot set the spawn directly. `!ftank 0` (disable spawning) is restricted to admins with immunity above 90. `!fwitch` and player voting are unchanged.

@@ -25,7 +25,9 @@ static bool
 	SM_bEventsHooked = false,
 	SM_bModuleIsEnabled = false,
 	SM_bHooked = false,
-	SM_bRoundBonusReported[2] = {false, ...};
+	SM_bIsFirstRoundOver = false,
+	SM_bIsSecondRoundStarted = false,
+	SM_bIsSecondRoundOver = false;
 
 // Cvars
 static ConVar
@@ -125,8 +127,9 @@ void SM_OnMapStart()
 		}
 	}
 
-	SM_bRoundBonusReported[0] = false;
-	SM_bRoundBonusReported[1] = false;
+	SM_bIsFirstRoundOver = false;
+	SM_bIsSecondRoundStarted = false;
+	SM_bIsSecondRoundOver = false;
 	SM_iFirstScore = 0;
 
 	SM_fTempMulti[0] = SM_hTempMulti0.FloatValue;
@@ -202,6 +205,7 @@ static void ToggleHook(bool bIsHook)
 			HookEvent("door_close", SM_DoorClose_Event);
 			HookEvent("player_death", SM_PlayerDeath_Event);
 			HookEvent("round_end", SM_RoundEnd_Event, EventHookMode_PostNoCopy);
+			HookEvent("round_start", SM_RoundStart_Event, EventHookMode_PostNoCopy);
 			HookEvent("finale_vehicle_leaving", SM_FinaleVehicleLeaving_Event, EventHookMode_PostNoCopy);
 
 			/*AddCommandListener(SM_Command_Say, "say");
@@ -214,6 +218,7 @@ static void ToggleHook(bool bIsHook)
 			UnhookEvent("door_close", SM_DoorClose_Event);
 			UnhookEvent("player_death", SM_PlayerDeath_Event);
 			UnhookEvent("round_end", SM_RoundEnd_Event, EventHookMode_PostNoCopy);
+			UnhookEvent("round_start", SM_RoundStart_Event, EventHookMode_PostNoCopy);
 			UnhookEvent("finale_vehicle_leaving", SM_FinaleVehicleLeaving_Event, EventHookMode_PostNoCopy);
 
 			/*RemoveCommandListener(SM_Command_Say, "say");
@@ -259,35 +264,57 @@ static void SM_PlayerDeath_Event(Event hEvent, const char[] sEventName, bool bDo
 	}
 }
 
-// round_end can fire more than once per half, and coop/PVE restarts never enter the second half,
-// so the engine's half flag decides which bonus is reported instead of counting events.
 static void SM_RoundEnd_Event(Event hEvent, const char[] sEventName, bool bDontBroadcast)
 {
 	if (!SM_bModuleIsEnabled || !IsPluginEnabled()) {
 		return;
 	}
 
-	int iHalf = view_as<int>(IsVersus() && InSecondHalfOfRound());
-	if (SM_bRoundBonusReported[iHalf]) {
+	if (!SM_bIsFirstRoundOver) {
+		// First round just ended, save the current score.
+		SM_bIsFirstRoundOver = true;
+		int iAliveCount;
+		SM_iFirstScore = RoundToFloor(SM_CalculateAvgHealth(iAliveCount) * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio * iAliveCount / 4.0);
+
+		// If the score is nonzero, trust the SurvivalBonus var.
+		SM_iFirstScore = (SM_iFirstScore) ? (SM_hSurvivalBonus.IntValue * iAliveCount) : 0;
+
+		//PrintToChatAll("\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
+		CPrintToChatAll("%t", "ConfoglCompMod_Round1Bonus", SM_iFirstScore);
+
+		if (SM_hCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) {
+			//PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
+			CPrintToChatAll("%t", "ConfoglCompMod_CustomMaxDistance", GetCustomMapMaxScore());
+		}
+	} else if (SM_bIsSecondRoundStarted && !SM_bIsSecondRoundOver) {
+		SM_bIsSecondRoundOver = true;
+		// Second round has ended, print scores
+
+		int iAliveCount;
+		int iScore = RoundToFloor(SM_CalculateAvgHealth(iAliveCount) * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio * iAliveCount / 4.0);
+		// If the score is nonzero, trust the SurvivalBonus var.
+		iScore = (iScore) ? (SM_hSurvivalBonus.IntValue * iAliveCount) : 0;
+
+		//PrintToChatAll("\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
+		//PrintToChatAll("\x01[\x05Confogl\x01] Round 2 Bonus: \x04%d", iScore);
+		CPrintToChatAll("%t", "ConfoglCompMod_Round1Bonus", SM_iFirstScore);
+		CPrintToChatAll("%t", "ConfoglCompMod_Round2Bonus", iScore);
+
+		if (SM_hCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) {
+			//PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
+			CPrintToChatAll("%t", "ConfoglCompMod_CustomMaxDistance", GetCustomMapMaxScore());
+		}
+	}
+}
+
+static void SM_RoundStart_Event(Event hEvent, const char[] sEventName, bool bDontBroadcast)
+{
+	if (!SM_bModuleIsEnabled || !IsPluginEnabled() || !SM_bIsFirstRoundOver) {
 		return;
 	}
 
-	SM_bRoundBonusReported[iHalf] = true;
-
-	int iScore = SM_CalculateRoundBonus();
-	if (iHalf == 0) {
-		SM_iFirstScore = iScore;
-	}
-
-	CPrintToChatAll("%t", "ConfoglCompMod_Round1Bonus", SM_iFirstScore);
-
-	if (iHalf == 1) {
-		CPrintToChatAll("%t", "ConfoglCompMod_Round2Bonus", iScore);
-	}
-
-	if (SM_hCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) {
-		CPrintToChatAll("%t", "ConfoglCompMod_CustomMaxDistance", GetCustomMapMaxScore());
-	}
+	// Mark the beginning of the second round.
+	SM_bIsSecondRoundStarted = true;
 }
 
 static void SM_FinaleVehicleLeaving_Event(Event hEvent, const char[] sEventName, bool bDontBroadcast)
@@ -312,7 +339,7 @@ static Action SM_Cmd_Health(int client, int args)
 	int iAliveCount;
 	float fAvgHealth = SM_CalculateAvgHealth(iAliveCount);
 
-	if (IsVersus() && InSecondHalfOfRound()) {
+	if (SM_bIsSecondRoundStarted) {
 		if (client) {
 			//PrintToChat(client, "\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
 			CPrintToChat(client, "%t", "ConfoglCompMod_Round1Bonus", SM_iFirstScore);
@@ -339,8 +366,8 @@ static Action SM_Cmd_Health(int client, int args)
 		CPrintToChat(client, "%t", "ConfoglCompMod_HealthBonus", iScore);
 
 		if (SM_fSurvivalBonusRatio != 0.0) {
-			//PrintToChat(client, "\x01[\x05Confogl\x01] Static Survival Bonus Per Survivor: \x04%d", RoundToFloor(SM_StaticBonusPerSurvivor()));
-			CPrintToChat(client, "%t", "ConfoglCompMod_StaticSurvivalBonusPerSurvivor", RoundToFloor(SM_StaticBonusPerSurvivor()));
+			//PrintToChat(client, "\x01[\x05Confogl\x01] Static Survival Bonus Per Survivor: \x04%d", RoundToFloor(400 * SM_fMapMulti * SM_fSurvivalBonusRatio));
+			CPrintToChat(client, "%t", "ConfoglCompMod_StaticSurvivalBonusPerSurvivor", RoundToFloor(400 * SM_fMapMulti * SM_fSurvivalBonusRatio));
 		}
 
 		if (SM_hCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) {
@@ -351,7 +378,7 @@ static Action SM_Cmd_Health(int client, int args)
 		PrintToServer("[Confogl] Health Bonus: %d", iScore);
 
 		if (SM_fSurvivalBonusRatio != 0.0) {
-			PrintToServer("[Confogl] Static Survival Bonus Per Survivor: %d", RoundToFloor(SM_StaticBonusPerSurvivor()));
+			PrintToServer("[Confogl] Static Survival Bonus Per Survivor: %d", RoundToFloor(400 * SM_fMapMulti * SM_fSurvivalBonusRatio));
 		}
 
 		if (SM_hCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) {
@@ -443,8 +470,8 @@ static float SM_CalculateAvgHealth(int &iAliveCount = 0)
 	// Total Health Points = Total Permanent Health + Total Adjusted Temp Health
 
 	// return Average Health Points
-	float fAvgHealth = (iSurvCount > 0) ? (iTotalHealth + fTotalAdjustedTempHealth) / iSurvCount : 0.0;
-
+	float fAvgHealth = (iTotalHealth + fTotalAdjustedTempHealth) / iSurvCount;
+	
 	if (SM_bDebugEnabled || IsDebugEnabled()) {
 		LogMessage("[%s] TotalPerm: %d TotalAdjustedTemp: %.02f SurvCount: %d AliveCount: %d AvgHealth: %.02f", \
 						SM_MODULE_NAME, iTotalHealth, fTotalAdjustedTempHealth, iSurvCount, iAliveCount, fAvgHealth);
@@ -469,40 +496,17 @@ static float SM_CalculateAvgHealth(int &iAliveCount = 0)
 	return Plugin_Continue;
 }*/
 
-static float SM_StaticBonusPerSurvivor()
-{
-	return 400 * SM_fMapMulti * SM_fSurvivalBonusRatio;
-}
-
-static int SM_BonusPerSurvivor(float fAvgHealth)
-{
-	return RoundToFloor(fAvgHealth * SM_fMapMulti * SM_fHBRatio + SM_StaticBonusPerSurvivor());
-}
-
 static int SM_CalculateSurvivalBonus()
 {
-	return SM_BonusPerSurvivor(SM_CalculateAvgHealth());
+	return RoundToFloor(SM_CalculateAvgHealth() * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio);
 }
 
 static int SM_CalculateScore()
 {
 	int iAliveCount = 0;
-	float fAvgHealth = SM_CalculateAvgHealth(iAliveCount);
+	float fScore = SM_CalculateAvgHealth(iAliveCount);
 
-	return SM_BonusPerSurvivor(fAvgHealth) * iAliveCount;
-}
-
-// The engine pays vs_survival_bonus per living survivor; the local formula only decides whether any bonus exists.
-static int SM_CalculateRoundBonus()
-{
-	int iAliveCount = 0;
-	float fAvgHealth = SM_CalculateAvgHealth(iAliveCount);
-
-	if (RoundToFloor(fAvgHealth * SM_fMapMulti * SM_fHBRatio + SM_StaticBonusPerSurvivor() * iAliveCount / 4.0) == 0) {
-		return 0;
-	}
-
-	return SM_hSurvivalBonus.IntValue * iAliveCount;
+	return RoundToFloor(fScore * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio) * iAliveCount;
 }
 
 static int Native_IsScoremodEnabled(Handle plugin, int numParams)
