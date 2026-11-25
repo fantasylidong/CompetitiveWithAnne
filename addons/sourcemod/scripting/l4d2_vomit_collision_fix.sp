@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <dhooks>
 
-#define PLUGIN_VERSION "1.1"
+#define PLUGIN_VERSION "1.1-anne1"
 #define GAMEDATA_FILE "l4d2_vomit_collision_fix"
 #define TEAM_SURVIVOR 2
 
@@ -33,6 +33,10 @@ bool g_bAnyDown;
 
 int g_iHitboxHook[MAXPLAYERS + 1] = {INVALID_HOOK_ID, ...};
 bool g_bHitboxHooked;
+Handle g_hUnhookTimer;
+
+// How often to check whether the hitbox hooks are still needed
+#define UNHOOK_CHECK_INTERVAL 1.0
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
@@ -79,9 +83,23 @@ public void OnMapStart()
 	g_iDownCheckTick = -1;
 }
 
+public void OnMapEnd()
+{
+	UnhookPlayerHitboxes();
+}
+
+public void OnClientDisconnect(int client)
+{
+	if (g_iHitboxHook[client] != INVALID_HOOK_ID)
+	{
+		DynamicHook.RemoveHook(g_iHitboxHook[client]);
+		g_iHitboxHook[client] = INVALID_HOOK_ID;
+	}
+}
+
 public void OnClientPutInServer(int client)
 {
-	if (g_bHitboxHooked)
+	if (g_bHitboxHooked && g_iHitboxHook[client] == INVALID_HOOK_ID)
 	{
 		g_iHitboxHook[client] = g_hTestHitboxes.HookEntity(Hook_Pre, client, CTerrorPlayer_TestHitboxes);
 	}
@@ -110,6 +128,14 @@ MRESReturn Vomit_PhysicsSolidMaskForEntity_Post(DHookReturn hReturn)
 	return MRES_Override;
 }
 
+/*
+	Anne: upstream v1.1 hooked every client on every vomit tick and unhooked them on the next frame.
+	Each DynamicHook.HookEntity builds a DHooks manager, JITs a thunk and mprotects/patches the vtable,
+	so a sustained vomit with 10-28 SI on the server cost thousands of hook create/destroy cycles per
+	second and caused heavy sv spikes. Linux runs these traces on the main thread (the Windows worker
+	thread crash v1.1 worked around does not apply), so keep the hooks attached for as long as a biled
+	survivor is down and only remove them once nobody needs them anymore.
+*/
 void HookPlayerHitboxes()
 {
 	if (g_bHitboxHooked)
@@ -117,20 +143,36 @@ void HookPlayerHitboxes()
 		return;
 	}
 
+	g_bHitboxHooked = true;
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientInGame(i))
+		if (IsClientInGame(i) && g_iHitboxHook[i] == INVALID_HOOK_ID)
 		{
 			g_iHitboxHook[i] = g_hTestHitboxes.HookEntity(Hook_Pre, i, CTerrorPlayer_TestHitboxes);
 		}
 	}
 
-	g_bHitboxHooked = true;
-	RequestFrame(Frame_UnhookPlayerHitboxes);
+	delete g_hUnhookTimer;
+	g_hUnhookTimer = CreateTimer(UNHOOK_CHECK_INTERVAL, Timer_CheckUnhook, _, TIMER_REPEAT);
 }
 
-void Frame_UnhookPlayerHitboxes()
+Action Timer_CheckUnhook(Handle timer)
 {
+	if (IsAnySurvivorVomitedAndDown())
+	{
+		return Plugin_Continue;
+	}
+
+	g_hUnhookTimer = null;
+	UnhookPlayerHitboxes();
+	return Plugin_Stop;
+}
+
+void UnhookPlayerHitboxes()
+{
+	delete g_hUnhookTimer;
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (g_iHitboxHook[i] != INVALID_HOOK_ID)

@@ -916,6 +916,10 @@
 
 - `!ftank` now requires the generic admin flag (`b`), not the ban flag (`d`), in both the standard and Anne plugins. Regular players cannot set the spawn directly. `!ftank 0` (disable spawning) is restricted to admins with immunity above 90. `!fwitch` and player voting are unchanged.
 
+### November 25, 2026: Fixed Server Stutter Caused by the Vomit Collision Fix
+
+- With upstream v1.1, `l4d2_vomit_collision_fix.smx` re-attached and removed a hook on every player (including every special infected bot) on every tick while a Boomer kept vomiting and a biled survivor was down or pinned by a Hunter or Charger. With many special infected this caused noticeable `sv` stutter. The hooks are now attached once when that condition starts and kept until no biled survivor is down or pinned anymore (checked once per second). Vomit still passes over downed or pinned survivors as before.
+
 ### November 25, 2026: SourceBans No Longer Loads Expired Admins
 
 - `sbpp_main.smx` now skips admins whose `sb_admins.expires` has passed when loading from the database (`0` is still permanent), and the `sb_admins.cfg` backup records the expiry time. `sbpp_admcfg.smx` also skips expired admins when it falls back to that backup because the database is unavailable.
