@@ -111,7 +111,8 @@ int
 	, serverID = -1
 	, ProcessQueueTime = 5
 	, g_ownReasons[MAXPLAYERS + 1] =  { false, ... } /* Own Chat Reason */
-	, CommandDisable; /* Disable of addban and unban */
+	, CommandDisable /* Disable of addban and unban */
+	, g_iNextAdminExpiry; /* 下一个管理员到期的 Unix 时间，0 = 无 */
 
 Handle
 	ConfigParser
@@ -122,7 +123,8 @@ Handle
 	, g_hFwd_OnBanAdded
 	, g_hFwd_OnReportAdded
 	, PlayerRecheck[MAXPLAYERS + 1] =  { INVALID_HANDLE, ... } /* Datapack and Timer handles */
-	, PlayerDataPack[MAXPLAYERS + 1] =  { INVALID_HANDLE, ... };
+	, PlayerDataPack[MAXPLAYERS + 1] =  { INVALID_HANDLE, ... }
+	, g_hAdminExpiryTimer = INVALID_HANDLE; /* 管理员到期后重建缓存 */
 
 public Plugin myinfo =
 {
@@ -296,6 +298,9 @@ public void OnMapStart()
 
 public OnMapEnd()
 {
+	// TIMER_FLAG_NO_MAPCHANGE 定时器会在换图时被销毁；新图重建管理员缓存时会重新排程。
+	g_hAdminExpiryTimer = INVALID_HANDLE;
+
 	for (int i = 0; i <= MaxClients; i++)
 	{
 		if (PlayerDataPack[i] != INVALID_HANDLE)
@@ -1042,7 +1047,7 @@ public void GotDatabase(Database db, const char[] error, any data)
 
 	DB = db;
 
-	char query[1024];
+	char query[2048];
 
 	// 共享连接的字符集由 anne_db 统一设置（utf8mb4）。
 	AnneDB_SetCharsetIfOwned(DB, "utf8");
@@ -1080,24 +1085,29 @@ public void GotDatabase(Database db, const char[] error, any data)
 
 		if (serverID == -1)
 		{
-			FormatEx(query, 1024, "SELECT authid, srv_password, (SELECT name FROM %s_srvgroups WHERE name = srv_group AND flags != '') AS srv_group, srv_flags, user, immunity  \
+			FormatEx(query, 1024, "SELECT authid, srv_password, (SELECT name FROM %s_srvgroups WHERE name = srv_group AND flags != '') AS srv_group, srv_flags, user, immunity, MAX(a.expires) AS expires  \
 						FROM %s_admins_servers_groups AS asg \
 						LEFT JOIN %s_admins AS a ON a.aid = asg.admin_id \
-						WHERE %s (server_id = (SELECT sid FROM %s_servers WHERE ip = '%s' AND port = '%s' LIMIT 0,1)  \
+						WHERE %s (a.expires IS NULL OR a.expires = 0 OR a.expires > UNIX_TIMESTAMP()) AND (server_id = (SELECT sid FROM %s_servers WHERE ip = '%s' AND port = '%s' LIMIT 0,1)  \
 						OR srv_group_id = ANY (SELECT group_id FROM %s_servers_groups WHERE server_id = (SELECT sid FROM %s_servers WHERE ip = '%s' AND port = '%s' LIMIT 0,1))) \
 						GROUP BY aid, authid, srv_password, srv_group, srv_flags, user",
 				DatabasePrefix, DatabasePrefix, DatabasePrefix, queryLastLogin, DatabasePrefix, ServerIp, ServerPort, DatabasePrefix, DatabasePrefix, ServerIp, ServerPort);
 		} else {
-			FormatEx(query, 1024, "SELECT authid, srv_password, (SELECT name FROM %s_srvgroups WHERE name = srv_group AND flags != '') AS srv_group, srv_flags, user, immunity  \
+			FormatEx(query, 1024, "SELECT authid, srv_password, (SELECT name FROM %s_srvgroups WHERE name = srv_group AND flags != '') AS srv_group, srv_flags, user, immunity, MAX(a.expires) AS expires  \
 						FROM %s_admins_servers_groups AS asg \
 						LEFT JOIN %s_admins AS a ON a.aid = asg.admin_id \
-						WHERE %s server_id = %d  \
-						OR srv_group_id = ANY (SELECT group_id FROM %s_servers_groups WHERE server_id = %d) \
+						WHERE %s (a.expires IS NULL OR a.expires = 0 OR a.expires > UNIX_TIMESTAMP()) AND (server_id = %d  \
+						OR srv_group_id = ANY (SELECT group_id FROM %s_servers_groups WHERE server_id = %d)) \
 						GROUP BY aid, authid, srv_password, srv_group, srv_flags, user",
 				DatabasePrefix, DatabasePrefix, DatabasePrefix, queryLastLogin, serverID, DatabasePrefix, serverID);
 		}
 		curLoading++;
 		SQL_TQuery(DB, AdminsDone, query);
+
+		// 其他来源（admins_simple.ini 等）可能仍授予已在 SourceBans 到期的管理员，加载后统一撤销。
+		FormatEx(query, sizeof(query), "SELECT authid FROM %s_admins WHERE expires > 0 AND expires <= UNIX_TIMESTAMP() AND authid IS NOT NULL AND authid != ''", DatabasePrefix);
+		curLoading++;
+		SQL_TQuery(DB, ExpiredAdminsDone, query);
 
 		#if defined DEBUG
 		LogToFile(logFile, "Fetching Admin List");
@@ -1677,6 +1687,9 @@ public AdminsDone(Handle:owner, Handle:hndl, const String:error[], any:data)
 	new Immunity = 0;
 	new AdminId:curAdm = INVALID_ADMIN_ID;
 	new Handle:adminsKV = CreateKeyValues("Admins");
+	new now = GetTime();
+	new expires;
+	new nextExpiry = 0;
 
 	while (SQL_MoreRows(hndl))
 	{
@@ -1691,6 +1704,14 @@ public AdminsDone(Handle:owner, Handle:hndl, const String:error[], any:data)
 		SQL_FetchString(hndl, 4, name, 66);
 
 		Immunity = SQL_FetchInt(hndl, 5);
+		expires = SQL_IsFieldNull(hndl, 6) ? 0 : SQL_FetchInt(hndl, 6);
+
+		// SQL 已过滤到期管理员；这里再防御一次，避免时钟差导致刚到期的管理员被加载。
+		if (expires > 0 && expires <= now)
+			continue;
+
+		if (expires > 0 && (nextExpiry == 0 || expires < nextExpiry))
+			nextExpiry = expires;
 
 		TrimString(name);
 		TrimString(identity);
@@ -1716,6 +1737,9 @@ public AdminsDone(Handle:owner, Handle:hndl, const String:error[], any:data)
 
 			if (Immunity > 0)
 				KvSetNum(adminsKV, "immunity", Immunity);
+
+			if (expires > 0)
+				KvSetNum(adminsKV, "expires", expires);
 
 			KvRewind(adminsKV);
 		}
@@ -1834,12 +1858,97 @@ public AdminsDone(Handle:owner, Handle:hndl, const String:error[], any:data)
 		KeyValuesToFile(adminsKV, adminsLoc);
 	CloseHandle(adminsKV);
 
+	ScheduleAdminExpiryRefresh(nextExpiry);
+
 	#if defined DEBUG
 	LogToFile(logFile, "Finished loading %i admins.", admCount);
 	#endif
 
 	--curLoading;
 	CheckLoadAdmins();
+}
+
+public ExpiredAdminsDone(Handle:owner, Handle:hndl, const String:error[], any:data)
+{
+	if (hndl == INVALID_HANDLE || strlen(error) > 0)
+	{
+		LogToFile(logFile, "Failed to retrieve expired admins from the database, %s", error);
+		--curLoading;
+		CheckLoadAdmins();
+		return;
+	}
+
+	decl String:identity[66];
+	new removed = 0;
+	while (SQL_FetchRow(hndl))
+	{
+		SQL_FetchString(hndl, 0, identity, sizeof(identity));
+		TrimString(identity);
+		removed += RemoveAdminByAnySteamUniverse(identity);
+	}
+
+	if (removed > 0)
+		LogToFile(logFile, "Revoked %d expired SourceBans admin entries granted by other admin sources.", removed);
+
+	--curLoading;
+	CheckLoadAdmins();
+}
+
+stock int RemoveAdminByAnySteamUniverse(const char[] identity)
+{
+	// SteamID2 的 universe 位在 SourceBans（STEAM_0）与 admins_simple.ini（常写 STEAM_1）之间不统一，两种都撤销。
+	if (strncmp(identity, "STEAM_", 6) != 0 || strlen(identity) < 9)
+		return 0;
+
+	char steamIdVariant[66];
+	int removed = 0;
+	strcopy(steamIdVariant, sizeof(steamIdVariant), identity);
+	for (int universe = 0; universe <= 1; universe++)
+	{
+		steamIdVariant[6] = view_as<char>('0' + universe);
+		AdminId adm = FindAdminByIdentity("steam", steamIdVariant);
+		if (adm != INVALID_ADMIN_ID && RemoveAdmin(adm))
+			removed++;
+	}
+	return removed;
+}
+
+stock void ScheduleAdminExpiryRefresh(int nextExpiry)
+{
+	if (g_hAdminExpiryTimer != INVALID_HANDLE)
+	{
+		KillTimer(g_hAdminExpiryTimer);
+		g_hAdminExpiryTimer = INVALID_HANDLE;
+	}
+
+	g_iNextAdminExpiry = nextExpiry;
+	if (nextExpiry <= 0)
+		return;
+
+	// 到期后 1 秒重建管理员缓存；超过 1 小时的先等 1 小时再重新计算，避免长定时器跨换图漂移。
+	float delay = float(nextExpiry - GetTime() + 1);
+	if (delay < 1.0)
+		delay = 1.0;
+	else if (delay > 3600.0)
+		delay = 3600.0;
+
+	g_hAdminExpiryTimer = CreateTimer(delay, Timer_AdminExpiry, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_AdminExpiry(Handle timer)
+{
+	g_hAdminExpiryTimer = INVALID_HANDLE;
+	if (g_iNextAdminExpiry > 0 && GetTime() >= g_iNextAdminExpiry)
+	{
+		LogToFile(logFile, "An admin expired at %d; rebuilding admin cache.", g_iNextAdminExpiry);
+		g_iNextAdminExpiry = 0;
+		DumpAdminCache(AdminCache_Admins, true);
+	}
+	else
+	{
+		ScheduleAdminExpiryRefresh(g_iNextAdminExpiry);
+	}
+	return Plugin_Stop;
 }
 
 public GroupsDone(Handle:owner, Handle:hndl, const String:error[], any:data)

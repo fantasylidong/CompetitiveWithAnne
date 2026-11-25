@@ -38,6 +38,7 @@ static String:g_CurPass[64];
 static Handle:g_GroupArray;
 static g_CurFlags;
 static g_CurImmunity;
+static g_CurExpires;
 
 public SMCResult:ReadUsers_NewSection(Handle:smc, const String:name[], bool:opt_quotes)
 {
@@ -68,6 +69,7 @@ public SMCResult:ReadUsers_NewSection(Handle:smc, const String:name[], bool:opt_
 		ClearArray(g_GroupArray);
 		g_CurFlags = 0;
 		g_CurImmunity = 0;
+		g_CurExpires = 0;
 	}
 	else
 	{
@@ -131,6 +133,10 @@ public SMCResult:ReadUsers_KeyValue(Handle:smc,
 	{
 		g_CurImmunity = StringToInt(value);
 	}
+	else if (StrEqual(key, "expires", false))
+	{
+		g_CurExpires = StringToInt(value);
+	}
 	
 	return SMCParse_Continue;
 }
@@ -146,7 +152,11 @@ public SMCResult:ReadUsers_EndSection(Handle:smc)
 	if (g_UserState == USER_STATE_INADMIN)
 	{
 		/* Dump this user to memory */
-		if (g_CurIdent[0] != '\0' && g_CurAuth[0] != '\0')
+		if (g_CurExpires > 0 && g_CurExpires <= GetTime())
+		{
+			/* 备份中已到期的 SourceBans 管理员不再加载 */
+		}
+		else if (g_CurIdent[0] != '\0' && g_CurAuth[0] != '\0')
 		{
 			decl AdminFlag:flags[26];
 			new AdminId:id, i, num_groups, num_flags;
@@ -258,6 +268,7 @@ static char g_CurPass[64];
 static ArrayList g_GroupArray;
 static int g_CurFlags;
 static int g_CurImmunity;
+static int g_CurExpires;
 
 public SMCResult ReadUsers_NewSection(SMCParser smc, const char[] name, bool opt_quotes)
 {
@@ -288,6 +299,7 @@ public SMCResult ReadUsers_NewSection(SMCParser smc, const char[] name, bool opt
 		g_GroupArray.Clear();
 		g_CurFlags = 0;
 		g_CurImmunity = 0;
+		g_CurExpires = 0;
 	}
 	else
 	{
@@ -351,6 +363,10 @@ public SMCResult ReadUsers_KeyValue(SMCParser smc,
 	{
 		g_CurImmunity = StringToInt(value);
 	}
+	else if (StrEqual(key, "expires", false))
+	{
+		g_CurExpires = StringToInt(value);
+	}
 	
 	return SMCParse_Continue;
 }
@@ -366,7 +382,11 @@ public SMCResult ReadUsers_EndSection(SMCParser smc)
 	if (g_UserState == UserState_InAdmin)
 	{
 		/* Dump this user to memory */
-		if (g_CurIdent[0] != '\0' && g_CurAuth[0] != '\0')
+		if (g_CurExpires > 0 && g_CurExpires <= GetTime())
+		{
+			/* 备份中已到期的 SourceBans 管理员不再加载 */
+		}
+		else if (g_CurIdent[0] != '\0' && g_CurAuth[0] != '\0')
 		{
 			AdminFlag flags[26];
 			AdminId id;

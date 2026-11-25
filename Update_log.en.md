@@ -915,3 +915,9 @@
 ### November 23, 2026: Moving the Tank Spawn No Longer Requires Ban Permission
 
 - `!ftank` now requires the generic admin flag (`b`), not the ban flag (`d`), in both the standard and Anne plugins. Regular players cannot set the spawn directly. `!ftank 0` (disable spawning) is restricted to admins with immunity above 90. `!fwitch` and player voting are unchanged.
+
+### November 25, 2026: SourceBans No Longer Loads Expired Admins
+
+- `sbpp_main.smx` now skips admins whose `sb_admins.expires` has passed when loading from the database (`0` is still permanent), and the `sb_admins.cfg` backup records the expiry time. `sbpp_admcfg.smx` also skips expired admins when it falls back to that backup because the database is unavailable.
+- After loading, admins that SourceBans marks as expired but that are still granted by another source such as `admins_simple.ini` are revoked (matching both `STEAM_0` and `STEAM_1` forms), so an admin that has expired on the website can no longer use admin access in game.
+- When an admin expires while the server is running, the admin cache is rebuilt about 1 second after the expiry time, without waiting for a map change or an `sm_rehash` from the website.
