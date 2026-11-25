@@ -925,3 +925,8 @@
 - `sbpp_main.smx` はデータベースから管理者を読み込む際、`sb_admins.expires` が過ぎた記録を除外します（`0` は引き続き永久）。バックアップの `sb_admins.cfg` にも期限を記録し、データベースが使えずバックアップを読む場合も `sbpp_admcfg.smx` が期限切れの管理者を除外します。
 - 読み込み後、SourceBans で期限切れになっているのに `admins_simple.ini` など別の経路で権限が付与されている管理者を取り消します（`STEAM_0`/`STEAM_1` の両表記に対応）。サイト上で期限が切れた管理者はゲーム内で管理者権限を使えなくなります。
 - サーバー稼働中に管理者の期限が切れた場合、期限の約1秒後に管理者キャッシュを自動で再構築します。マップ変更やサイトからの `sm_rehash` を待つ必要はありません。
+
+### 2026年11月25日 L4D2 専用サーバーの拡張を更新
+
+- SendTable を 1.0.2 に更新し、Valve の11月の更新後に Linux と Windows の専用サーバーが起動時にクラッシュする問題を修正しました。
+- SourceMod を 1.12.0.7263、Metamod:Source を 1.12.0-git1230、Stripper:Source を 1.2.2-git161、SourceScramble を 0.8.2.2、BuiltinVotes を 0.8.1、cutlrbtreefix を 0.3.2、RIPExt を 1.3.2 に更新しました。Linux 版の Stripper と BuiltinVotes は Valve の専用サーバー環境に対応するため、C++ ランタイムを静的リンクしています。

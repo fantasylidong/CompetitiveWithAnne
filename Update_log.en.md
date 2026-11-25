@@ -925,3 +925,8 @@
 - `sbpp_main.smx` now skips admins whose `sb_admins.expires` has passed when loading from the database (`0` is still permanent), and the `sb_admins.cfg` backup records the expiry time. `sbpp_admcfg.smx` also skips expired admins when it falls back to that backup because the database is unavailable.
 - After loading, admins that SourceBans marks as expired but that are still granted by another source such as `admins_simple.ini` are revoked (matching both `STEAM_0` and `STEAM_1` forms), so an admin that has expired on the website can no longer use admin access in game.
 - When an admin expires while the server is running, the admin cache is rebuilt about 1 second after the expiry time, without waiting for a map change or an `sm_rehash` from the website.
+
+### November 25, 2026: Updated L4D2 Dedicated Server Extensions
+
+- Updated SendTable to 1.0.2 to fix a startup crash on Linux and Windows dedicated servers after Valve's November update.
+- Updated SourceMod to 1.12.0.7263, Metamod:Source to 1.12.0-git1230, Stripper:Source to 1.2.2-git161, SourceScramble to 0.8.2.2, BuiltinVotes to 0.8.1, cutlrbtreefix to 0.3.2, and RIPExt to 1.3.2. The Linux builds of Stripper and BuiltinVotes link the C++ runtime statically for compatibility with Valve's dedicated server environment.

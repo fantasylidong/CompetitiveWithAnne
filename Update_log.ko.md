@@ -925,3 +925,8 @@
 - `sbpp_main.smx`는 데이터베이스에서 관리자를 불러올 때 `sb_admins.expires`가 지난 기록을 제외합니다(`0`은 계속 영구). 백업 파일 `sb_admins.cfg`에도 만료 시각을 기록하며, 데이터베이스를 쓸 수 없어 백업을 읽을 때도 `sbpp_admcfg.smx`가 만료된 관리자를 제외합니다.
 - 불러온 뒤 SourceBans에서 만료로 표시되었지만 `admins_simple.ini` 등 다른 경로로 여전히 권한이 부여된 관리자를 회수합니다(`STEAM_0`/`STEAM_1` 표기 모두 대응). 웹사이트에서 만료된 관리자는 게임 안에서 관리자 권한을 쓸 수 없습니다.
 - 서버 운영 중 관리자가 만료되면 만료 약 1초 뒤 관리자 캐시를 자동으로 다시 만들며, 맵 변경이나 웹사이트의 `sm_rehash`를 기다리지 않습니다.
+
+### 2026년 11월 25일 L4D2 전용 서버 확장 업데이트
+
+- SendTable을 1.0.2로 업데이트해 Valve의 11월 업데이트 이후 Linux와 Windows 전용 서버가 시작할 때 충돌하는 문제를 수정했습니다.
+- SourceMod를 1.12.0.7263, Metamod:Source를 1.12.0-git1230, Stripper:Source를 1.2.2-git161, SourceScramble을 0.8.2.2, BuiltinVotes를 0.8.1, cutlrbtreefix를 0.3.2, RIPExt를 1.3.2로 업데이트했습니다. Linux용 Stripper와 BuiltinVotes는 Valve 전용 서버 환경과의 호환성을 위해 C++ 런타임을 정적으로 링크합니다.

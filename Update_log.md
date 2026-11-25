@@ -1509,3 +1509,8 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - `sbpp_main.smx` 从数据库加载管理员时跳过 `sb_admins.expires` 已到期的记录（`0` 仍为永久），备份的 `sb_admins.cfg` 也一并记录到期时间；`sbpp_admcfg.smx` 在数据库不可用、改读备份时同样跳过已到期的管理员。
 - 加载后会撤销 SourceBans 已标记到期、但仍由 `admins_simple.ini` 等其他来源授予的管理员（同时匹配 `STEAM_0`/`STEAM_1` 写法），避免网站到期后游戏内仍可使用管理员权限。
 - 服务器运行中有管理员到期时，会在到期后约 1 秒自动重建管理员缓存，不必等换图或网站下发 `sm_rehash`。
+
+### 2026年11月25日 更新 L4D2 服务端扩展
+
+- SendTable 升至 1.0.2，修复 Valve 11 月更新后 Linux 和 Windows 服务端的启动崩溃。
+- 同步 SourceMod 1.12.0.7263、Metamod:Source 1.12.0-git1230、Stripper:Source 1.2.2-git161、SourceScramble 0.8.2.2、BuiltinVotes 0.8.1、cutlrbtreefix 0.3.2 和 RIPExt 1.3.2。Linux 版 Stripper 和 BuiltinVotes 静态链接 C++ 运行库，以兼容 Valve 随服务端附带的运行环境。

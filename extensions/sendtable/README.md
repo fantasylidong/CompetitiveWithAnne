@@ -2,7 +2,7 @@
 
 ## Upstream & Source Locations
 
-- **Extension upstream repository**: [`Crimson-DawnLight/L4D2MutiMod` (`extensions/sendtable`, v1.0.0, commit `06568bf`)](https://github.com/Crimson-DawnLight/L4D2MutiMod/tree/main/extensions/sendtable)
+- **Extension upstream repository**: [`Crimson-DawnLight/L4D2MutiMod` (`sendtable-v1.0.2`)](https://github.com/Crimson-DawnLight/L4D2MutiMod/releases/tag/sendtable-v1.0.2)
 - **Plugin & packaged distribution upstream**: [`ExpCharacter/oh-my-l4d2-plugins` (`l4d2_ammo_bit_widener_ext`, commit `a4238cd`)](https://github.com/ExpCharacter/oh-my-l4d2-plugins/tree/main/l4d2_ammo_bit_widener_ext)
 
 ## Repository File Mapping
