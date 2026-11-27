@@ -939,3 +939,16 @@
 - An admin with only `c` (for example `"10:c"`) can kick players, change maps, and move the Tank/Witch spawn. With immunity below paid admins they cannot kick paid admins, and `sm_ftank 0`/`sm_fwitch 0` still need immunity above 90.
 - When `sbpp_main.smx` revokes admins that expired in SourceBans, it keeps identities that have only `c` and revokes those with any other flag.
 - `admin_groups.cfg` adds a `ServerGuest` group (flag `c` only, immunity 10). A server owner grants the permissions above with `"STEAM_x:x:xxx" "@ServerGuest"` in `admins_simple.ini`.
+### November 27, 2026 — Corrected Firearm Balance Statistics (1.4.0)
+
+- Shooter time starts when a player first hits that Tank with the equipped weapon. It stops on a weapon change, a target change, a player exit, or the end of the fight. NewAnneWeb displays same-weapon team DPS, DPS per shooter, and shooter-seconds. Historical records retain team DPS.
+- Each shotgun blast counts once per special infected or Witch hit with at least 90% health before the shot. The one-shot rate includes every hit that fails to kill. The dashboard shows stationary standing, crouching, walking, and running separately from legacy stances. The new metrics start with samples from the updated plugin.
+
+### November 27, 2026 — Per-Player Weapon Statistics in Firearm Balance Stats (1.5.0)
+
+- Added per-player, per-weapon statistics in two new tables. `player_weapon_daily` stores one usage row per player, day, and weapon, plus one hit row each for common infected, special infected, Tanks, and Witches. `player_combat_rounds` stores one summary row per player per round. Hits, headshots, damage, and kills use exactly the same detection as the server-wide weapon statistics; shotgun hits and headshots count per pellet.
+- Added a "shots that hit" count: a bullet that passes through several targets, or a shotgun blast that hits several targets, counts once. It is used to calculate shot accuracy. Existing headshot-kill and kill counts are unchanged, and the website's existing headshot rate still displays as before.
+- Data is written at round end, map change, and disconnect. When a player goes idle or switches teams, the day's per-weapon data is saved first, and the round summary keeps accumulating after they return. Only human survivors are recorded, and the SteamID format matches the `players` table.
+- New switches: `sm_weapon_balance_player_enable` (default 1) and `sm_weapon_balance_player_min_shots` (default 20; rounds with fewer shots are not written to the round summary). The plugin only adds counters inside existing callbacks, adds no hooks, and writes through the existing asynchronous transaction and shared database connection.
+- Added the native `L4D2WBS_GetRoundUid` (`include/l4d2_weapon_balance_stats.inc`) so other plugins can read the same round ID used in `player_combat_rounds.round_uid`.
+

@@ -1523,3 +1523,16 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 只给 `c` 的管理员（如 `"10:c"`）可以踢人、换图、移动 Tank/Witch 位置；免疫低于付费管理员时踢不了付费管理员，`sm_ftank 0`/`sm_fwitch 0` 关闭仍需免疫 90 以上。
 - `sbpp_main.smx` 撤销 SourceBans 已到期管理员时，保留只有 `c` 的身份，只撤销带其他权限位的。
 - `admin_groups.cfg` 新增 `ServerGuest` 组（只有 `c`，免疫 10），服主在 `admins_simple.ini` 写 `"STEAM_x:x:xxx" "@ServerGuest"` 即可分配上述权限。
+### 2026年11月27日 修正枪械平衡统计（1.4.0）
+
+- 本版开始从每次持枪首次命中该 Tank 起计参战人秒，切枪、换目标、离场或战斗结束时结算。NewAnneWeb 同时显示同枪队伍 DPS、单人持枪 DPS 和参战人秒，历史记录仍可查看队伍 DPS。
+- 霰弹命中射前血量至少 90% 的特感或女巫时，每枪每目标计一次。秒杀率纳入所有未秒杀的命中。看板分开显示静止站立、蹲下、慢走、跑动与旧版姿态，新增指标从新版插件采样起算。
+
+### 2026年11月27日 枪械平衡统计新增个人分武器数据（1.5.0）
+
+- 新增按玩家记录的分武器统计，写入新表 `player_weapon_daily`（每人每天每把武器一行使用数据，外加普感、特感、Tank、Witch 各一行命中数据）和 `player_combat_rounds`（每人每回合一行汇总）。命中、爆头、伤害、击杀的判定和全服武器统计完全一致，霰弹的命中和爆头按弹丸计。
+- 新增"命中射击"计数：同一发子弹穿透多个目标、同一枪霰弹打中多个目标都只算一次，用来计算开枪命中率。原有的爆头击杀和击杀计数不变，网页上原来的爆头率照常显示。
+- 回合结束、换图、断线时写入；闲置或换队时先保存当天的分武器数据，回合汇总等回来后继续累计。只记录真人生还者，SteamID 格式与 `players` 表一致。
+- 新增开关 `sm_weapon_balance_player_enable`（默认 1）和 `sm_weapon_balance_player_min_shots`（默认 20，单回合开枪少于该值时不写回合汇总）。只在已有回调里多做计数，不新增 hook，写库沿用原来的异步事务和共享数据库连接。
+- 新增 native `L4D2WBS_GetRoundUid`（`include/l4d2_weapon_balance_stats.inc`），供其他插件取得与 `player_combat_rounds.round_uid` 相同的回合编号。
+
