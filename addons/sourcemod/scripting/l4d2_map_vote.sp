@@ -1078,7 +1078,7 @@ int ShowVoteMap_MenuHandler(Menu menu, MenuAction action, int client, int param2
 // MOD: 新增 — 检查是否允许选择章节（管理员）
 bool IsAdminCanPickChapter(int client) {
     // 你也可以换成 ADMFLAG_GENERIC 或自定义指令名
-    return CheckCommandAccess(client, "sm_mapvote_chapter", ADMFLAG_CHANGEMAP, true);
+    return CheckCommandAccess(client, "sm_mapvote_chapter", ADMFLAG_KICK, true);
 }
 
 // MOD: 新增 — 战役级投票（不选章节）

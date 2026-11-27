@@ -324,7 +324,8 @@ static int GetClientImmunityLevel(int client)
 
 static bool HasAnyAdminFlag(int client)
 {
-    return (GetUserAdmin(client) != INVALID_ADMIN_ID) || (GetUserFlagBits(client) != 0);
+    // 只有 c（服主在本服授权的踢人/换图/改克）不算管理员，不受防踢保护。
+    return (GetUserFlagBits(client) & ~ADMFLAG_KICK) != 0;
 }
 
 
@@ -614,7 +615,7 @@ static bool CanClientUseHat(int client)
 
 	ConVar hatsMenu = FindConVar("l4d_hats_menu");
 	char flags[32];
-	int menuFlags = ADMFLAG_KICK;
+	int menuFlags = ADMFLAG_SLAY;
 	if (hatsMenu != null)
 	{
 		hatsMenu.GetString(flags, sizeof(flags));

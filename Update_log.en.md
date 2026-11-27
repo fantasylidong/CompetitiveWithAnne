@@ -930,3 +930,11 @@
 
 - Updated SendTable to 1.0.2 to fix a startup crash on Linux and Windows dedicated servers after Valve's November update.
 - Updated SourceMod to 1.12.0.7263, Metamod:Source to 1.12.0-git1230, Stripper:Source to 1.2.2-git161, SourceScramble to 0.8.2.2, BuiltinVotes to 0.8.1, cutlrbtreefix to 0.3.2, and RIPExt to 1.3.2. The Linux builds of Stripper and BuiltinVotes link the C++ runtime statically for compatibility with Valve's dedicated server environment.
+
+### November 26, 2026: The c Flag Now Covers Only Kicking, Map Changes, and Moving the Tank/Witch, So Sponsored Server Owners Can Grant It Alone
+
+- The `c` flag is now used only for kicking, changing maps, and moving the Tank/Witch spawn. `sm_ftank` moves from `b` and `sm_fwitch` from `d` to `c`. `sm_map`, the admin-menu map change item, and picking a chapter directly in `!maps` move from `g` to `c`. The admin menu `sm_admin` moves from `b` to `c`; it only shows items the admin has access to.
+- `sm_kicktank` (kick extra Tanks down to one) and `sm_swap`/`sm_swapto`/`sm_swapteams` (team swaps) move from `c` to `b`. The hat menu and automatic hats now default to `f` instead of `c`. The admin daily quota and the "looking for group" toggle in global chat move from `c` to `b`. Paid admins (`abcdfgjk`) keep every feature they had.
+- An admin with only `c` is no longer treated as an admin identity: they are not covered by the `rpg` anti-kick protection, can be vote-kicked, and cannot use it to block votekicks against themselves. Glows, skins (which need `f`), and other perks are not available to them either.
+- An admin with only `c` (for example `"10:c"`) can kick players, change maps, and move the Tank/Witch spawn. With immunity below paid admins they cannot kick paid admins, and `sm_ftank 0`/`sm_fwitch 0` still need immunity above 90.
+- When `sbpp_main.smx` revokes admins that expired in SourceBans, it keeps identities that have only `c` and revokes those with any other flag.

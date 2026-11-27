@@ -1907,7 +1907,8 @@ stock int RemoveAdminByAnySteamUniverse(const char[] identity)
 	{
 		steamIdVariant[6] = view_as<char>('0' + universe);
 		AdminId adm = FindAdminByIdentity("steam", steamIdVariant);
-		if (adm != INVALID_ADMIN_ID && RemoveAdmin(adm))
+		// 服主在本服 admins_simple.ini 给的只有 c（踢人/改克）的管理员保留，只撤销仍带其他权限位的身份。
+		if (adm != INVALID_ADMIN_ID && (GetAdminFlags(adm, Access_Effective) & ~ADMFLAG_KICK) != 0 && RemoveAdmin(adm))
 			removed++;
 	}
 	return removed;

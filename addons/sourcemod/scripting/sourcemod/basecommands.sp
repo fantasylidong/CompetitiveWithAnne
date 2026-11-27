@@ -66,7 +66,7 @@ public void OnPluginStart()
 	LoadTranslations("plugin.basecommands");
 
 	RegAdminCmd("sm_kick", Command_Kick, ADMFLAG_KICK, "sm_kick <#userid|name> [reason]");
-	RegAdminCmd("sm_map", Command_Map, ADMFLAG_CHANGEMAP, "sm_map <map>");
+	RegAdminCmd("sm_map", Command_Map, ADMFLAG_KICK, "sm_map <map>");
 	RegAdminCmd("sm_rcon", Command_Rcon, ADMFLAG_RCON, "sm_rcon <args>");
 	RegAdminCmd("sm_cvar", Command_Cvar, ADMFLAG_CONVARS, "sm_cvar <cvar> [value]");
 	RegAdminCmd("sm_resetcvar", Command_ResetCvar, ADMFLAG_CONVARS, "sm_resetcvar <cvar>");
@@ -175,7 +175,7 @@ public void OnAdminMenuReady(Handle aTopMenu)
 	if (server_commands != INVALID_TOPMENUOBJECT)
 	{
 		hTopMenu.AddItem("sm_reloadadmins", AdminMenu_ReloadAdmins, server_commands, "sm_reloadadmins", ADMFLAG_BAN);
-		hTopMenu.AddItem("sm_map", AdminMenu_Map, server_commands, "sm_map", ADMFLAG_CHANGEMAP);
+		hTopMenu.AddItem("sm_map", AdminMenu_Map, server_commands, "sm_map", ADMFLAG_KICK);
 		hTopMenu.AddItem("sm_execcfg", AdminMenu_ExecCFG, server_commands, "sm_execcfg", ADMFLAG_CONFIG);		
 	}
 

@@ -884,8 +884,9 @@ Action Callvote_Callback(int client, char[] command, int argc)
         return Plugin_Continue;
     }
 	
-    AdminId clientAdmin = GetUserAdmin(client);
-    AdminId targetAdmin = GetUserAdmin(target);
+    // 只有 c（服主在本服授权的踢人/换图/改克）视同普通玩家，可被投票踢，也不能借此保护自己。
+    AdminId clientAdmin = (GetUserFlagBits(client) & ~ADMFLAG_KICK) != 0 ? GetUserAdmin(client) : INVALID_ADMIN_ID;
+    AdminId targetAdmin = (GetUserFlagBits(target) & ~ADMFLAG_KICK) != 0 ? GetUserAdmin(target) : INVALID_ADMIN_ID;
     if (clientAdmin == INVALID_ADMIN_ID && targetAdmin == INVALID_ADMIN_ID)
     {
         return Plugin_Continue;

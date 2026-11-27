@@ -1514,3 +1514,11 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 
 - SendTable 升至 1.0.2，修复 Valve 11 月更新后 Linux 和 Windows 服务端的启动崩溃。
 - 同步 SourceMod 1.12.0.7263、Metamod:Source 1.12.0-git1230、Stripper:Source 1.2.2-git161、SourceScramble 0.8.2.2、BuiltinVotes 0.8.1、cutlrbtreefix 0.3.2 和 RIPExt 1.3.2。Linux 版 Stripper 和 BuiltinVotes 静态链接 C++ 运行库，以兼容 Valve 随服务端附带的运行环境。
+
+### 2026年11月26日 c 权限位只管踢人、换图和改克/女巫，赞助服服主可单独分配
+
+- `c` 权限位现在只用于踢人、换图和改 Tank/Witch 位置：`sm_ftank` 由 `b`、`sm_fwitch` 由 `d` 改为 `c`；`sm_map`、管理员菜单的换图项和 `!maps` 中直接选章节由 `g` 改为 `c`；管理员菜单 `sm_admin` 由 `b` 改为 `c`，菜单里只会显示本人有权限的项目。
+- `sm_kicktank`（多 Tank 时踢到只剩一只）、`sm_swap`/`sm_swapto`/`sm_swapteams`（换队）由 `c` 改为 `b`；帽子菜单与自动帽子默认由 `c` 改为 `f`；全服聊天的管理员每日额度和“找队友”开关由 `c` 改为 `b`。付费管理员（`abcdfgjk`）可用的功能不变。
+- 只有 `c` 的管理员不再被视为“管理员身份”：不受 `rpg` 防踢保护，可以被投票踢，也不能借此阻止别人投票踢自己；轮廓、皮肤（需 `f`）以及其他特权同样拿不到。
+- 只给 `c` 的管理员（如 `"10:c"`）可以踢人、换图、移动 Tank/Witch 位置；免疫低于付费管理员时踢不了付费管理员，`sm_ftank 0`/`sm_fwitch 0` 关闭仍需免疫 90 以上。
+- `sbpp_main.smx` 撤销 SourceBans 已到期管理员时，保留只有 `c` 的身份，只撤销带其他权限位的。

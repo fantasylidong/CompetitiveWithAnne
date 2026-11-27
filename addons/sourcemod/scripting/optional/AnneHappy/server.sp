@@ -110,7 +110,7 @@ public void OnPluginStart()
 
     // ---- 管理命令 ----
     RegConsoleCmd("sm_setbot", SetBot);
-    RegAdminCmd("sm_kicktank", KickMoreTankThanOne, ADMFLAG_KICK, "有多只Tank时，随机踢至只有一只");
+    RegAdminCmd("sm_kicktank", KickMoreTankThanOne, ADMFLAG_GENERIC, "有多只Tank时，随机踢至只有一只");
     SetConVarBounds(FindConVar("survivor_limit"), ConVarBound_Upper, true, 31.0);
     RegAdminCmd("sm_addbot",   ADMAddBot, ADMFLAG_ROOT, "添加一个生还者Bot（不会被本插件踢）");
     RegAdminCmd("sm_delbot",   ADMDelBot, ADMFLAG_ROOT, "删除一个未被接管的生还者Bot");

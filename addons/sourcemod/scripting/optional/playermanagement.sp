@@ -65,9 +65,9 @@ public void OnPluginStart()
 	LoadTranslation("common.phrases");
 	LoadTranslation("playermanagement.phrases");
 
-	RegAdminCmd("sm_swap", Swap_Cmd, ADMFLAG_KICK, "sm_swap <player1> [player2] ... [playerN] - swap all listed players to opposite teams");
-	RegAdminCmd("sm_swapto", SwapTo_Cmd, ADMFLAG_KICK, "sm_swapto [force] <teamnum> <player1> [player2] ... [playerN] - swap all listed players to <teamnum> (1,2, or 3)");
-	RegAdminCmd("sm_swapteams", SwapTeams_Cmd, ADMFLAG_KICK, "sm_swapteams - swap the players between both teams");
+	RegAdminCmd("sm_swap", Swap_Cmd, ADMFLAG_GENERIC, "sm_swap <player1> [player2] ... [playerN] - swap all listed players to opposite teams");
+	RegAdminCmd("sm_swapto", SwapTo_Cmd, ADMFLAG_GENERIC, "sm_swapto [force] <teamnum> <player1> [player2] ... [playerN] - swap all listed players to <teamnum> (1,2, or 3)");
+	RegAdminCmd("sm_swapteams", SwapTeams_Cmd, ADMFLAG_GENERIC, "sm_swapteams - swap the players between both teams");
 	RegAdminCmd("sm_fixbots", FixBots_Cmd, ADMFLAG_BAN, "sm_fixbots - Spawns survivor bots to match survivor_limit");
 	RegConsoleCmd("sm_spectate", Spectate_Cmd, "Moves you to the spectator team");
 	RegConsoleCmd("sm_spec", Spectate_Cmd, "Moves you to the spectator team");

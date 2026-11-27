@@ -137,7 +137,7 @@ public void OnAdminMenuReady(Handle hTopMenu) {
     g_TopMenu_AdminMenu = topmenu;
     TopMenuObject server_commands = FindTopMenuCategory(topmenu, ADMINMENU_SERVERCOMMANDS);
     if (server_commands != INVALID_TOPMENUOBJECT) {
-        AddToTopMenu(topmenu, "l4d2_switch_map", TopMenuObject_Item, AdminMenu_MainHandler, server_commands, "l4d2_switch_map_access", ADMFLAG_CHANGEMAP);
+        AddToTopMenu(topmenu, "l4d2_switch_map", TopMenuObject_Item, AdminMenu_MainHandler, server_commands, "l4d2_switch_map_access", ADMFLAG_KICK);
         PrintToServer("[Admin Mission Menu] Menu item added successfully.");
     } else {
         PrintToServer("[Admin Mission Menu] Warning: Could not find server commands category.");

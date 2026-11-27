@@ -175,7 +175,7 @@ public void OnPluginStart()
 	g_cvLimit5M = CreateConVar("sm_qf_limit_5m", "10", "500w 积分以上玩家每日全服聊天次数。", FCVAR_NONE, true, 0.0);
 	g_cvLimit10M = CreateConVar("sm_qf_limit_10m", "20", "1000w 积分以上玩家每日全服聊天次数。", FCVAR_NONE, true, 0.0);
 	g_cvLimit20M = CreateConVar("sm_qf_limit_20m", "30", "2000w 积分以上玩家每日全服聊天次数。", FCVAR_NONE, true, 0.0);
-	g_cvLimitKickAdmin = CreateConVar("sm_qf_limit_kick_admin", "50", "有 kick 权限但没有 z 权限的管理员每日全服聊天次数。", FCVAR_NONE, true, 0.0);
+	g_cvLimitKickAdmin = CreateConVar("sm_qf_limit_kick_admin", "50", "有 b（普通管理员）权限但没有 z 权限的管理员每日全服聊天次数。", FCVAR_NONE, true, 0.0);
 	g_cvShowGlobal = CreateConVar("sm_qf_show_global", "1", "本服玩家是否能看到普通全服聊天和上线提示。", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_cvShowLFG = CreateConVar("sm_zd_show_global", "1", "本服旁观玩家是否能看到找队友全服提示。", FCVAR_NONE, true, 0.0, true, 1.0);
 
@@ -437,7 +437,7 @@ public Action Command_GlobalChatMenu(int client, int args)
 
 bool CanToggleLFGPreference(int client)
 {
-	return CheckCommandAccess(client, "sm_kick", ADMFLAG_KICK, true);
+	return CheckCommandAccess(client, "sm_globalchat_admin", ADMFLAG_GENERIC, true);
 }
 
 void ShowGlobalChatMenu(int client)
@@ -1110,7 +1110,7 @@ bool HasUnlimitedGlobalChat(int client)
 
 bool HasKickAdminGlobalChatLimit(int client)
 {
-	return CheckCommandAccess(client, "sm_kick", ADMFLAG_KICK, true);
+	return CheckCommandAccess(client, "sm_globalchat_admin", ADMFLAG_GENERIC, true);
 }
 
 int GetDailyLimit(int client)

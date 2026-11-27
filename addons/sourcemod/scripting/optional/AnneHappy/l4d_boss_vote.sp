@@ -53,8 +53,8 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_voteboss", VoteBossCmd); // Allows players to vote for custom boss spawns
 	RegConsoleCmd("sm_bossvote", VoteBossCmd); // Allows players to vote for custom boss spawns
 	
-	RegAdminCmd("sm_ftank", ForceTankCommand, ADMFLAG_GENERIC);
-	RegAdminCmd("sm_fwitch", ForceWitchCommand, ADMFLAG_BAN);
+	RegAdminCmd("sm_ftank", ForceTankCommand, ADMFLAG_KICK);
+	RegAdminCmd("sm_fwitch", ForceWitchCommand, ADMFLAG_KICK);
 
 	g_iRound = 0;
 }

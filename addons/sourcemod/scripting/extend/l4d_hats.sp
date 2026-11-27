@@ -817,8 +817,8 @@ public void OnPluginStart()
 	g_hCvarBots = CreateConVar(			"l4d_hats_bots",		"0",			"0=Disallow bots from spawning with Hats. 1=Allow bots to spawn with hats.", CVAR_FLAGS, true, 0.0, true, 1.0 );
 	g_hCvarChange = CreateConVar(		"l4d_hats_change",		"1.3",			"0=Off. Other value puts the player into thirdperson for this many seconds when selecting a hat.", CVAR_FLAGS );
 	g_hCvarDetect = CreateConVar(		"l4d_hats_detect",		"0.3",			"0.0=Off. How often to detect thirdperson view. Also uses ThirdPersonShoulder_Detect plugin if available.", CVAR_FLAGS );
-	g_hCvarMake = CreateConVar(			"l4d_hats_make",		"c",				"Specify admin flags or blank to allow all players to spawn with a hat, requires the l4d_hats_random cvar to spawn.", CVAR_FLAGS );
-	g_hCvarMenu = CreateConVar(			"l4d_hats_menu",		"c",				"Specify admin flags or blank to allow all players access to the hats menu.", CVAR_FLAGS );
+	g_hCvarMake = CreateConVar(			"l4d_hats_make",		"f",				"Specify admin flags or blank to allow all players to spawn with a hat, requires the l4d_hats_random cvar to spawn.", CVAR_FLAGS );
+	g_hCvarMenu = CreateConVar(			"l4d_hats_menu",		"f",				"Specify admin flags or blank to allow all players access to the hats menu.", CVAR_FLAGS );
 	g_hCvarModes = CreateConVar(		"l4d_hats_modes",		"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff = CreateConVar(		"l4d_hats_modes_off",	"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesTog = CreateConVar(		"l4d_hats_modes_tog",	"",				"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
