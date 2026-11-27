@@ -938,3 +938,4 @@
 - An admin with only `c` is no longer treated as an admin identity: they are not covered by the `rpg` anti-kick protection, can be vote-kicked, and cannot use it to block votekicks against themselves. Glows, skins (which need `f`), and other perks are not available to them either.
 - An admin with only `c` (for example `"10:c"`) can kick players, change maps, and move the Tank/Witch spawn. With immunity below paid admins they cannot kick paid admins, and `sm_ftank 0`/`sm_fwitch 0` still need immunity above 90.
 - When `sbpp_main.smx` revokes admins that expired in SourceBans, it keeps identities that have only `c` and revokes those with any other flag.
+- `admin_groups.cfg` adds a `ServerGuest` group (flag `c` only, immunity 10). A server owner grants the permissions above with `"STEAM_x:x:xxx" "@ServerGuest"` in `admins_simple.ini`.

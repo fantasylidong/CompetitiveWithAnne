@@ -1522,3 +1522,4 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 只有 `c` 的管理员不再被视为“管理员身份”：不受 `rpg` 防踢保护，可以被投票踢，也不能借此阻止别人投票踢自己；轮廓、皮肤（需 `f`）以及其他特权同样拿不到。
 - 只给 `c` 的管理员（如 `"10:c"`）可以踢人、换图、移动 Tank/Witch 位置；免疫低于付费管理员时踢不了付费管理员，`sm_ftank 0`/`sm_fwitch 0` 关闭仍需免疫 90 以上。
 - `sbpp_main.smx` 撤销 SourceBans 已到期管理员时，保留只有 `c` 的身份，只撤销带其他权限位的。
+- `admin_groups.cfg` 新增 `ServerGuest` 组（只有 `c`，免疫 10），服主在 `admins_simple.ini` 写 `"STEAM_x:x:xxx" "@ServerGuest"` 即可分配上述权限。
