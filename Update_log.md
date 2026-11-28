@@ -1536,3 +1536,19 @@ witchparty 和 allcharger模式在普通药役的基础上小僵尸再减少17-2
 - 新增开关 `sm_weapon_balance_player_enable`（默认 1）和 `sm_weapon_balance_player_min_shots`（默认 20，单回合开枪少于该值时不写回合汇总）。只在已有回调里多做计数，不新增 hook，写库沿用原来的异步事务和共享数据库连接。
 - 新增 native `L4D2WBS_GetRoundUid`（`include/l4d2_weapon_balance_stats.inc`），供其他插件取得与 `player_combat_rounds.round_uid` 相同的回合编号。
 
+### 2026年11月27日 Little Anti-Cheat 合入上游修复，新增管理员提示和接口
+
+- 霰弹、穿透或爆炸一次打死多个目标时，同一枪只做一次瞄准检测。旧版会对每个死者各查一次，重复累计检测次数，更容易误封。
+- 新增 `lilac_cheat_warning`（默认 1）：玩家第二次起被判定疑似 Aimbot、Aimlock 或 Bhop 时，在聊天栏提醒在线管理员。提示文字支持简中、繁中、英语、日语、韩语、越南语。
+- 修正噪音道具检测遍历实体时用错上限，原来可能漏查编号较大的实体。
+- 新增 `include/lilac.inc`，其他插件可以接收 LAC 的检测和封禁事件。
+- 以上修复来自上游 1.7.4 和 HarryPotter（fbef0102）维护的分支；本仓库原有的数据库共享连接、内鬼模式连跳豁免和默认值不变。
+- 瞄准检测默认只有同时出现至少两种证据（角度重复、甩枪、自动开火、总转角过大）时才计入封禁次数；只有一种证据的检测仍记日志并提醒管理员，但不计数，数据库里记为 `aimbot_weak`。按最近半年线上记录回放，旧规则会封禁 26 人（实际封禁 25 人），新规则只会封禁其中 1 人。新增 `lilac_aimbot_single_evidence`（默认 0），设为 1 恢复旧行为。
+
+### 2026年11月27日 join 插件：SteamID 未通过验证的玩家只能旁观
+
+- 玩家的 SteamID 还没通过 Steam 验证（或只拿到 `STEAM_ID_` 开头的占位值）时，不能加入生还者或特感队伍，也不能接管 bot，只能旁观；`!join`、`!inf`、`jointeam`、`chooseteam` 和接管 bot 都会被拦下并提示原因。被引擎或其他插件直接放进队伍时，会立即移回旁观。
+- 验证通过后聊天栏提示可以加入。进服 60 秒后仍未通过验证会被踢出并提示重连；服务器自己连不上 Steam 时只拦截不踢。
+- 同一次连接里只要验证过一次，之后章节过关、换图都直接放行，不用重新等验证。SourceMod 每次换图都会清掉验证状态再重新验证，如果每次都拦，过关后会有一段时间进不了队伍。
+- 新增 `join_require_steam_auth`（默认 1）和 `join_steam_auth_timeout`（默认 60 秒，0 为只拦截不踢）。提示支持简中、繁中、英语、日语、韩语、越南语。
+- 原因：Little Anti-Cheat 过去半年有 141 条检测记录落在占位 SteamID `STEAM_ID_STOP_IGNORING_RETVALS` 上，对应 72 个不同 IP，封禁可能落到别人身上。

@@ -71,6 +71,9 @@ addons/sourcemod/configs/l4d2_private_license.cfg
 addons/sourcemod/scripting/optional/AnneHappy/l4d2_player_attr_db.sp
 addons/sourcemod/plugins/optional/AnneHappy/l4d2_player_attr_db.smx
 addons/sourcemod/configs/l4d2_player_attr_db.sql
+addons/sourcemod/scripting/optional/AnneHappy/l4d2_combat_telemetry.sp
+addons/sourcemod/scripting/optional/AnneHappy/l4d2_combat_telemetry
+addons/sourcemod/plugins/optional/AnneHappy/l4d2_combat_telemetry.smx
 
 # Local database migration config with passwords
 scripts/01-cloud-mariadb-migrate.sh

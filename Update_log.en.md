@@ -952,3 +952,19 @@
 - New switches: `sm_weapon_balance_player_enable` (default 1) and `sm_weapon_balance_player_min_shots` (default 20; rounds with fewer shots are not written to the round summary). The plugin only adds counters inside existing callbacks, adds no hooks, and writes through the existing asynchronous transaction and shared database connection.
 - Added the native `L4D2WBS_GetRoundUid` (`include/l4d2_weapon_balance_stats.inc`) so other plugins can read the same round ID used in `player_combat_rounds.round_uid`.
 
+### November 27, 2026 — Little Anti-Cheat Merges Upstream Fixes and Adds Admin Warnings and an API
+
+- When one shotgun blast, penetrating bullet, or explosion kills several targets, the shot is now checked for aimbot only once. Previously each victim triggered its own check, which counted the same shot several times and made false bans more likely.
+- Added `lilac_cheat_warning` (default 1): from a player's second suspected Aimbot, Aimlock, or Bhop detection onward, online admins get a chat warning. The message is available in Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese.
+- Fixed the noisemaker check using the wrong entity limit, which could skip higher-numbered entities.
+- Added `include/lilac.inc` so other plugins can receive LAC's detection and ban events.
+- These fixes come from upstream 1.7.4 and the fork maintained by HarryPotter (fbef0102). This repository's shared database connection, Traitor-mode bhop exemption, and default values are unchanged.
+- By default, an aimbot detection now counts toward a ban only when it has at least two kinds of evidence (angle repeat, aim snap, autoshoot, or excessive total turn). Detections with a single kind of evidence are still logged and still warn admins, but do not count, and are stored as `aimbot_weak` in the database. Replaying the last six months of live records, the old rule would have banned 26 players (25 were actually banned); the new rule would ban one of them. Added `lilac_aimbot_single_evidence` (default 0); set it to 1 to restore the old behavior.
+
+### November 27, 2026 — join: Players Whose SteamID Is Not Yet Verified Can Only Spectate
+
+- Until Steam verifies a player's SteamID (or while only a placeholder starting with `STEAM_ID_` is available), the player cannot join the survivor or infected team or take over a bot, and can only spectate. `!join`, `!inf`, `jointeam`, `chooseteam`, and bot takeover are all blocked with an explanation. If the engine or another plugin puts the player on a team directly, they are moved back to spectators immediately.
+- Once verified, the player sees a chat message saying they can join. A player still unverified 60 seconds after joining is kicked and asked to reconnect. If the server itself cannot reach Steam, players are only blocked, not kicked.
+- Once a player has been verified during a connection, later chapter transitions and map changes let them through without waiting again. SourceMod clears and re-runs verification on every map change, so blocking each time would leave players unable to rejoin their team for a while after each chapter.
+- Added `join_require_steam_auth` (default 1) and `join_steam_auth_timeout` (default 60 seconds; 0 blocks without kicking). Messages are available in Simplified Chinese, Traditional Chinese, English, Japanese, Korean, and Vietnamese.
+- Reason: over the past six months, 141 Little Anti-Cheat detections were recorded under the placeholder SteamID `STEAM_ID_STOP_IGNORING_RETVALS`, from 72 different IPs, so a ban could land on someone else.

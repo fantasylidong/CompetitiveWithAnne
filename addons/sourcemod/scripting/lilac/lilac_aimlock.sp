@@ -180,6 +180,9 @@ static void lilac_detected_aimlock(int client)
 	if (++playerinfo_aimlock[client] < 2)
 		return;
 
+	if (icvar[CVAR_CHEAT_WARN])
+		lilac_warn_admins(client, CHEAT_AIMLOCK, playerinfo_aimlock[client]);
+
 	if (icvar[CVAR_LOG]) {
 		lilac_log_setup_client(client);
 		Format(line, sizeof(line),

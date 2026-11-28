@@ -120,6 +120,9 @@ static void lilac_detected_bhop(int client)
 	if (++detections[client] < 2)
 		return;
 
+	if (icvar[CVAR_CHEAT_WARN])
+		lilac_warn_admins(client, CHEAT_BHOP, detections[client]);
+
 	if (icvar[CVAR_LOG]) {
 		lilac_log_setup_client(client);
 		Format(line, sizeof(line),

@@ -18,11 +18,15 @@
 
 static int aimbot_detection[MAXPLAYERS + 1];
 static int aimbot_autoshoot[MAXPLAYERS + 1];
+// 同一 tick 内同一攻击者只做一次瞄准检测（霰弹 / 穿透 / 爆炸一次打死多个目标时，
+// 旧版会对同一枪排多次检测，重复累计次数）。来自上游 1.7.4，按攻击者去重。
+static int aimbot_timertick[MAXPLAYERS + 1];
 
 void lilac_aimbot_reset_client(int client)
 {
 	aimbot_detection[client] = 0;
 	aimbot_autoshoot[client] = 0;
+	aimbot_timertick[client] = 0;
 }
 
 int lilac_aimbot_get_client_detections(int client)
@@ -84,9 +88,14 @@ void event_death_shared(int userid, int client, int victim, bool skip_delta)
 		|| !is_player_valid(client)
 		|| !is_player_valid(victim)
 		|| IsFakeClient(client)
+		|| !IsPlayerAlive(client)
 		|| playerinfo_banned_flags[client][CHEAT_AIMBOT]
 		|| GetClientTime(client) < 10.1)
 		return;
+
+	if (aimbot_timertick[client] == GetGameTickCount())
+		return;
+	aimbot_timertick[client] = GetGameTickCount();
 
 	if (icvar[CVAR_AIMLOCK_LIGHT])
 		lilac_aimlock_light_test(client);
@@ -283,6 +292,17 @@ public Action timer_check_aimbot(Handle timer, DataPack pack)
 	return Plugin_Stop;
 }
 
+// 这次检测有几种独立证据：Angle-Repeat、Aim-Snap（含 Snap2）、Autoshoot、Total-Delta 各算一种。
+static int aimbot_evidence_kinds(int flags, float td)
+{
+	int kinds = 0;
+	if (flags & AIMBOT_FLAG_REPEAT) kinds++;
+	if (flags & (AIMBOT_FLAG_SNAP | AIMBOT_FLAG_SNAP2)) kinds++;
+	if (flags & AIMBOT_FLAG_AUTOSHOOT) kinds++;
+	if (td > AIMBOT_MAX_TOTAL_DELTA) kinds++;
+	return kinds;
+}
+
 static void lilac_detected_aimbot(int client, float delta, float td, int flags)
 {
 	if (playerinfo_banned_flags[client][CHEAT_AIMBOT])
@@ -290,6 +310,14 @@ static void lilac_detected_aimbot(int client, float delta, float td, int flags)
 
 	if (lilac_forward_allow_cheat_detection(client, CHEAT_AIMBOT) == false)
 		return;
+
+	// 线上数据显示，大部分封禁完全由同一种证据（主要是 Angle-Repeat）重复累计而来，
+	// 药役里近距离急转身打特感很容易单独触发。默认单一证据只记录、提醒管理员，不计入封禁次数。
+	if (!icvar[CVAR_AIMBOT_SINGLE_EVIDENCE] && aimbot_evidence_kinds(flags, td) < 2) {
+		lilac_forward_client_cheat(client, CHEAT_AIMBOT);
+		database_log(client, "aimbot_weak", DATABASE_LOG_ONLY, float(flags), td);
+		return;
+	}
 
 	// Detection expires in 10 minutes.
 	CreateTimer(600.0, timer_decrement_aimbot, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -299,6 +327,9 @@ static void lilac_detected_aimbot(int client, float delta, float td, int flags)
 	// Don't log the first detection.
 	if (++aimbot_detection[client] < 2)
 		return;
+
+	if (icvar[CVAR_CHEAT_WARN])
+		lilac_warn_admins(client, CHEAT_AIMBOT, aimbot_detection[client]);
 
 	if (icvar[CVAR_LOG]) {
 		lilac_log_setup_client(client);

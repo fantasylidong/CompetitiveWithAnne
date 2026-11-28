@@ -204,4 +204,16 @@
 	{
 		"ko"		"{green}[Join]{default} 일어나는 동작 중에는 관전으로 전환할 수 없습니다. 전환 예약이 취소되었습니다."
 	}
+	"Join_SteamAuthPending"
+	{
+		"ko"		"{green}[Join]{default} SteamID가 아직 Steam 인증을 받지 않았습니다. 인증 전에는 관전만 할 수 있습니다. 1분 안에 인증되지 않으면 다시 접속하세요."
+	}
+	"Join_SteamAuthPassed"
+	{
+		"ko"		"{green}[Join]{default} SteamID 인증이 완료되었습니다. 이제 팀에 참가할 수 있습니다."
+	}
+	"Join_SteamAuthKick"
+	{
+		"ko"		"SteamID를 Steam에서 인증하지 못했습니다. 다시 접속해 주세요."
+	}
 }

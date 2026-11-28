@@ -50,7 +50,7 @@ void check_inventory_for_noisemaker(int client)
 	noisemaker_entity_prev[client] = noisemaker_entity[client];
 	noisemaker_entity[client] = 0;
 
-	for (int i = MaxClients + 1; i < GetEntityCount(); i++) {
+	for (int i = MaxClients + 1; i < GetMaxEntities(); i++) {
 		if (!IsValidEdict(i))
 			continue;
 

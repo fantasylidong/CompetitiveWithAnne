@@ -104,4 +104,9 @@
 	{
 		"vi"		"Bạn đã bị cấm từ máy chủ này."
 	}
+	"admin_chat_warning_generic"
+	{
+		"#format"	"{1:N},{2:s},{3:d}"
+		"vi"		"{1} bị nghi sử dụng '{2}' (Số lần phát hiện: {3})"
+	}
 }

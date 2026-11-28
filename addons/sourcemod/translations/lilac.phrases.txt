@@ -104,4 +104,9 @@
 	{
 		"en"		"You have been banned from this server."
 	}
+	"admin_chat_warning_generic"
+	{
+		"#format"	"{1:N},{2:s},{3:d}"
+		"en"		"{1} is suspected of using '{2}' (Detections: {3})"
+	}
 }

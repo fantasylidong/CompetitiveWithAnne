@@ -85,7 +85,9 @@
 #define CVAR_AUTO_UPDATE           35
 #define CVAR_SOURCEIRC             36
 #define CVAR_DATABASE              37
-#define CVAR_MAX                   38
+#define CVAR_CHEAT_WARN            38
+#define CVAR_AIMBOT_SINGLE_EVIDENCE 39
+#define CVAR_MAX                   40
 
 #define BHOP_INDEX_MIN     0
 #define BHOP_INDEX_JUMP    1

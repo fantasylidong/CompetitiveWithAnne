@@ -204,4 +204,16 @@
 	{
 		"vi"		"{green}[Join]{default} Bạn đang đứng dậy nên không thể chuyển sang khán giả. Yêu cầu chuyển đội đã bị hủy."
 	}
+	"Join_SteamAuthPending"
+	{
+		"vi"		"{green}[Join]{default} SteamID của bạn chưa được Steam xác minh. Trước khi xác minh bạn chỉ có thể xem. Nếu sau một phút vẫn chưa được, hãy kết nối lại."
+	}
+	"Join_SteamAuthPassed"
+	{
+		"vi"		"{green}[Join]{default} SteamID đã được xác minh. Bây giờ bạn có thể vào đội."
+	}
+	"Join_SteamAuthKick"
+	{
+		"vi"		"SteamID của bạn không được Steam xác minh. Vui lòng kết nối lại."
+	}
 }

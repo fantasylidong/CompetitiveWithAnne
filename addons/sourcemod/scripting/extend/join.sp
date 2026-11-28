@@ -45,6 +45,7 @@
 #define JOIN_MOTD_DELAY 4.0
 #define ANNE_INFECTED_ENFORCE_INTERVAL 10.0
 #define TEAM_SPECTATOR 1
+#define TEAM_SURVIVOR_ID 2
 #define TEAM_INFECTED 3
 #define ZC_TANK 8
 
@@ -53,7 +54,7 @@ public Plugin myinfo =
 	name = "simple join",
 	author = "东",
 	description = "A plugin designed CompetitiveWithAnne package change player team.",
-	version = "1.8.1",
+	version = "1.9.0",
 	url = "https://github.com/fantasylidong/CompetitiveWithAnne"
 };
 #define AUTOUPDATE_URL_LENGTH 256
@@ -84,9 +85,14 @@ char
 
 Handle
 	g_hAwayTimer[MAXPLAYERS + 1],
-	g_hDonateRemindTimer[MAXPLAYERS + 1];
+	g_hDonateRemindTimer[MAXPLAYERS + 1],
+	g_hSteamAuthTimer[MAXPLAYERS + 1];
+
+bool
+	g_bSteamAuthBlockNotified[MAXPLAYERS + 1] = { false };
 
 int
+	g_iSteamAuthVerifiedUserId[MAXPLAYERS + 1] = { 0 },
 	g_iDonateOptionCount = 0,
 	g_iDonateRemindTicks[MAXPLAYERS + 1] = { 0 };
 
@@ -107,13 +113,17 @@ ConVar
 	hCvarTraitorEnable,
 	hCvarKickFamilyAccount,
 	hCvarIPUrl,
-	hCvarDonateUrl;
+	hCvarDonateUrl,
+	hCvarRequireSteamAuth,
+	hCvarSteamAuthTimeout;
 
 
 public void OnPluginStart()
 {
 	LoadTranslations("join.phrases");
 	hCvarEnableInf = CreateConVar("join_enable_inf", "1", "是否可以开启加入特感", _, true, 0.0, true, 1.0);
+	hCvarRequireSteamAuth = CreateConVar("join_require_steam_auth", "1", "SteamID 通过 Steam 验证前禁止加入生还者或特感队伍（只能旁观）", _, true, 0.0, true, 1.0);
+	hCvarSteamAuthTimeout = CreateConVar("join_steam_auth_timeout", "60", "进服多少秒后仍未通过 Steam 验证就踢出并提示重连；0 = 只拦截不踢。服务器自身连不上 Steam 时不踢", _, true, 0.0, true, 600.0);
 	hCvarKickFamilyAccount = CreateConVar("join_enable_kickfamilyaccount", "1", "是否开启踢出家庭共享账户", _, true, 0.0, true, 1.0);
 	hCvarEnableAutoupdate = CreateConVar("join_autoupdate", "0", "AnneHappy自动更新：0关闭，1无数据库插件，2含数据库插件（白名单服务器额外含隐藏插件）", _, true, 0.0, true, 2.0);
 	hCvarAutoupdatePublicUrl = CreateConVar("join_autoupdate_public_url", UPDATE_URL_PUBLIC, "join_autoupdate为1时使用的无数据库更新清单URL");
@@ -551,6 +561,13 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
 	if(IsValidPlayer(target) && GetEventInt(event, "oldteam") != team)
 		CancelAwayTimer(target);
 
+	// 兜底：引擎自动分队、其他插件直接 ChangeClientTeam 都会走到这里。
+	if(!disconnect && (team == TEAM_SURVIVOR_ID || team == TEAM_INFECTED) && IsSteamAuthBlocked(target))
+	{
+		CreateTimer(0.1, Timer_EnforceSteamAuthTeam, GetClientUserId(target), TIMER_FLAG_NO_MAPCHANGE);
+		return Plugin_Continue;
+	}
+
 	if (IsValidPlayer(target) && !disconnect && team == TEAM_INFECTED && ShouldRestrictInfectedTeam())
 	{
 		if(IsFakeClient(target))
@@ -620,12 +637,166 @@ bool CancelAwayTimer(int client)
 public void OnMapEnd()
 {
 	for(int client = 1; client <= MaxClients; client++)
+	{
 		CancelAwayTimer(client);
+		// TIMER_FLAG_NO_MAPCHANGE 会在换图时销毁计时器，这里只清句柄。
+		g_hSteamAuthTimer[client] = null;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SteamID 未验证的玩家只能旁观
+// ---------------------------------------------------------------------------
+
+// 真人且 SteamID 还没有通过 Steam 验证（或拿到的是 STEAM_ID_ 开头的占位值）。
+//
+// SourceMod 每次换图（包括章节过关）都会清掉所有玩家的验证状态再重新排队验证，
+// 中间有一段空档。所以这次连接里只要验证过一次就一直放行：userid 在换图时不变，
+// 真正断线重连会换新 userid，旧记录自然失效。
+bool IsSteamAuthBlocked(int client)
+{
+	if(!hCvarRequireSteamAuth.BoolValue || client <= 0 || client > MaxClients || !IsClientConnected(client) || IsFakeClient(client))
+		return false;
+
+	int userid = GetClientUserId(client);
+	if(g_iSteamAuthVerifiedUserId[client] == userid)
+		return false;
+
+	if(!HasValidSteamAuth(client))
+		return true;
+
+	g_iSteamAuthVerifiedUserId[client] = userid;
+	return false;
+}
+
+bool HasValidSteamAuth(int client)
+{
+	if(!IsClientAuthorized(client))
+		return false;
+
+	char auth[32];
+	if(!GetClientAuthId(client, AuthId_Steam2, auth, sizeof(auth), true))
+		return false;
+	return strncmp(auth, "STEAM_ID_", 9) != 0 && strncmp(auth, "STEAM_", 6) == 0;
+}
+
+bool IsSpectatorJoinArgument(const char[] arg)
+{
+	return StrEqual(arg, "spectator", false) || StrEqual(arg, "1");
+}
+
+void NotifySteamAuthBlocked(int client)
+{
+	if(!IsValidClient(client))
+		return;
+	CPrintToChat(client, "%t", "Join_SteamAuthPending");
+}
+
+void StartSteamAuthWatch(int client)
+{
+	StopSteamAuthWatch(client);
+	g_bSteamAuthBlockNotified[client] = false;
+	if(!IsSteamAuthBlocked(client))
+		return;
+
+	// 每 5 秒检查一次：已验证就提示放行；超时就踢出。
+	g_hSteamAuthTimer[client] = CreateTimer(5.0, Timer_SteamAuthWatch, GetClientUserId(client), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+}
+
+void StopSteamAuthWatch(int client)
+{
+	if(g_hSteamAuthTimer[client] != null)
+	{
+		delete g_hSteamAuthTimer[client];
+		g_hSteamAuthTimer[client] = null;
+	}
+}
+
+public void OnClientAuthorized(int client, const char[] auth)
+{
+	if(IsFakeClient(client))
+		return;
+
+	if(HasValidSteamAuth(client))
+		g_iSteamAuthVerifiedUserId[client] = GetClientUserId(client);
+
+	if(g_hSteamAuthTimer[client] == null)
+		return;
+
+	StopSteamAuthWatch(client);
+	if(IsClientInGame(client) && g_bSteamAuthBlockNotified[client])
+		CPrintToChat(client, "%t", "Join_SteamAuthPassed");
+}
+
+public Action Timer_SteamAuthWatch(Handle timer, int userid)
+{
+	int client = GetClientOfUserId(userid);
+	if(client <= 0)
+		return Plugin_Stop;
+
+	if(!IsSteamAuthBlocked(client))
+	{
+		g_hSteamAuthTimer[client] = null;
+		if(IsClientInGame(client) && g_bSteamAuthBlockNotified[client])
+			CPrintToChat(client, "%t", "Join_SteamAuthPassed");
+		return Plugin_Stop;
+	}
+
+	if(IsClientInGame(client) && !g_bSteamAuthBlockNotified[client])
+	{
+		g_bSteamAuthBlockNotified[client] = true;
+		CPrintToChat(client, "%t", "Join_SteamAuthPending");
+	}
+
+	int timeout = hCvarSteamAuthTimeout.IntValue;
+	if(timeout <= 0 || GetClientTime(client) < float(timeout))
+		return Plugin_Continue;
+
+	// 服务器自己连不上 Steam 时，所有新玩家都会卡在未验证，此时只拦截不踢。
+	if(IsServerSteamOffline())
+		return Plugin_Continue;
+
+	g_hSteamAuthTimer[client] = null;
+	KickClient(client, "%T", "Join_SteamAuthKick", client);
+	return Plugin_Stop;
+}
+
+bool IsServerSteamOffline()
+{
+	return GetFeatureStatus(FeatureType_Native, "SteamWorks_IsConnected") == FeatureStatus_Available
+		&& !SteamWorks_IsConnected();
+}
+
+public Action Timer_EnforceSteamAuthTeam(Handle timer, int userid)
+{
+	int client = GetClientOfUserId(userid);
+	if(client <= 0 || !IsValidClient(client) || !IsSteamAuthBlocked(client))
+		return Plugin_Stop;
+
+	int team = GetClientTeam(client);
+	if(team != TEAM_SURVIVOR_ID && team != TEAM_INFECTED)
+		return Plugin_Stop;
+
+	MoveClientToSpectator(client, true, true);
+	NotifySteamAuthBlocked(client);
+	return Plugin_Stop;
+}
+
+// 接管生还者 bot（闲置回来、!join 以外的接管方式）同样拦截。
+public Action L4D_OnTakeOverBot(int client)
+{
+	if(IsSteamAuthBlocked(client))
+	{
+		NotifySteamAuthBlocked(client);
+		return Plugin_Handled;
+	}
+	return Plugin_Continue;
 }
 
 
 public void OnClientPutInServer(int client)
 {
+	StartSteamAuthWatch(client);
 	if(client > 0 && IsClientConnected(client) && !IsFakeClient(client) && ShouldRestrictInfectedTeam())
 	{
 		//ServerCommand("sm_addbot2");
@@ -673,6 +844,7 @@ public void OnClientDisconnect(int client)
 	{
 		CancelAwayTimer(client);
 		ResetDonateClientState(client);
+		StopSteamAuthWatch(client);
 	}
 }
 
@@ -718,6 +890,12 @@ public Action TurnClientToInfected(int client, int args)
 	if(!IsValidClient(client))
 		return Plugin_Handled;
 
+	if(IsSteamAuthBlocked(client))
+	{
+		NotifySteamAuthBlocked(client);
+		return Plugin_Handled;
+	}
+
 	if(IsTraitorModeEnabled())
 	{
 		PrintTraitorTeamJoinBlocked(client);
@@ -753,6 +931,12 @@ public Action TurnClientToSurvivors(int client, int args)
 	if(CancelAwayTimer(client))
 	{
 		CPrintToChat(client, "%t", "Join_AwayCancelled");
+		return Plugin_Handled;
+	}
+
+	if(IsSteamAuthBlocked(client))
+	{
+		NotifySteamAuthBlocked(client);
 		return Plugin_Handled;
 	}
 
@@ -951,6 +1135,11 @@ public Action Command_Setinfo(int client, const char[] command, int args)
 {
 	char arg[32];
 	GetCmdArg(1, arg, sizeof(arg));
+	if(IsSteamAuthBlocked(client) && !IsSpectatorJoinArgument(arg))
+	{
+		NotifySteamAuthBlocked(client);
+		return Plugin_Handled;
+	}
 	if(IsTraitorModeEnabled() && IsInfectedJoinArgument(arg))
 	{
 		if(IsValidClient(client))
@@ -967,6 +1156,11 @@ public Action Command_Setinfo(int client, const char[] command, int args)
 
 public Action Command_Setinfo1(int client, const char[] command, int args)
 {
+	if(IsSteamAuthBlocked(client))
+	{
+		NotifySteamAuthBlocked(client);
+		return Plugin_Handled;
+	}
 	if(hCvarEnableInf.BoolValue){
     	return Plugin_Continue;
 	}

@@ -134,6 +134,12 @@ void lilac_config_setup()
 	cvar[CVAR_DATABASE] = CreateConVar("lilac_database", "l4dstats",
 		"Database to log detections to.\nempty = don't log to database\ndatabase name = log to this database (MySQL & SQLite supported)",
 		FCVAR_PROTECTED);
+	cvar[CVAR_AIMBOT_SINGLE_EVIDENCE] = CreateConVar("lilac_aimbot_single_evidence", "0",
+		"Whether an aimbot detection backed by only one kind of evidence (only Angle-Repeat, only Aim-Snap, only Autoshoot or only Total-Delta) counts toward the ban.\n0 = Log and warn only, do not count toward the ban.\n1 = Count it (original behavior).",
+		FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	cvar[CVAR_CHEAT_WARN] = CreateConVar("lilac_cheat_warning", "1",
+		"Warn online admins in chat when a player is suspected of Aimbot, Aimlock or Bhop (from the 2nd detection on).\n0 = Disabled.\n1 = Enabled.",
+		FCVAR_PROTECTED, true, 0.0, true, 1.0);
 
 	for (int i = 0; i < CVAR_MAX; i++) {
 		if (i != CVAR_LOG_DATE)
@@ -624,6 +630,12 @@ public void cvar_change(ConVar convar, const char[] oldValue, const char[] newVa
 	}
 	else if (view_as<Handle>(convar) == cvar[CVAR_LOSS_FIX]) {
 		icvar[CVAR_LOSS_FIX] = StringToInt(newValue, 10);
+	}
+	else if (view_as<Handle>(convar) == cvar[CVAR_AIMBOT_SINGLE_EVIDENCE]) {
+		icvar[CVAR_AIMBOT_SINGLE_EVIDENCE] = StringToInt(newValue, 10);
+	}
+	else if (view_as<Handle>(convar) == cvar[CVAR_CHEAT_WARN]) {
+		icvar[CVAR_CHEAT_WARN] = StringToInt(newValue, 10);
 	}
 	else if (view_as<Handle>(convar) == cvar[CVAR_AUTO_UPDATE]) {
 		icvar[CVAR_AUTO_UPDATE] = StringToInt(newValue, 10);

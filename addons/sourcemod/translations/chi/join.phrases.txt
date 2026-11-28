@@ -204,4 +204,16 @@
 	{
 		"chi"		"{green}[Join]{default} 你正在起身，无法切换旁观，切队请求已取消。"
 	}
+	"Join_SteamAuthPending"
+	{
+		"chi"		"{green}[Join]{default} 你的 SteamID 还没通过 Steam 验证，验证前只能旁观。一分钟内还没通过请重新连接。"
+	}
+	"Join_SteamAuthPassed"
+	{
+		"chi"		"{green}[Join]{default} SteamID 已通过验证，现在可以加入队伍了。"
+	}
+	"Join_SteamAuthKick"
+	{
+		"chi"		"你的 SteamID 未能通过 Steam 验证，请重新连接。"
+	}
 }

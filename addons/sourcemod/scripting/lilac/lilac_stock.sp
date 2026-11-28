@@ -361,6 +361,24 @@ int intabs(int num)
 	return ((num < 0) ? num * -1 : num);
 }
 
+// 提醒在线管理员某玩家疑似作弊（来自上游 1.7.4）。宏有自己的提示，这里只处理 Aimbot / Aimlock / Bhop。
+void lilac_warn_admins(int client, int cheat, int detections)
+{
+	char type[16];
+	switch (cheat) {
+	case CHEAT_BHOP: { strcopy(type, sizeof(type), "Bhop"); }
+	case CHEAT_AIMBOT: { strcopy(type, sizeof(type), "Aimbot"); }
+	case CHEAT_AIMLOCK: { strcopy(type, sizeof(type), "Aimlock"); }
+	default: { return; }
+	}
+
+	for (int i = 1; i <= MaxClients; i++) {
+		if (!is_player_valid(i) || IsFakeClient(i) || !is_player_admin(i))
+			continue;
+		PrintToChat(i, "[Lilac] %T", "admin_chat_warning_generic", i, client, type, detections);
+	}
+}
+
 bool is_player_admin(int client)
 {
 	// Todo: I don't know if this is correct.

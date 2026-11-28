@@ -204,4 +204,16 @@
 	{
 		"en"		"{green}[Join]{default} You are getting up and cannot switch to spectators. No team switch is scheduled."
 	}
+	"Join_SteamAuthPending"
+	{
+		"en"		"{green}[Join]{default} Your SteamID has not been verified by Steam yet. You can only spectate until it is. If it does not clear within a minute, reconnect."
+	}
+	"Join_SteamAuthPassed"
+	{
+		"en"		"{green}[Join]{default} Your SteamID has been verified. You can now join a team."
+	}
+	"Join_SteamAuthKick"
+	{
+		"en"		"Your SteamID could not be verified by Steam. Please reconnect."
+	}
 }

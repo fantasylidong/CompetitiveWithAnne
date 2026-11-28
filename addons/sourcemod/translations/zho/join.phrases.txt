@@ -204,4 +204,16 @@
 	{
 		"zho"		"{green}[Join]{default} 你正在起身，無法切換旁觀，切隊請求已取消。"
 	}
+	"Join_SteamAuthPending"
+	{
+		"zho"		"{green}[Join]{default} 你的 SteamID 尚未通過 Steam 驗證，驗證前只能旁觀。一分鐘內仍未通過請重新連線。"
+	}
+	"Join_SteamAuthPassed"
+	{
+		"zho"		"{green}[Join]{default} SteamID 已通過驗證，現在可以加入隊伍了。"
+	}
+	"Join_SteamAuthKick"
+	{
+		"zho"		"你的 SteamID 未能通過 Steam 驗證，請重新連線。"
+	}
 }

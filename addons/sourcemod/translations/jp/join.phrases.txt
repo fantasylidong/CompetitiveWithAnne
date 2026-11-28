@@ -204,4 +204,16 @@
 	{
 		"jp"		"{green}[Join]{default} 起き上がり動作中は観戦に切り替えられません。切り替え予約は取り消されました。"
 	}
+	"Join_SteamAuthPending"
+	{
+		"jp"		"{green}[Join]{default} SteamID がまだ Steam で認証されていません。認証されるまでは観戦のみです。1分以内に認証されない場合は再接続してください。"
+	}
+	"Join_SteamAuthPassed"
+	{
+		"jp"		"{green}[Join]{default} SteamID が認証されました。チームに参加できます。"
+	}
+	"Join_SteamAuthKick"
+	{
+		"jp"		"SteamID を Steam で認証できませんでした。再接続してください。"
+	}
 }
